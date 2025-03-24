@@ -359,6 +359,7 @@ const BENETRIP = {
     },
 
     /**
+/**
  * Configura o calendário para seleção de datas
  */
 configurarCalendario(pergunta) {
@@ -458,8 +459,8 @@ configurarCalendario(pergunta) {
             }
         }
     }, 300); // Verifica a cada 300ms
-},
-    
+}, // Esta vírgula é crucial!
+
     /**
      * Configura a entrada numérica para quantidade de viajantes
      */
