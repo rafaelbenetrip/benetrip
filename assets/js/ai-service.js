@@ -14,18 +14,18 @@ const BENETRIP_AI = {
     },
 
     /**
-     * Inicializa o serviço de IA
-     */
-    init() {
-        // Carrega a chave da API do ambiente ou do localStorage
-        this.config.apiKey = process.env.AI_API_KEY || localStorage.getItem('benetrip_ai_key');
-        console.log("Serviço de IA inicializado");
-        
-        // Carrega cache existente
-        this.loadCache();
-        
-        return this;
-    },
+ * Inicializa o serviço de IA
+ */
+init() {
+    // Definir a chave diretamente em vez de usar process.env
+    this.config.apiKey = 'demo-key-for-benetrip'; // Era process.env.AI_API_KEY || localStorage.getItem('benetrip_ai_key')
+    console.log("Serviço de IA inicializado");
+    
+    // Carrega cache existente
+    this.loadCache();
+    
+    return this;
+},
     
     /**
      * Sistema de cache para evitar chamadas repetidas à API
