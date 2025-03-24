@@ -12,7 +12,7 @@ const BENETRIP = {
         questionarioPath: 'data/questions.json',
         defaultCurrency: 'BRL',
         imagePath: 'assets/images/',
-        maxQuestionsPerFlow: 6, // Limitar a 5-6 perguntas por fluxo
+        maxQuestionsPerFlow: 8, // Limitar a 5-6 perguntas por fluxo
         animationDelay: 800
     },
 
