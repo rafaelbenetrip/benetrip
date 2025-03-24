@@ -688,24 +688,9 @@ configurarEntradaMoeda() {
      * Verifica se atingimos o limite de perguntas para este fluxo
      */
     verificarLimitePerguntas() {
-        // Contar quantas perguntas já foram respondidas para este fluxo
-        let contadorPerguntas = 0;
-        
-        for (let i = 0; i < this.estado.perguntaAtual; i++) {
-            const pergunta = this.estado.perguntas[i];
-            
-            // Verificar se a pergunta pertence ao fluxo atual
-            if (!pergunta.conditional || 
-                (pergunta.conditional.depends_on === 'conhece_destino' && 
-                 ((this.estado.fluxo === 'destino_conhecido' && pergunta.conditional.show_if_value === 0) ||
-                  (this.estado.fluxo === 'destino_desconhecido' && pergunta.conditional.show_if_value === 1))) ||
-                (pergunta.conditional.depends_on !== 'conhece_destino')) {
-                contadorPerguntas++;
-            }
-        }
-        
-        return contadorPerguntas >= this.config.maxQuestionsPerFlow;
-    },
+    // Desativar verificação de limite para garantir que todas as perguntas sejam exibidas
+    return false; // Sempre retorna falso para não finalizar prematuramente
+}
 
     /**
      * Mostra a resposta do usuário no chat
