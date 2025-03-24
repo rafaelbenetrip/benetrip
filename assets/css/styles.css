@@ -2115,3 +2115,26 @@ body {
         width: 100%;
     }
 }
+
+/* Estilos adicionais para o Flatpickr */
+.flatpickr-calendar {
+    background: transparent;
+    opacity: 1;
+    display: block;
+    width: 100%;
+    max-width: 355px;
+    margin: 0 auto;
+    box-shadow: 0 3px 13px rgba(0,0,0,0.08);
+}
+
+.flatpickr-day.selected,
+.flatpickr-day.startRange,
+.flatpickr-day.endRange {
+    background: var(--orange-primary);
+    border-color: var(--orange-primary);
+}
+
+.flatpickr-day.inRange {
+    background: rgba(232, 119, 34, 0.1);
+    border-color: rgba(232, 119, 34, 0.1);
+}
