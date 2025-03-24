@@ -4,20 +4,20 @@
  */
 
 const BENETRIP_API = {
-    /**
-     * Configurações da API
-     */
-    config: {
-        marker: process.env.AVIASALES_MARKER || '604241',
-        token: process.env.AVIASALES_TOKEN || 'e82f7d420689b6124dcfa5921a8c6934',
-        host: process.env.HOST || 'benetrip.com.br',
-        searchBaseUrl: 'https://api.travelpayouts.com/v1/flight_search',
-        resultsBaseUrl: 'https://api.travelpayouts.com/v1/flight_search_results',
-        clicksBaseUrl: 'https://api.travelpayouts.com/v1/flight_searches',
-        autocompleteUrl: 'https://autocomplete.travelpayouts.com/places2',
-        requestDelay: 2000, // ms entre requisições para resultados
-        maxRetries: 20 // número máximo de tentativas para obter resultados
-    },
+/**
+ * Configurações da API
+ */
+config: {
+    marker: '604241', // Era process.env.AVIASALES_MARKER || '604241'
+    token: 'e82f7d420689b6124dcfa5921a8c6934', // Era process.env.AVIASALES_TOKEN || 'e82f7d420689b6124dcfa5921a8c6934'
+    host: 'benetrip.com.br', // Era process.env.HOST || 'benetrip.com.br'
+    searchBaseUrl: 'https://api.travelpayouts.com/v1/flight_search',
+    resultsBaseUrl: 'https://api.travelpayouts.com/v1/flight_search_results',
+    clicksBaseUrl: 'https://api.travelpayouts.com/v1/flight_searches',
+    autocompleteUrl: 'https://autocomplete.travelpayouts.com/places2',
+    requestDelay: 2000,
+    maxRetries: 20
+},
 
     /**
      * Inicializa o serviço de API
