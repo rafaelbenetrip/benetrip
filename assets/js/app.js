@@ -698,7 +698,7 @@ configurarEntradaMoeda() {
     verificarLimitePerguntas() {
     // Desativar verificação de limite para garantir que todas as perguntas sejam exibidas
     return false; // Sempre retorna falso para não finalizar prematuramente
-}
+},
 
     /**
      * Mostra a resposta do usuário no chat
