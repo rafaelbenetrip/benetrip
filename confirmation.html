@@ -1,1 +1,70 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Benetrip - Confirmação de Viagem</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;700&family=Montserrat:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="assets/css/styles.css">
+</head>
+<body>
+    <div id="confirmation-container" class="container">
+        <div class="confirmation-header">
+            <img src="assets/images/logo.png" alt="Benetrip" class="logo">
+            <h1>Reserva Confirmada!</h1>
+        </div>
+        
+        <div class="tripinha-message">
+            <img src="assets/images/tripinha/avatar-normal.png" alt="Tripinha" />
+            <div class="message-bubble">
+                <p>Uhuuuuul! 🎉 Sua viagem está confirmada! O link para finalizar a reserva foi enviado para seu email. Qualquer dúvida, é só me chamar! Boa viagem! 🐾✈️</p>
+            </div>
+        </div>
+        
+        <div class="confirmation-details">
+            <h2>Resumo da Viagem</h2>
+            <div id="resumo-viagem">
+                <!-- Será preenchido pelo JavaScript -->
+            </div>
+            
+            <a href="index.html" class="btn-primary btn-block mt-4">Planejar Nova Viagem</a>
+        </div>
+    </div>
 
+    <script>
+        // Script simples para mostrar resumo da viagem
+        document.addEventListener('DOMContentLoaded', function() {
+            const resumoEl = document.getElementById('resumo-viagem');
+            const voo = JSON.parse(localStorage.getItem('benetrip_voo_selecionado'));
+            const destino = JSON.parse(localStorage.getItem('benetrip_destino_escolhido'));
+            
+            if (voo) {
+                resumoEl.innerHTML = `
+                    <div class="resumo-item">
+                        <span class="label">Destino:</span>
+                        <span class="valor">${destino ? destino.cidade + ', ' + destino.pais : 'Destino escolhido'}</span>
+                    </div>
+                    <div class="resumo-item">
+                        <span class="label">Data Ida:</span>
+                        <span class="valor">${voo.segmentos[0].partida.data}</span>
+                    </div>
+                    <div class="resumo-item">
+                        <span class="label">Data Volta:</span>
+                        <span class="valor">${voo.segmentos[1]?.partida.data || 'Sem volta'}</span>
+                    </div>
+                    <div class="resumo-item">
+                        <span class="label">Companhia:</span>
+                        <span class="valor">${voo.companhias[0]}</span>
+                    </div>
+                    <div class="resumo-item">
+                        <span class="label">Preço:</span>
+                        <span class="valor">${voo.preco.total} ${voo.preco.moeda}</span>
+                    </div>
+                `;
+            } else {
+                resumoEl.innerHTML = '<p>Detalhes da viagem não encontrados</p>';
+            }
+        });
+    </script>
+</body>
+</html>
