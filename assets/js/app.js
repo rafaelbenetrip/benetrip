@@ -458,7 +458,8 @@ configurarCalendario(pergunta) {
             }
         }
     }, 300); // Verifica a cada 300ms
-}    
+},
+    
     /**
      * Configura a entrada numérica para quantidade de viajantes
      */
