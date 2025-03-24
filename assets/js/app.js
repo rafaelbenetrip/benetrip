@@ -362,10 +362,13 @@ const BENETRIP = {
  * Configura o calendário para seleção de datas
  */
 configurarCalendario(pergunta) {
+    console.log("Iniciando configuração do calendário");
+    
     // Verificar se o calendário foi carregado no DOM
     const checkCalendarElement = setInterval(() => {
         const calendarElement = document.getElementById('inline-calendar');
         if (calendarElement) {
+            console.log("Elemento do calendário encontrado");
             clearInterval(checkCalendarElement);
             
             // Elementos do calendário
@@ -378,14 +381,15 @@ configurarCalendario(pergunta) {
             const minDate = pergunta.calendar.min_date || today;
             const maxDate = pergunta.calendar.max_date || new Date(today.getFullYear() + 1, today.getMonth(), today.getDate());
             
-            // Inicializar Flatpickr
-            if (window.flatpickr) {
-                const calendar = window.flatpickr(calendarElement, {
+            // Inicializar Flatpickr diretamente, sem verificar window.flatpickr
+            try {
+                const calendar = flatpickr(calendarElement, {
                     inline: true,
                     mode: "range",
                     minDate: minDate,
                     maxDate: maxDate,
                     dateFormat: "Y-m-d",
+                    defaultDate: [today, new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000)], // Hoje e uma semana depois
                     onChange: function(selectedDates, dateStr) {
                         if (selectedDates.length === 2) {
                             // Atualizar exibição das datas
@@ -406,6 +410,8 @@ configurarCalendario(pergunta) {
                     }
                 });
                 
+                console.log("Calendário inicializado com sucesso:", calendar);
+                
                 // Evento para o botão de confirmação
                 confirmButton.addEventListener('click', () => {
                     const datas = calendar.selectedDates.map(data => {
@@ -421,17 +427,15 @@ configurarCalendario(pergunta) {
                         this.processarResposta(valor, pergunta);
                     }
                 });
-                
-                console.log("Calendário inicializado com sucesso");
-            } else {
-                console.error("Biblioteca Flatpickr não encontrada");
+            } catch (error) {
+                console.error("Erro ao inicializar calendário:", error);
                 
                 // Fallback simples se a biblioteca não estiver disponível
                 confirmButton.disabled = false;
                 confirmButton.addEventListener('click', () => {
                     const hoje = new Date();
                     const amanha = new Date(hoje);
-                    amanha.setDate(amanha.getDate() + 1);
+                    amanha.setDate(amanha.getDate() + 7);
                     
                     const formatarData = (data) => {
                         const ano = data.getFullYear();
@@ -445,13 +449,16 @@ configurarCalendario(pergunta) {
                         dataVolta: formatarData(amanha)
                     };
                     
+                    // Atualizar texto dos elementos de data
+                    if (dateStart) dateStart.textContent = hoje.toLocaleDateString('pt-BR');
+                    if (dateEnd) dateEnd.textContent = amanha.toLocaleDateString('pt-BR');
+                    
                     this.processarResposta(valor, pergunta);
                 });
             }
         }
-    }, 100); // Verifica a cada 100ms se o elemento do calendário foi criado
-},
-    
+    }, 300); // Verifica a cada 300ms
+}    
     /**
      * Configura a entrada numérica para quantidade de viajantes
      */
