@@ -1,0 +1,129 @@
+[
+    {
+        "question": "1️⃣ Olá, Triper! Sou a Tripinha e vou te ajudar a planejar uma viagem incrível! Você já sabe para onde quer ir?",
+        "description": "Escolha se você já tem um destino definido ou se quer descobrir opções.",
+        "options": [
+            "✅ Sim, já sei para onde quero ir!",
+            "🔍 Não, quero descobrir lugares incríveis para visitar!"
+        ],
+        "key": "conhece_destino"
+    },
+    
+    {
+        "question": "2️⃣ Qual é o seu destino desejado?",
+        "description": "Digite o nome da cidade para onde você quer viajar.",
+        "input_field": true,
+        "autocomplete": true,
+        "conditional": {
+            "depends_on": "conhece_destino",
+            "show_if_value": 0
+        },
+        "key": "destino_conhecido"
+    },
+    
+    {
+        "question": "2️⃣ Com quem você vai viajar?",
+        "description": "Escolha quem estará com você nessa aventura.",
+        "options": [
+            "🧳 Sozinho(a) – Estou pronto para qualquer parada!",
+            "❤️ Romântico – Viajando a dois, quero momentos especiais.",
+            "👨‍👩‍👧‍👦 Família – Tem que ser divertido para todo mundo.",
+            "🎉 Amigos – O plano é curtir ao máximo juntos!"
+        ],
+        "key": "companhia"
+    },
+    
+    {
+        "question": "3️⃣.1️⃣ Quantas pessoas estão na sua família para esta viagem?",
+        "description": "Inclua todos, inclusive você!",
+        "input_field": true,
+        "numeric_only": true,
+        "number_input": true,
+        "conditional": {
+            "depends_on": "companhia",
+            "show_if_value": 2
+        },
+        "key": "quantidade_familia"
+    },
+    
+    {
+        "question": "3️⃣.1️⃣ Quantos amigos vão nessa aventura, incluindo você?",
+        "description": "Me diga o número total de pessoas da turma! 🐶🎒",
+        "input_field": true,
+        "numeric_only": true,
+        "number_input": true,
+        "conditional": {
+            "depends_on": "companhia",
+            "show_if_value": 3
+        },
+        "key": "quantidade_amigos"
+    },
+    
+    {
+        "question": "3️⃣ O que você mais busca nessa viagem?",
+        "description": "Escolha o que é mais importante para você.",
+        "options": [
+            "🌊 Relaxar – Quero descansar e curtir sem pressa.",
+            "🏔️ Aventura – Quero experiências excitantes e adrenalina.",
+            "🏛️ Cultura – Quero conhecer história, arte e gastronomia.",
+            "🛍️ Urbano – Quero agito, compras e vida noturna."
+        ],
+        "conditional": {
+            "depends_on": "conhece_destino",
+            "show_if_value": 1
+        },
+        "key": "preferencia_viagem"
+    },
+    
+    {
+        "question": "4️⃣ De onde você partirá?",
+        "description": "Digite apenas o nome da cidade de onde você vai sair.",
+        "options": null,
+        "input_field": true,
+        "autocomplete": true,
+        "key": "cidade_partida"
+    },
+    
+    {
+        "question": "5️⃣ Quando será a sua viagem?",
+        "description": "Selecione a data de ida e volta.",
+        "calendar": {
+            "min_date": "2025-03-23",
+            "max_date": "2026-03-23"
+        },
+        "date_format": "YYYY-MM-DD",
+        "key": "datas"
+    },
+    
+    {
+        "question": "6️⃣ Qual moeda você prefere usar para o orçamento?",
+        "description": "Escolha a moeda para definir seu orçamento de viagem.",
+        "options": [
+            "💰 Real Brasileiro (BRL)",
+            "💵 Dólar Americano (USD)",
+            "💶 Euro (EUR)"
+        ],
+        "currency_map": {
+            "💵 Dólar Americano (USD)": "USD",
+            "💶 Euro (EUR)": "EUR",
+            "💰 Real Brasileiro (BRL)": "BRL"
+        },
+        "conditional": {
+            "depends_on": "conhece_destino",
+            "show_if_value": 1
+        },
+        "key": "moeda_escolhida"
+    },
+    
+    {
+        "question": "6️⃣ Qual é o seu orçamento para passagens?",
+        "description": "Informe o valor máximo que deseja gastar com passagens por pessoa.",
+        "input_field": true,
+        "currency_format": true,
+        "conditional": {
+            "depends_on": "conhece_destino",
+            "show_if_value": 1
+        },
+        "key": "orcamento_valor"
+    }
+]
