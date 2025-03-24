@@ -580,39 +580,59 @@ configurarCalendario(pergunta) {
     },
 
     /**
-     * Configura a entrada de valor monetário
-     */
-    configurarEntradaMoeda() {
+ * Configura a entrada de valor monetário
+ */
+configurarEntradaMoeda() {
+    // Verificar se o input está presente no DOM
+    const checkInput = setInterval(() => {
         const input = document.querySelector('.currency-input');
-        const confirmBtn = document.querySelector('.confirm-currency');
-        
-        // Formatar entrada como moeda
-        input.addEventListener('input', (e) => {
-            // Remover tudo exceto números
-            let valor = e.target.value.replace(/\D/g, '');
+        if (input) {
+            clearInterval(checkInput);
             
-            // Converter para formato decimal (dividir por 100)
-            valor = (parseInt(valor) / 100).toFixed(2);
+            const confirmBtn = document.querySelector('.confirm-currency');
             
-            // Formatar com separador de milhares e decimal
-            if (!isNaN(valor)) {
-                e.target.value = valor.replace('.', ',');
+            // Inicializar com valor vazio
+            input.value = '';
+            confirmBtn.disabled = true;
+            
+            // Formatar entrada como moeda
+            input.addEventListener('input', (e) => {
+                // Remover tudo exceto números
+                let valor = e.target.value.replace(/\D/g, '');
                 
-                // Habilitar botão se tiver valor
-                confirmBtn.disabled = parseFloat(valor) <= 0;
-            }
-        });
-        
-        // Evento para o botão de confirmação
-        confirmBtn.addEventListener('click', () => {
-            const valor = parseFloat(input.value.replace(',', '.'));
-            if (valor > 0) {
-                const pergunta = this.estado.perguntas[this.estado.perguntaAtual];
-                this.processarResposta(valor, pergunta);
-            }
-        });
-    },
-
+                // Verificar se o valor não está vazio
+                if (valor) {
+                    // Converter para formato decimal (dividir por 100)
+                    valor = (parseInt(valor) / 100).toFixed(2);
+                    
+                    // Formatar com separador decimal
+                    e.target.value = valor.replace('.', ',');
+                    
+                    // Habilitar botão se tiver valor
+                    confirmBtn.disabled = parseFloat(valor) <= 0;
+                } else {
+                    e.target.value = '';
+                    confirmBtn.disabled = true;
+                }
+            });
+            
+            // Evento para o botão de confirmação
+            confirmBtn.addEventListener('click', () => {
+                const valor = parseFloat(input.value.replace(',', '.'));
+                if (valor > 0) {
+                    const pergunta = this.estado.perguntas[this.estado.perguntaAtual];
+                    this.processarResposta(valor, pergunta);
+                }
+            });
+            
+            // Foco automático no input
+            setTimeout(() => input.focus(), 300);
+            
+            console.log("Campo de moeda inicializado com sucesso");
+        }
+    }, 100); // Verifica a cada 100ms se o elemento foi criado
+},
+    
     /**
      * Configura a entrada de texto simples
      */
