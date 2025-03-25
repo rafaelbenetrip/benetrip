@@ -626,112 +626,116 @@ const BENETRIP = {
         });
     },
     /**
-     * Configura o campo de autocomplete para cidades/destinos
-     */
-    configurarAutocomplete(pergunta) {
-        const autocompleteId = this.estado.currentAutocompleteId;
-        if (!autocompleteId) {
-            console.error("ID de autocomplete não encontrado!");
+     /**
+ * Configura o campo de autocomplete para cidades/destinos
+ */
+configurarAutocomplete(pergunta) {
+    const autocompleteId = this.estado.currentAutocompleteId;
+    if (!autocompleteId) {
+        console.error("ID de autocomplete não encontrado!");
+        return;
+    }
+    
+    const input = document.getElementById(autocompleteId);
+    const results = document.getElementById(`${autocompleteId}-results`);
+    const confirmBtn = document.getElementById(`${autocompleteId}-confirm`);
+    
+    if (!input || !results || !confirmBtn) {
+        console.error("Elementos de autocomplete não encontrados!");
+        return;
+    }
+    
+    let selectedItem = null;
+    
+    // Função para buscar sugestões - usando lodash debounce se disponível
+    const buscarSugestoes = (typeof _ !== 'undefined' && _.debounce) 
+        ? _.debounce(buscarSugestoesImpl.bind(this), 300)
+        : buscarSugestoesImpl.bind(this);
+        
+    // Importante: Estamos criando uma função separada e usando bind(this) 
+    // para manter o contexto correto
+    async function buscarSugestoesImpl(termo) {
+        if (!termo || termo.length < 2) {
+            results.innerHTML = '';
             return;
         }
         
-        const input = document.getElementById(autocompleteId);
-        const results = document.getElementById(`${autocompleteId}-results`);
-        const confirmBtn = document.getElementById(`${autocompleteId}-confirm`);
-        
-        if (!input || !results || !confirmBtn) {
-            console.error("Elementos de autocomplete não encontrados!");
-            return;
-        }
-        
-        let selectedItem = null;
-        
-        // Função para buscar sugestões - usando lodash debounce se disponível
-        const buscarSugestoes = (typeof _ !== 'undefined' && _.debounce) 
-            ? _.debounce(buscarSugestoesImpl, 300)
-            : buscarSugestoesImpl;
-            
-        async function buscarSugestoesImpl(termo) {
-            if (!termo || termo.length < 2) {
-                results.innerHTML = '';
-                return;
+        try {
+            // Se o serviço de API estiver disponível, usar para buscar cidades
+            let sugestoes = [];
+            if (window.BENETRIP_API) {
+                sugestoes = await window.BENETRIP_API.buscarSugestoesCidade(termo);
+            } else {
+                // Sugestões locais básicas para desenvolvimento
+                sugestoes = [
+                    { type: "city", code: "SAO", name: "São Paulo", country_code: "BR", country_name: "Brasil" },
+                    { type: "city", code: "RIO", name: "Rio de Janeiro", country_code: "BR", country_name: "Brasil" },
+                    { type: "city", code: "NYC", name: "Nova York", country_code: "US", country_name: "Estados Unidos" },
+                    { type: "city", code: "MIA", name: "Miami", country_code: "US", country_name: "Estados Unidos" }
+                ];
             }
             
-            try {
-                // Se o serviço de API estiver disponível, usar para buscar cidades
-                let sugestoes = [];
-                if (window.BENETRIP_API) {
-                    sugestoes = await window.BENETRIP_API.buscarSugestoesCidade(termo);
-                } else {
-                    // Sugestões locais básicas para desenvolvimento
-                    sugestoes = [
-                        { type: "city", code: "SAO", name: "São Paulo", country_code: "BR", country_name: "Brasil" },
-                        { type: "city", code: "RIO", name: "Rio de Janeiro", country_code: "BR", country_name: "Brasil" },
-                        { type: "city", code: "NYC", name: "Nova York", country_code: "US", country_name: "Estados Unidos" },
-                        { type: "city", code: "MIA", name: "Miami", country_code: "US", country_name: "Estados Unidos" }
-                    ];
-                }
-                
-                // Mostrar sugestões
-                if (sugestoes.length > 0) {
-                    results.innerHTML = sugestoes.map(item => {
-                        return `
-                            <div class="autocomplete-item" data-code="${item.code}" data-name="${item.name}" data-country="${item.country_name}">
-                                <div class="item-code">${item.code}</div>
-                                <div class="item-details">
-                                    <div class="item-name">${item.name}</div>
-                                    <div class="item-country">${item.country_name}</div>
-                                </div>
+            // Mostrar sugestões
+            if (sugestoes.length > 0) {
+                results.innerHTML = sugestoes.map(item => {
+                    return `
+                        <div class="autocomplete-item" data-code="${item.code}" data-name="${item.name}" data-country="${item.country_name}">
+                            <div class="item-code">${item.code}</div>
+                            <div class="item-details">
+                                <div class="item-name">${item.name}</div>
+                                <div class="item-country">${item.country_name}</div>
                             </div>
-                        `;
-                    }).join('');
-                    
-                    // Adicionar eventos aos itens
-                    document.querySelectorAll('.autocomplete-item').forEach(item => {
-                        item.addEventListener('click', () => {
-                            selectedItem = {
-                                code: item.dataset.code,
-                                name: item.dataset.name,
-                                country: item.dataset.country
-                            };
-                            
-                            // Atualizar campo de entrada
-                            input.value = `${selectedItem.name} (${selectedItem.code})`;
-                            
-                            // Limpar resultados
-                            results.innerHTML = '';
-                            
-                            // Habilitar botão de confirmação
-                            confirmBtn.disabled = false;
-                        });
+                        </div>
+                    `;
+                }).join('');
+                
+                // Adicionar eventos aos itens
+                document.querySelectorAll('.autocomplete-item').forEach(item => {
+                    item.addEventListener('click', () => {
+                        selectedItem = {
+                            code: item.dataset.code,
+                            name: item.dataset.name,
+                            country: item.dataset.country
+                        };
+                        
+                        // Atualizar campo de entrada
+                        input.value = `${selectedItem.name} (${selectedItem.code})`;
+                        
+                        // Limpar resultados
+                        results.innerHTML = '';
+                        
+                        // Habilitar botão de confirmação
+                        confirmBtn.disabled = false;
                     });
-                } else {
-                    results.innerHTML = '<div class="no-results">Nenhum resultado encontrado</div>';
-                }
-            } catch (error) {
-                console.error("Erro ao buscar sugestões:", error);
-                results.innerHTML = '<div class="error">Erro ao buscar sugestões</div>';
+                });
+            } else {
+                results.innerHTML = '<div class="no-results">Nenhum resultado encontrado</div>';
             }
+        } catch (error) {
+            console.error("Erro ao buscar sugestões:", error);
+            results.innerHTML = '<div class="error">Erro ao buscar sugestões</div>';
         }
+    }
+    
+    // Evento para o campo de entrada
+    input.addEventListener('input', (e) => {
+        const termo = e.target.value;
+        buscarSugestoes(termo);
         
-        // Evento para o campo de entrada
-        input.addEventListener('input', (e) => {
-            const termo = e.target.value;
-            buscarSugestoes(termo);
-            // Desabilitar botão se limpar o campo
-            if (!termo) {
-                confirmBtn.disabled = true;
-                selectedItem = null;
-            }
-        });
-        
-        // Evento para o botão de confirmação
-        confirmBtn.addEventListener('click', () => {
-            if (selectedItem) {
-                this.processarResposta(selectedItem, pergunta);
-            }
-        });
-    },
+        // Desabilitar botão se limpar o campo
+        if (!termo) {
+            confirmBtn.disabled = true;
+            selectedItem = null;
+        }
+    });
+    
+    // Evento para o botão de confirmação
+    confirmBtn.addEventListener('click', () => {
+        if (selectedItem) {
+            this.processarResposta(selectedItem, pergunta);
+        }
+    });
+},
 
     /**
      * Configura a entrada de valor monetário
