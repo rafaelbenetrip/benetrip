@@ -131,6 +131,59 @@ const BENETRIP = {
         // Mostrar primeira pergunta após breve delay
         setTimeout(() => this.mostrarProximaPergunta(), this.config.animationDelay);
     },
+    
+    /**
+     * Mostra a próxima pergunta no chat
+     */
+    mostrarProximaPergunta() {
+        // Verificar se ainda temos perguntas
+        if (this.estado.perguntaAtual >= this.estado.perguntas.length) {
+            this.finalizarQuestionario();
+            return;
+        }
+        
+        // Obter a próxima pergunta
+        const pergunta = this.estado.perguntas[this.estado.perguntaAtual];
+        
+        // Verificar se é uma pergunta condicional
+        if (pergunta.conditional && !this.deveExibirPerguntaCondicional(pergunta)) {
+            // Pular esta pergunta e ir para a próxima
+            this.estado.perguntaAtual++;
+            this.mostrarProximaPergunta();
+            return;
+        }
+        
+        // Gerar e exibir a mensagem com a pergunta
+        const mensagemHTML = this.montarHTMLPergunta(pergunta);
+        
+        // Adicionar ao chat
+        const chatMessages = document.getElementById('chat-messages');
+        chatMessages.insertAdjacentHTML('beforeend', mensagemHTML);
+        
+        // Rolar para a última mensagem
+        this.rolarParaFinal();
+        
+        // Configurar eventos específicos para o tipo de pergunta
+        this.configurarEventosPergunta(pergunta);
+    },
+
+    /**
+     * Verifica se uma pergunta condicional deve ser exibida
+     */
+    deveExibirPerguntaCondicional(pergunta) {
+        if (!pergunta.conditional) return true;
+        
+        const dependenciaKey = pergunta.conditional.depends_on;
+        const valorEsperado = pergunta.conditional.show_if_value;
+        
+        // Verificar se temos a resposta para a dependência
+        if (this.estado.respostas.hasOwnProperty(dependenciaKey)) {
+            return this.estado.respostas[dependenciaKey] === valorEsperado;
+        }
+        
+        return false;
+    },
+
     /**
      * Monta o HTML para exibir uma pergunta no chat
      */
@@ -152,19 +205,17 @@ const BENETRIP = {
         } else if (pergunta.input_field) {
             if (pergunta.calendar) {
                 console.log("Gerando HTML do calendário");
-                // Modificação importante: ID único para o container do calendário
-                const calendarId = `calendar-container-${Date.now()}`;
                 opcoesHTML = `
-                    <div class="calendar-container" id="${calendarId}">
-                        <div class="flatpickr-calendar-container" id="inline-calendar" style="width: 100%; min-height: 300px;"></div>
+                    <div class="calendar-container">
+                        <div id="benetrip-calendar" class="flatpickr-calendar-container"></div>
                         <div class="date-selection">
-                            <p>Ida: <span id="date-start">Selecione</span></p>
-                            <p>Volta: <span id="date-end">Selecione</span></p>
+                            <p>Ida: <span id="data-ida">Selecione</span></p>
+                            <p>Volta: <span id="data-volta">Selecione</span></p>
                         </div>
-                        <button id="confirm-dates" class="confirm-button" disabled>Confirmar Datas</button>
+                        <button id="confirmar-datas" class="confirm-button" disabled>Confirmar Datas</button>
                     </div>
                 `;
-                console.log(`HTML do calendário gerado com ID: ${calendarId}`);
+                console.log("HTML do calendário gerado com ID fixo: benetrip-calendar");
             }
             else if (pergunta.number_input) {
                 // Entrada numérica
@@ -235,50 +286,8 @@ const BENETRIP = {
         
         // Configurar calendário
         if (pergunta.calendar) {
-            console.log("Aguardando renderização do DOM para configurar o calendário...");
-            
-            // Aguarde mais tempo para garantir que o DOM foi atualizado
-            setTimeout(() => {
-                console.log("Tentando configurar calendário após delay...");
-                
-                // Primeiro, tentar com ID específico
-                const calendarElement = document.getElementById('inline-calendar');
-                console.log("Elemento do calendário após delay:", calendarElement);
-                
-                if (calendarElement) {
-                    this.inicializarFlatpickr(calendarElement, pergunta);
-                } else {
-                    // Abordagem mais flexível para encontrar o elemento
-                    const containers = document.getElementsByClassName('calendar-container');
-                    if (containers.length > 0) {
-                        const latestContainer = containers[containers.length - 1];
-                        console.log("Container de calendário encontrado:", latestContainer);
-                        
-                        // Buscar pelo elemento de calendário dentro do container
-                        const calElement = latestContainer.querySelector('.flatpickr-calendar-container') || 
-                                          latestContainer.querySelector('div:first-child');
-                        
-                        if (calElement) {
-                            console.log("Elemento de calendário encontrado no container:", calElement);
-                            this.inicializarFlatpickr(calElement, pergunta);
-                        } else {
-                            // Se ainda não encontrar, criar um elemento no container
-                            console.log("Criando elemento de calendário no container existente...");
-                            const newCalendarElement = document.createElement('div');
-                            newCalendarElement.id = 'inline-calendar-dynamic';
-                            newCalendarElement.className = 'flatpickr-calendar-container';
-                            newCalendarElement.style.width = '100%';
-                            newCalendarElement.style.minHeight = '300px';
-                            
-                            latestContainer.insertBefore(newCalendarElement, latestContainer.firstChild);
-                            this.inicializarFlatpickr(newCalendarElement, pergunta);
-                        }
-                    } else {
-                        console.error("Nenhum container de calendário encontrado no DOM");
-                        this.criarCalendarioEmergencia(pergunta);
-                    }
-                }
-            }, 1000);
+            console.log("Configurando calendário...");
+            this.inicializarCalendario(pergunta);
         }
         
         // Configurar entrada numérica
@@ -301,6 +310,102 @@ const BENETRIP = {
             this.configurarEntradaTexto();
         }
     },
+
+    /**
+     * Inicializa o calendário com Flatpickr
+     */
+    inicializarCalendario(pergunta) {
+        console.log("Iniciando configuração do calendário");
+        
+        // Aguardar um momento para garantir que o DOM foi atualizado
+        setTimeout(() => {
+            const calendarElement = document.getElementById('benetrip-calendar');
+            
+            if (!calendarElement) {
+                console.error("Elemento do calendário não encontrado!");
+                return;
+            }
+            
+            console.log("Elemento do calendário encontrado, configurando Flatpickr");
+            
+            // Configurações do Flatpickr
+            const config = {
+                mode: "range",
+                dateFormat: "Y-m-d",
+                minDate: pergunta.calendar.min_date || "today",
+                maxDate: pergunta.calendar.max_date,
+                inline: true,
+                showMonths: 1,
+                locale: {
+                    weekdays: {
+                        shorthand: ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'],
+                        longhand: ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado']
+                    },
+                    months: {
+                        shorthand: ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'],
+                        longhand: ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro']
+                    },
+                    rangeSeparator: ' até ',
+                    firstDayOfWeek: 0
+                },
+                onChange: (selectedDates, dateStr) => {
+                    // Atualizar campos de data
+                    const dataIdaElement = document.getElementById('data-ida');
+                    const dataVoltaElement = document.getElementById('data-volta');
+                    const confirmarBtn = document.getElementById('confirmar-datas');
+                    
+                    if (selectedDates.length === 0) {
+                        dataIdaElement.textContent = "Selecione";
+                        dataVoltaElement.textContent = "Selecione";
+                        confirmarBtn.disabled = true;
+                    } else if (selectedDates.length === 1) {
+                        const dataFormatada = this.formatarDataVisivel(selectedDates[0]);
+                        dataIdaElement.textContent = dataFormatada;
+                        dataVoltaElement.textContent = "Selecione";
+                        confirmarBtn.disabled = true;
+                    } else if (selectedDates.length === 2) {
+                        const dataIdaFormatada = this.formatarDataVisivel(selectedDates[0]);
+                        const dataVoltaFormatada = this.formatarDataVisivel(selectedDates[1]);
+                        dataIdaElement.textContent = dataIdaFormatada;
+                        dataVoltaElement.textContent = dataVoltaFormatada;
+                        confirmarBtn.disabled = false;
+                    }
+                }
+            };
+            
+            // Inicializar Flatpickr
+            const calendario = flatpickr(calendarElement, config);
+            console.log("Flatpickr inicializado com sucesso");
+            
+            // Configurar botão de confirmação
+            const confirmarBtn = document.getElementById('confirmar-datas');
+            if (confirmarBtn) {
+                confirmarBtn.addEventListener('click', () => {
+                    const datas = calendario.selectedDates;
+                    if (datas.length === 2) {
+                        const dadosDatas = {
+                            dataIda: datas[0].toISOString().split('T')[0],
+                            dataVolta: datas[1].toISOString().split('T')[0]
+                        };
+                        this.processarResposta(dadosDatas, pergunta);
+                    }
+                });
+                console.log("Eventos do botão de confirmação configurados");
+            }
+        }, 300);
+    },
+
+    /**
+     * Formata a data para exibição amigável
+     */
+    formatarDataVisivel(data) {
+        return data.toLocaleDateString('pt-BR', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric'
+        });
+    },
+    
     /**
      * Configura a entrada numérica para quantidade de viajantes
      */
@@ -659,6 +764,46 @@ const BENETRIP = {
             }, 1000);
         });
     },
+
+    /**
+     * Mostra a Tripinha "pensando"
+     */
+    async mostrarTripinhaPensando() {
+        // Criar elemento de mensagem
+        const mensagemHTML = `
+            <div class="chat-message tripinha">
+                <div class="avatar">
+                    <img src="${this.config.imagePath}tripinha/avatar-pensando.png" alt="Tripinha pensando" />
+                </div>
+                <div class="message">
+                    <div class="thinking-dots">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        // Adicionar ao chat
+        const chatMessages = document.getElementById('chat-messages');
+        chatMessages.insertAdjacentHTML('beforeend', mensagemHTML);
+        
+        // Rolar para a última mensagem
+        this.rolarParaFinal();
+        
+        // Simular tempo de "pensamento"
+        return new Promise(resolve => {
+            setTimeout(() => {
+                // Remover mensagem de pensamento
+                const mensagemPensando = chatMessages.querySelector('.chat-message.tripinha:last-child');
+                if (mensagemPensando) {
+                    chatMessages.removeChild(mensagemPensando);
+                }
+                resolve();
+            }, 1500);
+        });
+    },
     /**
      * Configura eventos para atualização da barra de progresso
      */
@@ -963,7 +1108,6 @@ const BENETRIP = {
         // Outros eventos globais podem ser registrados aqui
     }
 };
-
 // Inicializar a aplicação quando o DOM estiver pronto
 document.addEventListener('DOMContentLoaded', () => {
     BENETRIP.init();
