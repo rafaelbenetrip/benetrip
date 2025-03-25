@@ -115,22 +115,26 @@ const BENETRIP = {
      * Mostra a mensagem de boas-vindas da Tripinha
      */
     mostrarMensagemBoasVindas() {
-        const mensagem = `
-            <div class="chat-message tripinha">
-                <div class="avatar">
-                    <img src="${this.config.imagePath}tripinha/avatar-normal.png" alt="Tripinha" />
-                </div>
-                <div class="message">
-                    <p>Oi, eu sou a Tripinha! 🐶 Vou te ajudar a encontrar o destino perfeito para sua próxima viagem! Vamos começar?</p>
-                </div>
+    const mensagem = `
+        <div class="chat-message tripinha">
+            <div class="avatar">
+                <img src="${this.config.imagePath}tripinha/avatar-normal.png" alt="Tripinha" />
             </div>
-        `;
-        
-        document.getElementById('chat-messages').innerHTML = mensagem;
-        
-        // Mostrar primeira pergunta após breve delay
-        setTimeout(() => this.mostrarProximaPergunta(), this.config.animationDelay);
-    },
+            <div class="message">
+                <p>Oi, eu sou a Tripinha! 🐶 Vou te ajudar a encontrar o destino perfeito para sua próxima viagem! Vamos começar?</p>
+            </div>
+        </div>
+    `;
+    
+    document.getElementById('chat-messages').innerHTML = mensagem;
+    
+    // Mostrar primeira pergunta após breve delay
+    // Armazenar referência ao "this" atual para usar dentro do setTimeout
+    const self = this;
+    setTimeout(function() {
+        self.mostrarProximaPergunta();
+    }, this.config.animationDelay);
+}
     
     /**
      * Mostra a próxima pergunta no chat
@@ -613,29 +617,33 @@ const BENETRIP = {
      * Processa a resposta do usuário a uma pergunta
      */
     processarResposta(valor, pergunta) {
-        // Armazenar resposta
-        this.estado.respostas[pergunta.key] = valor;
-        
-        // Mostrar resposta do usuário no chat
-        this.mostrarRespostaUsuario(valor, pergunta);
-        
-        // Se for a primeira pergunta (conhece_destino), definir o fluxo
-        if (pergunta.key === 'conhece_destino') {
-            this.estado.fluxo = valor === 0 ? 'destino_conhecido' : 'destino_desconhecido';
-        }
-        
-        // Avançar para a próxima pergunta
-        this.estado.perguntaAtual++;
-        
-        // Verificar se atingimos o limite de perguntas para este fluxo
-        if (this.verificarLimitePerguntas()) {
-            this.finalizarQuestionario();
-            return;
-        }
-        
-        // Mostrar próxima pergunta
-        setTimeout(() => this.mostrarProximaPergunta(), this.config.animationDelay);
-    },
+    // Armazenar resposta
+    this.estado.respostas[pergunta.key] = valor;
+    
+    // Mostrar resposta do usuário no chat
+    this.mostrarRespostaUsuario(valor, pergunta);
+    
+    // Se for a primeira pergunta (conhece_destino), definir o fluxo
+    if (pergunta.key === 'conhece_destino') {
+        this.estado.fluxo = valor === 0 ? 'destino_conhecido' : 'destino_desconhecido';
+    }
+    
+    // Avançar para a próxima pergunta
+    this.estado.perguntaAtual++;
+    
+    // Verificar se atingimos o limite de perguntas para este fluxo
+    if (this.verificarLimitePerguntas()) {
+        this.finalizarQuestionario();
+        return;
+    }
+    
+    // Mostrar próxima pergunta
+    // Armazenar referência ao "this" atual para usar dentro do setTimeout
+    const self = this;
+    setTimeout(function() {
+        self.mostrarProximaPergunta();
+    }, this.config.animationDelay);
+}
 
     /**
      * Verifica se atingimos o limite de perguntas para este fluxo
@@ -1109,7 +1117,7 @@ const BENETRIP = {
     }
 };
 // Inicializar a aplicação quando o DOM estiver pronto
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', function() {
     BENETRIP.init();
 });
 
