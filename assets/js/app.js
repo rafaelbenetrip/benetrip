@@ -66,6 +66,7 @@ const BENETRIP = {
         
         return this;
     },
+    
     /**
      * Inicia a interface de chat e carrega perguntas
      */
@@ -515,7 +516,7 @@ carregarFlatpickrDinamicamente(pergunta) {
     };
     
     document.head.appendChild(script);
-}
+},
 
 /**
  * Cria o elemento do calendário manualmente como último recurso
@@ -816,7 +817,7 @@ criarElementoCalendarioManualmente(pergunta) {
     setTimeout(function() {
         self.mostrarProximaPergunta();
     }, this.config.animationDelay);
-}
+},
 
     /**
      * Verifica se atingimos o limite de perguntas para este fluxo
