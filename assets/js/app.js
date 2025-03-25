@@ -695,17 +695,20 @@ configurarAutocomplete(pergunta) {
             if (termo !== currentQuery) return;
             
             if (sugestoes.length > 0) {
-                resultsContainer.innerHTML = sugestoes.map(item => {
-                    return `
-                        <div class="autocomplete-item" data-code="${item.code}" data-name="${item.name}" data-country="${item.country_name}">
-                            <div class="item-code">${item.code}</div>
-                            <div class="item-details">
-                                <div class="item-name">${item.name}</div>
-                                <div class="item-country">${item.country_name}</div>
-                            </div>
-                        </div>
-                    `;
-                }).join('');
+    resultsContainer.innerHTML = sugestoes.map(item => {
+        return `
+            <div class="autocomplete-item" 
+                 data-code="${item.code || item.iata}" 
+                 data-name="${item.name || item.city_name}"
+                 data-country="${item.country_name}">
+                <div class="item-code">${item.code || item.iata}</div>
+                <div class="item-details">
+                    <div class="item-name">${item.name || item.city_name}</div>
+                    <div class="item-country">${item.country_name}</div>
+                </div>
+            </div>
+        `;
+    }).join('');
                 
                 // Adicionar eventos aos itens
                 document.querySelectorAll(`#${autocompleteId}-results .autocomplete-item`).forEach(item => {
