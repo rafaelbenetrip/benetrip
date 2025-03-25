@@ -2158,3 +2158,32 @@ body {
     background-color: #f9f9f9;
     margin-top: 15px;
 }
+
+/* Estilos específicos para o calendário */
+#inline-calendar {
+    width: 100%;
+    min-height: 300px;
+    border: 1px solid var(--gray-medium);
+    border-radius: var(--border-radius-md);
+    background-color: white;
+    margin-bottom: 15px;
+    display: block !important;
+    visibility: visible !important;
+}
+
+.calendar-container {
+    margin-top: 15px;
+    padding: 10px;
+    background-color: var(--gray-light);
+    border-radius: var(--border-radius-md);
+    box-shadow: var(--shadow-sm);
+}
+
+/* Garantir que o Flatpickr seja exibido */
+.flatpickr-calendar {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    animation: none !important;
+    max-width: 100% !important;
+}
