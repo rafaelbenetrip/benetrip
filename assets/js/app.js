@@ -135,11 +135,11 @@ const BENETRIP = {
         self.mostrarProximaPergunta();
     }, this.config.animationDelay);
 },
-    
-    /**
-     * Mostra a próxima pergunta no chat
-     */
-    mostrarProximaPergunta() {
+
+/**
+ * Mostra a próxima pergunta no chat
+ */
+mostrarProximaPergunta() {
         // Verificar se ainda temos perguntas
         if (this.estado.perguntaAtual >= this.estado.perguntas.length) {
             this.finalizarQuestionario();
