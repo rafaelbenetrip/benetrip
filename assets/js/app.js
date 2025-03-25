@@ -302,20 +302,20 @@ const BENETRIP = {
             }
         }
         
-        // Construir a mensagem completa
-        return `
-            <div class="chat-message tripinha">
-                <div class="avatar">
-                    <img src="${this.config.imagePath}tripinha/avatar-normal.png" alt="Tripinha" />
-                </div>
-                <div class="message">
-                    <p class="question">${pergunta.question}</p>
-                    <p class="description">${pergunta.description || ''}</p>
-                    ${opcoesHTML}
-                </div>
+            // Construir a mensagem completa
+    return `
+        <div class="chat-message tripinha">
+            <div class="avatar">
+                <img src="${this.config.imagePath}tripinha/avatar-normal.png" alt="Tripinha" />
             </div>
-        `;
-    },
+            <div class="message">
+                <p class="question">${pergunta.question}</p>
+                <p class="description">${pergunta.description || ''}</p>
+                ${opcoesHTML}
+            </div>
+        </div>
+    `;
+},
 
     /**
      * Configura eventos específicos para cada tipo de pergunta
