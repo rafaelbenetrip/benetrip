@@ -132,7 +132,6 @@ const BENETRIP = {
         // Mostrar primeira pergunta após breve delay
         setTimeout(() => this.mostrarProximaPergunta(), this.config.animationDelay);
     },
-
     /**
      * Mostra a próxima pergunta no chat
      */
@@ -231,7 +230,6 @@ const BENETRIP = {
             }, 800);
         });
     },
-
     /**
      * Monta o HTML para exibir uma pergunta no chat
      */
@@ -253,19 +251,19 @@ const BENETRIP = {
     } else if (pergunta.input_field) {
                     // Campo de entrada de texto
         if (pergunta.calendar) {
-    console.log("Gerando HTML do calendário");
-    opcoesHTML = `
-        <div class="calendar-container" id="calendar-container-main">
-            <div id="inline-calendar" style="width: 100%; min-height: 300px;"></div>
-            <div class="date-selection">
-                <p>Ida: <span id="date-start">Selecione</span></p>
-                <p>Volta: <span id="date-end">Selecione</span></p>
-            </div>
-            <button id="confirm-dates" class="confirm-button" disabled>Confirmar Datas</button>
-        </div>
-    `;
-    console.log("HTML do calendário gerado");
-}
+            console.log("Gerando HTML do calendário");
+            opcoesHTML = `
+                <div class="calendar-container" id="calendar-container-main">
+                    <div id="inline-calendar" class="flatpickr-calendar-container" style="width: 100%; min-height: 300px;"></div>
+                    <div class="date-selection">
+                        <p>Ida: <span id="date-start">Selecione</span></p>
+                        <p>Volta: <span id="date-end">Selecione</span></p>
+                    </div>
+                    <button id="confirm-dates" class="confirm-button" disabled>Confirmar Datas</button>
+                </div>
+            `;
+            console.log("HTML do calendário gerado");
+        }
         else if (pergunta.number_input) {
                 // Entrada numérica
                 opcoesHTML = `
@@ -317,50 +315,49 @@ const BENETRIP = {
             </div>
         </div>
     `;
-},
-
+    },
     /**
      * Configura eventos específicos para cada tipo de pergunta
      */
-configurarEventosPergunta(pergunta) {
-    // Botões de opção para perguntas de múltipla escolha
-    const optionButtons = document.querySelectorAll('.option-button');
-    if (optionButtons.length > 0) {
-        optionButtons.forEach(button => {
-            button.addEventListener('click', () => {
-                const valor = parseInt(button.dataset.valor);
-                this.processarResposta(valor, pergunta);
+    configurarEventosPergunta(pergunta) {
+        // Botões de opção para perguntas de múltipla escolha
+        const optionButtons = document.querySelectorAll('.option-button');
+        if (optionButtons.length > 0) {
+            optionButtons.forEach(button => {
+                button.addEventListener('click', () => {
+                    const valor = parseInt(button.dataset.valor);
+                    this.processarResposta(valor, pergunta);
+                });
             });
-        });
-    }
-    
-    // Configurar calendário
-if (pergunta.calendar) {
-    console.log("Aguardando renderização do DOM para configurar o calendário...");
-    
-    // Aguarde mais tempo para garantir que o DOM foi atualizado
-    setTimeout(() => {
-        console.log("Tentando configurar calendário após delay...");
-        
-        // Verificação adicional do elemento
-        const calendarElement = document.getElementById('inline-calendar');
-        console.log("Elemento do calendário após delay:", calendarElement);
-        
-        if (calendarElement) {
-            this.inicializarFlatpickr(calendarElement, pergunta);
-        } else {
-            // Fallback: tentar encontrar por classe se o ID não funcionar
-            const elements = document.getElementsByClassName('flatpickr-calendar-container');
-            if (elements.length > 0) {
-                console.log("Elemento encontrado por classe:", elements[0]);
-                this.inicializarFlatpickr(elements[0], pergunta);
-            } else {
-                // Último recurso: forçar a criação do flatpickr
-                this.criarCalendarioEmergencia(pergunta);
-            }
         }
-    }, 1000); // Aumentado para 1 segundo
-}
+        
+        // Configurar calendário
+        if (pergunta.calendar) {
+            console.log("Aguardando renderização do DOM para configurar o calendário...");
+            
+            // Aguarde mais tempo para garantir que o DOM foi atualizado
+            setTimeout(() => {
+                console.log("Tentando configurar calendário após delay...");
+                
+                // Verificação adicional do elemento
+                const calendarElement = document.getElementById('inline-calendar');
+                console.log("Elemento do calendário após delay:", calendarElement);
+                
+                if (calendarElement) {
+                    this.inicializarFlatpickr(calendarElement, pergunta);
+                } else {
+                    // Fallback: tentar encontrar por classe se o ID não funcionar
+                    const elements = document.getElementsByClassName('flatpickr-calendar-container');
+                    if (elements.length > 0) {
+                        console.log("Elemento encontrado por classe:", elements[0]);
+                        this.inicializarFlatpickr(elements[0], pergunta);
+                    } else {
+                        // Último recurso: forçar a criação do flatpickr
+                        this.criarCalendarioEmergencia(pergunta);
+                    }
+                }
+            }, 1000); // Aumentado para 1 segundo
+        }
         
         // Configurar entrada numérica
         if (pergunta.number_input) {
@@ -382,122 +379,213 @@ if (pergunta.calendar) {
             this.configurarEntradaTexto();
         }
     },
+    /**
+     * Configura o calendário para seleção de datas
+     */
+    configurarCalendario(pergunta) {
+        console.log("Iniciando configuração do calendário");
+        
+        // Verificar se o Flatpickr está disponível
+        if (typeof flatpickr === 'undefined') {
+            console.error("Flatpickr não está disponível. Verifique se o script foi carregado corretamente.");
+            return;
+        }
+        
+        // Verificar se o elemento já existe no DOM
+        const calendarElement = document.getElementById('inline-calendar');
+        console.log("Verificação inicial do elemento: ", calendarElement);
+        
+        // Se o elemento já existir, configurar diretamente
+        if (calendarElement) {
+            this.inicializarFlatpickr(calendarElement, pergunta);
+            return;
+        }
+        
+        // Caso contrário, tentar uma busca mais ampla
+        const calendarContainers = document.querySelectorAll('.calendar-container');
+        if (calendarContainers.length > 0) {
+            // Tentar encontrar o elemento dentro do container
+            const latestContainer = calendarContainers[calendarContainers.length - 1];
+            console.log("Container de calendário encontrado:", latestContainer);
+            
+            // Verificar se há um elemento para o calendário dentro do container
+            const calendarElement = latestContainer.querySelector('[id^="inline-calendar"]') || 
+                                   latestContainer.querySelector('div:first-child');
+            
+            if (calendarElement) {
+                console.log("Elemento para calendário encontrado dentro do container:", calendarElement);
+                this.inicializarFlatpickr(calendarElement, pergunta);
+                return;
+            }
+        }
+        
+        // Se ainda não conseguiu encontrar, verificar periodicamente
+        let tentativas = 0;
+        const checkCalendarElement = setInterval(() => {
+            tentativas++;
+            console.log(`Procurando elemento do calendário (tentativa ${tentativas})...`);
+            
+            // Buscar por ID ou classe
+            const element = document.getElementById('inline-calendar') || 
+                           document.querySelector('.flatpickr-calendar-container');
+            
+            if (element) {
+                console.log("Elemento do calendário encontrado:", element);
+                clearInterval(checkCalendarElement);
+                this.inicializarFlatpickr(element, pergunta);
+            } else if (tentativas === 3) {
+                // Na terceira tentativa, exibir o DOM completo para depuração
+                console.log("DOM do chat atual:", document.getElementById('chat-messages')?.innerHTML);
+            } else if (tentativas > 5) {
+                console.error("Não foi possível encontrar o elemento do calendário. Criando um novo...");
+                clearInterval(checkCalendarElement);
+                this.criarCalendarioEmergencia(pergunta);
+            }
+        }, 500); // Aumentado o intervalo entre tentativas
+    },
 
     /**
-/**
- * Configura o calendário para seleção de datas
- */
-
-    configurarCalendario(pergunta) {
-    console.log("Iniciando configuração do calendário");
-    console.log("Flatpickr disponível?", typeof flatpickr !== 'undefined');
-    
-    // Verificar se o elemento já existe no DOM primeiro (sem intervalo)
-    const calendarElement = document.getElementById('inline-calendar');
-    console.log("Verificação inicial do elemento: ", calendarElement);
-    
-    // Se o elemento já existir, configurar diretamente
-    if (calendarElement) {
-        this.inicializarFlatpickr(calendarElement, pergunta);
-        return;
-    }
-    
-    // Caso contrário, verificar periodicamente até encontrá-lo
-    let tentativas = 0;
-    const checkCalendarElement = setInterval(() => {
-        tentativas++;
-        const element = document.getElementById('inline-calendar');
-        console.log(`Procurando elemento do calendário (tentativa ${tentativas})...`);
+     * Inicializa o Flatpickr
+     */
+    inicializarFlatpickr(calendarElement, pergunta) {
+        console.log("Preparando inicialização do Flatpickr...");
         
-        // Visualize o DOM completo para depuração
-        if (tentativas === 3) {
-            console.log("Estrutura atual do DOM para mensagens:", 
-                        document.getElementById('chat-messages').innerHTML);
-        }
-        
-        if (element) {
-            console.log("Elemento do calendário encontrado:", element);
-            clearInterval(checkCalendarElement);
-            this.inicializarFlatpickr(element, pergunta);
-        } else if (tentativas > 10) {
-            console.error("Não foi possível encontrar o elemento do calendário após 10 tentativas");
-            clearInterval(checkCalendarElement);
-        }
-    }, 300);
-},
-
-// Função auxiliar para inicializar o Flatpickr
-inicializarFlatpickr(calendarElement, pergunta) {
-    // Elementos do calendário
-    const dateStart = document.getElementById('date-start');
-    const dateEnd = document.getElementById('date-end');
-    const confirmButton = document.getElementById('confirm-dates');
-    
-    if (!dateStart || !dateEnd || !confirmButton) {
-        console.error("Elementos auxiliares do calendário não encontrados");
-        return;
-    }
-    
-    // Data mínima e máxima
-    const today = new Date();
-    const minDate = pergunta.calendar.min_date || today;
-    const maxDate = pergunta.calendar.max_date || new Date(today.getFullYear() + 1, today.getMonth(), today.getDate());
-    
-    try {
-        console.log("Inicializando Flatpickr no elemento...");
-        
-        const self = this; // Preservar referência ao objeto BENETRIP
-        
-        const calendar = flatpickr(calendarElement, {
-            inline: true,
-            mode: "range",
-            minDate: minDate,
-            maxDate: maxDate,
-            dateFormat: "Y-m-d",
-            onChange: function(selectedDates, dateStr) {
-                console.log("Datas selecionadas:", selectedDates);
-                
-                if (selectedDates.length === 2) {
-                    // Atualizar exibição das datas
-                    const dataFormatada = (data) => {
-                        return data.toLocaleDateString('pt-BR', {
-                            day: '2-digit',
-                            month: '2-digit',
-                            year: 'numeric'
-                        });
-                    };
-                    
-                    dateStart.textContent = dataFormatada(selectedDates[0]);
-                    dateEnd.textContent = dataFormatada(selectedDates[1]);
-                    
-                    // Habilitar botão de confirmação
-                    confirmButton.disabled = false;
-                }
+        try {
+            // Garantir que o elemento está realmente no DOM
+            if (!calendarElement || !document.body.contains(calendarElement)) {
+                console.error("Elemento de calendário inválido ou não está no DOM");
+                return;
             }
-        });
-        
-        console.log("Flatpickr inicializado com sucesso:", calendar);
-        
-        // Evento para o botão de confirmação
-        confirmButton.addEventListener('click', function() {
-            const datas = calendar.selectedDates.map(data => {
-                return data.toISOString().split('T')[0]; // Formato YYYY-MM-DD
+            
+            // Elementos auxiliares
+            const container = calendarElement.closest('.calendar-container');
+            if (!container) {
+                console.error("Container do calendário não encontrado");
+                return;
+            }
+            
+            const dateStart = container.querySelector('#date-start') || document.getElementById('date-start');
+            const dateEnd = container.querySelector('#date-end') || document.getElementById('date-end');
+            const confirmButton = container.querySelector('#confirm-dates') || document.getElementById('confirm-dates');
+            
+            if (!dateStart || !dateEnd || !confirmButton) {
+                console.error("Elementos auxiliares do calendário não encontrados");
+                return;
+            }
+            
+            // Data mínima e máxima
+            const today = new Date();
+            const minDate = pergunta.calendar?.min_date || today;
+            const maxDate = pergunta.calendar?.max_date || new Date(today.getFullYear() + 1, today.getMonth(), today.getDate());
+            
+            console.log("Inicializando Flatpickr com configurações:", {
+                elemento: calendarElement,
+                minDate,
+                maxDate,
+                elementosAuxiliares: {dateStart, dateEnd, confirmButton}
             });
             
-            // Verificar se temos duas datas
-            if (datas.length === 2) {
-                const valor = {
-                    dataIda: datas[0],
-                    dataVolta: datas[1]
-                };
-                self.processarResposta(valor, pergunta);
+            // Preservar referência ao BENETRIP
+            const self = this;
+            
+            // Forçar limpeza de qualquer instância anterior
+            if (calendarElement._flatpickr) {
+                calendarElement._flatpickr.destroy();
             }
-        });
-    } catch (error) {
-        console.error("Erro ao inicializar Flatpickr:", error);
-    }
-}, // Esta vírgula é crucial!
-
+            
+            // Inicializar flatpickr com configurações simplificadas
+            const calendar = flatpickr(calendarElement, {
+                inline: true,
+                mode: "range",
+                minDate: minDate,
+                maxDate: maxDate,
+                dateFormat: "Y-m-d",
+                appendTo: calendarElement,
+                onReady: function() {
+                    console.log("Flatpickr iniciado e pronto!");
+                },
+                onChange: function(selectedDates) {
+                    console.log("Datas selecionadas:", selectedDates);
+                    
+                    if (selectedDates.length === 2) {
+                        // Atualizar exibição das datas
+                        const dataFormatada = (data) => {
+                            return data.toLocaleDateString('pt-BR', {
+                                day: '2-digit',
+                                month: '2-digit',
+                                year: 'numeric'
+                            });
+                        };
+                        
+                        dateStart.textContent = dataFormatada(selectedDates[0]);
+                        dateEnd.textContent = dataFormatada(selectedDates[1]);
+                        
+                        // Habilitar botão de confirmação
+                        confirmButton.disabled = false;
+                    }
+                }
+            });
+            
+            console.log("Flatpickr inicializado com sucesso:", calendar);
+            
+            // Evento para o botão de confirmação
+            confirmButton.addEventListener('click', function() {
+                if (calendar.selectedDates && calendar.selectedDates.length === 2) {
+                    const valor = {
+                        dataIda: calendar.selectedDates[0].toISOString().split('T')[0],
+                        dataVolta: calendar.selectedDates[1].toISOString().split('T')[0]
+                    };
+                    self.processarResposta(valor, pergunta);
+                }
+            });
+        } catch (error) {
+            console.error("Erro ao inicializar Flatpickr:", error);
+            console.error("Estado do elemento:", calendarElement);
+        }
+    },
+    
+    /**
+     * Cria o calendário como último recurso quando o elemento não é encontrado
+     */
+    criarCalendarioEmergencia(pergunta) {
+        console.log("Criando calendário de emergência...");
+        
+        // Buscar o container de mensagens
+        const chatMessages = document.getElementById('chat-messages');
+        if (!chatMessages) {
+            console.error("Container de mensagens não encontrado");
+            return;
+        }
+        
+        // Buscar a última mensagem da Tripinha
+        const ultimas = chatMessages.querySelectorAll('.chat-message.tripinha');
+        const ultima = ultimas[ultimas.length - 1];
+        
+        if (!ultima) {
+            console.error("Última mensagem não encontrada");
+            return;
+        }
+        
+        // Buscar o container do calendário
+        const calendarContainer = ultima.querySelector('.calendar-container');
+        if (!calendarContainer) {
+            console.error("Container do calendário não encontrado");
+            return;
+        }
+        
+        // Criar novo elemento para o calendário
+        const calendarElement = document.createElement('div');
+        calendarElement.id = 'inline-calendar-emergency';
+        calendarElement.style.width = '100%';
+        calendarElement.style.minHeight = '300px';
+        calendarElement.style.marginBottom = '15px';
+        
+        // Inserir no início do container
+        calendarContainer.insertBefore(calendarElement, calendarContainer.firstChild);
+        
+        // Inicializar flatpickr no novo elemento
+        this.inicializarFlatpickr(calendarElement, pergunta);
+    },
     /**
      * Configura a entrada numérica para quantidade de viajantes
      */
@@ -626,58 +714,58 @@ inicializarFlatpickr(calendarElement, pergunta) {
     },
 
     /**
- * Configura a entrada de valor monetário
- */
-configurarEntradaMoeda() {
-    // Verificar se o input está presente no DOM
-    const checkInput = setInterval(() => {
-        const input = document.querySelector('.currency-input');
-        if (input) {
-            clearInterval(checkInput);
-            
-            const confirmBtn = document.querySelector('.confirm-currency');
-            
-            // Inicializar com valor vazio
-            input.value = '';
-            confirmBtn.disabled = true;
-            
-            // Formatar entrada como moeda
-            input.addEventListener('input', (e) => {
-                // Remover tudo exceto números
-                let valor = e.target.value.replace(/\D/g, '');
+     * Configura a entrada de valor monetário
+     */
+    configurarEntradaMoeda() {
+        // Verificar se o input está presente no DOM
+        const checkInput = setInterval(() => {
+            const input = document.querySelector('.currency-input');
+            if (input) {
+                clearInterval(checkInput);
                 
-                // Verificar se o valor não está vazio
-                if (valor) {
-                    // Converter para formato decimal (dividir por 100)
-                    valor = (parseInt(valor) / 100).toFixed(2);
+                const confirmBtn = document.querySelector('.confirm-currency');
+                
+                // Inicializar com valor vazio
+                input.value = '';
+                confirmBtn.disabled = true;
+                
+                // Formatar entrada como moeda
+                input.addEventListener('input', (e) => {
+                    // Remover tudo exceto números
+                    let valor = e.target.value.replace(/\D/g, '');
                     
-                    // Formatar com separador decimal
-                    e.target.value = valor.replace('.', ',');
-                    
-                    // Habilitar botão se tiver valor
-                    confirmBtn.disabled = parseFloat(valor) <= 0;
-                } else {
-                    e.target.value = '';
-                    confirmBtn.disabled = true;
-                }
-            });
-            
-            // Evento para o botão de confirmação
-            confirmBtn.addEventListener('click', () => {
-                const valor = parseFloat(input.value.replace(',', '.'));
-                if (valor > 0) {
-                    const pergunta = this.estado.perguntas[this.estado.perguntaAtual];
-                    this.processarResposta(valor, pergunta);
-                }
-            });
-            
-            // Foco automático no input
-            setTimeout(() => input.focus(), 300);
-            
-            console.log("Campo de moeda inicializado com sucesso");
-        }
-    }, 100); // Verifica a cada 100ms se o elemento foi criado
-},
+                    // Verificar se o valor não está vazio
+                    if (valor) {
+                        // Converter para formato decimal (dividir por 100)
+                        valor = (parseInt(valor) / 100).toFixed(2);
+                        
+                        // Formatar com separador decimal
+                        e.target.value = valor.replace('.', ',');
+                        
+                        // Habilitar botão se tiver valor
+                        confirmBtn.disabled = parseFloat(valor) <= 0;
+                    } else {
+                        e.target.value = '';
+                        confirmBtn.disabled = true;
+                    }
+                });
+                
+                // Evento para o botão de confirmação
+                confirmBtn.addEventListener('click', () => {
+                    const valor = parseFloat(input.value.replace(',', '.'));
+                    if (valor > 0) {
+                        const pergunta = this.estado.perguntas[this.estado.perguntaAtual];
+                        this.processarResposta(valor, pergunta);
+                    }
+                });
+                
+                // Foco automático no input
+                setTimeout(() => input.focus(), 300);
+                
+                console.log("Campo de moeda inicializado com sucesso");
+            }
+        }, 100); // Verifica a cada 100ms se o elemento foi criado
+    },
     
     /**
      * Configura a entrada de texto simples
@@ -734,9 +822,9 @@ configurarEntradaMoeda() {
      * Verifica se atingimos o limite de perguntas para este fluxo
      */
     verificarLimitePerguntas() {
-    // Desativar verificação de limite para garantir que todas as perguntas sejam exibidas
-    return false; // Sempre retorna falso para não finalizar prematuramente
-},
+        // Desativar verificação de limite para garantir que todas as perguntas sejam exibidas
+        return false; // Sempre retorna falso para não finalizar prematuramente
+    },
 
     /**
      * Mostra a resposta do usuário no chat
@@ -748,21 +836,19 @@ configurarEntradaMoeda() {
         if (pergunta.options) {
             // Resposta de múltipla escolha
             mensagemResposta = pergunta.options[valor];
-        } 
-        else if (pergunta.calendar) {
-    console.log("Gerando HTML do calendário");
-    opcoesHTML = `
-        <div class="calendar-container" id="calendar-container-main">
-            <div id="inline-calendar" class="flatpickr-calendar-container" style="width: 100%; min-height: 300px;"></div>
-            <div class="date-selection">
-                <p>Ida: <span id="date-start">Selecione</span></p>
-                <p>Volta: <span id="date-end">Selecione</span></p>
-            </div>
-            <button id="confirm-dates" class="confirm-button" disabled>Confirmar Datas</button>
-        </div>
-    `;
-    console.log("HTML do calendário gerado");
-}} else if (pergunta.autocomplete) {
+        } else if (pergunta.calendar) {
+            // Resposta de calendário
+            const formatarData = (data) => {
+                const dataObj = new Date(data);
+                return dataObj.toLocaleDateString('pt-BR', {
+                    day: '2-digit',
+                    month: '2-digit',
+                    year: 'numeric'
+                });
+            };
+            
+            mensagemResposta = `Ida: ${formatarData(valor.dataIda)} | Volta: ${formatarData(valor.dataVolta)}`;
+        } else if (pergunta.autocomplete) {
             // Resposta de autocomplete
             mensagemResposta = `${valor.name} (${valor.code}), ${valor.country}`;
         } else {
