@@ -134,7 +134,7 @@ const BENETRIP = {
     setTimeout(function() {
         self.mostrarProximaPergunta();
     }, this.config.animationDelay);
-}
+},
     
     /**
      * Mostra a próxima pergunta no chat
