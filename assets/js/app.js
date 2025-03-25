@@ -194,41 +194,33 @@ const BENETRIP = {
      * Monta o HTML para exibir uma pergunta no chat
      */
     montarHTMLPergunta(pergunta) {
-        let opcoesHTML = '';
-        
-        // Construir opções com base no tipo da pergunta
-        if (pergunta.options) {
-            // Perguntas de múltipla escolha
-            opcoesHTML = `
-                <div class="options-container">
-                    ${pergunta.options.map((opcao, index) => `
-                        <button class="option-button" data-index="${index}" data-valor="${index}">
-                            ${opcao}
-                        </button>
+    let opcoesHTML = '';
+    
+    if (pergunta.options) {
+        opcoesHTML = `
+            <div class="options-container">
+                ${pergunta.options.map((opcao, index) => `
+                    <button class="option-button" data-index="${index}" data-valor="${index}">
+                        ${opcao}
                     `).join('')}
+            </div>
+        `;
+    } else if (pergunta.input_field) {
+        if (pergunta.calendar) {
+            const calendarId = `benetrip-calendar-${Date.now()}`;
+            this.estado.currentCalendarId = calendarId; // Adicionar esta linha
+            
+            opcoesHTML = `
+                <div class="calendar-container" data-calendar-container="${calendarId}">
+                    <div id="${calendarId}" class="flatpickr-calendar-container"></div>
+                    <div class="date-selection">
+                        <p>Ida: <span id="data-ida-${calendarId}" class="data-ida">Selecione</span></p>
+                        <p>Volta: <span id="data-volta-${calendarId}" class="data-volta">Selecione</span></p>
+                    </div>
+                    <button id="confirmar-datas-${calendarId}" class="confirm-button confirm-dates" disabled>Confirmar Datas</button>
                 </div>
             `;
-        } else if (pergunta.input_field) {
-            if (pergunta.calendar) {
-    console.log("Gerando HTML do calendário");
-
-    // Gerar ID único para evitar conflitos com elementos anteriores
-    const calendarId = `benetrip-calendar-${Date.now()}`;
-
-    // Armazenar o ID para referência posterior
-    this.estado.currentCalendarId = calendarId;
-
-    // Adicionar HTML do calendário
-    opcoesHTML = `
-        <div class="calendar-container" data-calendar-container="${calendarId}">
-            <div id="${calendarId}" class="flatpickr-calendar-container"></div>
-            <div class="date-selection">
-                <p>Ida: <span id="data-ida-${calendarId}" class="data-ida">Selecione</span></p>
-                <p>Volta: <span id="data-volta-${calendarId}" class="data-volta">Selecione</span></p>
-            </div>
-            <button id="confirmar-datas-${calendarId}" class="confirm-button confirm-dates" disabled>Confirmar Datas</button>
-        </div>
-    `;
+        }
     console.log(`HTML do calendário gerado com ID dinâmico: ${calendarId}`);
 }
             else if (pergunta.number_input) {
@@ -283,18 +275,18 @@ const BENETRIP = {
         
         // Construir a mensagem completa
         return `
-            <div class="chat-message tripinha" data-pergunta-key="${pergunta.key || ''}">
-                <div class="avatar">
-                    <img src="${this.config.imagePath}tripinha/avatar-normal.png" alt="Tripinha" />
-                </div>
-                <div class="message">
-                    <p class="question">${pergunta.question}</p>
-                    <p class="description">${pergunta.description || ''}</p>
-                    ${opcoesHTML}
-                </div>
+        <div class="chat-message tripinha" data-pergunta-key="${pergunta.key || ''}">
+            <div class="avatar">
+                <img src="${this.config.imagePath}tripinha/avatar-normal.png" alt="Tripinha" />
             </div>
-        `;
-    },
+            <div class="message">
+                <p class="question">${pergunta.question}</p>
+                <p class="description">${pergunta.description || ''}</p>
+                ${opcoesHTML}
+            </div>
+        </div>
+    `;
+},
     /**
      * Configura eventos específicos para cada tipo de pergunta
      */
@@ -353,7 +345,6 @@ const BENETRIP = {
 inicializarCalendario(pergunta) {
     console.log("Iniciando configuração do calendário");
 
-    // Usar o ID armazenado no estado
     const calendarId = this.estado.currentCalendarId;
 
     if (!calendarId) {
@@ -363,27 +354,23 @@ inicializarCalendario(pergunta) {
 
     console.log(`Buscando elemento do calendário com ID: ${calendarId}`);
 
-    // Aguardar um momento para garantir que o DOM foi atualizado
     setTimeout(() => {
         const calendarElement = document.getElementById(calendarId);
 
         if (!calendarElement) {
             console.error(`Elemento do calendário com ID ${calendarId} não encontrado!`);
-            // Tentar uma abordagem alternativa
             this.criarElementoCalendarioManualmente(pergunta);
             return;
         }
 
         console.log("Elemento do calendário encontrado, configurando Flatpickr");
 
-        // Verificar se Flatpickr está disponível
         if (typeof flatpickr === 'undefined') {
             console.error("Biblioteca Flatpickr não encontrada!");
             this.carregarFlatpickrDinamicamente(pergunta);
             return;
         }
 
-        // Configurações do Flatpickr
         const config = {
             mode: "range",
             dateFormat: "Y-m-d",
@@ -404,7 +391,6 @@ inicializarCalendario(pergunta) {
                 firstDayOfWeek: 0
             },
             onChange: (selectedDates, dateStr) => {
-                // Atualizar campos de data
                 const dataIdaElement = document.getElementById(`data-ida-${calendarId}`);
                 const dataVoltaElement = document.getElementById(`data-volta-${calendarId}`);
                 const confirmarBtn = document.getElementById(`confirmar-datas-${calendarId}`);
@@ -433,15 +419,12 @@ inicializarCalendario(pergunta) {
             }
         };
 
-        // Inicializar Flatpickr
         try {
             const calendario = flatpickr(calendarElement, config);
             console.log("Flatpickr inicializado com sucesso");
 
-            // Armazenar a instância no estado para referência futura
             this.estado.calendarioAtual = calendario;
 
-            // Configurar botão de confirmação
             const confirmarBtn = document.getElementById(`confirmar-datas-${calendarId}`);
             if (confirmarBtn) {
                 confirmarBtn.addEventListener('click', () => {
@@ -461,7 +444,7 @@ inicializarCalendario(pergunta) {
         } catch (erro) {
             console.error("Erro ao inicializar Flatpickr:", erro);
         }
-    }, 500); // Aumentado para 500ms para garantir que o DOM foi atualizado
+    }, 500);
 },
 
     /**
