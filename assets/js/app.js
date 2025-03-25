@@ -476,7 +476,7 @@ inicializarCalendario(pergunta) {
             console.error("Erro ao inicializar Flatpickr:", erro);
         }
     }, 500); // Aumentado para 500ms para garantir que o DOM foi atualizado
-}
+},
 
 /**
  * Carrega a biblioteca Flatpickr dinamicamente
