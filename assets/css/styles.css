@@ -2230,3 +2230,50 @@ body {
     display: block !important;
     visibility: visible !important;
 }
+
+/* Estilos específicos para o calendário Benetrip */
+.flatpickr-calendar-container {
+    width: 100% !important;
+    min-height: 300px !important;
+    background-color: white !important;
+    border-radius: var(--border-radius-md) !important;
+    border: 1px solid var(--gray-medium) !important;
+    margin-bottom: var(--spacing-md) !important;
+}
+
+.flatpickr-calendar {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-shadow: none !important;
+    border: none !important;
+    background-color: transparent !important;
+}
+
+.flatpickr-day.selected,
+.flatpickr-day.startRange,
+.flatpickr-day.endRange {
+    background-color: var(--orange-primary) !important;
+    border-color: var(--orange-primary) !important;
+}
+
+.flatpickr-day.inRange {
+    background-color: rgba(232, 119, 34, 0.15) !important;
+    border-color: rgba(232, 119, 34, 0.1) !important;
+}
+
+.flatpickr-day:hover {
+    background-color: rgba(232, 119, 34, 0.1) !important;
+}
+
+.date-selection {
+    display: flex;
+    justify-content: space-between;
+    background-color: var(--gray-light);
+    padding: var(--spacing-md);
+    border-radius: var(--border-radius-md);
+    margin-bottom: var(--spacing-md);
+}
+
+.date-selection p span {
+    font-weight: 700;
+}
