@@ -112,9 +112,9 @@ const BENETRIP = {
     },
 
     /**
-     * Mostra a mensagem de boas-vindas da Tripinha
-     */
-    mostrarMensagemBoasVindas() {
+ * Mostra a mensagem de boas-vindas da Tripinha
+ */
+mostrarMensagemBoasVindas() {
     const mensagem = `
         <div class="chat-message tripinha">
             <div class="avatar">
@@ -134,42 +134,42 @@ const BENETRIP = {
     setTimeout(function() {
         self.mostrarProximaPergunta();
     }, this.config.animationDelay);
-},
+},  // Certifique-se de que esta linha tenha apenas a vírgula e o fechamento da chave
 
 /**
  * Mostra a próxima pergunta no chat
  */
 mostrarProximaPergunta() {
-        // Verificar se ainda temos perguntas
-        if (this.estado.perguntaAtual >= this.estado.perguntas.length) {
-            this.finalizarQuestionario();
-            return;
-        }
-        
-        // Obter a próxima pergunta
-        const pergunta = this.estado.perguntas[this.estado.perguntaAtual];
-        
-        // Verificar se é uma pergunta condicional
-        if (pergunta.conditional && !this.deveExibirPerguntaCondicional(pergunta)) {
-            // Pular esta pergunta e ir para a próxima
-            this.estado.perguntaAtual++;
-            this.mostrarProximaPergunta();
-            return;
-        }
-        
-        // Gerar e exibir a mensagem com a pergunta
-        const mensagemHTML = this.montarHTMLPergunta(pergunta);
-        
-        // Adicionar ao chat
-        const chatMessages = document.getElementById('chat-messages');
-        chatMessages.insertAdjacentHTML('beforeend', mensagemHTML);
-        
-        // Rolar para a última mensagem
-        this.rolarParaFinal();
-        
-        // Configurar eventos específicos para o tipo de pergunta
-        this.configurarEventosPergunta(pergunta);
-    },
+    // Verificar se ainda temos perguntas
+    if (this.estado.perguntaAtual >= this.estado.perguntas.length) {
+        this.finalizarQuestionario();
+        return;
+    }
+    
+    // Obter a próxima pergunta
+    const pergunta = this.estado.perguntas[this.estado.perguntaAtual];
+    
+    // Verificar se é uma pergunta condicional
+    if (pergunta.conditional && !this.deveExibirPerguntaCondicional(pergunta)) {
+        // Pular esta pergunta e ir para a próxima
+        this.estado.perguntaAtual++;
+        this.mostrarProximaPergunta();
+        return;
+    }
+    
+    // Gerar e exibir a mensagem com a pergunta
+    const mensagemHTML = this.montarHTMLPergunta(pergunta);
+    
+    // Adicionar ao chat
+    const chatMessages = document.getElementById('chat-messages');
+    chatMessages.insertAdjacentHTML('beforeend', mensagemHTML);
+    
+    // Rolar para a última mensagem
+    this.rolarParaFinal();
+    
+    // Configurar eventos específicos para o tipo de pergunta
+    this.configurarEventosPergunta(pergunta);
+},
 
     /**
      * Verifica se uma pergunta condicional deve ser exibida
