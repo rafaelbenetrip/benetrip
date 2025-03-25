@@ -571,7 +571,7 @@ const BENETRIP = {
         });
     },
     
-    /**
+        /**
      * Configura a entrada numérica para quantidade de viajantes
      */
     configurarEntradaNumerica() {
@@ -625,6 +625,7 @@ const BENETRIP = {
             this.processarResposta(valor, pergunta);
         });
     },
+    
     /**
      /**
  * Configura o campo de autocomplete para cidades/destinos
