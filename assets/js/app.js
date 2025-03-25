@@ -24,7 +24,9 @@ const BENETRIP = {
         perguntaAtual: 0,
         perguntas: [],
         respostas: {},
-        carregando: false
+        carregando: false,
+        currentCalendarId: null, // Armazena o ID do calendário atual
+        calendarioAtual: null    // Armazena a instância do calendário
     },
 
     /**
@@ -111,7 +113,6 @@ const BENETRIP = {
             throw erro;
         }
     },
-
     /**
      * Mostra a mensagem de boas-vindas da Tripinha
      */
@@ -197,7 +198,7 @@ const BENETRIP = {
         
         // Construir opções com base no tipo da pergunta
         if (pergunta.options) {
-            // Código existente para perguntas de múltipla escolha
+            // Perguntas de múltipla escolha
             opcoesHTML = `
                 <div class="options-container">
                     ${pergunta.options.map((opcao, index) => `
@@ -293,7 +294,6 @@ const BENETRIP = {
             </div>
         `;
     },
-
     /**
      * Configura eventos específicos para cada tipo de pergunta
      */
@@ -316,26 +316,7 @@ const BENETRIP = {
             // Verificar se carregou a biblioteca Flatpickr
             if (typeof flatpickr === 'undefined') {
                 console.error("Biblioteca Flatpickr não encontrada. Tentando carregar dinamicamente...");
-                
-                // Tentar carregar Flatpickr dinamicamente
-                const script = document.createElement('script');
-                script.src = 'https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.js';
-                script.onload = () => {
-                    console.log("Flatpickr carregado com sucesso");
-                    const style = document.createElement('link');
-                    style.rel = 'stylesheet';
-                    style.href = 'https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.css';
-                    document.head.appendChild(style);
-                    
-                    // Inicializar calendário após carregamento
-                    setTimeout(() => {
-                        this.inicializarCalendario(pergunta);
-                    }, 300);
-                };
-                script.onerror = () => {
-                    console.error("Falha ao carregar Flatpickr dinamicamente");
-                };
-                document.head.appendChild(script);
+                this.carregarFlatpickrDinamicamente(pergunta);
             } else {
                 // Inicializar o calendário com um pequeno atraso para garantir que o DOM foi atualizado
                 setTimeout(() => {
@@ -387,6 +368,8 @@ const BENETRIP = {
             
             if (!calendarElement) {
                 console.error(`Elemento do calendário com ID ${calendarId} não encontrado!`);
+                // Tentar uma abordagem alternativa
+                this.criarElementoCalendarioManualmente(pergunta);
                 return;
             }
             
@@ -518,7 +501,6 @@ const BENETRIP = {
         
         document.head.appendChild(script);
     },
-
     /**
      * Cria o elemento do calendário manualmente como último recurso
      */
@@ -547,15 +529,19 @@ const BENETRIP = {
             containerMensagem.querySelector('.calendar-container').remove();
         }
         
+        // Gerar ID único para o novo calendário
+        const calendarId = `benetrip-calendar-${Date.now()}`;
+        this.estado.currentCalendarId = calendarId;
+        
         // Criar HTML do calendário
         const calendarHTML = `
-            <div class="calendar-container">
-                <div id="benetrip-calendar" class="flatpickr-calendar-container"></div>
+            <div class="calendar-container" data-calendar-container="${calendarId}">
+                <div id="${calendarId}" class="flatpickr-calendar-container"></div>
                 <div class="date-selection">
-                    <p>Ida: <span id="data-ida">Selecione</span></p>
-                    <p>Volta: <span id="data-volta">Selecione</span></p>
+                    <p>Ida: <span id="data-ida-${calendarId}">Selecione</span></p>
+                    <p>Volta: <span id="data-volta-${calendarId}">Selecione</span></p>
                 </div>
-                <button id="confirmar-datas" class="confirm-button" disabled>Confirmar Datas</button>
+                <button id="confirmar-datas-${calendarId}" class="confirm-button confirm-dates" disabled>Confirmar Datas</button>
             </div>
         `;
         
@@ -564,7 +550,7 @@ const BENETRIP = {
         
         // Tentar inicializar novamente após criar o elemento
         setTimeout(() => {
-            const calendarElement = document.getElementById('benetrip-calendar');
+            const calendarElement = document.getElementById(calendarId);
             if (calendarElement) {
                 console.log("Elemento do calendário criado manualmente com sucesso");
                 this.inicializarCalendario(pergunta);
@@ -590,16 +576,31 @@ const BENETRIP = {
      */
     configurarEntradaNumerica() {
         const inputId = this.estado.currentNumberInputId;
-        const input = document.getElementById(inputId);
-        
-        if (!input) {
-            console.error(`Input número com ID ${inputId} não encontrado`);
+        if (!inputId) {
+            console.error("ID de entrada numérica não encontrado!");
             return;
         }
         
-        const decrementBtn = input.parentElement.querySelector('.decrement');
-        const incrementBtn = input.parentElement.querySelector('.increment');
-        const confirmBtn = input.parentElement.querySelector('.confirm-number');
+        const input = document.getElementById(inputId);
+        if (!input) {
+            console.error(`Input com ID ${inputId} não encontrado!`);
+            return;
+        }
+        
+        const container = input.closest('.number-input-container');
+        if (!container) {
+            console.error("Container de entrada numérica não encontrado!");
+            return;
+        }
+        
+        const decrementBtn = container.querySelector('.decrement');
+        const incrementBtn = container.querySelector('.increment');
+        const confirmBtn = container.querySelector('.confirm-number');
+        
+        if (!decrementBtn || !incrementBtn || !confirmBtn) {
+            console.error("Botões de entrada numérica não encontrados!");
+            return;
+        }
         
         // Evento para o botão de decremento
         decrementBtn.addEventListener('click', () => {
@@ -624,26 +625,33 @@ const BENETRIP = {
             this.processarResposta(valor, pergunta);
         });
     },
-
     /**
      * Configura o campo de autocomplete para cidades/destinos
      */
     configurarAutocomplete(pergunta) {
         const autocompleteId = this.estado.currentAutocompleteId;
-        const input = document.getElementById(autocompleteId);
-        
-        if (!input) {
-            console.error(`Input autocomplete com ID ${autocompleteId} não encontrado`);
+        if (!autocompleteId) {
+            console.error("ID de autocomplete não encontrado!");
             return;
         }
         
+        const input = document.getElementById(autocompleteId);
         const results = document.getElementById(`${autocompleteId}-results`);
         const confirmBtn = document.getElementById(`${autocompleteId}-confirm`);
         
+        if (!input || !results || !confirmBtn) {
+            console.error("Elementos de autocomplete não encontrados!");
+            return;
+        }
+        
         let selectedItem = null;
         
-        // Função para buscar sugestões
-        const buscarSugestoes = _.debounce(async (termo) => {
+        // Função para buscar sugestões - usando lodash debounce se disponível
+        const buscarSugestoes = (typeof _ !== 'undefined' && _.debounce) 
+            ? _.debounce(buscarSugestoesImpl, 300)
+            : buscarSugestoesImpl;
+            
+        async function buscarSugestoesImpl(termo) {
             if (!termo || termo.length < 2) {
                 results.innerHTML = '';
                 return;
@@ -652,7 +660,7 @@ const BENETRIP = {
             try {
                 // Se o serviço de API estiver disponível, usar para buscar cidades
                 let sugestoes = [];
-                if (window.BENETRIP_API && window.BENETRIP_API.buscarSugestoesCidade) {
+                if (window.BENETRIP_API) {
                     sugestoes = await window.BENETRIP_API.buscarSugestoesCidade(termo);
                 } else {
                     // Sugestões locais básicas para desenvolvimento
@@ -704,13 +712,12 @@ const BENETRIP = {
                 console.error("Erro ao buscar sugestões:", error);
                 results.innerHTML = '<div class="error">Erro ao buscar sugestões</div>';
             }
-        }, 300);
+        }
         
         // Evento para o campo de entrada
         input.addEventListener('input', (e) => {
             const termo = e.target.value;
             buscarSugestoes(termo);
-            
             // Desabilitar botão se limpar o campo
             if (!termo) {
                 confirmBtn.disabled = true;
@@ -724,59 +731,616 @@ const BENETRIP = {
                 this.processarResposta(selectedItem, pergunta);
             }
         });
-        
-        // Foco automático no input
-        setTimeout(() => input.focus(), 300);
     },
 
     /**
      * Configura a entrada de valor monetário
      */
     configurarEntradaMoeda() {
-        const currencyId = this.estado.currentCurrencyId;
-        const input = document.getElementById(currencyId);
-        
-        if (!input) {
-            console.error(`Input de moeda com ID ${currencyId} não encontrado`);
+        // Verificar se o input está presente no DOM
+        const checkInput = setInterval(() => {
+            const currencyId = this.estado.currentCurrencyId;
+            if (!currencyId) {
+                console.error("ID de entrada monetária não encontrado!");
+                clearInterval(checkInput);
+                return;
+            }
+            
+            const input = document.getElementById(currencyId);
+            const confirmBtn = document.getElementById(`${currencyId}-confirm`);
+            
+            if (input && confirmBtn) {
+                clearInterval(checkInput);
+                
+                // Inicializar com valor vazio
+                input.value = '';
+                confirmBtn.disabled = true;
+                
+                // Formatar entrada como moeda
+                input.addEventListener('input', (e) => {
+                    // Remover tudo exceto números
+                    let valor = e.target.value.replace(/\D/g, '');
+                    
+                    // Verificar se o valor não está vazio
+                    if (valor) {
+                        // Converter para formato decimal (dividir por 100)
+                        valor = (parseInt(valor) / 100).toFixed(2);
+                        
+                        // Formatar com separador decimal
+                        e.target.value = valor.replace('.', ',');
+                        
+                        // Habilitar botão se tiver valor
+                        confirmBtn.disabled = parseFloat(valor) <= 0;
+                    } else {
+                        e.target.value = '';
+                        confirmBtn.disabled = true;
+                    }
+                });
+                
+                // Evento para o botão de confirmação
+                confirmBtn.addEventListener('click', () => {
+                    const valor = parseFloat(input.value.replace(',', '.'));
+                    if (valor > 0) {
+                        const pergunta = this.estado.perguntas[this.estado.perguntaAtual];
+                        this.processarResposta(valor, pergunta);
+                    }
+                });
+                
+                // Foco automático no input
+                setTimeout(() => input.focus(), 300);
+                
+                console.log("Campo de moeda inicializado com sucesso");
+            }
+        }, 100); // Verifica a cada 100ms se o elemento foi criado
+    },
+    
+    /**
+     * Configura a entrada de texto simples
+     */
+    configurarEntradaTexto() {
+        const textId = this.estado.currentTextId;
+        if (!textId) {
+            console.error("ID de entrada de texto não encontrado!");
             return;
         }
         
-        const confirmBtn = document.getElementById(`${currencyId}-confirm`);
+        const input = document.getElementById(textId);
+        const confirmBtn = document.getElementById(`${textId}-confirm`);
         
-        // Inicializar com valor vazio
-        input.value = '';
-        confirmBtn.disabled = true;
+        if (!input || !confirmBtn) {
+            console.error("Elementos de entrada de texto não encontrados!");
+            return;
+        }
         
-        // Formatar entrada como moeda
+        // Evento para o campo de entrada
         input.addEventListener('input', (e) => {
-            // Remover tudo exceto números
-            let valor = e.target.value.replace(/\D/g, '');
-            
-            // Verificar se o valor não está vazio
-            if (valor) {
-                // Converter para formato decimal (dividir por 100)
-                valor = (parseInt(valor) / 100).toFixed(2);
-                
-                // Formatar com separador decimal
-                e.target.value = valor.replace('.', ',');
-                
-                // Habilitar botão se tiver valor
-                confirmBtn.disabled = parseFloat(valor) <= 0;
-            } else {
-                e.target.value = '';
-                confirmBtn.disabled = true;
-            }
+            const texto = e.target.value.trim();
+            confirmBtn.disabled = texto.length === 0;
         });
         
         // Evento para o botão de confirmação
         confirmBtn.addEventListener('click', () => {
-            const valor = parseFloat(input.value.replace(',', '.'));
-            if (valor > 0) {
+            const texto = input.value.trim();
+            if (texto.length > 0) {
                 const pergunta = this.estado.perguntas[this.estado.perguntaAtual];
-                this.processarResposta(valor, pergunta);
+                this.processarResposta(texto, pergunta);
+            }
+        });
+    },
+    /**
+     * Processa a resposta do usuário a uma pergunta
+     */
+    processarResposta(valor, pergunta) {
+        // Armazenar resposta
+        this.estado.respostas[pergunta.key] = valor;
+        
+        // Mostrar resposta do usuário no chat
+        this.mostrarRespostaUsuario(valor, pergunta);
+        
+        // Se for a primeira pergunta (conhece_destino), definir o fluxo
+        if (pergunta.key === 'conhece_destino') {
+            this.estado.fluxo = valor === 0 ? 'destino_conhecido' : 'destino_desconhecido';
+        }
+        
+        // Avançar para a próxima pergunta
+        this.estado.perguntaAtual++;
+        
+        // Verificar se atingimos o limite de perguntas para este fluxo
+        if (this.verificarLimitePerguntas()) {
+            this.finalizarQuestionario();
+            return;
+        }
+        
+        // Mostrar próxima pergunta
+        // Armazenar referência ao "this" atual para usar dentro do setTimeout
+        const self = this;
+        setTimeout(function() {
+            self.mostrarProximaPergunta();
+        }, this.config.animationDelay);
+    },
+
+    /**
+     * Verifica se atingimos o limite de perguntas para este fluxo
+     */
+    verificarLimitePerguntas() {
+        // Desativar verificação de limite para garantir que todas as perguntas sejam exibidas
+        return false; // Sempre retorna falso para não finalizar prematuramente
+    },
+
+    /**
+     * Mostra a resposta do usuário no chat
+     */
+    mostrarRespostaUsuario(valor, pergunta) {
+        let mensagemResposta = '';
+        
+        // Formatar a resposta com base no tipo de pergunta
+        if (pergunta.options) {
+            // Resposta de múltipla escolha
+            mensagemResposta = pergunta.options[valor];
+        } else if (pergunta.calendar) {
+            // Resposta de calendário
+            const formatarData = (data) => {
+                const dataObj = new Date(data);
+                return dataObj.toLocaleDateString('pt-BR', {
+                    day: '2-digit',
+                    month: '2-digit',
+                    year: 'numeric'
+                });
+            };
+            
+            mensagemResposta = `Ida: ${formatarData(valor.dataIda)} | Volta: ${formatarData(valor.dataVolta)}`;
+        } else if (pergunta.autocomplete) {
+            // Resposta de autocomplete
+            mensagemResposta = `${valor.name} (${valor.code}), ${valor.country}`;
+        } else {
+            // Outros tipos de resposta
+            mensagemResposta = valor.toString();
+        }
+        
+        // Criar elemento da mensagem
+        const mensagemHTML = `
+            <div class="chat-message user">
+                <div class="message">
+                    <p>${mensagemResposta}</p>
+                </div>
+            </div>
+        `;
+        
+        // Adicionar ao chat
+        const chatMessages = document.getElementById('chat-messages');
+        chatMessages.insertAdjacentHTML('beforeend', mensagemHTML);
+        
+        // Rolar para a última mensagem
+        this.rolarParaFinal();
+    },
+
+    /**
+     * Finaliza o questionário e passa para a próxima etapa
+     */
+    finalizarQuestionario() {
+        // Salvar dados do usuário
+        this.salvarDadosUsuario();
+        
+        // Mostrar mensagem de finalização
+        this.mostrarMensagemFinalizacao()
+            .then(() => {
+                // Determinar próxima etapa com base no fluxo
+                if (this.estado.fluxo === 'destino_conhecido') {
+                    // Se já sabe o destino, ir direto para busca de voos
+                    this.buscarVoos();
+                } else {
+                    // Se não sabe o destino, mostrar recomendações
+                    this.buscarRecomendacoes();
+                }
+            });
+    },
+    /**
+     * Mostra mensagem de finalização do questionário
+     */
+    async mostrarMensagemFinalizacao() {
+        // Mostrar Tripinha pensando
+        await this.mostrarTripinhaPensando();
+        
+        // Texto da mensagem
+        let textoMensagem = '';
+        
+        if (this.estado.fluxo === 'destino_conhecido') {
+            const destino = this.estado.respostas.destino_conhecido;
+            textoMensagem = `Ótimo! Vou buscar as melhores opções de voos para ${destino.name} para você! 🧳✈️`;
+        } else {
+            textoMensagem = `Perfeito! Com suas preferências, já sei quais destinos vão te encantar! Vou preparar algumas sugestões especiais para você! 🐾🗺️`;
+        }
+        
+        // Mostrar mensagem da Tripinha
+        const mensagemHTML = `
+            <div class="chat-message tripinha">
+                <div class="avatar">
+                    <img src="${this.config.imagePath}tripinha/avatar-normal.png" alt="Tripinha" />
+                </div>
+                <div class="message">
+                    <p>${textoMensagem}</p>
+                    <div class="progress-container">
+                        <div class="progress-bar" style="width: 0%"></div>
+                        <p class="progress-text">Preparando...</p>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        // Adicionar ao chat
+        const chatMessages = document.getElementById('chat-messages');
+        chatMessages.insertAdjacentHTML('beforeend', mensagemHTML);
+        
+        // Rolar para a última mensagem
+        this.rolarParaFinal();
+        
+        // Configurar manipulador de eventos para progresso
+        this.configurarEventosProgresso();
+        
+        // Retornar uma promessa que será resolvida após simular progresso inicial
+        return new Promise(resolve => {
+            setTimeout(() => {
+                this.atualizarBarraProgresso(15, "Iniciando busca...");
+                resolve();
+            }, 1000);
+        });
+    },
+
+    /**
+     * Mostra a Tripinha "pensando"
+     */
+    async mostrarTripinhaPensando() {
+        // Criar elemento de mensagem
+        const mensagemHTML = `
+            <div class="chat-message tripinha">
+                <div class="avatar">
+                    <img src="${this.config.imagePath}tripinha/avatar-pensando.png" alt="Tripinha pensando" />
+                </div>
+                <div class="message">
+                    <div class="thinking-dots">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        // Adicionar ao chat
+        const chatMessages = document.getElementById('chat-messages');
+        chatMessages.insertAdjacentHTML('beforeend', mensagemHTML);
+        
+        // Rolar para a última mensagem
+        this.rolarParaFinal();
+        
+        // Simular tempo de "pensamento"
+        return new Promise(resolve => {
+            setTimeout(() => {
+                // Remover mensagem de pensamento
+                const mensagemPensando = chatMessages.querySelector('.chat-message.tripinha:last-child');
+                if (mensagemPensando) {
+                    chatMessages.removeChild(mensagemPensando);
+                }
+                resolve();
+            }, 1500);
+        });
+    },
+
+    /**
+     * Configura eventos para atualização da barra de progresso
+     */
+    configurarEventosProgresso() {
+        // Remover manipuladores antigos para evitar duplicação
+        window.removeEventListener('benetrip_progress', this.handleProgressEvent);
+        
+        // Criar novo manipulador de eventos
+        this.handleProgressEvent = (event) => {
+            const { progress, message } = event.detail;
+            this.atualizarBarraProgresso(progress, message);
+        };
+        
+        // Registrar manipulador para eventos de progresso
+        window.addEventListener('benetrip_progress', this.handleProgressEvent);
+    },
+
+    /**
+     * Atualiza a barra de progresso
+     */
+    atualizarBarraProgresso(porcentagem, mensagem) {
+        const progressBar = document.querySelector('.progress-bar');
+        const progressText = document.querySelector('.progress-text');
+        
+        if (progressBar && progressText) {
+            progressBar.style.width = `${porcentagem}%`;
+            progressText.textContent = mensagem || 'Processando...';
+            
+            // Se o progresso for 100%, preparar para transição
+            if (porcentagem >= 100) {
+                setTimeout(() => {
+                    // Adicionar classe para animar saída
+                    document.querySelectorAll('.progress-container').forEach(el => {
+                        el.classList.add('completed');
+                    });
+                }, 500);
+            }
+        }
+    },
+    /**
+     * Busca recomendações de destinos com base nas preferências do usuário
+     */
+    buscarRecomendacoes() {
+        // Verificar se o serviço de IA está disponível
+        if (!window.BENETRIP_AI) {
+            console.error("Serviço de IA não disponível");
+            this.atualizarBarraProgresso(100, "Erro ao buscar recomendações. Redirecionando...");
+            
+            // Redirecionar para página de destinos após delay
+            setTimeout(() => {
+                window.location.href = 'destinos.html';
+            }, 2000);
+            return;
+        }
+        
+        // Chamar serviço de IA para recomendações
+        window.BENETRIP_AI.obterRecomendacoes(this.estado.respostas)
+            .then(recomendacoes => {
+                // Salvar recomendações
+                localStorage.setItem('benetrip_recomendacoes', JSON.stringify(recomendacoes));
+                
+                // Mostrar mensagem de conclusão
+                this.atualizarBarraProgresso(100, "Destinos encontrados! Redirecionando...");
+                
+                // Redirecionar para página de destinos após delay
+                setTimeout(() => {
+                    window.location.href = 'destinos.html';
+                }, 2000);
+            })
+            .catch(erro => {
+                console.error("Erro ao obter recomendações:", erro);
+                this.atualizarBarraProgresso(100, "Erro ao buscar recomendações. Redirecionando...");
+                
+                // Redirecionar para página de destinos após delay
+                setTimeout(() => {
+                    window.location.href = 'destinos.html';
+                }, 2000);
+            });
+    },
+
+    /**
+     * Busca voos para o destino escolhido pelo usuário
+     */
+    buscarVoos() {
+        // Verificar se o serviço de API está disponível
+        if (!window.BENETRIP_API) {
+            console.error("Serviço de API não disponível");
+            this.atualizarBarraProgresso(100, "Erro ao buscar voos. Redirecionando...");
+            
+            // Redirecionar para página de voos após delay
+            setTimeout(() => {
+                window.location.href = 'flights.html';
+            }, 2000);
+            return;
+        }
+        
+        // Preparar parâmetros para busca de voos
+        const destino = this.estado.respostas.destino_conhecido;
+        const origem = this.estado.respostas.cidade_partida;
+        const datas = this.estado.respostas.datas;
+        
+        const params = {
+            origem: origem.code,
+            destino: destino.code,
+            dataIda: datas.dataIda,
+            dataVolta: datas.dataVolta,
+            adultos: this.getNumeroAdultos()
+        };
+        
+        // Chamar serviço de API para busca de voos
+        window.BENETRIP_API.buscarVoos(params)
+            .then(resultados => {
+                // Salvar resultados
+                localStorage.setItem('benetrip_resultados_voos', JSON.stringify(resultados));
+                
+                // Mostrar mensagem de conclusão
+                this.atualizarBarraProgresso(100, "Voos encontrados! Redirecionando...");
+                
+                // Redirecionar para página de voos após delay
+                setTimeout(() => {
+                    window.location.href = 'flights.html';
+                }, 2000);
+            })
+            .catch(erro => {
+                console.error("Erro ao buscar voos:", erro);
+                this.atualizarBarraProgresso(100, "Erro ao buscar voos. Redirecionando...");
+                
+                // Redirecionar para página de voos após delay
+                setTimeout(() => {
+                    window.location.href = 'flights.html';
+                }, 2000);
+            });
+    },
+
+    /**
+     * Obtém o número total de adultos com base nas respostas
+     */
+    getNumeroAdultos() {
+        if (this.estado.respostas.companhia === 0) {
+            // Viajando sozinho
+            return 1;
+        } else if (this.estado.respostas.companhia === 1) {
+            // Viajando em casal
+            return 2;
+        } else if (this.estado.respostas.companhia === 2) {
+            // Viajando em família
+            return this.estado.respostas.quantidade_familia || 2;
+        } else if (this.estado.respostas.companhia === 3) {
+            // Viajando com amigos
+            return this.estado.respostas.quantidade_amigos || 2;
+        }
+        
+        // Valor padrão
+        return 1;
+    },
+    /**
+     * Salva os dados do usuário no localStorage
+     */
+    salvarDadosUsuario() {
+        localStorage.setItem('benetrip_user_data', JSON.stringify({
+            respostas: this.estado.respostas,
+            fluxo: this.estado.fluxo,
+            timestamp: Date.now()
+        }));
+    },
+
+    /**
+     * Verifica se existem dados salvos de uma sessão anterior
+     */
+    verificarDadosSalvos() {
+        const dadosSalvos = localStorage.getItem('benetrip_user_data');
+        
+        if (dadosSalvos) {
+            try {
+                const dados = JSON.parse(dadosSalvos);
+                
+                // Verificar se os dados ainda são válidos (menos de 24 horas)
+                const agora = Date.now();
+                const dataGravacao = dados.timestamp || 0;
+                
+                const horasDecorridas = (agora - dataGravacao) / (1000 * 60 * 60);
+                
+                if (horasDecorridas < 24) {
+                    // Dados ainda são válidos
+                    console.log("Dados de usuário carregados do localStorage");
+                    
+                    if (this.config.debugMode) {
+                        console.log("Dados carregados:", dados);
+                    }
+                }
+            } catch (erro) {
+                console.error("Erro ao carregar dados salvos:", erro);
+            }
+        }
+    },
+
+    /**
+     * Inicializa a tela de destinos
+     */
+    iniciarTelaDestinos() {
+        // Carregar dados salvos
+        const dadosUsuario = localStorage.getItem('benetrip_user_data');
+        const recomendacoes = localStorage.getItem('benetrip_recomendacoes');
+        
+        if (!dadosUsuario || !recomendacoes) {
+            // Redirecionar para a página inicial se não tiver dados
+            window.location.href = 'index.html';
+            return;
+        }
+        
+        // Renderizar destinos recomendados
+        this.renderizarDestinos(JSON.parse(recomendacoes));
+    },
+
+    /**
+     * Renderiza os destinos recomendados na tela
+     */
+    renderizarDestinos(recomendacoes) {
+        // Implementação a ser completada
+        console.log("Renderizando destinos:", recomendacoes);
+        
+        // O código para renderizar destinos será implementado na próxima fase
+    },
+
+    /**
+     * Inicializa a tela de voos
+     */
+    iniciarTelaVoos() {
+        // Carregar dados salvos
+        const dadosUsuario = localStorage.getItem('benetrip_user_data');
+        const resultadosVoos = localStorage.getItem('benetrip_resultados_voos');
+        
+        if (!dadosUsuario || !resultadosVoos) {
+            // Redirecionar para a página inicial se não tiver dados
+            window.location.href = 'index.html';
+            return;
+        }
+        
+        // Renderizar voos
+        this.renderizarVoos(JSON.parse(resultadosVoos));
+    },
+
+    /**
+     * Renderiza os voos encontrados na tela
+     */
+    renderizarVoos(resultados) {
+        // Implementação a ser completada
+        console.log("Renderizando voos:", resultados);
+        
+        // O código para renderizar voos será implementado na próxima fase
+    },
+    /**
+     * Mostrar indicador de carregamento
+     */
+    mostrarCarregando(estado) {
+        this.estado.carregando = estado;
+        
+        const loadingElement = document.getElementById('loading-indicator');
+        if (loadingElement) {
+            loadingElement.style.display = estado ? 'flex' : 'none';
+        }
+    },
+
+    /**
+     * Mostrar mensagem de erro
+     */
+    mostrarErro(mensagem) {
+        const errorElement = document.createElement('div');
+        errorElement.className = 'error-message';
+        errorElement.textContent = mensagem;
+        
+        document.body.appendChild(errorElement);
+        
+        setTimeout(() => {
+            errorElement.classList.add('show');
+        }, 100);
+        
+        setTimeout(() => {
+            errorElement.classList.remove('show');
+            setTimeout(() => {
+                document.body.removeChild(errorElement);
+            }, 300);
+        }, 3000);
+    },
+
+    /**
+     * Rolar o chat para a última mensagem
+     */
+    rolarParaFinal() {
+        const chatMessages = document.getElementById('chat-messages');
+        if (chatMessages) {
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+    },
+
+    /**
+     * Registrar manipuladores de eventos globais
+     */
+    registrarEventos() {
+        // Manipulador para o evento DOMContentLoaded
+        document.addEventListener('DOMContentLoaded', () => {
+            // Inicializar componentes específicos da página
+            if (document.getElementById('chat-container')) {
+                this.iniciarChat();
             }
         });
         
-        // Foco automático no input
-        setTimeout(() => input.focus(), 300);
-    },
+        // Outros eventos globais podem ser registrados aqui
+    }
+};
+
+// Inicializar a aplicação quando o DOM estiver pronto
+document.addEventListener('DOMContentLoaded', function() {
+    BENETRIP.init();
+});
+
+// Exportar a aplicação para o namespace global
+window.BENETRIP = BENETRIP;
