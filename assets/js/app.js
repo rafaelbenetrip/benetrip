@@ -647,12 +647,19 @@ inicializarCalendario(pergunta) {
 /**
  * Configura o campo de autocomplete para cidades/destinos
  */
+/**
+ * Configura o campo de autocomplete para cidades/destinos
+ */
 configurarAutocomplete(pergunta) {
     const autocompleteId = this.estado.currentAutocompleteId;
     if (!autocompleteId) {
         console.error("ID de autocomplete não encontrado!");
         return;
     }
+    
+    // Identificar o tipo de campo (origem ou destino)
+    const tipoCampo = pergunta.key === 'destino_conhecido' ? 'destino' : 'origem';
+    console.log(`Configurando autocomplete para campo: ${tipoCampo}`);
     
     const input = document.getElementById(autocompleteId);
     const resultsContainer = document.getElementById(`${autocompleteId}-results`);
@@ -682,6 +689,7 @@ configurarAutocomplete(pergunta) {
             // Usar a API Aviasales através do serviço
             if (window.BENETRIP_API) {
                 sugestoes = await window.BENETRIP_API.buscarSugestoesCidade(termo);
+                console.log(`Sugestões recebidas para ${tipoCampo}:`, sugestoes);
             } else {
                 // Fallback para dados simulados
                 sugestoes = [
@@ -694,21 +702,23 @@ configurarAutocomplete(pergunta) {
             // Verificar se a consulta ainda é relevante
             if (termo !== currentQuery) return;
             
-            if (sugestoes.length > 0) {
-    resultsContainer.innerHTML = sugestoes.map(item => {
-        return `
-            <div class="autocomplete-item" 
-                 data-code="${item.code || item.iata}" 
-                 data-name="${item.name || item.city_name}"
-                 data-country="${item.country_name}">
-                <div class="item-code">${item.code || item.iata}</div>
-                <div class="item-details">
-                    <div class="item-name">${item.name || item.city_name}</div>
-                    <div class="item-country">${item.country_name}</div>
-                </div>
-            </div>
-        `;
-    }).join('');
+            if (sugestoes && sugestoes.length > 0) {
+                resultsContainer.innerHTML = sugestoes.map(item => {
+                    // Garantir compatibilidade com diferentes formatos de resposta
+                    const code = item.code || item.iata;
+                    const name = item.name || item.city_name;
+                    const country = item.country_name;
+                    
+                    return `
+                        <div class="autocomplete-item" data-code="${code}" data-name="${name}" data-country="${country}">
+                            <div class="item-code">${code}</div>
+                            <div class="item-details">
+                                <div class="item-name">${name}</div>
+                                <div class="item-country">${country}</div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
                 
                 // Adicionar eventos aos itens
                 document.querySelectorAll(`#${autocompleteId}-results .autocomplete-item`).forEach(item => {
@@ -727,7 +737,7 @@ configurarAutocomplete(pergunta) {
                 resultsContainer.innerHTML = '<div class="no-results">Nenhum resultado encontrado</div>';
             }
         } catch (error) {
-            console.error("Erro ao buscar sugestões:", error);
+            console.error(`Erro ao buscar sugestões para ${tipoCampo}:`, error);
             resultsContainer.innerHTML = '<div class="error">Erro ao buscar sugestões</div>';
         }
     }, 300);
