@@ -253,18 +253,20 @@ const BENETRIP = {
     } else if (pergunta.input_field) {
                     // Campo de entrada de texto
         if (pergunta.calendar) {
-            // Calendário - Versão simplificada e robusta
-            opcoesHTML = `
-                <div class="calendar-container">
-                    <div id="inline-calendar" class="flatpickr-calendar-container"></div>
-                    <div class="date-selection">
-                        <p>Ida: <span id="date-start">Selecione</span></p>
-                        <p>Volta: <span id="date-end">Selecione</span></p>
-                    </div>
-                    <button id="confirm-dates" class="confirm-button">Confirmar Datas</button>
-                </div>
-            `;
-        }  else if (pergunta.number_input) {
+    console.log("Montando HTML do calendário");
+    opcoesHTML = `
+        <div class="calendar-container">
+            <div id="inline-calendar"></div>
+            <div class="date-selection">
+                <p>Ida: <span id="date-start">Selecione</span></p>
+                <p>Volta: <span id="date-end">Selecione</span></p>
+            </div>
+            <button id="confirm-dates" class="confirm-button" disabled>Confirmar Datas</button>
+        </div>
+    `;
+    console.log("HTML do calendário criado:", opcoesHTML);
+}
+        else if (pergunta.number_input) {
                 // Entrada numérica
                 opcoesHTML = `
                     <div class="number-input-container">
