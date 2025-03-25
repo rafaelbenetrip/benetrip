@@ -236,35 +236,35 @@ const BENETRIP = {
      * Monta o HTML para exibir uma pergunta no chat
      */
     montarHTMLPergunta(pergunta) {
-        let opcoesHTML = '';
-        
-        // Construir opções com base no tipo da pergunta
-        if (pergunta.options) {
-            // Pergunta de múltipla escolha
+    let opcoesHTML = '';
+    
+    // Construir opções com base no tipo da pergunta
+    if (pergunta.options) {
+        // Pergunta de múltipla escolha
+        opcoesHTML = `
+            <div class="options-container">
+                ${pergunta.options.map((opcao, index) => `
+                    <button class="option-button" data-index="${index}" data-valor="${index}">
+                        ${opcao}
+                    </button>
+                `).join('')}
+            </div>
+        `;
+    } else if (pergunta.input_field) {
+                    // Campo de entrada de texto
+        if (pergunta.calendar) {
+            // Calendário - Versão simplificada e robusta
             opcoesHTML = `
-                <div class="options-container">
-                    ${pergunta.options.map((opcao, index) => `
-                        <button class="option-button" data-index="${index}" data-valor="${index}">
-                            ${opcao}
-                        </button>
-                    `).join('')}
+                <div class="calendar-container">
+                    <div id="inline-calendar" class="flatpickr-calendar-container"></div>
+                    <div class="date-selection">
+                        <p>Ida: <span id="date-start">Selecione</span></p>
+                        <p>Volta: <span id="date-end">Selecione</span></p>
+                    </div>
+                    <button id="confirm-dates" class="confirm-button">Confirmar Datas</button>
                 </div>
             `;
-        } else if (pergunta.input_field) {
-            // Campo de entrada de texto
-            if (pergunta.calendar) {
-                // Calendário
-                opcoesHTML = `
-                    <div class="calendar-container">
-                        <div id="inline-calendar"></div>
-                        <div class="date-selection">
-                            <p>Ida: <span id="date-start">Selecione</span></p>
-                            <p>Volta: <span id="date-end">Selecione</span></p>
-                        </div>
-                        <button id="confirm-dates" class="confirm-button" disabled>Confirmar Datas</button>
-                    </div>
-                `;
-            } else if (pergunta.number_input) {
+        }  else if (pergunta.number_input) {
                 // Entrada numérica
                 opcoesHTML = `
                     <div class="number-input-container">
