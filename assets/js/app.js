@@ -253,10 +253,10 @@ const BENETRIP = {
     } else if (pergunta.input_field) {
                     // Campo de entrada de texto
         if (pergunta.calendar) {
-    console.log("Montando HTML do calendário");
+    console.log("Gerando HTML do calendário");
     opcoesHTML = `
-        <div class="calendar-container">
-            <div id="inline-calendar"></div>
+        <div class="calendar-container" id="calendar-container-main">
+            <div id="inline-calendar" style="width: 100%; min-height: 300px;"></div>
             <div class="date-selection">
                 <p>Ida: <span id="date-start">Selecione</span></p>
                 <p>Volta: <span id="date-end">Selecione</span></p>
@@ -264,7 +264,7 @@ const BENETRIP = {
             <button id="confirm-dates" class="confirm-button" disabled>Confirmar Datas</button>
         </div>
     `;
-    console.log("HTML do calendário criado:", opcoesHTML);
+    console.log("HTML do calendário gerado");
 }
         else if (pergunta.number_input) {
                 // Entrada numérica
@@ -322,22 +322,25 @@ const BENETRIP = {
     /**
      * Configura eventos específicos para cada tipo de pergunta
      */
-    configurarEventosPergunta(pergunta) {
-        // Botões de opção para perguntas de múltipla escolha
-        const optionButtons = document.querySelectorAll('.option-button');
-        if (optionButtons.length > 0) {
-            optionButtons.forEach(button => {
-                button.addEventListener('click', () => {
-                    const valor = parseInt(button.dataset.valor);
-                    this.processarResposta(valor, pergunta);
-                });
+configurarEventosPergunta(pergunta) {
+    // Botões de opção para perguntas de múltipla escolha
+    const optionButtons = document.querySelectorAll('.option-button');
+    if (optionButtons.length > 0) {
+        optionButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                const valor = parseInt(button.dataset.valor);
+                this.processarResposta(valor, pergunta);
             });
-        }
-        
-        // Configurar calendário
-        if (pergunta.calendar) {
+        });
+    }
+    
+    // Configurar calendário - adicionando um pequeno atraso para garantir que o DOM esteja atualizado
+    if (pergunta.calendar) {
+        console.log("Aguardando renderização do DOM para configurar o calendário...");
+        setTimeout(() => {
             this.configurarCalendario(pergunta);
-        }
+        }, 500); // Aguarde 500ms para garantir que o DOM foi atualizado
+    }
         
         // Configurar entrada numérica
         if (pergunta.number_input) {
