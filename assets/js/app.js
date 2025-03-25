@@ -424,7 +424,7 @@ if (pergunta.calendar) {
             clearInterval(checkCalendarElement);
         }
     }, 300);
-}
+},
 
 // Função auxiliar para inicializar o Flatpickr
 inicializarFlatpickr(calendarElement, pergunta) {
