@@ -2277,3 +2277,20 @@ body {
 .date-selection p span {
     font-weight: 700;
 }
+
+.number-input-container .confirm-number {
+    background-color: var(--blue-secondary);
+    color: var(--white);
+    padding: var(--spacing-sm) var(--spacing-md);
+    border-radius: var(--border-radius-md);
+    margin-left: auto;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: var(--font-size-md);
+    min-width: 100px;
+    transition: background-color var(--transition-fast);
+}
+
+.number-input-container .confirm-number:hover {
+    background-color: #0086B8;
+}
