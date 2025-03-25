@@ -206,24 +206,22 @@ const BENETRIP = {
             </div>
         `;
     } else if (pergunta.input_field) {
-        if (pergunta.calendar) {
-            const calendarId = `benetrip-calendar-${Date.now()}`;
-            this.estado.currentCalendarId = calendarId; // Adicionar esta linha
-            
-            opcoesHTML = `
-                <div class="calendar-container" data-calendar-container="${calendarId}">
-                    <div id="${calendarId}" class="flatpickr-calendar-container"></div>
-                    <div class="date-selection">
-                        <p>Ida: <span id="data-ida-${calendarId}" class="data-ida">Selecione</span></p>
-                        <p>Volta: <span id="data-volta-${calendarId}" class="data-volta">Selecione</span></p>
-                    </div>
-                    <button id="confirmar-datas-${calendarId}" class="confirm-button confirm-dates" disabled>Confirmar Datas</button>
-                </div>
-            `;
+    if (pergunta.calendar) {
+        // Gerar ID apenas se não existir
+        if (!this.estado.currentCalendarId) {
+            this.estado.currentCalendarId = `benetrip-calendar-${Date.now()}`;
         }
-    console.log(`HTML do calendário gerado com ID dinâmico: ${calendarId}`);
-}
-            else if (pergunta.number_input) {
+        const calendarId = this.estado.currentCalendarId;
+        
+        console.log(`Gerando HTML do calendário com ID: ${calendarId}`);
+        
+        opcoesHTML = `
+            <div class="calendar-container" data-calendar-container="${calendarId}">
+                <div id="${calendarId}" class="flatpickr-calendar-container"></div>
+                <!-- resto do código -->
+            </div>
+        `;
+    } else if (pergunta.number_input) {
                 // Entrada numérica
                 const inputId = `number-input-${Date.now()}`;
                 this.estado.currentNumberInputId = inputId;
@@ -303,20 +301,35 @@ const BENETRIP = {
         }
         
         // Configurar calendário
-        if (pergunta.calendar) {
-            console.log("Configurando calendário...");
-            
-            // Verificar se carregou a biblioteca Flatpickr
-            if (typeof flatpickr === 'undefined') {
-                console.error("Biblioteca Flatpickr não encontrada. Tentando carregar dinamicamente...");
-                this.carregarFlatpickrDinamicamente(pergunta);
-            } else {
-                // Inicializar o calendário com um pequeno atraso para garantir que o DOM foi atualizado
-                setTimeout(() => {
-                    this.inicializarCalendario(pergunta);
-                }, 300);
+if (pergunta.calendar) {
+    console.log("Configurando calendário...");
+    
+    // Garantir que temos um ID de calendário válido
+    if (!this.estado.currentCalendarId) {
+        this.estado.currentCalendarId = `benetrip-calendar-${Date.now()}`;
+        console.log(`Criado novo ID de calendário: ${this.estado.currentCalendarId}`);
+    }
+    
+    // Verificar se carregou a biblioteca Flatpickr
+    if (typeof flatpickr === 'undefined') {
+        console.error("Biblioteca Flatpickr não encontrada. Tentando carregar dinamicamente...");
+        this.carregarFlatpickrDinamicamente(pergunta);
+    } else {
+        // Salvar o ID do calendário em uma variável local
+        const calendarId = this.estado.currentCalendarId;
+        console.log(`Usando ID do calendário: ${calendarId} para inicialização`);
+        
+        // Inicializar o calendário com um pequeno atraso para garantir que o DOM foi atualizado
+        setTimeout(() => {
+            // Verificar novamente o ID dentro do setTimeout para garantir
+            if (!this.estado.currentCalendarId) {
+                this.estado.currentCalendarId = calendarId;
+                console.log(`Restaurado ID do calendário: ${calendarId}`);
             }
-        }
+            this.inicializarCalendario(pergunta);
+        }, 300);
+    }
+}
         
         // Configurar entrada numérica
         if (pergunta.number_input) {
@@ -345,13 +358,29 @@ const BENETRIP = {
 inicializarCalendario(pergunta) {
     console.log("Iniciando configuração do calendário");
 
-    const calendarId = this.estado.currentCalendarId;
-
-    if (!calendarId) {
-        console.error("ID do calendário não encontrado no estado!");
-        return;
+    // Se não temos um ID no estado, vamos gerar um novo
+    if (!this.estado.currentCalendarId) {
+        console.warn("ID do calendário não encontrado no estado, gerando um novo ID");
+        this.estado.currentCalendarId = `benetrip-calendar-${Date.now()}`;
+        
+        // Verificar se já temos um elemento de calendário no DOM
+        const existingContainer = document.querySelector('.calendar-container');
+        if (existingContainer) {
+            // Atualizar o ID no DOM para corresponder ao novo ID
+            const calendarElement = existingContainer.querySelector('.flatpickr-calendar-container');
+            if (calendarElement) {
+                calendarElement.id = this.estado.currentCalendarId;
+                console.log(`Atualizado ID do calendário existente para: ${this.estado.currentCalendarId}`);
+            }
+        } else {
+            console.error("Container de calendário não encontrado no DOM!");
+            // Criar elemento do calendário manualmente
+            this.criarElementoCalendarioManualmente(pergunta);
+            return;
+        }
     }
 
+    const calendarId = this.estado.currentCalendarId;
     console.log(`Buscando elemento do calendário com ID: ${calendarId}`);
 
     setTimeout(() => {
