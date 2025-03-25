@@ -381,23 +381,44 @@ config: {
     },
 
     /**
-     * Busca sugestões de lugares para autocomplete
-     */
-    async buscarSugestoesCidade(termo) {
-        try {
-            // Em produção, faria uma chamada à API para obter sugestões
-            // Para o MVP, simulamos algumas cidades
-            return this.simulateAutocompleteCities(termo);
-            
-            /* Código para chamada real à API
-            const response = await fetch(`${this.config.autocompleteUrl}?locale=pt&types[]=airport&types[]=city&term=${encodeURIComponent(termo)}`);
-            return await response.json();
-            */
-        } catch (error) {
-            console.error("Erro ao buscar sugestões de cidade:", error);
+ * Busca sugestões de lugares para autocomplete usando a API Aviasales
+ */
+async buscarSugestoesCidade(termo) {
+    try {
+        console.log("Buscando sugestões para:", termo);
+        
+        // Ignorar busca se o termo for curto demais
+        if (!termo || termo.length < 2) {
             return [];
         }
-    },
+        
+        // URL da API Aviasales Autocomplete
+        const url = `https://autocomplete.travelpayouts.com/places2?term=${encodeURIComponent(termo)}&locale=pt&types[]=city&types[]=airport`;
+        
+        console.log("Chamando API:", url);
+        
+        // Fazer a requisição usando fetch
+        const response = await fetch(url);
+        
+        // Verificar se a requisição foi bem sucedida
+        if (!response.ok) {
+            console.error("Erro na API:", response.status, response.statusText);
+            throw new Error(`Erro na API: ${response.status}`);
+        }
+        
+        // Converter resposta para JSON
+        const data = await response.json();
+        console.log("Resposta da API:", data);
+        
+        // Retornar resultados da API
+        return data;
+    } catch (error) {
+        console.error("Erro ao buscar sugestões de cidade:", error);
+        
+        // Em caso de erro, retornar simulação para não travar a interface
+        return this.simulateAutocompleteCities(termo);
+    }
+},
 
     /**
      * Simula ID de pesquisa para desenvolvimento
