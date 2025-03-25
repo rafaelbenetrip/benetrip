@@ -202,7 +202,7 @@ const BENETRIP = {
                 ${pergunta.options.map((opcao, index) => `
                     <button class="option-button" data-index="${index}" data-valor="${index}">
                         ${opcao}
-                    `).join('')}
+                    </button>`).join('')}
             </div>
         `;
     } else if (pergunta.input_field) {
