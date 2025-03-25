@@ -195,7 +195,7 @@ const BENETRIP = {
      */
     montarHTMLPergunta(pergunta) {
     let opcoesHTML = '';
-    
+
     if (pergunta.options) {
         opcoesHTML = `
             <div class="options-container">
@@ -206,73 +206,73 @@ const BENETRIP = {
             </div>
         `;
     } else if (pergunta.input_field) {
-    if (pergunta.calendar) {
-        // Gerar ID apenas se não existir
-        if (!this.estado.currentCalendarId) {
-            this.estado.currentCalendarId = `benetrip-calendar-${Date.now()}`;
-        }
-        const calendarId = this.estado.currentCalendarId;
-        
-        console.log(`Gerando HTML do calendário com ID: ${calendarId}`);
-        
-        opcoesHTML = `
-            <div class="calendar-container" data-calendar-container="${calendarId}">
-                <div id="${calendarId}" class="flatpickr-calendar-container"></div>
-                <!-- resto do código -->
-            </div>
-        `;
-    } else if (pergunta.number_input) {
-                // Entrada numérica
-                const inputId = `number-input-${Date.now()}`;
-                this.estado.currentNumberInputId = inputId;
-                
-                opcoesHTML = `
-                    <div class="number-input-container">
-                        <button class="decrement">-</button>
-                        <input type="number" min="1" max="20" value="1" id="${inputId}" class="number-input">
-                        <button class="increment">+</button>
-                        <button class="confirm-number">Confirmar</button>
-                    </div>
-                `;
-            } else if (pergunta.autocomplete) {
-                // Campo com autocomplete
-                const autocompleteId = `autocomplete-${Date.now()}`;
-                this.estado.currentAutocompleteId = autocompleteId;
-                
-                opcoesHTML = `
-                    <div class="autocomplete-container" id="${autocompleteId}-container">
-                        <input type="text" id="${autocompleteId}" class="autocomplete-input" placeholder="${pergunta.description}">
-                        <div id="${autocompleteId}-results" class="autocomplete-results"></div>
-                        <button id="${autocompleteId}-confirm" class="confirm-autocomplete" disabled>Confirmar</button>
-                    </div>
-                `;
-            } else if (pergunta.currency_format) {
-                // Campo para valor monetário
-                const currencyId = `currency-input-${Date.now()}`;
-                this.estado.currentCurrencyId = currencyId;
-                
-                opcoesHTML = `
-                    <div class="currency-input-container">
-                        <input type="text" id="${currencyId}" class="currency-input" placeholder="0,00">
-                        <button id="${currencyId}-confirm" class="confirm-currency" disabled>Confirmar</button>
-                    </div>
-                `;
-            } else {
-                // Campo de texto simples
-                const textId = `text-input-${Date.now()}`;
-                this.estado.currentTextId = textId;
-                
-                opcoesHTML = `
-                    <div class="text-input-container">
-                        <input type="text" id="${textId}" class="text-input" placeholder="${pergunta.description}">
-                        <button id="${textId}-confirm" class="confirm-text" disabled>Confirmar</button>
-                    </div>
-                `;
+        if (pergunta.calendar) {
+            // Gerar ID apenas se não existir
+            if (!this.estado.currentCalendarId) {
+                this.estado.currentCalendarId = `benetrip-calendar-${Date.now()}`;
             }
+            const calendarId = this.estado.currentCalendarId;
+
+            console.log(`Gerando HTML do calendário com ID: ${calendarId}`);
+
+            opcoesHTML = `
+                <div class="calendar-container" data-calendar-container="${calendarId}">
+                    <div id="${calendarId}" class="flatpickr-calendar-container"></div>
+                    <!-- resto do código -->
+                </div>
+            `;
+        } else if (pergunta.number_input) {
+            // Entrada numérica
+            const inputId = `number-input-${Date.now()}`;
+            this.estado.currentNumberInputId = inputId;
+
+            opcoesHTML = `
+                <div class="number-input-container">
+                    <button class="decrement">-</button>
+                    <input type="number" min="1" max="20" value="1" id="${inputId}" class="number-input">
+                    <button class="increment">+</button>
+                    <button class="confirm-number">Confirmar</button>
+                </div>
+            `;
+        } else if (pergunta.autocomplete) {
+            // Campo com autocomplete
+            const autocompleteId = `autocomplete-${Date.now()}`;
+            this.estado.currentAutocompleteId = autocompleteId;
+
+            opcoesHTML = `
+                <div class="autocomplete-container" id="${autocompleteId}-container">
+                    <input type="text" id="${autocompleteId}" class="autocomplete-input" placeholder="${pergunta.description}">
+                    <div id="${autocompleteId}-results" class="autocomplete-results"></div>
+                    <button id="${autocompleteId}-confirm" class="confirm-autocomplete" disabled>Confirmar</button>
+                </div>
+            `;
+        } else if (pergunta.currency_format) {
+            // Campo para valor monetário
+            const currencyId = `currency-input-${Date.now()}`;
+            this.estado.currentCurrencyId = currencyId;
+
+            opcoesHTML = `
+                <div class="currency-input-container">
+                    <input type="text" id="${currencyId}" class="currency-input" placeholder="0,00">
+                    <button id="${currencyId}-confirm" class="confirm-currency" disabled>Confirmar</button>
+                </div>
+            `;
+        } else {
+            // Campo de texto simples
+            const textId = `text-input-${Date.now()}`;
+            this.estado.currentTextId = textId;
+
+            opcoesHTML = `
+                <div class="text-input-container">
+                    <input type="text" id="${textId}" class="text-input" placeholder="${pergunta.description}">
+                    <button id="${textId}-confirm" class="confirm-text" disabled>Confirmar</button>
+                </div>
+            `;
         }
-        
-        // Construir a mensagem completa
-        return `
+    }
+
+    // Construir a mensagem completa
+    return `
         <div class="chat-message tripinha" data-pergunta-key="${pergunta.key || ''}">
             <div class="avatar">
                 <img src="${this.config.imagePath}tripinha/avatar-normal.png" alt="Tripinha" />
