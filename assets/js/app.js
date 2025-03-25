@@ -144,7 +144,7 @@ mostrarProximaPergunta() {
     if (this.estado.perguntaAtual >= this.estado.perguntas.length) {
         this.finalizarQuestionario();
         return;
-    }
+    },
     
     // Obter a próxima pergunta
     const pergunta = this.estado.perguntas[this.estado.perguntaAtual];
