@@ -442,21 +442,22 @@ const BENETRIP = {
                     
                     console.log("Flatpickr inicializado com sucesso:", calendar);
                     
-                    // Evento para o botão de confirmação
-                    confirmButton.addEventListener('click', function() {
-                        const datas = calendar.selectedDates.map(data => {
-                            return data.toISOString().split('T')[0]; // Formato YYYY-MM-DD
-                        });
-                        
-                        // Verificar se temos duas datas
-                        if (datas.length === 2) {
-                            const valor = {
-                                dataIda: datas[0],
-                                dataVolta: datas[1]
-                            };
-                            BENETRIP.processarResposta(valor, pergunta);
-                        }
-                    });
+// Evento para o botão de confirmação
+const self = this; // Capturar referência 'this'
+confirmButton.addEventListener('click', function() {
+    const datas = calendar.selectedDates.map(data => {
+        return data.toISOString().split('T')[0]; // Formato YYYY-MM-DD
+    });
+    
+    // Verificar se temos duas datas
+    if (datas.length === 2) {
+        const valor = {
+            dataIda: datas[0],
+            dataVolta: datas[1]
+        };
+        self.processarResposta(valor, pergunta);
+    }
+});
                 } catch (error) {
                     console.error("Erro ao inicializar Flatpickr:", error);
                 }
