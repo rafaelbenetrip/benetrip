@@ -644,6 +644,9 @@ inicializarCalendario(pergunta) {
      /**
  * Configura o campo de autocomplete para cidades/destinos
  */
+/**
+ * Configura o campo de autocomplete para cidades/destinos
+ */
 configurarAutocomplete(pergunta) {
     const autocompleteId = this.estado.currentAutocompleteId;
     if (!autocompleteId) {
@@ -652,41 +655,47 @@ configurarAutocomplete(pergunta) {
     }
     
     const input = document.getElementById(autocompleteId);
-    const results = document.getElementById(`${autocompleteId}-results`);
+    const resultsContainer = document.getElementById(`${autocompleteId}-results`);
     const confirmBtn = document.getElementById(`${autocompleteId}-confirm`);
     
-    if (!input || !results || !confirmBtn) {
+    if (!input || !resultsContainer || !confirmBtn) {
         console.error("Elementos de autocomplete não encontrados!");
         return;
     }
     
     let selectedItem = null;
+    let currentQuery = '';
     
-    const buscarSugestoes = (typeof _ !== 'undefined' && _.debounce) 
-        ? _.debounce(buscarSugestoesImpl.bind(this), 300)
-        : buscarSugestoesImpl.bind(this);
-        
-    async function buscarSugestoesImpl(termo) {
+    // Função para buscar sugestões com debounce (atraso)
+    const buscarSugestoes = _.debounce(async (termo) => {
         if (!termo || termo.length < 2) {
-            results.innerHTML = '';
+            resultsContainer.innerHTML = '';
             return;
         }
         
+        // Mostrar indicador de carregamento
+        resultsContainer.innerHTML = '<div class="loading-autocomplete">Buscando...</div>';
+        
         try {
             let sugestoes = [];
+            
+            // Usar a API Aviasales através do serviço
             if (window.BENETRIP_API) {
                 sugestoes = await window.BENETRIP_API.buscarSugestoesCidade(termo);
             } else {
+                // Fallback para dados simulados
                 sugestoes = [
                     { type: "city", code: "SAO", name: "São Paulo", country_code: "BR", country_name: "Brasil" },
                     { type: "city", code: "RIO", name: "Rio de Janeiro", country_code: "BR", country_name: "Brasil" },
-                    { type: "city", code: "NYC", name: "Nova York", country_code: "US", country_name: "Estados Unidos" },
-                    { type: "city", code: "MIA", name: "Miami", country_code: "US", country_name: "Estados Unidos" }
+                    { type: "city", code: "NYC", name: "Nova York", country_code: "US", country_name: "Estados Unidos" }
                 ];
             }
             
+            // Verificar se a consulta ainda é relevante
+            if (termo !== currentQuery) return;
+            
             if (sugestoes.length > 0) {
-                results.innerHTML = sugestoes.map(item => {
+                resultsContainer.innerHTML = sugestoes.map(item => {
                     return `
                         <div class="autocomplete-item" data-code="${item.code}" data-name="${item.name}" data-country="${item.country_name}">
                             <div class="item-code">${item.code}</div>
@@ -698,7 +707,8 @@ configurarAutocomplete(pergunta) {
                     `;
                 }).join('');
                 
-                document.querySelectorAll('.autocomplete-item').forEach(item => {
+                // Adicionar eventos aos itens
+                document.querySelectorAll(`#${autocompleteId}-results .autocomplete-item`).forEach(item => {
                     item.addEventListener('click', () => {
                         selectedItem = {
                             code: item.dataset.code,
@@ -706,33 +716,50 @@ configurarAutocomplete(pergunta) {
                             country: item.dataset.country
                         };
                         input.value = `${selectedItem.name} (${selectedItem.code})`;
-                        results.innerHTML = '';
+                        resultsContainer.innerHTML = '';
                         confirmBtn.disabled = false;
                     });
                 });
             } else {
-                results.innerHTML = '<div class="no-results">Nenhum resultado encontrado</div>';
+                resultsContainer.innerHTML = '<div class="no-results">Nenhum resultado encontrado</div>';
             }
         } catch (error) {
             console.error("Erro ao buscar sugestões:", error);
-            results.innerHTML = '<div class="error">Erro ao buscar sugestões</div>';
+            resultsContainer.innerHTML = '<div class="error">Erro ao buscar sugestões</div>';
         }
-    }
+    }, 300);
     
+    // Evento para input
     input.addEventListener('input', (e) => {
-        const termo = e.target.value;
-        buscarSugestoes(termo);
+        const termo = e.target.value.trim();
+        currentQuery = termo;
+        
         if (!termo) {
+            resultsContainer.innerHTML = '';
             confirmBtn.disabled = true;
             selectedItem = null;
+        } else {
+            buscarSugestoes(termo);
         }
     });
     
+    // Evento para o botão de confirmação
     confirmBtn.addEventListener('click', () => {
         if (selectedItem) {
             this.processarResposta(selectedItem, pergunta);
         }
     });
+    
+    // Evento para Enter no campo
+    input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && selectedItem) {
+            e.preventDefault();
+            this.processarResposta(selectedItem, pergunta);
+        }
+    });
+    
+    // Foco automático no campo
+    setTimeout(() => input.focus(), 300);
 }, // Adicionada a chave de fechamento e a vírgula
 
     /**
