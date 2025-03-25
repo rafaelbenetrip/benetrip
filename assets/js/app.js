@@ -334,13 +334,33 @@ configurarEventosPergunta(pergunta) {
         });
     }
     
-    // Configurar calendário - adicionando um pequeno atraso para garantir que o DOM esteja atualizado
-    if (pergunta.calendar) {
-        console.log("Aguardando renderização do DOM para configurar o calendário...");
-        setTimeout(() => {
-            this.configurarCalendario(pergunta);
-        }, 500); // Aguarde 500ms para garantir que o DOM foi atualizado
-    }
+    // Configurar calendário
+if (pergunta.calendar) {
+    console.log("Aguardando renderização do DOM para configurar o calendário...");
+    
+    // Aguarde mais tempo para garantir que o DOM foi atualizado
+    setTimeout(() => {
+        console.log("Tentando configurar calendário após delay...");
+        
+        // Verificação adicional do elemento
+        const calendarElement = document.getElementById('inline-calendar');
+        console.log("Elemento do calendário após delay:", calendarElement);
+        
+        if (calendarElement) {
+            this.inicializarFlatpickr(calendarElement, pergunta);
+        } else {
+            // Fallback: tentar encontrar por classe se o ID não funcionar
+            const elements = document.getElementsByClassName('flatpickr-calendar-container');
+            if (elements.length > 0) {
+                console.log("Elemento encontrado por classe:", elements[0]);
+                this.inicializarFlatpickr(elements[0], pergunta);
+            } else {
+                // Último recurso: forçar a criação do flatpickr
+                this.criarCalendarioEmergencia(pergunta);
+            }
+        }
+    }, 1000); // Aumentado para 1 segundo
+}
         
         // Configurar entrada numérica
         if (pergunta.number_input) {
@@ -728,19 +748,21 @@ configurarEntradaMoeda() {
         if (pergunta.options) {
             // Resposta de múltipla escolha
             mensagemResposta = pergunta.options[valor];
-        } else if (pergunta.calendar) {
-            // Resposta de calendário
-            const formatarData = (data) => {
-                const dataObj = new Date(data);
-                return dataObj.toLocaleDateString('pt-BR', {
-                    day: '2-digit',
-                    month: '2-digit',
-                    year: 'numeric'
-                });
-            };
-            
-            mensagemResposta = `Ida: ${formatarData(valor.dataIda)} | Volta: ${formatarData(valor.dataVolta)}`;
-        } else if (pergunta.autocomplete) {
+        } 
+        else if (pergunta.calendar) {
+    console.log("Gerando HTML do calendário");
+    opcoesHTML = `
+        <div class="calendar-container" id="calendar-container-main">
+            <div id="inline-calendar" class="flatpickr-calendar-container" style="width: 100%; min-height: 300px;"></div>
+            <div class="date-selection">
+                <p>Ida: <span id="date-start">Selecione</span></p>
+                <p>Volta: <span id="date-end">Selecione</span></p>
+            </div>
+            <button id="confirm-dates" class="confirm-button" disabled>Confirmar Datas</button>
+        </div>
+    `;
+    console.log("HTML do calendário gerado");
+}} else if (pergunta.autocomplete) {
             // Resposta de autocomplete
             mensagemResposta = `${valor.name} (${valor.code}), ${valor.country}`;
         } else {
