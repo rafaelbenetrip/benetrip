@@ -647,13 +647,10 @@ configurarAutocomplete(pergunta) {
     
     let selectedItem = null;
     
-    // Função para buscar sugestões - usando lodash debounce se disponível
     const buscarSugestoes = (typeof _ !== 'undefined' && _.debounce) 
         ? _.debounce(buscarSugestoesImpl.bind(this), 300)
         : buscarSugestoesImpl.bind(this);
         
-    // Importante: Estamos criando uma função separada e usando bind(this) 
-    // para manter o contexto correto
     async function buscarSugestoesImpl(termo) {
         if (!termo || termo.length < 2) {
             results.innerHTML = '';
@@ -661,12 +658,10 @@ configurarAutocomplete(pergunta) {
         }
         
         try {
-            // Se o serviço de API estiver disponível, usar para buscar cidades
             let sugestoes = [];
             if (window.BENETRIP_API) {
                 sugestoes = await window.BENETRIP_API.buscarSugestoesCidade(termo);
             } else {
-                // Sugestões locais básicas para desenvolvimento
                 sugestoes = [
                     { type: "city", code: "SAO", name: "São Paulo", country_code: "BR", country_name: "Brasil" },
                     { type: "city", code: "RIO", name: "Rio de Janeiro", country_code: "BR", country_name: "Brasil" },
@@ -675,7 +670,6 @@ configurarAutocomplete(pergunta) {
                 ];
             }
             
-            // Mostrar sugestões
             if (sugestoes.length > 0) {
                 results.innerHTML = sugestoes.map(item => {
                     return `
@@ -689,7 +683,6 @@ configurarAutocomplete(pergunta) {
                     `;
                 }).join('');
                 
-                // Adicionar eventos aos itens
                 document.querySelectorAll('.autocomplete-item').forEach(item => {
                     item.addEventListener('click', () => {
                         selectedItem = {
@@ -697,14 +690,8 @@ configurarAutocomplete(pergunta) {
                             name: item.dataset.name,
                             country: item.dataset.country
                         };
-                        
-                        // Atualizar campo de entrada
                         input.value = `${selectedItem.name} (${selectedItem.code})`;
-                        
-                        // Limpar resultados
                         results.innerHTML = '';
-                        
-                        // Habilitar botão de confirmação
                         confirmBtn.disabled = false;
                     });
                 });
@@ -717,25 +704,21 @@ configurarAutocomplete(pergunta) {
         }
     }
     
-    // Evento para o campo de entrada
     input.addEventListener('input', (e) => {
         const termo = e.target.value;
         buscarSugestoes(termo);
-        
-        // Desabilitar botão se limpar o campo
         if (!termo) {
             confirmBtn.disabled = true;
             selectedItem = null;
         }
     });
     
-    // Evento para o botão de confirmação
     confirmBtn.addEventListener('click', () => {
         if (selectedItem) {
             this.processarResposta(selectedItem, pergunta);
         }
     });
-},
+}, // Adicionada a chave de fechamento e a vírgula
 
     /**
      * Configura a entrada de valor monetário
