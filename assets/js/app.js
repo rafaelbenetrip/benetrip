@@ -285,6 +285,7 @@ const BENETRIP = {
         </div>
     `;
 },
+    
     /**
      * Configura eventos específicos para cada tipo de pergunta
      */
