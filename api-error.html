@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#E87722">
+    <title>Benetrip - Erro de Configuração</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;700&family=Montserrat:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #E87722;
+            --secondary: #00A3E0;
+            --tertiary: #F5F5F5;
+            --dark: #21272A;
+            --error: #D32F2F;
+            --success: #388E3C;
+        }
+        
+        body {
+            font-family: 'Poppins', sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            background-color: var(--tertiary);
+        }
+        
+        .container {
+            max-width: 480px;
+            margin: 0 auto;
+            padding: 20px;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+        
+        .error-card {
+            background-color: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            padding: 30px;
+            text-align: center;
+        }
+        
+        .error-title {
+            color: var(--error);
+            font-size: 24px;
+            margin-bottom: 20px;
+        }
+        
+        .error-message {
+            color: var(--dark);
+            margin-bottom: 30px;
+            line-height: 1.6;
+            text-align: left;
+        }
+        
+        .api-key-box {
+            background-color: #f8f8f8;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            padding: 15px;
+            margin: 20px 0;
+            text-align: left;
+        }
+        
+        .api-key-box pre {
+            margin: 0;
+            white-space: pre-wrap;
+            word-break: break-all;
+            font-family: monospace;
+            font-size: 14px;
+        }
+        
+        .code-instruction {
+            color: var(--dark);
+            font-size: 14px;
+            background-color: #f1f1f1;
+            padding: 15px;
+            border-radius: 6px;
+            margin: 20px 0;
+            text-align: left;
+        }
+        
+        .code-instruction code {
+            background-color: #e0e0e0;
+            padding: 2px 5px;
+            border-radius: 3px;
+            font-family: monospace;
+        }
+        
+        .btn {
+            display: inline-block;
+            padding: 12px 24px;
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 50px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            text-decoration: none;
+        }
+        
+        .btn:hover {
+            background-color: #D56A15;
+        }
+        
+        .btn-secondary {
+            background-color: var(--secondary);
+        }
+        
+        .btn-secondary:hover {
+            background-color: #0085B7;
+        }
+        
+        .tripinha {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        
+        .tripinha img {
+            width: 150px;
+            height: 150px;
+            object-fit: contain;
+        }
+        
+        .action-buttons {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin-top: 30px;
+        }
+        
+        .footer {
+            text-align: center;
+            padding: 20px;
+            font-size: 14px;
+            color: #777;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="tripinha">
+            <img src="assets/images/tripinha/avatar-pensando.png" alt="Tripinha preocupada" />
+        </div>
+        
+        <div class="error-card">
+            <h1 class="error-title">Oops! Erro de Configuração da API</h1>
+            
+            <div class="error-message">
+                <p>A Tripinha não conseguiu se conectar à API da OpenAI para buscar destinos. Isso acontece quando a chave da API não está configurada corretamente.</p>
+                
+                <p>Para corrigir esse problema:</p>
+            </div>
+            
+            <div class="code-instruction">
+                <p><strong>1. Edite o arquivo config.js</strong></p>
+                <p>Localize o arquivo <code>assets/js/config.js</code> e atualize a linha com sua chave da OpenAI:</p>
+                
+                <div class="api-key-box">
+                    <pre>openAI: "sk-sua-chave-da-openai-aqui",</pre>
+                </div>
+                
+                <p><strong>2. Certifique-se que:</strong></p>
+                <ul>
+                    <li>A chave começa com <code>sk-</code> (não use o formato <code>sk-proj-</code>)</li>
+                    <li>Sua conta OpenAI tem saldo disponível</li>
+                    <li>A chave não está expirada ou desativada</li>
+                </ul>
+            </div>
+            
+            <div class="action-buttons">
+                <a href="index.html" class="btn">Voltar ao Início</a>
+                <button id="retry-button" class="btn btn-secondary">Tentar Novamente</button>
+            </div>
+        </div>
+    </div>
+    
+    <div class="footer">
+        © 2025 Benetrip - Todos os direitos reservados
+    </div>
+    
+    <script>
+        // Botão para tentar novamente
+        document.getElementById('retry-button').addEventListener('click', function() {
+            location.reload();
+        });
+    </script>
+</body>
+</html>
