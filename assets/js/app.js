@@ -493,17 +493,34 @@ const BENETRIP = {
 
                     const confirmarBtn = document.getElementById(`confirmar-datas-${calendarId}`);
                     if (confirmarBtn) {
-                        confirmarBtn.addEventListener('click', () => {
-                            const datas = calendario.selectedDates;
-                            if (datas.length === 2) {
-                                // Corrigir problema de timezone garantindo dia correto
-                                const dadosDatas = {
-                                    dataIda: this.formatarDataISO(datas[0]),
-                                    dataVolta: this.formatarDataISO(datas[1])
-                                };
-                                this.processarResposta(dadosDatas, pergunta);
-                            }
-                        });
+    confirmarBtn.addEventListener('click', () => {
+        const datas = calendario.selectedDates;
+        if (datas.length === 2) {
+            // Criar cópias das datas para evitar modificações inesperadas
+            const dataIdaObj = new Date(datas[0]);
+            const dataVoltaObj = new Date(datas[1]);
+            
+            // Ajustar para meio-dia para evitar problemas de fuso horário
+            dataIdaObj.setHours(12, 0, 0, 0);
+            dataVoltaObj.setHours(12, 0, 0, 0);
+            
+            const dadosDatas = {
+                dataIda: this.formatarDataISO(dataIdaObj),
+                dataVolta: this.formatarDataISO(dataVoltaObj)
+            };
+            
+            // Verificar e registrar os valores para depuração
+            console.log("Datas selecionadas:", {
+                original: {
+                    ida: datas[0].toISOString(),
+                    volta: datas[1].toISOString()
+                },
+                ajustadas: dadosDatas
+            });
+            
+            this.processarResposta(dadosDatas, pergunta);
+        }
+    });
                         console.log("Eventos do botão de confirmação configurados");
                     } else {
                         console.error(`Botão de confirmação com ID confirmar-datas-${calendarId} não encontrado`);
@@ -628,12 +645,30 @@ const BENETRIP = {
      * Formata a data para o formato ISO (YYYY-MM-DD) corrigindo o problema de timezone
      */
     formatarDataISO(data) {
-        // Usar o método abaixo para evitar problemas de timezone que podem causar inconsistências de dias
-        const ano = data.getFullYear();
-        const mes = String(data.getMonth() + 1).padStart(2, '0');
-        const dia = String(data.getDate()).padStart(2, '0');
-        return `${ano}-${mes}-${dia}`;
-    },
+    if (!data) return '';
+    
+    // Verificar se o parâmetro é uma string e convertê-lo para objeto Date se necessário
+    let dataObj = data;
+    if (typeof data === 'string') {
+        dataObj = new Date(data);
+    }
+    
+    // Garantir que temos um objeto Date válido
+    if (!(dataObj instanceof Date) || isNaN(dataObj)) {
+        console.error("Data inválida:", data);
+        return '';
+    }
+    
+    // Usar UTC para evitar problemas de timezone
+    const ano = dataObj.getFullYear();
+    const mes = String(dataObj.getMonth() + 1).padStart(2, '0');
+    const dia = String(dataObj.getDate()).padStart(2, '0');
+    
+    // Log para depuração
+    console.log(`Convertendo data: Original=${dataObj.toISOString()}, Formatada=${ano}-${mes}-${dia}`);
+    
+    return `${ano}-${mes}-${dia}`;
+},
         
     /**
      * Configura a entrada numérica para quantidade de viajantes
