@@ -520,33 +520,63 @@ const BENETRIP = {
                     const confirmarBtn = document.getElementById(`confirmar-datas-${calendarId}`);
                     if (confirmarBtn) {
     confirmarBtn.addEventListener('click', () => {
-        const datas = calendario.selectedDates;
-        if (datas.length === 2) {
-            // Criar cópias das datas para evitar modificações inesperadas
-            const dataIdaObj = new Date(datas[0]);
-            const dataVoltaObj = new Date(datas[1]);
+    const datas = calendario.selectedDates;
+    if (datas.length === 2) {
+        try {
+            // Criar datas novas usando o método do próprio flatpickr para garantir consistência
+            const dataIdaStr = flatpickr.formatDate(datas[0], "Y-m-d");
+            const dataVoltaStr = flatpickr.formatDate(datas[1], "Y-m-d");
             
-            // Ajustar para meio-dia para evitar problemas de fuso horário
+            // Converter para objetos Date para garantir que estão no fuso horário local
+            const dataIdaObj = flatpickr.parseDate(dataIdaStr, "Y-m-d");
+            const dataVoltaObj = flatpickr.parseDate(dataVoltaStr, "Y-m-d");
+            
+            // Verificação adicional de segurança para garantir que as datas são válidas
+            if (!dataIdaObj || !dataVoltaObj) {
+                throw new Error("Datas inválidas detectadas");
+            }
+            
+            // Ajustar para meio-dia para evitar qualquer problema de timezone
             dataIdaObj.setHours(12, 0, 0, 0);
             dataVoltaObj.setHours(12, 0, 0, 0);
             
+            // Construir objeto de dados final usando formatação garantida
             const dadosDatas = {
                 dataIda: this.formatarDataISO(dataIdaObj),
                 dataVolta: this.formatarDataISO(dataVoltaObj)
             };
             
-            // Verificar e registrar os valores para depuração
-            console.log("Datas selecionadas:", {
+            // Log detalhado para diagnóstico
+            console.log("Processamento de datas:", {
                 original: {
                     ida: datas[0].toISOString(),
-                    volta: datas[1].toISOString()
+                    volta: datas[1].toISOString(),
                 },
-                ajustadas: dadosDatas
+                intermediário: {
+                    idaStr: dataIdaStr,
+                    voltaStr: dataVoltaStr
+                },
+                objetos: {
+                    ida: dataIdaObj.toISOString(),
+                    volta: dataVoltaObj.toISOString()
+                },
+                final: dadosDatas
             });
             
+            // Salvar também no estado para diagnóstico
+            this.estado.ultimasDatasSelecionadas = {
+                original: datas,
+                processadas: dadosDatas
+            };
+            
             this.processarResposta(dadosDatas, pergunta);
+            
+        } catch (erro) {
+            console.error("Erro ao processar datas:", erro);
+            this.mostrarErro("Houve um problema ao processar as datas. Por favor, selecione novamente.");
         }
-    });
+    }
+});
                         console.log("Eventos do botão de confirmação configurados");
                     } else {
                         console.error(`Botão de confirmação com ID confirmar-datas-${calendarId} não encontrado`);
