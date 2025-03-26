@@ -286,68 +286,68 @@ return `
      * Configura eventos específicos para cada tipo de pergunta
      */
     configurarEventosPergunta(pergunta) {
-        // Botões de opção para perguntas de múltipla escolha
-        const optionButtons = document.querySelectorAll('.option-button');
-        if (optionButtons.length > 0) {
-            optionButtons.forEach(button => {
-                button.addEventListener('click', () => {
-                    const valor = parseInt(button.dataset.valor);
-                    this.processarResposta(valor, pergunta);
-                });
+    // Botões de opção para perguntas de múltipla escolha
+    const optionButtons = document.querySelectorAll('.option-button');
+    if (optionButtons.length > 0) {
+        optionButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                const valor = parseInt(button.dataset.valor);
+                this.processarResposta(valor, pergunta);
             });
-        }
-        
-        // Configurar calendário
-if (pergunta.calendar) {
-    console.log("Configurando calendário...");
-    
-    // Garantir que temos um ID de calendário válido
-    if (!this.estado.currentCalendarId) {
-        this.estado.currentCalendarId = `benetrip-calendar-${Date.now()}`;
-        console.log(`Criado novo ID de calendário: ${this.estado.currentCalendarId}`);
+        });
     }
-    
-    // Verificar se carregou a biblioteca Flatpickr
-    if (typeof flatpickr === 'undefined') {
-        console.error("Biblioteca Flatpickr não encontrada. Tentando carregar dinamicamente...");
-        this.carregarFlatpickrDinamicamente(pergunta);
-    } else {
-        // Salvar o ID do calendário em uma variável local
-        const calendarId = this.estado.currentCalendarId;
-        console.log(`Usando ID do calendário: ${calendarId} para inicialização`);
-        
-        // Inicializar o calendário com um pequeno atraso para garantir que o DOM foi atualizado
-        setTimeout(() => {
-            // Verificar novamente o ID dentro do setTimeout para garantir
-            if (!this.estado.currentCalendarId) {
-                this.estado.currentCalendarId = calendarId;
-                console.log(`Restaurado ID do calendário: ${calendarId}`);
-            }
-            this.inicializarCalendario(pergunta);
-        }, 300);
+
+    // Configurar calendário
+    if (pergunta.calendar) {
+        console.log("Configurando calendário...");
+
+        // Garantir que temos um ID de calendário válido
+        if (!this.estado.currentCalendarId) {
+            this.estado.currentCalendarId = `benetrip-calendar-${Date.now()}`;
+            console.log(`Criado novo ID de calendário: ${this.estado.currentCalendarId}`);
+        }
+
+        // Verificar se carregou a biblioteca Flatpickr
+        if (typeof flatpickr === 'undefined') {
+            console.error("Biblioteca Flatpickr não encontrada. Tentando carregar dinamicamente...");
+            this.carregarFlatpickrDinamicamente(pergunta);
+        } else {
+            // Salvar o ID do calendário em uma variável local
+            const calendarId = this.estado.currentCalendarId;
+            console.log(`Usando ID do calendário: ${calendarId} para inicialização`);
+
+            // Inicializar o calendário com um pequeno atraso para garantir que o DOM foi atualizado
+            setTimeout(() => {
+                // Verificar novamente o ID dentro do setTimeout para garantir
+                if (!this.estado.currentCalendarId) {
+                    this.estado.currentCalendarId = calendarId;
+                    console.log(`Restaurado ID do calendário: ${calendarId}`);
+                }
+                this.inicializarCalendario(pergunta);
+            }, 300);
+        }
     }
-}
-        
-        // Configurar entrada numérica
-        if (pergunta.number_input) {
-            this.configurarEntradaNumerica();
-        }
-        
-        // Configurar autocomplete
-        if (pergunta.autocomplete) {
-            this.configurarAutocomplete(pergunta);
-        }
-        
-        // Configurar entrada de moeda
-        if (pergunta.currency_format) {
-            this.configurarEntradaMoeda();
-        }
-        
-        // Configurar entrada de texto
-        if (pergunta.input_field && !pergunta.calendar && !pergunta.number_input && !pergunta.autocomplete && !pergunta.currency_format) {
-            this.configurarEntradaTexto();
-        }
-    },
+
+    // Configurar entrada numérica
+    if (pergunta.number_input) {
+        this.configurarEntradaNumerica();
+    }
+
+    // Configurar autocomplete
+    if (pergunta.autocomplete) {
+        this.configurarAutocomplete(pergunta);
+    }
+
+    // Configurar entrada de moeda
+    if (pergunta.currency_format) {
+        this.configurarEntradaMoeda();
+    }
+
+    // Configurar entrada de texto
+    if (pergunta.input_field && !pergunta.calendar && !pergunta.number_input && !pergunta.autocomplete && !pergunta.currency_format) {
+        this.configurarEntradaTexto();
+    }
+},
 
     /**
  * Inicializa o calendário com Flatpickr - Versão corrigida
