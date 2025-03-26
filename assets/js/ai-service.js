@@ -14,18 +14,18 @@ const BENETRIP_AI = {
     },
 
     /**
- * Inicializa o serviço de IA
- */
-init() {
-    // Definir a chave diretamente em vez de usar process.env
-    this.config.apiKey = 'demo-key-for-benetrip'; // Era process.env.AI_API_KEY || localStorage.getItem('benetrip_ai_key')
-    console.log("Serviço de IA inicializado");
-    
-    // Carrega cache existente
-    this.loadCache();
-    
-    return this;
-},
+     * Inicializa o serviço de IA
+     */
+    init() {
+        // Definir a chave diretamente do .env ou localStorage
+        this.config.apiKey = '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';
+        console.log("Serviço de IA inicializado");
+        
+        // Carrega cache existente
+        this.loadCache();
+        
+        return this;
+    },
     
     /**
      * Sistema de cache para evitar chamadas repetidas à API
@@ -112,7 +112,7 @@ init() {
             
             // Processamento da resposta
             this.dispatchProgressEvent(80, "Organizando as melhores opções para você... 🗂️");
-            const destinations = this.processAIResponse(aiResponse, preferences);
+            const destinations = await this.processAIResponse(aiResponse, preferences);
             
             // Salva no cache
             this.cache.recommendations[cacheId] = destinations;
@@ -125,16 +125,6 @@ init() {
             
         } catch (error) {
             console.error("Erro ao obter recomendações:", error);
-            
-            // Usa recomendações locais em caso de falha
-            if (this.config.useLocalFallback) {
-                this.dispatchProgressEvent(90, "Finalizando recomendações... 📋");
-                const fallbackRecommendations = this.getFallbackRecommendations(preferences);
-                
-                this.dispatchProgressEvent(100, "Recomendações prontas! 🎉");
-                return fallbackRecommendations;
-            }
-            
             throw error;
         }
     },
@@ -143,10 +133,10 @@ init() {
      * Prepara o prompt para a API de IA
      */
     prepareAIPrompt(preferences) {
-        // Extrai dados relevantes das preferências
-        const {companhia, preferencia_viagem, moeda_escolhida, orcamento_valor, datas} = preferences;
+        // Extrair dados relevantes das preferências
+        const {companhia, preferencia_viagem, moeda_escolhida, orcamento_valor, datas, cidade_partida} = preferences;
         
-        // Mapeia termos para linguagem natural
+        // Mapear tipos de companhia para descrições
         const companhiaMap = {
             0: "sozinho",
             1: "em casal (viagem romântica)",
@@ -154,56 +144,73 @@ init() {
             3: "com amigos"
         };
         
+        // Mapear preferências de viagem
         const preferenciaMap = {
-            0: "relaxamento e descanso",
-            1: "aventura e atividades ao ar livre",
-            2: "cultura, história e gastronomia",
-            3: "experiência urbana, compras e vida noturna"
+            0: "relaxamento e descanso (praias, resorts tranquilos, spas)",
+            1: "aventura e atividades ao ar livre (trilhas, esportes, natureza)",
+            2: "cultura, história e gastronomia (museus, centros históricos, culinária local)",
+            3: "experiência urbana, compras e vida noturna (centros urbanos, lojas, restaurantes)"
         };
         
-        // Constrói o prompt para a IA
-        return `
-        Você é a Tripinha, uma cachorra vira-lata caramelo especialista em viagens da Benetrip. 
-        Preciso que recomende 5 destinos de viagem com base nas seguintes preferências:
+        // Informações sobre datas da viagem
+        const dataInfo = datas ? `Período da viagem: ${datas.dataIda} a ${datas.dataVolta}` : "Sem período definido";
         
+        // Informação da cidade de origem
+        const origemInfo = cidade_partida ? 
+            `Partindo de ${cidade_partida.name}, ${cidade_partida.country || ''}` : 
+            "Origem não especificada";
+        
+        return `
+        Você é a Tripinha, uma cachorra vira-lata caramelo especialista em viagens da Benetrip.
+        Preciso que recomende 6 destinos de viagem, considerando as seguintes preferências:
+        
+        - ${origemInfo}
         - Viajando ${companhiaMap[companhia]}
         - Busca principalmente: ${preferenciaMap[preferencia_viagem]}
-        - Orçamento: ${orcamento_valor} ${moeda_escolhida}
-        - Período aproximado da viagem: ${datas}
+        - Orçamento para passagens aéreas: ${orcamento_valor || 'flexível'} ${moeda_escolhida || 'BRL'} por pessoa
+        - ${dataInfo}
         
-        Para cada destino, forneça:
-        1. Nome da cidade e país
-        2. Código IATA da cidade
-        3. Descrição curta (30-40 palavras) no estilo animado e amigável da Tripinha
-        4. Uma curiosidade interessante sobre o lugar
-        5. Estimativa de preço de passagem em ${moeda_escolhida}
-        6. Estimativa de preço de hospedagem por noite em ${moeda_escolhida}
-        7. Uma tag principal que define o destino (ex: #Praia, #Aventura, #Cultural, #Urbano)
+        Forneça exatamente 6 destinos no seguinte formato JSON:
+        {
+          "destinations": [
+            {
+              "cidade": "Nome da cidade",
+              "pais": "Nome do país",
+              "codigo_pais": "Código de 2 letras do país",
+              "codigo_iata": "Código IATA do aeroporto principal",
+              "descricao_curta": "Breve descrição de uma linha",
+              "preco_passagem": valor numérico estimado (apenas para passagem aérea),
+              "preco_hospedagem": valor numérico por noite,
+              "experiencias": "3 experiências imperdíveis separadas por vírgula",
+              "custo_total": valor numérico estimado para 5 dias,
+              "porque_ir": "Uma frase curta e envolvente sobre o destino"
+            },
+            ...mais 5 destinos
+          ]
+        }
         
-        Formate cada recomendação em JSON para eu poder processar facilmente. Inclua 5 destinos no total, organizados em ordem de relevância para as preferências informadas.
+        Importante:
+        1. O primeiro destino deve ser a melhor correspondência para as preferências.
+        2. O último (sexto) destino será usado como "destino surpresa", então deve ser mais inusitado.
+        3. Todos os destinos DEVEM respeitar o orçamento para passagens aéreas.
+        4. O código_pais deve ser o código ISO de 2 letras (ex: br, us, pt).
+        5. Certifique-se de que os valores estejam na moeda solicitada (${moeda_escolhida || 'BRL'}).
+        6. Os preços e estimativas devem ser realistas para a região.
         `;
     },
-    
-    /**
+/**
      * Chama o serviço de IA para obter recomendações
      */
     async callAIService(prompt) {
-        // Verifica se temos uma chave de API configurada
+        // Verificar se temos uma chave de API configurada
         if (!this.config.apiKey) {
             throw new Error("Chave de API de IA não configurada");
         }
         
         try {
-            // Na implementação real, aqui seria feita a chamada à API de IA (OpenAI, Claude, etc.)
-            // Para este exemplo, vamos simular uma resposta após um breve delay
+            console.log("Enviando solicitação para a API...");
             
-            return new Promise((resolve) => {
-                setTimeout(() => {
-                    resolve(this.getSimulatedAIResponse(prompt));
-                }, 2000);
-            });
-            
-            /* Exemplo de chamada real à API da OpenAI
+            // Chamada à API da OpenAI
             const response = await fetch('https://api.openai.com/v1/chat/completions', {
                 method: 'POST',
                 headers: {
@@ -213,172 +220,98 @@ init() {
                 body: JSON.stringify({
                     model: "gpt-4",
                     messages: [
-                        {role: "system", content: "Você é a Tripinha, uma cachorra vira-lata caramelo especialista em viagens da Benetrip."},
+                        {role: "system", content: "Você é um assistente especializado em viagens que fornece recomendações de destinos em formato JSON estruturado."},
                         {role: "user", content: prompt}
                     ],
-                    temperature: 0.7
+                    temperature: 0.7,
+                    response_format: { type: "json_object" }
                 })
             });
             
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(`Erro na API: ${response.status} - ${error.error?.message || 'Erro desconhecido'}`);
+            }
+            
             const data = await response.json();
             return data.choices[0].message.content;
-            */
         } catch (error) {
             console.error("Erro ao chamar serviço de IA:", error);
-            throw error;
+            throw error; // Simplesmente propagamos o erro
         }
     },
-    
+
     /**
-     * Simula uma resposta da IA para desenvolvimento
-     * Em produção, seria substituído pela resposta real da API
+     * Busca imagens para os destinos
      */
-    getSimulatedAIResponse(prompt) {
-        // Análise simples do prompt para personalizar resposta
-        let destinations = [];
-        
-        if (prompt.includes("relaxamento")) {
-            destinations = [
-                {
-                    cidade: "Cancún",
-                    pais: "México",
-                    codigo_iata: "CUN",
-                    descricao: "Praias de areia branca e águas cristalinas perfeitas para relaxar! Ideal para descansar com o melhor do Caribe sem complicações. 🏖️",
-                    curiosidade: "A palavra Cancún significa 'ninho de serpentes' na língua maia original.",
-                    preco_passagem: 2800,
-                    preco_hospedagem: 350,
-                    tag: "#Praia"
-                },
-                {
-                    cidade: "Santorini",
-                    pais: "Grécia",
-                    codigo_iata: "JTR",
-                    descricao: "Cenários de tirar o fôlego com casinhas brancas e o azul do mar Egeu. Um lugar perfeito para relaxar com vistas deslumbrantes! ✨",
-                    curiosidade: "Santorini foi formada por uma enorme erupção vulcânica há cerca de 3.600 anos.",
-                    preco_passagem: 3500,
-                    preco_hospedagem: 400,
-                    tag: "#Romântico"
-                }
-            ];
-        } else if (prompt.includes("aventura")) {
-            destinations = [
-                {
-                    cidade: "Queenstown",
-                    pais: "Nova Zelândia",
-                    codigo_iata: "ZQN",
-                    descricao: "A capital mundial dos esportes de aventura! Bungee jump, rafting, esqui e cenários que parecem de filme de fantasia! 🏔️",
-                    curiosidade: "Foi cenário para as filmagens da trilogia 'O Senhor dos Anéis'.",
-                    preco_passagem: 4500,
-                    preco_hospedagem: 300,
-                    tag: "#Aventura"
-                },
-                {
-                    cidade: "Costa Rica",
-                    pais: "Costa Rica",
-                    codigo_iata: "SJO",
-                    descricao: "Florestas tropicais, vulcões ativos e tirolesas espetaculares! Um paraíso natural para quem ama adrenalina e vida selvagem! 🌴",
-                    curiosidade: "A Costa Rica não possui exército desde 1949 e investe esses recursos em educação e saúde.",
-                    preco_passagem: 2900,
-                    preco_hospedagem: 250,
-                    tag: "#Natureza"
-                }
-            ];
-        } else if (prompt.includes("cultura")) {
-            destinations = [
-                {
-                    cidade: "Kyoto",
-                    pais: "Japão",
-                    codigo_iata: "KIX",
-                    descricao: "Templos ancestrais, jardins zen e a verdadeira cultura japonesa tradicional. Uma viagem no tempo com a melhor gastronomia! 🏯",
-                    curiosidade: "Kyoto foi poupada dos bombardeios na Segunda Guerra Mundial devido ao seu valor histórico e cultural.",
-                    preco_passagem: 4200,
-                    preco_hospedagem: 320,
-                    tag: "#Cultural"
-                },
-                {
-                    cidade: "Praga",
-                    pais: "República Tcheca",
-                    codigo_iata: "PRG",
-                    descricao: "Arquitetura medieval intacta, castelos de contos de fadas e uma rica história cultural. Cada rua conta uma história fascinante! 🏰",
-                    curiosidade: "O Castelo de Praga é o maior castelo antigo do mundo.",
-                    preco_passagem: 3100,
-                    preco_hospedagem: 280,
-                    tag: "#Histórico"
-                }
-            ];
-        } else {
-            destinations = [
-                {
-                    cidade: "Nova York",
-                    pais: "Estados Unidos",
-                    codigo_iata: "NYC",
-                    descricao: "A cidade que nunca dorme! Shows da Broadway, museus de classe mundial e compras incríveis em cada esquina! 🗽",
-                    curiosidade: "O metrô de Nova York tem 472 estações, mais que qualquer outro sistema de metrô no mundo.",
-                    preco_passagem: 3800,
-                    preco_hospedagem: 450,
-                    tag: "#Urbano"
-                },
-                {
-                    cidade: "Dubai",
-                    pais: "Emirados Árabes Unidos",
-                    codigo_iata: "DXB",
-                    descricao: "Luxo inigualável, arranha-céus futuristas e shopping centers gigantescos. Uma experiência urbana como nenhuma outra! 🏙️",
-                    curiosidade: "O Burj Khalifa é tão alto que você pode assistir ao pôr do sol na base e subir ao topo para vê-lo novamente.",
-                    preco_passagem: 4100,
-                    preco_hospedagem: 500,
-                    tag: "#Luxo"
-                }
-            ];
-        }
-        
-        // Adiciona mais 3 destinos padrão para completar os 5 recomendados
-        destinations.push(
-            {
-                cidade: "Medellín",
-                pais: "Colômbia",
-                codigo_iata: "MDE",
-                descricao: "Clima perfeito o ano todo, pessoas acolhedoras e uma cidade que se transformou em exemplo mundial! Experiências urbanas e naturais! 🌺",
-                curiosidade: "Conhecida como 'Cidade da Eterna Primavera' pelo seu clima agradável durante todo o ano.",
-                preco_passagem: 2500,
-                preco_hospedagem: 200,
-                tag: "#Tendência"
-            },
-            {
-                cidade: "Lisboa",
-                pais: "Portugal",
-                codigo_iata: "LIS",
-                descricao: "Ruelas charmosas, pastéis de nata e o charme único lusitano. Fado nas noites e praias incríveis pertinho do centro! 🎭",
-                curiosidade: "Lisboa é construída sobre sete colinas, assim como Roma.",
-                preco_passagem: 2900,
-                preco_hospedagem: 280,
-                tag: "#Cultural"
-            },
-            {
-                cidade: "Bali",
-                pais: "Indonésia",
-                codigo_iata: "DPS",
-                descricao: "Espiritualidade, praias paradisíacas e uma cultura única. Perfeita para relaxar, praticar yoga e conectar-se com a natureza! 🧘‍♀️",
-                curiosidade: "Em Bali, cada criança recebe quatro nomes, independentemente do gênero.",
-                preco_passagem: 3800,
-                preco_hospedagem: 220,
-                tag: "#Relax"
+    async getDestinationImages(destino) {
+        try {
+            // Usando a API do Unsplash (você tem a chave no .env)
+            const accessKey = 'x8q70wHdUpQoKmNtBmhfEbatdsxyapgkUEBgxQav708';
+            const query = `${destino.cidade} ${destino.pais} landmark`;
+            const encodedQuery = encodeURIComponent(query);
+            
+            const response = await fetch(`https://api.unsplash.com/search/photos?query=${encodedQuery}&per_page=2&orientation=landscape&client_id=${accessKey}`);
+            
+            if (!response.ok) {
+                throw new Error(`Erro na API de imagens: ${response.status}`);
             }
-        );
-        
-        // Retorna apenas 5 destinos
-        return JSON.stringify({destinations: destinations.slice(0, 5)});
+            
+            const data = await response.json();
+            
+            // Se encontrou imagens, retornar URLs
+            if (data.results && data.results.length > 0) {
+                return {
+                    principal: data.results[0].urls.regular,
+                    secundaria: data.results.length > 1 ? data.results[1].urls.regular : data.results[0].urls.regular
+                };
+            }
+            
+            throw new Error("Nenhuma imagem encontrada");
+        } catch (error) {
+            console.error(`Erro ao buscar imagens para ${destino.cidade}:`, error);
+            
+            // Usar o Pixabay como fallback para imagens
+            try {
+                const pixabayKey = 'GtZcnoPlphF95dn7SsHt7FewD8YYlDQCkBK2vDD4Z7AUt5flGFFJwMEt';
+                const query = `${destino.cidade} ${destino.pais} travel`;
+                const encodedQuery = encodeURIComponent(query);
+                
+                const response = await fetch(`https://pixabay.com/api/?key=${pixabayKey}&q=${encodedQuery}&image_type=photo&orientation=horizontal&category=travel&per_page=2`);
+                
+                if (!response.ok) {
+                    throw new Error(`Erro na API Pixabay: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                
+                if (data.hits && data.hits.length > 0) {
+                    return {
+                        principal: data.hits[0].webformatURL,
+                        secundaria: data.hits.length > 1 ? data.hits[1].webformatURL : data.hits[0].webformatURL
+                    };
+                }
+            } catch (pixabayError) {
+                console.error("Erro no fallback de imagens:", pixabayError);
+            }
+            
+            // Se ambas as APIs falharem, usar URLs genéricas
+            return {
+                principal: `https://source.unsplash.com/1600x900/?${encodeURIComponent(destino.cidade)},landmark`,
+                secundaria: `https://source.unsplash.com/1600x900/?${encodeURIComponent(destino.pais)},travel`
+            };
+        }
     },
-    
+
     /**
      * Processa a resposta da IA e converte para formato utilizável
      */
-    processAIResponse(response, preferences) {
+    async processAIResponse(response, preferences) {
         try {
-            // Tenta fazer o parse da resposta
+            // Parseamento da resposta JSON
             let parsedResponse;
             
             if (typeof response === 'string') {
-                // Extrai apenas o JSON da resposta, caso tenha outros textos
                 const jsonMatch = response.match(/\{[\s\S]*\}/);
                 if (jsonMatch) {
                     parsedResponse = JSON.parse(jsonMatch[0]);
@@ -389,230 +322,117 @@ init() {
                 parsedResponse = response;
             }
             
-            // Verifica se há array de destinos
+            // Verificar se há array de destinos
             if (!parsedResponse.destinations || !Array.isArray(parsedResponse.destinations)) {
                 throw new Error("Resposta não contém lista de destinos");
             }
             
-            // Formata os destinos conforme necessário para exibição
-            const moeda = preferences.moeda_escolhida || 'BRL';
+            // Separar os destinos
+            const destinos = parsedResponse.destinations;
             
-            return parsedResponse.destinations.map((destino, index) => {
-                // Adiciona propriedades extras necessárias para o frontend
-                return {
-                    ...destino,
-                    id: `dest-${index + 1}`,
-                    moeda: moeda,
-                    ranking: index + 1,
-                    imagens: this.getImagePlaceholders(destino.cidade, destino.pais),
-                    comentario_tripinha: this.generateTripinhaComment(destino, preferences)
-                };
+            // Validar que temos os 6 destinos necessários
+            if (destinos.length < 6) {
+                throw new Error(`Número insuficiente de destinos: ${destinos.length}, necessário 6`);
+            }
+            
+            // Separar o destino principal (top), os alternativos e o surpresa
+            const destinoPrincipal = destinos[0];
+            const destinosAlternativos = destinos.slice(1, 5);
+            const destinoSurpresa = destinos[5];
+            
+            // Array para armazenar as promessas de processamento
+            const processamentoPromessas = [];
+            
+            // Processar destino principal
+            processamentoPromessas.push(this.processarDestino(destinoPrincipal, 1, preferences, true));
+            
+            // Processar destinos alternativos
+            destinosAlternativos.forEach((destino, index) => {
+                processamentoPromessas.push(this.processarDestino(destino, index + 2, preferences, false));
             });
+            
+            // Processar destino surpresa
+            processamentoPromessas.push(this.processarDestino(destinoSurpresa, 6, preferences, false, true));
+            
+            // Aguardar todas as promessas
+            const destinosProcessados = await Promise.all(processamentoPromessas);
+            
+            // Separar novamente para organizar conforme necessário pela interface
+            const resultado = {
+                principal: destinosProcessados[0],
+                alternativos: destinosProcessados.slice(1, 5),
+                surpresa: destinosProcessados[5]
+            };
+            
+            return resultado;
         } catch (error) {
             console.error("Erro ao processar resposta da IA:", error);
             throw error;
         }
     },
-    
-    /**
-     * Gera URLs de placeholder para imagens dos destinos
-     * Na implementação real, seria substituído por chamadas à API de imagens (Unsplash, Pexels, etc.)
-     */
-    getImagePlaceholders(cidade, pais) {
+
+    async processarDestino(destino, ranking, preferences, isPrincipal = false, isSurpresa = false) {
+        // Buscar imagens para o destino
+        const imagens = await this.getDestinationImages(destino);
+        
+        // Adicionar propriedades extras necessárias
         return {
-            principal: `https://source.unsplash.com/featured/?${encodeURIComponent(cidade)},landmark`,
-            secundaria: `https://source.unsplash.com/featured/?${encodeURIComponent(pais)},travel`
+            ...destino,
+            id: `dest-${ranking}`,
+            moeda: preferences.moeda_escolhida || 'BRL',
+            ranking: ranking,
+            imagens: imagens,
+            isPrincipal: isPrincipal,
+            isSurpresa: isSurpresa,
+            comentario_tripinha: this.generateTripinhaComment(destino, preferences, isSurpresa)
         };
     },
-    
+
     /**
      * Gera um comentário personalizado da Tripinha para cada destino
      */
-    generateTripinhaComment(destino, preferences) {
-        const comentarios = [
-            `Eu simplesmente AMEI ${destino.cidade}! Um lugar cheio de energia e experiências pra você curtir do seu jeito! 🐾`,
-            `${destino.cidade} é perfeito para quem busca ${destino.tag.replace('#','')}! Eu visitaria esse lugar com certeza! 🐶`,
-            `O que acha de explorar ${destino.cidade}? Eu ficaria super animada pra conhecer cada cantinho! 🧳`,
-            `${destino.cidade} me conquistou! E tenho certeza que vai te conquistar também! Que tal arrumar as malas? ✨`
+    generateTripinhaComment(destino, preferences, isSurpresa = false) {
+        // Array de templates de comentários para destinos normais
+        const comentariosNormais = [
+            `Eu simplesmente AMEI ${destino.cidade}! ${destino.porque_ir} É perfeito para quem viaja ${isSurpresa ? 'buscando surpresas' : 'querendo ' + this.getPreferenciaTexto(preferences.preferencia_viagem)}! 🐾`,
+            
+            `${destino.cidade} é incrível! ${destino.porque_ir} Você vai se apaixonar pelos lugares e experiências que esse destino oferece! ✨🐶`,
+            
+            `Farejei esse destino especialmente para você! ${destino.cidade} tem tudo o que você está buscando. ${destino.porque_ir} 🐾🌍`,
+            
+            `O que acha de explorar ${destino.cidade}? ${destino.porque_ir} É perfeito para sua viagem! Já estou ansiosa pra você conhecer! 🧳`
         ];
         
+        // Array de templates de comentários para destinos surpresa
+        const comentariosSurpresa = [
+            `Uau! Este é meu destino surpresa favorito! ${destino.cidade} vai te surpreender completamente. ${destino.porque_ir} Confie no meu faro! 🐾🎁`,
+            
+            `Sei que você não esperava por essa, mas ${destino.cidade} é uma joia escondida que poucos conhecem! ${destino.porque_ir} Que tal se aventurar? 🕵️‍♀️🐶`,
+            
+            `Olha que surpresa incrível! ${destino.cidade} não é um destino óbvio, mas é PERFEITO para você! ${destino.porque_ir} Vai por mim! 🎯🐾`
+        ];
+        
+        // Selecionar array de comentários com base no tipo do destino
+        const comentarios = isSurpresa ? comentariosSurpresa : comentariosNormais;
+        
+        // Retornar um comentário aleatório do array correspondente
         return comentarios[Math.floor(Math.random() * comentarios.length)];
     },
-    
+
     /**
-     * Retorna recomendações locais se a IA falhar
+     * Retorna texto descritivo para a preferência de viagem
      */
-    getFallbackRecommendations(preferences) {
-        // Destinos padrão organizados por tipo de preferência
-        const destinos = {
-            relaxamento: [
-                {
-                    id: 'dest-1',
-                    cidade: "Maceió",
-                    pais: "Brasil",
-                    codigo_iata: "MCZ",
-                    descricao: "Praias paradisíacas de águas cristalinas e piscinas naturais. O lugar perfeito para relaxar ao som do mar! 🏝️",
-                    curiosidade: "Maceió possui mais de 40km de litoral com praias urbanas e selvagens.",
-                    preco_passagem: 1200,
-                    preco_hospedagem: 200,
-                    tag: "#Praia",
-                    ranking: 1
-                },
-                {
-                    id: 'dest-2',
-                    cidade: "Gramado",
-                    pais: "Brasil",
-                    codigo_iata: "CXJ",
-                    descricao: "Clima europeu, fondue e muito charme. Um cantinho aconchegante para descansar com conforto! 🏡",
-                    curiosidade: "Em Gramado, há mais chocolaterias por metro quadrado que em qualquer outra cidade brasileira.",
-                    preco_passagem: 900,
-                    preco_hospedagem: 280,
-                    tag: "#Romântico",
-                    ranking: 2
-                }
-            ],
-            aventura: [
-                {
-                    id: 'dest-1',
-                    cidade: "Bonito",
-                    pais: "Brasil",
-                    codigo_iata: "BYO",
-                    descricao: "Rios de águas transparentes, cavernas e trilhas incríveis. Um paraíso natural para os aventureiros! 🌊",
-                    curiosidade: "A transparência da água em Bonito é resultado de um fenômeno geológico de filtragem natural.",
-                    preco_passagem: 1100,
-                    preco_hospedagem: 220,
-                    tag: "#Natureza",
-                    ranking: 1
-                },
-                {
-                    id: 'dest-2',
-                    cidade: "Chapada dos Veadeiros",
-                    pais: "Brasil",
-                    codigo_iata: "BSB",
-                    descricao: "Cachoeiras imponentes, trilhas desafiadoras e energia pura! O destino ideal para quem ama natureza selvagem! 🏞️",
-                    curiosidade: "A Chapada dos Veadeiros está sobre uma imensa placa de cristal de quartzo, que dizem ter propriedades energéticas.",
-                    preco_passagem: 850,
-                    preco_hospedagem: 180,
-                    tag: "#Aventura",
-                    ranking: 2
-                }
-            ],
-            cultura: [
-                {
-                    id: 'dest-1',
-                    cidade: "Salvador",
-                    pais: "Brasil",
-                    codigo_iata: "SSA",
-                    descricao: "Cultura afro-brasileira vibrante, centro histórico colorido e a melhor música! Uma explosão cultural à beira-mar! 🥁",
-                    curiosidade: "O Elevador Lacerda em Salvador foi o primeiro elevador urbano do mundo.",
-                    preco_passagem: 950,
-                    preco_hospedagem: 200,
-                    tag: "#Cultural",
-                    ranking: 1
-                },
-                {
-                    id: 'dest-2',
-                    cidade: "Ouro Preto",
-                    pais: "Brasil",
-                    codigo_iata: "BHZ",
-                    descricao: "Joias do barroco brasileiro, ruas de pedra e história em cada esquina! Um museu a céu aberto! ⛪",
-                    curiosidade: "Ouro Preto foi a primeira cidade brasileira a ser declarada Patrimônio Cultural da Humanidade pela UNESCO.",
-                    preco_passagem: 800,
-                    preco_hospedagem: 220,
-                    tag: "#Histórico",
-                    ranking: 2
-                }
-            ],
-            urbano: [
-                {
-                    id: 'dest-1',
-                    cidade: "São Paulo",
-                    pais: "Brasil",
-                    codigo_iata: "GRU",
-                    descricao: "Gastronomia mundial, museus incríveis e vida noturna agitada. A metrópole que nunca para! 🌆",
-                    curiosidade: "São Paulo tem a maior frota de helicópteros do mundo e o segundo maior tráfego de helicópteros, atrás apenas de Nova York.",
-                    preco_passagem: 700,
-                    preco_hospedagem: 250,
-                    tag: "#Urbano",
-                    ranking: 1
-                },
-                {
-                    id: 'dest-2',
-                    cidade: "Rio de Janeiro",
-                    pais: "Brasil",
-                    codigo_iata: "GIG",
-                    descricao: "Praias icônicas, Cristo Redentor e o jeito carioca de ser! A mistura perfeita de cidade e natureza! 🏄‍♂️",
-                    curiosidade: "O Rio de Janeiro foi a única cidade da América do Sul a já ter sido capital de um império europeu (Império Português).",
-                    preco_passagem: 750,
-                    preco_hospedagem: 300,
-                    tag: "#CidadeMaravilhosa",
-                    ranking: 2
-                }
-            ]
-        };
-        
-        // Seleciona os destinos com base na preferência
-        let tipoPreferencia = 'relaxamento';
-        if (preferences.preferencia_viagem === 1) tipoPreferencia = 'aventura';
-        if (preferences.preferencia_viagem === 2) tipoPreferencia = 'cultura';
-        if (preferences.preferencia_viagem === 3) tipoPreferencia = 'urbano';
-        
-        // Adiciona destinos padrão para completar 5
-        let recomendacoes = [...destinos[tipoPreferencia]];
-        
-        const destinosComplementares = [
-            {
-                id: 'dest-3',
-                cidade: "Jericoacoara",
-                pais: "Brasil",
-                codigo_iata: "JJD",
-                descricao: "Dunas, ventos perfeitos e paisagens de outro mundo. Um vilarejo rústico que é paraíso dos kitesurfistas! 🏄‍♀️",
-                curiosidade: "Em Jericoacoara não existem ruas pavimentadas, apenas areia.",
-                preco_passagem: 1300,
-                preco_hospedagem: 240,
-                tag: "#ParaísoNatural",
-                ranking: 3
-            },
-            {
-                id: 'dest-4',
-                cidade: "Natal",
-                pais: "Brasil",
-                codigo_iata: "NAT",
-                descricao: "Sol o ano inteiro, dunas gigantes e passeios de buggy emocionantes! A capital do sol não decepciona! 🌞",
-                curiosidade: "Natal tem o ar mais puro das Américas devido às correntes marítimas.",
-                preco_passagem: 950,
-                preco_hospedagem: 180,
-                tag: "#Dunas",
-                ranking: 4
-            },
-            {
-                id: 'dest-5',
-                cidade: "Curitiba",
-                pais: "Brasil",
-                codigo_iata: "CWB",
-                descricao: "Parques urbanos, transporte eficiente e qualidade de vida. Uma cidade planejada que encanta! 🌳",
-                curiosidade: "Curitiba tem o primeiro ônibus biarticulado do mundo e um dos sistemas de transporte público mais eficientes.",
-                preco_passagem: 800,
-                preco_hospedagem: 200,
-                tag: "#CidadeVerde",
-                ranking: 5
-            }
+    getPreferenciaTexto(preferencia) {
+        const textos = [
+            "relaxar e descansar",
+            "viver aventuras",
+            "descobrir cultura e gastronomia",
+            "explorar a vida urbana"
         ];
         
-        recomendacoes = recomendacoes.concat(destinosComplementares);
-        
-        // Adiciona propriedades extras
-        const moeda = preferences.moeda_escolhida || 'BRL';
-        return recomendacoes.map(destino => {
-            return {
-                ...destino,
-                moeda: moeda,
-                imagens: this.getImagePlaceholders(destino.cidade, destino.pais),
-                comentario_tripinha: this.generateTripinhaComment(destino, preferences)
-            };
-        });
+        return textos[preferencia] || "se divertir";
     },
-    
+
     /**
      * Despacha evento de progresso para atualizar a interface
      */
