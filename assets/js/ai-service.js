@@ -1,25 +1,25 @@
 /**
  * Serviço de IA para recomendação de destinos da Benetrip
- * Este módulo gerencia as recomendações inteligentes de destinos com base nas preferências do usuário
  */
 
 const BENETRIP_AI = {
-    /**
-     * Configurações do serviço de IA
-     */
+    // Configurações do serviço
     config: {
         apiKey: null, // Será inicializado durante setup
-        useLocalFallback: true, // Usar recomendações locais se a IA falhar
         cacheDuration: 24 * 60 * 60 * 1000, // 24 horas em ms
     },
 
-    /**
-     * Inicializa o serviço de IA
-     */
+    // Inicializa o serviço de IA
     init() {
-        // Definir a chave diretamente do .env ou localStorage
-        this.config.apiKey = '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';
-        console.log("Serviço de IA inicializado");
+        // Obter a chave da API do módulo de configuração
+        if (window.BENETRIP_CONFIG && window.BENETRIP_CONFIG.credentials) {
+            this.config.apiKey = window.BENETRIP_CONFIG.credentials.openAI;
+            console.log("Serviço de IA inicializado");
+        } else {
+            console.warn("BENETRIP_CONFIG não encontrado");
+            // Tentar usar a chave diretamente como último recurso
+            this.config.apiKey = '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';
+        }
         
         // Carrega cache existente
         this.loadCache();
@@ -27,17 +27,13 @@ const BENETRIP_AI = {
         return this;
     },
     
-    /**
-     * Sistema de cache para evitar chamadas repetidas à API
-     */
+    // Sistema de cache para evitar chamadas repetidas à API
     cache: {
         recommendations: {},
         timestamp: {}
     },
     
-    /**
-     * Carrega cache do localStorage
-     */
+    // Carrega cache do localStorage
     loadCache() {
         try {
             const cachedData = localStorage.getItem('benetrip_ai_cache');
@@ -51,9 +47,7 @@ const BENETRIP_AI = {
         }
     },
     
-    /**
-     * Salva cache no localStorage
-     */
+    // Salva cache no localStorage
     saveCache() {
         try {
             localStorage.setItem('benetrip_ai_cache', JSON.stringify(this.cache));
@@ -62,17 +56,16 @@ const BENETRIP_AI = {
         }
     },
     
-    /**
-     * Gera um ID de cache baseado nas preferências
-     */
+    // Gera um ID de cache baseado nas preferências
     generateCacheId(preferences) {
-        // Cria uma chave concatenando valores principais para identificação única
-        return `${preferences.companhia}_${preferences.preferencia_viagem}_${preferences.moeda_escolhida}`;
+        // Cria uma chave concatenando valores principais
+        const companhia = preferences.companhia || '0';
+        const preferencia = preferences.preferencia_viagem || '0';
+        const moeda = preferences.moeda_escolhida || 'BRL';
+        return `${companhia}_${preferencia}_${moeda}`;
     },
     
-    /**
-     * Verifica se há dados em cache válidos
-     */
+    // Verifica se há dados em cache válidos
     hasCachedData(cacheId) {
         if (!this.cache.recommendations[cacheId]) return false;
         
@@ -85,23 +78,27 @@ const BENETRIP_AI = {
 
     /**
      * Obtém recomendações de destinos baseadas nas preferências do usuário
-     * @param {Object} preferences - Preferências do usuário coletadas do questionário
-     * @returns {Promise<Array>} - Array de destinos recomendados
      */
     async obterRecomendacoes(preferences) {
         // Notifica início do processo
         this.dispatchProgressEvent(10, "Iniciando análise de suas preferências de viagem... 🔍");
         
-        // Gera ID para cache
-        const cacheId = this.generateCacheId(preferences);
-        
-        // Verifica se temos dados em cache
-        if (this.hasCachedData(cacheId)) {
-            this.dispatchProgressEvent(100, "Recomendações encontradas! 🎉");
-            return this.cache.recommendations[cacheId];
-        }
-        
         try {
+            // Verificar se preferences é válido
+            if (!preferences || typeof preferences !== 'object') {
+                console.warn("Preferências inválidas:", preferences);
+                throw new Error("Preferências de viagem inválidas");
+            }
+            
+            // Gera ID para cache
+            const cacheId = this.generateCacheId(preferences);
+            
+            // Verifica se temos dados em cache
+            if (this.hasCachedData(cacheId)) {
+                this.dispatchProgressEvent(100, "Recomendações encontradas! 🎉");
+                return this.cache.recommendations[cacheId];
+            }
+            
             // Preparação dos dados
             this.dispatchProgressEvent(30, "Processando suas preferências... 🧮");
             const prompt = this.prepareAIPrompt(preferences);
@@ -119,12 +116,18 @@ const BENETRIP_AI = {
             this.cache.timestamp[cacheId] = Date.now();
             this.saveCache();
             
+            // Salvar no localStorage para uso em outras páginas
+            localStorage.setItem('benetrip_recomendacoes', JSON.stringify(destinations));
+            
             // Finaliza processo
             this.dispatchProgressEvent(100, "Recomendações prontas! 🎉");
             return destinations;
             
         } catch (error) {
             console.error("Erro ao obter recomendações:", error);
+            this.dispatchProgressEvent(100, "Erro ao obter recomendações 😔");
+            
+            // Propagar o erro para ser tratado na interface
             throw error;
         }
     },
@@ -165,8 +168,8 @@ const BENETRIP_AI = {
         Preciso que recomende 6 destinos de viagem, considerando as seguintes preferências:
         
         - ${origemInfo}
-        - Viajando ${companhiaMap[companhia]}
-        - Busca principalmente: ${preferenciaMap[preferencia_viagem]}
+        - Viajando ${companhiaMap[companhia] || 'sozinho'}
+        - Busca principalmente: ${preferenciaMap[preferencia_viagem] || 'relaxamento e descanso'}
         - Orçamento para passagens aéreas: ${orcamento_valor || 'flexível'} ${moeda_escolhida || 'BRL'} por pessoa
         - ${dataInfo}
         
@@ -198,7 +201,8 @@ const BENETRIP_AI = {
         6. Os preços e estimativas devem ser realistas para a região.
         `;
     },
-/**
+    
+    /**
      * Chama o serviço de IA para obter recomendações
      */
     async callAIService(prompt) {
@@ -237,7 +241,7 @@ const BENETRIP_AI = {
             return data.choices[0].message.content;
         } catch (error) {
             console.error("Erro ao chamar serviço de IA:", error);
-            throw error; // Simplesmente propagamos o erro
+            throw error;
         }
     },
 
@@ -246,8 +250,10 @@ const BENETRIP_AI = {
      */
     async getDestinationImages(destino) {
         try {
-            // Usando a API do Unsplash (você tem a chave no .env)
-            const accessKey = 'x8q70wHdUpQoKmNtBmhfEbatdsxyapgkUEBgxQav708';
+            // Pegando a chave da API Unsplash da configuração
+            const accessKey = window.BENETRIP_CONFIG?.credentials?.unsplash || 
+                             'x8q70wHdUpQoKmNtBmhfEbatdsxyapgkUEBgxQav708';
+                             
             const query = `${destino.cidade} ${destino.pais} landmark`;
             const encodedQuery = encodeURIComponent(query);
             
@@ -273,7 +279,8 @@ const BENETRIP_AI = {
             
             // Usar o Pixabay como fallback para imagens
             try {
-                const pixabayKey = 'GtZcnoPlphF95dn7SsHt7FewD8YYlDQCkBK2vDD4Z7AUt5flGFFJwMEt';
+                const pixabayKey = window.BENETRIP_CONFIG?.credentials?.pexels || 
+                                  'GtZcnoPlphF95dn7SsHt7FewD8YYlDQCkBK2vDD4Z7AUt5flGFFJwMEt';
                 const query = `${destino.cidade} ${destino.pais} travel`;
                 const encodedQuery = encodeURIComponent(query);
                 
@@ -437,13 +444,17 @@ const BENETRIP_AI = {
      * Despacha evento de progresso para atualizar a interface
      */
     dispatchProgressEvent(progress, message) {
-        const event = new CustomEvent('benetrip_progress', {
-            detail: {
-                progress: progress,
-                message: message
-            }
-        });
-        window.dispatchEvent(event);
+        try {
+            const event = new CustomEvent('benetrip_progress', {
+                detail: {
+                    progress: progress,
+                    message: message
+                }
+            });
+            window.dispatchEvent(event);
+        } catch (error) {
+            console.warn("Erro ao despachar evento de progresso:", error);
+        }
     }
 };
 
