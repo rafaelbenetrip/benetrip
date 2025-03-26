@@ -450,6 +450,7 @@ if (!calendarElement) {
 
         try {
     try {
+    try {
     const calendario = flatpickr(calendarElement, config);
     console.log("Flatpickr inicializado com sucesso");
 
