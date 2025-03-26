@@ -189,10 +189,7 @@ const BENETRIP = {
         
         return false;
     },
-
-    /**
-     * Monta o HTML para exibir uma pergunta no chat
-     */
+    
     /**
  * Monta o HTML para exibir uma pergunta no chat
  */
@@ -678,13 +675,6 @@ formatarDataISO(data) {
         });
     },
     
-    /**
-     /**
- * Configura o campo de autocomplete para cidades/destinos
- */
-/**
- * Configura o campo de autocomplete para cidades/destinos
- */
 /**
  * Configura o campo de autocomplete para cidades/destinos
  */
