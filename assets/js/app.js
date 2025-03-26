@@ -501,10 +501,10 @@ inicializarCalendario(pergunta) {
         } catch (erro) {
             console.error("Erro ao inicializar Flatpickr:", erro);
         }
-    , 500);
+    }, 500);
 },
 
-    /**
+/**
  * Carrega a biblioteca Flatpickr dinamicamente
  */
 carregarFlatpickrDinamicamente(pergunta) {
@@ -542,8 +542,8 @@ carregarFlatpickrDinamicamente(pergunta) {
     
     document.head.appendChild(script);
 },
-    
-    /**
+
+/**
  * Cria o elemento do calendário manualmente como último recurso
  */
 criarElementoCalendarioManualmente(pergunta) {
