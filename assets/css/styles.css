@@ -2141,7 +2141,7 @@ body {
 
 /* Garantir que o calendário seja visível */
 #inline-calendar {
-    min-height: 300px;
+    min-height: 0;
     width: 100%;
     display: block !important;
     margin-bottom: 15px;
@@ -2215,11 +2215,16 @@ body {
 .flatpickr-calendar-container, 
 #inline-calendar,
 #inline-calendar-emergency {
-    min-height: 350px !important;
+    min-height: 0 !important;
     width: 100% !important;
     display: block !important;
     position: relative !important;
     z-index: 60 !important;
+}
+
+/* Adicionar altura apenas quando o calendário estiver inicializado */
+.calendar-initialized {
+    min-height: 300px !important;
 }
 
 /* Forçar visibilidade dos elementos internos do Flatpickr */
