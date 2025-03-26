@@ -324,15 +324,28 @@ if (pergunta.calendar) {
         const calendarId = this.estado.currentCalendarId;
         console.log(`Usando ID do calendário: ${calendarId} para inicialização`);
         
-        // Inicializar o calendário com um pequeno atraso para garantir que o DOM foi atualizado
+        // Usar uma abordagem mais robusta
         setTimeout(() => {
-            // Verificar novamente o ID dentro do setTimeout para garantir
-            if (!this.estado.currentCalendarId) {
-                this.estado.currentCalendarId = calendarId;
-                console.log(`Restaurado ID do calendário: ${calendarId}`);
+            const calendarElement = document.getElementById(calendarId);
+            
+            if (calendarElement) {
+                // Mostrar o contêiner do calendário para animação suave
+                const container = calendarElement.closest('.calendar-container');
+                if (container) {
+                    // Adicionar classe para começar a transição
+                    container.classList.add('initialized');
+                    
+                    // Pequeno delay para garantir que o DOM está pronto
+                    setTimeout(() => {
+                        this.inicializarCalendario(pergunta);
+                    }, 50);
+                } else {
+                    this.inicializarCalendario(pergunta);
+                }
+            } else {
+                this.criarElementoCalendarioManualmente(pergunta);
             }
-            this.inicializarCalendario(pergunta);
-        }, 300);
+        }, 100);
     }
 }
         
@@ -563,7 +576,7 @@ if (containerElement) {
         
         // Criar HTML do calendário
 const calendarHTML = `
-    <div class="calendar-container" data-calendar-container="${calendarId}">
+    <div class="calendar-container compact" data-calendar-container="${calendarId}">
         <div id="${calendarId}" class="flatpickr-calendar-container"></div>
         <div class="date-selection">
             <p>Ida: <span id="data-ida-${calendarId}">Selecione</span></p>
