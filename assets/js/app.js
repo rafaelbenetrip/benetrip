@@ -362,7 +362,7 @@ inicializarCalendario(pergunta) {
     if (!this.estado.currentCalendarId) {
         console.warn("ID do calendário não encontrado no estado, gerando um novo ID");
         this.estado.currentCalendarId = `benetrip-calendar-${Date.now()}`;
-        
+
         // Verificar se já temos um elemento de calendário no DOM
         const existingContainer = document.querySelector('.calendar-container');
         if (existingContainer) {
@@ -453,7 +453,7 @@ inicializarCalendario(pergunta) {
             console.log("Flatpickr inicializado com sucesso");
 
             this.estado.calendarioAtual = calendario;
-            
+
             // Ocultar o contêiner original de forma mais agressiva
             calendarElement.style.display = 'none';
             calendarElement.style.height = '0';
@@ -461,12 +461,12 @@ inicializarCalendario(pergunta) {
             calendarElement.style.overflow = 'hidden';
             calendarElement.style.margin = '0';
             calendarElement.style.padding = '0';
-            
+
             // Ajustar o container pai
             const containerElement = calendarElement.closest('.calendar-container');
             if (containerElement) {
                 containerElement.classList.add('only-flatpickr');
-                
+
                 // Remover qualquer espaçamento extra no container
                 const originalContainer = containerElement.querySelector('.flatpickr-calendar-container');
                 if (originalContainer && originalContainer !== calendarElement) {
@@ -495,7 +495,7 @@ inicializarCalendario(pergunta) {
             console.error("Erro ao inicializar Flatpickr:", erro);
         }
     }, 500);
-},
+}
 
     /**
      * Carrega a biblioteca Flatpickr dinamicamente
