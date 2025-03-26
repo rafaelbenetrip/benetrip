@@ -193,7 +193,10 @@ const BENETRIP = {
     /**
      * Monta o HTML para exibir uma pergunta no chat
      */
-    montarHTMLPergunta(pergunta) {
+    /**
+ * Monta o HTML para exibir uma pergunta no chat
+ */
+montarHTMLPergunta(pergunta) {
     let opcoesHTML = '';
 
     if (pergunta.options) {
@@ -207,7 +210,6 @@ const BENETRIP = {
         `;
     } else if (pergunta.input_field) {
         if (pergunta.calendar) {
-            // Gerar ID apenas se não existir
             if (!this.estado.currentCalendarId) {
                 this.estado.currentCalendarId = `benetrip-calendar-${Date.now()}`;
             }
@@ -222,7 +224,6 @@ const BENETRIP = {
                 </div>
             `;
         } else if (pergunta.number_input) {
-            // Entrada numérica
             const inputId = `number-input-${Date.now()}`;
             this.estado.currentNumberInputId = inputId;
 
@@ -235,7 +236,6 @@ const BENETRIP = {
                 </div>
             `;
         } else if (pergunta.autocomplete) {
-            // Campo com autocomplete
             const autocompleteId = `autocomplete-${Date.now()}`;
             this.estado.currentAutocompleteId = autocompleteId;
 
@@ -247,7 +247,6 @@ const BENETRIP = {
                 </div>
             `;
         } else if (pergunta.currency_format) {
-            // Campo para valor monetário
             const currencyId = `currency-input-${Date.now()}`;
             this.estado.currentCurrencyId = currencyId;
 
@@ -258,7 +257,6 @@ const BENETRIP = {
                 </div>
             `;
         } else {
-            // Campo de texto simples
             const textId = `text-input-${Date.now()}`;
             this.estado.currentTextId = textId;
 
@@ -272,12 +270,13 @@ const BENETRIP = {
     }
 
     // Construir a mensagem completa
+    const classeMensagem = pergunta.calendar ? 'message with-calendar' : 'message';
     return `
         <div class="chat-message tripinha" data-pergunta-key="${pergunta.key || ''}">
             <div class="avatar">
                 <img src="${this.config.imagePath}tripinha/avatar-normal.png" alt="Tripinha" />
             </div>
-            <div class="message">
+            <div class="${classeMensagem}">
                 <p class="question">${pergunta.question}</p>
                 <p class="description">${pergunta.description || ''}</p>
                 ${opcoesHTML}
