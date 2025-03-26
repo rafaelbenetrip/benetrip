@@ -2576,3 +2576,36 @@ body {
     border: 1px solid #e0e0e0 !important;
     border-radius: 8px !important;
 }
+
+/* Adicionar ao final do arquivo CSS */
+
+/* Correção para o quadro branco do calendário */
+.flatpickr-calendar-container {
+    display: none !important;
+    height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    overflow: hidden !important;
+}
+
+/* Garantir que a classe with-calendar não tenha espaço extra */
+.chat-message .message.with-calendar {
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+    margin-top: 0 !important;
+}
+
+/* Mostrar apenas o calendário Flatpickr */
+.flatpickr-calendar {
+    display: inline-block !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+/* Remover qualquer espaço em branco ao redor do calendário */
+.calendar-container {
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+}
