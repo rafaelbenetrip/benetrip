@@ -801,7 +801,7 @@ configurarAutocomplete(pergunta) {
     
     // Foco automático no campo
     setTimeout(() => input.focus(), 300);
-}, // Adicionada a chave de fechamento e a vírgula
+}
 
     /**
      * Configura a entrada de valor monetário
