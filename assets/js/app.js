@@ -446,7 +446,7 @@ if (!calendarElement) {
                     confirmarBtn.disabled = false;
                 }
             }
-        };
+        }
 
         try {
     const calendario = flatpickr(calendarElement, config);
