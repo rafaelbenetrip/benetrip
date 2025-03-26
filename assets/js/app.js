@@ -408,13 +408,22 @@ const BENETRIP = {
             amanha.setHours(0, 0, 0, 0);
 
             const config = {
-                mode: "range",
-                dateFormat: "Y-m-d",
-                // Usar a data de amanhã como mínima, ao invés de "today"
-                minDate: pergunta.calendar?.min_date || amanha,
-                maxDate: pergunta.calendar?.max_date,
-                inline: true,
-                showMonths: 1,
+    mode: "range",
+    dateFormat: "Y-m-d",
+    // Definição mais forte da data mínima, convertendo para string no formato YYYY-MM-DD
+    minDate: pergunta.calendar?.min_date || this.formatarDataISO(amanha),
+    maxDate: pergunta.calendar?.max_date,
+    inline: true,
+    showMonths: 1,
+    disable: [
+        function(date) {
+            // Desabilitar datas anteriores a amanhã
+            const amanha = new Date();
+            amanha.setDate(amanha.getDate() + 1);
+            amanha.setHours(0, 0, 0, 0);
+            return date < amanha;
+        }
+    ],
                 locale: {
                     weekdays: {
                         shorthand: ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'],
