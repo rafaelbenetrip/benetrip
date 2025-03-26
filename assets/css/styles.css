@@ -2479,3 +2479,25 @@ body {
         text-align: center;
     }
 }
+
+/* Estilos para o contêiner de carregamento do calendário */
+#calendar-loading-${calendarId} {
+    min-height: 200px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background-color: var(--gray-light);
+    border-radius: var(--border-radius-md);
+    margin-bottom: var(--spacing-md);
+}
+
+/* Ajustar altura do contêiner do calendário apenas quando estiver inicializado */
+.flatpickr-calendar-container {
+    min-height: 0;
+    transition: min-height 0.3s ease;
+}
+
+.flatpickr-calendar-container.calendar-initialized {
+    min-height: 300px;
+}
