@@ -326,7 +326,7 @@ if (pergunta.calendar) {
             this.inicializarCalendario(pergunta);
         }, 300);
     }
-},
+}
         
         // Configurar entrada numérica
         if (pergunta.number_input) {
