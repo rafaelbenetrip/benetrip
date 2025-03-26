@@ -353,7 +353,7 @@ if (pergunta.calendar) {
     },
 
     /**
- * Inicializa o calendário com Flatpickr
+ * Inicializa o calendário com Flatpickr - Versão corrigida
  */
 inicializarCalendario(pergunta) {
     console.log("Iniciando configuração do calendário");
@@ -400,11 +400,17 @@ inicializarCalendario(pergunta) {
             return;
         }
 
+        // Calcular a data de amanhã para definir como data mínima
+        const amanha = new Date();
+        amanha.setDate(amanha.getDate() + 1);
+        amanha.setHours(0, 0, 0, 0);
+
         const config = {
             mode: "range",
             dateFormat: "Y-m-d",
-            minDate: pergunta.calendar.min_date || "today",
-            maxDate: pergunta.calendar.max_date,
+            // Usar a data de amanhã como mínima, ao invés de "today"
+            minDate: pergunta.calendar?.min_date || amanha,
+            maxDate: pergunta.calendar?.max_date,
             inline: true,
             showMonths: 1,
             locale: {
@@ -479,9 +485,10 @@ inicializarCalendario(pergunta) {
                     confirmarBtn.addEventListener('click', () => {
                         const datas = calendario.selectedDates;
                         if (datas.length === 2) {
+                            // Corrigir problema de timezone garantindo dia correto
                             const dadosDatas = {
-                                dataIda: datas[0].toISOString().split('T')[0],
-                                dataVolta: datas[1].toISOString().split('T')[0]
+                                dataIda: this.formatarDataISO(datas[0]),
+                                dataVolta: this.formatarDataISO(datas[1])
                             };
                             this.processarResposta(dadosDatas, pergunta);
                         }
@@ -495,7 +502,7 @@ inicializarCalendario(pergunta) {
             console.error("Erro ao inicializar Flatpickr:", erro);
         }
     }, 500);
-}
+},
 
     /**
      * Carrega a biblioteca Flatpickr dinamicamente
@@ -536,63 +543,63 @@ inicializarCalendario(pergunta) {
         document.head.appendChild(script);
     },
     /**
-     * Cria o elemento do calendário manualmente como último recurso
-     */
-    criarElementoCalendarioManualmente(pergunta) {
-        console.log("Tentando criar elemento do calendário manualmente");
-        
-        // Verificar se a mensagem da pergunta está no DOM
-        const mensagens = document.querySelectorAll('.chat-message.tripinha');
-        if (mensagens.length === 0) {
-            console.error("Nenhuma mensagem encontrada para adicionar o calendário");
-            return;
-        }
-        
-        // Pegar a última mensagem da Tripinha
-        const ultimaMensagem = mensagens[mensagens.length - 1];
-        const containerMensagem = ultimaMensagem.querySelector('.message');
-        
-        if (!containerMensagem) {
-            console.error("Container de mensagem não encontrado");
-            return;
-        }
-        
-        // Verificar se já existe um container de calendário
-        if (containerMensagem.querySelector('.calendar-container')) {
-            console.log("Container de calendário já existe, recriando");
-            containerMensagem.querySelector('.calendar-container').remove();
-        }
-        
-        // Gerar ID único para o novo calendário
-        const calendarId = `benetrip-calendar-${Date.now()}`;
-        this.estado.currentCalendarId = calendarId;
-        
-        // Criar HTML do calendário
-        const calendarHTML = `
-            <div class="calendar-container" data-calendar-container="${calendarId}">
-                <div id="${calendarId}" class="flatpickr-calendar-container"></div>
-                <div class="date-selection">
-                    <p>Ida: <span id="data-ida-${calendarId}">Selecione</span></p>
-                    <p>Volta: <span id="data-volta-${calendarId}">Selecione</span></p>
-                </div>
-                <button id="confirmar-datas-${calendarId}" class="confirm-button confirm-dates" disabled>Confirmar Datas</button>
+ * Cria o elemento do calendário manualmente como último recurso
+ */
+criarElementoCalendarioManualmente(pergunta) {
+    console.log("Tentando criar elemento do calendário manualmente");
+    
+    // Verificar se a mensagem da pergunta está no DOM
+    const mensagens = document.querySelectorAll('.chat-message.tripinha');
+    if (mensagens.length === 0) {
+        console.error("Nenhuma mensagem encontrada para adicionar o calendário");
+        return;
+    }
+    
+    // Pegar a última mensagem da Tripinha
+    const ultimaMensagem = mensagens[mensagens.length - 1];
+    const containerMensagem = ultimaMensagem.querySelector('.message');
+    
+    if (!containerMensagem) {
+        console.error("Container de mensagem não encontrado");
+        return;
+    }
+    
+    // Verificar se já existe um container de calendário
+    if (containerMensagem.querySelector('.calendar-container')) {
+        console.log("Container de calendário já existe, recriando");
+        containerMensagem.querySelector('.calendar-container').remove();
+    }
+    
+    // Gerar ID único para o novo calendário
+    const calendarId = `benetrip-calendar-${Date.now()}`;
+    this.estado.currentCalendarId = calendarId;
+    
+    // Criar HTML do calendário
+    const calendarHTML = `
+        <div class="calendar-container" data-calendar-container="${calendarId}">
+            <div id="${calendarId}" class="flatpickr-calendar-container"></div>
+            <div class="date-selection">
+                <p>Ida: <span id="data-ida-${calendarId}">Selecione</span></p>
+                <p>Volta: <span id="data-volta-${calendarId}">Selecione</span></p>
             </div>
-        `;
-        
-        // Adicionar ao container da mensagem
-        containerMensagem.insertAdjacentHTML('beforeend', calendarHTML);
-        
-        // Tentar inicializar novamente após criar o elemento
-        setTimeout(() => {
-            const calendarElement = document.getElementById(calendarId);
-            if (calendarElement) {
-                console.log("Elemento do calendário criado manualmente com sucesso");
-                this.inicializarCalendario(pergunta);
-            } else {
-                console.error("Falha ao criar elemento do calendário manualmente");
-            }
-        }, 300);
-    },
+            <button id="confirmar-datas-${calendarId}" class="confirm-button confirm-dates" disabled>Confirmar Datas</button>
+        </div>
+    `;
+    
+    // Adicionar ao container da mensagem
+    containerMensagem.insertAdjacentHTML('beforeend', calendarHTML);
+    
+    // Tentar inicializar novamente após criar o elemento
+    setTimeout(() => {
+        const calendarElement = document.getElementById(calendarId);
+        if (calendarElement) {
+            console.log("Elemento do calendário criado manualmente com sucesso");
+            this.inicializarCalendario(pergunta);
+        } else {
+            console.error("Falha ao criar elemento do calendário manualmente");
+        }
+    }, 300);
+},
 
     /**
      * Formata a data para exibição amigável
@@ -604,7 +611,17 @@ inicializarCalendario(pergunta) {
             year: 'numeric'
         });
     },
-    
+
+/**
+ * Formata a data para o formato ISO (YYYY-MM-DD) corrigindo o problema de timezone
+ */
+formatarDataISO(data) {
+    // Usar o método abaixo para evitar problemas de timezone que podem causar inconsistências de dias
+    const ano = data.getFullYear();
+    const mes = String(data.getMonth() + 1).padStart(2, '0');
+    const dia = String(data.getDate()).padStart(2, '0');
+    return `${ano}-${mes}-${dia}`;
+},    
         /**
      * Configura a entrada numérica para quantidade de viajantes
      */
@@ -940,18 +957,19 @@ configurarAutocomplete(pergunta) {
             // Resposta de múltipla escolha
             mensagemResposta = pergunta.options[valor];
         } else if (pergunta.calendar) {
-            // Resposta de calendário
-            const formatarData = (data) => {
-                const dataObj = new Date(data);
-                return dataObj.toLocaleDateString('pt-BR', {
-                    day: '2-digit',
-                    month: '2-digit',
-                    year: 'numeric'
-                });
-            };
-            
-            mensagemResposta = `Ida: ${formatarData(valor.dataIda)} | Volta: ${formatarData(valor.dataVolta)}`;
-        } else if (pergunta.autocomplete) {
+    // Resposta de calendário
+    const formatarData = (data) => {
+        // Converter string para objeto Date se necessário
+        const dataObj = typeof data === 'string' ? new Date(data) : data;
+        return dataObj.toLocaleDateString('pt-BR', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric'
+        });
+    };
+    
+    mensagemResposta = `Ida: ${formatarData(valor.dataIda)} | Volta: ${formatarData(valor.dataVolta)}`;
+} else if (pergunta.autocomplete) {
             // Resposta de autocomplete
             mensagemResposta = `${valor.name} (${valor.code}), ${valor.country}`;
         } else {
