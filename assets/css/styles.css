@@ -2543,3 +2543,24 @@ body {
 .flatpickr-calendar-container.calendar-initialized {
     min-height: 300px;
 }
+
+/* Corrigir problema do espaço em branco no calendário */
+.calendar-container {
+    position: relative;
+    margin-bottom: 20px;
+}
+
+/* Garantir que o contêiner do calendário tenha altura apropriada */
+.flatpickr-calendar-container {
+    min-height: 300px;
+    position: relative;
+}
+
+/* Esconder completamente o contêiner de carregamento quando não necessário */
+.loading-container[style*="display: none"] {
+    display: none !important;
+    height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+}
