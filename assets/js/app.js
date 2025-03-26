@@ -207,33 +207,25 @@ const BENETRIP = {
         `;
     } else if (pergunta.input_field) {
         if (pergunta.calendar) {
-    // Gerar ID único para esta instância
-    const calendarId = `benetrip-calendar-${Date.now()}`;
-    this.estado.currentCalendarId = calendarId;
+        // Gerar ID apenas se não existir
+        if (!this.estado.currentCalendarId) {
+            this.estado.currentCalendarId = `benetrip-calendar-${Date.now()}`;
+        }
+        const calendarId = this.estado.currentCalendarId;
 
-    console.log(`Gerando HTML do calendário com ID: ${calendarId}`);
+        console.log(`Gerando HTML do calendário com ID: ${calendarId}`);
 
-    // HTML completo com todos os elementos necessários
-    opcoesHTML = `
-        <div class="calendar-container" data-calendar-container="${calendarId}">
-            <!-- Indicador de carregamento -->
-            <div id="calendar-loading-${calendarId}" class="loading-container">
-                <div class="loading-spinner"></div>
-                <p>Carregando calendário...</p>
+        opcoesHTML = `
+            <div class="calendar-container" data-calendar-container="${calendarId}">
+                <div id="calendar-loading-${calendarId}" class="loading-container">
+                    <div class="loading-spinner"></div>
+                    <p>Carregando calendário...</p>
+                </div>
+                <div id="${calendarId}" class="flatpickr-calendar-container" style="display: none;"></div>
+                <!-- resto do código -->
             </div>
-            
-            <!-- Contêiner para o Flatpickr (NÃO usar display:none inicialmente) -->
-            <div id="${calendarId}" class="flatpickr-calendar-container"></div>
-            
-            <!-- Interface de seleção de datas -->
-            <div class="date-selection">
-                <p>Ida: <span id="data-ida-${calendarId}">Selecione</span></p>
-                <p>Volta: <span id="data-volta-${calendarId}">Selecione</span></p>
-            </div>
-            <button id="confirmar-datas-${calendarId}" class="confirm-button confirm-dates" disabled>Confirmar Datas</button>
-        </div>
-    `;
-} else if (pergunta.number_input) {
+        `;
+    } else if (pergunta.number_input) {
             // Entrada numérica
             const inputId = `number-input-${Date.now()}`;
             this.estado.currentNumberInputId = inputId;
@@ -369,208 +361,134 @@ if (pergunta.calendar) {
  * Inicializa o calendário com Flatpickr
  */
 inicializarCalendario(pergunta) {
-    console.log("Iniciando a busca e configuração do calendário");
-    
-    const calendarId = this.estado.currentCalendarId;
-    if (!calendarId) {
-        console.error("ID do calendário não definido no estado!");
-        return;
+    console.log("Iniciando configuração do calendário");
+
+    // Se não temos um ID no estado, vamos gerar um novo
+    if (!this.estado.currentCalendarId) {
+        console.warn("ID do calendário não encontrado no estado, gerando um novo ID");
+        this.estado.currentCalendarId = `benetrip-calendar-${Date.now()}`;
+        
+        // Verificar se já temos um elemento de calendário no DOM
+        const existingContainer = document.querySelector('.calendar-container');
+        if (existingContainer) {
+            // Atualizar o ID no DOM para corresponder ao novo ID
+            const calendarElement = existingContainer.querySelector('.flatpickr-calendar-container');
+            if (calendarElement) {
+                calendarElement.id = this.estado.currentCalendarId;
+                console.log(`Atualizado ID do calendário existente para: ${this.estado.currentCalendarId}`);
+            }
+        } else {
+            console.error("Container de calendário não encontrado no DOM!");
+            // Criar elemento do calendário manualmente
+            this.criarElementoCalendarioManualmente(pergunta);
+            return;
+        }
     }
-    
-    console.log(`Buscando calendário com ID: ${calendarId}`);
-    
-    // Busca mais robusta pelo elemento, com múltiplas tentativas
-    let tentativa = 0;
-    const maxTentativas = 10;
-    const intervalo = 200;  // ms
-    
-    const buscarEConfigurar = () => {
-        tentativa++;
-        
-        // Primeiro, vamos buscar o container
-        const container = document.querySelector(`[data-calendar-container="${calendarId}"]`);
-        
-        if (!container) {
-            console.log(`[Tentativa ${tentativa}] Container de calendário não encontrado`);
-            if (tentativa < maxTentativas) {
-                setTimeout(buscarEConfigurar, intervalo);
-            } else {
-                console.error(`Desistindo após ${maxTentativas} tentativas`);
-            }
-            return;
-        }
-        
-        console.log(`[Tentativa ${tentativa}] Container encontrado, buscando elemento do calendário`);
-        
-        // Agora, buscar o elemento do calendário dentro do container
-        let calendarElement = container.querySelector('.flatpickr-calendar-container');
-        
+
+    const calendarId = this.estado.currentCalendarId;
+    console.log(`Buscando elemento do calendário com ID: ${calendarId}`);
+
+    setTimeout(() => {
+        const calendarElement = document.getElementById(calendarId);
+
         if (!calendarElement) {
-            console.error("Elemento do calendário não encontrado dentro do container!");
-            
-            // Tente criar manualmente se não encontrar
-            calendarElement = document.createElement('div');
-            calendarElement.id = calendarId;
-            calendarElement.className = 'flatpickr-calendar-container';
-            
-            // Coloque antes do elemento de seleção de data
-            const dateSelection = container.querySelector('.date-selection');
-            if (dateSelection) {
-                container.insertBefore(calendarElement, dateSelection);
-                console.log("Elemento do calendário criado manualmente");
-            } else {
-                // Se nem a seleção de data estiver presente, insira no início
-                container.prepend(calendarElement);
-                console.log("Elemento do calendário inserido no início do container");
-            }
-        }
-        
-        // Certifique-se de que tem o ID correto
-        if (calendarElement.id !== calendarId) {
-            console.log(`Corrigindo ID do elemento: ${calendarElement.id} -> ${calendarId}`);
-            calendarElement.id = calendarId;
-        }
-        
-        // Verificar Flatpickr
-        if (typeof flatpickr === 'undefined') {
-            console.error("Biblioteca Flatpickr não carregada!");
-            
-            // Carregue dinamicamente
-            const script = document.createElement('script');
-            script.src = 'https://cdn.jsdelivr.net/npm/flatpickr';
-            script.onload = () => {
-                console.log("Flatpickr carregado via script dinâmico");
-                this.configurarFlatpickr(calendarElement, calendarId, pergunta, container);
-            };
-            document.head.appendChild(script);
+            console.error(`Elemento do calendário com ID ${calendarId} não encontrado!`);
+            this.criarElementoCalendarioManualmente(pergunta);
             return;
         }
-        
-        // Se chegou aqui, temos o elemento e o Flatpickr está carregado
-        this.configurarFlatpickr(calendarElement, calendarId, pergunta, container);
-    };
-    
-    // Inicie a busca
-    buscarEConfigurar();
-},
 
-// Método separado para configurar o Flatpickr
-configurarFlatpickr(calendarElement, calendarId, pergunta, container) {
-    console.log("Configurando Flatpickr no elemento:", calendarElement);
-    
-    // Certifique-se de que o elemento é visível
-    calendarElement.style.display = 'block';
-    
-    const config = {
-        mode: "range",
-        dateFormat: "Y-m-d",
-        minDate: pergunta.calendar?.min_date || "today",
-        maxDate: pergunta.calendar?.max_date,
-        inline: true,
-        showMonths: 1,
-        locale: {
-            weekdays: {
-                shorthand: ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'],
-                longhand: ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado']
-            },
-            months: {
-                shorthand: ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'],
-                longhand: ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro']
-            },
-            rangeSeparator: ' até ',
-            firstDayOfWeek: 0
-        },
-        onChange: (selectedDates, dateStr) => {
-            // Buscar elementos relacionados
-            const dataIdaElement = document.getElementById(`data-ida-${calendarId}`);
-            const dataVoltaElement = document.getElementById(`data-volta-${calendarId}`);
-            const confirmarBtn = document.getElementById(`confirmar-datas-${calendarId}`);
+        console.log("Elemento do calendário encontrado, configurando Flatpickr");
 
-            if (!dataIdaElement || !dataVoltaElement || !confirmarBtn) {
-                console.error("Elementos de data ou botão não encontrados!");
-                return;
-            }
-
-            // Atualizar interface com base na seleção
-            if (selectedDates.length === 0) {
-                dataIdaElement.textContent = "Selecione";
-                dataVoltaElement.textContent = "Selecione";
-                confirmarBtn.disabled = true;
-            } else if (selectedDates.length === 1) {
-                const dataFormatada = this.formatarDataVisivel(selectedDates[0]);
-                dataIdaElement.textContent = dataFormatada;
-                dataVoltaElement.textContent = "Selecione";
-                confirmarBtn.disabled = true;
-            } else if (selectedDates.length === 2) {
-                const dataIdaFormatada = this.formatarDataVisivel(selectedDates[0]);
-                const dataVoltaFormatada = this.formatarDataVisivel(selectedDates[1]);
-                dataIdaElement.textContent = dataIdaFormatada;
-                dataVoltaElement.textContent = dataVoltaFormatada;
-                confirmarBtn.disabled = false;
-            }
+        if (typeof flatpickr === 'undefined') {
+            console.error("Biblioteca Flatpickr não encontrada!");
+            this.carregarFlatpickrDinamicamente(pergunta);
+            return;
         }
-    };
 
-    try {
-        // Inicializar o Flatpickr
-        console.log("Tentando inicializar Flatpickr");
-        const calendario = flatpickr(calendarElement, config);
-        console.log("Flatpickr inicializado com sucesso!");
+        const config = {
+            mode: "range",
+            dateFormat: "Y-m-d",
+            minDate: pergunta.calendar.min_date || "today",
+            maxDate: pergunta.calendar.max_date,
+            inline: true,
+            showMonths: 1,
+            locale: {
+                weekdays: {
+                    shorthand: ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'],
+                    longhand: ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado']
+                },
+                months: {
+                    shorthand: ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'],
+                    longhand: ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro']
+                },
+                rangeSeparator: ' até ',
+                firstDayOfWeek: 0
+            },
+            onChange: (selectedDates, dateStr) => {
+                const dataIdaElement = document.getElementById(`data-ida-${calendarId}`);
+                const dataVoltaElement = document.getElementById(`data-volta-${calendarId}`);
+                const confirmarBtn = document.getElementById(`confirmar-datas-${calendarId}`);
 
-        // Salvar no estado
-        this.estado.calendarioAtual = calendario;
+                if (!dataIdaElement || !dataVoltaElement || !confirmarBtn) {
+                    console.error("Elementos de data não encontrados!");
+                    return;
+                }
+
+                if (selectedDates.length === 0) {
+                    dataIdaElement.textContent = "Selecione";
+                    dataVoltaElement.textContent = "Selecione";
+                    confirmarBtn.disabled = true;
+                } else if (selectedDates.length === 1) {
+                    const dataFormatada = this.formatarDataVisivel(selectedDates[0]);
+                    dataIdaElement.textContent = dataFormatada;
+                    dataVoltaElement.textContent = "Selecione";
+                    confirmarBtn.disabled = true;
+                } else if (selectedDates.length === 2) {
+                    const dataIdaFormatada = this.formatarDataVisivel(selectedDates[0]);
+                    const dataVoltaFormatada = this.formatarDataVisivel(selectedDates[1]);
+                    dataIdaElement.textContent = dataIdaFormatada;
+                    dataVoltaElement.textContent = dataVoltaFormatada;
+                    confirmarBtn.disabled = false;
+                }
+            }
+        };
+
+        try {
+            const calendario = flatpickr(calendarElement, config);
+            console.log("Flatpickr inicializado com sucesso");
+
+            this.estado.calendarioAtual = calendario;
         
         // Esconder o indicador de carregamento
-        const loadingElement = container.querySelector(`#calendar-loading-${calendarId}`);
+        const loadingElement = document.getElementById(`calendar-loading-${calendarId}`);
         if (loadingElement) {
             loadingElement.style.display = 'none';
-            console.log("Indicador de carregamento escondido");
         }
         
-        // Adicionar classe para estilização
+        // Mostrar o calendário e adicionar classe para altura correta
+        calendarElement.style.display = 'block';
         calendarElement.classList.add('calendar-initialized');
-        
-        // Configurar botão de confirmação
-        const confirmarBtn = container.querySelector(`#confirmar-datas-${calendarId}`);
-        if (confirmarBtn) {
-            confirmarBtn.addEventListener('click', () => {
-                const datas = calendario.selectedDates;
-                if (datas.length === 2) {
-                    const dadosDatas = {
-                        dataIda: datas[0].toISOString().split('T')[0],
-                        dataVolta: datas[1].toISOString().split('T')[0]
-                    };
-                    this.processarResposta(dadosDatas, pergunta);
-                }
-            });
-            console.log("Evento de clique adicionado ao botão de confirmação");
-        } else {
-            console.error("Botão de confirmação não encontrado!");
-        }
-    } catch (erro) {
-        console.error("Erro ao inicializar Flatpickr:", erro);
-        
-        // Falha de inicialização - mostrar mensagem de erro e interface manual
-        const loadingElement = container.querySelector(`#calendar-loading-${calendarId}`);
-        if (loadingElement) {
-            loadingElement.innerHTML = `
-                <p style="color: #DC3545; font-weight: bold;">Não foi possível carregar o calendário</p>
-                <button class="btn-retry-calendar">Tentar Novamente</button>
-            `;
-            
-            // Adicionar evento ao botão de retry
-            const retryBtn = loadingElement.querySelector('.btn-retry-calendar');
-            if (retryBtn) {
-                retryBtn.addEventListener('click', () => {
-                    loadingElement.innerHTML = `
-                        <div class="loading-spinner"></div>
-                        <p>Tentando novamente...</p>
-                    `;
-                    setTimeout(() => this.inicializarCalendario(pergunta), 500);
+
+            const confirmarBtn = document.getElementById(`confirmar-datas-${calendarId}`);
+            if (confirmarBtn) {
+                confirmarBtn.addEventListener('click', () => {
+                    const datas = calendario.selectedDates;
+                    if (datas.length === 2) {
+                        const dadosDatas = {
+                            dataIda: datas[0].toISOString().split('T')[0],
+                            dataVolta: datas[1].toISOString().split('T')[0]
+                        };
+                        this.processarResposta(dadosDatas, pergunta);
+                    }
                 });
+                console.log("Eventos do botão de confirmação configurados");
+            } else {
+                console.error(`Botão de confirmação com ID confirmar-datas-${calendarId} não encontrado`);
             }
+        } catch (erro) {
+            console.error("Erro ao inicializar Flatpickr:", erro);
         }
-    }
+    }, 200);
 },
 
     /**
@@ -615,76 +533,60 @@ configurarFlatpickr(calendarElement, calendarId, pergunta, container) {
      * Cria o elemento do calendário manualmente como último recurso
      */
     criarElementoCalendarioManualmente(pergunta) {
-    console.log("Tentando criar elemento do calendário manualmente");
-    
-    // 1. Localizar onde inserir o calendário
-    const mensagens = document.querySelectorAll('.chat-message.tripinha');
-    if (mensagens.length === 0) {
-        console.error("Nenhuma mensagem encontrada para adicionar o calendário");
-        return;
-    }
-    
-    // Pegar a última mensagem da Tripinha
-    const ultimaMensagem = mensagens[mensagens.length - 1];
-    const containerMensagem = ultimaMensagem.querySelector('.message');
-    
-    if (!containerMensagem) {
-        console.error("Container de mensagem não encontrado");
-        return;
-    }
-    
-    // 2. Limpar qualquer calendário existente
-    if (containerMensagem.querySelector('.calendar-container')) {
-        console.log("Container de calendário já existe, removendo para recriar");
-        containerMensagem.querySelector('.calendar-container').remove();
-    }
-    
-    // 3. Gerar ID único para o novo calendário
-    const calendarId = `benetrip-calendar-${Date.now()}`;
-    this.estado.currentCalendarId = calendarId;
-    console.log(`Novo ID de calendário gerado: ${calendarId}`);
-    
-    // 4. Criar HTML COMPLETO do calendário com indicador de carregamento
-    const calendarHTML = `
-        <div class="calendar-container" data-calendar-container="${calendarId}">
-            <!-- Indicador de carregamento -->
-            <div id="calendar-loading-${calendarId}" class="loading-container">
-                <div class="loading-spinner"></div>
-                <p>Carregando seu calendário...</p>
-            </div>
-            
-            <!-- Container do calendário (inicialmente oculto) -->
-            <div id="${calendarId}" class="flatpickr-calendar-container" style="display: none;"></div>
-            
-            <!-- Seleção de datas e botão de confirmação -->
-            <div class="date-selection">
-                <p>Ida: <span id="data-ida-${calendarId}">Selecione</span></p>
-                <p>Volta: <span id="data-volta-${calendarId}">Selecione</span></p>
-            </div>
-            <button id="confirmar-datas-${calendarId}" class="confirm-button confirm-dates" disabled>Confirmar Datas</button>
-        </div>
-    `;
-    
-    // 5. Adicionar ao container da mensagem
-    containerMensagem.insertAdjacentHTML('beforeend', calendarHTML);
-    console.log("HTML do calendário inserido no DOM");
-    
-    // 6. Aumentar o tempo de espera antes de tentar inicializar
-    console.log("Aguardando 500ms para garantir que o DOM foi atualizado...");
-    setTimeout(() => {
-        // Verificar se o elemento foi criado corretamente
-        const calendarElement = document.getElementById(calendarId);
-        if (calendarElement) {
-            console.log("Elemento do calendário criado manualmente com sucesso");
-            // Iniciar o processo de inicialização do calendário
-            this.inicializarCalendario(pergunta);
-        } else {
-            console.error("Falha ao criar elemento do calendário manualmente");
-            // Mostrar mensagem amigável para o usuário
-            this.mostrarErro("Não foi possível carregar o calendário. Por favor, tente novamente.");
+        console.log("Tentando criar elemento do calendário manualmente");
+        
+        // Verificar se a mensagem da pergunta está no DOM
+        const mensagens = document.querySelectorAll('.chat-message.tripinha');
+        if (mensagens.length === 0) {
+            console.error("Nenhuma mensagem encontrada para adicionar o calendário");
+            return;
         }
-    }, 500); // Tempo maior de espera (500ms)
-},
+        
+        // Pegar a última mensagem da Tripinha
+        const ultimaMensagem = mensagens[mensagens.length - 1];
+        const containerMensagem = ultimaMensagem.querySelector('.message');
+        
+        if (!containerMensagem) {
+            console.error("Container de mensagem não encontrado");
+            return;
+        }
+        
+        // Verificar se já existe um container de calendário
+        if (containerMensagem.querySelector('.calendar-container')) {
+            console.log("Container de calendário já existe, recriando");
+            containerMensagem.querySelector('.calendar-container').remove();
+        }
+        
+        // Gerar ID único para o novo calendário
+        const calendarId = `benetrip-calendar-${Date.now()}`;
+        this.estado.currentCalendarId = calendarId;
+        
+        // Criar HTML do calendário
+        const calendarHTML = `
+            <div class="calendar-container" data-calendar-container="${calendarId}">
+                <div id="${calendarId}" class="flatpickr-calendar-container"></div>
+                <div class="date-selection">
+                    <p>Ida: <span id="data-ida-${calendarId}">Selecione</span></p>
+                    <p>Volta: <span id="data-volta-${calendarId}">Selecione</span></p>
+                </div>
+                <button id="confirmar-datas-${calendarId}" class="confirm-button confirm-dates" disabled>Confirmar Datas</button>
+            </div>
+        `;
+        
+        // Adicionar ao container da mensagem
+        containerMensagem.insertAdjacentHTML('beforeend', calendarHTML);
+        
+        // Tentar inicializar novamente após criar o elemento
+        setTimeout(() => {
+            const calendarElement = document.getElementById(calendarId);
+            if (calendarElement) {
+                console.log("Elemento do calendário criado manualmente com sucesso");
+                this.inicializarCalendario(pergunta);
+            } else {
+                console.error("Falha ao criar elemento do calendário manualmente");
+            }
+        }, 300);
+    },
 
     /**
      * Formata a data para exibição amigável
