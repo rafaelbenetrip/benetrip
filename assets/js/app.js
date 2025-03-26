@@ -505,43 +505,44 @@ inicializarCalendario(pergunta) {
 },
 
     /**
-     * Carrega a biblioteca Flatpickr dinamicamente
-     */
-    carregarFlatpickrDinamicamente(pergunta) {
-        console.log("Tentando carregar Flatpickr dinamicamente");
+ * Carrega a biblioteca Flatpickr dinamicamente
+ */
+carregarFlatpickrDinamicamente(pergunta) {
+    console.log("Tentando carregar Flatpickr dinamicamente");
+    
+    // Verificar se já existe um script de carregamento
+    if (document.querySelector('script[src*="flatpickr"]')) {
+        console.log("Carregamento de Flatpickr já em andamento");
+        return;
+    }
+    
+    const script = document.createElement('script');
+    script.src = 'https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.js';
+    script.onload = () => {
+        console.log("Flatpickr carregado com sucesso");
         
-        // Verificar se já existe um script de carregamento
-        if (document.querySelector('script[src*="flatpickr"]')) {
-            console.log("Carregamento de Flatpickr já em andamento");
-            return;
+        // Carregar estilos
+        if (!document.querySelector('link[href*="flatpickr"]')) {
+            const style = document.createElement('link');
+            style.rel = 'stylesheet';
+            style.href = 'https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.css';
+            document.head.appendChild(style);
         }
         
-        const script = document.createElement('script');
-        script.src = 'https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.js';
-        script.onload = () => {
-            console.log("Flatpickr carregado com sucesso");
-            
-            // Carregar estilos
-            if (!document.querySelector('link[href*="flatpickr"]')) {
-                const style = document.createElement('link');
-                style.rel = 'stylesheet';
-                style.href = 'https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.css';
-                document.head.appendChild(style);
-            }
-            
-            // Inicializar calendário após carregamento bem-sucedido
-            setTimeout(() => {
-                this.inicializarCalendario(pergunta);
-            }, 300);
-        };
-        
-        script.onerror = () => {
-            console.error("Falha ao carregar Flatpickr dinamicamente");
-            this.mostrarErro("Não foi possível carregar o componente de calendário. Recarregue a página e tente novamente.");
-        };
-        
-        document.head.appendChild(script);
-    },
+        // Inicializar calendário após carregamento bem-sucedido
+        setTimeout(() => {
+            this.inicializarCalendario(pergunta);
+        }, 300);
+    };
+    
+    script.onerror = () => {
+        console.error("Falha ao carregar Flatpickr dinamicamente");
+        this.mostrarErro("Não foi possível carregar o componente de calendário. Recarregue a página e tente novamente.");
+    };
+    
+    document.head.appendChild(script);
+},
+    
     /**
  * Cria o elemento do calendário manualmente como último recurso
  */
