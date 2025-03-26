@@ -2,16 +2,34 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#E87722">
     <title>Benetrip - Destinos Recomendados</title>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;700&family=Montserrat:wght@400;500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="assets/css/styles.css">
     <link rel="stylesheet" href="assets/css/mobile-optimizations.css">
 </head>
-<body>
+<body class="mobile-optimized">
+    <!-- Barra de status estilo app -->
+    <div class="native-status-bar"></div>
+    
     <div id="destinos-container">
-        <!-- Conteúdo será carregado dinamicamente -->
+        <!-- O conteúdo será carregado dinamicamente, mas adicionamos 
+             uma estrutura básica para otimização mobile -->
+        <div id="swipe-hint" class="swipe-hint" style="display:none;">
+            <div class="swipe-hint-arrow">←</div>
+            <div class="swipe-hint-text">Deslize para explorar</div>
+        </div>
+        
+        <!-- Fixed bottom bar para ações principais -->
+        <div id="bottom-actions" class="fixed-bottom-bar" style="display:none;">
+            <button class="btn-secundario btn-voltar">Refazer Quiz</button>
+            <button class="btn-principal btn-avancar">Ver Voos</button>
+        </div>
     </div>
+
+    <!-- Toast notification container -->
+    <div id="toast-container"></div>
 
     <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/lodash@4.17.21/lodash.min.js"></script>
@@ -20,5 +38,33 @@
     <script src="assets/js/destinos.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/hammer.js@2.0.8/hammer.min.js"></script>
     <script src="assets/js/mobile-interactions.js"></script>
+    
+    <!-- Script extra para mostrar/ocultar barra inferior após renderização -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Mostrar dica de swipe na primeira visita
+            const isFirstVisit = !localStorage.getItem('benetrip_swipe_hint_shown');
+            if (isFirstVisit) {
+                setTimeout(() => {
+                    const swipeHint = document.getElementById('swipe-hint');
+                    if (swipeHint) {
+                        swipeHint.style.display = 'flex';
+                        setTimeout(() => { swipeHint.style.opacity = '1'; }, 100);
+                        setTimeout(() => {
+                            swipeHint.style.opacity = '0';
+                            setTimeout(() => { swipeHint.style.display = 'none'; }, 500);
+                        }, 3000);
+                        localStorage.setItem('benetrip_swipe_hint_shown', 'true');
+                    }
+                }, 2000);
+            }
+            
+            // Mostrar barra inferior após renderização
+            setTimeout(() => {
+                const bottomBar = document.getElementById('bottom-actions');
+                if (bottomBar) bottomBar.style.display = 'flex';
+            }, 1000);
+        });
+    </script>
 </body>
 </html>
