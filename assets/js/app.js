@@ -270,19 +270,19 @@ montarHTMLPergunta(pergunta) {
     }
 
     // Construir a mensagem completa
-    const classeMensagem = pergunta.calendar ? 'message with-calendar' : 'message';
-    return `
-        <div class="chat-message tripinha" data-pergunta-key="${pergunta.key || ''}">
-            <div class="avatar">
-                <img src="${this.config.imagePath}tripinha/avatar-normal.png" alt="Tripinha" />
-            </div>
-            <div class="${classeMensagem}">
-                <p class="question">${pergunta.question}</p>
-                <p class="description">${pergunta.description || ''}</p>
-                ${opcoesHTML}
-            </div>
+const classeMensagem = pergunta.calendar ? 'message with-calendar' : 'message';
+return `
+    <div class="chat-message tripinha" data-pergunta-key="${pergunta.key || ''}">
+        <div class="avatar">
+            <img src="${this.config.imagePath}tripinha/avatar-normal.png" alt="Tripinha" />
         </div>
-    `;
+        <div class="${classeMensagem}">
+            <p class="question">${pergunta.question}</p>
+            <p class="description">${pergunta.description || ''}</p>
+            ${opcoesHTML}
+        </div>
+    </div>
+`;
 },
     
     /**
