@@ -2550,3 +2550,8 @@ body {
     margin-top: 0 !important;
     padding-top: 0 !important;
 }
+
+/* Reduzir o padding superior quando houver um calendário */
+.chat-message .message.with-calendar {
+    padding-top: 0;
+}
