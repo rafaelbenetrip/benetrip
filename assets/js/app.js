@@ -393,20 +393,6 @@ const BENETRIP = {
         this.criarElementoCalendarioManualmente(pergunta);
         return;
     }
-            if (existingContainer) {
-                // Atualizar o ID no DOM para corresponder ao novo ID
-                const calendarElement = existingContainer.querySelector('.flatpickr-calendar-container');
-                if (calendarElement) {
-                    calendarElement.id = this.estado.currentCalendarId;
-                    console.log(`Atualizado ID do calendário existente para: ${this.estado.currentCalendarId}`);
-                }
-            } else {
-                console.error("Container de calendário não encontrado no DOM!");
-                // Criar elemento do calendário manualmente
-                this.criarElementoCalendarioManualmente(pergunta);
-                return;
-            }
-        }
 
         const calendarId = this.estado.currentCalendarId;
         console.log(`Buscando elemento do calendário com ID: ${calendarId}`);
@@ -416,7 +402,7 @@ const BENETRIP = {
 
             if (!calendarElement) {
                 console.log(`Iniciando criação manual do calendário para ID ${calendarId}`);
-                this.criarElementoCalendarioManualmente(pergunta);
+
                 return;
             }
 
