@@ -403,7 +403,7 @@ if (!calendarElement) {
         const config = {
     mode: "range",
     dateFormat: "Y-m-d",
-    minDate: "tomorrow", // Trocar para "today" em vez de usar pergunta.calendar.min_date
+    minDate: "today", // Trocar para "today" em vez de usar pergunta.calendar.min_date
     maxDate: pergunta.calendar.max_date,
     inline: true,
     showMonths: 1,
