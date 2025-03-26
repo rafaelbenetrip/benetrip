@@ -358,15 +358,41 @@ const BENETRIP = {
      * Inicializa o calendário com Flatpickr - Versão corrigida
      */
     inicializarCalendario(pergunta) {
-        console.log("Iniciando configuração do calendário");
+    console.log("Iniciando configuração do calendário com proteção de duplicação");
 
-        // Se não temos um ID no estado, vamos gerar um novo
-        if (!this.estado.currentCalendarId) {
-            console.warn("ID do calendário não encontrado no estado, gerando um novo ID");
-            this.estado.currentCalendarId = `benetrip-calendar-${Date.now()}`;
-
-            // Verificar se já temos um elemento de calendário no DOM
-            const existingContainer = document.querySelector('.calendar-container');
+    // Verificar se o calendário já foi inicializado para evitar duplicação
+    if (this.estado.calendarioAtual) {
+        console.log("Calendário já inicializado, ignorando chamada duplicada");
+        return;
+    }
+    
+    // Usar um ID fixo para evitar problemas com múltiplas inicializações
+    this.estado.currentCalendarId = 'benetrip-calendar-principal';
+    
+    // Verificar se já temos um elemento de calendário no DOM
+    const existingContainer = document.querySelector('.calendar-container');
+    if (existingContainer) {
+        // Atualizar todos os IDs relacionados ao calendário para corresponder ao fixo
+        const calendarElement = existingContainer.querySelector('.flatpickr-calendar-container');
+        if (calendarElement) {
+            calendarElement.id = this.estado.currentCalendarId;
+            
+            // Atualizar também os IDs dos campos de data e botão
+            const dataIdaElement = existingContainer.querySelector('.date-selection p:first-child span');
+            const dataVoltaElement = existingContainer.querySelector('.date-selection p:last-child span');
+            const confirmarBtn = existingContainer.querySelector('.confirm-button');
+            
+            if (dataIdaElement) dataIdaElement.id = `data-ida-${this.estado.currentCalendarId}`;
+            if (dataVoltaElement) dataVoltaElement.id = `data-volta-${this.estado.currentCalendarId}`;
+            if (confirmarBtn) confirmarBtn.id = `confirmar-datas-${this.estado.currentCalendarId}`;
+            
+            console.log(`Elementos do calendário atualizados com ID fixo: ${this.estado.currentCalendarId}`);
+        }
+    } else {
+        console.warn("Container de calendário não encontrado, será criado manualmente");
+        this.criarElementoCalendarioManualmente(pergunta);
+        return;
+    }
             if (existingContainer) {
                 // Atualizar o ID no DOM para corresponder ao novo ID
                 const calendarElement = existingContainer.querySelector('.flatpickr-calendar-container');
