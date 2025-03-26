@@ -1057,32 +1057,17 @@ const BENETRIP = {
         } else if (pergunta.calendar) {
             // Resposta de calendário
 const formatarData = (data) => {
-    // Para strings no formato ISO (YYYY-MM-DD), formatamos diretamente sem converter para Date
-    if (typeof data === 'string' && data.match(/^\d{4}-\d{2}-\d{2}$/)) {
-        // Formato esperado: YYYY-MM-DD
-        const [ano, mes, dia] = data.split('-');
-        return `${dia}/${mes}/${ano}`;
-    } else if (typeof data === 'string') {
-        // Caso a string não esteja no formato ISO, tentamos forçar interpretação local
-        const [ano, mes, dia] = data.split('-').map(Number);
-        if (!isNaN(ano) && !isNaN(mes) && !isNaN(dia)) {
-            // Criar data no fuso horário local
-            const dataLocal = new Date(ano, mes - 1, dia);
-            return dataLocal.toLocaleDateString('pt-BR');
-        }
-        // Se não for possível interpretar, tentamos converter normalmente
-        const dataObj = new Date(data);
-        return dataObj.toLocaleDateString('pt-BR');
-    } else {
-        // Se já for um objeto Date
-        return data.toLocaleDateString('pt-BR', {
-            day: '2-digit',
-            month: '2-digit',
-            year: 'numeric'
-        });
-    }
+    // Converter string para objeto Date se necessário
+    const dataObj = typeof data === 'string' ? new Date(data) : data;
+    return dataObj.toLocaleDateString('pt-BR', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric'
+    });
 };
+
 mensagemResposta = `Ida: ${formatarData(valor.dataIda)} | Volta: ${formatarData(valor.dataVolta)}`;
+            
         } else if (pergunta.autocomplete) {
             // Resposta de autocomplete
             mensagemResposta = `${valor.name} (${valor.code}), ${valor.country}`;
