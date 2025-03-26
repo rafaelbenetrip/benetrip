@@ -449,6 +449,7 @@ if (!calendarElement) {
         }
 
         try {
+    try {
     const calendario = flatpickr(calendarElement, config);
     console.log("Flatpickr inicializado com sucesso");
 
@@ -474,25 +475,26 @@ if (!calendarElement) {
             originalContainer.style.height = '0';
         }
 
-            const confirmarBtn = document.getElementById(`confirmar-datas-${calendarId}`);
-            if (confirmarBtn) {
-                confirmarBtn.addEventListener('click', () => {
-                    const datas = calendario.selectedDates;
-                    if (datas.length === 2) {
-                        const dadosDatas = {
-                            dataIda: datas[0].toISOString().split('T')[0],
-                            dataVolta: datas[1].toISOString().split('T')[0]
-                        };
-                        this.processarResposta(dadosDatas, pergunta);
-                    }
-                });
-                console.log("Eventos do botão de confirmação configurados");
-            } else {
-                console.error(`Botão de confirmação com ID confirmar-datas-${calendarId} não encontrado`);
-            }
-        } catch (erro) {
-            console.error("Erro ao inicializar Flatpickr:", erro);
+        const confirmarBtn = document.getElementById(`confirmar-datas-${calendarId}`);
+        if (confirmarBtn) {
+            confirmarBtn.addEventListener('click', () => {
+                const datas = calendario.selectedDates;
+                if (datas.length === 2) {
+                    const dadosDatas = {
+                        dataIda: datas[0].toISOString().split('T')[0],
+                        dataVolta: datas[1].toISOString().split('T')[0]
+                    };
+                    this.processarResposta(dadosDatas, pergunta);
+                }
+            });
+            console.log("Eventos do botão de confirmação configurados");
+        } else {
+            console.error(`Botão de confirmação com ID confirmar-datas-${calendarId} não encontrado`);
         }
+    }
+} catch (erro) {
+    console.error("Erro ao inicializar Flatpickr:", erro);
+}
     }, 500);
 },
 
