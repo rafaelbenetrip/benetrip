@@ -207,29 +207,21 @@ const BENETRIP = {
         `;
     } else if (pergunta.input_field) {
         if (pergunta.calendar) {
-        // Gerar ID apenas se não existir
-        if (!this.estado.currentCalendarId) {
-            this.estado.currentCalendarId = `benetrip-calendar-${Date.now()}`;
-        }
-        const calendarId = this.estado.currentCalendarId;
+            // Gerar ID apenas se não existir
+            if (!this.estado.currentCalendarId) {
+                this.estado.currentCalendarId = `benetrip-calendar-${Date.now()}`;
+            }
+            const calendarId = this.estado.currentCalendarId;
 
-        console.log(`Gerando HTML do calendário com ID: ${calendarId}`);
+            console.log(`Gerando HTML do calendário com ID: ${calendarId}`);
 
-        opcoesHTML = `
-    <div class="calendar-container" data-calendar-container="${calendarId}">
-        <div id="calendar-loading-${calendarId}" class="loading-container">
-            <div class="loading-spinner"></div>
-            <p>Carregando calendário...</p>
-        </div>
-        <div id="${calendarId}" class="flatpickr-calendar-container" style="display: none;"></div>
-        <div class="date-selection">
-            <p>Ida: <span id="data-ida-${calendarId}">Selecione</span></p>
-            <p>Volta: <span id="data-volta-${calendarId}">Selecione</span></p>
-        </div>
-        <button id="confirmar-datas-${calendarId}" class="confirm-button confirm-dates" disabled>Confirmar Datas</button>
-    </div>
-`;
-    } else if (pergunta.number_input) {
+            opcoesHTML = `
+                <div class="calendar-container" data-calendar-container="${calendarId}">
+                    <div id="${calendarId}" class="flatpickr-calendar-container"></div>
+                    <!-- resto do código -->
+                </div>
+            `;
+        } else if (pergunta.number_input) {
             // Entrada numérica
             const inputId = `number-input-${Date.now()}`;
             this.estado.currentNumberInputId = inputId;
@@ -462,16 +454,6 @@ inicializarCalendario(pergunta) {
             console.log("Flatpickr inicializado com sucesso");
 
             this.estado.calendarioAtual = calendario;
-        
-        // Esconder o indicador de carregamento completamente
-const loadingElement = document.getElementById(`calendar-loading-${calendarId}`);
-if (loadingElement) {
-    loadingElement.parentNode.removeChild(loadingElement);
-}
-
-// Mostrar o calendário e adicionar classe para altura correta
-calendarElement.style.display = 'block';
-calendarElement.classList.add('calendar-initialized');
 
             const confirmarBtn = document.getElementById(`confirmar-datas-${calendarId}`);
             if (confirmarBtn) {
@@ -492,7 +474,7 @@ calendarElement.classList.add('calendar-initialized');
         } catch (erro) {
             console.error("Erro ao inicializar Flatpickr:", erro);
         }
-    }, 200);
+    }, 500);
 },
 
     /**
@@ -566,16 +548,16 @@ calendarElement.classList.add('calendar-initialized');
         this.estado.currentCalendarId = calendarId;
         
         // Criar HTML do calendário
-const calendarHTML = `
-    <div class="calendar-container" data-calendar-container="${calendarId}">
-        <div id="${calendarId}" class="flatpickr-calendar-container"></div>
-        <div class="date-selection">
-            <p>Ida: <span id="data-ida-${calendarId}">Selecione</span></p>
-            <p>Volta: <span id="data-volta-${calendarId}">Selecione</span></p>
-        </div>
-        <button id="confirmar-datas-${calendarId}" class="confirm-button confirm-dates" disabled>Confirmar Datas</button>
-    </div>
-`;
+        const calendarHTML = `
+            <div class="calendar-container" data-calendar-container="${calendarId}">
+                <div id="${calendarId}" class="flatpickr-calendar-container"></div>
+                <div class="date-selection">
+                    <p>Ida: <span id="data-ida-${calendarId}">Selecione</span></p>
+                    <p>Volta: <span id="data-volta-${calendarId}">Selecione</span></p>
+                </div>
+                <button id="confirmar-datas-${calendarId}" class="confirm-button confirm-dates" disabled>Confirmar Datas</button>
+            </div>
+        `;
         
         // Adicionar ao container da mensagem
         containerMensagem.insertAdjacentHTML('beforeend', calendarHTML);
