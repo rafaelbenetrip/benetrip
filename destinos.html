@@ -14,8 +14,14 @@
     <div class="native-status-bar"></div>
     
     <div id="destinos-container">
-        <!-- O conteúdo será carregado dinamicamente, mas adicionamos 
-             uma estrutura básica para otimização mobile -->
+        <!-- Conteúdo de carregamento inicial -->
+        <div class="loading-container">
+            <img src="assets/images/tripinha/avatar-pensando.png" alt="Tripinha carregando" class="loading-avatar" />
+            <div class="loading-text">Farejando destinos incríveis para você...</div>
+            <div class="loading-spinner"></div>
+        </div>
+        
+        <!-- Elementos originais mantidos -->
         <div id="swipe-hint" class="swipe-hint" style="display:none;">
             <div class="swipe-hint-arrow">←</div>
             <div class="swipe-hint-text">Deslize para explorar</div>
@@ -31,39 +37,119 @@
     <!-- Toast notification container -->
     <div id="toast-container"></div>
 
-    <!-- Scripts -->
-    <script src="https://cdn.jsdelivr.net/npm/lodash@4.17.21/lodash.min.js"></script>
-    <script src="assets/js/api.js"></script>
-    <script src="assets/js/ai-service.js"></script>
-    <script src="assets/js/destinos.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/hammer.js@2.0.8/hammer.min.js"></script>
-    <script src="assets/js/mobile-interactions.js"></script>
-    
-    <!-- Script extra para mostrar/ocultar barra inferior após renderização -->
+    <!-- Sistema de carregamento sequencial de scripts -->
     <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            // Mostrar dica de swipe na primeira visita
-            const isFirstVisit = !localStorage.getItem('benetrip_swipe_hint_shown');
-            if (isFirstVisit) {
-                setTimeout(() => {
-                    const swipeHint = document.getElementById('swipe-hint');
-                    if (swipeHint) {
-                        swipeHint.style.display = 'flex';
-                        setTimeout(() => { swipeHint.style.opacity = '1'; }, 100);
-                        setTimeout(() => {
-                            swipeHint.style.opacity = '0';
-                            setTimeout(() => { swipeHint.style.display = 'none'; }, 500);
-                        }, 3000);
-                        localStorage.setItem('benetrip_swipe_hint_shown', 'true');
-                    }
-                }, 2000);
+        // Função para carregar scripts em sequência
+        function loadScriptsSequentially(scripts, callback) {
+            if (scripts.length === 0) {
+                if (callback) callback();
+                return;
             }
             
-            // Mostrar barra inferior após renderização
-            setTimeout(() => {
-                const bottomBar = document.getElementById('bottom-actions');
-                if (bottomBar) bottomBar.style.display = 'flex';
-            }, 1000);
+            const nextScript = scripts.shift();
+            const scriptElement = document.createElement('script');
+            scriptElement.src = nextScript;
+            
+            scriptElement.onload = function() {
+                console.log(`Script carregado: ${nextScript}`);
+                loadScriptsSequentially(scripts, callback);
+            };
+            
+            scriptElement.onerror = function() {
+                console.error(`Erro ao carregar script: ${nextScript}`);
+                // Mostrar mensagem de erro para o usuário
+                showErrorMessage(`Não foi possível carregar recursos necessários. Tente recarregar a página.`);
+                // Continuar mesmo em caso de erro
+                loadScriptsSequentially(scripts, callback);
+            };
+            
+            document.body.appendChild(scriptElement);
+        }
+        
+        // Função para mostrar mensagem de erro
+        function showErrorMessage(message) {
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'mensagem-erro';
+            errorDiv.innerHTML = `
+                <div class="erro-conteudo">
+                    <span class="erro-icone">⚠️</span>
+                    <p>${message}</p>
+                    <button class="btn-fechar-erro">OK</button>
+                </div>
+            `;
+            
+            document.body.appendChild(errorDiv);
+            
+            // Configurar evento para fechar
+            errorDiv.querySelector('.btn-fechar-erro').addEventListener('click', () => {
+                document.body.removeChild(errorDiv);
+            });
+        }
+        
+        // Definir os scripts para carregar em ordem
+        const scripts = [
+            // Biblioteca utilitária primeiro
+            "https://cdn.jsdelivr.net/npm/lodash@4.17.21/lodash.min.js",
+            
+            // Gerenciador de configuração e chaves
+            "assets/js/config.js",
+            
+            // Depois APIs
+            "assets/js/api.js",
+            
+            // Serviço de IA
+            "assets/js/ai-service.js", 
+            
+            // Interface principal
+            "assets/js/destinos.js",
+            
+            // Suporte mobile por último
+            "https://cdn.jsdelivr.net/npm/hammer.js@2.0.8/hammer.min.js",
+            "assets/js/mobile-interactions.js"
+        ];
+        
+        // Iniciar carregamento sequencial
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log("Iniciando carregamento de scripts");
+            loadScriptsSequentially([...scripts], function() {
+                console.log("Todos os scripts carregados");
+                
+                // Inicializar todas as dependências na ordem correta
+                if (window.BENETRIP_CONFIG) {
+                    window.BENETRIP_CONFIG.init();
+                }
+                
+                if (window.BENETRIP_AI) {
+                    window.BENETRIP_AI.init();
+                }
+                
+                if (window.BENETRIP_DESTINOS) {
+                    window.BENETRIP_DESTINOS.init();
+                }
+                
+                // Código original para mostrar a dica de swipe
+                const isFirstVisit = !localStorage.getItem('benetrip_swipe_hint_shown');
+                if (isFirstVisit) {
+                    setTimeout(() => {
+                        const swipeHint = document.getElementById('swipe-hint');
+                        if (swipeHint) {
+                            swipeHint.style.display = 'flex';
+                            setTimeout(() => { swipeHint.style.opacity = '1'; }, 100);
+                            setTimeout(() => {
+                                swipeHint.style.opacity = '0';
+                                setTimeout(() => { swipeHint.style.display = 'none'; }, 500);
+                            }, 3000);
+                            localStorage.setItem('benetrip_swipe_hint_shown', 'true');
+                        }
+                    }, 2000);
+                }
+                
+                // Código original para mostrar a barra inferior
+                setTimeout(() => {
+                    const bottomBar = document.getElementById('bottom-actions');
+                    if (bottomBar) bottomBar.style.display = 'flex';
+                }, 1000);
+            });
         });
     </script>
 </body>
