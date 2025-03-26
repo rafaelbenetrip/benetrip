@@ -401,52 +401,72 @@ if (!calendarElement) {
         }
 
         const config = {
-            mode: "range",
-            dateFormat: "Y-m-d",
-            minDate: pergunta.calendar.min_date || "today",
-            maxDate: pergunta.calendar.max_date,
-            inline: true,
-            showMonths: 1,
-            locale: {
-                weekdays: {
-                    shorthand: ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'],
-                    longhand: ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado']
-                },
-                months: {
-                    shorthand: ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'],
-                    longhand: ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro']
-                },
-                rangeSeparator: ' até ',
-                firstDayOfWeek: 0
-            },
+    mode: "range",
+    dateFormat: "Y-m-d",
+    minDate: "tomorrow", // Trocar para "today" em vez de usar pergunta.calendar.min_date
+    maxDate: pergunta.calendar.max_date,
+    inline: true,
+    showMonths: 1,
+    locale: {
+        weekdays: {
+            shorthand: ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'],
+            longhand: ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado']
+        },
+        months: {
+            shorthand: ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'],
+            longhand: ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro']
+        },
+        rangeSeparator: ' até ',
+        firstDayOfWeek: 0
+    },
+    // Adicionar este objeto para corrigir problema de fuso horário
+    time_24hr: true,
+    enableTime: false,
+    formatDate: (date) => {
+        // Garantir formato correto sem deslocamento de fuso
+        const d = new Date(date);
+        d.setMinutes(d.getMinutes() + d.getTimezoneOffset());
+        const day = d.getDate().toString().padStart(2, '0');
+        const month = (d.getMonth() + 1).toString().padStart(2, '0');
+        const year = d.getFullYear();
+        return `${year}-${month}-${day}`;
+    },
             onChange: (selectedDates, dateStr) => {
-                const dataIdaElement = document.getElementById(`data-ida-${calendarId}`);
-                const dataVoltaElement = document.getElementById(`data-volta-${calendarId}`);
-                const confirmarBtn = document.getElementById(`confirmar-datas-${calendarId}`);
+    const dataIdaElement = document.getElementById(`data-ida-${calendarId}`);
+    const dataVoltaElement = document.getElementById(`data-volta-${calendarId}`);
+    const confirmarBtn = document.getElementById(`confirmar-datas-${calendarId}`);
 
-                if (!dataIdaElement || !dataVoltaElement || !confirmarBtn) {
-                    console.error("Elementos de data não encontrados!");
-                    return;
-                }
+    if (!dataIdaElement || !dataVoltaElement || !confirmarBtn) {
+        console.error("Elementos de data não encontrados!");
+        return;
+    }
 
-                if (selectedDates.length === 0) {
-                    dataIdaElement.textContent = "Selecione";
-                    dataVoltaElement.textContent = "Selecione";
-                    confirmarBtn.disabled = true;
-                } else if (selectedDates.length === 1) {
-                    const dataFormatada = this.formatarDataVisivel(selectedDates[0]);
-                    dataIdaElement.textContent = dataFormatada;
-                    dataVoltaElement.textContent = "Selecione";
-                    confirmarBtn.disabled = true;
-                } else if (selectedDates.length === 2) {
-                    const dataIdaFormatada = this.formatarDataVisivel(selectedDates[0]);
-                    const dataVoltaFormatada = this.formatarDataVisivel(selectedDates[1]);
-                    dataIdaElement.textContent = dataIdaFormatada;
-                    dataVoltaElement.textContent = dataVoltaFormatada;
-                    confirmarBtn.disabled = false;
-                }
-            }
-        };
+    if (selectedDates.length === 0) {
+        dataIdaElement.textContent = "Selecione";
+        dataVoltaElement.textContent = "Selecione";
+        confirmarBtn.disabled = true;
+    } else if (selectedDates.length === 1) {
+        const dataFormatada = this.formatarDataVisivel(selectedDates[0]);
+        dataIdaElement.textContent = dataFormatada;
+        dataVoltaElement.textContent = "Selecione";
+        confirmarBtn.disabled = true;
+    } else if (selectedDates.length === 2) {
+        // Ajustar para evitar problemas de fuso horário
+        const dataIdaObj = new Date(selectedDates[0]);
+        const dataVoltaObj = new Date(selectedDates[1]);
+        
+        // Garantir que as datas estão no formato correto sem deslocamento
+        const dataIdaCorrigida = new Date(dataIdaObj.getFullYear(), dataIdaObj.getMonth(), dataIdaObj.getDate());
+        const dataVoltaCorrigida = new Date(dataVoltaObj.getFullYear(), dataVoltaObj.getMonth(), dataVoltaObj.getDate());
+        
+        const dataIdaFormatada = this.formatarDataVisivel(dataIdaCorrigida);
+        const dataVoltaFormatada = this.formatarDataVisivel(dataVoltaCorrigida);
+        
+        dataIdaElement.textContent = dataIdaFormatada;
+        dataVoltaElement.textContent = dataVoltaFormatada;
+        confirmarBtn.disabled = false;
+    }
+};
 
         try {
     const calendario = flatpickr(calendarElement, config);
