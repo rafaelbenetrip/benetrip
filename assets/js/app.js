@@ -207,21 +207,25 @@ const BENETRIP = {
         `;
     } else if (pergunta.input_field) {
         if (pergunta.calendar) {
-            // Gerar ID apenas se não existir
-            if (!this.estado.currentCalendarId) {
-                this.estado.currentCalendarId = `benetrip-calendar-${Date.now()}`;
-            }
-            const calendarId = this.estado.currentCalendarId;
+        // Gerar ID apenas se não existir
+        if (!this.estado.currentCalendarId) {
+            this.estado.currentCalendarId = `benetrip-calendar-${Date.now()}`;
+        }
+        const calendarId = this.estado.currentCalendarId;
 
-            console.log(`Gerando HTML do calendário com ID: ${calendarId}`);
+        console.log(`Gerando HTML do calendário com ID: ${calendarId}`);
 
-            opcoesHTML = `
-                <div class="calendar-container" data-calendar-container="${calendarId}">
-                    <div id="${calendarId}" class="flatpickr-calendar-container"></div>
-                    <!-- resto do código -->
+        opcoesHTML = `
+            <div class="calendar-container" data-calendar-container="${calendarId}">
+                <div id="calendar-loading-${calendarId}" class="loading-container">
+                    <div class="loading-spinner"></div>
+                    <p>Carregando calendário...</p>
                 </div>
-            `;
-        } else if (pergunta.number_input) {
+                <div id="${calendarId}" class="flatpickr-calendar-container" style="display: none;"></div>
+                <!-- resto do código -->
+            </div>
+        `;
+    } else if (pergunta.number_input) {
             // Entrada numérica
             const inputId = `number-input-${Date.now()}`;
             this.estado.currentNumberInputId = inputId;
@@ -454,6 +458,16 @@ inicializarCalendario(pergunta) {
             console.log("Flatpickr inicializado com sucesso");
 
             this.estado.calendarioAtual = calendario;
+        
+        // Esconder o indicador de carregamento
+        const loadingElement = document.getElementById(`calendar-loading-${calendarId}`);
+        if (loadingElement) {
+            loadingElement.style.display = 'none';
+        }
+        
+        // Mostrar o calendário e adicionar classe para altura correta
+        calendarElement.style.display = 'block';
+        calendarElement.classList.add('calendar-initialized');
 
             const confirmarBtn = document.getElementById(`confirmar-datas-${calendarId}`);
             if (confirmarBtn) {
@@ -474,7 +488,7 @@ inicializarCalendario(pergunta) {
         } catch (erro) {
             console.error("Erro ao inicializar Flatpickr:", erro);
         }
-    }, 500);
+    }, 200);
 },
 
     /**
