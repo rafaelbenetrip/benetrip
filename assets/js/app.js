@@ -507,35 +507,44 @@ const BENETRIP = {
                 const confirmarBtn = document.getElementById(`confirmar-datas-${calendarId}`);
                 if (confirmarBtn) {
                     confirmarBtn.addEventListener('click', () => {
-                        const datas = calendario.selectedDates;
-                        if (datas.length === 2) {
-                            try {
-                                // Método simplificado para processar as datas
-                                // Usar strings YYYY-MM-DD direto do flatpickr
-                                const dataIda = flatpickr.formatDate(datas[0], "Y-m-d");
-                                const dataVolta = flatpickr.formatDate(datas[1], "Y-m-d");
-                                
-                                // Criar objeto de datas simples
-                                const dadosDatas = {
-                                    dataIda: dataIda,
-                                    dataVolta: dataVolta
-                                };
-                                
-                                // Log para depuração
-                                console.log("Datas selecionadas:", dataIda, dataVolta);
-                                
-                                // Salvar também no estado para diagnóstico
-                                this.estado.ultimasDatasSelecionadas = dadosDatas;
-                                
-                                // Processar a resposta
-                                this.processarResposta(dadosDatas, pergunta);
-                                
-                            } catch (erro) {
-                                console.error("Erro ao processar datas:", erro);
-                                this.mostrarErro("Houve um problema ao processar as datas. Por favor, selecione novamente.");
-                            }
-                        }
-                    });
+    try {
+        const datas = calendario.selectedDates;
+        if (datas.length === 2) {
+            // Método super simplificado que evita manipulações complexas de data
+            // Extrair componentes da data diretamente dos objetos Date
+            const dataIda = {
+                dia: datas[0].getDate(),
+                mes: datas[0].getMonth() + 1,
+                ano: datas[0].getFullYear()
+            };
+            
+            const dataVolta = {
+                dia: datas[1].getDate(),
+                mes: datas[1].getMonth() + 1,
+                ano: datas[1].getFullYear()
+            };
+            
+            // Criar strings de data no formato YYYY-MM-DD manualmente
+            const dataIdaStr = `${dataIda.ano}-${String(dataIda.mes).padStart(2, '0')}-${String(dataIda.dia).padStart(2, '0')}`;
+            const dataVoltaStr = `${dataVolta.ano}-${String(dataVolta.mes).padStart(2, '0')}-${String(dataVolta.dia).padStart(2, '0')}`;
+            
+            // Criar objeto de dados com as strings formatadas
+            const dadosDatas = {
+                dataIda: dataIdaStr,
+                dataVolta: dataVoltaStr
+            };
+            
+            // Log simplificado
+            console.log("Datas processadas:", dadosDatas);
+            
+            // Processar resposta
+            this.processarResposta(dadosDatas, pergunta);
+        }
+    } catch (erro) {
+        console.error("Erro ao processar datas:", erro);
+        this.mostrarErro("Houve um problema ao processar as datas. Por favor, selecione novamente.");
+    }
+});
                     console.log("Eventos do botão de confirmação configurados");
                 } else {
                     console.error(`Botão de confirmação com ID confirmar-datas-${calendarId} não encontrado`);
