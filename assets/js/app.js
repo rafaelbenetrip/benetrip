@@ -216,8 +216,12 @@ const BENETRIP = {
         console.log(`Gerando HTML do calendário com ID: ${calendarId}`);
 
         opcoesHTML = `
-    <div class="calendar-container compact" data-calendar-container="${calendarId}">
-        <div id="${calendarId}" class="flatpickr-calendar-container"></div>
+    <div class="calendar-container" data-calendar-container="${calendarId}">
+        <div id="calendar-loading-${calendarId}" class="loading-container">
+            <div class="loading-spinner"></div>
+            <p>Carregando calendário...</p>
+        </div>
+        <div id="${calendarId}" class="flatpickr-calendar-container" style="display: none;"></div>
         <div class="date-selection">
             <p>Ida: <span id="data-ida-${calendarId}">Selecione</span></p>
             <p>Volta: <span id="data-volta-${calendarId}">Selecione</span></p>
@@ -459,15 +463,15 @@ inicializarCalendario(pergunta) {
 
             this.estado.calendarioAtual = calendario;
         
-        // Mostrar o calendário e adicionar classe para altura correta
+        // Esconder o indicador de carregamento completamente
+const loadingElement = document.getElementById(`calendar-loading-${calendarId}`);
+if (loadingElement) {
+    loadingElement.parentNode.removeChild(loadingElement);
+}
+
+// Mostrar o calendário e adicionar classe para altura correta
 calendarElement.style.display = 'block';
 calendarElement.classList.add('calendar-initialized');
-
-// Garantir que o contêiner principal esteja visível e sem espaços indesejados
-const containerElement = calendarElement.closest('.calendar-container');
-if (containerElement) {
-    containerElement.classList.add('initialized');
-}
 
             const confirmarBtn = document.getElementById(`confirmar-datas-${calendarId}`);
             if (confirmarBtn) {
