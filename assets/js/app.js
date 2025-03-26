@@ -386,11 +386,11 @@ inicializarCalendario(pergunta) {
     setTimeout(() => {
         const calendarElement = document.getElementById(calendarId);
 
-        if (!calendarElement) {
-            console.error(`Elemento do calendário com ID ${calendarId} não encontrado!`);
-            this.criarElementoCalendarioManualmente(pergunta);
-            return;
-        }
+if (!calendarElement) {
+    console.log(`Iniciando criação manual do calendário para ID ${calendarId}`);
+    this.criarElementoCalendarioManualmente(pergunta);
+    return;
+}
 
         console.log("Elemento do calendário encontrado, configurando Flatpickr");
 
