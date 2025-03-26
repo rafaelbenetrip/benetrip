@@ -501,7 +501,7 @@ inicializarCalendario(pergunta) {
         } catch (erro) {
             console.error("Erro ao inicializar Flatpickr:", erro);
         }
-    }, 500);
+    }, 500)
 },
 
 /**
