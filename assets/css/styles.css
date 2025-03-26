@@ -2497,3 +2497,20 @@ body {
     margin-top: 0 !important;
     padding-top: 0 !important;
 }
+
+/* Remove margens e paddings internos do Flatpickr */
+.flatpickr-months {
+    margin-top: 0 !important;
+}
+
+.flatpickr-month {
+    margin-top: 0 !important;
+}
+
+.flatpickr-innerContainer {
+    padding-top: 0 !important;
+}
+
+.flatpickr-days {
+    margin-top: 0 !important;
+}
