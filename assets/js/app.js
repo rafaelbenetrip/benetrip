@@ -449,10 +449,19 @@ inicializarCalendario(pergunta) {
         };
 
         try {
-            const calendario = flatpickr(calendarElement, config);
-            console.log("Flatpickr inicializado com sucesso");
+    const calendario = flatpickr(calendarElement, config);
+    console.log("Flatpickr inicializado com sucesso");
 
-            this.estado.calendarioAtual = calendario;
+    this.estado.calendarioAtual = calendario;
+    
+    // Ocultar o contêiner original, já que o Flatpickr cria seu próprio elemento
+    calendarElement.style.display = 'none';
+    
+    // Ajustar o container pai para exibir apenas o calendário gerado pelo Flatpickr
+    const containerElement = calendarElement.closest('.calendar-container');
+    if (containerElement) {
+        containerElement.classList.add('only-flatpickr');
+    }
 
             const confirmarBtn = document.getElementById(`confirmar-datas-${calendarId}`);
             if (confirmarBtn) {
