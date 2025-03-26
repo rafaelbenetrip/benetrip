@@ -7,6 +7,8 @@ const BENETRIP_AI = {
     config: {
         apiKey: null, // Será inicializado durante setup
         cacheDuration: 24 * 60 * 60 * 1000, // 24 horas em ms
+        apiEndpoint: 'https://api.openai.com/v1/chat/completions',
+        model: 'gpt-4'
     },
 
     // Inicializa o serviço de IA
@@ -15,16 +17,40 @@ const BENETRIP_AI = {
         if (window.BENETRIP_CONFIG && window.BENETRIP_CONFIG.credentials) {
             this.config.apiKey = window.BENETRIP_CONFIG.credentials.openAI;
             console.log("Serviço de IA inicializado");
+            
+            // Verificar se a chave está em formato válido
+            if (!this.validateApiKey()) {
+                console.error("Chave API inválida ou em formato incorreto");
+                // Não lance exceção aqui, apenas registra o erro
+            }
         } else {
             console.warn("BENETRIP_CONFIG não encontrado");
-            // Tentar usar a chave diretamente como último recurso
-            this.config.apiKey = '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';
+            return this;
         }
         
         // Carrega cache existente
         this.loadCache();
         
         return this;
+    },
+    
+    // Valida o formato básico da chave API
+    validateApiKey() {
+        if (!this.config.apiKey) {
+            return false;
+        }
+        
+        // Verificar formato básico (começa com sk-)
+        if (!this.config.apiKey.startsWith('sk-')) {
+            return false;
+        }
+        
+        // Verificar comprimento (deve ser suficientemente longo)
+        if (this.config.apiKey.length < 20) {
+            return false;
+        }
+        
+        return true;
     },
     
     // Sistema de cache para evitar chamadas repetidas à API
@@ -84,6 +110,11 @@ const BENETRIP_AI = {
         this.dispatchProgressEvent(10, "Iniciando análise de suas preferências de viagem... 🔍");
         
         try {
+            // Verificar se a chave API está configurada
+            if (!this.validateApiKey()) {
+                throw new Error("A chave da API OpenAI não está configurada corretamente. Verifique o arquivo config.js e coloque uma chave válida.");
+            }
+            
             // Verificar se preferences é válido
             if (!preferences || typeof preferences !== 'object') {
                 console.warn("Preferências inválidas:", preferences);
@@ -127,8 +158,12 @@ const BENETRIP_AI = {
             console.error("Erro ao obter recomendações:", error);
             this.dispatchProgressEvent(100, "Erro ao obter recomendações 😔");
             
-            // Propagar o erro para ser tratado na interface
-            throw error;
+            // Propagar o erro com mensagem clara
+            if (error.message.includes("401") || error.message.includes("Incorrect API key")) {
+                throw new Error("Erro de autenticação com a API OpenAI. Sua chave API parece ser inválida ou expirada. Por favor, verifique-a no arquivo config.js.");
+            } else {
+                throw error;
+            }
         }
     },
     
@@ -215,14 +250,14 @@ const BENETRIP_AI = {
             console.log("Enviando solicitação para a API...");
             
             // Chamada à API da OpenAI
-            const response = await fetch('https://api.openai.com/v1/chat/completions', {
+            const response = await fetch(this.config.apiEndpoint, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${this.config.apiKey}`
                 },
                 body: JSON.stringify({
-                    model: "gpt-4",
+                    model: this.config.model,
                     messages: [
                         {role: "system", content: "Você é um assistente especializado em viagens que fornece recomendações de destinos em formato JSON estruturado."},
                         {role: "user", content: prompt}
@@ -234,7 +269,25 @@ const BENETRIP_AI = {
             
             if (!response.ok) {
                 const error = await response.json();
-                throw new Error(`Erro na API: ${response.status} - ${error.error?.message || 'Erro desconhecido'}`);
+                // Adicione informações mais detalhadas sobre o erro específico
+                let errorMessage = `Erro na API: ${response.status}`;
+                
+                if (error.error) {
+                    if (error.error.message) {
+                        errorMessage += ` - ${error.error.message}`;
+                    }
+                    
+                    if (error.error.code) {
+                        errorMessage += ` (código: ${error.error.code})`;
+                    }
+                }
+                
+                // Adicionar mensagem específica para erro de autenticação
+                if (response.status === 401) {
+                    errorMessage += ". Sua chave API da OpenAI parece ser inválida ou expirada. Verifique-a no arquivo config.js.";
+                }
+                
+                throw new Error(errorMessage);
             }
             
             const data = await response.json();
