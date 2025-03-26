@@ -2514,3 +2514,39 @@ body {
 .flatpickr-days {
     margin-top: 0 !important;
 }
+
+/* Ajustes para remover espaço em branco no calendário */
+.chat-message .message {
+    padding: var(--spacing-md);
+}
+
+.chat-message .message.with-calendar {
+    padding-top: 0;
+}
+
+.chat-message .message > * {
+    margin-bottom: 0;
+}
+
+.chat-message .message .description:empty {
+    display: none;
+}
+
+.calendar-container {
+    margin-top: 0 !important;
+    padding: 0 !important;
+}
+
+.flatpickr-calendar {
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+    border-top: none !important;
+}
+
+.flatpickr-months,
+.flatpickr-month,
+.flatpickr-innerContainer,
+.flatpickr-days {
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+}
