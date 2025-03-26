@@ -2559,3 +2559,20 @@ body {
 .chat-message .message.with-calendar {
     padding-top: 0;
 }
+
+/* Ajustes para o container do calendário quando o Flatpickr está ativo */
+.calendar-container.only-flatpickr .flatpickr-calendar-container {
+    display: none !important;
+    height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+/* Estilos para o calendário gerado pelo Flatpickr */
+.calendar-container.only-flatpickr .flatpickr-calendar {
+    margin-top: 0 !important;
+    margin-bottom: 0 !important;
+    box-shadow: none !important;
+    border: 1px solid #e0e0e0 !important;
+    border-radius: 8px !important;
+}
