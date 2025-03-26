@@ -2479,3 +2479,13 @@ body {
         text-align: center;
     }
 }
+
+.chat-message .message p {
+    margin: 0;
+    padding: 0;
+}
+
+.calendar-container {
+    margin-top: 0;
+    padding-top: 0;
+}
