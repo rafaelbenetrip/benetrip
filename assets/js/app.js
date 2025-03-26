@@ -216,15 +216,19 @@ const BENETRIP = {
         console.log(`Gerando HTML do calendário com ID: ${calendarId}`);
 
         opcoesHTML = `
-            <div class="calendar-container" data-calendar-container="${calendarId}">
-                <div id="calendar-loading-${calendarId}" class="loading-container">
-                    <div class="loading-spinner"></div>
-                    <p>Carregando calendário...</p>
-                </div>
-                <div id="${calendarId}" class="flatpickr-calendar-container" style="display: none;"></div>
-                <!-- resto do código -->
-            </div>
-        `;
+    <div class="calendar-container" data-calendar-container="${calendarId}">
+        <div id="calendar-loading-${calendarId}" class="loading-container">
+            <div class="loading-spinner"></div>
+            <p>Carregando calendário...</p>
+        </div>
+        <div id="${calendarId}" class="flatpickr-calendar-container" style="display: none;"></div>
+        <div class="date-selection">
+            <p>Ida: <span id="data-ida-${calendarId}">Selecione</span></p>
+            <p>Volta: <span id="data-volta-${calendarId}">Selecione</span></p>
+        </div>
+        <button id="confirmar-datas-${calendarId}" class="confirm-button confirm-dates" disabled>Confirmar Datas</button>
+    </div>
+`;
     } else if (pergunta.number_input) {
             // Entrada numérica
             const inputId = `number-input-${Date.now()}`;
