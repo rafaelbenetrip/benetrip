@@ -459,15 +459,15 @@ inicializarCalendario(pergunta) {
 
             this.estado.calendarioAtual = calendario;
         
-        // Esconder o indicador de carregamento
-        const loadingElement = document.getElementById(`calendar-loading-${calendarId}`);
-        if (loadingElement) {
-            loadingElement.style.display = 'none';
-        }
-        
-        // Mostrar o calendário e adicionar classe para altura correta
-        calendarElement.style.display = 'block';
-        calendarElement.classList.add('calendar-initialized');
+        // Esconder o indicador de carregamento completamente
+const loadingElement = document.getElementById(`calendar-loading-${calendarId}`);
+if (loadingElement) {
+    loadingElement.parentNode.removeChild(loadingElement);
+}
+
+// Mostrar o calendário e adicionar classe para altura correta
+calendarElement.style.display = 'block';
+calendarElement.classList.add('calendar-initialized');
 
             const confirmarBtn = document.getElementById(`confirmar-datas-${calendarId}`);
             if (confirmarBtn) {
@@ -562,16 +562,16 @@ inicializarCalendario(pergunta) {
         this.estado.currentCalendarId = calendarId;
         
         // Criar HTML do calendário
-        const calendarHTML = `
-            <div class="calendar-container" data-calendar-container="${calendarId}">
-                <div id="${calendarId}" class="flatpickr-calendar-container"></div>
-                <div class="date-selection">
-                    <p>Ida: <span id="data-ida-${calendarId}">Selecione</span></p>
-                    <p>Volta: <span id="data-volta-${calendarId}">Selecione</span></p>
-                </div>
-                <button id="confirmar-datas-${calendarId}" class="confirm-button confirm-dates" disabled>Confirmar Datas</button>
-            </div>
-        `;
+const calendarHTML = `
+    <div class="calendar-container" data-calendar-container="${calendarId}">
+        <div id="${calendarId}" class="flatpickr-calendar-container"></div>
+        <div class="date-selection">
+            <p>Ida: <span id="data-ida-${calendarId}">Selecione</span></p>
+            <p>Volta: <span id="data-volta-${calendarId}">Selecione</span></p>
+        </div>
+        <button id="confirmar-datas-${calendarId}" class="confirm-button confirm-dates" disabled>Confirmar Datas</button>
+    </div>
+`;
         
         // Adicionar ao container da mensagem
         containerMensagem.insertAdjacentHTML('beforeend', calendarHTML);
