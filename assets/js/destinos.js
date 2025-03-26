@@ -106,43 +106,58 @@ const BENETRIP_DESTINOS = {
         return true;
     },
     
-    /**
-     * Busca novas recomendações da IA
-     */
-    async buscarRecomendacoes() {
-        try {
-            this.mostrarCarregando("Buscando recomendações de destinos...");
-            
-            // Verificar se o serviço de IA está disponível
-            if (!window.BENETRIP_AI) {
-                console.error("Serviço de IA não disponível");
-                this.mostrarErro("Não foi possível carregar o serviço de recomendação. Tente recarregar a página.");
-                return;
-            }
-            
-            // Inicializar o serviço se necessário
-            if (typeof window.BENETRIP_AI.init === 'function' && !window.BENETRIP_AI.initialized) {
-                window.BENETRIP_AI.init();
-            }
-            
-            // Buscar recomendações
-            const recomendacoes = await window.BENETRIP_AI.obterRecomendacoes(this.estado.dadosUsuario);
-            
-            // Armazenar estado
-            this.estado.recomendacoes = recomendacoes;
-            
-            // Renderizar interface
-            this.renderizarInterface();
-        } catch (erro) {
-            console.error("Erro ao buscar recomendações:", erro);
-            this.mostrarErro("Não foi possível obter recomendações de destinos: " + erro.message);
-            
-            // Voltar para a tela inicial em caso de erro crítico
-            setTimeout(() => {
-                this.redirecionarParaInicio();
-            }, 5000);
+    // Adicionamos apenas a parte relevante do destinos.js que precisa ser modificada
+
+/**
+ * Busca novas recomendações da IA
+ */
+async buscarRecomendacoes() {
+    try {
+        this.mostrarCarregando("Buscando recomendações de destinos...");
+        
+        // Verificar se o serviço de IA está disponível
+        if (!window.BENETRIP_AI) {
+            console.error("Serviço de IA não disponível");
+            this.mostrarErro("Não foi possível carregar o serviço de recomendação. Tente recarregar a página.");
+            return;
         }
-    },
+        
+        // Inicializar o serviço se necessário
+        if (typeof window.BENETRIP_AI.init === 'function' && !window.BENETRIP_AI.initialized) {
+            window.BENETRIP_AI.init();
+        }
+        
+        // Buscar recomendações
+        const recomendacoes = await window.BENETRIP_AI.obterRecomendacoes(this.estado.dadosUsuario);
+        
+        // Armazenar estado
+        this.estado.recomendacoes = recomendacoes;
+        
+        // Renderizar interface
+        this.renderizarInterface();
+    } catch (erro) {
+        console.error("Erro ao buscar recomendações:", erro);
+        
+        // Se for erro de autenticação da API, redirecionar para página específica
+        if (erro.message.includes("Chave API") || 
+            erro.message.includes("API key") || 
+            erro.message.includes("autenticação") || 
+            erro.message.includes("401")) {
+            
+            console.log("Redirecionando para página de erro de API...");
+            
+            // Salvar a mensagem de erro para uso na página de erro
+            localStorage.setItem('benetrip_api_error', erro.message);
+            
+            // Redirecionar para a página de erro específica de API
+            window.location.href = 'api-error.html';
+            return;
+        }
+        
+        // Para outros erros, mostrar mensagem normal
+        this.mostrarErro("Não foi possível obter recomendações de destinos: " + erro.message);
+    }
+},
 
     /**
      * Redireciona para a página inicial
