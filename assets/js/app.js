@@ -454,14 +454,25 @@ inicializarCalendario(pergunta) {
 
     this.estado.calendarioAtual = calendario;
     
-    // Ocultar o contêiner original, já que o Flatpickr cria seu próprio elemento
+    // Ocultar o contêiner original de forma mais agressiva
     calendarElement.style.display = 'none';
+    calendarElement.style.height = '0';
+    calendarElement.style.width = '0';
+    calendarElement.style.overflow = 'hidden';
+    calendarElement.style.margin = '0';
+    calendarElement.style.padding = '0';
     
-    // Ajustar o container pai para exibir apenas o calendário gerado pelo Flatpickr
+    // Ajustar o container pai
     const containerElement = calendarElement.closest('.calendar-container');
     if (containerElement) {
         containerElement.classList.add('only-flatpickr');
-    }
+        
+        // Remover qualquer espaçamento extra no container
+        const originalContainer = containerElement.querySelector('.flatpickr-calendar-container');
+        if (originalContainer && originalContainer !== calendarElement) {
+            originalContainer.style.display = 'none';
+            originalContainer.style.height = '0';
+        }
 
             const confirmarBtn = document.getElementById(`confirmar-datas-${calendarId}`);
             if (confirmarBtn) {
