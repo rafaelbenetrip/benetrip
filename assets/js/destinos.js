@@ -18,7 +18,7 @@ const BENETRIP_DESTINOS = {
      * Estados do módulo
      */
     estado: {
-        recomendacoes: null,
+        recomendacoes: [],
         destinoSelecionado: null,
         mostrandoSurpresa: false,
         destinoSurpresa: null,
@@ -63,15 +63,13 @@ const BENETRIP_DESTINOS = {
             if (recomendacoes) {
                 this.estado.recomendacoes = JSON.parse(recomendacoes);
                 
-                // Verificar estrutura das recomendações
-                if (!this.estado.recomendacoes.principal) {
-                    console.warn("Estrutura de recomendações inválida");
-                    this.buscarRecomendacoes();
-                    return;
+                // Separar destino surpresa (último da lista)
+                if (this.estado.recomendacoes.length > 0) {
+                    this.estado.destinoSurpresa = this.estado.recomendacoes[this.estado.recomendacoes.length - 1];
                 }
             } else {
                 console.warn("Recomendações não encontradas");
-                this.buscarRecomendacoes();
+                this.redirecionarParaInicio();
                 return;
             }
             
@@ -80,43 +78,6 @@ const BENETRIP_DESTINOS = {
             console.error("Erro ao carregar dados:", erro);
             this.redirecionarParaInicio();
         }
-    },
-
-    /**
-     * Busca recomendações de destinos usando o serviço de IA
-     */
-    buscarRecomendacoes() {
-        // Verificar se o serviço de IA está disponível
-        if (!window.BENETRIP_AI) {
-            console.error("Serviço de IA não disponível");
-            this.redirecionarParaInicio();
-            return;
-        }
-        
-        // Mostrar carregamento
-        this.mostrarCarregando("Estou farejando os melhores destinos para você...");
-        
-        // Obter preferências do usuário
-        const preferencias = this.estado.dadosUsuario.respostas;
-        
-        // Chamar serviço de IA para obter recomendações
-        window.BENETRIP_AI.obterRecomendacoes(preferencias)
-            .then(recomendacoes => {
-                // Salvar recomendações
-                this.estado.recomendacoes = recomendacoes;
-                localStorage.setItem('benetrip_recomendacoes', JSON.stringify(recomendacoes));
-                
-                // Renderizar interface com as recomendações
-                this.renderizarInterface();
-                
-                // Remover indicador de carregamento
-                this.ocultarCarregando();
-            })
-            .catch(erro => {
-                console.error("Erro ao buscar recomendações:", erro);
-                this.mostrarErro("Houve um problema ao buscar recomendações. Por favor, tente novamente.");
-                this.ocultarCarregando();
-            });
     },
 
     /**
@@ -168,8 +129,8 @@ const BENETRIP_DESTINOS = {
                         <img src="${this.config.imagePath}tripinha/avatar-normal.png" alt="Tripinha" />
                     </div>
                     <div class="balao-mensagem">
-                        <p>Alright, Triper! 🐶 I've sniffed out some incredible destinations that fit your vibe! 🌎🔍 Take a look and tell me where we're heading!</p>
-                        <p>I made sure these places match your budget and travel style! If you don't like them, I can fetch more. OR... if you trust my snout, hit 'Surprise Me!' 🎁 and I'll pick an awesome spot for you!</p>
+                        <p>Alright, Triper! 🐶 Eu farejei alguns destinos incríveis que combinam com seu estilo! 🌎🔍 Dê uma olhada e me diga para onde vamos!</p>
+                        <p>Garanti que esses lugares respeitam seu orçamento e estilo de viagem! Se não gostar deles, posso buscar mais. OU... se confiar no meu faro, clique em 'Me Surpreenda!' 🎁 e escolherei um lugar incrível para você!</p>
                     </div>
                 </div>
                 
@@ -178,10 +139,10 @@ const BENETRIP_DESTINOS = {
                 </div>
                 
                 <div class="acoes-destinos">
-                    <button id="btn-selecionar-destino" class="btn-principal">Select City</button>
+                    <button id="btn-selecionar-destino" class="btn-principal">Escolher Cidade</button>
                     <div class="acoes-secundarias">
-                        <button id="btn-mais-opcoes" class="btn-secundario">Show More Options</button>
-                        <button id="btn-surpresa" class="btn-secundario">Surprise Me! 🎁</button>
+                        <button id="btn-mais-opcoes" class="btn-secundario">Mostrar Mais Opções</button>
+                        <button id="btn-surpresa" class="btn-secundario">Me Surpreenda! 🎁</button>
                     </div>
                 </div>
                 
@@ -190,11 +151,11 @@ const BENETRIP_DESTINOS = {
                         <img src="${this.config.imagePath}tripinha/avatar-normal.png" alt="Tripinha" />
                     </div>
                     <div class="balao-mensagem">
-                        <p>Paw-some choice! 🐾 I LOVE this place—you're gonna have the time of your life! Now, let's sniff out the best way to get there! ✈️</p>
+                        <p>Paw-some escolha! 🐾 Eu ADORO esse lugar—você vai ter momentos incríveis! Agora, vamos encontrar o melhor jeito de chegar lá! ✈️</p>
                     </div>
                 </div>
                 
-                <button id="btn-buscar-voos" class="btn-principal" style="display: none;">Find My Flights! ✈️</button>
+                <button id="btn-buscar-voos" class="btn-principal" style="display: none;">Encontrar Meus Voos! ✈️</button>
                 
                 <div id="modal-destino" class="modal-destino">
                     <div class="modal-conteudo">
@@ -240,7 +201,7 @@ const BENETRIP_DESTINOS = {
     },
 
     /**
-     * Renderiza card individual de destino
+     * Renderiza um card de destino
      */
     renderizarCardDestino(container, destino) {
         // Formatar valores monetários
@@ -266,31 +227,31 @@ const BENETRIP_DESTINOS = {
             <div class="destino-info">
                 <div class="info-item">
                     <span class="icon">✈️</span>
-                    <span class="label">Flight estimate:</span>
+                    <span class="label">Valor da passagem:</span>
                     <span class="valor">${precoPassagem}</span>
                 </div>
                 
                 <div class="info-item">
                     <span class="icon">🏨</span>
-                    <span class="label">Hotels:</span>
-                    <span class="valor">${precoHospedagem}/night</span>
+                    <span class="label">Hotéis:</span>
+                    <span class="valor">${precoHospedagem}/noite</span>
                 </div>
                 
                 <div class="info-item">
                     <span class="icon">🧩</span>
-                    <span class="label">Experiences:</span>
+                    <span class="label">Experiências:</span>
                     <span class="valor">${destino.experiencias}</span>
                 </div>
                 
                 <div class="info-item">
                     <span class="icon">💰</span>
-                    <span class="label">Total estimated cost:</span>
+                    <span class="label">Custo total estimado:</span>
                     <span class="valor">${custoTotal}</span>
                 </div>
                 
                 <div class="info-item destaque">
                     <span class="icon">✨</span>
-                    <span class="label">Why go?</span>
+                    <span class="label">Por que ir?</span>
                     <span class="valor">${destino.porque_ir}</span>
                 </div>
             </div>
@@ -298,20 +259,15 @@ const BENETRIP_DESTINOS = {
         
         // Adicionar o card ao container
         container.appendChild(card);
-        
-        // Adicionar classe "show" após um breve delay para animação
-        setTimeout(() => {
-            card.classList.add('show');
-        }, 100);
     },
+
     /**
-     * Formata valor monetário
+     * Formata um valor monetário
      */
     formatarMoeda(valor, moeda) {
         const simbolo = moeda === 'USD' ? '$' : (moeda === 'EUR' ? '€' : 'R$');
         return `${simbolo} ${valor.toLocaleString('pt-BR')}`;
     },
-
     /**
      * Configura eventos para os destinos
      */
@@ -322,7 +278,7 @@ const BENETRIP_DESTINOS = {
         const btnSurpresa = document.getElementById('btn-surpresa');
         const btnBuscarVoos = document.getElementById('btn-buscar-voos');
         const modalDestino = document.getElementById('modal-destino');
-        const btnFecharModal = modalDestino?.querySelector('.btn-fechar');
+        const btnFecharModal = modalDestino.querySelector('.btn-fechar');
         const listaSelecao = document.getElementById('lista-selecao-destinos');
         
         // Variável para armazenar o destino selecionado
@@ -344,7 +300,7 @@ const BENETRIP_DESTINOS = {
                     .find(d => d.id === idDestino);
                 
                 // Habilitar botão de seleção
-                if (btnSelecionar) btnSelecionar.disabled = false;
+                btnSelecionar.disabled = false;
             });
         });
         
@@ -397,7 +353,7 @@ const BENETRIP_DESTINOS = {
     },
 
     /**
-     * Abre modal de seleção de destino
+     * Abre o modal de seleção de destino
      */
     abrirModalSelecaoDestino(principal, alternativos) {
         const modal = document.getElementById('modal-destino');
@@ -417,7 +373,7 @@ const BENETRIP_DESTINOS = {
                 <span class="item-cidade">${principal.cidade}, ${principal.pais}</span>
                 <span class="item-preco">${this.formatarMoeda(principal.preco_passagem, principal.moeda)}</span>
             </div>
-            <span class="item-badge">Top Pick</span>
+            <span class="item-badge">Escolha Principal</span>
         `;
         lista.appendChild(itemPrincipal);
         
@@ -471,54 +427,20 @@ const BENETRIP_DESTINOS = {
         });
         
         // Ocultar botões de ação
-        const acoesDestinos = document.querySelector('.acoes-destinos');
-        if (acoesDestinos) acoesDestinos.style.display = 'none';
+        document.querySelector('.acoes-destinos').style.display = 'none';
         
         // Mostrar confirmação
-        const confirmacao = document.getElementById('confirmacao-destino');
-        const btnBuscarVoos = document.getElementById('btn-buscar-voos');
-        
-        if (confirmacao) confirmacao.style.display = 'flex';
-        if (btnBuscarVoos) btnBuscarVoos.style.display = 'block';
+        document.getElementById('confirmacao-destino').style.display = 'flex';
+        document.getElementById('btn-buscar-voos').style.display = 'block';
         
         // Rolar para a confirmação
-        if (confirmacao) confirmacao.scrollIntoView({ behavior: 'smooth' });
-    },
-
-    /**
-     * Busca mais opções de destinos
-     */
-    buscarMaisOpcoes() {
-        // Mostrar mensagem de feedback
-        this.mostrarToast("Buscando mais opções de destinos...");
-        
-        // Em um cenário real, faria uma nova chamada à API por mais destinos
-        // Para o MVP, vamos simular um recarregamento da página
-        setTimeout(() => {
-            // Mostrar carregamento
-            this.mostrarCarregando("Farejando mais destinos para você...");
-            
-            // Recarregar página após breve delay
-            setTimeout(() => {
-                // Em um cenário real, chamaríamos novamente o serviço de IA
-                // window.BENETRIP_AI.obterMaisRecomendacoes(...)
-                
-                // Para o MVP, simplesmente recarregamos a página
-                window.location.reload();
-            }, 1500);
-        }, 500);
+        document.getElementById('confirmacao-destino').scrollIntoView({ behavior: 'smooth' });
     },
 
     /**
      * Mostra o destino surpresa
      */
     mostrarDestinoSurpresa(surpresa) {
-        // Verificar se temos o destino surpresa
-        if (!surpresa) {
-            this.mostrarErro("Destino surpresa não disponível no momento");
-            return;
-        }
-        
         // Ocultar destinos atuais
         document.querySelectorAll('.destino-card').forEach(card => {
             card.style.display = 'none';
@@ -526,17 +448,16 @@ const BENETRIP_DESTINOS = {
         
         // Criar container para destino surpresa
         const container = document.getElementById('lista-destinos');
-        if (!container) return;
-        
-        // Formatar valores monetários
-        const precoPassagem = this.formatarMoeda(surpresa.preco_passagem, surpresa.moeda);
-        const precoHospedagem = this.formatarMoeda(surpresa.preco_hospedagem, surpresa.moeda);
-        const custoTotal = this.formatarMoeda(surpresa.custo_total, surpresa.moeda);
         
         // Renderizar destino surpresa com destaque especial
         const card = document.createElement('div');
         card.className = 'destino-card destino-surpresa animate-entrada';
         card.dataset.id = surpresa.id;
+        
+        // Formatar valores monetários
+        const precoPassagem = this.formatarMoeda(surpresa.preco_passagem, surpresa.moeda);
+        const precoHospedagem = this.formatarMoeda(surpresa.preco_hospedagem, surpresa.moeda);
+        const custoTotal = this.formatarMoeda(surpresa.custo_total, surpresa.moeda);
         
         card.innerHTML = `
             <div class="badge-surpresa">✨ Destino Surpresa! ✨</div>
@@ -552,90 +473,86 @@ const BENETRIP_DESTINOS = {
             <div class="destino-info">
                 <div class="info-item">
                     <span class="icon">✈️</span>
-                    <span class="label">Flight estimate:</span>
+                    <span class="label">Valor da passagem:</span>
                     <span class="valor">${precoPassagem}</span>
                 </div>
                 
                 <div class="info-item">
                     <span class="icon">🏨</span>
-                    <span class="label">Hotels:</span>
-                    <span class="valor">${precoHospedagem}/night</span>
+                    <span class="label">Hotéis:</span>
+                    <span class="valor">${precoHospedagem}/noite</span>
                 </div>
                 
                 <div class="info-item">
                     <span class="icon">🧩</span>
-                    <span class="label">Experiences:</span>
+                    <span class="label">Experiências:</span>
                     <span class="valor">${surpresa.experiencias}</span>
                 </div>
                 
                 <div class="info-item">
                     <span class="icon">💰</span>
-                    <span class="label">Total estimated cost:</span>
+                    <span class="label">Custo total estimado:</span>
                     <span class="valor">${custoTotal}</span>
                 </div>
                 
                 <div class="info-item destaque">
                     <span class="icon">✨</span>
-                    <span class="label">Why go?</span>
+                    <span class="label">Por que ir?</span>
                     <span class="valor">${surpresa.porque_ir}</span>
                 </div>
                 
                 <div class="comentario-tripinha">
                     <img src="${this.config.imagePath}tripinha/avatar-normal.png" alt="Tripinha" class="avatar-mini">
-                    <p>${surpresa.comentario_tripinha || 'Este é um destino incrível que escolhi especialmente para você! 🐾'}</p>
+                    <p>${surpresa.comentario_tripinha}</p>
                 </div>
             </div>
         `;
         
-        // Limpar container e adicionar card
+        // Adicionar ao container
         container.innerHTML = '';
         container.appendChild(card);
         
         // Atualizar botões
-        const acoesDestinos = document.querySelector('.acoes-destinos');
-        if (acoesDestinos) {
-            acoesDestinos.innerHTML = `
-                <button id="btn-selecionar-surpresa" class="btn-principal">Escolher Este Destino!</button>
-                <button id="btn-voltar" class="btn-secundario">Voltar às Sugestões</button>
-            `;
-            
-            // Configurar novos eventos
-            const btnSelecionar = document.getElementById('btn-selecionar-surpresa');
-            const btnVoltar = document.getElementById('btn-voltar');
-            
-            if (btnSelecionar) {
-                btnSelecionar.addEventListener('click', () => {
-                    this.confirmarSelecaoDestino(surpresa);
-                });
-            }
-            
-            if (btnVoltar) {
-                btnVoltar.addEventListener('click', () => {
-                    this.voltarSugestoesPrincipais();
-                });
-            }
-        }
+        document.querySelector('.acoes-destinos').innerHTML = `
+            <button id="btn-selecionar-surpresa" class="btn-principal">Escolher Este Destino!</button>
+            <button id="btn-voltar" class="btn-secundario">Voltar às Sugestões</button>
+        `;
+        
+        // Configurar novos eventos
+        document.getElementById('btn-selecionar-surpresa').addEventListener('click', () => {
+            this.confirmarSelecaoDestino(surpresa);
+        });
+        
+        document.getElementById('btn-voltar').addEventListener('click', () => {
+            this.voltarSugestoesPrincipais();
+        });
         
         // Rolar para o topo
         window.scrollTo({ top: 0, behavior: 'smooth' });
+    },
+
+    /**
+     * Busca mais opções de destinos
+     */
+    buscarMaisOpcoes() {
+        this.mostrarCarregando("Buscando mais destinos que combinam com você...");
         
-        // Atualizar estado
-        this.estado.mostrandoSurpresa = true;
+        // Na versão atual, simplesmente recarregar a interface
+        setTimeout(() => {
+            this.renderizarInterface();
+        }, 1500);
     },
 
     /**
      * Volta para as sugestões principais
      */
     voltarSugestoesPrincipais() {
-        // Recarregar a interface
+        // Recarregar a interface com as sugestões originais
         this.renderizarInterface();
-        
-        // Atualizar estado
-        this.estado.mostrandoSurpresa = false;
     },
 
     /**
-     * Prossegue para a página de voos
+     * Prossegue para a etapa de busca de voos
      */
     prosseguirParaVoos() {
         // Verificar se há destino selecionado
@@ -654,46 +571,12 @@ const BENETRIP_DESTINOS = {
     },
 
     /**
-     * Exibe um toast informativo
-     */
-    mostrarToast(mensagem, duracao = 2000) {
-        // Criar elemento de toast
-        const toast = document.createElement('div');
-        toast.className = 'toast-mensagem';
-        toast.textContent = mensagem;
-        
-        // Adicionar ao corpo do documento
-        document.body.appendChild(toast);
-        
-        // Mostrar toast
-        setTimeout(() => {
-            toast.classList.add('show');
-            
-            // Ocultar após duração
-            setTimeout(() => {
-                toast.classList.remove('show');
-                
-                // Remover do DOM após animação
-                setTimeout(() => {
-                    if (document.body.contains(toast)) {
-                        document.body.removeChild(toast);
-                    }
-                }, 300);
-            }, duracao);
-        }, 10);
-    },
-
-    /**
-     * Mostra indicador de carregamento
+     * Mostra um indicador de carregamento
      */
     mostrarCarregando(mensagem) {
-        // Remover overlay existente se houver
-        this.ocultarCarregando();
-        
         // Criar overlay de carregamento
         const overlay = document.createElement('div');
         overlay.className = 'overlay-carregamento';
-        overlay.id = 'benetrip-loading';
         overlay.innerHTML = `
             <div class="container-carregamento">
                 <img src="${this.config.imagePath}tripinha/avatar-pensando.png" alt="Tripinha" class="avatar-carregamento">
@@ -707,17 +590,7 @@ const BENETRIP_DESTINOS = {
     },
 
     /**
-     * Oculta indicador de carregamento
-     */
-    ocultarCarregando() {
-        const overlay = document.getElementById('benetrip-loading');
-        if (overlay && document.body.contains(overlay)) {
-            document.body.removeChild(overlay);
-        }
-    },
-
-    /**
-     * Mostra mensagem de erro
+     * Mostra uma mensagem de erro
      */
     mostrarErro(mensagem) {
         // Criar elemento para mensagem de erro
@@ -751,19 +624,7 @@ const BENETRIP_DESTINOS = {
      * Configura eventos globais
      */
     configurarEventos() {
-        // Adicionar evento de back/forward do navegador
-        window.addEventListener('popstate', () => {
-            // Se estiver mostrando o destino surpresa, voltar para as sugestões
-            if (this.estado.mostrandoSurpresa) {
-                this.voltarSugestoesPrincipais();
-                // Prevenir navegação padrão
-                history.pushState(null, '', window.location.href);
-                return;
-            }
-        });
-        
-        // Adicionar estado à history API para gerenciar navegação
-        history.pushState({page: 'destinos'}, '', window.location.href);
+        // Eventos globais podem ser configurados aqui
     }
 };
 
