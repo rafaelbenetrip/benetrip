@@ -2,14 +2,18 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#E87722">
     <title>Benetrip - Planeje sua Viagem com a Tripinha!</title>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;700&family=Montserrat:wght@400;500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
     <link rel="stylesheet" href="assets/css/styles.css">
     <link rel="stylesheet" href="assets/css/mobile-optimizations.css">
 </head>
-<body>
+<body class="mobile-optimized">
+    <!-- Barra de status estilo app -->
+    <div class="native-status-bar"></div>
+    
     <!-- Container principal do chat -->
     <div id="chat-container">
         <div class="chat-header">
@@ -20,11 +24,27 @@
             <!-- As mensagens do chat serão inseridas aqui dinamicamente -->
         </div>
 
+        <!-- Indicador de digitação -->
+        <div id="typing-indicator" class="typing-indicator" style="display: none;">
+            <div class="thinking-animation">
+                <div class="thinking-dot"></div>
+                <div class="thinking-dot"></div>
+                <div class="thinking-dot"></div>
+            </div>
+        </div>
+
         <!-- Indicador de carregamento -->
-        <div id="loading-indicator" style="display: none;">
-            <div class="loading-spinner"></div>
+        <div id="loading-indicator" class="loading-overlay" style="display: none;">
+            <div class="loading-container">
+                <img src="assets/images/tripinha/avatar-pensando.png" alt="Tripinha carregando" class="loading-avatar">
+                <div class="loading-text">Carregando...</div>
+                <div class="loading-spinner"></div>
+            </div>
         </div>
     </div>
+
+    <!-- Toast notification container -->
+    <div id="toast-container"></div>
 
     <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
