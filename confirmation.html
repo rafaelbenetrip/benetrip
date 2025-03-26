@@ -2,13 +2,17 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#E87722">
     <title>Benetrip - Confirmação de Viagem</title>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;700&family=Montserrat:wght@400;500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="assets/css/styles.css">
     <link rel="stylesheet" href="assets/css/mobile-optimizations.css">
 </head>
-<body>
+<body class="mobile-optimized">
+    <!-- Barra de status estilo app -->
+    <div class="native-status-bar"></div>
+    
     <div id="confirmation-container" class="container">
         <div class="confirmation-header">
             <img src="assets/images/logo.png" alt="Benetrip" class="logo">
@@ -24,13 +28,26 @@
         
         <div class="confirmation-details">
             <h2>Resumo da Viagem</h2>
-            <div id="resumo-viagem">
+            <div id="resumo-viagem" class="resumo-card">
                 <!-- Será preenchido pelo JavaScript -->
             </div>
             
-            <a href="index.html" class="btn-primary btn-block mt-4">Planejar Nova Viagem</a>
+            <div class="action-buttons">
+                <a href="index.html" class="btn-primary btn-block mt-4">Planejar Nova Viagem</a>
+            </div>
         </div>
+        
+        <!-- Espaço para garantir que o conteúdo não seja coberto -->
+        <div class="bottom-spacer" style="height: 60px;"></div>
     </div>
+
+    <!-- Botão Compartilhar Viagem (fixed) -->
+    <div class="fixed-bottom-bar">
+        <button class="btn-secundario btn-share">Compartilhar Viagem</button>
+    </div>
+
+    <!-- Toast notification container -->
+    <div id="toast-container"></div>
 
     <script>
         // Script simples para mostrar resumo da viagem
@@ -64,6 +81,34 @@
                 `;
             } else {
                 resumoEl.innerHTML = '<p>Detalhes da viagem não encontrados</p>';
+            }
+            
+            // Configurar botão de compartilhar
+            const btnShare = document.querySelector('.btn-share');
+            if (btnShare) {
+                btnShare.addEventListener('click', function() {
+                    // Verificar se a API Web Share está disponível
+                    if (navigator.share) {
+                        navigator.share({
+                            title: 'Minha viagem com Benetrip',
+                            text: `Acabei de reservar uma viagem para ${destino ? destino.cidade : 'um destino incrível'} com a Benetrip!`,
+                            url: window.location.href
+                        })
+                        .then(() => console.log('Viagem compartilhada com sucesso!'))
+                        .catch((error) => {
+                            console.log('Erro ao compartilhar:', error);
+                            // Mostrar toast se disponível
+                            if (window.BENETRIP_MOBILE && BENETRIP_MOBILE.mostrarToast) {
+                                BENETRIP_MOBILE.mostrarToast('Não foi possível compartilhar no momento');
+                            }
+                        });
+                    } else {
+                        // Fallback para navegadores sem suporte
+                        if (window.BENETRIP_MOBILE && BENETRIP_MOBILE.mostrarToast) {
+                            BENETRIP_MOBILE.mostrarToast('Compartilhamento não suportado neste navegador');
+                        }
+                    }
+                });
             }
         });
     </script>
