@@ -1,13 +1,13 @@
 [
     {
-        "question": "1️⃣ Olá, Triper! Sou a Tripinha e vou te ajudar a planejar uma viagem incrível! Você já sabe para onde quer ir?",
-        "description": "Escolha se você já tem um destino definido ou se quer descobrir opções.",
-        "options": [
-            "✅ Sim, já sei para onde quero ir!",
-            "🔍 Não, quero descobrir lugares incríveis para visitar!"
-        ],
-        "key": "conhece_destino"
-    },
+  "question": "1️⃣ Você já tem um destino em mente ou quer que eu te surpreenda?",
+  "description": "Escolha se já sabe pra onde quer ir ou se prefere descobrir novos lugares com a minha ajuda!",
+  "options": [
+    "✅ Sim, já tenho um lugar em mente!",
+    "🎁 Não, quero que você me ajude a encontrar o destino perfeito!"
+  ],
+  "key": "conhece_destino"
+},
     
     {
         "question": "2️⃣ Qual é o seu destino desejado?",
