@@ -1,1 +1,513 @@
+/**
+ * BENETRIP - Otimizações Mobile-First
+ * Estilos específicos para melhorar a experiência em dispositivos móveis
+ */
 
+/* Configurações Base Mobile-First */
+:root {
+    /* Ajustes de tamanhos para mobile */
+    --container-width: 100%;
+    --font-size-xs: 0.75rem;  /* 12px */
+    --font-size-sm: 0.875rem; /* 14px */
+    --font-size-md: 1rem;     /* 16px */
+    --font-size-lg: 1.125rem; /* 18px */
+    --font-size-xl: 1.25rem;  /* 20px */
+    
+    /* Espaçamentos reduzidos para mobile */
+    --spacing-xs: 4px;
+    --spacing-sm: 8px;
+    --spacing-md: 12px;
+    --spacing-lg: 16px;
+    --spacing-xl: 24px;
+    
+    /* Ajusta altura de touch areas */
+    --touch-target-min: 44px;
+}
+
+/* Reset e Configurações Base */
+* {
+    -webkit-tap-highlight-color: transparent;
+    box-sizing: border-box;
+}
+
+body {
+    padding: 0;
+    margin: 0;
+    width: 100%;
+    overflow-x: hidden;
+    font-size: 16px;
+    line-height: 1.5;
+    -webkit-text-size-adjust: 100%;
+}
+
+/* Melhorias em Touch Targets */
+button, 
+.btn,
+.option-button,
+.btn-escolher-destino,
+.btn-surpresa,
+input[type="button"],
+input[type="submit"] {
+    min-height: var(--touch-target-min);
+    padding: 12px 16px;
+    font-size: var(--font-size-md);
+    touch-action: manipulation;
+}
+
+/* Ajuste para botões de opção no chat */
+.option-button {
+    padding: 14px 16px;
+    margin-bottom: 8px;
+    font-size: var(--font-size-md);
+}
+
+/* Melhorias nos campos de formulário */
+input[type="text"],
+input[type="number"],
+input[type="search"],
+select,
+textarea,
+.text-input,
+.autocomplete-input,
+.currency-input {
+    min-height: var(--touch-target-min);
+    padding: 10px 12px;
+    font-size: 16px; /* Evita zoom no iOS */
+    width: 100%;
+}
+
+/* Evitar zoom indesejado no iOS */
+@supports (-webkit-touch-callout: none) {
+    input, 
+    select, 
+    textarea {
+        font-size: 16px;
+    }
+}
+
+/* Chat container otimizado para mobile */
+#chat-container {
+    height: 100vh;
+    width: 100%;
+    max-width: 100%;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.chat-header {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    padding: 10px var(--spacing-md);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.chat-messages {
+    flex: 1;
+    padding: var(--spacing-md);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.chat-message {
+    max-width: 85%;
+    margin-bottom: var(--spacing-md);
+}
+
+.chat-message .message {
+    padding: var(--spacing-md);
+}
+
+.chat-message .avatar {
+    width: 36px;
+    height: 36px;
+}
+
+/* Calendário mais amigável para toque */
+.flatpickr-day {
+    min-height: 40px;
+    line-height: 40px;
+}
+
+.flatpickr-months .flatpickr-month,
+.flatpickr-weekdays {
+    height: 44px;
+}
+
+.flatpickr-day.selected, 
+.flatpickr-day.startRange, 
+.flatpickr-day.endRange {
+    background: var(--orange-primary) !important;
+    border-color: var(--orange-primary) !important;
+}
+
+/* Otimizações para autocomplete */
+.autocomplete-container {
+    position: relative;
+    width: 100%;
+}
+
+.autocomplete-results {
+    max-height: 240px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+}
+
+.autocomplete-item {
+    padding: 12px var(--spacing-md);
+}
+
+/* Melhorias para destinos e cards */
+.destino-principal, 
+.destinos-alternativos {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+}
+
+.destino-card {
+    width: 100%;
+    margin-bottom: var(--spacing-md);
+}
+
+.destino-imagens {
+    height: 180px;
+}
+
+.alternativo-wrapper {
+    flex-direction: column;
+}
+
+.alternativo-imagem {
+    width: 100%;
+    height: 120px;
+}
+
+.destino-detalhes {
+    flex-direction: column;
+}
+
+.detalhe {
+    width: 100%;
+    margin-bottom: 8px;
+}
+
+/* Melhorias para voos */
+.voo-card {
+    width: 100%;
+    margin-bottom: var(--spacing-md);
+}
+
+.voo-header,
+.voo-footer {
+    padding: var(--spacing-md);
+    flex-direction: column;
+    align-items: flex-start;
+}
+
+.voo-preco {
+    margin-top: 8px;
+    align-items: flex-start;
+}
+
+.voo-footer {
+    flex-direction: column;
+    gap: 8px;
+}
+
+.btn-detalhes,
+.btn-selecionar {
+    width: 100%;
+}
+
+/* Ajustes para painéis e modais */
+.painel-filtros {
+    width: 100%;
+    max-width: 100%;
+}
+
+.modal-content {
+    width: 90%;
+    max-width: 350px;
+    padding: var(--spacing-md);
+}
+
+/* Melhoria em Tooltips e Popups */
+.confirmacao-container,
+.processing-container {
+    width: 90%;
+    max-width: 350px;
+    padding: var(--spacing-md);
+}
+
+/* Fixed bottom bar para ações principais */
+.fixed-bottom-bar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: white;
+    padding: 12px var(--spacing-md);
+    box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+    z-index: 100;
+    display: flex;
+    justify-content: space-between;
+}
+
+/* Visualização em tela cheia para elementos importantes */
+.fullscreen-mode {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 200;
+    background: white;
+    overflow-y: auto;
+    padding: var(--spacing-md);
+}
+
+/* Adicionar feedback tátil */
+@media (hover: none) {
+    .btn:active,
+    .option-button:active,
+    .btn-escolher-destino:active {
+        transform: scale(0.98);
+        opacity: 0.9;
+    }
+}
+
+/* Ajustes para orientação landscape */
+@media (orientation: landscape) and (max-height: 500px) {
+    .chat-header,
+    .voos-header,
+    .destinos-header {
+        padding: 5px var(--spacing-md);
+    }
+    
+    .chat-messages {
+        padding-bottom: 60px; /* Espaço para teclado */
+    }
+    
+    .modal-content {
+        max-height: 85vh;
+        overflow-y: auto;
+    }
+}
+
+/* Ajustes específicos para telas muito pequenas */
+@media (max-width: 320px) {
+    :root {
+        --font-size-md: 0.9375rem; /* 15px */
+        --font-size-lg: 1.0625rem; /* 17px */
+    }
+    
+    .chat-message {
+        max-width: 90%;
+    }
+    
+    .options-container {
+        margin-left: -8px;
+        margin-right: -8px;
+        width: calc(100% + 16px);
+    }
+    
+    .option-button {
+        padding: 10px 12px;
+    }
+    
+    .voo-card .horario .hora {
+        font-size: 1rem;
+    }
+    
+    .confirmacao-container {
+        width: 95%;
+    }
+}
+
+/* Ajustes para botões de ação grandes */
+.action-button-large {
+    display: block;
+    width: 100%;
+    padding: 16px;
+    font-size: var(--font-size-lg);
+    font-weight: bold;
+    text-align: center;
+    border-radius: var(--border-radius-md);
+    margin: var(--spacing-md) 0;
+    background-color: var(--orange-primary);
+    color: white;
+}
+
+/* Estilos para notificações toast */
+.toast-notification {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 12px 16px;
+    background-color: rgba(0, 0, 0, 0.8);
+    color: white;
+    border-radius: 24px;
+    z-index: 1000;
+    font-size: var(--font-size-sm);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.toast-notification.show {
+    opacity: 1;
+}
+
+/* Ajustes para gestos de swipe */
+.swipeable-container {
+    overflow-x: hidden;
+    position: relative;
+    width: 100%;
+}
+
+.swipeable-item {
+    transition: transform 0.3s ease;
+}
+
+.swipe-action {
+    position: absolute;
+    top: 0;
+    right: 0;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    padding: 0 20px;
+    font-weight: bold;
+    color: white;
+}
+
+/* Status bar no estilo app nativo */
+.native-status-bar {
+    position: sticky;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 20px;
+    background-color: var(--orange-primary);
+    z-index: 1000;
+}
+
+/* Gesture Pull-to-refresh */
+.pull-to-refresh {
+    position: relative;
+    overflow: hidden;
+}
+
+.pull-indicator {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    top: -50px;
+    transition: top 0.3s ease;
+    text-align: center;
+    width: 100%;
+}
+
+/* Melhorar layout da pergunta atual */
+.chat-message.current-question {
+    animation: highlight-question 2s ease;
+}
+
+@keyframes highlight-question {
+    0% { transform: translateY(10px); opacity: 0; }
+    100% { transform: translateY(0); opacity: 1; }
+}
+
+/* Ajustes para inputs com verificação */
+.verification-code-input {
+    display: flex;
+    justify-content: space-between;
+    width: 100%;
+    margin: var(--spacing-md) 0;
+}
+
+.verification-code-input input {
+    width: 40px;
+    height: 50px;
+    text-align: center;
+    font-size: var(--font-size-xl);
+    font-weight: bold;
+    border-radius: var(--border-radius-sm);
+    margin: 0 4px;
+}
+
+/* Melhoria em carregamentos e skeletons */
+.skeleton-loader {
+    background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+    background-size: 200% 100%;
+    animation: skeleton-loading 1.5s infinite;
+    border-radius: var(--border-radius-sm);
+    height: 16px;
+    margin-bottom: 8px;
+}
+
+@keyframes skeleton-loading {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
+/* Ajustes para a navegação entre abas estilo app */
+.tab-navigation {
+    display: flex;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: white;
+    box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+    z-index: 100;
+}
+
+.tab-item {
+    flex: 1;
+    text-align: center;
+    padding: 10px 0;
+    font-size: var(--font-size-xs);
+}
+
+.tab-icon {
+    display: block;
+    font-size: 24px;
+    margin-bottom: 4px;
+}
+
+/* Melhorias finais de espaçamento e layout */
+.chat-content,
+.voos-content,
+.destinos-content {
+    padding: var(--spacing-md);
+    padding-bottom: 80px; /* Espaço para navegação ou botões fixos */
+}
+
+/* Estilo para feedback de loading/buscando */
+.thinking-animation {
+    display: flex;
+    justify-content: center;
+    margin: var(--spacing-md) 0;
+}
+
+.thinking-dot {
+    width: 8px;
+    height: 8px;
+    margin: 0 4px;
+    border-radius: 50%;
+    background-color: var(--gray-dark);
+    animation: thinking-animation 1.4s infinite ease-in-out both;
+}
+
+.thinking-dot:nth-child(1) { animation-delay: -0.32s; }
+.thinking-dot:nth-child(2) { animation-delay: -0.16s; }
+
+@keyframes thinking-animation {
+    0%, 80%, 100% { transform: scale(0); }
+    40% { transform: scale(1); }
+}
