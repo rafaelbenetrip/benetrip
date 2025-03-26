@@ -1056,7 +1056,6 @@ const BENETRIP = {
             mensagemResposta = pergunta.options[valor];
         } else if (pergunta.calendar) {
             // Resposta de calendário
-            // No método mostrarRespostaUsuario, aproximadamente linha 1070
 const formatarData = (data) => {
     // Para strings no formato ISO (YYYY-MM-DD), formatamos diretamente sem converter para Date
     if (typeof data === 'string' && data.match(/^\d{4}-\d{2}-\d{2}$/)) {
@@ -1083,10 +1082,7 @@ const formatarData = (data) => {
         });
     }
 };
-
 mensagemResposta = `Ida: ${formatarData(valor.dataIda)} | Volta: ${formatarData(valor.dataVolta)}`;
-            
-            mensagemResposta = `Ida: ${formatarData(valor.dataIda)} | Volta: ${formatarData(valor.dataVolta)}`;
         } else if (pergunta.autocomplete) {
             // Resposta de autocomplete
             mensagemResposta = `${valor.name} (${valor.code}), ${valor.country}`;
