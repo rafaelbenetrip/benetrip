@@ -505,56 +505,29 @@ const BENETRIP = {
 
                     const confirmarBtn = document.getElementById(`confirmar-datas-${calendarId}`);
                     if (confirmarBtn) {
-    confirmarBtn.addEventListener('click', () => {
+    // No evento de clique do botão de confirmação
+confirmarBtn.addEventListener('click', () => {
     const datas = calendario.selectedDates;
     if (datas.length === 2) {
         try {
-            // Criar datas novas usando o método do próprio flatpickr para garantir consistência
-            const dataIdaStr = flatpickr.formatDate(datas[0], "Y-m-d");
-            const dataVoltaStr = flatpickr.formatDate(datas[1], "Y-m-d");
+            // Método simplificado para processar as datas
+            // Usar strings YYYY-MM-DD direto do flatpickr
+            const dataIda = flatpickr.formatDate(datas[0], "Y-m-d");
+            const dataVolta = flatpickr.formatDate(datas[1], "Y-m-d");
             
-            // Converter para objetos Date para garantir que estão no fuso horário local
-            const dataIdaObj = flatpickr.parseDate(dataIdaStr, "Y-m-d");
-            const dataVoltaObj = flatpickr.parseDate(dataVoltaStr, "Y-m-d");
-            
-            // Verificação adicional de segurança para garantir que as datas são válidas
-            if (!dataIdaObj || !dataVoltaObj) {
-                throw new Error("Datas inválidas detectadas");
-            }
-            
-            // Ajustar para meio-dia para evitar qualquer problema de timezone
-            dataIdaObj.setHours(12, 0, 0, 0);
-            dataVoltaObj.setHours(12, 0, 0, 0);
-            
-            // Construir objeto de dados final usando formatação garantida
+            // Criar objeto de datas simples
             const dadosDatas = {
-                dataIda: this.formatarDataISO(dataIdaObj),
-                dataVolta: this.formatarDataISO(dataVoltaObj)
+                dataIda: dataIda,
+                dataVolta: dataVolta
             };
             
-            // Log detalhado para diagnóstico
-            console.log("Processamento de datas:", {
-                original: {
-                    ida: datas[0].toISOString(),
-                    volta: datas[1].toISOString(),
-                },
-                intermediário: {
-                    idaStr: dataIdaStr,
-                    voltaStr: dataVoltaStr
-                },
-                objetos: {
-                    ida: dataIdaObj.toISOString(),
-                    volta: dataVoltaObj.toISOString()
-                },
-                final: dadosDatas
-            });
+            // Log para depuração
+            console.log("Datas selecionadas:", dataIda, dataVolta);
             
             // Salvar também no estado para diagnóstico
-            this.estado.ultimasDatasSelecionadas = {
-                original: datas,
-                processadas: dadosDatas
-            };
+            this.estado.ultimasDatasSelecionadas = dadosDatas;
             
+            // Processar a resposta
             this.processarResposta(dadosDatas, pergunta);
             
         } catch (erro) {
@@ -689,27 +662,45 @@ const BENETRIP = {
     formatarDataISO(data) {
     if (!data) return '';
     
-    // Verificar se o parâmetro é uma string e convertê-lo para objeto Date se necessário
-    let dataObj = data;
-    if (typeof data === 'string') {
-        dataObj = new Date(data);
-    }
-    
-    // Garantir que temos um objeto Date válido
-    if (!(dataObj instanceof Date) || isNaN(dataObj)) {
-        console.error("Data inválida:", data);
+    try {
+        // Se for já um formato ISO (YYYY-MM-DD), retornamos diretamente
+        if (typeof data === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(data)) {
+            return data;
+        }
+        
+        // Verificar se o parâmetro é uma string e convertê-lo para objeto Date
+        let dataObj = data;
+        if (typeof data === 'string') {
+            // Tentar extrair componentes de data no formato YYYY-MM-DD
+            const partes = data.split('-');
+            if (partes.length === 3) {
+                const ano = parseInt(partes[0]);
+                const mes = parseInt(partes[1]) - 1; // Mês em JS começa em 0
+                const dia = parseInt(partes[2]);
+                dataObj = new Date(ano, mes, dia, 12, 0, 0); // Definir para meio-dia para evitar problemas de fuso
+            } else {
+                dataObj = new Date(data);
+            }
+        }
+        
+        // Garantir que temos um objeto Date válido
+        if (!(dataObj instanceof Date) || isNaN(dataObj.getTime())) {
+            console.error("Data inválida:", data);
+            return '';
+        }
+        
+        const ano = dataObj.getFullYear();
+        const mes = String(dataObj.getMonth() + 1).padStart(2, '0');
+        const dia = String(dataObj.getDate()).padStart(2, '0');
+        
+        // Log para depuração
+        console.log(`Convertendo data: Original=${data}, Formatada=${ano}-${mes}-${dia}`);
+        
+        return `${ano}-${mes}-${dia}`;
+    } catch (erro) {
+        console.error("Erro ao formatar data:", erro, data);
         return '';
     }
-    
-    // Usar UTC para evitar problemas de timezone
-    const ano = dataObj.getFullYear();
-    const mes = String(dataObj.getMonth() + 1).padStart(2, '0');
-    const dia = String(dataObj.getDate()).padStart(2, '0');
-    
-    // Log para depuração
-    console.log(`Convertendo data: Original=${dataObj.toISOString()}, Formatada=${ano}-${mes}-${dia}`);
-    
-    return `${ano}-${mes}-${dia}`;
 },
         
     /**
@@ -1034,67 +1025,51 @@ const BENETRIP = {
      * Mostra a resposta do usuário no chat
      */
     mostrarRespostaUsuario(valor, pergunta) {
-        let mensagemResposta = '';
-        
-        // Formatar a resposta com base no tipo de pergunta
-        if (pergunta.options) {
-            // Resposta de múltipla escolha
-            mensagemResposta = pergunta.options[valor];
-        } else if (pergunta.calendar) {
-            // Resposta de calendário
-const formatarData = (data) => {
-    // Para strings no formato ISO (YYYY-MM-DD), formatamos diretamente sem converter para Date
-    if (typeof data === 'string' && data.match(/^\d{4}-\d{2}-\d{2}$/)) {
-        // Formato esperado: YYYY-MM-DD
-        const [ano, mes, dia] = data.split('-');
-        return `${dia}/${mes}/${ano}`;
-    } else if (typeof data === 'string') {
-        // Caso a string não esteja no formato ISO, tentamos forçar interpretação local
-        const [ano, mes, dia] = data.split('-').map(Number);
-        if (!isNaN(ano) && !isNaN(mes) && !isNaN(dia)) {
-            // Criar data no fuso horário local
-            const dataLocal = new Date(ano, mes - 1, dia);
-            return dataLocal.toLocaleDateString('pt-BR');
-        }
-        // Se não for possível interpretar, tentamos converter normalmente
-        const dataObj = new Date(data);
-        return dataObj.toLocaleDateString('pt-BR');
-    } else {
-        // Se já for um objeto Date
-        return data.toLocaleDateString('pt-BR', {
-            day: '2-digit',
-            month: '2-digit',
-            year: 'numeric'
-        });
-    }
-};
-
-mensagemResposta = `Ida: ${formatarData(valor.dataIda)} | Volta: ${formatarData(valor.dataVolta)}`;
+    let mensagemResposta = '';
+    
+    // Formatar a resposta com base no tipo de pergunta
+    if (pergunta.options) {
+        // Resposta de múltipla escolha
+        mensagemResposta = pergunta.options[valor];
+    } else if (pergunta.calendar) {
+        // Função simplificada para formatar data de YYYY-MM-DD para DD/MM/YYYY
+        const formatarDataVisual = (dataStr) => {
+            if (!dataStr || typeof dataStr !== 'string') return 'Data inválida';
             
-        } else if (pergunta.autocomplete) {
-            // Resposta de autocomplete
-            mensagemResposta = `${valor.name} (${valor.code}), ${valor.country}`;
-        } else {
-            // Outros tipos de resposta
-            mensagemResposta = valor.toString();
-        }
+            // Se for formato YYYY-MM-DD, converter para DD/MM/YYYY
+            if (dataStr.match(/^\d{4}-\d{2}-\d{2}$/)) {
+                const [ano, mes, dia] = dataStr.split('-');
+                return `${dia}/${mes}/${ano}`;
+            }
+            
+            return dataStr; // Retornar como está se não for o formato esperado
+        };
         
-        // Criar elemento da mensagem
-        const mensagemHTML = `
-            <div class="chat-message user">
-                <div class="message">
-                    <p>${mensagemResposta}</p>
-                </div>
+        mensagemResposta = `Ida: ${formatarDataVisual(valor.dataIda)} | Volta: ${formatarDataVisual(valor.dataVolta)}`;
+    } else if (pergunta.autocomplete) {
+        // Resposta de autocomplete
+        mensagemResposta = `${valor.name} (${valor.code}), ${valor.country}`;
+    } else {
+        // Outros tipos de resposta
+        mensagemResposta = valor.toString();
+    }
+    
+    // Criar elemento da mensagem
+    const mensagemHTML = `
+        <div class="chat-message user">
+            <div class="message">
+                <p>${mensagemResposta}</p>
             </div>
-        `;
-        
-        // Adicionar ao chat
-        const chatMessages = document.getElementById('chat-messages');
-        chatMessages.insertAdjacentHTML('beforeend', mensagemHTML);
-        
-        // Rolar para a última mensagem
-        this.rolarParaFinal();
-    },
+        </div>
+    `;
+    
+    // Adicionar ao chat
+    const chatMessages = document.getElementById('chat-messages');
+    chatMessages.insertAdjacentHTML('beforeend', mensagemHTML);
+    
+    // Rolar para a última mensagem
+    this.rolarParaFinal();
+},
 
     /**
      * Finaliza o questionário e passa para a próxima etapa
