@@ -386,11 +386,11 @@ inicializarCalendario(pergunta) {
     setTimeout(() => {
         const calendarElement = document.getElementById(calendarId);
 
-if (!calendarElement) {
-    console.log(`Iniciando criação manual do calendário para ID ${calendarId}`);
-    this.criarElementoCalendarioManualmente(pergunta);
-    return;
-}
+        if (!calendarElement) {
+            console.log(`Iniciando criação manual do calendário para ID ${calendarId}`);
+            this.criarElementoCalendarioManualmente(pergunta);
+            return;
+        }
 
         console.log("Elemento do calendário encontrado, configurando Flatpickr");
 
@@ -446,54 +446,54 @@ if (!calendarElement) {
                     confirmarBtn.disabled = false;
                 }
             }
-        }
+        };
 
         try {
-    const calendario = flatpickr(calendarElement, config);
-    console.log("Flatpickr inicializado com sucesso");
+            const calendario = flatpickr(calendarElement, config);
+            console.log("Flatpickr inicializado com sucesso");
 
-    this.estado.calendarioAtual = calendario;
-    
-    // Ocultar o contêiner original de forma mais agressiva
-    calendarElement.style.display = 'none';
-    calendarElement.style.height = '0';
-    calendarElement.style.width = '0';
-    calendarElement.style.overflow = 'hidden';
-    calendarElement.style.margin = '0';
-    calendarElement.style.padding = '0';
-    
-    // Ajustar o container pai
-    const containerElement = calendarElement.closest('.calendar-container');
-    if (containerElement) {
-        containerElement.classList.add('only-flatpickr');
-        
-        // Remover qualquer espaçamento extra no container
-        const originalContainer = containerElement.querySelector('.flatpickr-calendar-container');
-        if (originalContainer && originalContainer !== calendarElement) {
-            originalContainer.style.display = 'none';
-            originalContainer.style.height = '0';
-        }
-
-        const confirmarBtn = document.getElementById(`confirmar-datas-${calendarId}`);
-        if (confirmarBtn) {
-            confirmarBtn.addEventListener('click', () => {
-                const datas = calendario.selectedDates;
-                if (datas.length === 2) {
-                    const dadosDatas = {
-                        dataIda: datas[0].toISOString().split('T')[0],
-                        dataVolta: datas[1].toISOString().split('T')[0]
-                    };
-                    this.processarResposta(dadosDatas, pergunta);
+            this.estado.calendarioAtual = calendario;
+            
+            // Ocultar o contêiner original de forma mais agressiva
+            calendarElement.style.display = 'none';
+            calendarElement.style.height = '0';
+            calendarElement.style.width = '0';
+            calendarElement.style.overflow = 'hidden';
+            calendarElement.style.margin = '0';
+            calendarElement.style.padding = '0';
+            
+            // Ajustar o container pai
+            const containerElement = calendarElement.closest('.calendar-container');
+            if (containerElement) {
+                containerElement.classList.add('only-flatpickr');
+                
+                // Remover qualquer espaçamento extra no container
+                const originalContainer = containerElement.querySelector('.flatpickr-calendar-container');
+                if (originalContainer && originalContainer !== calendarElement) {
+                    originalContainer.style.display = 'none';
+                    originalContainer.style.height = '0';
                 }
-            });
-            console.log("Eventos do botão de confirmação configurados");
-        } else {
-            console.error(`Botão de confirmação com ID confirmar-datas-${calendarId} não encontrado`);
+
+                const confirmarBtn = document.getElementById(`confirmar-datas-${calendarId}`);
+                if (confirmarBtn) {
+                    confirmarBtn.addEventListener('click', () => {
+                        const datas = calendario.selectedDates;
+                        if (datas.length === 2) {
+                            const dadosDatas = {
+                                dataIda: datas[0].toISOString().split('T')[0],
+                                dataVolta: datas[1].toISOString().split('T')[0]
+                            };
+                            this.processarResposta(dadosDatas, pergunta);
+                        }
+                    });
+                    console.log("Eventos do botão de confirmação configurados");
+                } else {
+                    console.error(`Botão de confirmação com ID confirmar-datas-${calendarId} não encontrado`);
+                }
+            }
+        } catch (erro) {
+            console.error("Erro ao inicializar Flatpickr:", erro);
         }
-    }
-} catch (erro) {
-    console.error("Erro ao inicializar Flatpickr:", erro);
-}
     }, 500);
 },
 
