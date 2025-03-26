@@ -2480,12 +2480,20 @@ body {
     }
 }
 
+/* Remove margens e padding dos parágrafos dentro das mensagens */
 .chat-message .message p {
     margin: 0;
     padding: 0;
 }
 
+/* Garante que o contêiner do calendário não tenha espaço extra no topo */
 .calendar-container {
     margin-top: 0;
     padding-top: 0;
+}
+
+/* Remove espaço extra no widget do calendário Flatpickr */
+.flatpickr-calendar {
+    margin-top: 0 !important;
+    padding-top: 0 !important;
 }
