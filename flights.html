@@ -2,16 +2,35 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#E87722">
     <title>Benetrip - Voos Disponíveis</title>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;700&family=Montserrat:wght@400;500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="assets/css/styles.css">
     <link rel="stylesheet" href="assets/css/mobile-optimizations.css">
 </head>
-<body>
+<body class="mobile-optimized">
+    <!-- Barra de status estilo app -->
+    <div class="native-status-bar"></div>
+    
     <div id="voos-container">
-        <!-- Conteúdo será carregado dinamicamente -->
+        <!-- O conteúdo será carregado dinamicamente -->
+        
+        <!-- Dica de swipe para cartões de voo -->
+        <div id="swipe-hint" class="swipe-hint" style="display:none;">
+            <div class="swipe-hint-arrow">←</div>
+            <div class="swipe-hint-text">Deslize para ver detalhes</div>
+        </div>
+        
+        <!-- Fixed bottom bar para ações principais -->
+        <div id="bottom-actions" class="fixed-bottom-bar" style="display:none;">
+            <button class="btn-secundario btn-voltar">Voltar</button>
+            <button class="btn-principal btn-selecionar-voo">Selecionar Voo</button>
+        </div>
     </div>
+
+    <!-- Toast notification container -->
+    <div id="toast-container"></div>
 
     <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/lodash@4.17.21/lodash.min.js"></script>
@@ -19,5 +38,27 @@
     <script src="assets/js/flights.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/hammer.js@2.0.8/hammer.min.js"></script>
     <script src="assets/js/mobile-interactions.js"></script>
+    
+    <!-- Script para mostrar/ocultar bottom bar após renderização -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Mostrar barra inferior após renderização
+            setTimeout(() => {
+                const bottomBar = document.getElementById('bottom-actions');
+                if (bottomBar) bottomBar.style.display = 'flex';
+                
+                // Configurar evento para botão selecionar
+                const btnSelecionar = document.querySelector('.btn-selecionar-voo');
+                if (btnSelecionar) {
+                    btnSelecionar.addEventListener('click', function() {
+                        // Delegar para a função de seleção no flights.js
+                        if (window.BENETRIP_VOOS && BENETRIP_VOOS.selecionarVooAtivo) {
+                            BENETRIP_VOOS.selecionarVooAtivo();
+                        }
+                    });
+                }
+            }, 1000);
+        });
+    </script>
 </body>
 </html>
