@@ -6,29 +6,80 @@ const BENETRIP_CONFIG = {
     credentials: {},
     
     // Inicializa o sistema de configuração
-    init() {
-        console.log("Carregando configurações...");
-        
-        // Buscar chave no localStorage
-        const savedKey = localStorage.getItem('benetrip_openai_key');
-        if (savedKey) {
-            this.credentials = {
-                openAI: savedKey,
-                unsplash: 'x8q70wHdUpQoKmNtBmhfEbatdsxyapgkUEBgxQav708',
-                pexels: 'GtZcnoPlphF95dn7SsHt7FewD8YYlDQCkBK2vDD4Z7AUt5flGFFJwMEt',
-                aviasales: {
-                    token: 'e82f7d420689b6124dcfa5921a8c6934',
-                    marker: '604241'
-                }
-            };
-            console.log("Chave OpenAI carregada do localStorage");
-        } else {
-            // Se não houver chave salva, exibir formulário
-            this.showApiKeyForm();
+init() {
+    console.log("Carregando configurações...");
+    
+    // Flag para rastrear inicialização
+    this.initialized = true;
+    
+    // Tentar buscar de variáveis de ambiente do Netlify primeiro
+    if (this.getNetlifyConfigKey()) {
+        console.log("Chave API carregada das variáveis de ambiente do Netlify");
+        return this;
+    }
+    
+    // Buscar chave no localStorage
+    const savedKey = localStorage.getItem('benetrip_openai_key');
+    if (savedKey) {
+        this.credentials = {
+            openAI: savedKey,
+            unsplash: 'x8q70wHdUpQoKmNtBmhfEbatdsxyapgkUEBgxQav708',
+            pexels: 'GtZcnoPlphF95dn7SsHt7FewD8YYlDQCkBK2vDD4Z7AUt5flGFFJwMEt',
+            aviasales: {
+                token: 'e82f7d420689b6124dcfa5921a8c6934',
+                marker: '604241'
+            }
+        };
+        console.log("Chave OpenAI carregada do localStorage");
+    } else {
+        // Se não houver chave salva, exibir formulário
+        this.showApiKeyForm();
+    }
+    
+    return this;
+},
+
+// Método auxiliar para obter chaves API de variáveis de ambiente do Netlify
+getNetlifyConfigKey() {
+    try {
+        // Verificar se estamos no Netlify e temos variáveis de ambiente
+        if (window.ENV || 
+            (typeof process !== 'undefined' && process.env) || 
+            window.CLAUDE_API_KEY || 
+            window.OPENAI_API_KEY || 
+            window.AI_API_KEY) {
+            
+            // Obter a chave da API do ambiente
+            const apiKey = window.ENV?.OPENAI_API_KEY || 
+                           window.ENV?.CLAUDE_API_KEY || 
+                           window.ENV?.AI_API_KEY ||
+                           window.CLAUDE_API_KEY ||
+                           window.OPENAI_API_KEY ||
+                           window.AI_API_KEY ||
+                           (process.env?.OPENAI_API_KEY) ||
+                           (process.env?.CLAUDE_API_KEY);
+            
+            if (apiKey) {
+                // Configurar credenciais
+                this.credentials = {
+                    openAI: apiKey,
+                    unsplash: window.ENV?.UNSPLASH_ACCESS_KEY || 'x8q70wHdUpQoKmNtBmhfEbatdsxyapgkUEBgxQav708',
+                    pexels: window.ENV?.PEXELS_API_KEY || 'GtZcnoPlphF95dn7SsHt7FewD8YYlDQCkBK2vDD4Z7AUt5flGFFJwMEt',
+                    aviasales: {
+                        token: window.ENV?.AVIASALES_TOKEN || 'e82f7d420689b6124dcfa5921a8c6934',
+                        marker: window.ENV?.AVIASALES_MARKER || '604241'
+                    }
+                };
+                return true;
+            }
         }
         
-        return this;
-    },
+        return false;
+    } catch (error) {
+        console.error("Erro ao acessar variáveis de ambiente:", error);
+        return false;
+    }
+},
     
     // Exibe formulário para entrada da chave API
     showApiKeyForm() {
