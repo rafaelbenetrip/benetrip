@@ -284,128 +284,85 @@ getNetlifyVariable(name) {
      * Chama o serviço de IA para obter recomendações
      */
     async callAIService(prompt) {
-        // Verificar se temos uma chave de API configurada
-        if (!this.config.apiKey) {
-            throw new Error("Chave de API de IA não configurada");
-        }
+    try {
+        console.log("Chamando API através do Netlify Function...");
         
-        try {
-            console.log("Enviando solicitação para a API...");
-            
-            // Chamada à API da OpenAI
-            const response = await fetch(this.config.apiEndpoint, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${this.config.apiKey}`
-                },
-                body: JSON.stringify({
-                    model: this.config.model,
-                    messages: [
-                        {role: "system", content: "Você é um assistente especializado em viagens que fornece recomendações de destinos em formato JSON estruturado."},
-                        {role: "user", content: prompt}
-                    ],
-                    temperature: 0.7,
-                    response_format: { type: "json_object" }
-                })
-            });
-            
-            if (!response.ok) {
-                const error = await response.json();
-                // Adicione informações mais detalhadas sobre o erro específico
-                let errorMessage = `Erro na API: ${response.status}`;
-                
-                if (error.error) {
-                    if (error.error.message) {
-                        errorMessage += ` - ${error.error.message}`;
-                    }
-                    
-                    if (error.error.code) {
-                        errorMessage += ` (código: ${error.error.code})`;
-                    }
-                }
-                
-                // Adicionar mensagem específica para erro de autenticação
-                if (response.status === 401) {
-                    errorMessage += ". Sua chave API da OpenAI parece ser inválida ou expirada. Verifique-a no arquivo config.js.";
-                }
-                
-                throw new Error(errorMessage);
+        // Extrair dados da requisição dos estados
+        const dadosUsuario = this.estado?.dadosUsuario || {};
+        
+        // Chamada à API via função Netlify
+        const response = await fetch('/api/ai-recommend', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                companhia: dadosUsuario.companhia,
+                preferencia_viagem: dadosUsuario.preferencia_viagem,
+                moeda_escolhida: dadosUsuario.moeda_escolhida,
+                orcamento_valor: dadosUsuario.orcamento_valor,
+                datas: dadosUsuario.datas,
+                cidade_partida: dadosUsuario.cidade_partida
+            })
+        });
+        
+        if (!response.ok) {
+            let errorMessage = `Erro na API: ${response.status}`;
+            try {
+                const errorData = await response.json();
+                errorMessage += ` - ${errorData.error || 'Erro desconhecido'}`;
+            } catch (e) {
+                // Se não conseguir ler o JSON de erro
+                errorMessage += ' - Não foi possível obter detalhes do erro';
             }
             
-            const data = await response.json();
-            return data.choices[0].message.content;
-        } catch (error) {
-            console.error("Erro ao chamar serviço de IA:", error);
-            throw error;
+            throw new Error(errorMessage);
         }
-    },
+        
+        const data = await response.json();
+        return data.data; // O conteúdo da resposta da IA
+    } catch (error) {
+        console.error("Erro ao chamar serviço de IA:", error);
+        throw error;
+    }
+},
 
     /**
      * Busca imagens para os destinos
      */
     async getDestinationImages(destino) {
-        try {
-            // Pegando a chave da API Unsplash da configuração
-            const accessKey = window.BENETRIP_CONFIG?.credentials?.unsplash || 
-                             'x8q70wHdUpQoKmNtBmhfEbatdsxyapgkUEBgxQav708';
-                             
-            const query = `${destino.cidade} ${destino.pais} landmark`;
-            const encodedQuery = encodeURIComponent(query);
-            
-            const response = await fetch(`https://api.unsplash.com/search/photos?query=${encodedQuery}&per_page=2&orientation=landscape&client_id=${accessKey}`);
-            
-            if (!response.ok) {
-                throw new Error(`Erro na API de imagens: ${response.status}`);
-            }
-            
-            const data = await response.json();
-            
-            // Se encontrou imagens, retornar URLs
-            if (data.results && data.results.length > 0) {
-                return {
-                    principal: data.results[0].urls.regular,
-                    secundaria: data.results.length > 1 ? data.results[1].urls.regular : data.results[0].urls.regular
-                };
-            }
-            
-            throw new Error("Nenhuma imagem encontrada");
-        } catch (error) {
-            console.error(`Erro ao buscar imagens para ${destino.cidade}:`, error);
-            
-            // Usar o Pixabay como fallback para imagens
-            try {
-                const pixabayKey = window.BENETRIP_CONFIG?.credentials?.pexels || 
-                                  'GtZcnoPlphF95dn7SsHt7FewD8YYlDQCkBK2vDD4Z7AUt5flGFFJwMEt';
-                const query = `${destino.cidade} ${destino.pais} travel`;
-                const encodedQuery = encodeURIComponent(query);
-                
-                const response = await fetch(`https://pixabay.com/api/?key=${pixabayKey}&q=${encodedQuery}&image_type=photo&orientation=horizontal&category=travel&per_page=2`);
-                
-                if (!response.ok) {
-                    throw new Error(`Erro na API Pixabay: ${response.status}`);
-                }
-                
-                const data = await response.json();
-                
-                if (data.hits && data.hits.length > 0) {
-                    return {
-                        principal: data.hits[0].webformatURL,
-                        secundaria: data.hits.length > 1 ? data.hits[1].webformatURL : data.hits[0].webformatURL
-                    };
-                }
-            } catch (pixabayError) {
-                console.error("Erro no fallback de imagens:", pixabayError);
-            }
-            
-            // Se ambas as APIs falharem, usar URLs genéricas
+    try {
+        const query = `${destino.cidade} ${destino.pais} landmark`;
+        const encodedQuery = encodeURIComponent(query);
+        
+        // Usar nossa função Netlify para buscar imagens
+        const response = await fetch(`/api/image-search?query=${encodedQuery}`);
+        
+        if (!response.ok) {
+            throw new Error(`Erro na API de imagens: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        // Se encontrou imagens, retornar URLs
+        if (data.images && data.images.length > 0) {
             return {
-                principal: `https://source.unsplash.com/1600x900/?${encodeURIComponent(destino.cidade)},landmark`,
-                secundaria: `https://source.unsplash.com/1600x900/?${encodeURIComponent(destino.pais)},travel`
+                principal: data.images[0].url,
+                secundaria: data.images.length > 1 ? data.images[1].url : data.images[0].url
             };
         }
-    },
-
+        
+        throw new Error("Nenhuma imagem encontrada");
+    } catch (error) {
+        console.error(`Erro ao buscar imagens para ${destino.cidade}:`, error);
+        
+        // Usar URLs de placeholder como fallback
+        return {
+            principal: `https://via.placeholder.com/800x600.png?text=${encodeURIComponent(destino.cidade)}`,
+            secundaria: `https://via.placeholder.com/800x600.png?text=${encodeURIComponent(destino.pais)}`
+        };
+    }
+},
     /**
      * Processa a resposta da IA e converte para formato utilizável
      */
