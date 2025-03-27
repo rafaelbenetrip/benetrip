@@ -19,31 +19,69 @@ const BENETRIP_AI = {
 
     // Inicializa o serviço de IA
     init() {
-        // Tentar obter a chave das variáveis de ambiente do Netlify
-        if (typeof process !== 'undefined' && process.env && process.env.OPENAI_API_KEY) {
-            this.config.apiKey = process.env.OPENAI_API_KEY;
-            console.log("Chave API carregada das variáveis de ambiente");
+    // Tentar obter a chave das variáveis de ambiente do Netlify
+    if (typeof process !== 'undefined' && process.env && process.env.OPENAI_API_KEY) {
+        this.config.apiKey = process.env.OPENAI_API_KEY;
+        console.log("Chave API carregada das variáveis de ambiente");
+    } 
+    // Verificar se BENETRIP_CONFIG está disponível
+    else if (typeof window.BENETRIP_CONFIG !== 'undefined') {
+        // Se estiver disponível mas não inicializado, tente inicializar
+        if (typeof window.BENETRIP_CONFIG.init === 'function' && !window.BENETRIP_CONFIG.initialized) {
+            try {
+                console.log("Tentando inicializar BENETRIP_CONFIG automaticamente");
+                window.BENETRIP_CONFIG.init();
+            } catch (error) {
+                console.error("Erro ao inicializar BENETRIP_CONFIG:", error);
+            }
         }
-        // Obter a chave da API do módulo de configuração
-        else if (window.BENETRIP_CONFIG && window.BENETRIP_CONFIG.credentials) {
+        
+        // Agora tente obter as credenciais
+        if (window.BENETRIP_CONFIG.credentials) {
             this.config.apiKey = window.BENETRIP_CONFIG.credentials.openAI;
-            console.log("Serviço de IA inicializado");
+            console.log("Serviço de IA inicializado com credenciais");
             
             // Verificar se a chave está em formato válido
             if (!this.validateApiKey()) {
                 console.error("Chave API inválida ou em formato incorreto");
-                // Não lance exceção aqui, apenas registra o erro
             }
         } else {
-            console.warn("BENETRIP_CONFIG não encontrado");
-            return this;
+            console.warn("BENETRIP_CONFIG existe mas não tem credentials");
         }
+    } else {
+        // Se não pudermos obter a chave da API, verificamos se temos variáveis do Netlify
+        const netlifyKey = this.getNetlifyVariable('OPENAI_API_KEY') || 
+                         this.getNetlifyVariable('CLAUDE_API_KEY') || 
+                         this.getNetlifyVariable('AI_API_KEY');
         
-        // Carrega cache existente
-        this.loadCache();
-        
-        return this;
-    },
+        if (netlifyKey) {
+            this.config.apiKey = netlifyKey;
+            console.log("Chave API carregada das variáveis do Netlify");
+        } else {
+            console.warn("BENETRIP_CONFIG não encontrado e nenhuma variável de ambiente disponível");
+        }
+    }
+    
+    // Carrega cache existente
+    this.loadCache();
+    
+    return this;
+},
+
+// Método de ajuda para buscar variáveis do Netlify
+getNetlifyVariable(name) {
+    // Netlify injeta variáveis no objeto window.ENV ou como variáveis globais diretamente
+    if (window.ENV && window.ENV[name]) {
+        return window.ENV[name];
+    }
+    
+    // Tentar acessar diretamente (algumas configurações do Netlify)
+    if (window[name]) {
+        return window[name];
+    }
+    
+    return null;
+},
     
     // Valida o formato básico da chave API
     validateApiKey() {
