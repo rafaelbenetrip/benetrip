@@ -109,48 +109,69 @@
         ];
         
         // Iniciar carregamento sequencial
-        document.addEventListener('DOMContentLoaded', function() {
-            console.log("Iniciando carregamento de scripts");
-            loadScriptsSequentially([...scripts], function() {
-                console.log("Todos os scripts carregados");
-                
-                // Inicializar todas as dependências na ordem correta
-                if (window.BENETRIP_CONFIG) {
-                    window.BENETRIP_CONFIG.init();
-                }
-                
-                if (window.BENETRIP_AI) {
-                    window.BENETRIP_AI.init();
-                }
-                
-                if (window.BENETRIP_DESTINOS) {
-                    window.BENETRIP_DESTINOS.init();
-                }
-                
-                // Código original para mostrar a dica de swipe
-                const isFirstVisit = !localStorage.getItem('benetrip_swipe_hint_shown');
-                if (isFirstVisit) {
-                    setTimeout(() => {
-                        const swipeHint = document.getElementById('swipe-hint');
-                        if (swipeHint) {
-                            swipeHint.style.display = 'flex';
-                            setTimeout(() => { swipeHint.style.opacity = '1'; }, 100);
-                            setTimeout(() => {
-                                swipeHint.style.opacity = '0';
-                                setTimeout(() => { swipeHint.style.display = 'none'; }, 500);
-                            }, 3000);
-                            localStorage.setItem('benetrip_swipe_hint_shown', 'true');
-                        }
-                    }, 2000);
-                }
-                
-                // Código original para mostrar a barra inferior
+document.addEventListener('DOMContentLoaded', function() {
+    console.log("Iniciando carregamento de scripts");
+    
+    // Primeiro carregar e inicializar o config
+    loadScriptsSequentially(["assets/js/config.js"], function() {
+        console.log("Config carregado");
+        
+        // Inicializar config primeiro
+        if (window.BENETRIP_CONFIG) {
+            window.BENETRIP_CONFIG.init();
+            console.log("BENETRIP_CONFIG inicializado");
+        } else {
+            console.error("BENETRIP_CONFIG não disponível após carregamento");
+            showErrorMessage("Erro ao carregar configurações. Tente recarregar a página.");
+        }
+        
+        // Agora carregar o resto dos scripts
+        const remainingScripts = [
+            "https://cdn.jsdelivr.net/npm/lodash@4.17.21/lodash.min.js",
+            "assets/js/api.js",
+            "assets/js/ai-service.js", 
+            "assets/js/destinos.js",
+            "https://cdn.jsdelivr.net/npm/hammer.js@2.0.8/hammer.min.js",
+            "assets/js/mobile-interactions.js"
+        ];
+        
+        loadScriptsSequentially(remainingScripts, function() {
+            console.log("Todos os scripts restantes carregados");
+            
+            // Inicializar os outros módulos
+            if (window.BENETRIP_AI) {
+                window.BENETRIP_AI.init();
+            }
+            
+            if (window.BENETRIP_DESTINOS) {
+                window.BENETRIP_DESTINOS.init();
+            }
+            
+            // Código original para mostrar a dica de swipe
+            const isFirstVisit = !localStorage.getItem('benetrip_swipe_hint_shown');
+            if (isFirstVisit) {
                 setTimeout(() => {
-                    const bottomBar = document.getElementById('bottom-actions');
-                    if (bottomBar) bottomBar.style.display = 'flex';
-                }, 1000);
-            });
+                    const swipeHint = document.getElementById('swipe-hint');
+                    if (swipeHint) {
+                        swipeHint.style.display = 'flex';
+                        setTimeout(() => { swipeHint.style.opacity = '1'; }, 100);
+                        setTimeout(() => {
+                            swipeHint.style.opacity = '0';
+                            setTimeout(() => { swipeHint.style.display = 'none'; }, 500);
+                        }, 3000);
+                        localStorage.setItem('benetrip_swipe_hint_shown', 'true');
+                    }
+                }, 2000);
+            }
+            
+            // Código original para mostrar a barra inferior
+            setTimeout(() => {
+                const bottomBar = document.getElementById('bottom-actions');
+                if (bottomBar) bottomBar.style.display = 'flex';
+            }, 1000);
         });
+    });
+});
     </script>
 </body>
 </html>
