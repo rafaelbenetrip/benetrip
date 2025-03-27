@@ -112,63 +112,91 @@
 document.addEventListener('DOMContentLoaded', function() {
     console.log("Iniciando carregamento de scripts");
     
-    // Primeiro carregar e inicializar o config
-    loadScriptsSequentially(["assets/js/config.js"], function() {
-        console.log("Config carregado");
+    // Primeiro carregar config e dependências essenciais em ordem
+    const essentialScripts = [
+        "https://cdn.jsdelivr.net/npm/lodash@4.17.21/lodash.min.js",
+        "assets/js/config.js"
+    ];
+    
+    loadScriptsSequentially(essentialScripts, function() {
+        console.log("Dependências essenciais carregadas");
         
-        // Inicializar config primeiro
+        // Verificar e inicializar config
         if (window.BENETRIP_CONFIG) {
-            window.BENETRIP_CONFIG.init();
-            console.log("BENETRIP_CONFIG inicializado");
+            try {
+                window.BENETRIP_CONFIG.init();
+                console.log("BENETRIP_CONFIG inicializado com sucesso");
+            } catch (error) {
+                console.error("Erro ao inicializar BENETRIP_CONFIG:", error);
+            }
         } else {
-            console.error("BENETRIP_CONFIG não disponível após carregamento");
-            showErrorMessage("Erro ao carregar configurações. Tente recarregar a página.");
+            console.warn("BENETRIP_CONFIG não disponível, criando stub...");
+            // Criar stub de config para permitir que o sistema continue
+            window.BENETRIP_CONFIG = {
+                credentials: {},
+                initialized: true,
+                init: function() { return this; }
+            };
         }
         
-        // Agora carregar o resto dos scripts
-        const remainingScripts = [
-            "https://cdn.jsdelivr.net/npm/lodash@4.17.21/lodash.min.js",
+        // Carregar os scripts da aplicação com sincronização garantida
+        const appScripts = [
             "assets/js/api.js",
-            "assets/js/ai-service.js", 
-            "assets/js/destinos.js",
-            "https://cdn.jsdelivr.net/npm/hammer.js@2.0.8/hammer.min.js",
-            "assets/js/mobile-interactions.js"
+            "assets/js/ai-service.js"
         ];
         
-        loadScriptsSequentially(remainingScripts, function() {
-            console.log("Todos os scripts restantes carregados");
+        loadScriptsSequentially(appScripts, function() {
+            console.log("Scripts de API e IA carregados");
             
-            // Inicializar os outros módulos
+            // Inicializar serviços em sequência garantida
+            if (window.BENETRIP_API) {
+                window.BENETRIP_API.init();
+                console.log("API inicializada");
+            }
+            
             if (window.BENETRIP_AI) {
                 window.BENETRIP_AI.init();
+                console.log("Serviço de IA inicializado");
             }
             
-            if (window.BENETRIP_DESTINOS) {
-                window.BENETRIP_DESTINOS.init();
-            }
-            
-            // Código original para mostrar a dica de swipe
-            const isFirstVisit = !localStorage.getItem('benetrip_swipe_hint_shown');
-            if (isFirstVisit) {
+            // Finalmente carregar e inicializar a UI
+            loadScriptsSequentially(["assets/js/destinos.js"], function() {
+                console.log("UI carregada");
+                
+                if (window.BENETRIP_DESTINOS) {
+                    window.BENETRIP_DESTINOS.init();
+                    console.log("Sistema de destinos inicializado");
+                }
+                
+                // Código para elementos visuais
+                const isFirstVisit = !localStorage.getItem('benetrip_swipe_hint_shown');
+                if (isFirstVisit) {
+                    setTimeout(() => {
+                        const swipeHint = document.getElementById('swipe-hint');
+                        if (swipeHint) {
+                            swipeHint.style.display = 'flex';
+                            setTimeout(() => { swipeHint.style.opacity = '1'; }, 100);
+                            setTimeout(() => {
+                                swipeHint.style.opacity = '0';
+                                setTimeout(() => { swipeHint.style.display = 'none'; }, 500);
+                            }, 3000);
+                            localStorage.setItem('benetrip_swipe_hint_shown', 'true');
+                        }
+                    }, 2000);
+                }
+                
+                // Mostrar barra inferior
                 setTimeout(() => {
-                    const swipeHint = document.getElementById('swipe-hint');
-                    if (swipeHint) {
-                        swipeHint.style.display = 'flex';
-                        setTimeout(() => { swipeHint.style.opacity = '1'; }, 100);
-                        setTimeout(() => {
-                            swipeHint.style.opacity = '0';
-                            setTimeout(() => { swipeHint.style.display = 'none'; }, 500);
-                        }, 3000);
-                        localStorage.setItem('benetrip_swipe_hint_shown', 'true');
-                    }
-                }, 2000);
-            }
-            
-            // Código original para mostrar a barra inferior
-            setTimeout(() => {
-                const bottomBar = document.getElementById('bottom-actions');
-                if (bottomBar) bottomBar.style.display = 'flex';
-            }, 1000);
+                    const bottomBar = document.getElementById('bottom-actions');
+                    if (bottomBar) bottomBar.style.display = 'flex';
+                }, 1000);
+                
+                // Carregar scripts de interação mobile no final
+                loadScriptsSequentially([
+                    "https://cdn.jsdelivr.net/npm/hammer.js@2.0.8/hammer.min.js",
+                    "assets/js/mobile-interactions.js"
+                ]);
+            });
         });
     });
 });
