@@ -1,0 +1,9 @@
+{
+  "name": "benetrip",
+  "version": "3.0.0",
+  "description": "Benetrip travel recommendation app",
+  "dependencies": {
+    "axios": "^0.27.2",
+    "openai": "^3.2.1"
+  }
+}
