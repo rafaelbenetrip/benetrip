@@ -319,20 +319,25 @@ getNetlifyVariable(name) {
         const dadosUsuario = prompt || {};
         
         // Chamada à API via função Netlify
-        const response = await fetch('/.netlify/functions/ai-recommend', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                companhia: dadosUsuario.companhia,
-                preferencia_viagem: dadosUsuario.preferencia_viagem,
-                moeda_escolhida: dadosUsuario.moeda_escolhida,
-                orcamento_valor: dadosUsuario.orcamento_valor,
-                datas: dadosUsuario.datas,
-                cidade_partida: dadosUsuario.cidade_partida
-            })
-        });
+        const urlBase = window.location.hostname.includes('localhost') ? 
+    'http://localhost:8888' : 
+    '';
+
+const response = await fetch(`${urlBase}/.netlify/functions/ai-recommend`, {
+    method: 'POST',
+    headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+    },
+    body: JSON.stringify({
+        companhia: dadosUsuario.companhia,
+        preferencia_viagem: dadosUsuario.preferencia_viagem,
+        moeda_escolhida: dadosUsuario.moeda_escolhida,
+        orcamento_valor: dadosUsuario.orcamento_valor,
+        datas: dadosUsuario.datas,
+        cidade_partida: dadosUsuario.cidade_partida
+    })
+});
         
         if (!response.ok) {
             let errorMessage = `Erro na API: ${response.status}`;
