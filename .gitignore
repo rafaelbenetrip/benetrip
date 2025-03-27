@@ -1,0 +1,14 @@
+# Arquivos de ambiente com chaves API
+.env
+.env.local
+.env.development
+.env.production
+
+# Arquivos de dependências e build
+node_modules/
+dist/
+build/
+
+# Arquivos temporários do sistema
+.DS_Store
+Thumbs.db
