@@ -411,7 +411,7 @@ async callNetlifyFunction(preferences) {
         const encodedQuery = encodeURIComponent(query);
         
         // Usar nossa função Netlify para buscar imagens
-        const response = await fetch(`/api/image-search?query=${encodedQuery}`);
+        const response = await fetch(`/.netlify/functions/image-search?query=${encodedQuery}`);
         
         if (!response.ok) {
             throw new Error(`Erro na API de imagens: ${response.status}`);
