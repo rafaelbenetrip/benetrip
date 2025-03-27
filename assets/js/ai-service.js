@@ -143,6 +143,31 @@ getNetlifyVariable(name) {
             console.warn("Erro ao carregar cache de IA:", error);
         }
     },
+
+// Método de retry para chamadas de API com backoff exponencial
+retryFetch: async function(url, options, maxRetries = 3, delay = 1000) {
+    let lastError;
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+            console.log(`Tentativa ${attempt} de ${maxRetries} para ${url}`);
+            
+            const response = await fetch(url, options);
+            return response;
+        } catch (error) {
+            console.warn(`Tentativa ${attempt} falhou:`, error);
+            lastError = error;
+            
+            if (attempt < maxRetries) {
+                const waitTime = delay * Math.pow(2, attempt - 1); // Exponential backoff
+                console.log(`Aguardando ${waitTime}ms antes da próxima tentativa...`);
+                await new Promise(resolve => setTimeout(resolve, waitTime));
+            }
+        }
+    }
+    
+    throw lastError;
+},
     
     // Salva cache no localStorage
     saveCache() {
@@ -315,13 +340,14 @@ getNetlifyVariable(name) {
     try {
         console.log("Chamando API através do Netlify Function...");
         
-        // Extrair dados da requisição dos estados
-        const dadosUsuario = prompt || {};
-        
-        // Chamada à API via função Netlify
-        const urlBase = window.location.hostname.includes('localhost') ? 
-    'http://localhost:8888' : 
-    '';
+// Extrair dados da requisição dos estados
+const dadosUsuario = prompt || {};
+
+// Obter URL da API do BENETRIP_CONFIG
+const apiUrl = window.BENETRIP_CONFIG?.getApiUrl('aiRecommend') || 
+               '/.netlify/functions/ai-recommend';
+               
+console.log(`Usando endpoint de IA: ${apiUrl}`);
 
 const response = await fetch(`${urlBase}/.netlify/functions/ai-recommend`, {
     method: 'POST',
@@ -340,17 +366,33 @@ const response = await fetch(`${urlBase}/.netlify/functions/ai-recommend`, {
 });
         
         if (!response.ok) {
-            let errorMessage = `Erro na API: ${response.status}`;
-            try {
-                const errorData = await response.json();
-                errorMessage += ` - ${errorData.error || 'Erro desconhecido'}`;
-            } catch (e) {
-                // Se não conseguir ler o JSON de erro
-                errorMessage += ' - Não foi possível obter detalhes do erro';
-            }
-            
-            throw new Error(errorMessage);
+    let errorMessage = `Erro na API: ${response.status}`;
+    
+    // Log detalhado para debugging
+    console.error(`Erro na requisição para ${apiUrl}:`, {
+        status: response.status,
+        statusText: response.statusText,
+        headers: Object.fromEntries([...response.headers.entries()]),
+        requestData: dadosUsuario
+    });
+    
+    try {
+        const contentType = response.headers.get('content-type');
+        
+        if (contentType && contentType.includes('application/json')) {
+            const errorData = await response.json();
+            errorMessage += ` - ${errorData.error || errorData.message || 'Erro desconhecido'}`;
+        } else {
+            const textError = await response.text();
+            errorMessage += ` - ${textError.substring(0, 100) || 'Erro sem detalhes'}`;
         }
+    } catch (e) {
+        console.warn("Não foi possível ler detalhes do erro:", e);
+        errorMessage += ' - Não foi possível obter detalhes do erro';
+    }
+    
+    throw new Error(errorMessage);
+}
         
         const data = await response.json();
         return data.data; // O conteúdo da resposta da IA
@@ -416,7 +458,10 @@ async callNetlifyFunction(preferences) {
         const encodedQuery = encodeURIComponent(query);
         
         // Usar nossa função Netlify para buscar imagens
-        const response = await fetch(`/.netlify/functions/image-search?query=${encodedQuery}`);
+        const apiUrl = window.BENETRIP_CONFIG?.getApiUrl('imageSearch') || 
+               '/.netlify/functions/image-search';
+               
+const response = await fetch(`${apiUrl}?query=${encodedQuery}`);
         
         if (!response.ok) {
             throw new Error(`Erro na API de imagens: ${response.status}`);
