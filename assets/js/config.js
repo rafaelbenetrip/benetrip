@@ -20,18 +20,18 @@ const BENETRIP_CONFIG = {
         this.credentials = {
             // Para OpenAI - chave formato: sk-... (não use o formato sk-proj-...)
             // A chave deve ser de uma conta ativa e com saldo
-            openAI: "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", // SUBSTITUA ESTA CHAVE
+            openAI: "", // SUBSTITUA ESTA CHAVE
             
             // Para Unsplash
-            unsplash: "x8q70wHdUpQoKmNtBmhfEbatdsxyapgkUEBgxQav708", 
+            unsplash: "", 
             
             // Para Pexels
-            pexels: "GtZcnoPlphF95dn7SsHt7FewD8YYlDQCkBK2vDD4Z7AUt5flGFFJwMEt",
+            pexels: "",
             
             // Para Aviasales
             aviasales: {
-                token: "e82f7d420689b6124dcfa5921a8c6934",
-                marker: "604241"
+                token: "",
+                marker: ""
             }
         };
         
@@ -46,7 +46,7 @@ const BENETRIP_CONFIG = {
         // Verificar especificamente a chave da OpenAI
         const openAIKey = this.credentials.openAI;
         
-        if (!openAIKey || openAIKey === "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") {
+        if (!openAIKey || openAIKey === "") {
             console.error("ERRO: Chave OpenAI não configurada corretamente!");
             alert("ATENÇÃO: A chave da API OpenAI não está configurada. Por favor, edite o arquivo config.js e coloque sua chave real da OpenAI.");
         }
