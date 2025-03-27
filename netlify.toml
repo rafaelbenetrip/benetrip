@@ -1,0 +1,11 @@
+[build]
+  command = "# seu comando de build aqui, se houver"
+  publish = "."  # diretório onde seus arquivos HTML estão
+
+[functions]
+  directory = "netlify/functions"
+
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/:splat"
+  status = 200
