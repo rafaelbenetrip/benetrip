@@ -3,12 +3,6 @@
  */
 
 const BENETRIP_AI = {
-    // Tentar obter a chave das variáveis de ambiente do Netlify
-    if (process.env.OPENAI_API_KEY) {
-      this.config.apiKey = process.env.OPENAI_API_KEY;
-      console.log("Chave API carregada das variáveis de ambiente");
-    }
-    
     // Configurações do serviço
     config: {
         apiKey: null, // Será inicializado durante setup
@@ -17,10 +11,21 @@ const BENETRIP_AI = {
         model: 'gpt-4'
     },
 
+    // Sistema de cache para evitar chamadas repetidas à API
+    cache: {
+        recommendations: {},
+        timestamp: {}
+    },
+
     // Inicializa o serviço de IA
     init() {
+        // Tentar obter a chave das variáveis de ambiente do Netlify
+        if (typeof process !== 'undefined' && process.env && process.env.OPENAI_API_KEY) {
+            this.config.apiKey = process.env.OPENAI_API_KEY;
+            console.log("Chave API carregada das variáveis de ambiente");
+        }
         // Obter a chave da API do módulo de configuração
-        if (window.BENETRIP_CONFIG && window.BENETRIP_CONFIG.credentials) {
+        else if (window.BENETRIP_CONFIG && window.BENETRIP_CONFIG.credentials) {
             this.config.apiKey = window.BENETRIP_CONFIG.credentials.openAI;
             console.log("Serviço de IA inicializado");
             
@@ -57,12 +62,6 @@ const BENETRIP_AI = {
         }
         
         return true;
-    },
-    
-    // Sistema de cache para evitar chamadas repetidas à API
-    cache: {
-        recommendations: {},
-        timestamp: {}
     },
     
     // Carrega cache do localStorage
