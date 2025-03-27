@@ -3,6 +3,12 @@
  */
 
 const BENETRIP_AI = {
+    // Tentar obter a chave das variáveis de ambiente do Netlify
+    if (process.env.OPENAI_API_KEY) {
+      this.config.apiKey = process.env.OPENAI_API_KEY;
+      console.log("Chave API carregada das variáveis de ambiente");
+    }
+    
     // Configurações do serviço
     config: {
         apiKey: null, // Será inicializado durante setup
