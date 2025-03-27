@@ -316,10 +316,10 @@ getNetlifyVariable(name) {
         console.log("Chamando API através do Netlify Function...");
         
         // Extrair dados da requisição dos estados
-        const dadosUsuario = this.estado?.dadosUsuario || {};
+        const dadosUsuario = prompt || {};
         
         // Chamada à API via função Netlify
-        const response = await fetch('/api/ai-recommend', {
+        const response = await fetch('/.netlify/functions/ai-recommend', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -373,7 +373,7 @@ async callNetlifyFunction(preferences) {
         };
         
         // Chamar a API através de função Netlify
-        const response = await fetch('/api/ai-recommend', {
+        const response = await fetch('/.netlify/functions/ai-recommend', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -444,18 +444,34 @@ async callNetlifyFunction(preferences) {
     async processAIResponse(response, preferences) {
         try {
             // Parseamento da resposta JSON
-            let parsedResponse;
+            // ai-service.js (no método processAIResponse, linha ~493)
+let parsedResponse;
             
-            if (typeof response === 'string') {
-                const jsonMatch = response.match(/\{[\s\S]*\}/);
-                if (jsonMatch) {
-                    parsedResponse = JSON.parse(jsonMatch[0]);
-                } else {
-                    throw new Error("Formato de resposta inválido");
-                }
-            } else {
-                parsedResponse = response;
+if (typeof response === 'string') {
+    try {
+        // Primeiro tenta fazer parse direto
+        parsedResponse = JSON.parse(response);
+    } catch (e) {
+        // Se falhar, tenta extrair o JSON usando regex
+        const jsonMatch = response.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+            try {
+                parsedResponse = JSON.parse(jsonMatch[0]);
+            } catch (e2) {
+                throw new Error("Formato de resposta inválido: não foi possível extrair JSON válido");
             }
+        } else {
+            throw new Error("Formato de resposta inválido: nenhum JSON encontrado");
+        }
+    }
+} else if (response && typeof response === 'object') {
+    parsedResponse = response;
+} else {
+    throw new Error("Resposta inválida: tipo inesperado");
+}
+
+// Adicionar log para debug
+console.log("Resposta processada:", parsedResponse);
             
             // Verificar se há array de destinos
             if (!parsedResponse.destinations || !Array.isArray(parsedResponse.destinations)) {
