@@ -33,33 +33,52 @@ config: {
      * @returns {Promise<Object>} - Resultados da busca
      */
     async buscarVoos(params) {
-        try {
-            // Validar parâmetros
-            this.validateFlightParams(params);
+    try {
+        // Validar parâmetros
+        this.validateFlightParams(params);
+        
+        // Notificar início da busca
+        this.dispatchProgressEvent(10, "Iniciando busca de voos... ✈️");
+        
+        // Usar nossa função Netlify para buscar voos
+        this.dispatchProgressEvent(30, "Consultando as melhores ofertas para você... 🔍");
+        
+        const response = await fetch('/api/flight-search', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(params)
+        });
+        
+        if (!response.ok) {
+            let errorMessage = `Erro na API de voos: ${response.status}`;
+            try {
+                const errorData = await response.json();
+                errorMessage += ` - ${errorData.error || 'Erro desconhecido'}`;
+            } catch (e) {
+                // Se não conseguir ler o JSON de erro
+                errorMessage += ' - Não foi possível obter detalhes do erro';
+            }
             
-            // Notificar início da busca
-            this.dispatchProgressEvent(10, "Iniciando busca de voos... ✈️");
-            
-            // Inicializar busca e obter ID de pesquisa
-            const searchId = await this.iniciarBusca(params);
-            
-            // Buscar resultados usando o ID de pesquisa
-            this.dispatchProgressEvent(30, "Buscando as melhores ofertas para você... 🔍");
-            const resultados = await this.obterResultados(searchId);
-            
-            // Processar resultados para formato amigável
-            this.dispatchProgressEvent(80, "Organizando os melhores voos... 📋");
-            const processed = this.processResults(resultados, params);
-            
-            // Finalizar busca
-            this.dispatchProgressEvent(100, "Voos encontrados! 🎉");
-            return processed;
-            
-        } catch (error) {
-            console.error("Erro ao buscar voos:", error);
-            throw error;
+            throw new Error(errorMessage);
         }
-    },
+        
+        const resultados = await response.json();
+        
+        // Processar resultados para formato amigável
+        this.dispatchProgressEvent(80, "Organizando os melhores voos... 📋");
+        const processed = this.processResults(resultados, params);
+        
+        // Finalizar busca
+        this.dispatchProgressEvent(100, "Voos encontrados! 🎉");
+        return processed;
+        
+    } catch (error) {
+        console.error("Erro ao buscar voos:", error);
+        throw error;
+    }
+},
 
     /**
      * Valida parâmetros da busca de voos
