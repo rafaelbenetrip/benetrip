@@ -3,30 +3,28 @@ const { Configuration, OpenAIApi } = require("openai");
 const axios = require("axios");
 
 exports.handler = async function(event, context) {
-  // Verificar método e body
-  if (event.httpMethod !== "POST") {
-    return { 
-      statusCode: 405, 
-      headers: {
-        "Content-Type": "application/json",
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "POST, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type"
-      },
-      body: JSON.stringify({ error: "Método não permitido" })
+  // Adicionar headers CORS para todas as respostas
+  const headers = {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization",
+    "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+    "Content-Type": "application/json"
+  };
+
+  // Responder imediatamente a requisições OPTIONS preflight
+  if (event.httpMethod === "OPTIONS") {
+    return {
+      statusCode: 204,
+      headers,
+      body: ""
     };
   }
 
-  // Adicionar suporte ao preflight OPTIONS
-  if (event.httpMethod === "OPTIONS") {
-    return {
-      statusCode: 200,
-      headers: {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "POST, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type"
-      },
-      body: ""
+  if (event.httpMethod !== "POST") {
+    return { 
+      statusCode: 405, 
+      headers,
+      body: JSON.stringify({ error: "Método não permitido" })
     };
   }
 
