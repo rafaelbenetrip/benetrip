@@ -1,0 +1,6 @@
+# Função api-recommend
+/api/recommend /.netlify/functions/ai-recommend 200
+/.netlify/functions/ai-recommend /.netlify/functions/ai-recommend 200
+
+# Tratamento de CORS para funções
+/.netlify/functions/*  /.netlify/functions/:splat  200
