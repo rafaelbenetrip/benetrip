@@ -2,15 +2,48 @@
 const axios = require("axios");
 
 exports.handler = async function(event, context) {
+  // Permitir requisições OPTIONS (preflight CORS)
+  if (event.httpMethod === "OPTIONS") {
+    return {
+      statusCode: 200,
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type"
+      },
+      body: ""
+    };
+  }
+
   if (event.httpMethod !== "GET") {
-    return { statusCode: 405, body: "Método não permitido" };
+    return { 
+      statusCode: 405, 
+      headers: {
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*"
+      },
+      body: JSON.stringify({ error: "Método não permitido" })
+    };
   }
 
   // Extrair parâmetros da query
-  const { query, source } = event.queryStringParameters;
+  const { query, source } = event.queryStringParameters || {};
+  
+  if (!query) {
+    return {
+      statusCode: 400,
+      headers: {
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*"
+      },
+      body: JSON.stringify({ error: "Parâmetro 'query' é obrigatório" })
+    };
+  }
   
   try {
     let images = [];
+    let unsplashSuccess = false;
+    let pexelsSuccess = false;
     
     // Buscar no Unsplash se solicitado
     if (source === "unsplash" || !source) {
@@ -36,6 +69,7 @@ exports.handler = async function(event, context) {
             photographer: img.user.name,
             alt: img.alt_description || query
           }));
+          unsplashSuccess = true;
         }
       } catch (unsplashError) {
         console.log("Erro ao buscar no Unsplash:", unsplashError.message);
@@ -43,7 +77,7 @@ exports.handler = async function(event, context) {
     }
     
     // Buscar no Pexels se não tiver resultados do Unsplash ou se solicitado
-    if ((images.length === 0 && source !== "unsplash") || source === "pexels") {
+    if ((!unsplashSuccess && source !== "unsplash") || source === "pexels") {
       try {
         const pexelsResponse = await axios.get(
           `https://api.pexels.com/v1/search`,
@@ -68,17 +102,38 @@ exports.handler = async function(event, context) {
           }));
           
           images = [...images, ...pexelsImages];
+          pexelsSuccess = true;
         }
       } catch (pexelsError) {
         console.log("Erro ao buscar no Pexels:", pexelsError.message);
       }
     }
     
+    // Se nem Unsplash nem Pexels funcionarem, usar placeholder
+    if (!unsplashSuccess && !pexelsSuccess) {
+      images = [
+        {
+          url: `https://via.placeholder.com/800x600.png?text=${encodeURIComponent(query)}`,
+          source: "placeholder",
+          photographer: "Placeholder",
+          alt: query
+        },
+        {
+          url: `https://via.placeholder.com/800x600.png?text=${encodeURIComponent(query + ' landmark')}`,
+          source: "placeholder",
+          photographer: "Placeholder",
+          alt: query + " landmark"
+        }
+      ];
+    }
+    
     // Retornar resultados
     return {
       statusCode: 200,
       headers: {
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*",
+        "Cache-Control": "public, max-age=86400" // Cachear por 24 horas
       },
       body: JSON.stringify({ images })
     };
@@ -87,7 +142,21 @@ exports.handler = async function(event, context) {
     console.error("Erro ao buscar imagens:", error);
     return {
       statusCode: 500,
-      body: JSON.stringify({ error: error.message })
+      headers: {
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*"
+      },
+      body: JSON.stringify({ 
+        error: error.message,
+        images: [
+          {
+            url: `https://via.placeholder.com/800x600.png?text=${encodeURIComponent(query)}`,
+            source: "placeholder",
+            photographer: "Placeholder",
+            alt: query
+          }
+        ]
+      })
     };
   }
 };
