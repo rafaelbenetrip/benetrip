@@ -150,7 +150,7 @@
                 window.BENETRIP_AI.callAIService = function(prompt) {
                     console.log("Chamando API interceptada e corrigida para Netlify Functions");
                     // Usar a URL correta para funções Netlify
-                    return fetch('/.netlify/functions/ai-recommend', {
+                    return fetch('https://benetrip.netlify.app/.netlify/functions/ai-recommend', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json'
@@ -168,8 +168,8 @@
                 
                 // Patch para corrigir callNetlifyFunction
                 window.BENETRIP_AI.callNetlifyFunction = function(preferences) {
-                    console.log("Chamando função Netlify interceptada e corrigida");
-                    return fetch('/.netlify/functions/ai-recommend', {
+                    console.log("Chamando função Netlify com domínio correto");
+                    return fetch('https://benetrip.netlify.app/.netlify/functions/ai-recommend', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json'
@@ -191,7 +191,7 @@
                         const query = `${destino.cidade} ${destino.pais} landmark`;
                         const encodedQuery = encodeURIComponent(query);
                         
-                        return fetch(`/.netlify/functions/image-search?query=${encodedQuery}`)
+                        return fetch(`https://benetrip.netlify.app/.netlify/functions/image-search?query=${encodedQuery}`)
                             .then(response => {
                                 if (!response.ok) {
                                     throw new Error(`Erro na API de imagens: ${response.status}`);
@@ -264,7 +264,7 @@
                         isProduction: true,
                         getApiUrl: function(endpoint) {
                             // Converter o nome do endpoint para o formato correto de função Netlify
-                            return `/.netlify/functions/${endpoint.replace('Recommend', '-recommend').replace('Search', '-search')}`;
+                            return `https://benetrip.netlify.app/.netlify/functions/${endpoint.replace('Recommend', '-recommend').replace('Search', '-search')}`;
                         },
                         init: function() { return this; }
                     };
