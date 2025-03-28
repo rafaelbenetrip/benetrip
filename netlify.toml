@@ -2,25 +2,15 @@
   publish = "."
   functions = "netlify/functions"
 
-# Configurações CORS para todas as funções
-[[headers]]
-  for = "/.netlify/functions/*"
-    [headers.values]
-    Access-Control-Allow-Origin = "*"
-    Access-Control-Allow-Methods = "GET, POST, PUT, DELETE, OPTIONS"
-    Access-Control-Allow-Headers = "Content-Type, Authorization, X-Requested-With"
+[functions]
+  node_bundler = "esbuild"
 
-# Redirecionamentos para funcionar com domínio personalizado
 [[redirects]]
   from = "/api/*"
   to = "/.netlify/functions/:splat"
   status = 200
-  force = true
 
-# Gerenciar requisições OPTIONS para CORS
 [[redirects]]
-  from = "/.netlify/functions/*"
-  to = "/.netlify/functions/:splat"
+  from = "/*"
+  to = "/index.html"
   status = 200
-  conditions = {Method = ["OPTIONS"]}
-  force = true
