@@ -1,160 +1,372 @@
-// netlify/functions/proxy.js
-const axios = require("axios");
+const axios = require('axios');
 
 exports.handler = async function(event, context) {
-  // Aceitar qualquer método, incluindo OPTIONS para preflight CORS
+  // Adicionar headers CORS para todas as respostas
   const headers = {
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Headers": "Content-Type, Authorization",
     "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-    "Content-Type": "application/json"
+    "Content-Type": "application/json",
+    "Cache-Control": "no-cache"
   };
 
-  // Responder a preflight requests
+  // Responder a requisições OPTIONS para CORS preflight
   if (event.httpMethod === "OPTIONS") {
     return { statusCode: 204, headers, body: "" };
   }
+  
+  // Apenas permitir requisições POST
+  if (event.httpMethod !== 'POST') {
+    return {
+      statusCode: 405,
+      headers,
+      body: JSON.stringify({ error: "Método não permitido" })
+    };
+  }
 
   try {
-    // Extrair o endpoint alvo dos parâmetros da requisição
-    const target = event.path.split('/proxy/')[1] || 'ai-recommend';
-    const params = JSON.parse(event.body || '{}');
+    // Log de recebimento (para debugging)
+    console.log('Recebendo requisição para proxy de IA');
     
-    // Obter chave API diretamente das variáveis de ambiente
-    const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
-    const CLAUDE_API_KEY = process.env.CLAUDE_API_KEY;
+    // Extrair dados da requisição
+    const requestData = JSON.parse(event.body);
+    console.log('Dados recebidos:', JSON.stringify(requestData));
     
-    // Usar OpenAI (prefererencial) ou Claude
-    let responseData;
-    
-    if (OPENAI_API_KEY) {
-      console.log("Usando OpenAI API");
-      const prompt = `
-        Você é a Tripinha, uma cachorra vira-lata caramelo especialista em viagens da Benetrip.
-        Preciso que recomende 6 destinos de viagem, considerando as seguintes preferências:
-        
-        - Partindo de ${params.cidade_partida?.name || 'origem não especificada'}
-        - Viajando ${getCompanhiaText(params.companhia)}
-        - Busca principalmente: ${getPreferenciaText(params.preferencia_viagem)}
-        - Orçamento para passagens aéreas: ${params.orcamento_valor || 'flexível'} ${params.moeda_escolhida || 'BRL'} por pessoa
-        - Período: ${params.datas?.dataIda || 'não especificado'} a ${params.datas?.dataVolta || 'não especificado'}
-      `;
-      
-      const response = await axios.post(
-        "https://api.openai.com/v1/chat/completions",
-        {
-          model: "gpt-4",
-          messages: [
-            {
-              role: "system", 
-              content: "Você é um assistente especializado em viagens que fornece recomendações de destinos em formato JSON estruturado."
-            },
-            { role: "user", content: prompt }
-          ],
-          temperature: 0.7
-        },
-        {
-          headers: {
-            "Authorization": `Bearer ${OPENAI_API_KEY}`,
-            "Content-Type": "application/json"
-          }
-        }
-      );
-      
-      responseData = response.data.choices[0].message.content;
+    // Verificar se temos informações suficientes
+    if (!requestData) {
+      throw new Error("Dados de preferências não fornecidos");
     }
-    else if (CLAUDE_API_KEY) {
-      console.log("Usando Claude API");
-      const response = await axios.post(
-        "https://api.anthropic.com/v1/messages",
-        {
-          model: "claude-3-opus-20240229",
+    
+    // Gerar prompt adequado baseado nos dados do usuário
+    const prompt = gerarPromptParaDestinos(requestData);
+    
+    // Determinar qual API de IA usar (preferência para Claude, depois OpenAI, finalmente Gemini)
+    let response;
+    let formattedResponse;
+    
+    if (process.env.CLAUDE_API_KEY) {
+      console.log('Usando API do Claude');
+      
+      response = await axios({
+        method: 'post',
+        url: 'https://api.anthropic.com/v1/messages',
+        headers: {
+          'x-api-key': process.env.CLAUDE_API_KEY,
+          'anthropic-version': '2023-06-01',
+          'Content-Type': 'application/json'
+        },
+        data: {
+          model: "claude-3-sonnet-20240229",
+          max_tokens: 4000,
           messages: [
             {
               role: "user",
-              content: `Você é a Tripinha, uma cachorra vira-lata caramelo especialista em viagens da Benetrip.
-              Preciso que recomende 6 destinos de viagem, considerando as seguintes preferências:
-              
-              - Partindo de ${params.cidade_partida?.name || 'origem não especificada'}
-              - Viajando ${getCompanhiaText(params.companhia)}
-              - Busca principalmente: ${getPreferenciaText(params.preferencia_viagem)}
-              - Orçamento para passagens aéreas: ${params.orcamento_valor || 'flexível'} ${params.moeda_escolhida || 'BRL'} por pessoa
-              - Período: ${params.datas?.dataIda || 'não especificado'} a ${params.datas?.dataVolta || 'não especificado'}
-              
-              Forneça exatamente 6 destinos no seguinte formato JSON:
-              {
-                "destinations": [
-                  {
-                    "cidade": "Nome da cidade",
-                    "pais": "Nome do país",
-                    "codigo_pais": "Código de 2 letras do país",
-                    "codigo_iata": "Código IATA do aeroporto principal",
-                    "descricao_curta": "Breve descrição de uma linha",
-                    "preco_passagem": valor numérico estimado (apenas para passagem aérea),
-                    "preco_hospedagem": valor numérico por noite,
-                    "experiencias": "3 experiências imperdíveis separadas por vírgula",
-                    "custo_total": valor numérico estimado para 5 dias,
-                    "porque_ir": "Uma frase curta e envolvente sobre o destino"
-                  },
-                  ...mais 5 destinos
-                ]
-              }`
+              content: [
+                {
+                  type: "text",
+                  text: prompt
+                }
+              ]
             }
-          ],
-          max_tokens: 4000
-        },
-        {
-          headers: {
-            "Content-Type": "application/json",
-            "x-api-key": CLAUDE_API_KEY,
-            "anthropic-version": "2023-06-01"
-          }
+          ]
         }
-      );
+      });
       
-      responseData = response.data.content[0].text;
+      formattedResponse = {
+        tipo: "claude",
+        conteudo: response.data.content[0].text
+      };
+    }
+    else if (process.env.OPENAI_API_KEY) {
+      console.log('Usando API da OpenAI');
+      
+      response = await axios({
+        method: 'post',
+        url: 'https://api.openai.com/v1/chat/completions',
+        headers: {
+          'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        data: {
+          model: "gpt-4",
+          messages: [
+            { 
+              role: "system", 
+              content: `Você é o assistente de viagens da Benetrip, responsável por recomendar destinos personalizados. Retorne APENAS um objeto JSON com recomendações, sem texto adicional.`
+            },
+            {
+              role: "user",
+              content: prompt
+            }
+          ]
+        }
+      });
+      
+      formattedResponse = {
+        tipo: "openai",
+        conteudo: response.data.choices[0].message.content
+      };
+    }
+    else if (process.env.GEMINI_API_KEY) {
+      console.log('Usando API do Gemini');
+      
+      response = await axios({
+        method: 'post',
+        url: `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${process.env.GEMINI_API_KEY}`,
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        data: {
+          contents: [
+            {
+              parts: [
+                { 
+                  text: prompt
+                }
+              ]
+            }
+          ]
+        }
+      });
+      
+      formattedResponse = {
+        tipo: "gemini",
+        conteudo: response.data.candidates[0].content.parts[0].text
+      };
     }
     else {
-      return {
-        statusCode: 500,
-        headers,
-        body: JSON.stringify({ 
-          error: "Nenhuma API configurada", 
-          message: "Configure OPENAI_API_KEY ou CLAUDE_API_KEY nas variáveis de ambiente do Netlify" 
+      // Dados mockados caso nenhuma API esteja configurada
+      console.log('Nenhuma API de IA configurada, usando dados mockados');
+      
+      formattedResponse = {
+        tipo: "mockado",
+        conteudo: JSON.stringify({
+          "topPick": {
+            "destino": "Medellín",
+            "pais": "Colômbia",
+            "codigoPais": "CO",
+            "descricao": "Cidade da eterna primavera com clima agradável o ano todo",
+            "porque": "Combina natureza exuberante, cultura urbana vibrante e custo-benefício excelente",
+            "destaque": "Passeio de teleférico sobre a cidade com vistas incríveis das montanhas",
+            "comentario": "Eu simplesmente AMEI Medellín! As paisagens montanhosas e o clima primaveril são perfeitos para qualquer tipo de aventura! 🐾",
+            "preco": {
+              "voo": 1800,
+              "hotel": 200
+            }
+          },
+          "alternativas": [
+            {
+              "destino": "Lisboa",
+              "pais": "Portugal",
+              "codigoPais": "PT",
+              "porque": "Cidade histórica com arquitetura deslumbrante, gastronomia incrível e facilidade com o idioma",
+              "preco": {
+                "voo": 3200,
+                "hotel": 280
+              }
+            },
+            {
+              "destino": "Cidade do México",
+              "pais": "México",
+              "codigoPais": "MX",
+              "porque": "Rica história, culinária famosa mundialmente e ótimo custo-benefício",
+              "preco": {
+                "voo": 2400,
+                "hotel": 190
+              }
+            },
+            {
+              "destino": "Buenos Aires",
+              "pais": "Argentina",
+              "codigoPais": "AR",
+              "porque": "Capital cosmopolita com rica vida cultural, teatros e arquitetura europeia",
+              "preco": {
+                "voo": 1500,
+                "hotel": 220
+              }
+            },
+            {
+              "destino": "Santiago",
+              "pais": "Chile",
+              "codigoPais": "CL",
+              "porque": "Moderna capital cercada pela Cordilheira dos Andes com excelentes vinhos",
+              "preco": {
+                "voo": 1650,
+                "hotel": 240
+              }
+            }
+          ],
+          "surpresa": {
+            "destino": "Cartagena",
+            "pais": "Colômbia",
+            "codigoPais": "CO",
+            "descricao": "Joia colonial no Caribe colombiano com praias paradisíacas",
+            "porque": "Cidade murada histórica com ruas coloridas, cultura vibrante e praias maravilhosas",
+            "destaque": "Passeio de barco pelas Ilhas do Rosário com águas cristalinas",
+            "comentario": "Cartagena é um tesouro escondido que vai te conquistar! As cores, a música e a comida caribenha formam uma experiência inesquecível! 🐾🌴",
+            "preco": {
+              "voo": 2000,
+              "hotel": 220
+            }
+          }
         })
       };
     }
     
+    // Verificar se a resposta é válida
+    try {
+      const jsonContent = extrairJSON(formattedResponse.conteudo);
+      // Adicionar destino surpresa se não estiver presente
+      if (jsonContent && !jsonContent.surpresa && jsonContent.alternativas && jsonContent.alternativas.length >= 5) {
+        // Usar o último alternativo como surpresa
+        jsonContent.surpresa = {
+          ...jsonContent.alternativas.pop(),
+          destaque: jsonContent.alternativas[0].porque || "Experiência única que vai te surpreender",
+          descricao: jsonContent.alternativas[0].porque || "Um destino surpreendente para explorar",
+          comentario: "Este é um destino surpresa especial que farejei só para você! Confie no meu faro! 🐾🎁"
+        };
+        formattedResponse.conteudo = JSON.stringify(jsonContent);
+      }
+    } catch (jsonError) {
+      console.warn('Erro ao validar JSON da resposta:', jsonError);
+      // Continuamos mesmo com erro, o cliente vai tentar extrair o JSON
+    }
+    
+    // Retornar resposta padronizada
     return {
       statusCode: 200,
       headers,
-      body: JSON.stringify({ data: responseData })
+      body: JSON.stringify(formattedResponse)
     };
+    
   } catch (error) {
-    console.error("Erro no proxy:", error.message);
+    console.error('Erro no proxy da IA:', error);
+    
+    // Resposta de erro detalhada
     return {
       statusCode: 500,
       headers,
       body: JSON.stringify({ 
-        error: "Erro ao processar requisição", 
+        error: "Erro ao processar solicitação de IA",
         message: error.message,
+        // Apenas em desenvolvimento
         stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
       })
     };
   }
 };
 
-// Funções auxiliares
+// Função para extrair JSON de texto
+function extrairJSON(texto) {
+  try {
+    return JSON.parse(texto);
+  } catch (e) {
+    // Tentar extrair JSON de dentro do texto
+    try {
+      const match = texto.match(/\{[\s\S]*\}/);
+      if (match) {
+        return JSON.parse(match[0]);
+      }
+    } catch (innerError) {
+      console.error('Erro ao extrair JSON do texto:', innerError);
+    }
+    throw new Error('Não foi possível extrair JSON válido da resposta');
+  }
+}
+
+// Função para gerar prompt adequado para a IA
+function gerarPromptParaDestinos(dados) {
+  // Extrair informações relevantes dos dados recebidos
+  const companhia = getCompanhiaText(dados.companhia);
+  const preferencia = getPreferenciaText(dados.preferencia_viagem);
+  const cidadeOrigem = dados.cidade_partida?.name || 'origem não especificada';
+  const orcamento = dados.orcamento_valor || 'flexível';
+  const moeda = dados.moeda_escolhida || 'BRL';
+  
+  // Datas de viagem
+  let dataIda = 'não especificada';
+  let dataVolta = 'não especificada';
+  
+  if (dados.datas) {
+    if (typeof dados.datas === 'string' && dados.datas.includes(',')) {
+      const partes = dados.datas.split(',');
+      dataIda = partes[0];
+      dataVolta = partes[1];
+    } else if (dados.datas.dataIda && dados.datas.dataVolta) {
+      dataIda = dados.datas.dataIda;
+      dataVolta = dados.datas.dataVolta;
+    }
+  }
+
+  // Construir prompt detalhado
+  return `Você é a Tripinha, uma cachorra vira-lata caramelo especialista em viagens da Benetrip.
+Preciso que recomende destinos de viagem baseados nestas preferências do usuário:
+
+- Partindo de: ${cidadeOrigem}
+- Viajando: ${companhia}
+- Buscando principalmente: ${preferencia}
+- Orçamento para passagens: ${orcamento} ${moeda}
+- Período: ${dataIda} a ${dataVolta}
+
+Forneça EXATAMENTE o seguinte formato JSON, sem texto adicional antes ou depois:
+{
+  "topPick": {
+    "destino": "Nome da Cidade",
+    "pais": "Nome do País",
+    "codigoPais": "XX", // código de 2 letras do país
+    "descricao": "Breve descrição do destino com até 100 caracteres",
+    "porque": "Razão principal para visitar, relacionada às preferências do usuário",
+    "destaque": "Uma experiência única neste destino",
+    "comentario": "Um comentário animado da Tripinha, como se você fosse um cachorro entusiasmado",
+    "preco": {
+      "voo": número, // valor estimado em ${moeda}
+      "hotel": número // valor por noite estimado em ${moeda}
+    }
+  },
+  "alternativas": [
+    // EXATAMENTE 4 destinos alternativos, cada um com:
+    {
+      "destino": "Nome da Cidade",
+      "pais": "Nome do País", 
+      "codigoPais": "XX",
+      "porque": "Razão principal para visitar",
+      "preco": {
+        "voo": número,
+        "hotel": número
+      }
+    }
+  ],
+  "surpresa": {
+    // Um destino surpresa menos óbvio mas que também combine com as preferências
+    "destino": "Nome da Cidade",
+    "pais": "Nome do País",
+    "codigoPais": "XX",
+    "descricao": "Breve descrição do destino com até 100 caracteres",
+    "porque": "Razão principal para visitar, destacando o fator surpresa",
+    "destaque": "Uma experiência única e surpreendente neste destino",
+    "comentario": "Um comentário animado da Tripinha sobre este destino surpresa",
+    "preco": {
+      "voo": número,
+      "hotel": número
+    }
+  }
+}
+
+Cada destino DEVE ser realista e ter preços estimados plausíveis. Não inclua texto explicativo antes ou depois do JSON.`;
+}
+
+// Função auxiliar para obter texto de companhia
 function getCompanhiaText(value) {
   const options = {
-    0: "sozinho",
+    0: "sozinho(a)",
     1: "em casal (viagem romântica)",
     2: "em família",
     3: "com amigos"
   };
-  return options[value] || "sozinho";
+  return options[value] || "sozinho(a)";
 }
 
+// Função auxiliar para obter texto de preferência
 function getPreferenciaText(value) {
   const options = {
     0: "relaxamento e descanso (praias, resorts tranquilos, spas)",
@@ -162,5 +374,5 @@ function getPreferenciaText(value) {
     2: "cultura, história e gastronomia (museus, centros históricos, culinária local)",
     3: "experiência urbana, compras e vida noturna (centros urbanos, lojas, restaurantes)"
   };
-  return options[value] || "relaxamento e descanso";
+  return options[value] || "experiências diversificadas de viagem";
 }
