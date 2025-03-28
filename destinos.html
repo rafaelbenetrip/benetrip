@@ -8,30 +8,103 @@
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;700&family=Montserrat:wght@400;500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="assets/css/styles.css">
     <link rel="stylesheet" href="assets/css/mobile-optimizations.css">
+    <style>
+        /* Estilos para barra de progresso */
+        .progress-bar-container {
+            width: 100%;
+            background-color: #f3f3f3;
+            border-radius: 10px;
+            margin: 0.5rem 0 1rem;
+            overflow: hidden;
+        }
+        .progress-bar {
+            height: 10px;
+            background-color: #E87722;
+            width: 0%;
+            transition: width 0.5s ease;
+        }
+        /* Animações para carregamento */
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            100% { transform: scale(1.1); }
+        }
+        .loading-avatar {
+            animation: pulse 1.5s infinite alternate;
+        }
+        /* Estilos para header e conteúdo */
+        .app-header {
+            display: flex;
+            align-items: center;
+            padding: 1rem;
+            border-bottom: 1px solid #eee;
+        }
+        .app-header h1 {
+            margin: 0 auto;
+            font-size: 1.2rem;
+        }
+        .btn-voltar {
+            background: none;
+            border: none;
+            color: #333;
+            cursor: pointer;
+        }
+    </style>
 </head>
 <body class="mobile-optimized">
     <!-- Barra de status estilo app -->
     <div class="native-status-bar"></div>
     
-    <div id="destinos-container">
-        <!-- Conteúdo de carregamento inicial -->
-        <div class="loading-container">
-            <img src="assets/images/tripinha/avatar-pensando.png" alt="Tripinha carregando" class="loading-avatar" />
-            <div class="loading-text">Farejando destinos incríveis para você...</div>
-            <div class="loading-spinner"></div>
-        </div>
-        
-        <!-- Elementos originais mantidos -->
-        <div id="swipe-hint" class="swipe-hint" style="display:none;">
-            <div class="swipe-hint-arrow">←</div>
-            <div class="swipe-hint-text">Deslize para explorar</div>
-        </div>
-        
-        <!-- Fixed bottom bar para ações principais -->
-        <div id="bottom-actions" class="fixed-bottom-bar" style="display:none;">
-            <button class="btn-secundario btn-voltar">Refazer Quiz</button>
-            <button class="btn-principal btn-avancar">Ver Voos</button>
-        </div>
+    <div class="container">
+        <!-- Header com botão de voltar -->
+        <header class="app-header">
+            <button id="btn-voltar" class="btn-voltar">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M19 12H5M12 19l-7-7 7-7"></path>
+                </svg>
+            </button>
+            <h1>Destinos Recomendados</h1>
+        </header>
+    
+        <!-- Conteúdo principal -->
+        <main id="destinos-container">
+            <!-- Conteúdo de carregamento inicial -->
+            <div class="loading-container">
+                <img src="assets/images/tripinha/avatar-pensando.png" alt="Tripinha carregando" class="loading-avatar" />
+                <div class="loading-text">Farejando destinos incríveis para você...</div>
+                <div class="progress-bar-container">
+                    <div class="progress-bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+                </div>
+                <div class="loading-spinner"></div>
+            </div>
+            
+            <!-- Interface principal (hidden inicialmente) -->
+            <div id="conteudo-recomendacoes" class="hidden">
+                <div id="mensagem-tripinha"></div>
+                <div id="destino-destaque" class="mt-4"></div>
+                <div id="destinos-alternativos" class="mt-4"></div>
+                <div id="opcao-surpresa" class="mt-4"></div>
+            </div>
+            
+            <!-- Mensagem de erro (hidden inicialmente) -->
+            <div id="erro-recomendacoes" class="hidden bg-red-100 text-red-700 p-4 rounded-lg my-4 text-center">
+                <p id="mensagem-erro" class="font-bold"></p>
+                <button id="btn-tentar-novamente" class="mt-4 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition-colors">
+                    Tentar Novamente
+                </button>
+            </div>
+            
+            <!-- Elementos da versão anterior -->
+            <div id="swipe-hint" class="swipe-hint" style="display:none;">
+                <div class="swipe-hint-arrow">←</div>
+                <div class="swipe-hint-text">Deslize para explorar</div>
+            </div>
+            
+            <!-- Fixed bottom bar para ações principais -->
+            <div id="bottom-actions" class="fixed-bottom-bar" style="display:none;">
+                <button class="btn-secundario btn-voltar">Refazer Quiz</button>
+                <button class="btn-principal btn-avancar">Ver Voos</button>
+            </div>
+        </main>
     </div>
 
     <!-- Toast notification container -->
@@ -143,88 +216,53 @@
             }, 5000);
         }
         
-        // Função para verificar e corrigir as URLs de API
+        // Função para verificar e corrigir as URLs de API (crucial para funcionamento)
         function checkAndFixAPIURLs() {
             if (window.BENETRIP_AI) {
-                // Patch para corrigir as URLs de API
-                window.BENETRIP_AI.callAIService = function(prompt) {
-                    console.log("Chamando API interceptada e corrigida para Netlify Functions");
-                    // Usar a URL correta para funções Netlify
-                    return fetch('https://benetrip.netlify.app/.netlify/functions/ai-recommend', {
+                // Patch para corrigir callNetlifyFunction para trabalhar com proxy corretamente
+                window.BENETRIP_AI.callNetlifyFunction = function(preferences) {
+                    console.log("Chamando função proxy para recomendações");
+                    return fetch('/.netlify/functions/proxy', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json'
                         },
-                        body: JSON.stringify(prompt)
+                        body: JSON.stringify(preferences)
                     })
                     .then(response => {
                         if (!response.ok) {
-                            throw new Error(`Erro na API: ${response.status}`);
+                            throw new Error(`Erro no proxy: ${response.status}`);
                         }
                         return response.json();
-                    })
-                    .then(data => data.data);
+                    });
                 };
                 
-                // Patch para corrigir callNetlifyFunction
-                window.BENETRIP_AI.callNetlifyFunction = function(preferences) {
-    console.log("Chamando função proxy para recomendações");
-    return fetch('/.netlify/functions/proxy', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(preferences)
-    })
-    .then(response => {
-        if (!response.ok) {
-            throw new Error(`Erro no proxy: ${response.status}`);
-        }
-        return response.json();
-    })
-    .then(data => data.data);
-};
-                
-                // Patch para corrigir getDestinationImages
-                window.BENETRIP_AI.getDestinationImages = function(destino) {
-                    try {
-                        const query = `${destino.cidade} ${destino.pais} landmark`;
-                        const encodedQuery = encodeURIComponent(query);
-                        
-                        return fetch(`https://benetrip.netlify.app/.netlify/functions/image-search?query=${encodedQuery}`)
-                            .then(response => {
-                                if (!response.ok) {
-                                    throw new Error(`Erro na API de imagens: ${response.status}`);
-                                }
-                                return response.json();
-                            })
-                            .then(data => {
-                                if (data.images && data.images.length > 0) {
-                                    return {
-                                        principal: data.images[0].url,
-                                        secundaria: data.images.length > 1 ? data.images[1].url : data.images[0].url
-                                    };
-                                }
-                                throw new Error("Nenhuma imagem encontrada");
-                            })
-                            .catch(error => {
-                                console.error(`Erro ao buscar imagens para ${destino.cidade}:`, error);
-                                return {
-                                    principal: `https://via.placeholder.com/800x600.png?text=${encodeURIComponent(destino.cidade)}`,
-                                    secundaria: `https://via.placeholder.com/800x600.png?text=${encodeURIComponent(destino.pais)}`
-                                };
-                            });
-                    } catch (error) {
-                        console.error(`Erro ao buscar imagens para ${destino.cidade}:`, error);
-                        return {
-                            principal: `https://via.placeholder.com/800x600.png?text=${encodeURIComponent(destino.cidade)}`,
-                            secundaria: `https://via.placeholder.com/800x600.png?text=${encodeURIComponent(destino.pais)}`
-                        };
-                    }
-                };
-                
-                // Usar sempre as funções do Netlify para produção
+                // Garantir que as URLs sempre usem funções Netlify
+                window.BENETRIP_AI.config = window.BENETRIP_AI.config || {};
                 window.BENETRIP_AI.config.useNetlifyFunctions = true;
+                window.BENETRIP_AI.config.fallbackEndpoint = '/.netlify/functions/proxy';
+                
+                // Adicionar manipulador de eventos de progresso para atualizar a barra
+                const origReportarProgresso = window.BENETRIP_AI.reportarProgresso;
+                if (origReportarProgresso) {
+                    window.BENETRIP_AI.reportarProgresso = function(fase, porcentagem, mensagem) {
+                        // Chamar implementação original
+                        origReportarProgresso.call(window.BENETRIP_AI, fase, porcentagem, mensagem);
+                        
+                        // Atualizar barra de progresso
+                        const barraProgresso = document.querySelector('.progress-bar');
+                        const textoProgresso = document.querySelector('.loading-text');
+                        
+                        if (barraProgresso) {
+                            barraProgresso.style.width = `${porcentagem}%`;
+                            barraProgresso.setAttribute('aria-valuenow', porcentagem);
+                        }
+                        
+                        if (textoProgresso && mensagem) {
+                            textoProgresso.textContent = mensagem;
+                        }
+                    };
+                }
                 
                 console.log("APIs corrigidas para usar caminhos Netlify Functions");
             } else {
@@ -232,9 +270,14 @@
             }
         }
         
-        // Iniciar carregamento sequencial
+        // Eventos DOM
         document.addEventListener('DOMContentLoaded', function() {
             console.log("Iniciando carregamento de scripts");
+            
+            // Configurar manipulador para botão de voltar
+            document.getElementById('btn-voltar').addEventListener('click', function() {
+                window.location.href = 'index.html';
+            });
             
             // Primeiro carregar config e dependências essenciais em ordem
             const essentialScripts = [
@@ -264,73 +307,120 @@
                         isProduction: true,
                         getApiUrl: function(endpoint) {
                             // Converter o nome do endpoint para o formato correto de função Netlify
-                            return `https://benetrip.netlify.app/.netlify/functions/${endpoint.replace('Recommend', '-recommend').replace('Search', '-search')}`;
+                            return `/.netlify/functions/${endpoint.replace('Recommend', '-recommend').replace('Search', '-search')}`;
                         },
                         init: function() { return this; }
                     };
                 }
                 
                 // Carregar os scripts da aplicação com sincronização garantida
-                const appScripts = [
-                    "assets/js/api.js",
-                    "assets/js/ai-service.js"
-                ];
-                
-                loadScriptsSequentially(appScripts, function() {
-                    console.log("Scripts de API e IA carregados");
-                    
-                    // Inicializar serviços em sequência garantida
-                    if (window.BENETRIP_API) {
-                        window.BENETRIP_API.init();
-                        console.log("API inicializada");
-                    }
+                loadScriptsSequentially(["assets/js/ai-service.js"], function() {
+                    console.log("Serviço de IA carregado");
                     
                     if (window.BENETRIP_AI) {
-                        window.BENETRIP_AI.init();
-                        console.log("Serviço de IA inicializado");
-                    }
-                    
-                    // Corrigir URLs de API antes de inicializar a UI
-                    checkAndFixAPIURLs();
-                    
-                    // Finalmente carregar e inicializar a UI
-                    loadScriptsSequentially(["assets/js/destinos.js"], function() {
-                        console.log("UI carregada");
-                        
-                        if (window.BENETRIP_DESTINOS) {
-                            window.BENETRIP_DESTINOS.init();
-                            console.log("Sistema de destinos inicializado");
+                        // Inicializar o serviço de IA
+                        if (typeof window.BENETRIP_AI.init === 'function' && !window.BENETRIP_AI.initialized) {
+                            window.BENETRIP_AI.init();
                         }
                         
-                        // Código para elementos visuais
-                        const isFirstVisit = !localStorage.getItem('benetrip_swipe_hint_shown');
-                        if (isFirstVisit) {
-                            setTimeout(() => {
-                                const swipeHint = document.getElementById('swipe-hint');
-                                if (swipeHint) {
-                                    swipeHint.style.display = 'flex';
-                                    setTimeout(() => { swipeHint.style.opacity = '1'; }, 100);
-                                    setTimeout(() => {
-                                        swipeHint.style.opacity = '0';
-                                        setTimeout(() => { swipeHint.style.display = 'none'; }, 500);
-                                    }, 3000);
-                                    localStorage.setItem('benetrip_swipe_hint_shown', 'true');
+                        // Aplicar correções críticas de URL
+                        checkAndFixAPIURLs();
+                        
+                        // Em seguida, carregar e inicializar o módulo de destinos
+                        loadScriptsSequentially(["assets/js/destinos.js"], function() {
+                            console.log("Módulo de destinos carregado");
+                            
+                            if (window.BENETRIP_DESTINOS) {
+                                // Forçar o uso das funções do ai-service.js corrigidas
+                                const origBuscarRecomendacoes = window.BENETRIP_DESTINOS.buscarRecomendacoes;
+                                if (origBuscarRecomendacoes) {
+                                    window.BENETRIP_DESTINOS.buscarRecomendacoes = async function() {
+                                        try {
+                                            // Iniciar barra de progresso
+                                            const barra = document.querySelector('.progress-bar');
+                                            if (barra) barra.style.width = '10%';
+                                            
+                                            // Continuar com implementação original
+                                            return await origBuscarRecomendacoes.call(window.BENETRIP_DESTINOS);
+                                        } catch (error) {
+                                            console.error("Erro capturado na busca de recomendações:", error);
+                                            
+                                            // Esconder a barra de progresso em caso de erro
+                                            const container = document.querySelector('.loading-container');
+                                            if (container) container.style.display = 'none';
+                                            
+                                            // Mostrar erro com UI consistente
+                                            const errorContainer = document.getElementById('erro-recomendacoes');
+                                            const errorMsg = document.getElementById('mensagem-erro');
+                                            
+                                            if (errorContainer && errorMsg) {
+                                                errorMsg.textContent = error.message || "Não foi possível carregar recomendações";
+                                                errorContainer.style.display = 'block';
+                                            } else {
+                                                showErrorMessage(error.message || "Erro ao carregar destinos");
+                                            }
+                                            
+                                            throw error; // Re-throw para manter o fluxo original
+                                        }
+                                    };
                                 }
-                            }, 2000);
-                        }
-                        
-                        // Mostrar barra inferior
-                        setTimeout(() => {
-                            const bottomBar = document.getElementById('bottom-actions');
-                            if (bottomBar) bottomBar.style.display = 'flex';
-                        }, 1000);
-                        
-                        // Carregar scripts de interação mobile no final, usando diretamente CDN confiável
-                        loadScriptsSequentially([
-                            "https://cdnjs.cloudflare.com/ajax/libs/hammer.js/2.0.8/hammer.min.js",
-                            "assets/js/mobile-interactions.js"
-                        ]);
-                    });
+                                
+                                // Inicializar o módulo de destinos
+                                window.BENETRIP_DESTINOS.init();
+                                console.log("Sistema de destinos inicializado");
+                            }
+                            
+                            // Código para elementos visuais
+                            const isFirstVisit = !localStorage.getItem('benetrip_swipe_hint_shown');
+                            if (isFirstVisit) {
+                                setTimeout(() => {
+                                    const swipeHint = document.getElementById('swipe-hint');
+                                    if (swipeHint) {
+                                        swipeHint.style.display = 'flex';
+                                        setTimeout(() => { swipeHint.style.opacity = '1'; }, 100);
+                                        setTimeout(() => {
+                                            swipeHint.style.opacity = '0';
+                                            setTimeout(() => { swipeHint.style.display = 'none'; }, 500);
+                                        }, 3000);
+                                        localStorage.setItem('benetrip_swipe_hint_shown', 'true');
+                                    }
+                                }, 2000);
+                            }
+                            
+                            // Mostrar barra inferior
+                            setTimeout(() => {
+                                const bottomBar = document.getElementById('bottom-actions');
+                                if (bottomBar) bottomBar.style.display = 'flex';
+                            }, 1000);
+                            
+                            // Configuração da barra fixa de ações
+                            const btnRefazer = document.querySelector('.btn-voltar');
+                            if (btnRefazer) {
+                                btnRefazer.addEventListener('click', function() {
+                                    window.location.href = 'index.html';
+                                });
+                            }
+                            
+                            const btnAvancar = document.querySelector('.btn-avancar');
+                            if (btnAvancar) {
+                                btnAvancar.addEventListener('click', function() {
+                                    if (window.BENETRIP_DESTINOS.estado.destinoSelecionado) {
+                                        window.BENETRIP_DESTINOS.prosseguirParaVoos();
+                                    } else {
+                                        showErrorMessage("Selecione um destino primeiro!");
+                                    }
+                                });
+                            }
+                            
+                            // Carregar scripts de interação mobile no final
+                            loadScriptsSequentially([
+                                "https://cdnjs.cloudflare.com/ajax/libs/hammer.js/2.0.8/hammer.min.js",
+                                "assets/js/mobile-interactions.js"
+                            ]);
+                        });
+                    } else {
+                        showErrorMessage("Não foi possível carregar o serviço de IA. Tente recarregar a página.");
+                    }
                 });
             });
         });
