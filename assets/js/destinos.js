@@ -3,847 +3,736 @@
  * Controla a exibição e interação dos destinos recomendados pela IA
  */
 
+// Módulo de Destinos do Benetrip
 const BENETRIP_DESTINOS = {
-    /**
-     * Configuração do módulo
-     */
-    config: {
-        imagePath: 'assets/images/',
-        maxDestacados: 1,
-        maxAlternativos: 4,
-        animationDelay: 300
-    },
-
-    /**
-     * Estados do módulo
-     */
-    estado: {
-        recomendacoes: null,
-        destinoSelecionado: null,
-        mostrandoSurpresa: false,
-        destinoSurpresa: null,
-        filtroAtivo: 'todos'
-    },
-
-    /**
-     * Inicializa o módulo de destinos
-     */
-    init() {
-        console.log("Inicializando módulo de destinos...");
-        
-        // Carregar dados
-        this.carregarDados();
-        
-        // Renderizar interface
-        this.renderizarInterface();
-        
-        // Configurar eventos
-        this.configurarEventos();
-        
-        return this;
-    },
-
-    /**
-     * Carrega dados do localStorage
-     */
-    carregarDados() {
-        try {
-            // Carregar preferências do usuário
-            const dadosUsuario = localStorage.getItem('benetrip_user_data');
-            if (dadosUsuario) {
-                this.estado.dadosUsuario = JSON.parse(dadosUsuario);
-            } else {
-                console.warn("Dados do usuário não encontrados");
-                // Criar dados mínimos para o formulário de busca
-                this.estado.dadosUsuario = {
-                    companhia: 0,
-                    preferencia_viagem: 0,
-                    moeda_escolhida: 'BRL'
-                };
-            }
-            
-            // Carregar recomendações
-            const recomendacoes = localStorage.getItem('benetrip_recomendacoes');
-            if (recomendacoes) {
-                this.estado.recomendacoes = JSON.parse(recomendacoes);
-            } else {
-                console.warn("Recomendações não encontradas, buscando novas recomendações");
-                this.buscarRecomendacoes();
-                return;
-            }
-            
-            // Verificar estrutura correta
-            if (!this.validarEstrutura(this.estado.recomendacoes)) {
-                console.warn("Estrutura de recomendações inválida");
-                this.buscarRecomendacoes();
-                return;
-            }
-            
-            console.log("Dados carregados com sucesso");
-        } catch (erro) {
-            console.error("Erro ao carregar dados:", erro);
-            this.buscarRecomendacoes();
-        }
-    },
+  // Dados e estado
+  recomendacoes: null,
+  dadosUsuario: null,
+  estaCarregando: true,
+  temErro: false,
+  mensagemErro: '',
+  
+  // Inicialização
+  init() {
+    console.log('Inicializando sistema de recomendações de destinos...');
     
-    /**
-     * Valida a estrutura das recomendações
-     */
-    validarEstrutura(recomendacoes) {
-        // Verificar estrutura principal
-        if (!recomendacoes) return false;
-        
-        // Verificar se tem as propriedades necessárias
-        if (!recomendacoes.principal || !recomendacoes.alternativos || !recomendacoes.surpresa) {
-            return false;
-        }
-        
-        // Verificar se tem pelo menos um destino alternativo
-        if (!Array.isArray(recomendacoes.alternativos) || recomendacoes.alternativos.length === 0) {
-            return false;
-        }
-        
-        return true;
-    },
+    // Configurar manipuladores de eventos
+    this.configurarEventos();
     
-    // Adicionamos apenas a parte relevante do destinos.js que precisa ser modificada
-
-/**
- * Busca novas recomendações da IA
- */
-async buscarRecomendacoes() {
-    try {
-        this.mostrarCarregando("Buscando recomendações de destinos...");
-        
-        // Verificar se o serviço de IA está disponível
-        if (!window.BENETRIP_AI) {
-            console.error("Serviço de IA não disponível");
-            this.mostrarErro("Não foi possível carregar o serviço de recomendação. Tente recarregar a página.");
-            return;
-        }
-        
-        // Inicializar o serviço se necessário
-        if (typeof window.BENETRIP_AI.init === 'function' && !window.BENETRIP_AI.initialized) {
-            window.BENETRIP_AI.init();
-        }
-        
-        // Buscar recomendações
-        const recomendacoes = await window.BENETRIP_AI.obterRecomendacoes(this.estado.dadosUsuario);
-        
-        // Armazenar estado
-        this.estado.recomendacoes = recomendacoes;
-        
-        // Renderizar interface
+    // Iniciar carregamento dos dados
+    this.carregarDados()
+      .then(() => {
         this.renderizarInterface();
-    } catch (erro) {
-        console.error("Erro ao buscar recomendações:", erro);
-        
-        // Se for erro de autenticação da API, redirecionar para página específica
-        if (erro.message.includes("Chave API") || 
-            erro.message.includes("API key") || 
-            erro.message.includes("autenticação") || 
-            erro.message.includes("401")) {
-            
-            console.log("Redirecionando para página de erro de API...");
-            
-            // Salvar a mensagem de erro para uso na página de erro
-            localStorage.setItem('benetrip_api_error', erro.message);
-            
-            // Redirecionar para a página de erro específica de API
-            window.location.href = 'api-error.html';
-            return;
-        }
-        
-        // Para outros erros, mostrar mensagem normal
-        this.mostrarErro("Não foi possível obter recomendações de destinos: " + erro.message);
-    }
-},
-
-    /**
-     * Redireciona para a página inicial
-     */
-    redirecionarParaInicio() {
-        alert("Precisamos de algumas informações antes de mostrar os destinos. Vamos recomeçar!");
+      })
+      .catch(erro => {
+        console.error('Erro na inicialização dos destinos:', erro);
+        this.mostrarErro('Não foi possível carregar as recomendações. Por favor, tente novamente.');
+      });
+  },
+  
+  // Configurar eventos da interface
+  configurarEventos() {
+    // Evento de progresso do carregamento
+    document.addEventListener('benetrip_progress', (evento) => {
+      this.atualizarProgresso(
+        evento.detail.mensagem, 
+        evento.detail.porcentagem
+      );
+    });
+    
+    // Botão para voltar ao chat
+    const btnVoltar = document.getElementById('btn-voltar');
+    if (btnVoltar) {
+      btnVoltar.addEventListener('click', () => {
         window.location.href = 'index.html';
-    },
-
-    /**
-     * Renderiza a interface principal
-     */
-    renderizarInterface() {
-        // Verificar se temos o contêiner principal
-        const container = document.getElementById('destinos-container');
-        if (!container) {
-            console.error("Contêiner de destinos não encontrado");
-            return;
-        }
-        
-        // Mostrar carregamento
-        container.innerHTML = `
-            <div class="loading-container">
-                <img src="${this.config.imagePath}tripinha/avatar-pensando.png" alt="Tripinha carregando" class="loading-avatar" />
-                <div class="loading-text">Farejando destinos incríveis para você...</div>
-                <div class="loading-spinner"></div>
-            </div>
-        `;
-        
-        // Simular carregamento para efeito visual
-        setTimeout(() => {
-            // Verificar se temos recomendações
-            if (!this.estado.recomendacoes) {
-                console.error("Recomendações não encontradas");
-                this.mostrarErro("Não foi possível carregar recomendações. Tente novamente.");
-                return;
-            }
-            
-            // Extrair os destinos das recomendações
-            const destinoPrincipal = this.estado.recomendacoes.principal;
-            const destinosAlternativos = this.estado.recomendacoes.alternativos;
-            const destinoSurpresa = this.estado.recomendacoes.surpresa;
-            
-            // Verificar se temos pelo menos um destino
-            if (!destinoPrincipal) {
-                console.error("Destino principal não encontrado");
-                this.mostrarErro("Não foi possível carregar destinos. Tente novamente.");
-                return;
-            }
-            
-            // Renderizar a estrutura principal baseada no protótipo
-            container.innerHTML = `
-                <div class="tripinha-recomendacao">
-                    <div class="avatar-tripinha">
-                        <img src="${this.config.imagePath}tripinha/avatar-normal.png" alt="Tripinha" />
-                    </div>
-                    <div class="balao-mensagem">
-                        <p>Alright, Triper! 🐶 Eu farejei alguns destinos incríveis que combinam com seu estilo! 🌎🔍 Dê uma olhada e me diga para onde vamos!</p>
-                        <p>Garanti que esses lugares respeitam seu orçamento e estilo de viagem! Se não gostar deles, posso buscar mais. OU... se confiar no meu faro, clique em 'Me Surpreenda!' 🎁 e escolherei um lugar incrível para você!</p>
-                    </div>
-                </div>
-                
-                <div id="lista-destinos" class="lista-destinos">
-                    <!-- Os destinos serão inseridos aqui dinamicamente -->
-                </div>
-                
-                <div class="acoes-destinos">
-                    <button id="btn-selecionar-destino" class="btn-principal">Escolher Cidade</button>
-                    <div class="acoes-secundarias">
-                        <button id="btn-mais-opcoes" class="btn-secundario">Mostrar Mais Opções</button>
-                        <button id="btn-surpresa" class="btn-secundario">Me Surpreenda! 🎁</button>
-                    </div>
-                </div>
-                
-                <div id="confirmacao-destino" class="tripinha-recomendacao" style="display: none;">
-                    <div class="avatar-tripinha">
-                        <img src="${this.config.imagePath}tripinha/avatar-normal.png" alt="Tripinha" />
-                    </div>
-                    <div class="balao-mensagem">
-                        <p>Paw-some escolha! 🐾 Eu ADORO esse lugar—você vai ter momentos incríveis! Agora, vamos encontrar o melhor jeito de chegar lá! ✈️</p>
-                    </div>
-                </div>
-                
-                <button id="btn-buscar-voos" class="btn-principal" style="display: none;">Encontrar Meus Voos! ✈️</button>
-                
-                <div id="modal-destino" class="modal-destino">
-                    <div class="modal-conteudo">
-                        <div class="modal-header">
-                            <h3>Escolha um destino</h3>
-                            <button class="btn-fechar">×</button>
-                        </div>
-                        <div class="modal-body">
-                            <ul id="lista-selecao-destinos" class="lista-selecao-destinos">
-                                <!-- A lista de seleção será populada dinamicamente -->
-                            </ul>
-                        </div>
-                    </div>
-                </div>
-            `;
-            
-            // Renderizar cada destino
-            this.renderizarDestinos(destinoPrincipal, destinosAlternativos);
-            
-            // Configurar eventos
-            this.configurarEventosDestinos(destinoPrincipal, destinosAlternativos, destinoSurpresa);
-            
-        }, 1500); // Delay para simular carregamento
-    },
-
-    /**
-     * Renderiza os destinos no novo formato
-     */
-    renderizarDestinos(principal, alternativos) {
-        const container = document.getElementById('lista-destinos');
-        if (!container) return;
-        
-        // Limpar qualquer conteúdo existente
-        container.innerHTML = '';
-        
-        // Renderizar o destino principal
-        this.renderizarCardDestino(container, principal);
-        
-        // Renderizar destinos alternativos (garantindo que é um array)
-        if (Array.isArray(alternativos)) {
-            alternativos.forEach(destino => {
-                if (destino) {  // Verificar se o destino existe
-                    this.renderizarCardDestino(container, destino);
-                }
-            });
-        } else if (alternativos) {
-            // Se alternativos não for um array mas existir, tratá-lo como um único destino
-            this.renderizarCardDestino(container, alternativos);
-        }
-    },
-
-    /**
-     * Renderiza um card de destino
-     */
-    renderizarCardDestino(container, destino) {
-        // Verificar se o destino existe
-        if (!destino) {
-            console.warn("Tentativa de renderizar destino indefinido");
-            return;
-        }
-        
-        // Verificar se temos propriedades essenciais
-        if (!destino.cidade || !destino.pais) {
-            console.warn("Destino inválido:", destino);
-            return;
-        }
-        
-        // Garantir que valores monetários existam
-        const preco_passagem = destino.preco_passagem || 0;
-        const preco_hospedagem = destino.preco_hospedagem || 0;
-        const custo_total = destino.custo_total || 0;
-        
-        // Garantir que imagens existam
-        const imagens = destino.imagens || {
-            principal: "https://source.unsplash.com/1600x900/?travel,city",
-            secundaria: "https://source.unsplash.com/1600x900/?landmark"
-        };
-        
-        // Formatar valores monetários
-        const precoPassagem = this.formatarMoeda(preco_passagem, destino.moeda);
-        const precoHospedagem = this.formatarMoeda(preco_hospedagem, destino.moeda);
-        const custoTotal = this.formatarMoeda(custo_total, destino.moeda);
-        
-        // Criar elemento do card
-        const card = document.createElement('div');
-        card.className = 'destino-card';
-        card.dataset.id = destino.id || `dest-${Math.random().toString(36).substring(2, 9)}`;
-        
-        // Renderizar o HTML do card conforme o protótipo
-        card.innerHTML = `
-            <div class="destino-header">
-                <img src="${imagens.principal}" alt="${destino.cidade}" class="destino-imagem">
-                <div class="destino-titulo">
-                    <h3>${destino.cidade}, ${destino.pais} <span class="codigo-pais">${destino.codigo_pais || ''}</span></h3>
-                    <p class="destino-descricao">${destino.descricao_curta || 'Um destino incrível para explorar!'}</p>
-                </div>
-            </div>
-            
-            <div class="destino-info">
-                <div class="info-item">
-                    <span class="icon">✈️</span>
-                    <span class="label">Valor da passagem:</span>
-                    <span class="valor">${precoPassagem}</span>
-                </div>
-                
-                <div class="info-item">
-                    <span class="icon">🏨</span>
-                    <span class="label">Hotéis:</span>
-                    <span class="valor">${precoHospedagem}/noite</span>
-                </div>
-                
-                <div class="info-item">
-                    <span class="icon">🧩</span>
-                    <span class="label">Experiências:</span>
-                    <span class="valor">${destino.experiencias || 'Explorar a cidade e conhecer atrações locais'}</span>
-                </div>
-                
-                <div class="info-item">
-                    <span class="icon">💰</span>
-                    <span class="label">Custo total estimado:</span>
-                    <span class="valor">${custoTotal}</span>
-                </div>
-                
-                <div class="info-item destaque">
-                    <span class="icon">✨</span>
-                    <span class="label">Por que ir?</span>
-                    <span class="valor">${destino.porque_ir || 'Uma experiência única!'}</span>
-                </div>
-            </div>
-        `;
-        
-        // Adicionar o card ao container
-        container.appendChild(card);
-    },
-
-    /**
-     * Formata um valor monetário
-     */
-    formatarMoeda(valor, moeda) {
-        // Garantir que valor seja um número
-        const valorNumerico = Number(valor) || 0;
-        
-        const simbolo = moeda === 'USD' ? '$' : (moeda === 'EUR' ? '€' : 'R$');
-        return `${simbolo} ${valorNumerico.toLocaleString('pt-BR')}`;
-    },
-    
-    /**
-     * Configura eventos para os destinos
-     */
-    configurarEventosDestinos(principal, alternativos, surpresa) {
-        // Referências aos elementos
-        const btnSelecionar = document.getElementById('btn-selecionar-destino');
-        const btnMaisOpcoes = document.getElementById('btn-mais-opcoes');
-        const btnSurpresa = document.getElementById('btn-surpresa');
-        const btnBuscarVoos = document.getElementById('btn-buscar-voos');
-        const modalDestino = document.getElementById('modal-destino');
-        const btnFecharModal = modalDestino?.querySelector('.btn-fechar');
-        const listaSelecao = document.getElementById('lista-selecao-destinos');
-        
-        // Variável para armazenar o destino selecionado
-        let destinoSelecionado = null;
-        
-        // Evento para clicar em um destino
-        document.querySelectorAll('.destino-card').forEach(card => {
-            card.addEventListener('click', () => {
-                // Remover seleção anterior
-                document.querySelectorAll('.destino-card.selecionado').forEach(c => 
-                    c.classList.remove('selecionado'));
-                
-                // Adicionar seleção ao card atual
-                card.classList.add('selecionado');
-                
-                // Atualizar destino selecionado
-                const idDestino = card.dataset.id;
-                let todosDestinos = [principal];
-                
-                if (Array.isArray(alternativos)) {
-                    todosDestinos = [...todosDestinos, ...alternativos];
-                } else if (alternativos) {
-                    todosDestinos.push(alternativos);
-                }
-                
-                if (surpresa) {
-                    todosDestinos.push(surpresa);
-                }
-                
-                destinoSelecionado = todosDestinos.find(d => d && d.id === idDestino);
-                
-                // Habilitar botão de seleção
-                if (btnSelecionar) btnSelecionar.disabled = false;
-            });
-        });
-        
-        // Evento para botão de selecionar destino
-        if (btnSelecionar) {
-            btnSelecionar.addEventListener('click', () => {
-                if (destinoSelecionado) {
-                    this.confirmarSelecaoDestino(destinoSelecionado);
-                } else {
-                    // Se não houver destino selecionado, mostrar modal
-                    this.abrirModalSelecaoDestino(principal, alternativos);
-                }
-            });
-        }
-        
-        // Evento para botão de mostrar mais opções
-        if (btnMaisOpcoes) {
-            btnMaisOpcoes.addEventListener('click', () => {
-                this.buscarMaisOpcoes();
-            });
-        }
-        
-        // Evento para botão de destino surpresa
-        if (btnSurpresa) {
-            btnSurpresa.addEventListener('click', () => {
-                if (surpresa) {
-                    this.mostrarDestinoSurpresa(surpresa);
-                } else {
-                    this.mostrarErro("Destino surpresa não disponível no momento.");
-                }
-            });
-        }
-        
-        // Evento para botão de buscar voos
-        if (btnBuscarVoos) {
-            btnBuscarVoos.addEventListener('click', () => {
-                this.prosseguirParaVoos();
-            });
-        }
-        
-        // Eventos para o modal
-        if (btnFecharModal) {
-            btnFecharModal.addEventListener('click', () => {
-                modalDestino.style.display = 'none';
-            });
-        }
-        
-        // Fechar modal ao clicar fora
-        window.addEventListener('click', (e) => {
-            if (e.target === modalDestino) {
-                modalDestino.style.display = 'none';
-            }
-        });
-    },
-
-    /**
-     * Abre o modal de seleção de destino
-     */
-    abrirModalSelecaoDestino(principal, alternativos) {
-        const modal = document.getElementById('modal-destino');
-        const lista = document.getElementById('lista-selecao-destinos');
-        
-        if (!modal || !lista) return;
-        
-        // Limpar lista
-        lista.innerHTML = '';
-        
-        // Adicionar destino principal
-        if (principal) {
-            const itemPrincipal = document.createElement('li');
-            itemPrincipal.className = 'item-destino';
-            itemPrincipal.dataset.id = principal.id;
-            itemPrincipal.innerHTML = `
-                <div class="item-info">
-                    <span class="item-cidade">${principal.cidade}, ${principal.pais}</span>
-                    <span class="item-preco">${this.formatarMoeda(principal.preco_passagem, principal.moeda)}</span>
-                </div>
-                <span class="item-badge">Escolha Principal</span>
-            `;
-            lista.appendChild(itemPrincipal);
-        }
-        
-        // Adicionar destinos alternativos
-        if (Array.isArray(alternativos)) {
-            alternativos.forEach(destino => {
-                if (destino) {  // Verificar se o destino existe
-                    const item = document.createElement('li');
-                    item.className = 'item-destino';
-                    item.dataset.id = destino.id;
-                    item.innerHTML = `
-                        <div class="item-info">
-                            <span class="item-cidade">${destino.cidade}, ${destino.pais}</span>
-                            <span class="item-preco">${this.formatarMoeda(destino.preco_passagem, destino.moeda)}</span>
-                        </div>
-                    `;
-                    lista.appendChild(item);
-                }
-            });
-        }
-        
-        // Configurar eventos para os itens
-        document.querySelectorAll('.item-destino').forEach(item => {
-            item.addEventListener('click', () => {
-                const idDestino = item.dataset.id;
-                
-                let todosDestinos = [principal];
-                if (Array.isArray(alternativos)) {
-                    todosDestinos = [...todosDestinos, ...alternativos];
-                } else if (alternativos) {
-                    todosDestinos.push(alternativos);
-                }
-                
-                const destino = todosDestinos.find(d => d && d.id === idDestino);
-                
-                if (destino) {
-                    modal.style.display = 'none';
-                    this.confirmarSelecaoDestino(destino);
-                }
-            });
-        });
-        
-        // Mostrar modal
-        modal.style.display = 'flex';
-    },
-
-    /**
-     * Confirma a seleção de um destino
-     */
-    confirmarSelecaoDestino(destino) {
-        // Salvar destino selecionado
-        localStorage.setItem('benetrip_destino_escolhido', JSON.stringify(destino));
-        this.estado.destinoSelecionado = destino;
-        
-        // Atualizar interface
-        document.querySelectorAll('.destino-card').forEach(card => {
-            if (card.dataset.id !== destino.id) {
-                card.classList.add('nao-selecionado');
-            } else {
-                card.classList.add('destino-escolhido');
-            }
-        });
-        
-        // Ocultar botões de ação
-        const acoesDestinos = document.querySelector('.acoes-destinos');
-        if (acoesDestinos) {
-            acoesDestinos.style.display = 'none';
-        }
-        
-        // Mostrar confirmação
-        const confirmacao = document.getElementById('confirmacao-destino');
-        const btnBuscarVoos = document.getElementById('btn-buscar-voos');
-        
-        if (confirmacao) confirmacao.style.display = 'flex';
-        if (btnBuscarVoos) btnBuscarVoos.style.display = 'block';
-        
-        // Rolar para a confirmação
-        if (confirmacao) {
-            confirmacao.scrollIntoView({ behavior: 'smooth' });
-        }
-    },
-
-    /**
-     * Mostra o destino surpresa
-     */
-    mostrarDestinoSurpresa(surpresa) {
-        // Garantir que o destino surpresa existe
-        if (!surpresa) {
-            this.mostrarErro("Destino surpresa não disponível");
-            return;
-        }
-        
-        // Verificar propriedades essenciais
-        if (!surpresa.cidade || !surpresa.pais) {
-            this.mostrarErro("Informações incompletas para o destino surpresa");
-            return;
-        }
-        
-        // Garantir que imagens existam
-        const imagens = surpresa.imagens || {
-            principal: "https://source.unsplash.com/1600x900/?surprise,travel",
-            secundaria: "https://source.unsplash.com/1600x900/?landmark"
-        };
-        
-        // Ocultar destinos atuais
-        document.querySelectorAll('.destino-card').forEach(card => {
-            card.style.display = 'none';
-        });
-        
-        // Criar container para destino surpresa
-        const container = document.getElementById('lista-destinos');
-        if (!container) return;
-        
-        // Formatar valores monetários
-        const precoPassagem = this.formatarMoeda(surpresa.preco_passagem || 0, surpresa.moeda);
-        const precoHospedagem = this.formatarMoeda(surpresa.preco_hospedagem || 0, surpresa.moeda);
-        const custoTotal = this.formatarMoeda(surpresa.custo_total || 0, surpresa.moeda);
-        
-        // Renderizar destino surpresa com destaque especial
-        const card = document.createElement('div');
-        card.className = 'destino-card destino-surpresa animate-entrada';
-        card.dataset.id = surpresa.id || `surpresa-${Math.random().toString(36).substring(2, 9)}`;
-        
-        card.innerHTML = `
-            <div class="badge-surpresa">✨ Destino Surpresa! ✨</div>
-            
-            <div class="destino-header">
-                <img src="${imagens.principal}" alt="${surpresa.cidade}" class="destino-imagem">
-                <div class="destino-titulo">
-                    <h3>${surpresa.cidade}, ${surpresa.pais} <span class="codigo-pais">${surpresa.codigo_pais || ''}</span></h3>
-                    <p class="destino-descricao">${surpresa.descricao_curta || 'Um destino surpresa esperando por você!'}</p>
-                </div>
-            </div>
-            
-            <div class="destino-info">
-                <div class="info-item">
-                    <span class="icon">✈️</span>
-                    <span class="label">Valor da passagem:</span>
-                    <span class="valor">${precoPassagem}</span>
-                </div>
-                
-                <div class="info-item">
-                    <span class="icon">🏨</span>
-                    <span class="label">Hotéis:</span>
-                    <span class="valor">${precoHospedagem}/noite</span>
-                </div>
-                
-                <div class="info-item">
-                    <span class="icon">🧩</span>
-                    <span class="label">Experiências:</span>
-                    <span class="valor">${surpresa.experiencias || 'Explorar a cidade e conhecer atrações locais'}</span>
-                </div>
-                
-                <div class="info-item">
-                    <span class="icon">💰</span>
-                    <span class="label">Custo total estimado:</span>
-                    <span class="valor">${custoTotal}</span>
-                </div>
-                
-                <div class="info-item destaque">
-                    <span class="icon">✨</span>
-                    <span class="label">Por que ir?</span>
-                    <span class="valor">${surpresa.porque_ir || 'Uma experiência única e surpreendente!'}</span>
-                </div>
-                
-                <div class="comentario-tripinha">
-                    <img src="${this.config.imagePath}tripinha/avatar-normal.png" alt="Tripinha" class="avatar-mini">
-                    <p>${surpresa.comentario_tripinha || "Uau! Este é meu destino surpresa favorito! Confie no meu faro! 🐾🎁"}</p>
-                </div>
-            </div>
-        `;
-        
-        // Adicionar ao container
-        container.innerHTML = '';
-        container.appendChild(card);
-        
-        // Atualizar botões
-        const acoesDestinos = document.querySelector('.acoes-destinos');
-        if (acoesDestinos) {
-            acoesDestinos.innerHTML = `
-                <button id="btn-selecionar-surpresa" class="btn-principal">Escolher Este Destino!</button>
-                <button id="btn-voltar" class="btn-secundario">Voltar às Sugestões</button>
-            `;
-            
-            // Configurar novos eventos
-            document.getElementById('btn-selecionar-surpresa')?.addEventListener('click', () => {
-                this.confirmarSelecaoDestino(surpresa);
-            });
-            
-            document.getElementById('btn-voltar')?.addEventListener('click', () => {
-                this.voltarSugestoesPrincipais();
-            });
-        }
-        
-        // Rolar para o topo
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-    },
-
-    /**
-     * Busca mais opções de destinos
-     */
-    buscarMaisOpcoes() {
-        this.mostrarCarregando("Buscando mais destinos que combinam com você...");
-        
-        setTimeout(() => {
-            // Buscar novas recomendações da API
-            this.buscarRecomendacoes();
-        }, 1000);
-    },
-
-    /**
-     * Volta para as sugestões principais
-     */
-    voltarSugestoesPrincipais() {
-        // Recarregar a interface com as sugestões originais
-        this.renderizarInterface();
-    },
-
-    /**
-     * Prossegue para a etapa de busca de voos
-     */
-    prosseguirParaVoos() {
-        // Verificar se há destino selecionado
-        if (!this.estado.destinoSelecionado) {
-            this.mostrarErro("Por favor, selecione um destino primeiro");
-            return;
-        }
-        
-        // Mostrar carregamento
-        this.mostrarCarregando("Preparando busca de voos...");
-        
-        // Redirecionar para a página de voos
-        setTimeout(() => {
-            window.location.href = 'flights.html';
-        }, 1000);
-    },
-
-    /**
-     * Mostra um indicador de carregamento
-     */
-    mostrarCarregando(mensagem) {
-        // Verificar se já existe um overlay
-        const overlayExistente = document.querySelector('.overlay-carregamento');
-        if (overlayExistente) {
-            const mensagemElement = overlayExistente.querySelector('p');
-            if (mensagemElement) {
-                mensagemElement.textContent = mensagem || 'Carregando...';
-            }
-            return;
-        }
-        
-        // Criar overlay de carregamento
-        const overlay = document.createElement('div');
-        overlay.className = 'overlay-carregamento';
-        overlay.innerHTML = `
-            <div class="container-carregamento">
-                <img src="${this.config.imagePath}tripinha/avatar-pensando.png" alt="Tripinha" class="avatar-carregamento">
-                <p>${mensagem || 'Carregando...'}</p>
-                <div class="spinner"></div>
-            </div>
-        `;
-        
-        // Adicionar ao documento
-        document.body.appendChild(overlay);
-    },
-    
-    /**
-     * Remove o indicador de carregamento
-     */
-    ocultarCarregando() {
-        const overlay = document.querySelector('.overlay-carregamento');
-        if (overlay) {
-            document.body.removeChild(overlay);
-        }
-    },
-
-    /**
-     * Mostra uma mensagem de erro
-     */
-    mostrarErro(mensagem) {
-        // Ocultar carregamento se estiver visível
-        this.ocultarCarregando();
-        
-        // Criar elemento para mensagem de erro
-        const erro = document.createElement('div');
-        erro.className = 'mensagem-erro';
-        erro.innerHTML = `
-            <div class="erro-conteudo">
-                <span class="erro-icone">⚠️</span>
-                <p>${mensagem}</p>
-                <button class="btn-fechar-erro">OK</button>
-            </div>
-        `;
-        
-        // Adicionar ao documento
-        document.body.appendChild(erro);
-        
-        // Configurar evento para fechar
-        erro.querySelector('.btn-fechar-erro').addEventListener('click', () => {
-            document.body.removeChild(erro);
-        });
-        
-        // Fechar automaticamente após alguns segundos
-        setTimeout(() => {
-            if (document.body.contains(erro)) {
-                document.body.removeChild(erro);
-            }
-        }, 5000);
-    },
-
-    /**
-     * Configura eventos globais
-     */
-    configurarEventos() {
-        // Configurar eventos para mostrar/ocultar o carregamento
-        window.addEventListener('benetrip_progress', (event) => {
-            const { progress, message } = event.detail;
-            
-            if (progress < 100) {
-                this.mostrarCarregando(message);
-            } else {
-                setTimeout(() => {
-                    this.ocultarCarregando();
-                }, 500);
-            }
-        });
+      });
     }
+    
+    // Delegação de eventos para elementos que serão criados dinamicamente
+    document.addEventListener('click', (evento) => {
+      // Lidar com clique em cartões de destino
+      if (evento.target.closest('.card-destino')) {
+        const card = evento.target.closest('.card-destino');
+        const destino = card.dataset.destino;
+        this.selecionarDestino(destino);
+      }
+      
+      // Botão "Me Surpreenda"
+      if (evento.target.closest('#btn-surpresa')) {
+        this.mostrarDestinoSurpresa();
+      }
+      
+      // Botão para mais opções
+      if (evento.target.closest('#btn-mais-opcoes')) {
+        this.mostrarMaisOpcoes();
+      }
+    });
+  },
+  
+  // Carregar dados do usuário e recomendações
+  async carregarDados() {
+    try {
+      // Obter dados do usuário do localStorage
+      this.dadosUsuario = this.carregarDadosUsuario();
+      
+      if (!this.dadosUsuario) {
+        throw new Error('Dados do usuário não encontrados');
+      }
+      
+      // Iniciar carregamento das recomendações
+      this.recomendacoes = await this.buscarRecomendacoes();
+      this.estaCarregando = false;
+      
+      return true;
+    } catch (erro) {
+      this.estaCarregando = false;
+      this.temErro = true;
+      this.mensagemErro = erro.message;
+      throw erro;
+    }
+  },
+  
+  // Carregar dados do usuário do localStorage
+  carregarDadosUsuario() {
+    try {
+      const dadosString = localStorage.getItem('benetrip_user_data');
+      if (!dadosString) {
+        return null;
+      }
+      
+      return JSON.parse(dadosString);
+    } catch (erro) {
+      console.error('Erro ao carregar dados do usuário:', erro);
+      return null;
+    }
+  },
+  
+  // Buscar recomendações da IA
+  async buscarRecomendacoes() {
+    try {
+      this.atualizarProgresso('Analisando suas preferências de viagem...', 20);
+      
+      // Verificar se serviço de IA foi inicializado
+      if (!window.BENETRIP_AI || !window.BENETRIP_AI.isInitialized()) {
+        if (window.BENETRIP_AI && typeof window.BENETRIP_AI.init === 'function') {
+          window.BENETRIP_AI.init();
+        } else {
+          throw new Error('Serviço de IA não disponível');
+        }
+      }
+      
+      // Obter recomendações
+      const recomendacoes = await window.BENETRIP_AI.obterRecomendacoes(this.dadosUsuario);
+      
+      // Validar recomendações
+      if (!recomendacoes || !recomendacoes.topPick) {
+        console.error('Recomendações não encontradas');
+        throw new Error('Dados de recomendação inválidos');
+      }
+      
+      return recomendacoes;
+    } catch (erro) {
+      console.error('Erro ao buscar recomendações:', erro);
+      throw erro;
+    }
+  },
+  
+  // Atualizar barra de progresso
+  atualizarProgresso(mensagem, porcentagem) {
+    const barraProgresso = document.getElementById('barra-progresso');
+    const textoProgresso = document.getElementById('texto-progresso');
+    
+    if (barraProgresso) {
+      barraProgresso.style.width = `${porcentagem}%`;
+      barraProgresso.setAttribute('aria-valuenow', porcentagem);
+    }
+    
+    if (textoProgresso) {
+      textoProgresso.textContent = mensagem;
+    }
+  },
+  
+  // Renderizar a interface com os dados obtidos
+  renderizarInterface() {
+    try {
+      // Verificar se há dados de recomendações
+      if (this.estaCarregando) {
+        this.renderizarCarregamento();
+        return;
+      }
+      
+      if (this.temErro) {
+        this.mostrarErro(this.mensagemErro);
+        return;
+      }
+      
+      if (!this.recomendacoes) {
+        console.error('Recomendações não encontradas');
+        this.mostrarErro('Não foi possível carregar as recomendações neste momento.');
+        return;
+      }
+      
+      // Ocultar loader
+      const loader = document.getElementById('loader-recomendacoes');
+      if (loader) {
+        loader.classList.add('hidden');
+      }
+      
+      // Mostrar conteúdo principal
+      const conteudo = document.getElementById('conteudo-recomendacoes');
+      if (conteudo) {
+        conteudo.classList.remove('hidden');
+      }
+      
+      // Renderizar componentes principais
+      this.renderizarMensagemTripinha();
+      this.renderizarDestinoDestaque(this.recomendacoes.topPick);
+      this.renderizarDestinosAlternativos(this.recomendacoes.alternativas);
+      this.renderizarOpcaoSurpresa();
+      
+    } catch (erro) {
+      console.error('Erro ao renderizar interface:', erro);
+      this.mostrarErro('Ocorreu um erro ao exibir as recomendações.');
+    }
+  },
+  
+  // Renderizar estado de carregamento
+  renderizarCarregamento() {
+    const loader = document.getElementById('loader-recomendacoes');
+    if (loader) {
+      loader.classList.remove('hidden');
+    }
+    
+    const conteudo = document.getElementById('conteudo-recomendacoes');
+    if (conteudo) {
+      conteudo.classList.add('hidden');
+    }
+  },
+  
+  // Exibir mensagem de erro
+  mostrarErro(mensagem) {
+    // Ocultar loader
+    const loader = document.getElementById('loader-recomendacoes');
+    if (loader) {
+      loader.classList.add('hidden');
+    }
+    
+    // Mostrar container de erro
+    const containerErro = document.getElementById('erro-recomendacoes');
+    if (containerErro) {
+      const mensagemErro = document.getElementById('mensagem-erro');
+      if (mensagemErro) {
+        mensagemErro.textContent = mensagem;
+      }
+      containerErro.classList.remove('hidden');
+    } else {
+      // Se não existir o container de erro, criar um
+      const novoContainerErro = document.createElement('div');
+      novoContainerErro.id = 'erro-recomendacoes';
+      novoContainerErro.className = 'bg-red-100 text-red-700 p-4 rounded-lg my-4 text-center';
+      novoContainerErro.innerHTML = `
+        <p id="mensagem-erro" class="font-bold">${mensagem}</p>
+        <button id="btn-tentar-novamente" class="mt-4 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition-colors">
+          Tentar Novamente
+        </button>
+      `;
+      
+      // Adicionar ao DOM
+      const container = document.querySelector('.container');
+      if (container) {
+        container.appendChild(novoContainerErro);
+      } else {
+        document.body.appendChild(novoContainerErro);
+      }
+      
+      // Configurar evento do botão
+      const btnTentarNovamente = document.getElementById('btn-tentar-novamente');
+      if (btnTentarNovamente) {
+        btnTentarNovamente.addEventListener('click', () => {
+          window.location.reload();
+        });
+      }
+    }
+  },
+  
+  // Renderizar mensagem da Tripinha
+  renderizarMensagemTripinha() {
+    const container = document.getElementById('mensagem-tripinha');
+    if (!container) return;
+    
+    container.innerHTML = `
+      <div class="bg-gray-50 p-4 rounded-lg shadow-sm border border-gray-200">
+        <div class="flex items-start gap-3">
+          <div class="w-12 h-12 rounded-full overflow-hidden flex-shrink-0 bg-orange-100">
+            <img src="assets/img/tripinha-avatar.png" alt="Tripinha" class="w-full h-full object-cover" onerror="this.src='https://placehold.co/60x60?text=🐶'">
+          </div>
+          <p class="text-gray-800 leading-relaxed">
+            Eu farejei por aí e encontrei alguns destinos incríveis para sua aventura! 🐾 Veja minha escolha top — 
+            e mais algumas opções se você quiser explorar! Se estiver com vontade de se arriscar, clica em 'Me Surpreenda!' e eu escolho uma joia escondida pra você! 🐕 ✨
+          </p>
+        </div>
+      </div>
+    `;
+  },
+  
+  // Renderizar destino destaque (top pick)
+  renderizarDestinoDestaque(destino) {
+    const container = document.getElementById('destino-destaque');
+    if (!container) return;
+    
+    container.innerHTML = `
+      <div class="border border-gray-200 rounded-lg overflow-hidden shadow-md">
+        <div class="relative">
+          <div 
+            class="absolute top-0 left-0 py-1 px-3 z-10 font-bold text-white"
+            style="background-color: #E87722;">
+            Escolha Top da Tripinha!
+          </div>
+          <div class="grid grid-cols-2 gap-1">
+            <div class="bg-gray-200 h-36">
+              <img 
+                src="https://source.unsplash.com/featured/?${destino.destino},landmark" 
+                alt="${destino.destino}" 
+                class="w-full h-full object-cover"
+                onerror="this.src='https://placehold.co/200x144?text=${destino.destino}'">
+            </div>
+            <div class="bg-gray-200 h-36">
+              <img 
+                src="https://source.unsplash.com/featured/?${destino.destino},travel" 
+                alt="${destino.destino}" 
+                class="w-full h-full object-cover"
+                onerror="this.src='https://placehold.co/200x144?text=${destino.destino}'">
+            </div>
+          </div>
+        </div>
+        
+        <div class="p-4">
+          <div class="flex justify-between items-start">
+            <h3 class="text-xl font-bold">${destino.destino}, ${destino.pais}</h3>
+            <span 
+              class="text-xs font-medium px-1 py-0.5 rounded"
+              style="background-color: #E0E0E0;">
+              ${destino.codigoPais}
+            </span>
+          </div>
+          
+          <div class="mt-3 space-y-2 text-sm">
+            <p class="flex items-center">
+              <span class="mr-2 w-5 text-center">✈️</span> 
+              <span class="font-medium">Estimativa de Voo:</span> 
+              <span class="ml-1">R$ ${destino.preco.voo} (ida e volta)</span>
+            </p>
+            <p class="flex items-center">
+              <span class="mr-2 w-5 text-center">🏨</span> 
+              <span class="font-medium">Estimativa de Hotel:</span> 
+              <span class="ml-1">R$ ${destino.preco.hotel}/noite</span>
+            </p>
+            <p class="flex items-center">
+              <span class="mr-2 w-5 text-center">🗓️</span> 
+              <span class="font-medium">Duração da Viagem:</span> 
+              <span class="ml-1">${this.obterDatasViagem()}</span>
+            </p>
+            <p class="flex items-start mt-2">
+              <span class="mr-2 w-5 text-center flex-shrink-0">🌆</span> 
+              <span>
+                <span class="font-medium">Por que ir?:</span> 
+                <span class="ml-1">${destino.porque}</span>
+              </span>
+            </p>
+            <p class="flex items-start">
+              <span class="mr-2 w-5 text-center flex-shrink-0">⭐</span>
+              <span>
+                <span class="font-medium">Destaque da Experiência:</span> 
+                <span class="ml-1">${destino.destaque}</span>
+              </span>
+            </p>
+          </div>
+          
+          <div 
+            class="mt-3 text-sm italic p-3 rounded"
+            style="background-color: rgba(0, 163, 224, 0.1);">
+            <p class="flex items-start">
+              <span class="mr-2 flex-shrink-0">💬</span>
+              <span>"${destino.comentario}"</span>
+            </p>
+          </div>
+          
+          <button 
+            class="w-full font-bold py-2.5 px-4 rounded mt-4 text-white transition-colors duration-200 hover:opacity-90"
+            style="background-color: #E87722;"
+            data-destino="${destino.destino}"
+            onclick="BENETRIP_DESTINOS.selecionarDestino('${destino.destino}')">
+            Escolher Este Destino!
+          </button>
+        </div>
+      </div>
+    `;
+  },
+  
+  // Renderizar destinos alternativos
+  renderizarDestinosAlternativos(destinos) {
+    const container = document.getElementById('destinos-alternativos');
+    if (!container) return;
+    
+    // Limpar container
+    container.innerHTML = '<h3 class="font-bold text-lg mt-2">Mais Destinos Incríveis</h3>';
+    
+    // Renderizar cada destino alternativo (limitando a 4)
+    const destinosLimitados = destinos.slice(0, 4);
+    
+    destinosLimitados.forEach(destino => {
+      const elementoDestino = document.createElement('div');
+      elementoDestino.className = 'card-destino border border-gray-200 rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow duration-200';
+      elementoDestino.dataset.destino = destino.destino;
+      
+      elementoDestino.innerHTML = `
+        <div class="flex">
+          <div class="w-1/3">
+            <img 
+              src="https://source.unsplash.com/featured/?${destino.destino}" 
+              alt="${destino.destino}" 
+              class="w-full h-full object-cover"
+              onerror="this.src='https://placehold.co/120x120?text=${destino.destino}'">
+          </div>
+          <div class="w-2/3 p-3">
+            <div class="flex justify-between items-start">
+              <h3 class="font-bold">${destino.destino}, ${destino.pais}</h3>
+              <span 
+                class="text-xs font-medium px-1 py-0.5 rounded"
+                style="background-color: #E0E0E0;">
+                ${destino.codigoPais}
+              </span>
+            </div>
+            <div class="mt-2 space-y-1 text-xs">
+              <p class="flex items-center">
+                <span class="mr-1 w-4 text-center">✈️</span> 
+                <span class="font-medium">Voo:</span> 
+                <span class="ml-1">R$ ${destino.preco.voo}</span>
+              </p>
+              <p class="flex items-center">
+                <span class="mr-1 w-4 text-center">🏨</span> 
+                <span class="font-medium">Hotel:</span> 
+                <span class="ml-1">R$ ${destino.preco.hotel}/noite</span>
+              </p>
+              <p class="flex items-start mt-2">
+                <span class="mr-1 w-4 text-center flex-shrink-0">💡</span> 
+                <span>
+                  <span class="font-medium">Por que ir?:</span> 
+                  <span class="ml-1">${destino.porque}</span>
+                </span>
+              </p>
+            </div>
+          </div>
+        </div>
+      `;
+      
+      container.appendChild(elementoDestino);
+    });
+    
+    // Adicionar botão de "Mostrar Mais"
+    const btnMaisOpcoes = document.createElement('button');
+    btnMaisOpcoes.id = 'btn-mais-opcoes';
+    btnMaisOpcoes.className = 'w-full font-medium py-3 px-4 rounded transition-colors duration-200 hover:bg-blue-200';
+    btnMaisOpcoes.style.backgroundColor = 'rgba(0, 163, 224, 0.15)';
+    btnMaisOpcoes.style.color = '#00A3E0';
+    btnMaisOpcoes.textContent = 'Mostrar Mais Opções';
+    
+    container.appendChild(btnMaisOpcoes);
+  },
+  
+  // Renderizar opção "Me Surpreenda"
+  renderizarOpcaoSurpresa() {
+    const container = document.getElementById('opcao-surpresa');
+    if (!container) return;
+    
+    container.innerHTML = `
+      <div 
+        class="p-4 rounded-lg mt-2 text-white"
+        style="background-color: #E87722;">
+        <p class="font-bold text-lg text-center">Ainda não decidiu? Sem problemas! Clique em 'Me Surpreenda!' e eu escolho um lugar baseado nas suas vibes de viagem! 🐾</p>
+        <button 
+          id="btn-surpresa"
+          class="w-full font-bold py-2.5 px-4 rounded mt-3 transition-colors duration-200 hover:bg-blue-600"
+          style="background-color: #00A3E0;">
+          Me Surpreenda! 🎲
+        </button>
+      </div>
+    `;
+  },
+  
+  // Método para exibir destino surpresa
+  mostrarDestinoSurpresa() {
+    // Escolher um destino aleatório das alternativas
+    if (!this.recomendacoes || !this.recomendacoes.alternativas || this.recomendacoes.alternativas.length === 0) {
+      console.error('Sem destinos alternativos para surpresa');
+      return;
+    }
+    
+    // Escolher aleatoriamente entre as alternativas
+    const indiceAleatorio = Math.floor(Math.random() * this.recomendacoes.alternativas.length);
+    const destino = this.recomendacoes.alternativas[indiceAleatorio];
+    
+    // Enriquecer o destino com dados extras para a surpresa
+    const destinoSurpresa = {
+      ...destino,
+      descricao: destino.porque,
+      destaque: `Experiência única para descobrir ${destino.destino}`,
+      comentario: `${destino.destino} é uma descoberta incrível que combina perfeitamente com o seu perfil de viajante! Poucos conhecem, mas tenho certeza que você vai amar! 🐾`,
+      curiosidade: `Sabia que ${destino.destino} é um dos lugares mais autênticos para experimentar a cultura de ${destino.pais}? É um tesouro escondido!`
+    };
+    
+    // Criar e exibir o modal de destino surpresa
+    const modalContainer = document.createElement('div');
+    modalContainer.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto';
+    modalContainer.id = 'modal-surpresa';
+    
+    modalContainer.innerHTML = `
+      <div class="bg-white rounded-lg w-full max-w-md relative max-h-[90vh] overflow-y-auto">
+        <button class="absolute top-2 right-2 text-gray-500 hover:text-gray-800 z-10" onclick="document.getElementById('modal-surpresa').remove()">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+        
+        <div class="relative">
+          <div 
+            class="absolute top-0 left-0 py-1 px-3 z-10 font-bold text-white"
+            style="background-color: #00A3E0;">
+            ✨ Destino Surpresa! ✨
+          </div>
+          <div class="grid grid-cols-1 gap-1">
+            <div class="bg-gray-200 h-56">
+              <img 
+                src="https://source.unsplash.com/featured/?${destinoSurpresa.destino},landmark" 
+                alt="${destinoSurpresa.destino}" 
+                class="w-full h-full object-cover"
+                onerror="this.src='https://placehold.co/400x224?text=${destinoSurpresa.destino}'">
+            </div>
+          </div>
+        </div>
+        
+        <div class="p-4">
+          <div class="flex justify-between items-start">
+            <h3 class="text-xl font-bold">${destinoSurpresa.destino}, ${destinoSurpresa.pais}</h3>
+            <span 
+              class="text-xs font-medium px-1 py-0.5 rounded"
+              style="background-color: #E0E0E0;">
+              ${destinoSurpresa.codigoPais}
+            </span>
+          </div>
+          
+          <div class="mt-3 space-y-2 text-sm">
+            <p class="flex items-center">
+              <span class="mr-2 w-5 text-center">✈️</span> 
+              <span class="font-medium">Estimativa de Voo:</span> 
+              <span class="ml-1">R$ ${destinoSurpresa.preco.voo} (ida e volta)</span>
+            </p>
+            <p class="flex items-center">
+              <span class="mr-2 w-5 text-center">🏨</span> 
+              <span class="font-medium">Estimativa de Hotel:</span> 
+              <span class="ml-1">R$ ${destinoSurpresa.preco.hotel}/noite</span>
+            </p>
+            <p class="flex items-center">
+              <span class="mr-2 w-5 text-center">🗓️</span> 
+              <span class="font-medium">Duração da Viagem:</span> 
+              <span class="ml-1">${this.obterDatasViagem()}</span>
+            </p>
+            <p class="flex items-start mt-2">
+              <span class="mr-2 w-5 text-center flex-shrink-0">🏛️</span> 
+              <span>
+                <span class="font-medium">Por que ir?:</span> 
+                <span class="ml-1">${destinoSurpresa.porque}</span>
+              </span>
+            </p>
+            <p class="flex items-start">
+              <span class="mr-2 w-5 text-center flex-shrink-0">⭐</span>
+              <span>
+                <span class="font-medium">Destaque da Experiência:</span> 
+                <span class="ml-1">${destinoSurpresa.destaque}</span>
+              </span>
+            </p>
+          </div>
+          
+          <div 
+            class="mt-3 text-sm p-3 rounded"
+            style="background-color: rgba(0, 163, 224, 0.1);">
+            <p class="flex items-start font-medium">
+              <span class="mr-2 flex-shrink-0">🔮</span>
+              <span>Por que é uma descoberta especial?</span>
+            </p>
+            <p class="mt-2">
+              ${destinoSurpresa.destino} é um tesouro escondido que combina perfeitamente com o que você busca! 
+              É um lugar menos explorado pelo turismo de massa, mas oferece experiências autênticas e memoráveis.
+            </p>
+          </div>
+          
+          <div 
+            class="mt-3 text-sm italic p-3 rounded"
+            style="background-color: rgba(232, 119, 34, 0.1);">
+            <p class="flex items-start">
+              <span class="mr-2 flex-shrink-0">💬</span>
+              <span>"${destinoSurpresa.comentario}"</span>
+            </p>
+          </div>
+          
+          <div class="mt-3 p-3 rounded bg-yellow-50 text-sm">
+            <p class="flex items-start">
+              <span class="mr-2 flex-shrink-0">🎁</span>
+              <span class="font-medium">Curiosidade exclusiva:</span>
+              <span class="ml-1">${destinoSurpresa.curiosidade}</span>
+            </p>
+          </div>
+          
+          <button 
+            class="w-full font-bold py-2.5 px-4 rounded mt-4 text-white transition-colors duration-200 hover:opacity-90"
+            style="background-color: #E87722;"
+            onclick="BENETRIP_DESTINOS.selecionarDestino('${destinoSurpresa.destino}'); document.getElementById('modal-surpresa').remove()">
+            Quero Este Destino Surpresa!
+          </button>
+          
+          <button 
+            class="w-full font-medium py-2.5 px-4 rounded border border-gray-300 transition-colors duration-200 hover:bg-gray-100 mt-2"
+            onclick="document.getElementById('modal-surpresa').remove()">
+            Voltar às Sugestões
+          </button>
+        </div>
+      </div>
+    `;
+    
+    document.body.appendChild(modalContainer);
+  },
+  
+  // Método para mostrar mais opções
+  mostrarMaisOpcoes() {
+    // Implementação futura para carregar mais destinos
+    alert('Esta funcionalidade será implementada em breve!');
+  },
+  
+  // Método para selecionar um destino
+  selecionarDestino(nomeDestino) {
+    console.log(`Destino selecionado: ${nomeDestino}`);
+    
+    // Encontrar o destino selecionado
+    let destinoSelecionado = null;
+    
+    if (this.recomendacoes.topPick.destino === nomeDestino) {
+      destinoSelecionado = this.recomendacoes.topPick;
+    } else {
+      destinoSelecionado = this.recomendacoes.alternativas.find(d => d.destino === nomeDestino);
+    }
+    
+    if (!destinoSelecionado) {
+      console.error(`Destino não encontrado: ${nomeDestino}`);
+      return;
+    }
+    
+    // Salvar destino selecionado no localStorage
+    localStorage.setItem('benetrip_destino_selecionado', JSON.stringify(destinoSelecionado));
+    
+    // Exibir confirmação
+    this.mostrarConfirmacaoSelecao(destinoSelecionado);
+  },
+  
+  // Método para mostrar confirmação de seleção
+  mostrarConfirmacaoSelecao(destino) {
+    const modalContainer = document.createElement('div');
+    modalContainer.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
+    modalContainer.id = 'modal-confirmacao';
+    
+    modalContainer.innerHTML = `
+      <div class="bg-white rounded-lg w-full max-w-md p-4">
+        <div 
+          class="p-4 rounded-lg" 
+          style="background-color: rgba(232, 119, 34, 0.1);">
+          <div class="flex items-start gap-3">
+            <div class="w-12 h-12 rounded-full overflow-hidden flex-shrink-0 bg-orange-100">
+              <img src="assets/img/tripinha-avatar.png" alt="Tripinha" class="w-full h-full object-cover" onerror="this.src='https://placehold.co/60x60?text=🐶'">
+            </div>
+            <div>
+              <p class="font-bold">Ótima escolha, Triper! 🐾 ${destino.destino} é incrível! Tem certeza que este é o destino certo para sua aventura?</p>
+              
+              <div class="mt-3">
+                <label class="flex items-center space-x-2 cursor-pointer">
+                  <input 
+                    type="checkbox" 
+                    id="confirmar-selecao"
+                    class="form-checkbox h-5 w-5 rounded"
+                    style="color: #E87722;">
+                  <span>Sim, tenho certeza!</span>
+                </label>
+              </div>
+              
+              <p class="mt-3 text-sm">Só um aviso, Triper! Os preços que você está vendo são estimativas baseadas em buscas recentes. Os preços em tempo real aparecerão quando você escolher seus voos e hotéis.</p>
+            </div>
+          </div>
+        </div>
+        
+        <div class="flex gap-2 mt-4">
+          <button 
+            id="btn-cancelar"
+            class="flex-1 py-2 px-4 border border-gray-300 rounded hover:bg-gray-100 transition-colors">
+            Voltar
+          </button>
+          <button 
+            id="btn-confirmar"
+            class="flex-1 py-2 px-4 text-white rounded transition-colors hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+            style="background-color: #E87722;"
+            disabled>
+            Confirmar
+          </button>
+        </div>
+      </div>
+    `;
+    
+    document.body.appendChild(modalContainer);
+    
+    // Configurar eventos
+    const checkboxConfirmar = document.getElementById('confirmar-selecao');
+    const btnConfirmar = document.getElementById('btn-confirmar');
+    const btnCancelar = document.getElementById('btn-cancelar');
+    
+    checkboxConfirmar.addEventListener('change', () => {
+      btnConfirmar.disabled = !checkboxConfirmar.checked;
+    });
+    
+    btnCancelar.addEventListener('click', () => {
+      document.getElementById('modal-confirmacao').remove();
+    });
+    
+    btnConfirmar.addEventListener('click', () => {
+      // Redirecionar para a tela de voos
+      window.location.href = 'voos.html';
+    });
+  },
+  
+  // Método auxiliar para obter período de datas da viagem
+  obterDatasViagem() {
+    // Tentar obter dados reais do armazenamento
+    try {
+      const dadosUsuario = this.dadosUsuario;
+      if (dadosUsuario && dadosUsuario.datas) {
+        const datasViagem = dadosUsuario.datas.split(',');
+        if (datasViagem.length === 2) {
+          // Formatar as datas
+          const dataIda = new Date(datasViagem[0]);
+          const dataVolta = new Date(datasViagem[1]);
+          
+          // Formatação para pt-BR
+          const opcoesFormatacao = { day: 'numeric', month: 'long', year: 'numeric' };
+          return `${dataIda.toLocaleDateString('pt-BR', opcoesFormatacao)} a ${dataVolta.toLocaleDateString('pt-BR', opcoesFormatacao)}`;
+        }
+      }
+    } catch (erro) {
+      console.error('Erro ao processar datas:', erro);
+    }
+    
+    // Fallback: retornar datas genéricas
+    return "5 a 12 de Agosto, 2025";
+  }
 };
 
-// Inicializar quando o DOM estiver pronto
+// Inicializar o módulo quando o DOM estiver pronto
 document.addEventListener('DOMContentLoaded', () => {
-    BENETRIP_DESTINOS.init();
+  // Inicializar sistema de destinos
+  BENETRIP_DESTINOS.init();
 });
-
-// Exportar para namespace global
-window.BENETRIP_DESTINOS = BENETRIP_DESTINOS;
