@@ -168,22 +168,22 @@
                 
                 // Patch para corrigir callNetlifyFunction
                 window.BENETRIP_AI.callNetlifyFunction = function(preferences) {
-                    console.log("Chamando função Netlify com domínio correto");
-                    return fetch('https://benetrip.netlify.app/.netlify/functions/ai-recommend', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify(preferences)
-                    })
-                    .then(response => {
-                        if (!response.ok) {
-                            throw new Error(`Erro na função Netlify: ${response.status}`);
-                        }
-                        return response.json();
-                    })
-                    .then(data => data.data);
-                };
+    // Usar path relativo para funcionar em qualquer domínio
+    return fetch('/.netlify/functions/ai-recommend', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(preferences)
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`Erro na função Netlify: ${response.status}`);
+        }
+        return response.json();
+    })
+    .then(data => data.data);
+};
                 
                 // Patch para corrigir getDestinationImages
                 window.BENETRIP_AI.getDestinationImages = function(destino) {
