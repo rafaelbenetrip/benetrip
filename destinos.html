@@ -71,6 +71,24 @@
                     };
                     
                     document.body.appendChild(alternativeScript);
+                } else if (url.includes('lodash')) {
+                    console.log("Tentando CDN alternativo para Lodash...");
+                    const alternativeUrl = 'https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.21/lodash.min.js';
+                    const alternativeScript = document.createElement('script');
+                    alternativeScript.src = alternativeUrl;
+                    
+                    alternativeScript.onload = function() {
+                        console.log(`Script carregado do CDN alternativo: ${alternativeUrl}`);
+                        if (callback) callback();
+                    };
+                    
+                    alternativeScript.onerror = function() {
+                        console.error(`Erro ao carregar do CDN alternativo: ${alternativeUrl}`);
+                        showErrorMessage(`Falha ao carregar recurso: ${url.split('/').pop()}`);
+                        if (errorCallback) errorCallback();
+                    };
+                    
+                    document.body.appendChild(alternativeScript);
                 } else {
                     // Para outros scripts, mostrar erro e continuar
                     showErrorMessage(`Falha ao carregar recurso: ${url.split('/').pop()}`);
@@ -129,7 +147,6 @@
         function checkAndFixAPIURLs() {
             if (window.BENETRIP_AI) {
                 // Patch para corrigir as URLs de API
-                const originalCallAIService = window.BENETRIP_AI.callAIService;
                 window.BENETRIP_AI.callAIService = function(prompt) {
                     console.log("Chamando API interceptada e corrigida para Netlify Functions");
                     // Usar a URL correta para funções Netlify
@@ -150,7 +167,6 @@
                 };
                 
                 // Patch para corrigir callNetlifyFunction
-                const originalCallNetlifyFunction = window.BENETRIP_AI.callNetlifyFunction;
                 window.BENETRIP_AI.callNetlifyFunction = function(preferences) {
                     console.log("Chamando função Netlify interceptada e corrigida");
                     return fetch('/.netlify/functions/ai-recommend', {
@@ -170,7 +186,6 @@
                 };
                 
                 // Patch para corrigir getDestinationImages
-                const originalGetDestinationImages = window.BENETRIP_AI.getDestinationImages;
                 window.BENETRIP_AI.getDestinationImages = function(destino) {
                     try {
                         const query = `${destino.cidade} ${destino.pais} landmark`;
@@ -195,18 +210,21 @@
                             .catch(error => {
                                 console.error(`Erro ao buscar imagens para ${destino.cidade}:`, error);
                                 return {
-                                    principal: `https://source.unsplash.com/1600x900/?travel,city`,
-                                    secundaria: `https://source.unsplash.com/1600x900/?landmark`
+                                    principal: `https://via.placeholder.com/800x600.png?text=${encodeURIComponent(destino.cidade)}`,
+                                    secundaria: `https://via.placeholder.com/800x600.png?text=${encodeURIComponent(destino.pais)}`
                                 };
                             });
                     } catch (error) {
                         console.error(`Erro ao buscar imagens para ${destino.cidade}:`, error);
                         return {
-                            principal: `https://source.unsplash.com/1600x900/?travel,city`,
-                            secundaria: `https://source.unsplash.com/1600x900/?landmark`
+                            principal: `https://via.placeholder.com/800x600.png?text=${encodeURIComponent(destino.cidade)}`,
+                            secundaria: `https://via.placeholder.com/800x600.png?text=${encodeURIComponent(destino.pais)}`
                         };
                     }
                 };
+                
+                // Usar sempre as funções do Netlify para produção
+                window.BENETRIP_AI.config.useNetlifyFunctions = true;
                 
                 console.log("APIs corrigidas para usar caminhos Netlify Functions");
             } else {
@@ -220,7 +238,7 @@
             
             // Primeiro carregar config e dependências essenciais em ordem
             const essentialScripts = [
-                "https://cdn.jsdelivr.net/npm/lodash@4.17.21/lodash.min.js",
+                "https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.21/lodash.min.js",
                 "assets/js/config.js"
             ];
             
@@ -235,12 +253,19 @@
                     } catch (error) {
                         console.error("Erro ao inicializar BENETRIP_CONFIG:", error);
                     }
-                } else {
-                    console.warn("BENETRIP_CONFIG não disponível, criando stub...");
+                } 
+                
+                if (!window.BENETRIP_CONFIG || !window.BENETRIP_CONFIG.initialized) {
+                    console.warn("BENETRIP_CONFIG não disponível ou não inicializado, criando stub...");
                     // Criar stub de config para permitir que o sistema continue
                     window.BENETRIP_CONFIG = {
                         credentials: {},
                         initialized: true,
+                        isProduction: true,
+                        getApiUrl: function(endpoint) {
+                            // Converter o nome do endpoint para o formato correto de função Netlify
+                            return `/.netlify/functions/${endpoint.replace('Recommend', '-recommend').replace('Search', '-search')}`;
+                        },
                         init: function() { return this; }
                     };
                 }
@@ -300,9 +325,9 @@
                             if (bottomBar) bottomBar.style.display = 'flex';
                         }, 1000);
                         
-                        // Carregar scripts de interação mobile no final
+                        // Carregar scripts de interação mobile no final, usando diretamente CDN confiável
                         loadScriptsSequentially([
-                            "https://cdn.jsdelivr.net/npm/hammer.js@2.0.8/hammer.min.js",
+                            "https://cdnjs.cloudflare.com/ajax/libs/hammer.js/2.0.8/hammer.min.js",
                             "assets/js/mobile-interactions.js"
                         ]);
                     });
