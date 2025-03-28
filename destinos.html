@@ -168,8 +168,8 @@
                 
                 // Patch para corrigir callNetlifyFunction
                 window.BENETRIP_AI.callNetlifyFunction = function(preferences) {
-    // Usar path relativo para funcionar em qualquer domínio
-    return fetch('/.netlify/functions/ai-recommend', {
+    console.log("Chamando função proxy para recomendações");
+    return fetch('/.netlify/functions/proxy', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'
@@ -178,7 +178,7 @@
     })
     .then(response => {
         if (!response.ok) {
-            throw new Error(`Erro na função Netlify: ${response.status}`);
+            throw new Error(`Erro no proxy: ${response.status}`);
         }
         return response.json();
     })
