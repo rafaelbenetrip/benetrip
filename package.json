@@ -1,9 +1,10 @@
 {
-  "name": "benetrip",
-  "version": "3.0.0",
-  "description": "Benetrip travel recommendation app",
+  "name": "benetrip-netlify-functions",
+  "version": "1.0.0",
+  "description": "Funções Netlify para o Benetrip",
+  "main": "proxy.js",
   "dependencies": {
-    "axios": "^0.27.2",
-    "openai": "^3.2.1"
+    "axios": "^1.6.2",
+    "openai": "^4.24.1"
   }
 }
