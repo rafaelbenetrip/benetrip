@@ -1,0 +1,9 @@
+{
+  "name": "benetrip-api",
+  "version": "1.0.0",
+  "description": "API functions for Benetrip",
+  "dependencies": {
+    "openai": "^4.28.0",
+    "axios": "^1.6.2"
+  }
+}
