@@ -166,25 +166,31 @@ window.BENETRIP_AI = {
     try {
       return JSON.parse(texto);
     } catch (e) {
+      console.log('Erro ao fazer parse direto, tentando extrair do texto');
+      
       // Se falhar, tenta extrair JSON de bloco de código ou texto
       try {
         // Busca por blocos de código JSON
         const blocoCodigo = texto.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
         if (blocoCodigo && blocoCodigo[1]) {
-          return JSON.parse(blocoCodigo[1].trim());
+          const jsonLimpo = blocoCodigo[1].trim();
+          console.log('JSON extraído de bloco de código:', jsonLimpo.substring(0, 100) + '...');
+          return JSON.parse(jsonLimpo);
         }
         
         // Busca pela primeira ocorrência de chaves
-        const jsonRegex = /{[\s\S]*?}/;
-        const match = texto.match(jsonRegex);
-        if (match) {
-          return JSON.parse(match[0]);
+        const match = texto.match(/(\{[\s\S]*\})/);
+        if (match && match[0]) {
+          const jsonPotencial = match[0];
+          console.log('JSON extraído de texto:', jsonPotencial.substring(0, 100) + '...');
+          return JSON.parse(jsonPotencial);
         }
+        
+        throw new Error('Não foi possível extrair JSON válido da resposta');
       } catch (innerError) {
         console.error('Erro ao extrair JSON do texto:', innerError);
+        throw new Error('Não foi possível extrair JSON válido da resposta');
       }
-      
-      throw new Error('Não foi possível extrair JSON válido da resposta');
     }
   },
   
@@ -193,7 +199,7 @@ window.BENETRIP_AI = {
     try {
       console.log(`Chamando função Netlify proxy com dados:`, data);
       
-      // Usar a URL relativa para garantir compatibilidade entre ambientes
+      // Usar URL absoluta para garantir compatibilidade entre ambientes
       const url = this.config.fallbackEndpoint;
       
       const response = await fetch(url, {
@@ -225,6 +231,40 @@ window.BENETRIP_AI = {
     }
   },
   
+  // Método para validar a estrutura dos dados das recomendações
+  validarEstruturaDados(dados) {
+    // Verificar estrutura básica
+    if (!dados.topPick || !Array.isArray(dados.alternativas)) {
+      console.error('Estrutura básica de dados inválida:', dados);
+      throw new Error('Formato de dados inválido');
+    }
+    
+    // Garantir que haja alternativas suficientes
+    if (!dados.alternativas || dados.alternativas.length < 1) {
+      console.warn('Alternativas insuficientes, adicionando dados fictícios');
+      dados.alternativas = [...this.config.mockData.alternativas];
+    }
+    
+    // Garantir que temos o destino surpresa
+    if (!dados.surpresa && dados.alternativas.length > 0) {
+      console.log('Destino surpresa não encontrado, criando a partir de alternativa');
+      dados.surpresa = {
+        ...dados.alternativas.pop(),
+        descricao: "Um destino surpreendente que poucos conhecem!",
+        destaque: "Experiência única que vai te surpreender",
+        comentario: "Este é um destino surpresa especial que farejei só para você! Confie no meu faro! 🐾🎁"
+      };
+    }
+    
+    // Se ainda não tivermos surpresa, criar uma fictícia
+    if (!dados.surpresa) {
+      console.log('Criando destino surpresa fictício');
+      dados.surpresa = this.config.mockData.surpresa;
+    }
+    
+    return dados;
+  },
+  
   // Método para registrar eventos de progresso
   reportarProgresso(fase, porcentagem, mensagem) {
     const evento = new CustomEvent('benetrip_progress', {
@@ -250,6 +290,8 @@ window.BENETRIP_AI = {
     if (!preferenciasUsuario) {
       throw new Error('Preferências de usuário não fornecidas');
     }
+    
+    console.log('Recebendo pedido de recomendações com preferências:', preferenciasUsuario);
     
     // Gerar chave de cache
     const cacheKey = this.generateCacheId(preferenciasUsuario);
@@ -280,34 +322,21 @@ window.BENETRIP_AI = {
       this.reportarProgresso('finalizando', 70, 'Encontrando os destinos perfeitos para você...');
       
       // Extrair e processar recomendações
-      const recomendacoes = this.extrairJSON(resposta.conteudo);
-      
-      // Validar estrutura básica das recomendações
-      if (!recomendacoes.topPick || !Array.isArray(recomendacoes.alternativas)) {
-        throw new Error('Formato de recomendações inválido. Dados: ' + JSON.stringify(recomendacoes));
+      let recomendacoes;
+      try {
+        recomendacoes = this.extrairJSON(resposta.conteudo);
+        console.log('Recomendações extraídas com sucesso:', recomendacoes);
+      } catch (extractError) {
+        console.error('Erro ao extrair JSON da resposta:', extractError);
+        throw new Error('Falha ao processar resposta do serviço de IA');
       }
+      
+      // Validar e corrigir estrutura das recomendações
+      recomendacoes = this.validarEstruturaDados(recomendacoes);
       
       // Garantir que temos 4 alternativas exatamente
       while (recomendacoes.alternativas.length > 4) {
         recomendacoes.alternativas.pop();
-      }
-      
-      // Garantir que temos o destino surpresa
-      if (!recomendacoes.surpresa && recomendacoes.alternativas.length > 0) {
-        // Usar último alternativo como surpresa
-        console.log('Criando destino surpresa a partir de alternativa');
-        recomendacoes.surpresa = {
-          ...recomendacoes.alternativas.pop(),
-          descricao: "Um destino surpreendente que poucos conhecem!",
-          destaque: "Experiência única que vai te surpreender",
-          comentario: "Este é um destino surpresa especial que farejei só para você! Confie no meu faro! 🐾🎁"
-        };
-      }
-      
-      // Se ainda não tivermos surpresa, criar uma fictícia
-      if (!recomendacoes.surpresa) {
-        console.log('Criando destino surpresa fictício');
-        recomendacoes.surpresa = this.config.mockData.surpresa;
       }
       
       // Adicionar alternativas se estiverem faltando
@@ -336,22 +365,11 @@ window.BENETRIP_AI = {
     } catch (erro) {
       console.error('Erro ao obter recomendações:', erro);
       
-      // Tentar usar cache mesmo em produção em caso de erro
+      // Tentar usar cache mesmo com erro
       if (this.cache.recommendations[cacheKey]) {
         console.warn('Usando cache de emergência devido a erro');
         return this.cache.recommendations[cacheKey];
       }
-      
-      // Se nenhum cache disponível, usar dados mockados
-      console.warn('Usando dados mockados devido a erro e falta de cache');
-      
-      // Armazenar os dados mockados para uso futuro
-      this.cache.recommendations[cacheKey] = this.config.mockData;
-      this.cache.timestamp[cacheKey] = Date.now();
-      this.saveCacheToStorage();
-      
-      // Salvar no localStorage também
-      localStorage.setItem('benetrip_recomendacoes', JSON.stringify(this.config.mockData));
       
       // Mostrar erro
       throw new Error('Não foi possível gerar recomendações no momento. Por favor, tente novamente mais tarde.');
