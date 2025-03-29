@@ -49,29 +49,24 @@ exports.handler = async function(event, context) {
       console.log('Usando API do Claude');
       
       response = await axios({
-        method: 'post',
-        url: 'https://api.anthropic.com/v1/messages',
-        headers: {
-          'x-api-key': process.env.CLAUDE_API_KEY,
-          'anthropic-version': '2023-06-01',
-          'Content-Type': 'application/json'
-        },
-        data: {
-          model: "claude-3-sonnet-20240229",
-          max_tokens: 4000,
-          messages: [
-            {
-              role: "user",
-              content: [
-                {
-                  type: "text",
-                  text: prompt
-                }
-              ]
-            }
-          ]
-        }
-      });
+  method: 'post',
+  url: 'https://api.anthropic.com/v1/messages',
+  headers: {
+    'anthropic-api-key': process.env.CLAUDE_API_KEY,
+    'anthropic-version': '2023-01-01',
+    'Content-Type': 'application/json'
+  },
+  data: {
+    model: "claude-3-sonnet-20240229",
+    max_tokens: 4000,
+    messages: [
+      {
+        role: "user",
+        content: prompt
+      }
+    ]
+  }
+});
       
       formattedResponse = {
         tipo: "claude",
