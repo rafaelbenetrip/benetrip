@@ -1,4 +1,4 @@
-// api/recommendations.js
+// api/recommendations.js - Endpoint da API Vercel para recomendações de destinos
 import { OpenAI } from 'openai';
 import axios from 'axios';
 
@@ -23,7 +23,7 @@ export default async function handler(req, res) {
 
   try {
     // Log para debugging
-    console.log('Processando requisição para recomendações');
+    console.log('Processando requisição para recomendações no Vercel');
     
     // Extrair dados da requisição
     const requestData = req.body;
@@ -118,7 +118,7 @@ export default async function handler(req, res) {
 
     // Use este bloco para testes quando não quiser chamar APIs externas
     if (usarMockData) {
-      console.log('Usando dados mockados para desenvolvimento');
+      console.log('Usando dados mockados para desenvolvimento no Vercel');
       responseData = {
         tipo: "mockado-desenvolvimento",
         conteudo: JSON.stringify(mockData)
@@ -276,7 +276,7 @@ export default async function handler(req, res) {
     return res.status(200).json(responseData);
     
   } catch (error) {
-    console.error('Erro na API de recomendações:', error);
+    console.error('Erro na API de recomendações Vercel:', error);
     
     return res.status(500).json({ 
       error: "Erro ao processar solicitação de IA",
