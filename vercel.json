@@ -2,12 +2,12 @@
   "version": 2,
   "builds": [
     { 
-      "src": "public/**/*", 
-      "use": "@vercel/static" 
-    },
-    { 
       "src": "api/**/*.js", 
       "use": "@vercel/node" 
+    },
+    { 
+      "src": "public/**/*", 
+      "use": "@vercel/static" 
     }
   ],
   "routes": [
@@ -15,9 +15,21 @@
       "src": "/api/(.*)", 
       "dest": "/api/$1" 
     },
+    { 
+      "src": "/test-api",
+      "dest": "/public/test-api.html"
+    },
+    { 
+      "src": "/test-api.html",
+      "dest": "/public/test-api.html"
+    },
     {
-      "src": "/(assets|images|css|js|favicon.ico)(.*)",
-      "dest": "/public/$1$2"
+      "src": "/(.*\\.(js|css|jpg|jpeg|png|gif|ico|svg))",
+      "dest": "/public/$1"
+    },
+    {
+      "src": "/(assets|images|css|js)/(.*)",
+      "dest": "/public/$1/$2"
     },
     { 
       "src": "/(.*)", 
@@ -31,6 +43,6 @@
     "UNSPLASH_ACCESS_KEY": "@unsplash_access_key",
     "AVIASALES_TOKEN": "@aviasales_token",
     "AVIASALES_MARKER": "@aviasales_marker",
-    "HOST": "benetrip.com.br"
+    "HOST": "benetrip.vercel.app"
   }
 }
