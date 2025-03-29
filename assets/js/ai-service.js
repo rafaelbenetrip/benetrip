@@ -3,8 +3,7 @@ window.BENETRIP_AI = {
   // Configurações do serviço
   config: {
     cacheDuration: 24 * 60 * 60 * 1000, // 24 horas em ms
-    useNetlifyFunctions: true, // Sempre usar Netlify Functions em produção
-    fallbackEndpoint: '/.netlify/functions/proxy',
+    apiEndpoint: '/api/recommendations',
     mockData: { // Dados de exemplo para casos de falha
       "topPick": {
         "destino": "Medellín",
