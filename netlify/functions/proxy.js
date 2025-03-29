@@ -1,3 +1,4 @@
+// netlify/functions/proxy.js
 const axios = require('axios');
 
 exports.handler = async function(event, context) {
@@ -40,7 +41,7 @@ exports.handler = async function(event, context) {
     // Gerar prompt adequado baseado nos dados do usuário
     const prompt = gerarPromptParaDestinos(requestData);
     
-    // Determinar qual API de IA usar (preferência para Claude, depois OpenAI, finalmente Gemini)
+    // Determinar qual API de IA usar (preferência para Claude)
     let response;
     let formattedResponse;
     
@@ -77,69 +78,12 @@ exports.handler = async function(event, context) {
         conteudo: response.data.content[0].text
       };
     }
-    else if (process.env.OPENAI_API_KEY) {
-      console.log('Usando API da OpenAI');
-      
-      response = await axios({
-        method: 'post',
-        url: 'https://api.openai.com/v1/chat/completions',
-        headers: {
-          'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
-          'Content-Type': 'application/json'
-        },
-        data: {
-          model: "gpt-4",
-          messages: [
-            { 
-              role: "system", 
-              content: `Você é o assistente de viagens da Benetrip, responsável por recomendar destinos personalizados. Retorne APENAS um objeto JSON com recomendações, sem texto adicional.`
-            },
-            {
-              role: "user",
-              content: prompt
-            }
-          ]
-        }
-      });
-      
-      formattedResponse = {
-        tipo: "openai",
-        conteudo: response.data.choices[0].message.content
-      };
-    }
-    else if (process.env.GEMINI_API_KEY) {
-      console.log('Usando API do Gemini');
-      
-      response = await axios({
-        method: 'post',
-        url: `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${process.env.GEMINI_API_KEY}`,
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        data: {
-          contents: [
-            {
-              parts: [
-                { 
-                  text: prompt
-                }
-              ]
-            }
-          ]
-        }
-      });
-      
-      formattedResponse = {
-        tipo: "gemini",
-        conteudo: response.data.candidates[0].content.parts[0].text
-      };
-    }
     else {
-      // Dados mockados caso nenhuma API esteja configurada
-      console.log('Nenhuma API de IA configurada, usando dados mockados');
+      // Dados mockados caso API não esteja disponível - apenas para desenvolvimento
+      console.log('API de Claude não configurada, usando dados simulados temporariamente');
       
       formattedResponse = {
-        tipo: "mockado",
+        tipo: "simulado",
         conteudo: JSON.stringify({
           "topPick": {
             "destino": "Medellín",
@@ -205,8 +149,8 @@ exports.handler = async function(event, context) {
             "destaque": "Passeio de barco pelas Ilhas do Rosário com águas cristalinas",
             "comentario": "Cartagena é um tesouro escondido que vai te conquistar! As cores, a música e a comida caribenha formam uma experiência inesquecível! 🐾🌴",
             "preco": {
-              "voo": 2000,
-              "hotel": 220
+              "voo": 1950,
+              "hotel": 320
             }
           }
         })
@@ -218,7 +162,6 @@ exports.handler = async function(event, context) {
       const jsonContent = extrairJSON(formattedResponse.conteudo);
       // Adicionar destino surpresa se não estiver presente
       if (jsonContent && !jsonContent.surpresa && jsonContent.alternativas && jsonContent.alternativas.length >= 5) {
-        // Usar o último alternativo como surpresa
         jsonContent.surpresa = {
           ...jsonContent.alternativas.pop(),
           destaque: jsonContent.alternativas[0].porque || "Experiência única que vai te surpreender",
@@ -229,10 +172,8 @@ exports.handler = async function(event, context) {
       }
     } catch (jsonError) {
       console.warn('Erro ao validar JSON da resposta:', jsonError);
-      // Continuamos mesmo com erro, o cliente vai tentar extrair o JSON
     }
     
-    // Retornar resposta padronizada
     return {
       statusCode: 200,
       headers,
@@ -242,15 +183,12 @@ exports.handler = async function(event, context) {
   } catch (error) {
     console.error('Erro no proxy da IA:', error);
     
-    // Resposta de erro detalhada
     return {
       statusCode: 500,
       headers,
       body: JSON.stringify({ 
         error: "Erro ao processar solicitação de IA",
-        message: error.message,
-        // Apenas em desenvolvimento
-        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        message: error.message
       })
     };
   }
@@ -259,6 +197,9 @@ exports.handler = async function(event, context) {
 // Função para extrair JSON de texto
 function extrairJSON(texto) {
   try {
+    // Se já for objeto, retornar diretamente
+    if (typeof texto === 'object') return texto;
+    
     return JSON.parse(texto);
   } catch (e) {
     // Tentar extrair JSON de dentro do texto
