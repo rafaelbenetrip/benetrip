@@ -178,11 +178,29 @@ window.BENETRIP_AI = {
           return JSON.parse(jsonLimpo);
         }
         
-        // Busca pela primeira ocorrência de chaves
+        // Busca pela primeira ocorrência de chaves balanceadas
+        let depth = 0;
+        let start = -1;
+        
+        for (let i = 0; i < texto.length; i++) {
+          if (texto[i] === '{') {
+            if (depth === 0) start = i;
+            depth++;
+          } else if (texto[i] === '}') {
+            depth--;
+            if (depth === 0 && start !== -1) {
+              const jsonStr = texto.substring(start, i + 1);
+              console.log('JSON extraído do texto usando análise de profundidade:', jsonStr.substring(0, 100) + '...');
+              return JSON.parse(jsonStr);
+            }
+          }
+        }
+        
+        // Último recurso: busca por regex simples
         const match = texto.match(/(\{[\s\S]*\})/);
         if (match && match[0]) {
           const jsonPotencial = match[0];
-          console.log('JSON extraído de texto:', jsonPotencial.substring(0, 100) + '...');
+          console.log('JSON extraído de texto usando regex:', jsonPotencial.substring(0, 100) + '...');
           return JSON.parse(jsonPotencial);
         }
         
@@ -328,11 +346,20 @@ window.BENETRIP_AI = {
         console.log('Recomendações extraídas com sucesso:', recomendacoes);
       } catch (extractError) {
         console.error('Erro ao extrair JSON da resposta:', extractError);
-        throw new Error('Falha ao processar resposta do serviço de IA');
+        console.log('Usando dados mockados devido a erro de extração');
+        this.reportarProgresso('fallback', 80, 'Usando dados mockados devido a erro e falta de cache');
+        recomendacoes = {...this.config.mockData};
       }
       
       // Validar e corrigir estrutura das recomendações
-      recomendacoes = this.validarEstruturaDados(recomendacoes);
+      try {
+        recomendacoes = this.validarEstruturaDados(recomendacoes);
+      } catch (validationError) {
+        console.error('Erro na validação dos dados:', validationError);
+        console.log('Usando dados mockados devido a erro de validação');
+        this.reportarProgresso('fallback', 85, 'Usando dados mockados devido a erro de validação');
+        recomendacoes = {...this.config.mockData};
+      }
       
       // Garantir que temos 4 alternativas exatamente
       while (recomendacoes.alternativas.length > 4) {
@@ -365,14 +392,28 @@ window.BENETRIP_AI = {
     } catch (erro) {
       console.error('Erro ao obter recomendações:', erro);
       
-      // Tentar usar cache mesmo com erro
+      // Tentar usar cache mesmo que seja antigo
       if (this.cache.recommendations[cacheKey]) {
         console.warn('Usando cache de emergência devido a erro');
+        this.reportarProgresso('cache-emergencia', 100, 'Usando recomendações armazenadas (emergência)...');
         return this.cache.recommendations[cacheKey];
       }
       
-      // Mostrar erro
-      throw new Error('Não foi possível gerar recomendações no momento. Por favor, tente novamente mais tarde.');
+      // Se não tiver cache, usar dados mockados
+      console.log('Usando dados mockados devido a erro e falta de cache');
+      this.reportarProgresso('mockados', 100, 'Usando recomendações padrão devido a erro...');
+      
+      const dadosMockados = {...this.config.mockData};
+      
+      // Armazenar no cache para futuras requisições
+      this.cache.recommendations[cacheKey] = dadosMockados;
+      this.cache.timestamp[cacheKey] = Date.now();
+      this.saveCacheToStorage();
+      
+      // Salvar no localStorage para uso em outras páginas também
+      localStorage.setItem('benetrip_recomendacoes', JSON.stringify(dadosMockados));
+      
+      return dadosMockados;
     }
   }
 };
