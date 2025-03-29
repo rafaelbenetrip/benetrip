@@ -15,9 +15,22 @@
       "src": "/api/(.*)", 
       "dest": "/api/$1" 
     },
+    {
+      "src": "/(assets|images|css|js|favicon.ico)(.*)",
+      "dest": "/public/$1$2"
+    },
     { 
       "src": "/(.*)", 
       "dest": "/public/$1" 
     }
-  ]
+  ],
+  "env": {
+    "OPENAI_API_KEY": "@openai_api_key",
+    "CLAUDE_API_KEY": "@claude_api_key",
+    "PEXELS_API_KEY": "@pexels_api_key",
+    "UNSPLASH_ACCESS_KEY": "@unsplash_access_key",
+    "AVIASALES_TOKEN": "@aviasales_token",
+    "AVIASALES_MARKER": "@aviasales_marker",
+    "HOST": "benetrip.com.br"
+  }
 }
