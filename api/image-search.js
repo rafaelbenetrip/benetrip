@@ -1,4 +1,4 @@
-// api/image-search.js
+// api/image-search.js - Endpoint Vercel para busca de imagens
 import axios from 'axios';
 
 export default async function handler(req, res) {
@@ -26,6 +26,7 @@ export default async function handler(req, res) {
   }
   
   try {
+    console.log(`Buscando imagens para '${query}' no Vercel`);
     let images = [];
     let unsplashSuccess = false;
     let pexelsSuccess = false;
@@ -120,7 +121,7 @@ export default async function handler(req, res) {
     });
     
   } catch (error) {
-    console.error("Erro ao buscar imagens:", error);
+    console.error("Erro ao buscar imagens no Vercel:", error);
     return res.status(500).json({ 
       error: error.message,
       images: [
