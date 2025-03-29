@@ -1,0 +1,15 @@
+{
+  "name": "benetrip",
+  "version": "1.0.0",
+  "description": "Benetrip - Chatbot de planejamento de viagens",
+  "private": true,
+  "scripts": {
+    "build": "echo 'No build step required'"
+  },
+  "dependencies": {
+    // Dependências do frontend, se houver (ex: bibliotecas como flatpickr)
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
