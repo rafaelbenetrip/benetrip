@@ -1,4 +1,4 @@
-// api/flight-search.js
+// api/flight-search.js - Endpoint Vercel para busca de voos
 import axios from 'axios';
 import crypto from 'crypto';
 
@@ -20,6 +20,7 @@ export default async function handler(req, res) {
   }
 
   try {
+    console.log('Recebendo requisição de busca de voos no Vercel');
     const params = req.body;
     
     // Gerar assinatura para a API Aviasales
@@ -109,7 +110,7 @@ export default async function handler(req, res) {
     });
     
   } catch (error) {
-    console.error("Erro na busca de voos:", error);
+    console.error("Erro na busca de voos no Vercel:", error);
     return res.status(500).json({ 
       error: error.message,
       success: false
