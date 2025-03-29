@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Benetrip API Test</title>
+    <title>Benetrip API Test - Vercel</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -34,13 +34,21 @@
         h1 {
             color: #00A3E0;
         }
+        .info {
+            background-color: #e0f7ff;
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
     </style>
 </head>
 <body>
-    <h1>Benetrip API Test</h1>
-    <p>Esta página testa a conectividade com a API do Vercel para a Benetrip.</p>
+    <h1>Benetrip API Test - Vercel</h1>
+    <div class="info">
+        <p>Esta página testa a conectividade com a API do Vercel para a Benetrip. Ela faz uma requisição para a API de recomendações e mostra a resposta.</p>
+    </div>
     
-    <button id="testApi">Testar API</button>
+    <button id="testApi">Testar API de Recomendações</button>
     <div id="status">Status: Aguardando teste...</div>
     
     <h2>Resposta:</h2>
@@ -51,7 +59,7 @@
             const statusEl = document.getElementById('status');
             const responseEl = document.getElementById('response');
             
-            statusEl.textContent = 'Status: Enviando requisição...';
+            statusEl.textContent = 'Status: Enviando requisição para API Vercel...';
             responseEl.textContent = 'Aguardando resposta...';
             
             const testData = {
@@ -91,8 +99,30 @@
                 }
                 
                 const data = await response.json();
-                statusEl.textContent = 'Status: Resposta recebida com sucesso!';
-                responseEl.textContent = JSON.stringify(data, null, 2);
+                statusEl.textContent = 'Status: Resposta recebida com sucesso do Vercel!';
+                
+                // Mostrar tipo de resposta
+                const tipoResposta = document.createElement('div');
+                tipoResposta.style.marginTop = '10px';
+                tipoResposta.style.marginBottom = '10px';
+                tipoResposta.style.fontWeight = 'bold';
+                tipoResposta.textContent = `Tipo de resposta: ${data.tipo || 'desconhecido'}`;
+                
+                statusEl.appendChild(tipoResposta);
+                
+                // Exibir conteúdo da resposta
+                try {
+                    // Tentar fazer parse se for string JSON
+                    if (typeof data.conteudo === 'string') {
+                        const jsonData = JSON.parse(data.conteudo);
+                        responseEl.textContent = JSON.stringify(jsonData, null, 2);
+                    } else {
+                        responseEl.textContent = JSON.stringify(data, null, 2);
+                    }
+                } catch (e) {
+                    // Se não for JSON válido, mostrar como está
+                    responseEl.textContent = data.conteudo || JSON.stringify(data, null, 2);
+                }
                 
             } catch (error) {
                 statusEl.textContent = `Status: Erro: ${error.message}`;
