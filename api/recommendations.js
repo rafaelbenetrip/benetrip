@@ -1,5 +1,6 @@
 // api/recommendations.js
 import { OpenAI } from 'openai';
+import axios from 'axios';
 
 export default async function handler(req, res) {
   // Configurar cabeçalhos CORS
@@ -31,40 +32,231 @@ export default async function handler(req, res) {
       throw new Error("Dados de preferências não fornecidos");
     }
     
+    // Dados mockados para fallback em caso de erro
+    const mockData = {
+      "topPick": {
+        "destino": "Medellín",
+        "pais": "Colômbia",
+        "codigoPais": "CO",
+        "descricao": "Cidade da eterna primavera com clima perfeito o ano todo",
+        "porque": "Clima primaveril o ano todo com paisagens montanhosas deslumbrantes",
+        "destaque": "Passeio de teleférico, Comuna 13 e fazendas de café próximas",
+        "comentario": "Eu simplesmente AMEI Medellín! É perfeito para quem busca um mix de cultura e natureza! 🐾",
+        "preco": {
+          "voo": 1800,
+          "hotel": 350
+        }
+      },
+      "alternativas": [
+        {
+          "destino": "Montevidéu",
+          "pais": "Uruguai",
+          "codigoPais": "UY",
+          "porque": "Clima costeiro tranquilo com frutos do mar deliciosos e espaços culturais",
+          "preco": {
+            "voo": 1500,
+            "hotel": 300
+          }
+        },
+        {
+          "destino": "Buenos Aires",
+          "pais": "Argentina",
+          "codigoPais": "AR",
+          "porque": "Capital cosmopolita com rica vida cultural, teatros e arquitetura europeia",
+          "preco": {
+            "voo": 1400,
+            "hotel": 280
+          }
+        },
+        {
+          "destino": "Santiago",
+          "pais": "Chile",
+          "codigoPais": "CL",
+          "porque": "Moderna capital cercada pela Cordilheira dos Andes com excelentes vinhos",
+          "preco": {
+            "voo": 1600,
+            "hotel": 350
+          }
+        },
+        {
+          "destino": "Cusco",
+          "pais": "Peru",
+          "codigoPais": "PE",
+          "porque": "Portal para Machu Picchu com rica história inca e arquitetura colonial",
+          "preco": {
+            "voo": 1700,
+            "hotel": 250
+          }
+        }
+      ],
+      "surpresa": {
+        "destino": "Cartagena",
+        "pais": "Colômbia",
+        "codigoPais": "CO",
+        "descricao": "Joia colonial no Caribe colombiano com praias paradisíacas",
+        "porque": "Cidade murada histórica com ruas coloridas, cultura vibrante e praias maravilhosas",
+        "destaque": "Passeio de barco pelas Ilhas do Rosário com águas cristalinas",
+        "comentario": "Cartagena é um tesouro escondido que vai te conquistar! As cores, a música e a comida caribenha formam uma experiência inesquecível! 🐾🌴",
+        "preco": {
+          "voo": 1950,
+          "hotel": 320
+        }
+      }
+    };
+    
     // Gerar prompt baseado nos dados do usuário
     const prompt = gerarPromptParaDestinos(requestData);
     
-    // Inicializar a API OpenAI
-    const openai = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY
-    });
+    let responseData;
     
-    console.log('Enviando requisição para OpenAI...');
-    
-    // Fazer a chamada para a API da OpenAI
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4",
-      messages: [
-        {
-          role: "system",
-          content: "Você é a Tripinha, uma cachorra vira-lata caramelo especialista em viagens da Benetrip."
-        },
-        {
-          role: "user",
-          content: prompt
+    // Tentar usar OpenAI primeiro
+    if (process.env.OPENAI_API_KEY) {
+      try {
+        console.log('Usando OpenAI para recomendações');
+        
+        // Inicializar a API OpenAI
+        const openai = new OpenAI({
+          apiKey: process.env.OPENAI_API_KEY
+        });
+        
+        console.log('Enviando requisição para OpenAI...');
+        
+        // Fazer a chamada para a API da OpenAI
+        const completion = await openai.chat.completions.create({
+          model: "gpt-4",
+          messages: [
+            {
+              role: "system",
+              content: "Você é a Tripinha, uma cachorra vira-lata caramelo especialista em viagens da Benetrip."
+            },
+            {
+              role: "user",
+              content: prompt
+            }
+          ],
+          temperature: 0.7,
+          max_tokens: 4000
+        });
+        
+        console.log('Resposta recebida da OpenAI');
+        
+        responseData = {
+          tipo: "openai",
+          conteudo: completion.choices[0].message.content
+        };
+      } catch (openaiError) {
+        console.error('Erro ao usar OpenAI:', openaiError);
+        
+        // Tentar Claude como fallback
+        if (process.env.CLAUDE_API_KEY) {
+          try {
+            console.log('Tentando usar Claude como fallback');
+            
+            const claudeResponse = await axios({
+              method: 'post',
+              url: 'https://api.anthropic.com/v1/messages',
+              headers: {
+                'anthropic-api-key': process.env.CLAUDE_API_KEY,
+                'anthropic-version': '2023-06-01',
+                'Content-Type': 'application/json'
+              },
+              data: {
+                model: "claude-3-sonnet-20240229",
+                max_tokens: 4000,
+                messages: [
+                  {
+                    role: "user",
+                    content: prompt
+                  }
+                ]
+              }
+            });
+            
+            console.log('Resposta recebida do Claude');
+            
+            responseData = {
+              tipo: "claude",
+              conteudo: claudeResponse.data.content[0].text
+            };
+          } catch (claudeError) {
+            console.error('Erro ao usar Claude como fallback:', claudeError);
+            
+            // Usar dados mockados se ambas as APIs falharem
+            responseData = {
+              tipo: "mockado",
+              conteudo: JSON.stringify(mockData)
+            };
+          }
+        } else {
+          // Sem Claude API Key, usar dados mockados
+          responseData = {
+            tipo: "mockado",
+            conteudo: JSON.stringify(mockData)
+          };
         }
-      ],
-      temperature: 0.7,
-      max_tokens: 4000
-    });
+      }
+    } else if (process.env.CLAUDE_API_KEY) {
+      // Se não tiver OpenAI mas tiver Claude
+      try {
+        console.log('Usando Claude para recomendações');
+        
+        const claudeResponse = await axios({
+          method: 'post',
+          url: 'https://api.anthropic.com/v1/messages',
+          headers: {
+            'anthropic-api-key': process.env.CLAUDE_API_KEY,
+            'anthropic-version': '2023-06-01',
+            'Content-Type': 'application/json'
+          },
+          data: {
+            model: "claude-3-sonnet-20240229",
+            max_tokens: 4000,
+            messages: [
+              {
+                role: "user",
+                content: prompt
+              }
+            ]
+          }
+        });
+        
+        console.log('Resposta recebida do Claude');
+        
+        responseData = {
+          tipo: "claude",
+          conteudo: claudeResponse.data.content[0].text
+        };
+      } catch (claudeError) {
+        console.error('Erro ao usar Claude:', claudeError);
+        
+        // Usar dados mockados se Claude falhar
+        responseData = {
+          tipo: "mockado",
+          conteudo: JSON.stringify(mockData)
+        };
+      }
+    } else {
+      // Se não tiver API keys, usar dados mockados
+      console.log('Sem API keys configuradas, usando dados mockados');
+      
+      responseData = {
+        tipo: "mockado",
+        conteudo: JSON.stringify(mockData)
+      };
+    }
     
-    console.log('Resposta recebida da OpenAI');
+    // Validar a resposta para garantir formato JSON correto
+    try {
+      const jsonContent = extrairJSON(responseData.conteudo);
+      console.log('JSON extraído com sucesso');
+    } catch (jsonError) {
+      console.error('Erro ao extrair JSON da resposta:', jsonError);
+      responseData.conteudo = JSON.stringify(mockData);
+      responseData.tipo = "mockado-json-erro";
+    }
     
     // Retornar a resposta formatada
-    return res.status(200).json({
-      tipo: "openai",
-      conteudo: completion.choices[0].message.content
-    });
+    return res.status(200).json(responseData);
     
   } catch (error) {
     console.error('Erro na API de recomendações:', error);
@@ -73,6 +265,63 @@ export default async function handler(req, res) {
       error: "Erro ao processar solicitação de IA",
       message: error.message
     });
+  }
+}
+
+// Função para extrair JSON de texto, lidando com diferentes formatos
+function extrairJSON(texto) {
+  // Se já for um objeto, retornar diretamente
+  if (texto && typeof texto === 'object') {
+    return texto;
+  }
+  
+  // Primeiro, tenta fazer parse direto
+  try {
+    return JSON.parse(texto);
+  } catch (e) {
+    console.log('Erro ao fazer parse direto, tentando extrair do texto');
+    
+    // Se falhar, tenta extrair JSON de bloco de código ou texto
+    try {
+      // Busca por blocos de código JSON
+      const blocoCodigo = texto.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+      if (blocoCodigo && blocoCodigo[1]) {
+        const jsonLimpo = blocoCodigo[1].trim();
+        console.log('JSON extraído de bloco de código', jsonLimpo.substring(0, 100) + '...');
+        return JSON.parse(jsonLimpo);
+      }
+      
+      // Busca pela primeira ocorrência de chaves balanceadas
+      let depth = 0;
+      let start = -1;
+      
+      for (let i = 0; i < texto.length; i++) {
+        if (texto[i] === '{') {
+          if (depth === 0) start = i;
+          depth++;
+        } else if (texto[i] === '}') {
+          depth--;
+          if (depth === 0 && start !== -1) {
+            const jsonStr = texto.substring(start, i + 1);
+            console.log('JSON extraído do texto usando análise de profundidade');
+            return JSON.parse(jsonStr);
+          }
+        }
+      }
+      
+      // Último recurso: busca por regex simples
+      const match = texto.match(/(\{[\s\S]*\})/);
+      if (match && match[0]) {
+        const jsonPotencial = match[0];
+        console.log('JSON extraído de texto usando regex');
+        return JSON.parse(jsonPotencial);
+      }
+      
+      throw new Error('Não foi possível extrair JSON válido da resposta');
+    } catch (innerError) {
+      console.error('Erro ao extrair JSON do texto:', innerError);
+      throw new Error('Não foi possível extrair JSON válido da resposta');
+    }
   }
 }
 
