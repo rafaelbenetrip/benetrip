@@ -4,9 +4,10 @@
 
 [functions]
   node_bundler = "esbuild"
+  included_files = ["package.json"]
 
 [[redirects]]
-  from = "/api/*"
+  from = "/.netlify/functions/*"
   to = "/.netlify/functions/:splat"
   status = 200
 
