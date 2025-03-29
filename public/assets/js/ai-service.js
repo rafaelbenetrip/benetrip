@@ -3,7 +3,7 @@ window.BENETRIP_AI = {
   // Configurações do serviço
   config: {
     cacheDuration: 24 * 60 * 60 * 1000, // 24 horas em ms
-    apiEndpoint: '/api/recommendations', // Novo caminho para Vercel
+    apiEndpoint: '/api/recommendations', // Endpoint Vercel
     mockData: { // Dados de exemplo para casos de falha
       "topPick": {
         "destino": "Medellín",
@@ -211,8 +211,8 @@ window.BENETRIP_AI = {
     }
   },
   
-  // Método atualizado para chamar a API do Vercel
-  async callNetlifyFunction(data) {
+  // Método para chamar a API do Vercel
+  async callVercelApi(data) {
     try {
       console.log(`Chamando API Vercel com dados:`, data);
       
@@ -238,7 +238,7 @@ window.BENETRIP_AI = {
         } catch (e) {
           errorText = `${response.status} ${response.statusText}`;
         }
-        throw new Error(`Erro no proxy: ${errorText}`);
+        throw new Error(`Erro na API: ${errorText}`);
       }
       
       const responseData = await response.json();
@@ -337,7 +337,7 @@ window.BENETRIP_AI = {
       this.reportarProgresso('processando', 30, 'Analisando suas preferências de viagem...');
       
       // Chamar a API do Vercel
-      const resposta = await this.callNetlifyFunction(preferenciasUsuario);
+      const resposta = await this.callVercelApi(preferenciasUsuario);
       
       // Verificar formato da resposta
       if (!resposta || !resposta.conteudo) {
@@ -427,4 +427,4 @@ window.BENETRIP_AI = {
 };
 
 // Inicializar o serviço quando o script for carregado
-window.BENETRIP_AI.init();
+window.BENETRIP_AI.init();d
