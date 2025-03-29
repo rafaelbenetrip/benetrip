@@ -3,7 +3,7 @@ window.BENETRIP_AI = {
   // Configurações do serviço
   config: {
     cacheDuration: 24 * 60 * 60 * 1000, // 24 horas em ms
-    apiEndpoint: '/api/recommendations',
+    apiEndpoint: '/api/recommendations', // Novo caminho para Vercel
     mockData: { // Dados de exemplo para casos de falha
       "topPick": {
         "destino": "Medellín",
@@ -211,13 +211,13 @@ window.BENETRIP_AI = {
     }
   },
   
-  // Método para chamar a função Netlify
+  // Método para chamar a API do Vercel
   async callNetlifyFunction(data) {
     try {
-      console.log(`Chamando função Netlify proxy com dados:`, data);
+      console.log(`Chamando API Vercel com dados:`, data);
       
-      // Usar URL absoluta para garantir compatibilidade entre ambientes
-      const url = this.config.fallbackEndpoint;
+      // Usar a URL do endpoint Vercel ao invés do Netlify
+      const url = this.config.apiEndpoint;
       
       const response = await fetch(url, {
         method: 'POST',
@@ -239,11 +239,11 @@ window.BENETRIP_AI = {
       }
       
       const responseData = await response.json();
-      console.log('Resposta da função Netlify:', responseData.tipo);
+      console.log('Resposta da API Vercel:', responseData.tipo);
       
       return responseData;
     } catch (error) {
-      console.error('Erro ao chamar função Netlify:', error);
+      console.error('Erro ao chamar API Vercel:', error);
       throw error;
     }
   },
@@ -327,7 +327,7 @@ window.BENETRIP_AI = {
       // Reportar progresso
       this.reportarProgresso('processando', 30, 'Analisando suas preferências de viagem...');
       
-      // Chamar a função proxy no Netlify
+      // Chamar a API do Vercel
       const resposta = await this.callNetlifyFunction(preferenciasUsuario);
       
       // Verificar formato da resposta
