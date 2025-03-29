@@ -731,7 +731,7 @@ const BENETRIP_DESTINOS = {
     
     btnConfirmar.addEventListener('click', () => {
       // Redirecionar para a tela de voos
-      window.location.href = 'voos.html';
+      window.location.href = 'flights.html';
     });
   },
   
