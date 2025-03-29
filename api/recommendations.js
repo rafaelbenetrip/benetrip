@@ -3,6 +3,8 @@ import { OpenAI } from 'openai';
 import axios from 'axios';
 
 export default async function handler(req, res) {
+  console.log('Recebendo requisição na API recommendations!');
+  
   // Configurar cabeçalhos CORS
   res.setHeader('Access-Control-Allow-Credentials', true);
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -21,7 +23,7 @@ export default async function handler(req, res) {
 
   try {
     // Log para debugging
-    console.log('Recebendo requisição para recomendações');
+    console.log('Processando requisição para recomendações');
     
     // Extrair dados da requisição
     const requestData = req.body;
@@ -104,13 +106,26 @@ export default async function handler(req, res) {
       }
     };
     
+    // Para testes rápidos, podemos retornar dados mockados diretamente
+    // Comentar esta linha em produção
+    // return res.status(200).json({ tipo: "mockado", conteudo: JSON.stringify(mockData) });
+    
     // Gerar prompt baseado nos dados do usuário
     const prompt = gerarPromptParaDestinos(requestData);
     
     let responseData;
-    
+    let usarMockData = true; // Defina como false para usar APIs reais
+
+    // Use este bloco para testes quando não quiser chamar APIs externas
+    if (usarMockData) {
+      console.log('Usando dados mockados para desenvolvimento');
+      responseData = {
+        tipo: "mockado-desenvolvimento",
+        conteudo: JSON.stringify(mockData)
+      };
+    }
     // Tentar usar OpenAI primeiro
-    if (process.env.OPENAI_API_KEY) {
+    else if (process.env.OPENAI_API_KEY) {
       try {
         console.log('Usando OpenAI para recomendações');
         
@@ -247,8 +262,10 @@ export default async function handler(req, res) {
     
     // Validar a resposta para garantir formato JSON correto
     try {
-      const jsonContent = extrairJSON(responseData.conteudo);
-      console.log('JSON extraído com sucesso');
+      if (responseData.conteudo) {
+        const jsonContent = extrairJSON(responseData.conteudo);
+        console.log('JSON extraído com sucesso');
+      }
     } catch (jsonError) {
       console.error('Erro ao extrair JSON da resposta:', jsonError);
       responseData.conteudo = JSON.stringify(mockData);
@@ -287,7 +304,7 @@ function extrairJSON(texto) {
       const blocoCodigo = texto.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
       if (blocoCodigo && blocoCodigo[1]) {
         const jsonLimpo = blocoCodigo[1].trim();
-        console.log('JSON extraído de bloco de código', jsonLimpo.substring(0, 100) + '...');
+        console.log('JSON extraído de bloco de código');
         return JSON.parse(jsonLimpo);
       }
       
