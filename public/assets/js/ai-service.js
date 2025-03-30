@@ -12,7 +12,7 @@ window.BENETRIP_AI = {
         "descricao": "Cidade da eterna primavera com clima perfeito o ano todo",
         "porque": "Clima primaveril o ano todo com paisagens montanhosas deslumbrantes",
         "destaque": "Passeio de teleférico, Comuna 13 e fazendas de café próximas",
-        "comentario": "Eu simplesmente AMEI Medellín! É perfeito para quem busca um mix de cultura e natureza! 🐾",
+        "comentario": "Eu simplesmente AMEI Medellín! Perfeito para quem busca um mix de cultura e natureza! 🐾",
         "preco": {
           "voo": 1800,
           "hotel": 350
