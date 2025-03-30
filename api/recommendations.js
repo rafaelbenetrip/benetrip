@@ -1,5 +1,4 @@
 // api/recommendations.js - Endpoint da API Vercel para recomendações de destinos
-import { OpenAI } from 'openai';
 import axios from 'axios';
 
 export default async function handler(req, res) {
@@ -106,174 +105,63 @@ export default async function handler(req, res) {
       }
     };
     
-    // Para testes rápidos, podemos retornar dados mockados diretamente
-    // Comentar esta linha em produção
-    // return res.status(200).json({ tipo: "mockado", conteudo: JSON.stringify(mockData) });
-    
     // Gerar prompt baseado nos dados do usuário
     const prompt = gerarPromptParaDestinos(requestData);
     
-    let responseData;
-    let usarMockData = true; // Defina como false para usar APIs reais
-
-    // Use este bloco para testes quando não quiser chamar APIs externas
-    if (usarMockData) {
-      console.log('Usando dados mockados para desenvolvimento no Vercel');
-      responseData = {
-        tipo: "mockado-desenvolvimento",
-        conteudo: JSON.stringify(mockData)
-      };
-    }
-    // Tentar usar OpenAI primeiro
-    else if (process.env.OPENAI_API_KEY) {
-      try {
-        console.log('Usando OpenAI para recomendações');
-        
-        // Inicializar a API OpenAI
-        const openai = new OpenAI({
-          apiKey: process.env.OPENAI_API_KEY
-        });
-        
-        console.log('Enviando requisição para OpenAI...');
-        
-        // Fazer a chamada para a API da OpenAI
-        const completion = await openai.chat.completions.create({
-          model: "gpt-4",
-          messages: [
-            {
-              role: "system",
-              content: "Você é a Tripinha, uma cachorra vira-lata caramelo especialista em viagens da Benetrip."
-            },
-            {
-              role: "user",
-              content: prompt
-            }
-          ],
-          temperature: 0.7,
-          max_tokens: 4000
-        });
-        
-        console.log('Resposta recebida da OpenAI');
-        
-        responseData = {
-          tipo: "openai",
-          conteudo: completion.choices[0].message.content
-        };
-      } catch (openaiError) {
-        console.error('Erro ao usar OpenAI:', openaiError);
-        
-        // Tentar Claude como fallback
-        if (process.env.CLAUDE_API_KEY) {
-          try {
-            console.log('Tentando usar Claude como fallback');
-            
-            const claudeResponse = await axios({
-              method: 'post',
-              url: 'https://api.anthropic.com/v1/messages',
-              headers: {
-                'anthropic-api-key': process.env.CLAUDE_API_KEY,
-                'anthropic-version': '2023-06-01',
-                'Content-Type': 'application/json'
-              },
-              data: {
-                model: "claude-3-sonnet-20240229",
-                max_tokens: 4000,
-                messages: [
-                  {
-                    role: "user",
-                    content: prompt
-                  }
-                ]
-              }
-            });
-            
-            console.log('Resposta recebida do Claude');
-            
-            responseData = {
-              tipo: "claude",
-              conteudo: claudeResponse.data.content[0].text
-            };
-          } catch (claudeError) {
-            console.error('Erro ao usar Claude como fallback:', claudeError);
-            
-            // Usar dados mockados se ambas as APIs falharem
-            responseData = {
-              tipo: "mockado",
-              conteudo: JSON.stringify(mockData)
-            };
-          }
-        } else {
-          // Sem Claude API Key, usar dados mockados
-          responseData = {
-            tipo: "mockado",
-            conteudo: JSON.stringify(mockData)
-          };
-        }
+    // Chamar a API Perplexity
+    try {
+      console.log('Usando Perplexity para recomendações');
+      
+      // Verificar se API key da Perplexity está configurada
+      if (!process.env.PERPLEXITY_API_KEY) {
+        throw new Error('PERPLEXITY_API_KEY não configurada');
       }
-    } else if (process.env.CLAUDE_API_KEY) {
-      // Se não tiver OpenAI mas tiver Claude
+      
+      const perplexityResponse = await callPerplexityAPI(prompt);
+      
+      console.log('Resposta recebida da Perplexity');
+      
+      // Retornar a resposta formatada
+      return res.status(200).json({
+        tipo: "perplexity",
+        conteudo: perplexityResponse
+      });
+    } catch (perplexityError) {
+      console.error('Erro ao usar Perplexity:', perplexityError);
+      
+      // Tentar outros modelos como fallback se disponíveis
       try {
-        console.log('Usando Claude para recomendações');
+        let fallbackResponse = null;
         
-        const claudeResponse = await axios({
-          method: 'post',
-          url: 'https://api.anthropic.com/v1/messages',
-          headers: {
-            'anthropic-api-key': process.env.CLAUDE_API_KEY,
-            'anthropic-version': '2023-06-01',
-            'Content-Type': 'application/json'
-          },
-          data: {
-            model: "claude-3-sonnet-20240229",
-            max_tokens: 4000,
-            messages: [
-              {
-                role: "user",
-                content: prompt
-              }
-            ]
-          }
-        });
+        // Tentar OpenAI como fallback se configurada
+        if (process.env.OPENAI_API_KEY) {
+          console.log('Tentando OpenAI como fallback');
+          fallbackResponse = await callOpenAIAPI(prompt);
+        } 
+        // Tentar Claude como segundo fallback
+        else if (process.env.CLAUDE_API_KEY) {
+          console.log('Tentando Claude como fallback');
+          fallbackResponse = await callClaudeAPI(prompt);
+        }
         
-        console.log('Resposta recebida do Claude');
+        if (fallbackResponse) {
+          return res.status(200).json({
+            tipo: "fallback",
+            conteudo: fallbackResponse
+          });
+        } else {
+          throw new Error('Nenhum serviço de IA disponível');
+        }
+      } catch (fallbackError) {
+        console.error('Erro ao usar serviços de fallback:', fallbackError);
         
-        responseData = {
-          tipo: "claude",
-          conteudo: claudeResponse.data.content[0].text
-        };
-      } catch (claudeError) {
-        console.error('Erro ao usar Claude:', claudeError);
-        
-        // Usar dados mockados se Claude falhar
-        responseData = {
+        // Retornar dados mockados se nenhum serviço estiver disponível
+        return res.status(200).json({
           tipo: "mockado",
           conteudo: JSON.stringify(mockData)
-        };
+        });
       }
-    } else {
-      // Se não tiver API keys, usar dados mockados
-      console.log('Sem API keys configuradas, usando dados mockados');
-      
-      responseData = {
-        tipo: "mockado",
-        conteudo: JSON.stringify(mockData)
-      };
     }
-    
-    // Validar a resposta para garantir formato JSON correto
-    try {
-      if (responseData.conteudo) {
-        const jsonContent = extrairJSON(responseData.conteudo);
-        console.log('JSON extraído com sucesso');
-      }
-    } catch (jsonError) {
-      console.error('Erro ao extrair JSON da resposta:', jsonError);
-      responseData.conteudo = JSON.stringify(mockData);
-      responseData.tipo = "mockado-json-erro";
-    }
-    
-    // Retornar a resposta formatada
-    return res.status(200).json(responseData);
     
   } catch (error) {
     console.error('Erro na API de recomendações Vercel:', error);
@@ -285,60 +173,180 @@ export default async function handler(req, res) {
   }
 }
 
-// Função para extrair JSON de texto, lidando com diferentes formatos
-function extrairJSON(texto) {
-  // Se já for um objeto, retornar diretamente
-  if (texto && typeof texto === 'object') {
-    return texto;
-  }
-  
-  // Primeiro, tenta fazer parse direto
+// Chamar a API da Perplexity
+async function callPerplexityAPI(prompt) {
   try {
-    return JSON.parse(texto);
-  } catch (e) {
-    console.log('Erro ao fazer parse direto, tentando extrair do texto');
+    const apiKey = process.env.PERPLEXITY_API_KEY;
     
-    // Se falhar, tenta extrair JSON de bloco de código ou texto
-    try {
-      // Busca por blocos de código JSON
-      const blocoCodigo = texto.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-      if (blocoCodigo && blocoCodigo[1]) {
-        const jsonLimpo = blocoCodigo[1].trim();
-        console.log('JSON extraído de bloco de código');
-        return JSON.parse(jsonLimpo);
-      }
-      
-      // Busca pela primeira ocorrência de chaves balanceadas
-      let depth = 0;
-      let start = -1;
-      
-      for (let i = 0; i < texto.length; i++) {
-        if (texto[i] === '{') {
-          if (depth === 0) start = i;
-          depth++;
-        } else if (texto[i] === '}') {
-          depth--;
-          if (depth === 0 && start !== -1) {
-            const jsonStr = texto.substring(start, i + 1);
-            console.log('JSON extraído do texto usando análise de profundidade');
-            return JSON.parse(jsonStr);
+    const response = await axios({
+      method: 'post',
+      url: 'https://api.perplexity.ai/chat/completions',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      data: {
+        model: 'sonar',
+        messages: [
+          {
+            role: 'system',
+            content: 'Você é a Tripinha, uma cachorra vira-lata caramelo especialista em viagens da Benetrip. Você usa um tom amigável, alegre e entusiasmado. Você conhece sobre destinos turísticos em todo o mundo e pode recomendar lugares baseados nas preferências dos usuários.'
+          },
+          {
+            role: 'user',
+            content: prompt
+          }
+        ],
+        temperature: 0.7,
+        max_tokens: 4000,
+        response_format: {
+          type: "json_schema",
+          json_schema: {
+            type: "object",
+            properties: {
+              topPick: {
+                type: "object",
+                properties: {
+                  destino: { type: "string" },
+                  pais: { type: "string" },
+                  codigoPais: { type: "string" },
+                  descricao: { type: "string" },
+                  porque: { type: "string" },
+                  destaque: { type: "string" },
+                  comentario: { type: "string" },
+                  preco: {
+                    type: "object",
+                    properties: {
+                      voo: { type: "number" },
+                      hotel: { type: "number" }
+                    }
+                  }
+                }
+              },
+              alternativas: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    destino: { type: "string" },
+                    pais: { type: "string" },
+                    codigoPais: { type: "string" },
+                    porque: { type: "string" },
+                    preco: {
+                      type: "object",
+                      properties: {
+                        voo: { type: "number" },
+                        hotel: { type: "number" }
+                      }
+                    }
+                  }
+                }
+              },
+              surpresa: {
+                type: "object",
+                properties: {
+                  destino: { type: "string" },
+                  pais: { type: "string" },
+                  codigoPais: { type: "string" },
+                  descricao: { type: "string" },
+                  porque: { type: "string" },
+                  destaque: { type: "string" },
+                  comentario: { type: "string" },
+                  preco: {
+                    type: "object",
+                    properties: {
+                      voo: { type: "number" },
+                      hotel: { type: "number" }
+                    }
+                  }
+                }
+              }
+            }
           }
         }
-      }
-      
-      // Último recurso: busca por regex simples
-      const match = texto.match(/(\{[\s\S]*\})/);
-      if (match && match[0]) {
-        const jsonPotencial = match[0];
-        console.log('JSON extraído de texto usando regex');
-        return JSON.parse(jsonPotencial);
-      }
-      
-      throw new Error('Não foi possível extrair JSON válido da resposta');
-    } catch (innerError) {
-      console.error('Erro ao extrair JSON do texto:', innerError);
-      throw new Error('Não foi possível extrair JSON válido da resposta');
+      },
+      timeout: 30000 // 30 segundos
+    });
+    
+    // Retorna diretamente o conteúdo JSON da resposta
+    return response.data.choices[0].message.content;
+  } catch (error) {
+    console.error('Erro na chamada à API Perplexity:', error);
+    if (error.response) {
+      console.error('Resposta de erro:', error.response.data);
     }
+    throw error;
+  }
+}
+
+// Chamar a API da OpenAI como fallback
+async function callOpenAIAPI(prompt) {
+  try {
+    const apiKey = process.env.OPENAI_API_KEY;
+    
+    const response = await axios({
+      method: 'post',
+      url: 'https://api.openai.com/v1/chat/completions',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      data: {
+        model: "gpt-4",
+        messages: [
+          {
+            role: "system",
+            content: "Você é a Tripinha, uma cachorra vira-lata caramelo especialista em viagens da Benetrip."
+          },
+          {
+            role: "user",
+            content: prompt
+          }
+        ],
+        temperature: 0.7,
+        max_tokens: 4000,
+        response_format: { "type": "json_object" }
+      },
+      timeout: 30000
+    });
+    
+    return response.data.choices[0].message.content;
+  } catch (error) {
+    console.error('Erro na chamada à API OpenAI:', error);
+    throw error;
+  }
+}
+
+// Chamar a API do Claude como fallback secundário
+async function callClaudeAPI(prompt) {
+  try {
+    const apiKey = process.env.CLAUDE_API_KEY;
+    
+    const response = await axios({
+      method: 'post',
+      url: 'https://api.anthropic.com/v1/messages',
+      headers: {
+        'anthropic-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'Content-Type': 'application/json'
+      },
+      data: {
+        model: "claude-3-sonnet-20240229",
+        max_tokens: 4000,
+        messages: [
+          {
+            role: "user",
+            content: prompt
+          }
+        ]
+      },
+      timeout: 30000
+    });
+    
+    return response.data.content[0].text;
+  } catch (error) {
+    console.error('Erro na chamada à API Claude:', error);
+    throw error;
   }
 }
 
@@ -374,6 +382,13 @@ function gerarPromptParaDestinos(dados) {
 - Buscando principalmente: ${preferencia}
 - Orçamento para passagens: ${orcamento} ${moeda}
 - Período: ${dataIda} a ${dataVolta}
+
+Você deve usar a internet para pesquisar destinos reais que combinem com essas preferências.
+Forneça destinos relevantes para o perfil do usuário considerando:
+- Atrações que combinam com as preferências indicadas
+- Clima adequado no período de viagem
+- Opções dentro do orçamento mencionado
+- Facilidade de acesso a partir da origem
 
 Forneça EXATAMENTE o seguinte formato JSON, sem texto adicional antes ou depois:
 {
