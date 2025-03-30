@@ -1,4 +1,4 @@
-// api/recommendations.js - Endpoint da API Vercel para recomendações de destinos
+// api/recommendations.js - Endpoint da API Vercel para recomendações de destino
 import axios from 'axios';
 
 export default async function handler(req, res) {
