@@ -1,4 +1,4 @@
-// Serviço de IA para o Benetrip
+// Serviço de IA para o Benetrip - Versão Vercel com Perplexity
 window.BENETRIP_AI = {
   // Configurações do serviço
   config: {
@@ -212,13 +212,12 @@ window.BENETRIP_AI = {
   },
   
   // Método para chamar a API do Vercel
-  async callVercelApi(data) {
+  async callVercelAPI(data) {
     try {
       console.log(`Chamando API Vercel com dados:`, data);
       
-      // URL absoluta da API, com fallback para localhost em desenvolvimento
-      const baseUrl = window.location.origin;
-      const apiUrl = `${baseUrl}/api/recommendations`;
+      // URL absoluta da API
+      const apiUrl = this.config.apiEndpoint;
       
       console.log('Enviando requisição para:', apiUrl);
       
@@ -242,7 +241,7 @@ window.BENETRIP_AI = {
       }
       
       const responseData = await response.json();
-      console.log('Resposta da API Vercel recebida:', responseData.tipo);
+      console.log('Resposta da API Vercel recebida:', responseData.tipo || 'sem tipo');
       
       return responseData;
     } catch (error) {
@@ -306,7 +305,7 @@ window.BENETRIP_AI = {
     console.log(`Progresso: ${fase} ${porcentagem}% - ${mensagem}`);
   },
   
-  // Método para obter recomendações de destinos
+  // Método para obter recomendações de destinos com Perplexity
   async obterRecomendacoes(preferenciasUsuario) {
     if (!this.isInitialized()) {
       this.init();
@@ -336,8 +335,8 @@ window.BENETRIP_AI = {
       // Reportar progresso
       this.reportarProgresso('processando', 30, 'Analisando suas preferências de viagem...');
       
-      // Chamar a API do Vercel
-      const resposta = await this.callVercelApi(preferenciasUsuario);
+      // Chamar a API do Vercel para processamento com Perplexity
+      const resposta = await this.callVercelAPI(preferenciasUsuario);
       
       // Verificar formato da resposta
       if (!resposta || !resposta.conteudo) {
@@ -427,4 +426,4 @@ window.BENETRIP_AI = {
 };
 
 // Inicializar o serviço quando o script for carregado
-window.BENETRIP_AI.init();d
+window.BENETRIP_AI.init();
