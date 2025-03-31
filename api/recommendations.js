@@ -43,13 +43,6 @@ module.exports = async function handler(req, res) {
     console.log('Tipo de dados recebidos:', typeof requestData);
     console.log('Conteúdo parcial:', JSON.stringify(requestData).substring(0, 200) + '...');
     
-    // Se o usuário já tem um destino em mente, retornar informações específicas desse destino
-    if (requestData.conhece_destino === 0 && requestData.destino_conhecido) {
-      // Implementação futura: buscar informações detalhadas sobre o destino conhecido
-      // Por enquanto, vamos seguir com as recomendações gerais
-      console.log('Usuário tem destino em mente:', requestData.destino_conhecido);
-    }
-    
     // Gerar prompt baseado nos dados do usuário
     let prompt;
     try {
@@ -57,7 +50,7 @@ module.exports = async function handler(req, res) {
       console.log('Prompt gerado com sucesso, tamanho:', prompt.length);
     } catch (promptError) {
       console.error('Erro ao gerar prompt:', promptError);
-      prompt = "Recomende destinos de viagem únicos e personalizados. Um destino principal, EXATAMENTE 4 destinos alternativos diferentes entre si, e um destino surpresa diferente dos demais. Seja criativo e evite destinos óbvios ou repetidos. Responda em formato JSON.";
+      prompt = "Recomende destinos de viagem únicos e personalizados para o Brasil e mundo. Um destino principal, 4 destinos alternativos diferentes entre si, e um destino surpresa diferente dos demais. Respeite o orçamento máximo para voos. Seja criativo e evite destinos óbvios ou repetidos. Responda em formato JSON.";
     }
     
     // Tentar múltiplas vezes a consulta à API com diferentes modelos
@@ -73,8 +66,8 @@ module.exports = async function handler(req, res) {
       if (process.env.PERPLEXITY_API_KEY) {
         try {
           console.log('Chamando API Perplexity...');
-          const response = await callPerplexityAPI(prompt);
-          if (response && isValidDestinationJSON(response)) {
+          const response = await callPerplexityAPI(prompt, requestData);
+          if (response && isValidDestinationJSON(response, requestData)) {
             console.log('Resposta Perplexity válida recebida');
             return res.status(200).json({
               tipo: "perplexity",
@@ -93,8 +86,8 @@ module.exports = async function handler(req, res) {
       if (process.env.OPENAI_API_KEY) {
         try {
           console.log('Chamando API OpenAI...');
-          const response = await callOpenAIAPI(prompt);
-          if (response && isValidDestinationJSON(response)) {
+          const response = await callOpenAIAPI(prompt, requestData);
+          if (response && isValidDestinationJSON(response, requestData)) {
             console.log('Resposta OpenAI válida recebida');
             return res.status(200).json({
               tipo: "openai",
@@ -113,8 +106,8 @@ module.exports = async function handler(req, res) {
       if (process.env.CLAUDE_API_KEY) {
         try {
           console.log('Chamando API Claude...');
-          const response = await callClaudeAPI(prompt);
-          if (response && isValidDestinationJSON(response)) {
+          const response = await callClaudeAPI(prompt, requestData);
+          if (response && isValidDestinationJSON(response, requestData)) {
             console.log('Resposta Claude válida recebida');
             return res.status(200).json({
               tipo: "claude",
@@ -131,7 +124,7 @@ module.exports = async function handler(req, res) {
       
       // Se chegamos aqui, todas as tentativas falharam nesta iteração
       // Vamos modificar o prompt para a próxima tentativa para incentivar mais criatividade
-      prompt = `${prompt}\n\nIMPORTANTE: Faça um misto de sugestão de destinos conhecidos e desconhecidos que sejam diferentes, CRIATIVOS e ÚNICOS que sejam ADEQUADOS PARA AS PREFRÊNCIAS indicadas. Forneça EXATAMENTE 4 destinos alternativos. Não mais, não menos.`;
+      prompt = `${prompt}\n\nIMPORTANTE: Sugira destinos TOTALMENTE DIFERENTES, CRIATIVOS e ÚNICOS. NÃO mencione Santiago, Cusco, ou outros destinos comuns. Explore destinos alternativos e menos óbvios que sejam adequados para as preferências indicadas. Você DEVE fornecer EXATAMENTE 4 DESTINOS ALTERNATIVOS. RESPEITE RIGOROSAMENTE o orçamento máximo informado para os voos.`;
     }
     
     // Se todas as tentativas falharam, criar uma resposta de emergência
@@ -163,7 +156,7 @@ module.exports = async function handler(req, res) {
 }
 
 // Chamar a API da Perplexity com melhor tratamento de erros
-async function callPerplexityAPI(prompt) {
+async function callPerplexityAPI(prompt, requestData) {
   try {
     const apiKey = process.env.PERPLEXITY_API_KEY;
     
@@ -173,12 +166,16 @@ async function callPerplexityAPI(prompt) {
     
     console.log('Enviando requisição para Perplexity...');
     
+    // Reforçar a mensagem sobre orçamento
+    const orcamentoMessage = requestData.orcamento_valor ? 
+      `\n5. MUITO IMPORTANTE: O valor de cada voo DEVE ser MENOR que o orçamento máximo de ${requestData.orcamento_valor} ${requestData.moeda_escolhida || 'BRL'}.` : '';
+    
     // Construir instruções claras para não usar formatação markdown
-    const enhancedPrompt = `${prompt}\n\nINSTRUÇÕES FINAIS IMPORTANTES: 
-    1. NÃO inclua blocos de código, marcadores markdown, ou comentários em sua resposta.
+    const enhancedPrompt = `${prompt}\n\nIMPORTANTE: 
+    1. NÃO inclua blocos de código, marcadores markdown, ou comentários em sua resposta. 
     2. Retorne APENAS o JSON puro.
     3. Garanta EXATAMENTE 4 destinos alternativos.
-    4. Verifique se os 6 destinos totais são completamente diferentes entre si.`;
+    4. Verifique se os 6 destinos totais são completamente diferentes entre si.${orcamentoMessage}`;
     
     const response = await axios({
       method: 'post',
@@ -192,7 +189,7 @@ async function callPerplexityAPI(prompt) {
         messages: [
           {
             role: 'system',
-            content: 'Você é um especialista em viagens focado em fornecer recomendações altamente personalizadas. Gere sugestões diferentes uma das outras, criativas e adequadas ao perfil do viajante. Retorne SEMPRE EXATAMENTE 4 destinos alternativos. Retorne APENAS JSON puro, sem marcações ou formatação extra.'
+            content: 'Você é um especialista em viagens focado em fornecer recomendações altamente personalizadas. Evite sugerir destinos populares ou óbvios. Gere sugestões completamente diferentes uma das outras, criativas e adequadas ao perfil do viajante. Respeite rigorosamente o orçamento máximo informado para passagens aéreas. Retorne APENAS JSON puro, sem marcações ou formatação extra. SEMPRE forneça EXATAMENTE 4 destinos alternativos, nem mais nem menos.'
           },
           {
             role: 'user',
@@ -245,7 +242,7 @@ async function callPerplexityAPI(prompt) {
 }
 
 // Chamar a API da OpenAI como alternativa
-async function callOpenAIAPI(prompt) {
+async function callOpenAIAPI(prompt, requestData) {
   try {
     const apiKey = process.env.OPENAI_API_KEY;
     
@@ -255,12 +252,16 @@ async function callOpenAIAPI(prompt) {
     
     console.log('Enviando requisição para OpenAI...');
     
+    // Reforçar a mensagem sobre orçamento
+    const orcamentoMessage = requestData.orcamento_valor ? 
+      `\n5. MUITO IMPORTANTE: O valor de cada voo DEVE ser MENOR que o orçamento máximo de ${requestData.orcamento_valor} ${requestData.moeda_escolhida || 'BRL'}.` : '';
+    
     // Modificar o prompt para pedir explicitamente resposta em JSON
-    const enhancedPrompt = `${prompt}\n\nINSTRUÇÕES FINAIS IMPORTANTES: 
-    1. Sua resposta deve ser exclusivamente um objeto JSON válido sem formatação markdown.
+    const enhancedPrompt = `${prompt}\n\nIMPORTANTE: 
+    1. Sua resposta deve ser exclusivamente um objeto JSON válido sem formatação markdown. 
     2. NÃO inclua blocos de código, comentários ou texto adicional.
     3. Garanta EXATAMENTE 4 destinos alternativos.
-    4. Verifique se os 6 destinos totais são completamente diferentes entre si.`;
+    4. Verifique se os 6 destinos totais são completamente diferentes entre si.${orcamentoMessage}`;
     
     const response = await axios({
       method: 'post',
@@ -274,7 +275,7 @@ async function callOpenAIAPI(prompt) {
         messages: [
           {
             role: "system",
-            content: "Você é um especialista em viagens focado em fornecer recomendações altamente personalizadas e criativas. Gere sugestões completamente diferentes uma das outras e adequadas ao perfil do viajante. Retorne SEMPRE EXATAMENTE 4 destinos alternativos. Retorne APENAS JSON puro, sem formatação extra."
+            content: "Você é um especialista em viagens focado em fornecer recomendações altamente personalizadas e criativas. Evite sugerir destinos populares ou óbvios como Santiago ou Cusco. Gere sugestões completamente diferentes uma das outras e adequadas ao perfil do viajante. SEMPRE forneça EXATAMENTE 4 destinos alternativos, nem mais nem menos. Respeite rigorosamente o orçamento máximo informado para passagens aéreas. Retorne APENAS JSON puro, sem formatação extra."
           },
           {
             role: "user",
@@ -309,7 +310,7 @@ async function callOpenAIAPI(prompt) {
 }
 
 // Chamar a API do Claude como alternativa final
-async function callClaudeAPI(prompt) {
+async function callClaudeAPI(prompt, requestData) {
   try {
     const apiKey = process.env.CLAUDE_API_KEY;
     
@@ -319,11 +320,16 @@ async function callClaudeAPI(prompt) {
     
     console.log('Enviando requisição para Claude...');
     
+    // Reforçar a mensagem sobre orçamento
+    const orcamentoMessage = requestData.orcamento_valor ? 
+      `\n5. MUITO IMPORTANTE: O valor de cada voo DEVE ser MENOR que o orçamento máximo de ${requestData.orcamento_valor} ${requestData.moeda_escolhida || 'BRL'}.` : '';
+    
     // Adicionar instrução específica para o Claude retornar apenas JSON
-    const enhancedPrompt = `${prompt}\n\nINSTRUÇÕES FINAIS IMPORTANTES: 
-    1. Sua resposta deve ser APENAS o objeto JSON válido, sem NENHUM texto adicional, marcação de código, comentários ou explicações.
-    2. Garanta EXATAMENTE 4 destinos alternativos.
-    3. Verifique se os 6 destinos totais são completamente diferentes entre si.`;
+    const enhancedPrompt = `${prompt}\n\nIMPORTANTE: 
+    1. Sua resposta deve ser APENAS o objeto JSON válido, sem NENHUM texto adicional.
+    2. NÃO inclua marcação de código, comentários ou explicações.
+    3. Garanta EXATAMENTE 4 destinos alternativos.
+    4. Verifique se os 6 destinos totais são completamente diferentes entre si.${orcamentoMessage}`;
     
     const response = await axios({
       method: 'post',
@@ -339,7 +345,7 @@ async function callClaudeAPI(prompt) {
         messages: [
           {
             role: "system",
-            content: "Você é um especialista em viagens focado em fornecer recomendações altamente personalizadas e criativas. Gere sugestões completamente diferentes uma das outras e adequadas ao perfil do viajante. Retorne SEMPRE EXATAMENTE 4 destinos alternativos. Retorne APENAS JSON puro."
+            content: "Você é um especialista em viagens focado em fornecer recomendações altamente personalizadas e criativas. Evite sugerir destinos populares ou óbvios como Santiago ou Cusco. Gere sugestões completamente diferentes uma das outras e adequadas ao perfil do viajante. SEMPRE forneça EXATAMENTE 4 destinos alternativos, nem mais nem menos. Respeite rigorosamente o orçamento máximo informado para passagens aéreas. Retorne APENAS JSON puro."
           },
           {
             role: "user",
@@ -435,7 +441,7 @@ function extrairJSONDaResposta(texto) {
 }
 
 // Verifica se o objeto JSON recebido é válido para nosso contexto
-function isValidDestinationJSON(jsonString) {
+function isValidDestinationJSON(jsonString, requestData) {
   if (!jsonString) return false;
   
   try {
@@ -447,7 +453,7 @@ function isValidDestinationJSON(jsonString) {
       return false;
     }
     
-    // MODIFICADO: Verificar se tem exatamente 4 destinos alternativos
+    // Verificar se tem exatamente 4 destinos alternativos
     if (!Array.isArray(data.alternativas) || data.alternativas.length !== 4) {
       console.log(`JSON inválido: array de alternativas deve conter exatamente 4 destinos (contém ${data.alternativas.length})`);
       return false;
@@ -459,7 +465,7 @@ function isValidDestinationJSON(jsonString) {
       return false;
     }
     
-    // NOVO: Verificar se cada alternativa tem os campos necessários
+    // Verificar se cada alternativa tem os campos necessários
     for (let i = 0; i < data.alternativas.length; i++) {
       const alt = data.alternativas[i];
       if (!alt.destino || !alt.pais || !alt.codigoPais || !alt.porque || !alt.preco || 
@@ -487,23 +493,48 @@ function isValidDestinationJSON(jsonString) {
     const repetidos = destinos.filter(d => problemDestinos.includes(d));
     
     if (repetidos.length >= 2) {
-      console.log(`JSON tem destinos problemáticos repetidos: ${repetidos.join(', ')}`);
+      console.log(`JSON inválido: tem destinos problemáticos repetidos: ${repetidos.join(', ')}`);
       return false;
     }
     
     // Verificar se há destinos repetidos em geral
     const destSet = new Set(destinos);
     if (destSet.size < destinos.length) {
-      console.log("JSON tem destinos repetidos");
+      console.log("JSON inválido: tem destinos repetidos");
       return false;
     }
     
-    // NOVO: Verificar diversidade geográfica
+    // Verificar diversidade geográfica
     const paises = data.alternativas.map(alt => alt.pais.toLowerCase());
     const paisesUnicos = new Set(paises);
     if (paisesUnicos.size < 2 && paises.length === 4) {
       console.log("JSON inválido: alternativas não têm diversidade geográfica suficiente");
       return false;
+    }
+    
+    // NOVO: Verificar se os preços respeitam o orçamento (quando fornecido)
+    if (requestData && requestData.orcamento_valor && !isNaN(parseFloat(requestData.orcamento_valor))) {
+      const orcamentoMax = parseFloat(requestData.orcamento_valor);
+      
+      // Verificar destino principal
+      if (data.topPick.preco.voo > orcamentoMax * 1.1) { // Permite 10% de tolerância
+        console.log(`JSON inválido: topPick tem voo acima do orçamento (${data.topPick.preco.voo} > ${orcamentoMax})`);
+        return false;
+      }
+      
+      // Verificar alternativas
+      for (let i = 0; i < data.alternativas.length; i++) {
+        if (data.alternativas[i].preco.voo > orcamentoMax * 1.1) {
+          console.log(`JSON inválido: alternativa ${i+1} tem voo acima do orçamento (${data.alternativas[i].preco.voo} > ${orcamentoMax})`);
+          return false;
+        }
+      }
+      
+      // Verificar surpresa
+      if (data.surpresa.preco.voo > orcamentoMax * 1.2) { // Permite 20% de tolerância para surpresa
+        console.log(`JSON inválido: surpresa tem voo acima do orçamento (${data.surpresa.preco.voo} > ${orcamentoMax})`);
+        return false;
+      }
     }
     
     return true;
@@ -527,6 +558,8 @@ function gerarPromptParaDestinos(dados) {
   
   // Extrair qualquer informação adicional importante
   const conheceDestino = dados.conhece_destino || 0;
+  const tipoDestino = dados.tipo_destino || 'qualquer';
+  const famaDestino = dados.fama_destino || 'qualquer';
   
   // Datas de viagem com verificação de formato
   let dataIda = 'não especificada';
@@ -557,7 +590,7 @@ function gerarPromptParaDestinos(dados) {
     console.log("Erro ao calcular duração da viagem:", e);
   }
 
-  // NOVO: Determinar estação do ano baseada na data de ida
+  // Determinar estação do ano baseada na data de ida
   let estacaoViagem = 'não determinada';
   let hemisferio = 'norte'; // Padrão para simplificar
   
@@ -592,17 +625,22 @@ PERFIL DO VIAJANTE:
 - Viajando: ${companhia}
 - Número de pessoas: ${quantidadePessoas}
 - Atividades preferidas: ${preferencia}
-- Orçamento por pessoa: ${orcamento} ${moeda}
+- Orçamento máximo para voos (ida e volta por pessoa): ${orcamento} ${moeda}
 - Período da viagem: ${dataIda} a ${dataVolta} (${duracaoViagem})
 - Estação do ano na viagem: ${estacaoViagem}
 - Experiência como viajante: ${conheceDestino === 1 ? 'Com experiência' : 'Iniciante'} 
+- Preferência por destinos: ${getTipoDestinoText(tipoDestino)}
+- Popularidade do destino: ${getFamaDestinoText(famaDestino)}
 
 IMPORTANTE:
 1. Sugira destinos DIVERSIFICADOS e CRIATIVOS que combinem bem com o perfil.
-2. Destinos DEVEM ser DIFERENTES entre si.
-3. Forneça EXATAMENTE 4 DESTINOS ALTERNATIVOS diferentes entre si.
-4. O destino principal, os 4 alternativos e a surpresa DEVEM ser locais DISTINTOS.
-5. Considere a ÉPOCA DO ANO (${estacaoViagem}) para sugerir destinos com clima adequado.
+2. NÃO sugira Santiago, Cusco, Buenos Aires ou Montevidéu.
+3. Destinos DEVEM ser DIFERENTES entre si.
+4. Forneça EXATAMENTE 4 DESTINOS ALTERNATIVOS diferentes entre si.
+5. O destino principal, os 4 alternativos e a surpresa DEVEM ser locais DISTINTOS.
+6. Considere a ÉPOCA DO ANO (${estacaoViagem}) para sugerir destinos com clima adequado.
+7. Tente incluir destinos de continentes diferentes nas alternativas.
+8. Respeite RIGOROSAMENTE o orçamento informado. O valor "voo" em TODAS as recomendações DEVE ser menor ou igual ao orçamento máximo fornecido.
 
 Forneça no formato JSON exato abaixo, SEM formatação markdown:
 {
@@ -709,12 +747,46 @@ function getPreferenciaText(value) {
   return options[value] || "experiências diversificadas de viagem";
 }
 
+// Função auxiliar para obter texto de tipo de destino
+function getTipoDestinoText(value) {
+  // Converter para número se for string
+  if (typeof value === 'string') {
+    value = parseInt(value, 10);
+  }
+  
+  const options = {
+    0: "nacional",
+    1: "internacional",
+    2: "qualquer (nacional ou internacional)"
+  };
+  return options[value] || "qualquer";
+}
+
+// Função auxiliar para obter texto de fama do destino
+function getFamaDestinoText(value) {
+  // Converter para número se for string
+  if (typeof value === 'string') {
+    value = parseInt(value, 10);
+  }
+  
+  const options = {
+    0: "famoso e turístico",
+    1: "fora do circuito turístico comum",
+    2: "mistura de ambos"
+  };
+  return options[value] || "qualquer";
+}
+
 // Função para gerar dados de emergência personalizados baseados no perfil
 function generateEmergencyData(dadosUsuario = {}) {
   // Determinar o tipo de destino baseado nas preferências
   const preferencia = dadosUsuario.preferencia_viagem || 0;
   const companhia = dadosUsuario.companhia || 0;
   const quantidadePessoas = dadosUsuario.quantidade_familia || dadosUsuario.quantidade_amigos || 1;
+  
+  // Extrair orçamento para ajustar preços de emergência
+  const orcamento = dadosUsuario.orcamento_valor ? parseFloat(dadosUsuario.orcamento_valor) : null;
+  const orçamentoFator = orcamento ? Math.min(orcamento / 2000, 1.5) : 1;
   
   // Vamos ter alguns conjuntos de destinos por tipo de viagem
   const destinosPorPreferencia = {
@@ -729,7 +801,7 @@ function generateEmergencyData(dadosUsuario = {}) {
           porque: "Combinação perfeita de praias paradisíacas e ambiente relaxado",
           destaque: "Pôr do sol na Duna do Pôr do Sol com show de capoeira",
           comentario: "Au au! Jeri tem dunas INCRÍVEIS para cavar e praias sem fim para correr! E aquelas redes dentro d'água? Paraíso canino!",
-          preco: { voo: 1200, hotel: 280 }
+          preco: { voo: Math.round(1200 * orçamentoFator), hotel: 280 }
         },
         alternativas: [
           {
@@ -737,28 +809,28 @@ function generateEmergencyData(dadosUsuario = {}) {
             pais: "Brasil",
             codigoPais: "BR",
             porque: "As 'piscinas naturais' garantem relaxamento total em águas cristalinas",
-            preco: { voo: 1100, hotel: 250 }
+            preco: { voo: Math.round(1100 * orçamentoFator), hotel: 250 }
           },
           {
             destino: "Ilhabela",
             pais: "Brasil",
             codigoPais: "BR",
             porque: "Combina praias tranquilas com natureza exuberante, perfeito para descanso",
-            preco: { voo: 900, hotel: 320 }
+            preco: { voo: Math.round(900 * orçamentoFator), hotel: 320 }
           },
           {
             destino: "Punta Cana",
             pais: "República Dominicana",
             codigoPais: "DO",
             porque: "Resorts all-inclusive em praias de areia branca com coqueiros",
-            preco: { voo: 2800, hotel: 480 }
+            preco: { voo: Math.round(2800 * orçamentoFator), hotel: 480 }
           },
           {
             destino: "Maldivas",
             pais: "Maldivas",
             codigoPais: "MV",
             porque: "A definição de paraíso com bangalôs sobre águas cristalinas",
-            preco: { voo: 5200, hotel: 950 }
+            preco: { voo: Math.round(5200 * orçamentoFator), hotel: 950 }
           }
         ],
         surpresa: {
@@ -769,7 +841,7 @@ function generateEmergencyData(dadosUsuario = {}) {
           porque: "Combina praias espetaculares com uma cultura fascinante e pouco explorada pelos brasileiros",
           destaque: "Tour de especiarias nas fazendas históricas seguido de jantar na praia",
           comentario: "Zanzibar é um tesouro escondido que você nem imaginava! Praias de cinema, povo acolhedor e uma história cheia de mistérios! Au au de alegria só de pensar! 🐾🌴",
-          preco: { voo: 4200, hotel: 300 }
+          preco: { voo: Math.round(4200 * orçamentoFator), hotel: 300 }
         }
       }
     ],
@@ -784,7 +856,7 @@ function generateEmergencyData(dadosUsuario = {}) {
           porque: "Oferece aventura em trilhas na Amazônia e esportes aquáticos nos rios cristalinos",
           destaque: "Passeio de barco até a Ilha do Amor e trilha na Floresta Nacional do Tapajós",
           comentario: "Alter do Chão tem TANTOS cheiros incríveis para farejar na floresta! E aquela água clarinha pra nadar? Patas para cima, melhor aventura ever! 🐾🌳",
-          preco: { voo: 1400, hotel: 180 }
+          preco: { voo: Math.round(1400 * orçamentoFator), hotel: 180 }
         },
         alternativas: [
           {
@@ -792,28 +864,28 @@ function generateEmergencyData(dadosUsuario = {}) {
             pais: "Brasil",
             codigoPais: "BR",
             porque: "Aventura entre dunas e lagoas de água doce em paisagem única no mundo",
-            preco: { voo: 1300, hotel: 220 }
+            preco: { voo: Math.round(1300 * orçamentoFator), hotel: 220 }
           },
           {
             destino: "Chapada dos Veadeiros",
             pais: "Brasil",
             codigoPais: "BR",
             porque: "Trilhas desafiadoras levam a cachoeiras espetaculares e cânions",
-            preco: { voo: 950, hotel: 170 }
+            preco: { voo: Math.round(950 * orçamentoFator), hotel: 170 }
           },
           {
             destino: "Queenstown",
             pais: "Nova Zelândia",
             codigoPais: "NZ",
             porque: "Capital mundial dos esportes radicais com bungee jump e rafting",
-            preco: { voo: 6800, hotel: 340 }
+            preco: { voo: Math.round(6800 * orçamentoFator), hotel: 340 }
           },
           {
             destino: "San Gil",
             pais: "Colômbia",
             codigoPais: "CO",
             porque: "Destino emergente para esportes radicais com rafting, parapente e mountain bike",
-            preco: { voo: 2100, hotel: 150 }
+            preco: { voo: Math.round(2100 * orçamentoFator), hotel: 150 }
           }
         ],
         surpresa: {
@@ -824,7 +896,7 @@ function generateEmergencyData(dadosUsuario = {}) {
           porque: "Combina aventura selvagem com os dragões e mergulho em alguns dos corais mais preservados do mundo",
           destaque: "Trekking guiado para observar os dragões de Komodo em seu habitat natural",
           comentario: "Uau! Komodo tem LAGARTOS GIGANTES! Eu ficaria latindo de longe, mas você vai amar! E os peixes coloridos? O paraíso existe, e é aqui! 🐾🦎",
-          preco: { voo: 5500, hotel: 260 }
+          preco: { voo: Math.round(5500 * orçamentoFator), hotel: 260 }
         }
       }
     ],
@@ -839,7 +911,7 @@ function generateEmergencyData(dadosUsuario = {}) {
           porque: "Imersão profunda na cultura afro-brasileira com arquitetura colonial preservada",
           destaque: "Aula de percussão com mestres locais seguida de jantar de comida baiana tradicional",
           comentario: "Salvador tem TANTOS cheiros de comida boa e música que faz até cachorro querer sambar! O Pelourinho é demais para passear e farejar história! 🐾🥁",
-          preco: { voo: 1100, hotel: 220 }
+          preco: { voo: Math.round(1100 * orçamentoFator), hotel: 220 }
         },
         alternativas: [
           {
@@ -847,28 +919,28 @@ function generateEmergencyData(dadosUsuario = {}) {
             pais: "Brasil",
             codigoPais: "BR",
             porque: "Joia do barroco brasileiro com igrejas históricas e gastronomia mineira",
-            preco: { voo: 950, hotel: 190 }
+            preco: { voo: Math.round(950 * orçamentoFator), hotel: 190 }
           },
           {
             destino: "Quioto",
             pais: "Japão",
             codigoPais: "JP",
             porque: "Templos milenares e tradições vivas da cultura japonesa",
-            preco: { voo: 5900, hotel: 310 }
+            preco: { voo: Math.round(5900 * orçamentoFator), hotel: 310 }
           },
           {
             destino: "Istambul",
             pais: "Turquia",
             codigoPais: "TR",
             porque: "Encontro entre Oriente e Ocidente com bazaars, mesquitas e palácios históricos",
-            preco: { voo: 4200, hotel: 270 }
+            preco: { voo: Math.round(4200 * orçamentoFator), hotel: 270 }
           },
           {
             destino: "Cartagena",
             pais: "Colômbia",
             codigoPais: "CO",
             porque: "Cidade colonial cercada por muralhas com rica herança cultural afro-caribenha",
-            preco: { voo: 1900, hotel: 230 }
+            preco: { voo: Math.round(1900 * orçamentoFator), hotel: 230 }
           }
         ],
         surpresa: {
@@ -879,7 +951,7 @@ function generateEmergencyData(dadosUsuario = {}) {
           porque: "Experiência cultural profunda em um dos destinos mais autênticos e menos turísticos do Sudeste Asiático",
           destaque: "Cerimônia do Tak Bat, onde centenas de monges coletam oferendas ao amanhecer",
           comentario: "Luang Prabang tem monges de túnicas laranja e comida TÃO cheirosa nos mercados! Fiquei sentada comportada vendo os monges passarem! Quase ganhei petiscos! 🐾🏮",
-          preco: { voo: 4900, hotel: 180 }
+          preco: { voo: Math.round(4900 * orçamentoFator), hotel: 180 }
         }
       }
     ],
@@ -894,7 +966,7 @@ function generateEmergencyData(dadosUsuario = {}) {
           porque: "Oferece diversidade gastronômica imbatível e compras de classe mundial",
           destaque: "Tour gastronômico pelos bares da Vila Madalena seguido de balada premium",
           comentario: "São Paulo tem TANTOS cheiros diferentes e restaurantes pet friendly! Tem até sorveteria para cachorro! Amo passear na Paulista aos domingos! 🐾🌆",
-          preco: { voo: 800, hotel: 280 }
+          preco: { voo: Math.round(800 * orçamentoFator), hotel: 280 }
         },
         alternativas: [
           {
@@ -902,28 +974,28 @@ function generateEmergencyData(dadosUsuario = {}) {
             pais: "Emirados Árabes Unidos",
             codigoPais: "AE",
             porque: "Shopping de luxo, arquitetura futurista e experiências urbanas exclusivas",
-            preco: { voo: 4800, hotel: 520 }
+            preco: { voo: Math.round(4800 * orçamentoFator), hotel: 520 }
           },
           {
             destino: "Tóquio",
             pais: "Japão",
             codigoPais: "JP",
             porque: "Mistura de tradição e futuro com tecnologia, moda e gastronomia de ponta",
-            preco: { voo: 5700, hotel: 380 }
+            preco: { voo: Math.round(5700 * orçamentoFator), hotel: 380 }
           },
           {
             destino: "Nova York",
             pais: "Estados Unidos",
             codigoPais: "US",
             porque: "A capital cultural do mundo com teatros, museus, compras e vida noturna",
-            preco: { voo: 3900, hotel: 450 }
+            preco: { voo: Math.round(3900 * orçamentoFator), hotel: 450 }
           },
           {
             destino: "Cidade do México",
             pais: "México",
             codigoPais: "MX",
             porque: "Metrópole vibrante com fusão entre cultura histórica e modernidade",
-            preco: { voo: 2800, hotel: 260 }
+            preco: { voo: Math.round(2800 * orçamentoFator), hotel: 260 }
           }
         ],
         surpresa: {
@@ -934,7 +1006,7 @@ function generateEmergencyData(dadosUsuario = {}) {
           porque: "Surpreende com sua cena cultural vibrante, clubes de classe mundial e contrastes arquitetônicos",
           destaque: "Jantar nos restaurantes badalados de Mar Mikhael seguido de clubes premiados",
           comentario: "Beirute é INCRÍVEL! Tanta comida cheirosa, música alta e pessoas que adoram fazer carinho em cachorros! A vida noturna é au au de primeira! 🐾🌙",
-          preco: { voo: 4100, hotel: 290 }
+          preco: { voo: Math.round(4100 * orçamentoFator), hotel: 290 }
         }
       }
     ]
@@ -946,8 +1018,9 @@ function generateEmergencyData(dadosUsuario = {}) {
   
   // Reordenar alternativas para evitar sempre as mesmas posições
   const resultado = {...conjuntoPreferencia[indiceAleatorio]};
+  resultado.alternativas = embaralharArray([...resultado.alternativas]);
   
-  // MODIFICADO: Garantir exatamente 4 alternativas
+  // Garantir exatamente 4 alternativas
   if (resultado.alternativas.length < 4) {
     // Adicionar destinos adicionais genéricos se necessário
     const destinosExtras = [
@@ -956,28 +1029,28 @@ function generateEmergencyData(dadosUsuario = {}) {
         pais: "Áustria",
         codigoPais: "AT",
         porque: "Combinação de cultura, arquitetura histórica e gastronomia refinada",
-        preco: { voo: 3800, hotel: 280 }
+        preco: { voo: Math.round(3800 * orçamentoFator), hotel: 280 }
       },
       {
         destino: "Chiang Mai",
         pais: "Tailândia",
         codigoPais: "TH",
         porque: "Experiência cultural autêntica com templos antigos e culinária local",
-        preco: { voo: 4200, hotel: 150 }
+        preco: { voo: Math.round(4200 * orçamentoFator), hotel: 150 }
       },
       {
         destino: "Vancouver",
         pais: "Canadá", 
         codigoPais: "CA",
         porque: "Equilíbrio perfeito entre natureza e vida urbana moderna",
-        preco: { voo: 3600, hotel: 320 }
+        preco: { voo: Math.round(3600 * orçamentoFator), hotel: 320 }
       },
       {
         destino: "Porto",
         pais: "Portugal",
         codigoPais: "PT",
         porque: "Charme histórico, gastronomia rica e cenário para fotos incríveis",
-        preco: { voo: 3100, hotel: 190 }
+        preco: { voo: Math.round(3100 * orçamentoFator), hotel: 190 }
       }
     ];
     
@@ -990,7 +1063,25 @@ function generateEmergencyData(dadosUsuario = {}) {
     resultado.alternativas = resultado.alternativas.slice(0, 4);
   }
   
-  resultado.alternativas = embaralharArray([...resultado.alternativas]);
+  // Se temos um orçamento definido, garantir que todos os destinos estejam abaixo dele
+  if (orcamento) {
+    // Ajustar preço do destino principal se necessário
+    if (resultado.topPick.preco.voo > orcamento) {
+      resultado.topPick.preco.voo = Math.round(orcamento * 0.9); // 90% do orçamento
+    }
+    
+    // Ajustar preços das alternativas
+    resultado.alternativas.forEach(alt => {
+      if (alt.preco.voo > orcamento) {
+        alt.preco.voo = Math.round(orcamento * (0.7 + Math.random() * 0.2)); // 70-90% do orçamento
+      }
+    });
+    
+    // Ajustar preço do destino surpresa
+    if (resultado.surpresa.preco.voo > orcamento) {
+      resultado.surpresa.preco.voo = Math.round(orcamento * 0.95); // 95% do orçamento
+    }
+  }
   
   return resultado;
 }
