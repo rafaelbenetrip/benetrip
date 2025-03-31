@@ -1,49 +1,6 @@
 {
-  "version": 2,
-  "builds": [
-    { 
-      "src": "api/**/*.js", 
-      "use": "@vercel/node" 
-    },
-    { 
-      "src": "public/**/*", 
-      "use": "@vercel/static" 
-    }
-  ],
-  "routes": [
-    { 
-      "src": "/api/(.*)", 
-      "dest": "/api/$1" 
-    },
-    { 
-      "src": "/test-api",
-      "dest": "/public/test-api.html"
-    },
-    { 
-      "src": "/test-api.html",
-      "dest": "/public/test-api.html"
-    },
-    {
-      "src": "/(.*\\.(js|css|jpg|jpeg|png|gif|ico|svg))",
-      "dest": "/public/$1"
-    },
-    {
-      "src": "/(assets|images|css|js)/(.*)",
-      "dest": "/public/$1/$2"
-    },
-    { 
-      "src": "/(.*)", 
-      "dest": "/public/$1" 
-    }
-  ],
-  "env": {
-    "OPENAI_API_KEY": "@openai_api_key",
-    "CLAUDE_API_KEY": "@claude_api_key",
-    "PERPLEXITY_API_KEY": "@perplexity_api_key",
-    "PEXELS_API_KEY": "@pexels_api_key",
-    "UNSPLASH_ACCESS_KEY": "@unsplash_access_key",
-    "AVIASALES_TOKEN": "@aviasales_token",
-    "AVIASALES_MARKER": "@aviasales_marker",
-    "HOST": "benetrip.vercel.app"
-  }
+  "framework": null,
+  "buildCommand": null,
+  "outputDirectory": "public",
+  "installCommand": null
 }
