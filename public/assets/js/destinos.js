@@ -884,3 +884,71 @@ BENETRIP.Destinos = (function() {
     // Mover o foco para o modal para leitores de tela
     DOM.modalContainer.setAttribute('aria-hidden', 'false');
   }
+  
+  // Retornar a API pública
+  return publicAPI;
+})();
+
+// Inicializar estilos CSS adicionais
+(function() {
+  // Adiciona estilos para os containers de imagens e créditos
+  const style = document.createElement('style');
+  style.textContent = `
+    .image-container {
+      position: relative;
+      overflow: hidden;
+    }
+    .image-credit {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background-color: rgba(0, 0, 0, 0.6);
+      color: white;
+      font-size: 0.7rem;
+      padding: 2px 5px;
+      text-align: right;
+      opacity: 0;
+      transition: opacity 0.2s ease;
+    }
+    .image-container:hover .image-credit {
+      opacity: 1;
+    }
+    .image-credit a {
+      color: #fff;
+      text-decoration: underline;
+    }
+    .zoom-icon {
+      position: absolute;
+      top: 5px;
+      right: 5px;
+      background-color: rgba(0, 0, 0, 0.5);
+      color: white;
+      border-radius: 50%;
+      padding: 3px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      transition: opacity 0.2s ease;
+    }
+    .image-container:hover .zoom-icon {
+      opacity: 1;
+    }
+    .fade-in {
+      animation: fadeIn 0.5s ease-in-out;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+  `;
+  
+  document.head.appendChild(style);
+})();
+
+// Inicializar o módulo quando o DOM estiver pronto
+document.addEventListener('DOMContentLoaded', function() {
+  // Inicializar o módulo de destinos
+  BENETRIP.Destinos.init();
+});
