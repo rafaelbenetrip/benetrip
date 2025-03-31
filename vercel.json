@@ -1,17 +1,15 @@
 {
   "version": 2,
-  "builds": [
-    {
-      "src": "api/*.js",
-      "use": "@vercel/node"
-    },
-    {
-      "src": "public/**/*",
-      "use": "@vercel/static"
-    }
-  ],
   "functions": {
-    "api/*.js": {
+    "api/recommendations.js": {
+      "memory": 1024,
+      "maxDuration": 60
+    },
+    "api/flight-search.js": {
+      "memory": 1024,
+      "maxDuration": 60
+    },
+    "api/image-search.js": {
       "memory": 1024,
       "maxDuration": 60
     }
