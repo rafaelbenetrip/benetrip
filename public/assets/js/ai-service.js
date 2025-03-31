@@ -2,7 +2,6 @@
 window.BENETRIP_AI = {
   // Configurações do serviço
   config: {
-    cacheDuration: 24 * 60 * 60 * 1000, // 24 horas em ms
     apiEndpoint: '/api/recommendations', // Endpoint Vercel
     apiTimeout: 30000, // 30 segundos de timeout
     maxRetries: 2, // Número máximo de tentativas em caso de falha
@@ -79,21 +78,12 @@ window.BENETRIP_AI = {
     }
   },
   
-  // Sistema de cache para evitar chamadas repetidas à API
-  cache: {
-    recommendations: {},
-    timestamp: {}
-  },
-  
   // Inicialização do serviço
   init() {
     console.log('Inicializando serviço de IA do Benetrip');
     this.initialized = true;
     this._ultimaRequisicao = null;
     this._requestsInProgress = {};
-    
-    // Carregar cache salvo
-    this.loadCacheFromStorage();
     
     // Registrar listener para eventos de progresso
     window.addEventListener('benetrip_progress', (event) => {
@@ -108,54 +98,15 @@ window.BENETRIP_AI = {
     return this.initialized === true;
   },
 
-  // Carrega cache do localStorage
-  loadCacheFromStorage() {
-    try {
-      const cachedData = localStorage.getItem('benetrip_ai_cache');
-      if (cachedData) {
-        const parsed = JSON.parse(cachedData);
-        this.cache = {...parsed};
-        console.log("Cache de IA carregado: ", Object.keys(this.cache.recommendations).length, "recomendações");
-      }
-    } catch (error) {
-      console.warn("Erro ao carregar cache de IA:", error);
-      // Inicializar cache vazio em caso de erro
-      this.cache = {
-        recommendations: {},
-        timestamp: {}
-      };
-    }
-  },
-  
-  // Salva cache no localStorage
-  saveCacheToStorage() {
-    try {
-      localStorage.setItem('benetrip_ai_cache', JSON.stringify(this.cache));
-    } catch (error) {
-      console.warn("Erro ao salvar cache de IA:", error);
-    }
-  },
-  
-  // Gera um ID de cache baseado nas preferências
-  generateCacheId(preferences) {
-    // Extrair valores relevantes para formar uma chave de cache
+  // Gera um ID de requisição baseado nas preferências
+  generateRequestId(preferences) {
+    // Extrair valores relevantes para formar uma chave de identificação
     const companhia = preferences.companhia || '0';
     const preferencia = preferences.preferencia_viagem || '0';
     const moeda = preferences.moeda_escolhida || 'BRL';
     const origem = preferences.cidade_partida?.name || 'default';
     
     return `${origem}_${companhia}_${preferencia}_${moeda}`;
-  },
-  
-  // Verifica se há dados em cache válidos
-  hasCachedData(cacheId) {
-    if (!this.cache.recommendations[cacheId]) return false;
-    
-    const cacheTime = this.cache.timestamp[cacheId] || 0;
-    const now = Date.now();
-    
-    // Verifica se o cache ainda é válido
-    return (now - cacheTime) < this.config.cacheDuration;
   },
   
   // Método para extrair JSON de texto, lidando com diferentes formatos
@@ -387,28 +338,21 @@ window.BENETRIP_AI = {
     
     console.log('Recebendo pedido de recomendações com preferências:', preferenciasUsuario);
     
-    // Gerar chave de cache
-    const cacheKey = this.generateCacheId(preferenciasUsuario);
+    // Gerar ID para rastrear requisições duplicadas
+    const requestId = this.generateRequestId(preferenciasUsuario);
     
-    // Evitar chamadas duplicadas para o mesmo cacheKey
-    if (this._requestsInProgress[cacheKey]) {
-      console.log('Requisição já em andamento para:', cacheKey);
+    // Evitar chamadas duplicadas para o mesmo requestId
+    if (this._requestsInProgress[requestId]) {
+      console.log('Requisição já em andamento para:', requestId);
       this.reportarProgresso('aguardando', 50, 'Aguardando requisição em andamento...');
       
       // Aguardar a requisição em andamento ser concluída
       try {
-        return await this._requestsInProgress[cacheKey];
+        return await this._requestsInProgress[requestId];
       } catch (error) {
         console.error('Erro na requisição em andamento:', error);
         // Continuar com uma nova requisição
       }
-    }
-    
-    // Verificar cache
-    if (this.hasCachedData(cacheKey)) {
-      console.log('Usando recomendações em cache para:', cacheKey);
-      this.reportarProgresso('cache', 100, 'Usando recomendações armazenadas para você...');
-      return this.cache.recommendations[cacheKey];
     }
     
     // Criar uma promise para esta requisição e armazená-la
@@ -487,48 +431,31 @@ window.BENETRIP_AI = {
         // Reportar progresso final
         this.reportarProgresso('concluido', 100, 'Destinos encontrados!');
         
-        // Armazenar no cache
-        this.cache.recommendations[cacheKey] = recomendacoes;
-        this.cache.timestamp[cacheKey] = Date.now();
-        this.saveCacheToStorage();
-        
-        // Salvar no localStorage para uso em outras páginas também
+        // Salvar no localStorage apenas para uso em outras páginas se necessário
         localStorage.setItem('benetrip_recomendacoes', JSON.stringify(recomendacoes));
         
         return recomendacoes;
       } catch (erro) {
         console.error('Erro ao obter recomendações:', erro);
         
-        // Tentar usar cache mesmo que seja antigo
-        if (this.cache.recommendations[cacheKey]) {
-          console.warn('Usando cache de emergência devido a erro');
-          this.reportarProgresso('cache-emergencia', 100, 'Usando recomendações armazenadas (emergência)...');
-          return this.cache.recommendations[cacheKey];
-        }
-        
-        // Se não tiver cache, usar dados mockados
-        console.log('Usando dados mockados devido a erro e falta de cache');
+        // Usar dados mockados em caso de erro
+        console.log('Usando dados mockados devido a erro');
         this.reportarProgresso('mockados', 100, 'Usando recomendações padrão devido a erro...');
         
         const dadosMockados = {...this.config.mockData};
         
-        // Armazenar no cache para futuras requisições
-        this.cache.recommendations[cacheKey] = dadosMockados;
-        this.cache.timestamp[cacheKey] = Date.now();
-        this.saveCacheToStorage();
-        
-        // Salvar no localStorage para uso em outras páginas também
+        // Salvar no localStorage para uso em outras páginas se necessário
         localStorage.setItem('benetrip_recomendacoes', JSON.stringify(dadosMockados));
         
         return dadosMockados;
       } finally {
         // Remover a promise em andamento quando terminar
-        delete this._requestsInProgress[cacheKey];
+        delete this._requestsInProgress[requestId];
       }
     })();
     
     // Armazenar a promise para evitar chamadas duplicadas
-    this._requestsInProgress[cacheKey] = requestPromise;
+    this._requestsInProgress[requestId] = requestPromise;
     
     return requestPromise;
   }
