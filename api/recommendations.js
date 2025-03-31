@@ -2,9 +2,7 @@
 import axios from 'axios';
 
 export default async function handler(req, res) {
-  console.log('Recebendo requisição na API recommendations!');
-  
-  // Configurar cabeçalhos CORS
+  // Configuração de CORS para qualquer origem
   res.setHeader('Access-Control-Allow-Credentials', true);
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,POST');
@@ -20,18 +18,27 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "Método não permitido" });
   }
 
+  // Criar um wrapper global para toda a lógica
   try {
-    // Log para debugging
-    console.log('Processando requisição para recomendações no Vercel');
-    
-    // Extrair dados da requisição
-    const requestData = req.body;
-    console.log('Dados recebidos:', JSON.stringify(requestData).substring(0, 200) + '...');
-    
-    // Verificar se temos informações suficientes
-    if (!requestData) {
-      throw new Error("Dados de preferências não fornecidos");
+    // Verificar se existe corpo na requisição
+    if (!req.body) {
+      console.error('Corpo da requisição vazio');
+      return res.status(400).json({ error: "Nenhum dado fornecido na requisição" });
     }
+    
+    // Extrair dados da requisição com verificação extra
+    let requestData;
+    try {
+      requestData = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
+      console.log('Dados recebidos processados com sucesso');
+    } catch (parseError) {
+      console.error('Erro ao processar corpo da requisição:', parseError);
+      return res.status(400).json({ error: "Formato de dados inválido", details: parseError.message });
+    }
+    
+    // Verificação adicional de dados
+    console.log('Tipo de dados recebidos:', typeof requestData);
+    console.log('Conteúdo parcial:', JSON.stringify(requestData).substring(0, 200) + '...');
     
     // Dados mockados para fallback em caso de erro
     const mockData = {
@@ -106,20 +113,31 @@ export default async function handler(req, res) {
     };
     
     // Gerar prompt baseado nos dados do usuário
-    const prompt = gerarPromptParaDestinos(requestData);
-    
-    // Chamar a API Perplexity
+    let prompt;
     try {
-      console.log('Usando Perplexity para recomendações');
-      
+      prompt = gerarPromptParaDestinos(requestData);
+      console.log('Prompt gerado com sucesso, tamanho:', prompt.length);
+    } catch (promptError) {
+      console.error('Erro ao gerar prompt:', promptError);
+      prompt = "Recomende destinos de viagem para um usuário. Forneça um destino principal, 4 alternativas e um destino surpresa. Responda em formato JSON.";
+    }
+    
+    // Chamar a API Perplexity com verificação de ambiente
+    try {
       // Verificar se API key da Perplexity está configurada
       if (!process.env.PERPLEXITY_API_KEY) {
+        console.warn('PERPLEXITY_API_KEY não configurada, tentando alternativas');
         throw new Error('PERPLEXITY_API_KEY não configurada');
       }
       
+      console.log('Chamando API Perplexity...');
       const perplexityResponse = await callPerplexityAPI(prompt);
+      console.log('Resposta Perplexity recebida com sucesso');
       
-      console.log('Resposta recebida da Perplexity');
+      // Verificar se a resposta é válida
+      if (!perplexityResponse) {
+        throw new Error('Resposta vazia da Perplexity');
+      }
       
       // Retornar a resposta formatada
       return res.status(200).json({
@@ -127,21 +145,23 @@ export default async function handler(req, res) {
         conteudo: perplexityResponse
       });
     } catch (perplexityError) {
-      console.error('Erro ao usar Perplexity:', perplexityError);
+      console.error('Erro ao usar Perplexity:', perplexityError.message);
       
-      // Tentar outros modelos como fallback se disponíveis
+      // Tentar outros modelos como fallback com verificação de ambiente
       try {
         let fallbackResponse = null;
         
         // Tentar OpenAI como fallback se configurada
         if (process.env.OPENAI_API_KEY) {
-          console.log('Tentando OpenAI como fallback');
+          console.log('Tentando OpenAI como fallback...');
           fallbackResponse = await callOpenAIAPI(prompt);
+          console.log('Resposta OpenAI recebida com sucesso');
         } 
         // Tentar Claude como segundo fallback
         else if (process.env.CLAUDE_API_KEY) {
-          console.log('Tentando Claude como fallback');
+          console.log('Tentando Claude como fallback...');
           fallbackResponse = await callClaudeAPI(prompt);
+          console.log('Resposta Claude recebida com sucesso');
         }
         
         if (fallbackResponse) {
@@ -153,9 +173,10 @@ export default async function handler(req, res) {
           throw new Error('Nenhum serviço de IA disponível');
         }
       } catch (fallbackError) {
-        console.error('Erro ao usar serviços de fallback:', fallbackError);
+        console.error('Erro ao usar serviços de fallback:', fallbackError.message);
         
         // Retornar dados mockados se nenhum serviço estiver disponível
+        console.log('Retornando dados mockados devido a falhas em todos os serviços');
         return res.status(200).json({
           tipo: "mockado",
           conteudo: JSON.stringify(mockData)
@@ -163,20 +184,102 @@ export default async function handler(req, res) {
       }
     }
     
-  } catch (error) {
-    console.error('Erro na API de recomendações Vercel:', error);
+  } catch (globalError) {
+    // Captura qualquer erro não tratado para evitar o 500
+    console.error('Erro global na API de recomendações:', globalError);
     
-    return res.status(500).json({ 
-      error: "Erro ao processar solicitação de IA",
-      message: error.message
+    // Retornar resposta de erro com detalhes
+    return res.status(200).json({ 
+      tipo: "erro",
+      conteudo: JSON.stringify({
+        error: "Erro no processamento",
+        message: globalError.message,
+        // Dados mockados como fallback de emergência
+        data: {
+          "topPick": {
+            "destino": "Medellín",
+            "pais": "Colômbia",
+            "codigoPais": "CO",
+            "descricao": "Cidade da eterna primavera com clima perfeito o ano todo",
+            "porque": "Clima primaveril o ano todo com paisagens montanhosas deslumbrantes",
+            "destaque": "Passeio de teleférico, Comuna 13 e fazendas de café próximas",
+            "comentario": "Eu simplesmente AMEI Medellín! É perfeito para quem busca um mix de cultura e natureza! 🐾",
+            "preco": {
+              "voo": 1800,
+              "hotel": 350
+            }
+          },
+          "alternativas": [
+            {
+              "destino": "Montevidéu",
+              "pais": "Uruguai",
+              "codigoPais": "UY",
+              "porque": "Clima costeiro tranquilo com frutos do mar deliciosos e espaços culturais",
+              "preco": {
+                "voo": 1500,
+                "hotel": 300
+              }
+            },
+            {
+              "destino": "Buenos Aires",
+              "pais": "Argentina",
+              "codigoPais": "AR",
+              "porque": "Capital cosmopolita com rica vida cultural, teatros e arquitetura europeia",
+              "preco": {
+                "voo": 1400,
+                "hotel": 280
+              }
+            },
+            {
+              "destino": "Santiago",
+              "pais": "Chile",
+              "codigoPais": "CL",
+              "porque": "Moderna capital cercada pela Cordilheira dos Andes com excelentes vinhos",
+              "preco": {
+                "voo": 1600,
+                "hotel": 350
+              }
+            },
+            {
+              "destino": "Cusco",
+              "pais": "Peru",
+              "codigoPais": "PE",
+              "porque": "Portal para Machu Picchu com rica história inca e arquitetura colonial",
+              "preco": {
+                "voo": 1700,
+                "hotel": 250
+              }
+            }
+          ],
+          "surpresa": {
+            "destino": "Cartagena",
+            "pais": "Colômbia",
+            "codigoPais": "CO",
+            "descricao": "Joia colonial no Caribe colombiano com praias paradisíacas",
+            "porque": "Cidade murada histórica com ruas coloridas, cultura vibrante e praias maravilhosas",
+            "destaque": "Passeio de barco pelas Ilhas do Rosário com águas cristalinas",
+            "comentario": "Cartagena é um tesouro escondido que vai te conquistar! As cores, a música e a comida caribenha formam uma experiência inesquecível! 🐾🌴",
+            "preco": {
+              "voo": 1950,
+              "hotel": 320
+            }
+          }
+        }
+      })
     });
   }
 }
 
-// Chamar a API da Perplexity
+// Chamar a API da Perplexity com melhor tratamento de erros
 async function callPerplexityAPI(prompt) {
   try {
     const apiKey = process.env.PERPLEXITY_API_KEY;
+    
+    if (!apiKey) {
+      throw new Error('Chave da API Perplexity não configurada');
+    }
+    
+    console.log('Enviando requisição para Perplexity...');
     
     const response = await axios({
       method: 'post',
@@ -265,16 +368,40 @@ async function callPerplexityAPI(prompt) {
           }
         }
       },
-      timeout: 30000 // 30 segundos
+      timeout: 60000 // Aumentado para 60 segundos
     });
+    
+    // Verificar se a resposta contém o conteúdo esperado
+    if (!response.data || !response.data.choices || !response.data.choices[0] || !response.data.choices[0].message || !response.data.choices[0].message.content) {
+      console.error('Resposta Perplexity incompleta:', JSON.stringify(response.data).substring(0, 500));
+      throw new Error('Formato de resposta da Perplexity inválido');
+    }
     
     // Retorna diretamente o conteúdo JSON da resposta
     return response.data.choices[0].message.content;
   } catch (error) {
-    console.error('Erro na chamada à API Perplexity:', error);
-    if (error.response) {
-      console.error('Resposta de erro:', error.response.data);
+    console.error('Erro detalhado na chamada à API Perplexity:');
+    
+    // Verificar se é um erro de timeout
+    if (error.code === 'ECONNABORTED') {
+      console.error('Timeout na chamada à API Perplexity');
     }
+    
+    // Verificar erro de resposta da API
+    if (error.response) {
+      console.error('Status:', error.response.status);
+      console.error('Headers:', JSON.stringify(error.response.headers));
+      console.error('Dados:', JSON.stringify(error.response.data).substring(0, 500));
+    }
+    
+    // Verificar erro de requisição
+    if (error.request) {
+      console.error('Requisição enviada, mas sem resposta');
+    }
+    
+    // Outros erros
+    console.error('Mensagem de erro:', error.message);
+    
     throw error;
   }
 }
@@ -283,6 +410,12 @@ async function callPerplexityAPI(prompt) {
 async function callOpenAIAPI(prompt) {
   try {
     const apiKey = process.env.OPENAI_API_KEY;
+    
+    if (!apiKey) {
+      throw new Error('Chave da API OpenAI não configurada');
+    }
+    
+    console.log('Enviando requisição para OpenAI...');
     
     const response = await axios({
       method: 'post',
@@ -307,12 +440,22 @@ async function callOpenAIAPI(prompt) {
         max_tokens: 4000,
         response_format: { "type": "json_object" }
       },
-      timeout: 30000
+      timeout: 60000 // Aumentado para 60 segundos
     });
+    
+    if (!response.data || !response.data.choices || !response.data.choices[0] || !response.data.choices[0].message || !response.data.choices[0].message.content) {
+      throw new Error('Formato de resposta da OpenAI inválido');
+    }
     
     return response.data.choices[0].message.content;
   } catch (error) {
-    console.error('Erro na chamada à API OpenAI:', error);
+    console.error('Erro detalhado na chamada à API OpenAI:');
+    
+    if (error.response) {
+      console.error('Status:', error.response.status);
+      console.error('Dados:', JSON.stringify(error.response.data).substring(0, 500));
+    }
+    
     throw error;
   }
 }
@@ -321,6 +464,12 @@ async function callOpenAIAPI(prompt) {
 async function callClaudeAPI(prompt) {
   try {
     const apiKey = process.env.CLAUDE_API_KEY;
+    
+    if (!apiKey) {
+      throw new Error('Chave da API Claude não configurada');
+    }
+    
+    console.log('Enviando requisição para Claude...');
     
     const response = await axios({
       method: 'post',
@@ -340,34 +489,44 @@ async function callClaudeAPI(prompt) {
           }
         ]
       },
-      timeout: 30000
+      timeout: 60000 // Aumentado para 60 segundos
     });
+    
+    if (!response.data || !response.data.content || !response.data.content[0] || !response.data.content[0].text) {
+      throw new Error('Formato de resposta do Claude inválido');
+    }
     
     return response.data.content[0].text;
   } catch (error) {
-    console.error('Erro na chamada à API Claude:', error);
+    console.error('Erro detalhado na chamada à API Claude:');
+    
+    if (error.response) {
+      console.error('Status:', error.response.status);
+      console.error('Dados:', JSON.stringify(error.response.data).substring(0, 500));
+    }
+    
     throw error;
   }
 }
 
 // Função para gerar prompt adequado para a IA
 function gerarPromptParaDestinos(dados) {
-  // Extrair informações relevantes dos dados recebidos
-  const companhia = getCompanhiaText(dados.companhia);
-  const preferencia = getPreferenciaText(dados.preferencia_viagem);
+  // Extrair informações relevantes dos dados recebidos, com verificações
+  const companhia = getCompanhiaText(dados.companhia || 0);
+  const preferencia = getPreferenciaText(dados.preferencia_viagem || 0);
   const cidadeOrigem = dados.cidade_partida?.name || 'origem não especificada';
   const orcamento = dados.orcamento_valor || 'flexível';
   const moeda = dados.moeda_escolhida || 'BRL';
   
-  // Datas de viagem
+  // Datas de viagem com verificação de formato
   let dataIda = 'não especificada';
   let dataVolta = 'não especificada';
   
   if (dados.datas) {
     if (typeof dados.datas === 'string' && dados.datas.includes(',')) {
       const partes = dados.datas.split(',');
-      dataIda = partes[0];
-      dataVolta = partes[1];
+      dataIda = partes[0] || 'não especificada';
+      dataVolta = partes[1] || 'não especificada';
     } else if (dados.datas.dataIda && dados.datas.dataVolta) {
       dataIda = dados.datas.dataIda;
       dataVolta = dados.datas.dataVolta;
@@ -383,8 +542,7 @@ function gerarPromptParaDestinos(dados) {
 - Orçamento para passagens: ${orcamento} ${moeda}
 - Período: ${dataIda} a ${dataVolta}
 
-Você deve usar a internet para pesquisar destinos reais que combinem com essas preferências.
-Forneça destinos relevantes para o perfil do usuário considerando:
+Você deve fornecer destinos relevantes para o perfil do usuário considerando:
 - Atrações que combinam com as preferências indicadas
 - Clima adequado no período de viagem
 - Opções dentro do orçamento mencionado
@@ -437,8 +595,13 @@ Forneça EXATAMENTE o seguinte formato JSON, sem texto adicional antes ou depois
 Cada destino DEVE ser realista e ter preços estimados plausíveis. Não inclua texto explicativo antes ou depois do JSON.`;
 }
 
-// Função auxiliar para obter texto de companhia
+// Função auxiliar para obter texto de companhia com verificação de tipo
 function getCompanhiaText(value) {
+  // Converter para número se for string
+  if (typeof value === 'string') {
+    value = parseInt(value, 10);
+  }
+  
   const options = {
     0: "sozinho(a)",
     1: "em casal (viagem romântica)",
@@ -448,8 +611,13 @@ function getCompanhiaText(value) {
   return options[value] || "sozinho(a)";
 }
 
-// Função auxiliar para obter texto de preferência
+// Função auxiliar para obter texto de preferência com verificação de tipo
 function getPreferenciaText(value) {
+  // Converter para número se for string
+  if (typeof value === 'string') {
+    value = parseInt(value, 10);
+  }
+  
   const options = {
     0: "relaxamento e descanso (praias, resorts tranquilos, spas)",
     1: "aventura e atividades ao ar livre (trilhas, esportes, natureza)",
