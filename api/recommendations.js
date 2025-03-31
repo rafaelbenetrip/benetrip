@@ -43,6 +43,13 @@ module.exports = async function handler(req, res) {
     console.log('Tipo de dados recebidos:', typeof requestData);
     console.log('Conteúdo parcial:', JSON.stringify(requestData).substring(0, 200) + '...');
     
+    // Se o usuário já tem um destino em mente, retornar informações específicas desse destino
+    if (requestData.conhece_destino === 0 && requestData.destino_conhecido) {
+      // Implementação futura: buscar informações detalhadas sobre o destino conhecido
+      // Por enquanto, vamos seguir com as recomendações gerais
+      console.log('Usuário tem destino em mente:', requestData.destino_conhecido);
+    }
+    
     // Gerar prompt baseado nos dados do usuário
     let prompt;
     try {
@@ -50,7 +57,7 @@ module.exports = async function handler(req, res) {
       console.log('Prompt gerado com sucesso, tamanho:', prompt.length);
     } catch (promptError) {
       console.error('Erro ao gerar prompt:', promptError);
-      prompt = "Recomende destinos de viagem únicos e personalizados para o Brasil e mundo. Um destino principal, 4 destinos alternativos diferentes entre si, e um destino surpresa diferente dos demais. Seja criativo e evite destinos óbvios ou repetidos. Responda em formato JSON.";
+      prompt = "Recomende destinos de viagem únicos e personalizados para o Brasil e mundo. Um destino principal, EXATAMENTE 4 destinos alternativos diferentes entre si, e um destino surpresa diferente dos demais. Seja criativo e evite destinos óbvios ou repetidos. Responda em formato JSON.";
     }
     
     // Tentar múltiplas vezes a consulta à API com diferentes modelos
@@ -124,7 +131,7 @@ module.exports = async function handler(req, res) {
       
       // Se chegamos aqui, todas as tentativas falharam nesta iteração
       // Vamos modificar o prompt para a próxima tentativa para incentivar mais criatividade
-      prompt = `${prompt}\n\nIMPORTANTE: Sugira destinos TOTALMENTE DIFERENTES, CRIATIVOS e ÚNICOS. NÃO mencione Santiago, Cusco, ou outros destinos comuns. Explore destinos alternativos e menos óbvios que sejam adequados para as preferências indicadas.`;
+      prompt = `${prompt}\n\nIMPORTANTE: Sugira destinos TOTALMENTE DIFERENTES, CRIATIVOS e ÚNICOS. NÃO mencione Santiago, Cusco, ou outros destinos comuns. Explore destinos alternativos e menos óbvios que sejam adequados para as preferências indicadas. Forneça EXATAMENTE 4 destinos alternativos. Não mais, não menos.`;
     }
     
     // Se todas as tentativas falharam, criar uma resposta de emergência
@@ -167,7 +174,11 @@ async function callPerplexityAPI(prompt) {
     console.log('Enviando requisição para Perplexity...');
     
     // Construir instruções claras para não usar formatação markdown
-    const enhancedPrompt = `${prompt}\n\nIMPORTANTE: NÃO inclua blocos de código, marcadores markdown, ou comentários em sua resposta. Retorne APENAS o JSON puro.`;
+    const enhancedPrompt = `${prompt}\n\nINSTRUÇÕES FINAIS IMPORTANTES: 
+    1. NÃO inclua blocos de código, marcadores markdown, ou comentários em sua resposta.
+    2. Retorne APENAS o JSON puro.
+    3. Garanta EXATAMENTE 4 destinos alternativos.
+    4. Verifique se os 6 destinos totais são completamente diferentes entre si.`;
     
     const response = await axios({
       method: 'post',
@@ -181,7 +192,7 @@ async function callPerplexityAPI(prompt) {
         messages: [
           {
             role: 'system',
-            content: 'Você é um especialista em viagens focado em fornecer recomendações altamente personalizadas. Evite sugerir destinos populares ou óbvios. Gere sugestões completamente diferentes uma das outras, criativas e adequadas ao perfil do viajante. Retorne APENAS JSON puro, sem marcações ou formatação extra.'
+            content: 'Você é um especialista em viagens focado em fornecer recomendações altamente personalizadas. Evite sugerir destinos populares ou óbvios. Gere sugestões completamente diferentes uma das outras, criativas e adequadas ao perfil do viajante. Retorne SEMPRE EXATAMENTE 4 destinos alternativos. Retorne APENAS JSON puro, sem marcações ou formatação extra.'
           },
           {
             role: 'user',
@@ -245,7 +256,11 @@ async function callOpenAIAPI(prompt) {
     console.log('Enviando requisição para OpenAI...');
     
     // Modificar o prompt para pedir explicitamente resposta em JSON
-    const enhancedPrompt = `${prompt}\n\nIMPORTANTE: Sua resposta deve ser exclusivamente um objeto JSON válido sem formatação markdown. NÃO inclua blocos de código, comentários ou texto adicional.`;
+    const enhancedPrompt = `${prompt}\n\nINSTRUÇÕES FINAIS IMPORTANTES: 
+    1. Sua resposta deve ser exclusivamente um objeto JSON válido sem formatação markdown.
+    2. NÃO inclua blocos de código, comentários ou texto adicional.
+    3. Garanta EXATAMENTE 4 destinos alternativos.
+    4. Verifique se os 6 destinos totais são completamente diferentes entre si.`;
     
     const response = await axios({
       method: 'post',
@@ -259,7 +274,7 @@ async function callOpenAIAPI(prompt) {
         messages: [
           {
             role: "system",
-            content: "Você é um especialista em viagens focado em fornecer recomendações altamente personalizadas e criativas. Evite sugerir destinos populares ou óbvios como Santiago ou Cusco. Gere sugestões completamente diferentes uma das outras e adequadas ao perfil do viajante. Retorne APENAS JSON puro, sem formatação extra."
+            content: "Você é um especialista em viagens focado em fornecer recomendações altamente personalizadas e criativas. Evite sugerir destinos populares ou óbvios como Santiago ou Cusco. Gere sugestões completamente diferentes uma das outras e adequadas ao perfil do viajante. Retorne SEMPRE EXATAMENTE 4 destinos alternativos. Retorne APENAS JSON puro, sem formatação extra."
           },
           {
             role: "user",
@@ -305,7 +320,10 @@ async function callClaudeAPI(prompt) {
     console.log('Enviando requisição para Claude...');
     
     // Adicionar instrução específica para o Claude retornar apenas JSON
-    const enhancedPrompt = `${prompt}\n\nIMPORTANTE: Sua resposta deve ser APENAS o objeto JSON válido, sem NENHUM texto adicional, marcação de código, comentários ou explicações.`;
+    const enhancedPrompt = `${prompt}\n\nINSTRUÇÕES FINAIS IMPORTANTES: 
+    1. Sua resposta deve ser APENAS o objeto JSON válido, sem NENHUM texto adicional, marcação de código, comentários ou explicações.
+    2. Garanta EXATAMENTE 4 destinos alternativos.
+    3. Verifique se os 6 destinos totais são completamente diferentes entre si.`;
     
     const response = await axios({
       method: 'post',
@@ -321,7 +339,7 @@ async function callClaudeAPI(prompt) {
         messages: [
           {
             role: "system",
-            content: "Você é um especialista em viagens focado em fornecer recomendações altamente personalizadas e criativas. Evite sugerir destinos populares ou óbvios como Santiago ou Cusco. Gere sugestões completamente diferentes uma das outras e adequadas ao perfil do viajante. Retorne APENAS JSON puro."
+            content: "Você é um especialista em viagens focado em fornecer recomendações altamente personalizadas e criativas. Evite sugerir destinos populares ou óbvios como Santiago ou Cusco. Gere sugestões completamente diferentes uma das outras e adequadas ao perfil do viajante. Retorne SEMPRE EXATAMENTE 4 destinos alternativos. Retorne APENAS JSON puro."
           },
           {
             role: "user",
@@ -429,9 +447,9 @@ function isValidDestinationJSON(jsonString) {
       return false;
     }
     
-    // Verificar se tem pelo menos um destino alternativo
-    if (!Array.isArray(data.alternativas) || data.alternativas.length < 1) {
-      console.log("JSON inválido: array de alternativas vazio ou inexistente");
+    // MODIFICADO: Verificar se tem exatamente 4 destinos alternativos
+    if (!Array.isArray(data.alternativas) || data.alternativas.length !== 4) {
+      console.log(`JSON inválido: array de alternativas deve conter exatamente 4 destinos (contém ${data.alternativas.length})`);
       return false;
     }
     
@@ -439,6 +457,16 @@ function isValidDestinationJSON(jsonString) {
     if (!data.topPick.destino || !data.topPick.pais || !data.topPick.preco) {
       console.log("JSON inválido: topPick incompleto");
       return false;
+    }
+    
+    // NOVO: Verificar se cada alternativa tem os campos necessários
+    for (let i = 0; i < data.alternativas.length; i++) {
+      const alt = data.alternativas[i];
+      if (!alt.destino || !alt.pais || !alt.codigoPais || !alt.porque || !alt.preco || 
+          !alt.preco.voo || !alt.preco.hotel) {
+        console.log(`JSON inválido: alternativa ${i+1} tem campos obrigatórios faltando`);
+        return false;
+      }
     }
     
     // Verificar se o destino surpresa tem os campos necessários
@@ -470,6 +498,14 @@ function isValidDestinationJSON(jsonString) {
       return false;
     }
     
+    // NOVO: Verificar diversidade geográfica
+    const paises = data.alternativas.map(alt => alt.pais.toLowerCase());
+    const paisesUnicos = new Set(paises);
+    if (paisesUnicos.size < 2 && paises.length === 4) {
+      console.log("JSON inválido: alternativas não têm diversidade geográfica suficiente");
+      return false;
+    }
+    
     return true;
   } catch (error) {
     console.error("Erro ao validar JSON:", error);
@@ -491,8 +527,6 @@ function gerarPromptParaDestinos(dados) {
   
   // Extrair qualquer informação adicional importante
   const conheceDestino = dados.conhece_destino || 0;
-  const tipoDestino = dados.tipo_destino || 'qualquer';
-  const famaDestino = dados.fama_destino || 'qualquer';
   
   // Datas de viagem com verificação de formato
   let dataIda = 'não especificada';
@@ -523,7 +557,34 @@ function gerarPromptParaDestinos(dados) {
     console.log("Erro ao calcular duração da viagem:", e);
   }
 
-  // Construir prompt detalhado e personalizado
+  // NOVO: Determinar estação do ano baseada na data de ida
+  let estacaoViagem = 'não determinada';
+  let hemisferio = 'norte'; // Padrão para simplificar
+  
+  try {
+    if (dataIda !== 'não especificada') {
+      const dataObj = new Date(dataIda);
+      const mes = dataObj.getMonth();
+      
+      // Simplificação para hemisfério norte
+      if (mes >= 2 && mes <= 4) estacaoViagem = 'primavera';
+      else if (mes >= 5 && mes <= 7) estacaoViagem = 'verão';
+      else if (mes >= 8 && mes <= 10) estacaoViagem = 'outono';
+      else estacaoViagem = 'inverno';
+      
+      // Inversão para hemisfério sul
+      if (hemisferio === 'sul') {
+        if (estacaoViagem === 'verão') estacaoViagem = 'inverno';
+        else if (estacaoViagem === 'inverno') estacaoViagem = 'verão';
+        else if (estacaoViagem === 'primavera') estacaoViagem = 'outono';
+        else if (estacaoViagem === 'outono') estacaoViagem = 'primavera';
+      }
+    }
+  } catch (e) {
+    console.log("Erro ao determinar estação do ano:", e);
+  }
+
+  // Construir prompt detalhado e personalizado (MODIFICADO)
   return `Crie recomendações de viagem CRIATIVAS e ÚNICAS para:
 
 PERFIL DO VIAJANTE:
@@ -533,15 +594,17 @@ PERFIL DO VIAJANTE:
 - Atividades preferidas: ${preferencia}
 - Orçamento por pessoa: ${orcamento} ${moeda}
 - Período da viagem: ${dataIda} a ${dataVolta} (${duracaoViagem})
+- Estação do ano na viagem: ${estacaoViagem}
 - Experiência como viajante: ${conheceDestino === 1 ? 'Com experiência' : 'Iniciante'} 
-- Preferência por destinos: ${getTipoDestinoText(tipoDestino)}
-- Popularidade do destino: ${getFamaDestinoText(famaDestino)}
 
 IMPORTANTE:
 1. Sugira destinos DIVERSIFICADOS e CRIATIVOS que combinem bem com o perfil.
 2. NÃO sugira Santiago, Cusco, Buenos Aires ou Montevidéu.
 3. Destinos DEVEM ser DIFERENTES entre si.
-4. O destino principal, alternativas e surpresa DEVEM ser de locais DISTINTOS.
+4. Forneça EXATAMENTE 4 DESTINOS ALTERNATIVOS diferentes entre si.
+5. O destino principal, os 4 alternativos e a surpresa DEVEM ser locais DISTINTOS.
+6. Considere a ÉPOCA DO ANO (${estacaoViagem}) para sugerir destinos com clima adequado.
+7. Tente incluir destinos de continentes diferentes nas alternativas.
 
 Forneça no formato JSON exato abaixo, SEM formatação markdown:
 {
@@ -560,8 +623,38 @@ Forneça no formato JSON exato abaixo, SEM formatação markdown:
   },
   "alternativas": [
     {
-      "destino": "Nome da Cidade",
-      "pais": "Nome do País", 
+      "destino": "Nome da Cidade 1",
+      "pais": "Nome do País 1", 
+      "codigoPais": "XX",
+      "porque": "Razão específica para visitar",
+      "preco": {
+        "voo": número,
+        "hotel": número
+      }
+    },
+    {
+      "destino": "Nome da Cidade 2",
+      "pais": "Nome do País 2", 
+      "codigoPais": "XX",
+      "porque": "Razão específica para visitar",
+      "preco": {
+        "voo": número,
+        "hotel": número
+      }
+    },
+    {
+      "destino": "Nome da Cidade 3",
+      "pais": "Nome do País 3", 
+      "codigoPais": "XX",
+      "porque": "Razão específica para visitar",
+      "preco": {
+        "voo": número,
+        "hotel": número
+      }
+    },
+    {
+      "destino": "Nome da Cidade 4",
+      "pais": "Nome do País 4", 
       "codigoPais": "XX",
       "porque": "Razão específica para visitar",
       "preco": {
@@ -616,36 +709,6 @@ function getPreferenciaText(value) {
     3: "experiência urbana, compras e vida noturna (centros urbanos, lojas, restaurantes)"
   };
   return options[value] || "experiências diversificadas de viagem";
-}
-
-// Função auxiliar para obter texto de tipo de destino
-function getTipoDestinoText(value) {
-  // Converter para número se for string
-  if (typeof value === 'string') {
-    value = parseInt(value, 10);
-  }
-  
-  const options = {
-    0: "nacional",
-    1: "internacional",
-    2: "qualquer (nacional ou internacional)"
-  };
-  return options[value] || "qualquer";
-}
-
-// Função auxiliar para obter texto de fama do destino
-function getFamaDestinoText(value) {
-  // Converter para número se for string
-  if (typeof value === 'string') {
-    value = parseInt(value, 10);
-  }
-  
-  const options = {
-    0: "famoso e turístico",
-    1: "fora do circuito turístico comum",
-    2: "mistura de ambos"
-  };
-  return options[value] || "qualquer";
 }
 
 // Função para gerar dados de emergência personalizados baseados no perfil
@@ -885,7 +948,51 @@ function generateEmergencyData(dadosUsuario = {}) {
   
   // Reordenar alternativas para evitar sempre as mesmas posições
   const resultado = {...conjuntoPreferencia[indiceAleatorio]};
-  resultado.alternativas = embaralharArray([...resultado.alternativas]).slice(0, 4);
+  
+  // MODIFICADO: Garantir exatamente 4 alternativas
+  if (resultado.alternativas.length < 4) {
+    // Adicionar destinos adicionais genéricos se necessário
+    const destinosExtras = [
+      {
+        destino: "Viena",
+        pais: "Áustria",
+        codigoPais: "AT",
+        porque: "Combinação de cultura, arquitetura histórica e gastronomia refinada",
+        preco: { voo: 3800, hotel: 280 }
+      },
+      {
+        destino: "Chiang Mai",
+        pais: "Tailândia",
+        codigoPais: "TH",
+        porque: "Experiência cultural autêntica com templos antigos e culinária local",
+        preco: { voo: 4200, hotel: 150 }
+      },
+      {
+        destino: "Vancouver",
+        pais: "Canadá", 
+        codigoPais: "CA",
+        porque: "Equilíbrio perfeito entre natureza e vida urbana moderna",
+        preco: { voo: 3600, hotel: 320 }
+      },
+      {
+        destino: "Porto",
+        pais: "Portugal",
+        codigoPais: "PT",
+        porque: "Charme histórico, gastronomia rica e cenário para fotos incríveis",
+        preco: { voo: 3100, hotel: 190 }
+      }
+    ];
+    
+    // Adicionar destinos extras até completar 4 alternativas
+    while (resultado.alternativas.length < 4) {
+      resultado.alternativas.push(destinosExtras[resultado.alternativas.length % destinosExtras.length]);
+    }
+  } else if (resultado.alternativas.length > 4) {
+    // Limitar a exatamente 4 alternativas
+    resultado.alternativas = resultado.alternativas.slice(0, 4);
+  }
+  
+  resultado.alternativas = embaralharArray([...resultado.alternativas]);
   
   return resultado;
 }
