@@ -4,7 +4,7 @@ window.BENETRIP_AI = {
   config: {
     apiEndpoint: '/api/recommendations', // Endpoint Vercel
     imageApiEndpoint: '/api/image-search', // Endpoint Vercel para busca de imagens
-    apiTimeout: 30000, // 30 segundos de timeout
+    apiTimeout: 60000, // 60 segundos de timeout
     maxRetries: 2, // Número máximo de tentativas em caso de falha
     retryDelay: 1000, // Tempo entre tentativas em ms
     mockData: { // Dados de exemplo para casos de falha
