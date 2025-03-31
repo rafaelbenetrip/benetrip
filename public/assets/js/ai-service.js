@@ -3,79 +3,9 @@ window.BENETRIP_AI = {
   // Configurações do serviço
   config: {
     apiEndpoint: '/api/recommendations', // Endpoint Vercel
-    apiTimeout: 30000, // 30 segundos de timeout
-    maxRetries: 2, // Número máximo de tentativas em caso de falha
-    retryDelay: 1000, // Tempo entre tentativas em ms
-    mockData: { // Dados de exemplo para casos de falha
-      "topPick": {
-        "destino": "Medellín",
-        "pais": "Colômbia",
-        "codigoPais": "CO",
-        "descricao": "Cidade da eterna primavera com clima perfeito o ano todo",
-        "porque": "Clima primaveril o ano todo com paisagens montanhosas deslumbrantes",
-        "destaque": "Passeio de teleférico, Comuna 13 e fazendas de café próximas",
-        "comentario": "Eu simplesmente AMEI Medellín! Perfeito para quem busca um mix de cultura e natureza! 🐾",
-        "preco": {
-          "voo": 1800,
-          "hotel": 350
-        }
-      },
-      "alternativas": [
-        {
-          "destino": "Montevidéu",
-          "pais": "Uruguai",
-          "codigoPais": "UY",
-          "porque": "Clima costeiro tranquilo com frutos do mar deliciosos e espaços culturais",
-          "preco": {
-            "voo": 1500,
-            "hotel": 300
-          }
-        },
-        {
-          "destino": "Buenos Aires",
-          "pais": "Argentina",
-          "codigoPais": "AR",
-          "porque": "Capital cosmopolita com rica vida cultural, teatros e arquitetura europeia",
-          "preco": {
-            "voo": 1400,
-            "hotel": 280
-          }
-        },
-        {
-          "destino": "Santiago",
-          "pais": "Chile",
-          "codigoPais": "CL",
-          "porque": "Moderna capital cercada pela Cordilheira dos Andes com excelentes vinhos",
-          "preco": {
-            "voo": 1600,
-            "hotel": 350
-          }
-        },
-        {
-          "destino": "Cusco",
-          "pais": "Peru",
-          "codigoPais": "PE",
-          "porque": "Portal para Machu Picchu com rica história inca e arquitetura colonial",
-          "preco": {
-            "voo": 1700,
-            "hotel": 250
-          }
-        }
-      ],
-      "surpresa": {
-        "destino": "Cartagena",
-        "pais": "Colômbia",
-        "codigoPais": "CO",
-        "descricao": "Joia colonial no Caribe colombiano com praias paradisíacas",
-        "porque": "Cidade murada histórica com ruas coloridas, cultura vibrante e praias maravilhosas",
-        "destaque": "Passeio de barco pelas Ilhas do Rosário com águas cristalinas",
-        "comentario": "Cartagena é um tesouro escondido que vai te conquistar! As cores, a música e a comida caribenha formam uma experiência inesquecível! 🐾🌴",
-        "preco": {
-          "voo": 1950,
-          "hotel": 320
-        }
-      }
-    }
+    apiTimeout: 45000, // 45 segundos de timeout (aumentado para dar mais tempo à IA)
+    maxRetries: 3, // Aumentado número máximo de tentativas em caso de falha
+    retryDelay: 2000 // Tempo entre tentativas em ms (aumentado)
   },
   
   // Inicialização do serviço
@@ -116,10 +46,10 @@ window.BENETRIP_AI = {
       return texto;
     }
     
-    // Se for nulo ou undefined, retorna objeto vazio
+    // Se for nulo ou undefined, retorna null para indicar erro
     if (!texto) {
       console.warn('Texto de resposta vazio');
-      return {};
+      return null;
     }
     
     // Primeiro, tenta fazer parse direto
@@ -164,12 +94,12 @@ window.BENETRIP_AI = {
           return JSON.parse(jsonPotencial);
         }
         
-        // Se nada funcionar, retorna um objeto vazio
-        console.warn('Não foi possível extrair JSON válido da resposta, retornando objeto vazio');
-        return {};
+        // Se nada funcionar, retorna null para indicar erro
+        console.warn('Não foi possível extrair JSON válido da resposta');
+        return null;
       } catch (innerError) {
         console.error('Erro ao extrair JSON do texto:', innerError);
-        return {};
+        return null;
       }
     }
   },
@@ -235,32 +165,51 @@ window.BENETRIP_AI = {
       if ((isTimeoutError || error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) 
           && retryCount < this.config.maxRetries) {
         console.log(`Tentativa ${retryCount + 1} falhou. Tentando novamente em ${this.config.retryDelay}ms...`);
-        await this.sleep(this.config.retryDelay);
+        
+        // Usar backoff exponencial para as tentativas
+        const adjustedDelay = this.config.retryDelay * Math.pow(1.5, retryCount);
+        console.log(`Aguardando ${adjustedDelay}ms antes da próxima tentativa...`);
+        
+        await this.sleep(adjustedDelay);
         return this.callVercelAPI(data, retryCount + 1);
       }
       
-      // Se for erro de CORS, tentar com formatos alternativos
+      // Se for erro de CORS, tentar com abordagem alternativa
       if (error.message.includes('CORS') && retryCount < 1) {
         console.log('Erro de CORS detectado, tentando abordagem alternativa...');
+        
+        // Tentar com URL absoluta
         try {
-          // Tentar com jsonp ou outro método
-          // Esta é apenas uma simulação de resposta para não travar o fluxo
-          console.log('Retornando dados simulados devido ao erro de CORS');
-          return {
-            tipo: "simulado-cors",
-            conteudo: JSON.stringify(this.config.mockData)
+          // Criar URL completa para o API Gateway
+          const absoluteUrl = window.location.protocol + '//' + window.location.host + this.config.apiEndpoint;
+          console.log('Tentando com URL absoluta:', absoluteUrl);
+          
+          // Ajustar cabeçalhos para contornar problemas de CORS
+          const headers = {
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest'
           };
+          
+          const corsResponse = await fetch(absoluteUrl, {
+            method: 'POST',
+            headers: headers,
+            body: JSON.stringify(data),
+            credentials: 'same-origin'
+          });
+          
+          if (!corsResponse.ok) {
+            throw new Error(`Erro CORS alternativo: ${corsResponse.status} ${corsResponse.statusText}`);
+          }
+          
+          return await corsResponse.json();
         } catch (corsError) {
           console.error('Erro na abordagem alternativa para CORS:', corsError);
+          throw new Error('Falha na comunicação com o servidor após múltiplas tentativas');
         }
       }
       
-      // Simulação de resposta para não travar o fluxo
-      console.log('Retornando dados simulados devido ao erro');
-      return {
-        tipo: "simulado-error",
-        conteudo: JSON.stringify(this.config.mockData)
-      };
+      // Se todas as tentativas falharem, propagar o erro
+      throw new Error('Falha na comunicação com o servidor de IA após múltiplas tentativas');
     }
   },
   
@@ -269,42 +218,31 @@ window.BENETRIP_AI = {
     // Verificar se dados é nulo ou undefined
     if (!dados) {
       console.error('Dados de recomendações são nulos ou indefinidos');
-      return {...this.config.mockData};
+      throw new Error('Dados de recomendações inválidos ou ausentes');
     }
     
     // Verificar estrutura básica
     if (!dados.topPick) {
       console.error('Destino principal não encontrado nos dados');
-      dados.topPick = this.config.mockData.topPick;
+      throw new Error('Estrutura de dados inválida: destino principal ausente');
     }
     
     // Verificar se alternativas existem
-    if (!dados.alternativas || !Array.isArray(dados.alternativas)) {
-      console.error('Alternativas não encontradas ou não são um array');
-      dados.alternativas = [...this.config.mockData.alternativas];
+    if (!dados.alternativas || !Array.isArray(dados.alternativas) || dados.alternativas.length === 0) {
+      console.error('Alternativas não encontradas ou não são um array válido');
+      throw new Error('Estrutura de dados inválida: alternativas ausentes ou inválidas');
     }
     
-    // Garantir que haja alternativas suficientes
-    if (dados.alternativas.length < 1) {
-      console.warn('Alternativas insuficientes, adicionando dados fictícios');
-      dados.alternativas = [...this.config.mockData.alternativas];
-    }
-    
-    // Garantir que temos o destino surpresa
-    if (!dados.surpresa && dados.alternativas.length > 0) {
-      console.log('Destino surpresa não encontrado, criando a partir de alternativa');
-      dados.surpresa = {
-        ...dados.alternativas.pop(),
-        descricao: "Um destino surpreendente que poucos conhecem!",
-        destaque: "Experiência única que vai te surpreender",
-        comentario: "Este é um destino surpresa especial que farejei só para você! Confie no meu faro! 🐾🎁"
-      };
-    }
-    
-    // Se ainda não tivermos surpresa, criar uma fictícia
+    // Verificar destino surpresa
     if (!dados.surpresa) {
-      console.log('Criando destino surpresa fictício');
-      dados.surpresa = this.config.mockData.surpresa;
+      console.error('Destino surpresa não encontrado');
+      throw new Error('Estrutura de dados inválida: destino surpresa ausente');
+    }
+    
+    // Garantir que temos 4 alternativas no máximo para manter a interface uniforme
+    if (dados.alternativas.length > 4) {
+      console.log('Reduzindo para 4 alternativas para manter a interface uniforme');
+      dados.alternativas = dados.alternativas.slice(0, 4);
     }
     
     return dados;
@@ -325,7 +263,16 @@ window.BENETRIP_AI = {
     console.log(`Progresso: ${fase} ${porcentagem}% - ${mensagem}`);
   },
   
-  // Método para obter recomendações de destinos com Perplexity
+  // Método para construir uma estrutura de resposta de erro
+  criarRespostaErro(mensagem) {
+    return {
+      erro: true,
+      mensagem: mensagem || 'Ocorreu um erro ao processar sua solicitação',
+      timestamp: new Date().toISOString()
+    };
+  },
+  
+  // Método para obter recomendações de destinos com IA
   async obterRecomendacoes(preferenciasUsuario) {
     if (!this.isInitialized()) {
       this.init();
@@ -364,7 +311,7 @@ window.BENETRIP_AI = {
         // Reportar progresso
         this.reportarProgresso('processando', 30, 'Analisando suas preferências de viagem...');
         
-        // Chamar a API do Vercel para processamento com Perplexity
+        // Chamar a API do Vercel para processamento com IA
         const resposta = await this.callVercelAPI(preferenciasUsuario);
         
         // Verificar formato da resposta
@@ -378,26 +325,27 @@ window.BENETRIP_AI = {
         // Extrair e processar recomendações
         let recomendacoes;
         try {
-          // Se for tipo erro mas com dados fallback
-          if (resposta.tipo === 'erro' && resposta.conteudo) {
-            const conteudoObj = this.extrairJSON(resposta.conteudo);
-            if (conteudoObj.data) {
-              console.log('Usando dados de fallback da resposta de erro');
-              recomendacoes = conteudoObj.data;
-            } else {
-              throw new Error('Formato inválido nos dados de fallback');
-            }
-          } else if (resposta.conteudo) {
+          // Verificar se é uma resposta de erro
+          if (resposta.erro) {
+            throw new Error(resposta.message || 'Erro no serviço de recomendações');
+          }
+          
+          // Extrair conteúdo da resposta
+          if (resposta.conteudo) {
             recomendacoes = this.extrairJSON(resposta.conteudo);
+            
+            // Verificar se a extração foi bem-sucedida
+            if (!recomendacoes) {
+              throw new Error('Falha ao extrair recomendações da resposta');
+            }
+            
             console.log('Recomendações extraídas com sucesso:', recomendacoes);
           } else {
             throw new Error('Conteúdo da resposta não encontrado');
           }
         } catch (extractError) {
           console.error('Erro ao extrair JSON da resposta:', extractError);
-          console.log('Usando dados mockados devido a erro de extração');
-          this.reportarProgresso('fallback', 80, 'Usando dados padrão devido a erro de processamento');
-          recomendacoes = {...this.config.mockData};
+          throw new Error('Não foi possível obter recomendações válidas. Por favor, tente novamente.');
         }
         
         // Validar e corrigir estrutura das recomendações
@@ -405,27 +353,7 @@ window.BENETRIP_AI = {
           recomendacoes = this.validarEstruturaDados(recomendacoes);
         } catch (validationError) {
           console.error('Erro na validação dos dados:', validationError);
-          console.log('Usando dados mockados devido a erro de validação');
-          this.reportarProgresso('fallback', 85, 'Usando dados padrão devido a erro de validação');
-          recomendacoes = {...this.config.mockData};
-        }
-        
-        // Garantir que temos 4 alternativas exatamente
-        while (recomendacoes.alternativas && recomendacoes.alternativas.length > 4) {
-          recomendacoes.alternativas.pop();
-        }
-        
-        // Adicionar alternativas se estiverem faltando
-        if (recomendacoes.alternativas) {
-          while (recomendacoes.alternativas.length < 4) {
-            const mockAlternativa = this.config.mockData.alternativas[recomendacoes.alternativas.length];
-            if (mockAlternativa) {
-              console.log('Adicionando alternativa fictícia');
-              recomendacoes.alternativas.push(mockAlternativa);
-            } else {
-              break;
-            }
-          }
+          throw new Error('Formato de recomendações inválido. Por favor, tente novamente com outras preferências.');
         }
         
         // Reportar progresso final
@@ -438,16 +366,11 @@ window.BENETRIP_AI = {
       } catch (erro) {
         console.error('Erro ao obter recomendações:', erro);
         
-        // Usar dados mockados em caso de erro
-        console.log('Usando dados mockados devido a erro');
-        this.reportarProgresso('mockados', 100, 'Usando recomendações padrão devido a erro...');
+        // Notificar o usuário do erro
+        this.reportarProgresso('erro', 100, 'Erro ao obter recomendações. Por favor, tente novamente.');
         
-        const dadosMockados = {...this.config.mockData};
-        
-        // Salvar no localStorage para uso em outras páginas se necessário
-        localStorage.setItem('benetrip_recomendacoes', JSON.stringify(dadosMockados));
-        
-        return dadosMockados;
+        // Propagar o erro
+        throw erro;
       } finally {
         // Remover a promise em andamento quando terminar
         delete this._requestsInProgress[requestId];
