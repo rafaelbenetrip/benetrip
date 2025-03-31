@@ -24,14 +24,6 @@
       "dest": "api/image-search.js"
     },
     {
-      "src": "/destinos",
-      "dest": "/public/destinos.html"
-    },
-    {
-      "src": "/destinos/(.*)",
-      "dest": "/public/destinos.html"
-    },
-    {
       "src": "/assets/(.*)",
       "dest": "/public/assets/$1"
     },
@@ -50,17 +42,6 @@
     {
       "src": "/(.*)",
       "dest": "/public/$1"
-    }
-  ],
-  "headers": [
-    {
-      "source": "/destinos.html",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "public, max-age=0, must-revalidate"
-        }
-      ]
     }
   ]
 }
