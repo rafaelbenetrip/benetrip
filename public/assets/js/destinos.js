@@ -20,8 +20,7 @@ BENETRIP.Destinos = (function() {
     progressUpdateInterval: 300, // ms
     progressInitialValue: 10, // %
     progressMaxValue: 90, // %
-    // Imagens locais (usar diretamente o que temos)
-    tripinhaImageUrl: '/assets/images/tripinha/avatar-normal.png', 
+    imagePlaceholderUrl: 'https://via.placeholder.com/400x224.png?text=',
     dateFormat: { year: 'numeric', month: 'long', day: 'numeric' }
   };
   
@@ -79,13 +78,8 @@ BENETRIP.Destinos = (function() {
    */
   function registrarEventListeners() {
     // Navegação e controles
-    if (DOM.btnVoltar) {
-      DOM.btnVoltar.addEventListener('click', voltarParaChat);
-    }
-    
-    if (DOM.btnTentarNovamente) {
-      DOM.btnTentarNovamente.addEventListener('click', carregarRecomendacoes);
-    }
+    DOM.btnVoltar.addEventListener('click', voltarParaChat);
+    DOM.btnTentarNovamente.addEventListener('click', carregarRecomendacoes);
     
     // Escutar eventos de progresso da IA
     document.addEventListener('benetrip_progress', handleProgressEvent);
@@ -249,17 +243,22 @@ BENETRIP.Destinos = (function() {
     try {
       // Ocultar loading e mostrar conteúdo com animação
       setTimeout(() => {
-        if (DOM.containerLoading) DOM.containerLoading.style.display = 'none';
-        if (DOM.containerConteudo) DOM.containerConteudo.classList.remove('hidden');
+        DOM.containerLoading.style.display = 'none';
+        DOM.containerConteudo.classList.remove('hidden');
         
         // Aplicar classe de animação para entrada de conteúdo
-        if (DOM.containerConteudo) DOM.containerConteudo.classList.add('fade-in');
+        DOM.containerConteudo.classList.add('fade-in');
         
         // Renderizar todos os componentes
         renderizarMensagemTripinha();
         renderizarDestinoDestaque();
         renderizarDestinosAlternativos();
         renderizarOpcaoSurpresa();
+        
+        // Pré-carregar imagens para melhorar performance
+        if (window.BENETRIP_IMAGES) {
+          window.BENETRIP_IMAGES.preloadImages(state.recomendacoes);
+        }
         
         // Atualizar estado
         state.loading = false;
@@ -275,9 +274,9 @@ BENETRIP.Destinos = (function() {
    * Mostra a tela de carregamento
    */
   function mostrarTelaCarregando() {
-    if (DOM.containerLoading) DOM.containerLoading.style.display = 'block';
-    if (DOM.containerConteudo) DOM.containerConteudo.classList.add('hidden');
-    if (DOM.containerErro) DOM.containerErro.classList.add('hidden');
+    DOM.containerLoading.style.display = 'block';
+    DOM.containerConteudo.classList.add('hidden');
+    DOM.containerErro.classList.add('hidden');
     atualizarBarraProgresso(CONFIG.progressInitialValue);
   }
   
@@ -293,9 +292,9 @@ BENETRIP.Destinos = (function() {
     }
     
     // Ocultar carregamento e mostrar erro
-    if (DOM.containerLoading) DOM.containerLoading.style.display = 'none';
-    if (DOM.containerConteudo) DOM.containerConteudo.classList.add('hidden');
-    if (DOM.containerErro) DOM.containerErro.classList.remove('hidden');
+    DOM.containerLoading.style.display = 'none';
+    DOM.containerConteudo.classList.add('hidden');
+    DOM.containerErro.classList.remove('hidden');
     
     // Exibir mensagem de erro
     const mensagemErro = document.getElementById('mensagem-erro');
@@ -335,19 +334,6 @@ BENETRIP.Destinos = (function() {
   }
   
   /**
-   * Verifica se uma imagem existe
-   * @param {string} url - URL da imagem a verificar
-   * @return {boolean} true se a imagem existe, false caso contrário
-   */
-  function mostrarIconeDestino(destino) {
-    // Criar um elemento div com cor de fundo e estilo
-    const iconeTxt = destino.substr(0, 2).toUpperCase();
-    return `<div class="bg-blue-500 text-white rounded-full w-full h-full flex items-center justify-center text-xl font-bold">
-      ${iconeTxt}
-    </div>`;
-  }
-  
-  /**
    * Renderiza a mensagem da Tripinha
    */
   function renderizarMensagemTripinha() {
@@ -356,8 +342,8 @@ BENETRIP.Destinos = (function() {
     DOM.mensagemTripinha.innerHTML = `
       <div class="bg-gray-50 p-4 rounded-lg shadow-sm border border-gray-200">
         <div class="flex items-start gap-3">
-          <div class="w-12 h-12 rounded-full overflow-hidden flex-shrink-0 bg-orange-100">
-            <img src="${CONFIG.tripinhaImageUrl}" alt="Tripinha animada" class="w-full h-full object-cover" onerror="this.style.display='none'; this.parentNode.innerHTML='🐶';" />
+          <div class="w-12 h-12 rounded-full overflow-hidden flex-shrink-0">
+            <img src="assets/images/tripinha/avatar-feliz.png" alt="Tripinha animada" class="w-full h-full object-cover" loading="eager" />
           </div>
           <p class="text-gray-800 leading-relaxed">
             Eu farejei por aí e encontrei alguns destinos incríveis para sua aventura! 🐾 Veja minha escolha top — 
@@ -377,10 +363,8 @@ BENETRIP.Destinos = (function() {
     const destino = state.recomendacoes.topPick;
     if (!destino) return;
     
-    // Data de viagem
-    const dataViagem = destino.dataViagem ? 
-      formatarData(destino.dataViagem.inicio) + ' a ' + formatarData(destino.dataViagem.fim) : 
-      '5 a 9 de Agosto, 2025';
+    // Obter imagens do destino se disponíveis, ou usar uma padrão
+    const imagens = destino.imagens || [];
     
     // Criar estrutura HTML do destino destaque
     let html = `
@@ -392,18 +376,49 @@ BENETRIP.Destinos = (function() {
           <div class="grid grid-cols-2 gap-1">
     `;
     
-    // Adicionar placeholders de imagem (divisão colorida)
-    const corFundo1 = 'bg-orange-100';
-    const corFundo2 = 'bg-blue-100';
+    // Adicionar as duas imagens principais (ou placeholders)
+    for (let i = 0; i < 2; i++) {
+      if (imagens[i]) {
+        const imgAlt = sanitizarString(imagens[i].alt || `${destino.destino}, ${destino.pais}`);
+        const imgUrl = imagens[i].url;
+        const photoUrl = imagens[i].photographerUrl || '#';
+        const photoName = sanitizarString(imagens[i].photographer || 'Fotógrafo');
+        const sourceUrl = imagens[i].sourceUrl || '#';
+        
+        html += `
+          <div class="bg-gray-200 h-36 image-container">
+            <a href="${sourceUrl}" target="_blank" rel="noopener noreferrer" class="image-link" title="Ver imagem original">
+              <img src="${imgUrl}" alt="${imgAlt}" class="w-full h-full object-cover" loading="${i === 0 ? 'eager' : 'lazy'}" />
+              <div class="zoom-icon" aria-hidden="true">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="11" cy="11" r="8"></circle>
+                  <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                  <line x1="11" y1="8" x2="11" y2="14"></line>
+                  <line x1="8" y1="11" x2="14" y2="11"></line>
+                </svg>
+              </div>
+            </a>
+            <div class="image-credit">
+              Foto por <a href="${photoUrl}" target="_blank" rel="noopener noreferrer">${photoName}</a>
+            </div>
+          </div>
+        `;
+      } else {
+        // Placeholder se não houver imagem
+        const placeholderText = encodeURIComponent(destino.destino || 'Destino');
+        html += `
+          <div class="bg-gray-200 h-36">
+            <img src="${CONFIG.imagePlaceholderUrl}${placeholderText}" 
+                alt="${sanitizarString(destino.destino)}" class="w-full h-full object-cover" loading="${i === 0 ? 'eager' : 'lazy'}" />
+          </div>
+        `;
+      }
+    }
     
-    html += `
-      <div class="${corFundo1} h-36 flex items-center justify-center">
-        <span class="text-lg font-bold">${destino.destino.substr(0, 1)}</span>
-      </div>
-      <div class="${corFundo2} h-36 flex items-center justify-center">
-        <span class="text-lg font-bold">${destino.pais.substr(0, 1)}</span>
-      </div>
-    `;
+    // Data de viagem
+    const dataViagem = destino.dataViagem ? 
+      formatarData(destino.dataViagem.inicio) + ' a ' + formatarData(destino.dataViagem.fim) : 
+      '5 a 9 de Agosto, 2025';
     
     // Continuar com as informações do destino
     html += `
@@ -414,7 +429,7 @@ BENETRIP.Destinos = (function() {
           <div class="flex justify-between items-start">
             <h3 class="text-xl font-bold">${sanitizarString(destino.destino)}, ${sanitizarString(destino.pais)}</h3>
             <span class="text-xs font-medium px-1 py-0.5 rounded" style="background-color: #E0E0E0">
-              ${sanitizarString(destino.codigoPais || 'AR')}
+              ${sanitizarString(destino.codigoPais)}
             </span>
           </div>
           
@@ -422,12 +437,12 @@ BENETRIP.Destinos = (function() {
             <p class="flex items-center">
               <span class="mr-2 w-5 text-center" aria-hidden="true">✈️</span> 
               <span class="font-medium">Estimativa de Voo:</span> 
-              <span class="ml-1">R$ ${destino.preco?.voo || '1500'} (ida e volta)</span>
+              <span class="ml-1">R$ ${destino.preco?.voo || '?'} (ida e volta)</span>
             </p>
             <p class="flex items-center">
               <span class="mr-2 w-5 text-center" aria-hidden="true">🏨</span> 
               <span class="font-medium">Estimativa de Hotel:</span> 
-              <span class="ml-1">R$ ${destino.preco?.hotel || '300'}/noite</span>
+              <span class="ml-1">R$ ${destino.preco?.hotel || '?'}/noite</span>
             </p>
             <p class="flex items-center">
               <span class="mr-2 w-5 text-center" aria-hidden="true">🗓️</span> 
@@ -438,14 +453,14 @@ BENETRIP.Destinos = (function() {
               <span class="mr-2 w-5 text-center flex-shrink-0" aria-hidden="true">🌆</span> 
               <span>
                 <span class="font-medium">Por que ir?:</span> 
-                <span class="ml-1">${sanitizarString(destino.porque || 'Experiência urbana intensa, boas compras e uma das melhores cenas gastronômicas da América Latina.')}</span>
+                <span class="ml-1">${sanitizarString(destino.porque || 'Um destino incrível para sua próxima aventura!')}</span>
               </span>
             </p>
             <p class="flex items-start">
               <span class="mr-2 w-5 text-center flex-shrink-0" aria-hidden="true">⭐</span>
               <span>
                 <span class="font-medium">Destaque da Experiência:</span> 
-                <span class="ml-1">${sanitizarString(destino.destaque || 'Visite o Teatro Colón e experimente o famoso asado argentino.')}</span>
+                <span class="ml-1">${sanitizarString(destino.destaque || 'Experiência única e inesquecível!')}</span>
               </span>
             </p>
           </div>
@@ -453,7 +468,7 @@ BENETRIP.Destinos = (function() {
           <div class="mt-3 text-sm italic p-3 rounded" style="background-color: rgba(0, 163, 224, 0.1)">
             <p class="flex items-start">
               <span class="mr-2 flex-shrink-0" aria-hidden="true">💬</span>
-              <span>"${sanitizarString(destino.comentario || 'Vai ser uma aventura incrível, com muita energia e diversão!')}"</span>
+              <span>"${sanitizarString(destino.comentario || 'Um destino incrível que vai te surpreender!')}"</span>
             </p>
           </div>
           
@@ -483,11 +498,11 @@ BENETRIP.Destinos = (function() {
     // Limpar container
     DOM.destinosAlternativos.innerHTML = '<h3 class="font-bold text-lg mt-2">Mais Destinos Incríveis</h3>';
     
-    // Algumas cores alternadas para os blocos
-    const cores = ['bg-blue-100', 'bg-green-100', 'bg-yellow-100', 'bg-purple-100', 'bg-pink-100'];
-    
     // Renderizar cada destino alternativo
     alternativas.forEach((destino, index) => {
+      // Obter a primeira imagem do destino, se disponível
+      const imagem = destino.imagens && destino.imagens.length > 0 ? destino.imagens[0] : null;
+      
       const card = document.createElement('div');
       card.className = 'border border-gray-200 rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow duration-200 mt-4 destino-card';
       card.setAttribute('data-destino', destino.destino);
@@ -497,31 +512,64 @@ BENETRIP.Destinos = (function() {
       card.setAttribute('tabindex', '0');
       card.setAttribute('aria-label', `Selecionar destino ${destino.destino}, ${destino.pais}`);
       
-      // Selecionar uma cor de fundo para este destino
-      const corFundo = cores[index % cores.length];
-      
       let cardHtml = `
         <div class="flex">
-          <div class="w-1/3 ${corFundo} flex items-center justify-center">
-            <span class="text-2xl font-bold">${destino.destino.substr(0, 1).toUpperCase()}</span>
+          <div class="w-1/3">
+      `;
+      
+      // Adicionar imagem com créditos
+      if (imagem) {
+        const imgAlt = sanitizarString(imagem.alt || `${destino.destino}, ${destino.pais}`);
+        const imgUrl = imagem.url;
+        const photoUrl = imagem.photographerUrl || '#';
+        const photoName = sanitizarString(imagem.photographer || 'Fotógrafo');
+        const sourceUrl = imagem.sourceUrl || '#';
+        
+        cardHtml += `
+            <div class="image-container h-full">
+              <a href="${sourceUrl}" target="_blank" rel="noopener noreferrer" class="image-link" title="Ver imagem original">
+                <img src="${imgUrl}" alt="${imgAlt}" class="w-full h-full object-cover" loading="lazy" />
+                <div class="zoom-icon" aria-hidden="true">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                  </svg>
+                </div>
+              </a>
+              <div class="image-credit">
+                Foto: <a href="${photoUrl}" target="_blank" rel="noopener noreferrer">${photoName}</a>
+              </div>
+            </div>
+        `;
+      } else {
+        // Placeholder se não houver imagem
+        const placeholderText = encodeURIComponent(destino.destino || 'Destino');
+        cardHtml += `
+            <img src="${CONFIG.imagePlaceholderUrl}${placeholderText}" 
+                alt="${sanitizarString(destino.destino)}" class="w-full h-full object-cover" loading="lazy" />
+        `;
+      }
+      
+      // Continuar com as informações do destino
+      cardHtml += `
           </div>
           <div class="w-2/3 p-3">
             <div class="flex justify-between items-start">
               <h3 class="font-bold">${sanitizarString(destino.destino)}, ${sanitizarString(destino.pais)}</h3>
               <span class="text-xs font-medium px-1 py-0.5 rounded" style="background-color: #E0E0E0">
-                ${sanitizarString(destino.codigoPais || 'BR')}
+                ${sanitizarString(destino.codigoPais)}
               </span>
             </div>
             <div class="mt-2 space-y-1 text-xs">
               <p class="flex items-center">
                 <span class="mr-1 w-4 text-center" aria-hidden="true">✈️</span> 
                 <span class="font-medium">Voo:</span> 
-                <span class="ml-1">R$ ${destino.preco?.voo || '1200'}</span>
+                <span class="ml-1">R$ ${destino.preco?.voo || '?'}</span>
               </p>
               <p class="flex items-center">
                 <span class="mr-1 w-4 text-center" aria-hidden="true">🏨</span> 
                 <span class="font-medium">Hotel:</span> 
-                <span class="ml-1">R$ ${destino.preco?.hotel || '250'}/noite</span>
+                <span class="ml-1">R$ ${destino.preco?.hotel || '?'}/noite</span>
               </p>
               <p class="flex items-start mt-2">
                 <span class="mr-1 w-4 text-center flex-shrink-0" aria-hidden="true">🌆</span> 
@@ -688,6 +736,9 @@ BENETRIP.Destinos = (function() {
       document.body.appendChild(DOM.modalContainer);
     }
     
+    // Obter a imagem principal
+    const imagem = surpresa.imagens && surpresa.imagens.length > 0 ? surpresa.imagens[0] : null;
+    
     // Data de viagem
     const dataViagem = surpresa.dataViagem ? 
       formatarData(surpresa.dataViagem.inicio) + ' a ' + formatarData(surpresa.dataViagem.fim) : 
@@ -708,11 +759,42 @@ BENETRIP.Destinos = (function() {
             <div class="absolute top-0 left-0 py-1 px-3 z-10 font-bold text-white" style="background-color: #00A3E0">
               ✨ Destino Surpresa! ✨
             </div>
-            
-            <!-- Usar um bloco de cor em vez de imagem para evitar problemas -->
-            <div class="bg-purple-100 h-56 flex items-center justify-center">
-              <span class="text-4xl font-bold">${surpresa.destino.substr(0, 1)}${surpresa.pais.substr(0, 1)}</span>
+    `;
+    
+    // Adicionar imagem
+    if (imagem) {
+      const imgAlt = sanitizarString(imagem.alt || `${surpresa.destino}, ${surpresa.pais}`);
+      const imgUrl = imagem.url;
+      const photoUrl = imagem.photographerUrl || '#';
+      const photoName = sanitizarString(imagem.photographer || 'Fotógrafo');
+      const sourceUrl = imagem.sourceUrl || '#';
+      
+      modalHtml += `
+            <div class="image-container">
+              <a href="${sourceUrl}" target="_blank" rel="noopener noreferrer" class="image-link" title="Ver imagem original">
+                <img src="${imgUrl}" alt="${imgAlt}" class="w-full h-56 object-cover" />
+                <div class="zoom-icon" aria-hidden="true">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                  </svg>
+                </div>
+              </a>
+              <div class="image-credit">
+                Foto por <a href="${photoUrl}" target="_blank" rel="noopener noreferrer">${photoName}</a>
+              </div>
             </div>
+      `;
+    } else {
+      // Placeholder se não houver imagem
+      const placeholderText = encodeURIComponent(surpresa.destino || 'Destino Surpresa');
+      modalHtml += `
+            <img src="${CONFIG.imagePlaceholderUrl}${placeholderText}" 
+                alt="${sanitizarString(surpresa.destino)}" class="w-full h-56 object-cover" />
+      `;
+    }
+    
+    modalHtml += `
           </div>
         </div>
         
@@ -720,7 +802,7 @@ BENETRIP.Destinos = (function() {
           <div class="flex justify-between items-start">
             <h3 id="modal-title" class="text-xl font-bold">${sanitizarString(surpresa.destino)}, ${sanitizarString(surpresa.pais)}</h3>
             <span class="text-xs font-medium px-1 py-0.5 rounded" style="background-color: #E0E0E0">
-              ${sanitizarString(surpresa.codigoPais || 'CL')}
+              ${sanitizarString(surpresa.codigoPais)}
             </span>
           </div>
           
@@ -728,12 +810,12 @@ BENETRIP.Destinos = (function() {
             <p class="flex items-center">
               <span class="mr-2 w-5 text-center" aria-hidden="true">✈️</span> 
               <span class="font-medium">Estimativa de Voo:</span> 
-              <span class="ml-1">R$ ${surpresa.preco?.voo || '1800'} (ida e volta)</span>
+              <span class="ml-1">R$ ${surpresa.preco?.voo || '?'} (ida e volta)</span>
             </p>
             <p class="flex items-center">
               <span class="mr-2 w-5 text-center" aria-hidden="true">🏨</span> 
               <span class="font-medium">Estimativa de Hotel:</span> 
-              <span class="ml-1">R$ ${surpresa.preco?.hotel || '280'}/noite</span>
+              <span class="ml-1">R$ ${surpresa.preco?.hotel || '?'}/noite</span>
             </p>
             <p class="flex items-center">
               <span class="mr-2 w-5 text-center" aria-hidden="true">🗓️</span> 
@@ -748,14 +830,14 @@ BENETRIP.Destinos = (function() {
               <span>Por que é uma descoberta especial?</span>
             </p>
             <p class="mt-2">
-              ${sanitizarString(surpresa.descricaoEspecial || 'Este é um destino único que combina perfeitamente com o seu estilo de viagem! Com opções de aventuras naturais e cultura vibrante.')}
+              ${sanitizarString(surpresa.descricaoEspecial || 'Este é um destino único que combina perfeitamente com o seu estilo de viagem!')}
             </p>
           </div>
           
           <div class="mt-3 text-sm italic p-3 rounded" style="background-color: rgba(232, 119, 34, 0.1)">
             <p class="flex items-start">
               <span class="mr-2 flex-shrink-0" aria-hidden="true">💬</span>
-              <span>"${sanitizarString(surpresa.comentario || 'Um destino incrível que vai te surpreender com paisagens de tirar o fôlego e experiências únicas!')}"</span>
+              <span>"${sanitizarString(surpresa.comentario || 'Um destino incrível que vai te surpreender!')}"</span>
             </p>
           </div>
           
@@ -763,7 +845,7 @@ BENETRIP.Destinos = (function() {
             <p class="flex items-start">
               <span class="mr-2 flex-shrink-0" aria-hidden="true">🎁</span>
               <span class="font-medium">Curiosidade exclusiva:</span>
-              <span class="ml-1">${sanitizarString(surpresa.curiosidade || 'Este destino é conhecido por sua culinária famosa e tradições únicas que datam de séculos!')}</span>
+              <span class="ml-1">${sanitizarString(surpresa.curiosidade || 'Este destino tem uma característica interessante e inesperada!')}</span>
             </p>
           </div>
           
@@ -812,6 +894,47 @@ BENETRIP.Destinos = (function() {
   // Adiciona estilos para os containers de imagens e créditos
   const style = document.createElement('style');
   style.textContent = `
+    .image-container {
+      position: relative;
+      overflow: hidden;
+    }
+    .image-credit {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background-color: rgba(0, 0, 0, 0.6);
+      color: white;
+      font-size: 0.7rem;
+      padding: 2px 5px;
+      text-align: right;
+      opacity: 0;
+      transition: opacity 0.2s ease;
+    }
+    .image-container:hover .image-credit {
+      opacity: 1;
+    }
+    .image-credit a {
+      color: #fff;
+      text-decoration: underline;
+    }
+    .zoom-icon {
+      position: absolute;
+      top: 5px;
+      right: 5px;
+      background-color: rgba(0, 0, 0, 0.5);
+      color: white;
+      border-radius: 50%;
+      padding: 3px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      transition: opacity 0.2s ease;
+    }
+    .image-container:hover .zoom-icon {
+      opacity: 1;
+    }
     .fade-in {
       animation: fadeIn 0.5s ease-in-out;
     }
