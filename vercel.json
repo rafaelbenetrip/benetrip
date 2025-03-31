@@ -14,17 +14,16 @@
       "maxDuration": 30
     }
   },
-  "headers": [
-    {
-      "source": "/api/(.*)",
-      "headers": [
-        { "key": "Connection", "value": "keep-alive" },
-        { "key": "Keep-Alive", "value": "timeout=60" },
-        { "key": "Cache-Control", "value": "public, max-age=60, stale-while-revalidate=300" }
-      ]
-    }
-  ],
   "routes": [
+    {
+      "src": "/api/(.*)",
+      "headers": {
+        "Connection": "keep-alive",
+        "Keep-Alive": "timeout=60",
+        "Cache-Control": "public, max-age=60, stale-while-revalidate=300"
+      },
+      "continue": true
+    },
     {
       "src": "/api/recommendations",
       "dest": "/api/recommendations.js"
