@@ -295,10 +295,13 @@ window.BENETRIP_AI = {
   },
   
   // Método para buscar imagens para um destino
-  async buscarImagensParaDestino(destino, pais) {
+  async buscarImagensParaDestino(destino, pais, descricao = '', porque = '') {
     try {
-      const query = `${destino} ${pais} tourism landmark`;
-      console.log(`Buscando imagens para: ${query}`);
+      // Combinar descrição e motivo para melhorar a consulta
+      const descricaoCompleta = `${descricao} ${porque}`.trim();
+      const query = `${destino} ${pais}`;
+      
+      console.log(`Buscando imagens para: ${query} com descrição: ${descricaoCompleta}`);
       
       // URL da API de imagens
       const apiUrl = this.config.imageApiEndpoint;
@@ -310,6 +313,8 @@ window.BENETRIP_AI = {
       // Adicionar parâmetros como query string
       const url = new URL(fullUrl);
       url.searchParams.append('query', query);
+      url.searchParams.append('perPage', 4); // Aumentar para ter mais opções
+      url.searchParams.append('descricao', descricaoCompleta); // Passar a descrição completa para melhorar classificação
       
       console.log('Enviando requisição para API de imagens:', url.toString());
       
@@ -353,6 +358,15 @@ window.BENETRIP_AI = {
           console.log(`Imagens recebidas para ${destino}:`, data.images?.length || 0);
           
           if (data.images && data.images.length > 0) {
+            // Verificar e completar metadados se estiverem faltando
+            data.images = data.images.map(img => ({
+              ...img,
+              photographerUrl: img.photographerUrl || '#',
+              sourceUrl: img.sourceUrl || '#',
+              alt: img.alt || `${destino}, ${pais}`,
+              photographerId: img.photographerId || 'unknown'
+            }));
+            
             return data.images;
           } else {
             throw new Error('Nenhuma imagem encontrada');
@@ -379,14 +393,20 @@ window.BENETRIP_AI = {
           url: `https://source.unsplash.com/featured/?${encodeURIComponent(destino + ' ' + pais)}`,
           source: "unsplash-fallback",
           photographer: "Unsplash",
-          sourceUrl: "https://unsplash.com",
+          photographerId: "unsplash",
+          photographerUrl: "https://unsplash.com",
+          sourceUrl: `https://unsplash.com/s/photos/${encodeURIComponent(destino)}`,
+          downloadUrl: `https://source.unsplash.com/featured/?${encodeURIComponent(destino + ' ' + pais)}`,
           alt: `${destino}, ${pais}`
         },
         {
           url: `https://source.unsplash.com/featured/?${encodeURIComponent(destino + ' tourism')}`,
           source: "unsplash-fallback",
           photographer: "Unsplash",
-          sourceUrl: "https://unsplash.com",
+          photographerId: "unsplash",
+          photographerUrl: "https://unsplash.com",
+          sourceUrl: `https://unsplash.com/s/photos/${encodeURIComponent(destino + '-tourism')}`,
+          downloadUrl: `https://source.unsplash.com/featured/?${encodeURIComponent(destino + ' tourism')}`,
           alt: `${destino}, ${pais} - Atrações turísticas`
         },
         // Adicionar placeholder como último recurso
@@ -394,7 +414,10 @@ window.BENETRIP_AI = {
           url: `https://via.placeholder.com/800x600.png?text=${encodeURIComponent(destino)}`,
           source: "placeholder",
           photographer: "Placeholder",
+          photographerId: "placeholder",
+          photographerUrl: "#",
           sourceUrl: "#",
+          downloadUrl: `https://via.placeholder.com/800x600.png?text=${encodeURIComponent(destino)}`,
           alt: `${destino}, ${pais}`
         }
       ];
@@ -419,7 +442,9 @@ window.BENETRIP_AI = {
         promessasImagens.push(
           this.buscarImagensParaDestino(
             recomendacoesEnriquecidas.topPick.destino,
-            recomendacoesEnriquecidas.topPick.pais
+            recomendacoesEnriquecidas.topPick.pais,
+            recomendacoesEnriquecidas.topPick.descricao,
+            recomendacoesEnriquecidas.topPick.porque
           ).then(imagens => {
             recomendacoesEnriquecidas.topPick.imagens = imagens;
           })
@@ -432,7 +457,9 @@ window.BENETRIP_AI = {
           promessasImagens.push(
             this.buscarImagensParaDestino(
               alternativa.destino,
-              alternativa.pais
+              alternativa.pais,
+              "", // Sem descrição dedicada
+              alternativa.porque // Usar o campo "porque" como descrição
             ).then(imagens => {
               recomendacoesEnriquecidas.alternativas[index].imagens = imagens;
             })
@@ -445,7 +472,9 @@ window.BENETRIP_AI = {
         promessasImagens.push(
           this.buscarImagensParaDestino(
             recomendacoesEnriquecidas.surpresa.destino,
-            recomendacoesEnriquecidas.surpresa.pais
+            recomendacoesEnriquecidas.surpresa.pais,
+            recomendacoesEnriquecidas.surpresa.descricao,
+            recomendacoesEnriquecidas.surpresa.porque
           ).then(imagens => {
             recomendacoesEnriquecidas.surpresa.imagens = imagens;
           })
