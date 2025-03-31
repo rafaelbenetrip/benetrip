@@ -281,6 +281,77 @@ async function callPerplexityAPI(prompt) {
     
     console.log('Enviando requisição para Perplexity...');
     
+    // Define o schema JSON correto
+    const schemaJSON = {
+      type: "object",
+      properties: {
+        topPick: {
+          type: "object",
+          properties: {
+            destino: { type: "string" },
+            pais: { type: "string" },
+            codigoPais: { type: "string" },
+            descricao: { type: "string" },
+            porque: { type: "string" },
+            destaque: { type: "string" },
+            comentario: { type: "string" },
+            preco: {
+              type: "object",
+              properties: {
+                voo: { type: "number" },
+                hotel: { type: "number" }
+              },
+              required: ["voo", "hotel"]
+            }
+          },
+          required: ["destino", "pais", "codigoPais", "descricao", "porque", "destaque", "comentario", "preco"]
+        },
+        alternativas: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              destino: { type: "string" },
+              pais: { type: "string" },
+              codigoPais: { type: "string" },
+              porque: { type: "string" },
+              preco: {
+                type: "object",
+                properties: {
+                  voo: { type: "number" },
+                  hotel: { type: "number" }
+                },
+                required: ["voo", "hotel"]
+              }
+            },
+            required: ["destino", "pais", "codigoPais", "porque", "preco"]
+          }
+        },
+        surpresa: {
+          type: "object",
+          properties: {
+            destino: { type: "string" },
+            pais: { type: "string" },
+            codigoPais: { type: "string" },
+            descricao: { type: "string" },
+            porque: { type: "string" },
+            destaque: { type: "string" },
+            comentario: { type: "string" },
+            preco: {
+              type: "object",
+              properties: {
+                voo: { type: "number" },
+                hotel: { type: "number" }
+              },
+              required: ["voo", "hotel"]
+            }
+          },
+          required: ["destino", "pais", "codigoPais", "descricao", "porque", "destaque", "comentario", "preco"]
+        }
+      },
+      required: ["topPick", "alternativas", "surpresa"]
+    };
+    
     const response = await axios({
       method: 'post',
       url: 'https://api.perplexity.ai/chat/completions',
@@ -304,68 +375,7 @@ async function callPerplexityAPI(prompt) {
         max_tokens: 4000,
         response_format: {
           type: "json_schema",
-          json_schema: {
-            type: "object",
-            properties: {
-              topPick: {
-                type: "object",
-                properties: {
-                  destino: { type: "string" },
-                  pais: { type: "string" },
-                  codigoPais: { type: "string" },
-                  descricao: { type: "string" },
-                  porque: { type: "string" },
-                  destaque: { type: "string" },
-                  comentario: { type: "string" },
-                  preco: {
-                    type: "object",
-                    properties: {
-                      voo: { type: "number" },
-                      hotel: { type: "number" }
-                    }
-                  }
-                }
-              },
-              alternativas: {
-                type: "array",
-                items: {
-                  type: "object",
-                  properties: {
-                    destino: { type: "string" },
-                    pais: { type: "string" },
-                    codigoPais: { type: "string" },
-                    porque: { type: "string" },
-                    preco: {
-                      type: "object",
-                      properties: {
-                        voo: { type: "number" },
-                        hotel: { type: "number" }
-                      }
-                    }
-                  }
-                }
-              },
-              surpresa: {
-                type: "object",
-                properties: {
-                  destino: { type: "string" },
-                  pais: { type: "string" },
-                  codigoPais: { type: "string" },
-                  descricao: { type: "string" },
-                  porque: { type: "string" },
-                  destaque: { type: "string" },
-                  comentario: { type: "string" },
-                  preco: {
-                    type: "object",
-                    properties: {
-                      voo: { type: "number" },
-                      hotel: { type: "number" }
-                    }
-                  }
-                }
-              }
-            }
-          }
+          json_schema: schemaJSON
         }
       },
       timeout: 60000 // Aumentado para 60 segundos
@@ -417,6 +427,9 @@ async function callOpenAIAPI(prompt) {
     
     console.log('Enviando requisição para OpenAI...');
     
+    // Modificar o prompt para pedir explicitamente resposta em JSON
+    const jsonPrompt = `${prompt}\n\nIMPORTANTE: Sua resposta deve ser exclusivamente um objeto JSON válido, sem nenhum texto adicional.`;
+    
     const response = await axios({
       method: 'post',
       url: 'https://api.openai.com/v1/chat/completions',
@@ -429,16 +442,16 @@ async function callOpenAIAPI(prompt) {
         messages: [
           {
             role: "system",
-            content: "Você é a Tripinha, uma cachorra vira-lata caramelo especialista em viagens da Benetrip."
+            content: "Você é a Tripinha, uma cachorra vira-lata caramelo especialista em viagens da Benetrip. Você deve retornar somente JSON válido, sem texto adicional."
           },
           {
             role: "user",
-            content: prompt
+            content: jsonPrompt
           }
         ],
         temperature: 0.7,
-        max_tokens: 4000,
-        response_format: { "type": "json_object" }
+        max_tokens: 4000
+        // Removido o response_format que estava causando erro
       },
       timeout: 60000 // Aumentado para 60 segundos
     });
@@ -447,7 +460,22 @@ async function callOpenAIAPI(prompt) {
       throw new Error('Formato de resposta da OpenAI inválido');
     }
     
-    return response.data.choices[0].message.content;
+    // Tentar extrair apenas o JSON da resposta caso haja texto adicional
+    const content = response.data.choices[0].message.content;
+    try {
+      // Tentar encontrar JSON em uma string que pode conter texto adicional
+      const jsonMatch = content.match(/(\{[\s\S]*\})/);
+      if (jsonMatch && jsonMatch[0]) {
+        // Validar se é JSON válido
+        JSON.parse(jsonMatch[0]);
+        return jsonMatch[0];
+      }
+      // Se não encontrou padrão JSON ou não é válido, retornar conteúdo original
+      return content;
+    } catch (parseError) {
+      console.log('Erro ao extrair JSON da resposta:', parseError);
+      return content; // Retornar conteúdo original se não conseguir extrair JSON
+    }
   } catch (error) {
     console.error('Erro detalhado na chamada à API OpenAI:');
     
@@ -471,6 +499,9 @@ async function callClaudeAPI(prompt) {
     
     console.log('Enviando requisição para Claude...');
     
+    // Adicionar instrução específica para o Claude retornar apenas JSON
+    const jsonPrompt = `${prompt}\n\nIMPORTANTE: Sua resposta deve ser APENAS o objeto JSON, sem NENHUM texto adicional antes ou depois. Não inclua marcação de código, comentários ou explicações.`;
+    
     const response = await axios({
       method: 'post',
       url: 'https://api.anthropic.com/v1/messages',
@@ -484,8 +515,12 @@ async function callClaudeAPI(prompt) {
         max_tokens: 4000,
         messages: [
           {
+            role: "system",
+            content: "Você é a Tripinha, uma cachorra vira-lata caramelo especialista em viagens da Benetrip. Responda apenas com JSON puro, sem texto adicional."
+          },
+          {
             role: "user",
-            content: prompt
+            content: jsonPrompt
           }
         ]
       },
@@ -496,7 +531,22 @@ async function callClaudeAPI(prompt) {
       throw new Error('Formato de resposta do Claude inválido');
     }
     
-    return response.data.content[0].text;
+    // Tentar extrair apenas o JSON da resposta caso haja texto adicional
+    const content = response.data.content[0].text;
+    try {
+      // Tentar encontrar JSON em uma string que pode conter texto adicional
+      const jsonMatch = content.match(/(\{[\s\S]*\})/);
+      if (jsonMatch && jsonMatch[0]) {
+        // Validar se é JSON válido
+        JSON.parse(jsonMatch[0]);
+        return jsonMatch[0];
+      }
+      // Se não encontrou padrão JSON ou não é válido, retornar conteúdo original
+      return content;
+    } catch (parseError) {
+      console.log('Erro ao extrair JSON da resposta:', parseError);
+      return content; // Retornar conteúdo original se não conseguir extrair JSON
+    }
   } catch (error) {
     console.error('Erro detalhado na chamada à API Claude:');
     
