@@ -4,9 +4,9 @@ window.BENETRIP_AI = {
   config: {
     apiEndpoint: '/api/recommendations', // Endpoint Vercel
     imageApiEndpoint: '/api/image-search', // Endpoint Vercel para busca de imagens
-    apiTimeout: 60000, // 60 segundos de timeout
-    maxRetries: 2, // Número máximo de tentativas em caso de falha
-    retryDelay: 1000, // Tempo entre tentativas em ms
+    apiTimeout: 90000, // 90 segundos de timeout (aumentado de 60s para 90s)
+    maxRetries: 3, // Número máximo de tentativas em caso de falha (aumentado de 2 para 3)
+    retryDelay: 2000, // Tempo entre tentativas em ms (aumentado para melhor backoff)
     mockData: { // Dados de exemplo para casos de falha
       "topPick": {
         "destino": "Medellín",
@@ -180,7 +180,7 @@ window.BENETRIP_AI = {
     return new Promise(resolve => setTimeout(resolve, ms));
   },
   
-  // Método para chamar a API do Vercel com suporte a retry
+  // Método para chamar a API do Vercel com suporte a retry e exponential backoff
   async callVercelAPI(data, retryCount = 0) {
     try {
       console.log(`Chamando API Vercel com dados:`, data);
@@ -194,51 +194,80 @@ window.BENETRIP_AI = {
       
       console.log('Enviando requisição para:', fullUrl);
 
-      // Criar controller para timeout
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), this.config.apiTimeout);
-      
-      const response = await fetch(fullUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(data),
-        signal: controller.signal
-      });
-      
-      // Limpar timeout
-      clearTimeout(timeoutId);
-      
-      // Verificar se a resposta foi bem-sucedida
-      if (!response.ok) {
-        let errorText = '';
-        try {
-          const errorData = await response.json();
-          errorText = errorData.error || `${response.status} ${response.statusText}`;
-        } catch (e) {
-          errorText = `${response.status} ${response.statusText}`;
+      // Implementar retry automático com exponential backoff
+      let retryDelay = this.config.retryDelay;
+      let maxRetries = this.config.maxRetries;
+      let lastError = null;
+
+      for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        if (attempt > 0) {
+          console.log(`Tentativa ${attempt} de ${maxRetries} após ${retryDelay}ms...`);
+          await this.sleep(retryDelay);
+          retryDelay *= 2; // Backoff exponencial
         }
-        throw new Error(`Erro na API: ${errorText}`);
+
+        try {
+          // Criar controller para timeout
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), this.config.apiTimeout);
+          
+          const response = await fetch(fullUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Connection': 'keep-alive',
+              'Keep-Alive': 'timeout=90'
+            },
+            body: JSON.stringify(data),
+            signal: controller.signal,
+            // Adicionando keepalive para manter conexão
+            keepalive: true
+          });
+          
+          // Limpar timeout
+          clearTimeout(timeoutId);
+          
+          // Verificar se a resposta foi bem-sucedida
+          if (!response.ok) {
+            let errorText = '';
+            try {
+              const errorData = await response.json();
+              errorText = errorData.error || `${response.status} ${response.statusText}`;
+            } catch (e) {
+              errorText = `${response.status} ${response.statusText}`;
+            }
+            throw new Error(`Erro na API: ${errorText}`);
+          }
+          
+          const responseData = await response.json();
+          console.log('Resposta da API Vercel recebida:', responseData.tipo || 'sem tipo');
+          
+          return responseData;
+          
+        } catch (fetchError) {
+          lastError = fetchError;
+          console.warn(`Tentativa ${attempt + 1} falhou:`, fetchError.message);
+          
+          // Verificar se é um erro de timeout ou aborto
+          const isTimeoutError = fetchError.name === 'AbortError' || fetchError.message.includes('timeout');
+          
+          // Verificar se temos mais tentativas disponíveis
+          if (attempt < maxRetries) {
+            // Continuar para próxima tentativa
+            this.reportarProgresso('retry', 50, `Tentando novamente... (${attempt + 1}/${maxRetries})`);
+            continue;
+          } else {
+            // Se for a última tentativa, lançar o erro
+            throw fetchError;
+          }
+        }
       }
       
-      const responseData = await response.json();
-      console.log('Resposta da API Vercel recebida:', responseData.tipo || 'sem tipo');
+      // Se chegou aqui, todas as tentativas falharam
+      throw lastError || new Error('Falha em todas as tentativas de conexão');
       
-      return responseData;
     } catch (error) {
       console.error('Erro ao chamar API Vercel:', error);
-      
-      // Verificar se é um erro de timeout ou aborto
-      const isTimeoutError = error.name === 'AbortError' || error.message.includes('timeout');
-      
-      // Tentar novamente se for um erro de rede ou timeout e não exceder o máximo de tentativas
-      if ((isTimeoutError || error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) 
-          && retryCount < this.config.maxRetries) {
-        console.log(`Tentativa ${retryCount + 1} falhou. Tentando novamente em ${this.config.retryDelay}ms...`);
-        await this.sleep(this.config.retryDelay);
-        return this.callVercelAPI(data, retryCount + 1);
-      }
       
       // Se for erro de CORS, tentar com formatos alternativos
       if (error.message.includes('CORS') && retryCount < 1) {
@@ -284,35 +313,62 @@ window.BENETRIP_AI = {
       
       console.log('Enviando requisição para API de imagens:', url.toString());
       
-      // Criar controller para timeout
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), this.config.apiTimeout);
-      
-      const response = await fetch(url.toString(), {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        signal: controller.signal
-      });
-      
-      // Limpar timeout
-      clearTimeout(timeoutId);
-      
-      // Verificar se a resposta foi bem-sucedida
-      if (!response.ok) {
-        throw new Error(`Erro ao buscar imagens: ${response.status} ${response.statusText}`);
+      // Implementar retry automático com exponential backoff
+      let retryDelay = this.config.retryDelay;
+      let maxRetries = 2; // Menos tentativas para imagens
+      let lastError = null;
+
+      for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        if (attempt > 0) {
+          console.log(`Tentativa de imagem ${attempt} de ${maxRetries} após ${retryDelay}ms...`);
+          await this.sleep(retryDelay);
+          retryDelay *= 2; // Backoff exponencial
+        }
+
+        try {
+          // Criar controller para timeout
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 30000); // Timeout mais curto para imagens
+          
+          const response = await fetch(url.toString(), {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+              'Connection': 'keep-alive'
+            },
+            signal: controller.signal,
+            keepalive: true
+          });
+          
+          // Limpar timeout
+          clearTimeout(timeoutId);
+          
+          // Verificar se a resposta foi bem-sucedida
+          if (!response.ok) {
+            throw new Error(`Erro ao buscar imagens: ${response.status} ${response.statusText}`);
+          }
+          
+          const data = await response.json();
+          console.log(`Imagens recebidas para ${destino}:`, data.images?.length || 0);
+          
+          if (data.images && data.images.length > 0) {
+            return data.images;
+          } else {
+            throw new Error('Nenhuma imagem encontrada');
+          }
+          
+        } catch (fetchError) {
+          lastError = fetchError;
+          console.warn(`Tentativa de imagem ${attempt + 1} falhou:`, fetchError.message);
+          
+          // Continuar para próxima tentativa exceto na última
+          if (attempt === maxRetries) throw fetchError;
+        }
       }
       
-      const data = await response.json();
-      console.log(`Imagens recebidas para ${destino}:`, data.images?.length || 0);
+      // Se chegou aqui, todas as tentativas falharam
+      throw lastError || new Error('Falha em todas as tentativas de busca de imagens');
       
-      if (data.images && data.images.length > 0) {
-        return data.images;
-      } else {
-        console.warn(`Nenhuma imagem encontrada para ${destino}, usando placeholders`);
-        throw new Error('Nenhuma imagem encontrada');
-      }
     } catch (error) {
       console.error(`Erro ao buscar imagens para ${destino}:`, error);
       
@@ -346,40 +402,58 @@ window.BENETRIP_AI = {
       // Clonar objeto para não modificar o original
       const recomendacoesEnriquecidas = JSON.parse(JSON.stringify(recomendacoes));
       
+      // Array de promessas para buscar todas as imagens em paralelo
+      const promessasImagens = [];
+      
       // Buscar imagens para o destino principal
       if (recomendacoesEnriquecidas.topPick) {
-        const imagens = await this.buscarImagensParaDestino(
-          recomendacoesEnriquecidas.topPick.destino,
-          recomendacoesEnriquecidas.topPick.pais
+        promessasImagens.push(
+          this.buscarImagensParaDestino(
+            recomendacoesEnriquecidas.topPick.destino,
+            recomendacoesEnriquecidas.topPick.pais
+          ).then(imagens => {
+            recomendacoesEnriquecidas.topPick.imagens = imagens;
+          })
         );
-        recomendacoesEnriquecidas.topPick.imagens = imagens;
       }
       
-      // Buscar imagens para as alternativas (de forma sequencial para evitar sobrecarga)
+      // Buscar imagens para as alternativas
       if (recomendacoesEnriquecidas.alternativas && Array.isArray(recomendacoesEnriquecidas.alternativas)) {
-        for (let i = 0; i < recomendacoesEnriquecidas.alternativas.length; i++) {
-          const alternativa = recomendacoesEnriquecidas.alternativas[i];
-          
-          // Adicionar um pequeno delay para evitar muitas requisições simultâneas
-          await this.sleep(300);
-          
-          const imagens = await this.buscarImagensParaDestino(
-            alternativa.destino,
-            alternativa.pais
+        recomendacoesEnriquecidas.alternativas.forEach((alternativa, index) => {
+          promessasImagens.push(
+            this.buscarImagensParaDestino(
+              alternativa.destino,
+              alternativa.pais
+            ).then(imagens => {
+              recomendacoesEnriquecidas.alternativas[index].imagens = imagens;
+            })
           );
-          alternativa.imagens = imagens;
-        }
+        });
       }
       
       // Buscar imagens para o destino surpresa
       if (recomendacoesEnriquecidas.surpresa) {
-        await this.sleep(300);
-        const imagens = await this.buscarImagensParaDestino(
-          recomendacoesEnriquecidas.surpresa.destino,
-          recomendacoesEnriquecidas.surpresa.pais
+        promessasImagens.push(
+          this.buscarImagensParaDestino(
+            recomendacoesEnriquecidas.surpresa.destino,
+            recomendacoesEnriquecidas.surpresa.pais
+          ).then(imagens => {
+            recomendacoesEnriquecidas.surpresa.imagens = imagens;
+          })
         );
-        recomendacoesEnriquecidas.surpresa.imagens = imagens;
       }
+      
+      // Aguardar todas as promessas com um timeout geral
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Timeout ao buscar imagens')), 45000)
+      );
+      
+      // Race entre o timeout e todas as promessas de imagens
+      await Promise.race([
+        // allSettled permite que algumas falhem sem interromper todo o processo
+        Promise.allSettled(promessasImagens),
+        timeoutPromise
+      ]);
       
       this.reportarProgresso('imagens', 100, 'Imagens carregadas com sucesso!');
       
@@ -494,7 +568,7 @@ window.BENETRIP_AI = {
         // Reportar progresso
         this.reportarProgresso('processando', 30, 'Analisando suas preferências de viagem...');
         
-        // Chamar a API do Vercel para processamento com Perplexity
+        // Chamar a API do Vercel para processamento com IA
         const resposta = await this.callVercelAPI(preferenciasUsuario);
         
         // Verificar formato da resposta
