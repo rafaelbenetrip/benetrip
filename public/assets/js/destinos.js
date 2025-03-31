@@ -20,8 +20,11 @@ BENETRIP.Destinos = (function() {
     progressUpdateInterval: 300, // ms
     progressInitialValue: 10, // %
     progressMaxValue: 90, // %
-    imagePlaceholderUrl: 'https://via.placeholder.com/400x224.png?text=',
-    dateFormat: { year: 'numeric', month: 'long', day: 'numeric' }
+    // Usar placeholders locais ao invés de via.placeholder.com
+    fallbackImageUrl: '/assets/images/placeholder-destination.jpg',
+    tripinhaImageUrl: '/assets/images/tripinha/avatar.png', // Imagem padrão da Tripinha
+    dateFormat: { year: 'numeric', month: 'long', day: 'numeric' },
+    maxRetries: 2 // Limite de tentativas de recarga de imagens
   };
   
   // Estado interno do módulo
@@ -30,7 +33,8 @@ BENETRIP.Destinos = (function() {
     progress: 0,
     updateInterval: null,
     recomendacoes: null,
-    selectedDestination: null
+    selectedDestination: null,
+    imageLoadAttempts: {} // Rastrear tentativas de carregamento de imagem
   };
   
   // API pública
@@ -52,8 +56,94 @@ BENETRIP.Destinos = (function() {
     iniciarCarregamento();
     carregarRecomendacoes();
     
+    // Verificar disponibilidade de recursos essenciais
+    verificarRecursos();
+    
     // Retornar a API pública para encadeamento
     return publicAPI;
+  }
+  
+  /**
+   * Verifica a disponibilidade de recursos essenciais
+   */
+  function verificarRecursos() {
+    // Verificar existência da imagem da Tripinha
+    const tripinhaImgTest = new Image();
+    tripinhaImgTest.onload = function() {
+      // Imagem encontrada, atualizar config
+      CONFIG.tripinhaImageUrl = this.src;
+    };
+    tripinhaImgTest.onerror = function() {
+      // Tentar caminho alternativo
+      console.warn('Imagem da Tripinha não encontrada em: ' + this.src + '. Tentando alternativa...');
+      const alternativas = [
+        '/assets/images/tripinha/avatar.png',
+        '/assets/images/avatar.png',
+        '/assets/images/mascot.png',
+        '/assets/avatar.png'
+      ];
+      
+      // Tentar cada alternativa
+      testNextImage(0);
+      
+      function testNextImage(index) {
+        if (index >= alternativas.length) {
+          console.error('Nenhuma imagem da Tripinha encontrada. Usando fallback.');
+          CONFIG.tripinhaImageUrl = CONFIG.fallbackImageUrl;
+          return;
+        }
+        
+        const imgTest = new Image();
+        imgTest.onload = function() {
+          CONFIG.tripinhaImageUrl = alternativas[index];
+          console.log('Imagem da Tripinha encontrada em: ' + CONFIG.tripinhaImageUrl);
+          
+          // Se já renderizou a mensagem, atualizar
+          if (DOM.mensagemTripinha && !DOM.mensagemTripinha.querySelector('img[src="' + CONFIG.tripinhaImageUrl + '"]')) {
+            const img = DOM.mensagemTripinha.querySelector('img');
+            if (img) img.src = CONFIG.tripinhaImageUrl;
+          }
+        };
+        imgTest.onerror = function() {
+          testNextImage(index + 1);
+        };
+        imgTest.src = alternativas[index];
+      }
+    };
+    tripinhaImgTest.src = '/assets/images/tripinha/avatar-feliz.png';
+    
+    // Verificar se o placeholder está funcionando
+    const placeholderTest = new Image();
+    placeholderTest.onerror = function() {
+      console.warn('Serviço de placeholder não está disponível. Usando imagem local de fallback.');
+      // Desativar o serviço externo e usar imagem local
+      CONFIG.useLocalPlaceholder = true;
+    };
+    placeholderTest.src = 'https://via.placeholder.com/10x10?text=test';
+  }
+  
+  /**
+   * Gera URL para imagem placeholder
+   * @param {string} text - Texto a ser exibido no placeholder
+   * @param {number} width - Largura da imagem
+   * @param {number} height - Altura da imagem
+   * @return {string} URL da imagem placeholder
+   */
+  function getPlaceholderUrl(text, width = 400, height = 224) {
+    // Se estiver usando placeholder local ou o placeholder externo falhou
+    if (CONFIG.useLocalPlaceholder) {
+      return CONFIG.fallbackImageUrl;
+    }
+    
+    try {
+      // Tentar serviço externo
+      const encodedText = encodeURIComponent(text || 'Destino');
+      return `https://via.placeholder.com/${width}x${height}?text=${encodedText}`;
+    } catch (e) {
+      // Em caso de erro, usar imagem local
+      console.warn('Erro ao gerar URL de placeholder:', e);
+      return CONFIG.fallbackImageUrl;
+    }
   }
   
   /**
@@ -78,8 +168,13 @@ BENETRIP.Destinos = (function() {
    */
   function registrarEventListeners() {
     // Navegação e controles
-    DOM.btnVoltar.addEventListener('click', voltarParaChat);
-    DOM.btnTentarNovamente.addEventListener('click', carregarRecomendacoes);
+    if (DOM.btnVoltar) {
+      DOM.btnVoltar.addEventListener('click', voltarParaChat);
+    }
+    
+    if (DOM.btnTentarNovamente) {
+      DOM.btnTentarNovamente.addEventListener('click', carregarRecomendacoes);
+    }
     
     // Escutar eventos de progresso da IA
     document.addEventListener('benetrip_progress', handleProgressEvent);
@@ -97,6 +192,55 @@ BENETRIP.Destinos = (function() {
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') fecharModal();
     });
+    
+    // Adicionar handler global para erros de imagem
+    document.addEventListener('error', function(e) {
+      const target = e.target;
+      if (target.tagName === 'IMG') {
+        handleImageError(target);
+      }
+    }, true);
+  }
+  
+  /**
+   * Manipula erros de carregamento de imagem
+   * @param {HTMLImageElement} img - Elemento de imagem que falhou
+   */
+  function handleImageError(img) {
+    const imgSrc = img.src;
+    const imgId = img.dataset.id || imgSrc;
+    
+    // Verificar o número de tentativas
+    if (!state.imageLoadAttempts[imgId]) {
+      state.imageLoadAttempts[imgId] = 1;
+    } else {
+      state.imageLoadAttempts[imgId]++;
+    }
+    
+    // Se excedeu o número máximo de tentativas, usar imagem de fallback
+    if (state.imageLoadAttempts[imgId] > CONFIG.maxRetries) {
+      console.warn(`Falha ao carregar imagem após ${CONFIG.maxRetries} tentativas: ${imgSrc}`);
+      img.src = CONFIG.fallbackImageUrl;
+      img.onerror = null; // Evitar loop infinito
+      return;
+    }
+    
+    // Se a imagem é da Tripinha, tentar usar a configurada
+    if (imgSrc.includes('tripinha') || imgSrc.includes('avatar-feliz')) {
+      console.log('Tentando imagem alternativa para Tripinha:', CONFIG.tripinhaImageUrl);
+      img.src = CONFIG.tripinhaImageUrl;
+      return;
+    }
+    
+    // Se é um placeholder, tentar usar local
+    if (imgSrc.includes('placeholder')) {
+      img.src = CONFIG.fallbackImageUrl;
+      return;
+    }
+    
+    // Para outras imagens, tentar placeholder
+    const alt = img.alt || 'Imagem';
+    img.src = getPlaceholderUrl(alt);
   }
   
   /**
@@ -243,11 +387,11 @@ BENETRIP.Destinos = (function() {
     try {
       // Ocultar loading e mostrar conteúdo com animação
       setTimeout(() => {
-        DOM.containerLoading.style.display = 'none';
-        DOM.containerConteudo.classList.remove('hidden');
+        if (DOM.containerLoading) DOM.containerLoading.style.display = 'none';
+        if (DOM.containerConteudo) DOM.containerConteudo.classList.remove('hidden');
         
         // Aplicar classe de animação para entrada de conteúdo
-        DOM.containerConteudo.classList.add('fade-in');
+        if (DOM.containerConteudo) DOM.containerConteudo.classList.add('fade-in');
         
         // Renderizar todos os componentes
         renderizarMensagemTripinha();
@@ -274,9 +418,9 @@ BENETRIP.Destinos = (function() {
    * Mostra a tela de carregamento
    */
   function mostrarTelaCarregando() {
-    DOM.containerLoading.style.display = 'block';
-    DOM.containerConteudo.classList.add('hidden');
-    DOM.containerErro.classList.add('hidden');
+    if (DOM.containerLoading) DOM.containerLoading.style.display = 'block';
+    if (DOM.containerConteudo) DOM.containerConteudo.classList.add('hidden');
+    if (DOM.containerErro) DOM.containerErro.classList.add('hidden');
     atualizarBarraProgresso(CONFIG.progressInitialValue);
   }
   
@@ -292,9 +436,9 @@ BENETRIP.Destinos = (function() {
     }
     
     // Ocultar carregamento e mostrar erro
-    DOM.containerLoading.style.display = 'none';
-    DOM.containerConteudo.classList.add('hidden');
-    DOM.containerErro.classList.remove('hidden');
+    if (DOM.containerLoading) DOM.containerLoading.style.display = 'none';
+    if (DOM.containerConteudo) DOM.containerConteudo.classList.add('hidden');
+    if (DOM.containerErro) DOM.containerErro.classList.remove('hidden');
     
     // Exibir mensagem de erro
     const mensagemErro = document.getElementById('mensagem-erro');
@@ -343,7 +487,7 @@ BENETRIP.Destinos = (function() {
       <div class="bg-gray-50 p-4 rounded-lg shadow-sm border border-gray-200">
         <div class="flex items-start gap-3">
           <div class="w-12 h-12 rounded-full overflow-hidden flex-shrink-0">
-            <img src="assets/images/tripinha/avatar-feliz.png" alt="Tripinha animada" class="w-full h-full object-cover" loading="eager" />
+            <img src="${CONFIG.tripinhaImageUrl}" alt="Tripinha animada" class="w-full h-full object-cover" loading="eager" onerror="BENETRIP.Destinos.handleImageError(this)" />
           </div>
           <p class="text-gray-800 leading-relaxed">
             Eu farejei por aí e encontrei alguns destinos incríveis para sua aventura! 🐾 Veja minha escolha top — 
@@ -388,7 +532,7 @@ BENETRIP.Destinos = (function() {
         html += `
           <div class="bg-gray-200 h-36 image-container">
             <a href="${sourceUrl}" target="_blank" rel="noopener noreferrer" class="image-link" title="Ver imagem original">
-              <img src="${imgUrl}" alt="${imgAlt}" class="w-full h-full object-cover" loading="${i === 0 ? 'eager' : 'lazy'}" />
+              <img src="${imgUrl}" alt="${imgAlt}" class="w-full h-full object-cover" loading="${i === 0 ? 'eager' : 'lazy'}" data-id="destaque-${i}" onerror="BENETRIP.Destinos.handleImageError(this)" />
               <div class="zoom-icon" aria-hidden="true">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                   <circle cx="11" cy="11" r="8"></circle>
@@ -408,8 +552,13 @@ BENETRIP.Destinos = (function() {
         const placeholderText = encodeURIComponent(destino.destino || 'Destino');
         html += `
           <div class="bg-gray-200 h-36">
-            <img src="${CONFIG.imagePlaceholderUrl}${placeholderText}" 
-                alt="${sanitizarString(destino.destino)}" class="w-full h-full object-cover" loading="${i === 0 ? 'eager' : 'lazy'}" />
+            <img 
+              src="${CONFIG.fallbackImageUrl}" 
+              alt="${sanitizarString(destino.destino)}" 
+              class="w-full h-full object-cover" 
+              loading="${i === 0 ? 'eager' : 'lazy'}" 
+              data-id="destaque-placeholder-${i}" 
+            />
           </div>
         `;
       }
@@ -528,7 +677,7 @@ BENETRIP.Destinos = (function() {
         cardHtml += `
             <div class="image-container h-full">
               <a href="${sourceUrl}" target="_blank" rel="noopener noreferrer" class="image-link" title="Ver imagem original">
-                <img src="${imgUrl}" alt="${imgAlt}" class="w-full h-full object-cover" loading="lazy" />
+                <img src="${imgUrl}" alt="${imgAlt}" class="w-full h-full object-cover" loading="lazy" data-id="alt-${index}" onerror="BENETRIP.Destinos.handleImageError(this)" />
                 <div class="zoom-icon" aria-hidden="true">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <circle cx="11" cy="11" r="8"></circle>
@@ -543,10 +692,13 @@ BENETRIP.Destinos = (function() {
         `;
       } else {
         // Placeholder se não houver imagem
-        const placeholderText = encodeURIComponent(destino.destino || 'Destino');
         cardHtml += `
-            <img src="${CONFIG.imagePlaceholderUrl}${placeholderText}" 
-                alt="${sanitizarString(destino.destino)}" class="w-full h-full object-cover" loading="lazy" />
+            <img src="${CONFIG.fallbackImageUrl}" 
+                alt="${sanitizarString(destino.destino)}" 
+                class="w-full h-full object-cover" 
+                loading="lazy" 
+                data-id="alt-placeholder-${index}" 
+            />
         `;
       }
       
@@ -772,7 +924,7 @@ BENETRIP.Destinos = (function() {
       modalHtml += `
             <div class="image-container">
               <a href="${sourceUrl}" target="_blank" rel="noopener noreferrer" class="image-link" title="Ver imagem original">
-                <img src="${imgUrl}" alt="${imgAlt}" class="w-full h-56 object-cover" />
+                <img src="${imgUrl}" alt="${imgAlt}" class="w-full h-56 object-cover" data-id="surpresa-img" onerror="BENETRIP.Destinos.handleImageError(this)" />
                 <div class="zoom-icon" aria-hidden="true">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <circle cx="11" cy="11" r="8"></circle>
@@ -787,10 +939,12 @@ BENETRIP.Destinos = (function() {
       `;
     } else {
       // Placeholder se não houver imagem
-      const placeholderText = encodeURIComponent(surpresa.destino || 'Destino Surpresa');
       modalHtml += `
-            <img src="${CONFIG.imagePlaceholderUrl}${placeholderText}" 
-                alt="${sanitizarString(surpresa.destino)}" class="w-full h-56 object-cover" />
+            <img src="${CONFIG.fallbackImageUrl}" 
+                alt="${sanitizarString(surpresa.destino)}" 
+                class="w-full h-56 object-cover" 
+                data-id="surpresa-placeholder" 
+            />
       `;
     }
     
@@ -884,6 +1038,9 @@ BENETRIP.Destinos = (function() {
     // Mover o foco para o modal para leitores de tela
     DOM.modalContainer.setAttribute('aria-hidden', 'false');
   }
+  
+  // Adicionar o método handleImageError à API pública para poder ser chamado inline
+  publicAPI.handleImageError = handleImageError;
   
   // Retornar a API pública
   return publicAPI;
