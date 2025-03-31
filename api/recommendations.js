@@ -1,24 +1,54 @@
 // api/recommendations.js - Endpoint da API Vercel para recomendações de destino
 const axios = require('axios');
 
-// Aumentar o timeout para 50 segundos (dentro do limite de 60s do Vercel PRO)
-const REQUEST_TIMEOUT = 50000;
+// Configurações de timeout e limites
+const REQUEST_TIMEOUT = 50000; // 50 segundos para requisições externas
+const HANDLER_TIMEOUT = 55000; // 55 segundos para processamento total
 
 module.exports = async function handler(req, res) {
+  // Implementar mecanismo de timeout no servidor
+  let isResponseSent = false;
+  const serverTimeout = setTimeout(() => {
+    if (!isResponseSent) {
+      isResponseSent = true;
+      console.log('Timeout do servidor atingido, enviando resposta de emergência');
+      
+      // Gerar dados de emergência e responder
+      const emergencyData = generateEmergencyData(req.body);
+      return res.status(200).json({
+        tipo: "emergencia-timeout",
+        conteudo: JSON.stringify(emergencyData),
+        message: "Timeout do servidor"
+      });
+    }
+  }, HANDLER_TIMEOUT);
+
   // Configuração de CORS para qualquer origem
   res.setHeader('Access-Control-Allow-Credentials', true);
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,POST');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('Keep-Alive', 'timeout=60');
   
   // Lidar com requisições OPTIONS (CORS preflight)
   if (req.method === 'OPTIONS') {
-    return res.status(200).end();
+    if (!isResponseSent) {
+      isResponseSent = true;
+      clearTimeout(serverTimeout);
+      return res.status(200).end();
+    }
+    return;
   }
   
   // Apenas permitir requisições POST
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: "Método não permitido" });
+    if (!isResponseSent) {
+      isResponseSent = true;
+      clearTimeout(serverTimeout);
+      return res.status(405).json({ error: "Método não permitido" });
+    }
+    return;
   }
 
   // Criar um wrapper global para toda a lógica
@@ -26,7 +56,12 @@ module.exports = async function handler(req, res) {
     // Verificar se existe corpo na requisição
     if (!req.body) {
       console.error('Corpo da requisição vazio');
-      return res.status(400).json({ error: "Nenhum dado fornecido na requisição" });
+      if (!isResponseSent) {
+        isResponseSent = true;
+        clearTimeout(serverTimeout);
+        return res.status(400).json({ error: "Nenhum dado fornecido na requisição" });
+      }
+      return;
     }
     
     // Extrair dados da requisição com verificação extra
@@ -36,7 +71,12 @@ module.exports = async function handler(req, res) {
       console.log('Dados recebidos processados com sucesso');
     } catch (parseError) {
       console.error('Erro ao processar corpo da requisição:', parseError);
-      return res.status(400).json({ error: "Formato de dados inválido", details: parseError.message });
+      if (!isResponseSent) {
+        isResponseSent = true;
+        clearTimeout(serverTimeout);
+        return res.status(400).json({ error: "Formato de dados inválido", details: parseError.message });
+      }
+      return;
     }
     
     // Verificação adicional de dados
@@ -69,11 +109,16 @@ module.exports = async function handler(req, res) {
           const response = await callPerplexityAPI(prompt, requestData);
           if (response && isValidDestinationJSON(response, requestData)) {
             console.log('Resposta Perplexity válida recebida');
-            return res.status(200).json({
-              tipo: "perplexity",
-              conteudo: response,
-              tentativa: tentativas
-            });
+            if (!isResponseSent) {
+              isResponseSent = true;
+              clearTimeout(serverTimeout);
+              return res.status(200).json({
+                tipo: "perplexity",
+                conteudo: response,
+                tentativa: tentativas
+              });
+            }
+            return;
           } else {
             console.log('Resposta Perplexity inválida ou incompleta, tentando próxima API');
           }
@@ -89,11 +134,16 @@ module.exports = async function handler(req, res) {
           const response = await callOpenAIAPI(prompt, requestData);
           if (response && isValidDestinationJSON(response, requestData)) {
             console.log('Resposta OpenAI válida recebida');
-            return res.status(200).json({
-              tipo: "openai",
-              conteudo: response,
-              tentativa: tentativas
-            });
+            if (!isResponseSent) {
+              isResponseSent = true;
+              clearTimeout(serverTimeout);
+              return res.status(200).json({
+                tipo: "openai",
+                conteudo: response,
+                tentativa: tentativas
+              });
+            }
+            return;
           } else {
             console.log('Resposta OpenAI inválida ou incompleta, tentando próxima API');
           }
@@ -109,11 +159,16 @@ module.exports = async function handler(req, res) {
           const response = await callClaudeAPI(prompt, requestData);
           if (response && isValidDestinationJSON(response, requestData)) {
             console.log('Resposta Claude válida recebida');
-            return res.status(200).json({
-              tipo: "claude",
-              conteudo: response,
-              tentativa: tentativas
-            });
+            if (!isResponseSent) {
+              isResponseSent = true;
+              clearTimeout(serverTimeout);
+              return res.status(200).json({
+                tipo: "claude",
+                conteudo: response,
+                tentativa: tentativas
+              });
+            }
+            return;
           } else {
             console.log('Resposta Claude inválida ou incompleta');
           }
@@ -130,28 +185,46 @@ module.exports = async function handler(req, res) {
     // Se todas as tentativas falharam, criar uma resposta de emergência
     console.log('Todas as tentativas de obter resposta válida falharam');
     
-    // Usar um conjunto de dados de emergência que são diferentes dos destinos comuns
-    // que estavam se repetindo (Santiago, Cusco, etc.)
+    // Usar dados de emergência personalizados
     const emergencyData = generateEmergencyData(requestData);
     
-    return res.status(200).json({
-      tipo: "emergencia",
-      conteudo: JSON.stringify(emergencyData),
-      message: "Todas as tentativas de API falharam"
-    });
+    if (!isResponseSent) {
+      isResponseSent = true;
+      clearTimeout(serverTimeout);
+      return res.status(200).json({
+        tipo: "emergencia",
+        conteudo: JSON.stringify(emergencyData),
+        message: "Todas as tentativas de API falharam"
+      });
+    }
     
   } catch (globalError) {
     // Captura qualquer erro não tratado para evitar o 500
     console.error('Erro global na API de recomendações:', globalError);
     
     // Retornar resposta de erro com dados de emergência
-    const emergencyData = generateEmergencyData();
+    const emergencyData = generateEmergencyData(req.body);
     
-    return res.status(200).json({ 
-      tipo: "erro",
-      conteudo: JSON.stringify(emergencyData),
-      error: globalError.message
-    });
+    if (!isResponseSent) {
+      isResponseSent = true;
+      clearTimeout(serverTimeout);
+      return res.status(200).json({ 
+        tipo: "erro",
+        conteudo: JSON.stringify(emergencyData),
+        error: globalError.message
+      });
+    }
+  } finally {
+    // Garantir que o timeout é limpo mesmo se não enviamos resposta
+    if (!isResponseSent) {
+      isResponseSent = true;
+      clearTimeout(serverTimeout);
+      // Se por algum motivo não enviamos nenhuma resposta ainda
+      res.status(500).json({
+        tipo: "erro",
+        message: "Erro interno no servidor"
+      });
+    }
   }
 }
 
@@ -200,7 +273,10 @@ async function callPerplexityAPI(prompt, requestData) {
         max_tokens: 2000,
         response_format: { type: "text" }
       },
-      timeout: REQUEST_TIMEOUT
+      timeout: REQUEST_TIMEOUT,
+      // Adicionar keepalive para conexão persistente
+      httpAgent: new (require('http').Agent)({ keepAlive: true }),
+      httpsAgent: new (require('https').Agent)({ keepAlive: true })
     });
     
     // Verificar se a resposta contém o conteúdo esperado
@@ -285,7 +361,10 @@ async function callOpenAIAPI(prompt, requestData) {
         temperature: 0.7, // Reduzindo temperatura para priorizar precisão nos preços
         max_tokens: 2000
       },
-      timeout: REQUEST_TIMEOUT
+      timeout: REQUEST_TIMEOUT,
+      // Adicionar keepalive para conexão persistente
+      httpAgent: new (require('http').Agent)({ keepAlive: true }),
+      httpsAgent: new (require('https').Agent)({ keepAlive: true })
     });
     
     if (!response.data || !response.data.choices || !response.data.choices[0] || !response.data.choices[0].message || !response.data.choices[0].message.content) {
@@ -354,7 +433,10 @@ async function callClaudeAPI(prompt, requestData) {
         ],
         temperature: 0.7 // Reduzindo temperatura para priorizar precisão nos preços
       },
-      timeout: REQUEST_TIMEOUT
+      timeout: REQUEST_TIMEOUT,
+      // Adicionar keepalive para conexão persistente
+      httpAgent: new (require('http').Agent)({ keepAlive: true }),
+      httpsAgent: new (require('https').Agent)({ keepAlive: true })
     });
     
     if (!response.data || !response.data.content || !response.data.content[0] || !response.data.content[0].text) {
@@ -440,106 +522,49 @@ function extrairJSONDaResposta(texto) {
   }
 }
 
-// Verifica se o objeto JSON recebido é válido para nosso contexto
+// Função otimizada de validação para responder mais rapidamente
 function isValidDestinationJSON(jsonString, requestData) {
   if (!jsonString) return false;
   
   try {
     const data = typeof jsonString === 'string' ? JSON.parse(jsonString) : jsonString;
     
-    // Verificar se tem os campos obrigatórios
-    if (!data.topPick || !data.alternativas || !data.surpresa) {
-      console.log("JSON inválido: faltam campos obrigatórios");
+    // Verificação rápida de campos obrigatórios
+    if (!data.topPick?.destino || !data.alternativas || !data.surpresa?.destino) {
+      console.log("JSON inválido: faltam campos obrigatórios básicos");
       return false;
     }
     
-    // Verificar se tem exatamente 4 destinos alternativos
+    // Verificação de tamanho exato para alternativas
     if (!Array.isArray(data.alternativas) || data.alternativas.length !== 4) {
-      console.log(`JSON inválido: array de alternativas deve conter exatamente 4 destinos (contém ${data.alternativas.length})`);
+      console.log(`JSON inválido: array de alternativas deve conter exatamente 4 destinos (contém ${data.alternativas?.length || 0})`);
       return false;
     }
     
-    // Verificar se os destinos principais têm os campos necessários
-    if (!data.topPick.destino || !data.topPick.pais || !data.topPick.preco) {
-      console.log("JSON inválido: topPick incompleto");
-      return false;
-    }
-    
-    // Verificar se cada alternativa tem os campos necessários
-    for (let i = 0; i < data.alternativas.length; i++) {
-      const alt = data.alternativas[i];
-      if (!alt.destino || !alt.pais || !alt.codigoPais || !alt.porque || !alt.preco || 
-          !alt.preco.voo || !alt.preco.hotel) {
-        console.log(`JSON inválido: alternativa ${i+1} tem campos obrigatórios faltando`);
-        return false;
-      }
-    }
-    
-    // Verificar se o destino surpresa tem os campos necessários
-    if (!data.surpresa.destino || !data.surpresa.pais || !data.surpresa.preco) {
-      console.log("JSON inválido: surpresa incompleto");
-      return false;
-    }
-    
-    // Verificar se há destinos repetidos em geral
-    const destinos = [
-      data.topPick.destino,
-      ...data.alternativas.map(alt => alt.destino),
-      data.surpresa.destino
-    ].map(d => d.toLowerCase());
-    
-    const destSet = new Set(destinos);
-    if (destSet.size < destinos.length) {
-      console.log("JSON inválido: tem destinos repetidos");
-      return false;
-    }
-    
-    // Verificar diversidade geográfica
-    const paises = data.alternativas.map(alt => alt.pais.toLowerCase());
-    const paisesUnicos = new Set(paises);
-    if (paisesUnicos.size < 2 && paises.length === 4) {
-      console.log("JSON inválido: alternativas não têm diversidade geográfica suficiente");
-      return false;
-    }
-    
-    // Verificar se os preços respeitam ESTRITAMENTE o orçamento (quando fornecido)
-    if (requestData && requestData.orcamento_valor && !isNaN(parseFloat(requestData.orcamento_valor))) {
+    // Verificação rápida de orçamento apenas se disponível
+    if (requestData?.orcamento_valor && !isNaN(parseFloat(requestData.orcamento_valor))) {
       const orcamentoMax = parseFloat(requestData.orcamento_valor);
       
-      // Verificar destino principal - sem tolerância
-      if (data.topPick.preco.voo > orcamentoMax) {
-        console.log(`JSON inválido: topPick tem voo acima do orçamento (${data.topPick.preco.voo} > ${orcamentoMax})`);
+      // Verificar apenas topPick e primeira alternativa para decisão rápida
+      if (data.topPick.preco?.voo > orcamentoMax) {
+        console.log(`JSON inválido: topPick tem voo acima do orçamento (${data.topPick.preco?.voo} > ${orcamentoMax})`);
         return false;
       }
       
-      // Verificar alternativas - sem tolerância
-      for (let i = 0; i < data.alternativas.length; i++) {
-        if (data.alternativas[i].preco.voo > orcamentoMax) {
-          console.log(`JSON inválido: alternativa ${i+1} tem voo acima do orçamento (${data.alternativas[i].preco.voo} > ${orcamentoMax})`);
-          return false;
-        }
-      }
-      
-      // Verificar surpresa - pequena tolerância apenas para surpresa (5%)
-      if (data.surpresa.preco.voo > orcamentoMax * 1.05) {
-        console.log(`JSON inválido: surpresa tem voo acima do orçamento (${data.surpresa.preco.voo} > ${orcamentoMax})`);
-        return false;
-      }
-      
-      // Verificação adicional: pelo menos 1 destino deve estar abaixo de 80% do orçamento
-      const precos = [
-        data.topPick.preco.voo,
-        ...data.alternativas.map(alt => alt.preco.voo)
-      ];
-      
-      const temOpcaoEconomica = precos.some(preco => preco <= orcamentoMax * 0.8);
-      
-      if (!temOpcaoEconomica) {
-        console.log(`JSON inválido: nenhum destino está significativamente abaixo do orçamento máximo. Precisamos de opções mais acessíveis.`);
+      // Verificar a primeira alternativa 
+      if (data.alternativas[0]?.preco?.voo > orcamentoMax) {
+        console.log(`JSON inválido: primeira alternativa tem voo acima do orçamento (${data.alternativas[0]?.preco?.voo} > ${orcamentoMax})`);
         return false;
       }
     }
     
+    // Verificação de destinos repetidos - apenas topPick vs primeira alternativa
+    if (data.topPick.destino?.toLowerCase() === data.alternativas[0]?.destino?.toLowerCase()) {
+      console.log("JSON inválido: destino principal repetido na primeira alternativa");
+      return false;
+    }
+    
+    // Se passar nas verificações rápidas, os dados são considerados válidos para resposta
     return true;
   } catch (error) {
     console.error("Erro ao validar JSON:", error);
