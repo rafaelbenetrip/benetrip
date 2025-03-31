@@ -1,17 +1,18 @@
 {
-  "version": 2,
-  "builds": [
-    {
-      "src": "api/**/*.js",
-      "use": "@vercel/node"
-    }
-  ],
-  "routes": [
-    {
-      "src": "/api/(.*)",
-      "dest": "/api/$1"
-    }
-  ],
-  "installCommand": "npm install",
-  "outputDirectory": "public"
+  "name": "benetrip",
+  "version": "1.0.0",
+  "private": true,
+  "engines": {
+    "node": "18.x"
+  },
+  "dependencies": {
+    "axios": "1.4.0",
+    "dotenv": "^16.3.1",
+    "openai": "^4.20.1",
+    "@anthropic-ai/sdk": "^0.10.0",
+    "pexels": "^1.4.0"
+  },
+  "devDependencies": {
+    "@vercel/node": "^3.0.11"
+  }
 }
