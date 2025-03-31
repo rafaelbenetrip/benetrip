@@ -53,26 +53,37 @@ module.exports = async function handler(req, res) {
       prompt = "Recomende destinos de viagem únicos e personalizados para o Brasil e mundo. Um destino principal, 4 destinos alternativos diferentes entre si, e um destino surpresa diferente dos demais. Seja criativo e evite destinos óbvios ou repetidos. Responda em formato JSON.";
     }
     
-    // Tentar múltiplas vezes a consulta à API com diferentes modelos
-    // até um deles retornar uma resposta válida
+    // Estratégia de múltiplas tentativas com diferentes variações de prompt
+    const maxTentativas = 5; // Aumentado para 5 tentativas
     let tentativas = 0;
-    const maxTentativas = 3;
+    
+    // Array de variações de prompt para promover diversidade nas tentativas subsequentes
+    const promptVariations = [
+      "", // Primeira tentativa com o prompt original
+      "\n\nIMPORTANTE: Sugira destinos CRIATIVOS e ÚNICOS. Faça um misto entre destinos alternativos e menos óbvios e destinos conhecidos, sempre adequando às preferências indicadas.",
+      "\n\nIMPORTANTE: Seja criativo e evite destinos comuns como Santiago, Cusco, Buenos Aires ou Montevidéu. Forneça opções em diferentes continentes e alternativas variadas.",
+      "\n\nIMPORTANTE: Surpreenda com destinos fora do comum que realmente despertem interesse. Sugira lugares desconhecidos pela maioria dos viajantes mas com excelente infraestrutura turística.",
+      "\n\nIMPORTANTE: Foque exclusivamente em destinos incomuns e surpreendentes, evitando completamente os mais populares. Busque joias escondidas que poucos conhecem."
+    ];
     
     while (tentativas < maxTentativas) {
-      tentativas++;
-      console.log(`Tentativa ${tentativas} de ${maxTentativas}`);
+      // Construir o prompt atual com uma das variações para estimular diferentes respostas
+      const currentPromptVariation = promptVariations[Math.min(tentativas, promptVariations.length - 1)];
+      const currentPrompt = `${prompt}${currentPromptVariation}`;
+      
+      console.log(`Tentativa ${tentativas + 1} de ${maxTentativas}`);
       
       // 1. Tentar Perplexity primeiro
       if (process.env.PERPLEXITY_API_KEY) {
         try {
           console.log('Chamando API Perplexity...');
-          const response = await callPerplexityAPI(prompt);
+          const response = await callPerplexityAPI(currentPrompt);
           if (response && isValidDestinationJSON(response)) {
             console.log('Resposta Perplexity válida recebida');
             return res.status(200).json({
               tipo: "perplexity",
               conteudo: response,
-              tentativa: tentativas
+              tentativa: tentativas + 1
             });
           } else {
             console.log('Resposta Perplexity inválida ou incompleta, tentando próxima API');
@@ -86,13 +97,13 @@ module.exports = async function handler(req, res) {
       if (process.env.OPENAI_API_KEY) {
         try {
           console.log('Chamando API OpenAI...');
-          const response = await callOpenAIAPI(prompt);
+          const response = await callOpenAIAPI(currentPrompt);
           if (response && isValidDestinationJSON(response)) {
             console.log('Resposta OpenAI válida recebida');
             return res.status(200).json({
               tipo: "openai",
               conteudo: response,
-              tentativa: tentativas
+              tentativa: tentativas + 1
             });
           } else {
             console.log('Resposta OpenAI inválida ou incompleta, tentando próxima API');
@@ -106,13 +117,13 @@ module.exports = async function handler(req, res) {
       if (process.env.CLAUDE_API_KEY) {
         try {
           console.log('Chamando API Claude...');
-          const response = await callClaudeAPI(prompt);
+          const response = await callClaudeAPI(currentPrompt);
           if (response && isValidDestinationJSON(response)) {
             console.log('Resposta Claude válida recebida');
             return res.status(200).json({
               tipo: "claude",
               conteudo: response,
-              tentativa: tentativas
+              tentativa: tentativas + 1
             });
           } else {
             console.log('Resposta Claude inválida ou incompleta');
@@ -122,35 +133,87 @@ module.exports = async function handler(req, res) {
         }
       }
       
-      // Se chegamos aqui, todas as tentativas falharam nesta iteração
-      // Vamos modificar o prompt para a próxima tentativa para incentivar mais criatividade
-      prompt = `${prompt}\n\nIMPORTANTE: Sugira destinos CRIATIVOS e ÚNICOS. Faça um misto entre destinos alternativos e menos óbvios e destinos conhecidos, sempre adequando às preferências indicadas.`;
+      // Incrementar tentativas e aplicar um pequeno delay antes da próxima rodada
+      tentativas++;
+      
+      // Aplicar um delay crescente entre tentativas (backoff exponencial)
+      if (tentativas < maxTentativas) {
+        const delayMs = Math.min(1000 * Math.pow(2, tentativas - 1), 8000); // Máximo de 8 segundos
+        console.log(`Aguardando ${delayMs}ms antes da próxima tentativa...`);
+        await new Promise(resolve => setTimeout(resolve, delayMs));
+      }
     }
     
-    // Se todas as tentativas falharam, criar uma resposta de emergência
+    // Se chegamos aqui, todas as tentativas falharam
     console.log('Todas as tentativas de obter resposta válida falharam');
     
-    // Usar um conjunto de dados de emergência que são diferentes dos destinos comuns
-    // que estavam se repetindo (Santiago, Cusco, etc.)
-    const emergencyData = generateEmergencyData(requestData);
+    // Fazer uma última tentativa com um prompt drasticamente simplificado
+    try {
+      const simplifiedPrompt = `Forneça recomendações de destinos de viagem em formato JSON válido. Inclua no mínimo:
+      {
+        "topPick": {
+          "destino": "Nome da Cidade",
+          "pais": "Nome do País",
+          "descricao": "Breve descrição",
+          "preco": { "voo": 1000, "hotel": 200 }
+        },
+        "alternativas": [
+          {
+            "destino": "Nome da Cidade",
+            "pais": "Nome do País",
+            "preco": { "voo": 1000, "hotel": 200 }
+          }
+        ],
+        "surpresa": {
+          "destino": "Nome da Cidade",
+          "pais": "Nome do País",
+          "descricao": "Breve descrição",
+          "preco": { "voo": 1000, "hotel": 200 }
+        }
+      }`;
+      
+      console.log('Fazendo tentativa final com prompt simplificado');
+      
+      // Tentar cada serviço uma vez mais com o prompt simplificado
+      let finalResponse = null;
+      
+      if (process.env.PERPLEXITY_API_KEY) {
+        finalResponse = await callPerplexityAPI(simplifiedPrompt);
+      }
+      
+      if (!finalResponse && process.env.OPENAI_API_KEY) {
+        finalResponse = await callOpenAIAPI(simplifiedPrompt);
+      }
+      
+      if (!finalResponse && process.env.CLAUDE_API_KEY) {
+        finalResponse = await callClaudeAPI(simplifiedPrompt);
+      }
+      
+      if (finalResponse) {
+        return res.status(200).json({
+          tipo: "simplificado",
+          conteudo: finalResponse,
+          message: "Resposta obtida com prompt simplificado após falhas"
+        });
+      }
+    } catch (finalError) {
+      console.error('Erro na tentativa final:', finalError);
+    }
     
-    return res.status(200).json({
-      tipo: "emergencia",
-      conteudo: JSON.stringify(emergencyData),
-      message: "Todas as tentativas de API falharam"
+    // Se ainda não temos resposta, retornar erro
+    return res.status(500).json({
+      erro: "Falha ao obter recomendações de destino",
+      message: "Não foi possível gerar recomendações de viagem após múltiplas tentativas."
     });
     
   } catch (globalError) {
     // Captura qualquer erro não tratado para evitar o 500
     console.error('Erro global na API de recomendações:', globalError);
     
-    // Retornar resposta de erro com dados de emergência
-    const emergencyData = generateEmergencyData();
-    
-    return res.status(200).json({ 
-      tipo: "erro",
-      conteudo: JSON.stringify(emergencyData),
-      error: globalError.message
+    // Retornar resposta de erro clara
+    return res.status(500).json({ 
+      erro: "Erro interno no serviço de recomendações",
+      message: globalError.message
     });
   }
 }
@@ -267,7 +330,8 @@ async function callOpenAIAPI(prompt) {
           }
         ],
         temperature: 0.9, // Aumentando a temperatura para mais criatividade
-        max_tokens: 3000
+        max_tokens: 3000,
+        response_format: { "type": "json_object" } // Forçar formato JSON na resposta
       },
       timeout: REQUEST_TIMEOUT
     });
@@ -645,264 +709,4 @@ function getFamaDestinoText(value) {
     2: "mistura de ambos"
   };
   return options[value] || "qualquer";
-}
-
-// Função para gerar dados de emergência personalizados baseados no perfil
-function generateEmergencyData(dadosUsuario = {}) {
-  // Determinar o tipo de destino baseado nas preferências
-  const preferencia = dadosUsuario.preferencia_viagem || 0;
-  const companhia = dadosUsuario.companhia || 0;
-  const quantidadePessoas = dadosUsuario.quantidade_familia || dadosUsuario.quantidade_amigos || 1;
-  
-  // Vamos ter alguns conjuntos de destinos por tipo de viagem
-  const destinosPorPreferencia = {
-    // Relaxamento (0)
-    0: [
-      {
-        topPick: {
-          destino: "Jericoacoara",
-          pais: "Brasil",
-          codigoPais: "BR",
-          descricao: "Paraíso de dunas, lagoas e praias no Ceará",
-          porque: "Combinação perfeita de praias paradisíacas e ambiente relaxado",
-          destaque: "Pôr do sol na Duna do Pôr do Sol com show de capoeira",
-          comentario: "Au au! Jeri tem dunas INCRÍVEIS para cavar e praias sem fim para correr! E aquelas redes dentro d'água? Paraíso canino!",
-          preco: { voo: 1200, hotel: 280 }
-        },
-        alternativas: [
-          {
-            destino: "Maragogi",
-            pais: "Brasil",
-            codigoPais: "BR",
-            porque: "As 'piscinas naturais' garantem relaxamento total em águas cristalinas",
-            preco: { voo: 1100, hotel: 250 }
-          },
-          {
-            destino: "Ilhabela",
-            pais: "Brasil",
-            codigoPais: "BR",
-            porque: "Combina praias tranquilas com natureza exuberante, perfeito para descanso",
-            preco: { voo: 900, hotel: 320 }
-          },
-          {
-            destino: "Punta Cana",
-            pais: "República Dominicana",
-            codigoPais: "DO",
-            porque: "Resorts all-inclusive em praias de areia branca com coqueiros",
-            preco: { voo: 2800, hotel: 480 }
-          },
-          {
-            destino: "Maldivas",
-            pais: "Maldivas",
-            codigoPais: "MV",
-            porque: "A definição de paraíso com bangalôs sobre águas cristalinas",
-            preco: { voo: 5200, hotel: 950 }
-          }
-        ],
-        surpresa: {
-          destino: "Zanzibar",
-          pais: "Tanzânia",
-          codigoPais: "TZ",
-          descricao: "Ilha paradisíaca com praias de areia branca e cultura swahili única",
-          porque: "Combina praias espetaculares com uma cultura fascinante e pouco explorada pelos brasileiros",
-          destaque: "Tour de especiarias nas fazendas históricas seguido de jantar na praia",
-          comentario: "Zanzibar é um tesouro escondido que você nem imaginava! Praias de cinema, povo acolhedor e uma história cheia de mistérios! Au au de alegria só de pensar! 🐾🌴",
-          preco: { voo: 4200, hotel: 300 }
-        }
-      }
-    ],
-    // Aventura (1)
-    1: [
-      {
-        topPick: {
-          destino: "Alter do Chão",
-          pais: "Brasil",
-          codigoPais: "BR",
-          descricao: "O 'Caribe Amazônico' com praias de rio e floresta intocada",
-          porque: "Oferece aventura em trilhas na Amazônia e esportes aquáticos nos rios cristalinos",
-          destaque: "Passeio de barco até a Ilha do Amor e trilha na Floresta Nacional do Tapajós",
-          comentario: "Alter do Chão tem TANTOS cheiros incríveis para farejar na floresta! E aquela água clarinha pra nadar? Patas para cima, melhor aventura ever! 🐾🌳",
-          preco: { voo: 1400, hotel: 180 }
-        },
-        alternativas: [
-          {
-            destino: "Lençóis Maranhenses",
-            pais: "Brasil",
-            codigoPais: "BR",
-            porque: "Aventura entre dunas e lagoas de água doce em paisagem única no mundo",
-            preco: { voo: 1300, hotel: 220 }
-          },
-          {
-            destino: "Chapada dos Veadeiros",
-            pais: "Brasil",
-            codigoPais: "BR",
-            porque: "Trilhas desafiadoras levam a cachoeiras espetaculares e cânions",
-            preco: { voo: 950, hotel: 170 }
-          },
-          {
-            destino: "Queenstown",
-            pais: "Nova Zelândia",
-            codigoPais: "NZ",
-            porque: "Capital mundial dos esportes radicais com bungee jump e rafting",
-            preco: { voo: 6800, hotel: 340 }
-          },
-          {
-            destino: "San Gil",
-            pais: "Colômbia",
-            codigoPais: "CO",
-            porque: "Destino emergente para esportes radicais com rafting, parapente e mountain bike",
-            preco: { voo: 2100, hotel: 150 }
-          }
-        ],
-        surpresa: {
-          destino: "Komodo",
-          pais: "Indonésia",
-          codigoPais: "ID",
-          descricao: "Ilha habitada pelos famosos dragões de Komodo com snorkel em corais intocados",
-          porque: "Combina aventura selvagem com os dragões e mergulho em alguns dos corais mais preservados do mundo",
-          destaque: "Trekking guiado para observar os dragões de Komodo em seu habitat natural",
-          comentario: "Uau! Komodo tem LAGARTOS GIGANTES! Eu ficaria latindo de longe, mas você vai amar! E os peixes coloridos? O paraíso existe, e é aqui! 🐾🦎",
-          preco: { voo: 5500, hotel: 260 }
-        }
-      }
-    ],
-    // Cultura (2)
-    2: [
-      {
-        topPick: {
-          destino: "Salvador",
-          pais: "Brasil",
-          codigoPais: "BR",
-          descricao: "Capital da cultura afro-brasileira com música, gastronomia e história colonial",
-          porque: "Imersão profunda na cultura afro-brasileira com arquitetura colonial preservada",
-          destaque: "Aula de percussão com mestres locais seguida de jantar de comida baiana tradicional",
-          comentario: "Salvador tem TANTOS cheiros de comida boa e música que faz até cachorro querer sambar! O Pelourinho é demais para passear e farejar história! 🐾🥁",
-          preco: { voo: 1100, hotel: 220 }
-        },
-        alternativas: [
-          {
-            destino: "Ouro Preto",
-            pais: "Brasil",
-            codigoPais: "BR",
-            porque: "Joia do barroco brasileiro com igrejas históricas e gastronomia mineira",
-            preco: { voo: 950, hotel: 190 }
-          },
-          {
-            destino: "Quioto",
-            pais: "Japão",
-            codigoPais: "JP",
-            porque: "Templos milenares e tradições vivas da cultura japonesa",
-            preco: { voo: 5900, hotel: 310 }
-          },
-          {
-            destino: "Istambul",
-            pais: "Turquia",
-            codigoPais: "TR",
-            porque: "Encontro entre Oriente e Ocidente com bazaars, mesquitas e palácios históricos",
-            preco: { voo: 4200, hotel: 270 }
-          },
-          {
-            destino: "Cartagena",
-            pais: "Colômbia",
-            codigoPais: "CO",
-            porque: "Cidade colonial cercada por muralhas com rica herança cultural afro-caribenha",
-            preco: { voo: 1900, hotel: 230 }
-          }
-        ],
-        surpresa: {
-          destino: "Luang Prabang",
-          pais: "Laos",
-          codigoPais: "LA",
-          descricao: "Cidade patrimônio mundial com templos budistas e ritual diário dos monges",
-          porque: "Experiência cultural profunda em um dos destinos mais autênticos e menos turísticos do Sudeste Asiático",
-          destaque: "Cerimônia do Tak Bat, onde centenas de monges coletam oferendas ao amanhecer",
-          comentario: "Luang Prabang tem monges de túnicas laranja e comida TÃO cheirosa nos mercados! Fiquei sentada comportada vendo os monges passarem! Quase ganhei petiscos! 🐾🏮",
-          preco: { voo: 4900, hotel: 180 }
-        }
-      }
-    ],
-    // Urbano (3)
-    3: [
-      {
-        topPick: {
-          destino: "São Paulo",
-          pais: "Brasil",
-          codigoPais: "BR",
-          descricao: "Metrópole vibrante com os melhores restaurantes, compras e vida noturna",
-          porque: "Oferece diversidade gastronômica imbatível e compras de classe mundial",
-          destaque: "Tour gastronômico pelos bares da Vila Madalena seguido de balada premium",
-          comentario: "São Paulo tem TANTOS cheiros diferentes e restaurantes pet friendly! Tem até sorveteria para cachorro! Amo passear na Paulista aos domingos! 🐾🌆",
-          preco: { voo: 800, hotel: 280 }
-        },
-        alternativas: [
-          {
-            destino: "Dubai",
-            pais: "Emirados Árabes Unidos",
-            codigoPais: "AE",
-            porque: "Shopping de luxo, arquitetura futurista e experiências urbanas exclusivas",
-            preco: { voo: 4800, hotel: 520 }
-          },
-          {
-            destino: "Tóquio",
-            pais: "Japão",
-            codigoPais: "JP",
-            porque: "Mistura de tradição e futuro com tecnologia, moda e gastronomia de ponta",
-            preco: { voo: 5700, hotel: 380 }
-          },
-          {
-            destino: "Nova York",
-            pais: "Estados Unidos",
-            codigoPais: "US",
-            porque: "A capital cultural do mundo com teatros, museus, compras e vida noturna",
-            preco: { voo: 3900, hotel: 450 }
-          },
-          {
-            destino: "Cidade do México",
-            pais: "México",
-            codigoPais: "MX",
-            porque: "Metrópole vibrante com fusão entre cultura histórica e modernidade",
-            preco: { voo: 2800, hotel: 260 }
-          }
-        ],
-        surpresa: {
-          destino: "Beirute",
-          pais: "Líbano",
-          codigoPais: "LB",
-          descricao: "Cidade cosmopolita com vida noturna lendária e gastronomia premiada",
-          porque: "Surpreende com sua cena cultural vibrante, clubes de classe mundial e contrastes arquitetônicos",
-          destaque: "Jantar nos restaurantes badalados de Mar Mikhael seguido de clubes premiados",
-          comentario: "Beirute é INCRÍVEL! Tanta comida cheirosa, música alta e pessoas que adoram fazer carinho em cachorros! A vida noturna é au au de primeira! 🐾🌙",
-          preco: { voo: 4100, hotel: 290 }
-        }
-      }
-    ]
-  };
-  
-  // Selecionar baseado na preferência e variáveis aleatórias para evitar repetições
-  const conjuntoPreferencia = destinosPorPreferencia[preferencia] || destinosPorPreferencia[0];
-  const indiceAleatorio = Math.floor(Math.random() * conjuntoPreferencia.length);
-  
-  // Reordenar alternativas para evitar sempre as mesmas posições
-  const resultado = {...conjuntoPreferencia[indiceAleatorio]};
-  resultado.alternativas = embaralharArray([...resultado.alternativas]).slice(0, 4);
-  
-  return resultado;
-}
-
-// Função auxiliar para embaralhar arrays (útil para reordenar destinos)
-function embaralharArray(array) {
-  let currentIndex = array.length;
-  let randomIndex;
-
-  // Enquanto existirem elementos a serem embaralhados
-  while (currentIndex != 0) {
-    // Escolher um elemento restante
-    randomIndex = Math.floor(Math.random() * currentIndex);
-    currentIndex--;
-
-    // E trocar com o elemento atual
-    [array[currentIndex], array[randomIndex]] = [array[randomIndex], array[currentIndex]];
-  }
-
-  return array;
 }
