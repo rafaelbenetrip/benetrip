@@ -3,7 +3,6 @@ window.BENETRIP_AI = {
   // Configurações do serviço
   config: {
     apiEndpoint: '/api/recommendations', // Endpoint Vercel
-    imageApiEndpoint: '/api/image-search', // Endpoint Vercel para busca de imagens
     apiTimeout: 30000, // 30 segundos de timeout
     maxRetries: 2, // Número máximo de tentativas em caso de falha
     retryDelay: 1000, // Tempo entre tentativas em ms
@@ -265,135 +264,6 @@ window.BENETRIP_AI = {
     }
   },
   
-  // NOVA FUNÇÃO: Método para buscar imagens para um destino
-  async buscarImagensParaDestino(destino, pais) {
-    try {
-      const query = `${destino} ${pais} tourism`;
-      console.log(`Buscando imagens para: ${query}`);
-      
-      // URL da API de imagens
-      const apiUrl = this.config.imageApiEndpoint;
-      const baseUrl = window.location.origin;
-      
-      // Criar URL completa se for relativa
-      const fullUrl = apiUrl.startsWith('http') ? apiUrl : baseUrl + apiUrl;
-      
-      // Adicionar parâmetros como query string
-      const url = new URL(fullUrl);
-      url.searchParams.append('query', query);
-      
-      console.log('Enviando requisição para API de imagens:', url.toString());
-      
-      // Criar controller para timeout
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), this.config.apiTimeout);
-      
-      const response = await fetch(url.toString(), {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        signal: controller.signal
-      });
-      
-      // Limpar timeout
-      clearTimeout(timeoutId);
-      
-      // Verificar se a resposta foi bem-sucedida
-      if (!response.ok) {
-        throw new Error(`Erro ao buscar imagens: ${response.status} ${response.statusText}`);
-      }
-      
-      const data = await response.json();
-      console.log(`Imagens recebidas para ${destino}:`, data.images?.length || 0);
-      
-      if (data.images && data.images.length > 0) {
-        return data.images;
-      } else {
-        console.warn(`Nenhuma imagem encontrada para ${destino}, usando placeholders`);
-        throw new Error('Nenhuma imagem encontrada');
-      }
-    } catch (error) {
-      console.error(`Erro ao buscar imagens para ${destino}:`, error);
-      
-      // Retornar imagens placeholder em caso de erro
-      return [
-        {
-          url: `https://via.placeholder.com/800x600.png?text=${encodeURIComponent(destino)}`,
-          source: "placeholder",
-          photographer: "Placeholder",
-          sourceUrl: "#",
-          alt: `${destino}, ${pais}`
-        },
-        {
-          url: `https://via.placeholder.com/800x600.png?text=${encodeURIComponent(pais)}`,
-          source: "placeholder",
-          photographer: "Placeholder",
-          sourceUrl: "#",
-          alt: `${destino}, ${pais}`
-        }
-      ];
-    }
-  },
-  
-  // NOVA FUNÇÃO: Método para buscar imagens para todos os destinos nas recomendações
-  async enriquecerRecomendacoesComImagens(recomendacoes) {
-    if (!recomendacoes) return recomendacoes;
-    
-    this.reportarProgresso('imagens', 80, 'Buscando imagens para os destinos...');
-    
-    try {
-      // Clonar objeto para não modificar o original
-      const recomendacoesEnriquecidas = JSON.parse(JSON.stringify(recomendacoes));
-      
-      // Buscar imagens para o destino principal
-      if (recomendacoesEnriquecidas.topPick) {
-        const imagens = await this.buscarImagensParaDestino(
-          recomendacoesEnriquecidas.topPick.destino,
-          recomendacoesEnriquecidas.topPick.pais
-        );
-        recomendacoesEnriquecidas.topPick.imagens = imagens;
-      }
-      
-      // Buscar imagens para as alternativas (de forma sequencial para evitar sobrecarga)
-      if (recomendacoesEnriquecidas.alternativas && Array.isArray(recomendacoesEnriquecidas.alternativas)) {
-        for (let i = 0; i < recomendacoesEnriquecidas.alternativas.length; i++) {
-          const alternativa = recomendacoesEnriquecidas.alternativas[i];
-          
-          // Adicionar um pequeno delay para evitar muitas requisições simultâneas
-          await this.sleep(300);
-          
-          const imagens = await this.buscarImagensParaDestino(
-            alternativa.destino,
-            alternativa.pais
-          );
-          alternativa.imagens = imagens;
-        }
-      }
-      
-      // Buscar imagens para o destino surpresa
-      if (recomendacoesEnriquecidas.surpresa) {
-        await this.sleep(300);
-        const imagens = await this.buscarImagensParaDestino(
-          recomendacoesEnriquecidas.surpresa.destino,
-          recomendacoesEnriquecidas.surpresa.pais
-        );
-        recomendacoesEnriquecidas.surpresa.imagens = imagens;
-      }
-      
-      this.reportarProgresso('imagens', 100, 'Imagens carregadas com sucesso!');
-      
-      console.log('Recomendações enriquecidas com imagens:', recomendacoesEnriquecidas);
-      return recomendacoesEnriquecidas;
-    } catch (error) {
-      console.error('Erro ao enriquecer recomendações com imagens:', error);
-      this.reportarProgresso('imagens', 100, 'Erro ao carregar algumas imagens');
-      
-      // Retornar recomendações originais em caso de erro
-      return recomendacoes;
-    }
-  },
-  
   // Método para validar a estrutura dos dados das recomendações
   validarEstruturaDados(dados) {
     // Verificar se dados é nulo ou undefined
@@ -556,15 +426,6 @@ window.BENETRIP_AI = {
               break;
             }
           }
-        }
-        
-        // NOVO: Enriquecer com imagens
-        this.reportarProgresso('imagens', 85, 'Buscando imagens para os destinos...');
-        try {
-          recomendacoes = await this.enriquecerRecomendacoesComImagens(recomendacoes);
-        } catch (imageError) {
-          console.error('Erro ao adicionar imagens às recomendações:', imageError);
-          // Continuar com as recomendações sem imagens
         }
         
         // Reportar progresso final
