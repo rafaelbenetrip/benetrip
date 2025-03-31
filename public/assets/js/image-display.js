@@ -32,7 +32,92 @@ window.BENETRIP_IMAGES = {
       }
     }, true); // Usar fase de captura para pegar erros antes de chegarem ao elemento
     
+    // Injetar CSS para créditos de imagens
+    this.injectImageCreditsCSS();
+    
     return this;
+  },
+  
+  // Injetar CSS para os créditos de imagens
+  injectImageCreditsCSS() {
+    const style = document.createElement('style');
+    style.textContent = `
+      /* Estilos para créditos de imagens */
+      .image-container {
+        position: relative;
+        overflow: hidden;
+        border-radius: 8px;
+      }
+
+      .image-credit {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background-color: rgba(0, 0, 0, 0.6);
+        color: white;
+        padding: 4px 8px;
+        font-size: 10px;
+        transition: opacity 0.3s ease;
+        opacity: 0;
+        text-align: right;
+      }
+
+      .image-container:hover .image-credit {
+        opacity: 1;
+      }
+
+      .image-credit a {
+        color: #ffffff;
+        text-decoration: underline;
+      }
+
+      .image-link {
+        display: block;
+        position: relative;
+        cursor: pointer;
+        width: 100%;
+        height: 100%;
+      }
+
+      .image-link::after {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: rgba(0, 0, 0, 0.1);
+        opacity: 0;
+        transition: opacity 0.3s ease;
+      }
+
+      .image-link:hover::after {
+        opacity: 1;
+      }
+
+      .zoom-icon {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background-color: rgba(255, 255, 255, 0.7);
+        border-radius: 50%;
+        width: 36px;
+        height: 36px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+      }
+
+      .image-link:hover .zoom-icon {
+        opacity: 1;
+      }
+    `;
+    
+    document.head.appendChild(style);
   },
   
   // Verificar se o serviço foi inicializado
@@ -116,6 +201,213 @@ window.BENETRIP_IMAGES = {
     
     // Último recurso: placeholder
     return `${this.config.placeholderUrl}${this.config.sizes[size]}?text=${encodeURIComponent(destination.destino)}`;
+  },
+  
+  // Renderiza uma imagem com créditos
+  renderImageWithCredits(imageData, container, options = {}) {
+    if (!imageData) {
+      console.error('Dados de imagem não fornecidos');
+      return null;
+    }
+    
+    const { 
+      url, 
+      alt, 
+      photographer, 
+      photographerUrl = '#',
+      sourceUrl = '#'
+    } = imageData;
+    
+    // Opções padrão
+    const { 
+      width = '100%',
+      height = 'auto',
+      showCredits = true,
+      clickable = true,
+      aspectRatio = '16/9',
+      className = ''
+    } = options;
+    
+    // Criar elemento container
+    const imageContainer = document.createElement('div');
+    imageContainer.className = 'image-container ' + className;
+    imageContainer.style.width = width;
+    imageContainer.style.height = height;
+    imageContainer.style.aspectRatio = aspectRatio;
+    
+    // Criar link para a fonte original
+    const link = document.createElement('a');
+    link.href = sourceUrl;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    link.className = 'image-link';
+    link.setAttribute('aria-label', `Ver imagem original de ${alt} por ${photographer}`);
+    
+    // Criar elemento de imagem
+    const img = document.createElement('img');
+    img.src = url;
+    img.alt = alt || 'Imagem do destino';
+    img.style.width = '100%';
+    img.style.height = '100%';
+    img.style.objectFit = 'cover';
+    img.loading = 'lazy';
+    img.dataset.photographer = photographer;
+    img.dataset.source = sourceUrl;
+    
+    // Adicionar ícone de zoom se clicável
+    if (clickable) {
+      const zoomIcon = document.createElement('div');
+      zoomIcon.className = 'zoom-icon';
+      zoomIcon.innerHTML = `
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="8"></circle>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          <line x1="11" y1="8" x2="11" y2="14"></line>
+          <line x1="8" y1="11" x2="14" y2="11"></line>
+        </svg>
+      `;
+      link.appendChild(zoomIcon);
+    }
+    
+    // Adicionar imagem ao link
+    link.appendChild(img);
+    
+    // Adicionar link ao container
+    imageContainer.appendChild(link);
+    
+    // Adicionar elemento de créditos se solicitado
+    if (showCredits && photographer) {
+      const creditElement = document.createElement('div');
+      creditElement.className = 'image-credit';
+      
+      if (photographerUrl && photographerUrl !== '#') {
+        creditElement.innerHTML = `Foto por <a href="${photographerUrl}" target="_blank" rel="noopener noreferrer">${photographer}</a>`;
+      } else {
+        creditElement.textContent = `Foto por ${photographer}`;
+      }
+      
+      imageContainer.appendChild(creditElement);
+    }
+    
+    // Adicionar ao container fornecido
+    if (container) {
+      container.appendChild(imageContainer);
+    }
+    
+    return imageContainer;
+  },
+  
+  // Renderiza múltiplas imagens em uma galeria
+  renderImagesGallery(imagesData, container, options = {}) {
+    if (!Array.isArray(imagesData) || imagesData.length === 0) {
+      console.error('Dados de imagem não fornecidos ou inválidos');
+      return null;
+    }
+    
+    // Opções padrão
+    const { 
+      cols = 2,
+      gap = '8px',
+      aspectRatio = '16/9',
+      className = ''
+    } = options;
+    
+    // Criar container de galeria
+    const galleryContainer = document.createElement('div');
+    galleryContainer.className = 'images-gallery ' + className;
+    galleryContainer.style.display = 'grid';
+    galleryContainer.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+    galleryContainer.style.gap = gap;
+    
+    // Renderizar cada imagem
+    imagesData.forEach(imageData => {
+      this.renderImageWithCredits(imageData, galleryContainer, {
+        ...options,
+        width: '100%',
+        height: 'auto',
+        aspectRatio
+      });
+    });
+    
+    // Adicionar ao container fornecido
+    container.appendChild(galleryContainer);
+    
+    return galleryContainer;
+  },
+
+  // Adiciona funcionalidade de renderização direta na imagem do HTML
+  enhanceExistingImage(imgElement, imageData) {
+    if (!imgElement || !imageData) {
+      console.error('Elemento de imagem ou dados não fornecidos');
+      return;
+    }
+    
+    // Substituir src para usar URL da melhor imagem
+    imgElement.src = imageData.url;
+    imgElement.alt = imageData.alt || imgElement.alt;
+    
+    // Verificar se a imagem já está em um container
+    let container = imgElement.parentElement;
+    const alreadyEnhanced = container.classList.contains('image-container');
+    
+    // Se não estiver em um container com a classe correta, criar um novo
+    if (!alreadyEnhanced) {
+      // Criar novo container mantendo características do img existente
+      const width = imgElement.style.width || imgElement.width || '100%';
+      const height = imgElement.style.height || imgElement.height || 'auto';
+      
+      // Substituir a imagem por uma versão melhorada
+      const newContainer = document.createElement('div');
+      newContainer.className = 'image-container';
+      newContainer.style.width = width;
+      newContainer.style.height = height;
+      
+      // Criar link
+      const link = document.createElement('a');
+      link.href = imageData.sourceUrl || '#';
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      link.className = 'image-link';
+      
+      // Mover a imagem para o link
+      container.replaceChild(newContainer, imgElement);
+      link.appendChild(imgElement);
+      newContainer.appendChild(link);
+      
+      container = newContainer;
+      
+      // Adicionar ícone de zoom
+      const zoomIcon = document.createElement('div');
+      zoomIcon.className = 'zoom-icon';
+      zoomIcon.innerHTML = `
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="8"></circle>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          <line x1="11" y1="8" x2="11" y2="14"></line>
+          <line x1="8" y1="11" x2="14" y2="11"></line>
+        </svg>
+      `;
+      link.appendChild(zoomIcon);
+    }
+    
+    // Adicionar créditos
+    if (imageData.photographer) {
+      let creditElement = container.querySelector('.image-credit');
+      
+      if (!creditElement) {
+        creditElement = document.createElement('div');
+        creditElement.className = 'image-credit';
+        container.appendChild(creditElement);
+      }
+      
+      if (imageData.photographerUrl && imageData.photographerUrl !== '#') {
+        creditElement.innerHTML = `Foto por <a href="${imageData.photographerUrl}" target="_blank" rel="noopener noreferrer">${imageData.photographer}</a>`;
+      } else {
+        creditElement.textContent = `Foto por ${imageData.photographer}`;
+      }
+    }
+    
+    return container;
   },
   
   // Verificar imagens de todos os destinos nas recomendações
@@ -260,6 +552,27 @@ if (window.location.hostname === 'localhost' || window.location.hostname === '12
     window.BENETRIP_IMAGES.addDebugButton();
   });
 }
+
+// Compatibilidade com BENETRIP_IMAGE_DISPLAY para métodos já implementados
+window.BENETRIP_IMAGE_DISPLAY = {
+  init() {
+    // Já foi inicializado pelo BENETRIP_IMAGES
+    return window.BENETRIP_IMAGES;
+  },
+  
+  // Repassar métodos para BENETRIP_IMAGES
+  renderImageWithCredits(imageData, container, options = {}) {
+    return window.BENETRIP_IMAGES.renderImageWithCredits(imageData, container, options);
+  },
+  
+  renderImagesGallery(imagesData, container, options = {}) {
+    return window.BENETRIP_IMAGES.renderImagesGallery(imagesData, container, options);
+  },
+  
+  isInitialized() {
+    return window.BENETRIP_IMAGES.isInitialized();
+  }
+};
 
 // Expor para uso global em outros scripts
 window.ImageDebugTools = window.BENETRIP_IMAGES;
