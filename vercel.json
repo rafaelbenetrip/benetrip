@@ -3,10 +3,7 @@
   "builds": [
     {
       "src": "api/*.js",
-      "use": "@vercel/node",
-      "config": {
-        "includeFiles": ["package.json", "package-lock.json", "node_modules/**"]
-      }
+      "use": "@vercel/node"
     },
     {
       "src": "public/**/*",
@@ -16,15 +13,15 @@
   "routes": [
     {
       "src": "/api/recommendations",
-      "dest": "api/recommendations.js"
+      "dest": "/api/recommendations.js"
     },
     {
       "src": "/api/flight-search",
-      "dest": "api/flight-search.js"
+      "dest": "/api/flight-search.js"
     },
     {
       "src": "/api/image-search",
-      "dest": "api/image-search.js"
+      "dest": "/api/image-search.js"
     },
     {
       "src": "/destinos",
