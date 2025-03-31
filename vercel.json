@@ -3,7 +3,7 @@
   "builds": [
     {
       "src": "api/**/*.js",
-      "use": "@vercel/node@2.15.1"
+      "use": "@vercel/node"
     }
   ],
   "routes": [
@@ -11,8 +11,5 @@
       "src": "/api/(.*)",
       "dest": "/api/$1"
     }
-  ],
-  "installCommand": "npm install",
-  "outputDirectory": "public",
-  "public": true
+  ]
 }
