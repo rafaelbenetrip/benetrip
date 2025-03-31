@@ -319,6 +319,15 @@ const BENETRIP_DESTINOS = {
     
     console.log('Renderizando destino destaque:', destino);
     
+    // Verificar se temos imagens disponíveis do serviço de IA
+    const temImagens = destino.imagens && destino.imagens.length > 0;
+    const imagem1 = temImagens ? destino.imagens[0].url : `https://via.placeholder.com/800x600.png?text=${encodeURIComponent(destino.destino)}`;
+    const imagem2 = temImagens && destino.imagens.length > 1 ? destino.imagens[1].url : `https://via.placeholder.com/800x600.png?text=${encodeURIComponent(destino.pais)}`;
+    
+    // Obter informações adicionais para atribuição
+    const fotoCredito1 = temImagens ? `Foto: ${destino.imagens[0].photographer || 'Desconhecido'}` : '';
+    const fotoCredito2 = temImagens && destino.imagens.length > 1 ? `Foto: ${destino.imagens[1].photographer || 'Desconhecido'}` : '';
+    
     container.innerHTML = `
       <div class="border border-gray-200 rounded-lg overflow-hidden shadow-md">
         <div class="relative">
@@ -330,17 +339,19 @@ const BENETRIP_DESTINOS = {
           <div class="grid grid-cols-2 gap-1">
             <div class="bg-gray-200 h-36">
               <img 
-                src="https://source.unsplash.com/featured/?${encodeURIComponent(destino.destino)},landmark" 
-                alt="${destino.destino}" 
+                src="${imagem1}" 
+                alt="${destino.imagens && destino.imagens[0] ? destino.imagens[0].alt : destino.destino}" 
                 class="w-full h-full object-cover"
-                onerror="this.src='https://placehold.co/200x144?text=${encodeURIComponent(destino.destino)}'">
+                onerror="this.onerror=null; this.src='https://via.placeholder.com/400x224?text=${encodeURIComponent(destino.destino)}'"
+                title="${fotoCredito1}">
             </div>
             <div class="bg-gray-200 h-36">
               <img 
-                src="https://source.unsplash.com/featured/?${encodeURIComponent(destino.destino)},travel" 
-                alt="${destino.destino}" 
+                src="${imagem2}" 
+                alt="${destino.imagens && destino.imagens.length > 1 ? destino.imagens[1].alt : `${destino.pais}`}" 
                 class="w-full h-full object-cover"
-                onerror="this.src='https://placehold.co/200x144?text=${encodeURIComponent(destino.destino)}'">
+                onerror="this.onerror=null; this.src='https://via.placeholder.com/400x224?text=${encodeURIComponent(destino.pais)}'"
+                title="${fotoCredito2}">
             </div>
           </div>
         </div>
@@ -420,6 +431,11 @@ const BENETRIP_DESTINOS = {
     const destinosLimitados = destinos.slice(0, 4);
     
     destinosLimitados.forEach(destino => {
+      // Verificar se temos imagens disponíveis do serviço de IA
+      const temImagens = destino.imagens && destino.imagens.length > 0;
+      const imagem = temImagens ? destino.imagens[0].url : `https://via.placeholder.com/120x120?text=${encodeURIComponent(destino.destino)}`;
+      const fotoCredito = temImagens ? `Foto: ${destino.imagens[0].photographer || 'Desconhecido'}` : '';
+      
       const elementoDestino = document.createElement('div');
       elementoDestino.className = 'card-destino border border-gray-200 rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow duration-200 mt-3';
       elementoDestino.dataset.destino = destino.destino;
@@ -428,10 +444,11 @@ const BENETRIP_DESTINOS = {
         <div class="flex">
           <div class="w-1/3">
             <img 
-              src="https://source.unsplash.com/featured/?${encodeURIComponent(destino.destino)}" 
-              alt="${destino.destino}" 
+              src="${imagem}" 
+              alt="${temImagens ? destino.imagens[0].alt : destino.destino}" 
               class="w-full h-full object-cover"
-              onerror="this.src='https://placehold.co/120x120?text=${encodeURIComponent(destino.destino)}'">
+              onerror="this.onerror=null; this.src='https://via.placeholder.com/120x120?text=${encodeURIComponent(destino.destino)}'"
+              title="${fotoCredito}">
           </div>
           <div class="w-2/3 p-3">
             <div class="flex justify-between items-start">
@@ -509,6 +526,11 @@ const BENETRIP_DESTINOS = {
     const destino = this.recomendacoes.surpresa;
     console.log('Mostrando destino surpresa:', destino);
     
+    // Verificar se temos imagens disponíveis do serviço de IA
+    const temImagens = destino.imagens && destino.imagens.length > 0;
+    const imagem = temImagens ? destino.imagens[0].url : `https://via.placeholder.com/400x224?text=${encodeURIComponent(destino.destino)}`;
+    const fotoCredito = temImagens ? `Foto: ${destino.imagens[0].photographer || 'Desconhecido'}` : '';
+    
     // Criar e exibir o modal de destino surpresa
     const modalContainer = document.createElement('div');
     modalContainer.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto';
@@ -531,10 +553,11 @@ const BENETRIP_DESTINOS = {
           <div class="grid grid-cols-1 gap-1">
             <div class="bg-gray-200 h-56">
               <img 
-                src="https://source.unsplash.com/featured/?${encodeURIComponent(destino.destino)},landmark" 
-                alt="${destino.destino}" 
+                src="${imagem}" 
+                alt="${temImagens ? destino.imagens[0].alt : destino.destino}" 
                 class="w-full h-full object-cover"
-                onerror="this.src='https://placehold.co/400x224?text=${encodeURIComponent(destino.destino)}'">
+                onerror="this.onerror=null; this.src='https://via.placeholder.com/400x224?text=${encodeURIComponent(destino.destino)}'"
+                title="${fotoCredito}">
             </div>
           </div>
         </div>
