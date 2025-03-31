@@ -294,10 +294,10 @@ window.BENETRIP_AI = {
     }
   },
   
-  // NOVA FUNÇÃO: Método para buscar imagens para um destino
+  // Método para buscar imagens para um destino
   async buscarImagensParaDestino(destino, pais) {
     try {
-      const query = `${destino} ${pais} tourism`;
+      const query = `${destino} ${pais} tourism landmark`;
       console.log(`Buscando imagens para: ${query}`);
       
       // URL da API de imagens
@@ -334,6 +334,7 @@ window.BENETRIP_AI = {
             method: 'GET',
             headers: {
               'Content-Type': 'application/json',
+              'Cache-Control': 'no-cache',
               'Connection': 'keep-alive'
             },
             signal: controller.signal,
@@ -372,17 +373,25 @@ window.BENETRIP_AI = {
     } catch (error) {
       console.error(`Erro ao buscar imagens para ${destino}:`, error);
       
-      // Retornar imagens placeholder em caso de erro
+      // Retornar imagens FALLBACK mais robustas usando múltiplas estratégias
       return [
         {
-          url: `https://via.placeholder.com/800x600.png?text=${encodeURIComponent(destino)}`,
-          source: "placeholder",
-          photographer: "Placeholder",
-          sourceUrl: "#",
+          url: `https://source.unsplash.com/featured/?${encodeURIComponent(destino + ' ' + pais)}`,
+          source: "unsplash-fallback",
+          photographer: "Unsplash",
+          sourceUrl: "https://unsplash.com",
           alt: `${destino}, ${pais}`
         },
         {
-          url: `https://via.placeholder.com/800x600.png?text=${encodeURIComponent(pais)}`,
+          url: `https://source.unsplash.com/featured/?${encodeURIComponent(destino + ' tourism')}`,
+          source: "unsplash-fallback",
+          photographer: "Unsplash",
+          sourceUrl: "https://unsplash.com",
+          alt: `${destino}, ${pais} - Atrações turísticas`
+        },
+        // Adicionar placeholder como último recurso
+        {
+          url: `https://via.placeholder.com/800x600.png?text=${encodeURIComponent(destino)}`,
           source: "placeholder",
           photographer: "Placeholder",
           sourceUrl: "#",
@@ -392,7 +401,7 @@ window.BENETRIP_AI = {
     }
   },
   
-  // NOVA FUNÇÃO: Método para buscar imagens para todos os destinos nas recomendações
+  // Método para buscar imagens para todos os destinos nas recomendações
   async enriquecerRecomendacoesComImagens(recomendacoes) {
     if (!recomendacoes) return recomendacoes;
     
@@ -632,7 +641,7 @@ window.BENETRIP_AI = {
           }
         }
         
-        // NOVO: Enriquecer com imagens
+        // Enriquecer com imagens
         this.reportarProgresso('imagens', 85, 'Buscando imagens para os destinos...');
         try {
           recomendacoes = await this.enriquecerRecomendacoesComImagens(recomendacoes);
