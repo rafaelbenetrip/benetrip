@@ -16,18 +16,64 @@ function logEvent(type, message, data = {}) {
   return log;
 }
 
+// Classifica o tipo de destino para melhorar a relevância da busca
+function classificarDestino(query, descricao = '') {
+  const lowercaseQuery = query.toLowerCase();
+  const lowercaseDesc = descricao.toLowerCase();
+  
+  // Palavras-chave para classificação
+  const praiaKeywords = ['praia', 'beach', 'mar', 'ocean', 'ilha', 'island', 'caribe', 'caribbean', 'costa'];
+  const montanhaKeywords = ['montanha', 'mountain', 'serra', 'cordilheira', 'alpe', 'pico', 'vale', 'valley', 'hill'];
+  const cidadeKeywords = ['cidade', 'city', 'urbano', 'urban', 'metrópole', 'metropolis', 'capital'];
+  const historicoKeywords = ['histórico', 'historic', 'antigo', 'ancient', 'ruína', 'ruins', 'colonial', 'medieval'];
+  const naturezaKeywords = ['natureza', 'nature', 'parque', 'park', 'nacional', 'national', 'floresta', 'forest', 'selvagem', 'wild'];
+  
+  // Verificar presença de palavras-chave na consulta e descrição
+  let tipoDestino = '';
+  
+  // Testar correspondências
+  if (praiaKeywords.some(kw => lowercaseQuery.includes(kw) || lowercaseDesc.includes(kw))) {
+    tipoDestino = 'beach paradise';
+  } else if (montanhaKeywords.some(kw => lowercaseQuery.includes(kw) || lowercaseDesc.includes(kw))) {
+    tipoDestino = 'mountain landscape';
+  } else if (historicoKeywords.some(kw => lowercaseQuery.includes(kw) || lowercaseDesc.includes(kw))) {
+    tipoDestino = 'historic site';
+  } else if (naturezaKeywords.some(kw => lowercaseQuery.includes(kw) || lowercaseDesc.includes(kw))) {
+    tipoDestino = 'nature landscape';
+  } else if (cidadeKeywords.some(kw => lowercaseQuery.includes(kw) || lowercaseDesc.includes(kw))) {
+    tipoDestino = 'city skyline';
+  }
+  
+  // Se não conseguimos classificar, usar um termo genérico
+  return tipoDestino || 'landmark';
+}
+
 // Função para buscar imagens do Unsplash
 async function fetchUnsplashImages(query, options = {}) {
-  const { perPage = 2, orientation = "landscape", quality = "regular" } = options;
+  const { 
+    perPage = 2, 
+    orientation = "landscape", 
+    quality = "regular",
+    descricao = ""
+  } = options;
+  
+  // Classificar o tipo de destino para melhorar a relevância
+  const tipoDestino = classificarDestino(query, descricao);
+  
+  // Construir query mais precisa
+  const enhancedQuery = `${query} ${tipoDestino} travel destination`;
   
   try {
+    logEvent('info', 'Buscando no Unsplash', { query: enhancedQuery, orientation });
+    
     const response = await axios.get(
       'https://api.unsplash.com/search/photos',
       {
         params: {
-          query: query,
+          query: enhancedQuery,
           per_page: perPage,
-          orientation: orientation
+          orientation: orientation,
+          order_by: "relevant"
         },
         headers: {
           Authorization: `Client-ID ${process.env.UNSPLASH_ACCESS_KEY}`
@@ -39,10 +85,14 @@ async function fetchUnsplashImages(query, options = {}) {
       return {
         success: true,
         images: response.data.results.map(img => ({
-          url: img.urls[quality] || img.urls.regular, // Usa a qualidade especificada
+          url: img.urls[quality] || img.urls.regular,
           source: "unsplash",
           photographer: img.user.name,
-          alt: img.alt_description || query
+          photographerId: img.user.username,
+          photographerUrl: img.user.links.html,
+          sourceUrl: img.links.html,
+          downloadUrl: img.links.download,
+          alt: img.alt_description || `${query} - ${tipoDestino}`
         }))
       };
     }
@@ -60,16 +110,30 @@ async function fetchUnsplashImages(query, options = {}) {
 
 // Função para buscar imagens do Pexels
 async function fetchPexelsImages(query, options = {}) {
-  const { perPage = 2, orientation = "landscape", quality = "large" } = options;
+  const { 
+    perPage = 2, 
+    orientation = "landscape", 
+    quality = "large",
+    descricao = ""
+  } = options;
+  
+  // Classificar o tipo de destino para melhorar a relevância
+  const tipoDestino = classificarDestino(query, descricao);
+  
+  // Construir query mais precisa
+  const enhancedQuery = `${query} ${tipoDestino} travel destination`;
   
   try {
+    logEvent('info', 'Buscando no Pexels', { query: enhancedQuery, orientation });
+    
     const response = await axios.get(
       'https://api.pexels.com/v1/search',
       {
         params: {
-          query: query,
+          query: enhancedQuery,
           per_page: perPage,
-          orientation: orientation
+          orientation: orientation,
+          size: "large" // Preferir imagens de alta qualidade
         },
         headers: {
           Authorization: process.env.PEXELS_API_KEY
@@ -95,7 +159,11 @@ async function fetchPexelsImages(query, options = {}) {
           url: img.src[size] || img.src.large,
           source: "pexels",
           photographer: img.photographer,
-          alt: query
+          photographerId: img.photographer_id,
+          photographerUrl: img.photographer_url,
+          sourceUrl: img.url,
+          downloadUrl: img.src.original,
+          alt: `${query} - ${tipoDestino}`
         }))
       };
     }
@@ -113,7 +181,10 @@ async function fetchPexelsImages(query, options = {}) {
 
 // Função para gerar imagens de placeholder
 function getPlaceholderImages(query, options = {}) {
-  const { width = 800, height = 600 } = options;
+  const { width = 800, height = 600, descricao = "" } = options;
+  
+  // Classificar o tipo de destino para melhorar a relevância
+  const tipoDestino = classificarDestino(query, descricao);
   
   return {
     success: true,
@@ -122,13 +193,21 @@ function getPlaceholderImages(query, options = {}) {
         url: `https://via.placeholder.com/${width}x${height}.png?text=${encodeURIComponent(query)}`,
         source: "placeholder",
         photographer: "Placeholder",
-        alt: query
+        photographerId: "placeholder",
+        photographerUrl: "#",
+        sourceUrl: "#",
+        downloadUrl: `https://via.placeholder.com/${width}x${height}.png?text=${encodeURIComponent(query)}`,
+        alt: `${query} - ${tipoDestino}`
       },
       {
-        url: `https://via.placeholder.com/${width}x${height}.png?text=${encodeURIComponent(query + ' landmark')}`,
+        url: `https://via.placeholder.com/${width}x${height}.png?text=${encodeURIComponent(query + ' ' + tipoDestino)}`,
         source: "placeholder",
         photographer: "Placeholder",
-        alt: query + " landmark"
+        photographerId: "placeholder",
+        photographerUrl: "#",
+        sourceUrl: "#",
+        downloadUrl: `https://via.placeholder.com/${width}x${height}.png?text=${encodeURIComponent(query)}`,
+        alt: `${query} - ${tipoDestino}`
       }
     ]
   };
@@ -159,7 +238,8 @@ module.exports = async function handler(req, res) {
     orientation = "landscape",
     width = 800,
     height = 600,
-    quality = "regular" // para Unsplash: regular, small, thumb, etc.
+    quality = "regular",
+    descricao = ""
   } = req.query || {};
   
   if (!query) {
@@ -167,7 +247,7 @@ module.exports = async function handler(req, res) {
   }
   
   try {
-    logEvent('info', `Buscando imagens para '${query}'`, { query, source, perPage, orientation });
+    logEvent('info', `Buscando imagens para '${query}'`, { query, source, perPage, orientation, descricao });
     
     let images = [];
     let unsplashResult = { success: false, images: [] };
@@ -178,7 +258,8 @@ module.exports = async function handler(req, res) {
       unsplashResult = await fetchUnsplashImages(query, {
         perPage: parseInt(perPage),
         orientation,
-        quality
+        quality,
+        descricao
       });
       
       if (unsplashResult.success) {
@@ -195,7 +276,8 @@ module.exports = async function handler(req, res) {
       pexelsResult = await fetchPexelsImages(query, {
         perPage: parseInt(perPage),
         orientation,
-        quality
+        quality,
+        descricao
       });
       
       if (pexelsResult.success) {
@@ -211,7 +293,8 @@ module.exports = async function handler(req, res) {
     if (!unsplashResult.success && !pexelsResult.success) {
       const placeholderResult = getPlaceholderImages(query, {
         width: parseInt(width),
-        height: parseInt(height)
+        height: parseInt(height),
+        descricao
       });
       
       images = placeholderResult.images;
@@ -239,7 +322,8 @@ module.exports = async function handler(req, res) {
       error: error.message,
       images: getPlaceholderImages(query, {
         width: parseInt(width),
-        height: parseInt(height)
+        height: parseInt(height),
+        descricao
       }).images
     });
   }
