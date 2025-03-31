@@ -34,7 +34,7 @@
     },
     
     {
-        "question": "3️⃣.1️⃣ Quantas pessoas estão na sua família para esta viagem?",
+        "question": "2️⃣.1️⃣ Quantas pessoas estão na sua família para esta viagem?",
         "description": "Inclua todos, inclusive você!",
         "input_field": true,
         "numeric_only": true,
@@ -47,7 +47,7 @@
     },
     
     {
-        "question": "3️⃣.1️⃣ Quantos amigos vão nessa aventura, incluindo você?",
+        "question": "2️⃣.1️⃣ Quantos amigos vão nessa aventura, incluindo você?",
         "description": "Me diga o número total de pessoas da turma! 🐶🎒",
         "input_field": true,
         "numeric_only": true,
