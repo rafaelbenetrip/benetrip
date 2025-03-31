@@ -1,7 +1,7 @@
 // api/recommendations.js - Endpoint da API Vercel para recomendações de destino
-import axios from 'axios';
+const axios = require('axios');
 
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
   // Configuração de CORS para qualquer origem
   res.setHeader('Access-Control-Allow-Credentials', true);
   res.setHeader('Access-Control-Allow-Origin', '*');
