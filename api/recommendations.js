@@ -124,7 +124,7 @@ module.exports = async function handler(req, res) {
       
       // Se chegamos aqui, todas as tentativas falharam nesta iteração
       // Vamos modificar o prompt para a próxima tentativa para incentivar mais criatividade
-      prompt = `${prompt}\n\nIMPORTANTE: Sugira destinos TOTALMENTE DIFERENTES, CRIATIVOS e ÚNICOS. NÃO mencione Santiago, Cusco, ou outros destinos comuns. Explore destinos alternativos e menos óbvios que sejam adequados para as preferências indicadas.`;
+      prompt = `${prompt}\n\nIMPORTANTE: Sugira destinos CRIATIVOS e ÚNICOS. Faça um misto entre destinos alternativos e menos óbvios e destinos conhecidos, sempre adequando às preferências indicadas.`;
     }
     
     // Se todas as tentativas falharam, criar uma resposta de emergência
@@ -189,7 +189,7 @@ async function callPerplexityAPI(prompt) {
           }
         ],
         temperature: 0.9, // Aumentando a temperatura para mais criatividade
-        max_tokens: 2000,
+        max_tokens: 3000,
         response_format: { type: "text" }
       },
       timeout: REQUEST_TIMEOUT
@@ -259,7 +259,7 @@ async function callOpenAIAPI(prompt) {
         messages: [
           {
             role: "system",
-            content: "Você é um especialista em viagens focado em fornecer recomendações altamente personalizadas e criativas. Evite sugerir destinos populares ou óbvios como Santiago ou Cusco. Gere sugestões completamente diferentes uma das outras e adequadas ao perfil do viajante. Retorne APENAS JSON puro, sem formatação extra."
+            content: "Você é um especialista em viagens focado em fornecer recomendações altamente personalizadas e criativas. Gere sugestões diversas uma das outras e adequadas ao perfil do viajante. Retorne APENAS JSON puro, sem formatação extra."
           },
           {
             role: "user",
@@ -267,7 +267,7 @@ async function callOpenAIAPI(prompt) {
           }
         ],
         temperature: 0.9, // Aumentando a temperatura para mais criatividade
-        max_tokens: 2000
+        max_tokens: 3000
       },
       timeout: REQUEST_TIMEOUT
     });
@@ -317,11 +317,11 @@ async function callClaudeAPI(prompt) {
       },
       data: {
         model: "claude-3-haiku-20240307",
-        max_tokens: 2000,
+        max_tokens: 3000,
         messages: [
           {
             role: "system",
-            content: "Você é um especialista em viagens focado em fornecer recomendações altamente personalizadas e criativas. Evite sugerir destinos populares ou óbvios como Santiago ou Cusco. Gere sugestões completamente diferentes uma das outras e adequadas ao perfil do viajante. Retorne APENAS JSON puro."
+            content: "Você é um especialista em viagens focado em fornecer recomendações altamente personalizadas e criativas. Gere sugestões diversas e adequadas ao perfil do viajante. Retorne APENAS JSON puro."
           },
           {
             role: "user",
@@ -538,10 +538,9 @@ PERFIL DO VIAJANTE:
 - Popularidade do destino: ${getFamaDestinoText(famaDestino)}
 
 IMPORTANTE:
-1. Sugira destinos DIVERSIFICADOS e CRIATIVOS que combinem bem com o perfil.
-2. NÃO sugira Santiago, Cusco, Buenos Aires ou Montevidéu.
-3. Destinos DEVEM ser DIFERENTES entre si.
-4. O destino principal, alternativas e surpresa DEVEM ser de locais DISTINTOS.
+1. Sugira destinos DIVERSOS e CRIATIVOS que combinem bem com o perfil.
+2. Destinos DEVEM ser DIFERENTES entre si e necessitar de uma viagem de avião.
+3. O destino principal, alternativas e surpresa DEVEM ser de locais DISTINTOS.
 
 Forneça no formato JSON exato abaixo, SEM formatação markdown:
 {
