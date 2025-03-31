@@ -43,78 +43,6 @@ module.exports = async function handler(req, res) {
     console.log('Tipo de dados recebidos:', typeof requestData);
     console.log('Conteúdo parcial:', JSON.stringify(requestData).substring(0, 200) + '...');
     
-    // Dados mockados para fallback em caso de erro
-    const mockData = {
-      "topPick": {
-        "destino": "Medellín",
-        "pais": "Colômbia",
-        "codigoPais": "CO",
-        "descricao": "Cidade da eterna primavera com clima perfeito o ano todo",
-        "porque": "Clima primaveril o ano todo com paisagens montanhosas deslumbrantes",
-        "destaque": "Passeio de teleférico, Comuna 13 e fazendas de café próximas",
-        "comentario": "Eu simplesmente AMEI Medellín! É perfeito para quem busca um mix de cultura e natureza! 🐾",
-        "preco": {
-          "voo": 1800,
-          "hotel": 350
-        }
-      },
-      "alternativas": [
-        {
-          "destino": "Montevidéu",
-          "pais": "Uruguai",
-          "codigoPais": "UY",
-          "porque": "Clima costeiro tranquilo com frutos do mar deliciosos e espaços culturais",
-          "preco": {
-            "voo": 1500,
-            "hotel": 300
-          }
-        },
-        {
-          "destino": "Buenos Aires",
-          "pais": "Argentina",
-          "codigoPais": "AR",
-          "porque": "Capital cosmopolita com rica vida cultural, teatros e arquitetura europeia",
-          "preco": {
-            "voo": 1400,
-            "hotel": 280
-          }
-        },
-        {
-          "destino": "Santiago",
-          "pais": "Chile",
-          "codigoPais": "CL",
-          "porque": "Moderna capital cercada pela Cordilheira dos Andes com excelentes vinhos",
-          "preco": {
-            "voo": 1600,
-            "hotel": 350
-          }
-        },
-        {
-          "destino": "Cusco",
-          "pais": "Peru",
-          "codigoPais": "PE",
-          "porque": "Portal para Machu Picchu com rica história inca e arquitetura colonial",
-          "preco": {
-            "voo": 1700,
-            "hotel": 250
-          }
-        }
-      ],
-      "surpresa": {
-        "destino": "Cartagena",
-        "pais": "Colômbia",
-        "codigoPais": "CO",
-        "descricao": "Joia colonial no Caribe colombiano com praias paradisíacas",
-        "porque": "Cidade murada histórica com ruas coloridas, cultura vibrante e praias maravilhosas",
-        "destaque": "Passeio de barco pelas Ilhas do Rosário com águas cristalinas",
-        "comentario": "Cartagena é um tesouro escondido que vai te conquistar! As cores, a música e a comida caribenha formam uma experiência inesquecível! 🐾🌴",
-        "preco": {
-          "voo": 1950,
-          "hotel": 320
-        }
-      }
-    };
-    
     // Gerar prompt baseado nos dados do usuário
     let prompt;
     try {
@@ -122,152 +50,107 @@ module.exports = async function handler(req, res) {
       console.log('Prompt gerado com sucesso, tamanho:', prompt.length);
     } catch (promptError) {
       console.error('Erro ao gerar prompt:', promptError);
-      prompt = "Recomende destinos de viagem para um usuário. Forneça um destino principal, 4 alternativas e um destino surpresa. Responda em formato JSON.";
+      prompt = "Recomende destinos de viagem únicos e personalizados para o Brasil e mundo. Um destino principal, 4 destinos alternativos diferentes entre si, e um destino surpresa diferente dos demais. Seja criativo e evite destinos óbvios ou repetidos. Responda em formato JSON.";
     }
     
-    // Tenta usar cada serviço de IA em sequência até obter sucesso
-    let response = null;
+    // Tentar múltiplas vezes a consulta à API com diferentes modelos
+    // até um deles retornar uma resposta válida
+    let tentativas = 0;
+    const maxTentativas = 3;
     
-    // Tentar Perplexity primeiro se estiver configurado
-    if (process.env.PERPLEXITY_API_KEY) {
-      try {
-        console.log('Chamando API Perplexity...');
-        response = await callPerplexityAPI(prompt);
-        console.log('Resposta Perplexity recebida com sucesso');
-        
-        return res.status(200).json({
-          tipo: "perplexity",
-          conteudo: response
-        });
-      } catch (perplexityError) {
-        console.error('Erro ao usar Perplexity:', perplexityError.message);
-        // Continuar para o próximo método, não retornando aqui
+    while (tentativas < maxTentativas) {
+      tentativas++;
+      console.log(`Tentativa ${tentativas} de ${maxTentativas}`);
+      
+      // 1. Tentar Perplexity primeiro
+      if (process.env.PERPLEXITY_API_KEY) {
+        try {
+          console.log('Chamando API Perplexity...');
+          const response = await callPerplexityAPI(prompt);
+          if (response && isValidDestinationJSON(response)) {
+            console.log('Resposta Perplexity válida recebida');
+            return res.status(200).json({
+              tipo: "perplexity",
+              conteudo: response,
+              tentativa: tentativas
+            });
+          } else {
+            console.log('Resposta Perplexity inválida ou incompleta, tentando próxima API');
+          }
+        } catch (perplexityError) {
+          console.error('Erro ao usar Perplexity:', perplexityError.message);
+        }
       }
-    }
-    
-    // Tentar OpenAI em seguida, se configurado
-    if (process.env.OPENAI_API_KEY) {
-      try {
-        console.log('Tentando OpenAI como fallback...');
-        response = await callOpenAIAPI(prompt);
-        console.log('Resposta OpenAI recebida com sucesso');
-        
-        return res.status(200).json({
-          tipo: "openai",
-          conteudo: response
-        });
-      } catch (openaiError) {
-        console.error('Erro ao usar OpenAI:', openaiError.message);
-        // Continuar para o próximo método
+      
+      // 2. Tentar OpenAI em seguida
+      if (process.env.OPENAI_API_KEY) {
+        try {
+          console.log('Chamando API OpenAI...');
+          const response = await callOpenAIAPI(prompt);
+          if (response && isValidDestinationJSON(response)) {
+            console.log('Resposta OpenAI válida recebida');
+            return res.status(200).json({
+              tipo: "openai",
+              conteudo: response,
+              tentativa: tentativas
+            });
+          } else {
+            console.log('Resposta OpenAI inválida ou incompleta, tentando próxima API');
+          }
+        } catch (openaiError) {
+          console.error('Erro ao usar OpenAI:', openaiError.message);
+        }
       }
-    }
-    
-    // Tentar Claude como última opção de IA
-    if (process.env.CLAUDE_API_KEY) {
-      try {
-        console.log('Tentando Claude como fallback final...');
-        response = await callClaudeAPI(prompt);
-        console.log('Resposta Claude recebida com sucesso');
-        
-        return res.status(200).json({
-          tipo: "claude",
-          conteudo: response
-        });
-      } catch (claudeError) {
-        console.error('Erro ao usar Claude:', claudeError.message);
-        // Se todas as opções falharem, usar o mockado
+      
+      // 3. Tentar Claude por último
+      if (process.env.CLAUDE_API_KEY) {
+        try {
+          console.log('Chamando API Claude...');
+          const response = await callClaudeAPI(prompt);
+          if (response && isValidDestinationJSON(response)) {
+            console.log('Resposta Claude válida recebida');
+            return res.status(200).json({
+              tipo: "claude",
+              conteudo: response,
+              tentativa: tentativas
+            });
+          } else {
+            console.log('Resposta Claude inválida ou incompleta');
+          }
+        } catch (claudeError) {
+          console.error('Erro ao usar Claude:', claudeError.message);
+        }
       }
+      
+      // Se chegamos aqui, todas as tentativas falharam nesta iteração
+      // Vamos modificar o prompt para a próxima tentativa para incentivar mais criatividade
+      prompt = `${prompt}\n\nIMPORTANTE: Sugira destinos TOTALMENTE DIFERENTES, CRIATIVOS e ÚNICOS. NÃO mencione Santiago, Cusco, ou outros destinos comuns. Explore destinos alternativos e menos óbvios que sejam adequados para as preferências indicadas.`;
     }
     
-    // Se chegou aqui, todas as opções de IA falharam, usar mockado
-    console.log('Todos os serviços de IA falharam, retornando dados mockados');
+    // Se todas as tentativas falharam, criar uma resposta de emergência
+    console.log('Todas as tentativas de obter resposta válida falharam');
+    
+    // Usar um conjunto de dados de emergência que são diferentes dos destinos comuns
+    // que estavam se repetindo (Santiago, Cusco, etc.)
+    const emergencyData = generateEmergencyData(requestData);
+    
     return res.status(200).json({
-      tipo: "mockado",
-      conteudo: JSON.stringify(mockData)
+      tipo: "emergencia",
+      conteudo: JSON.stringify(emergencyData),
+      message: "Todas as tentativas de API falharam"
     });
     
   } catch (globalError) {
     // Captura qualquer erro não tratado para evitar o 500
     console.error('Erro global na API de recomendações:', globalError);
     
-    // Retornar resposta de erro com detalhes
+    // Retornar resposta de erro com dados de emergência
+    const emergencyData = generateEmergencyData();
+    
     return res.status(200).json({ 
       tipo: "erro",
-      conteudo: JSON.stringify({
-        error: "Erro no processamento",
-        message: globalError.message,
-        // Dados mockados como fallback de emergência
-        data: {
-          "topPick": {
-            "destino": "Medellín",
-            "pais": "Colômbia",
-            "codigoPais": "CO",
-            "descricao": "Cidade da eterna primavera com clima perfeito o ano todo",
-            "porque": "Clima primaveril o ano todo com paisagens montanhosas deslumbrantes",
-            "destaque": "Passeio de teleférico, Comuna 13 e fazendas de café próximas",
-            "comentario": "Eu simplesmente AMEI Medellín! É perfeito para quem busca um mix de cultura e natureza! 🐾",
-            "preco": {
-              "voo": 1800,
-              "hotel": 350
-            }
-          },
-          "alternativas": [
-            {
-              "destino": "Montevidéu",
-              "pais": "Uruguai",
-              "codigoPais": "UY",
-              "porque": "Clima costeiro tranquilo com frutos do mar deliciosos e espaços culturais",
-              "preco": {
-                "voo": 1500,
-                "hotel": 300
-              }
-            },
-            {
-              "destino": "Buenos Aires",
-              "pais": "Argentina",
-              "codigoPais": "AR",
-              "porque": "Capital cosmopolita com rica vida cultural, teatros e arquitetura europeia",
-              "preco": {
-                "voo": 1400,
-                "hotel": 280
-              }
-            },
-            {
-              "destino": "Santiago",
-              "pais": "Chile",
-              "codigoPais": "CL",
-              "porque": "Moderna capital cercada pela Cordilheira dos Andes com excelentes vinhos",
-              "preco": {
-                "voo": 1600,
-                "hotel": 350
-              }
-            },
-            {
-              "destino": "Cusco",
-              "pais": "Peru",
-              "codigoPais": "PE",
-              "porque": "Portal para Machu Picchu com rica história inca e arquitetura colonial",
-              "preco": {
-                "voo": 1700,
-                "hotel": 250
-              }
-            }
-          ],
-          "surpresa": {
-            "destino": "Cartagena",
-            "pais": "Colômbia",
-            "codigoPais": "CO",
-            "descricao": "Joia colonial no Caribe colombiano com praias paradisíacas",
-            "porque": "Cidade murada histórica com ruas coloridas, cultura vibrante e praias maravilhosas",
-            "destaque": "Passeio de barco pelas Ilhas do Rosário com águas cristalinas",
-            "comentario": "Cartagena é um tesouro escondido que vai te conquistar! As cores, a música e a comida caribenha formam uma experiência inesquecível! 🐾🌴",
-            "preco": {
-              "voo": 1950,
-              "hotel": 320
-            }
-          }
-        }
-      })
+      conteudo: JSON.stringify(emergencyData),
+      error: globalError.message
     });
   }
 }
@@ -283,7 +166,9 @@ async function callPerplexityAPI(prompt) {
     
     console.log('Enviando requisição para Perplexity...');
     
-    // Definição simplificada do schema para usar formato text
+    // Construir instruções claras para não usar formatação markdown
+    const enhancedPrompt = `${prompt}\n\nIMPORTANTE: NÃO inclua blocos de código, marcadores markdown, ou comentários em sua resposta. Retorne APENAS o JSON puro.`;
+    
     const response = await axios({
       method: 'post',
       url: 'https://api.perplexity.ai/chat/completions',
@@ -296,16 +181,15 @@ async function callPerplexityAPI(prompt) {
         messages: [
           {
             role: 'system',
-            content: 'Você é a Tripinha, uma cachorra vira-lata caramelo especialista em viagens da Benetrip. Você usa um tom amigável, alegre e entusiasmado. Você conhece sobre destinos turísticos em todo o mundo e pode recomendar lugares baseados nas preferências dos usuários. Responda APENAS em formato JSON válido, sem qualquer texto adicional.'
+            content: 'Você é um especialista em viagens focado em fornecer recomendações altamente personalizadas. Evite sugerir destinos populares ou óbvios. Gere sugestões completamente diferentes uma das outras, criativas e adequadas ao perfil do viajante. Retorne APENAS JSON puro, sem marcações ou formatação extra.'
           },
           {
             role: 'user',
-            content: prompt
+            content: enhancedPrompt
           }
         ],
-        temperature: 0.7,
+        temperature: 0.9, // Aumentando a temperatura para mais criatividade
         max_tokens: 2000,
-        // Simplificando para usar text sem estrutura de json_schema
         response_format: { type: "text" }
       },
       timeout: REQUEST_TIMEOUT
@@ -349,7 +233,7 @@ async function callPerplexityAPI(prompt) {
   }
 }
 
-// Chamar a API da OpenAI como fallback
+// Chamar a API da OpenAI como alternativa
 async function callOpenAIAPI(prompt) {
   try {
     const apiKey = process.env.OPENAI_API_KEY;
@@ -361,7 +245,7 @@ async function callOpenAIAPI(prompt) {
     console.log('Enviando requisição para OpenAI...');
     
     // Modificar o prompt para pedir explicitamente resposta em JSON
-    const jsonPrompt = `${prompt}\n\nIMPORTANTE: Sua resposta deve ser exclusivamente um objeto JSON válido, sem nenhum texto adicional.`;
+    const enhancedPrompt = `${prompt}\n\nIMPORTANTE: Sua resposta deve ser exclusivamente um objeto JSON válido sem formatação markdown. NÃO inclua blocos de código, comentários ou texto adicional.`;
     
     const response = await axios({
       method: 'post',
@@ -371,18 +255,18 @@ async function callOpenAIAPI(prompt) {
         'Content-Type': 'application/json'
       },
       data: {
-        model: "gpt-4-turbo",  // Modelo mais rápido
+        model: "gpt-4-turbo",
         messages: [
           {
             role: "system",
-            content: "Você é a Tripinha, uma cachorra vira-lata caramelo especialista em viagens da Benetrip. Você deve retornar somente JSON válido, sem texto adicional."
+            content: "Você é um especialista em viagens focado em fornecer recomendações altamente personalizadas e criativas. Evite sugerir destinos populares ou óbvios como Santiago ou Cusco. Gere sugestões completamente diferentes uma das outras e adequadas ao perfil do viajante. Retorne APENAS JSON puro, sem formatação extra."
           },
           {
             role: "user",
-            content: jsonPrompt
+            content: enhancedPrompt
           }
         ],
-        temperature: 0.7,
+        temperature: 0.9, // Aumentando a temperatura para mais criatividade
         max_tokens: 2000
       },
       timeout: REQUEST_TIMEOUT
@@ -409,7 +293,7 @@ async function callOpenAIAPI(prompt) {
   }
 }
 
-// Chamar a API do Claude como fallback secundário
+// Chamar a API do Claude como alternativa final
 async function callClaudeAPI(prompt) {
   try {
     const apiKey = process.env.CLAUDE_API_KEY;
@@ -421,7 +305,7 @@ async function callClaudeAPI(prompt) {
     console.log('Enviando requisição para Claude...');
     
     // Adicionar instrução específica para o Claude retornar apenas JSON
-    const jsonPrompt = `${prompt}\n\nIMPORTANTE: Sua resposta deve ser APENAS o objeto JSON, sem NENHUM texto adicional antes ou depois. Não inclua marcação de código, comentários ou explicações.`;
+    const enhancedPrompt = `${prompt}\n\nIMPORTANTE: Sua resposta deve ser APENAS o objeto JSON válido, sem NENHUM texto adicional, marcação de código, comentários ou explicações.`;
     
     const response = await axios({
       method: 'post',
@@ -432,18 +316,19 @@ async function callClaudeAPI(prompt) {
         'Content-Type': 'application/json'
       },
       data: {
-        model: "claude-3-haiku-20240307",  // Modelo mais rápido
+        model: "claude-3-haiku-20240307",
         max_tokens: 2000,
         messages: [
           {
             role: "system",
-            content: "Você é a Tripinha, uma cachorra vira-lata caramelo especialista em viagens da Benetrip. Responda apenas com JSON puro, sem texto adicional."
+            content: "Você é um especialista em viagens focado em fornecer recomendações altamente personalizadas e criativas. Evite sugerir destinos populares ou óbvios como Santiago ou Cusco. Gere sugestões completamente diferentes uma das outras e adequadas ao perfil do viajante. Retorne APENAS JSON puro."
           },
           {
             role: "user",
-            content: jsonPrompt
+            content: enhancedPrompt
           }
-        ]
+        ],
+        temperature: 0.9 // Aumentando a temperatura para mais criatividade
       },
       timeout: REQUEST_TIMEOUT
     });
@@ -476,8 +361,9 @@ function extrairJSONDaResposta(texto) {
     console.log("Tipo da resposta recebida:", typeof texto);
     console.log("Tamanho da resposta recebida:", texto.length);
     
-    // Verificar se já é um objeto JSON (isso acontece quando extraimos anteriormente)
+    // Verificar se já é um objeto JSON
     if (typeof texto === 'object' && texto !== null) {
+      console.log("Resposta já é um objeto, convertendo para string");
       return JSON.stringify(texto);
     }
     
@@ -499,7 +385,7 @@ function extrairJSONDaResposta(texto) {
       // Remover comentários de estilo JavaScript
       .replace(/\/\/.*$/gm, '')
       .replace(/\/\*[\s\S]*?\*\//g, '')
-      // Normalizar quebrars de linha e espaços extras
+      // Normalizar quebras de linha e espaços extras
       .replace(/\r\n/g, '\n')
       .trim();
     
@@ -521,98 +407,73 @@ function extrairJSONDaResposta(texto) {
       console.log("Nenhum padrão JSON encontrado no texto processado");
     }
     
-    // Tentativa adicional: construir um JSON válido do zero se a estrutura for reconhecível
-    // (isso é muito arriscado e deve ser usado como último recurso)
-    try {
-      // Verificar se o texto parece conter um JSON malformado
-      if (textoProcessado.includes('"topPick"') && textoProcessado.includes('"alternativas"') && textoProcessado.includes('"surpresa"')) {
-        console.log("Encontrou características de um JSON de destinos, tentando reconstrução manual");
-        
-        // Criar JSON mock baseado nos dados que conseguimos identificar
-        return JSON.stringify(mockData);
-      }
-    } catch (reconstructError) {
-      console.log("Falha na reconstrução manual:", reconstructError.message);
-    }
-    
-    // Se todas as tentativas falharem, retornar os dados mockados
-    // como último recurso para não quebrar a aplicação
-    console.log("Todas as tentativas de extração falharam, retornando dados mockados");
-    return JSON.stringify(mockData);
+    // Se todas as tentativas falharem, retornar null para tentar outro serviço
+    console.log("Todas as tentativas de extração falharam");
+    return null;
   } catch (error) {
     console.error('Erro fatal ao processar resposta:', error);
-    // Retornar dados mockados como segurança
-    const mockData = {
-      "topPick": {
-        "destino": "Medellín",
-        "pais": "Colômbia",
-        "codigoPais": "CO",
-        "descricao": "Cidade da eterna primavera com clima perfeito o ano todo",
-        "porque": "Clima primaveril o ano todo com paisagens montanhosas deslumbrantes",
-        "destaque": "Passeio de teleférico, Comuna 13 e fazendas de café próximas",
-        "comentario": "Eu simplesmente AMEI Medellín! É perfeito para quem busca um mix de cultura e natureza! 🐾",
-        "preco": {
-          "voo": 1800,
-          "hotel": 350
-        }
-      },
-      "alternativas": [
-        {
-          "destino": "Montevidéu",
-          "pais": "Uruguai",
-          "codigoPais": "UY",
-          "porque": "Clima costeiro tranquilo com frutos do mar deliciosos e espaços culturais",
-          "preco": {
-            "voo": 1500,
-            "hotel": 300
-          }
-        },
-        {
-          "destino": "Buenos Aires",
-          "pais": "Argentina",
-          "codigoPais": "AR",
-          "porque": "Capital cosmopolita com rica vida cultural, teatros e arquitetura europeia",
-          "preco": {
-            "voo": 1400,
-            "hotel": 280
-          }
-        },
-        {
-          "destino": "Santiago",
-          "pais": "Chile",
-          "codigoPais": "CL",
-          "porque": "Moderna capital cercada pela Cordilheira dos Andes com excelentes vinhos",
-          "preco": {
-            "voo": 1600,
-            "hotel": 350
-          }
-        },
-        {
-          "destino": "Cusco",
-          "pais": "Peru",
-          "codigoPais": "PE",
-          "porque": "Portal para Machu Picchu com rica história inca e arquitetura colonial",
-          "preco": {
-            "voo": 1700,
-            "hotel": 250
-          }
-        }
-      ],
-      "surpresa": {
-        "destino": "Cartagena",
-        "pais": "Colômbia",
-        "codigoPais": "CO",
-        "descricao": "Joia colonial no Caribe colombiano com praias paradisíacas",
-        "porque": "Cidade murada histórica com ruas coloridas, cultura vibrante e praias maravilhosas",
-        "destaque": "Passeio de barco pelas Ilhas do Rosário com águas cristalinas",
-        "comentario": "Cartagena é um tesouro escondido que vai te conquistar! As cores, a música e a comida caribenha formam uma experiência inesquecível! 🐾🌴",
-        "preco": {
-          "voo": 1950,
-          "hotel": 320
-        }
-      }
-    };
-    return JSON.stringify(mockData);
+    return null;
+  }
+}
+
+// Verifica se o objeto JSON recebido é válido para nosso contexto
+function isValidDestinationJSON(jsonString) {
+  if (!jsonString) return false;
+  
+  try {
+    const data = typeof jsonString === 'string' ? JSON.parse(jsonString) : jsonString;
+    
+    // Verificar se tem os campos obrigatórios
+    if (!data.topPick || !data.alternativas || !data.surpresa) {
+      console.log("JSON inválido: faltam campos obrigatórios");
+      return false;
+    }
+    
+    // Verificar se tem pelo menos um destino alternativo
+    if (!Array.isArray(data.alternativas) || data.alternativas.length < 1) {
+      console.log("JSON inválido: array de alternativas vazio ou inexistente");
+      return false;
+    }
+    
+    // Verificar se os destinos principais têm os campos necessários
+    if (!data.topPick.destino || !data.topPick.pais || !data.topPick.preco) {
+      console.log("JSON inválido: topPick incompleto");
+      return false;
+    }
+    
+    // Verificar se o destino surpresa tem os campos necessários
+    if (!data.surpresa.destino || !data.surpresa.pais || !data.surpresa.preco) {
+      console.log("JSON inválido: surpresa incompleto");
+      return false;
+    }
+    
+    // Verificar se não é um caso de destinos repetidos como Santiago e Cusco
+    const destinos = [
+      data.topPick.destino,
+      ...data.alternativas.map(alt => alt.destino),
+      data.surpresa.destino
+    ].map(d => d.toLowerCase());
+    
+    // Verificar se não tem os destinos que estão se repetindo nos resultados
+    const problemDestinos = ['santiago', 'cusco', 'buenos aires', 'montevidéu', 'montevideo'];
+    const repetidos = destinos.filter(d => problemDestinos.includes(d));
+    
+    if (repetidos.length >= 2) {
+      console.log(`JSON tem destinos problemáticos repetidos: ${repetidos.join(', ')}`);
+      return false;
+    }
+    
+    // Verificar se há destinos repetidos em geral
+    const destSet = new Set(destinos);
+    if (destSet.size < destinos.length) {
+      console.log("JSON tem destinos repetidos");
+      return false;
+    }
+    
+    return true;
+  } catch (error) {
+    console.error("Erro ao validar JSON:", error);
+    return false;
   }
 }
 
@@ -624,6 +485,14 @@ function gerarPromptParaDestinos(dados) {
   const cidadeOrigem = dados.cidade_partida?.name || 'origem não especificada';
   const orcamento = dados.orcamento_valor || 'flexível';
   const moeda = dados.moeda_escolhida || 'BRL';
+  
+  // Extrair informações sobre quantidade de pessoas
+  const quantidadePessoas = dados.quantidade_familia || dados.quantidade_amigos || 1;
+  
+  // Extrair qualquer informação adicional importante
+  const conheceDestino = dados.conhece_destino || 0;
+  const tipoDestino = dados.tipo_destino || 'qualquer';
+  const famaDestino = dados.fama_destino || 'qualquer';
   
   // Datas de viagem com verificação de formato
   let dataIda = 'não especificada';
@@ -639,25 +508,51 @@ function gerarPromptParaDestinos(dados) {
       dataVolta = dados.datas.dataVolta;
     }
   }
+  
+  // Calcular duração da viagem para contextualizar melhor
+  let duracaoViagem = 'não especificada';
+  try {
+    if (dataIda !== 'não especificada' && dataVolta !== 'não especificada') {
+      const ida = new Date(dataIda);
+      const volta = new Date(dataVolta);
+      const diff = Math.abs(volta - ida);
+      const dias = Math.ceil(diff / (1000 * 60 * 60 * 24));
+      duracaoViagem = `${dias} dias`;
+    }
+  } catch (e) {
+    console.log("Erro ao calcular duração da viagem:", e);
+  }
 
-  // Construir prompt detalhado
-  return `Quero recomendações de viagem com estas preferências:
+  // Construir prompt detalhado e personalizado
+  return `Crie recomendações de viagem CRIATIVAS e ÚNICAS para:
+
+PERFIL DO VIAJANTE:
 - Partindo de: ${cidadeOrigem}
 - Viajando: ${companhia}
-- Buscando: ${preferencia}
-- Orçamento: ${orcamento} ${moeda}
-- Período: ${dataIda} a ${dataVolta}
+- Número de pessoas: ${quantidadePessoas}
+- Atividades preferidas: ${preferencia}
+- Orçamento por pessoa: ${orcamento} ${moeda}
+- Período da viagem: ${dataIda} a ${dataVolta} (${duracaoViagem})
+- Experiência como viajante: ${conheceDestino === 1 ? 'Com experiência' : 'Iniciante'} 
+- Preferência por destinos: ${getTipoDestinoText(tipoDestino)}
+- Popularidade do destino: ${getFamaDestinoText(famaDestino)}
 
-Forneça EXATAMENTE este formato JSON, sem texto adicional:
+IMPORTANTE:
+1. Sugira destinos DIVERSIFICADOS e CRIATIVOS que combinem bem com o perfil.
+2. NÃO sugira Santiago, Cusco, Buenos Aires ou Montevidéu.
+3. Destinos DEVEM ser DIFERENTES entre si.
+4. O destino principal, alternativas e surpresa DEVEM ser de locais DISTINTOS.
+
+Forneça no formato JSON exato abaixo, SEM formatação markdown:
 {
   "topPick": {
     "destino": "Nome da Cidade",
     "pais": "Nome do País",
     "codigoPais": "XX",
     "descricao": "Breve descrição do destino",
-    "porque": "Razão principal para visitar",
+    "porque": "Razão específica para visitar baseada nas preferências",
     "destaque": "Uma experiência única neste destino",
-    "comentario": "Um comentário animado da Tripinha",
+    "comentario": "Comentário entusiasmado da Tripinha (cachorra)",
     "preco": {
       "voo": número,
       "hotel": número
@@ -668,7 +563,7 @@ Forneça EXATAMENTE este formato JSON, sem texto adicional:
       "destino": "Nome da Cidade",
       "pais": "Nome do País", 
       "codigoPais": "XX",
-      "porque": "Razão principal para visitar",
+      "porque": "Razão específica para visitar",
       "preco": {
         "voo": número,
         "hotel": número
@@ -680,9 +575,9 @@ Forneça EXATAMENTE este formato JSON, sem texto adicional:
     "pais": "Nome do País",
     "codigoPais": "XX",
     "descricao": "Breve descrição do destino",
-    "porque": "Razão principal para visitar",
+    "porque": "Razão para visitar, destacando o fator surpresa",
     "destaque": "Uma experiência única neste destino",
-    "comentario": "Um comentário da Tripinha",
+    "comentario": "Comentário entusiasmado da Tripinha",
     "preco": {
       "voo": número,
       "hotel": número
@@ -723,74 +618,292 @@ function getPreferenciaText(value) {
   return options[value] || "experiências diversificadas de viagem";
 }
 
-// Dados mockados definidos fora das funções para disponibilidade global
-const mockData = {
-  "topPick": {
-    "destino": "Medellín",
-    "pais": "Colômbia",
-    "codigoPais": "CO",
-    "descricao": "Cidade da eterna primavera com clima perfeito o ano todo",
-    "porque": "Clima primaveril o ano todo com paisagens montanhosas deslumbrantes",
-    "destaque": "Passeio de teleférico, Comuna 13 e fazendas de café próximas",
-    "comentario": "Eu simplesmente AMEI Medellín! É perfeito para quem busca um mix de cultura e natureza! 🐾",
-    "preco": {
-      "voo": 1800,
-      "hotel": 350
-    }
-  },
-  "alternativas": [
-    {
-      "destino": "Montevidéu",
-      "pais": "Uruguai",
-      "codigoPais": "UY",
-      "porque": "Clima costeiro tranquilo com frutos do mar deliciosos e espaços culturais",
-      "preco": {
-        "voo": 1500,
-        "hotel": 300
-      }
-    },
-    {
-      "destino": "Buenos Aires",
-      "pais": "Argentina",
-      "codigoPais": "AR",
-      "porque": "Capital cosmopolita com rica vida cultural, teatros e arquitetura europeia",
-      "preco": {
-        "voo": 1400,
-        "hotel": 280
-      }
-    },
-    {
-      "destino": "Santiago",
-      "pais": "Chile",
-      "codigoPais": "CL",
-      "porque": "Moderna capital cercada pela Cordilheira dos Andes com excelentes vinhos",
-      "preco": {
-        "voo": 1600,
-        "hotel": 350
-      }
-    },
-    {
-      "destino": "Cusco",
-      "pais": "Peru",
-      "codigoPais": "PE",
-      "porque": "Portal para Machu Picchu com rica história inca e arquitetura colonial",
-      "preco": {
-        "voo": 1700,
-        "hotel": 250
-      }
-    }
-  ],
-  "surpresa": {
-    "destino": "Cartagena",
-    "pais": "Colômbia",
-    "codigoPais": "CO",
-    "descricao": "Joia colonial no Caribe colombiano com praias paradisíacas",
-    "porque": "Cidade murada histórica com ruas coloridas, cultura vibrante e praias maravilhosas",
-    "destaque": "Passeio de barco pelas Ilhas do Rosário com águas cristalinas",
-    "comentario": "Cartagena é um tesouro escondido que vai te conquistar! As cores, a música e a comida caribenha formam uma experiência inesquecível! 🐾🌴",
-    "preco": {
-      "voo": 1950,
-      "hotel": 320
-    }
+// Função auxiliar para obter texto de tipo de destino
+function getTipoDestinoText(value) {
+  // Converter para número se for string
+  if (typeof value === 'string') {
+    value = parseInt(value, 10);
   }
-};
+  
+  const options = {
+    0: "nacional",
+    1: "internacional",
+    2: "qualquer (nacional ou internacional)"
+  };
+  return options[value] || "qualquer";
+}
+
+// Função auxiliar para obter texto de fama do destino
+function getFamaDestinoText(value) {
+  // Converter para número se for string
+  if (typeof value === 'string') {
+    value = parseInt(value, 10);
+  }
+  
+  const options = {
+    0: "famoso e turístico",
+    1: "fora do circuito turístico comum",
+    2: "mistura de ambos"
+  };
+  return options[value] || "qualquer";
+}
+
+// Função para gerar dados de emergência personalizados baseados no perfil
+function generateEmergencyData(dadosUsuario = {}) {
+  // Determinar o tipo de destino baseado nas preferências
+  const preferencia = dadosUsuario.preferencia_viagem || 0;
+  const companhia = dadosUsuario.companhia || 0;
+  const quantidadePessoas = dadosUsuario.quantidade_familia || dadosUsuario.quantidade_amigos || 1;
+  
+  // Vamos ter alguns conjuntos de destinos por tipo de viagem
+  const destinosPorPreferencia = {
+    // Relaxamento (0)
+    0: [
+      {
+        topPick: {
+          destino: "Jericoacoara",
+          pais: "Brasil",
+          codigoPais: "BR",
+          descricao: "Paraíso de dunas, lagoas e praias no Ceará",
+          porque: "Combinação perfeita de praias paradisíacas e ambiente relaxado",
+          destaque: "Pôr do sol na Duna do Pôr do Sol com show de capoeira",
+          comentario: "Au au! Jeri tem dunas INCRÍVEIS para cavar e praias sem fim para correr! E aquelas redes dentro d'água? Paraíso canino!",
+          preco: { voo: 1200, hotel: 280 }
+        },
+        alternativas: [
+          {
+            destino: "Maragogi",
+            pais: "Brasil",
+            codigoPais: "BR",
+            porque: "As 'piscinas naturais' garantem relaxamento total em águas cristalinas",
+            preco: { voo: 1100, hotel: 250 }
+          },
+          {
+            destino: "Ilhabela",
+            pais: "Brasil",
+            codigoPais: "BR",
+            porque: "Combina praias tranquilas com natureza exuberante, perfeito para descanso",
+            preco: { voo: 900, hotel: 320 }
+          },
+          {
+            destino: "Punta Cana",
+            pais: "República Dominicana",
+            codigoPais: "DO",
+            porque: "Resorts all-inclusive em praias de areia branca com coqueiros",
+            preco: { voo: 2800, hotel: 480 }
+          },
+          {
+            destino: "Maldivas",
+            pais: "Maldivas",
+            codigoPais: "MV",
+            porque: "A definição de paraíso com bangalôs sobre águas cristalinas",
+            preco: { voo: 5200, hotel: 950 }
+          }
+        ],
+        surpresa: {
+          destino: "Zanzibar",
+          pais: "Tanzânia",
+          codigoPais: "TZ",
+          descricao: "Ilha paradisíaca com praias de areia branca e cultura swahili única",
+          porque: "Combina praias espetaculares com uma cultura fascinante e pouco explorada pelos brasileiros",
+          destaque: "Tour de especiarias nas fazendas históricas seguido de jantar na praia",
+          comentario: "Zanzibar é um tesouro escondido que você nem imaginava! Praias de cinema, povo acolhedor e uma história cheia de mistérios! Au au de alegria só de pensar! 🐾🌴",
+          preco: { voo: 4200, hotel: 300 }
+        }
+      }
+    ],
+    // Aventura (1)
+    1: [
+      {
+        topPick: {
+          destino: "Alter do Chão",
+          pais: "Brasil",
+          codigoPais: "BR",
+          descricao: "O 'Caribe Amazônico' com praias de rio e floresta intocada",
+          porque: "Oferece aventura em trilhas na Amazônia e esportes aquáticos nos rios cristalinos",
+          destaque: "Passeio de barco até a Ilha do Amor e trilha na Floresta Nacional do Tapajós",
+          comentario: "Alter do Chão tem TANTOS cheiros incríveis para farejar na floresta! E aquela água clarinha pra nadar? Patas para cima, melhor aventura ever! 🐾🌳",
+          preco: { voo: 1400, hotel: 180 }
+        },
+        alternativas: [
+          {
+            destino: "Lençóis Maranhenses",
+            pais: "Brasil",
+            codigoPais: "BR",
+            porque: "Aventura entre dunas e lagoas de água doce em paisagem única no mundo",
+            preco: { voo: 1300, hotel: 220 }
+          },
+          {
+            destino: "Chapada dos Veadeiros",
+            pais: "Brasil",
+            codigoPais: "BR",
+            porque: "Trilhas desafiadoras levam a cachoeiras espetaculares e cânions",
+            preco: { voo: 950, hotel: 170 }
+          },
+          {
+            destino: "Queenstown",
+            pais: "Nova Zelândia",
+            codigoPais: "NZ",
+            porque: "Capital mundial dos esportes radicais com bungee jump e rafting",
+            preco: { voo: 6800, hotel: 340 }
+          },
+          {
+            destino: "San Gil",
+            pais: "Colômbia",
+            codigoPais: "CO",
+            porque: "Destino emergente para esportes radicais com rafting, parapente e mountain bike",
+            preco: { voo: 2100, hotel: 150 }
+          }
+        ],
+        surpresa: {
+          destino: "Komodo",
+          pais: "Indonésia",
+          codigoPais: "ID",
+          descricao: "Ilha habitada pelos famosos dragões de Komodo com snorkel em corais intocados",
+          porque: "Combina aventura selvagem com os dragões e mergulho em alguns dos corais mais preservados do mundo",
+          destaque: "Trekking guiado para observar os dragões de Komodo em seu habitat natural",
+          comentario: "Uau! Komodo tem LAGARTOS GIGANTES! Eu ficaria latindo de longe, mas você vai amar! E os peixes coloridos? O paraíso existe, e é aqui! 🐾🦎",
+          preco: { voo: 5500, hotel: 260 }
+        }
+      }
+    ],
+    // Cultura (2)
+    2: [
+      {
+        topPick: {
+          destino: "Salvador",
+          pais: "Brasil",
+          codigoPais: "BR",
+          descricao: "Capital da cultura afro-brasileira com música, gastronomia e história colonial",
+          porque: "Imersão profunda na cultura afro-brasileira com arquitetura colonial preservada",
+          destaque: "Aula de percussão com mestres locais seguida de jantar de comida baiana tradicional",
+          comentario: "Salvador tem TANTOS cheiros de comida boa e música que faz até cachorro querer sambar! O Pelourinho é demais para passear e farejar história! 🐾🥁",
+          preco: { voo: 1100, hotel: 220 }
+        },
+        alternativas: [
+          {
+            destino: "Ouro Preto",
+            pais: "Brasil",
+            codigoPais: "BR",
+            porque: "Joia do barroco brasileiro com igrejas históricas e gastronomia mineira",
+            preco: { voo: 950, hotel: 190 }
+          },
+          {
+            destino: "Quioto",
+            pais: "Japão",
+            codigoPais: "JP",
+            porque: "Templos milenares e tradições vivas da cultura japonesa",
+            preco: { voo: 5900, hotel: 310 }
+          },
+          {
+            destino: "Istambul",
+            pais: "Turquia",
+            codigoPais: "TR",
+            porque: "Encontro entre Oriente e Ocidente com bazaars, mesquitas e palácios históricos",
+            preco: { voo: 4200, hotel: 270 }
+          },
+          {
+            destino: "Cartagena",
+            pais: "Colômbia",
+            codigoPais: "CO",
+            porque: "Cidade colonial cercada por muralhas com rica herança cultural afro-caribenha",
+            preco: { voo: 1900, hotel: 230 }
+          }
+        ],
+        surpresa: {
+          destino: "Luang Prabang",
+          pais: "Laos",
+          codigoPais: "LA",
+          descricao: "Cidade patrimônio mundial com templos budistas e ritual diário dos monges",
+          porque: "Experiência cultural profunda em um dos destinos mais autênticos e menos turísticos do Sudeste Asiático",
+          destaque: "Cerimônia do Tak Bat, onde centenas de monges coletam oferendas ao amanhecer",
+          comentario: "Luang Prabang tem monges de túnicas laranja e comida TÃO cheirosa nos mercados! Fiquei sentada comportada vendo os monges passarem! Quase ganhei petiscos! 🐾🏮",
+          preco: { voo: 4900, hotel: 180 }
+        }
+      }
+    ],
+    // Urbano (3)
+    3: [
+      {
+        topPick: {
+          destino: "São Paulo",
+          pais: "Brasil",
+          codigoPais: "BR",
+          descricao: "Metrópole vibrante com os melhores restaurantes, compras e vida noturna",
+          porque: "Oferece diversidade gastronômica imbatível e compras de classe mundial",
+          destaque: "Tour gastronômico pelos bares da Vila Madalena seguido de balada premium",
+          comentario: "São Paulo tem TANTOS cheiros diferentes e restaurantes pet friendly! Tem até sorveteria para cachorro! Amo passear na Paulista aos domingos! 🐾🌆",
+          preco: { voo: 800, hotel: 280 }
+        },
+        alternativas: [
+          {
+            destino: "Dubai",
+            pais: "Emirados Árabes Unidos",
+            codigoPais: "AE",
+            porque: "Shopping de luxo, arquitetura futurista e experiências urbanas exclusivas",
+            preco: { voo: 4800, hotel: 520 }
+          },
+          {
+            destino: "Tóquio",
+            pais: "Japão",
+            codigoPais: "JP",
+            porque: "Mistura de tradição e futuro com tecnologia, moda e gastronomia de ponta",
+            preco: { voo: 5700, hotel: 380 }
+          },
+          {
+            destino: "Nova York",
+            pais: "Estados Unidos",
+            codigoPais: "US",
+            porque: "A capital cultural do mundo com teatros, museus, compras e vida noturna",
+            preco: { voo: 3900, hotel: 450 }
+          },
+          {
+            destino: "Cidade do México",
+            pais: "México",
+            codigoPais: "MX",
+            porque: "Metrópole vibrante com fusão entre cultura histórica e modernidade",
+            preco: { voo: 2800, hotel: 260 }
+          }
+        ],
+        surpresa: {
+          destino: "Beirute",
+          pais: "Líbano",
+          codigoPais: "LB",
+          descricao: "Cidade cosmopolita com vida noturna lendária e gastronomia premiada",
+          porque: "Surpreende com sua cena cultural vibrante, clubes de classe mundial e contrastes arquitetônicos",
+          destaque: "Jantar nos restaurantes badalados de Mar Mikhael seguido de clubes premiados",
+          comentario: "Beirute é INCRÍVEL! Tanta comida cheirosa, música alta e pessoas que adoram fazer carinho em cachorros! A vida noturna é au au de primeira! 🐾🌙",
+          preco: { voo: 4100, hotel: 290 }
+        }
+      }
+    ]
+  };
+  
+  // Selecionar baseado na preferência e variáveis aleatórias para evitar repetições
+  const conjuntoPreferencia = destinosPorPreferencia[preferencia] || destinosPorPreferencia[0];
+  const indiceAleatorio = Math.floor(Math.random() * conjuntoPreferencia.length);
+  
+  // Reordenar alternativas para evitar sempre as mesmas posições
+  const resultado = {...conjuntoPreferencia[indiceAleatorio]};
+  resultado.alternativas = embaralharArray([...resultado.alternativas]).slice(0, 4);
+  
+  return resultado;
+}
+
+// Função auxiliar para embaralhar arrays (útil para reordenar destinos)
+function embaralharArray(array) {
+  let currentIndex = array.length;
+  let randomIndex;
+
+  // Enquanto existirem elementos a serem embaralhados
+  while (currentIndex != 0) {
+    // Escolher um elemento restante
+    randomIndex = Math.floor(Math.random() * currentIndex);
+    currentIndex--;
+
+    // E trocar com o elemento atual
+    [array[currentIndex], array[randomIndex]] = [array[randomIndex], array[currentIndex]];
+  }
+
+  return array;
+}
