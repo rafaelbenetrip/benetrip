@@ -1,8 +1,8 @@
 // api/flight-search.js - Endpoint Vercel para busca de voos
-import axios from 'axios';
-import crypto from 'crypto';
+const axios = require('axios');
+const crypto = require('crypto');
 
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
   // Configurar cabeçalhos CORS
   res.setHeader('Access-Control-Allow-Credentials', true);
   res.setHeader('Access-Control-Allow-Origin', '*');
