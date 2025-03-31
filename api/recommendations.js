@@ -1,6 +1,9 @@
 // api/recommendations.js - Endpoint da API Vercel para recomendações de destino
 const axios = require('axios');
 
+// Aumentar o timeout para 50 segundos (dentro do limite de 60s do Vercel PRO)
+const REQUEST_TIMEOUT = 50000;
+
 module.exports = async function handler(req, res) {
   // Configuração de CORS para qualquer origem
   res.setHeader('Access-Control-Allow-Credentials', true);
@@ -122,67 +125,66 @@ module.exports = async function handler(req, res) {
       prompt = "Recomende destinos de viagem para um usuário. Forneça um destino principal, 4 alternativas e um destino surpresa. Responda em formato JSON.";
     }
     
-    // Chamar a API Perplexity com verificação de ambiente
-    try {
-      // Verificar se API key da Perplexity está configurada
-      if (!process.env.PERPLEXITY_API_KEY) {
-        console.warn('PERPLEXITY_API_KEY não configurada, tentando alternativas');
-        throw new Error('PERPLEXITY_API_KEY não configurada');
-      }
-      
-      console.log('Chamando API Perplexity...');
-      const perplexityResponse = await callPerplexityAPI(prompt);
-      console.log('Resposta Perplexity recebida com sucesso');
-      
-      // Verificar se a resposta é válida
-      if (!perplexityResponse) {
-        throw new Error('Resposta vazia da Perplexity');
-      }
-      
-      // Retornar a resposta formatada
-      return res.status(200).json({
-        tipo: "perplexity",
-        conteudo: perplexityResponse
-      });
-    } catch (perplexityError) {
-      console.error('Erro ao usar Perplexity:', perplexityError.message);
-      
-      // Tentar outros modelos como fallback com verificação de ambiente
+    // Tenta usar cada serviço de IA em sequência até obter sucesso
+    let response = null;
+    
+    // Tentar Perplexity primeiro se estiver configurado
+    if (process.env.PERPLEXITY_API_KEY) {
       try {
-        let fallbackResponse = null;
+        console.log('Chamando API Perplexity...');
+        response = await callPerplexityAPI(prompt);
+        console.log('Resposta Perplexity recebida com sucesso');
         
-        // Tentar OpenAI como fallback se configurada
-        if (process.env.OPENAI_API_KEY) {
-          console.log('Tentando OpenAI como fallback...');
-          fallbackResponse = await callOpenAIAPI(prompt);
-          console.log('Resposta OpenAI recebida com sucesso');
-        } 
-        // Tentar Claude como segundo fallback
-        else if (process.env.CLAUDE_API_KEY) {
-          console.log('Tentando Claude como fallback...');
-          fallbackResponse = await callClaudeAPI(prompt);
-          console.log('Resposta Claude recebida com sucesso');
-        }
-        
-        if (fallbackResponse) {
-          return res.status(200).json({
-            tipo: "fallback",
-            conteudo: fallbackResponse
-          });
-        } else {
-          throw new Error('Nenhum serviço de IA disponível');
-        }
-      } catch (fallbackError) {
-        console.error('Erro ao usar serviços de fallback:', fallbackError.message);
-        
-        // Retornar dados mockados se nenhum serviço estiver disponível
-        console.log('Retornando dados mockados devido a falhas em todos os serviços');
         return res.status(200).json({
-          tipo: "mockado",
-          conteudo: JSON.stringify(mockData)
+          tipo: "perplexity",
+          conteudo: response
         });
+      } catch (perplexityError) {
+        console.error('Erro ao usar Perplexity:', perplexityError.message);
+        // Continuar para o próximo método, não retornando aqui
       }
     }
+    
+    // Tentar OpenAI em seguida, se configurado
+    if (process.env.OPENAI_API_KEY) {
+      try {
+        console.log('Tentando OpenAI como fallback...');
+        response = await callOpenAIAPI(prompt);
+        console.log('Resposta OpenAI recebida com sucesso');
+        
+        return res.status(200).json({
+          tipo: "openai",
+          conteudo: response
+        });
+      } catch (openaiError) {
+        console.error('Erro ao usar OpenAI:', openaiError.message);
+        // Continuar para o próximo método
+      }
+    }
+    
+    // Tentar Claude como última opção de IA
+    if (process.env.CLAUDE_API_KEY) {
+      try {
+        console.log('Tentando Claude como fallback final...');
+        response = await callClaudeAPI(prompt);
+        console.log('Resposta Claude recebida com sucesso');
+        
+        return res.status(200).json({
+          tipo: "claude",
+          conteudo: response
+        });
+      } catch (claudeError) {
+        console.error('Erro ao usar Claude:', claudeError.message);
+        // Se todas as opções falharem, usar o mockado
+      }
+    }
+    
+    // Se chegou aqui, todas as opções de IA falharam, usar mockado
+    console.log('Todos os serviços de IA falharam, retornando dados mockados');
+    return res.status(200).json({
+      tipo: "mockado",
+      conteudo: JSON.stringify(mockData)
+    });
     
   } catch (globalError) {
     // Captura qualquer erro não tratado para evitar o 500
@@ -281,77 +283,7 @@ async function callPerplexityAPI(prompt) {
     
     console.log('Enviando requisição para Perplexity...');
     
-    // Define o schema JSON correto
-    const schemaJSON = {
-      type: "object",
-      properties: {
-        topPick: {
-          type: "object",
-          properties: {
-            destino: { type: "string" },
-            pais: { type: "string" },
-            codigoPais: { type: "string" },
-            descricao: { type: "string" },
-            porque: { type: "string" },
-            destaque: { type: "string" },
-            comentario: { type: "string" },
-            preco: {
-              type: "object",
-              properties: {
-                voo: { type: "number" },
-                hotel: { type: "number" }
-              },
-              required: ["voo", "hotel"]
-            }
-          },
-          required: ["destino", "pais", "codigoPais", "descricao", "porque", "destaque", "comentario", "preco"]
-        },
-        alternativas: {
-          type: "array",
-          items: {
-            type: "object",
-            properties: {
-              destino: { type: "string" },
-              pais: { type: "string" },
-              codigoPais: { type: "string" },
-              porque: { type: "string" },
-              preco: {
-                type: "object",
-                properties: {
-                  voo: { type: "number" },
-                  hotel: { type: "number" }
-                },
-                required: ["voo", "hotel"]
-              }
-            },
-            required: ["destino", "pais", "codigoPais", "porque", "preco"]
-          }
-        },
-        surpresa: {
-          type: "object",
-          properties: {
-            destino: { type: "string" },
-            pais: { type: "string" },
-            codigoPais: { type: "string" },
-            descricao: { type: "string" },
-            porque: { type: "string" },
-            destaque: { type: "string" },
-            comentario: { type: "string" },
-            preco: {
-              type: "object",
-              properties: {
-                voo: { type: "number" },
-                hotel: { type: "number" }
-              },
-              required: ["voo", "hotel"]
-            }
-          },
-          required: ["destino", "pais", "codigoPais", "descricao", "porque", "destaque", "comentario", "preco"]
-        }
-      },
-      required: ["topPick", "alternativas", "surpresa"]
-    };
-    
+    // Definição simplificada do schema para usar formato text
     const response = await axios({
       method: 'post',
       url: 'https://api.perplexity.ai/chat/completions',
@@ -364,7 +296,7 @@ async function callPerplexityAPI(prompt) {
         messages: [
           {
             role: 'system',
-            content: 'Você é a Tripinha, uma cachorra vira-lata caramelo especialista em viagens da Benetrip. Você usa um tom amigável, alegre e entusiasmado. Você conhece sobre destinos turísticos em todo o mundo e pode recomendar lugares baseados nas preferências dos usuários.'
+            content: 'Você é a Tripinha, uma cachorra vira-lata caramelo especialista em viagens da Benetrip. Você usa um tom amigável, alegre e entusiasmado. Você conhece sobre destinos turísticos em todo o mundo e pode recomendar lugares baseados nas preferências dos usuários. Responda APENAS em formato JSON válido, sem qualquer texto adicional.'
           },
           {
             role: 'user',
@@ -372,23 +304,22 @@ async function callPerplexityAPI(prompt) {
           }
         ],
         temperature: 0.7,
-        max_tokens: 4000,
-        response_format: {
-          type: "json_schema",
-          json_schema: schemaJSON
-        }
+        max_tokens: 2000,
+        // Simplificando para usar text sem estrutura de json_schema
+        response_format: { type: "text" }
       },
-      timeout: 60000 // Aumentado para 60 segundos
+      timeout: REQUEST_TIMEOUT
     });
     
     // Verificar se a resposta contém o conteúdo esperado
     if (!response.data || !response.data.choices || !response.data.choices[0] || !response.data.choices[0].message || !response.data.choices[0].message.content) {
-      console.error('Resposta Perplexity incompleta:', JSON.stringify(response.data).substring(0, 500));
+      console.error('Resposta Perplexity incompleta:', JSON.stringify(response.data).substring(0, 200));
       throw new Error('Formato de resposta da Perplexity inválido');
     }
     
-    // Retorna diretamente o conteúdo JSON da resposta
-    return response.data.choices[0].message.content;
+    // Tentar extrair o JSON da resposta de texto
+    const content = response.data.choices[0].message.content;
+    return extrairJSONDaResposta(content);
   } catch (error) {
     console.error('Erro detalhado na chamada à API Perplexity:');
     
@@ -438,7 +369,7 @@ async function callOpenAIAPI(prompt) {
         'Content-Type': 'application/json'
       },
       data: {
-        model: "gpt-4",
+        model: "gpt-4-turbo",  // Modelo mais rápido
         messages: [
           {
             role: "system",
@@ -450,38 +381,24 @@ async function callOpenAIAPI(prompt) {
           }
         ],
         temperature: 0.7,
-        max_tokens: 4000
-        // Removido o response_format que estava causando erro
+        max_tokens: 2000
       },
-      timeout: 60000 // Aumentado para 60 segundos
+      timeout: REQUEST_TIMEOUT
     });
     
     if (!response.data || !response.data.choices || !response.data.choices[0] || !response.data.choices[0].message || !response.data.choices[0].message.content) {
       throw new Error('Formato de resposta da OpenAI inválido');
     }
     
-    // Tentar extrair apenas o JSON da resposta caso haja texto adicional
+    // Extrair JSON da resposta
     const content = response.data.choices[0].message.content;
-    try {
-      // Tentar encontrar JSON em uma string que pode conter texto adicional
-      const jsonMatch = content.match(/(\{[\s\S]*\})/);
-      if (jsonMatch && jsonMatch[0]) {
-        // Validar se é JSON válido
-        JSON.parse(jsonMatch[0]);
-        return jsonMatch[0];
-      }
-      // Se não encontrou padrão JSON ou não é válido, retornar conteúdo original
-      return content;
-    } catch (parseError) {
-      console.log('Erro ao extrair JSON da resposta:', parseError);
-      return content; // Retornar conteúdo original se não conseguir extrair JSON
-    }
+    return extrairJSONDaResposta(content);
   } catch (error) {
     console.error('Erro detalhado na chamada à API OpenAI:');
     
     if (error.response) {
       console.error('Status:', error.response.status);
-      console.error('Dados:', JSON.stringify(error.response.data).substring(0, 500));
+      console.error('Dados:', JSON.stringify(error.response.data).substring(0, 200));
     }
     
     throw error;
@@ -511,8 +428,8 @@ async function callClaudeAPI(prompt) {
         'Content-Type': 'application/json'
       },
       data: {
-        model: "claude-3-sonnet-20240229",
-        max_tokens: 4000,
+        model: "claude-3-haiku-20240307",  // Modelo mais rápido
+        max_tokens: 2000,
         messages: [
           {
             role: "system",
@@ -524,38 +441,60 @@ async function callClaudeAPI(prompt) {
           }
         ]
       },
-      timeout: 60000 // Aumentado para 60 segundos
+      timeout: REQUEST_TIMEOUT
     });
     
     if (!response.data || !response.data.content || !response.data.content[0] || !response.data.content[0].text) {
       throw new Error('Formato de resposta do Claude inválido');
     }
     
-    // Tentar extrair apenas o JSON da resposta caso haja texto adicional
+    // Extrair JSON da resposta
     const content = response.data.content[0].text;
-    try {
-      // Tentar encontrar JSON em uma string que pode conter texto adicional
-      const jsonMatch = content.match(/(\{[\s\S]*\})/);
-      if (jsonMatch && jsonMatch[0]) {
-        // Validar se é JSON válido
-        JSON.parse(jsonMatch[0]);
-        return jsonMatch[0];
-      }
-      // Se não encontrou padrão JSON ou não é válido, retornar conteúdo original
-      return content;
-    } catch (parseError) {
-      console.log('Erro ao extrair JSON da resposta:', parseError);
-      return content; // Retornar conteúdo original se não conseguir extrair JSON
-    }
+    return extrairJSONDaResposta(content);
   } catch (error) {
     console.error('Erro detalhado na chamada à API Claude:');
     
     if (error.response) {
       console.error('Status:', error.response.status);
-      console.error('Dados:', JSON.stringify(error.response.data).substring(0, 500));
+      console.error('Dados:', JSON.stringify(error.response.data).substring(0, 200));
     }
     
     throw error;
+  }
+}
+
+// Função para extrair JSON válido de uma string de texto
+function extrairJSONDaResposta(texto) {
+  try {
+    // Tentar analisar diretamente, assumindo que é um JSON completo
+    try {
+      return JSON.parse(texto);
+    } catch (e) {
+      // Se falhar, tente encontrar o JSON dentro da string
+      const jsonPattern = /\{[\s\S]*\}/;
+      const match = texto.match(jsonPattern);
+      
+      if (match && match[0]) {
+        // Tentar analisar o JSON extraído
+        const parsedJson = JSON.parse(match[0]);
+        return match[0]; // Retorna como string para manter compatibilidade
+      }
+      
+      // Se não conseguir encontrar um JSON válido, limpe e adapte a string
+      const limpo = texto
+        .replace(/```json/g, '')
+        .replace(/```/g, '')
+        .trim();
+      
+      // Tenta analisar a string limpa
+      JSON.parse(limpo); // Isso vai lançar erro se não for um JSON válido
+      return limpo;
+    }
+  } catch (error) {
+    console.error('Erro ao extrair JSON:', error);
+    // Se todas as tentativas falharem, retorne a string original
+    // Isso permite que o sistema decida como lidar com o formato
+    return texto;
   }
 }
 
@@ -584,37 +523,29 @@ function gerarPromptParaDestinos(dados) {
   }
 
   // Construir prompt detalhado
-  return `Preciso que recomende destinos de viagem baseados nestas preferências do usuário:
-
+  return `Quero recomendações de viagem com estas preferências:
 - Partindo de: ${cidadeOrigem}
 - Viajando: ${companhia}
-- Buscando principalmente: ${preferencia}
-- Orçamento para passagens: ${orcamento} ${moeda}
+- Buscando: ${preferencia}
+- Orçamento: ${orcamento} ${moeda}
 - Período: ${dataIda} a ${dataVolta}
 
-Você deve fornecer destinos relevantes para o perfil do usuário considerando:
-- Atrações que combinam com as preferências indicadas
-- Clima adequado no período de viagem
-- Opções dentro do orçamento mencionado
-- Facilidade de acesso a partir da origem
-
-Forneça EXATAMENTE o seguinte formato JSON, sem texto adicional antes ou depois:
+Forneça EXATAMENTE este formato JSON, sem texto adicional:
 {
   "topPick": {
     "destino": "Nome da Cidade",
     "pais": "Nome do País",
-    "codigoPais": "XX", // código de 2 letras do país
-    "descricao": "Breve descrição do destino com até 100 caracteres",
-    "porque": "Razão principal para visitar, relacionada às preferências do usuário",
+    "codigoPais": "XX",
+    "descricao": "Breve descrição do destino",
+    "porque": "Razão principal para visitar",
     "destaque": "Uma experiência única neste destino",
-    "comentario": "Um comentário animado da Tripinha, como se você fosse um cachorro entusiasmado",
+    "comentario": "Um comentário animado da Tripinha",
     "preco": {
-      "voo": número, // valor estimado em ${moeda}
-      "hotel": número // valor por noite estimado em ${moeda}
+      "voo": número,
+      "hotel": número
     }
   },
   "alternativas": [
-    // EXATAMENTE 4 destinos alternativos, cada um com:
     {
       "destino": "Nome da Cidade",
       "pais": "Nome do País", 
@@ -627,22 +558,19 @@ Forneça EXATAMENTE o seguinte formato JSON, sem texto adicional antes ou depois
     }
   ],
   "surpresa": {
-    // Um destino surpresa menos óbvio mas que também combine com as preferências
     "destino": "Nome da Cidade",
     "pais": "Nome do País",
     "codigoPais": "XX",
-    "descricao": "Breve descrição do destino com até 100 caracteres",
-    "porque": "Razão principal para visitar, destacando o fator surpresa",
-    "destaque": "Uma experiência única e surpreendente neste destino",
-    "comentario": "Um comentário animado da Tripinha sobre este destino surpresa",
+    "descricao": "Breve descrição do destino",
+    "porque": "Razão principal para visitar",
+    "destaque": "Uma experiência única neste destino",
+    "comentario": "Um comentário da Tripinha",
     "preco": {
       "voo": número,
       "hotel": número
     }
   }
-}
-
-Cada destino DEVE ser realista e ter preços estimados plausíveis. Não inclua texto explicativo antes ou depois do JSON.`;
+}`;
 }
 
 // Função auxiliar para obter texto de companhia com verificação de tipo
