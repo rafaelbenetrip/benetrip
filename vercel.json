@@ -11,9 +11,19 @@
     },
     "api/image-search.js": {
       "memory": 1024,
-      "maxDuration": 60
+      "maxDuration": 30
     }
   },
+  "headers": [
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        { "key": "Connection", "value": "keep-alive" },
+        { "key": "Keep-Alive", "value": "timeout=60" },
+        { "key": "Cache-Control", "value": "public, max-age=60, stale-while-revalidate=300" }
+      ]
+    }
+  ],
   "routes": [
     {
       "src": "/api/recommendations",
