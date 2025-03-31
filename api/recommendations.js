@@ -136,7 +136,7 @@ module.exports = async function handler(req, res) {
     
     return res.status(200).json({
       tipo: "emergencia",
-      conteudo: JSON.stringify(emergencyData),
+      conteudo: emergencyData,
       message: "Todas as tentativas de API falharam"
     });
     
@@ -149,7 +149,7 @@ module.exports = async function handler(req, res) {
     
     return res.status(200).json({ 
       tipo: "erro",
-      conteudo: JSON.stringify(emergencyData),
+      conteudo: emergencyData,
       error: globalError.message
     });
   }
@@ -363,15 +363,15 @@ function extrairJSONDaResposta(texto) {
     
     // Verificar se já é um objeto JSON
     if (typeof texto === 'object' && texto !== null) {
-      console.log("Resposta já é um objeto, convertendo para string");
-      return JSON.stringify(texto);
+      console.log("Resposta já é um objeto, retornando diretamente");
+      return texto; // Retornar o objeto diretamente, não stringificar
     }
     
     // Primeira tentativa: Analisar diretamente se for um JSON limpo
     try {
       const parsed = JSON.parse(texto);
       console.log("JSON analisado com sucesso no primeiro método");
-      return JSON.stringify(parsed); 
+      return parsed; // Retornar o objeto JavaScript, não stringificar
     } catch (e) {
       console.log("Primeira tentativa falhou, tentando métodos alternativos");
       // Continuar com os outros métodos
@@ -399,7 +399,7 @@ function extrairJSONDaResposta(texto) {
         const possibleJson = match[0];
         const parsed = JSON.parse(possibleJson);
         console.log("JSON extraído e analisado com sucesso via regex");
-        return JSON.stringify(parsed);
+        return parsed; // Retornar o objeto JavaScript, não stringificar
       } catch (regexError) {
         console.log("Falha na extração via regex:", regexError.message);
       }
@@ -417,11 +417,12 @@ function extrairJSONDaResposta(texto) {
 }
 
 // Verifica se o objeto JSON recebido é válido para nosso contexto
-function isValidDestinationJSON(jsonString) {
-  if (!jsonString) return false;
+function isValidDestinationJSON(data) {
+  if (!data) return false;
   
   try {
-    const data = typeof jsonString === 'string' ? JSON.parse(jsonString) : jsonString;
+    // Não precisa mais fazer parse aqui, pois o dado já deve ser um objeto JavaScript
+    // Remover essa conversão desnecessária
     
     // Verificar se tem os campos obrigatórios
     if (!data.topPick || !data.alternativas || !data.surpresa) {
