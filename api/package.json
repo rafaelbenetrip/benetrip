@@ -1,9 +1,11 @@
 {
   "name": "benetrip-api",
   "version": "1.0.0",
-  "description": "API functions for Benetrip",
+  "private": true,
   "dependencies": {
-    "openai": "^4.28.0",
-    "axios": "^1.6.2"
+    "axios": "1.3.5",
+    "dotenv": "^16.3.1",
+    "openai": "^4.20.1",
+    "@anthropic-ai/sdk": "^0.10.0"
   }
 }
