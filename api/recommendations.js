@@ -57,7 +57,7 @@ module.exports = async function handler(req, res) {
       console.log('Prompt gerado com sucesso, tamanho:', prompt.length);
     } catch (promptError) {
       console.error('Erro ao gerar prompt:', promptError);
-      prompt = "Recomende destinos de viagem únicos e personalizados para o Brasil e mundo. Um destino principal, EXATAMENTE 4 destinos alternativos diferentes entre si, e um destino surpresa diferente dos demais. Seja criativo e evite destinos óbvios ou repetidos. Responda em formato JSON.";
+      prompt = "Recomende destinos de viagem únicos e personalizados. Um destino principal, EXATAMENTE 4 destinos alternativos diferentes entre si, e um destino surpresa diferente dos demais. Seja criativo e evite destinos óbvios ou repetidos. Responda em formato JSON.";
     }
     
     // Tentar múltiplas vezes a consulta à API com diferentes modelos
@@ -131,7 +131,7 @@ module.exports = async function handler(req, res) {
       
       // Se chegamos aqui, todas as tentativas falharam nesta iteração
       // Vamos modificar o prompt para a próxima tentativa para incentivar mais criatividade
-      prompt = `${prompt}\n\nIMPORTANTE: Sugira destinos TOTALMENTE DIFERENTES, CRIATIVOS e ÚNICOS. NÃO mencione Santiago, Cusco, ou outros destinos comuns. Explore destinos alternativos e menos óbvios que sejam adequados para as preferências indicadas. Forneça EXATAMENTE 4 destinos alternativos. Não mais, não menos.`;
+      prompt = `${prompt}\n\nIMPORTANTE: Faça um misto de sugestão de destinos conhecidos e desconhecidos que sejam diferentes, CRIATIVOS e ÚNICOS que sejam ADEQUADOS PARA AS PREFRÊNCIAS indicadas. Forneça EXATAMENTE 4 destinos alternativos. Não mais, não menos.`;
     }
     
     // Se todas as tentativas falharam, criar uma resposta de emergência
@@ -192,7 +192,7 @@ async function callPerplexityAPI(prompt) {
         messages: [
           {
             role: 'system',
-            content: 'Você é um especialista em viagens focado em fornecer recomendações altamente personalizadas. Evite sugerir destinos populares ou óbvios. Gere sugestões completamente diferentes uma das outras, criativas e adequadas ao perfil do viajante. Retorne SEMPRE EXATAMENTE 4 destinos alternativos. Retorne APENAS JSON puro, sem marcações ou formatação extra.'
+            content: 'Você é um especialista em viagens focado em fornecer recomendações altamente personalizadas. Gere sugestões diferentes uma das outras, criativas e adequadas ao perfil do viajante. Retorne SEMPRE EXATAMENTE 4 destinos alternativos. Retorne APENAS JSON puro, sem marcações ou formatação extra.'
           },
           {
             role: 'user',
@@ -274,7 +274,7 @@ async function callOpenAIAPI(prompt) {
         messages: [
           {
             role: "system",
-            content: "Você é um especialista em viagens focado em fornecer recomendações altamente personalizadas e criativas. Evite sugerir destinos populares ou óbvios como Santiago ou Cusco. Gere sugestões completamente diferentes uma das outras e adequadas ao perfil do viajante. Retorne SEMPRE EXATAMENTE 4 destinos alternativos. Retorne APENAS JSON puro, sem formatação extra."
+            content: "Você é um especialista em viagens focado em fornecer recomendações altamente personalizadas e criativas. Gere sugestões completamente diferentes uma das outras e adequadas ao perfil do viajante. Retorne SEMPRE EXATAMENTE 4 destinos alternativos. Retorne APENAS JSON puro, sem formatação extra."
           },
           {
             role: "user",
@@ -339,7 +339,7 @@ async function callClaudeAPI(prompt) {
         messages: [
           {
             role: "system",
-            content: "Você é um especialista em viagens focado em fornecer recomendações altamente personalizadas e criativas. Evite sugerir destinos populares ou óbvios como Santiago ou Cusco. Gere sugestões completamente diferentes uma das outras e adequadas ao perfil do viajante. Retorne SEMPRE EXATAMENTE 4 destinos alternativos. Retorne APENAS JSON puro."
+            content: "Você é um especialista em viagens focado em fornecer recomendações altamente personalizadas e criativas. Gere sugestões completamente diferentes uma das outras e adequadas ao perfil do viajante. Retorne SEMPRE EXATAMENTE 4 destinos alternativos. Retorne APENAS JSON puro."
           },
           {
             role: "user",
@@ -599,12 +599,10 @@ PERFIL DO VIAJANTE:
 
 IMPORTANTE:
 1. Sugira destinos DIVERSIFICADOS e CRIATIVOS que combinem bem com o perfil.
-2. NÃO sugira Santiago, Cusco, Buenos Aires ou Montevidéu.
-3. Destinos DEVEM ser DIFERENTES entre si.
-4. Forneça EXATAMENTE 4 DESTINOS ALTERNATIVOS diferentes entre si.
-5. O destino principal, os 4 alternativos e a surpresa DEVEM ser locais DISTINTOS.
-6. Considere a ÉPOCA DO ANO (${estacaoViagem}) para sugerir destinos com clima adequado.
-7. Tente incluir destinos de continentes diferentes nas alternativas.
+2. Destinos DEVEM ser DIFERENTES entre si.
+3. Forneça EXATAMENTE 4 DESTINOS ALTERNATIVOS diferentes entre si.
+4. O destino principal, os 4 alternativos e a surpresa DEVEM ser locais DISTINTOS.
+5. Considere a ÉPOCA DO ANO (${estacaoViagem}) para sugerir destinos com clima adequado.
 
 Forneça no formato JSON exato abaixo, SEM formatação markdown:
 {
