@@ -1,250 +1,265 @@
 /**
- * Componente para exibição de imagens com créditos
- * Inclua este código no seu arquivo principal de JavaScript ou em um arquivo separado
+ * BENETRIP - Módulo de exibição e gerenciamento de imagens
+ * Utilitários para carregar, exibir e verificar imagens dos destinos
  */
+
+// Utilitário para tratar e exibir imagens de destinos
 window.BENETRIP_IMAGES = {
+  // Configurações do serviço
+  config: {
+    // URLs base para imagens de fallback
+    placeholderUrl: 'https://via.placeholder.com/',
+    unsplashBaseUrl: 'https://source.unsplash.com/featured/',
+    // Tempo máximo para verificar se uma imagem existe
+    timeoutVerify: 5000,
+    // Opções de tamanhos para diferentes contextos
+    sizes: {
+      destaque: '400x224',
+      alternativa: '120x120',
+      surpresa: '400x224'
+    }
+  },
+  
+  // Inicialização do serviço
   init() {
-    // Inicializar listeners para modal de imagens
-    this.setupImageModals();
+    console.log('Inicializando serviço de imagens Benetrip');
+    this.initialized = true;
+    
+    // Adicionar handler global para erros de imagem
+    document.addEventListener('error', (event) => {
+      if (event.target.tagName.toLowerCase() === 'img') {
+        this.handleImageError(event.target);
+      }
+    }, true); // Usar fase de captura para pegar erros antes de chegarem ao elemento
+    
     return this;
   },
-
-  // Configurar modais de imagem e exibição de créditos
-  setupImageModals() {
-    // Adicionar evento de clique para todas as imagens de destino
-    document.addEventListener('click', (event) => {
-      const target = event.target;
+  
+  // Verificar se o serviço foi inicializado
+  isInitialized() {
+    return this.initialized === true;
+  },
+  
+  // Tratar erro de carregamento de imagem
+  handleImageError(imgElement) {
+    // Verificar se a imagem já tem um fallback aplicado
+    if (imgElement.dataset.fallback === 'applied') {
+      return; // Evitar loop infinito de fallbacks
+    }
+    
+    const alt = imgElement.alt || 'imagem';
+    const size = imgElement.dataset.size || '400x224';
+    
+    // Tentar Unsplash como segunda opção
+    try {
+      imgElement.dataset.fallback = 'applied';
+      imgElement.src = `${this.config.unsplashBaseUrl}?${encodeURIComponent(alt)}`;
+      imgElement.onerror = () => {
+        // Se Unsplash falhar, usar placeholder
+        imgElement.src = `${this.config.placeholderUrl}${size}?text=${encodeURIComponent(alt)}`;
+      };
+    } catch (error) {
+      console.error('Erro ao aplicar fallback de imagem:', error);
+      imgElement.src = `${this.config.placeholderUrl}${size}?text=${encodeURIComponent(alt)}`;
+    }
+  },
+  
+  // Verificar se uma imagem existe e pode ser carregada
+  checkImageExists(url, timeout = this.config.timeoutVerify) {
+    return new Promise((resolve) => {
+      if (!url || url.includes('undefined')) {
+        resolve(false);
+        return;
+      }
       
-      // Verificar se o elemento clicado é uma imagem de destino
-      if (target.classList.contains('destino-img')) {
-        event.preventDefault();
-        
-        // Extrair informações de crédito da imagem
-        const imageUrl = target.getAttribute('src');
-        const photographer = target.getAttribute('data-photographer') || 'Fotógrafo não especificado';
-        const source = target.getAttribute('data-source') || 'Fonte desconhecida';
-        const sourceUrl = target.getAttribute('data-source-url') || '#';
-        const alt = target.getAttribute('alt') || 'Imagem de destino';
-        
-        // Exibir modal ou popup com a imagem ampliada e créditos
-        this.showImageModal(imageUrl, photographer, source, sourceUrl, alt);
-      }
-    });
-    
-    // Adicionar evento para fechar modal ao clicar fora
-    document.addEventListener('click', (event) => {
-      const modal = document.getElementById('benetrip-image-modal');
-      if (modal && event.target.id === 'benetrip-image-modal') {
-        this.closeImageModal();
-      }
-    });
-    
-    // Adicionar evento para fechar modal com tecla ESC
-    document.addEventListener('keydown', (event) => {
-      if (event.key === 'Escape') {
-        this.closeImageModal();
-      }
+      const img = new Image();
+      
+      // Definir timeout
+      const timer = setTimeout(() => {
+        img.src = '';  // Aborta carregamento
+        resolve(false);
+      }, timeout);
+      
+      img.onload = function() {
+        clearTimeout(timer);
+        resolve(true);
+      };
+      
+      img.onerror = function() {
+        clearTimeout(timer);
+        resolve(false);
+      };
+      
+      img.src = url;
     });
   },
   
-  // Exibir modal com imagem ampliada e créditos
-  showImageModal(imageUrl, photographer, source, sourceUrl, alt) {
-    // Remover modal existente se houver
-    this.closeImageModal();
+  // Obter URL de imagem de destino com fallbacks
+  async getDestinationImageUrl(destination, country, size = 'destaque', index = 0) {
+    // Verificar se temos imagens no objeto de destino
+    if (destination.imagens && destination.imagens.length > index) {
+      const imageUrl = destination.imagens[index].url;
+      const imageExists = await this.checkImageExists(imageUrl);
+      
+      if (imageExists) {
+        return imageUrl;
+      }
+    }
     
-    // Criar elemento de modal
-    const modal = document.createElement('div');
-    modal.id = 'benetrip-image-modal';
-    modal.classList.add('benetrip-modal');
+    // Fallback para Unsplash
+    const unsplashUrl = `${this.config.unsplashBaseUrl}?${encodeURIComponent(destination.destino + ' ' + destination.pais)}`;
+    const unsplashExists = await this.checkImageExists(unsplashUrl);
     
-    // Adicionar estilos inline
-    modal.style.position = 'fixed';
-    modal.style.top = '0';
-    modal.style.left = '0';
-    modal.style.width = '100%';
-    modal.style.height = '100%';
-    modal.style.backgroundColor = 'rgba(0, 0, 0, 0.9)';
-    modal.style.display = 'flex';
-    modal.style.flexDirection = 'column';
-    modal.style.alignItems = 'center';
-    modal.style.justifyContent = 'center';
-    modal.style.zIndex = '9999';
+    if (unsplashExists) {
+      return unsplashUrl;
+    }
     
-    // Criar container para imagem e créditos
-    const container = document.createElement('div');
-    container.classList.add('modal-container');
-    container.style.maxWidth = '80%';
-    container.style.maxHeight = '80%';
-    container.style.position = 'relative';
+    // Último recurso: placeholder
+    return `${this.config.placeholderUrl}${this.config.sizes[size]}?text=${encodeURIComponent(destination.destino)}`;
+  },
+  
+  // Verificar imagens de todos os destinos nas recomendações
+  async checkAllDestinationImages(recomendacoes) {
+    console.log("Verificando imagens de todos os destinos...");
+    const resultados = {
+      topPick: [],
+      alternativas: [],
+      surpresa: []
+    };
     
-    // Adicionar imagem
-    const img = document.createElement('img');
-    img.src = imageUrl;
-    img.alt = alt;
-    img.style.maxWidth = '100%';
-    img.style.maxHeight = '80vh';
-    img.style.objectFit = 'contain';
-    
-    // Adicionar botão de fechar
-    const closeBtn = document.createElement('button');
-    closeBtn.textContent = '×';
-    closeBtn.style.position = 'absolute';
-    closeBtn.style.top = '10px';
-    closeBtn.style.right = '10px';
-    closeBtn.style.backgroundColor = 'transparent';
-    closeBtn.style.border = 'none';
-    closeBtn.style.color = 'white';
-    closeBtn.style.fontSize = '30px';
-    closeBtn.style.cursor = 'pointer';
-    closeBtn.onclick = () => this.closeImageModal();
-    
-    // Adicionar créditos
-    const credits = document.createElement('div');
-    credits.classList.add('image-credits');
-    credits.style.color = 'white';
-    credits.style.padding = '10px';
-    credits.style.textAlign = 'center';
-    credits.style.marginTop = '10px';
-    
-    // Formatar os créditos
-    if (source.toLowerCase() === 'unsplash' || source.toLowerCase() === 'pexels') {
-      // Adicionar link para a origem se for Unsplash ou Pexels
-      credits.innerHTML = `Foto por <strong>${photographer}</strong> via <a href="${sourceUrl}" target="_blank" rel="noopener noreferrer" style="color: #e87722; text-decoration: underline;">${source}</a>`;
+    // Verificar destino principal
+    if (recomendacoes.topPick?.imagens) {
+      console.log(`Verificando ${recomendacoes.topPick.imagens.length} imagens para ${recomendacoes.topPick.destino}`);
+      for (const imagem of recomendacoes.topPick.imagens) {
+        const existe = await this.checkImageExists(imagem.url);
+        resultados.topPick.push({url: imagem.url, existe});
+      }
     } else {
-      // Sem link para outras fontes
-      credits.innerHTML = `Foto por <strong>${photographer}</strong> via ${source}`;
+      console.log("Destino principal não tem imagens");
     }
     
-    // Montar o modal
-    container.appendChild(img);
-    container.appendChild(closeBtn);
-    modal.appendChild(container);
-    modal.appendChild(credits);
+    // Verificar alternativas
+    if (recomendacoes.alternativas) {
+      for (const alt of recomendacoes.alternativas) {
+        if (alt.imagens) {
+          console.log(`Verificando ${alt.imagens.length} imagens para ${alt.destino}`);
+          const resultadosAlt = [];
+          for (const imagem of alt.imagens) {
+            const existe = await this.checkImageExists(imagem.url);
+            resultadosAlt.push({url: imagem.url, existe});
+          }
+          resultados.alternativas.push({
+            destino: alt.destino,
+            resultados: resultadosAlt
+          });
+        } else {
+          console.log(`Alternativa ${alt.destino} não tem imagens`);
+        }
+      }
+    }
     
-    // Adicionar ao documento
-    document.body.appendChild(modal);
+    // Verificar surpresa
+    if (recomendacoes.surpresa?.imagens) {
+      console.log(`Verificando ${recomendacoes.surpresa.imagens.length} imagens para ${recomendacoes.surpresa.destino}`);
+      for (const imagem of recomendacoes.surpresa.imagens) {
+        const existe = await this.checkImageExists(imagem.url);
+        resultados.surpresa.push({url: imagem.url, existe});
+      }
+    } else {
+      console.log("Destino surpresa não tem imagens");
+    }
     
-    // Impedir rolagem da página enquanto o modal estiver aberto
-    document.body.style.overflow = 'hidden';
+    console.log("Resultados da verificação de imagens:", resultados);
+    return resultados;
   },
   
-  // Fechar modal de imagem
-  closeImageModal() {
-    const modal = document.getElementById('benetrip-image-modal');
-    if (modal) {
-      modal.remove();
-      document.body.style.overflow = '';
+  // Pré-carregar imagens para melhorar performance
+  preloadImages(recomendacoes) {
+    if (!recomendacoes) return;
+    
+    const imageUrls = [];
+    
+    // Coletar URLs de imagens do destino principal
+    if (recomendacoes.topPick?.imagens) {
+      recomendacoes.topPick.imagens.forEach(img => {
+        if (img.url) imageUrls.push(img.url);
+      });
+    }
+    
+    // Coletar URLs de imagens das alternativas
+    if (recomendacoes.alternativas) {
+      recomendacoes.alternativas.forEach(alt => {
+        if (alt.imagens) {
+          alt.imagens.forEach(img => {
+            if (img.url) imageUrls.push(img.url);
+          });
+        }
+      });
+    }
+    
+    // Coletar URLs de imagens do destino surpresa
+    if (recomendacoes.surpresa?.imagens) {
+      recomendacoes.surpresa.imagens.forEach(img => {
+        if (img.url) imageUrls.push(img.url);
+      });
+    }
+    
+    // Pré-carregar imagens
+    if (imageUrls.length > 0) {
+      console.log(`Pré-carregando ${imageUrls.length} imagens...`);
+      imageUrls.forEach(url => {
+        const img = new Image();
+        img.src = url;
+      });
     }
   },
   
-  // Adicionar créditos de imagem em um elemento
-  addImageCredits(containerEl, images) {
-    if (!containerEl || !images || !images.length) return;
+  // Método para adicionar botão de debug na interface
+  addDebugButton() {
+    const btn = document.createElement('button');
+    btn.textContent = '🔍 Debug Imagens';
+    btn.style.position = 'fixed';
+    btn.style.bottom = '10px';
+    btn.style.left = '10px';
+    btn.style.zIndex = '9999';
+    btn.style.background = '#E87722';
+    btn.style.color = 'white';
+    btn.style.border = 'none';
+    btn.style.borderRadius = '4px';
+    btn.style.padding = '8px';
+    btn.style.fontSize = '12px';
+    btn.style.cursor = 'pointer';
     
-    // Remover créditos anteriores se existirem
-    const existingCredits = containerEl.querySelector('.image-credits-footer');
-    if (existingCredits) {
-      existingCredits.remove();
-    }
+    btn.addEventListener('click', async () => {
+      // Buscar recomendações do localStorage
+      try {
+        const recomendacoesStr = localStorage.getItem('benetrip_recomendacoes');
+        if (recomendacoesStr) {
+          const recomendacoes = JSON.parse(recomendacoesStr);
+          await this.checkAllDestinationImages(recomendacoes);
+          alert('Verificação de imagens concluída, verifique o console!');
+        } else {
+          alert('Nenhuma recomendação encontrada no localStorage!');
+        }
+      } catch (e) {
+        console.error('Erro ao debugar imagens:', e);
+        alert('Erro ao verificar imagens: ' + e.message);
+      }
+    });
     
-    // Criar elemento para créditos
-    const credits = document.createElement('div');
-    credits.classList.add('image-credits-footer');
-    credits.style.fontSize = '0.7rem';
-    credits.style.color = '#666';
-    credits.style.marginTop = '5px';
-    credits.style.textAlign = 'right';
-    
-    // Adicionar texto de crédito para a primeira imagem
-    if (images[0]) {
-      const { photographer, source } = images[0];
-      credits.textContent = `Foto: ${photographer} via ${source}`;
-    }
-    
-    // Adicionar ao container
-    containerEl.appendChild(credits);
-  },
-  
-  // Renderizar imagens para um destino específico
-  renderDestinationImages(containerEl, images, destino) {
-    if (!containerEl || !images || !images.length) return;
-    
-    // Limpar container
-    containerEl.innerHTML = '';
-    
-    // Determinar quantas imagens mostrar
-    const numImages = Math.min(images.length, 2); // Mostrar até 2 imagens
-    
-    // Criar wrapper de imagens
-    const imagesWrapper = document.createElement('div');
-    imagesWrapper.classList.add('destination-images');
-    imagesWrapper.style.position = 'relative';
-    imagesWrapper.style.overflow = 'hidden';
-    imagesWrapper.style.borderRadius = '8px';
-    
-    // Adicionar imagens
-    for (let i = 0; i < numImages; i++) {
-      const imageData = images[i];
-      if (!imageData) continue;
-      
-      const imgContainer = document.createElement('div');
-      imgContainer.style.position = numImages > 1 ? 'relative' : 'block';
-      imgContainer.style.width = numImages > 1 ? '50%' : '100%';
-      imgContainer.style.height = numImages > 1 ? '200px' : '250px';
-      imgContainer.style.display = 'inline-block';
-      imgContainer.style.overflow = 'hidden';
-      
-      const img = document.createElement('img');
-      img.classList.add('destino-img');
-      img.src = imageData.url;
-      img.alt = imageData.alt || `${destino}`;
-      img.setAttribute('data-photographer', imageData.photographer || 'Desconhecido');
-      img.setAttribute('data-source', imageData.source || 'Desconhecido');
-      img.setAttribute('data-source-url', imageData.sourceUrl || '#');
-      img.style.width = '100%';
-      img.style.height = '100%';
-      img.style.objectFit = 'cover';
-      img.style.cursor = 'pointer';
-      
-      imgContainer.appendChild(img);
-      imagesWrapper.appendChild(imgContainer);
-    }
-    
-    // Adicionar ao container
-    containerEl.appendChild(imagesWrapper);
-    
-    // Adicionar créditos em rodapé pequeno
-    this.addImageCredits(containerEl, images);
-    
-    return containerEl;
+    document.body.appendChild(btn);
   }
 };
 
-// Inicializar o serviço quando o script for carregado
-document.addEventListener('DOMContentLoaded', () => {
-  window.BENETRIP_IMAGES.init();
-});
+// Inicializar o serviço de imagens
+window.BENETRIP_IMAGES.init();
 
-// Adicionar estilos necessários
-(function() {
-  const style = document.createElement('style');
-  style.textContent = `
-    .destino-img {
-      transition: transform 0.3s ease;
-    }
-    
-    .destino-img:hover {
-      transform: scale(1.05);
-    }
-    
-    .image-credits-footer {
-      opacity: 0.7;
-      transition: opacity 0.3s ease;
-    }
-    
-    .destination-images:hover .image-credits-footer {
-      opacity: 1;
-    }
-  `;
-  document.head.appendChild(style);
-})();
+// Adicionar o botão de debug em ambiente de desenvolvimento
+if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+  document.addEventListener('DOMContentLoaded', () => {
+    window.BENETRIP_IMAGES.addDebugButton();
+  });
+}
+
+// Expor para uso global em outros scripts
+window.ImageDebugTools = window.BENETRIP_IMAGES;
