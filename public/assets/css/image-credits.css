@@ -1,0 +1,89 @@
+/* Estilos para créditos de imagens */
+.image-container {
+  position: relative;
+  overflow: hidden;
+  border-radius: 8px;
+}
+
+.image-credit {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background-color: rgba(0, 0, 0, 0.6);
+  color: white;
+  padding: 4px 8px;
+  font-size: 10px;
+  transition: opacity 0.3s ease;
+  opacity: 0;
+  text-align: right;
+}
+
+.image-container:hover .image-credit {
+  opacity: 1;
+}
+
+.image-credit a {
+  color: #ffffff;
+  text-decoration: underline;
+}
+
+.image-link {
+  display: block;
+  position: relative;
+  cursor: pointer;
+  width: 100%;
+  height: 100%;
+}
+
+.image-link::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.1);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.image-link:hover::after {
+  opacity: 1;
+}
+
+.zoom-icon {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background-color: rgba(255, 255, 255, 0.7);
+  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.image-link:hover .zoom-icon {
+  opacity: 1;
+}
+
+/* Estilos específicos para cards de destino */
+.destino-card .image-container {
+  height: 120px;
+  overflow: hidden;
+}
+
+.destino-destaque .image-container {
+  height: 200px;
+}
+
+.card-destino-foto {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
