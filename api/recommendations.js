@@ -108,16 +108,12 @@ module.exports = async function handler(req, res) {
           const response = await callPerplexityAPI(prompt, requestData);
           if (response && isValidDestinationJSON(response, requestData)) {
             console.log('Resposta Perplexity válida recebida');
-            let parsedResponse = JSON.parse(response);
-            // Pós-processamento para enriquecer comentários e pontos turísticos
-            parsedResponse = postProcessDestinos(parsedResponse);
-            const finalResponse = JSON.stringify(parsedResponse);
             if (!isResponseSent) {
               isResponseSent = true;
               clearTimeout(serverTimeout);
               return res.status(200).json({
                 tipo: "perplexity",
-                conteudo: finalResponse,
+                conteudo: response,
                 tentativa: tentativas
               });
             }
@@ -137,15 +133,12 @@ module.exports = async function handler(req, res) {
           const response = await callOpenAIAPI(prompt, requestData);
           if (response && isValidDestinationJSON(response, requestData)) {
             console.log('Resposta OpenAI válida recebida');
-            let parsedResponse = JSON.parse(response);
-            parsedResponse = postProcessDestinos(parsedResponse);
-            const finalResponse = JSON.stringify(parsedResponse);
             if (!isResponseSent) {
               isResponseSent = true;
               clearTimeout(serverTimeout);
               return res.status(200).json({
                 tipo: "openai",
-                conteudo: finalResponse,
+                conteudo: response,
                 tentativa: tentativas
               });
             }
@@ -165,15 +158,12 @@ module.exports = async function handler(req, res) {
           const response = await callClaudeAPI(prompt, requestData);
           if (response && isValidDestinationJSON(response, requestData)) {
             console.log('Resposta Claude válida recebida');
-            let parsedResponse = JSON.parse(response);
-            parsedResponse = postProcessDestinos(parsedResponse);
-            const finalResponse = JSON.stringify(parsedResponse);
             if (!isResponseSent) {
               isResponseSent = true;
               clearTimeout(serverTimeout);
               return res.status(200).json({
                 tipo: "claude",
-                conteudo: finalResponse,
+                conteudo: response,
                 tentativa: tentativas
               });
             }
@@ -193,7 +183,10 @@ module.exports = async function handler(req, res) {
     
     // Se todas as tentativas falharam, criar uma resposta de emergência
     console.log('Todas as tentativas de obter resposta válida falharam');
+    
+    // Usar dados de emergência personalizados
     const emergencyData = generateEmergencyData(requestData);
+    
     if (!isResponseSent) {
       isResponseSent = true;
       clearTimeout(serverTimeout);
@@ -205,8 +198,12 @@ module.exports = async function handler(req, res) {
     }
     
   } catch (globalError) {
+    // Captura qualquer erro não tratado para evitar o 500
     console.error('Erro global na API de recomendações:', globalError);
+    
+    // Retornar resposta de erro com dados de emergência
     const emergencyData = generateEmergencyData(req.body);
+    
     if (!isResponseSent) {
       isResponseSent = true;
       clearTimeout(serverTimeout);
@@ -217,9 +214,11 @@ module.exports = async function handler(req, res) {
       });
     }
   } finally {
+    // Garantir que o timeout é limpo mesmo se não enviamos resposta
     if (!isResponseSent) {
       isResponseSent = true;
       clearTimeout(serverTimeout);
+      // Se por algum motivo não enviamos nenhuma resposta ainda
       res.status(500).json({
         tipo: "erro",
         message: "Erro interno no servidor"
@@ -227,16 +226,23 @@ module.exports = async function handler(req, res) {
     }
   }
 }
+
 // Chamar a API da Perplexity com melhor tratamento de erros
 async function callPerplexityAPI(prompt, requestData) {
   try {
     const apiKey = process.env.PERPLEXITY_API_KEY;
+    
     if (!apiKey) {
       throw new Error('Chave da API Perplexity não configurada');
     }
+    
     console.log('Enviando requisição para Perplexity...');
+    
+    // Reforçar a mensagem sobre orçamento como prioridade absoluta e pontos turísticos
     const orcamentoMessage = requestData.orcamento_valor ? 
       `\n\n⚠️ ORÇAMENTO MÁXIMO: ${requestData.orcamento_valor} ${requestData.moeda_escolhida || 'BRL'} para voos (ida e volta por pessoa). Todos os destinos DEVEM ter preços de voo ABAIXO deste valor. Este é o requisito MAIS IMPORTANTE.` : '';
+    
+    // Construir instruções claras para não usar formatação markdown e incluir pontos turísticos
     const enhancedPrompt = `${prompt}${orcamentoMessage}\n\nIMPORTANTE: 
     1. Cada voo DEVE respeitar rigorosamente o orçamento máximo indicado.
     2. Retorne APENAS o JSON puro, sem marcação markdown ou comentários.
@@ -262,38 +268,50 @@ async function callPerplexityAPI(prompt, requestData) {
             content: enhancedPrompt
           }
         ],
-        temperature: 0.7,
+        temperature: 0.7, // Reduzindo temperatura para priorizar precisão nos preços
         max_tokens: 3000,
         response_format: { type: "text" }
       },
       timeout: REQUEST_TIMEOUT,
+      // Adicionar keepalive para conexão persistente
       httpAgent: new (require('http').Agent)({ keepAlive: true }),
       httpsAgent: new (require('https').Agent)({ keepAlive: true })
     });
     
+    // Verificar se a resposta contém o conteúdo esperado
     if (!response.data || !response.data.choices || !response.data.choices[0] || !response.data.choices[0].message || !response.data.choices[0].message.content) {
       console.error('Resposta Perplexity incompleta:', JSON.stringify(response.data).substring(0, 200));
       throw new Error('Formato de resposta da Perplexity inválido');
     }
     
+    // Tentar extrair o JSON da resposta de texto
     const content = response.data.choices[0].message.content;
     console.log('Conteúdo recebido da API Perplexity (primeiros 200 caracteres):', content.substring(0, 200));
     
     return extrairJSONDaResposta(content);
   } catch (error) {
     console.error('Erro detalhado na chamada à API Perplexity:');
+    
+    // Verificar se é um erro de timeout
     if (error.code === 'ECONNABORTED') {
       console.error('Timeout na chamada à API Perplexity');
     }
+    
+    // Verificar erro de resposta da API
     if (error.response) {
       console.error('Status:', error.response.status);
       console.error('Headers:', JSON.stringify(error.response.headers));
       console.error('Dados:', JSON.stringify(error.response.data).substring(0, 500));
     }
+    
+    // Verificar erro de requisição
     if (error.request) {
       console.error('Requisição enviada, mas sem resposta');
     }
+    
+    // Outros erros
     console.error('Mensagem de erro:', error.message);
+    
     throw error;
   }
 }
@@ -302,12 +320,18 @@ async function callPerplexityAPI(prompt, requestData) {
 async function callOpenAIAPI(prompt, requestData) {
   try {
     const apiKey = process.env.OPENAI_API_KEY;
+    
     if (!apiKey) {
       throw new Error('Chave da API OpenAI não configurada');
     }
+    
     console.log('Enviando requisição para OpenAI...');
+    
+    // Reforçar a mensagem sobre orçamento como prioridade absoluta e pontos turísticos
     const orcamentoMessage = requestData.orcamento_valor ? 
       `\n\n⚠️ ORÇAMENTO MÁXIMO: ${requestData.orcamento_valor} ${requestData.moeda_escolhida || 'BRL'} para voos (ida e volta por pessoa). Todos os destinos DEVEM ter preços de voo ABAIXO deste valor. Este é o requisito MAIS IMPORTANTE.` : '';
+    
+    // Modificar o prompt para pedir explicitamente resposta em JSON e pontos turísticos específicos
     const enhancedPrompt = `${prompt}${orcamentoMessage}\n\nIMPORTANTE: 
     1. Cada voo DEVE respeitar rigorosamente o orçamento máximo indicado.
     2. Sua resposta deve ser exclusivamente um objeto JSON válido sem formatação markdown. 
@@ -334,10 +358,11 @@ async function callOpenAIAPI(prompt, requestData) {
             content: enhancedPrompt
           }
         ],
-        temperature: 0.7,
+        temperature: 0.7, // Reduzindo temperatura para priorizar precisão nos preços
         max_tokens: 3000
       },
       timeout: REQUEST_TIMEOUT,
+      // Adicionar keepalive para conexão persistente
       httpAgent: new (require('http').Agent)({ keepAlive: true }),
       httpsAgent: new (require('https').Agent)({ keepAlive: true })
     });
@@ -346,16 +371,19 @@ async function callOpenAIAPI(prompt, requestData) {
       throw new Error('Formato de resposta da OpenAI inválido');
     }
     
+    // Extrair JSON da resposta
     const content = response.data.choices[0].message.content;
     console.log('Conteúdo recebido da API OpenAI (primeiros 200 caracteres):', content.substring(0, 200));
     
     return extrairJSONDaResposta(content);
   } catch (error) {
     console.error('Erro detalhado na chamada à API OpenAI:');
+    
     if (error.response) {
       console.error('Status:', error.response.status);
       console.error('Dados:', JSON.stringify(error.response.data).substring(0, 200));
     }
+    
     throw error;
   }
 }
@@ -364,19 +392,24 @@ async function callOpenAIAPI(prompt, requestData) {
 async function callClaudeAPI(prompt, requestData) {
   try {
     const apiKey = process.env.CLAUDE_API_KEY;
+    
     if (!apiKey) {
       throw new Error('Chave da API Claude não configurada');
     }
+    
     console.log('Enviando requisição para Claude...');
+    
+    // Reforçar a mensagem sobre orçamento como prioridade absoluta e pontos turísticos
     const orcamentoMessage = requestData.orcamento_valor ? 
       `\n\n⚠️ ORÇAMENTO MÁXIMO: ${requestData.orcamento_valor} ${requestData.moeda_escolhida || 'BRL'} para voos (ida e volta por pessoa). Todos os destinos DEVEM ter preços de voo ABAIXO deste valor. Este é o requisito MAIS IMPORTANTE.` : '';
+    
+    // Adicionar instrução específica para o Claude retornar apenas JSON e pontos turísticos
     const enhancedPrompt = `${prompt}${orcamentoMessage}\n\nIMPORTANTE: 
     1. Cada voo DEVE respeitar rigorosamente o orçamento máximo indicado.
     2. Sua resposta deve ser APENAS o objeto JSON válido, sem NENHUM texto adicional.
     3. Forneça EXATAMENTE 4 destinos alternativos totalmente diferentes entre si.
     4. Garanta preços realistas e acessíveis para todas as recomendações.
     5. Inclua PONTOS TURÍSTICOS ESPECÍFICOS para cada destino - 2 para o principal e surpresa, 1 para cada alternativa.`;
-    
     const response = await axios({
       method: 'post',
       url: 'https://api.anthropic.com/v1/messages',
@@ -398,9 +431,10 @@ async function callClaudeAPI(prompt, requestData) {
             content: enhancedPrompt
           }
         ],
-        temperature: 0.7
+        temperature: 0.7 // Reduzindo temperatura para priorizar precisão nos preços
       },
       timeout: REQUEST_TIMEOUT,
+      // Adicionar keepalive para conexão persistente
       httpAgent: new (require('http').Agent)({ keepAlive: true }),
       httpsAgent: new (require('https').Agent)({ keepAlive: true })
     });
@@ -409,16 +443,19 @@ async function callClaudeAPI(prompt, requestData) {
       throw new Error('Formato de resposta do Claude inválido');
     }
     
+    // Extrair JSON da resposta
     const content = response.data.content[0].text;
     console.log('Conteúdo recebido da API Claude (primeiros 200 caracteres):', content.substring(0, 200));
     
     return extrairJSONDaResposta(content);
   } catch (error) {
     console.error('Erro detalhado na chamada à API Claude:');
+    
     if (error.response) {
       console.error('Status:', error.response.status);
       console.error('Dados:', JSON.stringify(error.response.data).substring(0, 200));
     }
+    
     throw error;
   }
 }
@@ -426,35 +463,45 @@ async function callClaudeAPI(prompt, requestData) {
 // Função aprimorada para extrair JSON válido de uma string de texto
 function extrairJSONDaResposta(texto) {
   try {
+    // Registrar o formato do texto para diagnóstico
     console.log("Tipo da resposta recebida:", typeof texto);
     console.log("Tamanho da resposta recebida:", texto.length);
     
+    // Verificar se já é um objeto JSON
     if (typeof texto === 'object' && texto !== null) {
       console.log("Resposta já é um objeto, convertendo para string");
       return JSON.stringify(texto);
     }
     
+    // Primeira tentativa: Analisar diretamente se for um JSON limpo
     try {
       const parsed = JSON.parse(texto);
       console.log("JSON analisado com sucesso no primeiro método");
       return JSON.stringify(parsed); 
     } catch (e) {
       console.log("Primeira tentativa falhou, tentando métodos alternativos");
+      // Continuar com os outros métodos
     }
     
+    // Pré-processar o texto para remover problemas comuns
     let textoProcessado = texto
+      // Remover blocos de código markdown
       .replace(/```json/g, '')
       .replace(/```/g, '')
+      // Remover comentários de estilo JavaScript
       .replace(/\/\/.*$/gm, '')
       .replace(/\/\*[\s\S]*?\*\//g, '')
+      // Normalizar quebras de linha e espaços extras
       .replace(/\r\n/g, '\n')
       .trim();
     
+    // Tentar encontrar um objeto JSON usando regex mais preciso
     const jsonRegex = /(\{[\s\S]*\})/;
     const match = textoProcessado.match(jsonRegex);
     
     if (match && match[0]) {
       try {
+        // Tentar analisar o texto extraído
         const possibleJson = match[0];
         const parsed = JSON.parse(possibleJson);
         console.log("JSON extraído e analisado com sucesso via regex");
@@ -466,6 +513,7 @@ function extrairJSONDaResposta(texto) {
       console.log("Nenhum padrão JSON encontrado no texto processado");
     }
     
+    // Se todas as tentativas falharem, retornar null para tentar outro serviço
     console.log("Todas as tentativas de extração falharam");
     return null;
   } catch (error) {
@@ -473,71 +521,21 @@ function extrairJSONDaResposta(texto) {
     return null;
   }
 }
-// Função auxiliar para enriquecer o comentário da Tripinha garantindo que mencione pelo menos um ponto turístico
-function enriquecerComentarioTripinha(comentario, pontosTuristicos) {
-  let possuiPonto = false;
-  if (typeof comentario === 'string' && Array.isArray(pontosTuristicos)) {
-    pontosTuristicos.forEach(pt => {
-      if (comentario.toLowerCase().includes(pt.toLowerCase())) {
-        possuiPonto = true;
-      }
-    });
-  }
-  // Se não há menção de nenhum ponto turístico, adiciona de forma interpolada o primeiro da lista
-  if (!possuiPonto && pontosTuristicos.length > 0) {
-    return `${comentario} Não esqueça de conferir: ${pontosTuristicos[0]}.`;
-  }
-  return comentario;
-}
 
-// Função de pós-processamento para ajustar os dados dos destinos
-function postProcessDestinos(data) {
-  // Para o destino principal (topPick)
-  if (data.topPick) {
-    // Se não houver pontos turísticos, insere um padrão simples
-    if (!data.topPick.pontosTuristicos || data.topPick.pontosTuristicos.length === 0) {
-      data.topPick.pontosTuristicos = ["Ponto Histórico Central", "Atração Turística Popular"];
-    }
-    // Enriquecer o comentário da Tripinha para topPick
-    if (data.topPick.comentario) {
-      data.topPick.comentario = enriquecerComentarioTripinha(data.topPick.comentario, data.topPick.pontosTuristicos);
-    }
-  }
-  
-  // Para o destino surpresa
-  if (data.surpresa) {
-    if (!data.surpresa.pontosTuristicos || data.surpresa.pontosTuristicos.length === 0) {
-      data.surpresa.pontosTuristicos = ["Ponto Histórico Central", "Atração Turística Popular"];
-    }
-    if (data.surpresa.comentario) {
-      data.surpresa.comentario = enriquecerComentarioTripinha(data.surpresa.comentario, data.surpresa.pontosTuristicos);
-    }
-  }
-  
-  // Para cada alternativa, se faltar o ponto turístico, insere um padrão
-  if (Array.isArray(data.alternativas)) {
-    data.alternativas.forEach((alt, index) => {
-      if (!alt.pontoTuristico || alt.pontoTuristico.trim() === "") {
-        alt.pontoTuristico = "Ponto Turístico Popular";
-      }
-    });
-  }
-  return data;
-}
-
-// Função otimizada de validação para responder mais rapidamente e garantir a presença de pontos turísticos e comentários adequados
+// Função otimizada de validação para responder mais rapidamente
 function isValidDestinationJSON(jsonString, requestData) {
   if (!jsonString) return false;
   
   try {
     const data = typeof jsonString === 'string' ? JSON.parse(jsonString) : jsonString;
     
+    // Verificação rápida de campos obrigatórios
     if (!data.topPick?.destino || !data.alternativas || !data.surpresa?.destino) {
       console.log("JSON inválido: faltam campos obrigatórios básicos");
       return false;
     }
     
-    // Verificação dos campos de pontos turísticos no destino principal e surpresa
+    // Verificação dos campos de pontos turísticos
     if (!data.topPick.pontosTuristicos || !Array.isArray(data.topPick.pontosTuristicos) || data.topPick.pontosTuristicos.length < 2) {
       console.log("JSON inválido: faltam pontos turísticos no destino principal ou menos de 2");
       return false;
@@ -562,76 +560,55 @@ function isValidDestinationJSON(jsonString, requestData) {
       }
     }
     
-    // Verificação do comentário da Tripinha para topPick: deve ser uma string não vazia e mencionar pelo menos um dos pontos turísticos
-    if (!data.topPick.comentario || typeof data.topPick.comentario !== 'string' || data.topPick.comentario.trim() === "") {
-      console.log("JSON inválido: topPick não tem comentário da Tripinha");
-      return false;
-    }
-    let topPickCommentValid = false;
-    data.topPick.pontosTuristicos.forEach(pt => {
-      if (data.topPick.comentario.toLowerCase().includes(pt.toLowerCase())) {
-        topPickCommentValid = true;
-      }
-    });
-    if (!topPickCommentValid) {
-      console.log("JSON inválido: comentário da Tripinha do topPick não menciona nenhum ponto turístico");
-      return false;
-    }
-    
-    // Verificação do comentário da Tripinha para o destino surpresa
-    if (!data.surpresa.comentario || typeof data.surpresa.comentario !== 'string' || data.surpresa.comentario.trim() === "") {
-      console.log("JSON inválido: surpresa não tem comentário da Tripinha");
-      return false;
-    }
-    let surpresaCommentValid = false;
-    data.surpresa.pontosTuristicos.forEach(pt => {
-      if (data.surpresa.comentario.toLowerCase().includes(pt.toLowerCase())) {
-        surpresaCommentValid = true;
-      }
-    });
-    if (!surpresaCommentValid) {
-      console.log("JSON inválido: comentário da Tripinha da surpresa não menciona nenhum ponto turístico");
-      return false;
-    }
-    
-    // Verificação rápida de orçamento se disponível
+    // Verificação rápida de orçamento apenas se disponível
     if (requestData?.orcamento_valor && !isNaN(parseFloat(requestData.orcamento_valor))) {
       const orcamentoMax = parseFloat(requestData.orcamento_valor);
+      
+      // Verificar apenas topPick e primeira alternativa para decisão rápida
       if (data.topPick.preco?.voo > orcamentoMax) {
         console.log(`JSON inválido: topPick tem voo acima do orçamento (${data.topPick.preco?.voo} > ${orcamentoMax})`);
         return false;
       }
+      
+      // Verificar a primeira alternativa 
       if (data.alternativas[0]?.preco?.voo > orcamentoMax) {
         console.log(`JSON inválido: primeira alternativa tem voo acima do orçamento (${data.alternativas[0]?.preco?.voo} > ${orcamentoMax})`);
         return false;
       }
     }
     
-    // Verificação de destinos repetidos
+    // Verificação de destinos repetidos - apenas topPick vs primeira alternativa
     if (data.topPick.destino?.toLowerCase() === data.alternativas[0]?.destino?.toLowerCase()) {
       console.log("JSON inválido: destino principal repetido na primeira alternativa");
       return false;
     }
     
+    // Se passar nas verificações rápidas, os dados são considerados válidos para resposta
     return true;
   } catch (error) {
     console.error("Erro ao validar JSON:", error);
     return false;
   }
 }
-// Função para gerar prompt adequado para a IA com ênfase nos pontos turísticos e comentários da Tripinha
+
+// Função para gerar prompt adequado para a IA
 function gerarPromptParaDestinos(dados) {
+  // Extrair informações relevantes dos dados recebidos, com verificações
   const companhia = getCompanhiaText(dados.companhia || 0);
   const preferencia = getPreferenciaText(dados.preferencia_viagem || 0);
   const cidadeOrigem = dados.cidade_partida?.name || 'origem não especificada';
   const orcamento = dados.orcamento_valor || 'flexível';
   const moeda = dados.moeda_escolhida || 'BRL';
   
+  // Extrair informações sobre quantidade de pessoas
   const quantidadePessoas = dados.quantidade_familia || dados.quantidade_amigos || 1;
+  
+  // Extrair qualquer informação adicional importante
   const conheceDestino = dados.conhece_destino || 0;
   const tipoDestino = dados.tipo_destino || 'qualquer';
   const famaDestino = dados.fama_destino || 'qualquer';
   
+  // Datas de viagem com verificação de formato
   let dataIda = 'não especificada';
   let dataVolta = 'não especificada';
   
@@ -646,6 +623,7 @@ function gerarPromptParaDestinos(dados) {
     }
   }
   
+  // Calcular duração da viagem para contextualizar melhor
   let duracaoViagem = 'não especificada';
   try {
     if (dataIda !== 'não especificada' && dataVolta !== 'não especificada') {
@@ -659,6 +637,7 @@ function gerarPromptParaDestinos(dados) {
     console.log("Erro ao calcular duração da viagem:", e);
   }
 
+  // Determinar estação do ano baseada na data de ida
   let estacaoViagem = 'não determinada';
   let hemisferio = determinarHemisferio(cidadeOrigem);
   
@@ -667,11 +646,13 @@ function gerarPromptParaDestinos(dados) {
       const dataObj = new Date(dataIda);
       const mes = dataObj.getMonth();
       
+      // Simplificação para hemisfério norte
       if (mes >= 2 && mes <= 4) estacaoViagem = 'primavera';
       else if (mes >= 5 && mes <= 7) estacaoViagem = 'verão';
       else if (mes >= 8 && mes <= 10) estacaoViagem = 'outono';
       else estacaoViagem = 'inverno';
       
+      // Inversão para hemisfério sul
       if (hemisferio === 'sul') {
         if (estacaoViagem === 'verão') estacaoViagem = 'inverno';
         else if (estacaoViagem === 'inverno') estacaoViagem = 'verão';
@@ -683,13 +664,15 @@ function gerarPromptParaDestinos(dados) {
     console.log("Erro ao determinar estação do ano:", e);
   }
 
+  // NOVA SEÇÃO - Colocar orçamento com destaque prioritário
   const mensagemOrcamento = orcamento !== 'flexível' ?
     `⚠️ ORÇAMENTO MÁXIMO: ${orcamento} ${moeda} para voos (ida e volta por pessoa). Todos os destinos DEVEM ter preços de voo ABAIXO deste valor.` : 
     'Orçamento flexível';
     
+  // Adicionar sugestão de localidade baseada na origem
   const sugestaoDistancia = gerarSugestaoDistancia(cidadeOrigem, tipoDestino);
 
-  // Construir prompt detalhado e personalizado com ênfase em pontos turísticos
+  // Construir prompt detalhado e personalizado (MODIFICADO para incluir pontos turísticos)
   return `Crie recomendações de viagem que respeitam ESTRITAMENTE o orçamento do usuário:
 
 ${mensagemOrcamento}
@@ -713,10 +696,9 @@ IMPORTANTE:
 5. Inclua destinos de diferentes continentes/regiões nas alternativas.
 6. Garanta que os preços sejam realistas e precisos para voos de ida e volta partindo de ${cidadeOrigem}.
 7. Pelo menos um destino deve ter preço bem abaixo do orçamento máximo (economicamente vantajoso).
-8. Para cada destino, INCLUA PONTOS TURÍSTICOS ESPECÍFICOS E CONHECIDOS:
+8. Para cada destino, INCLUA PONTOS TURÍSTICOS ESPECÍFICOS E CONHECIDOS - não genéricos:
    - Principal e Surpresa: 2 pontos turísticos específicos para cada
    - Alternativas: 1 ponto turístico específico para cada
-9. **Garanta que o comentário entusiasmado da Tripinha inclua ao menos um dos pontos turísticos listados.**
 
 Forneça no formato JSON exato abaixo, SEM formatação markdown:
 {
@@ -803,8 +785,9 @@ Forneça no formato JSON exato abaixo, SEM formatação markdown:
 }`;
 }
 
-// Função para determinar o hemisfério baseado na cidade de origem
+// NOVA FUNÇÃO: Determinar o hemisfério baseado na cidade de origem
 function determinarHemisferio(cidadeOrigem) {
+  // Lista simplificada de grandes cidades no hemisfério sul
   const cidadesHemisferioSul = [
     'são paulo', 'rio de janeiro', 'brasília', 'salvador', 'fortaleza', 
     'recife', 'porto alegre', 'curitiba', 'manaus', 'belém', 'brasil',
@@ -814,10 +797,12 @@ function determinarHemisferio(cidadeOrigem) {
   ];
   
   if (!cidadeOrigem || cidadeOrigem === 'origem não especificada') {
-    return 'norte';
+    return 'norte'; // Padrão para o caso de não sabermos
   }
   
   const cidadeLowerCase = cidadeOrigem.toLowerCase();
+  
+  // Verificar se a cidade está na lista do hemisfério sul
   if (cidadesHemisferioSul.some(cidade => cidadeLowerCase.includes(cidade))) {
     return 'sul';
   }
@@ -825,16 +810,18 @@ function determinarHemisferio(cidadeOrigem) {
   return 'norte';
 }
 
-// Função para gerar sugestão de distância de viagem baseada na origem
+// NOVA FUNÇÃO: Gerar sugestão de distância de viagem baseada na origem
 function gerarSugestaoDistancia(cidadeOrigem, tipoDestino) {
   if (cidadeOrigem === 'origem não especificada') {
     return '';
   }
   
+  // Se o usuário prefere destinos nacionais
   if (tipoDestino === 0) {
     return '';
   }
   
+  // Lista de grandes hubs internacionais
   const grandeshubs = [
     'nova york', 'londres', 'paris', 'tóquio', 'dubai', 
     'frankfurt', 'hong kong', 'singapura', 'amsterdã',
@@ -842,6 +829,8 @@ function gerarSugestaoDistancia(cidadeOrigem, tipoDestino) {
   ];
   
   const cidadeLowerCase = cidadeOrigem.toLowerCase();
+  
+  // Se a origem for um grande hub, sugerir destinos mais distantes
   if (grandeshubs.some(cidade => cidadeLowerCase.includes(cidade))) {
     return '(considere incluir destinos intercontinentais nas opções)';
   }
@@ -851,6 +840,7 @@ function gerarSugestaoDistancia(cidadeOrigem, tipoDestino) {
 
 // Função auxiliar para obter texto de companhia com verificação de tipo
 function getCompanhiaText(value) {
+  // Converter para número se for string
   if (typeof value === 'string') {
     value = parseInt(value, 10);
   }
@@ -866,6 +856,7 @@ function getCompanhiaText(value) {
 
 // Função auxiliar para obter texto de preferência com verificação de tipo
 function getPreferenciaText(value) {
+  // Converter para número se for string
   if (typeof value === 'string') {
     value = parseInt(value, 10);
   }
@@ -881,6 +872,7 @@ function getPreferenciaText(value) {
 
 // Função auxiliar para obter texto de tipo de destino
 function getTipoDestinoText(value) {
+  // Converter para número se for string
   if (typeof value === 'string') {
     value = parseInt(value, 10);
   }
@@ -895,6 +887,7 @@ function getTipoDestinoText(value) {
 
 // Função auxiliar para obter texto de fama do destino
 function getFamaDestinoText(value) {
+  // Converter para número se for string
   if (typeof value === 'string') {
     value = parseInt(value, 10);
   }
@@ -906,70 +899,90 @@ function getFamaDestinoText(value) {
   };
   return options[value] || "qualquer";
 }
+
 // Função para gerar dados de emergência personalizados baseados no perfil
 function generateEmergencyData(dadosUsuario = {}) {
+  // Determinar o tipo de destino baseado nas preferências
   const preferencia = dadosUsuario.preferencia_viagem || 0;
   const companhia = dadosUsuario.companhia || 0;
   const quantidadePessoas = dadosUsuario.quantidade_familia || dadosUsuario.quantidade_amigos || 1;
+  
+  // Extrair orçamento para ajustar preços de emergência
   const orcamento = dadosUsuario.orcamento_valor ? parseFloat(dadosUsuario.orcamento_valor) : 3000;
+  
+  // Determinar a região de origem para ajustar destinos e preços
   const cidadeOrigem = dadosUsuario.cidade_partida?.name || '';
   const regiaoOrigem = determinarRegiaoOrigem(cidadeOrigem);
+  
+  // Gerar conjunto de destinos apropriados para a região
   const destinosPorRegiao = gerarDestinosPorRegiao(regiaoOrigem, preferencia, orcamento);
+  
+  // Selecionar o conjunto adequado
   const conjuntoAtual = destinosPorRegiao[preferencia] || destinosPorRegiao[0];
   const indiceAleatorio = Math.floor(Math.random() * conjuntoAtual.length);
+  
+  // Reordenar alternativas para evitar sempre as mesmas posições
   const resultado = {...conjuntoAtual[indiceAleatorio]};
   resultado.alternativas = embaralharArray([...resultado.alternativas]);
   
+  // Garantir exatamente 4 alternativas
   if (resultado.alternativas.length < 4) {
     const destinosExtras = gerarDestinosExtras(regiaoOrigem, orcamento);
+    
+    // Adicionar destinos extras até completar 4 alternativas
     while (resultado.alternativas.length < 4) {
       resultado.alternativas.push(destinosExtras[resultado.alternativas.length % destinosExtras.length]);
     }
   } else if (resultado.alternativas.length > 4) {
+    // Limitar a exatamente 4 alternativas
     resultado.alternativas = resultado.alternativas.slice(0, 4);
   }
   
+  // Garantir que o orçamento seja respeitado
   if (orcamento) {
+    // Ajustar preço do destino principal se necessário
     if (resultado.topPick.preco.voo > orcamento * 0.95) {
-      resultado.topPick.preco.voo = Math.round(orcamento * 0.85);
+      resultado.topPick.preco.voo = Math.round(orcamento * 0.85); // 85% do orçamento
     }
     
+    // Garantir pelo menos uma opção econômica
     let temOpcaoEconomica = false;
+    
+    // Ajustar preços das alternativas
     resultado.alternativas.forEach((alt, index) => {
       if (alt.preco.voo > orcamento * 0.95) {
-        const fatorAjuste = 0.7 + (index * 0.05);
+        // Ajustar preço para baixo
+        const fatorAjuste = 0.7 + (index * 0.05); // 70-85% do orçamento
         alt.preco.voo = Math.round(orcamento * fatorAjuste);
       }
+      
+      // Verificar se esta é uma opção econômica
       if (alt.preco.voo <= orcamento * 0.7) {
         temOpcaoEconomica = true;
       }
     });
     
+    // Se não temos uma opção econômica, criar uma
     if (!temOpcaoEconomica && resultado.alternativas.length > 0) {
-      resultado.alternativas[0].preco.voo = Math.round(orcamento * 0.6);
+      resultado.alternativas[0].preco.voo = Math.round(orcamento * 0.6); // 60% do orçamento
     }
     
+    // Ajustar preço do destino surpresa
     if (resultado.surpresa.preco.voo > orcamento) {
-      resultado.surpresa.preco.voo = Math.round(orcamento * 0.9);
+      resultado.surpresa.preco.voo = Math.round(orcamento * 0.9); // 90% do orçamento
     }
-  }
-  
-  // Pós-processamento para enriquecer os comentários da Tripinha nos dados de emergência
-  if (resultado.topPick) {
-    resultado.topPick.comentario = enriquecerComentarioTripinha(resultado.topPick.comentario, resultado.topPick.pontosTuristicos);
-  }
-  if (resultado.surpresa) {
-    resultado.surpresa.comentario = enriquecerComentarioTripinha(resultado.surpresa.comentario, resultado.surpresa.pontosTuristicos);
   }
   
   return resultado;
 }
 
-// Função para determinar região de origem para dados de emergência mais relevantes
+// NOVA FUNÇÃO: Determinar região de origem para dados de emergência mais relevantes
 function determinarRegiaoOrigem(cidadeOrigem) {
   if (!cidadeOrigem) return 'global';
   
   const cidadeLowerCase = cidadeOrigem.toLowerCase();
+  
+  // Regiões principais
   const regioesNorteAmerica = ['nova york', 'los angeles', 'chicago', 'toronto', 'cidade do méxico', 'montreal', 'miami', 'las vegas'];
   const regioesSulAmerica = ['são paulo', 'rio de janeiro', 'buenos aires', 'santiago', 'lima', 'bogotá', 'brasília', 'salvador'];
   const regioesEuropa = ['londres', 'paris', 'roma', 'madri', 'barcelona', 'berlim', 'amsterdã', 'lisboa'];
@@ -977,23 +990,29 @@ function determinarRegiaoOrigem(cidadeOrigem) {
   const regioesOceania = ['sydney', 'melbourne', 'auckland', 'brisbane', 'perth', 'adelaide', 'wellington'];
   const regioesAfrica = ['cidade do cabo', 'joanesburgo', 'cairo', 'casablanca', 'nairobi', 'lagos', 'marrakech'];
   
+  // Verificar em qual região a cidade se encaixa
   if (regioesNorteAmerica.some(cidade => cidadeLowerCase.includes(cidade))) return 'norte_america';
   if (regioesSulAmerica.some(cidade => cidadeLowerCase.includes(cidade))) return 'sul_america';
   if (regioesEuropa.some(cidade => cidadeLowerCase.includes(cidade))) return 'europa';
   if (regioesAsia.some(cidade => cidadeLowerCase.includes(cidade))) return 'asia';
   if (regioesOceania.some(cidade => cidadeLowerCase.includes(cidade))) return 'oceania';
   if (regioesAfrica.some(cidade => cidadeLowerCase.includes(cidade))) return 'africa';
+  
+  // Verificações mais amplas por país ou região
   if (cidadeLowerCase.includes('brasil') || cidadeLowerCase.includes('brazil')) return 'sul_america';
   if (cidadeLowerCase.includes('eua') || cidadeLowerCase.includes('usa') || cidadeLowerCase.includes('estados unidos')) return 'norte_america';
   if (cidadeLowerCase.includes('europa') || cidadeLowerCase.includes('europe')) return 'europa';
   if (cidadeLowerCase.includes('ásia') || cidadeLowerCase.includes('asia')) return 'asia';
+  
+  // Padrão global como fallback
   return 'global';
 }
 
-// Função para gerar destinos por região (atualizada para incluir pontos turísticos)
+// NOVA FUNÇÃO: Gerar destinos por região (atualizada para incluir pontos turísticos)
 function gerarDestinosPorRegiao(regiao, preferencia, orcamento) {
+  // Conjunto base de dados - exemplo para Sul América
   const sulAmerica = {
-    0: [
+    0: [ // Relaxamento
       {
         topPick: {
           destino: "Fernando de Noronha",
@@ -1053,7 +1072,7 @@ function gerarDestinosPorRegiao(regiao, preferencia, orcamento) {
         }
       }
     ],
-    1: [
+    1: [ // Aventura
       {
         topPick: {
           destino: "Chapada dos Veadeiros",
@@ -1113,10 +1132,12 @@ function gerarDestinosPorRegiao(regiao, preferencia, orcamento) {
         }
       }
     ]
+    // ... podem ser adicionados mais tipos de preferência
   };
   
+  // Conjunto para América do Norte
   const norteAmerica = {
-    0: [
+    0: [ // Relaxamento
       {
         topPick: {
           destino: "Cancún",
@@ -1176,10 +1197,12 @@ function gerarDestinosPorRegiao(regiao, preferencia, orcamento) {
         }
       }
     ]
+    // ... podem ser adicionados mais tipos de preferência e regiões
   };
   
+  // Conjunto para Europa
   const europa = {
-    2: [
+    2: [ // Cultura
       {
         topPick: {
           destino: "Porto",
@@ -1241,8 +1264,9 @@ function gerarDestinosPorRegiao(regiao, preferencia, orcamento) {
     ]
   };
   
+  // Conjunto global (para qualquer origem)
   const global = {
-    0: [
+    0: [ // Relaxamento
       {
         topPick: {
           destino: "Bali",
@@ -1302,7 +1326,7 @@ function gerarDestinosPorRegiao(regiao, preferencia, orcamento) {
         }
       }
     ],
-    1: [
+    1: [ // Aventura
       {
         topPick: {
           destino: "Queenstown",
@@ -1362,7 +1386,7 @@ function gerarDestinosPorRegiao(regiao, preferencia, orcamento) {
         }
       }
     ],
-    2: [
+    2: [ // Cultura
       {
         topPick: {
           destino: "Kyoto",
@@ -1422,7 +1446,7 @@ function gerarDestinosPorRegiao(regiao, preferencia, orcamento) {
         }
       }
     ],
-    3: [
+    3: [ // Urbano
       {
         topPick: {
           destino: "Singapura",
@@ -1484,6 +1508,7 @@ function gerarDestinosPorRegiao(regiao, preferencia, orcamento) {
     ]
   };
   
+  // Retornar o conjunto de dados apropriado baseado na região
   switch (regiao) {
     case 'sul_america':
       return sulAmerica;
@@ -1496,8 +1521,9 @@ function gerarDestinosPorRegiao(regiao, preferencia, orcamento) {
   }
 }
 
-// Função para gerar destinos extras para complementar quando necessário (atualizada com pontos turísticos)
+// NOVA FUNÇÃO: Gerar destinos extras para complementar quando necessário (atualizada com pontos turísticos)
 function gerarDestinosExtras(regiao, orcamento) {
+  // Destinos extras com preços ajustáveis por região
   const extrasGlobal = [
     {
       destino: "Lisboa",
@@ -1549,6 +1575,7 @@ function gerarDestinosExtras(regiao, orcamento) {
     }
   ];
   
+  // Extras específicos para América do Sul
   const extrasSulAmerica = [
     {
       destino: "Olinda",
@@ -1584,7 +1611,10 @@ function gerarDestinosExtras(regiao, orcamento) {
     }
   ];
   
+  // Selecionar o conjunto apropriado baseado na região
   const extrasRegionais = regiao === 'sul_america' ? extrasSulAmerica : extrasGlobal;
+  
+  // Embaralhar para diversidade
   return embaralharArray([...extrasRegionais]);
 }
 
@@ -1592,10 +1622,16 @@ function gerarDestinosExtras(regiao, orcamento) {
 function embaralharArray(array) {
   let currentIndex = array.length;
   let randomIndex;
+
+  // Enquanto existirem elementos a serem embaralhados
   while (currentIndex != 0) {
+    // Escolher um elemento restante
     randomIndex = Math.floor(Math.random() * currentIndex);
     currentIndex--;
+
+    // E trocar com o elemento atual
     [array[currentIndex], array[randomIndex]] = [array[randomIndex], array[currentIndex]];
   }
+
   return array;
 }
