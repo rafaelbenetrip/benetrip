@@ -142,7 +142,7 @@ const BENETRIP_DESTINOS = {
       console.log('Buscando novas recomendações com IA');
       this.atualizarProgresso('Consultando bancos de dados de viagem...', 40);
       
-      // Obter recomendações - usar respostas diretamente, não procurar em dadosUsuario.respostas
+      // Obter recomendações
       const recomendacoes = await window.BENETRIP_AI.obterRecomendacoes(this.dadosUsuario.respostas);
       console.log('Recomendações obtidas:', recomendacoes);
       
@@ -312,6 +312,42 @@ const BENETRIP_DESTINOS = {
     `;
   },
   
+  // Método auxiliar para renderizar imagem com créditos
+  renderizarImagemComCreditos(imagem, fallbackText, classes = '') {
+    if (!imagem) {
+      // Fallback para quando não há imagem disponível
+      return `
+        <div class="bg-gray-200 ${classes}">
+          <img 
+            src="https://via.placeholder.com/400x224?text=${encodeURIComponent(fallbackText)}" 
+            alt="${fallbackText}" 
+            class="w-full h-full object-cover">
+        </div>
+      `;
+    }
+    
+    // Com imagem disponível, incluir créditos e link
+    return `
+      <div class="image-container bg-gray-200 ${classes} relative">
+        <a href="${imagem.sourceUrl || '#'}" target="_blank" rel="noopener noreferrer" class="image-link block h-full">
+          <img 
+            src="${imagem.url}" 
+            alt="${imagem.alt || fallbackText}" 
+            class="w-full h-full object-cover"
+            onerror="this.onerror=null; this.src='https://via.placeholder.com/400x224?text=${encodeURIComponent(fallbackText)}'">
+          <div class="zoom-icon absolute top-2 right-2 bg-white bg-opacity-70 p-1 rounded-full">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="11" cy="11" r="8"></circle>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+          </div>
+        </a>
+        <div class="image-credit absolute bottom-0 left-0 right-0 bg-black bg-opacity-60 text-white text-xs p-1 truncate">
+          Foto por <a href="${imagem.photographerUrl || '#'}" target="_blank" rel="noopener noreferrer" class="underline">${imagem.photographer || 'Desconhecido'}</a>
+        </div>
+      </div>
+    `;
+  },
   // Renderizar destino destaque (top pick)
   renderizarDestinoDestaque(destino) {
     const container = document.getElementById('destino-destaque');
@@ -321,12 +357,6 @@ const BENETRIP_DESTINOS = {
     
     // Verificar se temos imagens disponíveis do serviço de IA
     const temImagens = destino.imagens && destino.imagens.length > 0;
-    const imagem1 = temImagens ? destino.imagens[0].url : `https://via.placeholder.com/800x600.png?text=${encodeURIComponent(destino.destino)}`;
-    const imagem2 = temImagens && destino.imagens.length > 1 ? destino.imagens[1].url : `https://via.placeholder.com/800x600.png?text=${encodeURIComponent(destino.pais)}`;
-    
-    // Obter informações adicionais para atribuição
-    const fotoCredito1 = temImagens ? `Foto: ${destino.imagens[0].photographer || 'Desconhecido'}` : '';
-    const fotoCredito2 = temImagens && destino.imagens.length > 1 ? `Foto: ${destino.imagens[1].photographer || 'Desconhecido'}` : '';
     
     container.innerHTML = `
       <div class="border border-gray-200 rounded-lg overflow-hidden shadow-md">
@@ -337,22 +367,16 @@ const BENETRIP_DESTINOS = {
             Escolha Top da Tripinha!
           </div>
           <div class="grid grid-cols-2 gap-1">
-            <div class="bg-gray-200 h-36">
-              <img 
-                src="${imagem1}" 
-                alt="${destino.imagens && destino.imagens[0] ? destino.imagens[0].alt : destino.destino}" 
-                class="w-full h-full object-cover"
-                onerror="this.onerror=null; this.src='https://via.placeholder.com/400x224?text=${encodeURIComponent(destino.destino)}'"
-                title="${fotoCredito1}">
-            </div>
-            <div class="bg-gray-200 h-36">
-              <img 
-                src="${imagem2}" 
-                alt="${destino.imagens && destino.imagens.length > 1 ? destino.imagens[1].alt : `${destino.pais}`}" 
-                class="w-full h-full object-cover"
-                onerror="this.onerror=null; this.src='https://via.placeholder.com/400x224?text=${encodeURIComponent(destino.pais)}'"
-                title="${fotoCredito2}">
-            </div>
+            ${this.renderizarImagemComCreditos(
+              destino.imagens && destino.imagens.length > 0 ? destino.imagens[0] : null,
+              destino.destino,
+              'h-36'
+            )}
+            ${this.renderizarImagemComCreditos(
+              destino.imagens && destino.imagens.length > 1 ? destino.imagens[1] : null,
+              destino.pais,
+              'h-36'
+            )}
           </div>
         </div>
         
@@ -431,11 +455,6 @@ const BENETRIP_DESTINOS = {
     const destinosLimitados = destinos.slice(0, 4);
     
     destinosLimitados.forEach(destino => {
-      // Verificar se temos imagens disponíveis do serviço de IA
-      const temImagens = destino.imagens && destino.imagens.length > 0;
-      const imagem = temImagens ? destino.imagens[0].url : `https://via.placeholder.com/120x120?text=${encodeURIComponent(destino.destino)}`;
-      const fotoCredito = temImagens ? `Foto: ${destino.imagens[0].photographer || 'Desconhecido'}` : '';
-      
       const elementoDestino = document.createElement('div');
       elementoDestino.className = 'card-destino border border-gray-200 rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow duration-200 mt-3';
       elementoDestino.dataset.destino = destino.destino;
@@ -443,12 +462,11 @@ const BENETRIP_DESTINOS = {
       elementoDestino.innerHTML = `
         <div class="flex">
           <div class="w-1/3">
-            <img 
-              src="${imagem}" 
-              alt="${temImagens ? destino.imagens[0].alt : destino.destino}" 
-              class="w-full h-full object-cover"
-              onerror="this.onerror=null; this.src='https://via.placeholder.com/120x120?text=${encodeURIComponent(destino.destino)}'"
-              title="${fotoCredito}">
+            ${this.renderizarImagemComCreditos(
+              destino.imagens && destino.imagens.length > 0 ? destino.imagens[0] : null,
+              destino.destino,
+              'h-full'
+            )}
           </div>
           <div class="w-2/3 p-3">
             <div class="flex justify-between items-start">
@@ -516,7 +534,7 @@ const BENETRIP_DESTINOS = {
     `;
   },
   
-  // Método para exibir destino surpresa
+  // Método para exibir destino surpresa - também usando o novo método de renderizar imagem
   mostrarDestinoSurpresa() {
     if (!this.recomendacoes || !this.recomendacoes.surpresa) {
       console.error('Destino surpresa não disponível');
@@ -525,11 +543,6 @@ const BENETRIP_DESTINOS = {
     
     const destino = this.recomendacoes.surpresa;
     console.log('Mostrando destino surpresa:', destino);
-    
-    // Verificar se temos imagens disponíveis do serviço de IA
-    const temImagens = destino.imagens && destino.imagens.length > 0;
-    const imagem = temImagens ? destino.imagens[0].url : `https://via.placeholder.com/400x224?text=${encodeURIComponent(destino.destino)}`;
-    const fotoCredito = temImagens ? `Foto: ${destino.imagens[0].photographer || 'Desconhecido'}` : '';
     
     // Criar e exibir o modal de destino surpresa
     const modalContainer = document.createElement('div');
@@ -551,14 +564,11 @@ const BENETRIP_DESTINOS = {
             ✨ Destino Surpresa! ✨
           </div>
           <div class="grid grid-cols-1 gap-1">
-            <div class="bg-gray-200 h-56">
-              <img 
-                src="${imagem}" 
-                alt="${temImagens ? destino.imagens[0].alt : destino.destino}" 
-                class="w-full h-full object-cover"
-                onerror="this.onerror=null; this.src='https://via.placeholder.com/400x224?text=${encodeURIComponent(destino.destino)}'"
-                title="${fotoCredito}">
-            </div>
+            ${this.renderizarImagemComCreditos(
+              destino.imagens && destino.imagens.length > 0 ? destino.imagens[0] : null,
+              destino.destino,
+              'h-56'
+            )}
           </div>
         </div>
         
