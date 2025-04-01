@@ -269,7 +269,7 @@ async function callPerplexityAPI(prompt, requestData) {
           }
         ],
         temperature: 0.7, // Reduzindo temperatura para priorizar precisão nos preços
-        max_tokens: 2000,
+        max_tokens: 3000,
         response_format: { type: "text" }
       },
       timeout: REQUEST_TIMEOUT,
@@ -359,7 +359,7 @@ async function callOpenAIAPI(prompt, requestData) {
           }
         ],
         temperature: 0.7, // Reduzindo temperatura para priorizar precisão nos preços
-        max_tokens: 2000
+        max_tokens: 3000
       },
       timeout: REQUEST_TIMEOUT,
       // Adicionar keepalive para conexão persistente
@@ -420,7 +420,7 @@ async function callClaudeAPI(prompt, requestData) {
       },
       data: {
         model: "claude-3-haiku-20240307",
-        max_tokens: 2000,
+        max_tokens: 3000,
         messages: [
           {
             role: "system",
