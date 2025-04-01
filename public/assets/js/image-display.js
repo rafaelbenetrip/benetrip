@@ -17,6 +17,18 @@ window.BENETRIP_IMAGES = {
       destaque: '400x224',
       alternativa: '120x120',
       surpresa: '400x224'
+    },
+    // Cache para pontos turísticos populares
+    cacheDuration: 24 * 60 * 60 * 1000, // 24 horas em milissegundos
+    // Mapeamento de pontos turísticos para URLs de imagens específicas de alta qualidade
+    pontosIconicos: {
+      "Cristo Redentor": "https://source.unsplash.com/featured/?christ+redeemer+rio",
+      "Torre Eiffel": "https://source.unsplash.com/featured/?eiffel+tower+paris",
+      "Coliseu": "https://source.unsplash.com/featured/?colosseum+rome",
+      "Machu Picchu": "https://source.unsplash.com/featured/?machu+picchu",
+      "Taj Mahal": "https://source.unsplash.com/featured/?taj+mahal",
+      "Times Square": "https://source.unsplash.com/featured/?times+square+new+york",
+      "Sagrada Família": "https://source.unsplash.com/featured/?sagrada+familia+barcelona"
     }
   },
   
@@ -24,6 +36,9 @@ window.BENETRIP_IMAGES = {
   init() {
     console.log('Inicializando serviço de imagens Benetrip');
     this.initialized = true;
+    
+    // Inicializar cache
+    this.imageCache = this._loadCacheFromStorage() || {};
     
     // Adicionar handler global para erros de imagem
     document.addEventListener('error', (event) => {
@@ -115,6 +130,40 @@ window.BENETRIP_IMAGES = {
       .image-link:hover .zoom-icon {
         opacity: 1;
       }
+      
+      /* Estilos para rótulos de pontos turísticos */
+      .tourist-spot-label {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        background-color: rgba(232, 119, 34, 0.85);
+        color: white;
+        padding: 4px 8px;
+        font-size: 11px;
+        border-radius: 4px;
+        max-width: 90%;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        z-index: 5;
+      }
+      
+      /* Galeria com imagens variáveis */
+      .images-gallery-variable {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 8px;
+      }
+      
+      .images-gallery-variable.has-multiple {
+        grid-template-columns: repeat(2, 1fr);
+      }
+      
+      @media (max-width: 480px) {
+        .images-gallery-variable.has-multiple {
+          grid-template-columns: 1fr;
+        }
+      }
     `;
     
     document.head.appendChild(style);
@@ -125,7 +174,80 @@ window.BENETRIP_IMAGES = {
     return this.initialized === true;
   },
   
-  // Tratar erro de carregamento de imagem
+  // Carregar cache de imagens do localStorage
+  _loadCacheFromStorage() {
+    try {
+      const cacheStr = localStorage.getItem('benetrip_images_cache');
+      if (!cacheStr) return null;
+      
+      const cache = JSON.parse(cacheStr);
+      
+      // Verificar se o cache expirou
+      if (cache._timestamp && (Date.now() - cache._timestamp > this.config.cacheDuration)) {
+        console.log('Cache de imagens expirado, resetando');
+        localStorage.removeItem('benetrip_images_cache');
+        return null;
+      }
+      
+      return cache;
+    } catch (error) {
+      console.error('Erro ao carregar cache de imagens:', error);
+      return null;
+    }
+  },
+  
+  // Salvar cache de imagens no localStorage
+  _saveCacheToStorage() {
+    try {
+      // Adicionar timestamp para controle de expiração
+      this.imageCache._timestamp = Date.now();
+      
+      // Limitar o tamanho do cache (apenas 50 entradas mais recentes)
+      const keys = Object.keys(this.imageCache).filter(k => k !== '_timestamp');
+      if (keys.length > 50) {
+        const keysToRemove = keys.slice(0, keys.length - 50);
+        keysToRemove.forEach(key => delete this.imageCache[key]);
+      }
+      
+      localStorage.setItem('benetrip_images_cache', JSON.stringify(this.imageCache));
+    } catch (error) {
+      console.error('Erro ao salvar cache de imagens:', error);
+    }
+  },
+  
+  // Adicionar imagem ao cache
+  addToCache(key, imageData) {
+    if (!key || !imageData) return;
+    
+    this.imageCache[key] = {
+      data: imageData,
+      timestamp: Date.now()
+    };
+    
+    // Salvar no localStorage periodicamente (evitar sobrecarga)
+    if (!this._saveTimeout) {
+      this._saveTimeout = setTimeout(() => {
+        this._saveCacheToStorage();
+        this._saveTimeout = null;
+      }, 5000);
+    }
+  },
+  
+  // Obter imagem do cache
+  getFromCache(key) {
+    if (!key || !this.imageCache[key]) return null;
+    
+    // Verificar validade do cache
+    const entry = this.imageCache[key];
+    if (Date.now() - entry.timestamp > this.config.cacheDuration) {
+      delete this.imageCache[key];
+      return null;
+    }
+    
+    return entry.data;
+  },
+  
+  // Tratar erro de carregamento de imagem com suporte a pontos turísticos
   handleImageError(imgElement) {
     // Verificar se a imagem já tem um fallback aplicado
     if (imgElement.dataset.fallback === 'applied') {
@@ -134,14 +256,29 @@ window.BENETRIP_IMAGES = {
     
     const alt = imgElement.alt || 'imagem';
     const size = imgElement.dataset.size || '400x224';
+    const pontoTuristico = imgElement.dataset.pontoTuristico;
+    
+    // Verificar se temos um ponto turístico icônico
+    if (pontoTuristico && this.config.pontosIconicos[pontoTuristico]) {
+      imgElement.dataset.fallback = 'applied';
+      imgElement.src = this.config.pontosIconicos[pontoTuristico];
+      return;
+    }
     
     // Tentar Unsplash como segunda opção
     try {
       imgElement.dataset.fallback = 'applied';
-      imgElement.src = `${this.config.unsplashBaseUrl}?${encodeURIComponent(alt)}`;
+      let query = alt;
+      
+      // Se temos um ponto turístico, usá-lo na consulta
+      if (pontoTuristico) {
+        query = `${pontoTuristico} ${alt}`;
+      }
+      
+      imgElement.src = `${this.config.unsplashBaseUrl}?${encodeURIComponent(query)}`;
       imgElement.onerror = () => {
         // Se Unsplash falhar, usar placeholder
-        imgElement.src = `${this.config.placeholderUrl}${size}?text=${encodeURIComponent(alt)}`;
+        imgElement.src = `${this.config.placeholderUrl}${size}?text=${encodeURIComponent(query)}`;
       };
     } catch (error) {
       console.error('Erro ao aplicar fallback de imagem:', error);
@@ -179,31 +316,62 @@ window.BENETRIP_IMAGES = {
     });
   },
   
-  // Obter URL de imagem de destino com fallbacks
+  // Obter URL de imagem de destino com fallbacks e suporte a pontos turísticos
   async getDestinationImageUrl(destination, country, size = 'destaque', index = 0) {
+    // Verificar se temos pontos turísticos específicos
+    const pontoTuristico = destination.pontosTuristicos && destination.pontosTuristicos.length > index 
+                          ? destination.pontosTuristicos[index] 
+                          : null;
+    
+    // Verificar se temos a imagem no cache
+    const cacheKey = `${destination.destino}_${pontoTuristico || 'general'}_${size}`;
+    const cachedImage = this.getFromCache(cacheKey);
+    if (cachedImage) {
+      return cachedImage;
+    }
+    
+    // Verificar se temos um ponto turístico icônico mapeado
+    if (pontoTuristico && this.config.pontosIconicos[pontoTuristico]) {
+      const iconicUrl = this.config.pontosIconicos[pontoTuristico];
+      this.addToCache(cacheKey, iconicUrl);
+      return iconicUrl;
+    }
+    
     // Verificar se temos imagens no objeto de destino
     if (destination.imagens && destination.imagens.length > index) {
       const imageUrl = destination.imagens[index].url;
       const imageExists = await this.checkImageExists(imageUrl);
       
       if (imageExists) {
+        this.addToCache(cacheKey, imageUrl);
         return imageUrl;
       }
     }
     
-    // Fallback para Unsplash
-    const unsplashUrl = `${this.config.unsplashBaseUrl}?${encodeURIComponent(destination.destino + ' ' + destination.pais)}`;
+    // Fallback para Unsplash com ponto turístico
+    let unsplashQuery = `${destination.destino} ${destination.pais}`;
+    if (pontoTuristico) {
+      unsplashQuery = `${pontoTuristico} ${destination.destino}`;
+    }
+    
+    const unsplashUrl = `${this.config.unsplashBaseUrl}?${encodeURIComponent(unsplashQuery)}`;
     const unsplashExists = await this.checkImageExists(unsplashUrl);
     
     if (unsplashExists) {
+      this.addToCache(cacheKey, unsplashUrl);
       return unsplashUrl;
     }
     
     // Último recurso: placeholder
-    return `${this.config.placeholderUrl}${this.config.sizes[size]}?text=${encodeURIComponent(destination.destino)}`;
+    const placeholderText = pontoTuristico 
+                          ? `${pontoTuristico} em ${destination.destino}` 
+                          : destination.destino;
+    
+    const placeholderUrl = `${this.config.placeholderUrl}${this.config.sizes[size]}?text=${encodeURIComponent(placeholderText)}`;
+    return placeholderUrl;
   },
   
-  // Renderiza uma imagem com créditos
+  // Renderiza uma imagem com créditos e ponto turístico (quando disponível)
   renderImageWithCredits(imageData, container, options = {}) {
     if (!imageData) {
       console.error('Dados de imagem não fornecidos');
@@ -215,7 +383,8 @@ window.BENETRIP_IMAGES = {
       alt, 
       photographer, 
       photographerUrl = '#',
-      sourceUrl = '#'
+      sourceUrl = '#',
+      pontoTuristico = null
     } = imageData;
     
     // Opções padrão
@@ -223,6 +392,7 @@ window.BENETRIP_IMAGES = {
       width = '100%',
       height = 'auto',
       showCredits = true,
+      showPontoTuristico = true,
       clickable = true,
       aspectRatio = '16/9',
       className = ''
@@ -254,6 +424,11 @@ window.BENETRIP_IMAGES = {
     img.dataset.photographer = photographer;
     img.dataset.source = sourceUrl;
     
+    // Adicionar o ponto turístico como dataset para uso em fallbacks
+    if (pontoTuristico) {
+      img.dataset.pontoTuristico = pontoTuristico;
+    }
+    
     // Adicionar ícone de zoom se clicável
     if (clickable) {
       const zoomIcon = document.createElement('div');
@@ -274,6 +449,14 @@ window.BENETRIP_IMAGES = {
     
     // Adicionar link ao container
     imageContainer.appendChild(link);
+    
+    // Adicionar rótulo de ponto turístico se disponível e solicitado
+    if (showPontoTuristico && pontoTuristico) {
+      const labelElement = document.createElement('div');
+      labelElement.className = 'tourist-spot-label';
+      labelElement.textContent = pontoTuristico;
+      imageContainer.appendChild(labelElement);
+    }
     
     // Adicionar elemento de créditos se solicitado
     if (showCredits && photographer) {
@@ -297,45 +480,55 @@ window.BENETRIP_IMAGES = {
     return imageContainer;
   },
   
-  // Renderiza múltiplas imagens em uma galeria
+  // Renderiza múltiplas imagens em uma galeria, com quantidade variável
   renderImagesGallery(imagesData, container, options = {}) {
-    if (!Array.isArray(imagesData) || imagesData.length === 0) {
+    if (!Array.isArray(imagesData)) {
       console.error('Dados de imagem não fornecidos ou inválidos');
+      return null;
+    }
+    
+    // Filtrar para remover imagens inválidas
+    const validImages = imagesData.filter(img => img && img.url);
+    
+    if (validImages.length === 0) {
+      console.warn('Nenhuma imagem válida para exibir');
       return null;
     }
     
     // Opções padrão
     const { 
-      cols = 2,
       gap = '8px',
       aspectRatio = '16/9',
-      className = ''
+      className = '',
+      showPontosTuristicos = true
     } = options;
     
     // Criar container de galeria
     const galleryContainer = document.createElement('div');
-    galleryContainer.className = 'images-gallery ' + className;
-    galleryContainer.style.display = 'grid';
-    galleryContainer.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+    galleryContainer.className = `images-gallery-variable ${className} ${validImages.length > 1 ? 'has-multiple' : ''}`;
     galleryContainer.style.gap = gap;
     
     // Renderizar cada imagem
-    imagesData.forEach(imageData => {
+    validImages.forEach((imageData, index) => {
       this.renderImageWithCredits(imageData, galleryContainer, {
         ...options,
         width: '100%',
         height: 'auto',
-        aspectRatio
+        aspectRatio,
+        showPontoTuristico: showPontosTuristicos && imageData.pontoTuristico
       });
     });
     
     // Adicionar ao container fornecido
-    container.appendChild(galleryContainer);
+    if (container) {
+      container.appendChild(galleryContainer);
+    }
     
     return galleryContainer;
   },
 
   // Adiciona funcionalidade de renderização direta na imagem do HTML
+  // com suporte a pontos turísticos
   enhanceExistingImage(imgElement, imageData) {
     if (!imgElement || !imageData) {
       console.error('Elemento de imagem ou dados não fornecidos');
@@ -345,6 +538,11 @@ window.BENETRIP_IMAGES = {
     // Substituir src para usar URL da melhor imagem
     imgElement.src = imageData.url;
     imgElement.alt = imageData.alt || imgElement.alt;
+    
+    // Adicionar o ponto turístico como dataset para uso em fallbacks
+    if (imageData.pontoTuristico) {
+      imgElement.dataset.pontoTuristico = imageData.pontoTuristico;
+    }
     
     // Verificar se a imagem já está em um container
     let container = imgElement.parentElement;
@@ -390,6 +588,20 @@ window.BENETRIP_IMAGES = {
       link.appendChild(zoomIcon);
     }
     
+    // Adicionar rótulo de ponto turístico se disponível
+    if (imageData.pontoTuristico) {
+      // Verificar se já existe um rótulo
+      let labelElement = container.querySelector('.tourist-spot-label');
+      
+      if (!labelElement) {
+        labelElement = document.createElement('div');
+        labelElement.className = 'tourist-spot-label';
+        container.appendChild(labelElement);
+      }
+      
+      labelElement.textContent = imageData.pontoTuristico;
+    }
+    
     // Adicionar créditos
     if (imageData.photographer) {
       let creditElement = container.querySelector('.image-credit');
@@ -424,7 +636,11 @@ window.BENETRIP_IMAGES = {
       console.log(`Verificando ${recomendacoes.topPick.imagens.length} imagens para ${recomendacoes.topPick.destino}`);
       for (const imagem of recomendacoes.topPick.imagens) {
         const existe = await this.checkImageExists(imagem.url);
-        resultados.topPick.push({url: imagem.url, existe});
+        resultados.topPick.push({
+          url: imagem.url, 
+          existe,
+          pontoTuristico: imagem.pontoTuristico
+        });
       }
     } else {
       console.log("Destino principal não tem imagens");
@@ -438,7 +654,11 @@ window.BENETRIP_IMAGES = {
           const resultadosAlt = [];
           for (const imagem of alt.imagens) {
             const existe = await this.checkImageExists(imagem.url);
-            resultadosAlt.push({url: imagem.url, existe});
+            resultadosAlt.push({
+              url: imagem.url, 
+              existe,
+              pontoTuristico: imagem.pontoTuristico
+            });
           }
           resultados.alternativas.push({
             destino: alt.destino,
@@ -455,7 +675,11 @@ window.BENETRIP_IMAGES = {
       console.log(`Verificando ${recomendacoes.surpresa.imagens.length} imagens para ${recomendacoes.surpresa.destino}`);
       for (const imagem of recomendacoes.surpresa.imagens) {
         const existe = await this.checkImageExists(imagem.url);
-        resultados.surpresa.push({url: imagem.url, existe});
+        resultados.surpresa.push({
+          url: imagem.url, 
+          existe,
+          pontoTuristico: imagem.pontoTuristico
+        });
       }
     } else {
       console.log("Destino surpresa não tem imagens");
@@ -504,6 +728,51 @@ window.BENETRIP_IMAGES = {
         img.src = url;
       });
     }
+  },
+  
+  // NOVA FUNÇÃO: Renderizar um destino com suas imagens de pontos turísticos
+  renderDestinationWithImages(destination, container, options = {}) {
+    if (!destination || !container) {
+      console.error('Destino ou container não fornecidos');
+      return null;
+    }
+    
+    // Opções padrão
+    const {
+      showImagens = true,
+      maxImagens = 2, // Por padrão, exibir até 2 imagens
+      className = '',
+      aspectRatio = '16/9'
+    } = options;
+    
+    // Criar container para o destino
+    const destinationContainer = document.createElement('div');
+    destinationContainer.className = `destination-container ${className}`;
+    
+    // Adicionar informações do destino
+    const infoContainer = document.createElement('div');
+    infoContainer.className = 'destination-info';
+    infoContainer.innerHTML = `
+      <h3>${destination.destino}, ${destination.pais}</h3>
+      <p class="description">${destination.descricao || destination.porque || ''}</p>
+    `;
+    
+    destinationContainer.appendChild(infoContainer);
+    
+    // Adicionar imagens se disponíveis e solicitadas
+    if (showImagens && destination.imagens && destination.imagens.length > 0) {
+      const imagesToShow = destination.imagens.slice(0, maxImagens);
+      
+      this.renderImagesGallery(imagesToShow, destinationContainer, {
+        aspectRatio,
+        showPontosTuristicos: true
+      });
+    }
+    
+    // Adicionar ao container fornecido
+    container.appendChild(destinationContainer);
+    
+    return destinationContainer;
   },
   
   // Método para adicionar botão de debug na interface
