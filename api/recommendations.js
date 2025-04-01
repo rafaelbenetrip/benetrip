@@ -90,7 +90,7 @@ module.exports = async function handler(req, res) {
       console.log('Prompt gerado com sucesso, tamanho:', prompt.length);
     } catch (promptError) {
       console.error('Erro ao gerar prompt:', promptError);
-      prompt = "Recomende destinos de viagem únicos e personalizados para o Brasil e mundo. Um destino principal, 4 destinos alternativos diferentes entre si, e um destino surpresa diferente dos demais. Priorize URGENTEMENTE respeitar o orçamento máximo para voos. Responda em formato JSON.";
+      prompt = "Recomende destinos de viagem únicos e personalizados para o Brasil e mundo. Um destino principal, 4 destinos alternativos diferentes entre si, e um destino surpresa diferente dos demais. Para cada destino, forneça 2-3 pontos turísticos específicos para visitar. Priorize URGENTEMENTE respeitar o orçamento máximo para voos. Responda em formato JSON.";
     }
     
     // Tentar múltiplas vezes a consulta à API com diferentes modelos
@@ -179,7 +179,7 @@ module.exports = async function handler(req, res) {
       
       // Se chegamos aqui, todas as tentativas falharam nesta iteração
       // Vamos modificar o prompt para a próxima tentativa para incentivar mais criatividade
-      prompt = `${prompt}\n\nURGENTE: O ORÇAMENTO MÁXIMO para voos (${requestData.orcamento_valor || 'informado'} ${requestData.moeda_escolhida || 'BRL'}) precisa ser RIGOROSAMENTE RESPEITADO. TODOS os destinos devem ter voos COM VALOR ABAIXO desse orçamento. Forneça um mix de destinos populares e alternativos, todos com preços realistas e acessíveis.`;
+      prompt = `${prompt}\n\nURGENTE: O ORÇAMENTO MÁXIMO para voos (${requestData.orcamento_valor || 'informado'} ${requestData.moeda_escolhida || 'BRL'}) precisa ser RIGOROSAMENTE RESPEITADO. TODOS os destinos devem ter voos COM VALOR ABAIXO desse orçamento. Forneça um mix de destinos populares e alternativos, todos com preços realistas e acessíveis. PARA CADA DESTINO, INDIQUE 2-3 PONTOS TURÍSTICOS ESPECÍFICOS E CONHECIDOS.`;
     }
     
     // Se todas as tentativas falharam, criar uma resposta de emergência
@@ -248,7 +248,8 @@ async function callPerplexityAPI(prompt, requestData) {
     1. Cada voo DEVE respeitar rigorosamente o orçamento máximo indicado.
     2. Retorne APENAS o JSON puro, sem marcação markdown ou comentários.
     3. Forneça EXATAMENTE 4 destinos alternativos totalmente diferentes entre si.
-    4. Garanta preços realistas e acessíveis para todas as recomendações.`;
+    4. Garanta preços realistas e acessíveis para todas as recomendações.
+    5. Para cada destino, inclua 2-3 PONTOS TURÍSTICOS ESPECÍFICOS que sejam conhecidos ou representativos.`;
     
     const response = await axios({
       method: 'post',
@@ -262,7 +263,7 @@ async function callPerplexityAPI(prompt, requestData) {
         messages: [
           {
             role: 'system',
-            content: 'Você é um especialista em viagens focado em fornecer recomendações personalizadas globais para vários orçamentos. Sua prioridade #1 é NUNCA exceder o orçamento máximo indicado para passagens aéreas. Forneça um mix balanceado de destinos populares e alternativos, adequados ao perfil do viajante. Retorne APENAS JSON puro. SEMPRE forneça EXATAMENTE 4 destinos alternativos.'
+            content: 'Você é um especialista em viagens focado em fornecer recomendações personalizadas globais para vários orçamentos. Sua prioridade #1 é NUNCA exceder o orçamento máximo indicado para passagens aéreas. Forneça um mix balanceado de destinos populares e alternativos, adequados ao perfil do viajante. Retorne APENAS JSON puro. SEMPRE forneça EXATAMENTE 4 destinos alternativos e inclua pontos turísticos específicos para cada destino.'
           },
           {
             role: 'user',
@@ -337,7 +338,8 @@ async function callOpenAIAPI(prompt, requestData) {
     1. Cada voo DEVE respeitar rigorosamente o orçamento máximo indicado.
     2. Sua resposta deve ser exclusivamente um objeto JSON válido sem formatação markdown. 
     3. Forneça EXATAMENTE 4 destinos alternativos totalmente diferentes entre si.
-    4. Garanta preços realistas e acessíveis para todas as recomendações.`;
+    4. Garanta preços realistas e acessíveis para todas as recomendações.
+    5. Para cada destino, inclua 2-3 PONTOS TURÍSTICOS ESPECÍFICOS e conhecidos.`;
     
     const response = await axios({
       method: 'post',
@@ -351,7 +353,7 @@ async function callOpenAIAPI(prompt, requestData) {
         messages: [
           {
             role: "system",
-            content: "Você é um especialista em viagens focado em fornecer recomendações personalizadas globais para vários orçamentos. Sua prioridade #1 é NUNCA exceder o orçamento máximo indicado para passagens aéreas. Forneça um mix balanceado de destinos populares e alternativos, adequados ao perfil do viajante. Retorne APENAS JSON puro. SEMPRE forneça EXATAMENTE 4 destinos alternativos."
+            content: "Você é um especialista em viagens focado em fornecer recomendações personalizadas globais para vários orçamentos. Sua prioridade #1 é NUNCA exceder o orçamento máximo indicado para passagens aéreas. Forneça um mix balanceado de destinos populares e alternativos, adequados ao perfil do viajante. Retorne APENAS JSON puro. SEMPRE forneça EXATAMENTE 4 destinos alternativos e inclua pontos turísticos específicos para cada destino."
           },
           {
             role: "user",
@@ -408,7 +410,8 @@ async function callClaudeAPI(prompt, requestData) {
     1. Cada voo DEVE respeitar rigorosamente o orçamento máximo indicado.
     2. Sua resposta deve ser APENAS o objeto JSON válido, sem NENHUM texto adicional.
     3. Forneça EXATAMENTE 4 destinos alternativos totalmente diferentes entre si.
-    4. Garanta preços realistas e acessíveis para todas as recomendações.`;
+    4. Garanta preços realistas e acessíveis para todas as recomendações.
+    5. Para cada destino, inclua 2-3 PONTOS TURÍSTICOS ESPECÍFICOS e CONHECIDOS.`;
     
     const response = await axios({
       method: 'post',
@@ -424,7 +427,7 @@ async function callClaudeAPI(prompt, requestData) {
         messages: [
           {
             role: "system",
-            content: "Você é um especialista em viagens focado em fornecer recomendações personalizadas globais para vários orçamentos. Sua prioridade #1 é NUNCA exceder o orçamento máximo indicado para passagens aéreas. Forneça um mix balanceado de destinos populares e alternativos, adequados ao perfil do viajante. Retorne APENAS JSON puro. SEMPRE forneça EXATAMENTE 4 destinos alternativos."
+            content: "Você é um especialista em viagens focado em fornecer recomendações personalizadas globais para vários orçamentos. Sua prioridade #1 é NUNCA exceder o orçamento máximo indicado para passagens aéreas. Forneça um mix balanceado de destinos populares e alternativos, adequados ao perfil do viajante. Retorne APENAS JSON puro. SEMPRE forneça EXATAMENTE 4 destinos alternativos e inclua pontos turísticos específicos para cada destino."
           },
           {
             role: "user",
@@ -539,6 +542,12 @@ function isValidDestinationJSON(jsonString, requestData) {
     if (!Array.isArray(data.alternativas) || data.alternativas.length !== 4) {
       console.log(`JSON inválido: array de alternativas deve conter exatamente 4 destinos (contém ${data.alternativas?.length || 0})`);
       return false;
+    }
+    
+    // Verificação de pontos turísticos para o destino principal
+    // Não exigiremos estritamente, mas logamos para informação
+    if (!data.topPick.pontosTuristicos && !data.topPick.pontoTuristico) {
+      console.log("Aviso: topPick não contém pontos turísticos");
     }
     
     // Verificação rápida de orçamento apenas se disponível
@@ -677,6 +686,7 @@ IMPORTANTE:
 5. Inclua destinos de diferentes continentes/regiões nas alternativas.
 6. Garanta que os preços sejam realistas e precisos para voos de ida e volta partindo de ${cidadeOrigem}.
 7. Pelo menos um destino deve ter preço bem abaixo do orçamento máximo (economicamente vantajoso).
+8. Para CADA destino, forneça 2-3 pontos turísticos específicos e conhecidos para visitar.
 
 Forneça no formato JSON exato abaixo, SEM formatação markdown:
 {
@@ -688,6 +698,7 @@ Forneça no formato JSON exato abaixo, SEM formatação markdown:
     "porque": "Razão específica para visitar baseada nas preferências",
     "destaque": "Uma experiência única neste destino",
     "comentario": "Comentário entusiasmado da Tripinha (cachorra)",
+    "pontosTuristicos": ["Ponto turístico 1", "Ponto turístico 2", "Ponto turístico 3"],
     "preco": {
       "voo": número,
       "hotel": número
@@ -699,6 +710,7 @@ Forneça no formato JSON exato abaixo, SEM formatação markdown:
       "pais": "Nome do País 1", 
       "codigoPais": "XX",
       "porque": "Razão específica para visitar",
+      "pontoTuristico": "Atrações para visitar neste destino",
       "preco": {
         "voo": número,
         "hotel": número
@@ -709,6 +721,7 @@ Forneça no formato JSON exato abaixo, SEM formatação markdown:
       "pais": "Nome do País 2", 
       "codigoPais": "XX",
       "porque": "Razão específica para visitar",
+      "pontoTuristico": "Atrações para visitar neste destino",
       "preco": {
         "voo": número,
         "hotel": número
@@ -719,6 +732,7 @@ Forneça no formato JSON exato abaixo, SEM formatação markdown:
       "pais": "Nome do País 3", 
       "codigoPais": "XX",
       "porque": "Razão específica para visitar",
+      "pontoTuristico": "Atrações para visitar neste destino",
       "preco": {
         "voo": número,
         "hotel": número
@@ -729,6 +743,7 @@ Forneça no formato JSON exato abaixo, SEM formatação markdown:
       "pais": "Nome do País 4", 
       "codigoPais": "XX",
       "porque": "Razão específica para visitar",
+      "pontoTuristico": "Atrações para visitar neste destino",
       "preco": {
         "voo": número,
         "hotel": número
@@ -743,6 +758,7 @@ Forneça no formato JSON exato abaixo, SEM formatação markdown:
     "porque": "Razão para visitar, destacando o fator surpresa",
     "destaque": "Uma experiência única neste destino",
     "comentario": "Comentário entusiasmado da Tripinha",
+    "pontosTuristicos": ["Ponto turístico surpresa 1", "Ponto turístico surpresa 2"],
     "preco": {
       "voo": número,
       "hotel": número
@@ -866,680 +882,145 @@ function getFamaDestinoText(value) {
   return options[value] || "qualquer";
 }
 
-// Função para gerar dados de emergência personalizados baseados no perfil
+// Função simplificada para gerar dados de emergência sem bancos de dados extensos
 function generateEmergencyData(dadosUsuario = {}) {
-  // Determinar o tipo de destino baseado nas preferências
-  const preferencia = dadosUsuario.preferencia_viagem || 0;
-  const companhia = dadosUsuario.companhia || 0;
-  const quantidadePessoas = dadosUsuario.quantidade_familia || dadosUsuario.quantidade_amigos || 1;
-  
   // Extrair orçamento para ajustar preços de emergência
   const orcamento = dadosUsuario.orcamento_valor ? parseFloat(dadosUsuario.orcamento_valor) : 3000;
+  const tipoPreferencia = dadosUsuario.preferencia_viagem || 0;
   
-  // Determinar a região de origem para ajustar destinos e preços
-  const cidadeOrigem = dadosUsuario.cidade_partida?.name || '';
-  const regiaoOrigem = determinarRegiaoOrigem(cidadeOrigem);
-  
-  // Gerar conjunto de destinos apropriados para a região
-  const destinosPorRegiao = gerarDestinosPorRegiao(regiaoOrigem, preferencia, orcamento);
-  
-  // Selecionar o conjunto adequado
-  const conjuntoAtual = destinosPorRegiao[preferencia] || destinosPorRegiao[0];
-  const indiceAleatorio = Math.floor(Math.random() * conjuntoAtual.length);
-  
-  // Reordenar alternativas para evitar sempre as mesmas posições
-  const resultado = {...conjuntoAtual[indiceAleatorio]};
-  resultado.alternativas = embaralharArray([...resultado.alternativas]);
-  
-  // Garantir exatamente 4 alternativas
-  if (resultado.alternativas.length < 4) {
-    const destinosExtras = gerarDestinosExtras(regiaoOrigem, orcamento);
-    
-    // Adicionar destinos extras até completar 4 alternativas
-    while (resultado.alternativas.length < 4) {
-      resultado.alternativas.push(destinosExtras[resultado.alternativas.length % destinosExtras.length]);
-    }
-  } else if (resultado.alternativas.length > 4) {
-    // Limitar a exatamente 4 alternativas
-    resultado.alternativas = resultado.alternativas.slice(0, 4);
-  }
-  
-  // Garantir que o orçamento seja respeitado
-  if (orcamento) {
-    // Ajustar preço do destino principal se necessário
-    if (resultado.topPick.preco.voo > orcamento * 0.95) {
-      resultado.topPick.preco.voo = Math.round(orcamento * 0.85); // 85% do orçamento
-    }
-    
-    // Garantir pelo menos uma opção econômica
-    let temOpcaoEconomica = false;
-    
-    // Ajustar preços das alternativas
-    resultado.alternativas.forEach((alt, index) => {
-      if (alt.preco.voo > orcamento * 0.95) {
-        // Ajustar preço para baixo
-        const fatorAjuste = 0.7 + (index * 0.05); // 70-85% do orçamento
-        alt.preco.voo = Math.round(orcamento * fatorAjuste);
+  // Base minimalista de dados para emergência
+  const dadosEmergencia = {
+    topPick: {
+      destino: "Barcelona",
+      pais: "Espanha",
+      codigoPais: "ES",
+      descricao: "Cidade mediterrânea com arquitetura única de Gaudí e praias urbanas",
+      porque: "Combinação perfeita de cultura, gastronomia, praia e vida noturna vibrante",
+      destaque: "Passeio pela Sagrada Família e tarde relaxante no Parque Güell",
+      comentario: "Barcelona é incrível! Tantos cheiros de tapas, música de rua e praias onde posso correr livremente! O melhor da Europa em uma cidade só! 🐾🌊",
+      pontosTuristicos: ["Sagrada Família", "Parque Güell", "La Rambla", "Bairro Gótico"],
+      preco: {
+        voo: Math.round(orcamento * 0.85),
+        hotel: 280
       }
-      
-      // Verificar se esta é uma opção econômica
-      if (alt.preco.voo <= orcamento * 0.7) {
-        temOpcaoEconomica = true;
-      }
-    });
-    
-    // Se não temos uma opção econômica, criar uma
-    if (!temOpcaoEconomica && resultado.alternativas.length > 0) {
-      resultado.alternativas[0].preco.voo = Math.round(orcamento * 0.6); // 60% do orçamento
-    }
-    
-    // Ajustar preço do destino surpresa
-    if (resultado.surpresa.preco.voo > orcamento) {
-      resultado.surpresa.preco.voo = Math.round(orcamento * 0.9); // 90% do orçamento
-    }
-  }
-  
-  return resultado;
-}
-
-// NOVA FUNÇÃO: Determinar região de origem para dados de emergência mais relevantes
-function determinarRegiaoOrigem(cidadeOrigem) {
-  if (!cidadeOrigem) return 'global';
-  
-  const cidadeLowerCase = cidadeOrigem.toLowerCase();
-  
-  // Regiões principais
-  const regioesNorteAmerica = ['nova york', 'los angeles', 'chicago', 'toronto', 'cidade do méxico', 'montreal', 'miami', 'las vegas'];
-  const regioesSulAmerica = ['são paulo', 'rio de janeiro', 'buenos aires', 'santiago', 'lima', 'bogotá', 'brasília', 'salvador'];
-  const regioesEuropa = ['londres', 'paris', 'roma', 'madri', 'barcelona', 'berlim', 'amsterdã', 'lisboa'];
-  const regioesAsia = ['tóquio', 'pequim', 'xangai', 'hong kong', 'singapura', 'seul', 'banguecoque', 'delhi'];
-  const regioesOceania = ['sydney', 'melbourne', 'auckland', 'brisbane', 'perth', 'adelaide', 'wellington'];
-  const regioesAfrica = ['cidade do cabo', 'joanesburgo', 'cairo', 'casablanca', 'nairobi', 'lagos', 'marrakech'];
-  
-  // Verificar em qual região a cidade se encaixa
-  if (regioesNorteAmerica.some(cidade => cidadeLowerCase.includes(cidade))) return 'norte_america';
-  if (regioesSulAmerica.some(cidade => cidadeLowerCase.includes(cidade))) return 'sul_america';
-  if (regioesEuropa.some(cidade => cidadeLowerCase.includes(cidade))) return 'europa';
-  if (regioesAsia.some(cidade => cidadeLowerCase.includes(cidade))) return 'asia';
-  if (regioesOceania.some(cidade => cidadeLowerCase.includes(cidade))) return 'oceania';
-  if (regioesAfrica.some(cidade => cidadeLowerCase.includes(cidade))) return 'africa';
-  
-  // Verificações mais amplas por país ou região
-  if (cidadeLowerCase.includes('brasil') || cidadeLowerCase.includes('brazil')) return 'sul_america';
-  if (cidadeLowerCase.includes('eua') || cidadeLowerCase.includes('usa') || cidadeLowerCase.includes('estados unidos')) return 'norte_america';
-  if (cidadeLowerCase.includes('europa') || cidadeLowerCase.includes('europe')) return 'europa';
-  if (cidadeLowerCase.includes('ásia') || cidadeLowerCase.includes('asia')) return 'asia';
-  
-  // Padrão global como fallback
-  return 'global';
-}
-
-// NOVA FUNÇÃO: Gerar destinos por região
-function gerarDestinosPorRegiao(regiao, preferencia, orcamento) {
-  // Conjunto base de dados - exemplo para Sul América
-  const sulAmerica = {
-    0: [ // Relaxamento
+    },
+    alternativas: [
       {
-        topPick: {
-          destino: "Fernando de Noronha",
-          pais: "Brasil",
-          codigoPais: "BR",
-          descricao: "Arquipélago paradisíaco com praias intocadas e vida marinha exuberante",
-          porque: "Praias de águas cristalinas perfeitas para relaxamento e contato com a natureza preservada",
-          destaque: "Mergulho com golfinhos na Baía dos Golfinhos e pôr do sol na Baía do Sancho",
-          comentario: "Au au! Noronha tem praias perfeitas para cavar na areia e tomar banho de mar! A água é tão clarinha que dá para ver os peixinhos nadando! 🐾🌊",
-          preco: { voo: Math.min(orcamento * 0.85, 1800), hotel: 450 }
-        },
-        alternativas: [
-          {
-            destino: "Jericoacoara",
-            pais: "Brasil",
-            codigoPais: "BR",
-            porque: "Paraíso de dunas, lagoas e praias com clima descontraído e ótima infraestrutura",
-            preco: { voo: Math.min(orcamento * 0.7, 1100), hotel: 250 }
-          },
-          {
-            destino: "Ilha Grande",
-            pais: "Brasil",
-            codigoPais: "BR",
-            porque: "Ilha paradisíaca sem carros com praias desertas e trilhas na Mata Atlântica",
-            preco: { voo: Math.min(orcamento * 0.5, 700), hotel: 280 }
-          },
-          {
-            destino: "San Andrés",
-            pais: "Colômbia",
-            codigoPais: "CO",
-            porque: "Ilha caribenha com mar de sete cores e praia de areia branca",
-            preco: { voo: Math.min(orcamento * 0.75, 1500), hotel: 220 }
-          },
-          {
-            destino: "Punta del Este",
-            pais: "Uruguai",
-            codigoPais: "UY",
-            porque: "Destino sofisticado com praias tranquilas e ótima gastronomia",
-            preco: { voo: Math.min(orcamento * 0.6, 1200), hotel: 320 }
-          }
-        ],
-        surpresa: {
-          destino: "Ilha de Providencia",
-          pais: "Colômbia",
-          codigoPais: "CO",
-          descricao: "Paraíso escondido no Caribe colombiano com águas cristalinas e poucos turistas",
-          porque: "Destino isolado e autêntico longe das multidões com recifes de coral preservados",
-          destaque: "Snorkeling em Crab Cay com visibilidade de mais de 30 metros",
-          comentario: "Providencia é um segredo que poucos conhecem! Praias intocadas e um mar tão azul que nem parece real! Fiquei impressionada com tantos cheirinhos diferentes! 🐾🏝️",
-          preco: { voo: Math.min(orcamento * 0.9, 2000), hotel: 210 }
+        destino: "Lisboa",
+        pais: "Portugal",
+        codigoPais: "PT",
+        porque: "Cidade charmosa com clima agradável, culinária deliciosa e preços acessíveis",
+        pontoTuristico: "Torre de Belém, Mosteiro dos Jerônimos e bairro de Alfama",
+        preco: {
+          voo: Math.round(orcamento * 0.75),
+          hotel: 230
+        }
+      },
+      {
+        destino: "Tóquio",
+        pais: "Japão",
+        codigoPais: "JP",
+        porque: "Metrópole futurista com tradição milenar, tecnologia de ponta e gastronomia refinada",
+        pontoTuristico: "Templo Senso-ji, Shibuya Crossing e Torre de Tóquio",
+        preco: {
+          voo: Math.round(orcamento * 0.9),
+          hotel: 320
+        }
+      },
+      {
+        destino: "Buenos Aires",
+        pais: "Argentina",
+        codigoPais: "AR",
+        porque: "Capital latina com rica cultura, arquitetura europeia e paixão pelo tango",
+        pontoTuristico: "Teatro Colón, Plaza de Mayo e bairro La Boca",
+        preco: {
+          voo: Math.round(orcamento * 0.6),
+          hotel: 190
+        }
+      },
+      {
+        destino: "Cidade do Cabo",
+        pais: "África do Sul",
+        codigoPais: "ZA",
+        porque: "Mistura de cidade, natureza, safáris e vinícolas em um só destino",
+        pontoTuristico: "Table Mountain, Cabo da Boa Esperança e Robben Island",
+        preco: {
+          voo: Math.round(orcamento * 0.82),
+          hotel: 240
         }
       }
     ],
-    1: [ // Aventura
-      {
-        topPick: {
-          destino: "Chapada dos Veadeiros",
-          pais: "Brasil",
-          codigoPais: "BR",
-          descricao: "Parque Nacional com cânions, cachoeiras e formações rochosas milenares",
-          porque: "Combinação perfeita de trilhas desafiadoras e cachoeiras espetaculares para banhos refrescantes",
-          destaque: "Trilha das 7 quedas d'água com banho nas piscinas naturais de água cristalina",
-          comentario: "Chapada tem TANTAS trilhas incríveis para explorar e cachoeiras para mergulhar! Andei tanto que minhas patinhas ficaram cansadas, mas valeu cada passo! 🐾🌄",
-          preco: { voo: Math.min(orcamento * 0.5, 800), hotel: 180 }
-        },
-        alternativas: [
-          {
-            destino: "Ushuaia",
-            pais: "Argentina",
-            codigoPais: "AR",
-            porque: "Fim do mundo com trekking na Patagônia, navegação no Canal de Beagle e glaciares",
-            preco: { voo: Math.min(orcamento * 0.8, 1700), hotel: 250 }
-          },
-          {
-            destino: "Bonito",
-            pais: "Brasil",
-            codigoPais: "BR",
-            porque: "Ecoturismo de ponta com flutuação em rios cristalinos e grutas impressionantes",
-            preco: { voo: Math.min(orcamento * 0.6, 900), hotel: 210 }
-          },
-          {
-            destino: "Huacachina",
-            pais: "Peru",
-            codigoPais: "PE",
-            porque: "Oásis no deserto com sandboarding e passeios de buggy nas dunas gigantes",
-            preco: { voo: Math.min(orcamento * 0.75, 1300), hotel: 150 }
-          },
-          {
-            destino: "San Pedro de Atacama",
-            pais: "Chile",
-            codigoPais: "CL",
-            porque: "Deserto mais árido do mundo com paisagens lunares e fenômenos geotérmicos",
-            preco: { voo: Math.min(orcamento * 0.7, 1400), hotel: 190 }
-          }
-        ],
-        surpresa: {
-          destino: "Salar de Uyuni",
-          pais: "Bolívia",
-          codigoPais: "BO",
-          descricao: "Maior deserto de sal do mundo com paisagens surreais e reflexos perfeitos",
-          porque: "Experiência de aventura única em um dos cenários mais fotogênicos do planeta",
-          destaque: "Tour de 3 dias visitando lagoas coloridas, gêiseres e formações rochosas",
-          comentario: "Uyuni parece outro planeta! Quando o sal reflete o céu é impossível saber onde termina um e começa o outro! Nunca vi nada igual! 🐾🌈",
-          preco: { voo: Math.min(orcamento * 0.75, 1600), hotel: 140 }
-        }
-      }
-    ]
-    // ... podem ser adicionados mais tipos de preferência
-  };
-  
-  // Conjunto para América do Norte
-  const norteAmerica = {
-    0: [ // Relaxamento
-      {
-        topPick: {
-          destino: "Cancún",
-          pais: "México",
-          codigoPais: "MX",
-          descricao: "Paraíso caribenho com praias de areia branca e águas turquesa",
-          porque: "Resorts all-inclusive com praias deslumbrantes e opções para todos os orçamentos",
-          destaque: "Relaxar em Playa Delfines com vista para o mar caribenho",
-          comentario: "Cancún tem a areia mais macia que já pisei! E aquela água quentinha e azul é perfeita para um cachorro feliz! 🐾🏖️",
-          preco: { voo: Math.min(orcamento * 0.7, 1900), hotel: 320 }
-        },
-        alternativas: [
-          {
-            destino: "Key West",
-            pais: "Estados Unidos",
-            codigoPais: "US",
-            porque: "Ilha tropical com clima descontraído, praias tranquilas e pores do sol espetaculares",
-            preco: { voo: Math.min(orcamento * 0.85, 2200), hotel: 380 }
-          },
-          {
-            destino: "Tulum",
-            pais: "México",
-            codigoPais: "MX",
-            porque: "Combinação perfeita de praia paradisíaca, ruínas maias e cenotes místicos",
-            preco: { voo: Math.min(orcamento * 0.75, 1800), hotel: 290 }
-          },
-          {
-            destino: "Kauai",
-            pais: "Estados Unidos",
-            codigoPais: "US",
-            porque: "A 'Ilha Jardim' do Havaí com praias intocadas e natureza exuberante",
-            preco: { voo: Math.min(orcamento * 0.9, 3000), hotel: 410 }
-          },
-          {
-            destino: "Palm Springs",
-            pais: "Estados Unidos",
-            codigoPais: "US",
-            porque: "Oásis no deserto com piscinas, spas e atmosfera relaxante",
-            preco: { voo: Math.min(orcamento * 0.8, 2100), hotel: 350 }
-          }
-        ],
-        surpresa: {
-          destino: "Little Corn Island",
-          pais: "Nicarágua",
-          codigoPais: "NI",
-          descricao: "Ilha remota no Caribe nicaraguense sem carros e com praias desertas",
-          porque: "Destino verdadeiramente isolado para relaxamento completo longe da civilização",
-          destaque: "Snorkeling em recifes de coral preservados com tartarugas marinhas",
-          comentario: "Little Corn é o verdadeiro paraíso escondido! Sem carros, só trilhas de terra e praias vazias! A vida simples com o mar mais lindo que você já viu! 🐾🌴",
-          preco: { voo: Math.min(orcamento * 0.85, 2300), hotel: 180 }
-        }
-      }
-    ]
-    // ... podem ser adicionados mais tipos de preferência e regiões
-  };
-  
-  // Conjunto para Europa
-  const europa = {
-    2: [ // Cultura
-      {
-        topPick: {
-          destino: "Porto",
-          pais: "Portugal",
-          codigoPais: "PT",
-          descricao: "Cidade histórica nas margens do Rio Douro com atmosfera autêntica",
-          porque: "Combinação perfeita de cultura, gastronomia, arquitetura histórica e vinhos do Porto",
-          destaque: "Visita às caves de vinho do Porto seguida de jantar com vista para o rio",
-          comentario: "Porto é pura magia! Tantos cheirinhos de comida boa, ruas históricas para explorar e pessoas que adoram fazer carinho em cachorros! 🐾🍷",
-          preco: { voo: Math.min(orcamento * 0.8, 2800), hotel: 220 }
-        },
-        alternativas: [
-          {
-            destino: "Cracóvia",
-            pais: "Polônia",
-            codigoPais: "PL",
-            porque: "Cidade medieval intacta com rica história, preços acessíveis e hospitalidade polonesa",
-            preco: { voo: Math.min(orcamento * 0.7, 2600), hotel: 180 }
-          },
-          {
-            destino: "Sevilha",
-            pais: "Espanha",
-            codigoPais: "ES",
-            porque: "Berço do flamenco com arquitetura mourisca, tapas deliciosas e atmosfera vibrante",
-            preco: { voo: Math.min(orcamento * 0.75, 2700), hotel: 210 }
-          },
-          {
-            destino: "Budapeste",
-            pais: "Hungria",
-            codigoPais: "HU",
-            porque: "Cidade termal dividida pelo Danúbio com arquitetura art nouveau e vida noturna",
-            preco: { voo: Math.min(orcamento * 0.65, 2500), hotel: 170 }
-          },
-          {
-            destino: "Bolonha",
-            pais: "Itália",
-            codigoPais: "IT",
-            porque: "Capital gastronômica da Itália com arquitetura medieval e ótimas universidades",
-            preco: { voo: Math.min(orcamento * 0.85, 2900), hotel: 250 }
-          }
-        ],
-        surpresa: {
-          destino: "Lviv",
-          pais: "Ucrânia",
-          codigoPais: "UA",
-          descricao: "Joia arquitetônica da Europa Oriental com influências austríacas e polonesas",
-          porque: "Centro histórico UNESCO com cafés históricos, igrejas medievais e preços acessíveis",
-          destaque: "Tour pelos antigos cafés literários e cervejarias artesanais da cidade",
-          comentario: "Lviv é um segredo que poucos conhecem! Praças charmosas, cafés aconchegantes e pessoas super amigáveis que sempre têm um petisco para oferecer! 🐾☕",
-          preco: { voo: Math.min(orcamento * 0.7, 2600), hotel: 140 }
-        }
-      }
-    ]
-  };
-  
-  // Conjunto global (para qualquer origem)
-  const global = {
-    0: [ // Relaxamento
-      {
-        topPick: {
-          destino: "Bali",
-          pais: "Indonésia",
-          codigoPais: "ID",
-          descricao: "Ilha dos Deuses com praias, templos e cultura única",
-          porque: "Equilibra perfeitamente relaxamento em praias e resorts com experiências culturais",
-          destaque: "Retiro em Ubud com yoga, spa e vista para campos de arroz em terraços",
-          comentario: "Bali tem energia especial! As praias são incríveis para correr e as pessoas sempre me dão petiscos nos templos! Que lugar abençoado! 🐾🌺",
-          preco: { voo: Math.min(orcamento * 0.8, 3500), hotel: 200 }
-        },
-        alternativas: [
-          {
-            destino: "Santorini",
-            pais: "Grécia",
-            codigoPais: "GR",
-            porque: "Ilha vulcânica com vistas deslumbrantes, vilas brancas e pores do sol inesquecíveis",
-            preco: { voo: Math.min(orcamento * 0.85, 3000), hotel: 350 }
-          },
-          {
-            destino: "Maldivas",
-            pais: "Maldivas",
-            codigoPais: "MV",
-            porque: "Destino de luxo com bangalôs sobre a água e recifes de coral exuberantes",
-            preco: { voo: Math.min(orcamento * 0.9, 4000), hotel: 500 }
-          },
-          {
-            destino: "Koh Samui",
-            pais: "Tailândia",
-            codigoPais: "TH",
-            porque: "Ilha tropical com praias de areia branca, spas requintados e comida deliciosa",
-            preco: { voo: Math.min(orcamento * 0.75, 3200), hotel: 180 }
-          },
-          {
-            destino: "Seychelles",
-            pais: "Seychelles",
-            codigoPais: "SC",
-            porque: "Arquipélago com algumas das praias mais bonitas do mundo e natureza intocada",
-            preco: { voo: Math.min(orcamento * 0.95, 4200), hotel: 400 }
-          }
-        ],
-        surpresa: {
-          destino: "Ilha de Socotra",
-          pais: "Iêmen",
-          codigoPais: "YE",
-          descricao: "Ilha 'alienígena' com vegetação única no mundo e praias desconhecidas",
-          porque: "Um dos lugares mais isolados e inexplorados do planeta, com biodiversidade única",
-          destaque: "Caminhada entre as icônicas árvores de sangue de dragão, espécie endêmica da ilha",
-          comentario: "Socotra parece outro planeta! Árvores que parecem guarda-chuvas virados e praias onde você não encontra mais ninguém! Um verdadeiro sonho de explorador! 🐾🌴",
-          preco: { voo: Math.min(orcamento * 0.85, 3700), hotel: 150 }
-        }
-      }
-    ],
-    1: [ // Aventura
-      {
-        topPick: {
-          destino: "Queenstown",
-          pais: "Nova Zelândia",
-          codigoPais: "NZ",
-          descricao: "Capital mundial dos esportes de aventura cercada por montanhas e lagos",
-          porque: "Oferece a maior variedade de aventuras radicais em cenários naturais deslumbrantes",
-          destaque: "Bungee jumping na ponte Kawarau, o primeiro ponto comercial de bungee do mundo",
-          comentario: "Queenstown tem trilhas INCRÍVEIS para explorar e paisagens que fariam qualquer cachorro ficar de boca aberta! Eu latia de alegria a cada aventura! 🐾⛰️",
-          preco: { voo: Math.min(orcamento * 0.8, 4000), hotel: 260 }
-        },
-        alternativas: [
-          {
-            destino: "Interlaken",
-            pais: "Suíça",
-            codigoPais: "CH",
-            porque: "Hub de aventuras alpinas com parapente, canyoning e esqui em cenário de montanhas",
-            preco: { voo: Math.min(orcamento * 0.85, 3200), hotel: 290 }
-          },
-          {
-            destino: "Moab",
-            pais: "Estados Unidos",
-            codigoPais: "US",
-            porque: "Meca do mountain bike com trilhas desafiadoras e parques nacionais espetaculares",
-            preco: { voo: Math.min(orcamento * 0.7, 2800), hotel: 230 }
-          },
-          {
-            destino: "Chiang Mai",
-            pais: "Tailândia",
-            codigoPais: "TH",
-            porque: "Trekking na selva, rafting em rios de corredeiras e passeios com elefantes resgatados",
-            preco: { voo: Math.min(orcamento * 0.8, 3300), hotel: 150 }
-          },
-          {
-            destino: "Victoria Falls",
-            pais: "Zâmbia",
-            codigoPais: "ZM",
-            porque: "Maior queda d'água do mundo com bungee jumping, rafting e safáris próximos",
-            preco: { voo: Math.min(orcamento * 0.9, 3600), hotel: 200 }
-          }
-        ],
-        surpresa: {
-          destino: "Svalbard",
-          pais: "Noruega",
-          codigoPais: "NO",
-          descricao: "Arquipélago no Ártico com ursos polares, expedições de caiaque e auroras boreais",
-          porque: "A última fronteira: aventura no extremo norte do planeta com paisagens árticas surreais",
-          destaque: "Expedição de snowmobile durante a noite polar para ver a aurora boreal dançando no céu",
-          comentario: "Svalbard é um sonho branco! Faz frio nas patinhas, mas a aventura de ver os ursos polares (de longe!) e a aurora boreal vale cada segundo! 🐾❄️",
-          preco: { voo: Math.min(orcamento * 0.9, 3900), hotel: 280 }
-        }
-      }
-    ],
-    2: [ // Cultura
-      {
-        topPick: {
-          destino: "Kyoto",
-          pais: "Japão",
-          codigoPais: "JP",
-          descricao: "Antiga capital japonesa com mais de 1.600 templos budistas e jardins zen",
-          porque: "Imersão profunda na cultura tradicional japonesa com cerimônias do chá e gueixas",
-          destaque: "Visita ao templo Fushimi Inari com seus milhares de portões torii vermelho-laranja",
-          comentario: "Kyoto tem tanta história e tantos cheiros diferentes! Os templos são calmos e os jardins perfeitos para passear tranquilamente! 🐾🏮",
-          preco: { voo: Math.min(orcamento * 0.9, 3800), hotel: 270 }
-        },
-        alternativas: [
-          {
-            destino: "Istambul",
-            pais: "Turquia",
-            codigoPais: "TR",
-            porque: "Cidade que conecta Europa e Ásia com mesquitas impressionantes e bazaars históricos",
-            preco: { voo: Math.min(orcamento * 0.8, 3000), hotel: 180 }
-          },
-          {
-            destino: "Varanasi",
-            pais: "Índia",
-            codigoPais: "IN",
-            porque: "Uma das cidades mais antigas do mundo com cerimônias espirituais no rio Ganges",
-            preco: { voo: Math.min(orcamento * 0.85, 3200), hotel: 120 }
-          },
-          {
-            destino: "Marrakech",
-            pais: "Marrocos",
-            codigoPais: "MA",
-            porque: "Labirinto de medinas, souks coloridos e palácios ornamentados com influência berbere",
-            preco: { voo: Math.min(orcamento * 0.7, 2800), hotel: 150 }
-          },
-          {
-            destino: "Luang Prabang",
-            pais: "Laos",
-            codigoPais: "LA",
-            porque: "Cidade patrimônio mundial com templos dourados, monges budistas e atmosfera tranquila",
-            preco: { voo: Math.min(orcamento * 0.8, 3300), hotel: 130 }
-          }
-        ],
-        surpresa: {
-          destino: "Yazd",
-          pais: "Irã",
-          codigoPais: "IR",
-          descricao: "Cidade antiga no deserto com arquitetura zoroastriana e torres do vento",
-          porque: "Experiência cultural autêntica em uma das cidades mais bem preservadas do Oriente Médio",
-          destaque: "Visita ao Templo do Fogo de Zoroastro, onde uma chama arde continuamente há 1.500 anos",
-          comentario: "Yazd é uma descoberta incrível! Labirintos de ruas de barro, torres que capturam o vento e pessoas tão hospitaleiras que sempre me ofereciam água fresca! 🐾🕌",
-          preco: { voo: Math.min(orcamento * 0.8, 3100), hotel: 100 }
-        }
-      }
-    ],
-    3: [ // Urbano
-      {
-        topPick: {
-          destino: "Singapura",
-          pais: "Singapura",
-          codigoPais: "SG",
-          descricao: "Cidade-estado futurista com arquitetura inovadora e fusão cultural",
-          porque: "Experiência urbana completa com compras, gastronomia, vida noturna e atrações inovadoras",
-          destaque: "Visita noturna aos jardins Gardens by the Bay com show de luzes na floresta de super-árvores",
-          comentario: "Singapura é a cidade mais limpa que já visitei! Os jardins são incríveis para passear e tem tantos restaurantes com cheiros deliciosos! 🐾🌆",
-          preco: { voo: Math.min(orcamento * 0.85, 3500), hotel: 300 }
-        },
-        alternativas: [
-          {
-            destino: "Berlim",
-            pais: "Alemanha",
-            codigoPais: "DE",
-            porque: "Capital cultural europeia com história fascinante, arte de rua e vida noturna lendária",
-            preco: { voo: Math.min(orcamento * 0.8, 3000), hotel: 250 }
-          },
-          {
-            destino: "Melbourne",
-            pais: "Austrália",
-            codigoPais: "AU",
-            porque: "Capital cultural australiana com cena gastronômica vibrante e arte urbana",
-            preco: { voo: Math.min(orcamento * 0.9, 4000), hotel: 280 }
-          },
-          {
-            destino: "Cidade do México",
-            pais: "México",
-            codigoPais: "MX",
-            porque: "Megalópole com história milenar, museus de classe mundial e gastronomia premiada",
-            preco: { voo: Math.min(orcamento * 0.7, 2500), hotel: 220 }
-          },
-          {
-            destino: "Montreal",
-            pais: "Canadá",
-            codigoPais: "CA",
-            porque: "Cidade com charme europeu na América do Norte, rica em cultura e festivais",
-            preco: { voo: Math.min(orcamento * 0.75, 2700), hotel: 260 }
-          }
-        ],
-        surpresa: {
-          destino: "Tallinn",
-          pais: "Estônia",
-          codigoPais: "EE",
-          descricao: "Capital medieval com centro histórico perfeito e cultura digital avançada",
-          porque: "Mistura fascinante entre cidade medieval perfeitamente preservada e hub tecnológico inovador",
-          destaque: "Explorar o bairro Telliskivi Creative City com seus cafés hipsters e arte urbana",
-          comentario: "Tallinn parece um conto de fadas com tecnologia! Você pode passear nas ruas de pedra medievais e depois trabalhar em cafés super modernos! A comida é deliciosa! 🐾🏰",
-          preco: { voo: Math.min(orcamento * 0.8, 3200), hotel: 180 }
-        }
-      }
-    ]
-  };
-  
-  // Retornar o conjunto de dados apropriado baseado na região
-  switch (regiao) {
-    case 'sul_america':
-      return sulAmerica;
-    case 'norte_america':
-      return norteAmerica;
-    case 'europa':
-      return europa;
-    default:
-      return global;
-  }
-}
-
-// NOVA FUNÇÃO: Gerar destinos extras para complementar quando necessário
-function gerarDestinosExtras(regiao, orcamento) {
-  // Destinos extras com preços ajustáveis por região
-  const extrasGlobal = [
-    {
-      destino: "Lisboa",
-      pais: "Portugal",
-      codigoPais: "PT",
-      porque: "Capital portuguesa com charme histórico, preços acessíveis e ótima gastronomia",
-      preco: { voo: Math.min(orcamento * 0.7, 2800), hotel: 220 }
-    },
-    {
-      destino: "Bangkok",
-      pais: "Tailândia",
-      codigoPais: "TH",
-      porque: "Metrópole vibrante com cultura rica, templos dourados e comida de rua incrível",
-      preco: { voo: Math.min(orcamento * 0.8, 3200), hotel: 150 }
-    },
-    {
-      destino: "Cidade do Cabo",
-      pais: "África do Sul",
-      codigoPais: "ZA",
-      porque: "Combinação de cidade cosmopolita, praias deslumbrantes e safáris próximos",
-      preco: { voo: Math.min(orcamento * 0.85, 3600), hotel: 200 }
-    },
-    {
-      destino: "Vancouver",
-      pais: "Canadá",
-      codigoPais: "CA",
-      porque: "Cidade cercada por montanhas e oceano com qualidade de vida excepcional",
-      preco: { voo: Math.min(orcamento * 0.75, 2700), hotel: 280 }
-    },
-    {
-      destino: "Quioto",
-      pais: "Japão",
-      codigoPais: "JP",
-      porque: "Antiga capital japonesa com mais de 1.600 templos e tradições preservadas",
-      preco: { voo: Math.min(orcamento * 0.9, 3500), hotel: 250 }
-    },
-    {
+    surpresa: {
       destino: "Ljubljana",
       pais: "Eslovênia",
       codigoPais: "SI",
-      porque: "Capital europeia verde com castelo medieval e atmosfera de conto de fadas",
-      preco: { voo: Math.min(orcamento * 0.7, 2800), hotel: 190 }
+      descricao: "Capital europeia verde com castelo medieval e atmosfera de conto de fadas",
+      porque: "Cidade encantadora pouco explorada com natureza exuberante nas proximidades",
+      destaque: "Passeio pela Ponte dos Dragões e navegação no rio Ljubljanica",
+      comentario: "Ljubljana é um segredo da Europa! Ruas de pedestres, cafés à beira-rio e pessoas super amigáveis que sempre me ofereciam petiscos! Uma joia escondida! 🐾🏰",
+      pontosTuristicos: ["Castelo de Ljubljana", "Ponte dos Dragões", "Mercado Central", "Parque Tivoli"],
+      preco: {
+        voo: Math.round(orcamento * 0.78),
+        hotel: 180
+      }
     }
-  ];
+  };
   
-  // Extras específicos para América do Sul
-  const extrasSulAmerica = [
-    {
-      destino: "Olinda",
-      pais: "Brasil",
-      codigoPais: "BR",
-      porque: "Cidade histórica com casario colonial colorido e rica tradição cultural",
-      preco: { voo: Math.min(orcamento * 0.6, 900), hotel: 180 }
-    },
-    {
-      destino: "Bariloche",
-      pais: "Argentina",
-      codigoPais: "AR",
-      porque: "Cenário alpino na Patagônia com lagos, montanhas e chocolate artesanal",
-      preco: { voo: Math.min(orcamento * 0.7, 1400), hotel: 220 }
-    },
-    {
-      destino: "Cartagena",
-      pais: "Colômbia",
-      codigoPais: "CO",
-      porque: "Cidade colonial murada no Caribe com casas coloridas e atmosfera vibrante",
-      preco: { voo: Math.min(orcamento * 0.75, 1500), hotel: 210 }
-    },
-    {
-      destino: "Paraty",
-      pais: "Brasil",
-      codigoPais: "BR",
-      porque: "Vila colonial histórica entre a mata atlântica e o mar com ruas de pedra",
-      preco: { voo: Math.min(orcamento * 0.5, 800), hotel: 250 }
-    }
-  ];
+  // Ajustar o tema dos destinos conforme a preferência do viajante
+  if (tipoPreferencia === 1) { // Aventura 
+    dadosEmergencia.topPick = {
+      destino: "Queenstown",
+      pais: "Nova Zelândia",
+      codigoPais: "NZ",
+      descricao: "Capital mundial dos esportes de aventura com cenários naturais deslumbrantes",
+      porque: "Oferece a maior variedade de aventuras radicais em paisagens de tirar o fôlego",
+      destaque: "Bungee jumping original do mundo e passeios de jet boat pelo desfiladeiro",
+      comentario: "Queenstown é um paraíso para cachorros aventureiros! Trilhas sem fim, montanhas nevadas e pessoas super animadas! Melhor lugar para quem gosta de ar livre! 🐾🏔️",
+      pontosTuristicos: ["Coronet Peak", "Lake Wakatipu", "Shotover Canyon", "The Remarkables"],
+      preco: {
+        voo: Math.round(orcamento * 0.93),
+        hotel: 260
+      }
+    };
+    
+    // Ajustar algumas alternativas para aventura
+    dadosEmergencia.alternativas[1] = {
+      destino: "Interlaken",
+      pais: "Suíça",
+      codigoPais: "CH",
+      porque: "Centro de aventuras alpinas com parapente, canyoning e esqui em cenário espetacular",
+      pontoTuristico: "Jungfrau, Lagos Thun e Brienz, trilha Hardergrat",
+      preco: {
+        voo: Math.round(orcamento * 0.85),
+        hotel: 290
+      }
+    };
+  }
+  else if (tipoPreferencia === 0) { // Relaxamento
+    dadosEmergencia.topPick = {
+      destino: "Maldivas",
+      pais: "Maldivas",
+      codigoPais: "MV",
+      descricao: "Arquipélago paradisíaco com águas cristalinas e bangalôs sobre a água",
+      porque: "Refúgio perfeito para relaxamento completo em praias imaculadas e resorts exclusivos",
+      destaque: "Snorkeling com raias e tubarões-baleia em águas turquesa transparentes",
+      comentario: "Maldivas é o paraíso na Terra! A água mais azul que já vi e areia tão branca que parece neve! Posso correr pela praia o dia inteiro! 🐾🏝️",
+      pontosTuristicos: ["Atolão Malé Norte", "Ilha Maafushi", "Recife de Banana", "Spa sobre a água"],
+      preco: {
+        voo: Math.round(orcamento * 0.92),
+        hotel: 550
+      }
+    };
+  }
   
-  // Selecionar o conjunto apropriado baseado na região
-  const extrasRegionais = regiao === 'sul_america' ? extrasSulAmerica : extrasGlobal;
-  
-  // Embaralhar para diversidade
-  return embaralharArray([...extrasRegionais]);
+  return dadosEmergencia;
 }
 
-// Função auxiliar para embaralhar arrays (útil para reordenar destinos)
+// Simplificar o embaralhamento de arrays para diversidade
 function embaralharArray(array) {
-  let currentIndex = array.length;
-  let randomIndex;
-
-  // Enquanto existirem elementos a serem embaralhados
-  while (currentIndex != 0) {
-    // Escolher um elemento restante
-    randomIndex = Math.floor(Math.random() * currentIndex);
-    currentIndex--;
-
-    // E trocar com o elemento atual
-    [array[currentIndex], array[randomIndex]] = [array[randomIndex], array[currentIndex]];
+  for (let i = array.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [array[i], array[j]] = [array[j], array[i]];
   }
-
   return array;
 }
