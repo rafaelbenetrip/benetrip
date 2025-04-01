@@ -106,14 +106,21 @@ module.exports = async function handler(req, res) {
         try {
           console.log('Chamando API Perplexity...');
           const response = await callPerplexityAPI(prompt, requestData);
-          if (response && isValidDestinationJSON(response, requestData)) {
+          
+          // NOVA FUNCIONALIDADE: Pós-processamento para garantir pontos turísticos e comentários
+          let processedResponse = response;
+          if (response && isPartiallyValidJSON(response)) {
+            processedResponse = ensureTouristAttractionsAndComments(response, requestData);
+          }
+          
+          if (processedResponse && isValidDestinationJSON(processedResponse, requestData)) {
             console.log('Resposta Perplexity válida recebida');
             if (!isResponseSent) {
               isResponseSent = true;
               clearTimeout(serverTimeout);
               return res.status(200).json({
                 tipo: "perplexity",
-                conteudo: response,
+                conteudo: processedResponse,
                 tentativa: tentativas
               });
             }
@@ -131,14 +138,21 @@ module.exports = async function handler(req, res) {
         try {
           console.log('Chamando API OpenAI...');
           const response = await callOpenAIAPI(prompt, requestData);
-          if (response && isValidDestinationJSON(response, requestData)) {
+          
+          // NOVA FUNCIONALIDADE: Pós-processamento para garantir pontos turísticos e comentários
+          let processedResponse = response;
+          if (response && isPartiallyValidJSON(response)) {
+            processedResponse = ensureTouristAttractionsAndComments(response, requestData);
+          }
+          
+          if (processedResponse && isValidDestinationJSON(processedResponse, requestData)) {
             console.log('Resposta OpenAI válida recebida');
             if (!isResponseSent) {
               isResponseSent = true;
               clearTimeout(serverTimeout);
               return res.status(200).json({
                 tipo: "openai",
-                conteudo: response,
+                conteudo: processedResponse,
                 tentativa: tentativas
               });
             }
@@ -156,14 +170,21 @@ module.exports = async function handler(req, res) {
         try {
           console.log('Chamando API Claude...');
           const response = await callClaudeAPI(prompt, requestData);
-          if (response && isValidDestinationJSON(response, requestData)) {
+          
+          // NOVA FUNCIONALIDADE: Pós-processamento para garantir pontos turísticos e comentários
+          let processedResponse = response;
+          if (response && isPartiallyValidJSON(response)) {
+            processedResponse = ensureTouristAttractionsAndComments(response, requestData);
+          }
+          
+          if (processedResponse && isValidDestinationJSON(processedResponse, requestData)) {
             console.log('Resposta Claude válida recebida');
             if (!isResponseSent) {
               isResponseSent = true;
               clearTimeout(serverTimeout);
               return res.status(200).json({
                 tipo: "claude",
-                conteudo: response,
+                conteudo: processedResponse,
                 tentativa: tentativas
               });
             }
@@ -178,7 +199,7 @@ module.exports = async function handler(req, res) {
       
       // Se chegamos aqui, todas as tentativas falharam nesta iteração
       // Vamos modificar o prompt para a próxima tentativa para incentivar mais criatividade
-      prompt = `${prompt}\n\nURGENTE: O ORÇAMENTO MÁXIMO para voos (${requestData.orcamento_valor || 'informado'} ${requestData.moeda_escolhida || 'BRL'}) precisa ser RIGOROSAMENTE RESPEITADO. TODOS os destinos devem ter voos COM VALOR ABAIXO desse orçamento. Forneça um mix de destinos populares e alternativos, todos com preços realistas e acessíveis. Inclua PONTOS TURÍSTICOS ESPECÍFICOS e DETALHADOS para cada destino.`;
+      prompt = `${prompt}\n\nURGENTE: O ORÇAMENTO MÁXIMO para voos (${requestData.orcamento_valor || 'informado'} ${requestData.moeda_escolhida || 'BRL'}) precisa ser RIGOROSAMENTE RESPEITADO. TODOS os destinos devem ter voos COM VALOR ABAIXO desse orçamento. Forneça um mix de destinos populares e alternativos, todos com preços realistas e acessíveis. Inclua PONTOS TURÍSTICOS ESPECÍFICOS e DETALHADOS para cada destino. COMENTÁRIOS DA TRIPINHA DEVEM mencionar pelo menos UM PONTO TURÍSTICO ESPECÍFICO de forma natural e entusiasmada.`;
     }
     
     // Se todas as tentativas falharam, criar uma resposta de emergência
@@ -227,6 +248,17 @@ module.exports = async function handler(req, res) {
   }
 }
 
+// NOVA FUNÇÃO: Validação parcial para verificação rápida
+function isPartiallyValidJSON(jsonString) {
+  if (!jsonString) return false;
+  
+  try {
+    const data = typeof jsonString === 'string' ? JSON.parse(jsonString) : jsonString;
+    return data && (data.topPick || data.alternativas || data.surpresa);
+  } catch (error) {
+    return false;
+  }
+}
 // Chamar a API da Perplexity com melhor tratamento de erros
 async function callPerplexityAPI(prompt, requestData) {
   try {
@@ -242,13 +274,14 @@ async function callPerplexityAPI(prompt, requestData) {
     const orcamentoMessage = requestData.orcamento_valor ? 
       `\n\n⚠️ ORÇAMENTO MÁXIMO: ${requestData.orcamento_valor} ${requestData.moeda_escolhida || 'BRL'} para voos (ida e volta por pessoa). Todos os destinos DEVEM ter preços de voo ABAIXO deste valor. Este é o requisito MAIS IMPORTANTE.` : '';
     
-    // Construir instruções claras para não usar formatação markdown e incluir pontos turísticos
+    // NOVA INSTRUÇÃO: Destaque explícito sobre comentários da Tripinha com pontos turísticos
     const enhancedPrompt = `${prompt}${orcamentoMessage}\n\nIMPORTANTE: 
     1. Cada voo DEVE respeitar rigorosamente o orçamento máximo indicado.
     2. Retorne APENAS o JSON puro, sem marcação markdown ou comentários.
     3. Forneça EXATAMENTE 4 destinos alternativos totalmente diferentes entre si.
     4. Garanta preços realistas e acessíveis para todas as recomendações.
-    5. Inclua PONTOS TURÍSTICOS ESPECÍFICOS para cada destino - 2 para o destino principal e destino surpresa, 1 para cada alternativa.`;
+    5. Inclua PONTOS TURÍSTICOS ESPECÍFICOS para cada destino - 2 para o destino principal e destino surpresa, 1 para cada alternativa.
+    6. Os comentários da Tripinha DEVEM mencionar de forma natural e entusiasmada PELO MENOS UM dos pontos turísticos mencionados. Exemplo: "Paris tem a Torre Eiffel mais linda que já vi! Adorei correr pelas Tulherias e farejar todas aquelas flores!"`;
     const response = await axios({
       method: 'post',
       url: 'https://api.perplexity.ai/chat/completions',
@@ -261,7 +294,7 @@ async function callPerplexityAPI(prompt, requestData) {
         messages: [
           {
             role: 'system',
-            content: 'Você é um especialista em viagens focado em fornecer recomendações personalizadas globais para vários orçamentos. Sua prioridade #1 é NUNCA exceder o orçamento máximo indicado para passagens aéreas. Forneça um mix balanceado de destinos populares e alternativos, adequados ao perfil do viajante. Para cada destino, forneça pontos turísticos específicos e conhecidos (não genéricos). Retorne APENAS JSON puro. SEMPRE forneça EXATAMENTE 4 destinos alternativos.'
+            content: 'Você é um especialista em viagens focado em fornecer recomendações personalizadas globais para vários orçamentos. Sua prioridade #1 é NUNCA exceder o orçamento máximo indicado para passagens aéreas. Forneça um mix balanceado de destinos populares e alternativos, adequados ao perfil do viajante. Para cada destino, forneça pontos turísticos específicos e conhecidos (não genéricos). Os comentários da Tripinha (cachorra mascote) devem mencionar pelo menos um ponto turístico específico de forma entusiasmada e natural. Retorne APENAS JSON puro. SEMPRE forneça EXATAMENTE 4 destinos alternativos.'
           },
           {
             role: 'user',
@@ -331,13 +364,14 @@ async function callOpenAIAPI(prompt, requestData) {
     const orcamentoMessage = requestData.orcamento_valor ? 
       `\n\n⚠️ ORÇAMENTO MÁXIMO: ${requestData.orcamento_valor} ${requestData.moeda_escolhida || 'BRL'} para voos (ida e volta por pessoa). Todos os destinos DEVEM ter preços de voo ABAIXO deste valor. Este é o requisito MAIS IMPORTANTE.` : '';
     
-    // Modificar o prompt para pedir explicitamente resposta em JSON e pontos turísticos específicos
+    // NOVA INSTRUÇÃO: Destaque explícito sobre comentários da Tripinha com pontos turísticos
     const enhancedPrompt = `${prompt}${orcamentoMessage}\n\nIMPORTANTE: 
     1. Cada voo DEVE respeitar rigorosamente o orçamento máximo indicado.
     2. Sua resposta deve ser exclusivamente um objeto JSON válido sem formatação markdown. 
     3. Forneça EXATAMENTE 4 destinos alternativos totalmente diferentes entre si.
     4. Garanta preços realistas e acessíveis para todas as recomendações.
-    5. Inclua PONTOS TURÍSTICOS ESPECÍFICOS para cada destino - 2 para o principal e surpresa, 1 para cada alternativa.`;
+    5. Inclua PONTOS TURÍSTICOS ESPECÍFICOS para cada destino - 2 para o principal e surpresa, 1 para cada alternativa.
+    6. Os comentários da Tripinha DEVEM mencionar de forma natural e entusiasmada PELO MENOS UM dos pontos turísticos mencionados. Exemplo: "Lisboa tem a melhor Torre de Belém! Adorei correr por Alfama e farejar todos aqueles cafés!"`;
     
     const response = await axios({
       method: 'post',
@@ -351,7 +385,7 @@ async function callOpenAIAPI(prompt, requestData) {
         messages: [
           {
             role: "system",
-            content: "Você é um especialista em viagens focado em fornecer recomendações personalizadas globais para vários orçamentos. Sua prioridade #1 é NUNCA exceder o orçamento máximo indicado para passagens aéreas. Forneça um mix balanceado de destinos populares e alternativos, adequados ao perfil do viajante. Para cada destino, forneça pontos turísticos específicos e conhecidos (não genéricos). Retorne APENAS JSON puro. SEMPRE forneça EXATAMENTE 4 destinos alternativos."
+            content: "Você é um especialista em viagens focado em fornecer recomendações personalizadas globais para vários orçamentos. Sua prioridade #1 é NUNCA exceder o orçamento máximo indicado para passagens aéreas. Forneça um mix balanceado de destinos populares e alternativos, adequados ao perfil do viajante. Para cada destino, forneça pontos turísticos específicos e conhecidos (não genéricos). Os comentários da Tripinha (cachorra mascote) devem mencionar pelo menos um ponto turístico específico de forma entusiasmada e natural. Retorne APENAS JSON puro. SEMPRE forneça EXATAMENTE 4 destinos alternativos."
           },
           {
             role: "user",
@@ -403,13 +437,14 @@ async function callClaudeAPI(prompt, requestData) {
     const orcamentoMessage = requestData.orcamento_valor ? 
       `\n\n⚠️ ORÇAMENTO MÁXIMO: ${requestData.orcamento_valor} ${requestData.moeda_escolhida || 'BRL'} para voos (ida e volta por pessoa). Todos os destinos DEVEM ter preços de voo ABAIXO deste valor. Este é o requisito MAIS IMPORTANTE.` : '';
     
-    // Adicionar instrução específica para o Claude retornar apenas JSON e pontos turísticos
+    // NOVA INSTRUÇÃO: Destaque explícito sobre comentários da Tripinha com pontos turísticos
     const enhancedPrompt = `${prompt}${orcamentoMessage}\n\nIMPORTANTE: 
     1. Cada voo DEVE respeitar rigorosamente o orçamento máximo indicado.
     2. Sua resposta deve ser APENAS o objeto JSON válido, sem NENHUM texto adicional.
     3. Forneça EXATAMENTE 4 destinos alternativos totalmente diferentes entre si.
     4. Garanta preços realistas e acessíveis para todas as recomendações.
-    5. Inclua PONTOS TURÍSTICOS ESPECÍFICOS para cada destino - 2 para o principal e surpresa, 1 para cada alternativa.`;
+    5. Inclua PONTOS TURÍSTICOS ESPECÍFICOS para cada destino - 2 para o principal e surpresa, 1 para cada alternativa.
+    6. Os comentários da Tripinha DEVEM mencionar de forma natural e entusiasmada PELO MENOS UM dos pontos turísticos mencionados. Exemplo: "Veneza tem os canais mais bonitos que já vi! Adorei passear perto da Ponte Rialto e farejar os aromas das gôndolas!"`;
     const response = await axios({
       method: 'post',
       url: 'https://api.anthropic.com/v1/messages',
@@ -424,7 +459,7 @@ async function callClaudeAPI(prompt, requestData) {
         messages: [
           {
             role: "system",
-            content: "Você é um especialista em viagens focado em fornecer recomendações personalizadas globais para vários orçamentos. Sua prioridade #1 é NUNCA exceder o orçamento máximo indicado para passagens aéreas. Forneça um mix balanceado de destinos populares e alternativos, adequados ao perfil do viajante. Para cada destino, forneça pontos turísticos específicos e conhecidos (não genéricos). Retorne APENAS JSON puro. SEMPRE forneça EXATAMENTE 4 destinos alternativos."
+            content: "Você é um especialista em viagens focado em fornecer recomendações personalizadas globais para vários orçamentos. Sua prioridade #1 é NUNCA exceder o orçamento máximo indicado para passagens aéreas. Forneça um mix balanceado de destinos populares e alternativos, adequados ao perfil do viajante. Para cada destino, forneça pontos turísticos específicos e conhecidos (não genéricos). Os comentários da Tripinha (cachorra mascote) devem mencionar pelo menos um ponto turístico específico de forma entusiasmada e natural. Retorne APENAS JSON puro. SEMPRE forneça EXATAMENTE 4 destinos alternativos."
           },
           {
             role: "user",
@@ -459,7 +494,6 @@ async function callClaudeAPI(prompt, requestData) {
     throw error;
   }
 }
-
 // Função aprimorada para extrair JSON válido de uma string de texto
 function extrairJSONDaResposta(texto) {
   try {
@@ -522,7 +556,7 @@ function extrairJSONDaResposta(texto) {
   }
 }
 
-// Função otimizada de validação para responder mais rapidamente
+// Função otimizada de validação com NOVA LÓGICA para verificar pontos turísticos e comentários
 function isValidDestinationJSON(jsonString, requestData) {
   if (!jsonString) return false;
   
@@ -552,12 +586,41 @@ function isValidDestinationJSON(jsonString, requestData) {
       return false;
     }
     
-    // Verificar se as alternativas têm pelo menos um ponto turístico cada
+    // NOVA VERIFICAÇÃO: Verificar se as alternativas têm pelo menos um ponto turístico cada
     for (let i = 0; i < data.alternativas.length; i++) {
       if (!data.alternativas[i].pontoTuristico) {
         console.log(`JSON inválido: alternativa ${i+1} não tem ponto turístico`);
         return false;
       }
+    }
+    
+    // NOVA VERIFICAÇÃO: Verificar se os comentários da Tripinha mencionam pelo menos um ponto turístico
+    if (data.topPick.comentario) {
+      const includesAnyTopPickAttraction = data.topPick.pontosTuristicos.some(attraction => 
+        data.topPick.comentario.toLowerCase().includes(attraction.toLowerCase())
+      );
+      
+      if (!includesAnyTopPickAttraction) {
+        console.log("JSON inválido: comentário da Tripinha no topPick não menciona nenhum ponto turístico");
+        return false;
+      }
+    } else {
+      console.log("JSON inválido: topPick não tem comentário da Tripinha");
+      return false;
+    }
+    
+    if (data.surpresa.comentario) {
+      const includesAnySurpriseAttraction = data.surpresa.pontosTuristicos.some(attraction => 
+        data.surpresa.comentario.toLowerCase().includes(attraction.toLowerCase())
+      );
+      
+      if (!includesAnySurpriseAttraction) {
+        console.log("JSON inválido: comentário da Tripinha na surpresa não menciona nenhum ponto turístico");
+        return false;
+      }
+    } else {
+      console.log("JSON inválido: surpresa não tem comentário da Tripinha");
+      return false;
     }
     
     // Verificação rápida de orçamento apenas se disponível
@@ -591,6 +654,191 @@ function isValidDestinationJSON(jsonString, requestData) {
   }
 }
 
+// NOVA FUNÇÃO: Enriquecer comentários da Tripinha para garantir menção de pontos turísticos
+function enriquecerComentarioTripinha(comentario, pontosTuristicos) {
+  if (!comentario || !pontosTuristicos || !Array.isArray(pontosTuristicos) || pontosTuristicos.length === 0) {
+    return null;
+  }
+  
+  // Verificar se já menciona algum ponto turístico
+  const mencionaAtual = pontosTuristicos.some(ponto => 
+    comentario.toLowerCase().includes(ponto.toLowerCase())
+  );
+  
+  // Se já menciona um ponto turístico, retornar o comentário original
+  if (mencionaAtual) {
+    return comentario;
+  }
+  
+  // Escolher o primeiro ponto turístico para mencionar
+  const pontoParaMencionar = pontosTuristicos[0];
+  
+  // Padrões de comentários para inserção natural
+  const padroes = [
+    `${comentario} Adorei especialmente ${pontoParaMencionar}! 🐾`,
+    `${comentario.replace(/🐾.*$/, '')} Fiquei impressionada com ${pontoParaMencionar}! 🐾`,
+    comentario.includes('!') 
+      ? comentario.replace(/!([^!]*)$/, `! ${pontoParaMencionar} é incrível!$1`)
+      : `${comentario} ${pontoParaMencionar} é um lugar que todo cachorro devia visitar! 🐾`,
+  ];
+  
+  // Escolher um padrão aleatoriamente
+  const indice = Math.floor(Math.random() * padroes.length);
+  return padroes[indice];
+}
+
+// NOVA FUNÇÃO: Banco de dados compacto de pontos turísticos para destinos populares
+const pontosPopulares = {
+  // Destinos globais populares
+  "Paris": ["Torre Eiffel", "Museu do Louvre", "Catedral Notre-Dame", "Arco do Triunfo", "Jardins de Luxemburgo"],
+  "Londres": ["Big Ben", "Palácio de Buckingham", "London Eye", "Torre de Londres", "Museu Britânico"],
+  "Roma": ["Coliseu", "Fontana di Trevi", "Vaticano", "Panteão", "Fórum Romano"],
+  "Nova York": ["Estátua da Liberdade", "Central Park", "Times Square", "Empire State Building", "Brooklyn Bridge"],
+  "Tóquio": ["Torre de Tóquio", "Santuário Meiji", "Shibuya Crossing", "Palácio Imperial", "Templo Senso-ji"],
+  "Barcelona": ["Sagrada Família", "Parque Güell", "Las Ramblas", "Casa Batlló", "Bairro Gótico"],
+  
+  // Destinos brasileiros
+  "Rio de Janeiro": ["Cristo Redentor", "Pão de Açúcar", "Praia de Copacabana", "Jardim Botânico", "Escadaria Selarón"],
+  "São Paulo": ["Avenida Paulista", "MASP", "Parque Ibirapuera", "Mercado Municipal", "Pinacoteca"],
+  "Fernando de Noronha": ["Praia do Sancho", "Baía dos Porcos", "Praia do Leão", "Morro Dois Irmãos", "Forte Nossa Senhora dos Remédios"],
+  "Salvador": ["Pelourinho", "Elevador Lacerda", "Igreja do Bonfim", "Farol da Barra", "Mercado Modelo"],
+  "Foz do Iguaçu": ["Cataratas do Iguaçu", "Parque das Aves", "Itaipu Binacional", "Marco das Três Fronteiras", "Templo Budista"],
+  
+  // Genéricos por país (para quando só temos país)
+  "generico_Brasil": ["Praias paradisíacas", "Floresta Amazônica", "Parques nacionais", "Cachoeiras exuberantes", "Reservas naturais"],
+  "generico_Portugal": ["Mosteiro dos Jerónimos", "Torre de Belém", "Castelo de São Jorge", "Oceanário de Lisboa", "Palácio da Pena"],
+  "generico_Itália": ["Museus históricos", "Praças renascentistas", "Catedrais antigas", "Vinícolas tradicionais", "Vilas medievais"],
+  "generico_França": ["Castelos históricos", "Vinhedos tradicionais", "Catedrais góticas", "Cafés parisienses", "Museus de arte"]
+};
+
+// NOVA FUNÇÃO: Pós-processamento para garantir pontos turísticos e comentários adequados
+function ensureTouristAttractionsAndComments(jsonString, requestData) {
+  try {
+    // Converter para objeto se for string
+    const data = typeof jsonString === 'string' ? JSON.parse(jsonString) : jsonString;
+    let modificado = false;
+    
+    // Tratar destino principal
+    if (data.topPick) {
+      // Verificar e adicionar pontos turísticos se necessário
+      if (!data.topPick.pontosTuristicos || !Array.isArray(data.topPick.pontosTuristicos) || data.topPick.pontosTuristicos.length < 2) {
+        const destino = data.topPick.destino;
+        const pontosConhecidos = pontosPopulares[destino] || pontosPopulares[`generico_${data.topPick.pais}`] || ["Principais atrativos da cidade", "Pontos históricos"];
+        
+        // Assegurar que temos pelo menos 2 pontos turísticos
+        data.topPick.pontosTuristicos = [
+          pontosConhecidos[0] || "Principais atrativos da cidade",
+          pontosConhecidos[1] || "Pontos históricos"
+        ];
+        modificado = true;
+      }
+      
+      // Verificar e melhorar comentário da Tripinha
+      if (data.topPick.comentario) {
+        const novoComentario = enriquecerComentarioTripinha(data.topPick.comentario, data.topPick.pontosTuristicos);
+        if (novoComentario && novoComentario !== data.topPick.comentario) {
+          data.topPick.comentario = novoComentario;
+          modificado = true;
+        }
+      } else {
+        // Criar comentário se não existir
+        const pontoTuristico = data.topPick.pontosTuristicos[0] || "esse lugar incrível";
+        data.topPick.comentario = `${data.topPick.destino} é um sonho! Adorei passear por ${pontoTuristico} e sentir todos aqueles cheiros novos! Uma aventura incrível para qualquer cachorro explorador! 🐾`;
+        modificado = true;
+      }
+    }
+    
+    // Tratar destino surpresa
+    if (data.surpresa) {
+      // Verificar e adicionar pontos turísticos se necessário
+      if (!data.surpresa.pontosTuristicos || !Array.isArray(data.surpresa.pontosTuristicos) || data.surpresa.pontosTuristicos.length < 2) {
+        const destino = data.surpresa.destino;
+        const pontosConhecidos = pontosPopulares[destino] || pontosPopulares[`generico_${data.surpresa.pais}`] || ["Locais exclusivos", "Atrativos menos conhecidos"];
+        
+        // Assegurar que temos pelo menos 2 pontos turísticos
+        data.surpresa.pontosTuristicos = [
+          pontosConhecidos[0] || "Locais exclusivos",
+          pontosConhecidos[1] || "Atrativos menos conhecidos"
+        ];
+        modificado = true;
+      }
+      
+      // Verificar e melhorar comentário da Tripinha
+      if (data.surpresa.comentario) {
+        const novoComentario = enriquecerComentarioTripinha(data.surpresa.comentario, data.surpresa.pontosTuristicos);
+        if (novoComentario && novoComentario !== data.surpresa.comentario) {
+          data.surpresa.comentario = novoComentario;
+          modificado = true;
+        }
+      } else {
+        // Criar comentário se não existir
+        const pontoTuristico = data.surpresa.pontosTuristicos[0] || "esse lugar secreto";
+        data.surpresa.comentario = `${data.surpresa.destino} é uma descoberta incrível! Poucos conhecem ${pontoTuristico}, mas é um paraíso para cachorros curiosos como eu! Tantos aromas novos para farejar! 🐾🌟`;
+        modificado = true;
+      }
+    }
+    
+    // Tratar destinos alternativos
+    if (data.alternativas && Array.isArray(data.alternativas)) {
+      for (let i = 0; i < data.alternativas.length; i++) {
+        const alternativa = data.alternativas[i];
+        if (!alternativa.pontoTuristico) {
+          const destino = alternativa.destino;
+          const pontosConhecidos = pontosPopulares[destino] || pontosPopulares[`generico_${alternativa.pais}`] || ["Atrações turísticas"];
+          
+          // Adicionar um ponto turístico
+          alternativa.pontoTuristico = pontosConhecidos[0] || "Atrações turísticas";
+          modificado = true;
+        }
+      }
+    }
+    
+    // Se faltarem exatamente 4 alternativas, completar
+    if (!data.alternativas || !Array.isArray(data.alternativas)) {
+      data.alternativas = [];
+      modificado = true;
+    }
+    
+    while (data.alternativas.length < 4) {
+      // Criar destinos alternativos extras
+      const destinos = ["Lisboa", "Barcelona", "Roma", "Tóquio"];
+      const paisesDestinos = ["Portugal", "Espanha", "Itália", "Japão"];
+      const codigosPaises = ["PT", "ES", "IT", "JP"];
+      
+      const index = data.alternativas.length % destinos.length;
+      const destino = destinos[index];
+      const pontosConhecidos = pontosPopulares[destino] || ["Atrações turísticas"];
+      
+      const precoBase = requestData?.orcamento_valor ? Math.round(parseFloat(requestData.orcamento_valor) * 0.7) : 2000;
+      
+      data.alternativas.push({
+        destino: destino,
+        pais: paisesDestinos[index],
+        codigoPais: codigosPaises[index],
+        porque: `Cidade com rica história, gastronomia única e atmosfera encantadora`,
+        pontoTuristico: pontosConhecidos[0] || "Atrações turísticas",
+        preco: {
+          voo: precoBase - (index * 100),
+          hotel: 200 + (index * 20)
+        }
+      });
+      
+      modificado = true;
+    }
+    
+    // Limitar a exatamente 4 alternativas
+    if (data.alternativas.length > 4) {
+      data.alternativas = data.alternativas.slice(0, 4);
+      modificado = true;
+    }
+    
+    return modificado ? JSON.stringify(data) : jsonString;
+    
+  } catch (error) {
+    console.error("Erro ao processar pontos turísticos:", error);
+    return jsonString; // Retornar original em caso de erro
+  }
+}
 // Função para gerar prompt adequado para a IA
 function gerarPromptParaDestinos(dados) {
   // Extrair informações relevantes dos dados recebidos, com verificações
@@ -672,7 +920,7 @@ function gerarPromptParaDestinos(dados) {
   // Adicionar sugestão de localidade baseada na origem
   const sugestaoDistancia = gerarSugestaoDistancia(cidadeOrigem, tipoDestino);
 
-  // Construir prompt detalhado e personalizado (MODIFICADO para incluir pontos turísticos)
+  // Construir prompt detalhado e personalizado (MODIFICADO para incluir pontos turísticos e comentários)
   return `Crie recomendações de viagem que respeitam ESTRITAMENTE o orçamento do usuário:
 
 ${mensagemOrcamento}
@@ -699,6 +947,7 @@ IMPORTANTE:
 8. Para cada destino, INCLUA PONTOS TURÍSTICOS ESPECÍFICOS E CONHECIDOS - não genéricos:
    - Principal e Surpresa: 2 pontos turísticos específicos para cada
    - Alternativas: 1 ponto turístico específico para cada
+9. Os comentários da Tripinha (que é uma cachorra mascote) DEVEM mencionar pelo menos um dos pontos turísticos do destino de forma natural e entusiasmada. Exemplo: "Paris tem a Torre Eiffel mais linda que já vi! Adorei passear pelos Jardins de Luxemburgo e farejar tantas flores novas! 🐾"
 
 Forneça no formato JSON exato abaixo, SEM formatação markdown:
 {
@@ -709,7 +958,7 @@ Forneça no formato JSON exato abaixo, SEM formatação markdown:
     "descricao": "Breve descrição do destino",
     "porque": "Razão específica para visitar baseada nas preferências",
     "destaque": "Uma experiência única neste destino",
-    "comentario": "Comentário entusiasmado da Tripinha (cachorra)",
+    "comentario": "Comentário entusiasmado da Tripinha (cachorra) mencionando pelo menos um ponto turístico específico",
     "pontosTuristicos": [
       "Nome do Primeiro Ponto Turístico específico e conhecido na cidade", 
       "Nome do Segundo Ponto Turístico específico e conhecido na cidade"
@@ -772,7 +1021,7 @@ Forneça no formato JSON exato abaixo, SEM formatação markdown:
     "descricao": "Breve descrição do destino",
     "porque": "Razão para visitar, destacando o fator surpresa",
     "destaque": "Uma experiência única neste destino",
-    "comentario": "Comentário entusiasmado da Tripinha",
+    "comentario": "Comentário entusiasmado da Tripinha mencionando pelo menos um ponto turístico específico",
     "pontosTuristicos": [
       "Nome do Primeiro Ponto Turístico específico e conhecido na cidade", 
       "Nome do Segundo Ponto Turístico específico e conhecido na cidade"
@@ -899,8 +1148,7 @@ function getFamaDestinoText(value) {
   };
   return options[value] || "qualquer";
 }
-
-// Função para gerar dados de emergência personalizados baseados no perfil
+// Função para gerar dados de emergência personalizados baseados no perfil - ATUALIZADA PARA PONTOS TURÍSTICOS
 function generateEmergencyData(dadosUsuario = {}) {
   // Determinar o tipo de destino baseado nas preferências
   const preferencia = dadosUsuario.preferencia_viagem || 0;
@@ -973,6 +1221,33 @@ function generateEmergencyData(dadosUsuario = {}) {
     }
   }
   
+  // NOVA FUNCIONALIDADE: Garantir que os comentários da Tripinha mencionem pontos turísticos
+  // Verifica se o comentário do topPick menciona algum ponto turístico
+  if (resultado.topPick && resultado.topPick.pontosTuristicos && resultado.topPick.comentario) {
+    const incluiAtracaoTopPick = resultado.topPick.pontosTuristicos.some(
+      atracao => resultado.topPick.comentario.toLowerCase().includes(atracao.toLowerCase())
+    );
+    
+    if (!incluiAtracaoTopPick) {
+      resultado.topPick.comentario = enriquecerComentarioTripinha(
+        resultado.topPick.comentario, resultado.topPick.pontosTuristicos
+      );
+    }
+  }
+  
+  // Verifica se o comentário da surpresa menciona algum ponto turístico
+  if (resultado.surpresa && resultado.surpresa.pontosTuristicos && resultado.surpresa.comentario) {
+    const incluiAtracaoSurpresa = resultado.surpresa.pontosTuristicos.some(
+      atracao => resultado.surpresa.comentario.toLowerCase().includes(atracao.toLowerCase())
+    );
+    
+    if (!incluiAtracaoSurpresa) {
+      resultado.surpresa.comentario = enriquecerComentarioTripinha(
+        resultado.surpresa.comentario, resultado.surpresa.pontosTuristicos
+      );
+    }
+  }
+  
   return resultado;
 }
 
@@ -1021,7 +1296,7 @@ function gerarDestinosPorRegiao(regiao, preferencia, orcamento) {
           descricao: "Arquipélago paradisíaco com praias intocadas e vida marinha exuberante",
           porque: "Praias de águas cristalinas perfeitas para relaxamento e contato com a natureza preservada",
           destaque: "Mergulho com golfinhos na Baía dos Golfinhos e pôr do sol na Baía do Sancho",
-          comentario: "Au au! Noronha tem praias perfeitas para cavar na areia e tomar banho de mar! A água é tão clarinha que dá para ver os peixinhos nadando! 🐾🌊",
+          comentario: "Au au! Noronha tem praias perfeitas para cavar na areia e tomar banho de mar! A Praia do Sancho é tão clarinha que dá para ver os peixinhos nadando! 🐾🌊",
           pontosTuristicos: ["Praia do Sancho", "Baía dos Porcos"],
           preco: { voo: Math.min(orcamento * 0.85, 1800), hotel: 450 }
         },
@@ -1066,7 +1341,7 @@ function gerarDestinosPorRegiao(regiao, preferencia, orcamento) {
           descricao: "Paraíso escondido no Caribe colombiano com águas cristalinas e poucos turistas",
           porque: "Destino isolado e autêntico longe das multidões com recifes de coral preservados",
           destaque: "Snorkeling em Crab Cay com visibilidade de mais de 30 metros",
-          comentario: "Providencia é um segredo que poucos conhecem! Praias intocadas e um mar tão azul que nem parece real! Fiquei impressionada com tantos cheirinhos diferentes! 🐾🏝️",
+          comentario: "Providencia é um segredo que poucos conhecem! Praias intocadas e Crab Cay tem um mar tão azul que nem parece real! Fiquei impressionada com tantos cheirinhos diferentes! 🐾🏝️",
           pontosTuristicos: ["Crab Cay", "Praia de Manzanillo"],
           preco: { voo: Math.min(orcamento * 0.9, 2000), hotel: 210 }
         }
@@ -1081,7 +1356,7 @@ function gerarDestinosPorRegiao(regiao, preferencia, orcamento) {
           descricao: "Parque Nacional com cânions, cachoeiras e formações rochosas milenares",
           porque: "Combinação perfeita de trilhas desafiadoras e cachoeiras espetaculares para banhos refrescantes",
           destaque: "Trilha das 7 quedas d'água com banho nas piscinas naturais de água cristalina",
-          comentario: "Chapada tem TANTAS trilhas incríveis para explorar e cachoeiras para mergulhar! Andei tanto que minhas patinhas ficaram cansadas, mas valeu cada passo! 🐾🌄",
+          comentario: "Chapada tem TANTAS trilhas incríveis para explorar e a Cachoeira Santa Bárbara é perfeita para mergulhar! Andei tanto que minhas patinhas ficaram cansadas, mas valeu cada passo! 🐾🌄",
           pontosTuristicos: ["Cachoeira Santa Bárbara", "Vale da Lua"],
           preco: { voo: Math.min(orcamento * 0.5, 800), hotel: 180 }
         },
@@ -1126,13 +1401,73 @@ function gerarDestinosPorRegiao(regiao, preferencia, orcamento) {
           descricao: "Maior deserto de sal do mundo com paisagens surreais e reflexos perfeitos",
           porque: "Experiência de aventura única em um dos cenários mais fotogênicos do planeta",
           destaque: "Tour de 3 dias visitando lagoas coloridas, gêiseres e formações rochosas",
-          comentario: "Uyuni parece outro planeta! Quando o sal reflete o céu é impossível saber onde termina um e começa o outro! Nunca vi nada igual! 🐾🌈",
+          comentario: "Uyuni parece outro planeta! A Ilha Incahuasi é cheia de cactos gigantes! Quando o sal reflete o céu é impossível saber onde termina um e começa o outro! Nunca vi nada igual! 🐾🌈",
           pontosTuristicos: ["Ilha Incahuasi", "Laguna Colorada"],
           preco: { voo: Math.min(orcamento * 0.75, 1600), hotel: 140 }
         }
       }
+    ],
+    2: [ // Cultura
+      {
+        topPick: {
+          destino: "Ouro Preto",
+          pais: "Brasil",
+          codigoPais: "BR",
+          descricao: "Cidade histórica colonial com arquitetura barroca e rica história cultural",
+          porque: "Patrimônio Mundial da UNESCO com igrejas históricas, museus e gastronomia mineira",
+          destaque: "Tour pelas igrejas barrocas seguido de degustação de comida mineira tradicional",
+          comentario: "Ouro Preto tem tantos cheirinhos deliciosos! Adorei passear pela Igreja São Francisco de Assis e pelas ruas de pedra! Os humanos me deram pedacinhos de pão de queijo! 🐾🏛️",
+          pontosTuristicos: ["Igreja São Francisco de Assis", "Museu da Inconfidência"],
+          preco: { voo: Math.min(orcamento * 0.6, 800), hotel: 180 }
+        },
+        alternativas: [
+          {
+            destino: "Cusco",
+            pais: "Peru",
+            codigoPais: "PE",
+            porque: "Antiga capital Inca com ruínas arqueológicas, arquitetura colonial e cultura andina",
+            pontoTuristico: "Sítio Arqueológico de Sacsayhuamán",
+            preco: { voo: Math.min(orcamento * 0.75, 1500), hotel: 200 }
+          },
+          {
+            destino: "Cartagena",
+            pais: "Colômbia",
+            codigoPais: "CO",
+            porque: "Cidade colonial murada com casas coloridas, fortalezas e praias do Caribe",
+            pontoTuristico: "Ciudad Amurallada",
+            preco: { voo: Math.min(orcamento * 0.7, 1400), hotel: 190 }
+          },
+          {
+            destino: "Montevidéu",
+            pais: "Uruguai",
+            codigoPais: "UY",
+            porque: "Capital com rica história, arquitetura art deco e cultura do mate e tango",
+            pontoTuristico: "Ciudad Vieja",
+            preco: { voo: Math.min(orcamento * 0.65, 1300), hotel: 170 }
+          },
+          {
+            destino: "Salvador",
+            pais: "Brasil",
+            codigoPais: "BR",
+            porque: "Berço da cultura afro-brasileira com culinária típica, música e arquitetura colonial",
+            pontoTuristico: "Pelourinho",
+            preco: { voo: Math.min(orcamento * 0.55, 1100), hotel: 160 }
+          }
+        ],
+        surpresa: {
+          destino: "San Miguel de Allende",
+          pais: "México",
+          codigoPais: "MX",
+          descricao: "Cidade colonial colorida com arquitetura neo-gótica e forte tradição artística",
+          porque: "Destino cultural premiado no México com festivais, galerias e gastronomia requintada",
+          destaque: "Tour pelas galerias de arte seguido de aula de culinária mexicana tradicional",
+          comentario: "San Miguel é mágica! A Parroquia é a igreja mais bonita que já vi, com torres que tocam o céu! As ruas coloridas têm tantos artistas e cheiros de tortilhas deliciosas! 🐾🎨",
+          pontosTuristicos: ["Parroquia de San Miguel Arcángel", "Fábrica La Aurora"],
+          preco: { voo: Math.min(orcamento * 0.8, 1600), hotel: 210 }
+        }
+      }
     ]
-    // ... podem ser adicionados mais tipos de preferência
+    // ... outros tipos de preferências
   };
   
   // Conjunto para América do Norte
@@ -1146,8 +1481,8 @@ function gerarDestinosPorRegiao(regiao, preferencia, orcamento) {
           descricao: "Paraíso caribenho com praias de areia branca e águas turquesa",
           porque: "Resorts all-inclusive com praias deslumbrantes e opções para todos os orçamentos",
           destaque: "Relaxar em Playa Delfines com vista para o mar caribenho",
-          comentario: "Cancún tem a areia mais macia que já pisei! E aquela água quentinha e azul é perfeita para um cachorro feliz! 🐾🏖️",
-          pontosTuristicos: ["Ruínas de Tulum", "Ilha Mujeres"],
+          comentario: "Cancún tem a areia mais macia que já pisei! Adoro correr na Isla Mujeres e aquela água quentinha e azul é perfeita para um cachorro feliz! 🐾🏖️",
+          pontosTuristicos: ["Isla Mujeres", "Playa Delfines"],
           preco: { voo: Math.min(orcamento * 0.7, 1900), hotel: 320 }
         },
         alternativas: [
@@ -1191,13 +1526,13 @@ function gerarDestinosPorRegiao(regiao, preferencia, orcamento) {
           descricao: "Ilha remota no Caribe nicaraguense sem carros e com praias desertas",
           porque: "Destino verdadeiramente isolado para relaxamento completo longe da civilização",
           destaque: "Snorkeling em recifes de coral preservados com tartarugas marinhas",
-          comentario: "Little Corn é o verdadeiro paraíso escondido! Sem carros, só trilhas de terra e praias vazias! A vida simples com o mar mais lindo que você já viu! 🐾🌴",
+          comentario: "Little Corn é o verdadeiro paraíso escondido! Sem carros, só trilhas de terra e Dolphin Rock é o lugar perfeito para mergulhos! A vida simples com o mar mais lindo que você já viu! 🐾🌴",
           pontosTuristicos: ["Dolphin Rock", "Praia Otto Beach"],
           preco: { voo: Math.min(orcamento * 0.85, 2300), hotel: 180 }
         }
       }
     ]
-    // ... podem ser adicionados mais tipos de preferência e regiões
+    // ... outros tipos de preferências
   };
   
   // Conjunto para Europa
@@ -1211,7 +1546,7 @@ function gerarDestinosPorRegiao(regiao, preferencia, orcamento) {
           descricao: "Cidade histórica nas margens do Rio Douro com atmosfera autêntica",
           porque: "Combinação perfeita de cultura, gastronomia, arquitetura histórica e vinhos do Porto",
           destaque: "Visita às caves de vinho do Porto seguida de jantar com vista para o rio",
-          comentario: "Porto é pura magia! Tantos cheirinhos de comida boa, ruas históricas para explorar e pessoas que adoram fazer carinho em cachorros! 🐾🍷",
+          comentario: "Porto é pura magia! Tantos cheirinhos de comida boa, a Livraria Lello é um labirinto de livros incríveis, e as pessoas adoram fazer carinho em cachorros! 🐾🍷",
           pontosTuristicos: ["Livraria Lello", "Ribeira"],
           preco: { voo: Math.min(orcamento * 0.8, 2800), hotel: 220 }
         },
@@ -1221,7 +1556,7 @@ function gerarDestinosPorRegiao(regiao, preferencia, orcamento) {
             pais: "Polônia",
             codigoPais: "PL",
             porque: "Cidade medieval intacta com rica história, preços acessíveis e hospitalidade polonesa",
-            pontoTuristico: "Wawel Castle",
+            pontoTuristico: "Castelo de Wawel",
             preco: { voo: Math.min(orcamento * 0.7, 2600), hotel: 180 }
           },
           {
@@ -1256,7 +1591,7 @@ function gerarDestinosPorRegiao(regiao, preferencia, orcamento) {
           descricao: "Joia arquitetônica da Europa Oriental com influências austríacas e polonesas",
           porque: "Centro histórico UNESCO com cafés históricos, igrejas medievais e preços acessíveis",
           destaque: "Tour pelos antigos cafés literários e cervejarias artesanais da cidade",
-          comentario: "Lviv é um segredo que poucos conhecem! Praças charmosas, cafés aconchegantes e pessoas super amigáveis que sempre têm um petisco para oferecer! 🐾☕",
+          comentario: "Lviv é um segredo que poucos conhecem! A Praça do Mercado tem praças charmosas, cafés aconchegantes e pessoas super amigáveis que sempre têm um petisco para oferecer! 🐾☕",
           pontosTuristicos: ["Praça do Mercado", "Capela Boim"],
           preco: { voo: Math.min(orcamento * 0.7, 2600), hotel: 140 }
         }
@@ -1275,7 +1610,7 @@ function gerarDestinosPorRegiao(regiao, preferencia, orcamento) {
           descricao: "Ilha dos Deuses com praias, templos e cultura única",
           porque: "Equilibra perfeitamente relaxamento em praias e resorts com experiências culturais",
           destaque: "Retiro em Ubud com yoga, spa e vista para campos de arroz em terraços",
-          comentario: "Bali tem energia especial! As praias são incríveis para correr e as pessoas sempre me dão petiscos nos templos! Que lugar abençoado! 🐾🌺",
+          comentario: "Bali tem energia especial! O Templo Tanah Lot é fascinante com o mar batendo nas rochas! As pessoas sempre me dão petiscos nos templos! Que lugar abençoado! 🐾🌺",
           pontosTuristicos: ["Templo Tanah Lot", "Terraços de Arroz Tegallalang"],
           preco: { voo: Math.min(orcamento * 0.8, 3500), hotel: 200 }
         },
@@ -1293,7 +1628,7 @@ function gerarDestinosPorRegiao(regiao, preferencia, orcamento) {
             pais: "Maldivas",
             codigoPais: "MV",
             porque: "Destino de luxo com bangalôs sobre a água e recifes de coral exuberantes",
-            pontoTuristico: "Playa Vaadhoo (Playa del Mar de Estrellas)",
+            pontoTuristico: "Playa Vaadhoo (Praia do Mar de Estrelas)",
             preco: { voo: Math.min(orcamento * 0.9, 4000), hotel: 500 }
           },
           {
@@ -1320,7 +1655,7 @@ function gerarDestinosPorRegiao(regiao, preferencia, orcamento) {
           descricao: "Ilha 'alienígena' com vegetação única no mundo e praias desconhecidas",
           porque: "Um dos lugares mais isolados e inexplorados do planeta, com biodiversidade única",
           destaque: "Caminhada entre as icônicas árvores de sangue de dragão, espécie endêmica da ilha",
-          comentario: "Socotra parece outro planeta! Árvores que parecem guarda-chuvas virados e praias onde você não encontra mais ninguém! Um verdadeiro sonho de explorador! 🐾🌴",
+          comentario: "Socotra parece outro planeta! As Árvores de Sangue de Dragão parecem guarda-chuvas virados e praias onde você não encontra mais ninguém! Um verdadeiro sonho de explorador! 🐾🌴",
           pontosTuristicos: ["Árvores de Sangue de Dragão", "Montanhas Hajhir"],
           preco: { voo: Math.min(orcamento * 0.85, 3700), hotel: 150 }
         }
@@ -1335,7 +1670,7 @@ function gerarDestinosPorRegiao(regiao, preferencia, orcamento) {
           descricao: "Capital mundial dos esportes de aventura cercada por montanhas e lagos",
           porque: "Oferece a maior variedade de aventuras radicais em cenários naturais deslumbrantes",
           destaque: "Bungee jumping na ponte Kawarau, o primeiro ponto comercial de bungee do mundo",
-          comentario: "Queenstown tem trilhas INCRÍVEIS para explorar e paisagens que fariam qualquer cachorro ficar de boca aberta! Eu latia de alegria a cada aventura! 🐾⛰️",
+          comentario: "Queenstown tem trilhas INCRÍVEIS para explorar e o Parque Nacional Fiordland tem paisagens que fariam qualquer cachorro ficar de boca aberta! Eu latia de alegria a cada aventura! 🐾⛰️",
           pontosTuristicos: ["Ponte Kawarau", "Parque Nacional Fiordland"],
           preco: { voo: Math.min(orcamento * 0.8, 4000), hotel: 260 }
         },
@@ -1380,7 +1715,7 @@ function gerarDestinosPorRegiao(regiao, preferencia, orcamento) {
           descricao: "Arquipélago no Ártico com ursos polares, expedições de caiaque e auroras boreais",
           porque: "A última fronteira: aventura no extremo norte do planeta com paisagens árticas surreais",
           destaque: "Expedição de snowmobile durante a noite polar para ver a aurora boreal dançando no céu",
-          comentario: "Svalbard é um sonho branco! Faz frio nas patinhas, mas a aventura de ver os ursos polares (de longe!) e a aurora boreal vale cada segundo! 🐾❄️",
+          comentario: "Svalbard é um sonho branco! Faz frio nas patinhas, mas a aventura de ver Longyearbyen e os ursos polares (de longe!) e a aurora boreal vale cada segundo! 🐾❄️",
           pontosTuristicos: ["Pyramiden (Cidade Fantasma)", "Longyearbyen"],
           preco: { voo: Math.min(orcamento * 0.9, 3900), hotel: 280 }
         }
@@ -1395,7 +1730,7 @@ function gerarDestinosPorRegiao(regiao, preferencia, orcamento) {
           descricao: "Antiga capital japonesa com mais de 1.600 templos budistas e jardins zen",
           porque: "Imersão profunda na cultura tradicional japonesa com cerimônias do chá e gueixas",
           destaque: "Visita ao templo Fushimi Inari com seus milhares de portões torii vermelho-laranja",
-          comentario: "Kyoto tem tanta história e tantos cheiros diferentes! Os templos são calmos e os jardins perfeitos para passear tranquilamente! 🐾🏮",
+          comentario: "Kyoto tem tanta história e tantos cheiros diferentes! O Fushimi Inari Taisha com seus portões vermelhos infinitos é como um labirinto mágico para explorar! 🐾🏮",
           pontosTuristicos: ["Fushimi Inari Taisha", "Templo Kinkaku-ji (Pavilhão Dourado)"],
           preco: { voo: Math.min(orcamento * 0.9, 3800), hotel: 270 }
         },
@@ -1440,7 +1775,7 @@ function gerarDestinosPorRegiao(regiao, preferencia, orcamento) {
           descricao: "Cidade antiga no deserto com arquitetura zoroastriana e torres do vento",
           porque: "Experiência cultural autêntica em uma das cidades mais bem preservadas do Oriente Médio",
           destaque: "Visita ao Templo do Fogo de Zoroastro, onde uma chama arde continuamente há 1.500 anos",
-          comentario: "Yazd é uma descoberta incrível! Labirintos de ruas de barro, torres que capturam o vento e pessoas tão hospitaleiras que sempre me ofereciam água fresca! 🐾🕌",
+          comentario: "Yazd é uma descoberta incrível! As Torres do Vento são incríveis com seu design genial para refrescar as casas! Labirintos de ruas de barro e pessoas tão hospitaleiras que sempre me ofereciam água fresca! 🐾🕌",
           pontosTuristicos: ["Torres do Vento (Badgirs)", "Templo do Fogo Zoroastriano"],
           preco: { voo: Math.min(orcamento * 0.8, 3100), hotel: 100 }
         }
@@ -1455,7 +1790,7 @@ function gerarDestinosPorRegiao(regiao, preferencia, orcamento) {
           descricao: "Cidade-estado futurista com arquitetura inovadora e fusão cultural",
           porque: "Experiência urbana completa com compras, gastronomia, vida noturna e atrações inovadoras",
           destaque: "Visita noturna aos jardins Gardens by the Bay com show de luzes na floresta de super-árvores",
-          comentario: "Singapura é a cidade mais limpa que já visitei! Os jardins são incríveis para passear e tem tantos restaurantes com cheiros deliciosos! 🐾🌆",
+          comentario: "Singapura é a cidade mais limpa que já visitei! Os Gardens by the Bay são mágicos com árvores gigantes iluminadas! Tem tantos restaurantes com cheiros deliciosos! 🐾🌆",
           pontosTuristicos: ["Gardens by the Bay", "Marina Bay Sands"],
           preco: { voo: Math.min(orcamento * 0.85, 3500), hotel: 300 }
         },
@@ -1500,7 +1835,7 @@ function gerarDestinosPorRegiao(regiao, preferencia, orcamento) {
           descricao: "Capital medieval com centro histórico perfeito e cultura digital avançada",
           porque: "Mistura fascinante entre cidade medieval perfeitamente preservada e hub tecnológico inovador",
           destaque: "Explorar o bairro Telliskivi Creative City com seus cafés hipsters e arte urbana",
-          comentario: "Tallinn parece um conto de fadas com tecnologia! Você pode passear nas ruas de pedra medievais e depois trabalhar em cafés super modernos! A comida é deliciosa! 🐾🏰",
+          comentario: "Tallinn parece um conto de fadas com tecnologia! O Centro Histórico de Tallinn é mágico com ruas de pedra medievais e depois trabalhar em cafés super modernos! A comida é deliciosa! 🐾🏰",
           pontosTuristicos: ["Centro Histórico de Tallinn", "Kadriorg Palace"],
           preco: { voo: Math.min(orcamento * 0.8, 3200), hotel: 180 }
         }
@@ -1634,4 +1969,4 @@ function embaralharArray(array) {
   }
 
   return array;
-}
+}        
