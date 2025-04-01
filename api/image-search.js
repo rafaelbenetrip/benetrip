@@ -16,55 +16,260 @@ function logEvent(type, message, data = {}) {
   return log;
 }
 
-// Classifica o tipo de destino para melhorar a relevância da busca
-function classificarDestino(query, descricao = '') {
-  const lowercaseQuery = query.toLowerCase();
-  const lowercaseDesc = descricao.toLowerCase();
+// Base de dados de pontos turísticos populares para destinos comuns
+const PONTOS_TURISTICOS_POPULARES = {
+  // Grandes cidades
+  "Paris": ["Torre Eiffel", "Museu do Louvre", "Arco do Triunfo", "Notre Dame", "Montmartre"],
+  "Nova York": ["Times Square", "Estátua da Liberdade", "Central Park", "Empire State Building", "Brooklyn Bridge"],
+  "Londres": ["London Eye", "Big Ben", "Tower Bridge", "Buckingham Palace", "British Museum"],
+  "Roma": ["Coliseu", "Fontana di Trevi", "Vaticano", "Pantheon", "Fórum Romano"],
+  "Tóquio": ["Torre de Tóquio", "Templo Senso-ji", "Shibuya Crossing", "Palácio Imperial", "Meiji Shrine"],
+  "Rio de Janeiro": ["Cristo Redentor", "Pão de Açúcar", "Praia de Copacabana", "Maracanã", "Escadaria Selarón"],
+  "Sydney": ["Opera House", "Harbour Bridge", "Bondi Beach", "Darling Harbour", "Sydney Tower"],
+  "Barcelona": ["Sagrada Família", "Park Güell", "La Rambla", "Casa Batlló", "Barri Gòtic"],
   
-  // Palavras-chave para classificação
-  const praiaKeywords = ['praia', 'beach', 'mar', 'ocean', 'ilha', 'island', 'caribe', 'caribbean', 'costa'];
-  const montanhaKeywords = ['montanha', 'mountain', 'serra', 'cordilheira', 'alpe', 'pico', 'vale', 'valley', 'hill'];
-  const cidadeKeywords = ['cidade', 'city', 'urbano', 'urban', 'metrópole', 'metropolis', 'capital'];
-  const historicoKeywords = ['histórico', 'historic', 'antigo', 'ancient', 'ruína', 'ruins', 'colonial', 'medieval'];
-  const naturezaKeywords = ['natureza', 'nature', 'parque', 'park', 'nacional', 'national', 'floresta', 'forest', 'selvagem', 'wild'];
+  // Destinos de praia
+  "Bali": ["Tanah Lot", "Uluwatu Temple", "Ubud", "Kuta Beach", "Tegalalang Rice Terraces"],
+  "Cancún": ["Chichen Itza", "Isla Mujeres", "Ruínas de Tulum", "Xcaret Park", "Playa Delfines"],
+  "Santorini": ["Oia", "Fira", "Red Beach", "Caldera", "Ancient Thera"],
+  "Maldivas": ["Male Atoll", "Biyadhoo Island", "Alimatha Island", "Sun Island", "Artificial Beach"],
   
-  // Verificar presença de palavras-chave na consulta e descrição
-  let tipoDestino = '';
+  // Destinos de natureza
+  "Yellowstone": ["Old Faithful", "Grand Prismatic Spring", "Yellowstone Lake", "Lamar Valley", "Mammoth Hot Springs"],
+  "Banff": ["Lake Louise", "Moraine Lake", "Banff Gondola", "Johnston Canyon", "Columbia Icefield"],
+  "Costa Rica": ["Arenal Volcano", "Manuel Antonio National Park", "Monteverde Cloud Forest", "Tortuguero", "Playa Tamarindo"],
   
-  // Testar correspondências
-  if (praiaKeywords.some(kw => lowercaseQuery.includes(kw) || lowercaseDesc.includes(kw))) {
-    tipoDestino = 'beach paradise';
-  } else if (montanhaKeywords.some(kw => lowercaseQuery.includes(kw) || lowercaseDesc.includes(kw))) {
-    tipoDestino = 'mountain landscape';
-  } else if (historicoKeywords.some(kw => lowercaseQuery.includes(kw) || lowercaseDesc.includes(kw))) {
-    tipoDestino = 'historic site';
-  } else if (naturezaKeywords.some(kw => lowercaseQuery.includes(kw) || lowercaseDesc.includes(kw))) {
-    tipoDestino = 'nature landscape';
-  } else if (cidadeKeywords.some(kw => lowercaseQuery.includes(kw) || lowercaseDesc.includes(kw))) {
-    tipoDestino = 'city skyline';
+  // Destinos históricos
+  "Atenas": ["Parthenon", "Acropolis", "Temple of Olympian Zeus", "Ancient Agora", "Plaka District"],
+  "Cairo": ["Pyramids of Giza", "Sphinx", "Egyptian Museum", "Khan el-Khalili", "Nile River"],
+  "Machu Picchu": ["Sun Gate", "Huayna Picchu", "Temple of the Sun", "Intihuatana", "Sacred Valley"],
+  
+  // América Latina
+  "Buenos Aires": ["Casa Rosada", "La Boca", "Recoleta Cemetery", "Teatro Colón", "Plaza de Mayo"],
+  "Cidade do México": ["Teotihuacan", "Frida Kahlo Museum", "Zócalo", "Chapultepec Castle", "Xochimilco"],
+  "Lima": ["Huaca Pucllana", "Plaza Mayor", "Miraflores", "Larco Museum", "Basilica Cathedral"],
+  "Cartagena": ["Ciudad Amurallada", "Castillo San Felipe", "Plaza Santo Domingo", "Las Bóvedas", "Isla Barú"],
+  "Medellín": ["Comuna 13", "Parque Arví", "Plaza Botero", "Jardín Botánico", "Pueblito Paisa"],
+  "Cusco": ["Sacsayhuamán", "Plaza de Armas", "Qorikancha", "San Blas", "Mercado San Pedro"]
+};
+
+// Lista expandida de keywords para diferentes tipos de destinos
+const CATEGORIAS_DESTINO = {
+  praia: {
+    keywords: ['praia', 'beach', 'mar', 'ocean', 'ilha', 'island', 'caribe', 'caribbean', 'costa', 'shore', 
+               'sand', 'areia', 'sol', 'sun', 'tropical', 'resort', 'bay', 'baía', 'cove', 'enseada', 
+               'snorkel', 'mergulho', 'diving', 'surfe', 'surf'],
+    termos_busca: ['beach paradise', 'tropical beach', 'coastline view', 'beach resort', 'ocean view']
+  },
+  montanha: {
+    keywords: ['montanha', 'mountain', 'serra', 'cordilheira', 'alpe', 'alpes', 'pico', 'peak', 'vale', 'valley', 
+               'hill', 'colina', 'highlands', 'snow', 'neve', 'altitude', 'trekking', 'hiking', 'alpinismo', 
+               'mountaineering', 'escalada', 'climbing', 'summit', 'cume'],
+    termos_busca: ['mountain landscape', 'mountain peak', 'mountain view', 'scenic mountains', 'hiking trails']
+  },
+  cidade: {
+    keywords: ['cidade', 'city', 'urbano', 'urban', 'metrópole', 'metropolis', 'capital', 'downtown', 'centro', 
+               'skyline', 'arranha-céu', 'skyscraper', 'avenida', 'avenue', 'boulevard', 'street', 'rua', 
+               'plaza', 'praça', 'square'],
+    termos_busca: ['city skyline', 'urban landscape', 'city streets', 'downtown view', 'city center']
+  },
+  historico: {
+    keywords: ['histórico', 'historic', 'antigo', 'ancient', 'ruína', 'ruins', 'colonial', 'medieval', 'castle', 
+               'castelo', 'palácio', 'palace', 'monumento', 'monument', 'heritage', 'patrimônio', 'archaeology', 
+               'arqueologia', 'cathedral', 'catedral', 'igreja', 'church', 'temple', 'templo'],
+    termos_busca: ['historic site', 'ancient ruins', 'historical landmark', 'old town', 'cultural heritage']
+  },
+  natureza: {
+    keywords: ['natureza', 'nature', 'parque', 'park', 'nacional', 'national', 'floresta', 'forest', 'selvagem', 
+               'wild', 'wilderness', 'reserva', 'reserve', 'ecológico', 'ecological', 'fauna', 'flora', 'wildlife', 
+               'vida selvagem', 'biodiversity', 'biodiversidade', 'pristine', 'intocado'],
+    termos_busca: ['nature landscape', 'national park', 'wildlife preserve', 'natural scenery', 'wilderness']
+  },
+  deserto: {
+    keywords: ['deserto', 'desert', 'duna', 'dune', 'areia', 'sand', 'oásis', 'oasis', 'cactus', 'cacto', 
+               'sahara', 'mojave', 'atacama', 'namib', 'gobi', 'kalahari'],
+    termos_busca: ['desert landscape', 'sand dunes', 'vast desert', 'desert oasis', 'desert sunset']
+  },
+  gastronomia: {
+    keywords: ['gastronomia', 'gastronomy', 'comida', 'food', 'culinária', 'culinary', 'restaurante', 'restaurant', 
+               'cozinha', 'kitchen', 'tradicional', 'traditional', 'mercado', 'market', 'café', 'coffee', 'wine', 
+               'vinho', 'cerveja', 'beer', 'street food', 'comida de rua'],
+    termos_busca: ['local cuisine', 'traditional food', 'food market', 'gastronomy scene', 'culinary experience']
+  },
+  rural: {
+    keywords: ['rural', 'campo', 'countryside', 'fazenda', 'farm', 'vineyard', 'vinhedo', 'plantation', 'plantação', 
+               'agricultural', 'agrícola', 'village', 'vila', 'cottage', 'chalé', 'barn', 'celeiro', 'pastoral'],
+    termos_busca: ['rural landscape', 'countryside view', 'farm scenery', 'village life', 'pastoral landscape']
+  },
+  aventura: {
+    keywords: ['aventura', 'adventure', 'adrenalina', 'adrenaline', 'radical', 'extreme', 'rafting', 'canoagem', 
+               'canyoning', 'kayak', 'caiaque', 'zip line', 'tirolesa', 'bungee', 'paragliding', 'parapente', 
+               'safari', 'expedição', 'expedition'],
+    termos_busca: ['adventure activity', 'extreme sports', 'adventure landscape', 'outdoor adventure', 'adrenaline sports']
+  },
+  inverno: {
+    keywords: ['inverno', 'winter', 'neve', 'snow', 'ski', 'esqui', 'snowboard', 'geleira', 'glacier', 'gelo', 
+               'ice', 'frio', 'cold', 'estação de esqui', 'ski resort', 'ártico', 'arctic', 'alpino', 'alpine'],
+    termos_busca: ['winter landscape', 'snowy mountains', 'ski resort', 'winter wonderland', 'snow-covered']
+  },
+  tropical: {
+    keywords: ['tropical', 'rainforest', 'floresta tropical', 'jungle', 'selva', 'amazon', 'amazônia', 'equatorial', 
+               'equator', 'equador', 'humid', 'úmido', 'exotic', 'exótico', 'paradise', 'paraíso'],
+    termos_busca: ['tropical landscape', 'rainforest view', 'jungle scenery', 'tropical paradise', 'exotic nature']
+  },
+  cultural: {
+    keywords: ['cultural', 'culture', 'tradição', 'tradition', 'festival', 'celebração', 'celebration', 'arte', 
+               'art', 'museu', 'museum', 'gallery', 'galeria', 'theatre', 'teatro', 'ethnic', 'étnico', 
+               'indigenous', 'indígena', 'folk', 'popular'],
+    termos_busca: ['cultural site', 'traditional festival', 'cultural heritage', 'local traditions', 'cultural landmark']
+  }
+};
+
+// Função expandida para classificar o tipo de destino e extrair pontos turísticos
+function classificarDestino(query, descricao = '', pontosTuristicos = []) {
+  const textoCompleto = `${query.toLowerCase()} ${descricao.toLowerCase()} ${pontosTuristicos.join(' ').toLowerCase()}`;
+  
+  // Verificar pontos turísticos específicos primeiro
+  const destinoNormalizado = normalizarNomeDestino(query);
+  const pontosTuristicosConhecidos = PONTOS_TURISTICOS_POPULARES[destinoNormalizado] || [];
+  
+  // Se temos pontos turísticos específicos fornecidos, usá-los
+  if (pontosTuristicos && pontosTuristicos.length > 0) {
+    // Escolher um ponto turístico aleatório da lista fornecida
+    const pontoAleatorio = pontosTuristicos[Math.floor(Math.random() * pontosTuristicos.length)];
+    return {
+      tipo: 'ponto_turistico_especifico',
+      termo: pontoAleatorio,
+      destino: query
+    };
   }
   
-  // Se não conseguimos classificar, usar um termo genérico
-  return tipoDestino || 'landmark';
+  // Se temos pontos turísticos conhecidos para este destino, usar um deles
+  if (pontosTuristicosConhecidos.length > 0) {
+    // Escolher um ponto turístico aleatório da lista conhecida
+    const pontoAleatorio = pontosTuristicosConhecidos[Math.floor(Math.random() * pontosTuristicosConhecidos.length)];
+    return {
+      tipo: 'ponto_turistico_conhecido',
+      termo: pontoAleatorio,
+      destino: query
+    };
+  }
+  
+  // Tentar identificar o tipo de destino com base no texto
+  let tipoEncontrado = '';
+  let melhorPontuacao = 0;
+  let termosBusca = [];
+  
+  // Verificar cada categoria
+  for (const [tipo, dados] of Object.entries(CATEGORIAS_DESTINO)) {
+    let pontuacao = 0;
+    
+    // Contar ocorrências de palavras-chave
+    for (const keyword of dados.keywords) {
+      if (textoCompleto.includes(keyword)) {
+        pontuacao++;
+      }
+    }
+    
+    // Se encontramos mais palavras-chave nesta categoria, atualizamos o tipo
+    if (pontuacao > melhorPontuacao) {
+      melhorPontuacao = pontuacao;
+      tipoEncontrado = tipo;
+      termosBusca = dados.termos_busca;
+    }
+  }
+  
+  // Se não conseguimos identificar o tipo, usar landmark como padrão
+  if (!tipoEncontrado || melhorPontuacao === 0) {
+    return {
+      tipo: 'landmark',
+      termo: 'famous landmark',
+      destino: query
+    };
+  }
+  
+  // Escolher um termo de busca aleatório para esta categoria
+  const termoAleatorio = termosBusca[Math.floor(Math.random() * termosBusca.length)];
+  
+  return {
+    tipo: tipoEncontrado,
+    termo: termoAleatorio,
+    destino: query
+  };
 }
 
-// Função para buscar imagens do Unsplash
+// Função para normalizar nome de destino para correspondência com a base de dados
+function normalizarNomeDestino(destino) {
+  // Lista de substituições comuns
+  const substituicoes = {
+    'nyc': 'Nova York',
+    'new york': 'Nova York',
+    'ny': 'Nova York',
+    'rio': 'Rio de Janeiro',
+    'cdmx': 'Cidade do México',
+    'mexico city': 'Cidade do México',
+    'la': 'Los Angeles',
+    'sf': 'San Francisco',
+    'sp': 'São Paulo',
+    'tokyo': 'Tóquio',
+    'bsas': 'Buenos Aires',
+    'london': 'Londres',
+    'paris': 'Paris',
+    'rome': 'Roma'
+  };
+  
+  // Normalizar para minúsculas
+  const nomeNormalizado = destino.toLowerCase();
+  
+  // Verificar substituições
+  for (const [abreviacao, nomeCompleto] of Object.entries(substituicoes)) {
+    if (nomeNormalizado.includes(abreviacao)) {
+      return nomeCompleto;
+    }
+  }
+  
+  // Tentar encontrar correspondência parcial na base de dados
+  for (const nomeDestino of Object.keys(PONTOS_TURISTICOS_POPULARES)) {
+    if (nomeDestino.toLowerCase().includes(nomeNormalizado) || 
+        nomeNormalizado.includes(nomeDestino.toLowerCase())) {
+      return nomeDestino;
+    }
+  }
+  
+  // Se não encontrar, retornar o destino original com a primeira letra maiúscula
+  return destino.charAt(0).toUpperCase() + destino.slice(1);
+}
+
+// Função aprimorada para buscar imagens do Unsplash
 async function fetchUnsplashImages(query, options = {}) {
   const { 
     perPage = 2, 
     orientation = "landscape", 
     quality = "regular",
-    descricao = ""
+    descricao = "",
+    pontosTuristicos = []
   } = options;
   
   // Classificar o tipo de destino para melhorar a relevância
-  const tipoDestino = classificarDestino(query, descricao);
+  const classificacao = classificarDestino(query, descricao, pontosTuristicos);
   
-  // Construir query mais precisa
-  const enhancedQuery = `${query} ${tipoDestino} travel destination`;
+  // Construir query mais precisa baseada na classificação
+  let enhancedQuery = `${classificacao.destino}`;
+  
+  // Se temos um ponto turístico específico, usar diretamente
+  if (classificacao.tipo === 'ponto_turistico_especifico' || classificacao.tipo === 'ponto_turistico_conhecido') {
+    enhancedQuery = `${classificacao.termo} ${classificacao.destino}`;
+  } else {
+    // Caso contrário, usar o termo de busca da categoria
+    enhancedQuery = `${classificacao.destino} ${classificacao.termo}`;
+  }
   
   try {
-    logEvent('info', 'Buscando no Unsplash', { query: enhancedQuery, orientation });
+    logEvent('info', 'Buscando no Unsplash', { 
+      query: enhancedQuery, 
+      orientation,
+      classificacao
+    });
     
     const response = await axios.get(
       'https://api.unsplash.com/search/photos',
@@ -92,7 +297,10 @@ async function fetchUnsplashImages(query, options = {}) {
           photographerUrl: img.user.links.html,
           sourceUrl: img.links.html,
           downloadUrl: img.links.download,
-          alt: img.alt_description || `${query} - ${tipoDestino}`
+          alt: img.alt_description || `${classificacao.termo} em ${classificacao.destino}`,
+          pontoTuristico: classificacao.tipo === 'ponto_turistico_especifico' || 
+                          classificacao.tipo === 'ponto_turistico_conhecido' ? 
+                          classificacao.termo : null
         }))
       };
     }
@@ -108,23 +316,36 @@ async function fetchUnsplashImages(query, options = {}) {
   }
 }
 
-// Função para buscar imagens do Pexels
+// Função aprimorada para buscar imagens do Pexels
 async function fetchPexelsImages(query, options = {}) {
   const { 
     perPage = 2, 
     orientation = "landscape", 
     quality = "large",
-    descricao = ""
+    descricao = "",
+    pontosTuristicos = []
   } = options;
   
   // Classificar o tipo de destino para melhorar a relevância
-  const tipoDestino = classificarDestino(query, descricao);
+  const classificacao = classificarDestino(query, descricao, pontosTuristicos);
   
-  // Construir query mais precisa
-  const enhancedQuery = `${query} ${tipoDestino} travel destination`;
+  // Construir query mais precisa baseada na classificação
+  let enhancedQuery = `${classificacao.destino}`;
+  
+  // Se temos um ponto turístico específico, usar diretamente
+  if (classificacao.tipo === 'ponto_turistico_especifico' || classificacao.tipo === 'ponto_turistico_conhecido') {
+    enhancedQuery = `${classificacao.termo} ${classificacao.destino}`;
+  } else {
+    // Caso contrário, usar o termo de busca da categoria
+    enhancedQuery = `${classificacao.destino} ${classificacao.termo}`;
+  }
   
   try {
-    logEvent('info', 'Buscando no Pexels', { query: enhancedQuery, orientation });
+    logEvent('info', 'Buscando no Pexels', { 
+      query: enhancedQuery, 
+      orientation,
+      classificacao
+    });
     
     const response = await axios.get(
       'https://api.pexels.com/v1/search',
@@ -163,7 +384,10 @@ async function fetchPexelsImages(query, options = {}) {
           photographerUrl: img.photographer_url,
           sourceUrl: img.url,
           downloadUrl: img.src.original,
-          alt: `${query} - ${tipoDestino}`
+          alt: `${classificacao.termo} em ${classificacao.destino}`,
+          pontoTuristico: classificacao.tipo === 'ponto_turistico_especifico' || 
+                          classificacao.tipo === 'ponto_turistico_conhecido' ? 
+                          classificacao.termo : null
         }))
       };
     }
@@ -181,33 +405,45 @@ async function fetchPexelsImages(query, options = {}) {
 
 // Função para gerar imagens de placeholder
 function getPlaceholderImages(query, options = {}) {
-  const { width = 800, height = 600, descricao = "" } = options;
+  const { width = 800, height = 600, descricao = "", pontosTuristicos = [] } = options;
   
   // Classificar o tipo de destino para melhorar a relevância
-  const tipoDestino = classificarDestino(query, descricao);
+  const classificacao = classificarDestino(query, descricao, pontosTuristicos);
+  
+  // Texto para placeholder
+  let placeholderText = query;
+  if (classificacao.tipo === 'ponto_turistico_especifico' || classificacao.tipo === 'ponto_turistico_conhecido') {
+    placeholderText = `${classificacao.termo} em ${classificacao.destino}`;
+  }
   
   return {
     success: true,
     images: [
       {
-        url: `https://via.placeholder.com/${width}x${height}.png?text=${encodeURIComponent(query)}`,
+        url: `https://via.placeholder.com/${width}x${height}.png?text=${encodeURIComponent(placeholderText)}`,
         source: "placeholder",
         photographer: "Placeholder",
         photographerId: "placeholder",
         photographerUrl: "#",
         sourceUrl: "#",
-        downloadUrl: `https://via.placeholder.com/${width}x${height}.png?text=${encodeURIComponent(query)}`,
-        alt: `${query} - ${tipoDestino}`
+        downloadUrl: `https://via.placeholder.com/${width}x${height}.png?text=${encodeURIComponent(placeholderText)}`,
+        alt: placeholderText,
+        pontoTuristico: classificacao.tipo === 'ponto_turistico_especifico' || 
+                        classificacao.tipo === 'ponto_turistico_conhecido' ? 
+                        classificacao.termo : null
       },
       {
-        url: `https://via.placeholder.com/${width}x${height}.png?text=${encodeURIComponent(query + ' ' + tipoDestino)}`,
+        url: `https://via.placeholder.com/${width}x${height}.png?text=${encodeURIComponent(placeholderText + ' - Vista 2')}`,
         source: "placeholder",
         photographer: "Placeholder",
         photographerId: "placeholder",
         photographerUrl: "#",
         sourceUrl: "#",
-        downloadUrl: `https://via.placeholder.com/${width}x${height}.png?text=${encodeURIComponent(query)}`,
-        alt: `${query} - ${tipoDestino}`
+        downloadUrl: `https://via.placeholder.com/${width}x${height}.png?text=${encodeURIComponent(placeholderText)}`,
+        alt: `${placeholderText} - Vista alternativa`,
+        pontoTuristico: classificacao.tipo === 'ponto_turistico_especifico' || 
+                        classificacao.tipo === 'ponto_turistico_conhecido' ? 
+                        classificacao.termo : null
       }
     ]
   };
@@ -239,7 +475,8 @@ module.exports = async function handler(req, res) {
     width = 800,
     height = 600,
     quality = "regular",
-    descricao = ""
+    descricao = "",
+    pontosTuristicos = ""
   } = req.query || {};
   
   if (!query) {
@@ -247,7 +484,31 @@ module.exports = async function handler(req, res) {
   }
   
   try {
-    logEvent('info', `Buscando imagens para '${query}'`, { query, source, perPage, orientation, descricao });
+    // Processar pontosTuristicos se fornecido como string
+    let pontosTuristicosArray = [];
+    if (pontosTuristicos) {
+      try {
+        // Tentar interpretá-lo como JSON
+        if (pontosTuristicos.startsWith('[')) {
+          pontosTuristicosArray = JSON.parse(pontosTuristicos);
+        } else {
+          // Caso contrário, dividir por vírgulas
+          pontosTuristicosArray = pontosTuristicos.split(',').map(p => p.trim());
+        }
+      } catch (e) {
+        // Em caso de erro, considerar como string única
+        pontosTuristicosArray = [pontosTuristicos];
+      }
+    }
+    
+    logEvent('info', `Buscando imagens para '${query}'`, { 
+      query, 
+      source, 
+      perPage, 
+      orientation, 
+      descricao,
+      pontosTuristicosArray
+    });
     
     let images = [];
     let unsplashResult = { success: false, images: [] };
@@ -259,14 +520,16 @@ module.exports = async function handler(req, res) {
         perPage: parseInt(perPage),
         orientation,
         quality,
-        descricao
+        descricao,
+        pontosTuristicos: pontosTuristicosArray
       });
       
       if (unsplashResult.success) {
         images = unsplashResult.images;
         logEvent('success', 'Imagens do Unsplash obtidas com sucesso', { 
           count: images.length,
-          query
+          query,
+          pontosTuristicos: pontosTuristicosArray.join(', ')
         });
       }
     }
@@ -277,14 +540,16 @@ module.exports = async function handler(req, res) {
         perPage: parseInt(perPage),
         orientation,
         quality,
-        descricao
+        descricao,
+        pontosTuristicos: pontosTuristicosArray
       });
       
       if (pexelsResult.success) {
         images = [...images, ...pexelsResult.images];
         logEvent('success', 'Imagens do Pexels obtidas com sucesso', { 
           count: pexelsResult.images.length,
-          query
+          query,
+          pontosTuristicos: pontosTuristicosArray.join(', ')
         });
       }
     }
@@ -294,13 +559,15 @@ module.exports = async function handler(req, res) {
       const placeholderResult = getPlaceholderImages(query, {
         width: parseInt(width),
         height: parseInt(height),
-        descricao
+        descricao,
+        pontosTuristicos: pontosTuristicosArray
       });
       
       images = placeholderResult.images;
       logEvent('info', 'Utilizando imagens de placeholder', { 
         count: images.length,
-        query
+        query,
+        pontosTuristicos: pontosTuristicosArray.join(', ')
       });
     }
     
@@ -308,7 +575,8 @@ module.exports = async function handler(req, res) {
     return res.status(200).json({ 
       images,
       cache: true,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      pontosTuristicos: pontosTuristicosArray.length > 0 ? pontosTuristicosArray : undefined
     });
     
   } catch (error) {
