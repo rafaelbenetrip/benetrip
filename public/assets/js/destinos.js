@@ -429,14 +429,12 @@ BENETRIP.Destinos = (function() {
           `${destino.destino}, ${destino.pais}`
         );
       } else {
-        // Placeholder se não houver imagem
+        // Placeholder apenas com texto do destino
         html += `
-          <div class="bg-gray-200 h-36">
-            <img 
-              src="assets/images/placeholder-destino.jpg" 
-              alt="Imagem de placeholder para ${destino.destino}" 
-              class="w-full h-full object-cover" 
-            />
+          <div class="bg-gray-200 h-36 flex items-center justify-center">
+            <span class="text-gray-600 font-medium text-center px-2">
+              ${destino.destino}
+            </span>
           </div>
         `;
       }
@@ -546,7 +544,7 @@ BENETRIP.Destinos = (function() {
           <div class="w-1/3">
       `;
       
-      // Adicionar imagem com créditos ou placeholder
+      // Adicionar imagem com créditos ou placeholder com texto
       if (imagem) {
         cardHtml += renderImageWithCredits(
           imagem, 
@@ -555,14 +553,12 @@ BENETRIP.Destinos = (function() {
           true // Versão compacta para cards menores
         );
       } else {
-        // Placeholder se não houver imagem
+        // Placeholder apenas com texto do destino
         cardHtml += `
-          <div class="bg-gray-200 h-full">
-            <img 
-              src="assets/images/placeholder-destino.jpg" 
-              alt="Imagem de placeholder para ${destino.destino}" 
-              class="w-full h-full object-cover" 
-            />
+          <div class="bg-gray-200 h-full flex items-center justify-center">
+            <span class="text-gray-600 font-medium text-center px-2">
+              ${destino.destino}
+            </span>
           </div>
         `;
       }
@@ -645,12 +641,10 @@ BENETRIP.Destinos = (function() {
   function renderImageWithCredits(imagem, heightClass, altFallback, compacto = false) {
     if (!imagem || !imagem.url) {
       return `
-        <div class="bg-gray-200 ${heightClass}">
-          <img 
-            src="assets/images/placeholder-destino.jpg" 
-            alt="Imagem de placeholder para ${altFallback}" 
-            class="w-full h-full object-cover" 
-          />
+        <div class="bg-gray-200 ${heightClass} flex items-center justify-center">
+          <span class="text-gray-600 font-medium text-center px-2">
+            ${altFallback}
+          </span>
         </div>
       `;
     }
@@ -737,7 +731,7 @@ BENETRIP.Destinos = (function() {
    * @returns {string} URL sanitizada ou URL padrão
    */
   function sanitizeURL(url) {
-    if (!url) return 'assets/images/placeholder-destino.jpg';
+    if (!url) return '#';
     
     try {
       const urlObj = new URL(url);
@@ -751,7 +745,7 @@ BENETRIP.Destinos = (function() {
       if (url.startsWith('assets/') || url.startsWith('/assets/')) {
         return url;
       }
-      return 'assets/images/placeholder-destino.jpg';
+      return '#';
     }
   }
 
