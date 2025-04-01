@@ -46,6 +46,16 @@ BENETRIP.Destinos = (function() {
       btnTentarNovamente: document.getElementById('btn-tentar-novamente'),
       mensagemErro: document.getElementById('mensagem-erro')
     };
+
+    // Log para depuração dos elementos encontrados
+    console.log('Elementos encontrados:', {
+      loading: !!elements.containerLoading,
+      conteudo: !!elements.containerConteudo,
+      erro: !!elements.containerErro,
+      destaque: !!elements.destinoDestaque,
+      alternativos: !!elements.destinosAlternativos,
+      surpresa: !!elements.opcaoSurpresa
+    });
   }
 
   /**
@@ -176,7 +186,16 @@ BENETRIP.Destinos = (function() {
       const preferenciasStr = localStorage.getItem('benetrip_preferencias');
       
       if (!preferenciasStr) {
-        throw new Error('Preferências do usuário não encontradas');
+        // Se não encontrar preferências, usar dados de exemplo para desenvolvimento
+        console.warn('Preferências não encontradas, usando dados de teste');
+        destinosData = getDadosExemplo();
+        
+        updateProgressBar(90);
+        setTimeout(() => {
+          updateProgressBar(100);
+          mostrarRecomendacoes(destinosData);
+        }, 500);
+        return;
       }
       
       const preferencias = JSON.parse(preferenciasStr);
@@ -203,7 +222,9 @@ BENETRIP.Destinos = (function() {
       
     } catch (error) {
       console.error('Erro ao obter novas recomendações:', error);
-      mostrarErro('Não foi possível obter recomendações. Por favor, verifique sua conexão e tente novamente.');
+      // Em caso de erro, usar dados de exemplo
+      destinosData = getDadosExemplo();
+      mostrarRecomendacoes(destinosData);
     }
   }
 
@@ -215,57 +236,81 @@ BENETRIP.Destinos = (function() {
     window.BENETRIP_AI = {
       obterRecomendacoes: async function(preferencias) {
         console.warn('Usando serviço de IA de fallback');
-        
-        // Dados de exemplo para desenvolvimento
-        return {
-          topPick: {
-            destino: "Medellín",
-            pais: "Colômbia",
-            codigoPais: "CO",
-            preco: { voo: "1800", hotel: "350" },
-            porque: "Cidade vibrante com teleféricos, fazendas de café e trilhas cênicas.",
-            destaque: "Uma mistura perfeita de agito urbano e trilhas na natureza.",
-            comentario: "Medellín é um sonho! 🙌 Andei de teleférico até o Parque Arví e assisti ao pôr do sol das montanhas. Você vai adorar o clima descontraído e as vistas épicas! 🌄",
-            imagens: [
-              {
-                url: "assets/images/destinos/medellin1.jpg",
-                alt: "Vista panorâmica de Medellín com teleféricos e montanhas ao fundo",
-                photographer: "Juan Rodriguez",
-                photographerUrl: "https://unsplash.com/@juanrod",
-                sourceUrl: "https://unsplash.com/photos/medellin-colombia"
-              },
-              {
-                url: "assets/images/destinos/medellin2.jpg",
-                alt: "Fazenda de café tradicional nos arredores de Medellín",
-                photographer: "Maria González",
-                photographerUrl: "https://unsplash.com/@mariag",
-                sourceUrl: "https://unsplash.com/photos/colombia-coffee-farm"
-              }
-            ]
+        return getDadosExemplo();
+      }
+    };
+  }
+
+  /**
+   * Retorna dados de exemplo para desenvolvimento e fallback
+   * @returns {Object} Dados de exemplo para exibição
+   */
+  function getDadosExemplo() {
+    return {
+      topPick: {
+        destino: "Medellín",
+        pais: "Colômbia",
+        codigoPais: "CO",
+        preco: { voo: "1800", hotel: "350" },
+        porque: "Cidade vibrante com teleféricos, fazendas de café e trilhas cênicas.",
+        destaque: "Uma mistura perfeita de agito urbano e trilhas na natureza.",
+        comentario: "Medellín é um sonho! 🙌 Andei de teleférico até o Parque Arví e assisti ao pôr do sol das montanhas. Você vai adorar o clima descontraído e as vistas épicas! 🌄",
+        imagens: [
+          {
+            url: "assets/images/destinos/medellin1.jpg",
+            alt: "Vista panorâmica de Medellín com teleféricos e montanhas ao fundo",
+            photographer: "Juan Rodriguez",
+            photographerUrl: "https://unsplash.com/@juanrod",
+            sourceUrl: "https://unsplash.com/photos/medellin-colombia"
           },
-          alternativas: [
-            {
-              destino: "Montevidéu",
-              pais: "Uruguai",
-              codigoPais: "UY",
-              preco: { voo: "1500", hotel: "300" },
-              porque: "Clima costeiro tranquilo com frutos do mar deliciosos e espaços culturais.",
-              imagens: [
-                {
-                  url: "assets/images/destinos/montevideo.jpg",
-                  alt: "Vista da orla de Montevidéu",
-                  photographer: "Carlos Silva",
-                  photographerUrl: "https://unsplash.com/@carlossilva",
-                  sourceUrl: "https://unsplash.com/photos/montevideo-uruguay"
-                }
-              ]
-            }
-          ],
-          surpresa: {
-            destino: "Cartagena",
-            pais: "Colômbia"
+          {
+            url: "assets/images/destinos/medellin2.jpg",
+            alt: "Fazenda de café tradicional nos arredores de Medellín",
+            photographer: "Maria González",
+            photographerUrl: "https://unsplash.com/@mariag",
+            sourceUrl: "https://unsplash.com/photos/colombia-coffee-farm"
           }
-        };
+        ]
+      },
+      alternativas: [
+        {
+          destino: "Montevidéu",
+          pais: "Uruguai",
+          codigoPais: "UY",
+          preco: { voo: "1500", hotel: "300" },
+          porque: "Clima costeiro tranquilo com frutos do mar deliciosos e espaços culturais.",
+          imagens: [
+            {
+              url: "assets/images/destinos/montevideo.jpg",
+              alt: "Vista da orla de Montevidéu",
+              photographer: "Carlos Silva",
+              photographerUrl: "https://unsplash.com/@carlossilva",
+              sourceUrl: "https://unsplash.com/photos/montevideo-uruguay"
+            }
+          ]
+        },
+        {
+          destino: "Santiago",
+          pais: "Chile",
+          codigoPais: "CL",
+          preco: { voo: "1600", hotel: "320" },
+          porque: "Mescla de cultura andina com paisagens urbanas modernas e vinícolas famosas.",
+          imagens: []
+        },
+        {
+          destino: "Buenos Aires",
+          pais: "Argentina",
+          codigoPais: "AR",
+          preco: { voo: "1450", hotel: "280" },
+          porque: "Capital cultural da América do Sul com tangos, arquitetura e gastronomia espetacular.",
+          imagens: []
+        }
+      ],
+      surpresa: {
+        ativa: true,
+        destino: "Cartagena",
+        pais: "Colômbia",
+        descricao: "Um destino mágico com praias paradisíacas e cidade histórica colorida!"
       }
     };
   }
@@ -314,6 +359,8 @@ BENETRIP.Destinos = (function() {
       if (elements.containerConteudo) {
         elements.containerConteudo.classList.remove('hidden');
       }
+      
+      console.log('Renderizando destinos com dados:', recomendacoes);
       
       // Renderizar componentes da interface
       renderizarMensagemTripinha();
@@ -406,6 +453,8 @@ BENETRIP.Destinos = (function() {
    */
   function renderizarDestinoDestaque(destino) {
     if (!elements.destinoDestaque || !destino) return;
+    
+    console.log('Renderizando destino em destaque:', destino);
     
     // Obter imagens do destino ou usar array vazio como fallback
     const imagens = destino.imagens || [];
@@ -513,7 +562,17 @@ BENETRIP.Destinos = (function() {
    * @param {Array} alternativas - Lista de destinos alternativos
    */
   function renderizarDestinosAlternativos(alternativas) {
-    if (!elements.destinosAlternativos || !Array.isArray(alternativas)) return;
+    if (!elements.destinosAlternativos) {
+      console.error('Container de destinos alternativos não encontrado');
+      return;
+    }
+    
+    if (!Array.isArray(alternativas)) {
+      console.warn('Alternativas não é um array:', alternativas);
+      alternativas = [];
+    }
+    
+    console.log('Renderizando destinos alternativos:', alternativas);
     
     // Limpar container e adicionar título
     elements.destinosAlternativos.innerHTML = '<h3 class="font-bold text-lg mt-2">Mais Destinos Incríveis</h3>';
@@ -529,7 +588,13 @@ BENETRIP.Destinos = (function() {
     }
     
     // Renderizar cada destino alternativo
-    alternativas.forEach(destino => {
+    alternativas.forEach((destino, index) => {
+      // Verificar se temos dados válidos
+      if (!destino || !destino.destino || !destino.pais) {
+        console.warn(`Destino alternativo ${index} inválido:`, destino);
+        return;
+      }
+      
       // Obter a primeira imagem do destino, se disponível
       const imagem = destino.imagens && destino.imagens.length > 0 ? destino.imagens[0] : null;
       
@@ -613,7 +678,18 @@ BENETRIP.Destinos = (function() {
    * @param {Object} surpresa - Dados do destino surpresa (se disponível)
    */
   function renderizarOpcaoSurpresa(surpresa) {
-    if (!elements.opcaoSurpresa) return;
+    if (!elements.opcaoSurpresa) {
+      console.error('Container de surpresa não encontrado');
+      return;
+    }
+    
+    console.log('Renderizando opção surpresa:', surpresa);
+    
+    // Verificar se a opção surpresa está ativa
+    if (surpresa && surpresa.ativa === false) {
+      elements.opcaoSurpresa.innerHTML = ''; // Não mostrar se estiver explicitamente desativado
+      return;
+    }
     
     elements.opcaoSurpresa.innerHTML = `
       <div class="p-4 rounded-lg mt-4 text-white" style="background-color: #E87722">
