@@ -6,6 +6,413 @@ const REQUEST_TIMEOUT = 50000; // 50 segundos para requisições externas
 const HANDLER_TIMEOUT = 55000; // 55 segundos para processamento total
 const AMADEUS_TIMEOUT = 15000; // 15 segundos para requisições à API Amadeus
 
+// Função para validar códigos IATA antes de fazer requisições
+function validarCodigoIATA(codigo) {
+  if (!codigo) return false;
+  
+  // Códigos IATA válidos têm 3 letras maiúsculas
+  const regex = /^[A-Z]{3}$/;
+  return regex.test(codigo);
+}
+
+// Função auxiliar para formatar duração
+function formatarDuracao(duracao) {
+  if (!duracao) return null;
+  
+  try {
+    // Formato esperado: PT12H30M
+    const horasMatch = duracao.match(/(\d+)H/);
+    const minutosMatch = duracao.match(/(\d+)M/);
+    
+    const horas = horasMatch ? parseInt(horasMatch[1]) : 0;
+    const minutos = minutosMatch ? parseInt(minutosMatch[1]) : 0;
+    
+    return `${horas}h${minutos > 0 ? ` ${minutos}m` : ''}`;
+  } catch (e) {
+    console.warn(`Erro ao formatar duração "${duracao}":`, e);
+    return null;
+  }
+}
+
+// Melhorar função de autenticação para incluir mais detalhes e lidar com erros
+async function obterTokenAmadeus() {
+  try {
+    console.log('Iniciando autenticação Amadeus...');
+    
+    const apiKey = process.env.AMADEUS_API_KEY;
+    const apiSecret = process.env.AMADEUS_API_SECRET;
+    
+    if (!apiKey || !apiSecret) {
+      console.error('Credenciais Amadeus não configuradas');
+      return null;
+    }
+    
+    const response = await axios({
+      method: 'post',
+      url: 'https://api.amadeus.com/v1/security/oauth2/token',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      data: new URLSearchParams({
+        'grant_type': 'client_credentials',
+        'client_id': apiKey,
+        'client_secret': apiSecret
+      }),
+      timeout: 10000
+    });
+    
+    if (!response.data || !response.data.access_token) {
+      throw new Error('Token não encontrado na resposta');
+    }
+    
+    console.log('Token Amadeus obtido com sucesso');
+    console.log(`Tipo de token: ${response.data.token_type}`);
+    console.log(`Expiração: ${response.data.expires_in} segundos`);
+    
+    return response.data.access_token;
+  } catch (erro) {
+    console.error(`Erro ao obter token Amadeus: ${erro.message}`);
+    
+    if (erro.response) {
+      console.error(`Status: ${erro.response.status}`);
+      console.error(`Dados: ${JSON.stringify(erro.response.data)}`);
+    }
+    
+    return null;
+  }
+}
+
+// Função melhorada para buscar preço de voo com a API Amadeus
+async function buscarPrecoVoo(origemIATA, destinoIATA, datas, token) {
+  // Validar parâmetros de entrada
+  if (!origemIATA || !destinoIATA || !datas || !token) {
+    console.log(`Parâmetros incompletos para busca de voo: ${origemIATA} -> ${destinoIATA}`);
+    return null;
+  }
+
+  try {
+    console.log(`Buscando voos de ${origemIATA} para ${destinoIATA}...`);
+    
+    // Configurar parâmetros completos conforme documentação
+    const params = {
+      originLocationCode: origemIATA,
+      destinationLocationCode: destinoIATA,
+      departureDate: datas.dataIda || '2025-08-05',
+      returnDate: datas.dataVolta || '2025-08-12',
+      adults: 1, // Garantir que este parâmetro esteja presente
+      currencyCode: 'BRL', // Garantir que a moeda esteja definida
+      max: 5 // Limitar número de resultados para performance
+    };
+    
+    // Log detalhado para diagnóstico
+    console.log('Parâmetros da requisição:', JSON.stringify(params));
+    
+    const response = await axios({
+      method: 'get',
+      url: 'https://api.amadeus.com/v2/shopping/flight-offers',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      },
+      params: params,
+      timeout: AMADEUS_TIMEOUT
+    });
+    
+    // Processar e extrair informações relevantes
+    if (response.data && response.data.data && response.data.data.length > 0) {
+      const melhorOferta = response.data.data[0]; // Usar a primeira oferta
+      
+      // Extrair o preço
+      const precoTotal = parseFloat(melhorOferta.price.total);
+      
+      // Extrair informações do voo
+      const detalhesVoo = {
+        companhia: melhorOferta.validatingAirlineCodes?.[0] || 'Várias',
+        numeroParadas: 0,
+        duracao: ''
+      };
+      
+      // Processar informações de segmentos e paradas
+      if (melhorOferta.itineraries && melhorOferta.itineraries.length > 0) {
+        // Contar paradas na ida
+        const segmentosIda = melhorOferta.itineraries[0].segments || [];
+        detalhesVoo.numeroParadas = Math.max(0, segmentosIda.length - 1);
+        
+        // Calcular duração da ida
+        if (melhorOferta.itineraries[0].duration) {
+          detalhesVoo.duracao = formatarDuracao(melhorOferta.itineraries[0].duration);
+        }
+      }
+      
+      return {
+        precoReal: precoTotal,
+        detalhesVoo: detalhesVoo
+      };
+    } else {
+      console.warn('Nenhuma oferta encontrada para', origemIATA, destinoIATA);
+      return null;
+    }
+  } catch (erro) {
+    // Melhorar o tratamento de erros com informações mais detalhadas
+    console.error(`Erro ao buscar preços de voo: ${erro.message}`);
+    
+    if (erro.response) {
+      console.error(`Status: ${erro.response.status}`);
+      console.error(`Dados: ${JSON.stringify(erro.response.data)}`);
+      
+      // Verificar erros específicos
+      if (erro.response.data && erro.response.data.errors) {
+        erro.response.data.errors.forEach(e => {
+          console.error(`Código de erro: ${e.code}, Título: ${e.title}, Detalhe: ${e.detail}`);
+        });
+      }
+    }
+    
+    return null;
+  }
+}
+
+// Função de retentativa para lidar com erros temporários
+async function buscarPrecoComRetentativa(origemIATA, destinoIATA, datas, token) {
+  const MAX_TENTATIVAS = 3;
+  let tentativa = 1;
+  let delayMs = 1000; // 1 segundo inicial
+  
+  while (tentativa <= MAX_TENTATIVAS) {
+    try {
+      console.log(`Tentativa ${tentativa}/${MAX_TENTATIVAS} para ${origemIATA} -> ${destinoIATA}`);
+      const resultado = await buscarPrecoVoo(origemIATA, destinoIATA, datas, token);
+      
+      if (resultado) {
+        return resultado;
+      }
+      
+      // Se chegou aqui, temos null como resultado (erro ou sem dados)
+      console.log(`Tentativa ${tentativa} falhou, aguardando ${delayMs}ms antes de tentar novamente...`);
+      
+      // Aguardar antes da próxima tentativa
+      await new Promise(resolve => setTimeout(resolve, delayMs));
+      
+      // Backoff exponencial (dobrar o tempo de espera)
+      delayMs *= 2;
+      tentativa++;
+    } catch (e) {
+      console.error(`Erro catastrófico na tentativa ${tentativa}:`, e);
+      tentativa++;
+      
+      // Aguardar antes da próxima tentativa
+      await new Promise(resolve => setTimeout(resolve, delayMs));
+      delayMs *= 2;
+    }
+  }
+  
+  console.log(`Todas as ${MAX_TENTATIVAS} tentativas falharam para ${origemIATA} -> ${destinoIATA}`);
+  return null;
+}
+
+// Implementar uso do endpoint alternativo Flight Inspiration Search em caso de falha persistente
+async function buscarPrecoAlternativo(origemIATA, datas, token) {
+  try {
+    console.log(`Tentando endpoint alternativo Flight Inspiration Search com origem ${origemIATA}`);
+    
+    const params = {
+      origin: origemIATA,
+      departureDate: `${datas.dataIda || '2025-08-05'},${datas.dataVolta || '2025-08-12'}`,
+      oneWay: false,
+      duration: "7,14", // Faixa aproximada
+      nonStop: false,
+      viewBy: "DESTINATION"
+    };
+    
+    const response = await axios({
+      method: 'get',
+      url: 'https://api.amadeus.com/v1/shopping/flight-destinations',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      },
+      params: params,
+      timeout: AMADEUS_TIMEOUT
+    });
+    
+    return response.data;
+  } catch (erro) {
+    console.error(`Erro ao usar endpoint alternativo: ${erro.message}`);
+    return null;
+  }
+}
+
+// Função para atualizar preços usando dados do endpoint alternativo
+function atualizarPrecosComDadosAlternativos(destinos, dadosAlternativos) {
+  if (!dadosAlternativos || !dadosAlternativos.data) {
+    return false;
+  }
+  
+  // Mapear destinos por código IATA para busca rápida
+  const mapaDadosAlternativos = {};
+  dadosAlternativos.data.forEach(item => {
+    mapaDadosAlternativos[item.destination] = parseFloat(item.price.total);
+  });
+  
+  // Atualizar destinos com preços encontrados
+  let atualizacoesFeitas = 0;
+  
+  destinos.forEach(destino => {
+    const codigoIATA = destino.aeroporto?.codigo;
+    if (codigoIATA && mapaDadosAlternativos[codigoIATA]) {
+      destino.preco.voo = Math.round(mapaDadosAlternativos[codigoIATA]);
+      destino.preco.fonte = 'Amadeus (alternativo)';
+      atualizacoesFeitas++;
+    }
+  });
+  
+  console.log(`Atualizados ${atualizacoesFeitas} destinos com dados alternativos`);
+  return atualizacoesFeitas > 0;
+}
+
+// Função melhorada para processar destinos
+async function processarDestinos(recomendacoes, origemIATA, datas, token) {
+  // Validar código de origem
+  if (!validarCodigoIATA(origemIATA)) {
+    console.error(`Código IATA de origem inválido: ${origemIATA}`);
+    origemIATA = 'GRU'; // Fallback para um aeroporto conhecido
+    console.log(`Usando código IATA de fallback: ${origemIATA}`);
+  }
+  
+  try {
+    console.log('Iniciando processamento de destinos para obter preços reais...');
+    
+    // Processar destino principal primeiro
+    if (recomendacoes.topPick && recomendacoes.topPick.aeroporto && recomendacoes.topPick.aeroporto.codigo) {
+      const destinoIATA = recomendacoes.topPick.aeroporto.codigo;
+      console.log(`Processando destino principal: ${recomendacoes.topPick.destino} (${destinoIATA})`);
+      
+      // Validar código IATA
+      if (validarCodigoIATA(destinoIATA)) {
+        const resultado = await buscarPrecoComRetentativa(
+          origemIATA,
+          destinoIATA,
+          datas,
+          token
+        );
+        
+        if (resultado) {
+          // Atualizar preço e detalhes
+          recomendacoes.topPick.preco.voo = resultado.precoReal;
+          recomendacoes.topPick.preco.fonte = 'Amadeus';
+          recomendacoes.topPick.detalhesVoo = resultado.detalhesVoo;
+          console.log(`Preço atualizado para ${recomendacoes.topPick.destino}: R$ ${recomendacoes.topPick.preco.voo}`);
+        }
+      } else {
+        console.warn(`Código IATA inválido para ${recomendacoes.topPick.destino}: ${destinoIATA}`);
+      }
+      
+      // Aguardar entre requisições para evitar rate limiting
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+    
+    // Processar destinos alternativos em lotes para melhor performance
+    if (recomendacoes.alternativas && Array.isArray(recomendacoes.alternativas)) {
+      // Processar em lotes de 2 para evitar sobrecarga da API
+      const lotes = [];
+      for (let i = 0; i < recomendacoes.alternativas.length; i += 2) {
+        lotes.push(recomendacoes.alternativas.slice(i, i + 2));
+      }
+      
+      for (const [index, lote] of lotes.entries()) {
+        console.log(`Processando lote ${index + 1}/${lotes.length} de destinos alternativos...`);
+        
+        // Processar destinos no lote em paralelo
+        await Promise.all(lote.map(async (alternativa) => {
+          if (alternativa.aeroporto && alternativa.aeroporto.codigo) {
+            const destinoIATA = alternativa.aeroporto.codigo;
+            
+            // Validar código IATA
+            if (validarCodigoIATA(destinoIATA)) {
+              console.log(`Processando destino alternativo: ${alternativa.destino} (${destinoIATA})`);
+              
+              const resultado = await buscarPrecoComRetentativa(
+                origemIATA,
+                destinoIATA,
+                datas,
+                token
+              );
+              
+              if (resultado) {
+                // Atualizar preço e detalhes
+                alternativa.preco.voo = resultado.precoReal;
+                alternativa.preco.fonte = 'Amadeus';
+                alternativa.detalhesVoo = resultado.detalhesVoo;
+                console.log(`Preço atualizado para ${alternativa.destino}: R$ ${alternativa.preco.voo}`);
+              }
+            } else {
+              console.warn(`Código IATA inválido para ${alternativa.destino}: ${destinoIATA}`);
+            }
+          }
+        }));
+        
+        // Aguardar entre lotes para evitar rate limiting
+        if (index < lotes.length - 1) {
+          console.log('Aguardando 1 segundo antes do próximo lote...');
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+      }
+    }
+    
+    // Processar destino surpresa
+    if (recomendacoes.surpresa && recomendacoes.surpresa.aeroporto && recomendacoes.surpresa.aeroporto.codigo) {
+      const destinoIATA = recomendacoes.surpresa.aeroporto.codigo;
+      
+      // Validar código IATA
+      if (validarCodigoIATA(destinoIATA)) {
+        console.log(`Processando destino surpresa: ${recomendacoes.surpresa.destino} (${destinoIATA})`);
+        
+        const resultado = await buscarPrecoComRetentativa(
+          origemIATA,
+          destinoIATA,
+          datas,
+          token
+        );
+        
+        if (resultado) {
+          // Atualizar preço e detalhes
+          recomendacoes.surpresa.preco.voo = resultado.precoReal;
+          recomendacoes.surpresa.preco.fonte = 'Amadeus';
+          recomendacoes.surpresa.detalhesVoo = resultado.detalhesVoo;
+          console.log(`Preço atualizado para ${recomendacoes.surpresa.destino}: R$ ${recomendacoes.surpresa.preco.voo}`);
+        }
+      } else {
+        console.warn(`Código IATA inválido para ${recomendacoes.surpresa.destino}: ${destinoIATA}`);
+      }
+    }
+    
+    // Se todas as buscas falharam, tentar endpoint alternativo
+    const todosDestinos = [
+      recomendacoes.topPick,
+      ...(recomendacoes.alternativas || []),
+      recomendacoes.surpresa
+    ].filter(Boolean);
+    
+    const algunsPrecoAtualizados = todosDestinos.some(d => d.preco?.fonte === 'Amadeus');
+    
+    if (!algunsPrecoAtualizados) {
+      console.log('Nenhum preço foi atualizado, tentando endpoint alternativo...');
+      
+      const dadosAlternativos = await buscarPrecoAlternativo(origemIATA, datas, token);
+      if (dadosAlternativos) {
+        const sucesso = atualizarPrecosComDadosAlternativos(todosDestinos, dadosAlternativos);
+        if (sucesso) {
+          console.log('Alguns preços foram atualizados usando endpoint alternativo');
+        }
+      }
+    }
+    
+    return recomendacoes;
+  } catch (error) {
+    console.error(`Erro ao processar destinos: ${error.message}`);
+    return recomendacoes; // Retornar recomendações originais em caso de erro
+  }
+}
+
+// Função principal - Handler da API
 module.exports = async function handler(req, res) {
   // Implementar mecanismo de timeout no servidor
   let isResponseSent = false;
@@ -440,241 +847,7 @@ module.exports = async function handler(req, res) {
       });
     }
   }
-}
-
-// Validação parcial para verificação rápida
-function isPartiallyValidJSON(jsonString) {
-  if (!jsonString) return false;
-  
-  try {
-    const data = typeof jsonString === 'string' ? JSON.parse(jsonString) : jsonString;
-    return data && (data.topPick || data.alternativas || data.surpresa);
-  } catch (error) {
-    return false;
-  }
-}
-
-// Função para obter token de autenticação da Amadeus
-async function obterTokenAmadeus() {
-  try {
-    const apiKey = process.env.AMADEUS_API_KEY;
-    const apiSecret = process.env.AMADEUS_API_SECRET;
-    
-    if (!apiKey || !apiSecret) {
-      console.error('Credenciais Amadeus não configuradas');
-      return null;
-    }
-    
-    console.log('Obtendo token de autenticação Amadeus...');
-    
-    const response = await axios({
-      method: 'post',
-      url: 'https://api.amadeus.com/v1/security/oauth2/token',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded'
-      },
-      data: `grant_type=client_credentials&client_id=${apiKey}&client_secret=${apiSecret}`,
-      timeout: 10000
-    });
-    
-    if (response.data && response.data.access_token) {
-      console.log('Token Amadeus obtido com sucesso');
-      return response.data.access_token;
-    } else {
-      console.error('Resposta Amadeus inválida:', response.data);
-      return null;
-    }
-  } catch (error) {
-    console.error('Erro ao obter token Amadeus:', error.message);
-    return null;
-  }
-}
-
-// Função para buscar preço de voo com a API Amadeus
-async function buscarPrecoVoo(origemIATA, destinoIATA, datas, token) {
-  try {
-    if (!token) {
-      console.error('Token Amadeus não disponível');
-      return null;
-    }
-    
-    if (!origemIATA || !destinoIATA) {
-      console.error('Códigos IATA inválidos:', origemIATA, destinoIATA);
-      return null;
-    }
-    
-    console.log(`Buscando voos de ${origemIATA} para ${destinoIATA}...`);
-    
-    // Validar e formatar datas
-    const dataIda = datas.dataIda || '2025-08-05';
-    const dataVolta = datas.dataVolta || '2025-08-12';
-    
-    const response = await axios({
-      method: 'get',
-      url: 'https://api.amadeus.com/v2/shopping/flight-offers',
-      headers: {
-        'Authorization': `Bearer ${token}`
-      },
-      params: {
-        originLocationCode: origemIATA,
-        destinationLocationCode: destinoIATA,
-        departureDate: dataIda,
-        returnDate: dataVolta,
-        adults: 1,
-        currencyCode: 'BRL',
-        max: 5
-      },
-      timeout: AMADEUS_TIMEOUT
-    });
-    
-    // Processar e extrair informações relevantes
-    if (response.data && response.data.data && response.data.data.length > 0) {
-      const melhorOferta = response.data.data[0]; // Usar a primeira oferta
-      
-      // Extrair o preço
-      const precoTotal = parseFloat(melhorOferta.price.total);
-      
-      // Extrair informações do voo
-      const detalhesVoo = {
-        companhia: melhorOferta.validatingAirlineCodes[0],
-        numeroParadas: 0,
-        duracao: ''
-      };
-      
-      // Processar informações de segmentos e paradas
-      if (melhorOferta.itineraries && melhorOferta.itineraries.length > 0) {
-        // Contar paradas na ida
-        const segmentosIda = melhorOferta.itineraries[0].segments || [];
-        detalhesVoo.numeroParadas = Math.max(0, segmentosIda.length - 1);
-        
-        // Calcular duração da ida
-        if (melhorOferta.itineraries[0].duration) {
-          detalhesVoo.duracao = formatarDuracao(melhorOferta.itineraries[0].duration);
-        }
-      }
-      
-      return {
-        precoReal: precoTotal,
-        detalhesVoo: detalhesVoo
-      };
-    } else {
-      console.warn('Nenhuma oferta encontrada para', origemIATA, destinoIATA);
-      return null;
-    }
-  } catch (error) {
-    console.error('Erro ao buscar preços de voo:', error.message);
-    if (error.response) {
-      console.error('Status:', error.response.status);
-      console.error('Dados:', JSON.stringify(error.response.data).substring(0, 200));
-    }
-    return null;
-  }
-}
-
-// Função para processar destinos em lotes
-async function processarDestinos(recomendacoes, origemIATA, datas, token) {
-  if (!recomendacoes || !token) {
-    console.log('Dados insuficientes para processamento de destinos');
-    return recomendacoes;
-  }
-  
-  console.log('Processando destinos para obter preços reais...');
-  
-  try {
-    // Processar o destino principal primeiro
-    if (recomendacoes.topPick && recomendacoes.topPick.aeroporto && recomendacoes.topPick.aeroporto.codigo) {
-      const destinoIATA = recomendacoes.topPick.aeroporto.codigo;
-      console.log(`Processando destino principal: ${recomendacoes.topPick.destino} (${destinoIATA})`);
-      
-      const dadosVoo = await buscarPrecoVoo(origemIATA, destinoIATA, datas, token);
-      
-      if (dadosVoo) {
-        // Atualizar com preço real
-        recomendacoes.topPick.preco.voo = dadosVoo.precoReal;
-        // Adicionar detalhes do voo
-        recomendacoes.topPick.detalhesVoo = dadosVoo.detalhesVoo;
-      }
-      
-      // Pequeno delay para não sobrecarregar a API
-      await new Promise(resolve => setTimeout(resolve, 1000));
-    }
-    
-    // Processar destinos alternativos em lotes
-    if (recomendacoes.alternativas && Array.isArray(recomendacoes.alternativas)) {
-      // Processar em lotes de 2
-      for (let i = 0; i < recomendacoes.alternativas.length; i += 2) {
-        const lote = recomendacoes.alternativas.slice(i, i + 2);
-        
-        // Processar em paralelo os destinos do lote
-        await Promise.all(lote.map(async (destino) => {
-          if (destino.aeroporto && destino.aeroporto.codigo) {
-            const destinoIATA = destino.aeroporto.codigo;
-            console.log(`Processando destino alternativo: ${destino.destino} (${destinoIATA})`);
-            
-            const dadosVoo = await buscarPrecoVoo(origemIATA, destinoIATA, datas, token);
-            
-            if (dadosVoo) {
-              // Atualizar com preço real
-              destino.preco.voo = dadosVoo.precoReal;
-              // Adicionar detalhes do voo
-              destino.detalhesVoo = dadosVoo.detalhesVoo;
-            }
-          }
-        }));
-        
-        // Delay entre lotes
-        if (i + 2 < recomendacoes.alternativas.length) {
-          await new Promise(resolve => setTimeout(resolve, 1000));
-        }
-      }
-    }
-    
-    // Processar destino surpresa por último
-    if (recomendacoes.surpresa && recomendacoes.surpresa.aeroporto && recomendacoes.surpresa.aeroporto.codigo) {
-      const destinoIATA = recomendacoes.surpresa.aeroporto.codigo;
-      console.log(`Processando destino surpresa: ${recomendacoes.surpresa.destino} (${destinoIATA})`);
-      
-      const dadosVoo = await buscarPrecoVoo(origemIATA, destinoIATA, datas, token);
-      
-      if (dadosVoo) {
-        // Atualizar com preço real
-        recomendacoes.surpresa.preco.voo = dadosVoo.precoReal;
-        // Adicionar detalhes do voo
-        recomendacoes.surpresa.detalhesVoo = dadosVoo.detalhesVoo;
-      }
-    }
-    
-    return recomendacoes;
-  } catch (error) {
-    console.error('Erro ao processar destinos:', error);
-    return recomendacoes; // Retornar recomendações originais em caso de erro
-  }
-}
-
-// Função auxiliar para formatar duração
-function formatarDuracao(duracaoString) {
-  try {
-    // Extrair horas e minutos da string formato PT2H30M
-    const horasMatch = duracaoString.match(/(\d+)H/);
-    const minutosMatch = duracaoString.match(/(\d+)M/);
-    
-    const horas = horasMatch ? parseInt(horasMatch[1]) : 0;
-    const minutos = minutosMatch ? parseInt(minutosMatch[1]) : 0;
-    
-    if (horas > 0 && minutos > 0) {
-      return `${horas}h ${minutos}m`;
-    } else if (horas > 0) {
-      return `${horas}h`;
-    } else if (minutos > 0) {
-      return `${minutos}m`;
-    } else {
-      return 'N/A';
-    }
-  } catch (error) {
-    console.error('Erro ao formatar duração:', error);
-    return 'N/A';
-  }
-}
+};
 
 // Função para extrair código IATA da origem
 function obterCodigoIATAOrigem(dadosUsuario) {
@@ -782,6 +955,18 @@ function obterDatasViagem(dadosUsuario) {
       dataIda: '2025-08-05',
       dataVolta: '2025-08-12'
     };
+  }
+}
+
+// Validação parcial para verificação rápida
+function isPartiallyValidJSON(jsonString) {
+  if (!jsonString) return false;
+  
+  try {
+    const data = typeof jsonString === 'string' ? JSON.parse(jsonString) : jsonString;
+    return data && (data.topPick || data.alternativas || data.surpresa);
+  } catch (error) {
+    return false;
   }
 }
 
@@ -1511,326 +1696,6 @@ function obterCodigoIATAPadrao(cidade, pais) {
   return "AAA"; // Código genérico
 }
 
-// Função para gerar prompt baseado nos dados do usuário
-function gerarPromptParaDestinos(dados) {
-  // Extrair informações relevantes dos dados recebidos, com verificações
-  const companhia = getCompanhiaText(dados.companhia || 0);
-  const preferencia = getPreferenciaText(dados.preferencia_viagem || 0);
-  const cidadeOrigem = dados.cidade_partida?.name || 'origem não especificada';
-  const orcamento = dados.orcamento_valor || 'flexível';
-  const moeda = dados.moeda_escolhida || 'BRL';
-  
-  // Extrair informações sobre quantidade de pessoas
-  const quantidadePessoas = dados.quantidade_familia || dados.quantidade_amigos || 1;
-  
-  // Extrair qualquer informação adicional importante
-  const conheceDestino = dados.conhece_destino || 0;
-  const tipoDestino = dados.tipo_destino || 'qualquer';
-  const famaDestino = dados.fama_destino || 'qualquer';
-  
-  // Datas de viagem com verificação de formato
-  let dataIda = 'não especificada';
-  let dataVolta = 'não especificada';
-  
-  if (dados.datas) {
-    if (typeof dados.datas === 'string' && dados.datas.includes(',')) {
-      const partes = dados.datas.split(',');
-      dataIda = partes[0] || 'não especificada';
-      dataVolta = partes[1] || 'não especificada';
-    } else if (dados.datas.dataIda && dados.datas.dataVolta) {
-      dataIda = dados.datas.dataIda;
-      dataVolta = dados.datas.dataVolta;
-    }
-  }
-  
-  // Calcular duração da viagem para contextualizar melhor
-  let duracaoViagem = 'não especificada';
-  try {
-    if (dataIda !== 'não especificada' && dataVolta !== 'não especificada') {
-      const ida = new Date(dataIda);
-      const volta = new Date(dataVolta);
-      const diff = Math.abs(volta - ida);
-      const dias = Math.ceil(diff / (1000 * 60 * 60 * 24));
-      duracaoViagem = `${dias} dias`;
-    }
-  } catch (e) {
-    console.log("Erro ao calcular duração da viagem:", e);
-  }
-
-  // Determinar estação do ano baseada na data de ida
-  let estacaoViagem = 'não determinada';
-  let hemisferio = determinarHemisferio(cidadeOrigem);
-  
-  try {
-    if (dataIda !== 'não especificada') {
-      const dataObj = new Date(dataIda);
-      const mes = dataObj.getMonth();
-      
-      // Simplificação para hemisfério norte
-      if (mes >= 2 && mes <= 4) estacaoViagem = 'primavera';
-      else if (mes >= 5 && mes <= 7) estacaoViagem = 'verão';
-      else if (mes >= 8 && mes <= 10) estacaoViagem = 'outono';
-      else estacaoViagem = 'inverno';
-      
-      // Inversão para hemisfério sul
-      if (hemisferio === 'sul') {
-        if (estacaoViagem === 'verão') estacaoViagem = 'inverno';
-        else if (estacaoViagem === 'inverno') estacaoViagem = 'verão';
-        else if (estacaoViagem === 'primavera') estacaoViagem = 'outono';
-        else if (estacaoViagem === 'outono') estacaoViagem = 'primavera';
-      }
-    }
-  } catch (e) {
-    console.log("Erro ao determinar estação do ano:", e);
-  }
-
-  // Colocar orçamento com destaque prioritário
-  const mensagemOrcamento = orcamento !== 'flexível' ?
-    `⚠️ ORÇAMENTO MÁXIMO: ${orcamento} ${moeda} para voos (ida e volta por pessoa). Todos os destinos DEVEM ter preços de voo ABAIXO deste valor. Este é o requisito MAIS IMPORTANTE.` : 
-    'Orçamento flexível';
-    
-  // Adicionar sugestão de localidade baseada na origem
-  const sugestaoDistancia = gerarSugestaoDistancia(cidadeOrigem, tipoDestino);
-
-  // Construir prompt detalhado e personalizado
-  return `Crie recomendações de viagem que respeitam ESTRITAMENTE o orçamento do usuário:
-
-${mensagemOrcamento}
-
-PERFIL DO VIAJANTE:
-- Partindo de: ${cidadeOrigem} ${sugestaoDistancia}
-- Viajando: ${companhia}
-- Número de pessoas: ${quantidadePessoas}
-- Atividades preferidas: ${preferencia}
-- Período da viagem: ${dataIda} a ${dataVolta} (${duracaoViagem})
-- Estação do ano na viagem: ${estacaoViagem}
-- Experiência como viajante: ${conheceDestino === 1 ? 'Com experiência' : 'Iniciante'} 
-- Preferência por destinos: ${getTipoDestinoText(tipoDestino)}
-- Popularidade do destino: ${getFamaDestinoText(famaDestino)}
-
-IMPORTANTE:
-1. O preço do VOO de CADA destino DEVE ser MENOR que o orçamento máximo de ${orcamento} ${moeda}.
-2. Forneça um mix equilibrado: inclua tanto destinos populares quanto opções alternativas.
-3. Forneça EXATAMENTE 4 destinos alternativos diferentes entre si.
-4. Considere a ÉPOCA DO ANO (${estacaoViagem}) para sugerir destinos com clima adequado.
-5. Inclua destinos de diferentes continentes/regiões nas alternativas.
-6. Garanta que os preços sejam realistas e precisos para voos de ida e volta partindo de ${cidadeOrigem}.
-7. Para CADA destino, inclua o código IATA (3 letras) do aeroporto principal ou mais próximo, para busca precisa de voos.
-8. Para cada destino, INCLUA PONTOS TURÍSTICOS ESPECÍFICOS E CONHECIDOS - não genéricos.
-9. Os comentários da Tripinha DEVEM mencionar pelo menos um dos pontos turísticos do destino.
-
-Forneça no formato JSON exato abaixo, SEM formatação markdown:
-{
-  "topPick": {
-    "destino": "Nome da Cidade",
-    "pais": "Nome do País",
-    "codigoPais": "XX",
-    "descricao": "Breve descrição do destino",
-    "porque": "Razão específica para visitar baseada nas preferências",
-    "destaque": "Uma experiência única neste destino",
-    "comentario": "Comentário entusiasmado da Tripinha (cachorra) mencionando pelo menos um ponto turístico específico",
-    "pontosTuristicos": [
-      "Nome do Primeiro Ponto Turístico específico e conhecido na cidade", 
-      "Nome do Segundo Ponto Turístico específico e conhecido na cidade"
-    ],
-    "aeroporto": {
-      "codigo": "XYZ",
-      "nome": "Nome do Aeroporto Principal"
-    },
-    "preco": {
-      "voo": número,
-      "hotel": número
-    }
-  },
-  "alternativas": [
-    {
-      "destino": "Nome da Cidade 1",
-      "pais": "Nome do País 1", 
-      "codigoPais": "XX",
-      "porque": "Razão específica para visitar",
-      "pontoTuristico": "Nome de um Ponto Turístico específico e conhecido na cidade",
-      "aeroporto": {
-        "codigo": "XYZ",
-        "nome": "Nome do Aeroporto Principal"
-      },
-      "preco": {
-        "voo": número,
-        "hotel": número
-      }
-    },
-    {
-      "destino": "Nome da Cidade 2",
-      "pais": "Nome do País 2", 
-      "codigoPais": "XX",
-      "porque": "Razão específica para visitar",
-      "pontoTuristico": "Nome de um Ponto Turístico específico e conhecido na cidade", 
-      "aeroporto": {
-        "codigo": "XYZ",
-        "nome": "Nome do Aeroporto Principal"
-      },
-      "preco": {
-        "voo": número,
-        "hotel": número
-      }
-    },
-    {
-      "destino": "Nome da Cidade 3",
-      "pais": "Nome do País 3", 
-      "codigoPais": "XX",
-      "porque": "Razão específica para visitar",
-      "pontoTuristico": "Nome de um Ponto Turístico específico e conhecido na cidade",
-      "aeroporto": {
-        "codigo": "XYZ",
-        "nome": "Nome do Aeroporto Principal"
-      },
-      "preco": {
-        "voo": número,
-        "hotel": número
-      }
-    },
-    {
-      "destino": "Nome da Cidade 4",
-      "pais": "Nome do País 4", 
-      "codigoPais": "XX",
-      "porque": "Razão específica para visitar",
-      "pontoTuristico": "Nome de um Ponto Turístico específico e conhecido na cidade",
-      "aeroporto": {
-        "codigo": "XYZ",
-        "nome": "Nome do Aeroporto Principal"
-      },
-      "preco": {
-        "voo": número,
-        "hotel": número
-      }
-    }
-  ],
-  "surpresa": {
-    "destino": "Nome da Cidade",
-    "pais": "Nome do País",
-    "codigoPais": "XX",
-    "descricao": "Breve descrição do destino",
-    "porque": "Razão para visitar, destacando o fator surpresa",
-    "destaque": "Uma experiência única neste destino",
-    "comentario": "Comentário entusiasmado da Tripinha mencionando pelo menos um ponto turístico específico",
-    "pontosTuristicos": [
-      "Nome do Primeiro Ponto Turístico específico e conhecido na cidade", 
-      "Nome do Segundo Ponto Turístico específico e conhecido na cidade"
-    ],
-    "aeroporto": {
-      "codigo": "XYZ",
-      "nome": "Nome do Aeroporto Principal"
-    },
-    "preco": {
-      "voo": número,
-      "hotel": número
-    }
-  }
-}`;
-}
-
-// Função auxiliar para obter texto de companhia com verificação de tipo
-function getCompanhiaText(value) {
-  // Converter para número se for string
-  if (typeof value === 'string') {
-    value = parseInt(value, 10);
-  }
-  
-  const options = {
-    0: "sozinho(a)",
-    1: "em casal (viagem romântica)",
-    2: "em família",
-    3: "com amigos"
-  };
-  return options[value] || "sozinho(a)";
-}
-
-// Função auxiliar para obter texto de preferência com verificação de tipo
-function getPreferenciaText(value) {
-  // Converter para número se for string
-  if (typeof value === 'string') {
-    value = parseInt(value, 10);
-  }
-  
-  const options = {
-    0: "relaxamento e descanso (praias, resorts tranquilos, spas)",
-    1: "aventura e atividades ao ar livre (trilhas, esportes, natureza)",
-    2: "cultura, história e gastronomia (museus, centros históricos, culinária local)",
-    3: "experiência urbana, compras e vida noturna (centros urbanos, lojas, restaurantes)"
-  };
-  return options[value] || "experiências diversificadas de viagem";
-}
-
-// Função auxiliar para obter texto de tipo de destino
-function getTipoDestinoText(value) {
-  // Converter para número se for string
-  if (typeof value === 'string') {
-    value = parseInt(value, 10);
-  }
-  
-  const options = {
-    0: "nacional",
-    1: "internacional",
-    2: "qualquer (nacional ou internacional)"
-  };
-  return options[value] || "qualquer";
-}
-
-// Função auxiliar para obter texto de fama do destino
-function getFamaDestinoText(value) {
-  // Converter para número se for string
-  if (typeof value === 'string') {
-    value = parseInt(value, 10);
-  }
-  
-  const options = {
-    0: "famoso e turístico",
-    1: "fora do circuito turístico comum",
-    2: "mistura de ambos"
-  };
-  return options[value] || "qualquer";
-}
-
-// Determinar o hemisfério baseado na cidade de origem (simplificado)
-function determinarHemisferio(cidadeOrigem) {
-  // Lista simplificada de termos que indicam hemisfério sul
-  const indicadoresSul = [
-    'brasil', 'argentina', 'chile', 'austrália', 'nova zelândia', 
-    'áfrica do sul', 'peru', 'uruguai', 'paraguai', 'bolívia'
-  ];
-  
-  if (!cidadeOrigem || cidadeOrigem === 'origem não especificada') {
-    return 'norte'; // Padrão para o caso de não sabermos
-  }
-  
-  const cidadeLowerCase = cidadeOrigem.toLowerCase();
-  
-  // Verificar se a cidade contém algum indicador de hemisfério sul
-  if (indicadoresSul.some(termo => cidadeLowerCase.includes(termo))) {
-    return 'sul';
-  }
-  
-  return 'norte';
-}
-
-// Gerar sugestão de distância de viagem baseada na origem (simplificado)
-function gerarSugestaoDistancia(cidadeOrigem, tipoDestino) {
-  if (cidadeOrigem === 'origem não especificada' || tipoDestino === 0) {
-    return '';
-  }
-  
-  // Lista simplificada de grandes hubs internacionais
-  const grandeshubs = ['nova york', 'londres', 'paris', 'tóquio', 'dubai', 'são paulo'];
-  
-  const cidadeLowerCase = cidadeOrigem.toLowerCase();
-  
-  // Se a origem for um grande hub, sugerir destinos mais distantes
-  if (grandeshubs.some(cidade => cidadeLowerCase.includes(cidade))) {
-    return '(considere incluir destinos intercontinentais nas opções)';
-  }
-  
-  return '(considere a distância e acessibilidade a partir desta origem)';
-}
-
 // Função para gerar dados de emergência personalizados baseados no perfil (SIMPLIFICADA)
 function generateEmergencyData(dadosUsuario = {}) {
   // Extrair parâmetros essenciais
@@ -2204,44 +2069,322 @@ function generateEmergencyData(dadosUsuario = {}) {
   return dadosRegiao;
 }
 
-// Determinar região de origem (simplificado para apenas 4 regiões principais)
-function determinarRegiaoOrigem(cidadeOrigem) {
-  if (!cidadeOrigem) return 'global';
+// Função para gerar prompt baseado nos dados do usuário
+function gerarPromptParaDestinos(dados) {
+  // Extrair informações relevantes dos dados recebidos, com verificações
+  const companhia = getCompanhiaText(dados.companhia || 0);
+  const preferencia = getPreferenciaText(dados.preferencia_viagem || 0);
+  const cidadeOrigem = dados.cidade_partida?.name || 'origem não especificada';
+  const orcamento = dados.orcamento_valor || 'flexível';
+  const moeda = dados.moeda_escolhida || 'BRL';
+  
+  // Extrair informações sobre quantidade de pessoas
+  const quantidadePessoas = dados.quantidade_familia || dados.quantidade_amigos || 1;
+  
+  // Extrair qualquer informação adicional importante
+  const conheceDestino = dados.conhece_destino || 0;
+  const tipoDestino = dados.tipo_destino || 'qualquer';
+  const famaDestino = dados.fama_destino || 'qualquer';
+  
+  // Datas de viagem com verificação de formato
+  let dataIda = 'não especificada';
+  let dataVolta = 'não especificada';
+  
+  if (dados.datas) {
+    if (typeof dados.datas === 'string' && dados.datas.includes(',')) {
+      const partes = dados.datas.split(',');
+      dataIda = partes[0] || 'não especificada';
+      dataVolta = partes[1] || 'não especificada';
+    } else if (dados.datas.dataIda && dados.datas.dataVolta) {
+      dataIda = dados.datas.dataIda;
+      dataVolta = dados.datas.dataVolta;
+    }
+  }
+  
+  // Calcular duração da viagem para contextualizar melhor
+  let duracaoViagem = 'não especificada';
+  try {
+    if (dataIda !== 'não especificada' && dataVolta !== 'não especificada') {
+      const ida = new Date(dataIda);
+      const volta = new Date(dataVolta);
+      const diff = Math.abs(volta - ida);
+      const dias = Math.ceil(diff / (1000 * 60 * 60 * 24));
+      duracaoViagem = `${dias} dias`;
+    }
+  } catch (e) {
+    console.log("Erro ao calcular duração da viagem:", e);
+  }
+
+  // Determinar estação do ano baseada na data de ida
+  let estacaoViagem = 'não determinada';
+  let hemisferio = determinarHemisferio(cidadeOrigem);
+  
+  try {
+    if (dataIda !== 'não especificada') {
+      const dataObj = new Date(dataIda);
+      const mes = dataObj.getMonth();
+      
+      // Simplificação para hemisfério norte
+      if (mes >= 2 && mes <= 4) estacaoViagem = 'primavera';
+      else if (mes >= 5 && mes <= 7) estacaoViagem = 'verão';
+      else if (mes >= 8 && mes <= 10) estacaoViagem = 'outono';
+      else estacaoViagem = 'inverno';
+      
+      // Inversão para hemisfério sul
+      if (hemisferio === 'sul') {
+        if (estacaoViagem === 'verão') estacaoViagem = 'inverno';
+        else if (estacaoViagem === 'inverno') estacaoViagem = 'verão';
+        else if (estacaoViagem === 'primavera') estacaoViagem = 'outono';
+        else if (estacaoViagem === 'outono') estacaoViagem = 'primavera';
+      }
+    }
+  } catch (e) {
+    console.log("Erro ao determinar estação do ano:", e);
+  }
+
+  // Colocar orçamento com destaque prioritário
+  const mensagemOrcamento = orcamento !== 'flexível' ?
+    `⚠️ ORÇAMENTO MÁXIMO: ${orcamento} ${moeda} para voos (ida e volta por pessoa). Todos os destinos DEVEM ter preços de voo ABAIXO deste valor. Este é o requisito MAIS IMPORTANTE.` : 
+    'Orçamento flexível';
+    
+  // Adicionar sugestão de localidade baseada na origem
+  const sugestaoDistancia = gerarSugestaoDistancia(cidadeOrigem, tipoDestino);
+
+  // Construir prompt detalhado e personalizado
+  return `Crie recomendações de viagem que respeitam ESTRITAMENTE o orçamento do usuário:
+
+${mensagemOrcamento}
+
+PERFIL DO VIAJANTE:
+- Partindo de: ${cidadeOrigem} ${sugestaoDistancia}
+- Viajando: ${companhia}
+- Número de pessoas: ${quantidadePessoas}
+- Atividades preferidas: ${preferencia}
+- Período da viagem: ${dataIda} a ${dataVolta} (${duracaoViagem})
+- Estação do ano na viagem: ${estacaoViagem}
+- Experiência como viajante: ${conheceDestino === 1 ? 'Com experiência' : 'Iniciante'} 
+- Preferência por destinos: ${getTipoDestinoText(tipoDestino)}
+- Popularidade do destino: ${getFamaDestinoText(famaDestino)}
+
+IMPORTANTE:
+1. O preço do VOO de CADA destino DEVE ser MENOR que o orçamento máximo de ${orcamento} ${moeda}.
+2. Forneça um mix equilibrado: inclua tanto destinos populares quanto opções alternativas.
+3. Forneça EXATAMENTE 4 destinos alternativos diferentes entre si.
+4. Considere a ÉPOCA DO ANO (${estacaoViagem}) para sugerir destinos com clima adequado.
+5. Inclua destinos de diferentes continentes/regiões nas alternativas.
+6. Garanta que os preços sejam realistas e precisos para voos de ida e volta partindo de ${cidadeOrigem}.
+7. Para CADA destino, inclua o código IATA (3 letras) do aeroporto principal ou mais próximo, para busca precisa de voos.
+8. Para cada destino, INCLUA PONTOS TURÍSTICOS ESPECÍFICOS E CONHECIDOS - não genéricos.
+9. Os comentários da Tripinha DEVEM mencionar pelo menos um dos pontos turísticos do destino.
+
+Forneça no formato JSON exato abaixo, SEM formatação markdown:
+{
+  "topPick": {
+    "destino": "Nome da Cidade",
+    "pais": "Nome do País",
+    "codigoPais": "XX",
+    "descricao": "Breve descrição do destino",
+    "porque": "Razão específica para visitar baseada nas preferências",
+    "destaque": "Uma experiência única neste destino",
+    "comentario": "Comentário entusiasmado da Tripinha (cachorra) mencionando pelo menos um ponto turístico específico",
+    "pontosTuristicos": [
+      "Nome do Primeiro Ponto Turístico específico e conhecido na cidade", 
+      "Nome do Segundo Ponto Turístico específico e conhecido na cidade"
+    ],
+    "aeroporto": {
+      "codigo": "XYZ",
+      "nome": "Nome do Aeroporto Principal"
+    },
+    "preco": {
+      "voo": número,
+      "hotel": número
+    }
+  },
+  "alternativas": [
+    {
+      "destino": "Nome da Cidade 1",
+      "pais": "Nome do País 1", 
+      "codigoPais": "XX",
+      "porque": "Razão específica para visitar",
+      "pontoTuristico": "Nome de um Ponto Turístico específico e conhecido na cidade",
+      "aeroporto": {
+        "codigo": "XYZ",
+        "nome": "Nome do Aeroporto Principal"
+      },
+      "preco": {
+        "voo": número,
+        "hotel": número
+      }
+    },
+    {
+      "destino": "Nome da Cidade 2",
+      "pais": "Nome do País 2", 
+      "codigoPais": "XX",
+      "porque": "Razão específica para visitar",
+      "pontoTuristico": "Nome de um Ponto Turístico específico e conhecido na cidade", 
+      "aeroporto": {
+        "codigo": "XYZ",
+        "nome": "Nome do Aeroporto Principal"
+      },
+      "preco": {
+        "voo": número,
+        "hotel": número
+      }
+    },
+    {
+      "destino": "Nome da Cidade 3",
+      "pais": "Nome do País 3", 
+      "codigoPais": "XX",
+      "porque": "Razão específica para visitar",
+      "pontoTuristico": "Nome de um Ponto Turístico específico e conhecido na cidade",
+      "aeroporto": {
+        "codigo": "XYZ",
+        "nome": "Nome do Aeroporto Principal"
+      },
+      "preco": {
+        "voo": número,
+        "hotel": número
+      }
+    },
+    {
+      "destino": "Nome da Cidade 4",
+      "pais": "Nome do País 4", 
+      "codigoPais": "XX",
+      "porque": "Razão específica para visitar",
+      "pontoTuristico": "Nome de um Ponto Turístico específico e conhecido na cidade",
+      "aeroporto": {
+        "codigo": "XYZ",
+        "nome": "Nome do Aeroporto Principal"
+      },
+      "preco": {
+        "voo": número,
+        "hotel": número
+      }
+    }
+  ],
+  "surpresa": {
+    "destino": "Nome da Cidade",
+    "pais": "Nome do País",
+    "codigoPais": "XX",
+    "descricao": "Breve descrição do destino",
+    "porque": "Razão para visitar, destacando o fator surpresa",
+    "destaque": "Uma experiência única neste destino",
+    "comentario": "Comentário entusiasmado da Tripinha mencionando pelo menos um ponto turístico específico",
+    "pontosTuristicos": [
+      "Nome do Primeiro Ponto Turístico específico e conhecido na cidade", 
+      "Nome do Segundo Ponto Turístico específico e conhecido na cidade"
+    ],
+    "aeroporto": {
+      "codigo": "XYZ",
+      "nome": "Nome do Aeroporto Principal"
+    },
+    "preco": {
+      "voo": número,
+      "hotel": número
+    }
+  }
+}`;
+}
+
+// Função auxiliar para obter texto de companhia com verificação de tipo
+function getCompanhiaText(value) {
+  // Converter para número se for string
+  if (typeof value === 'string') {
+    value = parseInt(value, 10);
+  }
+  
+  const options = {
+    0: "sozinho(a)",
+    1: "em casal (viagem romântica)",
+    2: "em família",
+    3: "com amigos"
+  };
+  return options[value] || "sozinho(a)";
+}
+
+// Função auxiliar para obter texto de preferência com verificação de tipo
+function getPreferenciaText(value) {
+  // Converter para número se for string
+  if (typeof value === 'string') {
+    value = parseInt(value, 10);
+  }
+  
+  const options = {
+    0: "relaxamento e descanso (praias, resorts tranquilos, spas)",
+    1: "aventura e atividades ao ar livre (trilhas, esportes, natureza)",
+    2: "cultura, história e gastronomia (museus, centros históricos, culinária local)",
+    3: "experiência urbana, compras e vida noturna (centros urbanos, lojas, restaurantes)"
+  };
+  return options[value] || "experiências diversificadas de viagem";
+}
+
+// Função auxiliar para obter texto de tipo de destino
+function getTipoDestinoText(value) {
+  // Converter para número se for string
+  if (typeof value === 'string') {
+    value = parseInt(value, 10);
+  }
+  
+  const options = {
+    0: "nacional",
+    1: "internacional",
+    2: "qualquer (nacional ou internacional)"
+  };
+  return options[value] || "qualquer";
+}
+
+// Função auxiliar para obter texto de fama do destino
+function getFamaDestinoText(value) {
+  // Converter para número se for string
+  if (typeof value === 'string') {
+    value = parseInt(value, 10);
+  }
+  
+  const options = {
+    0: "famoso e turístico",
+    1: "fora do circuito turístico comum",
+    2: "mistura de ambos"
+  };
+  return options[value] || "qualquer";
+}
+
+// Determinar o hemisfério baseado na cidade de origem (simplificado)
+function determinarHemisferio(cidadeOrigem) {
+  // Lista simplificada de termos que indicam hemisfério sul
+  const indicadoresSul = [
+    'brasil', 'argentina', 'chile', 'austrália', 'nova zelândia', 
+    'áfrica do sul', 'peru', 'uruguai', 'paraguai', 'bolívia'
+  ];
+  
+  if (!cidadeOrigem || cidadeOrigem === 'origem não especificada') {
+    return 'norte'; // Padrão para o caso de não sabermos
+  }
   
   const cidadeLowerCase = cidadeOrigem.toLowerCase();
   
-  // Termos que indicam América
-  const termosAmericas = ['brasil', 'argentina', 'chile', 'méxico', 'canadá', 'estados unidos', 'eua', 'peru', 'colômbia'];
+  // Verificar se a cidade contém algum indicador de hemisfério sul
+  if (indicadoresSul.some(termo => cidadeLowerCase.includes(termo))) {
+    return 'sul';
+  }
   
-  // Termos que indicam Europa
-  const termosEuropa = ['alemanha', 'frança', 'itália', 'espanha', 'reino unido', 'portugal', 'londres', 'paris', 'roma', 'madri'];
-  
-  // Termos que indicam Ásia/Oceania
-  const termosAsia = ['japão', 'china', 'índia', 'tailândia', 'austrália', 'singapura', 'tóquio', 'pequim', 'dubai'];
-  
-  // Verificar em qual região a cidade se encaixa
-  if (termosAmericas.some(termo => cidadeLowerCase.includes(termo))) return 'americas';
-  if (termosEuropa.some(termo => cidadeLowerCase.includes(termo))) return 'europa';
-  if (termosAsia.some(termo => cidadeLowerCase.includes(termo))) return 'asia';
-  
-  // Padrão global como fallback
-  return 'global';
+  return 'norte';
 }
 
-// Função auxiliar para embaralhar arrays (útil para reordenar destinos)
-function embaralharArray(array) {
-  let currentIndex = array.length;
-  let randomIndex;
-
-  // Enquanto existirem elementos a serem embaralhados
-  while (currentIndex != 0) {
-    // Escolher um elemento restante
-    randomIndex = Math.floor(Math.random() * currentIndex);
-    currentIndex--;
-
-    // E trocar com o elemento atual
-    [array[currentIndex], array[randomIndex]] = [array[randomIndex], array[currentIndex]];
+// Gerar sugestão de distância de viagem baseada na origem (simplificado)
+function gerarSugestaoDistancia(cidadeOrigem, tipoDestino) {
+  if (cidadeOrigem === 'origem não especificada' || tipoDestino === 0) {
+    return '';
   }
-
-  return array;
+  
+  // Lista simplificada de grandes hubs internacionais
+  const grandeshubs = ['nova york', 'londres', 'paris', 'tóquio', 'dubai', 'são paulo'];
+  
+  const cidadeLowerCase = cidadeOrigem.toLowerCase();
+  
+  // Se a origem for um grande hub, sugerir destinos mais distantes
+  if (grandeshubs.some(cidade => cidadeLowerCase.includes(cidade))) {
+    return '(considere incluir destinos intercontinentais nas opções)';
+  }
+  
+  return '(considere a distância e acessibilidade a partir desta origem)';
 }
