@@ -6,7 +6,7 @@ const https = require('https');
 // Configurações de timeout e limites
 const REQUEST_TIMEOUT = 50000; // 50 segundos para requisições externas
 const HANDLER_TIMEOUT = 55000; // 55 segundos para processamento total
-const AMADEUS_TIMEOUT = 15000; // 15 segundos para requisições à API Amadeus
+const AMADEUS_TIMEOUT = 40000; // 40 segundos para requisições à API Amadeus
 
 // =======================
 // Funções utilitárias
