@@ -6,7 +6,7 @@ const https = require('https');
 // Configurações de timeout e limites
 const REQUEST_TIMEOUT = 50000; // 50 segundos para requisições externas
 const HANDLER_TIMEOUT = 55000; // 55 segundos para processamento total
-const AMADEUS_TIMEOUT = 40000; // 40 segundos para requisições à API Amadeus
+const AMADEUS_TIMEOUT = 15000; // 15 segundos para requisições à API Amadeus
 
 // =======================
 // Funções utilitárias
@@ -79,7 +79,8 @@ async function obterTokenAmadeus() {
 // Função de busca de preço de voo
 // =======================
 
-async function buscarPrecoVoo(origemIATA, destinoIATA, datas, token) {
+// Agora, a função recebe um parâmetro adicional "moeda", que será o código da moeda selecionada pelo usuário.
+async function buscarPrecoVoo(origemIATA, destinoIATA, datas, token, moeda) {
   if (!origemIATA || !destinoIATA || !datas || !token) {
     console.log(`Parâmetros incompletos para busca de voo: ${origemIATA} -> ${destinoIATA}`);
     return null;
@@ -88,21 +89,24 @@ async function buscarPrecoVoo(origemIATA, destinoIATA, datas, token) {
   try {
     console.log(`Buscando voos de ${origemIATA} para ${destinoIATA}...`);
 
-    // Alerta: Caso o código IATA "STM" (por exemplo, para Santarém) esteja sendo usado, emita um aviso.
+    // Alerta: caso o código IATA "STM" (por exemplo, para Santarém) esteja em uso, emite um aviso.
     if (destinoIATA === "STM") {
       console.warn("Atenção: Confirme se o código IATA 'STM' para Santarém é suportado pela API Amadeus.");
     }
 
-    // Ajuste: Incluímos o filtro de classe de viagem para ECONOMY e limitamos a 1 resultado.
+    // Ajuste: Adicionamos filtros extras (children e infants igual a 0) para restringir a pesquisa
+    // sem forçar a busca por voos diretos e mantemos a classe ECONOMY.
     const params = {
       originLocationCode: origemIATA,
       destinationLocationCode: destinoIATA,
       departureDate: datas.dataIda,
       returnDate: datas.dataVolta,
       adults: 1,
-      currencyCode: 'BRL',
-      travelClass: 'ECONOMY', // Mantém a classe econômica
-      max: 1               // Solicita apenas o primeiro resultado
+      children: 0,
+      infants: 0,
+      currencyCode: moeda,           // Utiliza a moeda selecionada pelo usuário
+      travelClass: 'ECONOMY',
+      max: 1                       // Solicita apenas o primeiro resultado
     };
 
     console.log('Parâmetros da requisição:', JSON.stringify(params));
@@ -177,9 +181,9 @@ async function retryAsync(fn, maxAttempts = 3, initialDelay = 1000) {
   return null;
 }
 
-async function buscarPrecoComRetentativa(origemIATA, destinoIATA, datas, token) {
+async function buscarPrecoComRetentativa(origemIATA, destinoIATA, datas, token, moeda) {
   return await retryAsync(
-    async () => await buscarPrecoVoo(origemIATA, destinoIATA, datas, token),
+    async () => await buscarPrecoVoo(origemIATA, destinoIATA, datas, token, moeda),
     3,
     1000
   );
@@ -236,7 +240,7 @@ function atualizarPrecosComDadosAlternativos(destinos, dadosAlternativos) {
 // Processamento de destinos para enriquecer com preços reais
 // =======================
 
-async function processarDestinos(recomendacoes, origemIATA, datas, token) {
+async function processarDestinos(recomendacoes, origemIATA, datas, token, moeda) {
   if (!validarCodigoIATA(origemIATA)) {
     console.error(`Código IATA de origem inválido: ${origemIATA}`);
     origemIATA = 'GRU';
@@ -248,7 +252,7 @@ async function processarDestinos(recomendacoes, origemIATA, datas, token) {
       const destinoIATA = recomendacoes.topPick.aeroporto.codigo;
       console.log(`Processando destino principal: ${recomendacoes.topPick.destino} (${destinoIATA})`);
       if (validarCodigoIATA(destinoIATA)) {
-        const resultado = await buscarPrecoComRetentativa(origemIATA, destinoIATA, datas, token);
+        const resultado = await buscarPrecoComRetentativa(origemIATA, destinoIATA, datas, token, moeda);
         if (resultado) {
           recomendacoes.topPick.preco.voo = resultado.precoReal;
           recomendacoes.topPick.preco.fonte = 'Amadeus';
@@ -272,7 +276,7 @@ async function processarDestinos(recomendacoes, origemIATA, datas, token) {
             const destinoIATA = alternativa.aeroporto.codigo;
             if (validarCodigoIATA(destinoIATA)) {
               console.log(`Processando destino alternativo: ${alternativa.destino} (${destinoIATA})`);
-              const resultado = await buscarPrecoComRetentativa(origemIATA, destinoIATA, datas, token);
+              const resultado = await buscarPrecoComRetentativa(origemIATA, destinoIATA, datas, token, moeda);
               if (resultado) {
                 alternativa.preco.voo = resultado.precoReal;
                 alternativa.preco.fonte = 'Amadeus';
@@ -294,7 +298,7 @@ async function processarDestinos(recomendacoes, origemIATA, datas, token) {
       const destinoIATA = recomendacoes.surpresa.aeroporto.codigo;
       if (validarCodigoIATA(destinoIATA)) {
         console.log(`Processando destino surpresa: ${recomendacoes.surpresa.destino} (${destinoIATA})`);
-        const resultado = await buscarPrecoComRetentativa(origemIATA, destinoIATA, datas, token);
+        const resultado = await buscarPrecoComRetentativa(origemIATA, destinoIATA, datas, token, moeda);
         if (resultado) {
           recomendacoes.surpresa.preco.voo = resultado.precoReal;
           recomendacoes.surpresa.preco.fonte = 'Amadeus';
@@ -406,6 +410,9 @@ module.exports = async function handler(req, res) {
       prompt = "Recomende destinos de viagem únicos e personalizados. Responda em formato JSON.";
     }
 
+    // Extraímos a moeda selecionada pelo usuário (default para 'BRL' se não definida)
+    const moeda = requestData.moeda_escolhida || 'BRL';
+
     let tentativas = 0;
     const maxTentativas = 3;
     while (tentativas < maxTentativas) {
@@ -431,7 +438,7 @@ module.exports = async function handler(req, res) {
                 const datas = obterDatasViagem(requestData);
                 if (origemIATA) {
                   console.log(`Origem IATA identificada: ${origemIATA}, processando destinos...`);
-                  const recomendacoesEnriquecidas = await processarDestinos(recomendacoes, origemIATA, datas, token);
+                  const recomendacoesEnriquecidas = await processarDestinos(recomendacoes, origemIATA, datas, token, moeda);
                   console.log('Recomendações enriquecidas com sucesso');
                   if (!isResponseSent) {
                     isResponseSent = true;
@@ -485,7 +492,7 @@ module.exports = async function handler(req, res) {
                 const datas = obterDatasViagem(requestData);
                 if (origemIATA) {
                   console.log(`Origem IATA identificada: ${origemIATA}, processando destinos...`);
-                  const recomendacoesEnriquecidas = await processarDestinos(recomendacoes, origemIATA, datas, token);
+                  const recomendacoesEnriquecidas = await processarDestinos(recomendacoes, origemIATA, datas, token, moeda);
                   console.log('Recomendações enriquecidas com sucesso');
                   if (!isResponseSent) {
                     isResponseSent = true;
@@ -539,7 +546,7 @@ module.exports = async function handler(req, res) {
                 const datas = obterDatasViagem(requestData);
                 if (origemIATA) {
                   console.log(`Origem IATA identificada: ${origemIATA}, processando destinos...`);
-                  const recomendacoesEnriquecidas = await processarDestinos(recomendacoes, origemIATA, datas, token);
+                  const recomendacoesEnriquecidas = await processarDestinos(recomendacoes, origemIATA, datas, token, moeda);
                   console.log('Recomendações enriquecidas com sucesso');
                   if (!isResponseSent) {
                     isResponseSent = true;
@@ -587,7 +594,7 @@ module.exports = async function handler(req, res) {
         const datas = obterDatasViagem(requestData);
         if (origemIATA) {
           console.log(`Origem IATA identificada: ${origemIATA}, processando destinos de emergência...`);
-          const dadosEnriquecidos = await processarDestinos(emergencyData, origemIATA, datas, token);
+          const dadosEnriquecidos = await processarDestinos(emergencyData, origemIATA, datas, token, moeda);
           console.log('Dados de emergência enriquecidos com sucesso');
           if (!isResponseSent) {
             isResponseSent = true;
