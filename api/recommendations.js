@@ -469,7 +469,7 @@ async function obterTokenAmadeus() {
     
     const response = await axios({
       method: 'post',
-      url: 'https://test.api.amadeus.com/v1/security/oauth2/token',
+      url: 'https://api.amadeus.com/v1/security/oauth2/token',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded'
       },
@@ -511,7 +511,7 @@ async function buscarPrecoVoo(origemIATA, destinoIATA, datas, token) {
     
     const response = await axios({
       method: 'get',
-      url: 'https://test.api.amadeus.com/v2/shopping/flight-offers',
+      url: 'https://api.amadeus.com/v2/shopping/flight-offers',
       headers: {
         'Authorization': `Bearer ${token}`
       },
