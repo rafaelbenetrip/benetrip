@@ -80,7 +80,6 @@ async function obterTokenAmadeus() {
 // =======================
 
 async function buscarPrecoVoo(origemIATA, destinoIATA, datas, token) {
-  // Validar parâmetros de entrada
   if (!origemIATA || !destinoIATA || !datas || !token) {
     console.log(`Parâmetros incompletos para busca de voo: ${origemIATA} -> ${destinoIATA}`);
     return null;
@@ -88,26 +87,35 @@ async function buscarPrecoVoo(origemIATA, destinoIATA, datas, token) {
 
   try {
     console.log(`Buscando voos de ${origemIATA} para ${destinoIATA}...`);
-    // Configurar parâmetros conforme documentação da API Amadeus
+
+    // Alerta: caso o código IATA seja "STM" (por exemplo, para Santarém), registre um aviso.
+    if(destinoIATA === "STM") {
+      console.warn("Atenção: Verifique se o código IATA 'STM' para Santarém é suportado pela API Amadeus.");
+    }
+
     const params = {
       originLocationCode: origemIATA,
       destinationLocationCode: destinoIATA,
-      // Abaixo, utilize as datas obtidas dos dados do usuário (ajuste implementado)
       departureDate: datas.dataIda,
       returnDate: datas.dataVolta,
       adults: 1,
       currencyCode: 'BRL',
       max: 5
     };
+
     console.log('Parâmetros da requisição:', JSON.stringify(params));
-    // Nota: Verifique a documentação da Amadeus para confirmar o formato exato das datas e demais parâmetros.
+
     const response = await axios({
       method: 'get',
       url: 'https://api.amadeus.com/v2/shopping/flight-offers',
-      headers: { 'Authorization': `Bearer ${token}` },
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Accept': 'application/json'  // Ajuste: adicionando cabeçalho Accept
+      },
       params: params,
       timeout: AMADEUS_TIMEOUT
     });
+
     if (response.data && response.data.data && response.data.data.length > 0) {
       const melhorOferta = response.data.data[0];
       const precoTotal = parseFloat(melhorOferta.price.total);
@@ -146,22 +154,18 @@ async function buscarPrecoVoo(origemIATA, destinoIATA, datas, token) {
 // =======================
 // Função genérica de retentativa com backoff exponencial
 // =======================
+
 async function retryAsync(fn, maxAttempts = 3, initialDelay = 1000) {
   let attempt = 1;
   let delay = initialDelay;
   while (attempt <= maxAttempts) {
     try {
       const result = await fn();
-      if (result) {
-        return result;
-      }
-      // Se o resultado for null, lançar erro para retentativa
+      if (result) return result;
       throw new Error('Resultado inválido ou nulo');
     } catch (error) {
       console.error(`Tentativa ${attempt} falhou: ${error.message}`);
-      if (attempt === maxAttempts) {
-        return null;
-      }
+      if (attempt === maxAttempts) return null;
       console.log(`Aguardando ${delay}ms antes da próxima tentativa...`);
       await new Promise(resolve => setTimeout(resolve, delay));
       delay *= 2;
@@ -171,7 +175,6 @@ async function retryAsync(fn, maxAttempts = 3, initialDelay = 1000) {
   return null;
 }
 
-// Função de retentativa para buscar preço de voo
 async function buscarPrecoComRetentativa(origemIATA, destinoIATA, datas, token) {
   return await retryAsync(
     async () => await buscarPrecoVoo(origemIATA, destinoIATA, datas, token),
@@ -180,7 +183,10 @@ async function buscarPrecoComRetentativa(origemIATA, destinoIATA, datas, token) 
   );
 }
 
-// Função para usar endpoint alternativo (Flight Inspiration Search)
+// =======================
+// Endpoint alternativo: Flight Inspiration Search
+// =======================
+
 async function buscarPrecoAlternativo(origemIATA, datas, token) {
   try {
     console.log(`Tentando endpoint alternativo Flight Inspiration Search com origem ${origemIATA}`);
@@ -206,7 +212,6 @@ async function buscarPrecoAlternativo(origemIATA, datas, token) {
   }
 }
 
-// Atualiza preços com dados do endpoint alternativo
 function atualizarPrecosComDadosAlternativos(destinos, dadosAlternativos) {
   if (!dadosAlternativos || !dadosAlternativos.data) return false;
   const mapaDadosAlternativos = {};
@@ -227,17 +232,17 @@ function atualizarPrecosComDadosAlternativos(destinos, dadosAlternativos) {
 }
 
 // =======================
-// Processamento de destinos para enriquecimento com preços reais
+// Processamento de destinos para enriquecer com preços reais
 // =======================
+
 async function processarDestinos(recomendacoes, origemIATA, datas, token) {
   if (!validarCodigoIATA(origemIATA)) {
     console.error(`Código IATA de origem inválido: ${origemIATA}`);
-    origemIATA = 'GRU'; // Fallback
+    origemIATA = 'GRU';
     console.log(`Usando código IATA de fallback: ${origemIATA}`);
   }
   try {
     console.log('Iniciando processamento de destinos para obter preços reais...');
-    // Processar destino principal
     if (recomendacoes.topPick && recomendacoes.topPick.aeroporto && recomendacoes.topPick.aeroporto.codigo) {
       const destinoIATA = recomendacoes.topPick.aeroporto.codigo;
       console.log(`Processando destino principal: ${recomendacoes.topPick.destino} (${destinoIATA})`);
@@ -254,7 +259,6 @@ async function processarDestinos(recomendacoes, origemIATA, datas, token) {
       }
       await new Promise(resolve => setTimeout(resolve, 1000));
     }
-    // Processar destinos alternativos em lotes
     if (recomendacoes.alternativas && Array.isArray(recomendacoes.alternativas)) {
       const lotes = [];
       for (let i = 0; i < recomendacoes.alternativas.length; i += 2) {
@@ -285,7 +289,6 @@ async function processarDestinos(recomendacoes, origemIATA, datas, token) {
         }
       }
     }
-    // Processar destino surpresa
     if (recomendacoes.surpresa && recomendacoes.surpresa.aeroporto && recomendacoes.surpresa.aeroporto.codigo) {
       const destinoIATA = recomendacoes.surpresa.aeroporto.codigo;
       if (validarCodigoIATA(destinoIATA)) {
@@ -301,7 +304,6 @@ async function processarDestinos(recomendacoes, origemIATA, datas, token) {
         console.warn(`Código IATA inválido para ${recomendacoes.surpresa.destino}: ${destinoIATA}`);
       }
     }
-    // Se nenhum preço foi atualizado, tentar endpoint alternativo
     const todosDestinos = [
       recomendacoes.topPick,
       ...(recomendacoes.alternativas || []),
@@ -344,7 +346,6 @@ module.exports = async function handler(req, res) {
     }
   }, HANDLER_TIMEOUT);
 
-  // Configuração de CORS
   res.setHeader('Access-Control-Allow-Credentials', true);
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,POST');
@@ -395,24 +396,21 @@ module.exports = async function handler(req, res) {
     console.log('Tipo de dados recebidos:', typeof requestData);
     console.log('Conteúdo parcial:', JSON.stringify(requestData).substring(0, 200) + '...');
 
-    // Gerar prompt baseado nos dados do usuário
     let prompt;
     try {
       prompt = gerarPromptParaDestinos(requestData);
       console.log('Prompt gerado com sucesso, tamanho:', prompt.length);
     } catch (promptError) {
       console.error('Erro ao gerar prompt:', promptError);
-      prompt = "Recomende destinos de viagem únicos e personalizados para o Brasil e mundo. Um destino principal com 2 pontos turísticos, 4 destinos alternativos diferentes com 1 ponto turístico cada, e um destino surpresa com 2 pontos turísticos. Priorize URGENTEMENTE respeitar o orçamento máximo para voos. Inclua atrações turísticas específicas e conhecidas para cada destino. Responda em formato JSON.";
+      prompt = "Recomende destinos de viagem únicos e personalizados. Responda em formato JSON.";
     }
 
-    // Tentar múltiplas tentativas de consulta à API com diferentes modelos
     let tentativas = 0;
     const maxTentativas = 3;
     while (tentativas < maxTentativas) {
       tentativas++;
       console.log(`Tentativa ${tentativas} de ${maxTentativas}`);
       
-      // 1. Tentar API Perplexity
       if (process.env.PERPLEXITY_API_KEY) {
         try {
           console.log('Chamando API Perplexity...');
@@ -429,7 +427,7 @@ module.exports = async function handler(req, res) {
               const token = await obterTokenAmadeus();
               if (token) {
                 const origemIATA = obterCodigoIATAOrigem(requestData);
-                const datas = obterDatasViagem(requestData); // Ajuste: agora verifica "datas" diretamente
+                const datas = obterDatasViagem(requestData);
                 if (origemIATA) {
                   console.log(`Origem IATA identificada: ${origemIATA}, processando destinos...`);
                   const recomendacoesEnriquecidas = await processarDestinos(recomendacoes, origemIATA, datas, token);
@@ -467,7 +465,6 @@ module.exports = async function handler(req, res) {
         }
       }
       
-      // 2. Tentar API OpenAI
       if (process.env.OPENAI_API_KEY) {
         try {
           console.log('Chamando API OpenAI...');
@@ -522,7 +519,6 @@ module.exports = async function handler(req, res) {
         }
       }
       
-      // 3. Tentar API Claude
       if (process.env.CLAUDE_API_KEY) {
         try {
           console.log('Chamando API Claude...');
@@ -577,11 +573,9 @@ module.exports = async function handler(req, res) {
         }
       }
       
-      // Se todas as tentativas falharem, modificar o prompt para incentivar mais criatividade
-      prompt = `${prompt}\n\nURGENTE: O ORÇAMENTO MÁXIMO para voos (${requestData.orcamento_valor || 'informado'} ${requestData.moeda_escolhida || 'BRL'}) precisa ser RIGOROSAMENTE RESPEITADO. TODOS os destinos devem ter voos COM VALOR ABAIXO desse orçamento. Forneça um mix de destinos populares e alternativos, todos com preços realistas e acessíveis. Inclua PONTOS TURÍSTICOS ESPECÍFICOS e DETALHADOS para cada destino.`;
+      prompt = `${prompt}\n\nURGENTE: O ORÇAMENTO MÁXIMO para voos (${requestData.orcamento_valor || 'informado'} ${requestData.moeda_escolhida || 'BRL'}) precisa ser RIGOROSAMENTE RESPEITADO. TODOS os destinos devem ter voos COM VALOR ABAIXO desse orçamento. Forneça um mix de destinos populares e alternativos, com preços realistas e acessíveis.`;
     }
     
-    // Todas as tentativas falharam: gerar resposta de emergência
     console.log('Todas as tentativas de obter resposta válida falharam');
     const emergencyData = generateEmergencyData(requestData);
     try {
@@ -645,7 +639,7 @@ module.exports = async function handler(req, res) {
 };
 
 // =======================
-// Funções auxiliares de extração e validação de dados
+// Funções auxiliares para dados de entrada e validação
 // =======================
 
 function obterCodigoIATAOrigem(dadosUsuario) {
@@ -699,20 +693,15 @@ function obterCodigoIATAOrigem(dadosUsuario) {
   }
 }
 
-// Ajuste: Função modificada para verificar "dadosUsuario.datas" e também "dadosUsuario.respostas.datas"
 function obterDatasViagem(dadosUsuario) {
   try {
     let datas = dadosUsuario.datas || (dadosUsuario.respostas ? dadosUsuario.respostas.datas : null);
-    if (!datas) {
-      return { dataIda: '2025-08-05', dataVolta: '2025-08-12' };
-    }
+    if (!datas) return { dataIda: '2025-08-05', dataVolta: '2025-08-12' };
     if (typeof datas === 'string' && datas.includes(',')) {
       const [dataIda, dataVolta] = datas.split(',');
       return { dataIda: dataIda.trim(), dataVolta: dataVolta.trim() };
     }
-    if (datas.dataIda && datas.dataVolta) {
-      return { dataIda: datas.dataIda, dataVolta: datas.dataVolta };
-    }
+    if (datas.dataIda && datas.dataVolta) return { dataIda: datas.dataIda, dataVolta: datas.dataVolta };
     return { dataIda: '2025-08-05', dataVolta: '2025-08-12' };
   } catch (error) {
     console.error('Erro ao obter datas de viagem:', error);
@@ -736,17 +725,15 @@ async function callPerplexityAPI(prompt, requestData) {
     if (!apiKey) throw new Error('Chave da API Perplexity não configurada');
     console.log('Enviando requisição para Perplexity...');
     const orcamentoMessage = requestData.orcamento_valor ? 
-      `\n\n⚠️ ORÇAMENTO MÁXIMO: ${requestData.orcamento_valor} ${requestData.moeda_escolhida || 'BRL'} para voos (ida e volta por pessoa). Todos os destinos DEVEM ter preços de voo ABAIXO deste valor. Este é o requisito MAIS IMPORTANTE.` : '';
+      `\n\n⚠️ ORÇAMENTO MÁXIMO: ${requestData.orcamento_valor} ${requestData.moeda_escolhida || 'BRL'} para voos. Todos os destinos DEVEM ter preços abaixo deste valor.` : '';
     const enhancedPrompt = `${prompt}${orcamentoMessage}
     
 IMPORTANTE: 
-1. Cada voo DEVE respeitar rigorosamente o orçamento máximo indicado.
-2. Retorne APENAS o JSON puro, sem formatação markdown ou comentários.
-3. Forneça EXATAMENTE 4 destinos alternativos totalmente diferentes entre si.
-4. Garanta preços realistas e acessíveis para todas as recomendações.
-5. Inclua PONTOS TURÍSTICOS ESPECÍFICOS para cada destino - 2 para o destino principal e destino surpresa, 1 para cada alternativa.
-6. Os comentários da Tripinha DEVEM mencionar de forma natural e entusiasmada PELO MENOS UM dos pontos turísticos mencionados.
-7. PARA CADA DESTINO, inclua o código IATA (3 letras) do aeroporto principal ou mais próximo.`;
+1. Cada voo DEVE respeitar o orçamento máximo.
+2. Retorne APENAS o JSON puro.
+3. Forneça EXATAMENTE 4 destinos alternativos.
+4. Inclua PONTOS TURÍSTICOS ESPECÍFICOS (2 para topPick e surpresa, 1 para cada alternativa).
+5. Inclua o código IATA (3 letras) de cada aeroporto.`;
     const response = await axios({
       method: 'post',
       url: 'https://api.perplexity.ai/chat/completions',
@@ -759,7 +746,7 @@ IMPORTANTE:
         messages: [
           {
             role: 'system',
-            content: 'Você é um especialista em viagens focado em fornecer recomendações personalizadas globais para vários orçamentos. Sua prioridade #1 é NUNCA exceder o orçamento máximo indicado para passagens aéreas. Forneça um mix balanceado de destinos populares e alternativos, adequados ao perfil do viajante. Para cada destino, forneça pontos turísticos específicos e conhecidos (não genéricos). Os comentários da Tripinha (cachorra mascote) devem mencionar pelo menos um ponto turístico específico de forma entusiasmada e natural. Retorne APENAS JSON puro. SEMPRE forneça EXATAMENTE 4 destinos alternativos.'
+            content: 'Você é um especialista em viagens. Sua prioridade é não exceder o orçamento para voos. Retorne apenas JSON puro com 4 destinos alternativos.'
           },
           {
             role: 'user',
@@ -801,17 +788,15 @@ async function callOpenAIAPI(prompt, requestData) {
     if (!apiKey) throw new Error('Chave da API OpenAI não configurada');
     console.log('Enviando requisição para OpenAI...');
     const orcamentoMessage = requestData.orcamento_valor ? 
-      `\n\n⚠️ ORÇAMENTO MÁXIMO: ${requestData.orcamento_valor} ${requestData.moeda_escolhida || 'BRL'} para voos (ida e volta por pessoa). Todos os destinos DEVEM ter preços de voo ABAIXO deste valor. Este é o requisito MAIS IMPORTANTE.` : '';
+      `\n\n⚠️ ORÇAMENTO MÁXIMO: ${requestData.orcamento_valor} ${requestData.moeda_escolhida || 'BRL'} para voos.` : '';
     const enhancedPrompt = `${prompt}${orcamentoMessage}
     
 IMPORTANTE: 
-1. Cada voo DEVE respeitar rigorosamente o orçamento máximo indicado.
-2. Sua resposta deve ser exclusivamente um objeto JSON válido sem formatação markdown.
-3. Forneça EXATAMENTE 4 destinos alternativos totalmente diferentes entre si.
-4. Garanta preços realistas e acessíveis para todas as recomendações.
-5. Inclua PONTOS TURÍSTICOS ESPECÍFICOS para cada destino - 2 para o principal e surpresa, 1 para cada alternativa.
-6. Os comentários da Tripinha DEVEM mencionar de forma natural e entusiasmada PELO MENOS UM dos pontos turísticos mencionados.
-7. PARA CADA DESTINO, inclua o código IATA (3 letras) do aeroporto principal ou mais próximo.`;
+1. Cada voo DEVE respeitar o orçamento.
+2. Retorne apenas JSON.
+3. Forneça 4 destinos alternativos.
+4. Inclua pontos turísticos específicos.
+5. Inclua o código IATA de cada aeroporto.`;
     const response = await axios({
       method: 'post',
       url: 'https://api.openai.com/v1/chat/completions',
@@ -824,7 +809,7 @@ IMPORTANTE:
         messages: [
           {
             role: "system",
-            content: "Você é um especialista em viagens focado em fornecer recomendações personalizadas globais para vários orçamentos. Sua prioridade #1 é NUNCA exceder o orçamento máximo indicado para passagens aéreas. Forneça um mix balanceado de destinos populares e alternativos, adequados ao perfil do viajante. Para cada destino, forneça pontos turísticos específicos e conhecidos (não genéricos). Os comentários da Tripinha (cachorra mascote) devem mencionar pelo menos um ponto turístico específico de forma entusiasmada e natural. Retorne APENAS JSON puro. SEMPRE forneça EXATAMENTE 4 destinos alternativos."
+            content: "Você é um especialista em viagens. Retorne apenas JSON com 4 destinos alternativos, respeitando o orçamento para voos."
           },
           {
             role: "user",
@@ -860,17 +845,15 @@ async function callClaudeAPI(prompt, requestData) {
     if (!apiKey) throw new Error('Chave da API Claude não configurada');
     console.log('Enviando requisição para Claude...');
     const orcamentoMessage = requestData.orcamento_valor ? 
-      `\n\n⚠️ ORÇAMENTO MÁXIMO: ${requestData.orcamento_valor} ${requestData.moeda_escolhida || 'BRL'} para voos (ida e volta por pessoa). Todos os destinos DEVEM ter preços de voo ABAIXO deste valor. Este é o requisito MAIS IMPORTANTE.` : '';
+      `\n\n⚠️ ORÇAMENTO MÁXIMO: ${requestData.orcamento_valor} ${requestData.moeda_escolhida || 'BRL'} para voos.` : '';
     const enhancedPrompt = `${prompt}${orcamentoMessage}
     
 IMPORTANTE: 
-1. Cada voo DEVE respeitar rigorosamente o orçamento máximo indicado.
-2. Sua resposta deve ser APENAS o objeto JSON válido, sem NENHUM texto adicional.
-3. Forneça EXATAMENTE 4 destinos alternativos totalmente diferentes entre si.
-4. Garanta preços realistas e acessíveis para todas as recomendações.
-5. Inclua PONTOS TURÍSTICOS ESPECÍFICOS para cada destino - 2 para o principal e surpresa, 1 para cada alternativa.
-6. Os comentários da Tripinha DEVEM mencionar de forma natural e entusiasmada PELO MENOS UM dos pontos turísticos mencionados.
-7. PARA CADA DESTINO, inclua o código IATA (3 letras) do aeroporto principal ou mais próximo.`;
+1. Cada voo DEVE respeitar o orçamento.
+2. Retorne apenas o JSON.
+3. Forneça 4 destinos alternativos.
+4. Inclua pontos turísticos específicos.
+5. Inclua o código IATA de cada aeroporto.`;
     const response = await axios({
       method: 'post',
       url: 'https://api.anthropic.com/v1/messages',
@@ -885,7 +868,7 @@ IMPORTANTE:
         messages: [
           {
             role: "system",
-            content: "Você é um especialista em viagens focado em fornecer recomendações personalizadas globais para vários orçamentos. Sua prioridade #1 é NUNCA exceder o orçamento máximo indicado para passagens aéreas. Forneça um mix balanceado de destinos populares e alternativos, adequados ao perfil do viajante. Para cada destino, forneça pontos turísticos específicos e conhecidos (não genéricos). Os comentários da Tripinha (cachorra mascote) devem mencionar pelo menos um ponto turístico específico de forma entusiasmada e natural. Retorne APENAS JSON puro. SEMPRE forneça EXATAMENTE 4 destinos alternativos."
+            content: "Você é um especialista em viagens. Retorne apenas JSON com 4 destinos alternativos, respeitando o orçamento."
           },
           {
             role: "user",
@@ -914,7 +897,6 @@ IMPORTANTE:
   }
 }
 
-// Função para extrair JSON válido de uma string
 function extrairJSONDaResposta(texto) {
   try {
     console.log("Tipo da resposta recebida:", typeof texto);
@@ -959,7 +941,6 @@ function extrairJSONDaResposta(texto) {
   }
 }
 
-// Validação do JSON de destino
 function isValidDestinationJSON(jsonString, requestData) {
   if (!jsonString) return false;
   try {
@@ -1038,7 +1019,6 @@ function isValidDestinationJSON(jsonString, requestData) {
   }
 }
 
-// Enriquecer comentários da Tripinha
 function enriquecerComentarioTripinha(comentario, pontosTuristicos) {
   if (!comentario || !pontosTuristicos || !Array.isArray(pontosTuristicos) || pontosTuristicos.length === 0) return null;
   const mencionaAtual = pontosTuristicos.some(ponto => comentario.toLowerCase().includes(ponto.toLowerCase()));
@@ -1055,7 +1035,6 @@ function enriquecerComentarioTripinha(comentario, pontosTuristicos) {
   return padroes[indice];
 }
 
-// Banco simplificado de pontos turísticos populares
 const pontosPopulares = {
   "Paris": ["Torre Eiffel", "Museu do Louvre"],
   "Roma": ["Coliseu", "Vaticano"],
@@ -1070,7 +1049,6 @@ const pontosPopulares = {
   "generico_America": ["Parques nacionais", "Centros urbanos"]
 };
 
-// Garantir pontos turísticos e comentários
 function ensureTouristAttractionsAndComments(jsonString, requestData) {
   try {
     const data = typeof jsonString === 'string' ? JSON.parse(jsonString) : jsonString;
@@ -1192,7 +1170,6 @@ function ensureTouristAttractionsAndComments(jsonString, requestData) {
   }
 }
 
-// Obter código IATA padrão para um destino
 function obterCodigoIATAPadrao(cidade, pais) {
   const mapeamentoIATA = {
     'São Paulo': 'GRU',
@@ -1276,7 +1253,6 @@ function obterCodigoIATAPadrao(cidade, pais) {
   return "AAA";
 }
 
-// Dados de emergência personalizados
 function generateEmergencyData(dadosUsuario = {}) {
   const preferencia = dadosUsuario.preferencia_viagem || 0;
   const orcamento = dadosUsuario.orcamento_valor ? parseFloat(dadosUsuario.orcamento_valor) : 3000;
@@ -1308,7 +1284,6 @@ function generateEmergencyData(dadosUsuario = {}) {
   return dadosRegiao;
 }
 
-// Função para gerar prompt baseado nos dados do usuário
 function gerarPromptParaDestinos(dados) {
   const companhia = getCompanhiaText(dados.companhia || 0);
   const preferencia = getPreferenciaText(dados.preferencia_viagem || 0);
@@ -1364,7 +1339,7 @@ function gerarPromptParaDestinos(dados) {
     console.log("Erro ao determinar estação do ano:", e);
   }
   const mensagemOrcamento = orcamento !== 'flexível' ?
-    `⚠️ ORÇAMENTO MÁXIMO: ${orcamento} ${moeda} para voos (ida e volta por pessoa). Todos os destinos DEVEM ter preços de voo ABAIXO deste valor. Este é o requisito MAIS IMPORTANTE.` : 
+    `⚠️ ORÇAMENTO MÁXIMO: ${orcamento} ${moeda} para voos. Todos os destinos DEVEM ter preços abaixo deste valor.` : 
     'Orçamento flexível';
   const sugestaoDistancia = gerarSugestaoDistancia(cidadeOrigem, tipoDestino);
   return `Crie recomendações de viagem que respeitam ESTRITAMENTE o orçamento do usuário:
@@ -1384,13 +1359,13 @@ PERFIL DO VIAJANTE:
 
 IMPORTANTE:
 1. O preço do VOO de CADA destino DEVE ser MENOR que o orçamento máximo de ${orcamento} ${moeda}.
-2. Forneça um mix equilibrado: inclua tanto destinos populares quanto opções alternativas.
+2. Forneça um mix equilibrado: inclua tanto destinos populares quanto alternativas.
 3. Forneça EXATAMENTE 4 destinos alternativos diferentes entre si.
 4. Considere a ÉPOCA DO ANO (${estacaoViagem}) para sugerir destinos com clima adequado.
-5. Inclua destinos de diferentes continentes/regiões nas alternativas.
-6. Garanta que os preços sejam realistas e precisos para voos de ida e volta partindo de ${cidadeOrigem}.
-7. Para CADA destino, inclua o código IATA (3 letras) do aeroporto principal ou mais próximo, para busca precisa de voos.
-8. Para cada destino, INCLUA PONTOS TURÍSTICOS ESPECÍFICOS E CONHECIDOS - não genéricos.
+5. Inclua destinos de diferentes continentes/regiões.
+6. Garanta que os preços sejam realistas para voos de ida e volta partindo de ${cidadeOrigem}.
+7. Para CADA destino, inclua o código IATA (3 letras) do aeroporto principal.
+8. Para cada destino, INCLUA PONTOS TURÍSTICOS ESPECÍFICOS E CONHECIDOS.
 9. Os comentários da Tripinha DEVEM mencionar pelo menos um dos pontos turísticos do destino.
 
 Forneça no formato JSON exato abaixo, SEM formatação markdown:
@@ -1400,12 +1375,12 @@ Forneça no formato JSON exato abaixo, SEM formatação markdown:
     "pais": "Nome do País",
     "codigoPais": "XX",
     "descricao": "Breve descrição do destino",
-    "porque": "Razão específica para visitar baseada nas preferências",
+    "porque": "Razão específica para visitar",
     "destaque": "Uma experiência única neste destino",
-    "comentario": "Comentário entusiasmado da Tripinha (cachorra) mencionando pelo menos um ponto turístico específico",
+    "comentario": "Comentário entusiasmado da Tripinha, mencionando pelo menos um ponto turístico",
     "pontosTuristicos": [
-      "Nome do Primeiro Ponto Turístico específico e conhecido na cidade", 
-      "Nome do Segundo Ponto Turístico específico e conhecido na cidade"
+      "Nome do Primeiro Ponto Turístico", 
+      "Nome do Segundo Ponto Turístico"
     ],
     "aeroporto": {
       "codigo": "XYZ",
@@ -1422,7 +1397,7 @@ Forneça no formato JSON exato abaixo, SEM formatação markdown:
       "pais": "Nome do País 1", 
       "codigoPais": "XX",
       "porque": "Razão específica para visitar",
-      "pontoTuristico": "Nome de um Ponto Turístico específico e conhecido na cidade",
+      "pontoTuristico": "Nome de um Ponto Turístico",
       "aeroporto": {
         "codigo": "XYZ",
         "nome": "Nome do Aeroporto Principal"
@@ -1437,7 +1412,7 @@ Forneça no formato JSON exato abaixo, SEM formatação markdown:
       "pais": "Nome do País 2", 
       "codigoPais": "XX",
       "porque": "Razão específica para visitar",
-      "pontoTuristico": "Nome de um Ponto Turístico específico e conhecido na cidade", 
+      "pontoTuristico": "Nome de um Ponto Turístico", 
       "aeroporto": {
         "codigo": "XYZ",
         "nome": "Nome do Aeroporto Principal"
@@ -1452,7 +1427,7 @@ Forneça no formato JSON exato abaixo, SEM formatação markdown:
       "pais": "Nome do País 3", 
       "codigoPais": "XX",
       "porque": "Razão específica para visitar",
-      "pontoTuristico": "Nome de um Ponto Turístico específico e conhecido na cidade",
+      "pontoTuristico": "Nome de um Ponto Turístico",
       "aeroporto": {
         "codigo": "XYZ",
         "nome": "Nome do Aeroporto Principal"
@@ -1467,7 +1442,7 @@ Forneça no formato JSON exato abaixo, SEM formatação markdown:
       "pais": "Nome do País 4", 
       "codigoPais": "XX",
       "porque": "Razão específica para visitar",
-      "pontoTuristico": "Nome de um Ponto Turístico específico e conhecido na cidade",
+      "pontoTuristico": "Nome de um Ponto Turístico",
       "aeroporto": {
         "codigo": "XYZ",
         "nome": "Nome do Aeroporto Principal"
@@ -1485,10 +1460,10 @@ Forneça no formato JSON exato abaixo, SEM formatação markdown:
     "descricao": "Breve descrição do destino",
     "porque": "Razão para visitar, destacando o fator surpresa",
     "destaque": "Uma experiência única neste destino",
-    "comentario": "Comentário entusiasmado da Tripinha mencionando pelo menos um ponto turístico específico",
+    "comentario": "Comentário entusiasmado da Tripinha, mencionando pelo menos um ponto turístico",
     "pontosTuristicos": [
-      "Nome do Primeiro Ponto Turístico específico e conhecido na cidade", 
-      "Nome do Segundo Ponto Turístico específico e conhecido na cidade"
+      "Nome do Primeiro Ponto Turístico", 
+      "Nome do Segundo Ponto Turístico"
     ],
     "aeroporto": {
       "codigo": "XYZ",
@@ -1502,7 +1477,6 @@ Forneça no formato JSON exato abaixo, SEM formatação markdown:
 }`;
 }
 
-// Funções auxiliares para textos de perfil
 function getCompanhiaText(value) {
   if (typeof value === 'string') value = parseInt(value, 10);
   const options = {
@@ -1517,12 +1491,12 @@ function getCompanhiaText(value) {
 function getPreferenciaText(value) {
   if (typeof value === 'string') value = parseInt(value, 10);
   const options = {
-    0: "relaxamento e descanso (praias, resorts tranquilos, spas)",
-    1: "aventura e atividades ao ar livre (trilhas, esportes, natureza)",
-    2: "cultura, história e gastronomia (museus, centros históricos, culinária local)",
-    3: "experiência urbana, compras e vida noturna (centros urbanos, lojas, restaurantes)"
+    0: "relaxamento e descanso",
+    1: "aventura e atividades ao ar livre",
+    2: "cultura, história e gastronomia",
+    3: "experiência urbana, compras e vida noturna"
   };
-  return options[value] || "experiências diversificadas de viagem";
+  return options[value] || "experiências diversificadas";
 }
 
 function getTipoDestinoText(value) {
@@ -1545,7 +1519,6 @@ function getFamaDestinoText(value) {
   return options[value] || "qualquer";
 }
 
-// Determina o hemisfério baseado na cidade de origem (simplificado)
 function determinarHemisferio(cidadeOrigem) {
   const indicadoresSul = ['brasil', 'argentina', 'chile', 'austrália', 'nova zelândia', 'áfrica do sul', 'peru', 'uruguai', 'paraguai', 'bolívia'];
   if (!cidadeOrigem || cidadeOrigem === 'origem não especificada') return 'norte';
@@ -1554,27 +1527,23 @@ function determinarHemisferio(cidadeOrigem) {
   return 'norte';
 }
 
-// Sugestão de distância com base na origem
 function gerarSugestaoDistancia(cidadeOrigem, tipoDestino) {
   if (cidadeOrigem === 'origem não especificada' || tipoDestino === 0) return '';
   const grandeshubs = ['nova york', 'londres', 'paris', 'tóquio', 'dubai', 'são paulo'];
   const cidadeLowerCase = cidadeOrigem.toLowerCase();
   if (grandeshubs.some(cidade => cidadeLowerCase.includes(cidade))) {
-    return '(considere incluir destinos intercontinentais nas opções)';
+    return '(considere incluir destinos intercontinentais)';
   }
-  return '(considere a distância e acessibilidade a partir desta origem)';
+  return '(considere a distância e acessibilidade)';
 }
 
-// Placeholder para determinar região de origem (implementar conforme necessidade)
 function determinarRegiaoOrigem(cidadeOrigem) {
-  // Exemplo simplificado
   if (cidadeOrigem.toLowerCase().includes('são paulo') || cidadeOrigem.toLowerCase().includes('rio')) {
     return 'americas';
   }
   return 'global';
 }
 
-// Embaralhar array
 function embaralharArray(array) {
   for (let i = array.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
