@@ -4,6 +4,7 @@ const axios = require('axios');
 // Configurações de timeout e limites
 const REQUEST_TIMEOUT = 50000; // 50 segundos para requisições externas
 const HANDLER_TIMEOUT = 55000; // 55 segundos para processamento total
+const AMADEUS_TIMEOUT = 15000; // 15 segundos para requisições à API Amadeus
 
 module.exports = async function handler(req, res) {
   // Implementar mecanismo de timeout no servidor
@@ -115,6 +116,56 @@ module.exports = async function handler(req, res) {
           
           if (processedResponse && isValidDestinationJSON(processedResponse, requestData)) {
             console.log('Resposta Perplexity válida recebida');
+            
+            // Tentar enriquecer com preços reais da Amadeus
+            try {
+              // Converter para objeto se for string
+              const recomendacoes = typeof processedResponse === 'string' ? 
+                JSON.parse(processedResponse) : processedResponse;
+                
+              console.log('Tentando enriquecer recomendações com preços reais...');
+              
+              // Obter token de autenticação Amadeus
+              const token = await obterTokenAmadeus();
+              
+              if (token) {
+                // Extrair código IATA da origem
+                const origemIATA = obterCodigoIATAOrigem(requestData);
+                
+                // Extrair datas de viagem
+                const datas = obterDatasViagem(requestData);
+                
+                // Processar destinos para obter preços reais
+                if (origemIATA) {
+                  console.log(`Origem IATA identificada: ${origemIATA}, processando destinos...`);
+                  const recomendacoesEnriquecidas = await processarDestinos(
+                    recomendacoes, 
+                    origemIATA, 
+                    datas, 
+                    token
+                  );
+                  
+                  console.log('Recomendações enriquecidas com sucesso');
+                  
+                  // Retornar recomendações enriquecidas
+                  if (!isResponseSent) {
+                    isResponseSent = true;
+                    clearTimeout(serverTimeout);
+                    return res.status(200).json({
+                      tipo: "perplexity-enriquecido",
+                      conteudo: JSON.stringify(recomendacoesEnriquecidas),
+                      tentativa: tentativas
+                    });
+                  }
+                  return;
+                }
+              }
+            } catch (amadeusError) {
+              console.error('Erro ao enriquecer com Amadeus:', amadeusError.message);
+              // Continuar com resposta original em caso de falha
+            }
+            
+            // Retornar resposta original se não foi possível enriquecer
             if (!isResponseSent) {
               isResponseSent = true;
               clearTimeout(serverTimeout);
@@ -132,6 +183,7 @@ module.exports = async function handler(req, res) {
           console.error('Erro ao usar Perplexity:', perplexityError.message);
         }
       }
+      
       // 2. Tentar OpenAI em seguida
       if (process.env.OPENAI_API_KEY) {
         try {
@@ -146,6 +198,56 @@ module.exports = async function handler(req, res) {
           
           if (processedResponse && isValidDestinationJSON(processedResponse, requestData)) {
             console.log('Resposta OpenAI válida recebida');
+            
+            // Tentar enriquecer com preços reais da Amadeus
+            try {
+              // Converter para objeto se for string
+              const recomendacoes = typeof processedResponse === 'string' ? 
+                JSON.parse(processedResponse) : processedResponse;
+                
+              console.log('Tentando enriquecer recomendações com preços reais...');
+              
+              // Obter token de autenticação Amadeus
+              const token = await obterTokenAmadeus();
+              
+              if (token) {
+                // Extrair código IATA da origem
+                const origemIATA = obterCodigoIATAOrigem(requestData);
+                
+                // Extrair datas de viagem
+                const datas = obterDatasViagem(requestData);
+                
+                // Processar destinos para obter preços reais
+                if (origemIATA) {
+                  console.log(`Origem IATA identificada: ${origemIATA}, processando destinos...`);
+                  const recomendacoesEnriquecidas = await processarDestinos(
+                    recomendacoes, 
+                    origemIATA, 
+                    datas, 
+                    token
+                  );
+                  
+                  console.log('Recomendações enriquecidas com sucesso');
+                  
+                  // Retornar recomendações enriquecidas
+                  if (!isResponseSent) {
+                    isResponseSent = true;
+                    clearTimeout(serverTimeout);
+                    return res.status(200).json({
+                      tipo: "openai-enriquecido",
+                      conteudo: JSON.stringify(recomendacoesEnriquecidas),
+                      tentativa: tentativas
+                    });
+                  }
+                  return;
+                }
+              }
+            } catch (amadeusError) {
+              console.error('Erro ao enriquecer com Amadeus:', amadeusError.message);
+              // Continuar com resposta original em caso de falha
+            }
+            
+            // Retornar resposta original se não foi possível enriquecer
             if (!isResponseSent) {
               isResponseSent = true;
               clearTimeout(serverTimeout);
@@ -178,6 +280,56 @@ module.exports = async function handler(req, res) {
           
           if (processedResponse && isValidDestinationJSON(processedResponse, requestData)) {
             console.log('Resposta Claude válida recebida');
+            
+            // Tentar enriquecer com preços reais da Amadeus
+            try {
+              // Converter para objeto se for string
+              const recomendacoes = typeof processedResponse === 'string' ? 
+                JSON.parse(processedResponse) : processedResponse;
+                
+              console.log('Tentando enriquecer recomendações com preços reais...');
+              
+              // Obter token de autenticação Amadeus
+              const token = await obterTokenAmadeus();
+              
+              if (token) {
+                // Extrair código IATA da origem
+                const origemIATA = obterCodigoIATAOrigem(requestData);
+                
+                // Extrair datas de viagem
+                const datas = obterDatasViagem(requestData);
+                
+                // Processar destinos para obter preços reais
+                if (origemIATA) {
+                  console.log(`Origem IATA identificada: ${origemIATA}, processando destinos...`);
+                  const recomendacoesEnriquecidas = await processarDestinos(
+                    recomendacoes, 
+                    origemIATA, 
+                    datas, 
+                    token
+                  );
+                  
+                  console.log('Recomendações enriquecidas com sucesso');
+                  
+                  // Retornar recomendações enriquecidas
+                  if (!isResponseSent) {
+                    isResponseSent = true;
+                    clearTimeout(serverTimeout);
+                    return res.status(200).json({
+                      tipo: "claude-enriquecido",
+                      conteudo: JSON.stringify(recomendacoesEnriquecidas),
+                      tentativa: tentativas
+                    });
+                  }
+                  return;
+                }
+              }
+            } catch (amadeusError) {
+              console.error('Erro ao enriquecer com Amadeus:', amadeusError.message);
+              // Continuar com resposta original em caso de falha
+            }
+            
+            // Retornar resposta original se não foi possível enriquecer
             if (!isResponseSent) {
               isResponseSent = true;
               clearTimeout(serverTimeout);
@@ -198,15 +350,58 @@ module.exports = async function handler(req, res) {
       
       // Se chegamos aqui, todas as tentativas falharam nesta iteração
       // Vamos modificar o prompt para a próxima tentativa para incentivar mais criatividade
-      prompt = `${prompt}\n\nURGENTE: O ORÇAMENTO MÁXIMO para voos (${requestData.orcamento_valor || 'informado'} ${requestData.moeda_escolhida || 'BRL'}) precisa ser RIGOROSAMENTE RESPEITADO. TODOS os destinos devem ter voos COM VALOR ABAIXO desse orçamento. Forneça um mix de destinos populares e alternativos, todos com preços realistas e acessíveis. Inclua PONTOS TURÍSTICOS ESPECÍFICOS e DETALHADOS para cada destino. COMENTÁRIOS DA TRIPINHA DEVEM mencionar pelo menos UM PONTO TURÍSTICO ESPECÍFICO de forma natural e entusiasmada.`;
+      prompt = `${prompt}\n\nURGENTE: O ORÇAMENTO MÁXIMO para voos (${requestData.orcamento_valor || 'informado'} ${requestData.moeda_escolhida || 'BRL'}) precisa ser RIGOROSAMENTE RESPEITADO. TODOS os destinos devem ter voos COM VALOR ABAIXO desse orçamento. Forneça um mix de destinos populares e alternativos, todos com preços realistas e acessíveis. Inclua PONTOS TURÍSTICOS ESPECÍFICOS e DETALHADOS para cada destino. COMENTÁRIOS DA TRIPINHA DEVEM mencionar pelo menos UM PONTO TURÍSTICO ESPECÍFICO de forma natural e entusiasmada. PARA CADA DESTINO, INCLUA O CÓDIGO IATA (3 LETRAS) DO AEROPORTO PRINCIPAL.`;
     }
     
     // Se todas as tentativas falharam, criar uma resposta de emergência
     console.log('Todas as tentativas de obter resposta válida falharam');
     
-    // Usar dados de emergência personalizados
+    // Tentar enriquecer dados de emergência personalizados com preços reais
     const emergencyData = generateEmergencyData(requestData);
     
+    try {
+      console.log('Tentando enriquecer dados de emergência com preços reais...');
+      
+      // Obter token de autenticação Amadeus
+      const token = await obterTokenAmadeus();
+      
+      if (token) {
+        // Extrair código IATA da origem
+        const origemIATA = obterCodigoIATAOrigem(requestData);
+        
+        // Extrair datas de viagem
+        const datas = obterDatasViagem(requestData);
+        
+        // Processar destinos para obter preços reais
+        if (origemIATA) {
+          console.log(`Origem IATA identificada: ${origemIATA}, processando destinos de emergência...`);
+          const dadosEnriquecidos = await processarDestinos(
+            emergencyData, 
+            origemIATA, 
+            datas, 
+            token
+          );
+          
+          console.log('Dados de emergência enriquecidos com sucesso');
+          
+          // Retornar dados enriquecidos
+          if (!isResponseSent) {
+            isResponseSent = true;
+            clearTimeout(serverTimeout);
+            return res.status(200).json({
+              tipo: "emergencia-enriquecida",
+              conteudo: JSON.stringify(dadosEnriquecidos),
+              message: "Dados de emergência com preços reais"
+            });
+          }
+          return;
+        }
+      }
+    } catch (amadeusEmergencyError) {
+      console.error('Erro ao enriquecer dados de emergência:', amadeusEmergencyError.message);
+    }
+    
+    // Retornar dados de emergência originais se não foi possível enriquecer
     if (!isResponseSent) {
       isResponseSent = true;
       clearTimeout(serverTimeout);
@@ -259,6 +454,337 @@ function isPartiallyValidJSON(jsonString) {
   }
 }
 
+// Função para obter token de autenticação da Amadeus
+async function obterTokenAmadeus() {
+  try {
+    const apiKey = process.env.AMADEUS_API_KEY;
+    const apiSecret = process.env.AMADEUS_API_SECRET;
+    
+    if (!apiKey || !apiSecret) {
+      console.error('Credenciais Amadeus não configuradas');
+      return null;
+    }
+    
+    console.log('Obtendo token de autenticação Amadeus...');
+    
+    const response = await axios({
+      method: 'post',
+      url: 'https://test.api.amadeus.com/v1/security/oauth2/token',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      data: `grant_type=client_credentials&client_id=${apiKey}&client_secret=${apiSecret}`,
+      timeout: 10000
+    });
+    
+    if (response.data && response.data.access_token) {
+      console.log('Token Amadeus obtido com sucesso');
+      return response.data.access_token;
+    } else {
+      console.error('Resposta Amadeus inválida:', response.data);
+      return null;
+    }
+  } catch (error) {
+    console.error('Erro ao obter token Amadeus:', error.message);
+    return null;
+  }
+}
+
+// Função para buscar preço de voo com a API Amadeus
+async function buscarPrecoVoo(origemIATA, destinoIATA, datas, token) {
+  try {
+    if (!token) {
+      console.error('Token Amadeus não disponível');
+      return null;
+    }
+    
+    if (!origemIATA || !destinoIATA) {
+      console.error('Códigos IATA inválidos:', origemIATA, destinoIATA);
+      return null;
+    }
+    
+    console.log(`Buscando voos de ${origemIATA} para ${destinoIATA}...`);
+    
+    // Validar e formatar datas
+    const dataIda = datas.dataIda || '2025-08-05';
+    const dataVolta = datas.dataVolta || '2025-08-12';
+    
+    const response = await axios({
+      method: 'get',
+      url: 'https://test.api.amadeus.com/v2/shopping/flight-offers',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      },
+      params: {
+        originLocationCode: origemIATA,
+        destinationLocationCode: destinoIATA,
+        departureDate: dataIda,
+        returnDate: dataVolta,
+        adults: 1,
+        currencyCode: 'BRL',
+        max: 5
+      },
+      timeout: AMADEUS_TIMEOUT
+    });
+    
+    // Processar e extrair informações relevantes
+    if (response.data && response.data.data && response.data.data.length > 0) {
+      const melhorOferta = response.data.data[0]; // Usar a primeira oferta
+      
+      // Extrair o preço
+      const precoTotal = parseFloat(melhorOferta.price.total);
+      
+      // Extrair informações do voo
+      const detalhesVoo = {
+        companhia: melhorOferta.validatingAirlineCodes[0],
+        numeroParadas: 0,
+        duracao: ''
+      };
+      
+      // Processar informações de segmentos e paradas
+      if (melhorOferta.itineraries && melhorOferta.itineraries.length > 0) {
+        // Contar paradas na ida
+        const segmentosIda = melhorOferta.itineraries[0].segments || [];
+        detalhesVoo.numeroParadas = Math.max(0, segmentosIda.length - 1);
+        
+        // Calcular duração da ida
+        if (melhorOferta.itineraries[0].duration) {
+          detalhesVoo.duracao = formatarDuracao(melhorOferta.itineraries[0].duration);
+        }
+      }
+      
+      return {
+        precoReal: precoTotal,
+        detalhesVoo: detalhesVoo
+      };
+    } else {
+      console.warn('Nenhuma oferta encontrada para', origemIATA, destinoIATA);
+      return null;
+    }
+  } catch (error) {
+    console.error('Erro ao buscar preços de voo:', error.message);
+    if (error.response) {
+      console.error('Status:', error.response.status);
+      console.error('Dados:', JSON.stringify(error.response.data).substring(0, 200));
+    }
+    return null;
+  }
+}
+
+// Função para processar destinos em lotes
+async function processarDestinos(recomendacoes, origemIATA, datas, token) {
+  if (!recomendacoes || !token) {
+    console.log('Dados insuficientes para processamento de destinos');
+    return recomendacoes;
+  }
+  
+  console.log('Processando destinos para obter preços reais...');
+  
+  try {
+    // Processar o destino principal primeiro
+    if (recomendacoes.topPick && recomendacoes.topPick.aeroporto && recomendacoes.topPick.aeroporto.codigo) {
+      const destinoIATA = recomendacoes.topPick.aeroporto.codigo;
+      console.log(`Processando destino principal: ${recomendacoes.topPick.destino} (${destinoIATA})`);
+      
+      const dadosVoo = await buscarPrecoVoo(origemIATA, destinoIATA, datas, token);
+      
+      if (dadosVoo) {
+        // Atualizar com preço real
+        recomendacoes.topPick.preco.voo = dadosVoo.precoReal;
+        // Adicionar detalhes do voo
+        recomendacoes.topPick.detalhesVoo = dadosVoo.detalhesVoo;
+      }
+      
+      // Pequeno delay para não sobrecarregar a API
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+    
+    // Processar destinos alternativos em lotes
+    if (recomendacoes.alternativas && Array.isArray(recomendacoes.alternativas)) {
+      // Processar em lotes de 2
+      for (let i = 0; i < recomendacoes.alternativas.length; i += 2) {
+        const lote = recomendacoes.alternativas.slice(i, i + 2);
+        
+        // Processar em paralelo os destinos do lote
+        await Promise.all(lote.map(async (destino) => {
+          if (destino.aeroporto && destino.aeroporto.codigo) {
+            const destinoIATA = destino.aeroporto.codigo;
+            console.log(`Processando destino alternativo: ${destino.destino} (${destinoIATA})`);
+            
+            const dadosVoo = await buscarPrecoVoo(origemIATA, destinoIATA, datas, token);
+            
+            if (dadosVoo) {
+              // Atualizar com preço real
+              destino.preco.voo = dadosVoo.precoReal;
+              // Adicionar detalhes do voo
+              destino.detalhesVoo = dadosVoo.detalhesVoo;
+            }
+          }
+        }));
+        
+        // Delay entre lotes
+        if (i + 2 < recomendacoes.alternativas.length) {
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+      }
+    }
+    
+    // Processar destino surpresa por último
+    if (recomendacoes.surpresa && recomendacoes.surpresa.aeroporto && recomendacoes.surpresa.aeroporto.codigo) {
+      const destinoIATA = recomendacoes.surpresa.aeroporto.codigo;
+      console.log(`Processando destino surpresa: ${recomendacoes.surpresa.destino} (${destinoIATA})`);
+      
+      const dadosVoo = await buscarPrecoVoo(origemIATA, destinoIATA, datas, token);
+      
+      if (dadosVoo) {
+        // Atualizar com preço real
+        recomendacoes.surpresa.preco.voo = dadosVoo.precoReal;
+        // Adicionar detalhes do voo
+        recomendacoes.surpresa.detalhesVoo = dadosVoo.detalhesVoo;
+      }
+    }
+    
+    return recomendacoes;
+  } catch (error) {
+    console.error('Erro ao processar destinos:', error);
+    return recomendacoes; // Retornar recomendações originais em caso de erro
+  }
+}
+
+// Função auxiliar para formatar duração
+function formatarDuracao(duracaoString) {
+  try {
+    // Extrair horas e minutos da string formato PT2H30M
+    const horasMatch = duracaoString.match(/(\d+)H/);
+    const minutosMatch = duracaoString.match(/(\d+)M/);
+    
+    const horas = horasMatch ? parseInt(horasMatch[1]) : 0;
+    const minutos = minutosMatch ? parseInt(minutosMatch[1]) : 0;
+    
+    if (horas > 0 && minutos > 0) {
+      return `${horas}h ${minutos}m`;
+    } else if (horas > 0) {
+      return `${horas}h`;
+    } else if (minutos > 0) {
+      return `${minutos}m`;
+    } else {
+      return 'N/A';
+    }
+  } catch (error) {
+    console.error('Erro ao formatar duração:', error);
+    return 'N/A';
+  }
+}
+
+// Função para extrair código IATA da origem
+function obterCodigoIATAOrigem(dadosUsuario) {
+  try {
+    if (!dadosUsuario || !dadosUsuario.cidade_partida) {
+      return null;
+    }
+    
+    // Verificar se há código IATA direto na resposta
+    if (dadosUsuario.cidade_partida.iata) {
+      return dadosUsuario.cidade_partida.iata;
+    }
+    
+    // Mapeamento de cidades para códigos IATA
+    const mapeamentoIATA = {
+      'São Paulo': 'GRU',
+      'Rio de Janeiro': 'GIG',
+      'Brasília': 'BSB',
+      'Salvador': 'SSA',
+      'Recife': 'REC',
+      'Fortaleza': 'FOR',
+      'Belo Horizonte': 'CNF',
+      'Porto Alegre': 'POA',
+      'Curitiba': 'CWB',
+      'Belém': 'BEL',
+      'Manaus': 'MAO',
+      'Natal': 'NAT',
+      'Florianópolis': 'FLN',
+      'Maceió': 'MCZ',
+      'Goiânia': 'GYN',
+      'Vitória': 'VIX',
+      'Buenos Aires': 'EZE',
+      'Santiago': 'SCL',
+      'Lima': 'LIM',
+      'Bogotá': 'BOG',
+      'Cidade do México': 'MEX',
+      'Nova York': 'JFK',
+      'Los Angeles': 'LAX',
+      'Miami': 'MIA',
+      'Londres': 'LHR',
+      'Paris': 'CDG',
+      'Roma': 'FCO',
+      'Madri': 'MAD',
+      'Lisboa': 'LIS',
+      'Tóquio': 'HND',
+      'Dubai': 'DXB',
+      'Sydney': 'SYD'
+    };
+    
+    // Verificar se a cidade está no mapeamento
+    const cidadeNome = dadosUsuario.cidade_partida.name || '';
+    
+    for (const [cidade, iata] of Object.entries(mapeamentoIATA)) {
+      if (cidadeNome.toLowerCase().includes(cidade.toLowerCase())) {
+        return iata;
+      }
+    }
+    
+    // Padrão para o Brasil
+    return 'GRU';
+  } catch (error) {
+    console.error('Erro ao obter código IATA:', error);
+    return 'GRU';
+  }
+}
+
+// Função para extrair datas de viagem
+function obterDatasViagem(dadosUsuario) {
+  try {
+    if (!dadosUsuario || !dadosUsuario.respostas || !dadosUsuario.respostas.datas) {
+      // Datas padrão
+      return {
+        dataIda: '2025-08-05',
+        dataVolta: '2025-08-12'
+      };
+    }
+    
+    const datas = dadosUsuario.respostas.datas;
+    
+    // Verificar formato do objeto
+    if (datas.dataIda && datas.dataVolta) {
+      return {
+        dataIda: datas.dataIda,
+        dataVolta: datas.dataVolta
+      };
+    }
+    
+    // Verificar se é string com datas separadas por vírgula
+    if (typeof datas === 'string' && datas.includes(',')) {
+      const [dataIda, dataVolta] = datas.split(',');
+      return {
+        dataIda: dataIda.trim(),
+        dataVolta: dataVolta.trim()
+      };
+    }
+    
+    // Datas padrão se não encontrar formato válido
+    return {
+      dataIda: '2025-08-05',
+      dataVolta: '2025-08-12'
+    };
+  } catch (error) {
+    console.error('Erro ao obter datas de viagem:', error);
+    return {
+      dataIda: '2025-08-05',
+      dataVolta: '2025-08-12'
+    };
+  }
+}
+
 // Chamar a API da Perplexity com melhor tratamento de erros
 async function callPerplexityAPI(prompt, requestData) {
   try {
@@ -281,7 +807,8 @@ async function callPerplexityAPI(prompt, requestData) {
     3. Forneça EXATAMENTE 4 destinos alternativos totalmente diferentes entre si.
     4. Garanta preços realistas e acessíveis para todas as recomendações.
     5. Inclua PONTOS TURÍSTICOS ESPECÍFICOS para cada destino - 2 para o destino principal e destino surpresa, 1 para cada alternativa.
-    6. Os comentários da Tripinha DEVEM mencionar de forma natural e entusiasmada PELO MENOS UM dos pontos turísticos mencionados. Exemplo: "Paris tem a Torre Eiffel mais linda que já vi! Adorei correr pelas Tulherias e farejar todas aquelas flores!"`;
+    6. Os comentários da Tripinha DEVEM mencionar de forma natural e entusiasmada PELO MENOS UM dos pontos turísticos mencionados.
+    7. PARA CADA DESTINO, inclua o código IATA (3 letras) do aeroporto principal ou mais próximo.`;
     const response = await axios({
       method: 'post',
       url: 'https://api.perplexity.ai/chat/completions',
@@ -347,6 +874,7 @@ async function callPerplexityAPI(prompt, requestData) {
     throw error;
   }
 }
+
 // Chamar a API da OpenAI como alternativa
 async function callOpenAIAPI(prompt, requestData) {
   try {
@@ -369,7 +897,8 @@ async function callOpenAIAPI(prompt, requestData) {
     3. Forneça EXATAMENTE 4 destinos alternativos totalmente diferentes entre si.
     4. Garanta preços realistas e acessíveis para todas as recomendações.
     5. Inclua PONTOS TURÍSTICOS ESPECÍFICOS para cada destino - 2 para o principal e surpresa, 1 para cada alternativa.
-    6. Os comentários da Tripinha DEVEM mencionar de forma natural e entusiasmada PELO MENOS UM dos pontos turísticos mencionados. Exemplo: "Lisboa tem a melhor Torre de Belém! Adorei correr por Alfama e farejar todos aqueles cafés!"`;
+    6. Os comentários da Tripinha DEVEM mencionar de forma natural e entusiasmada PELO MENOS UM dos pontos turísticos mencionados.
+    7. PARA CADA DESTINO, inclua o código IATA (3 letras) do aeroporto principal ou mais próximo.`;
     
     const response = await axios({
       method: 'post',
@@ -441,7 +970,8 @@ async function callClaudeAPI(prompt, requestData) {
     3. Forneça EXATAMENTE 4 destinos alternativos totalmente diferentes entre si.
     4. Garanta preços realistas e acessíveis para todas as recomendações.
     5. Inclua PONTOS TURÍSTICOS ESPECÍFICOS para cada destino - 2 para o principal e surpresa, 1 para cada alternativa.
-    6. Os comentários da Tripinha DEVEM mencionar de forma natural e entusiasmada PELO MENOS UM dos pontos turísticos mencionados. Exemplo: "Veneza tem os canais mais bonitos que já vi! Adorei passear perto da Ponte Rialto e farejar os aromas das gôndolas!"`;
+    6. Os comentários da Tripinha DEVEM mencionar de forma natural e entusiasmada PELO MENOS UM dos pontos turísticos mencionados.
+    7. PARA CADA DESTINO, inclua o código IATA (3 letras) do aeroporto principal ou mais próximo.`;
     const response = await axios({
       method: 'post',
       url: 'https://api.anthropic.com/v1/messages',
@@ -639,6 +1169,18 @@ function isValidDestinationJSON(jsonString, requestData) {
       return false;
     }
     
+    // Verificar se há código IATA para destino principal
+    if (!data.topPick.aeroporto || !data.topPick.aeroporto.codigo) {
+      console.log("JSON inválido: falta código IATA no destino principal");
+      // Não falhar por isso, apenas logar
+    }
+    
+    // Verificar se há código IATA para destino surpresa
+    if (!data.surpresa.aeroporto || !data.surpresa.aeroporto.codigo) {
+      console.log("JSON inválido: falta código IATA no destino surpresa");
+      // Não falhar por isso, apenas logar
+    }
+    
     // Se passar nas verificações rápidas, os dados são considerados válidos para resposta
     return true;
   } catch (error) {
@@ -679,7 +1221,8 @@ function enriquecerComentarioTripinha(comentario, pontosTuristicos) {
   const indice = Math.floor(Math.random() * padroes.length);
   return padroes[indice];
 }
-// Banco simplificado de pontos turísticos populares (reduzido significativamente)
+
+// Banco simplificado de pontos turísticos populares
 const pontosPopulares = {
   // Destinos mais populares globalmente
   "Paris": ["Torre Eiffel", "Museu do Louvre"],
@@ -732,6 +1275,16 @@ function ensureTouristAttractionsAndComments(jsonString, requestData) {
         data.topPick.comentario = `${data.topPick.destino} é um sonho! Adorei passear por ${pontoTuristico} e sentir todos aqueles cheiros novos! Uma aventura incrível para qualquer cachorro explorador! 🐾`;
         modificado = true;
       }
+      
+      // Verificar e adicionar informações de aeroporto se necessário
+      if (!data.topPick.aeroporto || !data.topPick.aeroporto.codigo) {
+        // Criar informações de aeroporto
+        data.topPick.aeroporto = {
+          codigo: obterCodigoIATAPadrao(data.topPick.destino, data.topPick.pais),
+          nome: `Aeroporto de ${data.topPick.destino}`
+        };
+        modificado = true;
+      }
     }
     
     // Tratar destino surpresa
@@ -762,6 +1315,16 @@ function ensureTouristAttractionsAndComments(jsonString, requestData) {
         data.surpresa.comentario = `${data.surpresa.destino} é uma descoberta incrível! Poucos conhecem ${pontoTuristico}, mas é um paraíso para cachorros curiosos como eu! Tantos aromas novos para farejar! 🐾🌟`;
         modificado = true;
       }
+      
+      // Verificar e adicionar informações de aeroporto se necessário
+      if (!data.surpresa.aeroporto || !data.surpresa.aeroporto.codigo) {
+        // Criar informações de aeroporto
+        data.surpresa.aeroporto = {
+          codigo: obterCodigoIATAPadrao(data.surpresa.destino, data.surpresa.pais),
+          nome: `Aeroporto de ${data.surpresa.destino}`
+        };
+        modificado = true;
+      }
     }
     
     // Tratar destinos alternativos
@@ -774,6 +1337,16 @@ function ensureTouristAttractionsAndComments(jsonString, requestData) {
           
           // Adicionar um ponto turístico
           alternativa.pontoTuristico = pontosConhecidos[0] || "Atrações turísticas";
+          modificado = true;
+        }
+        
+        // Verificar e adicionar informações de aeroporto se necessário
+        if (!alternativa.aeroporto || !alternativa.aeroporto.codigo) {
+          // Criar informações de aeroporto
+          alternativa.aeroporto = {
+            codigo: obterCodigoIATAPadrao(alternativa.destino, alternativa.pais),
+            nome: `Aeroporto de ${alternativa.destino}`
+          };
           modificado = true;
         }
       }
@@ -790,6 +1363,7 @@ function ensureTouristAttractionsAndComments(jsonString, requestData) {
       const destinos = ["Lisboa", "Barcelona", "Roma", "Tóquio"];
       const paisesDestinos = ["Portugal", "Espanha", "Itália", "Japão"];
       const codigosPaises = ["PT", "ES", "IT", "JP"];
+      const codigosIATA = ["LIS", "BCN", "FCO", "HND"];
       
       const index = data.alternativas.length % destinos.length;
       const destino = destinos[index];
@@ -803,6 +1377,10 @@ function ensureTouristAttractionsAndComments(jsonString, requestData) {
         codigoPais: codigosPaises[index],
         porque: `Cidade com rica história, gastronomia única e atmosfera encantadora`,
         pontoTuristico: pontosConhecidos[0] || "Atrações turísticas",
+        aeroporto: {
+          codigo: codigosIATA[index],
+          nome: `Aeroporto de ${destino}`
+        },
         preco: {
           voo: precoBase - (index * 100),
           hotel: 200 + (index * 20)
@@ -826,7 +1404,114 @@ function ensureTouristAttractionsAndComments(jsonString, requestData) {
   }
 }
 
-// Função para gerar prompt adequado para a IA
+// Função para obter código IATA padrão para um destino
+function obterCodigoIATAPadrao(cidade, pais) {
+  // Mapeamento de cidades para códigos IATA
+  const mapeamentoIATA = {
+    // Brasil
+    'São Paulo': 'GRU',
+    'Rio de Janeiro': 'GIG',
+    'Brasília': 'BSB',
+    'Salvador': 'SSA',
+    'Recife': 'REC',
+    'Fortaleza': 'FOR',
+    'Belo Horizonte': 'CNF',
+    'Porto Alegre': 'POA',
+    'Curitiba': 'CWB',
+    'Belém': 'BEL',
+    'Manaus': 'MAO',
+    'Natal': 'NAT',
+    'Florianópolis': 'FLN',
+    'Maceió': 'MCZ',
+    'Goiânia': 'GYN',
+    'Vitória': 'VIX',
+    // América Latina
+    'Buenos Aires': 'EZE',
+    'Santiago': 'SCL',
+    'Lima': 'LIM',
+    'Bogotá': 'BOG',
+    'Cartagena': 'CTG',
+    'Cidade do México': 'MEX',
+    'Cancún': 'CUN',
+    'San José': 'SJO',
+    // América do Norte
+    'Nova York': 'JFK',
+    'Los Angeles': 'LAX',
+    'Miami': 'MIA',
+    'Toronto': 'YYZ',
+    'Vancouver': 'YVR',
+    // Europa
+    'Londres': 'LHR',
+    'Paris': 'CDG',
+    'Roma': 'FCO',
+    'Madri': 'MAD',
+    'Lisboa': 'LIS',
+    'Barcelona': 'BCN',
+    'Amsterdã': 'AMS',
+    'Berlim': 'BER',
+    'Frankfurt': 'FRA',
+    'Viena': 'VIE',
+    'Zurique': 'ZRH',
+    'Atenas': 'ATH',
+    'Istambul': 'IST',
+    // Ásia
+    'Tóquio': 'HND',
+    'Pequim': 'PEK',
+    'Xangai': 'PVG',
+    'Hong Kong': 'HKG',
+    'Bangkok': 'BKK',
+    'Seul': 'ICN',
+    'Dubai': 'DXB',
+    'Singapura': 'SIN',
+    'Mumbai': 'BOM',
+    'Nova Délhi': 'DEL',
+    // Oceania
+    'Sydney': 'SYD',
+    'Melbourne': 'MEL',
+    'Auckland': 'AKL'
+  };
+  
+  // Verificar se a cidade está no mapeamento
+  if (mapeamentoIATA[cidade]) {
+    return mapeamentoIATA[cidade];
+  }
+  
+  // Mapeamento por país se não encontrar a cidade específica
+  const mapeamentoPais = {
+    'Brasil': 'GRU',
+    'Estados Unidos': 'JFK',
+    'México': 'MEX',
+    'Canadá': 'YYZ',
+    'Reino Unido': 'LHR',
+    'França': 'CDG',
+    'Itália': 'FCO',
+    'Espanha': 'MAD',
+    'Portugal': 'LIS',
+    'Alemanha': 'FRA',
+    'Japão': 'HND',
+    'China': 'PEK',
+    'Índia': 'DEL',
+    'Austrália': 'SYD',
+    'Tailândia': 'BKK',
+    'Singapura': 'SIN',
+    'Emirados Árabes Unidos': 'DXB'
+  };
+  
+  // Verificar por país
+  if (mapeamentoPais[pais]) {
+    return mapeamentoPais[pais];
+  }
+  
+  // Caso não encontre nenhuma correspondência, usar código genérico
+  // Baseado nas primeiras letras da cidade
+  if (cidade && cidade.length >= 3) {
+    return cidade.substring(0, 3).toUpperCase();
+  }
+  
+  return "AAA"; // Código genérico
+}
+
+// Função para gerar prompt baseado nos dados do usuário
 function gerarPromptParaDestinos(dados) {
   // Extrair informações relevantes dos dados recebidos, com verificações
   const companhia = getCompanhiaText(dados.companhia || 0);
@@ -901,7 +1586,7 @@ function gerarPromptParaDestinos(dados) {
 
   // Colocar orçamento com destaque prioritário
   const mensagemOrcamento = orcamento !== 'flexível' ?
-    `⚠️ ORÇAMENTO MÁXIMO: ${orcamento} ${moeda} para voos (ida e volta por pessoa). Todos os destinos DEVEM ter preços de voo ABAIXO deste valor.` : 
+    `⚠️ ORÇAMENTO MÁXIMO: ${orcamento} ${moeda} para voos (ida e volta por pessoa). Todos os destinos DEVEM ter preços de voo ABAIXO deste valor. Este é o requisito MAIS IMPORTANTE.` : 
     'Orçamento flexível';
     
   // Adicionar sugestão de localidade baseada na origem
@@ -930,11 +1615,9 @@ IMPORTANTE:
 4. Considere a ÉPOCA DO ANO (${estacaoViagem}) para sugerir destinos com clima adequado.
 5. Inclua destinos de diferentes continentes/regiões nas alternativas.
 6. Garanta que os preços sejam realistas e precisos para voos de ida e volta partindo de ${cidadeOrigem}.
-7. Pelo menos um destino deve ter preço bem abaixo do orçamento máximo (economicamente vantajoso).
-8. Para cada destino, INCLUA PONTOS TURÍSTICOS ESPECÍFICOS E CONHECIDOS - não genéricos:
-   - Principal e Surpresa: 2 pontos turísticos específicos para cada
-   - Alternativas: 1 ponto turístico específico para cada
-9. Os comentários da Tripinha (que é uma cachorra mascote) DEVEM mencionar pelo menos um dos pontos turísticos do destino de forma natural e entusiasmada. Exemplo: "Paris tem a Torre Eiffel mais linda que já vi! Adorei passear pelos Jardins de Luxemburgo e farejar tantas flores novas! 🐾"
+7. Para CADA destino, inclua o código IATA (3 letras) do aeroporto principal ou mais próximo, para busca precisa de voos.
+8. Para cada destino, INCLUA PONTOS TURÍSTICOS ESPECÍFICOS E CONHECIDOS - não genéricos.
+9. Os comentários da Tripinha DEVEM mencionar pelo menos um dos pontos turísticos do destino.
 
 Forneça no formato JSON exato abaixo, SEM formatação markdown:
 {
@@ -950,6 +1633,10 @@ Forneça no formato JSON exato abaixo, SEM formatação markdown:
       "Nome do Primeiro Ponto Turístico específico e conhecido na cidade", 
       "Nome do Segundo Ponto Turístico específico e conhecido na cidade"
     ],
+    "aeroporto": {
+      "codigo": "XYZ",
+      "nome": "Nome do Aeroporto Principal"
+    },
     "preco": {
       "voo": número,
       "hotel": número
@@ -962,6 +1649,10 @@ Forneça no formato JSON exato abaixo, SEM formatação markdown:
       "codigoPais": "XX",
       "porque": "Razão específica para visitar",
       "pontoTuristico": "Nome de um Ponto Turístico específico e conhecido na cidade",
+      "aeroporto": {
+        "codigo": "XYZ",
+        "nome": "Nome do Aeroporto Principal"
+      },
       "preco": {
         "voo": número,
         "hotel": número
@@ -973,6 +1664,10 @@ Forneça no formato JSON exato abaixo, SEM formatação markdown:
       "codigoPais": "XX",
       "porque": "Razão específica para visitar",
       "pontoTuristico": "Nome de um Ponto Turístico específico e conhecido na cidade", 
+      "aeroporto": {
+        "codigo": "XYZ",
+        "nome": "Nome do Aeroporto Principal"
+      },
       "preco": {
         "voo": número,
         "hotel": número
@@ -984,6 +1679,10 @@ Forneça no formato JSON exato abaixo, SEM formatação markdown:
       "codigoPais": "XX",
       "porque": "Razão específica para visitar",
       "pontoTuristico": "Nome de um Ponto Turístico específico e conhecido na cidade",
+      "aeroporto": {
+        "codigo": "XYZ",
+        "nome": "Nome do Aeroporto Principal"
+      },
       "preco": {
         "voo": número,
         "hotel": número
@@ -995,6 +1694,10 @@ Forneça no formato JSON exato abaixo, SEM formatação markdown:
       "codigoPais": "XX",
       "porque": "Razão específica para visitar",
       "pontoTuristico": "Nome de um Ponto Turístico específico e conhecido na cidade",
+      "aeroporto": {
+        "codigo": "XYZ",
+        "nome": "Nome do Aeroporto Principal"
+      },
       "preco": {
         "voo": número,
         "hotel": número
@@ -1013,6 +1716,10 @@ Forneça no formato JSON exato abaixo, SEM formatação markdown:
       "Nome do Primeiro Ponto Turístico específico e conhecido na cidade", 
       "Nome do Segundo Ponto Turístico específico e conhecido na cidade"
     ],
+    "aeroporto": {
+      "codigo": "XYZ",
+      "nome": "Nome do Aeroporto Principal"
+    },
     "preco": {
       "voo": número,
       "hotel": número
@@ -1123,7 +1830,8 @@ function gerarSugestaoDistancia(cidadeOrigem, tipoDestino) {
   
   return '(considere a distância e acessibilidade a partir desta origem)';
 }
-// Função para gerar dados de emergência personalizados baseados no perfil (SIGNIFICATIVAMENTE SIMPLIFICADA)
+
+// Função para gerar dados de emergência personalizados baseados no perfil (SIMPLIFICADA)
 function generateEmergencyData(dadosUsuario = {}) {
   // Extrair parâmetros essenciais
   const preferencia = dadosUsuario.preferencia_viagem || 0;
@@ -1146,6 +1854,10 @@ function generateEmergencyData(dadosUsuario = {}) {
         destaque: "Visitar o Cristo Redentor ao pôr do sol com vista panorâmica da cidade",
         comentario: "O Rio tem a praia de Copacabana mais linda para cavar na areia! Corri pelo Cristo Redentor e vi a cidade inteira aos meus pés! Que aventura incrível! 🐾",
         pontosTuristicos: ["Cristo Redentor", "Praia de Copacabana"],
+        aeroporto: {
+          codigo: "GIG",
+          nome: "Aeroporto Internacional do Galeão"
+        },
         preco: { voo: Math.min(orcamento * 0.6, 1200), hotel: 250 }
       },
       alternativas: [
@@ -1155,6 +1867,10 @@ function generateEmergencyData(dadosUsuario = {}) {
           codigoPais: "MX",
           porque: "Capital cultural com pirâmides antigas, museus e gastronomia premiada",
           pontoTuristico: "Museu Frida Kahlo",
+          aeroporto: {
+            codigo: "MEX",
+            nome: "Aeroporto Internacional da Cidade do México"
+          },
           preco: { voo: Math.min(orcamento * 0.7, 1600), hotel: 180 }
         },
         {
@@ -1163,6 +1879,10 @@ function generateEmergencyData(dadosUsuario = {}) {
           codigoPais: "AR",
           porque: "A Paris da América do Sul com arquitetura europeia e tango nas ruas",
           pontoTuristico: "Teatro Colón",
+          aeroporto: {
+            codigo: "EZE",
+            nome: "Aeroporto Internacional Ministro Pistarini"
+          },
           preco: { voo: Math.min(orcamento * 0.65, 1500), hotel: 170 }
         },
         {
@@ -1171,6 +1891,10 @@ function generateEmergencyData(dadosUsuario = {}) {
           codigoPais: "CA",
           porque: "Metrópole multicultural com torres icônicas e proximidade às Cataratas do Niágara",
           pontoTuristico: "CN Tower",
+          aeroporto: {
+            codigo: "YYZ",
+            nome: "Aeroporto Internacional Toronto Pearson"
+          },
           preco: { voo: Math.min(orcamento * 0.8, 2200), hotel: 280 }
         },
         {
@@ -1179,6 +1903,10 @@ function generateEmergencyData(dadosUsuario = {}) {
           codigoPais: "PE",
           porque: "Antiga capital Inca próxima a Machu Picchu com rica história andina",
           pontoTuristico: "Sacsayhuamán",
+          aeroporto: {
+            codigo: "CUZ",
+            nome: "Aeroporto Internacional Alejandro Velasco Astete"
+          },
           preco: { voo: Math.min(orcamento * 0.75, 1800), hotel: 160 }
         }
       ],
@@ -1191,6 +1919,10 @@ function generateEmergencyData(dadosUsuario = {}) {
         destaque: "Passear pelas ruas coloridas da Cidade Murada ao entardecer",
         comentario: "Cartagena é mágica! A Ciudad Amurallada tem ruas de pedra onde posso passear a noite toda! E os pescadores sempre me dão petiscos fresquinhos no mercado! 🐾🐟",
         pontosTuristicos: ["Ciudad Amurallada", "Castillo San Felipe de Barajas"],
+        aeroporto: {
+          codigo: "CTG",
+          nome: "Aeroporto Internacional Rafael Núñez"
+        },
         preco: { voo: Math.min(orcamento * 0.7, 1700), hotel: 200 }
       }
     },
@@ -1204,6 +1936,10 @@ function generateEmergencyData(dadosUsuario = {}) {
         destaque: "Jantar com show de Fado em uma casa tradicional de Alfama",
         comentario: "Lisboa tem a Torre de Belém mais bonita à beira do rio! Adorei farejar os pastéis de nata quentinhos e correr pelas ruelas de Alfama! 🐾🚋",
         pontosTuristicos: ["Torre de Belém", "Bairro de Alfama"],
+        aeroporto: {
+          codigo: "LIS",
+          nome: "Aeroporto Humberto Delgado"
+        },
         preco: { voo: Math.min(orcamento * 0.7, 2600), hotel: 220 }
       },
       alternativas: [
@@ -1213,6 +1949,10 @@ function generateEmergencyData(dadosUsuario = {}) {
           codigoPais: "ES",
           porque: "Cidade mediterrânea com arquitetura fantástica de Gaudí e praias urbanas",
           pontoTuristico: "Sagrada Família",
+          aeroporto: {
+            codigo: "BCN",
+            nome: "Aeroporto de Barcelona-El Prat"
+          },
           preco: { voo: Math.min(orcamento * 0.75, 2800), hotel: 240 }
         },
         {
@@ -1221,6 +1961,10 @@ function generateEmergencyData(dadosUsuario = {}) {
           codigoPais: "NL",
           porque: "Cidade de canais com museus de classe mundial e atmosfera liberal",
           pontoTuristico: "Museu Van Gogh",
+          aeroporto: {
+            codigo: "AMS",
+            nome: "Aeroporto de Schiphol"
+          },
           preco: { voo: Math.min(orcamento * 0.8, 3000), hotel: 280 }
         },
         {
@@ -1229,6 +1973,10 @@ function generateEmergencyData(dadosUsuario = {}) {
           codigoPais: "CZ",
           porque: "Cidade medieval perfeitamente preservada com castelo e pontes históricos",
           pontoTuristico: "Ponte Carlos",
+          aeroporto: {
+            codigo: "PRG",
+            nome: "Aeroporto de Praga"
+          },
           preco: { voo: Math.min(orcamento * 0.7, 2700), hotel: 190 }
         },
         {
@@ -1237,6 +1985,10 @@ function generateEmergencyData(dadosUsuario = {}) {
           codigoPais: "IT",
           porque: "Capital histórica com ruínas antigas, arte renascentista e gastronomia premiada",
           pontoTuristico: "Coliseu",
+          aeroporto: {
+            codigo: "FCO",
+            nome: "Aeroporto Leonardo da Vinci-Fiumicino"
+          },
           preco: { voo: Math.min(orcamento * 0.8, 2900), hotel: 250 }
         }
       ],
@@ -1249,6 +2001,10 @@ function generateEmergencyData(dadosUsuario = {}) {
         destaque: "Degustação de vinho do Porto nas caves históricas de Vila Nova de Gaia",
         comentario: "Porto é um sonho para cães aventureiros! A Livraria Lello parece saída de um conto de fadas, e pude sentir o cheirinho do vinho do Porto envelhecendo nas caves! 🐾🍷",
         pontosTuristicos: ["Livraria Lello", "Caves de Vinho do Porto"],
+        aeroporto: {
+          codigo: "OPO",
+          nome: "Aeroporto Francisco Sá Carneiro"
+        },
         preco: { voo: Math.min(orcamento * 0.7, 2500), hotel: 200 }
       }
     },
@@ -1262,6 +2018,10 @@ function generateEmergencyData(dadosUsuario = {}) {
         destaque: "Visitar o cruzamento de Shibuya e depois relaxar no tradicional jardim Shinjuku Gyoen",
         comentario: "Tóquio é incrível! O cruzamento de Shibuya tem tantas pessoas e luzes! E os jardins de cerejeira são perfeitos para um cachorro curioso como eu! 🐾🌸",
         pontosTuristicos: ["Cruzamento de Shibuya", "Templo Senso-ji"],
+        aeroporto: {
+          codigo: "HND",
+          nome: "Aeroporto Internacional de Haneda"
+        },
         preco: { voo: Math.min(orcamento * 0.85, 3800), hotel: 270 }
       },
       alternativas: [
@@ -1271,6 +2031,10 @@ function generateEmergencyData(dadosUsuario = {}) {
           codigoPais: "TH",
           porque: "Capital tailandesa com templos dourados, mercados flutuantes e vida noturna",
           pontoTuristico: "Grande Palácio Real",
+          aeroporto: {
+            codigo: "BKK",
+            nome: "Aeroporto Internacional de Suvarnabhumi"
+          },
           preco: { voo: Math.min(orcamento * 0.8, 3500), hotel: 150 }
         },
         {
@@ -1279,6 +2043,10 @@ function generateEmergencyData(dadosUsuario = {}) {
           codigoPais: "SG",
           porque: "Cidade-estado moderna com arquitetura futurista, limpeza impecável e gastronomia diversa",
           pontoTuristico: "Gardens by the Bay",
+          aeroporto: {
+            codigo: "SIN",
+            nome: "Aeroporto de Changi"
+          },
           preco: { voo: Math.min(orcamento * 0.85, 3700), hotel: 290 }
         },
         {
@@ -1287,6 +2055,10 @@ function generateEmergencyData(dadosUsuario = {}) {
           codigoPais: "ID",
           porque: "Ilha paradisíaca com praias, templos, terraços de arroz e cultura única",
           pontoTuristico: "Templo Tanah Lot",
+          aeroporto: {
+            codigo: "DPS",
+            nome: "Aeroporto Internacional Ngurah Rai"
+          },
           preco: { voo: Math.min(orcamento * 0.75, 3400), hotel: 180 }
         },
         {
@@ -1295,6 +2067,10 @@ function generateEmergencyData(dadosUsuario = {}) {
           codigoPais: "AE",
           porque: "Cidade futurista no deserto com os prédios mais altos do mundo e luxo extremo",
           pontoTuristico: "Burj Khalifa",
+          aeroporto: {
+            codigo: "DXB",
+            nome: "Aeroporto Internacional de Dubai"
+          },
           preco: { voo: Math.min(orcamento * 0.8, 3600), hotel: 320 }
         }
       ],
@@ -1307,6 +2083,10 @@ function generateEmergencyData(dadosUsuario = {}) {
         destaque: "Passear pela cidade antiga iluminada por milhares de lanternas coloridas",
         comentario: "Hoi An é um sonho! A Cidade Antiga fica toda iluminada com lanternas coloridas à noite, parece mágica! E os barquinhos no rio têm cheiros tão interessantes! 🐾🏮",
         pontosTuristicos: ["Cidade Antiga de Hoi An", "Ponte Japonesa"],
+        aeroporto: {
+          codigo: "DAD",
+          nome: "Aeroporto Internacional de Da Nang"
+        },
         preco: { voo: Math.min(orcamento * 0.75, 3300), hotel: 130 }
       }
     },
@@ -1320,6 +2100,10 @@ function generateEmergencyData(dadosUsuario = {}) {
         destaque: "Passear pela Sagrada Família e depois relaxar na Praia de Barceloneta",
         comentario: "Barcelona é um paraíso! A Sagrada Família é o lugar mais impressionante que já vi com tantos detalhes para observar! O Parque Güell é como um parquinho mágico para cães! 🐾🏛️",
         pontosTuristicos: ["Sagrada Família", "Parque Güell"],
+        aeroporto: {
+          codigo: "BCN",
+          nome: "Aeroporto de Barcelona-El Prat"
+        },
         preco: { voo: Math.min(orcamento * 0.7, 2600), hotel: 220 }
       },
       alternativas: [
@@ -1329,6 +2113,10 @@ function generateEmergencyData(dadosUsuario = {}) {
           codigoPais: "JP",
           porque: "Metropole futurista com tradição milenar, segurança e gastronomia excepcional",
           pontoTuristico: "Cruzamento de Shibuya",
+          aeroporto: {
+            codigo: "HND",
+            nome: "Aeroporto Internacional de Haneda"
+          },
           preco: { voo: Math.min(orcamento * 0.85, 3500), hotel: 270 }
         },
         {
@@ -1337,6 +2125,10 @@ function generateEmergencyData(dadosUsuario = {}) {
           codigoPais: "ZA",
           porque: "Cidade entre montanha e mar com safáris próximos e paisagens deslumbrantes",
           pontoTuristico: "Table Mountain",
+          aeroporto: {
+            codigo: "CPT",
+            nome: "Aeroporto Internacional da Cidade do Cabo"
+          },
           preco: { voo: Math.min(orcamento * 0.8, 3000), hotel: 200 }
         },
         {
@@ -1345,6 +2137,10 @@ function generateEmergencyData(dadosUsuario = {}) {
           codigoPais: "US",
           porque: "A 'Capital do Mundo' com arranha-céus, cultura, compras e entretenimento",
           pontoTuristico: "Central Park",
+          aeroporto: {
+            codigo: "JFK",
+            nome: "Aeroporto Internacional John F. Kennedy"
+          },
           preco: { voo: Math.min(orcamento * 0.8, 3100), hotel: 350 }
         },
         {
@@ -1353,6 +2149,10 @@ function generateEmergencyData(dadosUsuario = {}) {
           codigoPais: "BR",
           porque: "Cidade maravilhosa com praias, montanhas e cultura brasileira vibrante",
           pontoTuristico: "Cristo Redentor",
+          aeroporto: {
+            codigo: "GIG",
+            nome: "Aeroporto Internacional do Galeão"
+          },
           preco: { voo: Math.min(orcamento * 0.6, 1500), hotel: 230 }
         }
       ],
@@ -1365,6 +2165,10 @@ function generateEmergencyData(dadosUsuario = {}) {
         destaque: "Passear pelo centro histórico e depois fazer uma excursão ao Lago Bled",
         comentario: "Ljubljana é um segredo escondido! A Ponte do Dragão tem estátuas que parecem ganhar vida! E o Castelo de Ljubljana no alto da colina tem os melhores pontos para farejar a cidade inteira! 🐾🏰",
         pontosTuristicos: ["Ponte do Dragão", "Castelo de Ljubljana"],
+        aeroporto: {
+          codigo: "LJU",
+          nome: "Aeroporto Jože Pučnik"
+        },
         preco: { voo: Math.min(orcamento * 0.7, 2700), hotel: 170 }
       }
     }
