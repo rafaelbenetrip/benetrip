@@ -1,6 +1,7 @@
 /**
  * BENETRIP - Visualização de Destinos Recomendados
  * Controla a exibição e interação dos destinos recomendados pela IA
+ * Versão 2.0 - Integração com API Amadeus para preços reais
  */
 
 // Módulo de Destinos do Benetrip
@@ -140,19 +141,36 @@ const BENETRIP_DESTINOS = {
       }
       
       console.log('Buscando novas recomendações com IA');
-      this.atualizarProgresso('Consultando bancos de dados de viagem...', 40);
+      this.atualizarProgresso('Consultando serviços de viagem...', 40);
       
-      // Obter recomendações
+      // Obter recomendações da API
       const recomendacoes = await window.BENETRIP_AI.obterRecomendacoes(this.dadosUsuario.respostas);
-      console.log('Recomendações obtidas:', recomendacoes);
+      
+      // Verificar se a resposta indica que os dados foram enriquecidos com preços reais
+      if (recomendacoes && recomendacoes.tipo && (
+          recomendacoes.tipo.includes('enriquecido') || 
+          recomendacoes.tipo.includes('perplexity-enriquecido') || 
+          recomendacoes.tipo.includes('openai-enriquecido') || 
+          recomendacoes.tipo.includes('claude-enriquecido')
+        )) {
+        this.atualizarProgresso('Preços reais de voos obtidos!', 90);
+      } else {
+        this.atualizarProgresso('Recomendações geradas com preços estimados', 85);
+      }
+      
+      // Converter o conteúdo para objeto se for string
+      const conteudo = recomendacoes.conteudo || recomendacoes;
+      const dados = typeof conteudo === 'string' ? JSON.parse(conteudo) : conteudo;
+      
+      console.log('Recomendações obtidas:', dados);
       
       // Validar recomendações
-      if (!recomendacoes || !recomendacoes.topPick) {
-        console.error('Recomendações inválidas:', recomendacoes);
+      if (!dados || !dados.topPick) {
+        console.error('Recomendações inválidas:', dados);
         throw new Error('Dados de recomendação inválidos');
       }
       
-      return recomendacoes;
+      return dados;
     } catch (erro) {
       console.error('Erro ao buscar recomendações:', erro);
       throw erro;
@@ -292,6 +310,68 @@ const BENETRIP_DESTINOS = {
     }
   },
   
+  // Método para preparar informações de aeroporto
+  prepararInformacaoAeroporto(destino) {
+    // Verificar se o destino tem informações de aeroporto
+    if (!destino || !destino.aeroporto || !destino.aeroporto.codigo) {
+      return '';
+    }
+    
+    const aeroporto = destino.aeroporto;
+    const codigo = aeroporto.codigo;
+    const nome = aeroporto.nome || `Aeroporto de ${destino.destino}`;
+    
+    return `
+      <p class="flex items-center mt-2">
+        <span class="mr-2 w-5 text-center">🛫</span> 
+        <span class="font-medium">Aeroporto:</span> 
+        <span class="ml-1">${nome} (${codigo})</span>
+      </p>
+    `;
+  },
+
+  // Método para preparar informações de voo
+  prepararInformacoesVoo(destino) {
+    // Verificar se destino tem detalhes de voo
+    if (!destino || !destino.detalhesVoo) {
+      return '';
+    }
+    
+    const detalhes = destino.detalhesVoo;
+    const companhia = detalhes.companhia || '-';
+    const paradas = detalhes.numeroParadas || 0;
+    const duracao = detalhes.duracao || 'N/A';
+    
+    // Formatar texto de paradas
+    let paradasTexto = 'Direto';
+    if (paradas === 1) {
+      paradasTexto = '1 parada';
+    } else if (paradas > 1) {
+      paradasTexto = `${paradas} paradas`;
+    }
+    
+    // Formatar companhia aérea
+    const companhiaTexto = companhia !== '-' ? 
+      `<span class="font-medium px-1 py-0.5 rounded bg-gray-200">${companhia}</span>` : 
+      '';
+    
+    return `
+      <div class="mt-2 p-2 bg-gray-50 rounded-md text-xs">
+        <p class="flex items-center justify-between">
+          <span class="flex items-center">
+            <span class="mr-1">✈️</span>
+            <span>${paradasTexto}</span>
+          </span>
+          <span>${companhiaTexto}</span>
+          <span class="flex items-center">
+            <span class="mr-1">⏱️</span>
+            <span>${duracao}</span>
+          </span>
+        </p>
+      </div>
+    `;
+  },
+  
   // Renderizar mensagem da Tripinha
   renderizarMensagemTripinha() {
     const container = document.getElementById('mensagem-tripinha');
@@ -348,6 +428,7 @@ const BENETRIP_DESTINOS = {
       </div>
     `;
   },
+  
   // Renderizar destino destaque (top pick)
   renderizarDestinoDestaque(destino) {
     const container = document.getElementById('destino-destaque');
@@ -357,6 +438,11 @@ const BENETRIP_DESTINOS = {
     
     // Verificar se temos imagens disponíveis do serviço de IA
     const temImagens = destino.imagens && destino.imagens.length > 0;
+    
+    // Verificar se temos preço real vs estimado
+    const precoReal = destino.detalhesVoo ? true : false;
+    const precoClasse = precoReal ? 'text-green-700 font-semibold' : '';
+    const precoIcone = precoReal ? '🔍 ' : '';
     
     container.innerHTML = `
       <div class="border border-gray-200 rounded-lg overflow-hidden shadow-md">
@@ -390,15 +476,20 @@ const BENETRIP_DESTINOS = {
             </span>
           </div>
           
-          <div class="mt-3 space-y-2 text-sm">
+          <div class="mt-3 space-y-1 text-sm">
             <p class="flex items-center">
               <span class="mr-2 w-5 text-center">✈️</span> 
-              <span class="font-medium">Estimativa de Voo:</span> 
-              <span class="ml-1">R$ ${destino.preco.voo} (ida e volta)</span>
+              <span class="font-medium">Preço de Voo:</span> 
+              <span class="ml-1 ${precoClasse}">${precoIcone}R$ ${destino.preco.voo} (ida e volta)</span>
             </p>
+            
+            ${this.prepararInformacoesVoo(destino)}
+            
+            ${this.prepararInformacaoAeroporto(destino)}
+            
             <p class="flex items-center">
               <span class="mr-2 w-5 text-center">🏨</span> 
-              <span class="font-medium">Estimativa de Hotel:</span> 
+              <span class="font-medium">Hotel:</span> 
               <span class="ml-1">R$ ${destino.preco.hotel}/noite</span>
             </p>
             <p class="flex items-center">
@@ -420,6 +511,12 @@ const BENETRIP_DESTINOS = {
                 <span class="ml-1">${destino.destaque}</span>
               </span>
             </p>
+            
+            <div class="flex flex-wrap gap-1 mt-2">
+              ${destino.pontosTuristicos ? destino.pontosTuristicos.map(ponto => 
+                `<span class="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">${ponto}</span>`
+              ).join('') : ''}
+            </div>
           </div>
           
           <div 
@@ -455,6 +552,11 @@ const BENETRIP_DESTINOS = {
     const destinosLimitados = destinos.slice(0, 4);
     
     destinosLimitados.forEach(destino => {
+      // Verificar se temos preço real vs estimado
+      const precoReal = destino.detalhesVoo ? true : false;
+      const precoClasse = precoReal ? 'text-green-700 font-semibold' : '';
+      const precoIcone = precoReal ? '🔍 ' : '';
+      
       const elementoDestino = document.createElement('div');
       elementoDestino.className = 'card-destino border border-gray-200 rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow duration-200 mt-3';
       elementoDestino.dataset.destino = destino.destino;
@@ -481,8 +583,25 @@ const BENETRIP_DESTINOS = {
               <p class="flex items-center">
                 <span class="mr-1 w-4 text-center">✈️</span> 
                 <span class="font-medium">Voo:</span> 
-                <span class="ml-1">R$ ${destino.preco.voo}</span>
+                <span class="ml-1 ${precoClasse}">${precoIcone}R$ ${destino.preco.voo}</span>
               </p>
+              
+              ${destino.detalhesVoo ? `
+                <p class="flex items-center justify-between bg-gray-50 px-1 py-0.5 rounded">
+                  <span>${destino.detalhesVoo.numeroParadas === 0 ? 'Direto' : 
+                        destino.detalhesVoo.numeroParadas === 1 ? '1 parada' : 
+                        `${destino.detalhesVoo.numeroParadas} paradas`}</span>
+                  <span>${destino.detalhesVoo.duracao || ''}</span>
+                </p>
+              ` : ''}
+              
+              ${destino.aeroporto && destino.aeroporto.codigo ? `
+                <p class="flex items-center text-gray-600">
+                  <span class="mr-1 w-4 text-center">🛫</span> 
+                  <span>${destino.aeroporto.codigo}</span>
+                </p>
+              ` : ''}
+              
               <p class="flex items-center">
                 <span class="mr-1 w-4 text-center">🏨</span> 
                 <span class="font-medium">Hotel:</span> 
@@ -495,6 +614,12 @@ const BENETRIP_DESTINOS = {
                   <span class="ml-1">${destino.porque}</span>
                 </span>
               </p>
+              
+              ${destino.pontoTuristico ? `
+                <p class="mt-1">
+                  <span class="bg-blue-100 text-blue-800 text-xs px-2 py-0.5 rounded-full">${destino.pontoTuristico}</span>
+                </p>
+              ` : ''}
             </div>
           </div>
         </div>
@@ -534,7 +659,7 @@ const BENETRIP_DESTINOS = {
     `;
   },
   
-  // Método para exibir destino surpresa - também usando o novo método de renderizar imagem
+  // Método para mostrar destino surpresa
   mostrarDestinoSurpresa() {
     if (!this.recomendacoes || !this.recomendacoes.surpresa) {
       console.error('Destino surpresa não disponível');
@@ -543,6 +668,11 @@ const BENETRIP_DESTINOS = {
     
     const destino = this.recomendacoes.surpresa;
     console.log('Mostrando destino surpresa:', destino);
+    
+    // Verificar se temos preço real vs estimado
+    const precoReal = destino.detalhesVoo ? true : false;
+    const precoClasse = precoReal ? 'text-green-700 font-semibold' : '';
+    const precoIcone = precoReal ? '🔍 ' : '';
     
     // Criar e exibir o modal de destino surpresa
     const modalContainer = document.createElement('div');
@@ -582,15 +712,20 @@ const BENETRIP_DESTINOS = {
             </span>
           </div>
           
-          <div class="mt-3 space-y-2 text-sm">
+          <div class="mt-3 space-y-1 text-sm">
             <p class="flex items-center">
               <span class="mr-2 w-5 text-center">✈️</span> 
-              <span class="font-medium">Estimativa de Voo:</span> 
-              <span class="ml-1">R$ ${destino.preco.voo} (ida e volta)</span>
+              <span class="font-medium">Preço de Voo:</span> 
+              <span class="ml-1 ${precoClasse}">${precoIcone}R$ ${destino.preco.voo} (ida e volta)</span>
             </p>
+            
+            ${this.prepararInformacoesVoo(destino)}
+            
+            ${this.prepararInformacaoAeroporto(destino)}
+            
             <p class="flex items-center">
               <span class="mr-2 w-5 text-center">🏨</span> 
-              <span class="font-medium">Estimativa de Hotel:</span> 
+              <span class="font-medium">Hotel:</span> 
               <span class="ml-1">R$ ${destino.preco.hotel}/noite</span>
             </p>
             <p class="flex items-center">
@@ -612,6 +747,12 @@ const BENETRIP_DESTINOS = {
                 <span class="ml-1">${destino.destaque}</span>
               </span>
             </p>
+            
+            <div class="flex flex-wrap gap-1 mt-2">
+              ${destino.pontosTuristicos ? destino.pontosTuristicos.map(ponto => 
+                `<span class="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">${ponto}</span>`
+              ).join('') : ''}
+            </div>
           </div>
           
           <div 
@@ -698,6 +839,10 @@ const BENETRIP_DESTINOS = {
   
   // Método para mostrar confirmação de seleção
   mostrarConfirmacaoSelecao(destino) {
+    // Verificar se temos preço real
+    const precoReal = destino.detalhesVoo ? true : false;
+    const precoTipo = precoReal ? 'preço real' : 'estimativa';
+    
     const modalContainer = document.createElement('div');
     modalContainer.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
     modalContainer.id = 'modal-confirmacao';
@@ -725,7 +870,11 @@ const BENETRIP_DESTINOS = {
                 </label>
               </div>
               
-              <p class="mt-3 text-sm">Só um aviso, Triper! Os preços que você está vendo são estimativas baseadas em buscas recentes. Os preços em tempo real aparecerão quando você escolher seus voos e hotéis.</p>
+              <p class="mt-3 text-sm">
+                Triper, o preço de voo mostrado (R$ ${destino.preco.voo}) é baseado em ${precoTipo} 
+                ${precoReal ? 'obtido em tempo real através da API da Amadeus' : 'e pode variar na etapa de reserva'}.
+                ${destino.aeroporto ? `O voo considerado é para o aeroporto ${destino.aeroporto.nome} (${destino.aeroporto.codigo}).` : ''}
+              </p>
             </div>
           </div>
         </div>
