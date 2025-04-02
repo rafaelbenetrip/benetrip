@@ -88,11 +88,12 @@ async function buscarPrecoVoo(origemIATA, destinoIATA, datas, token) {
   try {
     console.log(`Buscando voos de ${origemIATA} para ${destinoIATA}...`);
 
-    // Alerta: caso o código IATA seja "STM" (por exemplo, para Santarém), registre um aviso.
-    if(destinoIATA === "STM") {
-      console.warn("Atenção: Verifique se o código IATA 'STM' para Santarém é suportado pela API Amadeus.");
+    // Alerta: Caso o código IATA "STM" (por exemplo, para Santarém) esteja sendo usado, emita um aviso.
+    if (destinoIATA === "STM") {
+      console.warn("Atenção: Confirme se o código IATA 'STM' para Santarém é suportado pela API Amadeus.");
     }
 
+    // Ajuste: Incluímos o filtro de classe de viagem para ECONOMY e limitamos a 1 resultado.
     const params = {
       originLocationCode: origemIATA,
       destinationLocationCode: destinoIATA,
@@ -100,7 +101,8 @@ async function buscarPrecoVoo(origemIATA, destinoIATA, datas, token) {
       returnDate: datas.dataVolta,
       adults: 1,
       currencyCode: 'BRL',
-      max: 5
+      travelClass: 'ECONOMY', // Mantém a classe econômica
+      max: 1               // Solicita apenas o primeiro resultado
     };
 
     console.log('Parâmetros da requisição:', JSON.stringify(params));
@@ -110,7 +112,7 @@ async function buscarPrecoVoo(origemIATA, destinoIATA, datas, token) {
       url: 'https://api.amadeus.com/v2/shopping/flight-offers',
       headers: {
         'Authorization': `Bearer ${token}`,
-        'Accept': 'application/json'  // Ajuste: adicionando cabeçalho Accept
+        'Accept': 'application/json'
       },
       params: params,
       timeout: AMADEUS_TIMEOUT
@@ -195,7 +197,6 @@ async function buscarPrecoAlternativo(origemIATA, datas, token) {
       departureDate: `${datas.dataIda},${datas.dataVolta}`,
       oneWay: false,
       duration: "7,14",
-      nonStop: false,
       viewBy: "DESTINATION"
     };
     const response = await axios({
@@ -573,7 +574,7 @@ module.exports = async function handler(req, res) {
         }
       }
       
-      prompt = `${prompt}\n\nURGENTE: O ORÇAMENTO MÁXIMO para voos (${requestData.orcamento_valor || 'informado'} ${requestData.moeda_escolhida || 'BRL'}) precisa ser RIGOROSAMENTE RESPEITADO. TODOS os destinos devem ter voos COM VALOR ABAIXO desse orçamento. Forneça um mix de destinos populares e alternativos, com preços realistas e acessíveis.`;
+      prompt = `${prompt}\n\nURGENTE: O ORÇAMENTO MÁXIMO para voos (${requestData.orcamento_valor || 'informado'} ${requestData.moeda_escolhida || 'BRL'}) precisa ser RIGOROSAMENTE RESPEITADO. TODOS os destinos devem ter voos abaixo desse valor. Forneça um mix de destinos populares e alternativos, com preços realistas.`;
     }
     
     console.log('Todas as tentativas de obter resposta válida falharam');
@@ -868,7 +869,7 @@ IMPORTANTE:
         messages: [
           {
             role: "system",
-            content: "Você é um especialista em viagens. Retorne apenas JSON com 4 destinos alternativos, respeitando o orçamento."
+            content: "Você é um especialista em viagens. Retorne apenas JSON com 4 destinos alternativos, respeitando o orçamento para voos."
           },
           {
             role: "user",
