@@ -240,82 +240,6 @@ function normalizarNomeDestino(destino) {
   return destino.charAt(0).toUpperCase() + destino.slice(1);
 }
 
-// Função aprimorada para buscar imagens do Unsplash
-async function fetchUnsplashImages(query, options = {}) {
-  const { 
-    perPage = 2, 
-    orientation = "landscape", 
-    quality = "regular",
-    descricao = "",
-    pontosTuristicos = []
-  } = options;
-  
-  // Classificar o tipo de destino para melhorar a relevância
-  const classificacao = classificarDestino(query, descricao, pontosTuristicos);
-  
-  // Construir query mais precisa baseada na classificação
-  let enhancedQuery = `${classificacao.destino}`;
-  
-  // Se temos um ponto turístico específico, usar diretamente
-  if (classificacao.tipo === 'ponto_turistico_especifico' || classificacao.tipo === 'ponto_turistico_conhecido') {
-    enhancedQuery = `${classificacao.termo} ${classificacao.destino}`;
-  } else {
-    // Caso contrário, usar o termo de busca da categoria
-    enhancedQuery = `${classificacao.destino} ${classificacao.termo}`;
-  }
-  
-  try {
-    logEvent('info', 'Buscando no Unsplash', { 
-      query: enhancedQuery, 
-      orientation,
-      classificacao
-    });
-    
-    const response = await axios.get(
-      'https://api.unsplash.com/search/photos',
-      {
-        params: {
-          query: enhancedQuery,
-          per_page: perPage,
-          orientation: orientation,
-          order_by: "relevant"
-        },
-        headers: {
-          Authorization: `Client-ID ${process.env.UNSPLASH_ACCESS_KEY}`
-        }
-      }
-    );
-    
-    if (response.data.results && response.data.results.length > 0) {
-      return {
-        success: true,
-        images: response.data.results.map(img => ({
-          url: img.urls[quality] || img.urls.regular,
-          source: "unsplash",
-          photographer: img.user.name,
-          photographerId: img.user.username,
-          photographerUrl: img.user.links.html,
-          sourceUrl: img.links.html,
-          downloadUrl: img.links.download,
-          alt: img.alt_description || `${classificacao.termo} em ${classificacao.destino}`,
-          pontoTuristico: classificacao.tipo === 'ponto_turistico_especifico' || 
-                          classificacao.tipo === 'ponto_turistico_conhecido' ? 
-                          classificacao.termo : null
-        }))
-      };
-    }
-    
-    return { success: false, images: [] };
-  } catch (error) {
-    logEvent('error', 'Erro ao buscar no Unsplash', { 
-      query, 
-      error: error.message,
-      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
-    });
-    return { success: false, images: [], error };
-  }
-}
-
 // Função aprimorada para buscar imagens do Pexels
 async function fetchPexelsImages(query, options = {}) {
   const { 
@@ -395,6 +319,82 @@ async function fetchPexelsImages(query, options = {}) {
     return { success: false, images: [] };
   } catch (error) {
     logEvent('error', 'Erro ao buscar no Pexels', { 
+      query, 
+      error: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
+    return { success: false, images: [], error };
+  }
+}
+
+// Função aprimorada para buscar imagens do Unsplash
+async function fetchUnsplashImages(query, options = {}) {
+  const { 
+    perPage = 2, 
+    orientation = "landscape", 
+    quality = "regular",
+    descricao = "",
+    pontosTuristicos = []
+  } = options;
+  
+  // Classificar o tipo de destino para melhorar a relevância
+  const classificacao = classificarDestino(query, descricao, pontosTuristicos);
+  
+  // Construir query mais precisa baseada na classificação
+  let enhancedQuery = `${classificacao.destino}`;
+  
+  // Se temos um ponto turístico específico, usar diretamente
+  if (classificacao.tipo === 'ponto_turistico_especifico' || classificacao.tipo === 'ponto_turistico_conhecido') {
+    enhancedQuery = `${classificacao.termo} ${classificacao.destino}`;
+  } else {
+    // Caso contrário, usar o termo de busca da categoria
+    enhancedQuery = `${classificacao.destino} ${classificacao.termo}`;
+  }
+  
+  try {
+    logEvent('info', 'Buscando no Unsplash', { 
+      query: enhancedQuery, 
+      orientation,
+      classificacao
+    });
+    
+    const response = await axios.get(
+      'https://api.unsplash.com/search/photos',
+      {
+        params: {
+          query: enhancedQuery,
+          per_page: perPage,
+          orientation: orientation,
+          order_by: "relevant"
+        },
+        headers: {
+          Authorization: `Client-ID ${process.env.UNSPLASH_ACCESS_KEY}`
+        }
+      }
+    );
+    
+    if (response.data.results && response.data.results.length > 0) {
+      return {
+        success: true,
+        images: response.data.results.map(img => ({
+          url: img.urls[quality] || img.urls.regular,
+          source: "unsplash",
+          photographer: img.user.name,
+          photographerId: img.user.username,
+          photographerUrl: img.user.links.html,
+          sourceUrl: img.links.html,
+          downloadUrl: img.links.download,
+          alt: img.alt_description || `${classificacao.termo} em ${classificacao.destino}`,
+          pontoTuristico: classificacao.tipo === 'ponto_turistico_especifico' || 
+                          classificacao.tipo === 'ponto_turistico_conhecido' ? 
+                          classificacao.termo : null
+        }))
+      };
+    }
+    
+    return { success: false, images: [] };
+  } catch (error) {
+    logEvent('error', 'Erro ao buscar no Unsplash', { 
       query, 
       error: error.message,
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
@@ -511,31 +511,11 @@ module.exports = async function handler(req, res) {
     });
     
     let images = [];
-    let unsplashResult = { success: false, images: [] };
     let pexelsResult = { success: false, images: [] };
+    let unsplashResult = { success: false, images: [] };
     
-    // Buscar no Unsplash se solicitado
-    if (source === "unsplash" || !source) {
-      unsplashResult = await fetchUnsplashImages(query, {
-        perPage: parseInt(perPage),
-        orientation,
-        quality,
-        descricao,
-        pontosTuristicos: pontosTuristicosArray
-      });
-      
-      if (unsplashResult.success) {
-        images = unsplashResult.images;
-        logEvent('success', 'Imagens do Unsplash obtidas com sucesso', { 
-          count: images.length,
-          query,
-          pontosTuristicos: pontosTuristicosArray.join(', ')
-        });
-      }
-    }
-    
-    // Buscar no Pexels se necessário
-    if ((!unsplashResult.success && source !== "unsplash") || source === "pexels") {
+    // Buscar no Pexels primeiro (agora é a fonte principal)
+    if (source === "pexels" || !source) {
       pexelsResult = await fetchPexelsImages(query, {
         perPage: parseInt(perPage),
         orientation,
@@ -545,17 +525,37 @@ module.exports = async function handler(req, res) {
       });
       
       if (pexelsResult.success) {
-        images = [...images, ...pexelsResult.images];
+        images = pexelsResult.images;
         logEvent('success', 'Imagens do Pexels obtidas com sucesso', { 
-          count: pexelsResult.images.length,
+          count: images.length,
           query,
           pontosTuristicos: pontosTuristicosArray.join(', ')
         });
       }
     }
     
-    // Se nem Unsplash nem Pexels funcionarem, usar placeholder
-    if (!unsplashResult.success && !pexelsResult.success) {
+    // Buscar no Unsplash apenas se o Pexels falhar ou se for especificamente solicitado
+    if ((!pexelsResult.success && source !== "pexels") || source === "unsplash") {
+      unsplashResult = await fetchUnsplashImages(query, {
+        perPage: parseInt(perPage),
+        orientation,
+        quality,
+        descricao,
+        pontosTuristicos: pontosTuristicosArray
+      });
+      
+      if (unsplashResult.success) {
+        images = [...images, ...unsplashResult.images];
+        logEvent('success', 'Imagens do Unsplash obtidas com sucesso', { 
+          count: unsplashResult.images.length,
+          query,
+          pontosTuristicos: pontosTuristicosArray.join(', ')
+        });
+      }
+    }
+    
+    // Se nem Pexels nem Unsplash funcionarem, usar placeholder
+    if (!pexelsResult.success && !unsplashResult.success) {
       const placeholderResult = getPlaceholderImages(query, {
         width: parseInt(width),
         height: parseInt(height),
