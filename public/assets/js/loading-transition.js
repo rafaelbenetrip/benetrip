@@ -337,13 +337,13 @@
           transition: all 1s cubic-bezier(0.68, -0.55, 0.27, 1.55);
           z-index: 10;
           background-color: transparent !important;
-          /* Ajustado para manter proporção relativa aos destinos */
-          width: calc(24px + 0.2vw);
-          height: calc(24px + 0.2vw);
-          min-width: 24px;
-          min-height: 24px;
-          max-width: 48px;
-          max-height: 48px;
+          /* Ajustado para um tamanho maior */
+          width: calc(32px + 0.3vw);
+          height: calc(32px + 0.3vw);
+          min-width: 32px;
+          min-height: 32px;
+          max-width: 64px;
+          max-height: 64px;
         }
         
         /* Animação para a Tripinha "farejando" */
@@ -434,9 +434,9 @@
         
         /* Ajuste do tamanho da Tripinha baseado no contador de destinos */
         .active-search .tripinha-character {
-          /* Aumenta ligeiramente o tamanho após descobrir destinos */
-          width: calc(24px + 0.3vw + 0.4vmin * var(--discovered-count, 0));
-          height: calc(24px + 0.3vw + 0.4vmin * var(--discovered-count, 0));
+          /* Aumenta o tamanho após descobrir destinos */
+          width: calc(32px + 0.5vw + 0.6vmin * var(--discovered-count, 0));
+          height: calc(32px + 0.5vw + 0.6vmin * var(--discovered-count, 0));
           transition: width 0.5s ease, height 0.5s ease, left 1s cubic-bezier(0.68, -0.55, 0.27, 1.55), top 1s cubic-bezier(0.68, -0.55, 0.27, 1.55);
         }
         
