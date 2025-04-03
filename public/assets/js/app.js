@@ -312,26 +312,26 @@ const BENETRIP = {
                 console.log(`Criado novo ID de calendário: ${this.estado.currentCalendarId}`);
             }
 
-            // Verificar se carregou a biblioteca Flatpickr
-            if (typeof flatpickr === 'undefined') {
-                console.error("Biblioteca Flatpickr não encontrada. Tentando carregar dinamicamente...");
-                this.carregarFlatpickrDinamicamente(pergunta);
-            } else {
-                // Salvar o ID do calendário em uma variável local
-                const calendarId = this.estado.currentCalendarId;
-                console.log(`Usando ID do calendário: ${calendarId} para inicialização`);
+           // Verificar se carregou a biblioteca Flatpickr
+        if (typeof flatpickr === 'undefined') {
+            console.error("Biblioteca Flatpickr não encontrada. Tentando carregar dinamicamente...");
+            this.carregarFlatpickrDinamicamente(pergunta);
+        } else {
+            // Salvar o ID do calendário em uma variável local
+            const calendarId = this.estado.currentCalendarId;
+            console.log(`Usando ID do calendário: ${calendarId} para inicialização`);
 
-                // Inicializar o calendário com um pequeno atraso para garantir que o DOM foi atualizado
-                setTimeout(() => {
-                    // Verificar novamente o ID dentro do setTimeout para garantir
-                    if (!this.estado.currentCalendarId) {
-                        this.estado.currentCalendarId = calendarId;
-                        console.log(`Restaurado ID do calendário: ${calendarId}`);
-                    }
-                    this.inicializarCalendario(pergunta);
-                }, 300);
-            }
+            // Inicializar o calendário com um pequeno atraso para garantir que o DOM foi atualizado
+            setTimeout(() => {
+                // Verificar novamente o ID dentro do setTimeout para garantir
+                if (!this.estado.currentCalendarId) {
+                    this.estado.currentCalendarId = calendarId;
+                    console.log(`Restaurado ID do calendário: ${calendarId}`);
+                }
+                this.inicializarCalendario(pergunta);
+            }, 300);
         }
+    },
         /**
      * Inicializa o calendário com Flatpickr - Versão corrigida
      */
