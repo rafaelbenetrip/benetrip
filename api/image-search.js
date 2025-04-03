@@ -125,13 +125,24 @@ const CATEGORIAS_DESTINO = {
   }
 };
 
-// Função expandida para classificar o tipo de destino e extrair pontos turísticos
+// Função simplificada para extrair pontos turísticos
 function classificarDestino(query, descricao = '', pontosTuristicos = []) {
-  const textoCompleto = `${query.toLowerCase()} ${descricao.toLowerCase()} ${pontosTuristicos.join(' ').toLowerCase()}`;
+  // Extrair país e cidade da query se possível
+  let cidade = query;
+  let pais = '';
+  
+  // Tentar separar cidade e país se houver vírgula
+  if (query.includes(',')) {
+    const partes = query.split(',').map(parte => parte.trim());
+    cidade = partes[0];
+    pais = partes[1] || '';
+  }
+  
+  // Normalizar nome da cidade para busca no banco de dados
+  const cidadeNormalizada = normalizarNomeDestino(cidade);
   
   // Verificar pontos turísticos específicos primeiro
-  const destinoNormalizado = normalizarNomeDestino(query);
-  const pontosTuristicosConhecidos = PONTOS_TURISTICOS_POPULARES[destinoNormalizado] || [];
+  const pontosTuristicosConhecidos = PONTOS_TURISTICOS_POPULARES[cidadeNormalizada] || [];
   
   // Se temos pontos turísticos específicos fornecidos, usá-los
   if (pontosTuristicos && pontosTuristicos.length > 0) {
@@ -140,7 +151,8 @@ function classificarDestino(query, descricao = '', pontosTuristicos = []) {
     return {
       tipo: 'ponto_turistico_especifico',
       termo: pontoAleatorio,
-      destino: query
+      cidade: cidade,
+      pais: pais
     };
   }
   
@@ -151,50 +163,17 @@ function classificarDestino(query, descricao = '', pontosTuristicos = []) {
     return {
       tipo: 'ponto_turistico_conhecido',
       termo: pontoAleatorio,
-      destino: query
+      cidade: cidade,
+      pais: pais
     };
   }
   
-  // Tentar identificar o tipo de destino com base no texto
-  let tipoEncontrado = '';
-  let melhorPontuacao = 0;
-  let termosBusca = [];
-  
-  // Verificar cada categoria
-  for (const [tipo, dados] of Object.entries(CATEGORIAS_DESTINO)) {
-    let pontuacao = 0;
-    
-    // Contar ocorrências de palavras-chave
-    for (const keyword of dados.keywords) {
-      if (textoCompleto.includes(keyword)) {
-        pontuacao++;
-      }
-    }
-    
-    // Se encontramos mais palavras-chave nesta categoria, atualizamos o tipo
-    if (pontuacao > melhorPontuacao) {
-      melhorPontuacao = pontuacao;
-      tipoEncontrado = tipo;
-      termosBusca = dados.termos_busca;
-    }
-  }
-  
-  // Se não conseguimos identificar o tipo, usar landmark como padrão
-  if (!tipoEncontrado || melhorPontuacao === 0) {
-    return {
-      tipo: 'landmark',
-      termo: 'famous landmark',
-      destino: query
-    };
-  }
-  
-  // Escolher um termo de busca aleatório para esta categoria
-  const termoAleatorio = termosBusca[Math.floor(Math.random() * termosBusca.length)];
-  
+  // Se não temos pontos turísticos específicos, usar um termo genérico
   return {
-    tipo: tipoEncontrado,
-    termo: termoAleatorio,
-    destino: query
+    tipo: 'landmark',
+    termo: 'landmark',
+    cidade: cidade,
+    pais: pais
   };
 }
 
@@ -240,7 +219,7 @@ function normalizarNomeDestino(destino) {
   return destino.charAt(0).toUpperCase() + destino.slice(1);
 }
 
-// Função aprimorada para buscar imagens do Pexels
+// Função simplificada para buscar imagens do Pexels
 async function fetchPexelsImages(query, options = {}) {
   const { 
     perPage = 2, 
@@ -250,23 +229,29 @@ async function fetchPexelsImages(query, options = {}) {
     pontosTuristicos = []
   } = options;
   
-  // Classificar o tipo de destino para melhorar a relevância
+  // Classificar o destino para obter pontos turísticos
   const classificacao = classificarDestino(query, descricao, pontosTuristicos);
   
-  // Construir query mais precisa baseada na classificação
-  let enhancedQuery = `${classificacao.destino}`;
+  // Construir query simplificada: ponto turístico + cidade + país
+  let searchQuery = '';
   
-  // Se temos um ponto turístico específico, usar diretamente
   if (classificacao.tipo === 'ponto_turistico_especifico' || classificacao.tipo === 'ponto_turistico_conhecido') {
-    enhancedQuery = `${classificacao.termo} ${classificacao.destino}`;
+    // Formato: "Torre Eiffel Paris França"
+    searchQuery = `${classificacao.termo} ${classificacao.cidade}`;
+    if (classificacao.pais) {
+      searchQuery += ` ${classificacao.pais}`;
+    }
   } else {
-    // Caso contrário, usar o termo de busca da categoria
-    enhancedQuery = `${classificacao.destino} ${classificacao.termo}`;
+    // Sem ponto turístico, usar apenas cidade e país
+    searchQuery = classificacao.cidade;
+    if (classificacao.pais) {
+      searchQuery += ` ${classificacao.pais}`;
+    }
   }
   
   try {
     logEvent('info', 'Buscando no Pexels', { 
-      query: enhancedQuery, 
+      query: searchQuery, 
       orientation,
       classificacao
     });
@@ -275,7 +260,7 @@ async function fetchPexelsImages(query, options = {}) {
       'https://api.pexels.com/v1/search',
       {
         params: {
-          query: enhancedQuery,
+          query: searchQuery,
           per_page: perPage,
           orientation: orientation,
           size: "large" // Preferir imagens de alta qualidade
@@ -298,6 +283,11 @@ async function fetchPexelsImages(query, options = {}) {
       
       const size = sizeMap[quality] || 'large';
       
+      const altText = classificacao.tipo === 'ponto_turistico_especifico' || 
+                      classificacao.tipo === 'ponto_turistico_conhecido' ?
+                      `${classificacao.termo} em ${classificacao.cidade}` :
+                      `${classificacao.cidade}, ${classificacao.pais}`;
+      
       return {
         success: true,
         images: response.data.photos.map(img => ({
@@ -308,7 +298,7 @@ async function fetchPexelsImages(query, options = {}) {
           photographerUrl: img.photographer_url,
           sourceUrl: img.url,
           downloadUrl: img.src.original,
-          alt: `${classificacao.termo} em ${classificacao.destino}`,
+          alt: altText,
           pontoTuristico: classificacao.tipo === 'ponto_turistico_especifico' || 
                           classificacao.tipo === 'ponto_turistico_conhecido' ? 
                           classificacao.termo : null
@@ -327,7 +317,7 @@ async function fetchPexelsImages(query, options = {}) {
   }
 }
 
-// Função aprimorada para buscar imagens do Unsplash
+// Função simplificada para buscar imagens do Unsplash
 async function fetchUnsplashImages(query, options = {}) {
   const { 
     perPage = 2, 
@@ -337,23 +327,29 @@ async function fetchUnsplashImages(query, options = {}) {
     pontosTuristicos = []
   } = options;
   
-  // Classificar o tipo de destino para melhorar a relevância
+  // Classificar o destino para obter pontos turísticos
   const classificacao = classificarDestino(query, descricao, pontosTuristicos);
   
-  // Construir query mais precisa baseada na classificação
-  let enhancedQuery = `${classificacao.destino}`;
+  // Construir query simplificada: ponto turístico + cidade + país
+  let searchQuery = '';
   
-  // Se temos um ponto turístico específico, usar diretamente
   if (classificacao.tipo === 'ponto_turistico_especifico' || classificacao.tipo === 'ponto_turistico_conhecido') {
-    enhancedQuery = `${classificacao.termo} ${classificacao.destino}`;
+    // Formato: "Torre Eiffel Paris França"
+    searchQuery = `${classificacao.termo} ${classificacao.cidade}`;
+    if (classificacao.pais) {
+      searchQuery += ` ${classificacao.pais}`;
+    }
   } else {
-    // Caso contrário, usar o termo de busca da categoria
-    enhancedQuery = `${classificacao.destino} ${classificacao.termo}`;
+    // Sem ponto turístico, usar apenas cidade e país
+    searchQuery = classificacao.cidade;
+    if (classificacao.pais) {
+      searchQuery += ` ${classificacao.pais}`;
+    }
   }
   
   try {
     logEvent('info', 'Buscando no Unsplash', { 
-      query: enhancedQuery, 
+      query: searchQuery, 
       orientation,
       classificacao
     });
@@ -362,7 +358,7 @@ async function fetchUnsplashImages(query, options = {}) {
       'https://api.unsplash.com/search/photos',
       {
         params: {
-          query: enhancedQuery,
+          query: searchQuery,
           per_page: perPage,
           orientation: orientation,
           order_by: "relevant"
@@ -374,6 +370,11 @@ async function fetchUnsplashImages(query, options = {}) {
     );
     
     if (response.data.results && response.data.results.length > 0) {
+      const altText = classificacao.tipo === 'ponto_turistico_especifico' || 
+                      classificacao.tipo === 'ponto_turistico_conhecido' ?
+                      `${classificacao.termo} em ${classificacao.cidade}` :
+                      `${classificacao.cidade}, ${classificacao.pais}`;
+      
       return {
         success: true,
         images: response.data.results.map(img => ({
@@ -384,7 +385,7 @@ async function fetchUnsplashImages(query, options = {}) {
           photographerUrl: img.user.links.html,
           sourceUrl: img.links.html,
           downloadUrl: img.links.download,
-          alt: img.alt_description || `${classificacao.termo} em ${classificacao.destino}`,
+          alt: img.alt_description || altText,
           pontoTuristico: classificacao.tipo === 'ponto_turistico_especifico' || 
                           classificacao.tipo === 'ponto_turistico_conhecido' ? 
                           classificacao.termo : null
@@ -403,17 +404,25 @@ async function fetchUnsplashImages(query, options = {}) {
   }
 }
 
-// Função para gerar imagens de placeholder
+// Função simplificada para gerar imagens de placeholder
 function getPlaceholderImages(query, options = {}) {
   const { width = 800, height = 600, descricao = "", pontosTuristicos = [] } = options;
   
-  // Classificar o tipo de destino para melhorar a relevância
+  // Classificar o destino para obter pontos turísticos
   const classificacao = classificarDestino(query, descricao, pontosTuristicos);
   
   // Texto para placeholder
-  let placeholderText = query;
+  let placeholderText = '';
   if (classificacao.tipo === 'ponto_turistico_especifico' || classificacao.tipo === 'ponto_turistico_conhecido') {
-    placeholderText = `${classificacao.termo} em ${classificacao.destino}`;
+    placeholderText = `${classificacao.termo} em ${classificacao.cidade}`;
+    if (classificacao.pais) {
+      placeholderText += `, ${classificacao.pais}`;
+    }
+  } else {
+    placeholderText = classificacao.cidade;
+    if (classificacao.pais) {
+      placeholderText += `, ${classificacao.pais}`;
+    }
   }
   
   return {
