@@ -6,9 +6,9 @@ const https = require('https');
 // =======================
 // Configurações de timeout e limites
 // =======================
-const REQUEST_TIMEOUT = 60000; // 60 segundos para requisições externas
-const HANDLER_TIMEOUT = 60000; // 60 segundos para processamento total
-const AVIASALES_TIMEOUT = 55000; // 55 segundos para requisições à Aviasales (Calendar)
+const REQUEST_TIMEOUT = 50000; // 50 segundos para requisições externas
+const HANDLER_TIMEOUT = 55000; // 55 segundos para processamento total
+const AVIASALES_TIMEOUT = 15000; // 15 segundos para requisições à Aviasales (Calendar)
 const RETRY_DELAY = 1500; // 1.5 segundos entre tentativas
 const MAX_RETRY = 2; // Número máximo de tentativas para cada método
 
