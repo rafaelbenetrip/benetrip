@@ -1,7 +1,7 @@
 /**
  * BENETRIP - Animação Interativa de Transição
  * Melhora a experiência de espera entre o chat e os destinos recomendados
- * Versão 1.4 - Com correções para posicionamento da Tripinha e proporção da imagem
+ * Versão 1.5 - Com correções para progresso consistente e sincronização com carregamento de dados
  */
 
 (function() {
@@ -19,7 +19,7 @@
       discoveredCount: 0,
       progress: 0,
       isActive: false,
-      dataLoaded: false,  // Nova flag para verificar se os dados dos destinos estão carregados
+      dataLoaded: false,  // Flag para verificar se os dados dos destinos estão carregados
       pendingRedirect: false  // Flag para indicar redirecionamento pendente
     },
     destinations: [
@@ -52,6 +52,7 @@
       { threshold: 0, message: "Analisando suas preferências..." },
       { threshold: 30, message: "Consultando bases de dados de viagem..." },
       { threshold: 60, message: "Encontrando preços e disponibilidade..." },
+      { threshold: 85, message: "Aguardando carregamento completo..." },
       { threshold: 90, message: "Organizando os resultados para você!" }
     ],
     timers: {
@@ -617,42 +618,47 @@
 
     /**
      * Simula o progresso da animação
+     * Versão otimizada para evitar problemas com o progresso recuando
      */
     startSimulatedProgress() {
       let progress = 0;
-      const totalTime = 20000; // 20 segundos para chegar a 100%
-      const updateInterval = 300; // Atualizar a cada 300ms
+      const totalTime = 20000; // 20 segundos total
+      const updateInterval = 300;
       const steps = totalTime / updateInterval;
       const increment = 100 / steps;
       
-      // Simulação de carregamento de dados apenas para demonstração
-      setTimeout(() => {
-        // Simular carregamento de dados em aproximadamente 75% do progresso
-        if (progress >= 75 && !this.state.dataLoaded) {
-          console.log('🐾 Simulando o carregamento dos dados dos destinos...');
-          this.updateProgress(progress, null, true); // Indicar que os dados estão prontos
-        }
-      }, totalTime * 0.75);
+      // Limite para progresso simulado - nunca ultrapassar 85% automaticamente
+      const maxSimulatedProgress = 85;
       
       this.timers.progressTimer = setInterval(() => {
-        progress = Math.min(progress + increment, 100);
-        this.updateProgress(progress);
+        // Incrementar progresso até o limite máximo simulado
+        progress = Math.min(progress + increment, maxSimulatedProgress);
         
-        // Verificar se recebemos atualizações externas de progresso
-        if (this.state.progress > progress) {
-          progress = this.state.progress;
-        }
-        
-        // Se chegou a 100%, manter por 2 segundos e depois tentar redirecionar
-        if (progress >= 100) {
+        // Se os dados estiverem prontos, permitir avançar para 100%
+        if (this.state.dataLoaded && progress >= maxSimulatedProgress) {
+          progress = 100;
           clearInterval(this.timers.progressTimer);
           
           setTimeout(() => {
-            // Verificar se o redirecionamento já não aconteceu
             if (document.getElementById('loading-animation-container')) {
               this.redirectToDestinations();
             }
-          }, 2000);
+          }, 1500);
+        }
+        
+        this.updateProgress(progress);
+        
+        // Verificar sinais externos de progresso
+        if (this.state.progress > progress && this.state.progress <= maxSimulatedProgress) {
+          progress = this.state.progress;
+        }
+        
+        // Nunca permitir que o progresso simulado ultrapasse o limite se os dados não estiverem prontos
+        if (!this.state.dataLoaded && progress >= maxSimulatedProgress) {
+          progress = maxSimulatedProgress;
+          
+          // Atualizar mensagem para indicar que estamos aguardando os dados
+          this.updateLoadingPhase(progress);
         }
       }, updateInterval);
     },
@@ -827,27 +833,39 @@
 
     /**
      * Atualiza o progresso da animação
-     * Modificado para remover a barra visual e usar apenas a porcentagem
+     * Modificado para evitar recuar o progresso
      * @param {number} progress - Valor do progresso (0-100)
      * @param {string} message - Mensagem de status opcional
      * @param {boolean} dataReady - Indica se os dados dos destinos estão prontos
      */
     updateProgress(progress, message, dataReady) {
-      // Atualizar estado
-      this.state.progress = progress;
-      
       // Se os dados estiverem prontos, atualizar o estado
       if (dataReady === true) {
         this.state.dataLoaded = true;
         console.log('🐾 Dados dos destinos carregados com sucesso!');
         
         // Se houver um redirecionamento pendente, executá-lo agora
-        if (this.state.pendingRedirect && this.state.progress >= 100) {
+        if (this.state.pendingRedirect && progress >= 100) {
           setTimeout(() => {
             this.redirectToDestinations();
-          }, 500);
+          }, 800);
         }
       }
+      
+      // Nunca permitir que o progresso recue
+      if (progress < this.state.progress) {
+        console.log(`🐾 Evitando recuo de progresso: ${progress}% < ${this.state.progress}%`);
+        return;
+      }
+      
+      // Limitar progresso a 85% se os dados não estiverem prontos
+      if (!this.state.dataLoaded && progress > 85) {
+        progress = 85;
+        message = message || "Aguardando carregamento completo...";
+      }
+      
+      // Atualizar estado
+      this.state.progress = progress;
       
       // Atualizar elementos visuais
       const progressPercentage = document.querySelector('.progress-percentage');
@@ -929,16 +947,23 @@
 
     /**
      * Redireciona para a página de destinos apenas quando os dados estiverem prontos
+     * Corrigido para evitar problemas com redirecionamento prematuro
      */
     redirectToDestinations() {
-      // Verificar se os dados dos destinos estão carregados
+      // Garantir que redirecionamos apenas quando os dados estiverem realmente prontos
       if (!this.state.dataLoaded) {
         console.log('🐾 Tentativa de redirecionamento, mas os dados ainda não estão prontos. Aguardando...');
         this.state.pendingRedirect = true;
+        
+        // Manter a barra em 85% e adicionar mensagem explicativa
+        this.updateProgress(85, "Aguardando carregamento dos dados...");
         return;
       }
       
       console.log('🐾 Redirecionando para a página de destinos...');
+      
+      // Antes de redirecionar, garantir que o progresso está em 100%
+      this.updateProgress(100, "Redirecionando...");
       
       // Animar a saída
       const container = document.getElementById('loading-animation-container');
@@ -952,9 +977,6 @@
       
       // Restaurar o scroll e propriedades do body
       this.restoreScrollPosition();
-      
-      // Mensagem no console para debug
-      console.log('🐾 Redirecionamento confirmado - dados carregados:', this.state.dataLoaded);
       
       // Redirecionar após a animação de saída
       setTimeout(() => {
@@ -991,7 +1013,27 @@
     const message = evento.detail.message || evento.detail.mensagem || '';
     const dataReady = evento.detail.dataReady || evento.detail.dadosProntos || false;
     
-    LOADING_ANIMATION.updateProgress(progress, message, dataReady);
+    // Se os dados estão prontos, atualizar estado interno
+    if (dataReady) {
+      LOADING_ANIMATION.state.dataLoaded = true;
+      
+      // Se o progresso já está em 100%, redirecionar após um curto delay
+      if (LOADING_ANIMATION.state.progress >= 100) {
+        setTimeout(() => {
+          LOADING_ANIMATION.redirectToDestinations();
+        }, 800);
+      }
+    }
+    
+    // Limitar o progresso a 85% enquanto os dados não estiverem prontos
+    // Isso evita que a barra chegue a 100% e depois recue
+    let adjustedProgress = progress;
+    if (!LOADING_ANIMATION.state.dataLoaded && progress > 85) {
+      adjustedProgress = 85;
+      console.log('🐾 Limitando progresso a 85% enquanto aguarda dados');
+    }
+    
+    LOADING_ANIMATION.updateProgress(adjustedProgress, message, dataReady);
   };
 
   // =============== MELHORIAS PARA DETECÇÃO MAIS PRECISA ===============
@@ -1021,14 +1063,22 @@
   originalBENETRIP.notificarDadosProntos = function() {
     console.log('🐾 Dados dos destinos carregados externamente');
     if (LOADING_ANIMATION && document.getElementById('loading-animation-container')) {
-      // Disparar evento com dados atualizados
+      // Disparar evento com dados atualizados e progresso de 100%
       const evento = new CustomEvent('benetrip_progress', {
         detail: {
-          progress: LOADING_ANIMATION.state.progress,
+          progress: 100,
+          message: "Dados carregados! Redirecionando...",
           dataReady: true
         }
       });
       window.dispatchEvent(evento);
+      
+      // Se existe redirecionamento pendente e animação está ativa, executar
+      if (LOADING_ANIMATION.state.pendingRedirect) {
+        setTimeout(() => {
+          LOADING_ANIMATION.redirectToDestinations();
+        }, 800);
+      }
     }
   };
 
