@@ -18,7 +18,9 @@
       currentPosition: 0,
       discoveredCount: 0,
       progress: 0,
-      isActive: false
+      isActive: false,
+      dataLoaded: false,  // Nova flag para verificar se os dados dos destinos estão carregados
+      pendingRedirect: false  // Flag para indicar redirecionamento pendente
     },
     destinations: [
       { name: 'Paris', emoji: '🗼', x: 48, y: 22 },
@@ -153,14 +155,11 @@
         <div class="loading-animation-inner bg-gray-50 p-4 rounded-lg shadow">
           <h2 class="text-xl font-bold text-center mb-4">A Tripinha está farejando seu próximo destino!</h2>
           
-          <!-- Barra de progresso -->
+          <!-- Indicador de progresso (apenas número) -->
           <div class="progress-container mb-6">
             <div class="flex justify-between mb-1">
               <span class="loading-text text-sm font-medium">Iniciando busca...</span>
-              <span class="progress-percentage text-sm font-medium">0%</span>
-            </div>
-            <div class="w-full bg-gray-200 rounded-full h-3 progress-bar-container">
-              <div class="progress-bar h-3 rounded-full" style="width: 0%;"></div>
+              <span class="progress-percentage text-xl font-bold" style="color: #E87722;">0%</span>
             </div>
           </div>
           
@@ -263,26 +262,12 @@
           100% { opacity: 1; }
         }
         
-        /* Barra de progresso */
-        .progress-bar-container {
-          height: 12px;
-          border-radius: 6px;
-          overflow: hidden;
-          background-color: #f1f1f1;
-          position: relative;
-        }
-        
-        .progress-bar {
-          position: absolute;
-          top: 0;
-          left: 0;
-          background-color: #E87722;
-          height: 100%;
-          width: 0;
-          border-radius: 6px;
-          transition: width 0.3s ease-out;
-          will-change: width;
-          z-index: 1;
+        /* Porcentagem de progresso */
+        .progress-percentage {
+          color: #E87722;
+          font-size: 1.5rem;
+          font-weight: bold;
+          transition: transform 0.2s ease;
         }
         
         /* Mapa do mundo */
@@ -636,15 +621,18 @@
     startSimulatedProgress() {
       let progress = 0;
       const totalTime = 20000; // 20 segundos para chegar a 100%
-      const updateInterval = 200; // Atualizar a cada 200ms para movimento mais suave
+      const updateInterval = 300; // Atualizar a cada 300ms
       const steps = totalTime / updateInterval;
       const increment = 100 / steps;
       
-      // Iniciar com um primeiro incremento maior para feedback visual imediato
+      // Simulação de carregamento de dados apenas para demonstração
       setTimeout(() => {
-        progress = 5;
-        this.updateProgress(progress);
-      }, 100);
+        // Simular carregamento de dados em aproximadamente 75% do progresso
+        if (progress >= 75 && !this.state.dataLoaded) {
+          console.log('🐾 Simulando o carregamento dos dados dos destinos...');
+          this.updateProgress(progress, null, true); // Indicar que os dados estão prontos
+        }
+      }, totalTime * 0.75);
       
       this.timers.progressTimer = setInterval(() => {
         progress = Math.min(progress + increment, 100);
@@ -655,7 +643,7 @@
           progress = this.state.progress;
         }
         
-        // Se chegou a 100%, manter por 2 segundos e depois redirecionar
+        // Se chegou a 100%, manter por 2 segundos e depois tentar redirecionar
         if (progress >= 100) {
           clearInterval(this.timers.progressTimer);
           
@@ -839,40 +827,42 @@
 
     /**
      * Atualiza o progresso da animação
-     * Corrigido para garantir que a barra de progresso visual corresponda ao percentual exibido
+     * Modificado para remover a barra visual e usar apenas a porcentagem
      * @param {number} progress - Valor do progresso (0-100)
      * @param {string} message - Mensagem de status opcional
+     * @param {boolean} dataReady - Indica se os dados dos destinos estão prontos
      */
-    updateProgress(progress, message) {
+    updateProgress(progress, message, dataReady) {
       // Atualizar estado
       this.state.progress = progress;
       
-      // Atualizar elementos visuais
-      const progressBar = document.querySelector('.progress-bar');
-      const progressPercentage = document.querySelector('.progress-percentage');
-      
-      if (progressBar) {
-        // Forçar a largura diretamente no elemento e garantir que o estilo seja aplicado imediatamente
-        progressBar.style.width = `${progress}%`;
+      // Se os dados estiverem prontos, atualizar o estado
+      if (dataReady === true) {
+        this.state.dataLoaded = true;
+        console.log('🐾 Dados dos destinos carregados com sucesso!');
         
-        // Registrar a mudança visual para debug
-        console.log(`🐾 Atualizando barra de progresso para ${progress}%`);
-        
-        // Forçar recálculo de layout para aplicar a alteração imediatamente
-        progressBar.getBoundingClientRect();
-        
-        // Para browsers que podem estar ignorando a transição, forçar um repaint completo
-        document.body.style.display = 'none';
-        document.body.offsetHeight; // Força um repaint completo
-        document.body.style.display = '';
-        
-        // Aplicar estilo como estilo inline para contornar possíveis conflitos de CSS
-        progressBar.setAttribute('style', `width: ${progress}% !important; background-color: #E87722; height: 100%; border-radius: 6px; transition: width 0.3s ease-out;`);
+        // Se houver um redirecionamento pendente, executá-lo agora
+        if (this.state.pendingRedirect && this.state.progress >= 100) {
+          setTimeout(() => {
+            this.redirectToDestinations();
+          }, 500);
+        }
       }
+      
+      // Atualizar elementos visuais
+      const progressPercentage = document.querySelector('.progress-percentage');
       
       if (progressPercentage) {
         progressPercentage.textContent = `${Math.round(progress)}%`;
+        
+        // Animar a mudança de tamanho para dar destaque à porcentagem
+        progressPercentage.style.transform = 'scale(1.1)';
+        setTimeout(() => {
+          progressPercentage.style.transform = 'scale(1)';
+        }, 200);
       }
+      
+      console.log(`🐾 Progresso atualizado para ${progress}%`);
       
       // Atualizar mensagem, se fornecida
       if (message) {
@@ -938,9 +928,16 @@
     },
 
     /**
-     * Redireciona para a página de destinos
+     * Redireciona para a página de destinos apenas quando os dados estiverem prontos
      */
     redirectToDestinations() {
+      // Verificar se os dados dos destinos estão carregados
+      if (!this.state.dataLoaded) {
+        console.log('🐾 Tentativa de redirecionamento, mas os dados ainda não estão prontos. Aguardando...');
+        this.state.pendingRedirect = true;
+        return;
+      }
+      
       console.log('🐾 Redirecionando para a página de destinos...');
       
       // Animar a saída
@@ -955,6 +952,9 @@
       
       // Restaurar o scroll e propriedades do body
       this.restoreScrollPosition();
+      
+      // Mensagem no console para debug
+      console.log('🐾 Redirecionamento confirmado - dados carregados:', this.state.dataLoaded);
       
       // Redirecionar após a animação de saída
       setTimeout(() => {
@@ -989,8 +989,9 @@
     
     const progress = evento.detail.progress || evento.detail.porcentagem || 0;
     const message = evento.detail.message || evento.detail.mensagem || '';
+    const dataReady = evento.detail.dataReady || evento.detail.dadosProntos || false;
     
-    LOADING_ANIMATION.updateProgress(progress, message);
+    LOADING_ANIMATION.updateProgress(progress, message, dataReady);
   };
 
   // =============== MELHORIAS PARA DETECÇÃO MAIS PRECISA ===============
@@ -1014,6 +1015,21 @@
     console.log('🐾 Iniciando animação de transição manualmente');
     LOADING_ANIMATION.showLoadingAnimation();
     window.addEventListener('benetrip_progress', handleProgressEvent);
+  };
+  
+  // Método para notificar que os dados dos destinos estão prontos
+  originalBENETRIP.notificarDadosProntos = function() {
+    console.log('🐾 Dados dos destinos carregados externamente');
+    if (LOADING_ANIMATION && document.getElementById('loading-animation-container')) {
+      // Disparar evento com dados atualizados
+      const evento = new CustomEvent('benetrip_progress', {
+        detail: {
+          progress: LOADING_ANIMATION.state.progress,
+          dataReady: true
+        }
+      });
+      window.dispatchEvent(evento);
+    }
   };
 
   // Verificar quais métodos existem no objeto BENETRIP
