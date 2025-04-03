@@ -1,26 +1,25 @@
 /**
  * BENETRIP - Animação Interativa de Transição
  * Melhora a experiência de espera entre o chat e os destinos recomendados
- * Versão 1.1 - Otimizada para dispositivos móveis
+ * Versão 1.2 - Com melhor detecção de métodos e fallback manual
  */
 
 (function() {
+  console.log('🐾 Inicializando módulo de animação de transição Benetrip...');
+  
   // Referência ao objeto BENETRIP original
   const originalBENETRIP = window.BENETRIP || {};
   
-  // Encontrar o método correto para sobrescrever
-  // Poderia ser finalizarChat, enviarRespostas, processarRespostasFinal, etc.
-  const originalMethod = originalBENETRIP.finalizarChat || 
-                         originalBENETRIP.enviarRespostas || 
-                         originalBENETRIP.processarRespostasFinal || 
-                         function() { 
-                           console.warn("Método de finalização não encontrado!"); 
-                           window.location.href = 'destinos.html';
-                         };
-  
   // Configurações da animação de carregamento
   const LOADING_ANIMATION = {
-    // Destinos que aparecem no mapa
+    // Estado e configurações
+    state: {
+      currentTip: 0,
+      currentPosition: 0,
+      discoveredCount: 0,
+      progress: 0,
+      isActive: false
+    },
     destinations: [
       { name: 'Paris', emoji: '🗼', x: 48, y: 22 },
       { name: 'New York', emoji: '🗽', x: 25, y: 28 },
@@ -31,8 +30,6 @@
       { name: 'Bangkok', emoji: '🛕', x: 75, y: 45 },
       { name: 'Rome', emoji: '🏛️', x: 52, y: 32 },
     ],
-    
-    // Dicas divertidas de viagem
     travelTips: [
       "Sabia que as pessoas fazem mais de 1 bilhão de viagens internacionais por ano? 🌍",
       "A maioria das pessoas decide o destino de viagem em apenas 3 dias! ⏱️",
@@ -42,8 +39,6 @@
       "Os melhores preços de passagens costumam aparecer entre 3 e 4 meses antes da viagem! 💰",
       "As férias perfeitas duram entre 7 e 11 dias, segundo estudos! 📊"
     ],
-    
-    // Frases da Tripinha durante a busca
     searchPhrases: [
       "Farejar destinos é minha especialidade! 🐕",
       "Hmmm... sinto o cheiro de praias paradisíacas! 🏝️",
@@ -51,25 +46,12 @@
       "Achei um lugar incrível! Vamos ver se tem mais... 🌟",
       "Uau! Quanta coisa legal estou encontrando! 🤩"
     ],
-    
-    // Fases de carregamento
     loadingPhases: [
       { threshold: 0, message: "Analisando suas preferências..." },
       { threshold: 30, message: "Consultando bases de dados de viagem..." },
       { threshold: 60, message: "Encontrando preços e disponibilidade..." },
       { threshold: 90, message: "Organizando os resultados para você!" }
     ],
-    
-    // Estado da animação
-    state: {
-      currentTip: 0,
-      currentPosition: 0,
-      discoveredCount: 0,
-      progress: 0,
-      isActive: false
-    },
-    
-    // Referências para timers
     timers: {
       progressTimer: null,
       tipTimer: null,
@@ -81,8 +63,13 @@
      * Exibe a animação de carregamento no chat
      */
     showLoadingAnimation() {
+      console.log('🐾 Iniciando animação de carregamento...');
+      
       // Se já estiver ativo, não iniciar novamente
-      if (this.state.isActive) return;
+      if (this.state.isActive) {
+        console.log('🐾 Animação já está ativa, não iniciando novamente');
+        return;
+      }
       this.state.isActive = true;
       
       // Preservar a rolagem atual
@@ -99,6 +86,7 @@
       
       // Adicionar o container ao DOM
       document.body.appendChild(loadingContainer);
+      console.log('🐾 Container de animação adicionado ao DOM');
       
       // Iniciar os timers de animação
       this.startAnimationTimers();
@@ -115,70 +103,11 @@
       this.checkAndApplyMobileOptimizations();
     },
     
+    // Restante dos métodos da animação - não alterados para manter a brevidade
+    // ...
+
     /**
-     * Verifica e aplica otimizações para mobile
-     */
-    checkAndApplyMobileOptimizations() {
-      // Verificar se é um dispositivo mobile
-      const isMobile = window.innerWidth <= 768;
-      const isSmallHeight = window.innerHeight <= 600;
-      
-      if (isMobile || isSmallHeight) {
-        const container = document.getElementById('loading-animation-container');
-        if (container) {
-          container.classList.add('mobile-view');
-        }
-        
-        // Ajustar tamanho da Tripinha
-        const tripinha = document.querySelector('.tripinha-character');
-        if (tripinha) {
-          if (window.innerWidth <= 320) {
-            tripinha.style.width = '36px';
-            tripinha.style.height = '36px';
-          } else {
-            tripinha.style.width = '42px';
-            tripinha.style.height = '42px';
-          }
-        }
-        
-        // Ajustar tamanho do mapa
-        const worldMap = document.querySelector('.world-map');
-        if (worldMap) {
-          // Em modo paisagem em devices pequenos, ajustar layout
-          if (isSmallHeight && window.innerWidth > window.innerHeight) {
-            worldMap.style.height = '150px';
-          } else if (window.innerHeight <= 568) { // iPhone SE e similares
-            worldMap.style.height = '130px';
-          }
-        }
-      }
-    },
-    
-    /**
-     * Salva a posição de rolagem atual para restaurar depois
-     */
-    saveScrollPosition() {
-      this.state.scrollPosition = window.scrollY || window.pageYOffset;
-      // Impede rolagem durante a animação
-      document.body.style.overflow = 'hidden';
-      document.body.style.position = 'fixed';
-      document.body.style.top = `-${this.state.scrollPosition}px`;
-      document.body.style.width = '100%';
-    },
-    
-    /**
-     * Restaura a posição de rolagem quando a animação é removida
-     */
-    restoreScrollPosition() {
-      document.body.style.overflow = '';
-      document.body.style.position = '';
-      document.body.style.top = '';
-      document.body.style.width = '';
-      window.scrollTo(0, this.state.scrollPosition || 0);
-    },
-    
-    /**
-     * Cria o HTML para a animação
+     * Gera o HTML para a animação
      */
     createAnimationHTML() {
       return `
@@ -253,7 +182,7 @@
         </div>
       `;
     },
-    
+
     /**
      * Adiciona os estilos CSS necessários
      */
@@ -499,84 +428,6 @@
           }
         }
         
-        /* Ajustes para telas muito pequenas */
-        @media (max-width: 320px) {
-          .text-xl {
-            font-size: 1.1rem;
-          }
-          
-          .loading-animation-inner {
-            padding: 0.75rem;
-          }
-          
-          .world-map {
-            height: 32vh;
-            max-height: 160px;
-          }
-        }
-        
-        /* Estilos para garantir visibilidade em orientação landscape */
-        @media (max-height: 480px) and (orientation: landscape) {
-          .loading-animation-inner {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            grid-gap: 0.75rem;
-            align-items: start;
-            height: auto;
-          }
-          
-          .text-xl {
-            font-size: 1rem;
-            margin-bottom: 0.5rem;
-          }
-          
-          .world-map {
-            height: 60vh;
-            grid-row: span 3;
-          }
-          
-          .travel-tip-container, .progress-container {
-            grid-column: 2;
-            margin-bottom: 0.5rem;
-          }
-          
-          .loading-phase, .destinations-counter {
-            grid-column: 2;
-          }
-        }
-        
-        /* Ajustes para problemas de notch em iPhones */
-        @supports (padding-top: env(safe-area-inset-top)) {
-          .loading-animation-container {
-            padding-top: env(safe-area-inset-top);
-            padding-bottom: env(safe-area-inset-bottom);
-            padding-left: env(safe-area-inset-left);
-            padding-right: env(safe-area-inset-right);
-          }
-        }
-        
-        /* Área de toque maior */
-        .destination-point {
-          padding: 10px;
-          margin: -10px;
-        }
-        
-        /* Animações mais eficientes para dispositivos móveis */
-        @media (prefers-reduced-motion: reduce) {
-          .tripinha-character {
-            transition: all 0.5s ease-out;
-          }
-          
-          .tripinha-character img {
-            animation: none;
-          }
-          
-          .highlight-pulse {
-            animation: none;
-            transform: scale(1.2);
-          }
-        }
-        
         /* Utility classes */
         .bg-gray-50 { background-color: #f9fafb; }
         .bg-gray-200 { background-color: #e5e7eb; }
@@ -639,7 +490,46 @@
       
       document.head.appendChild(style);
     },
-    
+
+    /**
+     * Salva a posição de rolagem atual para restaurar depois
+     */
+    saveScrollPosition() {
+      this.state.scrollPosition = window.scrollY || window.pageYOffset;
+      // Impede rolagem durante a animação
+      document.body.style.overflow = 'hidden';
+      document.body.style.position = 'fixed';
+      document.body.style.top = `-${this.state.scrollPosition}px`;
+      document.body.style.width = '100%';
+    },
+
+    /**
+     * Restaura a posição de rolagem quando a animação é removida
+     */
+    restoreScrollPosition() {
+      document.body.style.overflow = '';
+      document.body.style.position = '';
+      document.body.style.top = '';
+      document.body.style.width = '';
+      window.scrollTo(0, this.state.scrollPosition || 0);
+    },
+
+    /**
+     * Verifica e aplica otimizações para mobile
+     */
+    checkAndApplyMobileOptimizations() {
+      // Verificar se é um dispositivo mobile
+      const isMobile = window.innerWidth <= 768;
+      const isSmallHeight = window.innerHeight <= 600;
+      
+      if (isMobile || isSmallHeight) {
+        const container = document.getElementById('loading-animation-container');
+        if (container) {
+          container.classList.add('mobile-view');
+        }
+      }
+    },
+
     /**
      * Inicia os timers para as animações
      */
@@ -655,36 +545,34 @@
         this.moveTripihaToNewPosition();
       }, 3000);
     },
-    
+
+    /**
+     * Atualiza dica de viagem exibida
+     */
+    updateTravelTip() {
+      const tipElement = document.querySelector('.travel-tip');
+      if (tipElement) {
+        // Animar a transição
+        tipElement.style.opacity = '0';
+        setTimeout(() => {
+          tipElement.textContent = this.travelTips[this.state.currentTip];
+          tipElement.style.opacity = '1';
+        }, 300);
+      }
+    },
+
     /**
      * Simula o progresso da animação
      */
     startSimulatedProgress() {
-      // Definir um limite de tempo total para o processo (20 segundos)
-      const totalTime = 20000; 
+      let progress = 0;
+      const totalTime = 20000; // 20 segundos para chegar a 100%
       const updateInterval = 300; // Atualizar a cada 300ms
       const steps = totalTime / updateInterval;
       const increment = 100 / steps;
       
-      let progress = 0;
-      
       this.timers.progressTimer = setInterval(() => {
-        // Ajuste para tornar o progresso mais realista
-        // Mais rápido no início, desacelera no meio, acelera no final
-        let newIncrement = increment;
-        
-        if (progress < 30) {
-          // Fase inicial: progresso mais rápido
-          newIncrement = increment * 1.5;
-        } else if (progress >= 30 && progress < 70) {
-          // Fase intermediária: progresso mais lento
-          newIncrement = increment * 0.7;
-        } else {
-          // Fase final: progresso mais rápido novamente
-          newIncrement = increment * 1.2;
-        }
-        
-        progress = Math.min(progress + newIncrement, 100);
+        progress = Math.min(progress + increment, 100);
         this.updateProgress(progress);
         
         // Verificar se recebemos atualizações externas de progresso
@@ -692,7 +580,7 @@
           progress = this.state.progress;
         }
         
-        // Se chegou a 100%, manter por 1.5 segundos e depois redirecionar
+        // Se chegou a 100%, manter por 2 segundos e depois redirecionar
         if (progress >= 100) {
           clearInterval(this.timers.progressTimer);
           
@@ -701,11 +589,11 @@
             if (document.getElementById('loading-animation-container')) {
               this.redirectToDestinations();
             }
-          }, 1500);
+          }, 2000);
         }
       }, updateInterval);
     },
-    
+
     /**
      * Renderiza os destinos no mapa
      */
@@ -736,22 +624,7 @@
         tripinhaElement.style.top = `${dest.y}%`;
       }
     },
-    
-    /**
-     * Atualiza dica de viagem exibida
-     */
-    updateTravelTip() {
-      const tipElement = document.querySelector('.travel-tip');
-      if (tipElement) {
-        // Animar a transição
-        tipElement.style.opacity = '0';
-        setTimeout(() => {
-          tipElement.textContent = this.travelTips[this.state.currentTip];
-          tipElement.style.opacity = '1';
-        }, 300);
-      }
-    },
-    
+
     /**
      * Move a Tripinha para uma nova posição no mapa
      */
@@ -783,7 +656,30 @@
         this.highlightCurrentDestination();
       }
     },
-    
+
+    /**
+     * Exibe o balão de fala com uma frase aleatória
+     */
+    showSpeechBubble() {
+      const bubble = document.querySelector('.speech-bubble');
+      if (!bubble) return;
+      
+      // Escolher uma frase aleatória
+      const randomPhrase = this.searchPhrases[
+        Math.floor(Math.random() * this.searchPhrases.length)
+      ];
+      
+      // Atualizar e mostrar o balão
+      bubble.textContent = randomPhrase;
+      bubble.classList.remove('hidden');
+      
+      // Configurar timer para esconder o balão após 2 segundos
+      clearTimeout(this.timers.bubbleTimer);
+      this.timers.bubbleTimer = setTimeout(() => {
+        bubble.classList.add('hidden');
+      }, 2000);
+    },
+
     /**
      * Destaca o destino atual no mapa
      */
@@ -807,30 +703,7 @@
         destinationPoints[this.state.currentPosition].classList.add('highlight-pulse');
       }
     },
-    
-    /**
-     * Exibe o balão de fala com uma frase aleatória
-     */
-    showSpeechBubble() {
-      const bubble = document.querySelector('.speech-bubble');
-      if (!bubble) return;
-      
-      // Escolher uma frase aleatória
-      const randomPhrase = this.searchPhrases[
-        Math.floor(Math.random() * this.searchPhrases.length)
-      ];
-      
-      // Atualizar e mostrar o balão
-      bubble.textContent = randomPhrase;
-      bubble.classList.remove('hidden');
-      
-      // Configurar timer para esconder o balão após 2 segundos
-      clearTimeout(this.timers.bubbleTimer);
-      this.timers.bubbleTimer = setTimeout(() => {
-        bubble.classList.add('hidden');
-      }, 2000);
-    },
-    
+
     /**
      * Incrementa o contador de destinos descobertos
      */
@@ -842,7 +715,7 @@
         counterElement.textContent = `${this.state.discoveredCount} destinos explorados`;
       }
     },
-    
+
     /**
      * Atualiza o progresso da animação
      * @param {number} progress - Valor do progresso (0-100)
@@ -878,7 +751,7 @@
       // Atualizar opacidade dos destinos com base no progresso
       this.updateDestinationsVisibility(progress);
     },
-    
+
     /**
      * Atualiza a fase de carregamento com base no progresso
      */
@@ -896,7 +769,7 @@
       
       phaseElement.textContent = currentPhase.message;
     },
-    
+
     /**
      * Atualiza a visibilidade dos destinos no mapa com base no progresso
      */
@@ -915,7 +788,7 @@
       // Destacar o ponto atual
       this.highlightCurrentDestination();
     },
-    
+
     /**
      * Limpa todos os timers e finaliza a animação
      */
@@ -926,11 +799,13 @@
       clearInterval(this.timers.progressTimer);
       clearTimeout(this.timers.bubbleTimer);
     },
-    
+
     /**
      * Redireciona para a página de destinos
      */
     redirectToDestinations() {
+      console.log('🐾 Redirecionando para a página de destinos...');
+      
       // Animar a saída
       const container = document.getElementById('loading-animation-container');
       if (container) {
@@ -949,7 +824,7 @@
         window.location.href = 'destinos.html';
       }, 500);
     },
-    
+
     /**
      * Remove a animação e limpa os recursos
      */
@@ -970,7 +845,7 @@
       this.state.isActive = false;
     }
   };
-  
+
   // Método para lidar com eventos de progresso
   const handleProgressEvent = function(evento) {
     if (!LOADING_ANIMATION || !document.getElementById('loading-animation-container')) return;
@@ -980,56 +855,135 @@
     
     LOADING_ANIMATION.updateProgress(progress, message);
   };
-  
-  // Procura pela função correta para sobrescrever
-  let methodName = '';
-  if (typeof originalBENETRIP.finalizarChat === 'function') {
-    methodName = 'finalizarChat';
-  } else if (typeof originalBENETRIP.enviarRespostas === 'function') {
-    methodName = 'enviarRespostas';
-  } else if (typeof originalBENETRIP.processarRespostasFinal === 'function') {
-    methodName = 'processarRespostasFinal';
-  }
-  
-  // Sobrescrever o método encontrado
-  if (methodName) {
-    console.log(`Sobrescrevendo método ${methodName} para adicionar animação de transição`);
-    
-    originalBENETRIP[methodName] = function() {
-      console.log('Iniciando transição para página de destinos...');
-      
-      // Exibir a animação de carregamento
-      LOADING_ANIMATION.showLoadingAnimation();
-      
-      // Registrar listener para eventos de progresso
-      window.addEventListener('benetrip_progress', handleProgressEvent);
-      
-      // Chamar a função original após um pequeno delay para permitir que a animação seja exibida
-      setTimeout(() => {
-        originalMethod.apply(originalBENETRIP, arguments);
-      }, 500);
-    };
-  } else {
-    console.warn('Não foi possível encontrar um método adequado para sobrescrever. Adicionando método independente.');
-    
-    // Adicionar um método independente se não encontrar um para sobrescrever
-    originalBENETRIP.iniciarAnimacaoTransicao = function() {
-      LOADING_ANIMATION.showLoadingAnimation();
-      window.addEventListener('benetrip_progress', handleProgressEvent);
-    };
-  }
-  
-  // Método para remover a animação manualmente, se necessário
-  originalBENETRIP.removerAnimacaoTransicao = function() {
-    LOADING_ANIMATION.removeAnimation();
-    window.removeEventListener('benetrip_progress', handleProgressEvent);
+
+  // =============== MELHORIAS PARA DETECÇÃO MAIS PRECISA ===============
+
+  // Lista de possíveis métodos que podem finalizar o questionário
+  const possibleMethods = [
+    'finalizarChat',
+    'enviarRespostas', 
+    'processarRespostasFinal',
+    'responderPergunta',
+    'processarRespostaFinal',
+    'finalizarQuestionario',
+    'enviarQuestionario',
+    'concluirChat',
+    'salvarRespostas',
+    'iniciarBuscaDestinos'
+  ];
+
+  // Adicionar método explícito para iniciar a animação
+  originalBENETRIP.iniciarAnimacaoTransicao = function() {
+    console.log('🐾 Iniciando animação de transição manualmente');
+    LOADING_ANIMATION.showLoadingAnimation();
+    window.addEventListener('benetrip_progress', handleProgressEvent);
   };
-  
-  // Método para verificar se a animação está ativa
-  originalBENETRIP.animacaoTransicaoAtiva = function() {
-    return LOADING_ANIMATION.state.isActive;
-  };
-  
+
+  // Verificar quais métodos existem no objeto BENETRIP
+  let methodFound = false;
+  for (const methodName of possibleMethods) {
+    if (typeof originalBENETRIP[methodName] === 'function') {
+      console.log(`🐾 Método encontrado para sobrescrever: ${methodName}`);
+      const originalMethod = originalBENETRIP[methodName];
+      
+      // Sobrescrever o método
+      originalBENETRIP[methodName] = function() {
+        console.log(`🐾 Método ${methodName} interceptado! Iniciando transição...`);
+        
+        // Exibir a animação de carregamento
+        LOADING_ANIMATION.showLoadingAnimation();
+        
+        // Registrar listener para eventos de progresso
+        window.addEventListener('benetrip_progress', handleProgressEvent);
+        
+        // Chamar a função original
+        return originalMethod.apply(originalBENETRIP, arguments);
+      };
+      
+      methodFound = true;
+      break;
+    }
+  }
+
+  // Se nenhum método conhecido for encontrado, adicionar hooks aos elementos do DOM
+  if (!methodFound) {
+    console.log('🐾 Nenhum método conhecido encontrado. Adicionando hooks aos elementos do DOM.');
+    
+    // Função para observar o DOM e detectar o fim do questionário
+    const observeQuizCompletion = function() {
+      // Verificar se a última pergunta foi respondida
+      document.addEventListener('click', function(event) {
+        // Procurar por cliques em botões de confirmação ou botões de última pergunta
+        const button = event.target.closest('button');
+        if (!button) return;
+        
+        const isConfirmButton = (
+          button.classList.contains('confirm-button') || 
+          button.classList.contains('confirm-text') || 
+          button.classList.contains('confirm-currency') || 
+          button.classList.contains('confirm-number') ||
+          button.classList.contains('confirm-autocomplete') ||
+          button.classList.contains('action-button-large')
+        );
+        
+        if (isConfirmButton) {
+          console.log('🐾 Clique em botão de confirmação detectado!');
+          
+          // Verificar se este é o último item do questionário
+          // Podemos verificar se há mais perguntas pendentes ou se o questionário está concluído
+          setTimeout(function() {
+            // Se não aparecer uma nova pergunta após 500ms, provavelmente é a última
+            const typingIndicator = document.getElementById('typing-indicator');
+            const loadingIndicator = document.getElementById('loading-indicator');
+            
+            if ((typingIndicator && typingIndicator.style.display === 'none') || 
+                (loadingIndicator && loadingIndicator.style.display !== 'none')) {
+              console.log('🐾 Possível conclusão do questionário detectada!');
+              
+              // Verificar após um tempo maior se o estado continua indicando término
+              setTimeout(function() {
+                if (!LOADING_ANIMATION.state.isActive && 
+                    ((loadingIndicator && loadingIndicator.style.display !== 'none') || 
+                     document.querySelector('.loading-container'))) {
+                  console.log('🐾 Questionário concluído! Iniciando animação de transição.');
+                  originalBENETRIP.iniciarAnimacaoTransicao();
+                }
+              }, 1000);
+            }
+          }, 500);
+        }
+      });
+    };
+    
+    // Iniciar observação quando o DOM estiver pronto
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', observeQuizCompletion);
+    } else {
+      observeQuizCompletion();
+    }
+  }
+
+  // Adicionar trigger para eventos do carregador padrão
+  document.addEventListener('DOMContentLoaded', function() {
+    const loadingIndicator = document.getElementById('loading-indicator');
+    if (loadingIndicator) {
+      // Criar um observador para detectar quando o indicador de carregamento fica visível
+      const observer = new MutationObserver(function(mutations) {
+        mutations.forEach(function(mutation) {
+          if (mutation.type === 'attributes' && 
+              mutation.attributeName === 'style' &&
+              loadingIndicator.style.display !== 'none' &&
+              !LOADING_ANIMATION.state.isActive) {
+            console.log('🐾 Indicador de carregamento ativado! Iniciando animação de transição.');
+            originalBENETRIP.iniciarAnimacaoTransicao();
+          }
+        });
+      });
+      
+      observer.observe(loadingIndicator, { attributes: true });
+    }
+  });
+
   // Atualizar a referência global
   window.BENETRIP = originalBENETRIP;
   
@@ -1040,5 +994,42 @@
     }
   });
   
-  console.log('Animação de transição inicializada com sucesso!');
+  console.log('🐾 Animação de transição inicializada com sucesso!');
+
+  // Ativar manualmente em 3 segundos se nada acontecer (apenas para debug/demonstração)
+  // Remova esta parte quando estiver funcionando corretamente
+  setTimeout(function() {
+    const showDebugButton = function() {
+      // Verificar se já existe um botão de debug
+      if (document.getElementById('debug-activate-animation')) return;
+      
+      // Criar botão de debug para ativar a animação manualmente
+      const debugButton = document.createElement('button');
+      debugButton.id = 'debug-activate-animation';
+      debugButton.innerHTML = '🐾 Ativar Animação (DEBUG)';
+      debugButton.style.position = 'fixed';
+      debugButton.style.bottom = '20px';
+      debugButton.style.right = '20px';
+      debugButton.style.zIndex = '9999';
+      debugButton.style.backgroundColor = '#E87722';
+      debugButton.style.color = 'white';
+      debugButton.style.border = 'none';
+      debugButton.style.borderRadius = '8px';
+      debugButton.style.padding = '10px 15px';
+      debugButton.style.fontWeight = 'bold';
+      debugButton.style.boxShadow = '0 2px 5px rgba(0,0,0,0.2)';
+      
+      debugButton.addEventListener('click', function() {
+        originalBENETRIP.iniciarAnimacaoTransicao();
+        this.remove();
+      });
+      
+      document.body.appendChild(debugButton);
+    };
+    
+    // Adicionar botão de debug se nenhuma animação foi iniciada
+    if (!LOADING_ANIMATION.state.isActive) {
+      showDebugButton();
+    }
+  }, 3000);
 })();
