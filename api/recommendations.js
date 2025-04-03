@@ -55,7 +55,7 @@ function logDetalhado(mensagem, dados, limite = MAX_LOG_LENGTH) {
 }
 
 // =======================
-// Função de busca de preço de voo via Aviasales
+// Função de busca de preço de voo via Aviasales usando o endpoint Calendar
 // =======================
 async function buscarPrecoVooAviasales(origemIATA, destinoIATA, datas, moeda) {
   if (!origemIATA || !destinoIATA || !datas) {
@@ -63,7 +63,7 @@ async function buscarPrecoVooAviasales(origemIATA, destinoIATA, datas, moeda) {
     return null;
   }
   try {
-    logDetalhado(`Buscando voo de ${origemIATA} para ${destinoIATA} via Aviasales...`, null);
+    logDetalhado(`Buscando voo de ${origemIATA} para ${destinoIATA} via Aviasales Calendar...`, null);
     const params = {
       origin: origemIATA,
       destination: destinoIATA,
@@ -73,36 +73,36 @@ async function buscarPrecoVooAviasales(origemIATA, destinoIATA, datas, moeda) {
       token: process.env.AVIASALES_TOKEN,
       marker: process.env.AVIASALES_MARKER
     };
-    logDetalhado('Parâmetros da requisição Aviasales:', params);
+    logDetalhado('Parâmetros da requisição Aviasales (calendar):', params);
     const response = await axios({
       method: 'get',
-      url: 'https://api.travelpayouts.com/v1/prices/cheap',
+      url: 'https://api.travelpayouts.com/v1/prices/calendar',
       params: params,
       timeout: AVIASALES_TIMEOUT
     });
     if (response.data && response.data.success && response.data.data) {
-      // Exemplo de estrutura: { "data": { "MIA": { "1": { price: 500, airline: "AA", departure_at: "2025-08-05T07:00:00", return_at: "2025-08-12T12:00:00" } } } }
-      const dadosDestino = response.data.data[destinoIATA];
-      if (dadosDestino) {
-        const keys = Object.keys(dadosDestino);
-        if (keys.length > 0) {
-          const oferta = dadosDestino[keys[0]];
-          if (oferta && oferta.price) {
-            const precoTotal = parseFloat(oferta.price);
-            const detalhesVoo = {
-              companhia: oferta.airline || 'Desconhecida',
-              departure_at: oferta.departure_at || '',
-              return_at: oferta.return_at || ''
-            };
-            return { precoReal: precoTotal, detalhesVoo, fonte: 'Aviasales' };
-          }
+      const calendarData = response.data.data;
+      let prices = [];
+      // Itera sobre as datas disponíveis e extrai os preços para o destino
+      Object.keys(calendarData).forEach(date => {
+        if (calendarData[date] && calendarData[date][destinoIATA]) {
+          prices.push(Number(calendarData[date][destinoIATA]));
         }
+      });
+      if (prices.length > 0) {
+        const soma = prices.reduce((acum, val) => acum + val, 0);
+        const media = Math.round(soma / prices.length);
+        const detalhesVoo = {
+          companhia: "Calendar Data",
+          observacao: `Média calculada com base em ${prices.length} valores`
+        };
+        return { precoReal: media, detalhesVoo, fonte: 'Aviasales (calendar)' };
       }
     }
-    logDetalhado('Nenhuma oferta válida encontrada na Aviasales', null);
+    logDetalhado('Nenhuma oferta válida encontrada na Aviasales Calendar', null);
     return null;
   } catch (erro) {
-    console.error(`Erro ao buscar preços via Aviasales: ${erro.message}`);
+    console.error(`Erro ao buscar preços via Aviasales Calendar: ${erro.message}`);
     logDetalhado('Detalhes do erro:', erro.response ? erro.response.data : erro);
     return null;
   }
@@ -114,7 +114,6 @@ async function buscarPrecoVooAviasales(origemIATA, destinoIATA, datas, moeda) {
 async function retryAsync(fn, maxAttempts = MAX_RETRY, initialDelay = RETRY_DELAY) {
   let attempt = 1;
   let delay = initialDelay;
-  
   while (attempt <= maxAttempts) {
     try {
       const result = await fn();
@@ -123,15 +122,12 @@ async function retryAsync(fn, maxAttempts = MAX_RETRY, initialDelay = RETRY_DELA
     } catch (error) {
       console.error(`Tentativa ${attempt} falhou com erro: ${error.message}`);
     }
-    
     if (attempt === maxAttempts) return null;
-    
     logDetalhado(`Aguardando ${delay}ms antes da próxima tentativa...`, null);
     await new Promise(resolve => setTimeout(resolve, delay));
     delay = Math.min(delay * 1.5, 5000);
     attempt++;
   }
-  
   return null;
 }
 
@@ -156,7 +152,6 @@ function estimarPrecoVoo(origemIATA, destinoIATA) {
     'AU': 'OCEANIA',
     'NZ': 'OCEANIA'
   };
-  
   const precosBase = {
     'BRASIL-BRASIL': 800,
     'BRASIL-AMERICA_NORTE': 2500,
@@ -170,18 +165,13 @@ function estimarPrecoVoo(origemIATA, destinoIATA) {
     'EUROPA-ASIA': 2000,
     'DEFAULT': 3000
   };
-  
   const origemRegiao = obterRegiaoPorCodigo(origemIATA) || 'BRASIL';
   const destinoRegiao = obterRegiaoPorCodigo(destinoIATA) || 'EUROPA';
-  
   const chavePreco = `${origemRegiao}-${destinoRegiao}`;
   const chaveInversa = `${destinoRegiao}-${origemRegiao}`;
-  
   let precoBase = precosBase[chavePreco] || precosBase[chaveInversa] || precosBase.DEFAULT;
-  
   const fatorVariacao = 0.85 + (Math.random() * 0.3);
   const precoEstimado = Math.round(precoBase * fatorVariacao);
-  
   return {
     precoReal: precoEstimado,
     detalhesVoo: {
@@ -205,18 +195,16 @@ function obterRegiaoPorCodigo(codigoIATA) {
     'ASIA': ['HND', 'NRT', 'PEK', 'HKG', 'SIN', 'BKK', 'DXB', 'ICN', 'KIX', 'TPE', 'BOM', 'DEL', 'KUL'],
     'OCEANIA': ['SYD', 'MEL', 'AKL', 'BNE', 'PER', 'CHC', 'ADL']
   };
-  
   for (const [regiao, aeroportos] of Object.entries(aeroportosRegiao)) {
     if (aeroportos.includes(codigoIATA)) {
       return regiao;
     }
   }
-  
   return null;
 }
 
 // =======================
-// Processamento de destinos para enriquecer com preços reais via Aviasales
+// Processamento de destinos para enriquecer com preços reais via Aviasales Calendar
 // =======================
 async function processarDestinos(recomendacoes, origemIATA, datas, moeda) {
   if (!validarCodigoIATA(origemIATA)) {
@@ -226,13 +214,12 @@ async function processarDestinos(recomendacoes, origemIATA, datas, moeda) {
   }
   
   try {
-    logDetalhado('Iniciando processamento de destinos com Aviasales...', null);
+    logDetalhado('Iniciando processamento de destinos com Aviasales Calendar...', null);
     
     // Processa o destino principal (topPick)
     if (recomendacoes.topPick && recomendacoes.topPick.aeroporto && recomendacoes.topPick.aeroporto.codigo) {
       const destinoIATA = recomendacoes.topPick.aeroporto.codigo;
       logDetalhado(`Processando destino principal: ${recomendacoes.topPick.destino} (${destinoIATA})`, null);
-      
       if (validarCodigoIATA(destinoIATA)) {
         const resultado = await retryAsync(
           async () => await buscarPrecoVooAviasales(origemIATA, destinoIATA, datas, moeda)
@@ -240,11 +227,11 @@ async function processarDestinos(recomendacoes, origemIATA, datas, moeda) {
         if (resultado) {
           recomendacoes.topPick.preco = recomendacoes.topPick.preco || {};
           recomendacoes.topPick.preco.voo = resultado.precoReal;
-          recomendacoes.topPick.preco.fonte = resultado.fonte || 'Aviasales';
+          recomendacoes.topPick.preco.fonte = resultado.fonte || 'Aviasales (calendar)';
           recomendacoes.topPick.detalhesVoo = resultado.detalhesVoo;
           logDetalhado(`Preço atualizado para ${recomendacoes.topPick.destino}: ${moeda} ${recomendacoes.topPick.preco.voo}`, null);
         } else {
-          console.warn(`Consulta Aviasales falhou para ${recomendacoes.topPick.destino}. Utilizando preço sugerido pela IA.`);
+          console.warn(`Consulta Aviasales Calendar falhou para ${recomendacoes.topPick.destino}. Utilizando preço sugerido pela IA.`);
           const fallback = estimarPrecoVoo(origemIATA, destinoIATA);
           recomendacoes.topPick.preco = {
             voo: fallback.precoReal,
@@ -255,7 +242,6 @@ async function processarDestinos(recomendacoes, origemIATA, datas, moeda) {
       } else {
         console.warn(`Código IATA inválido para ${recomendacoes.topPick.destino}: ${destinoIATA}`);
       }
-      
       await new Promise(resolve => setTimeout(resolve, 2000));
     }
     
@@ -265,7 +251,6 @@ async function processarDestinos(recomendacoes, origemIATA, datas, moeda) {
         const alternativa = recomendacoes.alternativas[i];
         if (alternativa.aeroporto && alternativa.aeroporto.codigo) {
           const destinoIATA = alternativa.aeroporto.codigo;
-          
           if (validarCodigoIATA(destinoIATA)) {
             logDetalhado(`Processando alternativa ${i+1}/${recomendacoes.alternativas.length}: ${alternativa.destino} (${destinoIATA})`, null);
             const resultado = await retryAsync(
@@ -274,11 +259,11 @@ async function processarDestinos(recomendacoes, origemIATA, datas, moeda) {
             if (resultado) {
               alternativa.preco = alternativa.preco || {};
               alternativa.preco.voo = resultado.precoReal;
-              alternativa.preco.fonte = resultado.fonte || 'Aviasales';
+              alternativa.preco.fonte = resultado.fonte || 'Aviasales (calendar)';
               alternativa.detalhesVoo = resultado.detalhesVoo;
               logDetalhado(`Preço atualizado para ${alternativa.destino}: ${moeda} ${alternativa.preco.voo}`, null);
             } else {
-              console.warn(`Consulta Aviasales falhou para ${alternativa.destino}. Utilizando preço sugerido pela IA.`);
+              console.warn(`Consulta Aviasales Calendar falhou para ${alternativa.destino}. Utilizando preço sugerido pela IA.`);
               const fallback = estimarPrecoVoo(origemIATA, destinoIATA);
               alternativa.preco = {
                 voo: fallback.precoReal,
@@ -289,7 +274,6 @@ async function processarDestinos(recomendacoes, origemIATA, datas, moeda) {
           } else {
             console.warn(`Código IATA inválido para ${alternativa.destino}: ${destinoIATA}`);
           }
-          
           if (i < recomendacoes.alternativas.length - 1) {
             await new Promise(resolve => setTimeout(resolve, 2000));
           }
@@ -300,7 +284,6 @@ async function processarDestinos(recomendacoes, origemIATA, datas, moeda) {
     // Processa o destino surpresa
     if (recomendacoes.surpresa && recomendacoes.surpresa.aeroporto && recomendacoes.surpresa.aeroporto.codigo) {
       const destinoIATA = recomendacoes.surpresa.aeroporto.codigo;
-      
       if (validarCodigoIATA(destinoIATA)) {
         logDetalhado(`Processando destino surpresa: ${recomendacoes.surpresa.destino} (${destinoIATA})`, null);
         const resultado = await retryAsync(
@@ -309,11 +292,11 @@ async function processarDestinos(recomendacoes, origemIATA, datas, moeda) {
         if (resultado) {
           recomendacoes.surpresa.preco = recomendacoes.surpresa.preco || {};
           recomendacoes.surpresa.preco.voo = resultado.precoReal;
-          recomendacoes.surpresa.preco.fonte = resultado.fonte || 'Aviasales';
+          recomendacoes.surpresa.preco.fonte = resultado.fonte || 'Aviasales (calendar)';
           recomendacoes.surpresa.detalhesVoo = resultado.detalhesVoo;
           logDetalhado(`Preço atualizado para ${recomendacoes.surpresa.destino}: ${moeda} ${recomendacoes.surpresa.preco.voo}`, null);
         } else {
-          console.warn(`Consulta Aviasales falhou para ${recomendacoes.surpresa.destino}. Utilizando preço sugerido pela IA.`);
+          console.warn(`Consulta Aviasales Calendar falhou para ${recomendacoes.surpresa.destino}. Utilizando preço sugerido pela IA.`);
           const fallback = estimarPrecoVoo(origemIATA, destinoIATA);
           recomendacoes.surpresa.preco = {
             voo: fallback.precoReal,
@@ -326,11 +309,7 @@ async function processarDestinos(recomendacoes, origemIATA, datas, moeda) {
       }
     }
     
-    // Verifica se os preços respeitam o orçamento máximo
-    if (recomendacoes.orcamentoMaximo) {
-      ajustarPrecosParaOrcamento(recomendacoes, recomendacoes.orcamentoMaximo);
-    }
-    
+    // (Obs.: a lógica de ajuste de preço conforme orçamento foi removida)
     return recomendacoes;
   } catch (error) {
     console.error(`Erro ao processar destinos: ${error.message}`);
@@ -338,40 +317,9 @@ async function processarDestinos(recomendacoes, origemIATA, datas, moeda) {
   }
 }
 
-// Função para garantir que todos os preços respeitam o orçamento máximo
-function ajustarPrecosParaOrcamento(recomendacoes, orcamentoMaximo) {
-  const orcamento = parseFloat(orcamentoMaximo);
-  if (isNaN(orcamento) || orcamento <= 0) return;
-  
-  if (recomendacoes.topPick && recomendacoes.topPick.preco && recomendacoes.topPick.preco.voo > orcamento) {
-    logDetalhado(`Ajustando preço do topPick para respeitar orçamento: ${recomendacoes.topPick.preco.voo} -> ${orcamento * 0.9}`, null);
-    recomendacoes.topPick.preco.voo = Math.round(orcamento * 0.9);
-    recomendacoes.topPick.preco.fonte += ' (ajustado)';
-  }
-  
-  if (recomendacoes.alternativas && Array.isArray(recomendacoes.alternativas)) {
-    recomendacoes.alternativas.forEach((alt, index) => {
-      if (alt.preco && alt.preco.voo > orcamento) {
-        const fator = 0.85 - (index * 0.05);
-        const novoPreco = Math.round(orcamento * fator);
-        logDetalhado(`Ajustando preço de alternativa para respeitar orçamento: ${alt.preco.voo} -> ${novoPreco}`, null);
-        alt.preco.voo = novoPreco;
-        alt.preco.fonte += ' (ajustado)';
-      }
-    });
-  }
-  
-  if (recomendacoes.surpresa && recomendacoes.surpresa.preco && recomendacoes.surpresa.preco.voo > orcamento) {
-    logDetalhado(`Ajustando preço da surpresa para respeitar orçamento: ${recomendacoes.surpresa.preco.voo} -> ${orcamento * 0.95}`, null);
-    recomendacoes.surpresa.preco.voo = Math.round(orcamento * 0.95);
-    recomendacoes.surpresa.preco.fonte += ' (ajustado)';
-  }
-}
-
 // =======================
 // Funções auxiliares para dados de entrada e validação
 // =======================
-
 function obterCodigoIATAOrigem(dadosUsuario) {
   try {
     if (!dadosUsuario || !dadosUsuario.cidade_partida) return null;
@@ -410,7 +358,6 @@ function obterCodigoIATAOrigem(dadosUsuario) {
       'Dubai': 'DXB',
       'Sydney': 'SYD'
     };
-    
     const cidadeNome = dadosUsuario.cidade_partida.name || '';
     for (const [cidade, iata] of Object.entries(mapeamentoIATA)) {
       if (cidadeNome.toLowerCase().includes(cidade.toLowerCase())) {
@@ -439,16 +386,13 @@ function obterDatasViagem(dadosUsuario) {
         dataVolta: formatarData(dataVoltaPadrao) 
       };
     }
-    
     if (typeof datas === 'string' && datas.includes(',')) {
       const [dataIda, dataVolta] = datas.split(',');
       return { dataIda: dataIda.trim(), dataVolta: dataVolta.trim() };
     }
-    
     if (datas.dataIda && datas.dataVolta) {
       return { dataIda: datas.dataIda, dataVolta: datas.dataVolta };
     }
-    
     return { dataIda: '2025-08-05', dataVolta: '2025-08-12' };
   } catch (error) {
     console.error('Erro ao obter datas de viagem:', error);
@@ -1322,9 +1266,7 @@ function obterCodigoIATAPadrao(cidade, pais) {
     'Melbourne': 'MEL',
     'Auckland': 'AKL'
   };
-  
   if (mapeamentoIATA[cidade]) return mapeamentoIATA[cidade];
-  
   const mapeamentoPais = {
     'Brasil': 'GRU',
     'Estados Unidos': 'JFK',
@@ -1344,11 +1286,8 @@ function obterCodigoIATAPadrao(cidade, pais) {
     'Singapura': 'SIN',
     'Emirados Árabes Unidos': 'DXB'
   };
-  
   if (mapeamentoPais[pais]) return mapeamentoPais[pais];
-  
   if (cidade && cidade.length >= 3) return cidade.substring(0, 3).toUpperCase();
-  
   return "AAA";
 }
 
@@ -1358,7 +1297,6 @@ function generateEmergencyData(dadosUsuario = {}) {
   const moeda = dadosUsuario.moeda_escolhida || 'BRL';
   const cidadeOrigem = dadosUsuario.cidade_partida?.name || '';
   const regiao = determinarRegiaoOrigem(cidadeOrigem);
-  
   const destinosEmergencia = {
     "americas": {
       topPick: {
@@ -1785,24 +1723,8 @@ function generateEmergencyData(dadosUsuario = {}) {
       }
     }
   };
-  
   const dadosRegiao = destinosEmergencia[regiao] || destinosEmergencia.global;
-  
-  if (orcamento) {
-    if (dadosRegiao.topPick.preco.voo > orcamento * 0.95) {
-      dadosRegiao.topPick.preco.voo = Math.round(orcamento * 0.85);
-    }
-    dadosRegiao.alternativas.forEach((alt, index) => {
-      if (alt.preco.voo > orcamento * 0.95) {
-        const fatorAjuste = 0.7 + (index * 0.05);
-        alt.preco.voo = Math.round(orcamento * fatorAjuste);
-      }
-    });
-    if (dadosRegiao.surpresa.preco.voo > orcamento) {
-      dadosRegiao.surpresa.preco.voo = Math.round(orcamento * 0.9);
-    }
-  }
-  
+  // Note que a lógica de ajuste de preços conforme orçamento foi removida.
   dadosRegiao.alternativas = embaralharArray([...dadosRegiao.alternativas]);
   return dadosRegiao;
 }
