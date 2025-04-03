@@ -85,6 +85,11 @@ const BENETRIP_DESTINOS = {
       // Iniciar carregamento das recomendações
       this.atualizarProgresso('Buscando melhores destinos para você...', 10);
       this.recomendacoes = await this.buscarRecomendacoes();
+      
+      // Buscar imagens para os destinos recomendados
+      this.atualizarProgresso('Buscando imagens dos destinos...', 70);
+      await this.enriquecerComImagens();
+      
       this.estaCarregando = false;
       
       return true;
@@ -94,6 +99,77 @@ const BENETRIP_DESTINOS = {
       this.temErro = true;
       this.mensagemErro = erro.message;
       throw erro;
+    }
+  },
+  
+  // Buscar imagens para um destino
+  async buscarImagensDestino(destino) {
+    try {
+      if (!destino) return null;
+      
+      // Construir URL com pontos turísticos
+      let url = `/api/image-search?query=${encodeURIComponent(destino.destino)}, ${encodeURIComponent(destino.pais)}`;
+      
+      // Adicionar pontos turísticos específicos à query
+      if (destino.pontosTuristicos && destino.pontosTuristicos.length > 0) {
+        url += `&pontosTuristicos=${encodeURIComponent(JSON.stringify(destino.pontosTuristicos))}`;
+      } else if (destino.pontoTuristico) {
+        url += `&pontosTuristicos=${encodeURIComponent(JSON.stringify([destino.pontoTuristico]))}`;
+      }
+      
+      console.log(`Buscando imagens para ${destino.destino} com pontos turísticos`, 
+        destino.pontosTuristicos || destino.pontoTuristico);
+      
+      const resposta = await fetch(url);
+      const dados = await resposta.json();
+      
+      if (dados && dados.images && dados.images.length > 0) {
+        console.log(`Encontradas ${dados.images.length} imagens para ${destino.destino}`);
+        return dados.images;
+      }
+      
+      console.warn(`Nenhuma imagem encontrada para ${destino.destino}`);
+      return null;
+    } catch (erro) {
+      console.error(`Erro ao buscar imagens para ${destino.destino}:`, erro);
+      return null;
+    }
+  },
+  // Buscar imagens para todos os destinos
+  async enriquecerComImagens() {
+    try {
+      console.log('Enriquecendo destinos com imagens...');
+      
+      // Buscar imagens para o destino principal
+      if (this.recomendacoes.topPick) {
+        this.recomendacoes.topPick.imagens = 
+          await this.buscarImagensDestino(this.recomendacoes.topPick);
+      }
+      
+      // Buscar imagens para destino surpresa
+      if (this.recomendacoes.surpresa) {
+        this.recomendacoes.surpresa.imagens = 
+          await this.buscarImagensDestino(this.recomendacoes.surpresa);
+      }
+      
+      // Buscar imagens para destinos alternativos
+      if (this.recomendacoes.alternativas && this.recomendacoes.alternativas.length > 0) {
+        for (let i = 0; i < this.recomendacoes.alternativas.length; i++) {
+          this.recomendacoes.alternativas[i].imagens = 
+            await this.buscarImagensDestino(this.recomendacoes.alternativas[i]);
+          
+          // Pequena pausa para não sobrecarregar a API
+          if (i < this.recomendacoes.alternativas.length - 1) {
+            await new Promise(resolve => setTimeout(resolve, 300));
+          }
+        }
+      }
+      
+      console.log('Destinos enriquecidos com imagens com sucesso');
+      return true;
+    } catch (erro) {
+      console.error('Erro ao enriquecer destinos com imagens:', erro);
+      return false;
     }
   },
   
@@ -191,7 +267,6 @@ const BENETRIP_DESTINOS = {
       textoProgresso.textContent = mensagem;
     }
   },
-  
   // Renderizar a interface com os dados obtidos
   renderizarInterface() {
     try {
@@ -371,7 +446,6 @@ const BENETRIP_DESTINOS = {
       </div>
     `;
   },
-  
   // Renderizar mensagem da Tripinha
   renderizarMensagemTripinha() {
     const container = document.getElementById('mensagem-tripinha');
