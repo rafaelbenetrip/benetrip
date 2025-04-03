@@ -331,8 +331,8 @@ const BENETRIP = {
                     this.inicializarCalendario(pergunta);
                 }, 300);
             }
-        },
-    /**
+        }
+        /**
      * Inicializa o calendário com Flatpickr - Versão corrigida
      */
     inicializarCalendario(pergunta) {
@@ -1500,4 +1500,3 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // Exportar a aplicação para o namespace global
 window.BENETRIP = BENETRIP;
-        
