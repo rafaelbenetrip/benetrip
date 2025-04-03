@@ -1148,40 +1148,4 @@
   });
   
   console.log('🐾 Animação de transição inicializada com sucesso!');
-
-  // Ativar manualmente em 3 segundos se nada acontecer (apenas para debug/demonstração)
-  setTimeout(function() {
-    const showDebugButton = function() {
-      // Verificar se já existe um botão de debug
-      if (document.getElementById('debug-activate-animation')) return;
-      
-      // Criar botão de debug para ativar a animação manualmente
-      const debugButton = document.createElement('button');
-      debugButton.id = 'debug-activate-animation';
-      debugButton.innerHTML = '🐾 Ativar Animação (DEBUG)';
-      debugButton.style.position = 'fixed';
-      debugButton.style.bottom = '20px';
-      debugButton.style.right = '20px';
-      debugButton.style.zIndex = '9999';
-      debugButton.style.backgroundColor = '#E87722';
-      debugButton.style.color = 'white';
-      debugButton.style.border = 'none';
-      debugButton.style.borderRadius = '8px';
-      debugButton.style.padding = '10px 15px';
-      debugButton.style.fontWeight = 'bold';
-      debugButton.style.boxShadow = '0 2px 5px rgba(0,0,0,0.2)';
-      
-      debugButton.addEventListener('click', function() {
-        originalBENETRIP.iniciarAnimacaoTransicao();
-        this.remove();
-      });
-      
-      document.body.appendChild(debugButton);
-    };
-    
-    // Adicionar botão de debug se nenhuma animação foi iniciada
-    if (!LOADING_ANIMATION.state.isActive) {
-      showDebugButton();
-    }
-  }, 3000);
 })();
