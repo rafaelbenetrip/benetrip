@@ -331,29 +331,7 @@ const BENETRIP = {
                     this.inicializarCalendario(pergunta);
                 }, 300);
             }
-        }
-
-        // Configurar entrada numérica
-        if (pergunta.number_input) {
-            this.configurarEntradaNumerica();
-        }
-
-        // Configurar autocomplete
-        if (pergunta.autocomplete) {
-            this.configurarAutocomplete(pergunta);
-        }
-
-        // Configurar entrada de moeda
-        if (pergunta.currency_format) {
-            this.configurarEntradaMoeda();
-        }
-
-        // Configurar entrada de texto
-        if (pergunta.input_field && !pergunta.calendar && !pergunta.number_input && !pergunta.autocomplete && !pergunta.currency_format) {
-            this.configurarEntradaTexto();
-        }
-    },
-
+        },
     /**
      * Inicializa o calendário com Flatpickr - Versão corrigida
      */
@@ -989,7 +967,6 @@ const BENETRIP = {
             }
         });
     },
-    
     /**
      * Processa a resposta do usuário a uma pergunta
      */
@@ -1255,6 +1232,11 @@ const BENETRIP = {
                 // Salvar recomendações
                 localStorage.setItem('benetrip_recomendacoes', JSON.stringify(recomendacoes));
                 
+                // Notificar que os dados estão prontos
+                if (window.BENETRIP.notificarDadosProntos) {
+                    window.BENETRIP.notificarDadosProntos();
+                }
+                
                 // Mostrar mensagem de conclusão
                 this.atualizarBarraProgresso(100, "Destinos encontrados! Redirecionando...");
                 
@@ -1273,7 +1255,6 @@ const BENETRIP = {
                 }, 2000);
             });
     },
-
     /**
      * Busca voos para o destino escolhido pelo usuário
      */
@@ -1308,6 +1289,11 @@ const BENETRIP = {
             .then(resultados => {
                 // Salvar resultados
                 localStorage.setItem('benetrip_resultados_voos', JSON.stringify(resultados));
+                
+                // Notificar que os dados estão prontos
+                if (window.BENETRIP.notificarDadosProntos) {
+                    window.BENETRIP.notificarDadosProntos();
+                }
                 
                 // Mostrar mensagem de conclusão
                 this.atualizarBarraProgresso(100, "Voos encontrados! Redirecionando...");
@@ -1514,3 +1500,4 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // Exportar a aplicação para o namespace global
 window.BENETRIP = BENETRIP;
+        
