@@ -160,8 +160,7 @@
               <span class="progress-percentage text-sm font-medium">0%</span>
             </div>
             <div class="w-full bg-gray-200 rounded-full h-3 progress-bar-container">
-              <div class="progress-bar h-3 rounded-full transition-all duration-500 ease-out" 
-                   style="width: 0%; background-color: #E87722;"></div>
+              <div class="progress-bar h-3 rounded-full" style="width: 0%;"></div>
             </div>
           </div>
           
@@ -270,13 +269,20 @@
           border-radius: 6px;
           overflow: hidden;
           background-color: #f1f1f1;
+          position: relative;
         }
         
         .progress-bar {
+          position: absolute;
+          top: 0;
+          left: 0;
           background-color: #E87722;
-          transition: width 0.5s ease-out;
           height: 100%;
+          width: 0;
           border-radius: 6px;
+          transition: width 0.3s ease-out;
+          will-change: width;
+          z-index: 1;
         }
         
         /* Mapa do mundo */
@@ -471,11 +477,11 @@
           }
           
           .tripinha-character {
-            /* Tripinha um pouco menor */
-            width: calc(20px + 0.2vw);
-            height: calc(20px + 0.2vw);
-            max-width: 36px;
-            max-height: 36px;
+            /* Tripinha tamanho em mobile */
+            width: calc(28px + 0.3vw);
+            height: calc(28px + 0.3vw);
+            max-width: 48px;
+            max-height: 48px;
           }
           
           .speech-bubble {
@@ -630,9 +636,15 @@
     startSimulatedProgress() {
       let progress = 0;
       const totalTime = 20000; // 20 segundos para chegar a 100%
-      const updateInterval = 300; // Atualizar a cada 300ms
+      const updateInterval = 200; // Atualizar a cada 200ms para movimento mais suave
       const steps = totalTime / updateInterval;
       const increment = 100 / steps;
+      
+      // Iniciar com um primeiro incremento maior para feedback visual imediato
+      setTimeout(() => {
+        progress = 5;
+        this.updateProgress(progress);
+      }, 100);
       
       this.timers.progressTimer = setInterval(() => {
         progress = Math.min(progress + increment, 100);
@@ -726,7 +738,7 @@
         const dest = this.destinations[this.state.currentPosition];
         
         // Posicionar a Tripinha à direita do destino (pois o focinho está à esquerda)
-        const offsetX = 8; // Deslocamento à direita em porcentagem
+        const offsetX = 10; // Deslocamento à direita em porcentagem (aumentado para a Tripinha maior)
         tripinhaElement.style.left = `${dest.x + offsetX}%`;
         tripinhaElement.style.top = `${dest.y}%`;
         
@@ -827,7 +839,7 @@
 
     /**
      * Atualiza o progresso da animação
-     * Melhorado para garantir que a barra de progresso funcione corretamente
+     * Corrigido para garantir que a barra de progresso visual corresponda ao percentual exibido
      * @param {number} progress - Valor do progresso (0-100)
      * @param {string} message - Mensagem de status opcional
      */
@@ -840,19 +852,22 @@
       const progressPercentage = document.querySelector('.progress-percentage');
       
       if (progressBar) {
-        // Forçar a largura diretamente no elemento
+        // Forçar a largura diretamente no elemento e garantir que o estilo seja aplicado imediatamente
         progressBar.style.width = `${progress}%`;
         
-        // Verificar se a largura realmente mudou
+        // Registrar a mudança visual para debug
         console.log(`🐾 Atualizando barra de progresso para ${progress}%`);
         
-        // Para browsers que podem estar ignorando a transição, forçar um repaint
-        setTimeout(() => {
-          progressBar.style.transition = 'none';
-          progressBar.offsetHeight; // Força um repaint
-          progressBar.style.transition = 'width 0.5s ease-out';
-          progressBar.style.width = `${progress}%`;
-        }, 10);
+        // Forçar recálculo de layout para aplicar a alteração imediatamente
+        progressBar.getBoundingClientRect();
+        
+        // Para browsers que podem estar ignorando a transição, forçar um repaint completo
+        document.body.style.display = 'none';
+        document.body.offsetHeight; // Força um repaint completo
+        document.body.style.display = '';
+        
+        // Aplicar estilo como estilo inline para contornar possíveis conflitos de CSS
+        progressBar.setAttribute('style', `width: ${progress}% !important; background-color: #E87722; height: 100%; border-radius: 6px; transition: width 0.3s ease-out;`);
       }
       
       if (progressPercentage) {
