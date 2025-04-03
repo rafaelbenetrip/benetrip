@@ -8,7 +8,7 @@ const https = require('https');
 // =======================
 const REQUEST_TIMEOUT = 50000; // 50 segundos para requisições externas
 const HANDLER_TIMEOUT = 55000; // 55 segundos para processamento total
-const AVIASALES_TIMEOUT = 15000; // 15 segundos para requisições à Aviasales
+const AVIASALES_TIMEOUT = 15000; // 15 segundos para requisições à Aviasales (Calendar)
 const RETRY_DELAY = 1500; // 1.5 segundos entre tentativas
 const MAX_RETRY = 2; // Número máximo de tentativas para cada método
 
@@ -55,7 +55,7 @@ function logDetalhado(mensagem, dados, limite = MAX_LOG_LENGTH) {
 }
 
 // =======================
-// Função de busca de preço de voo via Aviasales usando o endpoint Calendar
+// Função de busca de preço de voo via Aviasales Calendar
 // =======================
 async function buscarPrecoVooAviasales(origemIATA, destinoIATA, datas, moeda) {
   if (!origemIATA || !destinoIATA || !datas) {
@@ -63,7 +63,7 @@ async function buscarPrecoVooAviasales(origemIATA, destinoIATA, datas, moeda) {
     return null;
   }
   try {
-    logDetalhado(`Buscando voo de ${origemIATA} para ${destinoIATA} via Aviasales Calendar...`, null);
+    logDetalhado(`Buscando voo de ${origemIATA} para ${destinoIATA} via Aviasales (Calendar)...`, null);
     const params = {
       origin: origemIATA,
       destination: destinoIATA,
@@ -73,7 +73,7 @@ async function buscarPrecoVooAviasales(origemIATA, destinoIATA, datas, moeda) {
       token: process.env.AVIASALES_TOKEN,
       marker: process.env.AVIASALES_MARKER
     };
-    logDetalhado('Parâmetros da requisição Aviasales (calendar):', params);
+    logDetalhado('Parâmetros da requisição Aviasales Calendar:', params);
     const response = await axios({
       method: 'get',
       url: 'https://api.travelpayouts.com/v1/prices/calendar',
@@ -81,25 +81,29 @@ async function buscarPrecoVooAviasales(origemIATA, destinoIATA, datas, moeda) {
       timeout: AVIASALES_TIMEOUT
     });
     if (response.data && response.data.success && response.data.data) {
-      const calendarData = response.data.data;
-      let prices = [];
-      // Itera sobre as datas disponíveis e extrai os preços para o destino
-      Object.keys(calendarData).forEach(date => {
-        if (calendarData[date] && calendarData[date][destinoIATA]) {
-          prices.push(Number(calendarData[date][destinoIATA]));
+      // A resposta contém várias datas, ex:
+      // { "2025-06-04": { "MCZ": 350 }, "2025-06-05": { "MCZ": 360 }, ... }
+      let menorPreco = Infinity;
+      for (const date in response.data.data) {
+        const precosPorDestino = response.data.data[date];
+        if (precosPorDestino && precosPorDestino[destinoIATA] !== undefined) {
+          const preco = parseFloat(precosPorDestino[destinoIATA]);
+          if (preco < menorPreco) {
+            menorPreco = preco;
+          }
         }
-      });
-      if (prices.length > 0) {
-        const soma = prices.reduce((acum, val) => acum + val, 0);
-        const media = Math.round(soma / prices.length);
+      }
+      if (menorPreco !== Infinity) {
+        // Como o Calendar não retorna detalhes como companhia ou horários, usamos dados mínimos
         const detalhesVoo = {
-          companhia: "Calendar Data",
-          observacao: `Média calculada com base em ${prices.length} valores`
+          companhia: 'Não informado',
+          departure_at: '',
+          return_at: ''
         };
-        return { precoReal: media, detalhesVoo, fonte: 'Aviasales (calendar)' };
+        return { precoReal: menorPreco, detalhesVoo, fonte: 'Aviasales Calendar' };
       }
     }
-    logDetalhado('Nenhuma oferta válida encontrada na Aviasales Calendar', null);
+    logDetalhado('Nenhuma oferta válida encontrada no Calendar', null);
     return null;
   } catch (erro) {
     console.error(`Erro ao buscar preços via Aviasales Calendar: ${erro.message}`);
@@ -114,6 +118,7 @@ async function buscarPrecoVooAviasales(origemIATA, destinoIATA, datas, moeda) {
 async function retryAsync(fn, maxAttempts = MAX_RETRY, initialDelay = RETRY_DELAY) {
   let attempt = 1;
   let delay = initialDelay;
+  
   while (attempt <= maxAttempts) {
     try {
       const result = await fn();
@@ -122,12 +127,15 @@ async function retryAsync(fn, maxAttempts = MAX_RETRY, initialDelay = RETRY_DELA
     } catch (error) {
       console.error(`Tentativa ${attempt} falhou com erro: ${error.message}`);
     }
+    
     if (attempt === maxAttempts) return null;
+    
     logDetalhado(`Aguardando ${delay}ms antes da próxima tentativa...`, null);
     await new Promise(resolve => setTimeout(resolve, delay));
     delay = Math.min(delay * 1.5, 5000);
     attempt++;
   }
+  
   return null;
 }
 
@@ -135,6 +143,7 @@ async function retryAsync(fn, maxAttempts = MAX_RETRY, initialDelay = RETRY_DELA
 // Função de estimativa de preço como último recurso
 // =======================
 function estimarPrecoVoo(origemIATA, destinoIATA) {
+  // Mapeamento de regiões para gerar estimativas razoáveis
   const regioes = {
     'BR': 'BRASIL',
     'US': 'AMERICA_NORTE',
@@ -152,6 +161,8 @@ function estimarPrecoVoo(origemIATA, destinoIATA) {
     'AU': 'OCEANIA',
     'NZ': 'OCEANIA'
   };
+  
+  // Preços base por regiões
   const precosBase = {
     'BRASIL-BRASIL': 800,
     'BRASIL-AMERICA_NORTE': 2500,
@@ -165,13 +176,19 @@ function estimarPrecoVoo(origemIATA, destinoIATA) {
     'EUROPA-ASIA': 2000,
     'DEFAULT': 3000
   };
+  
   const origemRegiao = obterRegiaoPorCodigo(origemIATA) || 'BRASIL';
   const destinoRegiao = obterRegiaoPorCodigo(destinoIATA) || 'EUROPA';
+  
   const chavePreco = `${origemRegiao}-${destinoRegiao}`;
   const chaveInversa = `${destinoRegiao}-${origemRegiao}`;
+  
   let precoBase = precosBase[chavePreco] || precosBase[chaveInversa] || precosBase.DEFAULT;
+  
+  // Adiciona variação para parecer mais realista (±15%)
   const fatorVariacao = 0.85 + (Math.random() * 0.3);
   const precoEstimado = Math.round(precoBase * fatorVariacao);
+  
   return {
     precoReal: precoEstimado,
     detalhesVoo: {
@@ -195,11 +212,13 @@ function obterRegiaoPorCodigo(codigoIATA) {
     'ASIA': ['HND', 'NRT', 'PEK', 'HKG', 'SIN', 'BKK', 'DXB', 'ICN', 'KIX', 'TPE', 'BOM', 'DEL', 'KUL'],
     'OCEANIA': ['SYD', 'MEL', 'AKL', 'BNE', 'PER', 'CHC', 'ADL']
   };
+  
   for (const [regiao, aeroportos] of Object.entries(aeroportosRegiao)) {
     if (aeroportos.includes(codigoIATA)) {
       return regiao;
     }
   }
+  
   return null;
 }
 
@@ -220,6 +239,7 @@ async function processarDestinos(recomendacoes, origemIATA, datas, moeda) {
     if (recomendacoes.topPick && recomendacoes.topPick.aeroporto && recomendacoes.topPick.aeroporto.codigo) {
       const destinoIATA = recomendacoes.topPick.aeroporto.codigo;
       logDetalhado(`Processando destino principal: ${recomendacoes.topPick.destino} (${destinoIATA})`, null);
+      
       if (validarCodigoIATA(destinoIATA)) {
         const resultado = await retryAsync(
           async () => await buscarPrecoVooAviasales(origemIATA, destinoIATA, datas, moeda)
@@ -227,7 +247,7 @@ async function processarDestinos(recomendacoes, origemIATA, datas, moeda) {
         if (resultado) {
           recomendacoes.topPick.preco = recomendacoes.topPick.preco || {};
           recomendacoes.topPick.preco.voo = resultado.precoReal;
-          recomendacoes.topPick.preco.fonte = resultado.fonte || 'Aviasales (calendar)';
+          recomendacoes.topPick.preco.fonte = resultado.fonte || 'Aviasales Calendar';
           recomendacoes.topPick.detalhesVoo = resultado.detalhesVoo;
           logDetalhado(`Preço atualizado para ${recomendacoes.topPick.destino}: ${moeda} ${recomendacoes.topPick.preco.voo}`, null);
         } else {
@@ -242,6 +262,7 @@ async function processarDestinos(recomendacoes, origemIATA, datas, moeda) {
       } else {
         console.warn(`Código IATA inválido para ${recomendacoes.topPick.destino}: ${destinoIATA}`);
       }
+      
       await new Promise(resolve => setTimeout(resolve, 2000));
     }
     
@@ -251,6 +272,7 @@ async function processarDestinos(recomendacoes, origemIATA, datas, moeda) {
         const alternativa = recomendacoes.alternativas[i];
         if (alternativa.aeroporto && alternativa.aeroporto.codigo) {
           const destinoIATA = alternativa.aeroporto.codigo;
+          
           if (validarCodigoIATA(destinoIATA)) {
             logDetalhado(`Processando alternativa ${i+1}/${recomendacoes.alternativas.length}: ${alternativa.destino} (${destinoIATA})`, null);
             const resultado = await retryAsync(
@@ -259,7 +281,7 @@ async function processarDestinos(recomendacoes, origemIATA, datas, moeda) {
             if (resultado) {
               alternativa.preco = alternativa.preco || {};
               alternativa.preco.voo = resultado.precoReal;
-              alternativa.preco.fonte = resultado.fonte || 'Aviasales (calendar)';
+              alternativa.preco.fonte = resultado.fonte || 'Aviasales Calendar';
               alternativa.detalhesVoo = resultado.detalhesVoo;
               logDetalhado(`Preço atualizado para ${alternativa.destino}: ${moeda} ${alternativa.preco.voo}`, null);
             } else {
@@ -274,6 +296,7 @@ async function processarDestinos(recomendacoes, origemIATA, datas, moeda) {
           } else {
             console.warn(`Código IATA inválido para ${alternativa.destino}: ${destinoIATA}`);
           }
+          
           if (i < recomendacoes.alternativas.length - 1) {
             await new Promise(resolve => setTimeout(resolve, 2000));
           }
@@ -284,6 +307,7 @@ async function processarDestinos(recomendacoes, origemIATA, datas, moeda) {
     // Processa o destino surpresa
     if (recomendacoes.surpresa && recomendacoes.surpresa.aeroporto && recomendacoes.surpresa.aeroporto.codigo) {
       const destinoIATA = recomendacoes.surpresa.aeroporto.codigo;
+      
       if (validarCodigoIATA(destinoIATA)) {
         logDetalhado(`Processando destino surpresa: ${recomendacoes.surpresa.destino} (${destinoIATA})`, null);
         const resultado = await retryAsync(
@@ -292,7 +316,7 @@ async function processarDestinos(recomendacoes, origemIATA, datas, moeda) {
         if (resultado) {
           recomendacoes.surpresa.preco = recomendacoes.surpresa.preco || {};
           recomendacoes.surpresa.preco.voo = resultado.precoReal;
-          recomendacoes.surpresa.preco.fonte = resultado.fonte || 'Aviasales (calendar)';
+          recomendacoes.surpresa.preco.fonte = resultado.fonte || 'Aviasales Calendar';
           recomendacoes.surpresa.detalhesVoo = resultado.detalhesVoo;
           logDetalhado(`Preço atualizado para ${recomendacoes.surpresa.destino}: ${moeda} ${recomendacoes.surpresa.preco.voo}`, null);
         } else {
@@ -309,7 +333,8 @@ async function processarDestinos(recomendacoes, origemIATA, datas, moeda) {
       }
     }
     
-    // (Obs.: a lógica de ajuste de preço conforme orçamento foi removida)
+    // (Obs.: a lógica de ajuste de preço para respeitar orçamento foi removida)
+    
     return recomendacoes;
   } catch (error) {
     console.error(`Erro ao processar destinos: ${error.message}`);
@@ -358,6 +383,7 @@ function obterCodigoIATAOrigem(dadosUsuario) {
       'Dubai': 'DXB',
       'Sydney': 'SYD'
     };
+    
     const cidadeNome = dadosUsuario.cidade_partida.name || '';
     for (const [cidade, iata] of Object.entries(mapeamentoIATA)) {
       if (cidadeNome.toLowerCase().includes(cidade.toLowerCase())) {
@@ -1266,7 +1292,9 @@ function obterCodigoIATAPadrao(cidade, pais) {
     'Melbourne': 'MEL',
     'Auckland': 'AKL'
   };
+  
   if (mapeamentoIATA[cidade]) return mapeamentoIATA[cidade];
+  
   const mapeamentoPais = {
     'Brasil': 'GRU',
     'Estados Unidos': 'JFK',
@@ -1286,8 +1314,11 @@ function obterCodigoIATAPadrao(cidade, pais) {
     'Singapura': 'SIN',
     'Emirados Árabes Unidos': 'DXB'
   };
+  
   if (mapeamentoPais[pais]) return mapeamentoPais[pais];
+  
   if (cidade && cidade.length >= 3) return cidade.substring(0, 3).toUpperCase();
+  
   return "AAA";
 }
 
@@ -1297,6 +1328,7 @@ function generateEmergencyData(dadosUsuario = {}) {
   const moeda = dadosUsuario.moeda_escolhida || 'BRL';
   const cidadeOrigem = dadosUsuario.cidade_partida?.name || '';
   const regiao = determinarRegiaoOrigem(cidadeOrigem);
+  
   const destinosEmergencia = {
     "americas": {
       topPick: {
@@ -1723,8 +1755,11 @@ function generateEmergencyData(dadosUsuario = {}) {
       }
     }
   };
+  
   const dadosRegiao = destinosEmergencia[regiao] || destinosEmergencia.global;
-  // Note que a lógica de ajuste de preços conforme orçamento foi removida.
+  
+  // (Ajuste de preços para orçamento foi removido)
+  
   dadosRegiao.alternativas = embaralharArray([...dadosRegiao.alternativas]);
   return dadosRegiao;
 }
