@@ -1,7 +1,7 @@
 /**
  * BENETRIP - Animação Interativa de Transição
  * Melhora a experiência de espera entre o chat e os destinos recomendados
- * Versão 1.3 - Com correções para imagem, progresso e gramática
+ * Versão 1.4 - Com correções para posicionamento da Tripinha e proporção da imagem
  */
 
 (function() {
@@ -337,6 +337,13 @@
           transition: all 1s cubic-bezier(0.68, -0.55, 0.27, 1.55);
           z-index: 10;
           background-color: transparent !important;
+          /* Ajustado para manter proporção relativa aos destinos */
+          width: calc(24px + 0.2vw);
+          height: calc(24px + 0.2vw);
+          min-width: 24px;
+          min-height: 24px;
+          max-width: 48px;
+          max-height: 48px;
         }
         
         /* Animação para a Tripinha "farejando" */
@@ -346,6 +353,9 @@
           background-color: transparent !important;
           image-rendering: -webkit-optimize-contrast;
           image-rendering: crisp-edges;
+          /* Garantir que a imagem ocupe todo o espaço disponível */
+          width: 100%;
+          height: 100%;
         }
         
         @keyframes sniff {
@@ -422,6 +432,14 @@
           font-weight: 600;
         }
         
+        /* Ajuste do tamanho da Tripinha baseado no contador de destinos */
+        .active-search .tripinha-character {
+          /* Aumenta ligeiramente o tamanho após descobrir destinos */
+          width: calc(24px + 0.3vw + 0.4vmin * var(--discovered-count, 0));
+          height: calc(24px + 0.3vw + 0.4vmin * var(--discovered-count, 0));
+          transition: width 0.5s ease, height 0.5s ease, left 1s cubic-bezier(0.68, -0.55, 0.27, 1.55), top 1s cubic-bezier(0.68, -0.55, 0.27, 1.55);
+        }
+        
         /* Mobile optimizations */
         @media (max-width: 480px) {
           .loading-animation-container {
@@ -454,10 +472,10 @@
           
           .tripinha-character {
             /* Tripinha um pouco menor */
-            width: 10vw;
-            height: 10vw;
-            max-width: 48px;
-            max-height: 48px;
+            width: calc(20px + 0.2vw);
+            height: calc(20px + 0.2vw);
+            max-width: 36px;
+            max-height: 36px;
           }
           
           .speech-bubble {
@@ -660,18 +678,38 @@
         destinationsContainer.appendChild(destElement);
       });
       
+      // Ativar classe para controle de tamanho da Tripinha
+      const worldMap = document.querySelector('.world-map');
+      if (worldMap) {
+        worldMap.classList.add('active-search');
+      }
+      
       // Definir posição inicial da Tripinha
       this.state.currentPosition = Math.floor(Math.random() * this.destinations.length);
+      this.moveTripihaToInitialPosition();
+    },
+
+    /**
+     * Posiciona a Tripinha na posição inicial
+     */
+    moveTripihaToInitialPosition() {
       const tripinhaElement = document.querySelector('.tripinha-character');
-      if (tripinhaElement) {
-        const dest = this.destinations[this.state.currentPosition];
-        tripinhaElement.style.left = `${dest.x}%`;
-        tripinhaElement.style.top = `${dest.y}%`;
-      }
+      if (!tripinhaElement) return;
+      
+      const dest = this.destinations[this.state.currentPosition];
+      
+      // Posicionar a Tripinha à direita do destino (pois o focinho está à esquerda)
+      const offsetX = 8; // Deslocamento à direita em porcentagem
+      tripinhaElement.style.left = `${dest.x + offsetX}%`;
+      tripinhaElement.style.top = `${dest.y}%`;
+      
+      // Ajustar o tamanho proporcionalmente à quantidade de destinos descobertos
+      this.updateTripihaSize();
     },
 
     /**
      * Move a Tripinha para uma nova posição no mapa
+     * Modificado para posicionar sempre à direita do destino
      */
     moveTripihaToNewPosition() {
       // Escolher uma nova posição aleatória (diferente da atual)
@@ -686,7 +724,10 @@
       const tripinhaElement = document.querySelector('.tripinha-character');
       if (tripinhaElement) {
         const dest = this.destinations[this.state.currentPosition];
-        tripinhaElement.style.left = `${dest.x}%`;
+        
+        // Posicionar a Tripinha à direita do destino (pois o focinho está à esquerda)
+        const offsetX = 8; // Deslocamento à direita em porcentagem
+        tripinhaElement.style.left = `${dest.x + offsetX}%`;
         tripinhaElement.style.top = `${dest.y}%`;
         
         // Animar balão de fala
@@ -699,6 +740,20 @@
         
         // Destacar o destino atual
         this.highlightCurrentDestination();
+        
+        // Atualizar o tamanho da Tripinha
+        this.updateTripihaSize();
+      }
+    },
+
+    /**
+     * Atualiza o tamanho da Tripinha com base no número de destinos descobertos
+     */
+    updateTripihaSize() {
+      const worldMap = document.querySelector('.world-map');
+      if (worldMap) {
+        // Definir uma variável CSS personalizada para controlar o tamanho
+        worldMap.style.setProperty('--discovered-count', Math.min(this.state.discoveredCount / 5, 3));
       }
     },
 
@@ -765,6 +820,9 @@
         
         counterElement.textContent = text;
       }
+      
+      // Atualizar o tamanho da Tripinha quando novos destinos são descobertos
+      this.updateTripihaSize();
     },
 
     /**
