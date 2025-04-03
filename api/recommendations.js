@@ -81,8 +81,7 @@ async function buscarPrecoVooAviasales(origemIATA, destinoIATA, datas, moeda) {
       timeout: AVIASALES_TIMEOUT
     });
     if (response.data && response.data.success && response.data.data) {
-      // A resposta contém várias datas, ex:
-      // { "2025-06-04": { "MCZ": 350 }, "2025-06-05": { "MCZ": 360 }, ... }
+      // Percorre as datas para encontrar o menor preço para o destino
       let menorPreco = Infinity;
       for (const date in response.data.data) {
         const precosPorDestino = response.data.data[date];
@@ -94,7 +93,6 @@ async function buscarPrecoVooAviasales(origemIATA, destinoIATA, datas, moeda) {
         }
       }
       if (menorPreco !== Infinity) {
-        // Como o Calendar não retorna detalhes como companhia ou horários, usamos dados mínimos
         const detalhesVoo = {
           companhia: 'Não informado',
           departure_at: '',
@@ -109,6 +107,33 @@ async function buscarPrecoVooAviasales(origemIATA, destinoIATA, datas, moeda) {
     console.error(`Erro ao buscar preços via Aviasales Calendar: ${erro.message}`);
     logDetalhado('Detalhes do erro:', erro.response ? erro.response.data : erro);
     return null;
+  }
+}
+
+// =======================
+// Função de fallback solicitando estimativa via IA
+// =======================
+async function solicitarEstimativaVooAI(origemIATA, destinoIATA, datas, moeda) {
+  const prompt = `Forneça uma estimativa realista do preço de uma passagem aérea de ${origemIATA} para ${destinoIATA} na moeda ${moeda} para as datas ${datas.dataIda} a ${datas.dataVolta}. 
+Retorne um JSON com o seguinte formato:
+{
+  "precoReal": <numero>,
+  "detalhesVoo": {
+    "companhia": "<nome ou 'Estimativa AI'>",
+    "numeroParadas": <numero>,
+    "duracao": "<ex: '8h', '11h', etc.>"
+  },
+  "fonte": "Estimativa AI"
+}
+Por favor, retorne apenas o JSON.`;
+  try {
+    const response = await callOpenAIAPI(prompt, {}); // Utiliza OpenAI para obter a estimativa
+    const parsed = JSON.parse(response);
+    return parsed;
+  } catch (error) {
+    console.error("Erro ao solicitar estimativa via IA:", error);
+    // Se ocorrer erro, recorre ao fallback tradicional
+    return estimarPrecoVoo(origemIATA, destinoIATA);
   }
 }
 
@@ -140,10 +165,9 @@ async function retryAsync(fn, maxAttempts = MAX_RETRY, initialDelay = RETRY_DELA
 }
 
 // =======================
-// Função de estimativa de preço como último recurso
+// Função de fallback tradicional (mantida como backup)
 // =======================
 function estimarPrecoVoo(origemIATA, destinoIATA) {
-  // Mapeamento de regiões para gerar estimativas razoáveis
   const regioes = {
     'BR': 'BRASIL',
     'US': 'AMERICA_NORTE',
@@ -162,7 +186,6 @@ function estimarPrecoVoo(origemIATA, destinoIATA) {
     'NZ': 'OCEANIA'
   };
   
-  // Preços base por regiões
   const precosBase = {
     'BRASIL-BRASIL': 800,
     'BRASIL-AMERICA_NORTE': 2500,
@@ -185,7 +208,6 @@ function estimarPrecoVoo(origemIATA, destinoIATA) {
   
   let precoBase = precosBase[chavePreco] || precosBase[chaveInversa] || precosBase.DEFAULT;
   
-  // Adiciona variação para parecer mais realista (±15%)
   const fatorVariacao = 0.85 + (Math.random() * 0.3);
   const precoEstimado = Math.round(precoBase * fatorVariacao);
   
@@ -251,8 +273,8 @@ async function processarDestinos(recomendacoes, origemIATA, datas, moeda) {
           recomendacoes.topPick.detalhesVoo = resultado.detalhesVoo;
           logDetalhado(`Preço atualizado para ${recomendacoes.topPick.destino}: ${moeda} ${recomendacoes.topPick.preco.voo}`, null);
         } else {
-          console.warn(`Consulta Aviasales Calendar falhou para ${recomendacoes.topPick.destino}. Utilizando preço sugerido pela IA.`);
-          const fallback = estimarPrecoVoo(origemIATA, destinoIATA);
+          console.warn(`Consulta Aviasales Calendar falhou para ${recomendacoes.topPick.destino}. Solicitando estimativa via IA.`);
+          const fallback = await solicitarEstimativaVooAI(origemIATA, destinoIATA, datas, moeda);
           recomendacoes.topPick.preco = {
             voo: fallback.precoReal,
             fonte: fallback.fonte + ' (sugerido pela IA)'
@@ -285,8 +307,8 @@ async function processarDestinos(recomendacoes, origemIATA, datas, moeda) {
               alternativa.detalhesVoo = resultado.detalhesVoo;
               logDetalhado(`Preço atualizado para ${alternativa.destino}: ${moeda} ${alternativa.preco.voo}`, null);
             } else {
-              console.warn(`Consulta Aviasales Calendar falhou para ${alternativa.destino}. Utilizando preço sugerido pela IA.`);
-              const fallback = estimarPrecoVoo(origemIATA, destinoIATA);
+              console.warn(`Consulta Aviasales Calendar falhou para ${alternativa.destino}. Solicitando estimativa via IA.`);
+              const fallback = await solicitarEstimativaVooAI(origemIATA, destinoIATA, datas, moeda);
               alternativa.preco = {
                 voo: fallback.precoReal,
                 fonte: fallback.fonte + ' (sugerido pela IA)'
@@ -320,8 +342,8 @@ async function processarDestinos(recomendacoes, origemIATA, datas, moeda) {
           recomendacoes.surpresa.detalhesVoo = resultado.detalhesVoo;
           logDetalhado(`Preço atualizado para ${recomendacoes.surpresa.destino}: ${moeda} ${recomendacoes.surpresa.preco.voo}`, null);
         } else {
-          console.warn(`Consulta Aviasales Calendar falhou para ${recomendacoes.surpresa.destino}. Utilizando preço sugerido pela IA.`);
-          const fallback = estimarPrecoVoo(origemIATA, destinoIATA);
+          console.warn(`Consulta Aviasales Calendar falhou para ${recomendacoes.surpresa.destino}. Solicitando estimativa via IA.`);
+          const fallback = await solicitarEstimativaVooAI(origemIATA, destinoIATA, datas, moeda);
           recomendacoes.surpresa.preco = {
             voo: fallback.precoReal,
             fonte: fallback.fonte + ' (sugerido pela IA)'
@@ -332,8 +354,6 @@ async function processarDestinos(recomendacoes, origemIATA, datas, moeda) {
         console.warn(`Código IATA inválido para ${recomendacoes.surpresa.destino}: ${destinoIATA}`);
       }
     }
-    
-    // (Obs.: a lógica de ajuste de preço para respeitar orçamento foi removida)
     
     return recomendacoes;
   } catch (error) {
@@ -1758,8 +1778,7 @@ function generateEmergencyData(dadosUsuario = {}) {
   
   const dadosRegiao = destinosEmergencia[regiao] || destinosEmergencia.global;
   
-  // (Ajuste de preços para orçamento foi removido)
-  
+  // Removida a lógica de ajuste de preços para orçamento
   dadosRegiao.alternativas = embaralharArray([...dadosRegiao.alternativas]);
   return dadosRegiao;
 }
