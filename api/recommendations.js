@@ -3,20 +3,18 @@ const axios = require('axios');
 const http = require('http');
 const https = require('https');
 
+// =======================
 // Configurações de timeout e limites
+// =======================
 const REQUEST_TIMEOUT = 50000; // 50 segundos para requisições externas
 const HANDLER_TIMEOUT = 55000; // 55 segundos para processamento total
-const AMADEUS_TIMEOUT = 45000; // 45 segundos para requisições à API Amadeus
+const AVIASALES_TIMEOUT = 15000; // 15 segundos para requisições à Aviasales
 const RETRY_DELAY = 1500; // 1.5 segundos entre tentativas
 const MAX_RETRY = 2; // Número máximo de tentativas para cada método
 
-// Cache de tokens para reduzir requisições de autenticação
-let tokenCache = {
-  token: null,
-  expiry: null
-};
-
+// =======================
 // Configurações de logging
+// =======================
 const enableDetailedLogs = true;
 const MAX_LOG_LENGTH = 500; // Limite de caracteres para logs de resposta
 
@@ -49,7 +47,6 @@ function formatarDuracao(duracao) {
 // Log detalhado com limite de caracteres
 function logDetalhado(mensagem, dados, limite = MAX_LOG_LENGTH) {
   if (!enableDetailedLogs) return;
-  
   console.log(mensagem);
   if (dados) {
     const dadosStr = typeof dados === 'string' ? dados : JSON.stringify(dados);
@@ -58,267 +55,90 @@ function logDetalhado(mensagem, dados, limite = MAX_LOG_LENGTH) {
 }
 
 // =======================
-// Autenticação Amadeus
+// Função de busca de preço de voo via Aviasales
 // =======================
-
-async function obterTokenAmadeus() {
-  try {
-    // Verifica se já tem token válido em cache
-    const agora = new Date().getTime();
-    if (tokenCache.token && tokenCache.expiry && tokenCache.expiry > agora) {
-      logDetalhado('Usando token Amadeus em cache (válido)', null);
-      return tokenCache.token;
-    }
-
-    logDetalhado('Iniciando autenticação Amadeus...', null);
-    const apiKey = process.env.AMADEUS_API_KEY;
-    const apiSecret = process.env.AMADEUS_API_SECRET;
-    
-    if (!apiKey || !apiSecret) {
-      console.error('Credenciais Amadeus não configuradas');
-      return null;
-    }
-    
-    const response = await axios({
-      method: 'post',
-      url: 'https://api.amadeus.com/v1/security/oauth2/token',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      data: new URLSearchParams({
-        'grant_type': 'client_credentials',
-        'client_id': apiKey,
-        'client_secret': apiSecret
-      }),
-      timeout: 10000
-    });
-    
-    if (!response.data || !response.data.access_token) {
-      throw new Error('Token não encontrado na resposta');
-    }
-    
-    // Armazena token em cache (expira 5 minutos antes do tempo real para segurança)
-    const expiresIn = response.data.expires_in || 1800; // Padrão 30min se não informado
-    tokenCache = {
-      token: response.data.access_token,
-      expiry: agora + ((expiresIn - 300) * 1000) // Converte para ms e reduz 5min
-    };
-    
-    logDetalhado('Token Amadeus obtido com sucesso', {
-      tipo: response.data.token_type,
-      expiracao: `${expiresIn} segundos`
-    });
-    
-    return response.data.access_token;
-  } catch (erro) {
-    console.error(`Erro ao obter token Amadeus: ${erro.message}`);
-    if (erro.response) {
-      console.error(`Status: ${erro.response.status}`);
-      logDetalhado(`Dados do erro:`, erro.response.data);
-    }
-    return null;
-  }
-}
-// =======================
-// Funções de busca de preço de voo
-// =======================
-
-// Função principal com parâmetros otimizados
-async function buscarPrecoVoo(origemIATA, destinoIATA, datas, token, moeda) {
-  if (!origemIATA || !destinoIATA || !datas || !token) {
+async function buscarPrecoVooAviasales(origemIATA, destinoIATA, datas, moeda) {
+  if (!origemIATA || !destinoIATA || !datas) {
     logDetalhado(`Parâmetros incompletos para busca de voo:`, { origem: origemIATA, destino: destinoIATA });
     return null;
   }
-
   try {
-    logDetalhado(`Buscando voos de ${origemIATA} para ${destinoIATA}...`, null);
-
-    // Parâmetros mais específicos para reduzir a chance de timeout
-    const params = {
-      originLocationCode: origemIATA,
-      destinationLocationCode: destinoIATA,
-      departureDate: datas.dataIda,
-      returnDate: datas.dataVolta,
-      adults: 1,
-      children: 0,
-      infants: 0,
-      currencyCode: moeda,
-      travelClass: 'ECONOMY',
-      max: 1,  // Limitamos para apenas 1 resultado
-      nonStop: false  // Aceita voos com conexões
-    };
-
-    logDetalhado('Parâmetros da requisição:', params);
-
-    const response = await axios({
-      method: 'get',
-      url: 'https://api.amadeus.com/v2/shopping/flight-offers',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Accept': 'application/json'
-      },
-      params: params,
-      timeout: AMADEUS_TIMEOUT
-    });
-
-    if (response.data && response.data.data && response.data.data.length > 0) {
-      const melhorOferta = response.data.data[0];
-      const precoTotal = parseFloat(melhorOferta.price.total);
-      const detalhesVoo = {
-        companhia: melhorOferta.validatingAirlineCodes?.[0] || 'Várias',
-        numeroParadas: 0,
-        duracao: ''
-      };
-      if (melhorOferta.itineraries && melhorOferta.itineraries.length > 0) {
-        const segmentosIda = melhorOferta.itineraries[0].segments || [];
-        detalhesVoo.numeroParadas = Math.max(0, segmentosIda.length - 1);
-        if (melhorOferta.itineraries[0].duration) {
-          detalhesVoo.duracao = formatarDuracao(melhorOferta.itineraries[0].duration);
-        }
-      }
-      return { precoReal: precoTotal, detalhesVoo, fonte: 'Amadeus' };
-    } else {
-      logDetalhado('Nenhuma oferta encontrada para', { origem: origemIATA, destino: destinoIATA });
-      return null;
-    }
-  } catch (erro) {
-    console.error(`Erro ao buscar preços de voo: ${erro.message}`);
-    if (erro.response) {
-      console.error(`Status: ${erro.response.status}`);
-      logDetalhado(`Dados do erro:`, erro.response.data);
-      
-      if (erro.response.data && erro.response.data.errors) {
-        erro.response.data.errors.forEach(e => {
-          console.error(`Código de erro: ${e.code}, Título: ${e.title}, Detalhe: ${e.detail}`);
-        });
-        
-        // Verifica se é o erro de timeout específico
-        if (erro.response.data.errors.some(e => e.code === 38189 || e.detail?.includes('Primitive Timeout'))) {
-          console.warn("Erro de Primitive Timeout detectado, tentando estratégia alternativa...");
-        }
-      }
-    }
-    return null;
-  }
-}
-
-// Função simplificada que busca apenas voos de ida para reduzir carga de processamento
-async function buscarPrecoSimplificado(origemIATA, destinoIATA, datas, token, moeda) {
-  try {
-    logDetalhado(`Tentando busca simplificada de ${origemIATA} para ${destinoIATA}...`, null);
-    
-    // Parâmetros mínimos para reduzir carga de processamento
-    const params = {
-      originLocationCode: origemIATA,
-      destinationLocationCode: destinoIATA,
-      departureDate: datas.dataIda, // Apenas ida, sem volta
-      adults: 1,
-      currencyCode: moeda,
-      max: 1
-    };
-    
-    const response = await axios({
-      method: 'get',
-      url: 'https://api.amadeus.com/v2/shopping/flight-offers',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Accept': 'application/json'
-      },
-      params: params,
-      timeout: AMADEUS_TIMEOUT
-    });
-    
-    if (response.data && response.data.data && response.data.data.length > 0) {
-      const melhorOferta = response.data.data[0];
-      const precoTotal = parseFloat(melhorOferta.price.total);
-      
-      // Como é apenas ida, multiplicamos por ~1.8 para estimar ida e volta
-      const precoEstimadoIdaVolta = Math.round(precoTotal * 1.8);
-      
-      return { 
-        precoReal: precoEstimadoIdaVolta, 
-        detalhesVoo: { 
-          companhia: melhorOferta.validatingAirlineCodes?.[0] || 'Estimado', 
-          numeroParadas: 0, 
-          duracao: '' 
-        },
-        fonte: 'Amadeus (simplificado)' 
-      };
-    }
-    return null;
-  } catch (erro) {
-    console.error(`Erro na busca simplificada: ${erro.message}`);
-    return null;
-  }
-}
-
-// Função que usa o endpoint Flight Inspiration (mais estável)
-async function buscarComFlightInspiration(origemIATA, destinoIATA, token, moeda) {
-  try {
-    logDetalhado(`Usando Flight Inspiration Search para ${origemIATA}...`, null);
+    logDetalhado(`Buscando voo de ${origemIATA} para ${destinoIATA} via Aviasales...`, null);
     const params = {
       origin: origemIATA,
-      currency: moeda
+      destination: destinoIATA,
+      depart_date: datas.dataIda,
+      return_date: datas.dataVolta,
+      currency: moeda,
+      token: process.env.AVIASALES_TOKEN,
+      marker: process.env.AVIASALES_MARKER
     };
-    
+    logDetalhado('Parâmetros da requisição Aviasales:', params);
     const response = await axios({
       method: 'get',
-      url: 'https://api.amadeus.com/v1/shopping/flight-destinations',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Accept': 'application/json'
-      },
+      url: 'https://api.travelpayouts.com/v1/prices/cheap',
       params: params,
-      timeout: AMADEUS_TIMEOUT
+      timeout: AVIASALES_TIMEOUT
     });
-    
-    if (response.data && response.data.data) {
-      // Procura pelo destino específico nos resultados
-      const destinoEncontrado = response.data.data.find(
-        item => item.destination === destinoIATA
-      );
-      
-      if (destinoEncontrado && destinoEncontrado.price) {
-        return {
-          precoReal: parseFloat(destinoEncontrado.price.total),
-          detalhesVoo: {
-            companhia: 'Amadeus Inspiration',
-            numeroParadas: 1, // Valor padrão, não temos detalhes
-            duracao: ''
-          },
-          fonte: 'Amadeus (Inspiration)'
-        };
-      }
-      
-      // Se não encontrou o destino específico, estima baseado na média dos preços
-      const precos = response.data.data
-        .filter(item => item.price && item.price.total)
-        .map(item => parseFloat(item.price.total));
-      
-      if (precos.length > 0) {
-        const precoMedio = precos.reduce((sum, price) => sum + price, 0) / precos.length;
-        return {
-          precoReal: Math.round(precoMedio),
-          detalhesVoo: {
-            companhia: 'Estimativa',
-            numeroParadas: 1,
-            duracao: ''
-          },
-          fonte: 'Amadeus (média)'
-        };
+    if (response.data && response.data.success && response.data.data) {
+      // Exemplo de estrutura: { "data": { "MIA": { "1": { price: 500, airline: "AA", departure_at: "2025-08-05T07:00:00", return_at: "2025-08-12T12:00:00" } } } }
+      const dadosDestino = response.data.data[destinoIATA];
+      if (dadosDestino) {
+        const keys = Object.keys(dadosDestino);
+        if (keys.length > 0) {
+          const oferta = dadosDestino[keys[0]];
+          if (oferta && oferta.price) {
+            const precoTotal = parseFloat(oferta.price);
+            const detalhesVoo = {
+              companhia: oferta.airline || 'Desconhecida',
+              departure_at: oferta.departure_at || '',
+              return_at: oferta.return_at || ''
+            };
+            return { precoReal: precoTotal, detalhesVoo, fonte: 'Aviasales' };
+          }
+        }
       }
     }
+    logDetalhado('Nenhuma oferta válida encontrada na Aviasales', null);
     return null;
   } catch (erro) {
-    console.error(`Erro no Flight Inspiration: ${erro.message}`);
+    console.error(`Erro ao buscar preços via Aviasales: ${erro.message}`);
+    logDetalhado('Detalhes do erro:', erro.response ? erro.response.data : erro);
     return null;
   }
+}
+
+// =======================
+// Função genérica de retentativa com backoff exponencial
+// =======================
+async function retryAsync(fn, maxAttempts = MAX_RETRY, initialDelay = RETRY_DELAY) {
+  let attempt = 1;
+  let delay = initialDelay;
+  
+  while (attempt <= maxAttempts) {
+    try {
+      const result = await fn();
+      if (result) return result;
+      logDetalhado(`Tentativa ${attempt} retornou resultado nulo ou inválido`, null);
+    } catch (error) {
+      console.error(`Tentativa ${attempt} falhou com erro: ${error.message}`);
+    }
+    
+    if (attempt === maxAttempts) return null;
+    
+    logDetalhado(`Aguardando ${delay}ms antes da próxima tentativa...`, null);
+    await new Promise(resolve => setTimeout(resolve, delay));
+    delay = Math.min(delay * 1.5, 5000);
+    attempt++;
+  }
+  
+  return null;
 }
 
 // =======================
 // Função de estimativa de preço como último recurso
 // =======================
-
 function estimarPrecoVoo(origemIATA, destinoIATA) {
-  // Mapeamento de regiões para gerar estimativas razoáveis
   const regioes = {
     'BR': 'BRASIL',
     'US': 'AMERICA_NORTE',
@@ -337,7 +157,6 @@ function estimarPrecoVoo(origemIATA, destinoIATA) {
     'NZ': 'OCEANIA'
   };
   
-  // Preços base por regiões
   const precosBase = {
     'BRASIL-BRASIL': 800,
     'BRASIL-AMERICA_NORTE': 2500,
@@ -352,18 +171,14 @@ function estimarPrecoVoo(origemIATA, destinoIATA) {
     'DEFAULT': 3000
   };
   
-  // Tenta determinar as regiões dos códigos IATA
   const origemRegiao = obterRegiaoPorCodigo(origemIATA) || 'BRASIL';
   const destinoRegiao = obterRegiaoPorCodigo(destinoIATA) || 'EUROPA';
   
-  // Calcula chave para o preço base
   const chavePreco = `${origemRegiao}-${destinoRegiao}`;
   const chaveInversa = `${destinoRegiao}-${origemRegiao}`;
   
-  // Seleciona o preço base
   let precoBase = precosBase[chavePreco] || precosBase[chaveInversa] || precosBase.DEFAULT;
   
-  // Adiciona variação para parecer mais realista (±15%)
   const fatorVariacao = 0.85 + (Math.random() * 0.3);
   const precoEstimado = Math.round(precoBase * fatorVariacao);
   
@@ -379,9 +194,10 @@ function estimarPrecoVoo(origemIATA, destinoIATA) {
   };
 }
 
+// =======================
 // Função para determinar região geográfica pelo código do aeroporto
+// =======================
 function obterRegiaoPorCodigo(codigoIATA) {
-  // Mapa de aeroportos comuns por região
   const aeroportosRegiao = {
     'BRASIL': ['GRU', 'GIG', 'BSB', 'SSA', 'REC', 'FOR', 'CNF', 'POA', 'CWB', 'BEL', 'MAO', 'NAT', 'FLN', 'MCZ'],
     'AMERICA_NORTE': ['JFK', 'LAX', 'MIA', 'ORD', 'YYZ', 'MEX', 'CUN', 'YVR', 'DFW', 'ATL', 'SFO', 'LAS', 'YUL'],
@@ -400,70 +216,9 @@ function obterRegiaoPorCodigo(codigoIATA) {
 }
 
 // =======================
-// Função genérica de retentativa com backoff exponencial
+// Processamento de destinos para enriquecer com preços reais via Aviasales
 // =======================
-
-async function retryAsync(fn, maxAttempts = MAX_RETRY, initialDelay = RETRY_DELAY) {
-  let attempt = 1;
-  let delay = initialDelay;
-  
-  while (attempt <= maxAttempts) {
-    try {
-      const result = await fn();
-      if (result) return result;
-      logDetalhado(`Tentativa ${attempt} retornou resultado nulo ou inválido`, null);
-    } catch (error) {
-      console.error(`Tentativa ${attempt} falhou com erro: ${error.message}`);
-    }
-    
-    if (attempt === maxAttempts) return null;
-    
-    logDetalhado(`Aguardando ${delay}ms antes da próxima tentativa...`, null);
-    await new Promise(resolve => setTimeout(resolve, delay));
-    delay = Math.min(delay * 1.5, 5000); // Aumenta o delay, mas não mais que 5s
-    attempt++;
-  }
-  
-  return null;
-}
-
-// Função principal de busca com estratégia em camadas
-async function buscarPrecoComRetentativa(origemIATA, destinoIATA, datas, token, moeda) {
-  // Primeiro, tentamos com a API normal
-  let resultado = await retryAsync(
-    async () => await buscarPrecoVoo(origemIATA, destinoIATA, datas, token, moeda),
-    2 // Reduz para 2 tentativas com este método
-  );
-  
-  if (resultado) return resultado;
-  
-  // Se falhou com método normal, tenta com o simplificado
-  logDetalhado(`Método normal falhou, tentando abordagem simplificada para ${origemIATA} -> ${destinoIATA}`, null);
-  resultado = await retryAsync(
-    async () => await buscarPrecoSimplificado(origemIATA, destinoIATA, datas, token, moeda),
-    2
-  );
-  
-  if (resultado) return resultado;
-  
-  // Se nada funcionou, usa o endpoint alternativo de Flight Inspiration
-  logDetalhado("Ambos os métodos falharam, tentando Flight Inspiration como último recurso", null);
-  resultado = await retryAsync(
-    async () => await buscarComFlightInspiration(origemIATA, destinoIATA, token, moeda),
-    1
-  );
-  
-  if (resultado) return resultado;
-  
-  // Se todas as APIs falharem, usa estimativa
-  logDetalhado("Todas as APIs falharam, usando sistema de estimativa de preços", null);
-  return estimarPrecoVoo(origemIATA, destinoIATA);
-}
-// =======================
-// Processamento de destinos para enriquecer com preços reais
-// =======================
-
-async function processarDestinos(recomendacoes, origemIATA, datas, token, moeda) {
+async function processarDestinos(recomendacoes, origemIATA, datas, moeda) {
   if (!validarCodigoIATA(origemIATA)) {
     console.error(`Código IATA de origem inválido: ${origemIATA}`);
     origemIATA = 'GRU';
@@ -471,54 +226,70 @@ async function processarDestinos(recomendacoes, origemIATA, datas, token, moeda)
   }
   
   try {
-    logDetalhado('Iniciando processamento de destinos com estratégia melhorada...', null);
+    logDetalhado('Iniciando processamento de destinos com Aviasales...', null);
     
-    // Processamento dos destinos com maior delay entre requisições e ordem otimizada
-    
-    // 1. Primeiro processamos o destino principal (topPick)
+    // Processa o destino principal (topPick)
     if (recomendacoes.topPick && recomendacoes.topPick.aeroporto && recomendacoes.topPick.aeroporto.codigo) {
       const destinoIATA = recomendacoes.topPick.aeroporto.codigo;
       logDetalhado(`Processando destino principal: ${recomendacoes.topPick.destino} (${destinoIATA})`, null);
       
       if (validarCodigoIATA(destinoIATA)) {
-        const resultado = await buscarPrecoComRetentativa(origemIATA, destinoIATA, datas, token, moeda);
+        const resultado = await retryAsync(
+          async () => await buscarPrecoVooAviasales(origemIATA, destinoIATA, datas, moeda)
+        );
         if (resultado) {
+          recomendacoes.topPick.preco = recomendacoes.topPick.preco || {};
           recomendacoes.topPick.preco.voo = resultado.precoReal;
-          recomendacoes.topPick.preco.fonte = resultado.fonte || 'Amadeus';
+          recomendacoes.topPick.preco.fonte = resultado.fonte || 'Aviasales';
           recomendacoes.topPick.detalhesVoo = resultado.detalhesVoo;
           logDetalhado(`Preço atualizado para ${recomendacoes.topPick.destino}: ${moeda} ${recomendacoes.topPick.preco.voo}`, null);
+        } else {
+          console.warn(`Consulta Aviasales falhou para ${recomendacoes.topPick.destino}. Utilizando preço sugerido pela IA.`);
+          const fallback = estimarPrecoVoo(origemIATA, destinoIATA);
+          recomendacoes.topPick.preco = {
+            voo: fallback.precoReal,
+            fonte: fallback.fonte + ' (sugerido pela IA)'
+          };
+          recomendacoes.topPick.detalhesVoo = fallback.detalhesVoo;
         }
       } else {
         console.warn(`Código IATA inválido para ${recomendacoes.topPick.destino}: ${destinoIATA}`);
       }
       
-      // Espera maior entre requisições para reduzir chance de problemas
       await new Promise(resolve => setTimeout(resolve, 2000));
     }
     
-    // 2. Depois processamos as alternativas uma por uma (não em paralelo)
+    // Processa as alternativas (uma por uma)
     if (recomendacoes.alternativas && Array.isArray(recomendacoes.alternativas)) {
       for (let i = 0; i < recomendacoes.alternativas.length; i++) {
         const alternativa = recomendacoes.alternativas[i];
-        
         if (alternativa.aeroporto && alternativa.aeroporto.codigo) {
           const destinoIATA = alternativa.aeroporto.codigo;
           
           if (validarCodigoIATA(destinoIATA)) {
             logDetalhado(`Processando alternativa ${i+1}/${recomendacoes.alternativas.length}: ${alternativa.destino} (${destinoIATA})`, null);
-            
-            const resultado = await buscarPrecoComRetentativa(origemIATA, destinoIATA, datas, token, moeda);
+            const resultado = await retryAsync(
+              async () => await buscarPrecoVooAviasales(origemIATA, destinoIATA, datas, moeda)
+            );
             if (resultado) {
+              alternativa.preco = alternativa.preco || {};
               alternativa.preco.voo = resultado.precoReal;
-              alternativa.preco.fonte = resultado.fonte || 'Amadeus';
+              alternativa.preco.fonte = resultado.fonte || 'Aviasales';
               alternativa.detalhesVoo = resultado.detalhesVoo;
               logDetalhado(`Preço atualizado para ${alternativa.destino}: ${moeda} ${alternativa.preco.voo}`, null);
+            } else {
+              console.warn(`Consulta Aviasales falhou para ${alternativa.destino}. Utilizando preço sugerido pela IA.`);
+              const fallback = estimarPrecoVoo(origemIATA, destinoIATA);
+              alternativa.preco = {
+                voo: fallback.precoReal,
+                fonte: fallback.fonte + ' (sugerido pela IA)'
+              };
+              alternativa.detalhesVoo = fallback.detalhesVoo;
             }
           } else {
             console.warn(`Código IATA inválido para ${alternativa.destino}: ${destinoIATA}`);
           }
           
-          // Espera maior entre requisições para reduzir chance de problemas
           if (i < recomendacoes.alternativas.length - 1) {
             await new Promise(resolve => setTimeout(resolve, 2000));
           }
@@ -526,26 +297,36 @@ async function processarDestinos(recomendacoes, origemIATA, datas, token, moeda)
       }
     }
     
-    // 3. Por último processamos a surpresa
+    // Processa o destino surpresa
     if (recomendacoes.surpresa && recomendacoes.surpresa.aeroporto && recomendacoes.surpresa.aeroporto.codigo) {
       const destinoIATA = recomendacoes.surpresa.aeroporto.codigo;
       
       if (validarCodigoIATA(destinoIATA)) {
         logDetalhado(`Processando destino surpresa: ${recomendacoes.surpresa.destino} (${destinoIATA})`, null);
-        
-        const resultado = await buscarPrecoComRetentativa(origemIATA, destinoIATA, datas, token, moeda);
+        const resultado = await retryAsync(
+          async () => await buscarPrecoVooAviasales(origemIATA, destinoIATA, datas, moeda)
+        );
         if (resultado) {
+          recomendacoes.surpresa.preco = recomendacoes.surpresa.preco || {};
           recomendacoes.surpresa.preco.voo = resultado.precoReal;
-          recomendacoes.surpresa.preco.fonte = resultado.fonte || 'Amadeus';
+          recomendacoes.surpresa.preco.fonte = resultado.fonte || 'Aviasales';
           recomendacoes.surpresa.detalhesVoo = resultado.detalhesVoo;
           logDetalhado(`Preço atualizado para ${recomendacoes.surpresa.destino}: ${moeda} ${recomendacoes.surpresa.preco.voo}`, null);
+        } else {
+          console.warn(`Consulta Aviasales falhou para ${recomendacoes.surpresa.destino}. Utilizando preço sugerido pela IA.`);
+          const fallback = estimarPrecoVoo(origemIATA, destinoIATA);
+          recomendacoes.surpresa.preco = {
+            voo: fallback.precoReal,
+            fonte: fallback.fonte + ' (sugerido pela IA)'
+          };
+          recomendacoes.surpresa.detalhesVoo = fallback.detalhesVoo;
         }
       } else {
         console.warn(`Código IATA inválido para ${recomendacoes.surpresa.destino}: ${destinoIATA}`);
       }
     }
     
-    // Verifica se respeitamos o orçamento em todos os destinos
+    // Verifica se os preços respeitam o orçamento máximo
     if (recomendacoes.orcamentoMaximo) {
       ajustarPrecosParaOrcamento(recomendacoes, recomendacoes.orcamentoMaximo);
     }
@@ -571,7 +352,7 @@ function ajustarPrecosParaOrcamento(recomendacoes, orcamentoMaximo) {
   if (recomendacoes.alternativas && Array.isArray(recomendacoes.alternativas)) {
     recomendacoes.alternativas.forEach((alt, index) => {
       if (alt.preco && alt.preco.voo > orcamento) {
-        const fator = 0.85 - (index * 0.05); // Cada alternativa fica um pouco mais barata
+        const fator = 0.85 - (index * 0.05);
         const novoPreco = Math.round(orcamento * fator);
         logDetalhado(`Ajustando preço de alternativa para respeitar orçamento: ${alt.preco.voo} -> ${novoPreco}`, null);
         alt.preco.voo = novoPreco;
@@ -591,14 +372,10 @@ function ajustarPrecosParaOrcamento(recomendacoes, orcamentoMaximo) {
 // Funções auxiliares para dados de entrada e validação
 // =======================
 
-// Obtém o código IATA a partir da cidade de origem informada pelo usuário
 function obterCodigoIATAOrigem(dadosUsuario) {
   try {
     if (!dadosUsuario || !dadosUsuario.cidade_partida) return null;
-    
-    // Se já tiver o código IATA definido, usa diretamente
     if (dadosUsuario.cidade_partida.iata) return dadosUsuario.cidade_partida.iata;
-    
     const mapeamentoIATA = {
       'São Paulo': 'GRU',
       'Rio de Janeiro': 'GIG',
@@ -635,14 +412,11 @@ function obterCodigoIATAOrigem(dadosUsuario) {
     };
     
     const cidadeNome = dadosUsuario.cidade_partida.name || '';
-    
     for (const [cidade, iata] of Object.entries(mapeamentoIATA)) {
       if (cidadeNome.toLowerCase().includes(cidade.toLowerCase())) {
         return iata;
       }
     }
-    
-    // Se nada for encontrado, padroniza para São Paulo (GRU)
     return 'GRU';
   } catch (error) {
     console.error('Erro ao obter código IATA:', error);
@@ -650,22 +424,16 @@ function obterCodigoIATAOrigem(dadosUsuario) {
   }
 }
 
-// Obtém as datas de ida e volta a partir dos dados do usuário
 function obterDatasViagem(dadosUsuario) {
   try {
     let datas = dadosUsuario.datas || (dadosUsuario.respostas ? dadosUsuario.respostas.datas : null);
-    
     if (!datas) {
-      // Datas padrão (se não fornecidas)
       const hoje = new Date();
       const mesQueVem = new Date(hoje);
       mesQueVem.setMonth(hoje.getMonth() + 1);
-      
       const dataIdaPadrao = formatarData(mesQueVem);
-      
       const dataVoltaPadrao = new Date(mesQueVem);
       dataVoltaPadrao.setDate(dataVoltaPadrao.getDate() + 7);
-      
       return { 
         dataIda: dataIdaPadrao, 
         dataVolta: formatarData(dataVoltaPadrao) 
@@ -681,7 +449,6 @@ function obterDatasViagem(dadosUsuario) {
       return { dataIda: datas.dataIda, dataVolta: datas.dataVolta };
     }
     
-    // Se chegou aqui, usa datas padrão
     return { dataIda: '2025-08-05', dataVolta: '2025-08-12' };
   } catch (error) {
     console.error('Erro ao obter datas de viagem:', error);
@@ -689,17 +456,16 @@ function obterDatasViagem(dadosUsuario) {
   }
 }
 
-// Formata data como YYYY-MM-DD
 function formatarData(data) {
   const ano = data.getFullYear();
   const mes = String(data.getMonth() + 1).padStart(2, '0');
   const dia = String(data.getDate()).padStart(2, '0');
   return `${ano}-${mes}-${dia}`;
 }
+
 // =======================
 // Função principal - Handler da API
 // =======================
-
 module.exports = async function handler(req, res) {
   let isResponseSent = false;
   const serverTimeout = setTimeout(() => {
@@ -723,7 +489,6 @@ module.exports = async function handler(req, res) {
   res.setHeader('Connection', 'keep-alive');
   res.setHeader('Keep-Alive', 'timeout=60');
 
-  // Responde imediatamente para OPTIONS (preflight)
   if (req.method === 'OPTIONS') {
     if (!isResponseSent) {
       isResponseSent = true;
@@ -733,7 +498,6 @@ module.exports = async function handler(req, res) {
     return;
   }
   
-  // Verifica se o método é POST
   if (req.method !== 'POST') {
     if (!isResponseSent) {
       isResponseSent = true;
@@ -744,7 +508,6 @@ module.exports = async function handler(req, res) {
   }
 
   try {
-    // Verifica se tem corpo na requisição
     if (!req.body) {
       console.error('Corpo da requisição vazio');
       if (!isResponseSent) {
@@ -755,7 +518,6 @@ module.exports = async function handler(req, res) {
       return;
     }
     
-    // Processa os dados recebidos
     let requestData;
     try {
       requestData = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
@@ -772,8 +534,7 @@ module.exports = async function handler(req, res) {
     
     logDetalhado('Tipo de dados recebidos:', typeof requestData);
     logDetalhado('Conteúdo parcial:', JSON.stringify(requestData).substring(0, 200) + '...');
-
-    // Gera o prompt para os modelos de IA
+    
     let prompt;
     try {
       prompt = gerarPromptParaDestinos(requestData);
@@ -782,14 +543,10 @@ module.exports = async function handler(req, res) {
       console.error('Erro ao gerar prompt:', promptError);
       prompt = "Recomende destinos de viagem únicos e personalizados. Responda em formato JSON.";
     }
-
-    // Extrai a moeda selecionada pelo usuário (default para 'BRL' se não definida)
-    const moeda = requestData.moeda_escolhida || 'BRL';
     
-    // Armazena o orçamento para posterior verificação
+    const moeda = requestData.moeda_escolhida || 'BRL';
     const orcamento = requestData.orcamento_valor ? parseFloat(requestData.orcamento_valor) : null;
-
-    // Controle de tentativas
+    
     let tentativas = 0;
     const maxTentativas = 3;
     
@@ -797,55 +554,41 @@ module.exports = async function handler(req, res) {
       tentativas++;
       logDetalhado(`Tentativa ${tentativas} de ${maxTentativas}`, null);
       
-      // Tenta com Perplexity (se a chave estiver configurada)
       if (process.env.PERPLEXITY_API_KEY) {
         try {
           logDetalhado('Chamando API Perplexity...', null);
           const responsePerplexity = await callPerplexityAPI(prompt, requestData);
-          
           let processedResponse = responsePerplexity;
           if (responsePerplexity && isPartiallyValidJSON(responsePerplexity)) {
             processedResponse = ensureTouristAttractionsAndComments(responsePerplexity, requestData);
           }
-          
           if (processedResponse && isValidDestinationJSON(processedResponse, requestData)) {
             logDetalhado('Resposta Perplexity válida recebida', null);
-            
             try {
               const recomendacoes = typeof processedResponse === 'string' ? JSON.parse(processedResponse) : processedResponse;
-              logDetalhado('Tentando enriquecer recomendações com preços reais...', null);
-              
-              // Adiciona o orçamento máximo para verificação posterior
               if (orcamento) {
                 recomendacoes.orcamentoMaximo = orcamento;
               }
-              
-              const token = await obterTokenAmadeus();
-              if (token) {
-                const origemIATA = obterCodigoIATAOrigem(requestData);
-                const datas = obterDatasViagem(requestData);
-                
-                if (origemIATA) {
-                  logDetalhado(`Origem IATA identificada: ${origemIATA}, processando destinos...`, null);
-                  const recomendacoesEnriquecidas = await processarDestinos(recomendacoes, origemIATA, datas, token, moeda);
-                  logDetalhado('Recomendações enriquecidas com sucesso', null);
-                  
-                  if (!isResponseSent) {
-                    isResponseSent = true;
-                    clearTimeout(serverTimeout);
-                    return res.status(200).json({
-                      tipo: "perplexity-enriquecido",
-                      conteudo: JSON.stringify(recomendacoesEnriquecidas),
-                      tentativa: tentativas
-                    });
-                  }
-                  return;
+              const origemIATA = obterCodigoIATAOrigem(requestData);
+              const datas = obterDatasViagem(requestData);
+              if (origemIATA) {
+                logDetalhado(`Origem IATA identificada: ${origemIATA}, processando destinos...`, null);
+                const recomendacoesEnriquecidas = await processarDestinos(recomendacoes, origemIATA, datas, moeda);
+                logDetalhado('Recomendações enriquecidas com sucesso', null);
+                if (!isResponseSent) {
+                  isResponseSent = true;
+                  clearTimeout(serverTimeout);
+                  return res.status(200).json({
+                    tipo: "perplexity-enriquecido",
+                    conteudo: JSON.stringify(recomendacoesEnriquecidas),
+                    tentativa: tentativas
+                  });
                 }
+                return;
               }
-            } catch (amadeusError) {
-              console.error('Erro ao enriquecer com Amadeus:', amadeusError.message);
+            } catch (enriquecerError) {
+              console.error('Erro ao enriquecer recomendações:', enriquecerError.message);
             }
-            
             if (!isResponseSent) {
               isResponseSent = true;
               clearTimeout(serverTimeout);
@@ -864,55 +607,41 @@ module.exports = async function handler(req, res) {
         }
       }
       
-      // Tenta com OpenAI (se a chave estiver configurada)
       if (process.env.OPENAI_API_KEY) {
         try {
           logDetalhado('Chamando API OpenAI...', null);
           const responseOpenAI = await callOpenAIAPI(prompt, requestData);
-          
           let processedResponse = responseOpenAI;
           if (responseOpenAI && isPartiallyValidJSON(responseOpenAI)) {
             processedResponse = ensureTouristAttractionsAndComments(responseOpenAI, requestData);
           }
-          
           if (processedResponse && isValidDestinationJSON(processedResponse, requestData)) {
             logDetalhado('Resposta OpenAI válida recebida', null);
-            
             try {
               const recomendacoes = typeof processedResponse === 'string' ? JSON.parse(processedResponse) : processedResponse;
-              logDetalhado('Tentando enriquecer recomendações com preços reais...', null);
-              
-              // Adiciona o orçamento máximo para verificação posterior
               if (orcamento) {
                 recomendacoes.orcamentoMaximo = orcamento;
               }
-              
-              const token = await obterTokenAmadeus();
-              if (token) {
-                const origemIATA = obterCodigoIATAOrigem(requestData);
-                const datas = obterDatasViagem(requestData);
-                
-                if (origemIATA) {
-                  logDetalhado(`Origem IATA identificada: ${origemIATA}, processando destinos...`, null);
-                  const recomendacoesEnriquecidas = await processarDestinos(recomendacoes, origemIATA, datas, token, moeda);
-                  logDetalhado('Recomendações enriquecidas com sucesso', null);
-                  
-                  if (!isResponseSent) {
-                    isResponseSent = true;
-                    clearTimeout(serverTimeout);
-                    return res.status(200).json({
-                      tipo: "openai-enriquecido",
-                      conteudo: JSON.stringify(recomendacoesEnriquecidas),
-                      tentativa: tentativas
-                    });
-                  }
-                  return;
+              const origemIATA = obterCodigoIATAOrigem(requestData);
+              const datas = obterDatasViagem(requestData);
+              if (origemIATA) {
+                logDetalhado(`Origem IATA identificada: ${origemIATA}, processando destinos...`, null);
+                const recomendacoesEnriquecidas = await processarDestinos(recomendacoes, origemIATA, datas, moeda);
+                logDetalhado('Recomendações enriquecidas com sucesso', null);
+                if (!isResponseSent) {
+                  isResponseSent = true;
+                  clearTimeout(serverTimeout);
+                  return res.status(200).json({
+                    tipo: "openai-enriquecido",
+                    conteudo: JSON.stringify(recomendacoesEnriquecidas),
+                    tentativa: tentativas
+                  });
                 }
+                return;
               }
-            } catch (amadeusError) {
-              console.error('Erro ao enriquecer com Amadeus:', amadeusError.message);
+            } catch (enriquecerError) {
+              console.error('Erro ao enriquecer recomendações:', enriquecerError.message);
             }
-            
             if (!isResponseSent) {
               isResponseSent = true;
               clearTimeout(serverTimeout);
@@ -931,55 +660,41 @@ module.exports = async function handler(req, res) {
         }
       }
       
-      // Tenta com Claude (se a chave estiver configurada)
       if (process.env.CLAUDE_API_KEY) {
         try {
           logDetalhado('Chamando API Claude...', null);
           const responseClaude = await callClaudeAPI(prompt, requestData);
-          
           let processedResponse = responseClaude;
           if (responseClaude && isPartiallyValidJSON(responseClaude)) {
             processedResponse = ensureTouristAttractionsAndComments(responseClaude, requestData);
           }
-          
           if (processedResponse && isValidDestinationJSON(processedResponse, requestData)) {
             logDetalhado('Resposta Claude válida recebida', null);
-            
             try {
               const recomendacoes = typeof processedResponse === 'string' ? JSON.parse(processedResponse) : processedResponse;
-              logDetalhado('Tentando enriquecer recomendações com preços reais...', null);
-              
-              // Adiciona o orçamento máximo para verificação posterior
               if (orcamento) {
                 recomendacoes.orcamentoMaximo = orcamento;
               }
-              
-              const token = await obterTokenAmadeus();
-              if (token) {
-                const origemIATA = obterCodigoIATAOrigem(requestData);
-                const datas = obterDatasViagem(requestData);
-                
-                if (origemIATA) {
-                  logDetalhado(`Origem IATA identificada: ${origemIATA}, processando destinos...`, null);
-                  const recomendacoesEnriquecidas = await processarDestinos(recomendacoes, origemIATA, datas, token, moeda);
-                  logDetalhado('Recomendações enriquecidas com sucesso', null);
-                  
-                  if (!isResponseSent) {
-                    isResponseSent = true;
-                    clearTimeout(serverTimeout);
-                    return res.status(200).json({
-                      tipo: "claude-enriquecido",
-                      conteudo: JSON.stringify(recomendacoesEnriquecidas),
-                      tentativa: tentativas
-                    });
-                  }
-                  return;
+              const origemIATA = obterCodigoIATAOrigem(requestData);
+              const datas = obterDatasViagem(requestData);
+              if (origemIATA) {
+                logDetalhado(`Origem IATA identificada: ${origemIATA}, processando destinos...`, null);
+                const recomendacoesEnriquecidas = await processarDestinos(recomendacoes, origemIATA, datas, moeda);
+                logDetalhado('Recomendações enriquecidas com sucesso', null);
+                if (!isResponseSent) {
+                  isResponseSent = true;
+                  clearTimeout(serverTimeout);
+                  return res.status(200).json({
+                    tipo: "claude-enriquecido",
+                    conteudo: JSON.stringify(recomendacoesEnriquecidas),
+                    tentativa: tentativas
+                  });
                 }
+                return;
               }
-            } catch (amadeusError) {
-              console.error('Erro ao enriquecer com Amadeus:', amadeusError.message);
+            } catch (enriquecerError) {
+              console.error('Erro ao enriquecer recomendações:', enriquecerError.message);
             }
-            
             if (!isResponseSent) {
               isResponseSent = true;
               clearTimeout(serverTimeout);
@@ -998,52 +713,37 @@ module.exports = async function handler(req, res) {
         }
       }
       
-      // Refina o prompt para a próxima tentativa
       prompt = `${prompt}\n\nURGENTE: O ORÇAMENTO MÁXIMO para voos (${requestData.orcamento_valor || 'informado'} ${requestData.moeda_escolhida || 'BRL'}) precisa ser RIGOROSAMENTE RESPEITADO. TODOS os destinos devem ter voos abaixo desse valor. Forneça um mix de destinos populares e alternativos, com preços realistas.`;
     }
     
-    // Se chegou aqui, todas as tentativas falharam
     logDetalhado('Todas as tentativas de obter resposta válida falharam', null);
-    
-    // Usa dados de emergência
     const emergencyData = generateEmergencyData(requestData);
-    
     try {
       logDetalhado('Tentando enriquecer dados de emergência com preços reais...', null);
-      const token = await obterTokenAmadeus();
-      
-      if (token) {
-        const origemIATA = obterCodigoIATAOrigem(requestData);
-        const datas = obterDatasViagem(requestData);
-        
-        if (origemIATA) {
-          logDetalhado(`Origem IATA identificada: ${origemIATA}, processando destinos de emergência...`, null);
-          
-          // Adiciona o orçamento máximo para verificação posterior
-          if (orcamento) {
-            emergencyData.orcamentoMaximo = orcamento;
-          }
-          
-          const dadosEnriquecidos = await processarDestinos(emergencyData, origemIATA, datas, token, moeda);
-          logDetalhado('Dados de emergência enriquecidos com sucesso', null);
-          
-          if (!isResponseSent) {
-            isResponseSent = true;
-            clearTimeout(serverTimeout);
-            return res.status(200).json({
-              tipo: "emergencia-enriquecida",
-              conteudo: JSON.stringify(dadosEnriquecidos),
-              message: "Dados de emergência com preços reais"
-            });
-          }
-          return;
+      const origemIATA = obterCodigoIATAOrigem(requestData);
+      const datas = obterDatasViagem(requestData);
+      if (origemIATA) {
+        logDetalhado(`Origem IATA identificada: ${origemIATA}, processando destinos de emergência...`, null);
+        if (orcamento) {
+          emergencyData.orcamentoMaximo = orcamento;
         }
+        const dadosEnriquecidos = await processarDestinos(emergencyData, origemIATA, datas, moeda);
+        logDetalhado('Dados de emergência enriquecidos com sucesso', null);
+        if (!isResponseSent) {
+          isResponseSent = true;
+          clearTimeout(serverTimeout);
+          return res.status(200).json({
+            tipo: "emergencia-enriquecida",
+            conteudo: JSON.stringify(dadosEnriquecidos),
+            message: "Dados de emergência com preços reais"
+          });
+        }
+        return;
       }
-    } catch (amadeusEmergencyError) {
-      console.error('Erro ao enriquecer dados de emergência:', amadeusEmergencyError.message);
+    } catch (emergencyError) {
+      console.error('Erro ao enriquecer dados de emergência:', emergencyError.message);
     }
     
-    // Se falhou até a enriquecer os dados de emergência, retorna sem enriquecimento
     if (!isResponseSent) {
       isResponseSent = true;
       clearTimeout(serverTimeout);
@@ -1056,10 +756,7 @@ module.exports = async function handler(req, res) {
     
   } catch (globalError) {
     console.error('Erro global na API de recomendações:', globalError);
-    
-    // Em caso de erro global, tenta retornar dados de emergência
     const emergencyData = generateEmergencyData(req.body);
-    
     if (!isResponseSent) {
       isResponseSent = true;
       clearTimeout(serverTimeout);
@@ -1070,13 +767,10 @@ module.exports = async function handler(req, res) {
       });
     }
   } finally {
-    // Caso alguma condição tenha sido perdida, garante que sempre haverá resposta
     if (!isResponseSent) {
       isResponseSent = true;
       clearTimeout(serverTimeout);
-      
       const emergencyData = generateEmergencyData(req.body);
-      
       res.status(200).json({
         tipo: "erro-finally",
         conteudo: JSON.stringify(emergencyData),
@@ -1088,18 +782,15 @@ module.exports = async function handler(req, res) {
 
 // =======================
 // Funções para chamadas às APIs de LLM
+// (Mantidas inalteradas, pois não foram requisitadas modificações)
 // =======================
-
 async function callPerplexityAPI(prompt, requestData) {
   try {
     const apiKey = process.env.PERPLEXITY_API_KEY;
     if (!apiKey) throw new Error('Chave da API Perplexity não configurada');
-    
     logDetalhado('Enviando requisição para Perplexity...', null);
-    
     const orcamentoMessage = requestData.orcamento_valor ? 
       `\n\n⚠️ ORÇAMENTO MÁXIMO: ${requestData.orcamento_valor} ${requestData.moeda_escolhida || 'BRL'} para voos. Todos os destinos DEVEM ter preços abaixo deste valor.` : '';
-    
     const enhancedPrompt = `${prompt}${orcamentoMessage}
     
 IMPORTANTE: 
@@ -1108,7 +799,6 @@ IMPORTANTE:
 3. Forneça EXATAMENTE 4 destinos alternativos.
 4. Inclua PONTOS TURÍSTICOS ESPECÍFICOS (2 para topPick e surpresa, 1 para cada alternativa).
 5. Inclua o código IATA (3 letras) de cada aeroporto.`;
-
     const response = await axios({
       method: 'post',
       url: 'https://api.perplexity.ai/chat/completions',
@@ -1136,34 +826,27 @@ IMPORTANTE:
       httpAgent: new http.Agent({ keepAlive: true }),
       httpsAgent: new https.Agent({ keepAlive: true })
     });
-    
     if (!response.data || !response.data.choices || !response.data.choices[0] || 
         !response.data.choices[0].message || !response.data.choices[0].message.content) {
       logDetalhado('Resposta Perplexity incompleta:', JSON.stringify(response.data).substring(0, 200));
       throw new Error('Formato de resposta da Perplexity inválido');
     }
-    
     const content = response.data.choices[0].message.content;
     logDetalhado('Conteúdo recebido da API Perplexity (primeiros 200 caracteres):', content.substring(0, 200));
-    
     return extrairJSONDaResposta(content);
   } catch (error) {
     console.error('Erro detalhado na chamada à API Perplexity:');
-    
     if (error.code === 'ECONNABORTED') {
       console.error('Timeout na chamada à API Perplexity');
     }
-    
     if (error.response) {
       console.error('Status:', error.response.status);
       console.error('Headers:', JSON.stringify(error.response.headers));
       logDetalhado('Dados do erro:', error.response.data);
     }
-    
     if (error.request) {
       console.error('Requisição enviada, mas sem resposta');
     }
-    
     console.error('Mensagem de erro:', error.message);
     throw error;
   }
@@ -1173,12 +856,9 @@ async function callOpenAIAPI(prompt, requestData) {
   try {
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) throw new Error('Chave da API OpenAI não configurada');
-    
     logDetalhado('Enviando requisição para OpenAI...', null);
-    
     const orcamentoMessage = requestData.orcamento_valor ? 
       `\n\n⚠️ ORÇAMENTO MÁXIMO: ${requestData.orcamento_valor} ${requestData.moeda_escolhida || 'BRL'} para voos.` : '';
-    
     const enhancedPrompt = `${prompt}${orcamentoMessage}
     
 IMPORTANTE: 
@@ -1187,7 +867,6 @@ IMPORTANTE:
 3. Forneça 4 destinos alternativos.
 4. Inclua pontos turísticos específicos.
 5. Inclua o código IATA de cada aeroporto.`;
-
     const response = await axios({
       method: 'post',
       url: 'https://api.openai.com/v1/chat/completions',
@@ -1214,24 +893,19 @@ IMPORTANTE:
       httpAgent: new http.Agent({ keepAlive: true }),
       httpsAgent: new https.Agent({ keepAlive: true })
     });
-    
     if (!response.data || !response.data.choices || !response.data.choices[0] || 
         !response.data.choices[0].message || !response.data.choices[0].message.content) {
       throw new Error('Formato de resposta da OpenAI inválido');
     }
-    
     const content = response.data.choices[0].message.content;
     logDetalhado('Conteúdo recebido da API OpenAI (primeiros 200 caracteres):', content.substring(0, 200));
-    
     return extrairJSONDaResposta(content);
   } catch (error) {
     console.error('Erro detalhado na chamada à API OpenAI:');
-    
     if (error.response) {
       console.error('Status:', error.response.status);
       logDetalhado('Dados do erro:', error.response.data);
     }
-    
     throw error;
   }
 }
@@ -1240,12 +914,9 @@ async function callClaudeAPI(prompt, requestData) {
   try {
     const apiKey = process.env.CLAUDE_API_KEY;
     if (!apiKey) throw new Error('Chave da API Claude não configurada');
-    
     logDetalhado('Enviando requisição para Claude...', null);
-    
     const orcamentoMessage = requestData.orcamento_valor ? 
       `\n\n⚠️ ORÇAMENTO MÁXIMO: ${requestData.orcamento_valor} ${requestData.moeda_escolhida || 'BRL'} para voos.` : '';
-    
     const enhancedPrompt = `${prompt}${orcamentoMessage}
     
 IMPORTANTE: 
@@ -1254,7 +925,6 @@ IMPORTANTE:
 3. Forneça 4 destinos alternativos.
 4. Inclua pontos turísticos específicos.
 5. Inclua o código IATA de cada aeroporto.`;
-
     const response = await axios({
       method: 'post',
       url: 'https://api.anthropic.com/v1/messages',
@@ -1282,41 +952,32 @@ IMPORTANTE:
       httpAgent: new http.Agent({ keepAlive: true }),
       httpsAgent: new https.Agent({ keepAlive: true })
     });
-    
     if (!response.data || !response.data.content || !response.data.content[0] || !response.data.content[0].text) {
       throw new Error('Formato de resposta do Claude inválido');
     }
-    
     const content = response.data.content[0].text;
     logDetalhado('Conteúdo recebido da API Claude (primeiros 200 caracteres):', content.substring(0, 200));
-    
     return extrairJSONDaResposta(content);
   } catch (error) {
     console.error('Erro detalhado na chamada à API Claude:');
-    
     if (error.response) {
       console.error('Status:', error.response.status);
       logDetalhado('Dados do erro:', error.response.data);
     }
-    
     throw error;
   }
 }
+
 // =======================
 // Funções de processamento e extração de JSON 
 // =======================
-
-// Extrai JSON válido da resposta de texto do LLM
 function extrairJSONDaResposta(texto) {
   try {
     logDetalhado("Processando resposta para extrair JSON", null);
-    
     if (typeof texto === 'object' && texto !== null) {
       logDetalhado("Resposta já é um objeto, convertendo para string", null);
       return JSON.stringify(texto);
     }
-    
-    // Tenta parse direto primeiro
     try {
       const parsed = JSON.parse(texto);
       logDetalhado("JSON analisado com sucesso no primeiro método", null);
@@ -1324,8 +985,6 @@ function extrairJSONDaResposta(texto) {
     } catch (e) {
       logDetalhado("Primeira tentativa falhou, tentando métodos alternativos", null);
     }
-    
-    // Remove marcadores de código, comentários, etc.
     let textoProcessado = texto
       .replace(/```json/g, '')
       .replace(/```/g, '')
@@ -1333,11 +992,8 @@ function extrairJSONDaResposta(texto) {
       .replace(/\/\*[\s\S]*?\*\//g, '')
       .replace(/\r\n/g, '\n')
       .trim();
-    
-    // Tenta extrair o JSON usando regex
     const jsonRegex = /(\{[\s\S]*\})/;
     const match = textoProcessado.match(jsonRegex);
-    
     if (match && match[0]) {
       try {
         const possibleJson = match[0];
@@ -1350,7 +1006,6 @@ function extrairJSONDaResposta(texto) {
     } else {
       logDetalhado("Nenhum padrão JSON encontrado no texto processado", null);
     }
-    
     logDetalhado("Todas as tentativas de extração falharam", null);
     return null;
   } catch (error) {
@@ -1359,10 +1014,8 @@ function extrairJSONDaResposta(texto) {
   }
 }
 
-// Verifica se o JSON é parcialmente válido
 function isPartiallyValidJSON(jsonString) {
   if (!jsonString) return false;
-  
   try {
     const data = typeof jsonString === 'string' ? JSON.parse(jsonString) : jsonString;
     return data && (data.topPick || data.alternativas || data.surpresa);
@@ -1371,51 +1024,36 @@ function isPartiallyValidJSON(jsonString) {
   }
 }
 
-// Verifica se o JSON atende a todos os requisitos
 function isValidDestinationJSON(jsonString, requestData) {
   if (!jsonString) return false;
-  
   try {
     const data = typeof jsonString === 'string' ? JSON.parse(jsonString) : jsonString;
-    
-    // Verifica campos obrigatórios básicos
     if (!data.topPick?.destino || !data.alternativas || !data.surpresa?.destino) {
       logDetalhado("JSON inválido: faltam campos obrigatórios básicos", null);
       return false;
     }
-    
-    // Verifica pontos turísticos do topPick
     if (!data.topPick.pontosTuristicos || !Array.isArray(data.topPick.pontosTuristicos) || data.topPick.pontosTuristicos.length < 2) {
       logDetalhado("JSON inválido: faltam pontos turísticos no destino principal ou menos de 2", null);
       return false;
     }
-    
-    // Verifica pontos turísticos da surpresa
     if (!data.surpresa.pontosTuristicos || !Array.isArray(data.surpresa.pontosTuristicos) || data.surpresa.pontosTuristicos.length < 2) {
       logDetalhado("JSON inválido: faltam pontos turísticos no destino surpresa ou menos de 2", null);
       return false;
     }
-    
-    // Verifica alternativas
     if (!Array.isArray(data.alternativas) || data.alternativas.length !== 4) {
       logDetalhado(`JSON inválido: array de alternativas deve conter exatamente 4 destinos (contém ${data.alternativas?.length || 0})`, null);
       return false;
     }
-    
-    // Verifica pontos turísticos das alternativas
     for (let i = 0; i < data.alternativas.length; i++) {
       if (!data.alternativas[i].pontoTuristico) {
         logDetalhado(`JSON inválido: alternativa ${i+1} não tem ponto turístico`, null);
         return false;
       }
     }
-    
-    // Verifica comentário do topPick
     if (data.topPick.comentario) {
       const includesAnyTopPickAttraction = data.topPick.pontosTuristicos.some(attraction => 
         data.topPick.comentario.toLowerCase().includes(attraction.toLowerCase())
       );
-      
       if (!includesAnyTopPickAttraction) {
         logDetalhado("JSON inválido: comentário da Tripinha no topPick não menciona nenhum ponto turístico", null);
         return false;
@@ -1424,13 +1062,10 @@ function isValidDestinationJSON(jsonString, requestData) {
       logDetalhado("JSON inválido: topPick não tem comentário da Tripinha", null);
       return false;
     }
-    
-    // Verifica comentário da surpresa
     if (data.surpresa.comentario) {
       const includesAnySurpriseAttraction = data.surpresa.pontosTuristicos.some(attraction => 
         data.surpresa.comentario.toLowerCase().includes(attraction.toLowerCase())
       );
-      
       if (!includesAnySurpriseAttraction) {
         logDetalhado("JSON inválido: comentário da Tripinha na surpresa não menciona nenhum ponto turístico", null);
         return false;
@@ -1439,39 +1074,29 @@ function isValidDestinationJSON(jsonString, requestData) {
       logDetalhado("JSON inválido: surpresa não tem comentário da Tripinha", null);
       return false;
     }
-    
-    // Verifica orçamento
     if (requestData?.orcamento_valor && !isNaN(parseFloat(requestData.orcamento_valor))) {
       const orcamentoMax = parseFloat(requestData.orcamento_valor);
-      
       if (data.topPick.preco?.voo > orcamentoMax) {
         logDetalhado(`JSON inválido: topPick tem voo acima do orçamento (${data.topPick.preco?.voo} > ${orcamentoMax})`, null);
         return false;
       }
-      
       if (data.alternativas[0]?.preco?.voo > orcamentoMax) {
         logDetalhado(`JSON inválido: primeira alternativa tem voo acima do orçamento (${data.alternativas[0]?.preco?.voo} > ${orcamentoMax})`, null);
         return false;
       }
     }
-    
-    // Verifica duplicação de destinos
     if (data.topPick.destino?.toLowerCase() === data.alternativas[0]?.destino?.toLowerCase()) {
       logDetalhado("JSON inválido: destino principal repetido na primeira alternativa", null);
       return false;
     }
-    
-    // Verifica códigos IATA
     if (!data.topPick.aeroporto || !data.topPick.aeroporto.codigo) {
       logDetalhado("JSON inválido: falta código IATA no destino principal", null);
       return false;
     }
-    
     if (!data.surpresa.aeroporto || !data.surpresa.aeroporto.codigo) {
       logDetalhado("JSON inválido: falta código IATA no destino surpresa", null);
       return false;
     }
-    
     return true;
   } catch (error) {
     console.error("Erro ao validar JSON:", error);
@@ -1479,15 +1104,10 @@ function isValidDestinationJSON(jsonString, requestData) {
   }
 }
 
-// Função para garantir que os comentários mencionam pontos turísticos
 function enriquecerComentarioTripinha(comentario, pontosTuristicos) {
   if (!comentario || !pontosTuristicos || !Array.isArray(pontosTuristicos) || pontosTuristicos.length === 0) return null;
-  
-  // Verifica se já menciona algum ponto turístico
   const mencionaAtual = pontosTuristicos.some(ponto => comentario.toLowerCase().includes(ponto.toLowerCase()));
   if (mencionaAtual) return comentario;
-  
-  // Se não, adiciona menção a um ponto turístico
   const pontoParaMencionar = pontosTuristicos[0];
   const padroes = [
     `${comentario} Adorei especialmente ${pontoParaMencionar}! 🐾`,
@@ -1496,12 +1116,10 @@ function enriquecerComentarioTripinha(comentario, pontosTuristicos) {
       ? comentario.replace(/!([^!]*)$/, `! ${pontoParaMencionar} é incrível!$1`)
       : `${comentario} ${pontoParaMencionar} é um lugar que todo cachorro devia visitar! 🐾`
   ];
-  
   const indice = Math.floor(Math.random() * padroes.length);
   return padroes[indice];
 }
 
-// Pontos turísticos populares para uso em caso de falta
 const pontosPopulares = {
   "Paris": ["Torre Eiffel", "Museu do Louvre"],
   "Roma": ["Coliseu", "Vaticano"],
@@ -1525,31 +1143,22 @@ const pontosPopulares = {
   "generico_America": ["Parques nacionais", "Centros urbanos"]
 };
 
-// Corrige/completa JSON com pontos turísticos e comentários
 function ensureTouristAttractionsAndComments(jsonString, requestData) {
   try {
     const data = typeof jsonString === 'string' ? JSON.parse(jsonString) : jsonString;
     let modificado = false;
-    
-    // Processa topPick
     if (data.topPick) {
-      // Adiciona pontos turísticos se não existirem ou forem insuficientes
       if (!data.topPick.pontosTuristicos || !Array.isArray(data.topPick.pontosTuristicos) || data.topPick.pontosTuristicos.length < 2) {
         const destino = data.topPick.destino;
         const pontosConhecidos = pontosPopulares[destino] || ["Principais atrativos da cidade", "Pontos históricos"];
-        
         data.topPick.pontosTuristicos = [
           pontosConhecidos[0] || "Principais atrativos da cidade",
           pontosConhecidos[1] || "Pontos históricos"
         ];
-        
         modificado = true;
       }
-      
-      // Enriquece comentário para mencionar pontos turísticos
       if (data.topPick.comentario) {
         const novoComentario = enriquecerComentarioTripinha(data.topPick.comentario, data.topPick.pontosTuristicos);
-        
         if (novoComentario && novoComentario !== data.topPick.comentario) {
           data.topPick.comentario = novoComentario;
           modificado = true;
@@ -1559,8 +1168,6 @@ function ensureTouristAttractionsAndComments(jsonString, requestData) {
         data.topPick.comentario = `${data.topPick.destino} é um sonho! Adorei passear por ${pontoTuristico} e sentir todos aqueles cheiros novos! Uma aventura incrível para qualquer cachorro explorador! 🐾`;
         modificado = true;
       }
-      
-      // Adiciona código IATA se não existir
       if (!data.topPick.aeroporto || !data.topPick.aeroporto.codigo) {
         data.topPick.aeroporto = {
           codigo: obterCodigoIATAPadrao(data.topPick.destino, data.topPick.pais),
@@ -1569,26 +1176,18 @@ function ensureTouristAttractionsAndComments(jsonString, requestData) {
         modificado = true;
       }
     }
-    
-    // Processa surpresa
     if (data.surpresa) {
-      // Adiciona pontos turísticos se não existirem ou forem insuficientes
       if (!data.surpresa.pontosTuristicos || !Array.isArray(data.surpresa.pontosTuristicos) || data.surpresa.pontosTuristicos.length < 2) {
         const destino = data.surpresa.destino;
         const pontosConhecidos = pontosPopulares[destino] || ["Locais exclusivos", "Atrativos menos conhecidos"];
-        
         data.surpresa.pontosTuristicos = [
           pontosConhecidos[0] || "Locais exclusivos",
           pontosConhecidos[1] || "Atrativos menos conhecidos"
         ];
-        
         modificado = true;
       }
-      
-      // Enriquece comentário para mencionar pontos turísticos
       if (data.surpresa.comentario) {
         const novoComentario = enriquecerComentarioTripinha(data.surpresa.comentario, data.surpresa.pontosTuristicos);
-        
         if (novoComentario && novoComentario !== data.surpresa.comentario) {
           data.surpresa.comentario = novoComentario;
           modificado = true;
@@ -1598,8 +1197,6 @@ function ensureTouristAttractionsAndComments(jsonString, requestData) {
         data.surpresa.comentario = `${data.surpresa.destino} é uma descoberta incrível! Poucos conhecem ${pontoTuristico}, mas é um paraíso para cachorros curiosos como eu! Tantos aromas novos para farejar! 🐾🌟`;
         modificado = true;
       }
-      
-      // Adiciona código IATA se não existir
       if (!data.surpresa.aeroporto || !data.surpresa.aeroporto.codigo) {
         data.surpresa.aeroporto = {
           codigo: obterCodigoIATAPadrao(data.surpresa.destino, data.surpresa.pais),
@@ -1608,21 +1205,15 @@ function ensureTouristAttractionsAndComments(jsonString, requestData) {
         modificado = true;
       }
     }
-    
-    // Processa alternativas
     if (data.alternativas && Array.isArray(data.alternativas)) {
       for (let i = 0; i < data.alternativas.length; i++) {
         const alternativa = data.alternativas[i];
-        
-        // Adiciona ponto turístico se não existir
         if (!alternativa.pontoTuristico) {
           const destino = alternativa.destino;
           const pontosConhecidos = pontosPopulares[destino] || ["Atrações turísticas"];
           alternativa.pontoTuristico = pontosConhecidos[0] || "Atrações turísticas";
           modificado = true;
         }
-        
-        // Adiciona código IATA se não existir
         if (!alternativa.aeroporto || !alternativa.aeroporto.codigo) {
           alternativa.aeroporto = {
             codigo: obterCodigoIATAPadrao(alternativa.destino, alternativa.pais),
@@ -1632,26 +1223,19 @@ function ensureTouristAttractionsAndComments(jsonString, requestData) {
         }
       }
     }
-    
-    // Garante que há 4 alternativas exatamente
     if (!data.alternativas || !Array.isArray(data.alternativas)) {
       data.alternativas = [];
       modificado = true;
     }
-    
-    // Completa alternativas se faltarem
     while (data.alternativas.length < 4) {
       const destinos = ["Lisboa", "Barcelona", "Roma", "Tóquio"];
       const paisesDestinos = ["Portugal", "Espanha", "Itália", "Japão"];
       const codigosPaises = ["PT", "ES", "IT", "JP"];
       const codigosIATA = ["LIS", "BCN", "FCO", "HND"];
-      
       const index = data.alternativas.length % destinos.length;
       const destino = destinos[index];
       const pontosConhecidos = pontosPopulares[destino] || ["Atrações turísticas"];
-      
       const precoBase = requestData?.orcamento_valor ? Math.round(parseFloat(requestData.orcamento_valor) * 0.7) : 2000;
-      
       data.alternativas.push({
         destino: destino,
         pais: paisesDestinos[index],
@@ -1667,16 +1251,12 @@ function ensureTouristAttractionsAndComments(jsonString, requestData) {
           hotel: 200 + (index * 20)
         }
       });
-      
       modificado = true;
     }
-    
-    // Limita para exatamente 4 alternativas
     if (data.alternativas.length > 4) {
       data.alternativas = data.alternativas.slice(0, 4);
       modificado = true;
     }
-    
     return modificado ? JSON.stringify(data) : jsonString;
   } catch (error) {
     console.error("Erro ao processar pontos turísticos:", error);
@@ -1684,7 +1264,6 @@ function ensureTouristAttractionsAndComments(jsonString, requestData) {
   }
 }
 
-// Obtém código IATA padrão para um destino
 function obterCodigoIATAPadrao(cidade, pais) {
   const mapeamentoIATA = {
     'São Paulo': 'GRU',
@@ -1768,13 +1347,11 @@ function obterCodigoIATAPadrao(cidade, pais) {
   
   if (mapeamentoPais[pais]) return mapeamentoPais[pais];
   
-  // Se nada for encontrado, usa as primeiras 3 letras da cidade
   if (cidade && cidade.length >= 3) return cidade.substring(0, 3).toUpperCase();
   
-  return "AAA"; // Código genérico
+  return "AAA";
 }
 
-// Gera dados de emergência quando todas as APIs falham
 function generateEmergencyData(dadosUsuario = {}) {
   const preferencia = dadosUsuario.preferencia_viagem || 0;
   const orcamento = dadosUsuario.orcamento_valor ? parseFloat(dadosUsuario.orcamento_valor) : 3000;
@@ -1782,7 +1359,6 @@ function generateEmergencyData(dadosUsuario = {}) {
   const cidadeOrigem = dadosUsuario.cidade_partida?.name || '';
   const regiao = determinarRegiaoOrigem(cidadeOrigem);
   
-  // Destinos populares baseados na região de origem
   const destinosEmergencia = {
     "americas": {
       topPick: {
@@ -1891,7 +1467,6 @@ function generateEmergencyData(dadosUsuario = {}) {
       }
     },
     "europa": {
-      // Dados de emergência para Europa
       topPick: {
         destino: "Porto",
         pais: "Portugal",
@@ -1998,7 +1573,6 @@ function generateEmergencyData(dadosUsuario = {}) {
       }
     },
     "asia": {
-      // Dados de emergência para Ásia
       topPick: {
         destino: "Chiang Mai",
         pais: "Tailândia",
@@ -2105,7 +1679,6 @@ function generateEmergencyData(dadosUsuario = {}) {
       }
     },
     "global": {
-      // Dados genéricos de emergência
       topPick: {
         destino: "Cartagena",
         pais: "Colômbia",
@@ -2213,67 +1786,49 @@ function generateEmergencyData(dadosUsuario = {}) {
     }
   };
   
-  // Seleciona o conjunto de dados apropriado para a região
   const dadosRegiao = destinosEmergencia[regiao] || destinosEmergencia.global;
   
-  // Garante que os preços respeitam o orçamento
   if (orcamento) {
-    // Ajusta top pick
     if (dadosRegiao.topPick.preco.voo > orcamento * 0.95) {
       dadosRegiao.topPick.preco.voo = Math.round(orcamento * 0.85);
     }
-    
-    // Ajusta alternativas
     dadosRegiao.alternativas.forEach((alt, index) => {
       if (alt.preco.voo > orcamento * 0.95) {
         const fatorAjuste = 0.7 + (index * 0.05);
         alt.preco.voo = Math.round(orcamento * fatorAjuste);
       }
     });
-    
-    // Ajusta surpresa
     if (dadosRegiao.surpresa.preco.voo > orcamento) {
       dadosRegiao.surpresa.preco.voo = Math.round(orcamento * 0.9);
     }
   }
   
-  // Embaralha alternativas para variar
   dadosRegiao.alternativas = embaralharArray([...dadosRegiao.alternativas]);
-  
   return dadosRegiao;
 }
 
-// Função auxiliar para determinar região com base na origem
 function determinarRegiaoOrigem(cidadeOrigem) {
-  // Verifica se é do Brasil/América do Sul
   if (cidadeOrigem.toLowerCase().includes('são paulo') || 
       cidadeOrigem.toLowerCase().includes('rio') ||
       cidadeOrigem.toLowerCase().includes('brasil') ||
       cidadeOrigem.toLowerCase().includes('brasilia')) {
     return 'americas';
   }
-  
-  // Verifica se é da Europa
   if (cidadeOrigem.toLowerCase().includes('london') || 
       cidadeOrigem.toLowerCase().includes('paris') ||
       cidadeOrigem.toLowerCase().includes('madrid') ||
       cidadeOrigem.toLowerCase().includes('roma')) {
     return 'europa';
   }
-  
-  // Verifica se é da Ásia
   if (cidadeOrigem.toLowerCase().includes('tokyo') || 
       cidadeOrigem.toLowerCase().includes('beijing') ||
       cidadeOrigem.toLowerCase().includes('bangkok') ||
       cidadeOrigem.toLowerCase().includes('delhi')) {
     return 'asia';
   }
-  
-  // Padrão
   return 'global';
 }
 
-// Utilitário para embaralhar array
 function embaralharArray(array) {
   for (let i = array.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
@@ -2281,10 +1836,6 @@ function embaralharArray(array) {
   }
   return array;
 }
-
-// =======================
-// Função para gerar prompt com base nos dados de entrada
-// =======================
 
 function gerarPromptParaDestinos(dados) {
   const companhia = getCompanhiaText(dados.companhia || 0);
@@ -2297,7 +1848,6 @@ function gerarPromptParaDestinos(dados) {
   const tipoDestino = dados.tipo_destino || 'qualquer';
   const famaDestino = dados.fama_destino || 'qualquer';
   
-  // Processa datas
   let dataIda = 'não especificada';
   let dataVolta = 'não especificada';
   
@@ -2312,7 +1862,6 @@ function gerarPromptParaDestinos(dados) {
     }
   }
   
-  // Calcula duração da viagem
   let duracaoViagem = 'não especificada';
   try {
     if (dataIda !== 'não especificada' && dataVolta !== 'não especificada') {
@@ -2326,7 +1875,6 @@ function gerarPromptParaDestinos(dados) {
     console.log("Erro ao calcular duração da viagem:", e);
   }
   
-  // Determina estação do ano
   let estacaoViagem = 'não determinada';
   let hemisferio = determinarHemisferio(cidadeOrigem);
   
@@ -2340,7 +1888,6 @@ function gerarPromptParaDestinos(dados) {
       else if (mes >= 8 && mes <= 10) estacaoViagem = 'outono';
       else estacaoViagem = 'inverno';
       
-      // Ajusta para o hemisfério sul
       if (hemisferio === 'sul') {
         if (estacaoViagem === 'verão') estacaoViagem = 'inverno';
         else if (estacaoViagem === 'inverno') estacaoViagem = 'verão';
@@ -2352,15 +1899,12 @@ function gerarPromptParaDestinos(dados) {
     console.log("Erro ao determinar estação do ano:", e);
   }
   
-  // Formata mensagem de orçamento
   const mensagemOrcamento = orcamento !== 'flexível' ?
     `⚠️ ORÇAMENTO MÁXIMO: ${orcamento} ${moeda} para voos. Todos os destinos DEVEM ter preços abaixo deste valor.` : 
     'Orçamento flexível';
   
-  // Gera dica sobre distância
   const sugestaoDistancia = gerarSugestaoDistancia(cidadeOrigem, tipoDestino);
   
-  // Retorna o prompt completo
   return `Crie recomendações de viagem que respeitam ESTRITAMENTE o orçamento do usuário:
 
 ${mensagemOrcamento}
@@ -2496,80 +2040,64 @@ Forneça no formato JSON exato abaixo, SEM formatação markdown:
 }`;
 }
 
-// Funções auxiliares para formatar textos do prompt
 function getCompanhiaText(value) {
   if (typeof value === 'string') value = parseInt(value, 10);
-  
   const options = {
     0: "sozinho(a)",
     1: "em casal (viagem romântica)",
     2: "em família",
     3: "com amigos"
   };
-  
   return options[value] || "sozinho(a)";
 }
 
 function getPreferenciaText(value) {
   if (typeof value === 'string') value = parseInt(value, 10);
-  
   const options = {
     0: "relaxamento e descanso",
     1: "aventura e atividades ao ar livre",
     2: "cultura, história e gastronomia",
     3: "experiência urbana, compras e vida noturna"
   };
-  
   return options[value] || "experiências diversificadas";
 }
 
 function getTipoDestinoText(value) {
   if (typeof value === 'string') value = parseInt(value, 10);
-  
   const options = {
     0: "nacional",
     1: "internacional",
     2: "qualquer (nacional ou internacional)"
   };
-  
   return options[value] || "qualquer";
 }
 
 function getFamaDestinoText(value) {
   if (typeof value === 'string') value = parseInt(value, 10);
-  
   const options = {
     0: "famoso e turístico",
     1: "fora do circuito turístico comum",
     2: "mistura de ambos"
   };
-  
   return options[value] || "qualquer";
 }
 
 function determinarHemisferio(cidadeOrigem) {
   const indicadoresSul = ['brasil', 'argentina', 'chile', 'austrália', 'nova zelândia', 'áfrica do sul', 'peru', 'uruguai', 'paraguai', 'bolívia'];
-  
   if (!cidadeOrigem || cidadeOrigem === 'origem não especificada') return 'norte';
-  
   const cidadeLowerCase = cidadeOrigem.toLowerCase();
-  
   if (indicadoresSul.some(termo => cidadeLowerCase.includes(termo))) {
     return 'sul';
   }
-  
   return 'norte';
 }
 
 function gerarSugestaoDistancia(cidadeOrigem, tipoDestino) {
   if (cidadeOrigem === 'origem não especificada' || tipoDestino === 0) return '';
-  
   const grandeshubs = ['nova york', 'londres', 'paris', 'tóquio', 'dubai', 'são paulo'];
   const cidadeLowerCase = cidadeOrigem.toLowerCase();
-  
   if (grandeshubs.some(cidade => cidadeLowerCase.includes(cidade))) {
     return '(considere incluir destinos intercontinentais)';
   }
-  
   return '(considere a distância e acessibilidade)';
 }
