@@ -1,7 +1,7 @@
 /**
  * BENETRIP - Animação Interativa de Transição
  * Melhora a experiência de espera entre o chat e os destinos recomendados
- * Versão 1.2 - Com melhor detecção de métodos e fallback manual
+ * Versão 1.3 - Com correções para imagem, progresso e gramática
  */
 
 (function() {
@@ -101,10 +101,49 @@
       
       // Detectar se está em mobile e ajustar a interface se necessário
       this.checkAndApplyMobileOptimizations();
+      
+      // Usar a imagem correta da Tripinha
+      this.checkAndUpdateTripihaImage();
     },
     
-    // Restante dos métodos da animação - não alterados para manter a brevidade
-    // ...
+    /**
+     * Verifica e atualiza a imagem da Tripinha para garantir transparência
+     */
+    checkAndUpdateTripihaImage() {
+      // Lista de possíveis imagens da Tripinha (em ordem de preferência)
+      const possibleImages = [
+        'assets/images/tripinha/avatar-farejando.png',
+        'assets/images/tripinha/avatar-normal.png',
+        'assets/images/tripinha/tripinha.png',
+        'assets/images/tripinha/avatar.png',
+        'assets/images/avatar-tripinha.png',
+        'assets/images/tripinha.png'
+      ];
+      
+      // Testar cada imagem
+      const testImage = (index) => {
+        if (index >= possibleImages.length) return;
+        
+        const img = new Image();
+        img.onload = () => {
+          console.log(`🐾 Imagem encontrada: ${possibleImages[index]}`);
+          // Atualizar a imagem atual
+          const tripihaImage = document.querySelector('.tripinha-character img');
+          if (tripihaImage) {
+            tripihaImage.src = possibleImages[index];
+            
+            // Garantir estilos para transparência
+            tripihaImage.style.objectFit = 'contain';
+            tripihaImage.style.backgroundColor = 'transparent';
+          }
+        };
+        img.onerror = () => testImage(index + 1);
+        img.src = possibleImages[index];
+      };
+      
+      // Iniciar teste de imagens
+      testImage(0);
+    },
 
     /**
      * Gera o HTML para a animação
@@ -150,10 +189,11 @@
             
             <!-- Tripinha se movendo pelo mapa -->
             <div class="tripinha-character absolute w-12 h-12 transform -translate-x-1/2 -translate-y-1/2 transition-all duration-1000 ease-in-out"
-                 style="left: 50%; top: 50%;">
-              <img src="assets/images/tripinha/avatar-farejando.png" 
+                 style="left: 50%; top: 50%; background-color: transparent;">
+              <img src="assets/images/tripinha/avatar-normal.png" 
                    alt="Tripinha farejando" 
                    class="w-full h-full object-contain"
+                   style="background-color: transparent;"
                    onerror="this.onerror=null; this.src='https://placehold.co/48x48?text=🐕'">
               
               <!-- Balão de fala (inicialmente escondido) -->
@@ -296,11 +336,16 @@
           position: absolute;
           transition: all 1s cubic-bezier(0.68, -0.55, 0.27, 1.55);
           z-index: 10;
+          background-color: transparent !important;
         }
         
         /* Animação para a Tripinha "farejando" */
         .tripinha-character img {
           animation: sniff 1s infinite alternate;
+          object-fit: contain !important;
+          background-color: transparent !important;
+          image-rendering: -webkit-optimize-contrast;
+          image-rendering: crisp-edges;
         }
         
         @keyframes sniff {
@@ -706,18 +751,25 @@
 
     /**
      * Incrementa o contador de destinos descobertos
+     * Corrigido para usar forma singular quando count=1
      */
     incrementDiscoveredDestinations() {
       this.state.discoveredCount = Math.min(this.state.discoveredCount + 1, 30);
       
       const counterElement = document.querySelector('.destinations-counter');
       if (counterElement) {
-        counterElement.textContent = `${this.state.discoveredCount} destinos explorados`;
+        // Usar forma singular quando count=1
+        const text = this.state.discoveredCount === 1 
+          ? "1 destino explorado" 
+          : `${this.state.discoveredCount} destinos explorados`;
+        
+        counterElement.textContent = text;
       }
     },
 
     /**
      * Atualiza o progresso da animação
+     * Melhorado para garantir que a barra de progresso funcione corretamente
      * @param {number} progress - Valor do progresso (0-100)
      * @param {string} message - Mensagem de status opcional
      */
@@ -730,7 +782,19 @@
       const progressPercentage = document.querySelector('.progress-percentage');
       
       if (progressBar) {
+        // Forçar a largura diretamente no elemento
         progressBar.style.width = `${progress}%`;
+        
+        // Verificar se a largura realmente mudou
+        console.log(`🐾 Atualizando barra de progresso para ${progress}%`);
+        
+        // Para browsers que podem estar ignorando a transição, forçar um repaint
+        setTimeout(() => {
+          progressBar.style.transition = 'none';
+          progressBar.offsetHeight; // Força um repaint
+          progressBar.style.transition = 'width 0.5s ease-out';
+          progressBar.style.width = `${progress}%`;
+        }, 10);
       }
       
       if (progressPercentage) {
@@ -997,7 +1061,6 @@
   console.log('🐾 Animação de transição inicializada com sucesso!');
 
   // Ativar manualmente em 3 segundos se nada acontecer (apenas para debug/demonstração)
-  // Remova esta parte quando estiver funcionando corretamente
   setTimeout(function() {
     const showDebugButton = function() {
       // Verificar se já existe um botão de debug
