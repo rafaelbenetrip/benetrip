@@ -113,7 +113,7 @@
       // Lista de possíveis imagens da Tripinha (em ordem de preferência)
       const possibleImages = [
         'assets/images/tripinha/avatar-farejando.png',
-        'assets/images/tripinha/avatar-normal.png',
+        'assets/images/tripinha/avatar-farejando.png',
         'assets/images/tripinha/tripinha.png',
         'assets/images/tripinha/avatar.png',
         'assets/images/avatar-tripinha.png',
@@ -190,7 +190,7 @@
             <!-- Tripinha se movendo pelo mapa -->
             <div class="tripinha-character absolute w-12 h-12 transform -translate-x-1/2 -translate-y-1/2 transition-all duration-1000 ease-in-out"
                  style="left: 50%; top: 50%; background-color: transparent;">
-              <img src="assets/images/tripinha/avatar-normal.png" 
+              <img src="assets/images/tripinha/avatar-farejando.png" 
                    alt="Tripinha farejando" 
                    class="w-full h-full object-contain"
                    style="background-color: transparent;"
