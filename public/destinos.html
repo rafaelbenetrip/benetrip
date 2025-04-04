@@ -10,6 +10,51 @@
     <link rel="stylesheet" href="assets/css/mobile-optimizations.css">
     <link rel="stylesheet" href="assets/css/destinos.css">
     <link rel="stylesheet" href="assets/css/image-credits.css">
+    <style>
+      /* Estilos para o sistema de abas */
+      .aba-ativa {
+        color: #E87722;
+        border-bottom: 2px solid #E87722;
+        font-weight: 600;
+      }
+      
+      .aba-inativa {
+        color: #6B7280;
+        border-bottom: 2px solid transparent;
+      }
+      
+      /* Animações e transições */
+      .transition-all {
+        transition-property: all;
+        transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+        transition-duration: 300ms;
+      }
+      
+      .scale-95 {
+        transform: scale(0.95);
+      }
+      
+      .scale-100 {
+        transform: scale(1);
+      }
+      
+      .opacity-0 {
+        opacity: 0;
+      }
+      
+      /* Layout responsivo adaptativo */
+      @media (min-width: 480px) {
+        #destinos-alternativos .grid {
+          grid-template-columns: repeat(2, 1fr);
+        }
+      }
+      
+      @media (max-width: 479px) {
+        #destinos-alternativos .grid {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
 </head>
 <body class="mobile-optimized">
     <!-- Barra de status estilo app -->
