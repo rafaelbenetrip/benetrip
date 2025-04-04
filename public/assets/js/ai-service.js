@@ -239,6 +239,242 @@ window.BENETRIP_AI = {
     return new Promise(resolve => setTimeout(resolve, ms));
   },
   
+  // Funções auxiliares para formatação do prompt
+  getTipoDestinoText(tipoDestino) {
+    switch(tipoDestino) {
+      case 0: return "Nacional - Prefere viajar dentro do próprio país";
+      case 1: return "Internacional - Prefere viajar para fora do país";
+      default: return "Destinos nacionais ou internacionais";
+    }
+  },
+
+  getFamaDestinoText(famaDestino) {
+    switch(famaDestino) {
+      case 0: return "Destinos famosos e populares";
+      case 1: return "Destinos menos conhecidos e alternativos";
+      default: return "Mix de destinos populares e alternativos";
+    }
+  },
+
+  // Função para determinar a estação do ano em uma data
+  determinarEstacaoDoAno(data, hemisferio = 'sul') {
+    const mes = new Date(data).getMonth();
+    
+    if (hemisferio === 'sul') {
+      if (mes >= 2 && mes <= 4) return 'Outono';
+      if (mes >= 5 && mes <= 7) return 'Inverno';
+      if (mes >= 8 && mes <= 10) return 'Primavera';
+      return 'Verão';
+    } else {
+      if (mes >= 2 && mes <= 4) return 'Primavera';
+      if (mes >= 5 && mes <= 7) return 'Verão';
+      if (mes >= 8 && mes <= 10) return 'Outono';
+      return 'Inverno';
+    }
+  },
+
+  // Função para calcular a duração da viagem em dias
+  calcularDuracaoViagem(dataIda, dataVolta) {
+    const ida = new Date(dataIda);
+    const volta = new Date(dataVolta);
+    const diffTime = Math.abs(volta - ida);
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays;
+  },
+
+  // Gerar prompt aprimorado para recomendações de destinos
+  gerarPromptParaDestinos(dados) {
+    // Extrair dados relevantes das preferências
+    const {
+      cidade_partida,
+      moeda_escolhida = 'BRL',
+      orcamento_valor,
+      datas = {},
+      companhia = 0,
+      destino_imaginado = 2,
+      tipo_viagem = 1,
+      fama_destino = 2,
+      tipo_destino = 2,
+      item_essencial = 4,
+      quantidade_familia = 0,
+      quantidade_amigos = 0,
+      conhece_destino = 0
+    } = dados;
+
+    // Valores formatados para uso no prompt
+    const cidadeOrigem = cidade_partida?.name || "Cidade não especificada";
+    const moeda = moeda_escolhida;
+    const orcamento = orcamento_valor ? parseInt(orcamento_valor, 10) : 2500;
+    
+    // Tratar datas e calcular duração
+    const dataIda = datas.dataIda || new Date().toISOString().split('T')[0];
+    const dataVolta = datas.dataVolta || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    const duracaoViagem = this.calcularDuracaoViagem(dataIda, dataVolta);
+    
+    // Determinar estação do ano
+    const estacaoViagem = this.determinarEstacaoDoAno(dataIda);
+    
+    // Calcular número de pessoas
+    let quantidadePessoas = 1;
+    if (companhia === 1) quantidadePessoas = 2; // Casal
+    else if (companhia === 2) quantidadePessoas = parseInt(quantidade_familia, 10) || 3; // Família
+    else if (companhia === 3) quantidadePessoas = parseInt(quantidade_amigos, 10) || 4; // Amigos
+    
+    // Formatar preferência de companhia
+    let companheiroTexto;
+    switch(companhia) {
+      case 0: companheiroTexto = "Sozinho"; break;
+      case 1: companheiroTexto = "Em casal"; break;
+      case 2: companheiroTexto = "Em família"; break;
+      case 3: companheiroTexto = "Com amigos"; break;
+      default: companheiroTexto = "Sozinho";
+    }
+    
+    // Formatar preferência de viagem
+    let preferenciaTexto;
+    switch(tipo_viagem) {
+      case 0: preferenciaTexto = "relaxamento e tranquilidade"; break;
+      case 1: preferenciaTexto = "exploração e descoberta"; break;
+      case 2: preferenciaTexto = "aventura e adrenalina"; break;
+      case 3: preferenciaTexto = "cultura, gastronomia e experiências locais"; break;
+      default: preferenciaTexto = "experiências variadas";
+    }
+    
+    // Formatar preferência de atrações
+    let atracaoTexto;
+    switch(item_essencial) {
+      case 0: atracaoTexto = "diversão e entretenimento"; break;
+      case 1: atracaoTexto = "natureza e atividades ao ar livre"; break;
+      case 2: atracaoTexto = "cultura, história e museus"; break;
+      case 3: atracaoTexto = "compras e vida urbana"; break;
+      default: atracaoTexto = "experiências variadas";
+    }
+    
+    // Sugestão de distância baseada no tipo de destino
+    let sugestaoDistancia = "";
+    if (tipo_destino === 0) {
+      sugestaoDistancia = "(buscar destinos domésticos)";
+    } else if (tipo_destino === 1) {
+      sugestaoDistancia = "(buscar destinos internacionais)";
+    }
+    
+    // Mensagem específica para orçamento
+    let mensagemOrcamento;
+    if (orcamento < 1000) {
+      mensagemOrcamento = `Orçamento muito restrito de ${orcamento} ${moeda} por pessoa para voos (ida e volta). Priorize destinos próximos e econômicos.`;
+    } else if (orcamento < 2000) {
+      mensagemOrcamento = `Orçamento econômico de ${orcamento} ${moeda} por pessoa para voos (ida e volta). Foque em opções com boa relação custo-benefício.`;
+    } else if (orcamento < 4000) {
+      mensagemOrcamento = `Orçamento moderado de ${orcamento} ${moeda} por pessoa para voos (ida e volta). Pode incluir destinos de médio alcance com preços acessíveis.`;
+    } else {
+      mensagemOrcamento = `Orçamento confortável de ${orcamento} ${moeda} por pessoa para voos (ida e volta). Pode incluir destinos mais distantes e premium.`;
+    }
+
+    return `Crie recomendações de viagem que respeitam ESTRITAMENTE o orçamento do usuário:
+${mensagemOrcamento}
+PERFIL DO VIAJANTE:
+- Partindo de: ${cidadeOrigem} ${sugestaoDistancia}
+- Viajando: ${companheiroTexto}
+- Número de pessoas: ${quantidadePessoas}
+- Atividades preferidas: ${preferenciaTexto} e ${atracaoTexto}
+- Período da viagem: ${dataIda} a ${dataVolta} (${duracaoViagem} dias)
+- Estação do ano na viagem: ${estacaoViagem}
+- Experiência como viajante: ${conhece_destino === 1 ? 'Com experiência' : 'Iniciante'} 
+- Preferência por destinos: ${this.getTipoDestinoText(tipo_destino)}
+- Popularidade do destino: ${this.getFamaDestinoText(fama_destino)}
+
+IMPORTANTE:
+1. O preço do VOO de CADA destino DEVE ser MENOR que o orçamento máximo de ${orcamento} ${moeda}.
+2. INCLUA ESTIMATIVAS REALISTAS de preços para voos (ida e volta) e hospedagem por noite para TODOS os destinos.
+3. FORNEÇA INFORMAÇÕES CLIMÁTICAS detalhadas para o destino na época da viagem (temperatura, condições e recomendações).
+4. Forneça um mix equilibrado: inclua tanto destinos populares quanto alternativas.
+5. Forneça EXATAMENTE 4 destinos alternativos diferentes entre si.
+6. Considere a ÉPOCA DO ANO (${estacaoViagem}) para sugerir destinos com clima adequado.
+7. Inclua destinos de diferentes continentes/regiões.
+8. Garanta que os preços sejam realistas para voos de ida e volta partindo de ${cidadeOrigem}.
+9. Para CADA destino, inclua o código IATA (3 letras) do aeroporto principal.
+10. Para cada destino, INCLUA PONTOS TURÍSTICOS ESPECÍFICOS E CONHECIDOS.
+11. Os comentários da Tripinha DEVEM mencionar pelo menos um dos pontos turísticos do destino e ser escritos em primeira pessoa, como se ela tivesse visitado o local.
+
+Forneça no formato JSON exato abaixo, SEM formatação markdown:
+{
+  "topPick": {
+    "destino": "Nome da Cidade",
+    "pais": "Nome do País",
+    "codigoPais": "XX",
+    "descricao": "Breve descrição do destino",
+    "porque": "Razão específica para visitar",
+    "destaque": "Uma experiência única neste destino",
+    "comentario": "Comentário da Tripinha em primeira pessoa, mencionando pelo menos um ponto turístico como se ela tivesse visitado o local",
+    "pontosTuristicos": [
+      "Nome do Primeiro Ponto Turístico", 
+      "Nome do Segundo Ponto Turístico"
+    ],
+    "clima": {
+      "temperatura": "Faixa de temperatura média esperada",
+      "condicoes": "Descrição das condições climáticas esperadas",
+      "recomendacoes": "Dicas relacionadas ao clima"
+    },
+    "aeroporto": {
+      "codigo": "XYZ",
+      "nome": "Nome do Aeroporto Principal"
+    },
+    "preco": {
+      "voo": número,
+      "hotel": número
+    }
+  },
+  "alternativas": [
+    {
+      "destino": "Nome da Cidade 1",
+      "pais": "Nome do País 1", 
+      "codigoPais": "XX",
+      "porque": "Razão específica para visitar",
+      "pontosTuristicos": ["Nome do Primeiro Ponto Turístico", "Nome do Segundo Ponto Turístico"],
+      "clima": {
+        "temperatura": "Faixa de temperatura média esperada"
+      },
+      "aeroporto": {
+        "codigo": "XYZ",
+        "nome": "Nome do Aeroporto Principal"
+      },
+      "preco": {
+        "voo": número,
+        "hotel": número
+      }
+    },
+    ...
+  ],
+  "surpresa": {
+    "destino": "Nome da Cidade",
+    "pais": "Nome do País",
+    "codigoPais": "XX",
+    "descricao": "Breve descrição do destino",
+    "porque": "Razão para visitar, destacando o fator surpresa",
+    "destaque": "Uma experiência única neste destino",
+    "comentario": "Comentário da Tripinha em primeira pessoa, mencionando pelo menos um ponto turístico como se ela tivesse visitado o local",
+    "pontosTuristicos": [
+      "Nome do Primeiro Ponto Turístico", 
+      "Nome do Segundo Ponto Turístico"
+    ],
+    "clima": {
+      "temperatura": "Faixa de temperatura média esperada",
+      "condicoes": "Descrição das condições climáticas esperadas",
+      "recomendacoes": "Dicas relacionadas ao clima"
+    },
+    "aeroporto": {
+      "codigo": "XYZ",
+      "nome": "Nome do Aeroporto Principal"
+    },
+    "preco": {
+      "voo": número,
+      "hotel": número
+    }
+  },
+  "estacaoViagem": "${estacaoViagem}"
+}`;
+  },
+  
   // NOVA FUNÇÃO: Extrair pontos turísticos do texto
   extrairPontosTuristicos(texto, destino) {
     if (!texto || typeof texto !== 'string') return [];
@@ -330,6 +566,15 @@ window.BENETRIP_AI = {
       
       console.log('Enviando requisição para:', fullUrl);
 
+      // Gerar o prompt otimizado para recomendações
+      const prompt = this.gerarPromptParaDestinos(data);
+      
+      // Adicionar o prompt aos dados
+      const requestData = {
+        ...data,
+        prompt: prompt
+      };
+
       // Implementar retry automático com exponential backoff
       let retryDelay = this.config.retryDelay;
       let maxRetries = this.config.maxRetries;
@@ -354,7 +599,7 @@ window.BENETRIP_AI = {
               'Connection': 'keep-alive',
               'Keep-Alive': 'timeout=90'
             },
-            body: JSON.stringify(data),
+            body: JSON.stringify(requestData),
             signal: controller.signal,
             // Adicionando keepalive para manter conexão
             keepalive: true
