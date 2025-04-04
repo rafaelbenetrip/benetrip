@@ -692,3 +692,80 @@ h3 {
     background-color: #FFF7ED;
     border: 2px solid #FDBA74;
 }
+
+/* Adicionar ao final do arquivo destinos.css */
+
+/* Melhorias específicas para créditos de imagem e modal surpresa */
+
+/* Garantir que os links de créditos de imagem sejam clicáveis */
+.image-container .image-credit a,
+.image-container a.zoom-icon {
+  display: inline-block;
+  z-index: 20;
+  position: relative;
+  pointer-events: auto !important;
+}
+
+/* Melhor overlay de créditos com visibilidade garantida */
+.image-credit {
+  background-color: rgba(0, 0, 0, 0.7) !important;
+  padding: 4px 8px !important;
+  color: white !important;
+  font-size: 0.75rem !important;
+  z-index: 20 !important;
+  pointer-events: auto !important;
+}
+
+/* Estilos para o modal de destino surpresa */
+.modal-surpresa-container {
+  z-index: 9999 !important;
+}
+
+.modal-surpresa-content {
+  display: flex;
+  flex-direction: column;
+  max-height: 90vh !important;
+  overflow: hidden !important;
+}
+
+/* Certifique-se de que o botão fechar do modal está acima de tudo */
+.modal-surpresa-content .btn-fechar-modal {
+  z-index: 9999 !important;
+}
+
+/* Garantir que o nome do destino não se sobreponha às abas */
+.destino-nome {
+  z-index: 10;
+  position: relative;
+  margin-bottom: 0 !important;
+  padding-bottom: 8px !important;
+}
+
+/* Melhorar visibilidade do título de destino surpresa */
+.destino-titulo-overlay {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: linear-gradient(to top, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0.5) 70%, transparent 100%);
+  padding: 16px;
+  padding-top: 32px;
+  z-index: 10;
+}
+
+/* Sistema de abas no modal surpresa */
+.abas-surpresa {
+  border-bottom: 1px solid #e5e7eb;
+  display: flex;
+  overflow-x: auto;
+  background-color: white;
+  z-index: 15;
+  position: relative;
+}
+
+/* Conteúdo das abas com scroll independente */
+.conteudo-aba-surpresa {
+  overflow-y: auto;
+  max-height: calc(90vh - 280px);
+  padding: 16px;
+}
