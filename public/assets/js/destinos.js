@@ -12,6 +12,7 @@ const BENETRIP_DESTINOS = {
   estaCarregando: true,
   temErro: false,
   mensagemErro: '',
+  abaAtiva: 'visao-geral',
   
   // Inicialização
   init() {
@@ -71,6 +72,56 @@ const BENETRIP_DESTINOS = {
         this.mostrarMaisOpcoes();
       }
     });
+  },
+  
+  // Sistema de abas para destino principal - CORRIGIDO
+  trocarAba(novaAba) {
+    this.abaAtiva = novaAba;
+    
+    // Ocultar conteúdo de todas as abas
+    document.querySelectorAll('.conteudo-aba').forEach(el => {
+      el.classList.add('hidden');
+    });
+    
+    // Mostrar conteúdo da aba selecionada
+    const conteudoAba = document.getElementById(`conteudo-${novaAba}`);
+    if (conteudoAba) conteudoAba.classList.remove('hidden');
+    
+    // Atualizar estilo dos botões de aba
+    document.querySelectorAll('.botao-aba').forEach(el => {
+      el.classList.remove('aba-ativa');
+      el.classList.add('aba-inativa');
+    });
+    
+    const botaoAba = document.getElementById(`aba-${novaAba}`);
+    if (botaoAba) {
+      botaoAba.classList.remove('aba-inativa');
+      botaoAba.classList.add('aba-ativa');
+    }
+  },
+
+  // Função para trocar aba no modal de destino surpresa - CORRIGIDO
+  trocarAbaSurpresa(aba) {
+    // Ocultar conteúdo de todas as abas
+    document.querySelectorAll('.conteudo-aba-surpresa').forEach(el => {
+      el.classList.add('hidden');
+    });
+    
+    // Mostrar conteúdo da aba selecionada
+    const conteudoAba = document.getElementById(`conteudo-surpresa-${aba}`);
+    if (conteudoAba) conteudoAba.classList.remove('hidden');
+    
+    // Atualizar estilo dos botões de aba
+    document.querySelectorAll('.botao-aba').forEach(el => {
+      el.classList.remove('aba-ativa');
+      el.classList.add('aba-inativa');
+    });
+    
+    const botaoAba = document.getElementById(`aba-surpresa-${aba}`);
+    if (botaoAba) {
+      botaoAba.classList.remove('aba-inativa');
+      botaoAba.classList.add('aba-ativa');
+    }
   },
   
   // Carregar dados do usuário e recomendações
@@ -445,32 +496,6 @@ const BENETRIP_DESTINOS = {
     `;
   },
   
-  // Sistema de abas para destino principal
-  trocarAba(novaAba) {
-    abaAtiva = novaAba;
-    
-    // Ocultar conteúdo de todas as abas
-    document.querySelectorAll('.conteudo-aba').forEach(el => {
-      el.classList.add('hidden');
-    });
-    
-    // Mostrar conteúdo da aba selecionada
-    const conteudoAba = document.getElementById(`conteudo-${novaAba}`);
-    if (conteudoAba) conteudoAba.classList.remove('hidden');
-    
-    // Atualizar estilo dos botões de aba
-    document.querySelectorAll('.botao-aba').forEach(el => {
-      el.classList.remove('aba-ativa');
-      el.classList.add('aba-inativa');
-    });
-    
-    const botaoAba = document.getElementById(`aba-${novaAba}`);
-    if (botaoAba) {
-      botaoAba.classList.remove('aba-inativa');
-      botaoAba.classList.add('aba-ativa');
-    }
-  },
-  
   // Renderizar destino destaque com sistema de abas
   renderizarDestinoDestaque(destino) {
     const container = document.getElementById('destino-destaque');
@@ -666,9 +691,6 @@ const BENETRIP_DESTINOS = {
         ${botaoSelecaoHtml}
       </div>
     `;
-    
-    // Expor a função no objeto para ser acessível pelo onclick
-    this.trocarAba = trocarAba;
   },
   
   // Renderizar destinos alternativos em grid
@@ -969,30 +991,6 @@ const BENETRIP_DESTINOS = {
         modalContent.classList.remove('scale-95', 'opacity-0');
       }
     }, 10);
-    
-    // Função para trocar abas do modal surpresa
-    this.trocarAbaSurpresa = function(aba) {
-      // Ocultar conteúdo de todas as abas
-      document.querySelectorAll('.conteudo-aba-surpresa').forEach(el => {
-        el.classList.add('hidden');
-      });
-      
-      // Mostrar conteúdo da aba selecionada
-      const conteudoAba = document.getElementById(`conteudo-surpresa-${aba}`);
-      if (conteudoAba) conteudoAba.classList.remove('hidden');
-      
-      // Atualizar estilo dos botões de aba
-      document.querySelectorAll('.botao-aba').forEach(el => {
-        el.classList.remove('aba-ativa');
-        el.classList.add('aba-inativa');
-      });
-      
-      const botaoAba = document.getElementById(`aba-surpresa-${aba}`);
-      if (botaoAba) {
-        botaoAba.classList.remove('aba-inativa');
-        botaoAba.classList.add('aba-ativa');
-      }
-    };
   },
   
   // Método para mostrar mais opções
@@ -1006,7 +1004,7 @@ const BENETRIP_DESTINOS = {
     let destinoSelecionado = null;
     if (this.recomendacoes.topPick.destino === nomeDestino) {
       destinoSelecionado = this.recomendacoes.topPick;
-    } else if (this.recomendacoes.surpresa.destino === nomeDestino) {
+    } else if (this.recomendacoes.surpresa && this.recomendacoes.surpresa.destino === nomeDestino) {
       destinoSelecionado = this.recomendacoes.surpresa;
     } else {
       destinoSelecionado = this.recomendacoes.alternativas.find(d => d.destino === nomeDestino);
