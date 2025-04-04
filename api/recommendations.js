@@ -140,86 +140,20 @@ async function retryAsync(fn, maxAttempts = MAX_RETRY, initialDelay = RETRY_DELA
 }
 
 // =======================
-// Função de estimativa de preço como último recurso
+// Função de estimativa de preço modificada para não fornecer estimativas
 // =======================
 function estimarPrecoVoo(origemIATA, destinoIATA) {
-  // Mapeamento de regiões para gerar estimativas razoáveis
-  const regioes = {
-    'BR': 'BRASIL',
-    'US': 'AMERICA_NORTE',
-    'MX': 'AMERICA_NORTE',
-    'CA': 'AMERICA_NORTE',
-    'ES': 'EUROPA',
-    'PT': 'EUROPA',
-    'FR': 'EUROPA',
-    'IT': 'EUROPA',
-    'GB': 'EUROPA',
-    'DE': 'EUROPA',
-    'JP': 'ASIA',
-    'CN': 'ASIA',
-    'TH': 'ASIA',
-    'AU': 'OCEANIA',
-    'NZ': 'OCEANIA'
-  };
-  
-  // Preços base por regiões
-  const precosBase = {
-    'BRASIL-BRASIL': 800,
-    'BRASIL-AMERICA_NORTE': 2500,
-    'BRASIL-EUROPA': 3200,
-    'BRASIL-ASIA': 4500,
-    'BRASIL-OCEANIA': 5000,
-    'AMERICA_NORTE-AMERICA_NORTE': 700,
-    'AMERICA_NORTE-EUROPA': 1800,
-    'AMERICA_NORTE-ASIA': 3000,
-    'EUROPA-EUROPA': 600,
-    'EUROPA-ASIA': 2000,
-    'DEFAULT': 3000
-  };
-  
-  const origemRegiao = obterRegiaoPorCodigo(origemIATA) || 'BRASIL';
-  const destinoRegiao = obterRegiaoPorCodigo(destinoIATA) || 'EUROPA';
-  
-  const chavePreco = `${origemRegiao}-${destinoRegiao}`;
-  const chaveInversa = `${destinoRegiao}-${origemRegiao}`;
-  
-  let precoBase = precosBase[chavePreco] || precosBase[chaveInversa] || precosBase.DEFAULT;
-  
-  // Adiciona variação para parecer mais realista (±15%)
-  const fatorVariacao = 0.85 + (Math.random() * 0.3);
-  const precoEstimado = Math.round(precoBase * fatorVariacao);
-  
+  console.log('Função de estimação de preço desativada conforme solicitado.');
+  // Retorna um preço genérico com flag indicando que é uma estimativa
   return {
-    precoReal: precoEstimado,
+    precoReal: 0, // Valor zerado para indicar que não foi calculado
     detalhesVoo: {
-      companhia: 'Estimativa',
-      numeroParadas: origemRegiao === destinoRegiao ? 0 : 1,
-      duracao: origemRegiao === destinoRegiao ? '2h' : 
-               (origemRegiao === 'BRASIL' && destinoRegiao === 'EUROPA') ? '11h' : '8h'
+      companhia: 'N/D',
+      numeroParadas: 0,
+      duracao: 'N/D'
     },
-    fonte: 'Estimativa Benetrip'
+    fonte: 'Valor Indisponível'
   };
-}
-
-// =======================
-// Função para determinar região geográfica pelo código do aeroporto
-// =======================
-function obterRegiaoPorCodigo(codigoIATA) {
-  const aeroportosRegiao = {
-    'BRASIL': ['GRU', 'GIG', 'BSB', 'SSA', 'REC', 'FOR', 'CNF', 'POA', 'CWB', 'BEL', 'MAO', 'NAT', 'FLN', 'MCZ'],
-    'AMERICA_NORTE': ['JFK', 'LAX', 'MIA', 'ORD', 'YYZ', 'MEX', 'CUN', 'YVR', 'DFW', 'ATL', 'SFO', 'LAS', 'YUL'],
-    'EUROPA': ['LHR', 'CDG', 'FCO', 'MAD', 'LIS', 'AMS', 'FRA', 'BCN', 'MUC', 'VIE', 'ZRH', 'BRU', 'CPH', 'ATH', 'IST'],
-    'ASIA': ['HND', 'NRT', 'PEK', 'HKG', 'SIN', 'BKK', 'DXB', 'ICN', 'KIX', 'TPE', 'BOM', 'DEL', 'KUL'],
-    'OCEANIA': ['SYD', 'MEL', 'AKL', 'BNE', 'PER', 'CHC', 'ADL']
-  };
-  
-  for (const [regiao, aeroportos] of Object.entries(aeroportosRegiao)) {
-    if (aeroportos.includes(codigoIATA)) {
-      return regiao;
-    }
-  }
-  
-  return null;
 }
 
 // =======================
@@ -251,13 +185,12 @@ async function processarDestinos(recomendacoes, origemIATA, datas, moeda) {
           recomendacoes.topPick.detalhesVoo = resultado.detalhesVoo;
           logDetalhado(`Preço atualizado para ${recomendacoes.topPick.destino}: ${moeda} ${recomendacoes.topPick.preco.voo}`, null);
         } else {
-          console.warn(`Consulta Aviasales Calendar falhou para ${recomendacoes.topPick.destino}. Utilizando preço sugerido pela IA.`);
-          const fallback = estimarPrecoVoo(origemIATA, destinoIATA);
+          console.warn(`Consulta Aviasales Calendar falhou para ${recomendacoes.topPick.destino}.`);
+          // MODIFICAÇÃO: Não utilizar estimativa
           recomendacoes.topPick.preco = {
-            voo: fallback.precoReal,
-            fonte: fallback.fonte + ' (sugerido pela IA)'
+            voo: recomendacoes.topPick.preco?.voo || 0, // Manter o preço da IA ou zero
+            fonte: 'Indisponível - API não retornou dados'
           };
-          recomendacoes.topPick.detalhesVoo = fallback.detalhesVoo;
         }
       } else {
         console.warn(`Código IATA inválido para ${recomendacoes.topPick.destino}: ${destinoIATA}`);
@@ -285,13 +218,12 @@ async function processarDestinos(recomendacoes, origemIATA, datas, moeda) {
               alternativa.detalhesVoo = resultado.detalhesVoo;
               logDetalhado(`Preço atualizado para ${alternativa.destino}: ${moeda} ${alternativa.preco.voo}`, null);
             } else {
-              console.warn(`Consulta Aviasales Calendar falhou para ${alternativa.destino}. Utilizando preço sugerido pela IA.`);
-              const fallback = estimarPrecoVoo(origemIATA, destinoIATA);
+              console.warn(`Consulta Aviasales Calendar falhou para ${alternativa.destino}.`);
+              // MODIFICAÇÃO: Não utilizar estimativa
               alternativa.preco = {
-                voo: fallback.precoReal,
-                fonte: fallback.fonte + ' (sugerido pela IA)'
+                voo: alternativa.preco?.voo || 0, // Manter o preço da IA ou zero
+                fonte: 'Indisponível - API não retornou dados'
               };
-              alternativa.detalhesVoo = fallback.detalhesVoo;
             }
           } else {
             console.warn(`Código IATA inválido para ${alternativa.destino}: ${destinoIATA}`);
@@ -320,26 +252,70 @@ async function processarDestinos(recomendacoes, origemIATA, datas, moeda) {
           recomendacoes.surpresa.detalhesVoo = resultado.detalhesVoo;
           logDetalhado(`Preço atualizado para ${recomendacoes.surpresa.destino}: ${moeda} ${recomendacoes.surpresa.preco.voo}`, null);
         } else {
-          console.warn(`Consulta Aviasales Calendar falhou para ${recomendacoes.surpresa.destino}. Utilizando preço sugerido pela IA.`);
-          const fallback = estimarPrecoVoo(origemIATA, destinoIATA);
+          console.warn(`Consulta Aviasales Calendar falhou para ${recomendacoes.surpresa.destino}.`);
+          // MODIFICAÇÃO: Não utilizar estimativa
           recomendacoes.surpresa.preco = {
-            voo: fallback.precoReal,
-            fonte: fallback.fonte + ' (sugerido pela IA)'
+            voo: recomendacoes.surpresa.preco?.voo || 0, // Manter o preço da IA ou zero
+            fonte: 'Indisponível - API não retornou dados'
           };
-          recomendacoes.surpresa.detalhesVoo = fallback.detalhesVoo;
         }
       } else {
         console.warn(`Código IATA inválido para ${recomendacoes.surpresa.destino}: ${destinoIATA}`);
       }
     }
     
-    // (Obs.: a lógica de ajuste de preço para respeitar orçamento foi removida)
+   // Assegurar que temos a estação do ano armazenada
+    if (!recomendacoes.estacaoViagem) {
+      try {
+        if (datas.dataIda) {
+          const dataObj = new Date(datas.dataIda);
+          const mes = dataObj.getMonth();
+          let estacaoViagem = '';
+          
+          if (mes >= 2 && mes <= 4) estacaoViagem = 'primavera';
+          else if (mes >= 5 && mes <= 7) estacaoViagem = 'verão';
+          else if (mes >= 8 && mes <= 10) estacaoViagem = 'outono';
+          else estacaoViagem = 'inverno';
+          
+          // Determinar hemisfério baseado na origem
+          const hemisferio = determinarHemisferioDestino(origemIATA);
+          
+          if (hemisferio === 'sul') {
+            if (estacaoViagem === 'verão') estacaoViagem = 'inverno';
+            else if (estacaoViagem === 'inverno') estacaoViagem = 'verão';
+            else if (estacaoViagem === 'primavera') estacaoViagem = 'outono';
+            else if (estacaoViagem === 'outono') estacaoViagem = 'primavera';
+          }
+          
+          recomendacoes.estacaoViagem = estacaoViagem;
+          logDetalhado(`Estação do ano definida: ${estacaoViagem}`, null);
+        }
+      } catch (error) {
+        console.warn('Erro ao determinar estação do ano:', error);
+      }
+    }
     
     return recomendacoes;
   } catch (error) {
     console.error(`Erro ao processar destinos: ${error.message}`);
     return recomendacoes;
   }
+}
+
+// Adicione esta função para determinar hemisferio por IATA
+function determinarHemisferioDestino(iataCode) {
+  // IATA codes para países do hemisfério sul
+  const hemisfSulIATA = [
+    // América do Sul
+    'GRU', 'GIG', 'SSA', 'REC', 'FOR', 'BSB', 'CNF', 'CWB', 'POA', 'CGH', 'SDU', 'FLN',
+    // Austrália/Nova Zelândia
+    'SYD', 'MEL', 'BNE', 'PER', 'ADL', 'AKL', 'CHC', 'ZQN',
+    // África
+    'JNB', 'CPT', 'DUR'
+  ];
+  
+  if (hemisfSulIATA.includes(iataCode)) return 'sul';
+  return 'norte';
 }
 
 // =======================
@@ -683,7 +659,7 @@ module.exports = async function handler(req, res) {
         }
       }
       
-      prompt = `${prompt}\n\nURGENTE: O ORÇAMENTO MÁXIMO para voos (${requestData.orcamento_valor || 'informado'} ${requestData.moeda_escolhida || 'BRL'}) precisa ser RIGOROSAMENTE RESPEITADO. TODOS os destinos devem ter voos abaixo desse valor. Forneça um mix de destinos populares e alternativos, com preços realistas.`;
+      prompt = `${prompt}\n\nURGENTE: O ORÇAMENTO MÁXIMO para voos (${requestData.orcamento_valor || 'informado'} ${requestData.moeda_escolhida || 'BRL'}) precisa ser RIGOROSAMENTE RESPEITADO. TODOS os destinos devem ter voos abaixo desse valor. Forneça um mix equilibrado: inclua tanto destinos populares quanto alternativas.`;
     }
     
     logDetalhado('Todas as tentativas de obter resposta válida falharam', null);
@@ -1862,6 +1838,7 @@ function gerarPromptParaDestinos(dados) {
   
   const sugestaoDistancia = gerarSugestaoDistancia(cidadeOrigem, tipoDestino);
   
+  // Modificação: adicionando seção sobre clima
   return `Crie recomendações de viagem que respeitam ESTRITAMENTE o orçamento do usuário:
 
 ${mensagemOrcamento}
@@ -1887,6 +1864,7 @@ IMPORTANTE:
 7. Para CADA destino, inclua o código IATA (3 letras) do aeroporto principal.
 8. Para cada destino, INCLUA PONTOS TURÍSTICOS ESPECÍFICOS E CONHECIDOS.
 9. Os comentários da Tripinha DEVEM mencionar pelo menos um dos pontos turísticos do destino.
+10. NOVO: Forneça informações sobre o CLIMA esperado no destino durante a viagem (temperatura média e condições).
 
 Forneça no formato JSON exato abaixo, SEM formatação markdown:
 {
@@ -1902,6 +1880,11 @@ Forneça no formato JSON exato abaixo, SEM formatação markdown:
       "Nome do Primeiro Ponto Turístico", 
       "Nome do Segundo Ponto Turístico"
     ],
+    "clima": {
+      "temperatura": "Faixa de temperatura média esperada",
+      "condicoes": "Descrição das condições climáticas esperadas",
+      "recomendacoes": "Dicas relacionadas ao clima"
+    },
     "aeroporto": {
       "codigo": "XYZ",
       "nome": "Nome do Aeroporto Principal"
@@ -1918,6 +1901,9 @@ Forneça no formato JSON exato abaixo, SEM formatação markdown:
       "codigoPais": "XX",
       "porque": "Razão específica para visitar",
       "pontoTuristico": "Nome de um Ponto Turístico",
+      "clima": {
+        "temperatura": "Faixa de temperatura média esperada"
+      },
       "aeroporto": {
         "codigo": "XYZ",
         "nome": "Nome do Aeroporto Principal"
@@ -1927,51 +1913,7 @@ Forneça no formato JSON exato abaixo, SEM formatação markdown:
         "hotel": número
       }
     },
-    {
-      "destino": "Nome da Cidade 2",
-      "pais": "Nome do País 2", 
-      "codigoPais": "XX",
-      "porque": "Razão específica para visitar",
-      "pontoTuristico": "Nome de um Ponto Turístico", 
-      "aeroporto": {
-        "codigo": "XYZ",
-        "nome": "Nome do Aeroporto Principal"
-      },
-      "preco": {
-        "voo": número,
-        "hotel": número
-      }
-    },
-    {
-      "destino": "Nome da Cidade 3",
-      "pais": "Nome do País 3", 
-      "codigoPais": "XX",
-      "porque": "Razão específica para visitar",
-      "pontoTuristico": "Nome de um Ponto Turístico",
-      "aeroporto": {
-        "codigo": "XYZ",
-        "nome": "Nome do Aeroporto Principal"
-      },
-      "preco": {
-        "voo": número,
-        "hotel": número
-      }
-    },
-    {
-      "destino": "Nome da Cidade 4",
-      "pais": "Nome do País 4", 
-      "codigoPais": "XX",
-      "porque": "Razão específica para visitar",
-      "pontoTuristico": "Nome de um Ponto Turístico",
-      "aeroporto": {
-        "codigo": "XYZ",
-        "nome": "Nome do Aeroporto Principal"
-      },
-      "preco": {
-        "voo": número,
-        "hotel": número
-      }
-    }
+    ...
   ],
   "surpresa": {
     "destino": "Nome da Cidade",
@@ -1985,6 +1927,11 @@ Forneça no formato JSON exato abaixo, SEM formatação markdown:
       "Nome do Primeiro Ponto Turístico", 
       "Nome do Segundo Ponto Turístico"
     ],
+    "clima": {
+      "temperatura": "Faixa de temperatura média esperada",
+      "condicoes": "Descrição das condições climáticas esperadas",
+      "recomendacoes": "Dicas relacionadas ao clima"
+    },
     "aeroporto": {
       "codigo": "XYZ",
       "nome": "Nome do Aeroporto Principal"
@@ -1993,7 +1940,8 @@ Forneça no formato JSON exato abaixo, SEM formatação markdown:
       "voo": número,
       "hotel": número
     }
-  }
+  },
+  "estacaoViagem": "${estacaoViagem}"
 }`;
 }
 
