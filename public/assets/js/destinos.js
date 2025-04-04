@@ -29,6 +29,9 @@ const BENETRIP_DESTINOS = {
         console.error('Erro na inicialização dos destinos:', erro);
         this.mostrarErro('Não foi possível carregar as recomendações. Por favor, tente novamente.');
       });
+    
+    // Aplicar estilos modernos
+    this.aplicarEstilosModernos();
   },
   
   // Configurar eventos da interface
@@ -442,7 +445,33 @@ const BENETRIP_DESTINOS = {
     `;
   },
   
-  // Renderizar destino destaque (topPick)
+  // Sistema de abas para destino principal
+  trocarAba(novaAba) {
+    abaAtiva = novaAba;
+    
+    // Ocultar conteúdo de todas as abas
+    document.querySelectorAll('.conteudo-aba').forEach(el => {
+      el.classList.add('hidden');
+    });
+    
+    // Mostrar conteúdo da aba selecionada
+    const conteudoAba = document.getElementById(`conteudo-${novaAba}`);
+    if (conteudoAba) conteudoAba.classList.remove('hidden');
+    
+    // Atualizar estilo dos botões de aba
+    document.querySelectorAll('.botao-aba').forEach(el => {
+      el.classList.remove('aba-ativa');
+      el.classList.add('aba-inativa');
+    });
+    
+    const botaoAba = document.getElementById(`aba-${novaAba}`);
+    if (botaoAba) {
+      botaoAba.classList.remove('aba-inativa');
+      botaoAba.classList.add('aba-ativa');
+    }
+  },
+  
+  // Renderizar destino destaque com sistema de abas
   renderizarDestinoDestaque(destino) {
     const container = document.getElementById('destino-destaque');
     if (!container) return;
@@ -452,83 +481,207 @@ const BENETRIP_DESTINOS = {
     const precoReal = destino.detalhesVoo ? true : false;
     const precoClasse = precoReal ? 'text-green-700 font-semibold' : '';
     const precoIcone = precoReal ? '🔍 ' : '';
+    const estacaoAno = this.obterEstacaoAno() || 'primavera';
     
-    container.innerHTML = `
-      <div class="border border-gray-200 rounded-lg overflow-hidden shadow-md">
-        <div class="relative">
-          <div class="absolute top-0 left-0 py-1 px-3 z-10 font-bold text-white" style="background-color: #E87722;">
-            Escolha Top da Tripinha!
-          </div>
-          <div class="grid grid-cols-2 gap-1">
-            ${this.renderizarImagemComCreditos(
-              destino.imagens && destino.imagens.length > 0 ? destino.imagens[0] : null,
-              destino.destino,
-              'h-36'
-            )}
-            ${this.renderizarImagemComCreditos(
-              destino.imagens && destino.imagens.length > 1 ? destino.imagens[1] : null,
-              destino.pais,
-              'h-36'
-            )}
-          </div>
+    // Imagem de cabeçalho expandida
+    let headerHtml = `
+      <div class="relative rounded-t-lg overflow-hidden">
+        <div class="absolute top-0 left-0 py-1 px-3 z-10 font-bold text-white" style="background-color: #E87722;">
+          Escolha Top da Tripinha!
         </div>
-        <div class="p-4">
-          <div class="flex justify-between items-start">
-            <h3 class="text-xl font-bold">${destino.destino}, ${destino.pais}</h3>
-            <span class="text-xs font-medium px-1 py-0.5 rounded" style="background-color: #E0E0E0;">
-              ${destino.codigoPais}
-            </span>
-          </div>
-          <div class="mt-3 space-y-1 text-sm">
-            <p class="flex items-center">
-              <span class="mr-2 w-5 text-center">✈️</span>
-              <span class="font-medium">Preço de Voo:</span>
-              <span class="ml-1 ${precoClasse}">${precoIcone}R$ ${destino.preco.voo} (ida e volta)</span>
-            </p>
-            ${this.prepararInformacoesVoo(destino)}
-            ${this.prepararInformacaoAeroporto(destino)}
-            <p class="flex items-center">
-              <span class="mr-2 w-5 text-center">🏨</span>
-              <span class="font-medium">Hotel:</span>
-              <span class="ml-1">R$ ${destino.preco.hotel}/noite</span>
-            </p>
-            <p class="flex items-center">
-              <span class="mr-2 w-5 text-center">🗓️</span>
-              <span class="font-medium">Duração da Viagem:</span>
-              <span class="ml-1">${this.obterDatasViagem()}</span>
-            </p>
-            <p class="flex items-start mt-2">
-              <span class="mr-2 w-5 text-center flex-shrink-0">🌆</span>
-              <span><span class="font-medium">Por que ir?:</span> <span class="ml-1">${destino.porque}</span></span>
-            </p>
-            <p class="flex items-start">
-              <span class="mr-2 w-5 text-center flex-shrink-0">⭐</span>
-              <span><span class="font-medium">Destaque da Experiência:</span> <span class="ml-1">${destino.destaque}</span></span>
-            </p>
-            <div class="flex flex-wrap gap-1 mt-2">
-              ${destino.pontosTuristicos ? destino.pontosTuristicos.map(ponto => `<span class="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">${ponto}</span>`).join('') : ''}
-            </div>
-          </div>
-          <div class="mt-3 text-sm italic p-3 rounded" style="background-color: rgba(0, 163, 224, 0.1);">
-            <p class="flex items-start">
-              <span class="mr-2 flex-shrink-0">💬</span>
-              <span>"${destino.comentario}"</span>
-            </p>
-          </div>
-          <button class="w-full font-bold py-2.5 px-4 rounded mt-4 text-white transition-colors duration-200 hover:opacity-90" style="background-color: #E87722;" data-destino="${destino.destino}" onclick="BENETRIP_DESTINOS.selecionarDestino('${destino.destino}')">
-            Escolher Este Destino!
-          </button>
+        <div class="h-48">
+          ${this.renderizarImagemComCreditos(
+            destino.imagens && destino.imagens.length > 0 ? destino.imagens[0] : null,
+            destino.destino,
+            'h-full w-full'
+          )}
         </div>
       </div>
     `;
+    
+    // Cabeçalho com título e país
+    let tituloHtml = `
+      <div class="p-4 bg-white">
+        <div class="flex justify-between items-center">
+          <h3 class="text-xl font-bold">${destino.destino}, ${destino.pais}</h3>
+          <span class="text-xs font-medium px-2 py-1 rounded-lg" style="background-color: #E0E0E0;">
+            ${destino.codigoPais}
+          </span>
+        </div>
+      </div>
+    `;
+    
+    // Sistema de abas
+    let abasHtml = `
+      <div class="flex border-b border-gray-200 overflow-x-auto">
+        <button id="aba-visao-geral" class="botao-aba aba-ativa px-4 py-2 text-sm font-medium" onclick="BENETRIP_DESTINOS.trocarAba('visao-geral')">
+          Visão Geral
+        </button>
+        <button id="aba-pontos-turisticos" class="botao-aba aba-inativa px-4 py-2 text-sm font-medium" onclick="BENETRIP_DESTINOS.trocarAba('pontos-turisticos')">
+          Pontos Turísticos
+        </button>
+        <button id="aba-clima" class="botao-aba aba-inativa px-4 py-2 text-sm font-medium" onclick="BENETRIP_DESTINOS.trocarAba('clima')">
+          Clima
+        </button>
+        <button id="aba-comentarios" class="botao-aba aba-inativa px-4 py-2 text-sm font-medium" onclick="BENETRIP_DESTINOS.trocarAba('comentarios')">
+          Comentários
+        </button>
+      </div>
+    `;
+    
+    // Conteúdo da aba Visão Geral
+    let visaoGeralHtml = `
+      <div id="conteudo-visao-geral" class="conteudo-aba p-4">
+        <div class="grid grid-cols-2 gap-4">
+          <div class="bg-gray-50 p-3 rounded-lg">
+            <div class="flex items-center mb-2">
+              <span class="text-lg mr-2">✈️</span>
+              <span class="font-medium">Voo</span>
+            </div>
+            <p class="text-lg font-bold ${precoClasse}">R$ ${destino.preco.voo}</p>
+            <p class="text-xs text-gray-500">Ida e volta</p>
+            ${this.prepararInformacoesVoo(destino)}
+          </div>
+          
+          <div class="bg-gray-50 p-3 rounded-lg">
+            <div class="flex items-center mb-2">
+              <span class="text-lg mr-2">🏨</span>
+              <span class="font-medium">Hospedagem</span>
+            </div>
+            <p class="text-lg font-bold">R$ ${destino.preco.hotel}</p>
+            <p class="text-xs text-gray-500">Por noite</p>
+          </div>
+        </div>
+        
+        <div class="mt-4 bg-gray-50 p-3 rounded-lg">
+          <div class="flex items-center mb-2">
+            <span class="text-lg mr-2">🗓️</span>
+            <span class="font-medium">Período da Viagem</span>
+          </div>
+          <p class="font-medium">${this.obterDatasViagem()}</p>
+          <p class="text-sm text-gray-600 mt-1">Estação no destino: ${estacaoAno}</p>
+        </div>
+        
+        <div class="mt-4">
+          <h4 class="font-medium mb-2">Por que visitar:</h4>
+          <p class="text-gray-800">${destino.porque}</p>
+        </div>
+        
+        <div class="mt-4">
+          <h4 class="font-medium mb-2">Destaque da experiência:</h4>
+          <p class="text-gray-800">${destino.destaque}</p>
+        </div>
+      </div>
+    `;
+    
+    // Conteúdo da aba Pontos Turísticos
+    let pontosTuristicosHtml = `
+      <div id="conteudo-pontos-turisticos" class="conteudo-aba p-4 hidden">
+        <p class="text-sm text-gray-600 mb-3">Atrações imperdíveis em ${destino.destino}:</p>
+        ${destino.pontosTuristicos && destino.pontosTuristicos.length > 0 ? 
+          destino.pontosTuristicos.map((ponto, idx) => `
+            <div class="bg-white border border-gray-200 rounded-lg p-3 mb-3 shadow-sm">
+              <div class="flex items-center">
+                <span class="font-bold text-lg mr-3 text-blue-600">${idx + 1}</span>
+                <h5 class="font-medium">${ponto}</h5>
+              </div>
+              <p class="text-sm text-gray-600 mt-2">
+                ${this.gerarDescricaoAutomatica(ponto, destino.destino)}
+              </p>
+            </div>
+          `).join('') : 
+          '<p class="text-center text-gray-500 my-6">Informações sobre pontos turísticos não disponíveis</p>'
+        }
+      </div>
+    `;
+    
+    // Conteúdo da aba Clima
+    let climaHtml = `
+      <div id="conteudo-clima" class="conteudo-aba p-4 hidden">
+        <div class="text-center bg-blue-50 p-4 rounded-lg">
+          <h4 class="font-medium text-lg mb-2">Clima durante sua viagem</h4>
+          <div class="text-4xl mb-2">
+            ${this.obterEmojiClima(estacaoAno)}
+          </div>
+          <p class="text-lg font-bold">${estacaoAno.charAt(0).toUpperCase() + estacaoAno.slice(1)}</p>
+          <p class="text-sm text-gray-600 mt-2">Temperatura média: ${this.obterTemperaturaMedia(destino.destino, estacaoAno)}</p>
+        </div>
+        
+        <div class="mt-4 bg-white border border-gray-200 rounded-lg p-3">
+          <h5 class="font-medium mb-2">Recomendações para esta estação:</h5>
+          <ul class="list-disc pl-5 text-sm text-gray-700 space-y-1">
+            ${this.obterRecomendacoesClima(estacaoAno).map(rec => `<li>${rec}</li>`).join('')}
+          </ul>
+        </div>
+      </div>
+    `;
+    
+    // Conteúdo da aba Comentários
+    let comentariosHtml = `
+      <div id="conteudo-comentarios" class="conteudo-aba p-4 hidden">
+        <div class="bg-gray-50 p-4 rounded-lg">
+          <div class="flex items-start gap-3">
+            <div class="w-10 h-10 rounded-full overflow-hidden flex-shrink-0 bg-orange-100">
+              <img src="assets/images/tripinha/avatar-normal.png" alt="Tripinha" class="w-full h-full object-cover" onerror="this.src='https://placehold.co/60x60?text=🐶'">
+            </div>
+            <div>
+              <p class="font-medium text-sm mb-1">Comentário da Tripinha:</p>
+              <p class="italic">"${destino.comentario}"</p>
+            </div>
+          </div>
+        </div>
+        
+        <div class="mt-4 bg-gray-50 p-4 rounded-lg">
+          <h4 class="font-medium mb-2">Outras experiências:</h4>
+          <div class="border-l-2 border-gray-300 pl-3 py-1">
+            <p class="italic text-sm">"Adorei ${destino.destino}! A comida é incrível e as pessoas são muito receptivas. Recomendo visitar na ${estacaoAno}."</p>
+            <p class="text-xs text-gray-500 mt-1">- Ana S., viajou em 2024</p>
+          </div>
+        </div>
+      </div>
+    `;
+    
+    // Botão de seleção
+    let botaoSelecaoHtml = `
+      <div class="p-4 border-t border-gray-200">
+        <button class="w-full font-bold py-3 px-4 rounded-lg text-white transition-colors duration-200 hover:opacity-90" 
+          style="background-color: #E87722;" 
+          data-destino="${destino.destino}" 
+          onclick="BENETRIP_DESTINOS.selecionarDestino('${destino.destino}')">
+          Escolher Este Destino!
+        </button>
+      </div>
+    `;
+    
+    // Montar o HTML completo
+    container.innerHTML = `
+      <div class="border border-gray-200 rounded-lg overflow-hidden shadow-md">
+        ${headerHtml}
+        ${tituloHtml}
+        ${abasHtml}
+        ${visaoGeralHtml}
+        ${pontosTuristicosHtml}
+        ${climaHtml}
+        ${comentariosHtml}
+        ${botaoSelecaoHtml}
+      </div>
+    `;
+    
+    // Expor a função no objeto para ser acessível pelo onclick
+    this.trocarAba = trocarAba;
   },
   
-  // Renderizar destinos alternativos
+  // Renderizar destinos alternativos em grid
   renderizarDestinosAlternativos(destinos) {
     const container = document.getElementById('destinos-alternativos');
     if (!container) return;
     
-    container.innerHTML = '<h3 class="font-bold text-lg mt-2">Mais Destinos Incríveis</h3>';
+    container.innerHTML = '<h3 class="font-bold text-lg mt-4 mb-3">Mais Destinos Incríveis</h3>';
+    
+    // Criar container para o grid
+    const gridContainer = document.createElement('div');
+    gridContainer.className = 'grid grid-cols-2 gap-3';
+    container.appendChild(gridContainer);
     
     const destinosLimitados = destinos.slice(0, 4);
     destinosLimitados.forEach(destino => {
@@ -537,73 +690,84 @@ const BENETRIP_DESTINOS = {
       const precoIcone = precoReal ? '🔍 ' : '';
       
       const elementoDestino = document.createElement('div');
-      elementoDestino.className = 'card-destino border border-gray-200 rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow duration-200 mt-3';
+      elementoDestino.className = 'card-destino border border-gray-200 rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow duration-200 bg-white relative';
       elementoDestino.dataset.destino = destino.destino;
       
+      // Determinar ícone baseado no tipo de destino
+      const iconeTipo = this.determinarIconeTipoDestino(destino);
+      
       elementoDestino.innerHTML = `
-        <div class="flex">
-          <div class="w-1/3">
-            ${this.renderizarImagemComCreditos(
-              destino.imagens && destino.imagens.length > 0 ? destino.imagens[0] : null,
-              destino.destino,
-              'h-full'
-            )}
-          </div>
-          <div class="w-2/3 p-3">
-            <div class="flex justify-between items-start">
-              <h3 class="font-bold">${destino.destino}, ${destino.pais}</h3>
-              <span class="text-xs font-medium px-1 py-0.5 rounded" style="background-color: #E0E0E0;">
-                ${destino.codigoPais}
-              </span>
-            </div>
-            <div class="mt-2 space-y-1 text-xs">
-              <p class="flex items-center">
-                <span class="mr-1 w-4 text-center">✈️</span>
-                <span class="font-medium">Voo:</span>
-                <span class="ml-1 ${precoClasse}">${precoIcone}R$ ${destino.preco.voo}</span>
-              </p>
-              ${destino.detalhesVoo ? `
-                <p class="flex items-center justify-between bg-gray-50 px-1 py-0.5 rounded">
-                  <span>${destino.detalhesVoo.numeroParadas === 0 ? 'Direto' : destino.detalhesVoo.numeroParadas === 1 ? '1 parada' : `${destino.detalhesVoo.numeroParadas} paradas`}</span>
-                  <span>${destino.detalhesVoo.duracao || ''}</span>
-                </p>
-              ` : ''}
-              ${destino.aeroporto && destino.aeroporto.codigo ? `
-                <p class="flex items-center text-gray-600">
-                  <span class="mr-1 w-4 text-center">🛫</span>
-                  <span>${destino.aeroporto.codigo}</span>
-                </p>
-              ` : ''}
-              <p class="flex items-center">
-                <span class="mr-1 w-4 text-center">🏨</span>
-                <span class="font-medium">Hotel:</span>
-                <span class="ml-1">R$ ${destino.preco.hotel}/noite</span>
-              </p>
-              <p class="flex items-start mt-2">
-                <span class="mr-1 w-4 text-center flex-shrink-0">💡</span>
-                <span><span class="font-medium">Por que ir?:</span> <span class="ml-1">${destino.porque}</span></span>
-              </p>
-              ${destino.pontoTuristico ? `
-                <p class="mt-1">
-                  <span class="bg-blue-100 text-blue-800 text-xs px-2 py-0.5 rounded-full">${destino.pontoTuristico}</span>
-                </p>
-              ` : ''}
-            </div>
+        <div class="relative">
+          ${this.renderizarImagemComCreditos(
+            destino.imagens && destino.imagens.length > 0 ? destino.imagens[0] : null,
+            destino.destino,
+            'h-32'
+          )}
+          <div class="absolute top-2 right-2 bg-white bg-opacity-90 rounded-full p-1 shadow-sm">
+            <span class="text-lg">${iconeTipo}</span>
           </div>
         </div>
+        <div class="p-3">
+          <div class="flex justify-between items-start">
+            <h3 class="font-bold text-sm">${destino.destino}</h3>
+            <span class="text-xs font-medium px-1 py-0.5 rounded" style="background-color: #E0E0E0;">
+              ${destino.codigoPais}
+            </span>
+          </div>
+          <p class="text-xs text-gray-600 mb-2">${destino.pais}</p>
+          <div class="flex justify-between items-center">
+            <span class="text-sm ${precoClasse}">R$ ${destino.preco.voo}</span>
+            ${destino.aeroporto && destino.aeroporto.codigo ? 
+              `<span class="text-xs text-gray-500">${destino.aeroporto.codigo}</span>` : 
+              ''}
+          </div>
+          ${destino.pontoTuristico ? 
+            `<div class="mt-2">
+              <span class="bg-blue-50 text-blue-800 text-xs px-2 py-0.5 rounded-full inline-block max-w-full truncate">
+                ${destino.pontoTuristico}
+              </span>
+            </div>` : 
+            ''}
+        </div>
+        <div class="absolute inset-0 cursor-pointer" onclick="BENETRIP_DESTINOS.selecionarDestino('${destino.destino}')"></div>
       `;
       
-      container.appendChild(elementoDestino);
+      gridContainer.appendChild(elementoDestino);
     });
+  },
+  
+  // Método para determinar o ícone por tipo de destino
+  determinarIconeTipoDestino(destino) {
+    // Palavras-chave para categorizar os destinos
+    const destinos = {
+      praia: ['praia', 'mar', 'oceano', 'costa', 'ilha', 'caribe', 'litoral'],
+      montanha: ['montanha', 'montanhas', 'alpes', 'serra', 'cordilheira', 'neve', 'trilha'],
+      cidade: ['cidade', 'metrópole', 'capital', 'urbano', 'urbana'],
+      cultural: ['histórico', 'história', 'museu', 'arte', 'cultura', 'antigo'],
+      natureza: ['parque', 'natureza', 'floresta', 'selva', 'natural', 'flora', 'fauna']
+    };
     
-    // Botão "Mostrar Mais"
-    const btnMaisOpcoes = document.createElement('button');
-    btnMaisOpcoes.id = 'btn-mais-opcoes';
-    btnMaisOpcoes.className = 'w-full font-medium py-3 px-4 rounded transition-colors duration-200 hover:bg-blue-200 mt-3';
-    btnMaisOpcoes.style.backgroundColor = 'rgba(0, 163, 224, 0.15)';
-    btnMaisOpcoes.style.color = '#00A3E0';
-    btnMaisOpcoes.textContent = 'Mostrar Mais Opções';
-    container.appendChild(btnMaisOpcoes);
+    // Combinar todas as informações de texto para análise
+    const textoCompleto = `${destino.destino} ${destino.pais} ${destino.porque || ''} ${destino.pontoTuristico || ''}`.toLowerCase();
+    
+    // Verificar correspondências
+    for (const [tipo, palavrasChave] of Object.entries(destinos)) {
+      for (const palavra of palavrasChave) {
+        if (textoCompleto.includes(palavra)) {
+          // Retornar emoji correspondente
+          switch (tipo) {
+            case 'praia': return '🏖️';
+            case 'montanha': return '🏔️';
+            case 'cidade': return '🏙️';
+            case 'cultural': return '🏛️';
+            case 'natureza': return '🌿';
+          }
+        }
+      }
+    }
+    
+    // Emoji padrão se não encontrar correspondência
+    return '✈️';
   },
   
   // Renderizar opção "Me Surpreenda"
@@ -621,7 +785,7 @@ const BENETRIP_DESTINOS = {
     `;
   },
   
-  // Método para mostrar destino surpresa
+  // Método para mostrar destino surpresa com novo layout em abas
   mostrarDestinoSurpresa() {
     if (!this.recomendacoes || !this.recomendacoes.surpresa) {
       console.error('Destino surpresa não disponível');
@@ -634,93 +798,161 @@ const BENETRIP_DESTINOS = {
     const precoReal = destino.detalhesVoo ? true : false;
     const precoClasse = precoReal ? 'text-green-700 font-semibold' : '';
     const precoIcone = precoReal ? '🔍 ' : '';
+    const estacaoAno = this.obterEstacaoAno() || 'primavera';
     
+    // Criar o container do modal com classe para animação
     const modalContainer = document.createElement('div');
-    modalContainer.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto';
+    modalContainer.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto modal-surpresa-container';
     modalContainer.id = 'modal-surpresa';
     
+    // HTML do modal com design aprimorado
     modalContainer.innerHTML = `
-      <div class="bg-white rounded-lg w-full max-w-md relative max-h-[90vh] overflow-y-auto">
-        <button class="absolute top-2 right-2 text-gray-500 hover:text-gray-800 z-10" onclick="document.getElementById('modal-surpresa').remove()">
+      <div class="bg-white rounded-lg w-full max-w-md relative max-h-[90vh] overflow-y-auto transform transition-transform duration-500 modal-surpresa-content">
+        <button class="absolute top-3 right-3 text-white bg-gray-800 bg-opacity-50 rounded-full p-1 z-10 hover:bg-opacity-70 transition-all" 
+                onclick="document.getElementById('modal-surpresa').remove()">
           <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
           </svg>
         </button>
+        
+        <!-- Cabeçalho com imagem em destaque -->
         <div class="relative">
-          <div class="absolute top-0 left-0 py-1 px-3 z-10 font-bold text-white" style="background-color: #00A3E0;">
-            ✨ Destino Surpresa! ✨
-          </div>
-          <div class="grid grid-cols-1 gap-1">
+          <div class="h-56 bg-gray-200">
             ${this.renderizarImagemComCreditos(
               destino.imagens && destino.imagens.length > 0 ? destino.imagens[0] : null,
               destino.destino,
-              'h-56'
+              'h-full w-full'
             )}
           </div>
-        </div>
-        <div class="p-4">
-          <div class="flex justify-between items-start">
-            <h3 class="text-xl font-bold">${destino.destino}, ${destino.pais}</h3>
-            <span class="text-xs font-medium px-1 py-0.5 rounded" style="background-color: #E0E0E0;">
-              ${destino.codigoPais}
-            </span>
-          </div>
-          <div class="mt-3 space-y-1 text-sm">
-            <p class="flex items-center">
-              <span class="mr-2 w-5 text-center">✈️</span>
-              <span class="font-medium">Preço de Voo:</span>
-              <span class="ml-1 ${precoClasse}">${precoIcone}R$ ${destino.preco.voo} (ida e volta)</span>
-            </p>
-            ${this.prepararInformacoesVoo(destino)}
-            ${this.prepararInformacaoAeroporto(destino)}
-            <p class="flex items-center">
-              <span class="mr-2 w-5 text-center">🏨</span>
-              <span class="font-medium">Hotel:</span>
-              <span class="ml-1">R$ ${destino.preco.hotel}/noite</span>
-            </p>
-            <p class="flex items-center">
-              <span class="mr-2 w-5 text-center">🗓️</span>
-              <span class="font-medium">Duração da Viagem:</span>
-              <span class="ml-1">${this.obterDatasViagem()}</span>
-            </p>
-            <p class="flex items-start mt-2">
-              <span class="mr-2 w-5 text-center flex-shrink-0">🏛️</span>
-              <span><span class="font-medium">Por que ir?:</span> <span class="ml-1">${destino.porque}</span></span>
-            </p>
-            <p class="flex items-start">
-              <span class="mr-2 w-5 text-center flex-shrink-0">⭐</span>
-              <span><span class="font-medium">Destaque da Experiência:</span> <span class="ml-1">${destino.destaque}</span></span>
-            </p>
-            <div class="flex flex-wrap gap-1 mt-2">
-              ${destino.pontosTuristicos ? destino.pontosTuristicos.map(ponto => `<span class="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">${ponto}</span>`).join('') : ''}
+          
+          <div class="absolute top-0 left-0 right-0 p-4 bg-gradient-to-b from-black to-transparent">
+            <div class="inline-block py-1 px-3 mb-2 font-bold text-white rounded-full" style="background-color: #00A3E0;">
+              ✨ Destino Surpresa! ✨
             </div>
           </div>
-          <div class="mt-3 text-sm p-3 rounded" style="background-color: rgba(0, 163, 224, 0.1);">
-            <p class="flex items-start font-medium">
-              <span class="mr-2 flex-shrink-0">🔮</span>
-              <span>Por que é uma descoberta especial?</span>
-            </p>
-            <p class="mt-2">
-              ${destino.destino} é um tesouro escondido que combina perfeitamente com o que você busca! É um lugar menos explorado pelo turismo de massa, mas oferece experiências autênticas e memoráveis.
-            </p>
+          
+          <div class="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black to-transparent">
+            <h3 class="text-xl font-bold text-white drop-shadow-lg">${destino.destino}, ${destino.pais}</h3>
           </div>
-          <div class="mt-3 text-sm italic p-3 rounded" style="background-color: rgba(232, 119, 34, 0.1);">
-            <p class="flex items-start">
-              <span class="mr-2 flex-shrink-0">💬</span>
-              <span>"${destino.comentario}"</span>
-            </p>
+        </div>
+        
+        <!-- Sistema de abas -->
+        <div class="flex border-b border-gray-200 overflow-x-auto">
+          <button id="aba-surpresa-info" class="botao-aba aba-ativa px-4 py-2 text-sm font-medium" onclick="BENETRIP_DESTINOS.trocarAbaSurpresa('info')">
+            Informações
+          </button>
+          <button id="aba-surpresa-pontos" class="botao-aba aba-inativa px-4 py-2 text-sm font-medium" onclick="BENETRIP_DESTINOS.trocarAbaSurpresa('pontos')">
+            Pontos Turísticos
+          </button>
+          <button id="aba-surpresa-clima" class="botao-aba aba-inativa px-4 py-2 text-sm font-medium" onclick="BENETRIP_DESTINOS.trocarAbaSurpresa('clima')">
+            Clima
+          </button>
+        </div>
+        
+        <!-- Conteúdo da aba Informações -->
+        <div id="conteudo-surpresa-info" class="conteudo-aba-surpresa p-4">
+          <div class="bg-yellow-50 p-3 rounded-lg border border-yellow-100 mb-4">
+            <div class="flex items-start">
+              <span class="text-xl mr-2">🎁</span>
+              <div>
+                <p class="font-medium">Por que este é um destino especial:</p>
+                <p class="mt-1 text-sm">${destino.porque}</p>
+              </div>
+            </div>
           </div>
-          <div class="mt-3 p-3 rounded bg-yellow-50 text-sm">
-            <p class="flex items-start">
-              <span class="mr-2 flex-shrink-0">🎁</span>
-              <span class="font-medium">Curiosidade exclusiva:</span>
-              <span class="ml-1">Sabia que ${destino.destino} é um dos destinos mais autênticos para experimentar a cultura de ${destino.pais}? Poucos turistas conhecem todos os seus segredos!</span>
-            </p>
+          
+          <div class="grid grid-cols-2 gap-3 mb-4">
+            <div class="p-3 bg-gray-50 rounded-lg">
+              <p class="text-sm font-medium">Voo</p>
+              <p class="text-lg font-bold ${precoClasse}">R$ ${destino.preco.voo}</p>
+            </div>
+            
+            <div class="p-3 bg-gray-50 rounded-lg">
+              <p class="text-sm font-medium">Hotel</p>
+              <p class="text-lg font-bold">R$ ${destino.preco.hotel}/noite</p>
+            </div>
           </div>
-          <button class="w-full font-bold py-2.5 px-4 rounded mt-4 text-white transition-colors duration-200 hover:opacity-90" style="background-color: #E87722;" onclick="BENETRIP_DESTINOS.selecionarDestino('${destino.destino}'); document.getElementById('modal-surpresa').remove()">
+          
+          ${this.prepararInformacoesVoo(destino)}
+          ${this.prepararInformacaoAeroporto(destino)}
+          
+          <div class="p-3 bg-blue-50 rounded-lg mt-4">
+            <p class="font-medium">Experiência destacada:</p>
+            <p class="mt-1 text-sm">${destino.destaque || 'Descubra as belezas e encantos deste destino único!'}</p>
+          </div>
+          
+          <div class="mt-4 text-sm italic p-3 rounded-lg" style="background-color: rgba(232, 119, 34, 0.1);">
+            <div class="flex items-start">
+              <div class="w-8 h-8 rounded-full overflow-hidden flex-shrink-0 bg-orange-100 mr-2">
+                <img src="assets/images/tripinha/avatar-normal.png" alt="Tripinha" class="w-full h-full object-cover" onerror="this.src='https://placehold.co/40x40?text=🐶'">
+              </div>
+              <p>"${destino.comentario}"</p>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Conteúdo da aba Pontos Turísticos -->
+        <div id="conteudo-surpresa-pontos" class="conteudo-aba-surpresa p-4 hidden">
+          <p class="text-sm text-gray-600 mb-3">Lugares que você não pode deixar de conhecer:</p>
+          
+          ${destino.pontosTuristicos && destino.pontosTuristicos.length > 0 ? 
+            destino.pontosTuristicos.map((ponto, idx) => `
+              <div class="bg-white border border-gray-200 rounded-lg p-3 mb-3 shadow-sm">
+                <div class="flex items-center">
+                  <span class="font-bold text-lg mr-3 text-blue-600">${idx + 1}</span>
+                  <h5 class="font-medium">${ponto}</h5>
+                </div>
+                <p class="text-sm text-gray-600 mt-2">
+                  ${this.gerarDescricaoAutomatica(ponto, destino.destino)}
+                </p>
+              </div>
+            `).join('') : 
+            '<p class="text-center text-gray-500 my-6">Informações sobre pontos turísticos não disponíveis</p>'
+          }
+          
+          <div class="p-3 bg-yellow-50 rounded-lg border border-yellow-100 mt-3">
+            <div class="flex items-center mb-1">
+              <span class="mr-2">💡</span>
+              <span class="font-medium">Dica da Tripinha:</span>
+            </div>
+            <p class="text-sm">Este destino é menos conhecido pelos turistas, o que significa que você terá uma experiência mais autêntica e menos multidões!</p>
+          </div>
+        </div>
+        
+        <!-- Conteúdo da aba Clima -->
+        <div id="conteudo-surpresa-clima" class="conteudo-aba-surpresa p-4 hidden">
+          <div class="text-center bg-blue-50 p-4 rounded-lg">
+            <h4 class="font-medium text-lg mb-2">Clima durante sua viagem</h4>
+            <div class="text-5xl mb-3">
+              ${this.obterEmojiClima(estacaoAno)}
+            </div>
+            <p class="text-lg font-bold">${estacaoAno.charAt(0).toUpperCase() + estacaoAno.slice(1)}</p>
+            <p class="text-sm text-gray-600 mt-2">Temperatura média: ${this.obterTemperaturaMedia(destino.destino, estacaoAno)}</p>
+          </div>
+          
+          <div class="mt-4 bg-white border border-gray-200 rounded-lg p-3">
+            <h5 class="font-medium mb-2">Recomendações para esta estação:</h5>
+            <ul class="list-disc pl-5 text-sm text-gray-700 space-y-1">
+              ${this.obterRecomendacoesClima(estacaoAno).map(rec => `<li>${rec}</li>`).join('')}
+            </ul>
+          </div>
+          
+          <div class="mt-4 p-3 bg-gray-50 rounded-lg">
+            <h5 class="font-medium mb-1">Melhor época para visitar:</h5>
+            <p class="text-sm">${this.obterMelhorEpocaVisita(destino.destino)}</p>
+          </div>
+        </div>
+        
+        <!-- Botões de ação -->
+        <div class="p-4 border-t border-gray-200">
+          <button class="w-full font-bold py-3 px-4 rounded-lg text-white transition-colors duration-200 hover:opacity-90 mb-2" 
+            style="background-color: #E87722;" 
+            onclick="BENETRIP_DESTINOS.selecionarDestino('${destino.destino}'); document.getElementById('modal-surpresa').remove()">
             Quero Este Destino Surpresa!
           </button>
-          <button class="w-full font-medium py-2.5 px-4 rounded border border-gray-300 transition-colors duration-200 hover:bg-gray-100 mt-2" onclick="document.getElementById('modal-surpresa').remove()">
+          
+          <button class="w-full font-medium py-2.5 px-4 rounded-lg border border-gray-300 transition-colors duration-200 hover:bg-gray-100" 
+            onclick="document.getElementById('modal-surpresa').remove()">
             Voltar às Sugestões
           </button>
         </div>
@@ -728,6 +960,39 @@ const BENETRIP_DESTINOS = {
     `;
     
     document.body.appendChild(modalContainer);
+    
+    // Adicionar classe para animar entrada após um pequeno delay
+    setTimeout(() => {
+      const modalContent = document.querySelector('.modal-surpresa-content');
+      if (modalContent) {
+        modalContent.classList.add('scale-100');
+        modalContent.classList.remove('scale-95', 'opacity-0');
+      }
+    }, 10);
+    
+    // Função para trocar abas do modal surpresa
+    this.trocarAbaSurpresa = function(aba) {
+      // Ocultar conteúdo de todas as abas
+      document.querySelectorAll('.conteudo-aba-surpresa').forEach(el => {
+        el.classList.add('hidden');
+      });
+      
+      // Mostrar conteúdo da aba selecionada
+      const conteudoAba = document.getElementById(`conteudo-surpresa-${aba}`);
+      if (conteudoAba) conteudoAba.classList.remove('hidden');
+      
+      // Atualizar estilo dos botões de aba
+      document.querySelectorAll('.botao-aba').forEach(el => {
+        el.classList.remove('aba-ativa');
+        el.classList.add('aba-inativa');
+      });
+      
+      const botaoAba = document.getElementById(`aba-surpresa-${aba}`);
+      if (botaoAba) {
+        botaoAba.classList.remove('aba-inativa');
+        botaoAba.classList.add('aba-ativa');
+      }
+    };
   },
   
   // Método para mostrar mais opções
@@ -777,7 +1042,7 @@ const BENETRIP_DESTINOS = {
                 </label>
               </div>
               <p class="mt-3 text-sm">
-                Triper, o preço de voo mostrado (R$ ${destino.preco.voo}) é baseado em ${precoTipo} ${precoReal ? 'obtido em tempo real através da API da Amadeus' : 'e pode variar na etapa de reserva'}. ${destino.aeroporto ? `O voo considerado é para o aeroporto ${destino.aeroporto.nome} (${destino.aeroporto.codigo}).` : ''}
+                Só um aviso, Triper! Os preços que você está vendo são estimativas baseadas em buscas recentes. Os preços em tempo real aparecerão quando você escolher seus voos e hotéis com nossos parceiros confiáveis.
               </p>
             </div>
           </div>
@@ -837,6 +1102,226 @@ const BENETRIP_DESTINOS = {
       console.error('Erro ao processar datas:', erro);
     }
     return "5 a 12 de Agosto, 2025";
+  },
+  
+  // FUNÇÕES PARA INFORMAÇÕES DE CLIMA
+  obterEstacaoAno() {
+    try {
+      // Obter estação do ano dos dados da viagem ou determinar por data
+      if (this.recomendacoes && this.recomendacoes.estacaoViagem) {
+        return this.recomendacoes.estacaoViagem;
+      }
+      
+      // Lógica de fallback para determinar estação
+      const dataViagem = this.obterDataIdaObj();
+      if (!dataViagem) return 'primavera';
+      
+      const mes = dataViagem.getMonth();
+      
+      // Hemisfério Norte
+      if (mes >= 2 && mes <= 4) return 'primavera';
+      if (mes >= 5 && mes <= 7) return 'verão';
+      if (mes >= 8 && mes <= 10) return 'outono';
+      return 'inverno';
+    } catch (erro) {
+      console.error('Erro ao obter estação do ano:', erro);
+      return 'primavera';
+    }
+  },
+
+  obterDataIdaObj() {
+    try {
+      const dadosUsuario = this.dadosUsuario;
+      if (dadosUsuario && dadosUsuario.respostas && dadosUsuario.respostas.datas) {
+        const datas = dadosUsuario.respostas.datas;
+        if (datas.dataIda) {
+          return new Date(datas.dataIda);
+        }
+      }
+      return null;
+    } catch (erro) {
+      return null;
+    }
+  },
+
+  obterEmojiClima(estacao) {
+    const emojis = {
+      'primavera': '🌸',
+      'verão': '☀️',
+      'outono': '🍂',
+      'inverno': '❄️'
+    };
+    return emojis[estacao] || '🌤️';
+  },
+
+  obterTemperaturaMedia(destino, estacao) {
+    // Mapeamento de temperaturas aproximadas por região e estação
+    // Em uma implementação completa, isso viria da API de clima
+    const temperaturas = {
+      'primavera': { 'default': '18°C a 22°C' },
+      'verão': { 'default': '25°C a 30°C' },
+      'outono': { 'default': '15°C a 20°C' },
+      'inverno': { 'default': '5°C a 12°C' }
+    };
+    
+    // Adicionar algumas cidades específicas para demonstração
+    temperaturas.verão['Medellín'] = '22°C a 28°C';
+    temperaturas.inverno['Medellín'] = '17°C a 22°C';
+    
+    return temperaturas[estacao][destino] || temperaturas[estacao].default;
+  },
+
+  obterRecomendacoesClima(estacao) {
+    const recomendacoes = {
+      'primavera': [
+        'Leve roupas leves mas tenha um casaco para noites mais frias',
+        'Prepare-se para chuvas ocasionais',
+        'Ótima época para atividades ao ar livre'
+      ],
+      'verão': [
+        'Leve roupas leves e frescas',
+        'Protetor solar é essencial',
+        'Hidrate-se frequentemente durante passeios'
+      ],
+      'outono': [
+        'Leve camadas de roupas para se adaptar às mudanças de temperatura',
+        'Guarda-chuva compacto pode ser útil',
+        'Aproveite as cores da estação para fotos'
+      ],
+      'inverno': [
+        'Leve roupas quentes e impermeáveis',
+        'Prefira hospedagens com aquecimento',
+        'Verifique condições climáticas antes de passeios ao ar livre'
+      ]
+    };
+    
+    return recomendacoes[estacao] || recomendacoes.primavera;
+  },
+
+  obterMelhorEpocaVisita(destino) {
+    // Mapeamento simples de destinos e melhores épocas
+    // Em implementação real, isso viria da API
+    const melhoresEpocas = {
+      'Medellín': 'De dezembro a março (estação seca) ou de julho a agosto (verão do hemisfério norte).',
+      'Cartagena': 'De dezembro a abril, quando há menos chuvas e o clima é mais agradável.',
+      'default': 'A primavera e o outono costumam oferecer o melhor equilíbrio entre clima agradável e menos turistas.'
+    };
+    
+    return melhoresEpocas[destino] || melhoresEpocas.default;
+  },
+  
+  gerarDescricaoAutomatica(pontoTuristico, destino) {
+    // Gera descrições fictícias para pontos turísticos
+    // Em uma implementação real, isso viria dos dados da IA
+    const descricoes = [
+      `Um dos locais mais visitados de ${destino}, perfeito para fotos incríveis.`,
+      `Atração imperdível que representa a cultura local de ${destino}.`,
+      `Local histórico que conta muito sobre a história de ${destino}.`,
+      `Ponto turístico famoso por sua arquitetura e beleza natural.`,
+      `Destino popular entre turistas e moradores locais de ${destino}.`
+    ];
+    
+    // Usar o nome do ponto turístico para gerar um índice pseudo-aleatório
+    const hash = pontoTuristico.split('').reduce((sum, char) => sum + char.charCodeAt(0), 0);
+    const index = hash % descricoes.length;
+    
+    return descricoes[index];
+  },
+  
+  // Método para aplicar estilos modernos
+  aplicarEstilosModernos() {
+    // Criar elemento de estilo
+    const estiloElement = document.createElement('style');
+    estiloElement.textContent = `
+      /* Estilos para abas */
+      .aba-ativa {
+        color: #E87722;
+        border-bottom: 2px solid #E87722;
+        font-weight: 600;
+      }
+      
+      .aba-inativa {
+        color: #6B7280;
+        border-bottom: 2px solid transparent;
+      }
+      
+      /* Cards com profundidade */
+      .card-destino {
+        transition: all 0.3s ease;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.08);
+      }
+      
+      .card-destino:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 15px rgba(0,0,0,0.1);
+      }
+      
+      /* Animação para destino surpresa */
+      .modal-surpresa-content {
+        transform: scale(0.95);
+        opacity: 0;
+        transition: all 0.3s ease-out;
+      }
+      
+      .modal-surpresa-content.scale-100 {
+        transform: scale(1);
+        opacity: 1;
+      }
+      
+      /* Melhorias nas imagens */
+      .image-container {
+        position: relative;
+        overflow: hidden;
+      }
+      
+      .image-container img {
+        transition: transform 0.5s ease;
+      }
+      
+      .image-container:hover img {
+        transform: scale(1.05);
+      }
+      
+      /* Degradês funcionais */
+      .gradient-header {
+        background: linear-gradient(to bottom, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0) 100%);
+      }
+      
+      .gradient-footer {
+        background: linear-gradient(to top, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0) 100%);
+      }
+      
+      /* Melhorias na tipografia */
+      h3 {
+        letter-spacing: -0.01em;
+      }
+      
+      .text-price {
+        font-feature-settings: "tnum";
+        font-variant-numeric: tabular-nums;
+      }
+      
+      /* Indicador visual para cards clicáveis */
+      .card-destino::after {
+        content: "";
+        position: absolute;
+        bottom: 8px;
+        right: 8px;
+        width: 20px;
+        height: 20px;
+        background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="%23888" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17l9.2-9.2M17 17V7H7"/></svg>');
+        background-repeat: no-repeat;
+        opacity: 0.7;
+        transition: opacity 0.3s ease;
+      }
+      
+      .card-destino:hover::after {
+        opacity: 1;
+      }
+    `;
+    
+    // Adicionar ao documento
+    document.head.appendChild(estiloElement);
   }
 };
 
