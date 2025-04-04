@@ -1,7 +1,7 @@
 /**
  * BENETRIP - Visualização de Destinos Recomendados
  * Controla a exibição e interação dos destinos recomendados pela IA
- * Versão 2.1 - Integração com API Amadeus para preços reais e melhoria na montagem da query de imagens
+ * Versão 2.2 - Layout aprimorado, melhor suporte a dados dinâmicos e otimização da experiência do usuário
  */
 
 // Módulo de Destinos do Benetrip
@@ -480,17 +480,19 @@ const BENETRIP_DESTINOS = {
     
     return `
       <div class="image-container bg-gray-200 ${classes} relative">
-        <a href="${imagem.sourceUrl || '#'}" target="_blank" rel="noopener noreferrer" class="image-link block h-full">
-          <img src="${imagem.url}" alt="${imagem.alt || fallbackText}" class="w-full h-full object-cover" onerror="this.onerror=null; this.src='https://via.placeholder.com/400x224?text=${encodeURIComponent(fallbackText)}'">
-          <div class="zoom-icon absolute top-2 right-2 bg-white bg-opacity-70 p-1 rounded-full">
+        <img src="${imagem.url}" alt="${imagem.alt || fallbackText}" class="w-full h-full object-cover" onerror="this.onerror=null; this.src='https://via.placeholder.com/400x224?text=${encodeURIComponent(fallbackText)}'">
+        <div class="zoom-icon absolute top-2 right-2 bg-white bg-opacity-70 p-1 rounded-full">
+          <a href="${imagem.sourceUrl || '#'}" target="_blank" rel="noopener noreferrer" class="block" onclick="event.stopPropagation()">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <circle cx="11" cy="11" r="8"></circle>
               <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
             </svg>
-          </div>
-        </a>
+          </a>
+        </div>
         <div class="image-credit absolute bottom-0 left-0 right-0 bg-black bg-opacity-60 text-white text-xs p-1 truncate">
-          Foto por <a href="${imagem.photographerUrl || '#'}" target="_blank" rel="noopener noreferrer" class="underline">${imagem.photographer || 'Desconhecido'}</a>
+          <a href="${imagem.photographerUrl || '#'}" target="_blank" rel="noopener noreferrer" class="underline" onclick="event.stopPropagation()">
+            Foto por ${imagem.photographer || 'Desconhecido'}
+          </a>
         </div>
       </div>
     `;
@@ -505,7 +507,6 @@ const BENETRIP_DESTINOS = {
     const temImagens = destino.imagens && destino.imagens.length > 0;
     const precoReal = destino.detalhesVoo ? true : false;
     const precoClasse = precoReal ? 'text-green-700 font-semibold' : '';
-    const precoIcone = precoReal ? '🔍 ' : '';
     const estacaoAno = this.obterEstacaoAno() || 'primavera';
     
     // Imagem de cabeçalho expandida
@@ -558,24 +559,28 @@ const BENETRIP_DESTINOS = {
     let visaoGeralHtml = `
       <div id="conteudo-visao-geral" class="conteudo-aba p-4">
         <div class="grid grid-cols-2 gap-4">
-          <div class="bg-gray-50 p-3 rounded-lg">
-            <div class="flex items-center mb-2">
-              <span class="text-lg mr-2">✈️</span>
-              <span class="font-medium">Voo</span>
+          ${destino.preco && destino.preco.voo ? `
+            <div class="bg-gray-50 p-3 rounded-lg">
+              <div class="flex items-center mb-2">
+                <span class="text-lg mr-2">✈️</span>
+                <span class="font-medium">Voo</span>
+              </div>
+              <p class="text-lg font-bold ${precoClasse}">R$ ${destino.preco.voo}</p>
+              <p class="text-xs text-gray-500">Ida e volta</p>
+              ${this.prepararInformacoesVoo(destino)}
             </div>
-            <p class="text-lg font-bold ${precoClasse}">R$ ${destino.preco.voo}</p>
-            <p class="text-xs text-gray-500">Ida e volta</p>
-            ${this.prepararInformacoesVoo(destino)}
-          </div>
+          ` : ''}
           
-          <div class="bg-gray-50 p-3 rounded-lg">
-            <div class="flex items-center mb-2">
-              <span class="text-lg mr-2">🏨</span>
-              <span class="font-medium">Hospedagem</span>
+          ${destino.preco && destino.preco.hotel ? `
+            <div class="bg-gray-50 p-3 rounded-lg">
+              <div class="flex items-center mb-2">
+                <span class="text-lg mr-2">🏨</span>
+                <span class="font-medium">Hospedagem</span>
+              </div>
+              <p class="text-lg font-bold">R$ ${destino.preco.hotel}</p>
+              <p class="text-xs text-gray-500">Por noite</p>
             </div>
-            <p class="text-lg font-bold">R$ ${destino.preco.hotel}</p>
-            <p class="text-xs text-gray-500">Por noite</p>
-          </div>
+          ` : ''}
         </div>
         
         <div class="mt-4 bg-gray-50 p-3 rounded-lg">
@@ -605,14 +610,19 @@ const BENETRIP_DESTINOS = {
         <p class="text-sm text-gray-600 mb-3">Atrações imperdíveis em ${destino.destino}:</p>
         ${destino.pontosTuristicos && destino.pontosTuristicos.length > 0 ? 
           destino.pontosTuristicos.map((ponto, idx) => `
-            <div class="bg-white border border-gray-200 rounded-lg p-3 mb-3 shadow-sm">
+            <div class="bg-white border border-gray-200 rounded-lg p-3 mb-3 shadow-sm hover:shadow-md transition-all">
               <div class="flex items-center">
-                <span class="font-bold text-lg mr-3 text-blue-600">${idx + 1}</span>
+                <span class="flex items-center justify-center w-8 h-8 rounded-full mr-3 text-white font-bold" style="background-color: #00A3E0;">${idx + 1}</span>
                 <h5 class="font-medium">${ponto}</h5>
               </div>
-              <p class="text-sm text-gray-600 mt-2">
+              <p class="text-sm text-gray-600 mt-2 ml-11">
                 ${this.gerarDescricaoAutomatica(ponto, destino.destino)}
               </p>
+              ${idx === 0 && destino.imagens && destino.imagens.length > 1 ? `
+                <div class="mt-2 ml-11 rounded-lg overflow-hidden h-28">
+                  <img src="${destino.imagens[1].url}" alt="${ponto}" class="w-full h-full object-cover">
+                </div>
+              ` : ''}
             </div>
           `).join('') : 
           '<p class="text-center text-gray-500 my-6">Informações sobre pontos turísticos não disponíveis</p>'
@@ -629,13 +639,17 @@ const BENETRIP_DESTINOS = {
             ${this.obterEmojiClima(estacaoAno)}
           </div>
           <p class="text-lg font-bold">${estacaoAno.charAt(0).toUpperCase() + estacaoAno.slice(1)}</p>
-          <p class="text-sm text-gray-600 mt-2">Temperatura média: ${this.obterTemperaturaMedia(destino.destino, estacaoAno)}</p>
+          <p class="text-sm text-gray-600 mt-2">Temperatura média: ${destino.clima && destino.clima.temperatura || this.obterTemperaturaMedia(destino, estacaoAno)}</p>
+          ${destino.clima && destino.clima.condicoes ? `<p class="text-sm text-gray-600 mt-1">${destino.clima.condicoes}</p>` : ''}
         </div>
         
         <div class="mt-4 bg-white border border-gray-200 rounded-lg p-3">
           <h5 class="font-medium mb-2">Recomendações para esta estação:</h5>
           <ul class="list-disc pl-5 text-sm text-gray-700 space-y-1">
-            ${this.obterRecomendacoesClima(estacaoAno).map(rec => `<li>${rec}</li>`).join('')}
+            ${(destino.clima && destino.clima.recomendacoes ? 
+              (Array.isArray(destino.clima.recomendacoes) ? destino.clima.recomendacoes : [destino.clima.recomendacoes]) : 
+              this.obterRecomendacoesClima(destino, estacaoAno)
+            ).map(rec => `<li>${rec}</li>`).join('')}
           </ul>
         </div>
       </div>
@@ -650,14 +664,14 @@ const BENETRIP_DESTINOS = {
               <img src="assets/images/tripinha/avatar-normal.png" alt="Tripinha" class="w-full h-full object-cover" onerror="this.src='https://placehold.co/60x60?text=🐶'">
             </div>
             <div>
-              <p class="font-medium text-sm mb-1">Comentário da Tripinha:</p>
-              <p class="italic">"${destino.comentario}"</p>
+              <p class="font-medium text-sm mb-1">Minha experiência em ${destino.destino}:</p>
+              <p class="italic">"${destino.comentario || `Eu amei passear por ${destino.destino}! O cheiro das comidas locais fez meu focinho ficar alerta o tempo todo. Especialmente adorei visitar ${destino.pontosTuristicos && destino.pontosTuristicos.length > 0 ? destino.pontosTuristicos[0] : 'os pontos turísticos'} - uma experiência incrível! 🐾`}"</p>
             </div>
           </div>
         </div>
         
         <div class="mt-4 bg-gray-50 p-4 rounded-lg">
-          <h4 class="font-medium mb-2">Outras experiências:</h4>
+          <h4 class="font-medium mb-2">Dicas de outros viajantes:</h4>
           <div class="border-l-2 border-gray-300 pl-3 py-1">
             <p class="italic text-sm">"Adorei ${destino.destino}! A comida é incrível e as pessoas são muito receptivas. Recomendo visitar na ${estacaoAno}."</p>
             <p class="text-xs text-gray-500 mt-1">- Ana S., viajou em 2024</p>
@@ -709,7 +723,6 @@ const BENETRIP_DESTINOS = {
     destinosLimitados.forEach(destino => {
       const precoReal = destino.detalhesVoo ? true : false;
       const precoClasse = precoReal ? 'text-green-700 font-semibold' : '';
-      const precoIcone = precoReal ? '🔍 ' : '';
       
       const elementoDestino = document.createElement('div');
       elementoDestino.className = 'card-destino border border-gray-200 rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow duration-200 bg-white relative';
@@ -743,15 +756,24 @@ const BENETRIP_DESTINOS = {
               `<span class="text-xs text-gray-500">${destino.aeroporto.codigo}</span>` : 
               ''}
           </div>
-          ${destino.pontoTuristico ? 
-            `<div class="mt-2">
+          ${destino.pontoTuristico ? `
+            <div class="mt-2">
+              <div class="flex items-center">
+                <span class="text-xs mr-1">🎯</span>
+                <span class="text-xs text-gray-700">Destaque:</span>
+              </div>
               <span class="bg-blue-50 text-blue-800 text-xs px-2 py-0.5 rounded-full inline-block max-w-full truncate">
                 ${destino.pontoTuristico}
               </span>
-            </div>` : 
-            ''}
+            </div>
+          ` : ''}
+          <button 
+            class="w-full mt-3 py-1.5 px-2 rounded text-white text-sm font-medium transition-colors hover:opacity-90" 
+            style="background-color: #E87722;" 
+            onclick="BENETRIP_DESTINOS.selecionarDestino('${destino.destino}')">
+            Escolher Este Destino
+          </button>
         </div>
-        <div class="absolute inset-0 cursor-pointer" onclick="BENETRIP_DESTINOS.selecionarDestino('${destino.destino}')"></div>
       `;
       
       gridContainer.appendChild(elementoDestino);
@@ -800,7 +822,7 @@ const BENETRIP_DESTINOS = {
     container.innerHTML = `
       <div class="p-4 rounded-lg mt-2 text-white" style="background-color: #E87722;">
         <p class="font-bold text-lg text-center">Ainda não decidiu? Sem problemas! Clique em 'Me Surpreenda!' e eu escolho um lugar baseado nas suas vibes de viagem! 🐾</p>
-        <button id="btn-surpresa" class="w-full font-bold py-2.5 px-4 rounded mt-3 transition-colors duration-200 hover:bg-blue-600" style="background-color: #00A3E0;">
+        <button id="btn-surpresa" class="w-full font-bold py-2.5 px-4 rounded mt-3 transition-colors bg-white text-orange-500 hover:bg-gray-100">
           Me Surpreenda! 🎲
         </button>
       </div>
@@ -819,7 +841,6 @@ const BENETRIP_DESTINOS = {
     
     const precoReal = destino.detalhesVoo ? true : false;
     const precoClasse = precoReal ? 'text-green-700 font-semibold' : '';
-    const precoIcone = precoReal ? '🔍 ' : '';
     const estacaoAno = this.obterEstacaoAno() || 'primavera';
     
     // Criar o container do modal com classe para animação
@@ -827,12 +848,12 @@ const BENETRIP_DESTINOS = {
     modalContainer.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto modal-surpresa-container';
     modalContainer.id = 'modal-surpresa';
     
-    // HTML do modal com design aprimorado
+    // HTML do modal com design aprimorado e ajustes solicitados
     modalContainer.innerHTML = `
       <div class="bg-white rounded-lg w-full max-w-md relative max-h-[90vh] overflow-y-auto transform transition-transform duration-500 modal-surpresa-content">
-        <button class="absolute top-3 right-3 text-white bg-gray-800 bg-opacity-50 rounded-full p-1 z-10 hover:bg-opacity-70 transition-all" 
+        <button class="absolute top-3 right-3 z-10 w-8 h-8 flex items-center justify-center text-white bg-black bg-opacity-60 rounded-full hover:bg-opacity-80 transition-all" 
                 onclick="document.getElementById('modal-surpresa').remove()">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
           </svg>
         </button>
@@ -847,13 +868,14 @@ const BENETRIP_DESTINOS = {
             )}
           </div>
           
-          <div class="absolute top-0 left-0 right-0 p-4 bg-gradient-to-b from-black to-transparent">
+          <!-- Melhoria do título com fundo mais escuro para melhor visibilidade -->
+          <div class="absolute top-0 left-0 right-0 p-4 bg-gradient-to-b from-black via-black to-transparent" style="height: 50%;">
             <div class="inline-block py-1 px-3 mb-2 font-bold text-white rounded-full" style="background-color: #00A3E0;">
               ✨ Destino Surpresa! ✨
             </div>
           </div>
           
-          <div class="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black to-transparent">
+          <div class="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black via-black to-transparent" style="height: 50%;">
             <h3 class="text-xl font-bold text-white drop-shadow-lg">${destino.destino}, ${destino.pais}</h3>
           </div>
         </div>
@@ -884,15 +906,19 @@ const BENETRIP_DESTINOS = {
           </div>
           
           <div class="grid grid-cols-2 gap-3 mb-4">
-            <div class="p-3 bg-gray-50 rounded-lg">
-              <p class="text-sm font-medium">Voo</p>
-              <p class="text-lg font-bold ${precoClasse}">R$ ${destino.preco.voo}</p>
-            </div>
+            ${destino.preco && destino.preco.voo ? `
+              <div class="p-3 bg-gray-50 rounded-lg">
+                <p class="text-sm font-medium">Voo</p>
+                <p class="text-lg font-bold ${precoClasse}">R$ ${destino.preco.voo}</p>
+              </div>
+            ` : ''}
             
-            <div class="p-3 bg-gray-50 rounded-lg">
-              <p class="text-sm font-medium">Hotel</p>
-              <p class="text-lg font-bold">R$ ${destino.preco.hotel}/noite</p>
-            </div>
+            ${destino.preco && destino.preco.hotel ? `
+              <div class="p-3 bg-gray-50 rounded-lg">
+                <p class="text-sm font-medium">Hotel</p>
+                <p class="text-lg font-bold">R$ ${destino.preco.hotel}/noite</p>
+              </div>
+            ` : ''}
           </div>
           
           ${this.prepararInformacoesVoo(destino)}
@@ -908,25 +934,30 @@ const BENETRIP_DESTINOS = {
               <div class="w-8 h-8 rounded-full overflow-hidden flex-shrink-0 bg-orange-100 mr-2">
                 <img src="assets/images/tripinha/avatar-normal.png" alt="Tripinha" class="w-full h-full object-cover" onerror="this.src='https://placehold.co/40x40?text=🐶'">
               </div>
-              <p>"${destino.comentario}"</p>
+              <p>"${destino.comentario || `Eu adoro ${destino.destino}! É um lugar cheio de surpresas e meu focinho encontrou tantos cheiros diferentes! Você vai amar! 🐾`}"</p>
             </div>
           </div>
         </div>
         
-        <!-- Conteúdo da aba Pontos Turísticos -->
+        <!-- Conteúdo da aba Pontos Turísticos - Com layout melhorado conforme destino principal -->
         <div id="conteudo-surpresa-pontos" class="conteudo-aba-surpresa p-4 hidden">
           <p class="text-sm text-gray-600 mb-3">Lugares que você não pode deixar de conhecer:</p>
           
           ${destino.pontosTuristicos && destino.pontosTuristicos.length > 0 ? 
             destino.pontosTuristicos.map((ponto, idx) => `
-              <div class="bg-white border border-gray-200 rounded-lg p-3 mb-3 shadow-sm">
+              <div class="bg-white border border-gray-200 rounded-lg p-3 mb-3 shadow-sm hover:shadow-md transition-all">
                 <div class="flex items-center">
-                  <span class="font-bold text-lg mr-3 text-blue-600">${idx + 1}</span>
+                  <span class="flex items-center justify-center w-8 h-8 rounded-full mr-3 text-white font-bold" style="background-color: #00A3E0;">${idx + 1}</span>
                   <h5 class="font-medium">${ponto}</h5>
                 </div>
-                <p class="text-sm text-gray-600 mt-2">
+                <p class="text-sm text-gray-600 mt-2 ml-11">
                   ${this.gerarDescricaoAutomatica(ponto, destino.destino)}
                 </p>
+                ${idx === 0 && destino.imagens && destino.imagens.length > 1 ? `
+                  <div class="mt-2 ml-11 rounded-lg overflow-hidden h-28">
+                    <img src="${destino.imagens[1].url}" alt="${ponto}" class="w-full h-full object-cover">
+                  </div>
+                ` : ''}
               </div>
             `).join('') : 
             '<p class="text-center text-gray-500 my-6">Informações sobre pontos turísticos não disponíveis</p>'
@@ -941,7 +972,7 @@ const BENETRIP_DESTINOS = {
           </div>
         </div>
         
-        <!-- Conteúdo da aba Clima -->
+        <!-- Conteúdo da aba Clima - Com dados da IA -->
         <div id="conteudo-surpresa-clima" class="conteudo-aba-surpresa p-4 hidden">
           <div class="text-center bg-blue-50 p-4 rounded-lg">
             <h4 class="font-medium text-lg mb-2">Clima durante sua viagem</h4>
@@ -949,13 +980,17 @@ const BENETRIP_DESTINOS = {
               ${this.obterEmojiClima(estacaoAno)}
             </div>
             <p class="text-lg font-bold">${estacaoAno.charAt(0).toUpperCase() + estacaoAno.slice(1)}</p>
-            <p class="text-sm text-gray-600 mt-2">Temperatura média: ${this.obterTemperaturaMedia(destino.destino, estacaoAno)}</p>
+            <p class="text-sm text-gray-600 mt-2">Temperatura média: ${destino.clima && destino.clima.temperatura || this.obterTemperaturaMedia(destino, estacaoAno)}</p>
+            ${destino.clima && destino.clima.condicoes ? `<p class="text-sm text-gray-600 mt-1">${destino.clima.condicoes}</p>` : ''}
           </div>
           
           <div class="mt-4 bg-white border border-gray-200 rounded-lg p-3">
             <h5 class="font-medium mb-2">Recomendações para esta estação:</h5>
             <ul class="list-disc pl-5 text-sm text-gray-700 space-y-1">
-              ${this.obterRecomendacoesClima(estacaoAno).map(rec => `<li>${rec}</li>`).join('')}
+              ${(destino.clima && destino.clima.recomendacoes ? 
+                (Array.isArray(destino.clima.recomendacoes) ? destino.clima.recomendacoes : [destino.clima.recomendacoes]) : 
+                this.obterRecomendacoesClima(destino, estacaoAno)
+              ).map(rec => `<li>${rec}</li>`).join('')}
             </ul>
           </div>
           
@@ -1153,8 +1188,12 @@ const BENETRIP_DESTINOS = {
   },
 
   obterTemperaturaMedia(destino, estacao) {
-    // Mapeamento de temperaturas aproximadas por região e estação
-    // Em uma implementação completa, isso viria da API de clima
+    // Verificar se temos dados de clima da IA
+    if (destino && destino.clima && destino.clima.temperatura) {
+      return destino.clima.temperatura;
+    }
+    
+    // Fallback apenas se não houver dados da IA
     const temperaturas = {
       'primavera': { 'default': '18°C a 22°C' },
       'verão': { 'default': '25°C a 30°C' },
@@ -1166,10 +1205,18 @@ const BENETRIP_DESTINOS = {
     temperaturas.verão['Medellín'] = '22°C a 28°C';
     temperaturas.inverno['Medellín'] = '17°C a 22°C';
     
-    return temperaturas[estacao][destino] || temperaturas[estacao].default;
+    return temperaturas[estacao][destino.destino] || temperaturas[estacao].default;
   },
 
-  obterRecomendacoesClima(estacao) {
+  obterRecomendacoesClima(destino, estacao) {
+    // Verificar se temos recomendações de clima da IA
+    if (destino && destino.clima && destino.clima.recomendacoes) {
+      return Array.isArray(destino.clima.recomendacoes) 
+        ? destino.clima.recomendacoes 
+        : [destino.clima.recomendacoes];
+    }
+    
+    // Fallback apenas se não houver dados da IA
     const recomendacoes = {
       'primavera': [
         'Leve roupas leves mas tenha um casaco para noites mais frias',
