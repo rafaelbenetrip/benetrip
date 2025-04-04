@@ -473,37 +473,48 @@ const BENETRIP_DESTINOS = {
     `;
   },
   
-  // Método auxiliar para renderizar imagem com créditos - ADICIONADA CLASSE LOADING
-  renderizarImagemComCreditos(imagem, fallbackText, classes = '') {
-    if (!imagem) {
-      return `
-        <div class="bg-gray-200 ${classes}">
-          <img src="https://via.placeholder.com/400x224?text=${encodeURIComponent(fallbackText)}" alt="${fallbackText}" class="w-full h-full object-cover">
-        </div>
-      `;
-    }
-    
+  // Método auxiliar para renderizar imagem com créditos - CORRIGIDO PARA MELHOR ACESSO AOS LINKS
+renderizarImagemComCreditos(imagem, fallbackText, classes = '') {
+  if (!imagem) {
     return `
-      <div class="image-container loading bg-gray-200 ${classes} relative">
-        <img src="${imagem.url}" alt="${imagem.alt || fallbackText}" class="w-full h-full object-cover" 
-             onload="this.parentNode.classList.remove('loading')" 
-             onerror="this.onerror=null; this.src='https://via.placeholder.com/400x224?text=${encodeURIComponent(fallbackText)}'; this.parentNode.classList.remove('loading')">
-        <div class="zoom-icon absolute top-2 right-2 bg-white bg-opacity-70 p-1 rounded-full">
-          <a href="${imagem.sourceUrl || '#'}" target="_blank" rel="noopener noreferrer" class="block" onclick="event.stopPropagation()">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="11" cy="11" r="8"></circle>
-              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-            </svg>
-          </a>
-        </div>
-        <div class="image-credit absolute bottom-0 left-0 right-0 bg-black bg-opacity-60 text-white text-xs p-1 truncate">
-          <a href="${imagem.photographerUrl || '#'}" target="_blank" rel="noopener noreferrer" class="underline" onclick="event.stopPropagation()">
-            Foto por ${imagem.photographer || 'Desconhecido'}
-          </a>
-        </div>
+      <div class="bg-gray-200 ${classes}">
+        <img src="https://via.placeholder.com/400x224?text=${encodeURIComponent(fallbackText)}" alt="${fallbackText}" class="w-full h-full object-cover">
       </div>
     `;
-  },
+  }
+  
+  // Construir os créditos da imagem com link clicável garantido
+  const photographerLink = imagem.photographerUrl || '#';
+  const sourceLink = imagem.sourceUrl || '#';
+  const photographer = imagem.photographer || 'Desconhecido';
+
+  return `
+    <div class="image-container loading bg-gray-200 ${classes} relative">
+      <img src="${imagem.url}" alt="${imagem.alt || fallbackText}" class="w-full h-full object-cover" 
+           onload="this.parentNode.classList.remove('loading')" 
+           onerror="this.onerror=null; this.src='https://via.placeholder.com/400x224?text=${encodeURIComponent(fallbackText)}'; this.parentNode.classList.remove('loading')">
+      
+      <!-- Icone de lupa com link para fonte original -->
+      <a href="${sourceLink}" target="_blank" rel="noopener noreferrer" 
+         class="absolute top-2 right-2 bg-white bg-opacity-80 p-1.5 rounded-full z-10 hover:bg-opacity-100 transition-all"
+         onclick="event.stopPropagation(); window.open('${sourceLink}', '_blank');">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="8"></circle>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
+      </a>
+      
+      <!-- Créditos do fotógrafo com melhor posicionamento e visibilidade -->
+      <div class="absolute bottom-0 left-0 right-0 p-1.5 bg-black bg-opacity-70 text-white text-xs z-10">
+        <a href="${photographerLink}" target="_blank" rel="noopener noreferrer" 
+           class="text-white hover:underline"
+           onclick="event.stopPropagation(); window.open('${photographerLink}', '_blank');">
+          Foto por ${photographer}
+        </a>
+      </div>
+    </div>
+  `;
+},
   
   // Renderizar destino destaque com sistema de abas
   renderizarDestinoDestaque(destino) {
@@ -851,228 +862,216 @@ const BENETRIP_DESTINOS = {
   },
   
   // Método para mostrar destino surpresa - CORRIGIDO LAYOUT E MELHORADO GRADIENTE
-  mostrarDestinoSurpresa() {
-    if (!this.recomendacoes || !this.recomendacoes.surpresa) {
-      console.error('Destino surpresa não disponível');
-      return;
-    }
-    
-    const destino = this.recomendacoes.surpresa;
-    console.log('Mostrando destino surpresa:', destino);
-    
-    // Salvar temporariamente o destino selecionado para clima correto
-    this.destinoSelecionado = destino;
-    
-    const precoReal = destino.detalhesVoo ? true : false;
-    const precoClasse = precoReal ? 'text-green-700 font-semibold' : '';
-    const estacaoAno = this.obterEstacaoAno() || 'primavera';
-    
-    // Criar o container do modal com classe para animação
-    const modalContainer = document.createElement('div');
-    modalContainer.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto modal-surpresa-container';
-    modalContainer.id = 'modal-surpresa';
-    
-    // HTML do modal com design aprimorado e ajustes solicitados
-    modalContainer.innerHTML = `
-      <div class="bg-white rounded-lg w-full max-w-md relative max-h-[90vh] overflow-y-auto transform transition-transform duration-500 modal-surpresa-content">
-        <button class="absolute top-3 right-3 z-10 w-8 h-8 flex items-center justify-center text-white bg-black bg-opacity-60 rounded-full hover:bg-opacity-80 transition-all" 
-                onclick="document.getElementById('modal-surpresa').remove()">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
-        
-        <!-- Cabeçalho com imagem em destaque -->
-        <div class="relative">
-          <div class="h-56 bg-gray-200">
-            ${this.renderizarImagemComCreditos(
-              destino.imagens && destino.imagens.length > 0 ? destino.imagens[0] : null,
-              destino.destino,
-              'h-full w-full'
-            )}
-          </div>
-          
-          <!-- Melhoria do título com fundo mais escuro para melhor visibilidade -->
-          <div class="absolute top-0 left-0 right-0 p-4 bg-gradient-to-b from-black to-transparent" style="height: 40%;">
-            <div class="inline-block py-1 px-3 mb-2 font-bold text-white rounded-full" style="background-color: #00A3E0;">
-              ✨ Destino Surpresa! ✨
-            </div>
-          </div>
-          
-          <!-- Nome do destino com melhor visibilidade e contraste -->
-          <div class="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black via-black to-transparent" style="height: 60%;">
-            <h3 class="text-xl font-bold text-white drop-shadow-lg" style="text-shadow: 0 2px 4px rgba(0,0,0,0.9); position: relative; z-index: 5;">
-              ${destino.destino}, ${destino.pais}
-            </h3>
-          </div>
+  // Método para mostrar destino surpresa - CORRIGIDO COM LAYOUT AJUSTADO
+mostrarDestinoSurpresa() {
+  if (!this.recomendacoes || !this.recomendacoes.surpresa) {
+    console.error('Destino surpresa não disponível');
+    return;
+  }
+  
+  const destino = this.recomendacoes.surpresa;
+  console.log('Mostrando destino surpresa:', destino);
+  
+  // Salvar temporariamente o destino selecionado para clima correto
+  this.destinoSelecionado = destino;
+  
+  const precoReal = destino.detalhesVoo ? true : false;
+  const precoClasse = precoReal ? 'text-green-700 font-semibold' : '';
+  const estacaoAno = this.obterEstacaoAno() || 'primavera';
+  
+  // Criar o container do modal com classe para animação
+  const modalContainer = document.createElement('div');
+  modalContainer.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto modal-surpresa-container';
+  modalContainer.id = 'modal-surpresa';
+  
+  // HTML do modal com design corrigido
+  modalContainer.innerHTML = `
+    <div class="bg-white rounded-lg w-full max-w-md relative max-h-[90vh] overflow-hidden transform transition-transform duration-500 modal-surpresa-content">
+      <button class="absolute top-3 right-3 z-50 w-8 h-8 flex items-center justify-center text-white bg-black bg-opacity-60 rounded-full hover:bg-opacity-80 transition-all" 
+              onclick="document.getElementById('modal-surpresa').remove()">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
+      
+      <!-- Cabeçalho com imagem e título em design corrigido -->
+      <div style="height: 200px; position: relative; overflow: hidden;">
+        <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1;">
+          ${this.renderizarImagemComCreditos(
+            destino.imagens && destino.imagens.length > 0 ? destino.imagens[0] : null,
+            destino.destino,
+            'h-full w-full'
+          )}
         </div>
         
-        <!-- Sistema de abas -->
-        <div class="flex border-b border-gray-200 overflow-x-auto">
-          <button id="aba-surpresa-info" class="botao-aba aba-ativa px-4 py-2 text-sm font-medium" onclick="BENETRIP_DESTINOS.trocarAbaSurpresa('info')">
-            Informações
-          </button>
-          <button id="aba-surpresa-pontos" class="botao-aba aba-inativa px-4 py-2 text-sm font-medium" onclick="BENETRIP_DESTINOS.trocarAbaSurpresa('pontos')">
-            Pontos Turísticos
-          </button>
-          <button id="aba-surpresa-clima" class="botao-aba aba-inativa px-4 py-2 text-sm font-medium" onclick="BENETRIP_DESTINOS.trocarAbaSurpresa('clima')">
-            Clima
-          </button>
+        <!-- Banner superior -->
+        <div style="position: absolute; top: 0; left: 0; right: 0; z-index: 2; padding: 10px; background-color: #00A3E0; color: white; font-weight: bold; display: inline-block; border-bottom-right-radius: 10px;">
+          ✨ Destino Surpresa! ✨
         </div>
         
-        <!-- Conteúdo da aba Informações -->
-        <div id="conteudo-surpresa-info" class="conteudo-aba-surpresa p-4">
-          <div class="bg-yellow-50 p-3 rounded-lg border border-yellow-100 mb-4">
-            <div class="flex items-start">
-              <span class="text-xl mr-2">🎁</span>
-              <div>
-                <p class="font-medium">Por que este é um destino especial:</p>
-                <p class="mt-1 text-sm">${destino.porque}</p>
-              </div>
-            </div>
-          </div>
-          
-          <div class="grid grid-cols-2 gap-3 mb-4">
-            ${destino.preco && destino.preco.voo ? `
-              <div class="p-3 bg-gray-50 rounded-lg">
-                <p class="text-sm font-medium">Voo</p>
-                <p class="text-lg font-bold ${precoClasse}">R$ ${destino.preco.voo}</p>
-              </div>
-            ` : ''}
-            
-            ${destino.preco && destino.preco.hotel ? `
-              <div class="p-3 bg-gray-50 rounded-lg">
-                <p class="text-sm font-medium">Hotel</p>
-                <p class="text-lg font-bold">R$ ${destino.preco.hotel}/noite</p>
-              </div>
-            ` : ''}
-          </div>
-          
-          ${this.prepararInformacoesVoo(destino)}
-          ${this.prepararInformacaoAeroporto(destino)}
-          
-          <div class="p-3 bg-blue-50 rounded-lg mt-4">
-            <p class="font-medium">Experiência destacada:</p>
-            <p class="mt-1 text-sm">${destino.destaque || 'Descubra as belezas e encantos deste destino único!'}</p>
-          </div>
-          
-          <div class="mt-4 text-sm italic p-3 rounded-lg" style="background-color: rgba(232, 119, 34, 0.1);">
-            <div class="flex items-start">
-              <div class="w-10 h-10 rounded-full overflow-hidden flex-shrink-0 bg-orange-100 border-2 border-orange-200 mr-2">
-                <img src="assets/images/tripinha/avatar-normal.png" alt="Tripinha" class="w-full h-full object-cover" onerror="this.src='https://placehold.co/40x40?text=🐶'">
-              </div>
-              <p>"${destino.comentario || `Eu adoro ${destino.destino}! É um lugar cheio de surpresas e meu focinho encontrou tantos cheiros diferentes! Você vai amar! 🐾`}"</p>
-            </div>
-          </div>
-        </div>
-        
-        <!-- Conteúdo da aba Pontos Turísticos - Com layout melhorado conforme destino principal -->
-        <div id="conteudo-surpresa-pontos" class="conteudo-aba-surpresa p-4 hidden">
-          <p class="text-sm text-gray-600 mb-3">Lugares que você não pode deixar de conhecer:</p>
-          
-          ${destino.pontosTuristicos && destino.pontosTuristicos.length > 0 ? 
-            destino.pontosTuristicos.map((ponto, idx) => `
-              <div class="bg-white border border-gray-200 rounded-lg p-3 mb-3 shadow-sm hover:shadow-md transition-all">
-                <div class="flex items-center">
-                  <span class="flex items-center justify-center w-8 h-8 rounded-full mr-3 text-white font-bold" style="background-color: #00A3E0;">${idx + 1}</span>
-                  <h5 class="font-medium">${ponto}</h5>
-                </div>
-                <p class="text-sm text-gray-600 mt-2 ml-11">
-                  ${this.gerarDescricaoAutomatica(ponto, destino.destino)}
-                </p>
-                ${idx === 0 && destino.imagens && destino.imagens.length > 1 ? `
-                  <div class="mt-2 ml-11 rounded-lg overflow-hidden h-28">
-                    <img src="${destino.imagens[1].url}" alt="${ponto}" class="w-full h-full object-cover">
-                  </div>
-                ` : ''}
-              </div>
-            `).join('') : 
-            '<p class="text-center text-gray-500 my-6">Informações sobre pontos turísticos não disponíveis</p>'
-          }
-          
-          <div class="p-3 bg-yellow-50 rounded-lg border border-yellow-100 mt-3">
-            <div class="flex items-center mb-1">
-              <span class="mr-2">💡</span>
-              <span class="font-medium">Dica da Tripinha:</span>
-            </div>
-            <p class="text-sm">Este destino é menos conhecido pelos turistas, o que significa que você terá uma experiência mais autêntica e menos multidões!</p>
-          </div>
-        </div>
-        
-        <!-- Conteúdo da aba Clima - Com dados da IA -->
-        <div id="conteudo-surpresa-clima" class="conteudo-aba-surpresa p-4 hidden">
-          <div class="text-center bg-blue-50 p-4 rounded-lg">
-            <h4 class="font-medium text-lg mb-2">Clima durante sua viagem</h4>
-            <div class="text-5xl mb-3">
-              ${this.obterEmojiClima(estacaoAno)}
-            </div>
-            <p class="text-lg font-bold">${estacaoAno.charAt(0).toUpperCase() + estacaoAno.slice(1)}</p>
-            <p class="text-sm text-gray-600 mt-2">Temperatura média: ${destino.clima && destino.clima.temperatura || this.obterTemperaturaMedia(destino, estacaoAno)}</p>
-            ${destino.clima && destino.clima.condicoes ? `<p class="text-sm text-gray-600 mt-1">${destino.clima.condicoes}</p>` : ''}
-          </div>
-          
-          <div class="mt-4 bg-white border border-gray-200 rounded-lg p-3">
-            <h5 class="font-medium mb-2">Recomendações para esta estação:</h5>
-            <ul class="list-disc pl-5 text-sm text-gray-700 space-y-1">
-              ${(destino.clima && destino.clima.recomendacoes ? 
-                (Array.isArray(destino.clima.recomendacoes) ? destino.clima.recomendacoes : [destino.clima.recomendacoes]) : 
-                this.obterRecomendacoesClima(destino, estacaoAno)
-              ).map(rec => `<li>${rec}</li>`).join('')}
-            </ul>
-          </div>
-          
-          <div class="mt-4 p-3 bg-gray-50 rounded-lg">
-            <h5 class="font-medium mb-1">Melhor época para visitar:</h5>
-            <p class="text-sm">${this.obterMelhorEpocaVisita(destino.destino)}</p>
-          </div>
-        </div>
-        
-        <!-- Botões de ação -->
-        <div class="p-4 border-t border-gray-200">
-          <button class="w-full font-bold py-3 px-4 rounded-lg text-white transition-colors duration-200 hover:opacity-90 mb-2" 
-            style="background-color: #E87722;" 
-            onclick="BENETRIP_DESTINOS.selecionarDestino('${destino.destino}'); document.getElementById('modal-surpresa').remove()">
-            Quero Este Destino Surpresa!
-          </button>
-          
-          <button class="w-full font-medium py-2.5 px-4 rounded-lg border border-gray-300 transition-colors duration-200 hover:bg-gray-100" 
-            onclick="document.getElementById('modal-surpresa').remove()">
-            Voltar às Sugestões
-          </button>
+        <!-- Título com melhor contraste -->
+        <div style="position: absolute; bottom: 0; left: 0; right: 0; z-index: 2; background: linear-gradient(to top, rgba(0,0,0,0.9), rgba(0,0,0,0.6) 60%, transparent 100%); padding: 15px;">
+          <h3 class="text-xl font-bold text-white" style="text-shadow: 0 2px 4px rgba(0,0,0,0.9);">
+            ${destino.destino}, ${destino.pais}
+          </h3>
         </div>
       </div>
-    `;
-    
-    document.body.appendChild(modalContainer);
-    
-    // Adicionar classe para animar entrada após um pequeno delay
-    setTimeout(() => {
-      const modalContent = document.querySelector('.modal-surpresa-content');
-      if (modalContent) {
-        modalContent.classList.add('scale-100');
-        modalContent.classList.remove('scale-95', 'opacity-0');
-      }
-    }, 10);
-    
-    // Fechar modal ao clicar fora - ADICIONADO
-    modalContainer.addEventListener('click', function(e) {
-      if (e.target === this) {
-        this.remove();
-        BENETRIP_DESTINOS.destinoSelecionado = null;
-      }
-    });
-    
-    // Limpar destino selecionado após fechar o modal
-    const modalElement = document.getElementById('modal-surpresa');
-    if (modalElement) {
-      modalElement.addEventListener('click', (event) => {
-        if (event.target === modalElement) {
-          this.destinoSelecionado = null;
-          modalElement.remove();
+      
+      <!-- Sistema de abas - Agora após a imagem e o título -->
+      <div class="flex border-b border-gray-200 overflow-x-auto">
+        <button id="aba-surpresa-info" class="botao-aba aba-ativa px-4 py-2 text-sm font-medium" onclick="BENETRIP_DESTINOS.trocarAbaSurpresa('info')">
+          Informações
+        </button>
+        <button id="aba-surpresa-pontos" class="botao-aba aba-inativa px-4 py-2 text-sm font-medium" onclick="BENETRIP_DESTINOS.trocarAbaSurpresa('pontos')">
+          Pontos Turísticos
+        </button>
+        <button id="aba-surpresa-clima" class="botao-aba aba-inativa px-4 py-2 text-sm font-medium" onclick="BENETRIP_DESTINOS.trocarAbaSurpresa('clima')">
+          Clima
+        </button>
+      </div>
+      
+      <!-- Conteúdo da aba Informações -->
+      <div id="conteudo-surpresa-info" class="conteudo-aba-surpresa p-4 overflow-y-auto" style="max-height: calc(90vh - 280px);">
+        <div class="bg-yellow-50 p-3 rounded-lg border border-yellow-100 mb-4">
+          <div class="flex items-start">
+            <span class="text-xl mr-2">🎁</span>
+            <div>
+              <p class="font-medium">Por que este é um destino especial:</p>
+              <p class="mt-1 text-sm">${destino.porque || 'Ponta Negra e suas dunas.'}</p>
+            </div>
+          </div>
+        </div>
+        
+        <div class="grid grid-cols-2 gap-3 mb-4">
+          ${destino.preco && destino.preco.voo ? `
+            <div class="p-3 bg-gray-50 rounded-lg">
+              <p class="text-sm font-medium">Voo</p>
+              <p class="text-lg font-bold ${precoClasse}">R$ ${destino.preco.voo}</p>
+            </div>
+          ` : ''}
+          
+          ${destino.preco && destino.preco.hotel ? `
+            <div class="p-3 bg-gray-50 rounded-lg">
+              <p class="text-sm font-medium">Hotel</p>
+              <p class="text-lg font-bold">R$ ${destino.preco.hotel}/noite</p>
+            </div>
+          ` : ''}
+        </div>
+        
+        ${this.prepararInformacoesVoo(destino)}
+        ${this.prepararInformacaoAeroporto(destino)}
+        
+        <div class="p-3 bg-blue-50 rounded-lg mt-4">
+          <p class="font-medium">Experiência destacada:</p>
+          <p class="mt-1 text-sm">${destino.destaque || 'Passeio de buggy pelas dunas.'}</p>
+        </div>
+        
+        <div class="mt-4 text-sm italic p-3 rounded-lg" style="background-color: rgba(232, 119, 34, 0.1);">
+          <div class="flex items-start">
+            <div class="w-10 h-10 rounded-full overflow-hidden flex-shrink-0 bg-orange-100 border-2 border-orange-200 mr-2">
+              <img src="assets/images/tripinha/avatar-normal.png" alt="Tripinha" class="w-full h-full object-cover" onerror="this.src='https://placehold.co/40x40?text=🐶'">
+            </div>
+            <p>"${destino.comentario || `Foi incrível visitar a Praia de Ponta Negra e explorar as dunas de Natal!`}"</p>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Conteúdo da aba Pontos Turísticos -->
+      <div id="conteudo-surpresa-pontos" class="conteudo-aba-surpresa p-4 overflow-y-auto hidden" style="max-height: calc(90vh - 280px);">
+        <p class="text-sm text-gray-600 mb-3">Lugares que você não pode deixar de conhecer:</p>
+        
+        ${destino.pontosTuristicos && destino.pontosTuristicos.length > 0 ? 
+          destino.pontosTuristicos.map((ponto, idx) => `
+            <div class="bg-white border border-gray-200 rounded-lg p-3 mb-3 shadow-sm hover:shadow-md transition-all">
+              <div class="flex items-center">
+                <span class="flex items-center justify-center w-8 h-8 rounded-full mr-3 text-white font-bold" style="background-color: #00A3E0;">${idx + 1}</span>
+                <h5 class="font-medium">${ponto}</h5>
+              </div>
+              <p class="text-sm text-gray-600 mt-2 ml-11">
+                ${this.gerarDescricaoAutomatica(ponto, destino.destino)}
+              </p>
+              ${idx === 0 && destino.imagens && destino.imagens.length > 1 ? `
+                <div class="mt-2 ml-11 rounded-lg overflow-hidden h-28">
+                  <img src="${destino.imagens[1].url}" alt="${ponto}" class="w-full h-full object-cover">
+                </div>
+              ` : ''}
+            </div>
+          `).join('') : 
+          '<p class="text-center text-gray-500 my-6">Informações sobre pontos turísticos não disponíveis</p>'
         }
-      });
+        
+        <div class="p-3 bg-yellow-50 rounded-lg border border-yellow-100 mt-3">
+          <div class="flex items-center mb-1">
+            <span class="mr-2">💡</span>
+            <span class="font-medium">Dica da Tripinha:</span>
+          </div>
+          <p class="text-sm">Este destino é menos conhecido pelos turistas, o que significa que você terá uma experiência mais autêntica e menos multidões!</p>
+        </div>
+      </div>
+      
+      <!-- Conteúdo da aba Clima -->
+      <div id="conteudo-surpresa-clima" class="conteudo-aba-surpresa p-4 overflow-y-auto hidden" style="max-height: calc(90vh - 280px);">
+        <div class="text-center bg-blue-50 p-4 rounded-lg">
+          <h4 class="font-medium text-lg mb-2">Clima durante sua viagem</h4>
+          <div class="text-5xl mb-3">
+            ${this.obterEmojiClima(estacaoAno)}
+          </div>
+          <p class="text-lg font-bold">${estacaoAno.charAt(0).toUpperCase() + estacaoAno.slice(1)}</p>
+          <p class="text-sm text-gray-600 mt-2">Temperatura média: ${destino.clima && destino.clima.temperatura || this.obterTemperaturaMedia(destino, estacaoAno)}</p>
+          ${destino.clima && destino.clima.condicoes ? `<p class="text-sm text-gray-600 mt-1">${destino.clima.condicoes}</p>` : ''}
+        </div>
+        
+        <div class="mt-4 bg-white border border-gray-200 rounded-lg p-3">
+          <h5 class="font-medium mb-2">Recomendações para esta estação:</h5>
+          <ul class="list-disc pl-5 text-sm text-gray-700 space-y-1">
+            ${(destino.clima && destino.clima.recomendacoes ? 
+              (Array.isArray(destino.clima.recomendacoes) ? destino.clima.recomendacoes : [destino.clima.recomendacoes]) : 
+              this.obterRecomendacoesClima(destino, estacaoAno)
+            ).map(rec => `<li>${rec}</li>`).join('')}
+          </ul>
+        </div>
+        
+        <div class="mt-4 p-3 bg-gray-50 rounded-lg">
+          <h5 class="font-medium mb-1">Melhor época para visitar:</h5>
+          <p class="text-sm">${this.obterMelhorEpocaVisita(destino.destino)}</p>
+        </div>
+      </div>
+      
+      <!-- Botões de ação -->
+      <div class="p-4 border-t border-gray-200">
+        <button class="w-full font-bold py-3 px-4 rounded-lg text-white transition-colors duration-200 hover:opacity-90 mb-2" 
+          style="background-color: #E87722;" 
+          onclick="BENETRIP_DESTINOS.selecionarDestino('${destino.destino}'); document.getElementById('modal-surpresa').remove()">
+          Quero Este Destino Surpresa!
+        </button>
+        
+        <button class="w-full font-medium py-2.5 px-4 rounded-lg border border-gray-300 transition-colors duration-200 hover:bg-gray-100" 
+          onclick="document.getElementById('modal-surpresa').remove()">
+          Voltar às Sugestões
+        </button>
+      </div>
+    </div>
+  `;
+  
+  document.body.appendChild(modalContainer);
+  
+  // Adicionar classe para animar entrada após um pequeno delay
+  setTimeout(() => {
+    const modalContent = document.querySelector('.modal-surpresa-content');
+    if (modalContent) {
+      modalContent.classList.add('scale-100');
+      modalContent.classList.remove('scale-95', 'opacity-0');
     }
-  },
+  }, 10);
+  
+  // Fechar modal ao clicar fora
+  modalContainer.addEventListener('click', function(e) {
+    if (e.target === this) {
+      this.remove();
+      BENETRIP_DESTINOS.destinoSelecionado = null;
+    }
+  });
+},
   
   // Método para mostrar mais opções
   mostrarMaisOpcoes() {
