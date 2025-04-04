@@ -1,358 +1,294 @@
-/**
- * BENETRIP - Visualização de Voos
- * Controla a exibição e interação com os resultados de voos
- * Versão corrigida para resolver problemas de transição do fluxo de destinos
- */
+// api/flight-search.js - Endpoint Vercel para busca de voos
+const axios = require('axios');
+const crypto = require('crypto');
 
-const BENETRIP_VOOS = {
-    /**
-     * Configuração do módulo
-     */
-    config: {
-        imagePath: 'assets/images/',
-        companhiasLogos: {
-            'AA': 'american-airlines.png',
-            'LA': 'latam.png',
-            'G3': 'gol.png',
-            'AD': 'azul.png',
-            'CM': 'copa.png',
-            'AV': 'avianca.png',
-            'UA': 'united.png',
-            'DL': 'delta.png',
-            'default': 'airline-default.png'
+module.exports = async function handler(req, res) {
+  // Configurar cabeçalhos CORS
+  res.setHeader('Access-Control-Allow-Credentials', true);
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  
+  // Lidar com requisições OPTIONS (CORS preflight)
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+  
+  // Apenas permitir requisições POST
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: "Método não permitido" });
+  }
+
+  try {
+    console.log('Recebendo requisição de busca de voos no Vercel');
+    const params = req.body;
+    
+    // Obter token da API e marker do ambiente
+    const token = process.env.AVIASALES_TOKEN;
+    const marker = process.env.AVIASALES_MARKER;
+    
+    // Verificar se o token e marker estão configurados
+    if (!token || !marker) {
+      console.error("Token ou Marker da API Aviasales não configurados!");
+      return res.status(500).json({ 
+        error: "Configuração da API incompleta", 
+        success: false
+      });
+    }
+    
+    console.log('Token:', token.substring(0, 4) + '****');
+    console.log('Marker:', marker);
+    
+    // Preparar dados para a requisição
+    const data = {
+      marker: marker,
+      host: process.env.HOST || "benetrip.com.br",
+      user_ip: req.headers['x-forwarded-for'] || req.headers['client-ip'] || req.connection.remoteAddress || "127.0.0.1",
+      locale: "pt",
+      trip_class: params.classe || "Y",
+      passengers: {
+        adults: params.adultos || 1,
+        children: params.criancas || 0,
+        infants: params.bebes || 0
+      },
+      segments: []
+    };
+    
+    // Validar parâmetros obrigatórios
+    if (!params.origem || !params.destino || !params.dataIda) {
+      return res.status(400).json({ 
+        error: "Parâmetros obrigatórios faltando: origem, destino ou dataIda", 
+        params: params,
+        success: false
+      });
+    }
+    
+    // Adicionar segmento de ida
+    data.segments.push({
+      origin: params.origem,
+      destination: params.destino,
+      date: params.dataIda
+    });
+    
+    // Adicionar segmento de volta, se aplicável
+    if (params.dataVolta) {
+      data.segments.push({
+        origin: params.destino,
+        destination: params.origem,
+        date: params.dataVolta
+      });
+    }
+    
+    // Gerar assinatura para a API Aviasales
+    const signature = generateSignature(data, token);
+    data.signature = signature;
+    
+    console.log('Dados da requisição:', JSON.stringify(data, null, 2));
+    
+    // Fazer a requisição à API Aviasales
+    const searchResponse = await axios.post(
+      "https://api.travelpayouts.com/v1/flight_search",
+      data,
+      {
+        headers: {
+          "Content-Type": "application/json"
         },
-        animationDelay: 300,
-        debug: true // Habilita logs detalhados para debug
-    },
+        timeout: 10000 // 10 segundos
+      }
+    );
+    
+    console.log('Resposta da API: status', searchResponse.status);
+    
+    const searchId = searchResponse.data.search_id;
+    console.log('Search ID:', searchId);
+    
+    if (!searchId) {
+      console.error('Nenhum search_id retornado:', searchResponse.data);
+      return res.status(500).json({ 
+        error: "Falha na busca: API não retornou ID de busca", 
+        success: false, 
+        apiResponse: searchResponse.data 
+      });
+    }
+    
+    // Fazer várias tentativas para obter resultados
+    let resultados = null;
+    let tentativas = 0;
+    const maxTentativas = 5;
+    
+    while (tentativas < maxTentativas) {
+      tentativas++;
+      console.log(`Tentativa ${tentativas} de ${maxTentativas} para obter resultados...`);
+      
+      // Esperar entre as tentativas
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      
+      // Buscar resultados
+      const resultsResponse = await axios.get(
+        `https://api.travelpayouts.com/v1/flight_search_results?uuid=${searchId}`,
+        { timeout: 8000 }
+      );
+      
+      // Verificar se já temos resultados completos
+      if (resultsResponse.data && 
+          resultsResponse.data.proposals && 
+          resultsResponse.data.proposals.length > 0) {
+        console.log(`Encontrados ${resultsResponse.data.proposals.length} resultados`);
+        resultados = resultsResponse.data;
+        break;
+      }
+      
+      // Se for a última resposta com apenas search_id, significa que a busca continua
+      if (tentativas === maxTentativas && 
+          resultsResponse.data && 
+          Object.keys(resultsResponse.data).length === 1 &&
+          resultsResponse.data.search_id) {
+        console.log('A busca ainda está em andamento. Retornando o search_id para polling posterior');
+        return res.status(202).json({
+          success: true,
+          searchId: searchId,
+          message: "A busca está em andamento. Use o searchId para verificar os resultados posteriormente.",
+          tentativas: tentativas
+        });
+      }
+    }
+    
+    // Retornar resultados processados
+    return res.status(200).json({
+      success: true,
+      searchId: searchId,
+      resultados: resultados,
+      tentativas: tentativas
+    });
+    
+  } catch (error) {
+    console.error("Erro na busca de voos no Vercel:", error);
+    
+    // Verificar se é um erro da API
+    if (error.response) {
+      console.error("Status da resposta:", error.response.status);
+      console.error("Dados da resposta:", error.response.data);
+      
+      // Erro 401 - Problema de autenticação
+      if (error.response.status === 401) {
+        return res.status(500).json({
+          error: "Erro de autenticação na API. Verifique o token e a assinatura.",
+          status: error.response.status,
+          data: error.response.data,
+          success: false
+        });
+      }
+      
+      // Outros erros com resposta
+      return res.status(500).json({
+        error: `Erro na API: ${error.response.status} - ${error.response.statusText}`,
+        data: error.response.data,
+        success: false
+      });
+    }
+    
+    // Erros genéricos
+    return res.status(500).json({ 
+      error: error.message,
+      success: false
+    });
+  }
+}
 
-    /**
-     * Estados do módulo
-     */
-    estado: {
-        resultados: null,
-        voosSelecionados: [],
-        filtros: {
-            precoMax: null,
-            precoMin: null,
-            companhias: [],
-            paradas: null,
-            duracao: null
-        },
-        ordenacao: 'preco',
-        fluxo: null,
-        destinoEscolhido: null
-    },
-
-    /**
-     * Inicializa o módulo de voos
-     */
-    init() {
-        this.log("Inicializando módulo de voos...");
+// Função para gerar a assinatura da API
+function generateSignature(params, token) {
+  if (!token) {
+    console.warn("Token da API Aviasales não configurado!");
+    return "fake_signature_placeholder";
+  }
+  
+  try {
+    // 1. Extrair todos os parâmetros e valores
+    const flatValues = [];
+    
+    // Função auxiliar para extrair valores recursivamente
+    function extractValues(obj) {
+      if (!obj) return;
+      
+      for (const key of Object.keys(obj).sort()) {
+        const value = obj[key];
         
-        // Carregar dados
-        this.carregarDados();
-        
-        // Renderizar interface
-        this.renderizarInterface();
-        
-        // Configurar eventos
-        this.configurarEventos();
-        
-        return this;
-    },
-
-    /**
-     * Método de log com suporte a debug
-     */
-    log(mensagem, dados = null) {
-        if (!this.config.debug) return;
-        
-        console.log(`[BENETRIP_VOOS] ${mensagem}`);
-        if (dados !== null) {
-            console.log(dados);
-        }
-    },
-
-    /**
-     * Carrega dados do localStorage
-     */
-    carregarDados() {
-        try {
-            // Carregar preferências do usuário
-            const dadosUsuario = localStorage.getItem('benetrip_user_data');
-            this.log("Dados do usuário encontrados no localStorage", dadosUsuario ? "Sim" : "Não");
-            
-            if (dadosUsuario) {
-                this.estado.dadosUsuario = JSON.parse(dadosUsuario);
-                // Garantir que o fluxo existe, com valor padrão caso não exista
-                this.estado.fluxo = this.estado.dadosUsuario.fluxo || 'destino_desconhecido';
-                this.log("Fluxo identificado", this.estado.fluxo);
-            } else {
-                this.log("Dados do usuário não encontrados, redirecionando para início");
-                this.redirecionarParaInicio();
-                return;
-            }
-            
-            // Verificar destino selecionado (tentando ambas as nomenclaturas)
-            let destinoLocalStorage = localStorage.getItem('benetrip_destino_selecionado') || 
-                                      localStorage.getItem('benetrip_destino_escolhido');
-                                      
-            this.log("Destino encontrado no localStorage", destinoLocalStorage ? "Sim" : "Não");
-            
-            if (destinoLocalStorage) {
-                try {
-                    this.estado.destinoEscolhido = JSON.parse(destinoLocalStorage);
-                    this.log("Destino escolhido carregado com sucesso", this.estado.destinoEscolhido);
-                    
-                    // Padronizar o localStorage (se necessário)
-                    if (!localStorage.getItem('benetrip_destino_escolhido')) {
-                        localStorage.setItem('benetrip_destino_escolhido', destinoLocalStorage);
-                    }
-                } catch (parseError) {
-                    this.log("Erro ao processar destino escolhido", parseError.message);
-                    // Continuar mesmo com erro, pois pode haver outro fluxo
-                }
-            } else if (this.estado.fluxo !== 'destino_conhecido') {
-                // Só redirecionar se não estiver no fluxo de destino conhecido
-                this.log("Destino escolhido não encontrado, redirecionando para destinos");
-                this.redirecionarParaDestinos();
-                return;
-            }
-            
-            // Carregar resultados de voos
-            const resultadosVoos = localStorage.getItem('benetrip_resultados_voos');
-            if (resultadosVoos) {
-                this.estado.resultados = JSON.parse(resultadosVoos);
-                this.log("Resultados de voos carregados do localStorage");
-                
-                // Configurar filtros baseados nos resultados
-                this.configurarFiltrosIniciais();
-            } else {
-                // Se não tiver resultados, buscar voos
-                this.log("Nenhum resultado de voo encontrado, iniciando busca");
-                this.buscarVoos();
-            }
-            
-            this.log("Dados carregados com sucesso");
-        } catch (erro) {
-            console.error("Erro ao carregar dados:", erro);
-            this.redirecionarParaInicio();
-        }
-    },
-
-    /**
-     * Configura os filtros iniciais baseados nos resultados
-     */
-    configurarFiltrosIniciais() {
-        if (!this.estado.resultados || !this.estado.resultados.voos) return;
-        
-        // Código existente...
-    },
-
-    /**
-     * Redireciona para a página inicial
-     */
-    redirecionarParaInicio() {
-        alert("Precisamos de algumas informações antes de mostrar os voos. Vamos recomeçar!");
-        window.location.href = 'index.html';
-    },
-
-    /**
-     * Redireciona para a página de destinos
-     */
-    redirecionarParaDestinos() {
-        alert("Antes de ver os voos, você precisa escolher um destino!");
-        window.location.href = 'destinos.html';
-    },
-
-    /**
-     * Busca voos usando a API
-     */
-    buscarVoos() {
-        // Mostrar overlay de carregamento
-        this.mostrarCarregando(true, "Buscando as melhores opções de voos...");
-        
-        // Verificar se o serviço API está disponível
-        if (!window.BENETRIP_API) {
-            console.error("Serviço de API não disponível");
-            this.mostrarErro("Serviço de busca não disponível no momento. Tente novamente mais tarde.");
-            return;
-        }
-        
-        // Preparar parâmetros para busca
-        let params = {};
-        
-        if (this.estado.fluxo === 'destino_conhecido') {
-            // Fluxo onde o usuário já sabia o destino
-            const respostas = this.estado.dadosUsuario.respostas;
-            
-            params = {
-                origem: this.obterCodigoIATAOrigem(respostas),
-                destino: this.obterCodigoIATADestino(respostas.destino_conhecido),
-                dataIda: this.obterDataIda(respostas),
-                dataVolta: this.obterDataVolta(respostas),
-                adultos: this.getNumeroAdultos(respostas)
-            };
-            
-            this.log("Parâmetros de busca para destino conhecido", params);
-        } else {
-            // Fluxo de recomendação
-            const destino = this.estado.destinoEscolhido;
-            const respostas = this.estado.dadosUsuario.respostas;
-            
-            params = {
-                origem: this.obterCodigoIATAOrigem(respostas),
-                destino: this.obterCodigoIATADestino(destino),
-                dataIda: this.obterDataIda(respostas),
-                dataVolta: this.obterDataVolta(respostas),
-                adultos: this.getNumeroAdultos(respostas)
-            };
-            
-            this.log("Parâmetros de busca para destino recomendado", params);
-        }
-        
-        // Verificação de segurança para parâmetros essenciais
-        if (!params.origem || !params.destino || !params.dataIda) {
-            this.log("Parâmetros insuficientes para busca", params);
-            this.mostrarErro("Faltam informações necessárias para a busca de voos. Voltando à etapa anterior.");
-            setTimeout(() => this.redirecionarParaDestinos(), 3000);
-            return;
-        }
-        
-        // Chamar API para busca de voos
-        window.BENETRIP_API.buscarVoos(params)
-            .then(resultados => {
-                // Salvar resultados
-                this.estado.resultados = resultados;
-                localStorage.setItem('benetrip_resultados_voos', JSON.stringify(resultados));
-                
-                // Configurar filtros
-                this.configurarFiltrosIniciais();
-                
-                // Atualizar interface
-                this.renderizarInterface();
-                
-                // Esconder overlay de carregamento
-                this.mostrarCarregando(false);
-            })
-            .catch(erro => {
-                console.error("Erro ao buscar voos:", erro);
-                this.mostrarErro("Ocorreu um erro ao buscar voos. Tente novamente mais tarde.");
-                this.mostrarCarregando(false);
+        if (typeof value === 'object' && value !== null) {
+          if (Array.isArray(value)) {
+            // Para arrays, adicionar recursivamente cada item
+            value.forEach(item => {
+              if (typeof item === 'object' && item !== null) {
+                extractValues(item);
+              } else if (item !== undefined) {
+                flatValues.push(String(item));
+              }
             });
-    },
-
-    /**
-     * Métodos auxiliares para extrair informações consistentemente
-     */
-    obterCodigoIATAOrigem(respostas) {
-        if (!respostas) return null;
-        
-        // Tentar vários caminhos possíveis para encontrar o código IATA
-        if (respostas.cidade_partida) {
-            if (respostas.cidade_partida.code) return respostas.cidade_partida.code;
-            if (respostas.cidade_partida.iata) return respostas.cidade_partida.iata;
-            if (respostas.cidade_partida.aeroporto && respostas.cidade_partida.aeroporto.codigo) {
-                return respostas.cidade_partida.aeroporto.codigo;
-            }
+          } else {
+            // Para objetos, extrair valores recursivamente
+            extractValues(value);
+          }
+        } else if (value !== undefined && key !== 'signature') {
+          // Adicionar valores simples, exceto a própria assinatura
+          flatValues.push(String(value));
         }
-        
-        // Fallback para GRU (São Paulo) se não encontrar
-        this.log("Código IATA de origem não encontrado, usando GRU como fallback");
-        return "GRU";
-    },
+      }
+    }
     
-    obterCodigoIATADestino(destino) {
-        if (!destino) return null;
-        
-        // Tentar vários caminhos possíveis para encontrar o código IATA
-        if (destino.code) return destino.code;
-        if (destino.iata) return destino.iata;
-        if (destino.codigo_iata) return destino.codigo_iata;
-        if (destino.aeroporto && destino.aeroporto.codigo) {
-            return destino.aeroporto.codigo;
-        }
-        
-        this.log("Não foi possível encontrar código IATA para destino", destino);
-        return null;
-    },
+    // Extrair valores e ordená-los
+    extractValues(params);
+    flatValues.sort();
     
-    obterDataIda(respostas) {
-        if (!respostas) return null;
-        
-        // Tentar vários caminhos possíveis para encontrar a data
-        if (respostas.datas && respostas.datas.dataIda) {
-            return respostas.datas.dataIda;
-        }
-        
-        if (typeof respostas.datas === 'string' && respostas.datas.includes(',')) {
-            return respostas.datas.split(',')[0].trim();
-        }
-        
-        // Fallback para data padrão (um mês à frente)
-        const dataFutura = new Date();
-        dataFutura.setMonth(dataFutura.getMonth() + 1);
-        return this.formatarDataISO(dataFutura);
-    },
+    // Construir a string de assinatura: token + valores separados por :
+    const signatureString = token + flatValues.join(':');
+    console.log('String da assinatura (primeiros 30 chars):', signatureString.substring(0, 30) + '...');
     
-    obterDataVolta(respostas) {
-        if (!respostas) return null;
-        
-        // Tentar vários caminhos possíveis para encontrar a data
-        if (respostas.datas && respostas.datas.dataVolta) {
-            return respostas.datas.dataVolta;
-        }
-        
-        if (typeof respostas.datas === 'string' && respostas.datas.includes(',')) {
-            const partes = respostas.datas.split(',');
-            if (partes.length > 1) {
-                return partes[1].trim();
-            }
-        }
-        
-        // Fallback para data padrão (um mês e uma semana à frente)
-        const dataFutura = new Date();
-        dataFutura.setMonth(dataFutura.getMonth() + 1);
-        dataFutura.setDate(dataFutura.getDate() + 7);
-        return this.formatarDataISO(dataFutura);
-    },
+    // Gerar hash MD5
+    return crypto.createHash('md5').update(signatureString).digest('hex');
+  } catch (error) {
+    console.error("Erro ao gerar assinatura:", error);
     
-    formatarDataISO(data) {
-        return data.toISOString().split('T')[0]; // Formato YYYY-MM-DD
-    },
+    // Método de fallback original
+    try {
+      const paramsClone = JSON.parse(JSON.stringify(params));
+      delete paramsClone.signature; // Remover a assinatura se existir
+      const paramsString = JSON.stringify(paramsClone);
+      return crypto.createHash('md5').update(token + paramsString).digest('hex');
+    } catch (err) {
+      console.error("Erro no método de fallback:", err);
+      return "error_generating_signature";
+    }
+  }
+}
 
-    /**
-     * Obtém o número total de adultos com base nas respostas
-     */
-    getNumeroAdultos(respostas) {
-        if (!respostas) return 1;
-        
-        if (respostas.companhia === 0) {
-            // Viajando sozinho
-            return 1;
-        } else if (respostas.companhia === 1) {
-            // Viajando em casal
-            return 2;
-        } else if (respostas.companhia === 2) {
-            // Viajando em família
-            return respostas.quantidade_familia || 2;
-        } else if (respostas.companhia === 3) {
-            // Viajando com amigos
-            return respostas.quantidade_amigos || 2;
-        }
-        
-        // Valor padrão
-        return 1;
-    },
-
-    // Os métodos restantes permanecem inalterados
-    // ...
-};
-
-// Inicializar quando o DOM estiver pronto
-document.addEventListener('DOMContentLoaded', () => {
-    BENETRIP_VOOS.init();
-});
-
-// Exportar para namespace global
-window.BENETRIP_VOOS = BENETRIP_VOOS;
+// Função auxiliar para verificação de parâmetros (debug)
+function validarParametrosBusca(params) {
+  console.log('Validando parâmetros de busca de voos:');
+  console.log('Origem:', params.origem);
+  console.log('Destino:', params.destino);
+  console.log('Data de Ida:', params.dataIda);
+  console.log('Data de Volta:', params.dataVolta);
+  
+  let valido = true;
+  let mensagensErro = [];
+  
+  if (!params.origem) {
+    valido = false;
+    mensagensErro.push('Código IATA de origem não encontrado');
+  }
+  
+  if (!params.destino) {
+    valido = false;
+    mensagensErro.push('Código IATA de destino não encontrado');
+  }
+  
+  if (!params.dataIda) {
+    valido = false;
+    mensagensErro.push('Data de ida não encontrada');
+  }
+  
+  return {
+    valido,
+    mensagensErro,
+    params
+  };
+}
