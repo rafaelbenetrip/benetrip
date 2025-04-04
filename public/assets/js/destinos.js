@@ -1,7 +1,7 @@
 /**
  * BENETRIP - Visualização de Destinos Recomendados
  * Controla a exibição e interação dos destinos recomendados pela IA
- * Versão 2.2 - Layout aprimorado, melhor suporte a dados dinâmicos e otimização da experiência do usuário
+ * Versão 2.3 - Layout otimizado, suporte melhorado a dados dinâmicos e experiência do usuário aprimorada
  */
 
 // Módulo de Destinos do Benetrip
@@ -454,7 +454,7 @@ const BENETRIP_DESTINOS = {
     `;
   },
   
-  // Renderizar mensagem da Tripinha
+  // Renderizar mensagem da Tripinha - AJUSTADO TAMANHO DA FOTO
   renderizarMensagemTripinha() {
     const container = document.getElementById('mensagem-tripinha');
     if (!container) return;
@@ -462,7 +462,7 @@ const BENETRIP_DESTINOS = {
     container.innerHTML = `
       <div class="bg-gray-50 p-4 rounded-lg shadow-sm border border-gray-200">
         <div class="flex items-start gap-3">
-          <div class="w-14 h-14 rounded-full overflow-hidden flex-shrink-0 bg-orange-100 border-2 border-orange-200">
+          <div class="w-10 h-10 rounded-full overflow-hidden flex-shrink-0 bg-orange-100 border-2 border-orange-200">
             <img src="assets/images/tripinha/avatar-normal.png" alt="Tripinha" class="w-full h-full object-cover" onerror="this.src='https://placehold.co/60x60?text=🐶'">
           </div>
           <p class="text-gray-800 leading-relaxed">
@@ -473,7 +473,7 @@ const BENETRIP_DESTINOS = {
     `;
   },
   
-  // Método auxiliar para renderizar imagem com créditos
+  // Método auxiliar para renderizar imagem com créditos - ADICIONADA CLASSE LOADING
   renderizarImagemComCreditos(imagem, fallbackText, classes = '') {
     if (!imagem) {
       return `
@@ -484,8 +484,10 @@ const BENETRIP_DESTINOS = {
     }
     
     return `
-      <div class="image-container bg-gray-200 ${classes} relative">
-        <img src="${imagem.url}" alt="${imagem.alt || fallbackText}" class="w-full h-full object-cover" onerror="this.onerror=null; this.src='https://via.placeholder.com/400x224?text=${encodeURIComponent(fallbackText)}'">
+      <div class="image-container loading bg-gray-200 ${classes} relative">
+        <img src="${imagem.url}" alt="${imagem.alt || fallbackText}" class="w-full h-full object-cover" 
+             onload="this.parentNode.classList.remove('loading')" 
+             onerror="this.onerror=null; this.src='https://via.placeholder.com/400x224?text=${encodeURIComponent(fallbackText)}'; this.parentNode.classList.remove('loading')">
         <div class="zoom-icon absolute top-2 right-2 bg-white bg-opacity-70 p-1 rounded-full">
           <a href="${imagem.sourceUrl || '#'}" target="_blank" rel="noopener noreferrer" class="block" onclick="event.stopPropagation()">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -635,7 +637,7 @@ const BENETRIP_DESTINOS = {
       </div>
     `;
     
-    // Conteúdo da aba Clima
+    // Conteúdo da aba Clima - COM DEBUG LOG ADICIONADO
     let climaHtml = `
       <div id="conteudo-clima" class="conteudo-aba p-4 hidden">
         <div class="text-center bg-blue-50 p-4 rounded-lg">
@@ -660,12 +662,12 @@ const BENETRIP_DESTINOS = {
       </div>
     `;
     
-    // Conteúdo da aba Comentários
+    // Conteúdo da aba Comentários - AJUSTADO TAMANHO DA FOTO
     let comentariosHtml = `
       <div id="conteudo-comentarios" class="conteudo-aba p-4 hidden">
         <div class="bg-gray-50 p-4 rounded-lg">
           <div class="flex items-start gap-3">
-            <div class="w-14 h-14 rounded-full overflow-hidden flex-shrink-0 bg-orange-100 border-2 border-orange-200">
+            <div class="w-10 h-10 rounded-full overflow-hidden flex-shrink-0 bg-orange-100 border-2 border-orange-200">
               <img src="assets/images/tripinha/avatar-normal.png" alt="Tripinha" class="w-full h-full object-cover" onerror="this.src='https://placehold.co/60x60?text=🐶'">
             </div>
             <div>
@@ -712,7 +714,7 @@ const BENETRIP_DESTINOS = {
     `;
   },
   
-  // Renderizar destinos alternativos em grid
+  // Renderizar destinos alternativos em grid - MELHORADO COM IDS ÚNICOS E LISTENERS ESPECÍFICOS
   renderizarDestinosAlternativos(destinos) {
     const container = document.getElementById('destinos-alternativos');
     if (!container) return;
@@ -735,6 +737,9 @@ const BENETRIP_DESTINOS = {
       
       // Determinar ícone baseado no tipo de destino
       const iconeTipo = this.determinarIconeTipoDestino(destino);
+      
+      // ID único para o botão baseado no nome do destino
+      const btnId = `btn-destino-${destino.destino.replace(/\s+/g, '-').toLowerCase()}`;
       
       elementoDestino.innerHTML = `
         <div class="relative">
@@ -773,15 +778,26 @@ const BENETRIP_DESTINOS = {
             </div>
           ` : ''}
           <button 
+            id="${btnId}"
             class="w-full mt-3 py-1.5 px-2 rounded text-white text-sm font-medium transition-colors hover:opacity-90" 
-            style="background-color: #E87722;" 
-            onclick="BENETRIP_DESTINOS.selecionarDestino('${destino.destino}')">
+            style="background-color: #E87722;">
             Escolher Este Destino
           </button>
         </div>
       `;
       
       gridContainer.appendChild(elementoDestino);
+      
+      // Adicionar event listener específico para cada botão após renderizar
+      setTimeout(() => {
+        const btnDestino = document.getElementById(btnId);
+        if (btnDestino) {
+          btnDestino.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.selecionarDestino(destino.destino);
+          });
+        }
+      }, 0);
     });
   },
   
@@ -834,7 +850,7 @@ const BENETRIP_DESTINOS = {
     `;
   },
   
-  // Método para mostrar destino surpresa com novo layout em abas
+  // Método para mostrar destino surpresa - CORRIGIDO LAYOUT E MELHORADO GRADIENTE
   mostrarDestinoSurpresa() {
     if (!this.recomendacoes || !this.recomendacoes.surpresa) {
       console.error('Destino surpresa não disponível');
@@ -883,8 +899,11 @@ const BENETRIP_DESTINOS = {
             </div>
           </div>
           
-          <div class="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black to-transparent" style="height: 50%;">
-            <h3 class="text-xl font-bold text-white drop-shadow-lg" style="text-shadow: 0 1px 3px rgba(0,0,0,0.8);">${destino.destino}, ${destino.pais}</h3>
+          <!-- Nome do destino com melhor visibilidade e contraste -->
+          <div class="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black via-black to-transparent" style="height: 60%;">
+            <h3 class="text-xl font-bold text-white drop-shadow-lg" style="text-shadow: 0 2px 4px rgba(0,0,0,0.9); position: relative; z-index: 5;">
+              ${destino.destino}, ${destino.pais}
+            </h3>
           </div>
         </div>
         
@@ -939,7 +958,7 @@ const BENETRIP_DESTINOS = {
           
           <div class="mt-4 text-sm italic p-3 rounded-lg" style="background-color: rgba(232, 119, 34, 0.1);">
             <div class="flex items-start">
-              <div class="w-14 h-14 rounded-full overflow-hidden flex-shrink-0 bg-orange-100 border-2 border-orange-200 mr-2">
+              <div class="w-10 h-10 rounded-full overflow-hidden flex-shrink-0 bg-orange-100 border-2 border-orange-200 mr-2">
                 <img src="assets/images/tripinha/avatar-normal.png" alt="Tripinha" class="w-full h-full object-cover" onerror="this.src='https://placehold.co/40x40?text=🐶'">
               </div>
               <p>"${destino.comentario || `Eu adoro ${destino.destino}! É um lugar cheio de surpresas e meu focinho encontrou tantos cheiros diferentes! Você vai amar! 🐾`}"</p>
@@ -1035,6 +1054,14 @@ const BENETRIP_DESTINOS = {
       }
     }, 10);
     
+    // Fechar modal ao clicar fora - ADICIONADO
+    modalContainer.addEventListener('click', function(e) {
+      if (e.target === this) {
+        this.remove();
+        BENETRIP_DESTINOS.destinoSelecionado = null;
+      }
+    });
+    
     // Limpar destino selecionado após fechar o modal
     const modalElement = document.getElementById('modal-surpresa');
     if (modalElement) {
@@ -1052,7 +1079,7 @@ const BENETRIP_DESTINOS = {
     alert('Esta funcionalidade será implementada em breve!');
   },
   
-  // Método para selecionar um destino
+  // Método para selecionar um destino - MELHORADO TRATAMENTO DE ERROS
   selecionarDestino(nomeDestino) {
     console.log(`Destino selecionado: ${nomeDestino}`);
     let destinoSelecionado = null;
@@ -1063,15 +1090,18 @@ const BENETRIP_DESTINOS = {
     } else {
       destinoSelecionado = this.recomendacoes.alternativas.find(d => d.destino === nomeDestino);
     }
+    
     if (!destinoSelecionado) {
       console.error(`Destino não encontrado: ${nomeDestino}`);
+      alert('Desculpe, não foi possível encontrar informações sobre este destino. Por favor, tente outro.');
       return;
     }
+    
     localStorage.setItem('benetrip_destino_selecionado', JSON.stringify(destinoSelecionado));
     this.mostrarConfirmacaoSelecao(destinoSelecionado);
   },
   
-  // Método para mostrar confirmação de seleção
+  // Método para mostrar confirmação de seleção - AJUSTADO TAMANHO DA FOTO
   mostrarConfirmacaoSelecao(destino) {
     const precoReal = destino.detalhesVoo ? true : false;
     const precoTipo = precoReal ? 'preço real' : 'estimativa';
@@ -1082,7 +1112,7 @@ const BENETRIP_DESTINOS = {
       <div class="bg-white rounded-lg w-full max-w-md p-4">
         <div class="p-4 rounded-lg" style="background-color: rgba(232, 119, 34, 0.1);">
           <div class="flex items-start gap-3">
-            <div class="w-14 h-14 rounded-full overflow-hidden flex-shrink-0 bg-orange-100 border-2 border-orange-200">
+            <div class="w-10 h-10 rounded-full overflow-hidden flex-shrink-0 bg-orange-100 border-2 border-orange-200">
               <img src="assets/images/tripinha/avatar-normal.png" alt="Tripinha" class="w-full h-full object-cover" onerror="this.src='https://placehold.co/60x60?text=🐶'">
             </div>
             <div>
@@ -1110,17 +1140,28 @@ const BENETRIP_DESTINOS = {
       </div>
     `;
     document.body.appendChild(modalContainer);
+    
     const checkboxConfirmar = document.getElementById('confirmar-selecao');
     const btnConfirmar = document.getElementById('btn-confirmar');
     const btnCancelar = document.getElementById('btn-cancelar');
+    
     checkboxConfirmar.addEventListener('change', () => {
       btnConfirmar.disabled = !checkboxConfirmar.checked;
     });
+    
     btnCancelar.addEventListener('click', () => {
       document.getElementById('modal-confirmacao').remove();
     });
+    
     btnConfirmar.addEventListener('click', () => {
       window.location.href = 'flights.html';
+    });
+    
+    // Fechar modal ao clicar fora - ADICIONADO
+    modalContainer.addEventListener('click', function(e) {
+      if (e.target === this) {
+        this.remove();
+      }
     });
   },
   
@@ -1157,7 +1198,7 @@ const BENETRIP_DESTINOS = {
   },
   
   // FUNÇÕES PARA INFORMAÇÕES DE CLIMA
-  // Função corrigida para considerar hemisférios
+  // Função corrigida para considerar hemisférios - ADICIONADO LOG
   obterEstacaoAno() {
     try {
       // Obter estação do ano dos dados da viagem ou determinar por data
@@ -1180,6 +1221,10 @@ const BENETRIP_DESTINOS = {
       
       // Verificar se o destino está no hemisfério sul
       const destinoAtual = this.obterDestinoAtual();
+      const hemisferio = this.estaNoHemisferioSul(destinoAtual) ? 'sul' : 'norte';
+      console.log(`Cálculo de estação para ${destinoAtual?.destino || 'destino desconhecido'} no hemisfério ${hemisferio}`);
+      console.log(`Mês da viagem: ${mes}, estação base: ${estacao}`);
+      
       if (this.estaNoHemisferioSul(destinoAtual)) {
         // Inverter estações para hemisfério sul
         if (estacao === 'verão') return 'inverno';
@@ -1243,11 +1288,16 @@ const BENETRIP_DESTINOS = {
     return emojis[estacao] || '🌤️';
   },
 
+  // Método para obter temperatura média - ADICIONADO LOG
   obterTemperaturaMedia(destino, estacao) {
     // Verificar se temos dados de clima da IA
     if (destino && destino.clima && destino.clima.temperatura) {
+      console.log(`Usando temperatura da IA para ${destino.destino}: ${destino.clima.temperatura}`);
       return destino.clima.temperatura;
     }
+    
+    // Log para debug da fonte dos dados climáticos
+    console.log(`Fonte de dados climáticos para ${destino.destino}: Fallback local`);
     
     // Fallback apenas se não houver dados da IA
     const temperaturas = {
@@ -1329,7 +1379,7 @@ const BENETRIP_DESTINOS = {
     return descricoes[index];
   },
   
-  // Método para aplicar estilos modernos
+  // Método para aplicar estilos modernos - ADICIONADA ANIMAÇÃO DE LOADING
   aplicarEstilosModernos() {
     // Criar elemento de estilo
     const estiloElement = document.createElement('style');
@@ -1418,6 +1468,27 @@ const BENETRIP_DESTINOS = {
       
       .card-destino:hover::after {
         opacity: 1;
+      }
+      
+      /* Animação de carregamento para imagens */
+      .image-container.loading {
+        position: relative;
+      }
+      
+      .image-container.loading::after {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+        animation: loading-shine 1.5s infinite;
+      }
+      
+      @keyframes loading-shine {
+        0% { transform: translateX(-100%); }
+        100% { transform: translateX(100%); }
       }
     `;
     
