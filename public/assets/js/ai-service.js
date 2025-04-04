@@ -23,6 +23,15 @@ window.BENETRIP_AI = {
         "destaque": "Passeio de teleférico, Comuna 13 e fazendas de café próximas",
         "comentario": "Eu simplesmente AMEI Medellín! Perfeito para quem busca um mix de cultura e natureza! 🐾",
         "pontosTuristicos": ["Comuna 13", "Parque Arví", "Plaza Botero", "Pueblito Paisa"],
+        "clima": {
+          "temperatura": "20-25°C durante todo o ano",
+          "condicoes": "Clima primaveril constante com sol e chuvas ocasionais",
+          "recomendacoes": "Leve roupas leves e um casaco leve para as noites"
+        },
+        "aeroporto": {
+          "codigo": "MDE",
+          "nome": "Aeroporto Internacional José María Córdova"
+        },
         "preco": {
           "voo": 1800,
           "hotel": 350
@@ -35,6 +44,13 @@ window.BENETRIP_AI = {
           "codigoPais": "UY",
           "porque": "Clima costeiro tranquilo com frutos do mar deliciosos e espaços culturais",
           "pontosTuristicos": ["Rambla de Montevideo", "Ciudad Vieja", "Mercado del Puerto"],
+          "clima": {
+            "temperatura": "15-25°C dependendo da estação"
+          },
+          "aeroporto": {
+            "codigo": "MVD",
+            "nome": "Aeroporto Internacional de Carrasco"
+          },
           "preco": {
             "voo": 1500,
             "hotel": 300
@@ -46,6 +62,13 @@ window.BENETRIP_AI = {
           "codigoPais": "AR",
           "porque": "Capital cosmopolita com rica vida cultural, teatros e arquitetura europeia",
           "pontosTuristicos": ["Teatro Colón", "La Boca", "Recoleta"],
+          "clima": {
+            "temperatura": "15-30°C dependendo da estação"
+          },
+          "aeroporto": {
+            "codigo": "EZE",
+            "nome": "Aeroporto Internacional Ministro Pistarini"
+          },
           "preco": {
             "voo": 1400,
             "hotel": 280
@@ -57,6 +80,13 @@ window.BENETRIP_AI = {
           "codigoPais": "CL",
           "porque": "Moderna capital cercada pela Cordilheira dos Andes com excelentes vinhos",
           "pontosTuristicos": ["Santa Lucía Hill", "La Moneda", "Sky Costanera"],
+          "clima": {
+            "temperatura": "10-30°C dependendo da estação"
+          },
+          "aeroporto": {
+            "codigo": "SCL",
+            "nome": "Aeroporto Internacional Arturo Merino Benítez"
+          },
           "preco": {
             "voo": 1600,
             "hotel": 350
@@ -68,6 +98,13 @@ window.BENETRIP_AI = {
           "codigoPais": "PE",
           "porque": "Portal para Machu Picchu com rica história inca e arquitetura colonial",
           "pontosTuristicos": ["Sacsayhuamán", "Plaza de Armas", "Machu Picchu"],
+          "clima": {
+            "temperatura": "10-20°C durante o dia, mais frio à noite"
+          },
+          "aeroporto": {
+            "codigo": "CUZ",
+            "nome": "Aeroporto Internacional Alejandro Velasco Astete"
+          },
           "preco": {
             "voo": 1700,
             "hotel": 250
@@ -83,6 +120,15 @@ window.BENETRIP_AI = {
         "destaque": "Passeio de barco pelas Ilhas do Rosário com águas cristalinas",
         "comentario": "Cartagena é um tesouro escondido que vai te conquistar! As cores, a música e a comida caribenha formam uma experiência inesquecível! 🐾🌴",
         "pontosTuristicos": ["Ciudad Amurallada", "Castillo San Felipe", "Islas del Rosario", "Plaza Santo Domingo"],
+        "clima": {
+          "temperatura": "27-32°C durante todo o ano",
+          "condicoes": "Quente e úmido com brisa do mar, clima tropical perfeito para praia",
+          "recomendacoes": "Leve roupas muito leves, protetor solar e chapéu"
+        },
+        "aeroporto": {
+          "codigo": "CTG",
+          "nome": "Aeroporto Internacional Rafael Núñez"
+        },
         "preco": {
           "voo": 1950,
           "hotel": 320
@@ -755,6 +801,33 @@ window.BENETRIP_AI = {
     
     if (!dados.surpresa.pontosTuristicos) {
       dados.surpresa.pontosTuristicos = [];
+    }
+    
+    // Verificar e adicionar informações climáticas se estiverem faltando
+    if (!dados.topPick.clima) {
+      dados.topPick.clima = {
+        temperatura: "Indisponível",
+        condicoes: "Informações climáticas não disponíveis",
+        recomendacoes: "Consulte a previsão do tempo antes de viajar"
+      };
+    }
+    
+    if (dados.alternativas) {
+      dados.alternativas.forEach(alt => {
+        if (!alt.clima) {
+          alt.clima = {
+            temperatura: "Indisponível"
+          };
+        }
+      });
+    }
+    
+    if (!dados.surpresa.clima) {
+      dados.surpresa.clima = {
+        temperatura: "Indisponível",
+        condicoes: "Informações climáticas não disponíveis",
+        recomendacoes: "Consulte a previsão do tempo antes de viajar"
+      };
     }
     
     return dados;
