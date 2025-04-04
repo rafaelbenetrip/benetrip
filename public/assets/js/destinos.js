@@ -1097,27 +1097,46 @@ const BENETRIP_DESTINOS = {
     });
   },
   
-  // Método para selecionar um destino - MELHORADO TRATAMENTO DE ERROS
-  selecionarDestino(nomeDestino) {
+// Método para selecionar um destino - VERSÃO CORRIGIDA
+selecionarDestino(nomeDestino) {
     console.log(`Destino selecionado: ${nomeDestino}`);
     let destinoSelecionado = null;
+    
+    // Encontrar o destino pelo nome
     if (this.recomendacoes.topPick.destino === nomeDestino) {
-      destinoSelecionado = this.recomendacoes.topPick;
+        destinoSelecionado = this.recomendacoes.topPick;
     } else if (this.recomendacoes.surpresa && this.recomendacoes.surpresa.destino === nomeDestino) {
-      destinoSelecionado = this.recomendacoes.surpresa;
+        destinoSelecionado = this.recomendacoes.surpresa;
     } else {
-      destinoSelecionado = this.recomendacoes.alternativas.find(d => d.destino === nomeDestino);
+        destinoSelecionado = this.recomendacoes.alternativas.find(d => d.destino === nomeDestino);
     }
     
     if (!destinoSelecionado) {
-      console.error(`Destino não encontrado: ${nomeDestino}`);
-      alert('Desculpe, não foi possível encontrar informações sobre este destino. Por favor, tente outro.');
-      return;
+        console.error(`Destino não encontrado: ${nomeDestino}`);
+        alert('Desculpe, não foi possível encontrar informações sobre este destino. Por favor, tente outro.');
+        return;
     }
     
+    // Garantir que o objeto tenha a propriedade de código IATA acessível
+    if (!destinoSelecionado.codigo_iata && destinoSelecionado.aeroporto && destinoSelecionado.aeroporto.codigo) {
+        destinoSelecionado.codigo_iata = destinoSelecionado.aeroporto.codigo;
+    }
+    
+    // Salvar em ambas as chaves para compatibilidade
     localStorage.setItem('benetrip_destino_selecionado', JSON.stringify(destinoSelecionado));
+    localStorage.setItem('benetrip_destino_escolhido', JSON.stringify(destinoSelecionado));
+    
+    // Definir fluxo no objeto de dados do usuário
+    try {
+        const dadosUsuario = JSON.parse(localStorage.getItem('benetrip_user_data') || '{}');
+        dadosUsuario.fluxo = 'destino_desconhecido'; // Indicar que é um destino da recomendação
+        localStorage.setItem('benetrip_user_data', JSON.stringify(dadosUsuario));
+    } catch (e) {
+        console.warn('Erro ao atualizar fluxo nos dados do usuário:', e);
+    }
+    
     this.mostrarConfirmacaoSelecao(destinoSelecionado);
-  },
+},
   
   // Método para mostrar confirmação de seleção - AJUSTADO TAMANHO DA FOTO
   mostrarConfirmacaoSelecao(destino) {
