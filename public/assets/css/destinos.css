@@ -658,3 +658,37 @@ h3 {
   border-radius: 9999px;
   margin-right: 0.75rem;
 }
+
+/* Classes de tamanho para avatares - Correção de dimensionamento */
+.w-10 {
+    width: 2.5rem !important; /* 40px */
+}
+.h-10 {
+    height: 2.5rem !important; /* 40px */
+}
+
+.w-14 {
+    width: 3.5rem; /* 56px - dimensão anterior */
+}
+.h-14 {
+    height: 3.5rem; /* 56px - dimensão anterior */
+}
+
+/* Melhorar a proporção da imagem da Tripinha em todos os contextos */
+.tripinha-img {
+    width: 2.5rem !important;
+    height: 2.5rem !important;
+    object-fit: cover;
+    border-radius: 9999px;
+}
+
+/* Atualizar classes de container da Tripinha */
+.tripinha-container {
+    width: 2.5rem !important;
+    height: 2.5rem !important;
+    border-radius: 9999px;
+    overflow: hidden;
+    flex-shrink: 0;
+    background-color: #FFF7ED;
+    border: 2px solid #FDBA74;
+}
