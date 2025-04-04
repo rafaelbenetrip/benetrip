@@ -1,7 +1,7 @@
 /**
  * BENETRIP - Visualização de Destinos Recomendados
  * Controla a exibição e interação dos destinos recomendados pela IA
- * Versão 2.3 - Layout aprimorado, melhor suporte a dados dinâmicos e otimização da experiência do usuário
+ * Versão 2.2 - Layout aprimorado, melhor suporte a dados dinâmicos e otimização da experiência do usuário
  */
 
 // Módulo de Destinos do Benetrip
@@ -13,7 +13,6 @@ const BENETRIP_DESTINOS = {
   temErro: false,
   mensagemErro: '',
   abaAtiva: 'visao-geral',
-  destinoSelecionado: null,
   
   // Inicialização
   init() {
@@ -60,16 +59,7 @@ const BENETRIP_DESTINOS = {
       if (evento.target.closest('.card-destino')) {
         const card = evento.target.closest('.card-destino');
         const destino = card.dataset.destino;
-        
-        // CORREÇÃO: Verifica se o clique foi no botão dentro do card
-        if (evento.target.closest('button')) {
-          // Se foi no botão, aciona a seleção do destino
-          this.selecionarDestino(destino);
-          evento.stopPropagation(); // Impede propagação para o card
-        } else {
-          // Se foi no card (mas não no botão), também seleciona o destino
-          this.selecionarDestino(destino);
-        }
+        this.selecionarDestino(destino);
       }
       
       // Botão "Me Surpreenda"
@@ -467,7 +457,7 @@ const BENETRIP_DESTINOS = {
     container.innerHTML = `
       <div class="bg-gray-50 p-4 rounded-lg shadow-sm border border-gray-200">
         <div class="flex items-start gap-3">
-          <div class="w-14 h-14 rounded-full overflow-hidden flex-shrink-0 bg-orange-100 border-2 border-orange-200">
+          <div class="w-12 h-12 rounded-full overflow-hidden flex-shrink-0 bg-orange-100">
             <img src="assets/images/tripinha/avatar-normal.png" alt="Tripinha" class="w-full h-full object-cover" onerror="this.src='https://placehold.co/60x60?text=🐶'">
           </div>
           <p class="text-gray-800 leading-relaxed">
@@ -517,7 +507,7 @@ const BENETRIP_DESTINOS = {
     const temImagens = destino.imagens && destino.imagens.length > 0;
     const precoReal = destino.detalhesVoo ? true : false;
     const precoClasse = precoReal ? 'text-green-700 font-semibold' : '';
-    const estacaoAno = this.obterEstacaoAno(destino) || 'primavera';
+    const estacaoAno = this.obterEstacaoAno() || 'primavera';
     
     // Imagem de cabeçalho expandida
     let headerHtml = `
@@ -670,7 +660,7 @@ const BENETRIP_DESTINOS = {
       <div id="conteudo-comentarios" class="conteudo-aba p-4 hidden">
         <div class="bg-gray-50 p-4 rounded-lg">
           <div class="flex items-start gap-3">
-            <div class="w-14 h-14 rounded-full overflow-hidden flex-shrink-0 bg-orange-100 border-2 border-orange-200">
+            <div class="w-10 h-10 rounded-full overflow-hidden flex-shrink-0 bg-orange-100">
               <img src="assets/images/tripinha/avatar-normal.png" alt="Tripinha" class="w-full h-full object-cover" onerror="this.src='https://placehold.co/60x60?text=🐶'">
             </div>
             <div>
@@ -832,7 +822,7 @@ const BENETRIP_DESTINOS = {
     container.innerHTML = `
       <div class="p-4 rounded-lg mt-2 text-white" style="background-color: #E87722;">
         <p class="font-bold text-lg text-center">Ainda não decidiu? Sem problemas! Clique em 'Me Surpreenda!' e eu escolho um lugar baseado nas suas vibes de viagem! 🐾</p>
-        <button id="btn-surpresa" class="w-full font-bold py-2.5 px-4 rounded mt-3 transition-colors duration-200 hover:bg-blue-600" style="background-color: #00A3E0; color: white;">
+        <button id="btn-surpresa" class="w-full font-bold py-2.5 px-4 rounded mt-3 transition-colors bg-white text-orange-500 hover:bg-gray-100">
           Me Surpreenda! 🎲
         </button>
       </div>
@@ -851,7 +841,7 @@ const BENETRIP_DESTINOS = {
     
     const precoReal = destino.detalhesVoo ? true : false;
     const precoClasse = precoReal ? 'text-green-700 font-semibold' : '';
-    const estacaoAno = this.obterEstacaoAno(destino) || 'primavera';
+    const estacaoAno = this.obterEstacaoAno() || 'primavera';
     
     // Criar o container do modal com classe para animação
     const modalContainer = document.createElement('div');
@@ -879,14 +869,14 @@ const BENETRIP_DESTINOS = {
           </div>
           
           <!-- Melhoria do título com fundo mais escuro para melhor visibilidade -->
-          <div class="absolute top-0 left-0 right-0 p-4 bg-gradient-to-b from-black to-transparent" style="height: 40%;">
+          <div class="absolute top-0 left-0 right-0 p-4 bg-gradient-to-b from-black via-black to-transparent" style="height: 50%;">
             <div class="inline-block py-1 px-3 mb-2 font-bold text-white rounded-full" style="background-color: #00A3E0;">
               ✨ Destino Surpresa! ✨
             </div>
           </div>
           
-          <div class="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black to-transparent" style="height: 50%;">
-            <h3 class="text-xl font-bold text-white drop-shadow-lg" style="text-shadow: 0 1px 3px rgba(0,0,0,0.8);">${destino.destino}, ${destino.pais}</h3>
+          <div class="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black via-black to-transparent" style="height: 50%;">
+            <h3 class="text-xl font-bold text-white drop-shadow-lg">${destino.destino}, ${destino.pais}</h3>
           </div>
         </div>
         
@@ -941,7 +931,7 @@ const BENETRIP_DESTINOS = {
           
           <div class="mt-4 text-sm italic p-3 rounded-lg" style="background-color: rgba(232, 119, 34, 0.1);">
             <div class="flex items-start">
-              <div class="w-14 h-14 rounded-full overflow-hidden flex-shrink-0 bg-orange-100 border-2 border-orange-200 mr-2">
+              <div class="w-8 h-8 rounded-full overflow-hidden flex-shrink-0 bg-orange-100 mr-2">
                 <img src="assets/images/tripinha/avatar-normal.png" alt="Tripinha" class="w-full h-full object-cover" onerror="this.src='https://placehold.co/40x40?text=🐶'">
               </div>
               <p>"${destino.comentario || `Eu adoro ${destino.destino}! É um lugar cheio de surpresas e meu focinho encontrou tantos cheiros diferentes! Você vai amar! 🐾`}"</p>
@@ -1058,10 +1048,6 @@ const BENETRIP_DESTINOS = {
       console.error(`Destino não encontrado: ${nomeDestino}`);
       return;
     }
-    
-    // Armazenar destino selecionado para outras operações
-    this.destinoSelecionado = destinoSelecionado;
-    
     localStorage.setItem('benetrip_destino_selecionado', JSON.stringify(destinoSelecionado));
     this.mostrarConfirmacaoSelecao(destinoSelecionado);
   },
@@ -1077,7 +1063,7 @@ const BENETRIP_DESTINOS = {
       <div class="bg-white rounded-lg w-full max-w-md p-4">
         <div class="p-4 rounded-lg" style="background-color: rgba(232, 119, 34, 0.1);">
           <div class="flex items-start gap-3">
-            <div class="w-14 h-14 rounded-full overflow-hidden flex-shrink-0 bg-orange-100 border-2 border-orange-200">
+            <div class="w-12 h-12 rounded-full overflow-hidden flex-shrink-0 bg-orange-100">
               <img src="assets/images/tripinha/avatar-normal.png" alt="Tripinha" class="w-full h-full object-cover" onerror="this.src='https://placehold.co/60x60?text=🐶'">
             </div>
             <div>
@@ -1151,46 +1137,12 @@ const BENETRIP_DESTINOS = {
     return "5 a 12 de Agosto, 2025";
   },
   
-  // Retorna o destino atualmente em foco
-  obterDestinoAtual() {
-    // Se houver um destino explicitamente selecionado, use-o
-    if (this.destinoSelecionado) return this.destinoSelecionado;
-    
-    // Caso contrário, use o destino principal das recomendações
-    if (this.recomendacoes && this.recomendacoes.topPick) return this.recomendacoes.topPick;
-    
-    return null;
-  },
-  
-  // Verifica se um destino está no hemisfério sul
-  estaNoHemisferioSul(destino) {
-    if (!destino || !destino.pais) return false;
-    
-    // Lista de países no hemisfério sul
-    const paisesHemisferioSul = [
-      'Argentina', 'Austrália', 'Bolívia', 'Brasil', 'Chile', 
-      'Nova Zelândia', 'Paraguai', 'Peru', 'Uruguai', 'África do Sul',
-      'Moçambique', 'Angola', 'Namíbia', 'Zimbábue', 'Madagascar',
-      'Indonésia', 'Malásia', 'Papua-Nova Guiné', 'Fiji', 'Equador',
-      'Colômbia', 'Venezuela'
-    ];
-    
-    return paisesHemisferioSul.some(pais => 
-      destino.pais.toLowerCase().includes(pais.toLowerCase())
-    );
-  },
-  
   // FUNÇÕES PARA INFORMAÇÕES DE CLIMA
-  obterEstacaoAno(destino = null) {
+  obterEstacaoAno() {
     try {
       // Obter estação do ano dos dados da viagem ou determinar por data
       if (this.recomendacoes && this.recomendacoes.estacaoViagem) {
         return this.recomendacoes.estacaoViagem;
-      }
-      
-      // Se não for passado um destino específico, use o destino atual
-      if (!destino) {
-        destino = this.obterDestinoAtual();
       }
       
       // Lógica de fallback para determinar estação
@@ -1198,24 +1150,12 @@ const BENETRIP_DESTINOS = {
       if (!dataViagem) return 'primavera';
       
       const mes = dataViagem.getMonth();
-      let estacao = '';
       
-      // Determinar estação para hemisfério norte
-      if (mes >= 2 && mes <= 4) estacao = 'primavera';
-      else if (mes >= 5 && mes <= 7) estacao = 'verão';
-      else if (mes >= 8 && mes <= 10) estacao = 'outono';
-      else estacao = 'inverno';
-      
-      // Verificar se o destino está no hemisfério sul
-      if (destino && this.estaNoHemisferioSul(destino)) {
-        // Inverter estações para hemisfério sul
-        if (estacao === 'verão') return 'inverno';
-        if (estacao === 'inverno') return 'verão';
-        if (estacao === 'primavera') return 'outono';
-        if (estacao === 'outono') return 'primavera';
-      }
-      
-      return estacao;
+      // Hemisfério Norte
+      if (mes >= 2 && mes <= 4) return 'primavera';
+      if (mes >= 5 && mes <= 7) return 'verão';
+      if (mes >= 8 && mes <= 10) return 'outono';
+      return 'inverno';
     } catch (erro) {
       console.error('Erro ao obter estação do ano:', erro);
       return 'primavera';
