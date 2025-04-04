@@ -862,7 +862,7 @@ renderizarImagemComCreditos(imagem, fallbackText, classes = '') {
   },
   
   // Método para mostrar destino surpresa - CORRIGIDO LAYOUT E MELHORADO GRADIENTE
-  // Método para mostrar destino surpresa - CORRIGIDO COM LAYOUT AJUSTADO
+// Método para mostrar destino surpresa - COMPLETAMENTE CORRIGIDO
 mostrarDestinoSurpresa() {
   if (!this.recomendacoes || !this.recomendacoes.surpresa) {
     console.error('Destino surpresa não disponível');
@@ -887,14 +887,20 @@ mostrarDestinoSurpresa() {
   // HTML do modal com design corrigido
   modalContainer.innerHTML = `
     <div class="bg-white rounded-lg w-full max-w-md relative max-h-[90vh] overflow-hidden transform transition-transform duration-500 modal-surpresa-content">
-      <button class="absolute top-3 right-3 z-50 w-8 h-8 flex items-center justify-center text-white bg-black bg-opacity-60 rounded-full hover:bg-opacity-80 transition-all" 
-              onclick="document.getElementById('modal-surpresa').remove()">
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-        </svg>
-      </button>
+      <!-- CABEÇALHO CORRIGIDO: Barra superior com título e botão fechar -->
+      <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 15px; background-color: #00A3E0; color: white; position: relative; z-index: 100;">
+        <div style="font-weight: bold; display: flex; align-items: center;">
+          ✨ Destino Surpresa!
+        </div>
+        <button class="flex items-center justify-center w-8 h-8 rounded-full bg-black bg-opacity-20 hover:bg-opacity-40 transition-all" 
+                onclick="document.getElementById('modal-surpresa').remove()">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
       
-      <!-- Cabeçalho com imagem e título em design corrigido -->
+      <!-- Imagem com título do destino -->
       <div style="height: 200px; position: relative; overflow: hidden;">
         <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1;">
           ${this.renderizarImagemComCreditos(
@@ -902,11 +908,6 @@ mostrarDestinoSurpresa() {
             destino.destino,
             'h-full w-full'
           )}
-        </div>
-        
-        <!-- Banner superior -->
-        <div style="position: absolute; top: 0; left: 0; right: 0; z-index: 2; padding: 10px; background-color: #00A3E0; color: white; font-weight: bold; display: inline-block; border-bottom-right-radius: 10px;">
-          ✨ Destino Surpresa! ✨
         </div>
         
         <!-- Título com melhor contraste -->
@@ -1072,11 +1073,6 @@ mostrarDestinoSurpresa() {
     }
   });
 },
-  
-  // Método para mostrar mais opções
-  mostrarMaisOpcoes() {
-    alert('Esta funcionalidade será implementada em breve!');
-  },
   
   // Método para selecionar um destino - MELHORADO TRATAMENTO DE ERROS
   selecionarDestino(nomeDestino) {
