@@ -13,6 +13,7 @@ const BENETRIP_DESTINOS = {
   temErro: false,
   mensagemErro: '',
   abaAtiva: 'visao-geral',
+  destinoSelecionado: null, // Adicionado para rastrear o destino atual
   
   // Inicialização
   init() {
@@ -59,7 +60,11 @@ const BENETRIP_DESTINOS = {
       if (evento.target.closest('.card-destino')) {
         const card = evento.target.closest('.card-destino');
         const destino = card.dataset.destino;
-        this.selecionarDestino(destino);
+        if (evento.target.closest('button')) {
+          // Evento foi no botão dentro do card, não no card inteiro
+          this.selecionarDestino(destino);
+          evento.stopPropagation(); // Impede propagação para o card
+        }
       }
       
       // Botão "Me Surpreenda"
@@ -457,7 +462,7 @@ const BENETRIP_DESTINOS = {
     container.innerHTML = `
       <div class="bg-gray-50 p-4 rounded-lg shadow-sm border border-gray-200">
         <div class="flex items-start gap-3">
-          <div class="w-12 h-12 rounded-full overflow-hidden flex-shrink-0 bg-orange-100">
+          <div class="w-14 h-14 rounded-full overflow-hidden flex-shrink-0 bg-orange-100 border-2 border-orange-200">
             <img src="assets/images/tripinha/avatar-normal.png" alt="Tripinha" class="w-full h-full object-cover" onerror="this.src='https://placehold.co/60x60?text=🐶'">
           </div>
           <p class="text-gray-800 leading-relaxed">
@@ -660,7 +665,7 @@ const BENETRIP_DESTINOS = {
       <div id="conteudo-comentarios" class="conteudo-aba p-4 hidden">
         <div class="bg-gray-50 p-4 rounded-lg">
           <div class="flex items-start gap-3">
-            <div class="w-10 h-10 rounded-full overflow-hidden flex-shrink-0 bg-orange-100">
+            <div class="w-14 h-14 rounded-full overflow-hidden flex-shrink-0 bg-orange-100 border-2 border-orange-200">
               <img src="assets/images/tripinha/avatar-normal.png" alt="Tripinha" class="w-full h-full object-cover" onerror="this.src='https://placehold.co/60x60?text=🐶'">
             </div>
             <div>
@@ -822,7 +827,7 @@ const BENETRIP_DESTINOS = {
     container.innerHTML = `
       <div class="p-4 rounded-lg mt-2 text-white" style="background-color: #E87722;">
         <p class="font-bold text-lg text-center">Ainda não decidiu? Sem problemas! Clique em 'Me Surpreenda!' e eu escolho um lugar baseado nas suas vibes de viagem! 🐾</p>
-        <button id="btn-surpresa" class="w-full font-bold py-2.5 px-4 rounded mt-3 transition-colors bg-white text-orange-500 hover:bg-gray-100">
+        <button id="btn-surpresa" class="w-full font-bold py-2.5 px-4 rounded mt-3 transition-colors duration-200 hover:bg-blue-600" style="background-color: #00A3E0; color: white;">
           Me Surpreenda! 🎲
         </button>
       </div>
@@ -838,6 +843,9 @@ const BENETRIP_DESTINOS = {
     
     const destino = this.recomendacoes.surpresa;
     console.log('Mostrando destino surpresa:', destino);
+    
+    // Salvar temporariamente o destino selecionado para clima correto
+    this.destinoSelecionado = destino;
     
     const precoReal = destino.detalhesVoo ? true : false;
     const precoClasse = precoReal ? 'text-green-700 font-semibold' : '';
@@ -869,14 +877,14 @@ const BENETRIP_DESTINOS = {
           </div>
           
           <!-- Melhoria do título com fundo mais escuro para melhor visibilidade -->
-          <div class="absolute top-0 left-0 right-0 p-4 bg-gradient-to-b from-black via-black to-transparent" style="height: 50%;">
+          <div class="absolute top-0 left-0 right-0 p-4 bg-gradient-to-b from-black to-transparent" style="height: 40%;">
             <div class="inline-block py-1 px-3 mb-2 font-bold text-white rounded-full" style="background-color: #00A3E0;">
               ✨ Destino Surpresa! ✨
             </div>
           </div>
           
-          <div class="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black via-black to-transparent" style="height: 50%;">
-            <h3 class="text-xl font-bold text-white drop-shadow-lg">${destino.destino}, ${destino.pais}</h3>
+          <div class="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black to-transparent" style="height: 50%;">
+            <h3 class="text-xl font-bold text-white drop-shadow-lg" style="text-shadow: 0 1px 3px rgba(0,0,0,0.8);">${destino.destino}, ${destino.pais}</h3>
           </div>
         </div>
         
@@ -931,7 +939,7 @@ const BENETRIP_DESTINOS = {
           
           <div class="mt-4 text-sm italic p-3 rounded-lg" style="background-color: rgba(232, 119, 34, 0.1);">
             <div class="flex items-start">
-              <div class="w-8 h-8 rounded-full overflow-hidden flex-shrink-0 bg-orange-100 mr-2">
+              <div class="w-14 h-14 rounded-full overflow-hidden flex-shrink-0 bg-orange-100 border-2 border-orange-200 mr-2">
                 <img src="assets/images/tripinha/avatar-normal.png" alt="Tripinha" class="w-full h-full object-cover" onerror="this.src='https://placehold.co/40x40?text=🐶'">
               </div>
               <p>"${destino.comentario || `Eu adoro ${destino.destino}! É um lugar cheio de surpresas e meu focinho encontrou tantos cheiros diferentes! Você vai amar! 🐾`}"</p>
@@ -1026,6 +1034,17 @@ const BENETRIP_DESTINOS = {
         modalContent.classList.remove('scale-95', 'opacity-0');
       }
     }, 10);
+    
+    // Limpar destino selecionado após fechar o modal
+    const modalElement = document.getElementById('modal-surpresa');
+    if (modalElement) {
+      modalElement.addEventListener('click', (event) => {
+        if (event.target === modalElement) {
+          this.destinoSelecionado = null;
+          modalElement.remove();
+        }
+      });
+    }
   },
   
   // Método para mostrar mais opções
@@ -1063,7 +1082,7 @@ const BENETRIP_DESTINOS = {
       <div class="bg-white rounded-lg w-full max-w-md p-4">
         <div class="p-4 rounded-lg" style="background-color: rgba(232, 119, 34, 0.1);">
           <div class="flex items-start gap-3">
-            <div class="w-12 h-12 rounded-full overflow-hidden flex-shrink-0 bg-orange-100">
+            <div class="w-14 h-14 rounded-full overflow-hidden flex-shrink-0 bg-orange-100 border-2 border-orange-200">
               <img src="assets/images/tripinha/avatar-normal.png" alt="Tripinha" class="w-full h-full object-cover" onerror="this.src='https://placehold.co/60x60?text=🐶'">
             </div>
             <div>
@@ -1138,6 +1157,7 @@ const BENETRIP_DESTINOS = {
   },
   
   // FUNÇÕES PARA INFORMAÇÕES DE CLIMA
+  // Função corrigida para considerar hemisférios
   obterEstacaoAno() {
     try {
       // Obter estação do ano dos dados da viagem ou determinar por data
@@ -1150,16 +1170,52 @@ const BENETRIP_DESTINOS = {
       if (!dataViagem) return 'primavera';
       
       const mes = dataViagem.getMonth();
+      let estacao = '';
       
-      // Hemisfério Norte
-      if (mes >= 2 && mes <= 4) return 'primavera';
-      if (mes >= 5 && mes <= 7) return 'verão';
-      if (mes >= 8 && mes <= 10) return 'outono';
-      return 'inverno';
+      // Determinar estação para hemisfério norte
+      if (mes >= 2 && mes <= 4) estacao = 'primavera';
+      else if (mes >= 5 && mes <= 7) estacao = 'verão';
+      else if (mes >= 8 && mes <= 10) estacao = 'outono';
+      else estacao = 'inverno';
+      
+      // Verificar se o destino está no hemisfério sul
+      const destinoAtual = this.obterDestinoAtual();
+      if (this.estaNoHemisferioSul(destinoAtual)) {
+        // Inverter estações para hemisfério sul
+        if (estacao === 'verão') return 'inverno';
+        if (estacao === 'inverno') return 'verão';
+        if (estacao === 'primavera') return 'outono';
+        if (estacao === 'outono') return 'primavera';
+      }
+      
+      return estacao;
     } catch (erro) {
       console.error('Erro ao obter estação do ano:', erro);
       return 'primavera';
     }
+  },
+
+  // Obter o destino atual em foco
+  obterDestinoAtual() {
+    // Retorna o destino atualmente em foco
+    if (this.destinoSelecionado) return this.destinoSelecionado;
+    if (this.recomendacoes && this.recomendacoes.topPick) return this.recomendacoes.topPick;
+    return null;
+  },
+
+  // Verifica se um destino está no hemisfério sul
+  estaNoHemisferioSul(destino) {
+    if (!destino || !destino.pais) return false;
+    
+    // Lista de países no hemisfério sul
+    const paisesHemisferioSul = [
+      'Argentina', 'Austrália', 'Bolívia', 'Brasil', 'Chile', 
+      'Nova Zelândia', 'Paraguai', 'Peru', 'Uruguai', 'África do Sul'
+    ];
+    
+    return paisesHemisferioSul.some(pais => 
+      destino.pais.toLowerCase().includes(pais.toLowerCase())
+    );
   },
 
   obterDataIdaObj() {
