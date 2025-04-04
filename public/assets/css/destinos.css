@@ -332,3 +332,200 @@
     white-space: nowrap;
     border-width: 0;
 }
+
+/* Estilos para o sistema de abas */
+.botao-aba {
+  position: relative;
+  transition: all 0.2s;
+}
+
+.aba-ativa {
+  color: #E87722;
+  border-bottom: 2px solid #E87722;
+  font-weight: 600;
+}
+
+.aba-inativa {
+  color: #6B7280;
+  border-bottom: 2px solid transparent;
+}
+
+.aba-ativa::after {
+  content: "";
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background-color: #E87722;
+}
+
+.botao-aba:hover:not(.aba-ativa) {
+  color: #4B5563;
+  background-color: #F9FAFB;
+}
+
+/* Cards com profundidade e interatividade */
+.card-destino {
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.08);
+  position: relative;
+}
+
+.card-destino:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 15px rgba(0,0,0,0.1);
+}
+
+/* Tratamento especial para imagens */
+.image-container {
+  position: relative;
+  overflow: hidden;
+}
+
+.image-container img {
+  transition: transform 0.5s ease;
+}
+
+.image-container:hover img {
+  transform: scale(1.05);
+}
+
+.image-credit {
+  transform: translateY(100%);
+  transition: transform 0.3s ease;
+}
+
+.image-container:hover .image-credit {
+  transform: translateY(0);
+}
+
+/* Destaque para seções importantes */
+.primary-info {
+  border-left: 3px solid #E87722;
+  padding-left: 10px;
+}
+
+.secondary-info {
+  border-left: 3px solid #00A3E0;
+  padding-left: 10px;
+}
+
+/* Animações para o modal de destino surpresa */
+.modal-surpresa-container {
+  animation: fadeIn 0.3s ease-out;
+}
+
+.modal-surpresa-content {
+  animation: scaleIn 0.4s cubic-bezier(0.165, 0.84, 0.44, 1);
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes scaleIn {
+  from { 
+    transform: scale(0.95); 
+    opacity: 0;
+  }
+  to { 
+    transform: scale(1);
+    opacity: 1; 
+  }
+}
+
+/* Melhorias na tipografia */
+h3 {
+  letter-spacing: -0.01em;
+}
+
+.subtitle {
+  font-weight: 500;
+  color: #4B5563;
+  margin-bottom: 0.5rem;
+}
+
+/* Estilos para preços */
+.price {
+  font-feature-settings: "tnum";
+  font-variant-numeric: tabular-nums;
+}
+
+/* Design responsivo adaptativo */
+@media (max-width: 480px) {
+  .two-column-layout {
+    display: block;
+  }
+  
+  .grid-cols-2 {
+    grid-template-columns: 1fr;
+  }
+  
+  .mobile-full-width {
+    width: 100%;
+  }
+}
+
+/* Consistência com a identidade visual */
+.primary-color {
+  color: #E87722;
+}
+
+.secondary-color {
+  color: #00A3E0;
+}
+
+.primary-bg {
+  background-color: #E87722;
+}
+
+.secondary-bg {
+  background-color: #00A3E0;
+}
+
+/* Degradês funcionais */
+.gradient-top {
+  background: linear-gradient(to bottom, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0) 100%);
+}
+
+.gradient-bottom {
+  background: linear-gradient(to top, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0) 100%);
+}
+
+/* Blocos de informação organizados */
+.info-block {
+  padding: 1rem;
+  border-radius: 0.5rem;
+  margin-bottom: 1rem;
+  background-color: #F9FAFB;
+}
+
+.info-block-title {
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+  display: flex;
+  align-items: center;
+}
+
+.info-block-title svg, 
+.info-block-title span {
+  margin-right: 0.5rem;
+}
+
+/* Indicadores visuais para tipos de destino */
+.destination-type {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  background-color: white;
+  border-radius: 50%;
+  width: 2rem;
+  height: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  z-index: 10;
+}
