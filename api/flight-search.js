@@ -1,4 +1,5 @@
 // api/flight-search.js - Endpoint para busca de voos conforme as especificações da API Travelpayouts
+// ATENÇÃO: Utiliza o método de assinatura por ORDENAÇÃO ALFABÉTICA.
 const axios = require('axios');
 const crypto = require('crypto');
 
@@ -12,47 +13,57 @@ function isValidIATA(code) {
   return /^[A-Z]{3}$/.test(code);
 }
 
-// Função para gerar a assinatura com ordem fixa e logs detalhados
+// ========================================================================
+// NOVA FUNÇÃO generateSignature - Método de Ordenação Alfabética
+// ========================================================================
 function generateSignature(data, token) {
-  // Ordem fixa conforme documentação Travelpayouts:
-  // token:marker:host:user_ip:locale:trip_class:
-  // passengers.adults:passengers.children:passengers.infants:
-  // para cada segmento: origin:destination:date
   const values = [];
-  values.push(data.marker);
-  values.push(data.host);
-  values.push(data.user_ip);
-  values.push(data.locale);
-  values.push(data.trip_class);
-  values.push(String(data.passengers.adults));
-  values.push(String(data.passengers.children));
-  values.push(String(data.passengers.infants));
-  data.segments.forEach(segment => {
-    values.push(segment.origin);
-    values.push(segment.destination);
-    values.push(segment.date);
+  // Ordem alfabética das chaves de PRIMEIRO nível:
+  const topLevelKeys = ['host', 'locale', 'marker', 'passengers', 'segments', 'trip_class', 'user_ip'].sort();
+
+  topLevelKeys.forEach(key => {
+    if (key === 'passengers') {
+      // Ordena alfabeticamente as chaves DENTRO de 'passengers'
+      const passengerKeys = Object.keys(data.passengers).sort(); // ['adults', 'children', 'infants']
+      passengerKeys.forEach(pKey => {
+        // Adiciona os VALORES na ordem das chaves ordenadas
+        values.push(String(data.passengers[pKey]));
+      });
+    } else if (key === 'segments') {
+      // Processa cada segmento na ordem em que aparecem no array
+      data.segments.forEach(segment => {
+        // Ordena alfabeticamente as chaves DENTRO de cada 'segment'
+        const segmentKeys = Object.keys(segment).sort(); // ['date', 'destination', 'origin']
+        segmentKeys.forEach(sKey => {
+          // Adiciona os VALORES na ordem das chaves ordenadas
+          values.push(segment[sKey]);
+        });
+      });
+    } else {
+      // Adiciona o valor das chaves de primeiro nível simples
+      values.push(data[key]);
+    }
   });
 
-  // Concatena com ":" e antepõe o token também separado por ":"
-  const signatureString = token + ':' + values.join(':');
+  // Concatena os VALORES coletados (na ordem definida pela ordenação alfabética das chaves) com ":"
+  const valuesString = values.join(':');
+  // Adiciona o token no início, separado por ":"
+  const signatureString = token + ':' + valuesString;
 
   // --- LOGS DETALHADOS PARA DEBUG ---
-  console.log("--- Debug Assinatura ---");
+  console.log("--- Debug Assinatura (Método Ordenação Alfabética) ---");
   console.log("Token (início):", token ? token.substring(0, 4) + '****' : 'NÃO DEFINIDO');
-  console.log("Marker:", data.marker);
-  console.log("Host:", data.host);
-  console.log("User IP:", data.user_ip);
-  console.log("Locale:", data.locale);
-  console.log("Trip Class:", data.trip_class);
-  console.log("Passengers:", JSON.stringify(data.passengers));
-  console.log("Segments:", JSON.stringify(data.segments));
-  console.log("String completa para assinatura:", signatureString); // Log completo! Cuidado se o token for muito sensível.
+  console.log("Valores concatenados (na ordem das chaves ordenadas):", valuesString);
+  console.log("String completa para assinatura:", signatureString);
   // --- FIM DOS LOGS DETALHADOS ---
 
   const signatureHash = crypto.createHash('md5').update(signatureString).digest('hex');
-  console.log("Hash MD5 gerado (Signature):", signatureHash);
+  console.log("Hash MD5 gerado (Signature - Alfabético):", signatureHash);
   return signatureHash;
 }
+// ========================================================================
+// Fim da NOVA FUNÇÃO generateSignature
+// ========================================================================
 
 
 module.exports = async function handler(req, res) {
@@ -73,7 +84,7 @@ module.exports = async function handler(req, res) {
   }
 
   try {
-    console.log("Iniciando busca de voos...");
+    console.log("Iniciando busca de voos (Assinatura Alfabética)...");
     const params = req.body;
 
     // --- Validações ---
@@ -100,9 +111,8 @@ module.exports = async function handler(req, res) {
     // --- Obter variáveis de ambiente ---
     const token = process.env.AVIASALES_TOKEN;
     const marker = process.env.AVIASALES_MARKER;
-    // Tenta obter o host da requisição ou da variável de ambiente, com fallback
-    const requestHost = req.headers.host;
-    const hostEnv = process.env.HOST || "benetrip.com.br"; // Use o seu domínio principal aqui como fallback seguro
+    // USA O VALOR CORRIGIDO COM WWW
+    const hostEnv = process.env.HOST || "www.benetrip.com.br"; // <- Garantir que usa www
 
     if (!token || !marker) {
       console.error("!!! ERRO CRÍTICO: AVIASALES_TOKEN ou AVIASALES_MARKER não configurados no ambiente do servidor !!!");
@@ -110,28 +120,29 @@ module.exports = async function handler(req, res) {
     }
 
     // Determina o IP do usuário
-    const userIp = req.headers['x-forwarded-for']?.split(',')[0].trim() || // Pega o primeiro IP se houver múltiplos
+    const userIp = req.headers['x-forwarded-for']?.split(',')[0].trim() ||
                    req.headers['client-ip'] ||
-                   req.connection?.remoteAddress || // Use optional chaining
-                   req.socket?.remoteAddress || // Fallback adicional
-                   "127.0.0.1"; // Último recurso
+                   req.connection?.remoteAddress ||
+                   req.socket?.remoteAddress ||
+                   "127.0.0.1";
 
     console.log("Usando Token (início):", token.substring(0, 4) + "****");
     console.log("Usando Marker:", marker);
-    console.log("Usando Host para assinatura:", hostEnv); // O host usado na assinatura
+    console.log("Usando Host para assinatura:", hostEnv); // DEVE SER www.benetrip.com.br
     console.log("IP Detectado:", userIp);
     // --- Fim Obter variáveis ---
 
 
     // --- Montar objeto da requisição para Travelpayouts ---
+    // Certifique-se de que todas as chaves necessárias para a assinatura estejam presentes aqui
     const requestData = {
       marker: marker,
-      host: hostEnv, // Usar o host definido acima
+      host: hostEnv, // Usar o host correto com www
       user_ip: userIp,
-      locale: "en", // Alterado para 'pt', ajuste se necessário
+      locale: "pt", // Pode voltar para 'pt' ou manter 'en' se preferir testar
       trip_class: params.classe ? params.classe.toUpperCase() : "Y",
       passengers: {
-        adults: parseInt(params.adultos || 1, 10), // Garantir que são números inteiros
+        adults: parseInt(params.adultos || 1, 10),
         children: parseInt(params.criancas || 0, 10),
         infants: parseInt(params.bebes || 0, 10)
       },
@@ -148,35 +159,34 @@ module.exports = async function handler(req, res) {
     // Adicionar segmento de volta, se fornecido
     if (params.dataVolta) {
       requestData.segments.push({
-        origin: destino, // Origem é o destino da ida
-        destination: origem, // Destino é a origem da ida
+        origin: destino,
+        destination: origem,
         date: params.dataVolta
       });
     }
     // --- Fim Montar objeto ---
 
 
-    // --- Gerar Assinatura ---
-    // A função generateSignature agora contém logs detalhados
+    // --- Gerar Assinatura (AGORA USANDO O MÉTODO ALFABÉTICO) ---
     const signature = generateSignature(requestData, token);
-    requestData.signature = signature;
+    requestData.signature = signature; // Adiciona a assinatura gerada ao corpo da requisição
     // --- Fim Gerar Assinatura ---
 
-    console.log("Enviando requisição para Travelpayouts com dados:", JSON.stringify({ ...requestData, signature: signature.substring(0, 5) + '...' }, null, 2)); // Não logar assinatura completa aqui
+    console.log("Enviando requisição para Travelpayouts com dados:", JSON.stringify({ ...requestData, signature: signature.substring(0, 5) + '...' }, null, 2));
 
     // --- Enviar requisição para Travelpayouts ---
     const apiResponse = await axios.post(
       "https://api.travelpayouts.com/v1/flight_search",
-      requestData,
+      requestData, // Envia o objeto completo com a nova assinatura
       {
         headers: { "Content-Type": "application/json" },
-        timeout: 15000 // Aumentado para 15 segundos
+        timeout: 15000
       }
     );
     // --- Fim Enviar requisição ---
 
     console.log("Resposta inicial da Travelpayouts (Status):", apiResponse.status);
-    console.log("Resposta inicial da Travelpayouts (Data):", apiResponse.data); // Log da resposta
+    console.log("Resposta inicial da Travelpayouts (Data):", apiResponse.data);
 
     const searchId = apiResponse.data.search_id;
     if (!searchId) {
@@ -184,9 +194,9 @@ module.exports = async function handler(req, res) {
       return res.status(500).json({ error: "Falha ao iniciar a busca. A API externa não retornou um ID.", apiResponse: apiResponse.data });
     }
 
-    // --- Lógica de Polling ---
-    const maxAttempts = 12;   // Aumentado
-    const intervalMs = 3500;  // Aumentado
+    // --- Lógica de Polling (sem alterações) ---
+    const maxAttempts = 12;
+    const intervalMs = 3500;
     let attempts = 0;
     let resultados = null;
     let pollingComplete = false;
@@ -199,32 +209,27 @@ module.exports = async function handler(req, res) {
       try {
         const resultsResponse = await axios.get(
           `https://api.travelpayouts.com/v1/flight_search_results?uuid=${searchId}`,
-          { timeout: 10000 } // Timeout para cada tentativa de polling
+          { timeout: 10000 }
         );
 
-        // Verifica se a busca foi concluída (mesmo que sem resultados) ou se há propostas
          if (resultsResponse.data?.search_completed || (resultsResponse.data?.proposals && resultsResponse.data.proposals.length > 0)) {
            console.log(`Resultados recebidos ou busca concluída na tentativa ${attempts}.`);
-           resultados = resultsResponse.data; // Armazena os dados (pode ter proposals ou não)
-           pollingComplete = true; // Marca como completo para sair do loop
+           resultados = resultsResponse.data;
+           pollingComplete = true;
          } else {
            console.log(`Busca ainda em andamento (tentativa ${attempts})...`);
          }
 
       } catch (pollError) {
         console.error(`Erro durante o polling (tentativa ${attempts}):`, pollError.message);
-        // Decide se quer parar o polling em caso de erro ou continuar tentando
         if (pollError.response) {
             console.error("Polling Error Status:", pollError.response.status);
             console.error("Polling Error Data:", pollError.response.data);
-            // Se for um erro como 404 (search not found), pode parar
             if (pollError.response.status === 404) {
                 console.warn("Search ID não encontrado no polling. Parando.");
-                pollingComplete = true; // Para o loop
-                // Considerar retornar erro aqui ou apenas o status 202 abaixo
+                pollingComplete = true;
             }
         }
-        // Continua tentando nas próximas iterações a menos que seja um erro fatal
       }
     } // Fim do While
 
@@ -245,7 +250,7 @@ module.exports = async function handler(req, res) {
           success: true,
           status: 'completed',
           search_id: searchId,
-          resultados: resultados, // Contém proposals, gates, airlines, etc.
+          resultados: resultados,
           attempts: attempts
         });
     } else {
@@ -255,7 +260,7 @@ module.exports = async function handler(req, res) {
             status: 'completed_empty',
             search_id: searchId,
             message: "Busca concluída, mas nenhum voo encontrado para os critérios fornecidos.",
-            resultados: resultados, // Pode conter informações úteis mesmo sem proposals
+            resultados: resultados,
             attempts: attempts
         });
     }
@@ -270,13 +275,13 @@ module.exports = async function handler(req, res) {
         status: error.response.status,
         headers: error.response.headers,
         data: error.response.data,
-        config_url: error.config?.url, // Loga a URL que falhou
+        config_url: error.config?.url,
         config_method: error.config?.method,
       });
       // Retorna o erro específico da API externa para o cliente
       return res.status(error.response.status).json({
           error: "Erro ao comunicar com a API externa.",
-          details: error.response.data // Envia detalhes do erro da API externa
+          details: error.response.data
       });
     } else if (error.request) {
       // A requisição foi feita mas não houve resposta
@@ -285,7 +290,7 @@ module.exports = async function handler(req, res) {
     } else {
       // Erro na configuração da requisição ou outro erro interno
       console.error("Erro interno:", error.message);
-      console.error(error.stack); // Log do stack trace
+      console.error(error.stack);
       return res.status(500).json({ error: "Erro interno no servidor.", details: error.message });
     }
   }
