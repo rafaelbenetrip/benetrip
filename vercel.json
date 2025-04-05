@@ -12,6 +12,10 @@
     "api/image-search.js": {
       "memory": 1024,
       "maxDuration": 30
+    },
+        {
+      "src": "/api/flight-results",
+      "dest": "/api/flight-results.js"
     }
   },
   "routes": [
