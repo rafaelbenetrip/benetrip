@@ -8,12 +8,10 @@ const BENETRIP_API = {
  * Configurações da API
  */
 config: {
-    marker: '604241', // Era process.env.AVIASALES_MARKER || '604241'
-    token: 'e82f7d420689b6124dcfa5921a8c6934', // Era process.env.AVIASALES_TOKEN || 'e82f7d420689b6124dcfa5921a8c6934'
-    host: 'benetrip.com.br', // Era process.env.HOST || 'benetrip.com.br'
-    searchBaseUrl: 'https://api.travelpayouts.com/v1/flight_search',
-    resultsBaseUrl: 'https://api.travelpayouts.com/v1/flight_search_results',
-    clicksBaseUrl: 'https://api.travelpayouts.com/v1/flight_searches',
+    // Removidas credenciais hardcoded por razões de segurança
+    // Todas as credenciais são gerenciadas pelo backend
+    searchBaseUrl: '/api/flight-search', // Endpoint do Vercel
+    resultsBaseUrl: '/api/flight-search-results', // Endpoint para polling
     autocompleteUrl: 'https://autocomplete.travelpayouts.com/places2',
     requestDelay: 2000,
     maxRetries: 20
@@ -40,10 +38,10 @@ config: {
         // Notificar início da busca
         this.dispatchProgressEvent(10, "Iniciando busca de voos... ✈️");
         
-        // Usar nossa função Netlify para buscar voos
+        // Usar nossa função de backend para buscar voos
         this.dispatchProgressEvent(30, "Consultando as melhores ofertas para você... 🔍");
         
-        const response = await fetch('/api/flight-search', {
+        const response = await fetch(this.config.searchBaseUrl, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -110,123 +108,14 @@ config: {
     },
 
     /**
-     * Gera assinatura para a API Aviasales
-     */
-    generateSignature(params) {
-        // Na implementação real, usaria uma função de hash MD5
-        // Para o MVP, estamos simplificando
-        return "hash-simulado-para-demo";
-    },
-
-    /**
-     * Inicia a busca na API Aviasales
-     */
-    async iniciarBusca(params) {
-        try {
-            // Preparar dados para a requisição
-            const data = {
-                signature: this.generateSignature(params),
-                marker: this.config.marker,
-                host: this.config.host,
-                user_ip: "127.0.0.1", // Em produção, usar IP real do usuário
-                locale: "pt",
-                trip_class: params.classe || "Y", // Econômica por padrão
-                passengers: {
-                    adults: params.adultos || 1,
-                    children: params.criancas || 0,
-                    infants: params.bebes || 0
-                },
-                segments: []
-            };
-            
-            // Adicionar segmento de ida
-            data.segments.push({
-                origin: params.origem,
-                destination: params.destino,
-                date: params.dataIda
-            });
-            
-            // Adicionar segmento de volta, se aplicável
-            if (params.dataVolta) {
-                data.segments.push({
-                    origin: params.destino,
-                    destination: params.origem,
-                    date: params.dataVolta
-                });
-            }
-            
-            // Na implementação real, fazer a requisição à API
-            // Para o MVP, simulamos o retorno
-            return this.simulateSearchId();
-            
-            /* Exemplo de código para a chamada real à API
-            const response = await fetch(this.config.searchBaseUrl, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(data)
-            });
-            
-            const responseData = await response.json();
-            return responseData.search_id;
-            */
-        } catch (error) {
-            console.error("Erro ao iniciar busca:", error);
-            throw error;
-        }
-    },
-
-    /**
-     * Obtém resultados de busca usando o ID de pesquisa
-     */
-    async obterResultados(searchId) {
-        try {
-            let tentativas = 0;
-            let resultados = null;
-            
-            // Loop para obter resultados (pode demorar alguns segundos)
-            while (tentativas < this.config.maxRetries) {
-                tentativas++;
-                
-                // Atualizar progresso a cada tentativa
-                const progress = Math.min(30 + Math.floor(tentativas * 2.5), 75);
-                this.dispatchProgressEvent(progress, `Buscando voos (tentativa ${tentativas})... ⏳`);
-                
-                // Simular delay da API
-                await new Promise(resolve => setTimeout(resolve, this.config.requestDelay));
-                
-                // Simulação de resultados para o MVP
-                resultados = this.simulateResults(searchId, tentativas);
-                
-                // Verificar se já temos resultados completos
-                if (resultados && resultados.proposals && resultados.proposals.length > 0) {
-                    break;
-                }
-                
-                /* Código para chamada real à API
-                const response = await fetch(`${this.config.resultsBaseUrl}?uuid=${searchId}`);
-                resultados = await response.json();
-                
-                // Verificar se já temos resultados completos
-                if (resultados && resultados.proposals && resultados.proposals.length > 0) {
-                    break;
-                }
-                */
-            }
-            
-            return resultados;
-            
-        } catch (error) {
-            console.error("Erro ao obter resultados:", error);
-            throw error;
-        }
-    },
-
-    /**
      * Processa resultados de voos para formato amigável ao usuário
      */
     processResults(results, params) {
+        // Se o resultado for um objeto com propriedade 'resultados', extrair os resultados
+        if (results.resultados) {
+            results = results.resultados;
+        }
+        
         // Verifica se temos resultados válidos
         if (!results || !results.proposals || results.proposals.length === 0) {
             return {
@@ -262,20 +151,20 @@ config: {
                 
                 // Extrair informações de preço
                 const preco = proposta.terms ? {
-                    total: proposta.terms["48"].total || proposta.terms["48"].price,
-                    moeda: proposta.terms["48"].currency || "BRL"
+                    total: proposta.terms["48"]?.total || proposta.terms["48"]?.price,
+                    moeda: proposta.terms["48"]?.currency || "BRL"
                 } : {
                     total: "Indisponível",
                     moeda: "BRL"
                 };
                 
                 // Informações sobre bagagem
-                const bagagem = proposta.terms && proposta.terms["48"].flights_baggage 
+                const bagagem = proposta.terms && proposta.terms["48"]?.flights_baggage 
                     ? proposta.terms["48"].flights_baggage 
                     : "Verificar com a companhia";
                 
                 return {
-                    id: `voo-${index + 1}`,
+                    id: proposta.sign || `voo-${index + 1}`,
                     segmentos: segmentos,
                     duracaoTotal: duracaoTotal,
                     preco: preco,
@@ -380,19 +269,64 @@ config: {
     },
 
     /**
+     * Realiza polling para obter resultados de voos
+     */
+    async realizarPollingResultados(searchId, maxTentativas = 10) {
+        try {
+            let tentativas = 0;
+            
+            while (tentativas < maxTentativas) {
+                tentativas++;
+                
+                this.dispatchProgressEvent(30 + (tentativas / maxTentativas) * 50, 
+                    `Buscando voos (tentativa ${tentativas})... ⏳`);
+                
+                // Aguardar entre tentativas
+                await new Promise(r => setTimeout(r, this.config.requestDelay));
+                
+                // Realizar requisição de polling
+                const response = await fetch(`${this.config.resultsBaseUrl}?searchId=${searchId}`);
+                
+                if (!response.ok) {
+                    console.warn(`Tentativa ${tentativas}: erro na requisição`);
+                    continue;
+                }
+                
+                const data = await response.json();
+                
+                // Verificar se temos resultados
+                if (data.resultados && data.resultados.proposals && 
+                    data.resultados.proposals.length > 0) {
+                    return data;
+                }
+                
+                // Se for a última tentativa sem resultados
+                if (tentativas === maxTentativas) {
+                    return { 
+                        success: false,
+                        message: "Tempo limite excedido ao buscar voos" 
+                    };
+                }
+            }
+            
+            return { 
+                success: false,
+                message: "Não foi possível encontrar voos no momento" 
+            };
+            
+        } catch (error) {
+            console.error("Erro ao realizar polling de resultados:", error);
+            throw error;
+        }
+    },
+
+    /**
      * Gera link de reserva para um voo específico
      */
-    async gerarLinkReserva(voId, searchId) {
+    async gerarLinkReserva(vooId, searchId) {
         try {
-            // Em produção, faria uma chamada à API para obter o link de reserva
-            // Para o MVP, simulamos um link
-            return `https://www.benetrip.com.br/reserva?voo=${voId}&search=${searchId}`;
-            
-            /* Código para chamada real à API
-            const response = await fetch(`${this.config.clicksBaseUrl}/${searchId}/clicks/${termsUrl}.json?marker=${this.config.marker}`);
-            const data = await response.json();
-            return data.url;
-            */
+            // Em ambiente real, far-se-ia uma chamada ao backend para gerar o link
+            return `/api/generate-booking-link?vooId=${vooId}&searchId=${searchId}`;
         } catch (error) {
             console.error("Erro ao gerar link de reserva:", error);
             throw error;
@@ -400,236 +334,43 @@ config: {
     },
 
     /**
- * Busca sugestões de lugares para autocomplete usando a API Aviasales
- */
-async buscarSugestoesCidade(termo) {
-    try {
-        console.log("Buscando sugestões para:", termo);
-        
-        // Ignorar busca se o termo for curto demais
-        if (!termo || termo.length < 2) {
-            return [];
-        }
-        
-        // URL da API Aviasales Autocomplete
-        const url = `https://autocomplete.travelpayouts.com/places2?term=${encodeURIComponent(termo)}&locale=pt&types[]=city&types[]=airport`;
-        
-        console.log("Chamando API:", url);
-        
-        // Fazer a requisição usando fetch
-        const response = await fetch(url);
-        
-        // Verificar se a requisição foi bem sucedida
-        if (!response.ok) {
-            console.error("Erro na API:", response.status, response.statusText);
-            throw new Error(`Erro na API: ${response.status}`);
-        }
-        
-        // Converter resposta para JSON
-        const data = await response.json();
-        console.log("Resposta da API:", data);
-        
-        // Retornar resultados da API
-        return data;
-    } catch (error) {
-        console.error("Erro ao buscar sugestões de cidade:", error);
-        
-        // Em caso de erro, retornar simulação para não travar a interface
-        return this.simulateAutocompleteCities(termo);
-    }
-},
-
-    /**
-     * Simula ID de pesquisa para desenvolvimento
+     * Busca sugestões de lugares para autocomplete usando a API Aviasales
      */
-    simulateSearchId() {
-        return `search-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-    },
-
-    /**
-     * Simula resultados de busca para desenvolvimento
-     */
-    simulateResults(searchId, tentativa) {
-        // Nos primeiros 3 retornos, simular que não temos resultados ainda
-        if (tentativa < 3) {
-            return { search_id: searchId };
+    async buscarSugestoesCidade(termo) {
+        try {
+            console.log("Buscando sugestões para:", termo);
+            
+            // Ignorar busca se o termo for curto demais
+            if (!termo || termo.length < 2) {
+                return [];
+            }
+            
+            // URL da API Aviasales Autocomplete
+            const url = `${this.config.autocompleteUrl}?term=${encodeURIComponent(termo)}&locale=pt&types[]=city&types[]=airport`;
+            
+            console.log("Chamando API:", url);
+            
+            // Fazer a requisição usando fetch
+            const response = await fetch(url);
+            
+            // Verificar se a requisição foi bem sucedida
+            if (!response.ok) {
+                console.error("Erro na API:", response.status, response.statusText);
+                throw new Error(`Erro na API: ${response.status}`);
+            }
+            
+            // Converter resposta para JSON
+            const data = await response.json();
+            console.log("Resposta da API:", data);
+            
+            // Retornar resultados da API
+            return data;
+        } catch (error) {
+            console.error("Erro ao buscar sugestões de cidade:", error);
+            
+            // Em caso de erro, retornar simulação para não travar a interface
+            return this.simulateAutocompleteCities(termo);
         }
-        
-        // Após a terceira tentativa, retornar resultados simulados
-        return {
-            search_id: searchId,
-            proposals: [
-                {
-                    segment: [
-                        {
-                            flight: [
-                                {
-                                    departure: "GRU",
-                                    departure_date: "2025-07-15",
-                                    departure_time: "08:30",
-                                    arrival: "MIA",
-                                    arrival_date: "2025-07-15",
-                                    arrival_time: "16:45",
-                                    marketing_carrier: "AA",
-                                    duration: 525
-                                }
-                            ]
-                        },
-                        {
-                            flight: [
-                                {
-                                    departure: "MIA",
-                                    departure_date: "2025-07-22",
-                                    departure_time: "19:30",
-                                    arrival: "GRU",
-                                    arrival_date: "2025-07-23",
-                                    arrival_time: "07:45",
-                                    marketing_carrier: "AA",
-                                    duration: 540
-                                }
-                            ]
-                        }
-                    ],
-                    total_duration: 1065,
-                    is_direct: true,
-                    carriers: ["AA"],
-                    terms: {
-                        "48": {
-                            total: "3450.75",
-                            price: "3450.75",
-                            currency: "BRL",
-                            flights_baggage: "1PC"
-                        }
-                    }
-                },
-                {
-                    segment: [
-                        {
-                            flight: [
-                                {
-                                    departure: "GRU",
-                                    departure_date: "2025-07-15",
-                                    departure_time: "10:20",
-                                    arrival: "BOG",
-                                    arrival_date: "2025-07-15",
-                                    arrival_time: "14:10",
-                                    marketing_carrier: "AV",
-                                    duration: 350
-                                },
-                                {
-                                    departure: "BOG",
-                                    departure_date: "2025-07-15",
-                                    departure_time: "16:30",
-                                    arrival: "MIA",
-                                    arrival_date: "2025-07-15",
-                                    arrival_time: "20:50",
-                                    marketing_carrier: "AV",
-                                    duration: 260
-                                }
-                            ]
-                        },
-                        {
-                            flight: [
-                                {
-                                    departure: "MIA",
-                                    departure_date: "2025-07-22",
-                                    departure_time: "21:30",
-                                    arrival: "BOG",
-                                    arrival_date: "2025-07-23",
-                                    arrival_time: "00:50",
-                                    marketing_carrier: "AV",
-                                    duration: 260
-                                },
-                                {
-                                    departure: "BOG",
-                                    departure_date: "2025-07-23",
-                                    departure_time: "02:10",
-                                    arrival: "GRU",
-                                    arrival_date: "2025-07-23",
-                                    arrival_time: "09:15",
-                                    marketing_carrier: "AV",
-                                    duration: 365
-                                }
-                            ]
-                        }
-                    ],
-                    total_duration: 1235,
-                    is_direct: false,
-                    carriers: ["AV"],
-                    terms: {
-                        "48": {
-                            total: "2890.45",
-                            price: "2890.45",
-                            currency: "BRL",
-                            flights_baggage: "1PC"
-                        }
-                    }
-                },
-                {
-                    segment: [
-                        {
-                            flight: [
-                                {
-                                    departure: "GRU",
-                                    departure_date: "2025-07-15",
-                                    departure_time: "23:45",
-                                    arrival: "PTY",
-                                    arrival_date: "2025-07-16",
-                                    arrival_time: "04:20",
-                                    marketing_carrier: "CM",
-                                    duration: 395
-                                },
-                                {
-                                    departure: "PTY",
-                                    departure_date: "2025-07-16",
-                                    departure_time: "08:30",
-                                    arrival: "MIA",
-                                    arrival_date: "2025-07-16",
-                                    arrival_time: "12:15",
-                                    marketing_carrier: "CM",
-                                    duration: 225
-                                }
-                            ]
-                        },
-                        {
-                            flight: [
-                                {
-                                    departure: "MIA",
-                                    departure_date: "2025-07-22",
-                                    departure_time: "16:10",
-                                    arrival: "PTY",
-                                    arrival_date: "2025-07-22",
-                                    arrival_time: "19:40",
-                                    marketing_carrier: "CM",
-                                    duration: 210
-                                },
-                                {
-                                    departure: "PTY",
-                                    departure_date: "2025-07-22",
-                                    departure_time: "21:30",
-                                    arrival: "GRU",
-                                    arrival_date: "2025-07-23",
-                                    arrival_time: "05:15",
-                                    marketing_carrier: "CM",
-                                    duration: 405
-                                }
-                            ]
-                        }
-                    ],
-                    total_duration: 1235,
-                    is_direct: false,
-                    carriers: ["CM"],
-                    terms: {
-                        "48": {
-                            total: "2750.30",
-                            price: "2750.30",
-                            currency: "BRL",
-                            flights_baggage: "2PC"
-                        }
-                    }
-                }
-            ]
-        };
     },
 
     /**
