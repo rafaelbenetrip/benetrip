@@ -1,61 +1,80 @@
-// api/flight-search.js - Endpoint Vercel para busca de voos
+// api/flight-search.js - Endpoint para busca de voos conforme as especificações da API Travelpayouts
 const axios = require('axios');
 const crypto = require('crypto');
 
+// Validação simples de data no formato YYYY-MM-DD
+function isValidDate(dateStr) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(dateStr);
+}
+
+// Validação simples para código IATA (3 letras maiúsculas)
+function isValidIATA(code) {
+  return /^[A-Z]{3}$/.test(code);
+}
+
 module.exports = async function handler(req, res) {
-  // Configurar cabeçalhos CORS
+  // Configuração dos cabeçalhos CORS
   res.setHeader('Access-Control-Allow-Credentials', true);
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   
-  // Lidar com requisições OPTIONS (CORS preflight)
+  // Lida com requisições OPTIONS (preflight)
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
   
-  // Apenas permitir requisições POST
+  // Permite somente método POST
   if (req.method !== 'POST') {
     return res.status(405).json({ error: "Método não permitido" });
   }
-
+  
   try {
-    console.log('Recebendo requisição de busca de voos no Vercel');
+    console.log("Iniciando busca de voos");
     const params = req.body;
     
-    // Obter token da API e marker do ambiente
+    // Validação dos parâmetros obrigatórios
+    if (!params.origem || !params.destino || !params.dataIda) {
+      return res.status(400).json({ 
+        error: "Parâmetros obrigatórios ausentes: 'origem', 'destino' ou 'dataIda'" 
+      });
+    }
+    
+    // Validar formato das datas
+    if (!isValidDate(params.dataIda)) {
+      return res.status(400).json({ error: "dataIda inválida. Use o formato YYYY-MM-DD" });
+    }
+    if (params.dataVolta && !isValidDate(params.dataVolta)) {
+      return res.status(400).json({ error: "dataVolta inválida. Use o formato YYYY-MM-DD" });
+    }
+    
+    // Garantir que os códigos IATA estejam em maiúsculas
+    const origem = params.origem.toUpperCase();
+    const destino = params.destino.toUpperCase();
+    if (!isValidIATA(origem) || !isValidIATA(destino)) {
+      return res.status(400).json({ error: "Código IATA inválido. Use 3 letras maiúsculas." });
+    }
+    
+    // Obter variáveis de ambiente
     const token = process.env.AVIASALES_TOKEN;
     const marker = process.env.AVIASALES_MARKER;
     const host = process.env.HOST || "benetrip.com.br";
     
-    // Verificar se o token e marker estão configurados
     if (!token || !marker) {
-      console.error("Token ou Marker da API Aviasales não configurados!");
-      return res.status(500).json({ 
-        error: "Configuração da API incompleta", 
-        success: false
-      });
+      console.error("Token ou Marker da API não configurados");
+      return res.status(500).json({ error: "Configuração da API incompleta" });
     }
     
-    console.log('Token:', token.substring(0, 4) + '****');
-    console.log('Marker:', marker);
+    console.log("Token:", token.substring(0, 4) + "****");
+    console.log("Marker:", marker);
     
-    // Validar parâmetros obrigatórios
-    if (!params.origem || !params.destino || !params.dataIda) {
-      return res.status(400).json({ 
-        error: "Parâmetros obrigatórios faltando: origem, destino ou dataIda", 
-        params: params,
-        success: false
-      });
-    }
-    
-    // Preparar dados para a requisição
-    const data = {
+    // Montar o objeto de requisição conforme a especificação da API
+    const requestData = {
       marker: marker,
       host: host,
       user_ip: req.headers['x-forwarded-for'] || req.headers['client-ip'] || req.connection.remoteAddress || "127.0.0.1",
       locale: "pt",
-      trip_class: params.classe || "Y",
+      trip_class: params.classe ? params.classe.toUpperCase() : "Y",
       passengers: {
         adults: params.adultos || 1,
         children: params.criancas || 0,
@@ -65,222 +84,128 @@ module.exports = async function handler(req, res) {
     };
     
     // Adicionar segmento de ida
-    data.segments.push({
-      origin: params.origem,
-      destination: params.destino,
+    requestData.segments.push({
+      origin: origem,
+      destination: destino,
       date: params.dataIda
     });
     
     // Adicionar segmento de volta, se aplicável
     if (params.dataVolta) {
-      data.segments.push({
-        origin: params.destino,
-        destination: params.origem,
+      requestData.segments.push({
+        origin: destino,
+        destination: origem,
         date: params.dataVolta
       });
     }
     
-    // Gerar assinatura para a API Aviasales usando o objeto data completo
-    const signature = generateSignature(data, token);
-    data.signature = signature;
+    // Gerar a assinatura com ordem fixa
+    const signature = generateSignature(requestData, token);
+    requestData.signature = signature;
     
-    console.log('Dados da requisição:', JSON.stringify(data, null, 2));
+    console.log("Objeto de requisição montado:", JSON.stringify(requestData, null, 2));
     
-    // Fazer a requisição à API Aviasales
-    const searchResponse = await axios.post(
+    // Enviar a requisição POST para a API Aviasales
+    const apiResponse = await axios.post(
       "https://api.travelpayouts.com/v1/flight_search",
-      data,
+      requestData,
       {
-        headers: {
-          "Content-Type": "application/json"
-        },
+        headers: { "Content-Type": "application/json" },
         timeout: 10000 // 10 segundos
       }
     );
     
-    console.log('Resposta da API: status', searchResponse.status);
-    
-    const searchId = searchResponse.data.search_id;
-    console.log('Search ID:', searchId);
+    console.log("Resposta da API, status:", apiResponse.status);
+    const searchId = apiResponse.data.search_id;
     
     if (!searchId) {
-      console.error('Nenhum search_id retornado:', searchResponse.data);
-      return res.status(500).json({ 
-        error: "Falha na busca: API não retornou ID de busca", 
-        success: false, 
-        apiResponse: searchResponse.data 
-      });
+      console.error("A API não retornou search_id:", apiResponse.data);
+      return res.status(500).json({ error: "A API não retornou search_id", apiResponse: apiResponse.data });
     }
     
-    // Fazer várias tentativas para obter resultados
+    // Polling para obter os resultados completos
+    const maxAttempts = 10;   // Número máximo de tentativas
+    const intervalMs = 3000;    // Intervalo entre tentativas em milissegundos
+    let attempts = 0;
     let resultados = null;
-    let tentativas = 0;
-    const maxTentativas = 5;
     
-    while (tentativas < maxTentativas) {
-      tentativas++;
-      console.log(`Tentativa ${tentativas} de ${maxTentativas} para obter resultados...`);
+    while (attempts < maxAttempts) {
+      attempts++;
+      console.log(`Polling: tentativa ${attempts} de ${maxAttempts}`);
       
-      // Esperar entre as tentativas
-      await new Promise(resolve => setTimeout(resolve, 3000));
+      // Aguarda o intervalo
+      await new Promise(resolve => setTimeout(resolve, intervalMs));
       
-      // Buscar resultados
+      // Consulta os resultados utilizando o search_id
       const resultsResponse = await axios.get(
         `https://api.travelpayouts.com/v1/flight_search_results?uuid=${searchId}`,
         { timeout: 8000 }
       );
       
-      // Verificar se já temos resultados completos
       if (resultsResponse.data && 
           resultsResponse.data.proposals && 
           resultsResponse.data.proposals.length > 0) {
-        console.log(`Encontrados ${resultsResponse.data.proposals.length} resultados`);
+        console.log(`Resultados encontrados na tentativa ${attempts}`);
         resultados = resultsResponse.data;
         break;
       }
-      
-      // Se for a última resposta com apenas search_id, significa que a busca continua
-      if (tentativas === maxTentativas && 
-          resultsResponse.data && 
-          Object.keys(resultsResponse.data).length === 1 &&
-          resultsResponse.data.search_id) {
-        console.log('A busca ainda está em andamento. Retornando o search_id para polling posterior');
-        return res.status(202).json({
-          success: true,
-          searchId: searchId,
-          message: "A busca está em andamento. Use o searchId para verificar os resultados posteriormente.",
-          tentativas: tentativas
-        });
-      }
     }
     
-    // Retornar resultados processados
-    return res.status(200).json({
-      success: true,
-      searchId: searchId,
-      resultados: resultados,
-      tentativas: tentativas
-    });
-    
-  } catch (error) {
-    console.error("Erro na busca de voos no Vercel:", error);
-    
-    // Verificar se é um erro da API
-    if (error.response) {
-      console.error("Status da resposta:", error.response.status);
-      console.error("Dados da resposta:", error.response.data);
-      
-      // Erro 401 - Problema de autenticação
-      if (error.response.status === 401) {
-        return res.status(500).json({
-          error: "Erro de autenticação na API. Verifique o token e a assinatura.",
-          status: error.response.status,
-          data: error.response.data,
-          success: false
-        });
-      }
-      
-      // Outros erros com resposta
-      return res.status(500).json({
-        error: `Erro na API: ${error.response.status} - ${error.response.statusText}`,
-        data: error.response.data,
-        success: false
+    // Se nenhum resultado completo for encontrado, retorna o search_id para polling posterior
+    if (!resultados) {
+      console.log("Busca em andamento; retornando search_id para consulta posterior");
+      return res.status(202).json({
+        success: true,
+        search_id: searchId,
+        message: "A busca está em andamento. Utilize o search_id para verificar os resultados posteriormente.",
+        attempts: attempts
       });
     }
     
-    // Erros genéricos
-    return res.status(500).json({ 
-      error: error.message,
-      success: false
+    // Retorna os resultados encontrados
+    return res.status(200).json({
+      success: true,
+      search_id: searchId,
+      resultados: resultados,
+      attempts: attempts
     });
-  }
-}
-
-// Função para gerar a assinatura da API com ordem fixa
-function generateSignature(params, token) {
-  if (!token) {
-    console.warn("Token da API Aviasales não configurado!");
-    return "fake_signature_placeholder";
-  }
-  
-  try {
-    // Ordem fixa dos parâmetros conforme a documentação:
-    // marker, host, user_ip, locale, trip_class, passengers, segments
-    const keysOrder = ["marker", "host", "user_ip", "locale", "trip_class", "passengers", "segments"];
-    let signatureString = token;
     
-    for (const key of keysOrder) {
-      if (params[key] !== undefined && params[key] !== null) {
-        if (key === "passengers") {
-          // Ordem fixa: adults, children, infants
-          const passengersOrder = ["adults", "children", "infants"];
-          for (const subKey of passengersOrder) {
-            if (params.passengers[subKey] !== undefined && params.passengers[subKey] !== null) {
-              signatureString += String(params.passengers[subKey]);
-            }
-          }
-        } else if (key === "segments") {
-          // Para segments, processa os itens na ordem original
-          // Cada segmento deve ter: origin, destination, date (nessa ordem)
-          for (const segment of params.segments) {
-            const segmentOrder = ["origin", "destination", "date"];
-            for (const segKey of segmentOrder) {
-              if (segment[segKey] !== undefined && segment[segKey] !== null) {
-                signatureString += String(segment[segKey]);
-              }
-            }
-          }
-        } else {
-          signatureString += String(params[key]);
-        }
-      }
-    }
-    
-    console.log('String da assinatura (primeiros 30 chars):', signatureString.substring(0, 30) + '...');
-    return crypto.createHash('md5').update(signatureString).digest('hex');
   } catch (error) {
-    console.error("Erro ao gerar assinatura:", error);
-    
-    // Método de fallback usando JSON.stringify com ordenação das chaves (menos recomendado)
-    try {
-      const sortedString = JSON.stringify(params, Object.keys(params).sort());
-      return crypto.createHash('md5').update(token + sortedString).digest('hex');
-    } catch (err) {
-      console.error("Erro no método de fallback:", err);
-      return "error_generating_signature";
+    console.error("Erro na busca de voos:", error);
+    if (error.response) {
+      console.error("Status da resposta:", error.response.status);
+      console.error("Dados da resposta:", error.response.data);
+      return res.status(error.response.status).json({ error: error.response.data });
     }
+    return res.status(500).json({ error: error.message });
   }
-}
+};
 
-// Função auxiliar para verificação de parâmetros (debug)
-function validarParametrosBusca(params) {
-  console.log('Validando parâmetros de busca de voos:');
-  console.log('Origem:', params.origem);
-  console.log('Destino:', params.destino);
-  console.log('Data de Ida:', params.dataIda);
-  console.log('Data de Volta:', params.dataVolta);
+// Função para gerar a assinatura com ordem fixa
+function generateSignature(data, token) {
+  // Ordem fixa:
+  // marker, host, user_ip, locale, trip_class, 
+  // passengers.adults, passengers.children, passengers.infants,
+  // Para cada segmento (na ordem): origin, destination, date
+  const values = [];
+  values.push(data.marker);
+  values.push(data.host);
+  values.push(data.user_ip);
+  values.push(data.locale);
+  values.push(data.trip_class);
+  values.push(String(data.passengers.adults));
+  values.push(String(data.passengers.children));
+  values.push(String(data.passengers.infants));
   
-  let valido = true;
-  let mensagensErro = [];
+  data.segments.forEach(segment => {
+    values.push(segment.origin);
+    values.push(segment.destination);
+    values.push(segment.date);
+  });
   
-  if (!params.origem) {
-    valido = false;
-    mensagensErro.push('Código IATA de origem não encontrado');
-  }
+  // Monta a string com delimitador ":" e adiciona o token como prefixo
+  const signatureString = token + ':' + values.join(':');
+  console.log("String da assinatura (primeiros 30 chars):", signatureString.substring(0, 30) + "...");
   
-  if (!params.destino) {
-    valido = false;
-    mensagensErro.push('Código IATA de destino não encontrado');
-  }
-  
-  if (!params.dataIda) {
-    valido = false;
-    mensagensErro.push('Data de ida não encontrada');
-  }
-  
-  return {
-    valido,
-    mensagensErro,
-    params
-  };
+  return crypto.createHash('md5').update(signatureString).digest('hex');
 }
