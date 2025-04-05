@@ -9,7 +9,7 @@
 const BENETRIP_VOOS = {
   // --- Constantes ---
   POLLING_INTERVAL_MS: 4000, // Intervalo entre chamadas de polling (4 segundos)
-  MAX_POLLING_ATTEMPTS: 15,  // Máximo de tentativas de polling
+  MAX_POLLING_ATTEMPTS: 30,  // Máximo de tentativas de polling
 
   // --- Dados e Estado ---
   destino: null,
