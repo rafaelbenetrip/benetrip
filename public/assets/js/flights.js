@@ -1,6 +1,6 @@
 /**
  * BENETRIP - Módulo de Busca e Exibição de Voos
- * Versão 2.1.0
+ * Versão 2.1.1
  * Este módulo gerencia a busca de voos na API Travelpayouts (Aviasales)
  * e exibe os resultados para o usuário
  */
@@ -126,9 +126,13 @@ const BENETRIP_VOOS = {
       
       const datas = dadosUsuario.respostas.datas;
       
+      // Obter o código IATA de origem com tratamento de erro
+      const origemIATA = this.obterCodigoIATAOrigem(dadosUsuario);
+      console.log('Código IATA de origem obtido:', origemIATA);
+      
       // Construir parâmetros da requisição
       const params = {
-        origem: this.obterCodigoIATAOrigem(dadosUsuario),
+        origem: origemIATA,
         destino: this.destino.codigo_iata,
         dataIda: datas.dataIda,
         dataVolta: datas.dataVolta,
@@ -936,17 +940,52 @@ const BENETRIP_VOOS = {
     }
   },
   
+  // Método corrigido para obter código IATA da origem
   obterCodigoIATAOrigem(dadosUsuario) {
-    // Tentar obter do localStorage ou usar um valor padrão
-    if (dadosUsuario && dadosUsuario.respostas && dadosUsuario.respostas.cidade_partida) {
-      // Implementar lógica para obter código IATA a partir da cidade
-      return this.obterCodigoIATADeCidade(dadosUsuario.respostas.cidade_partida);
+    try {
+      // Tentar obter do localStorage ou usar um valor padrão
+      if (dadosUsuario && dadosUsuario.respostas) {
+        // Tentar extrair a cidade de partida
+        let cidadePartida = null;
+        
+        // Verificar diferentes formatos possíveis nos dados
+        if (typeof dadosUsuario.respostas.cidade_partida === 'string') {
+          // Formato simples de string
+          cidadePartida = dadosUsuario.respostas.cidade_partida;
+        } else if (dadosUsuario.respostas.cidade_partida && typeof dadosUsuario.respostas.cidade_partida === 'object') {
+          // Formato de objeto (podendo ter propriedades como value, text, name, etc)
+          const objCidade = dadosUsuario.respostas.cidade_partida;
+          cidadePartida = objCidade.value || objCidade.text || objCidade.name || objCidade.label || '';
+        } else if (dadosUsuario.respostas.partida) {
+          // Outro nome possível para o campo
+          cidadePartida = dadosUsuario.respostas.partida;
+        }
+        
+        // Diagnóstico
+        console.log('Cidade de partida obtida dos dados:', cidadePartida, 'tipo:', typeof cidadePartida);
+        
+        // Se encontrou uma cidade válida, obter o código IATA
+        if (cidadePartida) {
+          return this.obterCodigoIATADeCidade(cidadePartida);
+        }
+      }
+      
+      console.warn('Dados de cidade não encontrados. Usando São Paulo (GRU) como padrão');
+      return 'GRU'; // Padrão: São Paulo
+    } catch (erro) {
+      console.error('Erro ao obter código IATA de origem:', erro);
+      return 'GRU'; // Valor padrão em caso de erro
+    }
+  },
+
+  // Método corrigido para obter código IATA a partir do nome da cidade
+  obterCodigoIATADeCidade(nomeCidade) {
+    // Verificação de tipo - corrige o erro TypeError: nomeCidade.toLowerCase is not a function
+    if (!nomeCidade || typeof nomeCidade !== 'string') {
+      console.warn('Nome de cidade inválido ou não é uma string:', nomeCidade);
+      return 'GRU'; // Valor padrão para São Paulo
     }
     
-    return 'GRU'; // Padrão: São Paulo
-  },
-  
-  obterCodigoIATADeCidade(nomeCidade) {
     // Mapeamento simplificado de algumas cidades comuns
     const mapeamentoCidades = {
       'São Paulo': 'SAO',
@@ -967,16 +1006,32 @@ const BENETRIP_VOOS = {
       'Goiânia': 'GYN'
     };
     
+    // Verificação para códigos IATA diretos (já fornecidos pelo usuário)
+    if (nomeCidade.length === 3 && nomeCidade === nomeCidade.toUpperCase()) {
+      console.log(`Código IATA fornecido diretamente: ${nomeCidade}`);
+      return nomeCidade;
+    }
+    
     // Verificar correspondência exata
     if (mapeamentoCidades[nomeCidade]) {
+      console.log(`Correspondência exata encontrada para ${nomeCidade}: ${mapeamentoCidades[nomeCidade]}`);
       return mapeamentoCidades[nomeCidade];
     }
     
-    // Verificar correspondência parcial
+    // Verificar correspondência parcial (case insensitive)
+    const cidadeLowerCase = nomeCidade.toLowerCase();
     for (const [cidade, codigo] of Object.entries(mapeamentoCidades)) {
-      if (nomeCidade.toLowerCase().includes(cidade.toLowerCase())) {
+      if (cidadeLowerCase.includes(cidade.toLowerCase())) {
+        console.log(`Correspondência parcial encontrada para ${nomeCidade}: ${codigo}`);
         return codigo;
       }
+    }
+    
+    // Extração de código IATA se estiver no formato "Cidade (IATA)"
+    const match = nomeCidade.match(/\(([A-Z]{3})\)/);
+    if (match && match[1]) {
+      console.log(`Código IATA extraído do formato Cidade (IATA): ${match[1]}`);
+      return match[1];
     }
     
     console.warn(`Código IATA não encontrado para cidade: ${nomeCidade}. Usando GRU (São Paulo) como padrão.`);
