@@ -217,7 +217,6 @@ const BENETRIP_VOOS = {
     // Não encontrado
     return null;
   },
-
   // --- Iniciar Busca de Voos (Chama o backend para obter search_id) ---
   async iniciarBuscaVoos() {
     try {
@@ -527,8 +526,7 @@ const BENETRIP_VOOS = {
       });
   },
   // --- Fim Gerenciamento do Polling ---
-
-   // --- Renderização ---
+  // --- Renderização ---
   atualizarProgresso(mensagem, porcentagem) {
     const barraProgresso = document.querySelector('.progress-bar');
     const textoProgresso = document.querySelector('.loading-text');
@@ -919,7 +917,6 @@ const BENETRIP_VOOS = {
         }, 4000); // Mostra por 4 segundos
     }
   },
-
   // --- Métodos de Formatação e Extração de Dados ---
   formatarPreco(preco, moeda = 'BRL') {
      // (Função mantida como antes)
@@ -1589,6 +1586,117 @@ const BENETRIP_VOOS = {
     
     return 1; // valor padrão
   },
+  configurarEventosAposRenderizacao() {
+    // Configura eventos que dependem dos elementos renderizados
+
+    // Swipe (se Hammer estiver disponível)
+    if (typeof Hammer !== 'undefined') {
+       const swipeContainer = document.getElementById('voos-swipe-container');
+       if (swipeContainer) {
+          // Limpar instâncias anteriores do Hammer, se possível
+          if (this.hammerInstance) {
+            this.hammerInstance.destroy();
+          }
+
+          this.hammerInstance = new Hammer(swipeContainer);
+          this.hammerInstance.on('swipeleft', () => this.proximoVoo());
+          this.hammerInstance.on('swiperight', () => this.vooAnterior());
+          
+          // Feedback visual para swipe
+          this.hammerInstance.on('swipeleft swiperight', () => {
+            // Feedback sonoro opcional
+            if (typeof Audio !== 'undefined') {
+              try {
+                const clickSound = new Audio('assets/sounds/swipe.mp3');
+                clickSound.volume = 0.2;
+                clickSound.play().catch(() => {}); // Ignora erros de reprodução (políticas de autoplay)
+              } catch (e) {} // Ignora erros de áudio
+            }
+          });
+       }
+    }
+
+    // Scroll-snap pode atualizar o voo ativo (alternativa/complemento ao swipe)
+    const swipeContainer = document.getElementById('voos-swipe-container');
+    if (swipeContainer && 'onscrollend' in window) { // Usa onscrollend se disponível
+      swipeContainer.onscrollend = () => {
+        this.atualizarVooAtivoBaseadoNoScroll(swipeContainer);
+      };
+    } else if (swipeContainer) { // Fallback com debounce no scroll
+       let scrollTimeout;
+       swipeContainer.onscroll = () => {
+           clearTimeout(scrollTimeout);
+           scrollTimeout = setTimeout(() => {
+                this.atualizarVooAtivoBaseadoNoScroll(swipeContainer);
+           }, 150); // Ajuste o debounce conforme necessário
+       };
+    }
+
+    // Botão de voltar (garante que está configurado)
+    const btnVoltar = document.querySelector('.btn-voltar');
+    if (btnVoltar && !btnVoltar.dataset.listenerAttached) { // Evita adicionar múltiplas vezes
+       btnVoltar.addEventListener('click', () => { 
+          // Confirmação caso o usuário já tenha visto resultados
+          if (this.resultados?.proposals?.length > 0) {
+            if (confirm('Tem certeza que deseja voltar? Você vai precisar fazer uma nova busca de voos.')) {
+              window.location.href = 'destinos.html';
+            }
+          } else {
+            window.location.href = 'destinos.html';
+          }
+       });
+       btnVoltar.dataset.listenerAttached = 'true';
+    }
+    
+    // Botão de selecionar voo
+    const btnSelecionar = document.querySelector('.btn-selecionar-voo');
+    if (btnSelecionar && !btnSelecionar.dataset.listenerAttached) {
+      btnSelecionar.addEventListener('click', () => {
+        if (this.vooSelecionado) {
+          this.mostrarConfirmacaoSelecao(this.vooSelecionado);
+        } else if (this.vooAtivo) {
+          this.selecionarVooAtivo();
+        } else {
+          this.exibirToast('Por favor, selecione um voo primeiro', 'warning');
+        }
+      });
+      btnSelecionar.dataset.listenerAttached = 'true';
+    }
+    
+    // Cards de voo - eventListener para cliques
+    const cards = document.querySelectorAll('.voo-card');
+    cards.forEach(card => {
+      if (!card.dataset.listenerAttached) {
+        card.addEventListener('click', () => {
+          const vooId = card.dataset.vooId;
+          if (vooId) this.selecionarVoo(vooId);
+        });
+        card.dataset.listenerAttached = 'true';
+      }
+    });
+  },
+  
+  // Método auxiliar para atualizar voo ativo com base no scroll
+  atualizarVooAtivoBaseadoNoScroll(swipeContainer) {
+    if (!swipeContainer) return;
+    
+    const scrollLeft = swipeContainer.scrollLeft;
+    const cardWidth = swipeContainer.querySelector('.voo-card')?.offsetWidth || 0;
+    
+    if (cardWidth > 0 && this.resultados?.proposals?.length > 0) {
+      const newIndex = Math.round(scrollLeft / cardWidth);
+      
+      // Verifica se o índice é válido e diferente do atual
+      if (newIndex >= 0 && 
+          newIndex < this.resultados.proposals.length && 
+          newIndex !== this.indexVooAtivo) {
+        
+        this.indexVooAtivo = newIndex;
+        this.vooAtivo = this.resultados.proposals[this.indexVooAtivo];
+        this.atualizarVooAtivo();
+      }
+    }
+  },
 
   // --- Estilos e UI ---
   aplicarEstilosModernos() {
@@ -1777,3 +1885,87 @@ const BENETRIP_VOOS = {
           padding-bottom: 80px; /* Espaço para o botão fixo */
         }
       }
+    `;
+    document.head.appendChild(estiloElement);
+  },
+
+  mostrarErro(mensagem) {
+    console.error("Erro exibido:", mensagem); // Loga o erro
+    this.pararPolling(); // Garante que o polling pare em caso de erro
+    this.temErro = true;
+    this.estaCarregando = false; // Termina o carregamento
+    this.mensagemErro = mensagem || 'Ocorreu um erro desconhecido.';
+    this.renderizarInterface(); // Mostra a UI de erro
+    
+    // Reportar erro para análise (se implementado)
+    this.reportarErro({
+      mensagem: mensagem,
+      searchId: this.searchId,
+      timestamp: new Date().toISOString(),
+      tentativas: this.pollingAttempts,
+      contexto: {
+        origem: this.obterCodigoIATAOrigem(this.carregarDadosUsuario()),
+        destino: this.destino?.codigo_iata,
+        datas: this.carregarDadosUsuario()?.respostas?.datas
+      }
+    });
+  },
+  
+  // Método para reportar erros (mock para implementação futura)
+  reportarErro(dadosErro) {
+    // Implementação futura: enviar para sistema de análise de erros
+    // Por enquanto, apenas loga os dados para diagnóstico
+    console.warn("Dados de erro para análise:", dadosErro);
+    
+    // Opcionalmente, armazena localmente para análise posterior
+    try {
+      const errosAnteriores = JSON.parse(localStorage.getItem('benetrip_erros') || '[]');
+      errosAnteriores.push(dadosErro);
+      // Manter apenas os últimos 10 erros para não sobrecarregar localStorage
+      if (errosAnteriores.length > 10) errosAnteriores.shift();
+      localStorage.setItem('benetrip_erros', JSON.stringify(errosAnteriores));
+    } catch (e) {
+      console.error("Erro ao salvar dados de erro:", e);
+    }
+  }
+  
+}; // Fim do objeto BENETRIP_VOOS
+
+// Inicializar o módulo quando o DOM estiver pronto
+document.addEventListener('DOMContentLoaded', () => {
+  // Verificar se estamos na página correta
+  if (document.getElementById('voos-container')) {
+    console.log('Inicializando módulo de voos Benetrip...');
+    BENETRIP_VOOS.init();
+  }
+  
+  // Adicionar listener para recarregar dados se a página ficar inativa e retornar
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && 
+        document.getElementById('voos-container') && 
+        BENETRIP_VOOS.resultados === null && 
+        !BENETRIP_VOOS.estaCarregando && 
+        !BENETRIP_VOOS.isPolling) {
+      // Recarrega apenas se não estiver em carregamento e não tiver resultados
+      console.log('Página reativada, recarregando dados...');
+      BENETRIP_VOOS.init();
+    }
+  });
+});
+
+// Tratar erros não capturados
+window.addEventListener('error', (event) => {
+  console.error('Erro não capturado em flights.js:', event.error);
+  
+  // Se o módulo de voos estiver inicializado, reporta o erro
+  if (BENETRIP_VOOS && typeof BENETRIP_VOOS.reportarErro === 'function') {
+    BENETRIP_VOOS.reportarErro({
+      tipo: 'erro_nao_capturado',
+      mensagem: event.message || 'Erro JavaScript não capturado',
+      origem: event.filename,
+      linha: event.lineno,
+      coluna: event.colno,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
