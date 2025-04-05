@@ -1097,8 +1097,8 @@ const BENETRIP_DESTINOS = {
     });
   },
   
-// Método para selecionar um destino - VERSÃO CORRIGIDA
-selecionarDestino(nomeDestino) {
+  // Método para selecionar um destino - VERSÃO CORRIGIDA E MELHORADA
+  selecionarDestino(nomeDestino) {
     console.log(`Destino selecionado: ${nomeDestino}`);
     let destinoSelecionado = null;
     
@@ -1117,26 +1117,70 @@ selecionarDestino(nomeDestino) {
         return;
     }
     
-    // Garantir que o objeto tenha a propriedade de código IATA acessível
-    if (!destinoSelecionado.codigo_iata && destinoSelecionado.aeroporto && destinoSelecionado.aeroporto.codigo) {
-        destinoSelecionado.codigo_iata = destinoSelecionado.aeroporto.codigo;
-    }
+    // Padronizar os dados do destino - Muito importante para a busca de voos
+    const destinoPadronizado = {
+        ...destinoSelecionado,
+        // Garantir que o código IATA esteja no formato correto e disponível em local padrão
+        codigo_iata: destinoSelecionado.aeroporto?.codigo || 
+                      destinoSelecionado.codigo_iata || 
+                      this.obterCodigoIATADestino(destinoSelecionado)
+    };
     
-    // Salvar em ambas as chaves para compatibilidade
-    localStorage.setItem('benetrip_destino_selecionado', JSON.stringify(destinoSelecionado));
-    localStorage.setItem('benetrip_destino_escolhido', JSON.stringify(destinoSelecionado));
+    // Salvar em formato padronizado
+    localStorage.setItem('benetrip_destino_selecionado', JSON.stringify(destinoPadronizado));
     
-    // Definir fluxo no objeto de dados do usuário
+    // Atualizar os dados do usuário para incluir o destino selecionado
     try {
         const dadosUsuario = JSON.parse(localStorage.getItem('benetrip_user_data') || '{}');
         dadosUsuario.fluxo = 'destino_desconhecido'; // Indicar que é um destino da recomendação
+        
+        // Incluir código IATA do destino nas respostas
+        if (!dadosUsuario.respostas) dadosUsuario.respostas = {};
+        dadosUsuario.respostas.destino_escolhido = {
+            name: destinoPadronizado.destino,
+            pais: destinoPadronizado.pais,
+            code: destinoPadronizado.codigo_iata
+        };
+        
         localStorage.setItem('benetrip_user_data', JSON.stringify(dadosUsuario));
     } catch (e) {
         console.warn('Erro ao atualizar fluxo nos dados do usuário:', e);
     }
     
-    this.mostrarConfirmacaoSelecao(destinoSelecionado);
-},
+    this.mostrarConfirmacaoSelecao(destinoPadronizado);
+  },
+  
+  // Método auxiliar para tentar obter código IATA
+  obterCodigoIATADestino(destino) {
+    // Lista de capitais e cidades principais com seus códigos IATA
+    const cidadesComuns = {
+        'paris': 'CDG',
+        'londres': 'LHR',
+        'nova york': 'JFK',
+        'roma': 'FCO',
+        'tóquio': 'HND',
+        'são paulo': 'GRU',
+        'rio de janeiro': 'GIG',
+        'madri': 'MAD',
+        'lisboa': 'LIS',
+        'barcelona': 'BCN',
+        'miami': 'MIA',
+        'orlando': 'MCO'
+    };
+    
+    const nomeLower = destino.destino.toLowerCase();
+    
+    // Tenta encontrar por nome da cidade
+    for (const [cidade, codigo] of Object.entries(cidadesComuns)) {
+        if (nomeLower.includes(cidade)) return codigo;
+    }
+    
+    // Se não encontrar, usa a primeira letra do país + primeiras duas letras da cidade
+    // Este é apenas um fallback temporário; na versão real precisaria usar uma API
+    const primeiraLetraPais = destino.pais.charAt(0).toUpperCase();
+    const primeirasLetrasCidade = destino.destino.substring(0, 2).toUpperCase();
+    return primeiraLetraPais + primeirasLetrasCidade;
+  },
   
   // Método para mostrar confirmação de seleção - AJUSTADO TAMANHO DA FOTO
   mostrarConfirmacaoSelecao(destino) {
