@@ -128,7 +128,7 @@ module.exports = async function handler(req, res) {
       marker: marker,
       host: hostEnv, // Usar o host definido acima
       user_ip: userIp,
-      locale: "pt", // Alterado para 'pt', ajuste se necessário
+      locale: "en", // Alterado para 'pt', ajuste se necessário
       trip_class: params.classe ? params.classe.toUpperCase() : "Y",
       passengers: {
         adults: parseInt(params.adultos || 1, 10), // Garantir que são números inteiros
