@@ -8,6 +8,68 @@
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;700&family=Montserrat:wght@400;500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="assets/css/styles.css">
     <link rel="stylesheet" href="assets/css/mobile-optimizations.css">
+    <style>
+        /* Estilos para toast notification */
+        #toast-container {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1000;
+            width: 90%;
+            max-width: 400px;
+        }
+        
+        .toast {
+            background-color: #333;
+            color: white;
+            padding: 12px 20px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            text-align: center;
+            opacity: 0;
+            transform: translateY(20px);
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+        
+        .toast-visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        
+        .toast-info {
+            background-color: #00A3E0;
+        }
+        
+        .toast-success {
+            background-color: #4CAF50;
+        }
+        
+        .toast-error {
+            background-color: #F44336;
+        }
+        
+        /* Efeito pulsante para botão de confirmar */
+        .btn-pulsante {
+            animation: pulse 1.5s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% {
+                transform: scale(1);
+            }
+            50% {
+                transform: scale(1.05);
+                box-shadow: 0 0 10px rgba(232, 119, 34, 0.5);
+            }
+        }
+        
+        /* Destaque para voos diretos */
+        .voo-direto {
+            border-left: 3px solid #4CAF50;
+        }
+    </style>
 </head>
 <body class="mobile-optimized">
     <!-- Barra de status estilo app -->
@@ -57,7 +119,41 @@
                         }
                     });
                 }
+                
+                // Mostrar dica de swipe após carregamento
+                const swipeHint = document.getElementById('swipe-hint');
+                if (swipeHint) {
+                    swipeHint.style.display = 'flex';
+                    // Ocultar após 3 segundos
+                    setTimeout(() => {
+                        swipeHint.style.opacity = '0';
+                        setTimeout(() => {
+                            swipeHint.style.display = 'none';
+                        }, 500);
+                    }, 3000);
+                }
             }, 1000);
+            
+            // Função para mostrar toast notifications
+            window.showToast = function(message, type = 'info', duration = 3000) {
+                const toast = document.createElement('div');
+                toast.className = `toast toast-${type}`;
+                toast.textContent = message;
+                
+                const container = document.getElementById('toast-container');
+                container.appendChild(toast);
+                
+                // Trigger reflow para iniciar a animação
+                void toast.offsetWidth;
+                toast.classList.add('toast-visible');
+                
+                setTimeout(() => {
+                    toast.classList.remove('toast-visible');
+                    setTimeout(() => {
+                        container.removeChild(toast);
+                    }, 300);
+                }, duration);
+            }
         });
     </script>
 </body>
