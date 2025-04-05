@@ -1358,14 +1358,70 @@ const BENETRIP = {
     },
     
     /**
-     * Salva os dados do usuário no localStorage
+     * Salva os dados do usuário no localStorage com formato padronizado
      */
     salvarDadosUsuario() {
-        localStorage.setItem('benetrip_user_data', JSON.stringify({
-            respostas: this.estado.respostas,
+        // Estrutura padronizada para salvar no localStorage
+        const dadosPadronizados = {
             fluxo: this.estado.fluxo,
-            timestamp: Date.now()
-        }));
+            timestamp: Date.now(),
+            respostas: {
+                ...this.estado.respostas,
+                // Garante que informações de passageiros estejam sempre no mesmo formato
+                passageiros: {
+                    adultos: this.getNumeroAdultos(),
+                    criancas: 0,
+                    bebes: 0
+                }
+            }
+        };
+        
+        // Verificar e padronizar dados da cidade de partida
+        if (this.estado.respostas.cidade_partida) {
+            // Garante que cidade_partida seja sempre um objeto com formato padrão
+            if (typeof this.estado.respostas.cidade_partida === 'string') {
+                // Tenta extrair código IATA se estiver no formato "Cidade (ABC)"
+                const match = this.estado.respostas.cidade_partida.match(/\(([A-Z]{3})\)/);
+                dadosPadronizados.respostas.cidade_partida = {
+                    name: this.estado.respostas.cidade_partida,
+                    code: match ? match[1] : 'GRU' // Fallback para GRU se não encontrar
+                };
+            }
+        }
+        
+        // Padronizar dados de destino conhecido, se existir
+        if (this.estado.respostas.destino_conhecido) {
+            if (typeof this.estado.respostas.destino_conhecido === 'string') {
+                const match = this.estado.respostas.destino_conhecido.match(/\(([A-Z]{3})\)/);
+                dadosPadronizados.respostas.destino_conhecido = {
+                    name: this.estado.respostas.destino_conhecido,
+                    code: match ? match[1] : 'JFK', // Fallback para JFK se não encontrar
+                    country: 'País não especificado'
+                };
+            }
+        }
+        
+        // Padronizar dados de datas, se existir
+        if (this.estado.respostas.datas) {
+            // Garantir que datas estejam no formato correto (YYYY-MM-DD)
+            if (this.estado.respostas.datas.dataIda && typeof this.estado.respostas.datas.dataIda === 'string') {
+                dadosPadronizados.respostas.datas = {
+                    ...this.estado.respostas.datas,
+                    dataIda: this.formatarDataISO(this.estado.respostas.datas.dataIda),
+                    dataVolta: this.formatarDataISO(this.estado.respostas.datas.dataVolta || '')
+                };
+            }
+        }
+        
+        // Adicionar moeda preferida
+        dadosPadronizados.respostas.moeda = this.estado.respostas.moeda_escolhida || this.config.defaultCurrency;
+        
+        // Log para debug
+        if (this.config.debugMode) {
+            console.log("Dados padronizados para salvamento:", dadosPadronizados);
+        }
+        
+        localStorage.setItem('benetrip_user_data', JSON.stringify(dadosPadronizados));
     },
 
     /**
