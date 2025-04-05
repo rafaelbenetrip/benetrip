@@ -16,7 +16,7 @@
     "api/flight-results.js": {
        "memory": 1024,  // Pode usar o padrão ou ajustar se necessário
        "maxDuration": 15  // Geralmente rápido, só faz uma chamada GET
-    }
+    },
   },
   "routes": [
     // Regra para adicionar headers a todas as rotas /api/*
