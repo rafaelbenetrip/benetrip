@@ -212,6 +212,7 @@ function generateSignature(params, token) {
       if (!obj) return;
       
       for (const key of Object.keys(obj).sort()) {
+        if (key === 'signature') continue;
         const value = obj[key];
         
         if (typeof value === 'object' && value !== null) {
@@ -228,19 +229,18 @@ function generateSignature(params, token) {
             // Para objetos, extrair valores recursivamente
             extractValues(value);
           }
-        } else if (value !== undefined && key !== 'signature') {
-          // Adicionar valores simples, exceto a própria assinatura
+        } else if (value !== undefined) {
+          // Adicionar valores simples
           flatValues.push(String(value));
         }
       }
     }
     
-    // Extrair valores e ordená-los
+    // Extrair valores (não reordenar novamente)
     extractValues(params);
-    flatValues.sort();
     
-    // Construir a string de assinatura: token + valores separados por :
-    const signatureString = token + flatValues.join(':');
+    // Construir a string de assinatura: token + valores concatenados sem delimitador
+    const signatureString = token + flatValues.join('');
     console.log('String da assinatura (primeiros 30 chars):', signatureString.substring(0, 30) + '...');
     
     // Gerar hash MD5
