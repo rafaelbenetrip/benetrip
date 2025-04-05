@@ -12,9 +12,15 @@
     "api/image-search.js": {
       "memory": 1024,
       "maxDuration": 30
+    },
+    "api/flight-results.js": {
+       "memory": 1024,  // Pode usar o padrão ou ajustar se necessário
+       "maxDuration": 15  // Geralmente rápido, só faz uma chamada GET
     }
   },
   "routes": [
+    // Regra para adicionar headers a todas as rotas /api/*
+    // 'continue: true' permite que outras regras de rota sejam processadas depois
     {
       "src": "/api/(.*)",
       "headers": {
@@ -24,6 +30,8 @@
       },
       "continue": true
     },
+
+    // --- Mapeamento explícito das funções da API ---
     {
       "src": "/api/recommendations",
       "dest": "/api/recommendations.js"
@@ -36,25 +44,37 @@
       "src": "/api/image-search",
       "dest": "/api/image-search.js"
     },
+    // --- REGRA ADICIONADA ---
     {
-      "src": "/destinos",
+      "src": "/api/flight-results",
+      "dest": "/api/flight-results.js"
+    },
+    // --- Fim Mapeamento API ---
+
+    // --- Regras para servir arquivos estáticos da pasta /public ---
+    // Coloque as mais específicas primeiro
+    {
+      "src": "/destinos", // Mapeia /destinos para /public/destinos.html
       "dest": "/public/destinos.html"
     },
     {
-      "src": "/assets/(.*)",
+      "src": "/assets/(.*)", // Mapeia /assets/* para /public/assets/*
       "dest": "/public/assets/$1"
     },
     {
-      "src": "/(.*)\\.html",
+      "src": "/(.*)\\.html", // Mapeia qualquer /arquivo.html para /public/arquivo.html
       "dest": "/public/$1.html"
     },
     {
-      "src": "/$",
+      "src": "/$", // Mapeia a raiz "/" para /public/index.html
       "dest": "/public/index.html"
     },
+    // Regra de fallback geral para outros arquivos na pasta /public
+    // Deve vir por último ou após todas as rotas de API/páginas específicas
     {
       "src": "/(.*)",
       "dest": "/public/$1"
     }
+    // --- Fim Regras Estáticas ---
   ]
 }
