@@ -196,7 +196,7 @@ module.exports = async function handler(req, res) {
   }
 }
 
-// Função para gerar a assinatura da API
+// Função para gerar a assinatura da API com ordem fixa
 function generateSignature(params, token) {
   if (!token) {
     console.warn("Token da API Aviasales não configurado!");
@@ -204,56 +204,47 @@ function generateSignature(params, token) {
   }
   
   try {
-    // 1. Extrair todos os parâmetros e valores
-    const flatValues = [];
+    // Ordem fixa dos parâmetros conforme a documentação:
+    // marker, host, user_ip, locale, trip_class, passengers, segments
+    const keysOrder = ["marker", "host", "user_ip", "locale", "trip_class", "passengers", "segments"];
+    let signatureString = token;
     
-    // Função auxiliar para extrair valores recursivamente
-    function extractValues(obj) {
-      if (!obj) return;
-      
-      for (const key of Object.keys(obj).sort()) {
-        if (key === 'signature') continue;
-        const value = obj[key];
-        
-        if (typeof value === 'object' && value !== null) {
-          if (Array.isArray(value)) {
-            // Para arrays, adicionar recursivamente cada item
-            value.forEach(item => {
-              if (typeof item === 'object' && item !== null) {
-                extractValues(item);
-              } else if (item !== undefined) {
-                flatValues.push(String(item));
-              }
-            });
-          } else {
-            // Para objetos, extrair valores recursivamente
-            extractValues(value);
+    for (const key of keysOrder) {
+      if (params[key] !== undefined && params[key] !== null) {
+        if (key === "passengers") {
+          // Ordem fixa: adults, children, infants
+          const passengersOrder = ["adults", "children", "infants"];
+          for (const subKey of passengersOrder) {
+            if (params.passengers[subKey] !== undefined && params.passengers[subKey] !== null) {
+              signatureString += String(params.passengers[subKey]);
+            }
           }
-        } else if (value !== undefined) {
-          // Adicionar valores simples
-          flatValues.push(String(value));
+        } else if (key === "segments") {
+          // Para segments, processa os itens na ordem original
+          // Cada segmento deve ter: origin, destination, date (nessa ordem)
+          for (const segment of params.segments) {
+            const segmentOrder = ["origin", "destination", "date"];
+            for (const segKey of segmentOrder) {
+              if (segment[segKey] !== undefined && segment[segKey] !== null) {
+                signatureString += String(segment[segKey]);
+              }
+            }
+          }
+        } else {
+          signatureString += String(params[key]);
         }
       }
     }
     
-    // Extrair valores (não reordenar novamente)
-    extractValues(params);
-    
-    // Construir a string de assinatura: token + valores concatenados sem delimitador
-    const signatureString = token + flatValues.join('');
     console.log('String da assinatura (primeiros 30 chars):', signatureString.substring(0, 30) + '...');
-    
-    // Gerar hash MD5
     return crypto.createHash('md5').update(signatureString).digest('hex');
   } catch (error) {
     console.error("Erro ao gerar assinatura:", error);
     
-    // Método de fallback original
+    // Método de fallback usando JSON.stringify com ordenação das chaves (menos recomendado)
     try {
-      const paramsClone = JSON.parse(JSON.stringify(params));
-      delete paramsClone.signature; // Remover a assinatura se existir
-      const paramsString = JSON.stringify(paramsClone);
-      return crypto.createHash('md5').update(token + paramsString).digest('hex');
+      const sortedString = JSON.stringify(params, Object.keys(params).sort());
+      return crypto.createHash('md5').update(token + sortedString).digest('hex');
     } catch (err) {
       console.error("Erro no método de fallback:", err);
       return "error_generating_signature";
