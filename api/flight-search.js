@@ -23,6 +23,12 @@ function generateSignature(data, token) {
   paramPairs.push(['trip_class', data.trip_class]);
   paramPairs.push(['user_ip', data.user_ip]);
   
+  // Adicionar parâmetros opcionais se existirem
+  if (data.currency !== undefined) paramPairs.push(['currency', data.currency]);
+  if (data.know_english !== undefined) paramPairs.push(['know_english', data.know_english]);
+  if (data.direct !== undefined) paramPairs.push(['direct', data.direct]);
+  if (data.flexible !== undefined) paramPairs.push(['flexible', data.flexible]);
+  
   // Adicionar parâmetros de passageiros
   paramPairs.push(['passengers.adults', data.passengers.adults]);
   paramPairs.push(['passengers.children', data.passengers.children]);
@@ -113,7 +119,11 @@ module.exports = async function handler(req, res) {
         children: parseInt(params.criancas || 0, 10),
         infants: parseInt(params.bebes || 0, 10)
       },
-      segments: []
+      segments: [],
+      // Parâmetros adicionais para melhorar resultados
+      direct: false, // Inclui voos com conexões
+      currency: "USD", // Moeda internacional pode ajudar a API
+      know_english: true // Indica que o usuário aceita resultados em inglês
     };
 
     requestData.segments.push({ origin: origem, destination: destino, date: params.dataIda });
@@ -128,6 +138,7 @@ module.exports = async function handler(req, res) {
     // --- Fim Gerar Assinatura ---
 
     console.log("Enviando requisição INICIAL para Travelpayouts...");
+    console.log("Payload completo:", JSON.stringify(requestData, null, 2));
 
     // --- Enviar requisição INICIAL ---
     const apiResponse = await axios.post(
