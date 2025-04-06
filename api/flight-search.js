@@ -1,4 +1,5 @@
 // api/flight-search.js - INICIA a busca de voos e retorna search_id
+// Versão com correção na geração da assinatura e ajuste de locale
 const axios = require('axios');
 const crypto = require('crypto');
 
@@ -11,59 +12,87 @@ function isValidIATA(code) {
   return /^[A-Z]{3}$/.test(code);
 }
 
-// Função generateSignature ATUALIZADA - Inclui parâmetros opcionais dinamicamente
+// Função Auxiliar para achatar e coletar todos os valores primitivos de um objeto/array
+function flattenValues(data) {
+    const values = [];
+    const process = (item) => {
+        if (item === null || item === undefined) {
+            // Ignora null/undefined explicitamente para evitar 'null'/'undefined' na assinatura
+            return;
+        }
+        if (typeof item === 'object') {
+            if (Array.isArray(item)) {
+                item.forEach(process); // Processa cada item do array
+            } else {
+                // Processa valores de propriedades do objeto recursivamente
+                Object.values(item).forEach(process);
+            }
+        } else if (typeof item === 'string' || typeof item === 'number' || typeof item === 'boolean') {
+            // Adiciona apenas valores primitivos convertidos para string
+            values.push(String(item));
+        }
+    };
+    process(data);
+    return values;
+}
+
+
+// --- Função generateSignature CORRIGIDA (Ponto 1) ---
+// Ordena os VALORES alfabeticamente, conforme documentação oficial
 function generateSignature(data, token) {
-  // Extrair todos os parâmetros em pares de chave-valor
-  const paramPairs = [];
+    console.log("--- Iniciando Geração de Assinatura (Valores Ordenados) ---");
+    // 1. Coletar TODOS os valores dos parâmetros enviados
+    //    Incluindo os valores de 'passengers' e 'segments' individualmente
+    const allValues = [];
 
-  // Adicionar parâmetros simples obrigatórios
-  paramPairs.push(['host', data.host]);
-  paramPairs.push(['locale', data.locale]);
-  paramPairs.push(['marker', data.marker]);
-  paramPairs.push(['trip_class', data.trip_class]);
-  paramPairs.push(['user_ip', data.user_ip]);
+    // Adiciona valores simples obrigatórios
+    allValues.push(String(data.marker));
+    allValues.push(String(data.host));
+    allValues.push(String(data.user_ip));
+    allValues.push(String(data.locale));
+    allValues.push(String(data.trip_class));
 
-  // Adicionar parâmetros opcionais SE existirem no objeto 'data'
-  // (Certifique-se de que a lista aqui corresponda aos parâmetros opcionais que você pode enviar)
-  if (data.know_english !== undefined) paramPairs.push(['know_english', data.know_english]);
-  // Adicione outros parâmetros opcionais aqui da mesma forma se for usá-los
-  // Ex: if (data.currency !== undefined) paramPairs.push(['currency', data.currency]);
-  // Ex: if (data.direct !== undefined) paramPairs.push(['direct', data.direct]);
-  // Ex: if (data.flexible !== undefined) paramPairs.push(['flexible', data.flexible]);
+    // Adiciona valores de passageiros
+    allValues.push(String(data.passengers.adults));
+    allValues.push(String(data.passengers.children));
+    allValues.push(String(data.passengers.infants));
 
+    // Adiciona valores de segmentos
+    data.segments.forEach(segment => {
+        allValues.push(String(segment.origin));
+        allValues.push(String(segment.destination));
+        allValues.push(String(segment.date));
+    });
 
-  // Adicionar parâmetros de passageiros
-  paramPairs.push(['passengers.adults', data.passengers.adults]);
-  paramPairs.push(['passengers.children', data.passengers.children]);
-  paramPairs.push(['passengers.infants', data.passengers.infants]);
+    // Adiciona valores opcionais SE existirem
+    if (data.know_english !== undefined) {
+        allValues.push(String(data.know_english));
+    }
+    if (data.currency !== undefined) {
+        allValues.push(String(data.currency));
+    }
+    if (data.only_direct !== undefined) { // Exemplo se adicionar only_direct
+        allValues.push(String(data.only_direct));
+    }
+    // Adicione outros parâmetros opcionais aqui
 
-  // Adicionar segmentos
-  data.segments.forEach((segment, index) => {
-    paramPairs.push([`segments[${index}].date`, segment.date]);
-    paramPairs.push([`segments[${index}].destination`, segment.destination]);
-    paramPairs.push([`segments[${index}].origin`, segment.origin]);
-  });
+    console.log("Valores coletados ANTES da ordenação:", allValues);
 
-  // Ordenar por nome do parâmetro (primeira posição no par)
-  paramPairs.sort((a, b) => a[0].localeCompare(b[0]));
+    // 2. Ordenar a lista de valores alfabeticamente
+    allValues.sort((a, b) => a.localeCompare(b)); // Ordenação alfabética padrão
 
-  // Extrair apenas os valores (segunda posição no par) na ordem ordenada
-  const sortedValues = paramPairs.map(pair => pair[1]);
+    console.log("Valores coletados DEPOIS da ordenação:", allValues);
 
-  // Concatenar valores com token
-  const signatureString = token + ':' + sortedValues.join(':');
+    // 3. Concatenar token e valores ordenados com ':'
+    const signatureString = token + ':' + allValues.join(':');
 
-  console.log("--- Debug Assinatura (Método Ordenação Alfabética) ---");
-  console.log("Token (início):", token ? token.substring(0, 4) + '****' : 'NÃO DEFINIDO');
-  console.log("Parâmetros incluídos na assinatura (nomes ordenados):", paramPairs.map(p => p[0]).join(', '));
-  console.log("Valores concatenados (na ordem das chaves ordenadas):", sortedValues.join(':'));
-  console.log("String completa para assinatura:", signatureString);
+    console.log("String completa para assinatura:", signatureString);
 
-  // Gerar hash
-  const signatureHash = crypto.createHash('md5').update(signatureString).digest('hex');
-  console.log("Hash MD5 gerado (Signature - Alfabético):", signatureHash);
+    // 4. Gerar hash MD5
+    const signatureHash = crypto.createHash('md5').update(signatureString).digest('hex');
+    console.log("Hash MD5 gerado (Signature - Valores Ordenados):", signatureHash);
 
-  return signatureHash;
+    return signatureHash;
 }
 // --- Fim Funções Auxiliares ---
 
@@ -89,8 +118,6 @@ module.exports = async function handler(req, res) {
 
     // --- Validações ---
     if (!params.origem || !params.destino || !params.dataIda || !isValidIATA(params.origem.toUpperCase()) || !isValidIATA(params.destino.toUpperCase()) || !isValidDate(params.dataIda) || (params.dataVolta && !isValidDate(params.dataVolta))) {
-        // Consolida validações básicas
-        // (Adicione validações mais específicas se necessário)
         return res.status(400).json({ error: "Parâmetros inválidos ou ausentes." });
     }
     const origem = params.origem.toUpperCase();
@@ -100,7 +127,7 @@ module.exports = async function handler(req, res) {
     // --- Obter variáveis de ambiente ---
     const token = process.env.AVIASALES_TOKEN;
     const marker = process.env.AVIASALES_MARKER;
-    const hostEnv = process.env.HOST || "www.benetrip.com.br"; // Garante www
+    const hostEnv = process.env.HOST || "www.benetrip.com.br";
 
     if (!token || !marker) {
       console.error("!!! ERRO CRÍTICO: Credenciais da API não configuradas no servidor.");
@@ -112,12 +139,14 @@ module.exports = async function handler(req, res) {
 
 
     // --- Montar objeto da requisição ---
+    // Lista de locales suportados pela documentação oficial
+    const supportedLocales = ['en', 'ru', 'de', 'fr', 'it', 'pl', 'th', 'zh-Hans', 'ko', 'ja', 'vi', 'pt', 'uk', 'es', 'id', 'ms', 'zh-Hant', 'tr'];
     const requestData = {
       marker: marker,
       host: hostEnv,
       user_ip: userIp,
-      // AJUSTE: Usa locale suportado por Aviasales (ex: en-us) como padrão
-      locale: params.locale && ['en-us', 'en-gb', 'ru', 'de', 'es', 'fr', 'pl'].includes(params.locale) ? params.locale : "en-us",
+      // AJUSTE (Ponto 3): Usa 'en' como padrão e valida contra lista oficial
+      locale: params.locale && supportedLocales.includes(params.locale) ? params.locale : "en",
       trip_class: params.classe ? params.classe.toUpperCase() : "Y",
       passengers: {
         adults: parseInt(params.adultos || 1, 10),
@@ -125,17 +154,23 @@ module.exports = async function handler(req, res) {
         infants: parseInt(params.bebes || 0, 10)
       },
       segments: []
-      // AJUSTE: Adiciona know_english se fornecido pelo frontend
-      // O valor deve ser true ou false (booleano)
-      // know_english: params.know_english !== undefined ? Boolean(params.know_english) : undefined
-      // Descomente a linha acima se for usar o parâmetro know_english
+      // Opcionais podem ser adicionados aqui, se necessário
+      // know_english: ...,
+      // currency: ...,
+      // only_direct: ...,
     };
 
-    // AJUSTE: Adiciona know_english ao requestData SE ele foi passado em params
-    // Certifique-se que o frontend envie um valor booleano ou que possa ser convertido para booleano
+     // Adiciona opcionais se vierem do frontend
     if (params.know_english !== undefined) {
-        // Converte para booleano para garantir o tipo correto
+        // Garante que é booleano para a assinatura
         requestData.know_english = (String(params.know_english).toLowerCase() === 'true');
+    }
+    if (params.currency) {
+        // Garante 3 letras maiúsculas
+        requestData.currency = String(params.currency).toUpperCase().substring(0, 3);
+    }
+     if (params.only_direct !== undefined) { // Exemplo only_direct
+        requestData.only_direct = (String(params.only_direct).toLowerCase() === 'true');
     }
 
 
@@ -145,16 +180,14 @@ module.exports = async function handler(req, res) {
     }
     // --- Fim Montar objeto ---
 
-    // --- Gerar Assinatura ---
-    // A função generateSignature agora lida com os parâmetros opcionais presentes em requestData
+    // --- Gerar Assinatura (usando a nova função corrigida) ---
     const signature = generateSignature(requestData, token);
     requestData.signature = signature;
     // --- Fim Gerar Assinatura ---
 
     console.log("Enviando requisição INICIAL para Travelpayouts...");
-    // Remove a assinatura do log para segurança, caso o log seja público
     const logData = { ...requestData };
-    delete logData.signature;
+    delete logData.signature; // Não loga a assinatura
     console.log("Payload (sem assinatura):", JSON.stringify(logData, null, 2));
 
 
@@ -164,45 +197,50 @@ module.exports = async function handler(req, res) {
       requestData,
       {
         headers: { "Content-Type": "application/json" },
-        timeout: 15000 // Timeout para esta chamada inicial
+        timeout: 15000
       }
     );
     // --- Fim Enviar requisição ---
 
     console.log("Resposta inicial da Travelpayouts (Status):", apiResponse.status);
-    // console.log("Resposta inicial completa:", apiResponse.data); // Log completo para debug
 
     const searchId = apiResponse.data?.search_id;
-    // AJUSTE: Captura currency_rates da resposta inicial
-    const currencyRates = apiResponse.data?.currency_rates;
+    const currencyRates = apiResponse.data?.currency_rates; // Pode não vir mais aqui, verificar docs
 
     if (searchId) {
       console.log("Busca iniciada com sucesso. Search ID:", searchId);
-      // AJUSTE: Retorna 202 Accepted com o search_id e currency_rates.
+      // Retorna 202 com search_id (e talvez currency_rates, se ainda vier)
       return res.status(202).json({
         search_id: searchId,
-        currency_rates: currencyRates, // Inclui as taxas de câmbio
+        currency_rates: currencyRates,
         message: "Busca de voos iniciada. Use o search_id para verificar os resultados."
       });
     } else {
-      // Se a API não retornar search_id mesmo com status 2xx, algo está errado.
-      console.error("!!! ERRO: A API Travelpayouts não retornou search_id apesar do status de sucesso aparente. Resposta:", apiResponse.data);
+      // A API retornou 200 mas sem search_id? Algo errado.
+      console.error("!!! ERRO: A API Travelpayouts não retornou search_id apesar do status 200. Resposta:", apiResponse.data);
       return res.status(500).json({ error: "Falha ao iniciar a busca. Resposta inesperada da API externa.", apiResponse: apiResponse.data });
     }
 
   } catch (error) {
-    // --- Tratamento de Erro (mantido) ---
+    // --- Tratamento de Erro ---
     console.error("!!! ERRO GERAL NO HANDLER /api/flight-search !!!");
     if (error.response) {
+        // Erro retornado pela API da Travelpayouts (ex: 400 Bad Request, 401 Unauthorized, 403 Forbidden, 5xx)
         console.error("Erro Axios (Initial Search): Status:", error.response.status, "Data:", error.response.data);
-        return res.status(error.response.status).json({ // Retorna o erro da API externa
+        // Se for 401 ou 403, provavelmente a assinatura está errada ou token/marker inválido
+        if (error.response.status === 401 || error.response.status === 403) {
+             console.error("!!! ATENÇÃO: Erro 401/403 pode indicar assinatura inválida ou credenciais incorretas !!!");
+        }
+        return res.status(error.response.status).json({
             error: `Erro ${error.response.status} ao iniciar busca com a API externa.`,
             details: error.response.data
         });
     } else if (error.request) {
+        // A requisição foi feita mas não houve resposta (timeout, problema de rede)
         console.error("Erro Axios (Initial Search): Nenhuma resposta recebida:", error.message);
         return res.status(504).json({ error: "Nenhuma resposta da API externa ao iniciar busca (Gateway Timeout)." });
     } else {
+        // Erro na configuração da requisição ou outro erro interno
         console.error("Erro interno (Initial Search):", error.message);
         return res.status(500).json({ error: "Erro interno no servidor ao iniciar busca.", details: error.message });
     }
