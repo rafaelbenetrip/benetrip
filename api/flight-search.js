@@ -11,54 +11,58 @@ function isValidIATA(code) {
   return /^[A-Z]{3}$/.test(code);
 }
 
-// Função generateSignature CORRIGIDA - Ordena alfabeticamente por nome de parâmetro
+// Função generateSignature ATUALIZADA - Inclui parâmetros opcionais dinamicamente
 function generateSignature(data, token) {
   // Extrair todos os parâmetros em pares de chave-valor
   const paramPairs = [];
-  
-  // Adicionar parâmetros simples
+
+  // Adicionar parâmetros simples obrigatórios
   paramPairs.push(['host', data.host]);
   paramPairs.push(['locale', data.locale]);
   paramPairs.push(['marker', data.marker]);
   paramPairs.push(['trip_class', data.trip_class]);
   paramPairs.push(['user_ip', data.user_ip]);
-  
-  // Adicionar parâmetros opcionais se existirem
-  if (data.currency !== undefined) paramPairs.push(['currency', data.currency]);
+
+  // Adicionar parâmetros opcionais SE existirem no objeto 'data'
+  // (Certifique-se de que a lista aqui corresponda aos parâmetros opcionais que você pode enviar)
   if (data.know_english !== undefined) paramPairs.push(['know_english', data.know_english]);
-  if (data.direct !== undefined) paramPairs.push(['direct', data.direct]);
-  if (data.flexible !== undefined) paramPairs.push(['flexible', data.flexible]);
-  
+  // Adicione outros parâmetros opcionais aqui da mesma forma se for usá-los
+  // Ex: if (data.currency !== undefined) paramPairs.push(['currency', data.currency]);
+  // Ex: if (data.direct !== undefined) paramPairs.push(['direct', data.direct]);
+  // Ex: if (data.flexible !== undefined) paramPairs.push(['flexible', data.flexible]);
+
+
   // Adicionar parâmetros de passageiros
   paramPairs.push(['passengers.adults', data.passengers.adults]);
   paramPairs.push(['passengers.children', data.passengers.children]);
   paramPairs.push(['passengers.infants', data.passengers.infants]);
-  
+
   // Adicionar segmentos
   data.segments.forEach((segment, index) => {
     paramPairs.push([`segments[${index}].date`, segment.date]);
     paramPairs.push([`segments[${index}].destination`, segment.destination]);
     paramPairs.push([`segments[${index}].origin`, segment.origin]);
   });
-  
+
   // Ordenar por nome do parâmetro (primeira posição no par)
   paramPairs.sort((a, b) => a[0].localeCompare(b[0]));
-  
+
   // Extrair apenas os valores (segunda posição no par) na ordem ordenada
   const sortedValues = paramPairs.map(pair => pair[1]);
-  
+
   // Concatenar valores com token
   const signatureString = token + ':' + sortedValues.join(':');
-  
+
   console.log("--- Debug Assinatura (Método Ordenação Alfabética) ---");
   console.log("Token (início):", token ? token.substring(0, 4) + '****' : 'NÃO DEFINIDO');
+  console.log("Parâmetros incluídos na assinatura (nomes ordenados):", paramPairs.map(p => p[0]).join(', '));
   console.log("Valores concatenados (na ordem das chaves ordenadas):", sortedValues.join(':'));
   console.log("String completa para assinatura:", signatureString);
-  
+
   // Gerar hash
   const signatureHash = crypto.createHash('md5').update(signatureString).digest('hex');
   console.log("Hash MD5 gerado (Signature - Alfabético):", signatureHash);
-  
+
   return signatureHash;
 }
 // --- Fim Funções Auxiliares ---
@@ -85,8 +89,8 @@ module.exports = async function handler(req, res) {
 
     // --- Validações ---
     if (!params.origem || !params.destino || !params.dataIda || !isValidIATA(params.origem.toUpperCase()) || !isValidIATA(params.destino.toUpperCase()) || !isValidDate(params.dataIda) || (params.dataVolta && !isValidDate(params.dataVolta))) {
-         // Consolida validações básicas
-         // (Adicione validações mais específicas se necessário)
+        // Consolida validações básicas
+        // (Adicione validações mais específicas se necessário)
         return res.status(400).json({ error: "Parâmetros inválidos ou ausentes." });
     }
     const origem = params.origem.toUpperCase();
@@ -112,7 +116,8 @@ module.exports = async function handler(req, res) {
       marker: marker,
       host: hostEnv,
       user_ip: userIp,
-      locale: params.locale || "en", // Usa locale suportado por Aviasales (en-us, en-gb, ru, de, es, fr, pl)
+      // AJUSTE: Usa locale suportado por Aviasales (ex: en-us) como padrão
+      locale: params.locale && ['en-us', 'en-gb', 'ru', 'de', 'es', 'fr', 'pl'].includes(params.locale) ? params.locale : "en-us",
       trip_class: params.classe ? params.classe.toUpperCase() : "Y",
       passengers: {
         adults: parseInt(params.adultos || 1, 10),
@@ -120,7 +125,19 @@ module.exports = async function handler(req, res) {
         infants: parseInt(params.bebes || 0, 10)
       },
       segments: []
+      // AJUSTE: Adiciona know_english se fornecido pelo frontend
+      // O valor deve ser true ou false (booleano)
+      // know_english: params.know_english !== undefined ? Boolean(params.know_english) : undefined
+      // Descomente a linha acima se for usar o parâmetro know_english
     };
+
+    // AJUSTE: Adiciona know_english ao requestData SE ele foi passado em params
+    // Certifique-se que o frontend envie um valor booleano ou que possa ser convertido para booleano
+    if (params.know_english !== undefined) {
+        // Converte para booleano para garantir o tipo correto
+        requestData.know_english = (String(params.know_english).toLowerCase() === 'true');
+    }
+
 
     requestData.segments.push({ origin: origem, destination: destino, date: params.dataIda });
     if (params.dataVolta) {
@@ -129,12 +146,17 @@ module.exports = async function handler(req, res) {
     // --- Fim Montar objeto ---
 
     // --- Gerar Assinatura ---
+    // A função generateSignature agora lida com os parâmetros opcionais presentes em requestData
     const signature = generateSignature(requestData, token);
     requestData.signature = signature;
     // --- Fim Gerar Assinatura ---
 
     console.log("Enviando requisição INICIAL para Travelpayouts...");
-    console.log("Payload completo:", JSON.stringify(requestData, null, 2));
+    // Remove a assinatura do log para segurança, caso o log seja público
+    const logData = { ...requestData };
+    delete logData.signature;
+    console.log("Payload (sem assinatura):", JSON.stringify(logData, null, 2));
+
 
     // --- Enviar requisição INICIAL ---
     const apiResponse = await axios.post(
@@ -148,14 +170,18 @@ module.exports = async function handler(req, res) {
     // --- Fim Enviar requisição ---
 
     console.log("Resposta inicial da Travelpayouts (Status):", apiResponse.status);
+    // console.log("Resposta inicial completa:", apiResponse.data); // Log completo para debug
 
     const searchId = apiResponse.data?.search_id;
+    // AJUSTE: Captura currency_rates da resposta inicial
+    const currencyRates = apiResponse.data?.currency_rates;
 
     if (searchId) {
       console.log("Busca iniciada com sucesso. Search ID:", searchId);
-      // Retorna 202 Accepted com o search_id. O frontend fará o polling.
+      // AJUSTE: Retorna 202 Accepted com o search_id e currency_rates.
       return res.status(202).json({
         search_id: searchId,
+        currency_rates: currencyRates, // Inclui as taxas de câmbio
         message: "Busca de voos iniciada. Use o search_id para verificar os resultados."
       });
     } else {
