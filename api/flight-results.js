@@ -19,7 +19,7 @@ module.exports = async function handler(req, res) {
   const { uuid } = req.query;
 
   if (!uuid || typeof uuid !== 'string' || uuid.trim() === '') {
-      return res.status(400).json({ error: "Parâmetro 'uuid' (search_id) é obrigatório e deve ser válido." });
+    return res.status(400).json({ error: "Parâmetro 'uuid' (search_id) é obrigatório e deve ser válido." });
   }
 
   console.log(`Verificando resultados para search_id (uuid): ${uuid}`);
@@ -37,10 +37,20 @@ module.exports = async function handler(req, res) {
     // Analisamos a resposta para estruturar melhor ao frontend
     const data = resultsResponse.data;
     
+    // NOVO: Logar estrutura da resposta para diagnóstico
+    console.log(`Estrutura da resposta: ${typeof data === 'object' ? 
+      (Array.isArray(data) ? 'Array' : 'Objeto') : typeof data}`);
+    console.log(`Tamanho da resposta: ${Array.isArray(data) ? data.length : 'N/A'}`);
+    
+    if (Array.isArray(data) && data.length === 1) {
+      console.log(`Conteúdo do primeiro item: ${JSON.stringify(Object.keys(data[0]))}`);
+    }
+    
     // Verifica se ainda está em andamento (resposta apenas com search_id)
     let searchComplete = true;
     if (Array.isArray(data) && data.length === 1 && 
         Object.keys(data[0]).length === 1 && data[0].search_id === uuid) {
+      console.log("Apenas search_id encontrado - resultados ainda não prontos");
       searchComplete = false;
     }
     
@@ -57,13 +67,28 @@ module.exports = async function handler(req, res) {
     
     // Para resposta completa, utilizamos o Array[0] que contém os dados completos
     if (Array.isArray(data) && data.length > 0) {
-      // Verifica se temos propostas (voos encontrados)
+      // MELHORIA: Verificação explícita para busca completa sem resultados
       const hasProposals = data[0].proposals && Array.isArray(data[0].proposals) && data[0].proposals.length > 0;
+      
+      console.log(`Propostas encontradas: ${hasProposals ? data[0].proposals.length : 0}`);
+      
+      if (!hasProposals) {
+        console.log("Busca completa, mas sem resultados disponíveis");
+        return res.status(200).json({
+          search_completed: true,
+          has_results: false,
+          search_id: uuid,
+          timestamp: new Date().toISOString(),
+          message: "Nenhum voo encontrado para os critérios especificados",
+          ...data[0] // Mantemos os dados originais para análise
+        });
+      }
       
       return res.status(200).json({
         search_completed: true,
         search_id: uuid,
-        has_results: hasProposals,
+        has_results: true,
+        proposal_count: hasProposals ? data[0].proposals.length : 0,
         timestamp: new Date().toISOString(),
         ...data[0] // Spread todos os dados do primeiro objeto
       });
@@ -75,7 +100,8 @@ module.exports = async function handler(req, res) {
       search_id: uuid,
       has_results: false,
       timestamp: new Date().toISOString(),
-      original_response: data
+      original_response: data,
+      message: "Formato de resposta não esperado da API de voos"
     });
 
   } catch (error) {
@@ -87,7 +113,8 @@ module.exports = async function handler(req, res) {
       return res.status(504).json({ 
         error: "Tempo limite excedido ao buscar resultados. A API externa está demorando mais que o esperado.",
         is_timeout: true,
-        search_id: uuid
+        search_id: uuid,
+        timestamp: new Date().toISOString()
       });
     }
     
@@ -99,21 +126,24 @@ module.exports = async function handler(req, res) {
       if (error.response.status === 404) {
         return res.status(404).json({
           error: "ID de busca não encontrado ou expirado. Inicie uma nova busca.",
-          search_id: uuid
+          search_id: uuid,
+          timestamp: new Date().toISOString()
         });
       }
       
       return res.status(error.response.status).json({
         error: `Erro ${error.response.status} ao obter resultados da API externa.`,
         details: error.response.data,
-        search_id: uuid
+        search_id: uuid,
+        timestamp: new Date().toISOString()
       });
     } else if (error.request) {
       // Erro sem resposta (timeout, rede)
       console.error(`Erro Axios (Get Results) para ${uuid}: Nenhuma resposta recebida:`, error.message);
       return res.status(504).json({ 
         error: "Nenhuma resposta da API externa ao buscar resultados (Gateway Timeout).",
-        search_id: uuid
+        search_id: uuid,
+        timestamp: new Date().toISOString()
       });
     } else {
       // Outros erros
@@ -121,7 +151,8 @@ module.exports = async function handler(req, res) {
       return res.status(500).json({ 
         error: "Erro interno no servidor ao buscar resultados.", 
         details: error.message,
-        search_id: uuid
+        search_id: uuid,
+        timestamp: new Date().toISOString()
       });
     }
   }
