@@ -112,7 +112,7 @@ module.exports = async function handler(req, res) {
       marker: marker,
       host: hostEnv,
       user_ip: userIp,
-      locale: params.locale || "pt", // Usa locale do request ou 'pt'
+      locale: params.locale || "en-us", // Usa locale suportado por Aviasales (en-us, en-gb, ru, de, es, fr, pl)
       trip_class: params.classe ? params.classe.toUpperCase() : "Y",
       passengers: {
         adults: parseInt(params.adultos || 1, 10),
