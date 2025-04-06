@@ -475,18 +475,24 @@ const BENETRIP_VOOS = {
                 dados.proposals = this.preprocessarPropostas(dados.proposals);
                 this.resultados = dados; // Armazena TUDO (inclui meta, airlines, gates, etc.)
                 this.atualizarProgresso('Voos encontrados!', 100);
+                
+                // Exibe toast para melhoria UX
+                this.exibirToast(`${dados.proposals.length} voos encontrados! ✈️`, 'success');
             } else {
                 // Busca completa, mas sem resultados
-                this.resultados = dados; // Armazena mesmo sem propostas
-                this.atualizarProgresso('Busca finalizada.', 100); // Mensagem neutra
+                console.log('Busca concluída sem resultados disponíveis');
+                this.resultados = { 
+                    ...dados,
+                    proposals: [], 
+                    message: dados.message || "Nenhum voo disponível para esta rota nas datas selecionadas"
+                };
+                this.atualizarProgresso('Busca finalizada, sem voos disponíveis.', 100);
+                
+                // Exibe toast para feedback ao usuário
+                this.exibirToast('Não encontramos voos disponíveis para esta rota e datas.', 'warning');
             }
             
             this.renderizarInterface(); // Renderiza a interface final (com resultados ou mensagem)
-            
-            // Exibe toast para melhoria UX
-            if (temResultados) {
-                this.exibirToast(`${dados.proposals.length} voos encontrados! ✈️`, 'success');
-            }
         } else {
             // Busca ainda não concluída, continua no próximo intervalo
             console.log('Busca ainda em andamento...');
@@ -500,7 +506,7 @@ const BENETRIP_VOOS = {
             this.mostrarErro('Erro de conexão ao verificar resultados. Verifique sua internet.');
         }
     }
-  },
+},
   
   // Pré-processa as propostas para adicionar informações úteis e organizá-las
   preprocessarPropostas(propostas) {
