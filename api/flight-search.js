@@ -119,11 +119,7 @@ module.exports = async function handler(req, res) {
         children: parseInt(params.criancas || 0, 10),
         infants: parseInt(params.bebes || 0, 10)
       },
-      segments: [],
-      // Parâmetros adicionais para melhorar resultados
-      direct: false, // Inclui voos com conexões
-      currency: "USD", // Moeda internacional pode ajudar a API
-      know_english: true // Indica que o usuário aceita resultados em inglês
+      segments: []
     };
 
     requestData.segments.push({ origin: origem, destination: destino, date: params.dataIda });
