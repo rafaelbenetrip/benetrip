@@ -45,15 +45,18 @@ module.exports = async function handler(req, res) {
       (Array.isArray(data) ? 'Array' : 'Objeto') : typeof data}`);
     if (Array.isArray(data)) {
         console.log(`Tamanho do array da resposta: ${data.length}`);
-        if (data.length > 0) {
+        if (data.length > 0 && typeof data[0] === 'object' && data[0] !== null) { // Adicionado verificação de objeto não nulo
             console.log(`Chaves do primeiro item do array: ${JSON.stringify(Object.keys(data[0]))}`);
+        } else if (data.length > 0) {
+            console.log(`Primeiro item do array não é um objeto: ${JSON.stringify(data[0])}`);
         }
     }
 
 
     // Verifica se ainda está em andamento (resposta é um array com um objeto contendo apenas search_id)
     let searchComplete = true;
-    if (Array.isArray(data) && data.length === 1 &&
+    // Adiciona verificação se data[0] é um objeto antes de acessar suas chaves
+    if (Array.isArray(data) && data.length === 1 && data[0] && typeof data[0] === 'object' &&
         Object.keys(data[0]).length === 1 && data[0].search_id === uuid) {
       console.log(`Resultados para ${uuid} ainda não estão prontos (resposta contém apenas search_id).`);
       searchComplete = false;
@@ -71,14 +74,14 @@ module.exports = async function handler(req, res) {
     }
 
     // Para resposta completa, esperamos um Array contendo um objeto com os dados (proposals, meta, etc.)
-    // A lógica original que acessa data[0] parece correta com base na verificação de conclusão acima.
-    if (Array.isArray(data) && data.length > 0 && data[0] && typeof data[0] === 'object' && data[0].search_id === uuid ) { // Verifica se o objeto existe e tem search_id
+    // Verifica se data[0] é um objeto e se tem a propriedade search_id correspondente
+    if (Array.isArray(data) && data.length > 0 && data[0] && typeof data[0] === 'object' && data[0].search_id === uuid ) {
       const resultsData = data[0]; // O objeto principal com os resultados
       const hasProposals = resultsData.proposals && Array.isArray(resultsData.proposals) && resultsData.proposals.length > 0;
 
       console.log(`Propostas encontradas para ${uuid}: ${hasProposals ? resultsData.proposals.length : 0}`);
 
-      // NOVO: Verificar se há metadados de erro nos gates (opcional, mas útil para debug)
+      // Verificar se há metadados de erro nos gates (opcional, mas útil para debug)
       if (resultsData.meta && resultsData.meta.gates) {
         const gates = resultsData.meta.gates;
 
@@ -100,6 +103,8 @@ module.exports = async function handler(req, res) {
 
       if (!hasProposals) {
         console.log(`Busca completa para ${uuid}, mas sem resultados disponíveis.`);
+        // AJUSTE DEBUG: Loga a resposta completa quando não há propostas
+        console.log(`DEBUG: Resposta completa sem propostas para ${uuid}:`, JSON.stringify(resultsData));
         return res.status(200).json({
           search_completed: true,
           has_results: false,
@@ -122,7 +127,8 @@ module.exports = async function handler(req, res) {
     }
 
     // Fallback para outros formatos de resposta inesperados
-    console.warn(`Formato de resposta inesperado para ${uuid}. Resposta:`, JSON.stringify(data));
+    // (Ex: A API retornou um array com múltiplos objetos, o que não é esperado para busca completa)
+    console.warn(`Formato de resposta inesperado para ${uuid}. Esperava array com 1 objeto contendo search_id. Resposta:`, JSON.stringify(data));
     return res.status(200).json({
       search_completed: true, // Assumimos que completou, mas o formato é estranho
       search_id: uuid,
