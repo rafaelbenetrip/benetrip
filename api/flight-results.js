@@ -26,6 +26,10 @@ module.exports = async function handler(req, res) {
   const resultsUrl = `https://api.travelpayouts.com/v1/flight_search_results?uuid=${uuid}`;
 
   try {
+    // Aguardamos um pouco antes de fazer a primeira solicitação para dar tempo à API
+    // Isso é importante para evitar obter uma resposta vazia muito cedo
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    
     // Com plano PRO podemos usar um timeout maior, mas ainda mantendo margem de segurança
     const resultsResponse = await axios.get(resultsUrl, {
       headers: { 'Accept-Encoding': 'gzip,deflate,sdch' },
@@ -71,6 +75,26 @@ module.exports = async function handler(req, res) {
       const hasProposals = data[0].proposals && Array.isArray(data[0].proposals) && data[0].proposals.length > 0;
       
       console.log(`Propostas encontradas: ${hasProposals ? data[0].proposals.length : 0}`);
+      
+      // NOVO: Verificar se há metadados de erro nos gates
+      if (data[0].meta && data[0].meta.gates) {
+        const gates = data[0].meta.gates;
+        
+        // Verificar se algum gateway reportou erro
+        const gatesWithErrors = gates.filter(gate => gate.error && gate.error.code !== 0);
+        if (gatesWithErrors.length > 0) {
+          console.warn('Alguns gateways reportaram erros:');
+          gatesWithErrors.forEach(gate => {
+            console.warn(`- Gateway ${gate.id}: Código ${gate.error.code}, Mensagem: ${gate.error.tos || 'Sem mensagem'}`);
+          });
+        }
+        
+        // Verificar se algum gateway retornou resultados
+        console.log('Estatísticas de gateways:');
+        gates.forEach(gate => {
+          console.log(`- Gateway ${gate.id}: Total=${gate.count || 0}, Válidos=${gate.good_count || 0}, Tempo=${gate.duration || 0}s`);
+        });
+      }
       
       if (!hasProposals) {
         console.log("Busca completa, mas sem resultados disponíveis");
