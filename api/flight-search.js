@@ -11,35 +11,48 @@ function isValidIATA(code) {
   return /^[A-Z]{3}$/.test(code);
 }
 
-// Função generateSignature (Método Ordenação Alfabética - MANTIDA IGUAL À VERSÃO ANTERIOR)
+// Função generateSignature CORRIGIDA - Ordena alfabeticamente por nome de parâmetro
 function generateSignature(data, token) {
-  const values = [];
-  const topLevelKeys = ['host', 'locale', 'marker', 'passengers', 'segments', 'trip_class', 'user_ip'].sort();
-
-  topLevelKeys.forEach(key => {
-    if (key === 'passengers') {
-      const passengerKeys = Object.keys(data.passengers).sort();
-      passengerKeys.forEach(pKey => { values.push(String(data.passengers[pKey])); });
-    } else if (key === 'segments') {
-      data.segments.forEach(segment => {
-        const segmentKeys = Object.keys(segment).sort();
-        segmentKeys.forEach(sKey => { values.push(segment[sKey]); });
-      });
-    } else {
-      values.push(data[key]);
-    }
+  // Extrair todos os parâmetros em pares de chave-valor
+  const paramPairs = [];
+  
+  // Adicionar parâmetros simples
+  paramPairs.push(['host', data.host]);
+  paramPairs.push(['locale', data.locale]);
+  paramPairs.push(['marker', data.marker]);
+  paramPairs.push(['trip_class', data.trip_class]);
+  paramPairs.push(['user_ip', data.user_ip]);
+  
+  // Adicionar parâmetros de passageiros
+  paramPairs.push(['passengers.adults', data.passengers.adults]);
+  paramPairs.push(['passengers.children', data.passengers.children]);
+  paramPairs.push(['passengers.infants', data.passengers.infants]);
+  
+  // Adicionar segmentos
+  data.segments.forEach((segment, index) => {
+    paramPairs.push([`segments[${index}].date`, segment.date]);
+    paramPairs.push([`segments[${index}].destination`, segment.destination]);
+    paramPairs.push([`segments[${index}].origin`, segment.origin]);
   });
-
-  const valuesString = values.join(':');
-  const signatureString = token + ':' + valuesString;
-
+  
+  // Ordenar por nome do parâmetro (primeira posição no par)
+  paramPairs.sort((a, b) => a[0].localeCompare(b[0]));
+  
+  // Extrair apenas os valores (segunda posição no par) na ordem ordenada
+  const sortedValues = paramPairs.map(pair => pair[1]);
+  
+  // Concatenar valores com token
+  const signatureString = token + ':' + sortedValues.join(':');
+  
   console.log("--- Debug Assinatura (Método Ordenação Alfabética) ---");
   console.log("Token (início):", token ? token.substring(0, 4) + '****' : 'NÃO DEFINIDO');
-  console.log("Valores concatenados (na ordem das chaves ordenadas):", valuesString);
+  console.log("Valores concatenados (na ordem das chaves ordenadas):", sortedValues.join(':'));
   console.log("String completa para assinatura:", signatureString);
-
+  
+  // Gerar hash
   const signatureHash = crypto.createHash('md5').update(signatureString).digest('hex');
   console.log("Hash MD5 gerado (Signature - Alfabético):", signatureHash);
+  
   return signatureHash;
 }
 // --- Fim Funções Auxiliares ---
