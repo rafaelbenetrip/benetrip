@@ -1,5 +1,5 @@
 // api/flight-search.js - INICIA a busca de voos e retorna search_id
-// Versão com correção na geração da assinatura e ajuste de locale
+// Versão com assinatura CORRIGIDA para ordenação aninhada (documentação)
 const axios = require('axios');
 const crypto = require('crypto');
 
@@ -12,87 +12,70 @@ function isValidIATA(code) {
   return /^[A-Z]{3}$/.test(code);
 }
 
-// Função Auxiliar para achatar e coletar todos os valores primitivos de um objeto/array
-function flattenValues(data) {
-    const values = [];
-    const process = (item) => {
-        if (item === null || item === undefined) {
-            // Ignora null/undefined explicitamente para evitar 'null'/'undefined' na assinatura
-            return;
-        }
-        if (typeof item === 'object') {
-            if (Array.isArray(item)) {
-                item.forEach(process); // Processa cada item do array
-            } else {
-                // Processa valores de propriedades do objeto recursivamente
-                Object.values(item).forEach(process);
-            }
-        } else if (typeof item === 'string' || typeof item === 'number' || typeof item === 'boolean') {
-            // Adiciona apenas valores primitivos convertidos para string
-            values.push(String(item));
-        }
-    };
-    process(data);
-    return values;
-}
-
-
-// --- Função generateSignature CORRIGIDA (Ponto 1) ---
-// Ordena os VALORES alfabeticamente, conforme documentação oficial
+// --- Função generateSignature CORRIGIDA (Ordenação Aninhada) ---
+// Segue a lógica da documentação: ordena nomes de nível superior + 'passengers' + 'segments',
+// e insere os valores aninhados na ordem correta.
 function generateSignature(data, token) {
-    console.log("--- Iniciando Geração de Assinatura (Valores Ordenados) ---");
-    // 1. Coletar TODOS os valores dos parâmetros enviados
-    //    Incluindo os valores de 'passengers' e 'segments' individualmente
-    const allValues = [];
+  console.log("--- Iniciando Geração de Assinatura (Ordenação Aninhada Correta) ---");
 
-    // Adiciona valores simples obrigatórios
-    allValues.push(String(data.marker));
-    allValues.push(String(data.host));
-    allValues.push(String(data.user_ip));
-    allValues.push(String(data.locale));
-    allValues.push(String(data.trip_class));
+  // 1. Identificar chaves de nível superior e nomes das estruturas aninhadas
+  const topLevelParamNames = [];
+  const nestedStructureNames = ['passengers', 'segments']; // Estruturas aninhadas conhecidas
 
-    // Adiciona valores de passageiros
-    allValues.push(String(data.passengers.adults));
-    allValues.push(String(data.passengers.children));
-    allValues.push(String(data.passengers.infants));
+  // Adiciona chaves de nível superior presentes em 'data'
+  if (data.host !== undefined) topLevelParamNames.push('host');
+  if (data.locale !== undefined) topLevelParamNames.push('locale');
+  if (data.marker !== undefined) topLevelParamNames.push('marker');
+  if (data.trip_class !== undefined) topLevelParamNames.push('trip_class');
+  if (data.user_ip !== undefined) topLevelParamNames.push('user_ip');
+  // Adiciona opcionais de nível superior se presentes
+  if (data.currency !== undefined) topLevelParamNames.push('currency');
+  if (data.know_english !== undefined) topLevelParamNames.push('know_english');
+  if (data.only_direct !== undefined) topLevelParamNames.push('only_direct');
+  // Adicione outros opcionais de nível superior aqui
 
-    // Adiciona valores de segmentos
-    data.segments.forEach(segment => {
-        allValues.push(String(segment.origin));
-        allValues.push(String(segment.destination));
-        allValues.push(String(segment.date));
-    });
+  // Lista combinada de nomes para ordenação
+  const namesToSort = [...topLevelParamNames, ...nestedStructureNames];
 
-    // Adiciona valores opcionais SE existirem
-    if (data.know_english !== undefined) {
-        allValues.push(String(data.know_english));
+  // 2. Ordenar a lista de nomes alfabeticamente
+  namesToSort.sort((a, b) => a.localeCompare(b));
+  console.log("Ordem dos nomes (nível superior + aninhados) para processamento:", namesToSort);
+
+  // 3. Construir a lista final de VALORES na ordem definida
+  const finalValues = [];
+  namesToSort.forEach(name => {
+    if (name === 'passengers') {
+      // Insere valores de passengers na ordem: adults, children, infants
+      finalValues.push(String(data.passengers.adults));
+      finalValues.push(String(data.passengers.children));
+      finalValues.push(String(data.passengers.infants));
+    } else if (name === 'segments') {
+      // Insere valores de cada segmento na ordem: date, destination, origin
+      data.segments.forEach(segment => {
+        finalValues.push(String(segment.date));
+        finalValues.push(String(segment.destination));
+        finalValues.push(String(segment.origin));
+      });
+    } else {
+      // É um parâmetro de nível superior (simples ou opcional)
+      // Adiciona o valor correspondente SE ele existir em 'data'
+      if (data[name] !== undefined) {
+         finalValues.push(String(data[name]));
+      }
     }
-    if (data.currency !== undefined) {
-        allValues.push(String(data.currency));
-    }
-    if (data.only_direct !== undefined) { // Exemplo se adicionar only_direct
-        allValues.push(String(data.only_direct));
-    }
-    // Adicione outros parâmetros opcionais aqui
+  });
 
-    console.log("Valores coletados ANTES da ordenação:", allValues);
+  console.log("Valores finais coletados na ordem correta:", finalValues);
 
-    // 2. Ordenar a lista de valores alfabeticamente
-    allValues.sort((a, b) => a.localeCompare(b)); // Ordenação alfabética padrão
+  // 4. Concatenar token e valores finais com ':'
+  const signatureString = token + ':' + finalValues.join(':');
+  console.log("String completa para assinatura:", signatureString);
 
-    console.log("Valores coletados DEPOIS da ordenação:", allValues);
+  // 5. Gerar hash MD5
+  const signatureHash = crypto.createHash('md5').update(signatureString).digest('hex');
+  console.log("Hash MD5 gerado (Signature - Ordenação Aninhada Correta):", signatureHash);
 
-    // 3. Concatenar token e valores ordenados com ':'
-    const signatureString = token + ':' + allValues.join(':');
-
-    console.log("String completa para assinatura:", signatureString);
-
-    // 4. Gerar hash MD5
-    const signatureHash = crypto.createHash('md5').update(signatureString).digest('hex');
-    console.log("Hash MD5 gerado (Signature - Valores Ordenados):", signatureHash);
-
-    return signatureHash;
+  return signatureHash;
 }
 // --- Fim Funções Auxiliares ---
 
@@ -139,13 +122,12 @@ module.exports = async function handler(req, res) {
 
 
     // --- Montar objeto da requisição ---
-    // Lista de locales suportados pela documentação oficial
     const supportedLocales = ['en', 'ru', 'de', 'fr', 'it', 'pl', 'th', 'zh-Hans', 'ko', 'ja', 'vi', 'pt', 'uk', 'es', 'id', 'ms', 'zh-Hant', 'tr'];
     const requestData = {
       marker: marker,
       host: hostEnv,
       user_ip: userIp,
-      // AJUSTE (Ponto 3): Usa 'en' como padrão e valida contra lista oficial
+      // Mantém locale 'en' e validação
       locale: params.locale && supportedLocales.includes(params.locale) ? params.locale : "en",
       trip_class: params.classe ? params.classe.toUpperCase() : "Y",
       passengers: {
@@ -154,24 +136,20 @@ module.exports = async function handler(req, res) {
         infants: parseInt(params.bebes || 0, 10)
       },
       segments: []
-      // Opcionais podem ser adicionados aqui, se necessário
-      // know_english: ...,
-      // currency: ...,
-      // only_direct: ...,
+      // Opcionais serão adicionados abaixo se vierem dos params
     };
 
      // Adiciona opcionais se vierem do frontend
     if (params.know_english !== undefined) {
-        // Garante que é booleano para a assinatura
         requestData.know_english = (String(params.know_english).toLowerCase() === 'true');
     }
     if (params.currency) {
-        // Garante 3 letras maiúsculas
         requestData.currency = String(params.currency).toUpperCase().substring(0, 3);
     }
-     if (params.only_direct !== undefined) { // Exemplo only_direct
+     if (params.only_direct !== undefined) {
         requestData.only_direct = (String(params.only_direct).toLowerCase() === 'true');
     }
+    // Adicione outros opcionais aqui se necessário
 
 
     requestData.segments.push({ origin: origem, destination: destino, date: params.dataIda });
@@ -187,7 +165,7 @@ module.exports = async function handler(req, res) {
 
     console.log("Enviando requisição INICIAL para Travelpayouts...");
     const logData = { ...requestData };
-    delete logData.signature; // Não loga a assinatura
+    delete logData.signature;
     console.log("Payload (sem assinatura):", JSON.stringify(logData, null, 2));
 
 
@@ -205,19 +183,19 @@ module.exports = async function handler(req, res) {
     console.log("Resposta inicial da Travelpayouts (Status):", apiResponse.status);
 
     const searchId = apiResponse.data?.search_id;
-    const currencyRates = apiResponse.data?.currency_rates; // Pode não vir mais aqui, verificar docs
+    const currencyRates = apiResponse.data?.currency_rates;
 
-    if (searchId) {
+    // Tratar status 200 ou 202 como sucesso se tiver search_id
+    if (searchId && (apiResponse.status === 200 || apiResponse.status === 202)) {
       console.log("Busca iniciada com sucesso. Search ID:", searchId);
-      // Retorna 202 com search_id (e talvez currency_rates, se ainda vier)
+      // Retorna 202 para indicar processo assíncrono ao frontend
       return res.status(202).json({
         search_id: searchId,
         currency_rates: currencyRates,
         message: "Busca de voos iniciada. Use o search_id para verificar os resultados."
       });
     } else {
-      // A API retornou 200 mas sem search_id? Algo errado.
-      console.error("!!! ERRO: A API Travelpayouts não retornou search_id apesar do status 200. Resposta:", apiResponse.data);
+      console.error(`!!! ERRO: A API Travelpayouts retornou status ${apiResponse.status} mas sem search_id ou status inesperado. Resposta:`, apiResponse.data);
       return res.status(500).json({ error: "Falha ao iniciar a busca. Resposta inesperada da API externa.", apiResponse: apiResponse.data });
     }
 
@@ -225,22 +203,18 @@ module.exports = async function handler(req, res) {
     // --- Tratamento de Erro ---
     console.error("!!! ERRO GERAL NO HANDLER /api/flight-search !!!");
     if (error.response) {
-        // Erro retornado pela API da Travelpayouts (ex: 400 Bad Request, 401 Unauthorized, 403 Forbidden, 5xx)
         console.error("Erro Axios (Initial Search): Status:", error.response.status, "Data:", error.response.data);
-        // Se for 401 ou 403, provavelmente a assinatura está errada ou token/marker inválido
         if (error.response.status === 401 || error.response.status === 403) {
-             console.error("!!! ATENÇÃO: Erro 401/403 pode indicar assinatura inválida ou credenciais incorretas !!!");
+             console.error("!!! ATENÇÃO: Erro 401/403. Verifique se a nova lógica de assinatura está 100% correta ou se as credenciais (Token/Marker) estão válidas.");
         }
         return res.status(error.response.status).json({
             error: `Erro ${error.response.status} ao iniciar busca com a API externa.`,
             details: error.response.data
         });
     } else if (error.request) {
-        // A requisição foi feita mas não houve resposta (timeout, problema de rede)
         console.error("Erro Axios (Initial Search): Nenhuma resposta recebida:", error.message);
         return res.status(504).json({ error: "Nenhuma resposta da API externa ao iniciar busca (Gateway Timeout)." });
     } else {
-        // Erro na configuração da requisição ou outro erro interno
         console.error("Erro interno (Initial Search):", error.message);
         return res.status(500).json({ error: "Erro interno no servidor ao iniciar busca.", details: error.message });
     }
