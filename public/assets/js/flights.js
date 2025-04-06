@@ -241,7 +241,7 @@ const BENETRIP_VOOS = {
         criancas: dadosUsuario?.respostas?.passageiros?.criancas || 0,
         bebes: dadosUsuario?.respostas?.passageiros?.bebes || 0,
         classe: 'Y', // Econômica por padrão
-        locale: 'pt' // Pode ajustar se necessário
+        locale: "en-us" // Garantir locale suportado pela Aviasales
       };
 
       // Validar parâmetros antes de prosseguir
