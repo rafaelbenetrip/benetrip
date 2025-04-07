@@ -157,3 +157,120 @@
 .voos-swipe-container {
   border: 1px dashed #E87722 !important;
 }
+
+/* Correções de visibilidade para voos */
+#voos-container {
+  min-height: 100vh;
+  width: 100%;
+  max-width: 480px;
+  margin: 0 auto;
+  position: relative;
+  background-color: #f8f8f8;
+  z-index: 10;
+}
+
+.voos-content {
+  padding-bottom: 80px;
+  visibility: visible !important;
+  display: block !important;
+}
+
+.voos-lista {
+  overflow: hidden;
+  background-color: #fff;
+  border-radius: 8px;
+  margin: 8px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  visibility: visible !important;
+  position: relative;
+  z-index: 5;
+}
+
+.voos-swipe-container {
+  display: flex !important;
+  overflow-x: auto;
+  scroll-snap-type: x proximity;
+  -webkit-overflow-scrolling: touch;
+  gap: 8px;
+  padding: 8px;
+  visibility: visible !important;
+  opacity: 1 !important;
+  transform: translateZ(0);
+  will-change: scroll-position;
+}
+
+.voo-card {
+  flex: 0 0 calc(100% - 16px);
+  min-width: calc(100% - 16px);
+  scroll-snap-align: center;
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+  overflow: hidden;
+  visibility: visible !important;
+  opacity: 1 !important;
+  will-change: transform;
+}
+
+.botao-selecao-fixo {
+  position: fixed !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  padding: 12px !important;
+  background-color: white !important;
+  box-shadow: 0 -2px 5px rgba(0,0,0,0.1) !important;
+  z-index: 1000 !important;
+  display: flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+.btn-selecionar-voo {
+  width: 100%;
+  background-color: #E87722;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 12px;
+  font-weight: bold;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  visibility: visible !important;
+}
+
+/* Garante que o toast fique acima do botão mas não sobreponha modais */
+#toast-container {
+  z-index: 990 !important;
+  bottom: 80px !important;
+}
+
+/* Otimizações de performance */
+.flight-line {
+  height: 2px;
+  position: relative;
+  will-change: transform;
+}
+
+/* Corrige problemas de z-index para modais e sobreposições */
+.modal-confirmacao,
+.modal-detalhes-voo {
+  z-index: 1100 !important;
+}
+
+/* Melhora as transições para mais suavidade */
+.voo-card {
+  transition: all 0.3s cubic-bezier(0.25, 0.1, 0.25, 1);
+}
+
+.voo-card-ativo {
+  transform: translateY(-2px);
+}
+
+/* Evita que caches apareçam em branco */
+.voo-card {
+  min-height: 200px !important;
+  background-color: white !important;
+}
