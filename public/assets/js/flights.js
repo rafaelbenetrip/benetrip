@@ -629,22 +629,147 @@ const BENETRIP_VOOS = {
 
     const voos = this.finalResults?.proposals || [];
 
+    // Header melhorado com contador de resultados mais visível
     const header = document.createElement('div');
     header.className = 'voos-header p-3 bg-gray-50 border-b';
-    header.innerHTML = `<div class="flex justify-between items-center"><h3 class="font-medium">${voos.length} ${voos.length === 1 ? 'voo encontrado' : 'voos encontrados'}</h3><div class="flex items-center"><span class="text-sm text-gray-600 mr-2">Por preço</span><span class="bg-orange-100 text-orange-800 text-xs px-2 py-1 rounded-full">↑ Baratos</span></div></div>`;
+    header.innerHTML = `
+      <div class="flex justify-between items-center">
+        <div class="flex items-center">
+          <h3 class="font-medium"><span class="text-primary font-bold" style="color:#E87722">${voos.length}</span> ${voos.length === 1 ? 'voo encontrado' : 'voos encontrados'}</h3>
+          ${voos.length > 10 ? `<span class="ml-2 text-xs text-gray-500">(mostrando os melhores preços)</span>` : ''}
+        </div>
+        <div class="flex items-center">
+          <span class="text-sm text-gray-600 mr-2">Por preço</span>
+          <span class="bg-orange-100 text-orange-800 text-xs px-2 py-1 rounded-full">↑ Baratos</span>
+        </div>
+      </div>
+    `;
     listaVoos.appendChild(header);
 
+    // Adiciona seletores de visualização
+    const viewSelector = document.createElement('div');
+    viewSelector.className = 'view-selector p-2 border-b flex justify-between items-center';
+    viewSelector.innerHTML = `
+      <div class="flex space-x-2">
+        <button class="view-btn view-btn-active px-2 py-1 rounded text-sm" data-view="cards">
+          <span class="icon">🗂️</span> Cards
+        </button>
+        <button class="view-btn px-2 py-1 rounded text-sm" data-view="list">
+          <span class="icon">📋</span> Lista
+        </button>
+      </div>
+      <div class="text-xs text-gray-500">
+        <span class="swipe-instruction flex items-center">
+          <span class="mr-1">←</span> Deslize para navegar <span class="ml-1">→</span>
+        </span>
+      </div>
+    `;
+    listaVoos.appendChild(viewSelector);
+
+    // Container para contadores de paginação
+    const paginationInfo = document.createElement('div');
+    paginationInfo.className = 'pagination-info text-center text-sm py-1 sticky top-0 bg-white bg-opacity-80 z-10 border-b';
+    paginationInfo.innerHTML = `<span class="current-index font-bold">1</span> de <span class="total-count">${voos.length}</span>`;
+    listaVoos.appendChild(paginationInfo);
+
+    // Container de swipe melhorado
     const voosContainer = document.createElement('div');
     voosContainer.className = 'voos-swipe-container';
     voosContainer.id = 'voos-swipe-container';
     listaVoos.appendChild(voosContainer);
 
-    voos.forEach((voo, index) => {
+    // Adiciona apenas os primeiros 20 voos inicialmente (para performance)
+    // ou todos se forem menos que 20
+    const initialVoos = voos.slice(0, Math.min(20, voos.length));
+    initialVoos.forEach((voo, index) => {
       const cardVoo = this.criarCardVoo(voo, index);
       voosContainer.appendChild(cardVoo);
     });
 
+    // Adiciona controles de navegação visual
+    const navControls = document.createElement('div');
+    navControls.className = 'nav-controls flex justify-between items-center p-2 sticky bottom-0 bg-white bg-opacity-90 border-t z-10';
+    navControls.innerHTML = `
+      <button class="nav-btn prev-btn px-3 py-1 bg-gray-100 rounded-full mr-2 flex items-center" aria-label="Voo anterior">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"></path></svg>
+        <span class="ml-1">Anterior</span>
+      </button>
+      <div class="pagination-dots flex space-x-1 justify-center">
+        ${initialVoos.length <= 10 ? Array(initialVoos.length).fill().map((_, i) => 
+          `<span class="pagination-dot ${i === 0 ? 'active' : ''}" data-index="${i}"></span>`
+        ).join('') : '<span class="text-xs">Navegue pelos melhores preços</span>'}
+      </div>
+      <button class="nav-btn next-btn px-3 py-1 bg-gray-100 rounded-full ml-2 flex items-center" aria-label="Próximo voo">
+        <span class="mr-1">Próximo</span>
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"></path></svg>
+      </button>
+    `;
+    listaVoos.appendChild(navControls);
+    
+    // Adiciona botão de carregar mais (para melhorar desempenho com muitas ofertas)
+    if (voos.length > 20) {
+      const loadMoreWrapper = document.createElement('div');
+      loadMoreWrapper.className = 'load-more-wrapper p-3 text-center';
+      loadMoreWrapper.innerHTML = `
+        <button class="load-more-btn px-4 py-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors">
+          Carregar mais resultados (${voos.length - initialVoos.length} restantes)
+        </button>
+      `;
+      listaVoos.appendChild(loadMoreWrapper);
+    }
+    
     container.appendChild(listaVoos);
+    
+    // Configura eventos para os botões de navegação
+    const prevBtn = listaVoos.querySelector('.prev-btn');
+    const nextBtn = listaVoos.querySelector('.next-btn');
+    const loadMoreBtn = listaVoos.querySelector('.load-more-btn');
+    const viewBtns = listaVoos.querySelectorAll('.view-btn');
+    
+    if (prevBtn) prevBtn.addEventListener('click', () => this.vooAnterior());
+    if (nextBtn) nextBtn.addEventListener('click', () => this.proximoVoo());
+    
+    if (loadMoreBtn) {
+      loadMoreBtn.addEventListener('click', () => {
+        // Carrega mais 20 voos
+        const currentCount = voosContainer.children.length;
+        const nextBatch = voos.slice(currentCount, currentCount + 20);
+        
+        nextBatch.forEach((voo, idx) => {
+          const index = currentCount + idx;
+          const cardVoo = this.criarCardVoo(voo, index);
+          voosContainer.appendChild(cardVoo);
+        });
+        
+        // Atualiza contador do botão ou remove se não houver mais
+        const remaining = voos.length - voosContainer.children.length;
+        if (remaining <= 0) {
+          loadMoreBtn.parentElement.remove();
+        } else {
+          loadMoreBtn.textContent = `Carregar mais resultados (${remaining} restantes)`;
+        }
+      });
+    }
+    
+    // Configura eventos para alternância de visualização
+    viewBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const view = btn.dataset.view;
+        viewBtns.forEach(b => b.classList.remove('view-btn-active'));
+        btn.classList.add('view-btn-active');
+        
+        if (view === 'list') {
+          voosContainer.classList.add('voos-list-view');
+          voosContainer.classList.remove('voos-card-view');
+        } else {
+          voosContainer.classList.add('voos-card-view');
+          voosContainer.classList.remove('voos-list-view');
+        }
+      });
+    });
+    
+    // Ativa view de cards por padrão
+    voosContainer.classList.add('voos-card-view');
   },
 
   criarCardVoo(voo, index) {
@@ -661,31 +786,130 @@ const BENETRIP_VOOS = {
     const infoVolta = voo.segment?.length > 1 ? this.obterInfoSegmento(voo.segment[1]) : null;
     const economiaPercentual = voo._economia || 0;
     const isMelhorPreco = voo._melhorPreco || index === 0;
-    const tagMelhorPreco = isMelhorPreco ? `<span class="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full absolute top-2 right-2">Melhor preço</span>` : '';
-
-    if (infoIda?.paradas === 0 && (!infoVolta || infoVolta.paradas === 0)) cardVoo.classList.add('voo-direto');
+    const ehVooDireto = infoIda?.paradas === 0 && (!infoVolta || infoVolta.paradas === 0);
+    
+    // Adiciona mais classes para destacar melhor os cards
+    if (ehVooDireto) cardVoo.classList.add('voo-direto');
+    if (isMelhorPreco) cardVoo.classList.add('voo-melhor-preco');
+    if (index === 0) cardVoo.classList.add('voo-primeiro');
+    if (index % 2 === 0) cardVoo.classList.add('voo-par');
+    
+    // Tags especiais para o card
+    let tagsSpeciais = '';
+    if (isMelhorPreco) {
+      tagsSpeciais += `<span class="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full absolute top-2 right-2 shadow-sm">Melhor preço</span>`;
+    }
+    if (ehVooDireto) {
+      tagsSpeciais += `<span class="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full absolute top-2 left-2 shadow-sm">Voo Direto</span>`;
+    }
+    
+    // Ícones para indicar qualidade do voo
+    const qualityStars = index < 3 ? 
+      `<div class="quality-stars absolute bottom-2 right-2 text-yellow-500">
+         ${Array(4 - Math.min(index, 3)).fill('★').join('')}${Array(Math.min(index, 3)).fill('☆').join('')}
+       </div>` : '';
+    
+    // Formata os números de indicação do card
+    const indexDisplay = `<div class="card-index absolute top-0 left-0 w-6 h-6 flex items-center justify-center bg-gray-100 rounded-br-lg text-xs font-bold">${index + 1}</div>`;
 
     cardVoo.innerHTML = `
-        <div class="relative"> ${tagMelhorPreco} <div class="flex justify-between items-start mb-4"> <div> <span class="text-xl font-bold">${precoFormatado}</span> ${economiaPercentual > 0 ? `<span class="text-xs bg-green-100 text-green-800 px-1 py-0.5 rounded ml-1">-${economiaPercentual}%</span>` : ''} <p class="text-xs text-gray-500">Por pessoa, ida${infoVolta ? ' e volta' : ''}</p> </div> <div class="flex items-center"> <span class="text-xs bg-gray-100 px-2 py-1 rounded">${this.obterCompanhiasAereas(voo)}</span> </div> </div> </div>
-        <div class="border-t pt-3"> <div class="mb-4"> <div class="flex justify-between items-center text-sm"><span class="font-medium">IDA</span><span class="text-xs text-gray-500">${this.formatarData(infoIda?.dataPartida)}</span></div> <div class="flex items-center justify-between mt-2"> <div class="text-center"><p class="font-bold">${infoIda?.horaPartida}</p><p class="text-xs text-gray-600">${infoIda?.aeroportoPartida}</p></div> <div class="flex-1 px-2"> <div class="text-xs text-center text-gray-500">${this.formatarDuracao(infoIda?.duracao)}</div> <div class="flight-line relative"><div class="border-t border-gray-300 my-2"></div><div class="flight-stops absolute inset-x-0 top-1/2 flex justify-center -mt-1">${this.renderizarParadas(infoIda?.paradas)}</div></div> <div class="text-xs text-center text-gray-500">${infoIda?.paradas ?? 0} ${infoIda?.paradas === 1 ? 'parada' : 'paradas'}</div> </div> <div class="text-center"><p class="font-bold">${infoIda?.horaChegada}</p><p class="text-xs text-gray-600">${infoIda?.aeroportoChegada}</p></div> </div> </div>
-        ${infoVolta ? `<div class="mt-4 pt-3 border-t"> <div class="flex justify-between items-center text-sm"><span class="font-medium">VOLTA</span><span class="text-xs text-gray-500">${this.formatarData(infoVolta?.dataPartida)}</span></div> <div class="flex items-center justify-between mt-2"> <div class="text-center"><p class="font-bold">${infoVolta?.horaPartida}</p><p class="text-xs text-gray-600">${infoVolta?.aeroportoPartida}</p></div> <div class="flex-1 px-2"> <div class="text-xs text-center text-gray-500">${this.formatarDuracao(infoVolta?.duracao)}</div> <div class="flight-line relative"><div class="border-t border-gray-300 my-2"></div><div class="flight-stops absolute inset-x-0 top-1/2 flex justify-center -mt-1">${this.renderizarParadas(infoVolta?.paradas)}</div></div> <div class="text-xs text-center text-gray-500">${infoVolta?.paradas ?? 0} ${infoVolta?.paradas === 1 ? 'parada' : 'paradas'}</div> </div> <div class="text-center"><p class="font-bold">${infoVolta?.horaChegada}</p><p class="text-xs text-gray-600">${infoVolta?.aeroportoChegada}</p></div> </div> </div>` : ''} </div>
-        <div class="mt-4 pt-2 border-t flex justify-between"> <button class="btn-detalhes-voo text-sm text-blue-600" data-voo-id="${vooId}">Ver detalhes</button> <div class="flex items-center text-xs text-gray-500"><span class="mr-1">Restam</span><span class="bg-orange-100 text-orange-800 px-1 py-0.5 rounded font-medium">${voo._assentosDisponiveis || '?'}</span></div> </div>
+        <div class="relative">
+            ${indexDisplay}
+            ${tagsSpeciais}
+            <div class="flex justify-between items-start mb-4 mt-2"> 
+                <div> 
+                    <span class="text-2xl font-bold" style="color: #E87722;">${precoFormatado}</span> 
+                    ${economiaPercentual > 0 ? `<span class="text-xs bg-green-100 text-green-800 px-1 py-0.5 rounded ml-1 font-medium">-${economiaPercentual}%</span>` : ''} 
+                    <p class="text-xs text-gray-500">Por pessoa, ida${infoVolta ? ' e volta' : ''}</p> 
+                </div> 
+                <div class="flex items-center"> 
+                    <span class="text-xs bg-gray-100 px-2 py-1 rounded font-medium">${this.obterCompanhiasAereas(voo)}</span> 
+                </div> 
+            </div>
+            ${qualityStars}
+        </div>
+        
+        <div class="border-t pt-3"> 
+            <div class="mb-4"> 
+                <div class="flex justify-between items-center text-sm">
+                    <span class="font-medium bg-gray-50 px-2 py-0.5 rounded">IDA</span>
+                    <span class="text-xs text-gray-500">${this.formatarData(infoIda?.dataPartida)}</span>
+                </div> 
+                <div class="flex items-center justify-between mt-2"> 
+                    <div class="text-center">
+                        <p class="font-bold">${infoIda?.horaPartida}</p>
+                        <p class="text-xs text-gray-600">${infoIda?.aeroportoPartida}</p>
+                    </div> 
+                    <div class="flex-1 px-2"> 
+                        <div class="text-xs text-center text-gray-500">${this.formatarDuracao(infoIda?.duracao)}</div> 
+                        <div class="flight-line relative">
+                            <div class="border-t ${ehVooDireto ? 'border-blue-300' : 'border-gray-300'} my-2"></div>
+                            <div class="flight-stops absolute inset-x-0 top-1/2 flex justify-center -mt-1">
+                                ${this.renderizarParadas(infoIda?.paradas)}
+                            </div>
+                        </div> 
+                        <div class="text-xs text-center text-gray-500">
+                            ${ehVooDireto ? 
+                              '<span class="text-blue-600 font-medium">Voo Direto</span>' : 
+                              `${infoIda?.paradas ?? 0} ${infoIda?.paradas === 1 ? 'parada' : 'paradas'}`
+                            }
+                        </div> 
+                    </div> 
+                    <div class="text-center">
+                        <p class="font-bold">${infoIda?.horaChegada}</p>
+                        <p class="text-xs text-gray-600">${infoIda?.aeroportoChegada}</p>
+                    </div> 
+                </div> 
+            </div>
+            
+            ${infoVolta ? `
+            <div class="mt-4 pt-3 border-t"> 
+                <div class="flex justify-between items-center text-sm">
+                    <span class="font-medium bg-gray-50 px-2 py-0.5 rounded">VOLTA</span>
+                    <span class="text-xs text-gray-500">${this.formatarData(infoVolta?.dataPartida)}</span>
+                </div> 
+                <div class="flex items-center justify-between mt-2"> 
+                    <div class="text-center">
+                        <p class="font-bold">${infoVolta?.horaPartida}</p>
+                        <p class="text-xs text-gray-600">${infoVolta?.aeroportoPartida}</p>
+                    </div> 
+                    <div class="flex-1 px-2"> 
+                        <div class="text-xs text-center text-gray-500">${this.formatarDuracao(infoVolta?.duracao)}</div> 
+                        <div class="flight-line relative">
+                            <div class="border-t ${(!infoVolta || infoVolta.paradas === 0) ? 'border-blue-300' : 'border-gray-300'} my-2"></div>
+                            <div class="flight-stops absolute inset-x-0 top-1/2 flex justify-center -mt-1">
+                                ${this.renderizarParadas(infoVolta?.paradas)}
+                            </div>
+                        </div> 
+                        <div class="text-xs text-center text-gray-500">
+                            ${(!infoVolta || infoVolta.paradas === 0) ? 
+                              '<span class="text-blue-600 font-medium">Voo Direto</span>' : 
+                              `${infoVolta?.paradas ?? 0} ${infoVolta?.paradas === 1 ? 'parada' : 'paradas'}`
+                            }
+                        </div> 
+                    </div> 
+                    <div class="text-center">
+                        <p class="font-bold">${infoVolta?.horaChegada}</p>
+                        <p class="text-xs text-gray-600">${infoVolta?.aeroportoChegada}</p>
+                    </div> 
+                </div> 
+            </div>` : ''} 
+        </div>
+        
+        <div class="mt-4 pt-2 border-t flex justify-between items-center"> 
+            <button class="btn-detalhes-voo text-sm text-blue-600 hover:text-blue-800 hover:underline" data-voo-id="${vooId}">
+                Ver detalhes
+            </button> 
+            <div class="flex items-center text-xs text-gray-500">
+                <span class="mr-1">Restam</span>
+                <span class="bg-orange-100 text-orange-800 px-2 py-1 rounded font-medium">${voo._assentosDisponiveis || '?'}</span>
+            </div>
+            <button class="btn-select-voo text-xs bg-gray-100 hover:bg-gray-200 px-2 py-1 rounded transition-colors duration-200" data-voo-id="${vooId}">
+                Selecionar
+            </button>
+        </div>
     `;
-
-    // Adiciona tag Voo Direto visualmente
-    if (infoIda?.paradas === 0 && (!infoVolta || infoVolta.paradas === 0)) {
-        const idaContainer = cardVoo.querySelector('.flex-1.px-2');
-        if (idaContainer) {
-            const flightLine = idaContainer.querySelector('.flight-line');
-            const stopsText = idaContainer.querySelector('.text-xs.text-center.text-gray-500:last-child');
-            if (flightLine) flightLine.style.display = 'none';
-            if (stopsText) stopsText.style.display = 'none';
-            const vooDiretoTag = document.createElement('div');
-            vooDiretoTag.className = 'text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full text-center mt-1';
-            vooDiretoTag.innerText = 'Voo Direto';
-            idaContainer.appendChild(vooDiretoTag);
-        }
-    }
+    
     return cardVoo;
   },
 
@@ -1099,6 +1323,8 @@ const BENETRIP_VOOS = {
          });
        }
     }
+    
+    // Configura eventos de scroll para atualizar card ativo
     const sc = document.getElementById('voos-swipe-container');
     if (sc && 'onscrollend' in window) {
       sc.onscrollend = () => this.atualizarVooAtivoBaseadoNoScroll(sc);
@@ -1109,6 +1335,130 @@ const BENETRIP_VOOS = {
         st = setTimeout(() => this.atualizarVooAtivoBaseadoNoScroll(sc), 150);
       };
     }
+    
+    // Configura ações dos cartões individuais
+    document.querySelectorAll('.btn-select-voo').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        const vooId = btn.dataset.vooId;
+        if (vooId) {
+          this.selecionarVoo(vooId);
+        }
+      });
+    });
+    
+    // Configura atualização de elementos da interface
+    const currentIndexElement = document.querySelector('.current-index');
+    if (currentIndexElement) {
+      // Atualiza o índice na paginação ao navegar
+      this.indexObserver = new MutationObserver(() => {
+        if (currentIndexElement) {
+          currentIndexElement.textContent = (this.indexVooAtivo + 1).toString();
+        }
+        
+        // Atualiza também os dots de paginação
+        document.querySelectorAll('.pagination-dot').forEach((dot, idx) => {
+          if (parseInt(dot.dataset.index) === this.indexVooAtivo) {
+            dot.classList.add('active');
+          } else {
+            dot.classList.remove('active');
+          }
+        });
+      });
+      
+      // Observa mudanças na propriedade indexVooAtivo
+      this.indexObserver.observe(this, {
+        attributes: true,
+        attributeFilter: ['indexVooAtivo']
+      });
+    }
+    
+    // Configura cliques nos dots de paginação
+    document.querySelectorAll('.pagination-dot').forEach(dot => {
+      dot.addEventListener('click', () => {
+        const idx = parseInt(dot.dataset.index);
+        if (!isNaN(idx) && this.finalResults?.proposals[idx]) {
+          this.indexVooAtivo = idx;
+          this.vooAtivo = this.finalResults.proposals[idx];
+          this.atualizarVooAtivo();
+        }
+      });
+    });
+    
+    // Cliques nos controles de navegação já foram configurados na renderização
+    
+    // Hack visual: destaca o primeiro voo com delay para chamar atenção
+    setTimeout(() => {
+      const firstCard = document.querySelector('.voo-card[data-voo-index="0"]');
+      if (firstCard && !this.vooSelecionado) {
+        firstCard.classList.add('voo-card-highlight');
+        setTimeout(() => firstCard.classList.remove('voo-card-highlight'), 800);
+      }
+    }, 1000);
+    
+    // Configura resposta visual ao atingir o fim da lista
+    const nextBtn = document.querySelector('.next-btn');
+    const prevBtn = document.querySelector('.prev-btn');
+    if (nextBtn && prevBtn) {
+      this.proximoVooOriginal = this.proximoVoo;
+      this.vooAnteriorOriginal = this.vooAnterior;
+      
+      this.proximoVoo = () => {
+        const maxIndex = this.finalResults?.proposals?.length - 1 || 0;
+        const isLast = this.indexVooAtivo >= maxIndex;
+        
+        if (isLast) {
+          // Feedback visual quando chegou ao fim
+          nextBtn.classList.add('opacity-50');
+          setTimeout(() => nextBtn.classList.remove('opacity-50'), 300);
+        } else {
+          // Chama o método original
+          this.proximoVooOriginal();
+        }
+      };
+      
+      this.vooAnterior = () => {
+        const isFirst = this.indexVooAtivo <= 0;
+        
+        if (isFirst) {
+          // Feedback visual quando chegou ao início
+          prevBtn.classList.add('opacity-50');
+          setTimeout(() => prevBtn.classList.remove('opacity-50'), 300);
+        } else {
+          // Chama o método original
+          this.vooAnteriorOriginal();
+        }
+      };
+    }
+    
+    // Acrescenta estilo de sobra nas bordas para indicar scroll
+    const addScrollShadows = () => {
+      const container = document.getElementById('voos-swipe-container');
+      if (!container) return;
+      
+      // Verifica se tem conteúdo à direita
+      const hasMoreRight = container.scrollWidth > container.clientWidth + container.scrollLeft + 10;
+      // Verifica se tem conteúdo à esquerda
+      const hasMoreLeft = container.scrollLeft > 10;
+      
+      if (hasMoreRight) {
+        container.classList.add('shadow-right');
+      } else {
+        container.classList.remove('shadow-right');
+      }
+      
+      if (hasMoreLeft) {
+        container.classList.add('shadow-left');
+      } else {
+        container.classList.remove('shadow-left');
+      }
+    };
+    
+    // Aplica inicialmente
+    addScrollShadows();
+    
+    // E configura para se repetir no scroll
+    sc?.addEventListener('scroll', addScrollShadows);
   },
 
   atualizarVooAtivoBaseadoNoScroll(swipeContainer) {
@@ -1131,31 +1481,334 @@ const BENETRIP_VOOS = {
     const s = document.createElement('style');
     s.id = id;
     s.textContent = `
-      .voos-swipe-container { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch; }
-      .voo-card { flex: 0 0 100%; scroll-snap-align: center; transition: all 0.3s ease; position: relative; }
-      .voo-card-ativo { box-shadow: 0 0 0 2px #E87722; }
+      /* Cores da identidade Benetrip */
+      :root {
+        --benetrip-orange: #E87722;
+        --benetrip-blue: #00A3E0;
+        --benetrip-dark: #21272A;
+        --benetrip-light-gray: #F5F5F5;
+        --benetrip-gray: #E0E0E0;
+      }
+      
+      /* Container principal */
+      #voos-container { 
+        padding-bottom: 80px; 
+        max-width: 100%; 
+        overflow-x: hidden; 
+        background-color: #f8f8f8;
+      }
+      
+      /* Estilos para o swipe container */
+      .voos-swipe-container { 
+        display: flex; 
+        overflow-x: auto; 
+        scroll-snap-type: x mandatory; 
+        -webkit-overflow-scrolling: touch; 
+        scroll-behavior: smooth;
+        gap: 8px;
+        padding: 4px 8px;
+        min-height: 350px;
+        scrollbar-width: thin;
+      }
+      
+      /* Scrollbar personalizada */
+      .voos-swipe-container::-webkit-scrollbar {
+        height: 8px;
+      }
+      .voos-swipe-container::-webkit-scrollbar-track {
+        background: #f1f1f1;
+        border-radius: 4px;
+      }
+      .voos-swipe-container::-webkit-scrollbar-thumb {
+        background: #ccc;
+        border-radius: 4px;
+      }
+      .voos-swipe-container::-webkit-scrollbar-thumb:hover {
+        background: #aaa;
+      }
+      
+      /* Estilos dos cards */
+      .voo-card { 
+        flex: 0 0 calc(100% - 16px); 
+        scroll-snap-align: center; 
+        transition: all 0.3s ease; 
+        position: relative; 
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        border-radius: 8px;
+        margin-bottom: 8px;
+        overflow: hidden;
+      }
+      
+      /* Alternância de visualização */
+      .voos-card-view .voo-card {
+        flex: 0 0 calc(100% - 16px);
+      }
+      
+      @media (min-width: 640px) {
+        .voos-card-view .voo-card {
+          flex: 0 0 calc(50% - 16px);
+        }
+      }
+      
+      @media (min-width: 1024px) {
+        .voos-card-view .voo-card {
+          flex: 0 0 calc(33.333% - 16px);
+        }
+      }
+      
+      .voos-list-view {
+        display: block !important;
+      }
+      
+      .voos-list-view .voo-card {
+        flex: none;
+        width: 100%;
+        margin-bottom: 4px;
+        scroll-snap-align: unset;
+        border-radius: 4px;
+      }
+      
+      /* Estados do card */
+      .voo-card-ativo { 
+        box-shadow: 0 0 0 3px var(--benetrip-orange), 0 4px 6px rgba(0,0,0,0.1); 
+        transform: translateY(-2px);
+      }
       .voo-card-highlight { animation: pulse 1s; }
-      .voo-selecionado { box-shadow: 0 0 0 3px #00A3E0; background-color: #f0f9ff; }
-      @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(232, 119, 34, 0.7); } 70% { box-shadow: 0 0 0 6px rgba(232, 119, 34, 0); } 100% { box-shadow: 0 0 0 0 rgba(232, 119, 34, 0); } }
+      .voo-selecionado { 
+        box-shadow: 0 0 0 3px var(--benetrip-blue), 0 4px 8px rgba(0,0,0,0.15); 
+        background-color: #f0f9ff; 
+      }
+      .voo-melhor-preco {
+        border: 1px solid #d1fae5;
+      }
+      .voo-direto {
+        border-left: 4px solid var(--benetrip-blue);
+      }
+      .voo-primeiro {
+        border-top: 2px solid var(--benetrip-orange);
+      }
+      
+      /* Cards pares e ímpares para diferenciar melhor */
+      .voo-par {
+        background-color: #ffffff;
+      }
+      .voos-list-view .voo-par {
+        background-color: #fafafa;
+      }
+      
+      /* Animações */
+      @keyframes pulse { 
+        0% { box-shadow: 0 0 0 0 rgba(232, 119, 34, 0.7); } 
+        70% { box-shadow: 0 0 0 6px rgba(232, 119, 34, 0); } 
+        100% { box-shadow: 0 0 0 0 rgba(232, 119, 34, 0); } 
+      }
+      
       .btn-pulsante { animation: button-pulse 1.5s 2; }
-      @keyframes button-pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
-      .progress-bar-container { height: 8px; background-color: #f3f4f6; border-radius: 4px; overflow: hidden; margin: 0 auto; width: 80%; max-width: 300px; }
-      .progress-bar { height: 100%; background-color: #E87722; border-radius: 4px; transition: width 0.3s ease; }
-      .botao-selecao-fixo { position: fixed; bottom: 0; left: 0; right: 0; padding: 8px 16px; background-color: white; border-top: 1px solid #e5e7eb; z-index: 40; }
-      .btn-selecionar-voo { display: flex; justify-content: space-between; align-items: center; width: 100%; padding: 12px 16px; background-color: #E87722; color: white; border-radius: 6px; font-weight: bold; transition: all 0.2s; }
-      .btn-selecionar-voo:hover { background-color: #d06a1c; }
-      .toast-container { position: fixed; bottom: 80px; left: 0; right: 0; display: flex; flex-direction: column; align-items: center; z-index: 50; pointer-events: none; }
-      .toast { padding: 8px 16px; border-radius: 4px; background-color: rgba(0, 0, 0, 0.7); color: white; margin-bottom: 8px; transform: translateY(20px); opacity: 0; transition: all 0.3s ease; max-width: 80%; text-align: center; }
-      .toast-visible { transform: translateY(0); opacity: 1; }
+      
+      @keyframes button-pulse { 
+        0% { transform: scale(1); } 
+        50% { transform: scale(1.05); } 
+        100% { transform: scale(1); } 
+      }
+      
+      /* Barra de progresso */
+      .progress-bar-container { 
+        height: 8px; 
+        background-color: #f3f4f6; 
+        border-radius: 4px; 
+        overflow: hidden; 
+        margin: 0 auto; 
+        width: 80%; 
+        max-width: 300px; 
+      }
+      
+      .progress-bar { 
+        height: 100%; 
+        background-color: var(--benetrip-orange); 
+        border-radius: 4px; 
+        transition: width 0.3s ease; 
+      }
+      
+      /* Botão de seleção fixo */
+      .botao-selecao-fixo { 
+        position: fixed; 
+        bottom: 0; 
+        left: 0; 
+        right: 0; 
+        padding: 8px 16px; 
+        background-color: white; 
+        border-top: 1px solid #e5e7eb; 
+        z-index: 40;
+        box-shadow: 0 -2px 10px rgba(0,0,0,0.05);
+      }
+      
+      .btn-selecionar-voo { 
+        display: flex; 
+        justify-content: space-between; 
+        align-items: center; 
+        width: 100%; 
+        padding: 12px 16px; 
+        background-color: var(--benetrip-orange); 
+        color: white; 
+        border-radius: 6px; 
+        font-weight: bold; 
+        transition: all 0.2s; 
+      }
+      
+      .btn-selecionar-voo:hover { 
+        background-color: #d06a1c; 
+      }
+      
+      /* Sistema de toast */
+      .toast-container { 
+        position: fixed; 
+        bottom: 80px; 
+        left: 0; 
+        right: 0; 
+        display: flex; 
+        flex-direction: column; 
+        align-items: center; 
+        z-index: 50; 
+        pointer-events: none; 
+      }
+      
+      .toast { 
+        padding: 8px 16px; 
+        border-radius: 4px; 
+        background-color: rgba(0, 0, 0, 0.7); 
+        color: white; 
+        margin-bottom: 8px; 
+        transform: translateY(20px); 
+        opacity: 0; 
+        transition: all 0.3s ease; 
+        max-width: 80%; 
+        text-align: center; 
+      }
+      
+      .toast-visible { 
+        transform: translateY(0); 
+        opacity: 1; 
+      }
+      
       .toast-success { background-color: rgba(22, 163, 74, 0.9); }
       .toast-warning { background-color: rgba(234, 88, 12, 0.9); }
       .toast-error { background-color: rgba(220, 38, 38, 0.9); }
-      .swipe-hint { position: fixed; bottom: 60px; left: 0; right: 0; display: flex; justify-content: center; align-items: center; background-color: rgba(0, 0, 0, 0.7); color: white; padding: 8px 16px; z-index: 30; opacity: 1; transition: opacity 0.5s ease; }
-      .swipe-hint-arrow { animation: arrow-bounce 1s infinite; display: inline-block; }
-      @keyframes arrow-bounce { 0%, 100% { transform: translateX(0); } 50% { transform: translateX(-3px); } }
-      .swipe-hint-arrow:last-child { animation: arrow-bounce-right 1s infinite; }
-      @keyframes arrow-bounce-right { 0%, 100% { transform: translateX(0); } 50% { transform: translateX(3px); } }
-      #voos-container { padding-bottom: 80px; }
+      
+      /* Dica de swipe */
+      .swipe-hint { 
+        position: fixed; 
+        bottom: 60px; 
+        left: 0; 
+        right: 0; 
+        display: flex; 
+        justify-content: center; 
+        align-items: center; 
+        background-color: rgba(0, 0, 0, 0.7); 
+        color: white; 
+        padding: 8px 16px; 
+        z-index: 30; 
+        opacity: 1; 
+        transition: opacity 0.5s ease; 
+        border-radius: 4px;
+      }
+      
+      .swipe-hint-arrow { 
+        animation: arrow-bounce 1s infinite; 
+        display: inline-block; 
+      }
+      
+      @keyframes arrow-bounce { 
+        0%, 100% { transform: translateX(0); } 
+        50% { transform: translateX(-3px); } 
+      }
+      
+      .swipe-hint-arrow:last-child { 
+        animation: arrow-bounce-right 1s infinite; 
+      }
+      
+      @keyframes arrow-bounce-right { 
+        0%, 100% { transform: translateX(0); } 
+        50% { transform: translateX(3px); } 
+      }
+      
+      /* Novos elementos de UI */
+      .view-selector {
+        background-color: #fff;
+      }
+      
+      .view-btn {
+        transition: all 0.2s ease;
+        color: #666;
+      }
+      
+      .view-btn-active {
+        background-color: var(--benetrip-orange);
+        color: white;
+        font-weight: 500;
+      }
+      
+      .pagination-info {
+        font-size: 0.8rem;
+      }
+      
+      .pagination-dots {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+      }
+      
+      .pagination-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background-color: #ccc;
+        margin: 0 3px;
+      }
+      
+      .pagination-dot.active {
+        background-color: var(--benetrip-orange);
+        width: 10px;
+        height: 10px;
+      }
+      
+      .nav-btn {
+        transition: all 0.2s ease;
+      }
+      
+      .nav-btn:hover {
+        background-color: #e0e0e0;
+      }
+      
+      .nav-controls {
+        margin-top: 8px;
+      }
+      
+      .card-index {
+        z-index: 1;
+        opacity: 0.8;
+      }
+      
+      .btn-select-voo {
+        transition: all 0.2s ease;
+      }
+      
+      .btn-select-voo:hover {
+        background-color: var(--benetrip-blue);
+        color: white;
+      }
+      
+      .load-more-btn {
+        transition: all 0.2s ease;
+      }
+      
+      .load-more-btn:hover {
+        background-color: #dbeafe;
+      }
+      
+      .quality-stars {
+        font-size: 0.75rem;
+        opacity: 0.8;
+      }
     `;
     document.head.appendChild(s);
   },
