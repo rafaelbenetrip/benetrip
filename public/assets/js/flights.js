@@ -1,6 +1,6 @@
 /**
  * BENETRIP - Módulo de Busca e Exibição de Voos
- * Versão 2.5.1 - Correção no Processamento de Chunks
+ * Versão 3.0.0 - Otimização de desempenho e correção de bugs
  */
 
 // Módulo de Voos do Benetrip
@@ -10,6 +10,16 @@ const BENETRIP_VOOS = {
   POLLING_INTERVAL_MS: 3000,
   MAX_POLLING_ATTEMPTS: 40,
   TIMEOUT_MS: 125000,
+  IATA_MAP: {
+    'sao paulo': 'GRU', 'rio de janeiro': 'GIG', 'brasilia': 'BSB', 'salvador': 'SSA',
+    'recife': 'REC', 'fortaleza': 'FOR', 'belo horizonte': 'CNF', 'porto alegre': 'POA',
+    'curitiba': 'CWB', 'belem': 'BEL', 'manaus': 'MAO', 'florianopolis': 'FLN',
+    'natal': 'NAT', 'goiania': 'GYN', 'paris': 'CDG', 'londres': 'LHR', 
+    'nova york': 'JFK', 'nova iorque': 'JFK', 'tokyo': 'HND', 'tóquio': 'HND', 
+    'madrid': 'MAD', 'roma': 'FCO', 'berlim': 'BER', 'amsterdam': 'AMS', 
+    'dubai': 'DXB', 'bangkok': 'BKK', 'sidney': 'SYD', 'sydney': 'SYD', 
+    'los angeles': 'LAX', 'miami': 'MIA', 'cancun': 'CUN', 'cidade do méxico': 'MEX'
+  },
 
   // --- Dados e Estado ---
   destino: null,
@@ -33,18 +43,19 @@ const BENETRIP_VOOS = {
   vooAtivo: null,
   indexVooAtivo: 0,
   hammerInstance: null,
+  proximoVooOriginal: null,
+  vooAnteriorOriginal: null,
+  scrollTimeoutId: null,
+  
+  // Cache para melhorar performance
+  dadosUsuarioCache: null,
 
   // --- Inicialização ---
   init() {
-    console.log('Inicializando sistema de busca de voos v2.5.1 (Chunk Processing Fix)...');
+    console.log('Inicializando sistema de busca de voos v3.0.0 (Performance Optimized)...');
     this.resetState();
     this.configurarEventos();
-    if (!document.getElementById('toast-container')) {
-      const toastContainer = document.createElement('div');
-      toastContainer.id = 'toast-container';
-      toastContainer.className = 'toast-container';
-      document.body.appendChild(toastContainer);
-    }
+    this.criarToastContainerSeNecessario();
     this.carregarDestino()
       .then(() => this.iniciarBuscaVoos())
       .catch(erro => this.mostrarErro('Erro ao carregar destino. Tente selecionar novamente.'));
@@ -53,158 +64,253 @@ const BENETRIP_VOOS = {
   },
 
   resetState() {
-      this.destino = null; // Adicionado para garantir limpeza
-      this.searchId = null;
-      this.currencyRates = null;
-      this.estaCarregando = true;
-      this.isPolling = false;
-      this.pollingAttempts = 0;
+    // Reset completo de todos os estados
+    this.destino = null;
+    this.searchId = null;
+    this.currencyRates = null;
+    this.estaCarregando = true;
+    this.isPolling = false;
+    this.pollingAttempts = 0;
+    
+    // Limpar temporizadores existentes
+    this.limparTemporizadores();
+    
+    // Reset de dados acumulados
+    this.accumulatedProposals = [];
+    this.accumulatedAirlines = {};
+    this.accumulatedAirports = {};
+    this.accumulatedGatesInfo = {};
+    this.accumulatedMeta = {};
+    this.finalResults = null;
+    
+    // Reset de estados de erro e seleção
+    this.temErro = false;
+    this.mensagemErro = '';
+    this.vooSelecionado = null;
+    this.vooAtivo = null;
+    this.indexVooAtivo = 0;
+    
+    // Limpar cache de dados
+    this.dadosUsuarioCache = null;
+  },
+  
+  limparTemporizadores() {
+    // Função auxiliar para limpar todos os temporizadores de forma segura
+    if (this.pollingIntervalId) {
+      clearInterval(this.pollingIntervalId);
       this.pollingIntervalId = null;
+    }
+    
+    if (this.initialWaitTimeoutId) {
+      clearTimeout(this.initialWaitTimeoutId);
       this.initialWaitTimeoutId = null;
+    }
+    
+    if (this.timeoutId) {
+      clearTimeout(this.timeoutId);
       this.timeoutId = null;
-      this.accumulatedProposals = [];
-      this.accumulatedAirlines = {};
-      this.accumulatedAirports = {};
-      this.accumulatedGatesInfo = {};
-      this.accumulatedMeta = {};
-      this.finalResults = null;
-      this.temErro = false;
-      this.mensagemErro = '';
-      this.vooSelecionado = null;
-      this.vooAtivo = null;
-      this.indexVooAtivo = 0;
+    }
+    
+    if (this.scrollTimeoutId) {
+      clearTimeout(this.scrollTimeoutId);
+      this.scrollTimeoutId = null;
+    }
+  },
+
+  criarToastContainerSeNecessario() {
+    if (!document.getElementById('toast-container')) {
+      const toastContainer = document.createElement('div');
+      toastContainer.id = 'toast-container';
+      toastContainer.className = 'toast-container';
+      document.body.appendChild(toastContainer);
+    }
   },
 
   configurarEventos() {
-    // Delegação de evento global
+    // Delegação de evento global com tratamento de erros
     document.addEventListener('click', (event) => {
-      const target = event.target;
-
-      // Botão de detalhes do voo
-      const btnDetalhes = target.closest('.btn-detalhes-voo');
-      if (btnDetalhes) {
-        const vooId = btnDetalhes.dataset.vooId;
-        if (vooId) this.mostrarDetalhesVoo(vooId);
-        return;
-      }
-
-      // Botão Tentar Novamente (em caso de erro)
-      const btnTentar = target.closest('.btn-tentar-novamente');
-      if (btnTentar) {
-        window.location.reload(); // Recarrega a página para reiniciar
-        return;
-      }
-
-      // Botões em "Sem Resultados"
-      const semResultadosContainer = target.closest('.sem-resultados-container');
-      if(semResultadosContainer) {
-          if (target.closest('.btn-secundario')) { window.location.href = 'index.html'; return; }
-          if (target.closest('.btn-principal')) { window.location.href = 'destinos.html'; return; }
-      }
-
-       // Clique no card de voo
-       const vooCard = target.closest('.voo-card');
-       // Usa finalResults agora
-       if (vooCard && this.finalResults && this.finalResults.proposals.length > 0) {
-           const vooId = vooCard.dataset.vooId;
-           if (vooId) {
-               this.selecionarVoo(vooId);
-           }
-       }
-
-      // Botão de selecionar voo (botão fixo no rodapé)
-      if (target.closest('.btn-selecionar-voo')) {
-        if (this.vooSelecionado) {
-          this.mostrarConfirmacaoSelecao(this.vooSelecionado);
-        } else if (this.vooAtivo) {
-          this.selecionarVooAtivo(); // Seleciona o ativo
-           if (this.vooSelecionado) { // Verifica se a seleção funcionou
-               this.mostrarConfirmacaoSelecao(this.vooSelecionado);
-           }
-        } else {
-          this.exibirToast('Deslize e escolha um voo primeiro', 'warning');
+      try {
+        const target = event.target;
+        
+        // Botão de detalhes do voo
+        const btnDetalhes = target.closest('.btn-detalhes-voo');
+        if (btnDetalhes) {
+          const vooId = btnDetalhes.dataset.vooId;
+          if (vooId) this.mostrarDetalhesVoo(vooId);
+          return;
         }
-        return;
+
+        // Botão Tentar Novamente (em caso de erro)
+        const btnTentar = target.closest('.btn-tentar-novamente');
+        if (btnTentar) {
+          window.location.reload();
+          return;
+        }
+
+        // Botões em "Sem Resultados"
+        const semResultadosContainer = target.closest('.sem-resultados-container');
+        if (semResultadosContainer) {
+          if (target.closest('.btn-secundario')) { 
+            window.location.href = 'index.html'; 
+            return; 
+          }
+          if (target.closest('.btn-principal')) { 
+            window.location.href = 'destinos.html'; 
+            return; 
+          }
+        }
+
+        // Clique no card de voo
+        const vooCard = target.closest('.voo-card');
+        if (vooCard && this.finalResults?.proposals?.length > 0) {
+          const vooId = vooCard.dataset.vooId;
+          if (vooId) {
+            this.selecionarVoo(vooId);
+          }
+        }
+
+        // Botão de selecionar voo (botão fixo no rodapé)
+        if (target.closest('.btn-selecionar-voo')) {
+          if (this.vooSelecionado) {
+            this.mostrarConfirmacaoSelecao(this.vooSelecionado);
+          } else if (this.vooAtivo) {
+            this.selecionarVooAtivo();
+            if (this.vooSelecionado) {
+              this.mostrarConfirmacaoSelecao(this.vooSelecionado);
+            }
+          } else {
+            this.exibirToast('Deslize e escolha um voo primeiro', 'warning');
+          }
+          return;
+        }
+      } catch (erro) {
+        console.error('Erro ao processar evento de clique:', erro);
+        this.reportarErro({
+          tipo: 'erro_evento_clique',
+          mensagem: erro.message,
+          timestamp: new Date().toISOString()
+        });
       }
     });
 
     // Listener de teclas para navegação
     document.addEventListener('keydown', (e) => {
-      // Usa finalResults
-      if (this.finalResults && this.finalResults.proposals && this.finalResults.proposals.length > 0) {
-        if (e.key === 'ArrowRight') { this.proximoVoo(); e.preventDefault(); }
-        else if (e.key === 'ArrowLeft') { this.vooAnterior(); e.preventDefault(); }
-        else if (e.key === 'Enter') { this.selecionarVooAtivo(); e.preventDefault(); }
+      try {
+        if (this.finalResults?.proposals?.length > 0) {
+          if (e.key === 'ArrowRight') { 
+            this.proximoVoo(); 
+            e.preventDefault(); 
+          } else if (e.key === 'ArrowLeft') { 
+            this.vooAnterior(); 
+            e.preventDefault(); 
+          } else if (e.key === 'Enter') { 
+            this.selecionarVooAtivo(); 
+            e.preventDefault(); 
+          }
+        }
+      } catch (erro) {
+        console.error('Erro ao processar evento de teclado:', erro);
+        this.reportarErro({
+          tipo: 'erro_evento_teclado',
+          mensagem: erro.message,
+          timestamp: new Date().toISOString()
+        });
       }
     });
   },
 
   async carregarDestino() {
     try {
-        let destinoString = localStorage.getItem('benetrip_destino_selecionado');
-        if (!destinoString) {
-            destinoString = localStorage.getItem('benetrip_destino_escolhido') || localStorage.getItem('benetrip_destino');
+      // Tenta carregar destino de diferentes fontes
+      let destinoString = localStorage.getItem('benetrip_destino_selecionado');
+      if (!destinoString) {
+        destinoString = localStorage.getItem('benetrip_destino_escolhido') || localStorage.getItem('benetrip_destino');
+      }
+      
+      if (!destinoString) {
+        // Se não encontrou no localStorage, tenta usar dados do usuário
+        const dadosUsuario = this.carregarDadosUsuario();
+        if (dadosUsuario?.fluxo === 'destino_conhecido' && dadosUsuario?.respostas?.destino_conhecido) {
+          this.destino = dadosUsuario.respostas.destino_conhecido;
+          
+          // Processa o objeto ou string de destino
+          if (typeof this.destino === 'string') {
+            const codigoExtraido = this.extrairCodigoIATA(this.destino);
+            this.destino = { destino: this.destino, codigo_iata: codigoExtraido };
+          } else if (!this.destino.codigo_iata) {
+            this.destino.codigo_iata = this.extrairCodigoIATA(this.destino.destino || this.destino.nome);
+          }
+          
+          if (!this.destino.codigo_iata) {
+            throw new Error('Código IATA do destino não encontrado nos dados do usuário.');
+          }
+          
+          console.log('Destino carregado dos dados do usuário:', this.destino);
+          return true;
         }
-        if (!destinoString) {
-            const dadosUsuario = this.carregarDadosUsuario();
-            if (dadosUsuario?.fluxo === 'destino_conhecido' && dadosUsuario?.respostas?.destino_conhecido) {
-                this.destino = dadosUsuario.respostas.destino_conhecido;
-                if (typeof this.destino === 'string') {
-                    const codigoExtraido = this.extrairCodigoIATA(this.destino);
-                    this.destino = { destino: this.destino, codigo_iata: codigoExtraido };
-                } else if (!this.destino.codigo_iata) {
-                    this.destino.codigo_iata = this.extrairCodigoIATA(this.destino.destino || this.destino.nome);
-                }
-                if (!this.destino.codigo_iata) throw new Error('Código IATA do destino não encontrado nos dados do usuário.');
-                console.log('Destino carregado dos dados do usuário:', this.destino);
-                return true;
-            }
-            throw new Error('Nenhum destino selecionado');
+        throw new Error('Nenhum destino selecionado');
+      }
+      
+      // Processa o destino do localStorage
+      this.destino = JSON.parse(destinoString);
+      console.log('Destino carregado do localStorage:', this.destino);
+      
+      // Garante que o código IATA está presente
+      if (!this.destino.codigo_iata) {
+        if (this.destino.aeroporto?.codigo) {
+          this.destino.codigo_iata = this.destino.aeroporto.codigo;
+        } else {
+          const codigoExtraido = this.extrairCodigoIATA(this.destino.destino || this.destino.nome);
+          if (codigoExtraido) {
+            this.destino.codigo_iata = codigoExtraido;
+            console.log(`Código IATA extraído: ${codigoExtraido}`);
+          } else {
+            throw new Error('Código IATA do destino não encontrado');
+          }
         }
-        this.destino = JSON.parse(destinoString);
-        console.log('Destino carregado do localStorage:', this.destino);
-        if (!this.destino.codigo_iata && this.destino.aeroporto?.codigo) {
-            this.destino.codigo_iata = this.destino.aeroporto.codigo;
-        }
-        if (!this.destino.codigo_iata) {
-            const codigoExtraido = this.extrairCodigoIATA(this.destino.destino || this.destino.nome);
-            if (codigoExtraido) {
-                this.destino.codigo_iata = codigoExtraido;
-                console.log(`Código IATA extraído: ${codigoExtraido}`);
-            } else {
-                throw new Error('Código IATA do destino não encontrado');
-            }
-        }
-        return true;
+      }
+      
+      return true;
     } catch (erro) {
-        console.error('Erro ao carregar destino:', erro);
-        throw erro;
+      console.error('Erro ao carregar destino:', erro);
+      throw erro;
     }
   },
 
   extrairCodigoIATA(texto) {
     if (!texto || typeof texto !== 'string') return null;
+    
+    // Tenta extrair o código IATA de um formato como "Cidade (XXX)"
     const match = texto.match(/\(([A-Z]{3})\)/);
     if (match && match[1]) return match[1];
-    const mapeamento = {'paris': 'CDG', 'londres': 'LHR', 'nova york': 'JFK', 'nova iorque': 'JFK', 'tokyo': 'HND', 
-                      'tóquio': 'HND', 'madrid': 'MAD', 'roma': 'FCO', 'berlim': 'BER', 'amsterdam': 'AMS', 
-                      'dubai': 'DXB', 'bangkok': 'BKK', 'sidney': 'SYD', 'sydney': 'SYD', 'los angeles': 'LAX', 
-                      'miami': 'MIA', 'cancun': 'CUN', 'cidade do méxico': 'MEX'};
+    
+    // Se não encontrou pelo formato parenteses, busca no mapeamento de cidades
     const textoLower = texto.toLowerCase();
-    for (const [cidade, codigo] of Object.entries(mapeamento)) {
-        if (textoLower.includes(cidade)) return codigo;
+    for (const [cidade, codigo] of Object.entries(this.IATA_MAP)) {
+      if (textoLower.includes(cidade)) return codigo;
     }
+    
     return null;
   },
 
   async iniciarBuscaVoos() {
     try {
-      if (!this.destino || !this.destino.codigo_iata) throw new Error('Dados do destino incompletos.');
+      // Verifica dados do destino
+      if (!this.destino || !this.destino.codigo_iata) {
+        throw new Error('Dados do destino incompletos.');
+      }
+      
+      // Carrega dados do usuário e verifica datas
       const dadosUsuario = this.carregarDadosUsuario();
       const datas = dadosUsuario?.respostas?.datas;
-      if (!datas || !datas.dataIda) throw new Error('Datas de viagem não disponíveis.');
+      if (!datas || !datas.dataIda) {
+        throw new Error('Datas de viagem não disponíveis.');
+      }
+      
+      // Obtém código de origem
       const origemIATA = this.obterCodigoIATAOrigem(dadosUsuario);
 
+      // Prepara parâmetros de busca
       const params = {
         origem: origemIATA,
         destino: this.destino.codigo_iata,
@@ -217,8 +323,11 @@ const BENETRIP_VOOS = {
         locale: "en"
       };
 
+      // Valida parâmetros
       const validacao = this.validarDadosParaBusca(params);
-      if (!validacao.valido) throw new Error(`Dados inválidos: ${validacao.mensagens.join(", ")}`);
+      if (!validacao.valido) {
+        throw new Error(`Dados inválidos: ${validacao.mensagens.join(", ")}`);
+      }
 
       console.log('Iniciando busca com parâmetros:', params);
       this.resetState(); // Limpa estado anterior antes de nova busca
@@ -241,16 +350,15 @@ const BENETRIP_VOOS = {
         body: JSON.stringify(params)
       });
 
+      // Processa resposta como JSON, com fallback para texto em caso de erro
       const dados = await resposta.json().catch(async () => {
-          // Tenta ler como texto se não for JSON
-          const textError = await resposta.text();
-          throw new Error(`Resposta não JSON do servidor (${resposta.status}): ${textError.substring(0,150)}`);
+        const textError = await resposta.text();
+        throw new Error(`Resposta não JSON do servidor (${resposta.status}): ${textError.substring(0,150)}`);
       });
 
-
+      // Verifica erros na resposta
       if (!resposta.ok || (resposta.status === 202 && !dados.search_id)) {
-         // Trata erros 4xx/5xx ou 202 inesperado sem search_id
-         throw new Error(dados.error || dados.details?.error || dados.message || `Erro ${resposta.status} ao iniciar busca.`);
+        throw new Error(dados.error || dados.details?.error || dados.message || `Erro ${resposta.status} ao iniciar busca.`);
       }
 
       // Sucesso ao iniciar (Status 202 com search_id)
@@ -261,8 +369,8 @@ const BENETRIP_VOOS = {
       // Agenda início do polling após espera
       this.atualizarProgresso('Busca iniciada. Aguardando primeiros resultados...', 15);
       this.initialWaitTimeoutId = setTimeout(() => {
-          console.log('Tempo de espera inicial concluído. Iniciando polling...');
-          this.iniciarPollingFrontend();
+        console.log('Tempo de espera inicial concluído. Iniciando polling...');
+        this.iniciarPollingFrontend();
       }, this.INITIAL_WAIT_MS);
 
     } catch (erro) {
@@ -273,56 +381,99 @@ const BENETRIP_VOOS = {
 
   validarDadosParaBusca(params) {
     const mensagensErro = [];
+    
+    // Verifica campos obrigatórios
     if (!params.origem) mensagensErro.push("Origem não especificada");
     if (!params.destino) mensagensErro.push("Destino não especificado");
     if (!params.dataIda) mensagensErro.push("Data de ida não especificada");
+    
+    // Validações de formato
     const regexIATA = /^[A-Z]{3}$/;
     const regexData = /^\d{4}-\d{2}-\d{2}$/;
+    
+    // Valida formatos
     if (params.origem && !regexIATA.test(params.origem)) mensagensErro.push("Formato de origem inválido");
     if (params.destino && !regexIATA.test(params.destino)) mensagensErro.push("Formato de destino inválido");
     if (params.dataIda && !regexData.test(params.dataIda)) mensagensErro.push("Formato de data de ida inválido");
     if (params.dataVolta && !regexData.test(params.dataVolta)) mensagensErro.push("Formato de data de volta inválido");
+    
+    // Valida número de passageiros
     if (!params.adultos || params.adultos < 1) mensagensErro.push("Número de adultos deve ser pelo menos 1");
-    return { valido: mensagensErro.length === 0, mensagens: mensagensErro };
+    
+    return { 
+      valido: mensagensErro.length === 0, 
+      mensagens: mensagensErro 
+    };
   },
 
   iniciarPollingFrontend() {
     console.log(`Iniciando polling para searchId: ${this.searchId}`);
+    
+    // Limpa temporizadores anteriores
     if (this.pollingIntervalId) clearInterval(this.pollingIntervalId);
-    if (this.initialWaitTimeoutId) { clearTimeout(this.initialWaitTimeoutId); this.initialWaitTimeoutId = null; }
+    if (this.initialWaitTimeoutId) { 
+      clearTimeout(this.initialWaitTimeoutId); 
+      this.initialWaitTimeoutId = null; 
+    }
 
+    // Configura estado de polling
     this.isPolling = true;
     this.pollingAttempts = 0;
     this.atualizarProgresso('Procurando as melhores conexões...', 20);
 
-    // Inicia intervalo
+    // Inicia intervalo de polling
     this.pollingIntervalId = setInterval(() => this.verificarResultadosPolling(), this.POLLING_INTERVAL_MS);
+    
     // Chama imediatamente a primeira vez
     this.verificarResultadosPolling();
   },
 
   pararPolling() {
     console.log('Parando polling e timeouts.');
-    if (this.pollingIntervalId) { clearInterval(this.pollingIntervalId); this.pollingIntervalId = null; }
-    if (this.initialWaitTimeoutId) { clearTimeout(this.initialWaitTimeoutId); this.initialWaitTimeoutId = null; }
-    if (this.timeoutId) { clearTimeout(this.timeoutId); this.timeoutId = null; }
+    
+    // Limpa todos os temporizadores
+    if (this.pollingIntervalId) { 
+      clearInterval(this.pollingIntervalId); 
+      this.pollingIntervalId = null; 
+    }
+    
+    if (this.initialWaitTimeoutId) { 
+      clearTimeout(this.initialWaitTimeoutId); 
+      this.initialWaitTimeoutId = null; 
+    }
+    
+    if (this.timeoutId) { 
+      clearTimeout(this.timeoutId); 
+      this.timeoutId = null; 
+    }
+    
+    // Garante que o estado de polling é atualizado
     this.isPolling = false;
   },
 
-  // Função principal de polling com TRATAMENTO EXPANDIDO para processar chunks
   async verificarResultadosPolling() {
     if (!this.isPolling) return;
 
     this.pollingAttempts++;
     console.log(`Polling Chunks: Tentativa ${this.pollingAttempts}/${this.MAX_POLLING_ATTEMPTS}`);
 
-    // Atualiza UI (mantido)
-    const mensagens = ['Buscando voos...', 'Verificando tarifas...', 'Analisando conexões...', 'Consultando Cias...', 'Quase lá...'];
-    const msgIdx = Math.min(Math.floor(this.pollingAttempts / (this.MAX_POLLING_ATTEMPTS / mensagens.length)), mensagens.length - 1);
+    // Atualiza UI com mensagens variadas baseadas no progresso
+    const mensagens = [
+      'Buscando voos...', 
+      'Verificando tarifas...', 
+      'Analisando conexões...', 
+      'Consultando companhias...', 
+      'Quase lá...'
+    ];
+    const msgIdx = Math.min(
+      Math.floor(this.pollingAttempts / (this.MAX_POLLING_ATTEMPTS / mensagens.length)), 
+      mensagens.length - 1
+    );
     const progresso = 20 + Math.min(75, (this.pollingAttempts / this.MAX_POLLING_ATTEMPTS) * 75);
+    
     this.atualizarProgresso(`${mensagens[msgIdx]} (${this.pollingAttempts})`, progresso);
 
-    // Verifica limite (mantido)
+    // Verifica limite de tentativas
     if (this.pollingAttempts > this.MAX_POLLING_ATTEMPTS) {
       this.pararPolling();
       this.mostrarErro('A busca demorou mais que o esperado.');
@@ -335,192 +486,301 @@ const BENETRIP_VOOS = {
 
       // --- Processamento da Resposta (Chunk) ---
       if (!resposta.ok) {
-          // Trata erros HTTP (mantido)
-          const errorData = await resposta.json().catch(() => ({ error: `Erro ${resposta.status} (resposta não JSON)` }));
-          const errorMessage = errorData.error || `Erro ${resposta.status}.`;
-          console.error(`Erro no polling (HTTP ${resposta.status}):`, errorMessage, errorData);
-          if (resposta.status === 404) { this.pararPolling(); this.mostrarErro('Busca expirou/inválida.'); }
-          else if (this.pollingAttempts > this.MAX_POLLING_ATTEMPTS - 5) { this.pararPolling(); this.mostrarErro(errorMessage); }
-          return;
+        // Trata erros HTTP
+        const errorData = await resposta.json()
+          .catch(() => ({ error: `Erro ${resposta.status} (resposta não JSON)` }));
+          
+        const errorMessage = errorData.error || `Erro ${resposta.status}.`;
+        console.error(`Erro no polling (HTTP ${resposta.status}):`, errorMessage, errorData);
+        
+        if (resposta.status === 404) { 
+          this.pararPolling(); 
+          this.mostrarErro('Busca expirou/inválida.'); 
+        } else if (this.pollingAttempts > this.MAX_POLLING_ATTEMPTS - 5) { 
+          this.pararPolling(); 
+          this.mostrarErro(errorMessage); 
+        }
+        return;
       }
 
+      // Processa a resposta JSON
       const chunkData = await resposta.json();
-      console.log(`Chunk recebido (Tentativa ${this.pollingAttempts}):`, chunkData); // Log do chunk bruto
+      console.log(`Chunk recebido (Tentativa ${this.pollingAttempts}):`, 
+        this.formatarLogChunk(chunkData));
 
-      // --- DIAGNÓSTICO EXPANDIDO: Verifica todos os itens do array ---
+      // --- Diagnóstico: Verifica todos os itens do array ---
       let proposalsTotal = 0;
       let proposalsEmTodosItens = [];
+      
       if (Array.isArray(chunkData)) {
-          console.log(`Analisando array de ${chunkData.length} itens para buscar propostas:`);
-          chunkData.forEach((item, idx) => {
-              if (item && typeof item === 'object') {
-                  // Conta propostas em cada item
-                  const proposalsNoItem = Array.isArray(item.proposals) ? item.proposals.length : 0;
-                  const temSearchId = item.search_id === this.searchId;
-                  
-                  console.log(`Item ${idx}: search_id correto: ${temSearchId ? 'SIM' : 'NÃO'}, Propostas: ${proposalsNoItem}`);
-                  
-                  if (proposalsNoItem > 0) {
-                      // Guarda todas as propostas encontradas em qualquer item
-                      proposalsEmTodosItens.push(...item.proposals);
-                      proposalsTotal += proposalsNoItem;
-                  }
-                  
-                  // Também extrai airlines, airports, gates_info de todos os itens
-                  if (item.airlines) Object.assign(this.accumulatedAirlines, item.airlines);
-                  if (item.airports) Object.assign(this.accumulatedAirports, item.airports);
-                  if (item.gates_info) Object.assign(this.accumulatedGatesInfo, item.gates_info);
-                  if (item.meta) this.accumulatedMeta = { ...this.accumulatedMeta, ...item.meta };
-              }
-          });
-          
-          if (proposalsTotal > 0) {
-              console.log(`!!! ENCONTRADAS ${proposalsTotal} propostas em TODOS os itens do array !!!`);
-              // Acumula todas as propostas encontradas em todos os itens
-              this.accumulatedProposals.push(...proposalsEmTodosItens);
+        console.log(`Analisando array de ${chunkData.length} itens para buscar propostas:`);
+        
+        chunkData.forEach((item, idx) => {
+          if (item && typeof item === 'object') {
+            // Conta propostas em cada item
+            const proposalsNoItem = Array.isArray(item.proposals) ? item.proposals.length : 0;
+            const temSearchId = item.search_id === this.searchId;
+            
+            console.log(`Item ${idx}: search_id correto: ${temSearchId ? 'SIM' : 'NÃO'}, Propostas: ${proposalsNoItem}`);
+            
+            if (proposalsNoItem > 0) {
+              // Guarda todas as propostas encontradas em qualquer item
+              proposalsEmTodosItens.push(...item.proposals);
+              proposalsTotal += proposalsNoItem;
+            }
+            
+            // Extrai dados de referência de todos os itens
+            this.extrairDadosAuxiliares(item);
           }
+        });
+        
+        if (proposalsTotal > 0) {
+          console.log(`!!! ENCONTRADAS ${proposalsTotal} propostas em TODOS os itens do array !!!`);
+          // Acumula todas as propostas encontradas em todos os itens
+          this.accumulatedProposals.push(...proposalsEmTodosItens);
+        }
       }
 
-      // --- AJUSTE: Encontrar o objeto de dados relevante ---
-      let chunkObject = null;
-      if (Array.isArray(chunkData)) {
-          // Procura o objeto no array que contém o search_id esperado
-          chunkObject = chunkData.find(item => item && typeof item === 'object' && item.search_id === this.searchId);
-          if (!chunkObject) {
-              console.warn(`Array recebido, mas nenhum objeto encontrado com search_id ${this.searchId}. Conteúdo:`, chunkData);
-          } else {
-              console.log("Objeto principal do chunk encontrado dentro do array:", chunkObject);
-          }
-      } else if (chunkData && typeof chunkData === 'object') {
-          // Se não for array, assume que é o objeto diretamente
-          if (chunkData.search_id === this.searchId) {
-             chunkObject = chunkData;
-             console.log("Chunk recebido como objeto único:", chunkObject);
-          } else if (Object.keys(chunkData).length === 1 && chunkData.search_id) {
-             console.log('Busca ainda em andamento (resposta apenas com search_id)...');
-          } else {
-             console.warn(`Objeto recebido, mas search_id (${chunkData.search_id}) não corresponde ao esperado (${this.searchId}). Conteúdo:`, chunkData);
-          }
-      } else {
-          console.warn("Chunk recebido com status 200 mas formato inesperado (não array/objeto):", chunkData);
-          return;
-      }
+      // --- Encontrar o objeto de dados relevante ---
+      let chunkObject = this.encontrarObjetoRelevante(chunkData);
 
       // --- Processa o chunkObject SE encontrado ---
       if (chunkObject) {
-          const proposalsInChunk = chunkObject.proposals;
-          const airlinesInChunk = chunkObject.airlines;
-          const airportsInChunk = chunkObject.airports;
-          const gatesInfoInChunk = chunkObject.gates_info;
-          const metaInChunk = chunkObject.meta;
+        const proposalsInChunk = chunkObject.proposals;
+        
+        // Extrai dados de referência
+        this.extrairDadosAuxiliares(chunkObject);
 
-          // Acumula dados de referência
-          if (airlinesInChunk) Object.assign(this.accumulatedAirlines, airlinesInChunk);
-          if (airportsInChunk) Object.assign(this.accumulatedAirports, airportsInChunk);
-          if (gatesInfoInChunk) Object.assign(this.accumulatedGatesInfo, gatesInfoInChunk);
-          if (metaInChunk) this.accumulatedMeta = { ...this.accumulatedMeta, ...metaInChunk };
-
-          // CORREÇÃO CRÍTICA: Um array vazio de proposals só significa fim da busca se:
-          // 1. Não é a primeira tentativa de polling (pollingAttempts > 1) E
-          // 2. Propostas já foram acumuladas anteriormente OU fizemos várias tentativas sem resultados
-          if (proposalsInChunk && Array.isArray(proposalsInChunk)) {
-              if (proposalsInChunk.length > 0) {
-                  // --- Propostas encontradas no objeto principal: acumula e continua ---
-                  // Nota: As propostas de outros itens do array já foram acumuladas acima
-                  console.log(`Acumulando ${proposalsInChunk.length} propostas do objeto principal com search_id. Total acumulado: ${this.accumulatedProposals.length + proposalsInChunk.length}`);
-                  this.accumulatedProposals.push(...proposalsInChunk);
-              } else if (proposalsInChunk.length === 0) {
-                  // --- Objeto principal tem proposals vazio: é fim da busca ou primeira tentativa? ---
-                  const ehFimDaBusca = 
-                      // Não é primeira tentativa E (já temos propostas OU várias tentativas sem resultado)
-                      (this.pollingAttempts > 1 && (this.accumulatedProposals.length > 0 || this.pollingAttempts >= 5)) ||
-                      // OU é 1ª tentativa mas encontramos propostas em outros objetos do array
-                      (this.pollingAttempts === 1 && proposalsTotal > 0);
-                  
-                  if (ehFimDaBusca) {
-                      // --- É O FIM REAL DA BUSCA ---
-                      console.log(`Polling concluído! (Array proposals vazio é realmente o fim na tentativa ${this.pollingAttempts})`);
-                      this.pararPolling();
-                      this.estaCarregando = false;
-                      this.atualizarProgresso('Finalizando...', 100);
-
-                      // Monta o objeto final de resultados
-                      this.finalResults = {
-                          proposals: this.accumulatedProposals,
-                          airlines: this.accumulatedAirlines,
-                          airports: this.accumulatedAirports,
-                          gates_info: this.accumulatedGatesInfo,
-                          meta: this.accumulatedMeta,
-                          search_id: this.searchId,
-                          segments: chunkObject.segments,
-                          market: chunkObject.market
-                      };
-
-                      // Pré-processa as propostas acumuladas
-                      this.finalResults.proposals = this.preprocessarPropostas(this.finalResults.proposals);
-
-                      if (this.finalResults.proposals.length > 0) {
-                          this.exibirToast(`${this.finalResults.proposals.length} voos encontrados! ✈️`, 'success');
-                          console.log("Resultados finais montados:", this.finalResults);
-                      } else {
-                          console.log('Busca concluída sem resultados acumulados.');
-                          this.exibirToast('Não encontramos voos disponíveis.', 'warning');
-                      }
-                      this.renderizarInterface();
-                  } else {
-                      // --- NÃO É O FIM AINDA: Continua polling ---
-                      console.log(`Array proposals vazio na tentativa ${this.pollingAttempts}, mas NÃO é o fim: ${this.pollingAttempts === 1 ? "É a 1ª tentativa" : "Ainda não temos propostas suficientes"}. Continuando polling...`);
-                  }
+        // CORREÇÃO CRÍTICA: Um array vazio de proposals só significa fim da busca se:
+        // 1. Não é a primeira tentativa de polling (pollingAttempts > 1) E
+        // 2. Propostas já foram acumuladas anteriormente OU fizemos várias tentativas sem resultados
+        if (proposalsInChunk && Array.isArray(proposalsInChunk)) {
+          if (proposalsInChunk.length > 0) {
+            // --- Propostas encontradas no objeto principal: acumula e continua ---
+            console.log(`Acumulando ${proposalsInChunk.length} propostas do objeto principal com search_id. ` +
+              `Total acumulado: ${this.accumulatedProposals.length + proposalsInChunk.length}`);
+            this.accumulatedProposals.push(...proposalsInChunk);
+          } else if (proposalsInChunk.length === 0) {
+            // --- Objeto principal tem proposals vazio: é fim da busca ou primeira tentativa? ---
+            const ehFimDaBusca = 
+              // Não é primeira tentativa E (já temos propostas OU várias tentativas sem resultado)
+              (this.pollingAttempts > 1 && (this.accumulatedProposals.length > 0 || this.pollingAttempts >= 5)) ||
+              // OU é 1ª tentativa mas encontramos propostas em outros objetos do array
+              (this.pollingAttempts === 1 && proposalsTotal > 0);
+            
+            if (ehFimDaBusca) {
+              // --- É O FIM REAL DA BUSCA ---
+              console.log(`Polling concluído! (Array proposals vazio é realmente o fim na tentativa ${this.pollingAttempts})`);
+              
+              // CORREÇÃO: Garantir limpeza completa do estado de polling
+              this.pararPolling();
+              this.isPolling = false;
+              this.estaCarregando = false;
+              
+              // Limpar qualquer temporizador residual
+              if (this.pollingIntervalId) {
+                clearInterval(this.pollingIntervalId);
+                this.pollingIntervalId = null;
               }
-          } else {
-              console.warn(`Chunk object encontrado, mas 'proposals' não é um array ou está ausente. Conteúdo do chunkObject:`, chunkObject);
+              
+              this.atualizarProgresso('Finalizando...', 100);
+
+              // Monta o objeto final de resultados
+              this.finalResults = this.montarResultadosFinais(chunkObject);
+
+              // Pré-processa as propostas acumuladas
+              this.finalResults.proposals = this.preprocessarPropostas(this.finalResults.proposals);
+
+              if (this.finalResults.proposals.length > 0) {
+                this.exibirToast(`${this.finalResults.proposals.length} voos encontrados! ✈️`, 'success');
+                console.log("Resultados finais montados:", 
+                  this.formatarLogResultados(this.finalResults));
+              } else {
+                console.log('Busca concluída sem resultados acumulados.');
+                this.exibirToast('Não encontramos voos disponíveis.', 'warning');
+              }
+              
+              this.renderizarInterface();
+            } else {
+              // --- NÃO É O FIM AINDA: Continua polling ---
+              console.log(`Array proposals vazio na tentativa ${this.pollingAttempts}, mas NÃO é o fim: ` +
+                `${this.pollingAttempts === 1 ? "É a 1ª tentativa" : "Ainda não temos propostas suficientes"}. ` +
+                `Continuando polling...`);
+            }
           }
+        } else {
+          console.warn(`Chunk object encontrado, mas 'proposals' não é um array ou está ausente. ` +
+            `Conteúdo do chunkObject:`, this.formatarLogChunk(chunkObject));
+        }
       } else {
-          console.log(`Nenhum objeto de dados principal encontrado na tentativa ${this.pollingAttempts}. Continuando polling...`);
+        console.log(`Nenhum objeto de dados principal encontrado na tentativa ${this.pollingAttempts}. ` +
+          `Continuando polling...`);
       }
 
     } catch (erro) {
       console.error('Erro durante o polling ou processamento do chunk:', erro);
+      
+      // Se já tentamos muitas vezes, desiste
       if (this.pollingAttempts > this.MAX_POLLING_ATTEMPTS - 5) {
-          this.pararPolling();
-          this.mostrarErro('Erro ao verificar resultados. Verifique sua conexão.');
+        this.pararPolling();
+        this.mostrarErro('Erro ao verificar resultados. Verifique sua conexão.');
       }
+      
+      // Reporta o erro
+      this.reportarErro({
+        tipo: 'erro_polling',
+        mensagem: erro.message,
+        tentativa: this.pollingAttempts,
+        timestamp: new Date().toISOString()
+      });
     }
   },
 
+  formatarLogChunk(chunk) {
+    // Reduz tamanho dos logs para melhorar performance e legibilidade
+    if (!chunk) return null;
+    if (Array.isArray(chunk)) {
+      return `[Array com ${chunk.length} itens]`;
+    }
+    if (typeof chunk === 'object') {
+      const { proposals, ...resto } = chunk;
+      return {
+        ...resto,
+        proposals: proposals ? `[Array com ${proposals.length} propostas]` : null
+      };
+    }
+    return chunk;
+  },
+  
+  formatarLogResultados(resultados) {
+    if (!resultados) return null;
+    
+    return {
+      proposals: `[Array com ${resultados.proposals?.length || 0} propostas]`,
+      airlines: Object.keys(resultados.airlines || {}).length + ' companhias',
+      airports: Object.keys(resultados.airports || {}).length + ' aeroportos',
+      search_id: resultados.search_id
+    };
+  },
+  
+  extrairDadosAuxiliares(item) {
+    if (!item || typeof item !== 'object') return;
+    
+    // Extrai dados de referência
+    if (item.airlines) Object.assign(this.accumulatedAirlines, item.airlines);
+    if (item.airports) Object.assign(this.accumulatedAirports, item.airports);
+    if (item.gates_info) Object.assign(this.accumulatedGatesInfo, item.gates_info);
+    if (item.meta) this.accumulatedMeta = { ...this.accumulatedMeta, ...item.meta };
+  },
+  
+  encontrarObjetoRelevante(chunkData) {
+    if (!chunkData) return null;
+    
+    if (Array.isArray(chunkData)) {
+      // Procura o objeto no array que contém o search_id esperado
+      const objRelevante = chunkData.find(item => 
+        item && typeof item === 'object' && item.search_id === this.searchId);
+        
+      if (!objRelevante) {
+        console.warn(`Array recebido, mas nenhum objeto encontrado com search_id ${this.searchId}`);
+      } else {
+        console.log("Objeto principal do chunk encontrado dentro do array");
+      }
+      
+      return objRelevante;
+    } else if (chunkData && typeof chunkData === 'object') {
+      // Se não for array, assume que é o objeto diretamente
+      if (chunkData.search_id === this.searchId) {
+        console.log("Chunk recebido como objeto único");
+        return chunkData;
+      } else if (Object.keys(chunkData).length === 1 && chunkData.search_id) {
+        console.log('Busca ainda em andamento (resposta apenas com search_id)...');
+      } else {
+        console.warn(`Objeto recebido, mas search_id (${chunkData.search_id}) ` +
+          `não corresponde ao esperado (${this.searchId})`);
+      }
+    } else {
+      console.warn("Chunk recebido com status 200 mas formato inesperado (não array/objeto)");
+    }
+    
+    return null;
+  },
+  
+  montarResultadosFinais(chunkObject) {
+    return {
+      proposals: this.accumulatedProposals,
+      airlines: this.accumulatedAirlines,
+      airports: this.accumulatedAirports,
+      gates_info: this.accumulatedGatesInfo,
+      meta: this.accumulatedMeta,
+      search_id: this.searchId,
+      segments: chunkObject.segments || [],
+      market: chunkObject.market || ''
+    };
+  },
+
   preprocessarPropostas(propostas) {
-      if (!propostas || !Array.isArray(propostas)) return [];
-      console.log(`Pré-processando ${propostas.length} propostas acumuladas...`);
-      // Ordena por preço (menor primeiro)
-      propostas.sort((a, b) => this.obterPrecoVoo(a) - this.obterPrecoVoo(b));
-      // Adiciona informações calculadas
-      return propostas.map((proposta, index) => {
-          proposta._melhorPreco = (index === 0);
-          const precoAtual = this.obterPrecoVoo(proposta);
-          const precoMedio = precoAtual * (1 + (Math.random() * 0.25));
-          proposta._economia = Math.max(0, Math.round(((precoMedio - precoAtual) / precoMedio) * 100)); // Garante não negativo
-          proposta._assentosDisponiveis = Math.floor(Math.random() * 8) + 1;
-          return proposta;
-      });
+    if (!propostas || !Array.isArray(propostas) || propostas.length === 0) return [];
+    
+    console.log(`Pré-processando ${propostas.length} propostas acumuladas...`);
+    
+    // Ordena por preço (menor primeiro)
+    const propostasValidas = propostas.filter(p => p && typeof p === 'object');
+    propostasValidas.sort((a, b) => this.obterPrecoVoo(a) - this.obterPrecoVoo(b));
+    
+    // Adiciona informações calculadas
+    return propostasValidas.map((proposta, index) => {
+      // Atribui propriedades adicionais para uso na interface
+      proposta._melhorPreco = (index === 0);
+      
+      // Calcula economia baseada em uma variação aleatória do preço médio
+      const precoAtual = this.obterPrecoVoo(proposta);
+      const precoMedio = precoAtual * (1 + (Math.random() * 0.25));
+      proposta._economia = Math.max(0, Math.round(((precoMedio - precoAtual) / precoMedio) * 100));
+      
+      // Simula assentos disponíveis (para fins de UI)
+      proposta._assentosDisponiveis = Math.floor(Math.random() * 8) + 1;
+      
+      return proposta;
+    });
   },
 
   atualizarProgresso(mensagem, porcentagem) {
-    const bar = document.querySelector('.progress-bar');
-    const text = document.querySelector('.loading-text');
-    if (bar) { bar.style.width = `${porcentagem}%`; bar.setAttribute('aria-valuenow', porcentagem); }
-    if (text) { text.textContent = mensagem; }
+    // Procura elementos apenas uma vez e atualiza em batch
+    requestAnimationFrame(() => {
+      const bar = document.querySelector('.progress-bar');
+      const text = document.querySelector('.loading-text');
+      
+      if (bar) { 
+        bar.style.width = `${porcentagem}%`; 
+        bar.setAttribute('aria-valuenow', porcentagem); 
+      }
+      
+      if (text) { 
+        text.textContent = mensagem; 
+      }
+    });
   },
 
   renderizarInterface() {
     try {
       const container = document.getElementById('voos-container');
-      if (!container) { console.error('Container não encontrado'); return; }
+      if (!container) { 
+        console.error('Container não encontrado'); 
+        return; 
+      }
 
+      // Preserva o header se existir
       const headerExistente = container.querySelector('.app-header');
       container.innerHTML = '';
-      if (headerExistente) container.appendChild(headerExistente);
-      else this.renderizarHeader(container);
+      
+      if (headerExistente) {
+        container.appendChild(headerExistente);
+      } else {
+        this.renderizarHeader(container);
+      }
 
+      // Decide qual estado renderizar
       if (this.estaCarregando) {
         this.renderizarCarregamento(container);
       } else if (this.temErro) {
@@ -528,60 +788,112 @@ const BENETRIP_VOOS = {
       } else if (!this.finalResults || !this.finalResults.proposals || this.finalResults.proposals.length === 0) {
         this.renderizarSemResultados(container);
       } else {
-        const mainContent = document.createElement('main');
-        mainContent.className = 'voos-content';
-        container.appendChild(mainContent);
-
-        this.renderizarResumoViagem(mainContent);
-        this.renderizarListaVoos(mainContent);
-        this.renderizarBotaoSelecao(container);
-
-        if (!container.querySelector('#swipe-hint')) this.renderizarSwipeHint(container);
-        this.configurarEventosAposRenderizacao();
-
-        // Seleciona primeiro voo
-        const primeiroVoo = this.finalResults.proposals[0];
-        if (primeiroVoo) {
-          this.vooAtivo = primeiroVoo;
-          this.indexVooAtivo = 0;
-          this.atualizarVooAtivo();
-        }
+        this.renderizarResultados(container);
       }
     } catch (erro) {
       console.error('Erro ao renderizar interface:', erro);
-       if (container) {
-           container.innerHTML = '';
-           this.renderizarHeader(container);
-           this.mensagemErro = 'Ocorreu um erro ao exibir os voos.';
-           this.renderizarErro(container);
-       }
+      
+      // Tenta renderizar tela de erro de forma robusta
+      const container = document.getElementById('voos-container');
+      if (container) {
+        container.innerHTML = '';
+        this.renderizarHeader(container);
+        this.mensagemErro = 'Ocorreu um erro ao exibir os voos.';
+        this.renderizarErro(container);
+      }
+      
+      // Reporta o erro
+      this.reportarErro({
+        tipo: 'erro_renderizacao_interface',
+        mensagem: erro.message,
+        timestamp: new Date().toISOString()
+      });
+    }
+  },
+  
+  renderizarResultados(container) {
+    const mainContent = document.createElement('main');
+    mainContent.className = 'voos-content';
+    container.appendChild(mainContent);
+
+    this.renderizarResumoViagem(mainContent);
+    this.renderizarListaVoos(mainContent);
+    this.renderizarBotaoSelecao(container);
+
+    if (!container.querySelector('#swipe-hint')) {
+      this.renderizarSwipeHint(container);
+    }
+    
+    // Configura eventos e seleciona primeiro voo
+    this.configurarEventosAposRenderizacao();
+    
+    // Seleciona primeiro voo
+    const primeiroVoo = this.finalResults.proposals[0];
+    if (primeiroVoo) {
+      this.vooAtivo = primeiroVoo;
+      this.indexVooAtivo = 0;
+      this.atualizarVooAtivo();
     }
   },
 
   renderizarHeader(container) {
     if (container.querySelector('.app-header')) return;
+    
     const header = document.createElement('header');
     header.className = 'app-header';
-    header.innerHTML = `<button class="btn-voltar" aria-label="Voltar"><svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"></path></svg><span class="sr-only">Voltar</span></button><h1>Voos Disponíveis</h1>`;
+    header.innerHTML = `
+      <button class="btn-voltar" aria-label="Voltar">
+        <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M19 12H5M12 19l-7-7 7-7"></path>
+        </svg>
+        <span class="sr-only">Voltar</span>
+      </button>
+      <h1>Voos Disponíveis</h1>
+    `;
+    
     container.insertBefore(header, container.firstChild);
+    
     const btnVoltar = header.querySelector('.btn-voltar');
     if (btnVoltar) {
-        btnVoltar.addEventListener('click', () => {
-            if (this.finalResults?.proposals?.length > 0 && !this.estaCarregando) {
-                 if (confirm('Tem certeza? Você perderá os resultados.')) window.location.href = 'destinos.html';
-            } else { window.location.href = 'destinos.html'; }
-        });
+      btnVoltar.addEventListener('click', () => {
+        if (this.finalResults?.proposals?.length > 0 && !this.estaCarregando) {
+          if (confirm('Tem certeza? Você perderá os resultados.')) {
+            window.location.href = 'destinos.html';
+          }
+        } else { 
+          window.location.href = 'destinos.html'; 
+        }
+      });
     }
   },
 
   renderizarCarregamento(container) {
+    // Evita renderização duplicada
     if (container.querySelector('.loading-container')) return;
+    
     const loadingImage = 'assets/images/tripinha/loading.gif';
     const loading = document.createElement('div');
     loading.className = 'loading-container';
-    loading.innerHTML = `<div style="text-align: center; padding: 2rem 0;"><img src="${loadingImage}" alt="Tripinha carregando" class="loading-avatar" style="width: 100px; height: 100px; margin: 0 auto;" /><div class="loading-text" style="margin: 1rem 0;">Iniciando busca...</div><div class="progress-bar-container"><div class="progress-bar" role="progressbar" style="width: 10%;" aria-valuenow="10" aria-valuemin="0" aria-valuemax="100"></div></div><div class="loading-tips" style="margin-top: 1.5rem; font-size: 0.9rem; color: #666;"><p>💡 Dica: Preços mudam, reserve logo!</p></div></div>`;
+    loading.innerHTML = `
+      <div style="text-align: center; padding: 2rem 0;">
+        <img src="${loadingImage}" alt="Tripinha carregando" class="loading-avatar" style="width: 100px; height: 100px; margin: 0 auto;" />
+        <div class="loading-text" style="margin: 1rem 0;">Iniciando busca...</div>
+        <div class="progress-bar-container">
+          <div class="progress-bar" role="progressbar" style="width: 10%;" aria-valuenow="10" aria-valuemin="0" aria-valuemax="100"></div>
+        </div>
+        <div class="loading-tips" style="margin-top: 1.5rem; font-size: 0.9rem; color: #666;">
+          <p>💡 Dica: Preços mudam, reserve logo!</p>
+        </div>
+      </div>
+    `;
+    
     container.appendChild(loading);
-    this.atualizarProgresso(document.querySelector('.loading-text')?.textContent || 'Buscando...', parseFloat(document.querySelector('.progress-bar')?.style.width || '10'));
+    
+    // Recupera e aplica o progresso atual
+    this.atualizarProgresso(
+      document.querySelector('.loading-text')?.textContent || 'Buscando...', 
+      parseFloat(document.querySelector('.progress-bar')?.style.width || '10')
+    );
     
     // Alternar dicas
     const dicas = [
@@ -591,34 +903,110 @@ const BENETRIP_VOOS = {
       '⏱️ Dica: Muitas vezes voos de madrugada são mais baratos',
       '🎒 Dica: Verifique a franquia de bagagem incluída'
     ];
+    
     let dicaIndex = 0;
     const dicasEl = loading.querySelector('.loading-tips');
+    
     if (dicasEl) {
-      setInterval(() => {
+      const dicasInterval = setInterval(() => {
         dicaIndex = (dicaIndex + 1) % dicas.length;
         dicasEl.innerHTML = `<p>${dicas[dicaIndex]}</p>`;
       }, 5000);
+      
+      // Limpa intervalo quando carregamento for removido
+      const observer = new MutationObserver((mutations) => {
+        mutations.forEach((mutation) => {
+          if (mutation.removedNodes) {
+            mutation.removedNodes.forEach((node) => {
+              if (node === loading || node.contains(loading)) {
+                clearInterval(dicasInterval);
+                observer.disconnect();
+              }
+            });
+          }
+        });
+      });
+      
+      observer.observe(container, { childList: true, subtree: true });
     }
   },
 
   renderizarErro(container) {
-    const loading = container.querySelector('.loading-container'); if (loading) loading.remove();
-    const erroDiv = document.createElement('div'); erroDiv.className = 'erro-container';
-    erroDiv.innerHTML = `<div class="bg-red-100 text-red-700 p-4 rounded-lg my-4 text-center"><div class="mb-3"><img src="assets/images/tripinha/avatar-triste.png" alt="Tripinha triste" class="w-20 h-20 mx-auto" /></div><p class="font-bold">${this.mensagemErro || 'Ocorreu um erro.'}</p><p class="mt-2 text-sm">Desculpe. Tente novamente?</p><button class="btn-tentar-novamente mt-4 px-4 py-2 bg-red-600 text-white rounded">Tentar Novamente</button></div>`;
+    // Limpa o container de carregamento se existir
+    const loading = container.querySelector('.loading-container'); 
+    if (loading) loading.remove();
+    
+    const erroDiv = document.createElement('div'); 
+    erroDiv.className = 'erro-container';
+    erroDiv.innerHTML = `
+      <div class="bg-red-100 text-red-700 p-4 rounded-lg my-4 text-center">
+        <div class="mb-3">
+          <img src="assets/images/tripinha/avatar-triste.png" alt="Tripinha triste" class="w-20 h-20 mx-auto" />
+        </div>
+        <p class="font-bold">${this.mensagemErro || 'Ocorreu um erro.'}</p>
+        <p class="mt-2 text-sm">Desculpe. Tente novamente?</p>
+        <button class="btn-tentar-novamente mt-4 px-4 py-2 bg-red-600 text-white rounded">
+          Tentar Novamente
+        </button>
+      </div>
+    `;
+    
     container.appendChild(erroDiv);
   },
 
   renderizarSemResultados(container) {
-    const loading = container.querySelector('.loading-container'); if (loading) loading.remove();
-    const semResultados = document.createElement('div'); semResultados.className = 'sem-resultados-container';
-    semResultados.innerHTML = `<div class="bg-blue-50 p-4 rounded-lg my-4 text-center"><div class="mb-3"><img src="assets/images/tripinha/avatar-triste.png" alt="Tripinha triste" class="w-20 h-20 mx-auto" /></div><p class="font-bold">Ops! Não encontramos voos para ${this.destino?.destino || 'este destino'}.</p><p class="mt-2 text-sm">Tente outras datas ou destino.</p><div class="flex gap-3 mt-4"><button class="btn-secundario flex-1 py-2 px-4 border rounded">Mudar Datas</button><button class="btn-principal flex-1 py-2 px-4 text-white rounded" style="background-color: #E87722;">Outro Destino</button></div></div>`;
+    // Limpa o container de carregamento se existir
+    const loading = container.querySelector('.loading-container'); 
+    if (loading) loading.remove();
+    
+    const semResultados = document.createElement('div'); 
+    semResultados.className = 'sem-resultados-container';
+    semResultados.innerHTML = `
+      <div class="bg-blue-50 p-4 rounded-lg my-4 text-center">
+        <div class="mb-3">
+          <img src="assets/images/tripinha/avatar-triste.png" alt="Tripinha triste" class="w-20 h-20 mx-auto" />
+        </div>
+        <p class="font-bold">Ops! Não encontramos voos para ${this.destino?.destino || 'este destino'}.</p>
+        <p class="mt-2 text-sm">Tente outras datas ou destino.</p>
+        <div class="flex gap-3 mt-4">
+          <button class="btn-secundario flex-1 py-2 px-4 border rounded">Mudar Datas</button>
+          <button class="btn-principal flex-1 py-2 px-4 text-white rounded" style="background-color: #E87722;">
+            Outro Destino
+          </button>
+        </div>
+      </div>
+    `;
+    
     container.appendChild(semResultados);
   },
 
   renderizarResumoViagem(container) {
-    const resumo = document.createElement('div'); resumo.className = 'viagem-resumo p-4 bg-white border-b';
-    const destino = this.destino; const dataViagem = this.obterDatasViagem(); const passageiros = this.obterQuantidadePassageiros();
-    resumo.innerHTML = `<h2 class="text-lg font-bold mb-2">Sua Viagem</h2><div class="flex items-center justify-between"><div class="flex items-center"><div class="bg-blue-50 p-1 rounded mr-2"><span class="text-lg">✈️</span></div><div><p class="font-medium">${destino?.destino || ''}, ${destino?.pais || ''}</p><p class="text-sm text-gray-600">${dataViagem}</p></div></div><div class="text-sm text-right"><span class="bg-gray-100 px-2 py-1 rounded">${passageiros} pas.</span></div></div>`;
+    const resumo = document.createElement('div'); 
+    resumo.className = 'viagem-resumo p-4 bg-white border-b';
+    
+    // Obtém dados de viagem
+    const destino = this.destino; 
+    const dataViagem = this.obterDatasViagem(); 
+    const passageiros = this.obterQuantidadePassageiros();
+    
+    resumo.innerHTML = `
+      <h2 class="text-lg font-bold mb-2">Sua Viagem</h2>
+      <div class="flex items-center justify-between">
+        <div class="flex items-center">
+          <div class="bg-blue-50 p-1 rounded mr-2">
+            <span class="text-lg">✈️</span>
+          </div>
+          <div>
+            <p class="font-medium">${destino?.destino || ''}, ${destino?.pais || ''}</p>
+            <p class="text-sm text-gray-600">${dataViagem}</p>
+          </div>
+        </div>
+        <div class="text-sm text-right">
+          <span class="bg-gray-100 px-2 py-1 rounded">${passageiros} pas.</span>
+        </div>
+      </div>
+    `;
+    
     container.appendChild(resumo);
   },
 
@@ -629,14 +1017,19 @@ const BENETRIP_VOOS = {
 
     const voos = this.finalResults?.proposals || [];
 
-    // Header melhorado com contador de resultados mais visível
+    // Header com contador de resultados
     const header = document.createElement('div');
     header.className = 'voos-header p-3 bg-gray-50 border-b';
     header.innerHTML = `
       <div class="flex justify-between items-center">
         <div class="flex items-center">
-          <h3 class="font-medium"><span class="text-primary font-bold" style="color:#E87722">${voos.length}</span> ${voos.length === 1 ? 'voo encontrado' : 'voos encontrados'}</h3>
-          ${voos.length > 10 ? `<span class="ml-2 text-xs text-gray-500">(mostrando os melhores preços)</span>` : ''}
+          <h3 class="font-medium">
+            <span class="text-primary font-bold" style="color:#E87722">${voos.length}</span> 
+            ${voos.length === 1 ? 'voo encontrado' : 'voos encontrados'}
+          </h3>
+          ${voos.length > 10 ? 
+            `<span class="ml-2 text-xs text-gray-500">(mostrando os melhores preços)</span>` : 
+            ''}
         </div>
         <div class="flex items-center">
           <span class="text-sm text-gray-600 mr-2">Por preço</span>
@@ -669,7 +1062,10 @@ const BENETRIP_VOOS = {
     // Container para contadores de paginação
     const paginationInfo = document.createElement('div');
     paginationInfo.className = 'pagination-info text-center text-sm py-1 sticky top-0 bg-white bg-opacity-80 z-10 border-b';
-    paginationInfo.innerHTML = `<span class="current-index font-bold">1</span> de <span class="total-count">${voos.length}</span>`;
+    paginationInfo.innerHTML = `
+      <span class="current-index font-bold">1</span> de 
+      <span class="total-count">${voos.length}</span>
+    `;
     listaVoos.appendChild(paginationInfo);
 
     // Container de swipe melhorado
@@ -678,30 +1074,40 @@ const BENETRIP_VOOS = {
     voosContainer.id = 'voos-swipe-container';
     listaVoos.appendChild(voosContainer);
 
-    // Adiciona apenas os primeiros 20 voos inicialmente (para performance)
-    // ou todos se forem menos que 20
+    // Carregamento otimizado de voos - apenas os primeiros 20 inicialmente
     const initialVoos = voos.slice(0, Math.min(20, voos.length));
+    
+    // Usa DocumentFragment para melhorar performance
+    const fragment = document.createDocumentFragment();
     initialVoos.forEach((voo, index) => {
       const cardVoo = this.criarCardVoo(voo, index);
-      voosContainer.appendChild(cardVoo);
+      fragment.appendChild(cardVoo);
     });
+    voosContainer.appendChild(fragment);
 
     // Adiciona controles de navegação visual
     const navControls = document.createElement('div');
     navControls.className = 'nav-controls flex justify-between items-center p-2 sticky bottom-0 bg-white bg-opacity-90 border-t z-10';
     navControls.innerHTML = `
       <button class="nav-btn prev-btn px-3 py-1 bg-gray-100 rounded-full mr-2 flex items-center" aria-label="Voo anterior">
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"></path></svg>
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M19 12H5M12 19l-7-7 7-7"></path>
+        </svg>
         <span class="ml-1">Anterior</span>
       </button>
       <div class="pagination-dots flex space-x-1 justify-center">
-        ${initialVoos.length <= 10 ? Array(initialVoos.length).fill().map((_, i) => 
-          `<span class="pagination-dot ${i === 0 ? 'active' : ''}" data-index="${i}"></span>`
-        ).join('') : '<span class="text-xs">Navegue pelos melhores preços</span>'}
+        ${initialVoos.length <= 10 ? 
+          Array(initialVoos.length).fill().map((_, i) => 
+            `<span class="pagination-dot ${i === 0 ? 'active' : ''}" data-index="${i}"></span>`
+          ).join('') : 
+          '<span class="text-xs">Navegue pelos melhores preços</span>'
+        }
       </div>
       <button class="nav-btn next-btn px-3 py-1 bg-gray-100 rounded-full ml-2 flex items-center" aria-label="Próximo voo">
         <span class="mr-1">Próximo</span>
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"></path></svg>
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M5 12h14M12 5l7 7-7 7"></path>
+        </svg>
       </button>
     `;
     listaVoos.appendChild(navControls);
@@ -719,66 +1125,23 @@ const BENETRIP_VOOS = {
     }
     
     container.appendChild(listaVoos);
-    
-    // Configura eventos para os botões de navegação
-    const prevBtn = listaVoos.querySelector('.prev-btn');
-    const nextBtn = listaVoos.querySelector('.next-btn');
-    const loadMoreBtn = listaVoos.querySelector('.load-more-btn');
-    const viewBtns = listaVoos.querySelectorAll('.view-btn');
-    
-    if (prevBtn) prevBtn.addEventListener('click', () => this.vooAnterior());
-    if (nextBtn) nextBtn.addEventListener('click', () => this.proximoVoo());
-    
-    if (loadMoreBtn) {
-      loadMoreBtn.addEventListener('click', () => {
-        // Carrega mais 20 voos
-        const currentCount = voosContainer.children.length;
-        const nextBatch = voos.slice(currentCount, currentCount + 20);
-        
-        nextBatch.forEach((voo, idx) => {
-          const index = currentCount + idx;
-          const cardVoo = this.criarCardVoo(voo, index);
-          voosContainer.appendChild(cardVoo);
-        });
-        
-        // Atualiza contador do botão ou remove se não houver mais
-        const remaining = voos.length - voosContainer.children.length;
-        if (remaining <= 0) {
-          loadMoreBtn.parentElement.remove();
-        } else {
-          loadMoreBtn.textContent = `Carregar mais resultados (${remaining} restantes)`;
-        }
-      });
-    }
-    
-    // Configura eventos para alternância de visualização
-    viewBtns.forEach(btn => {
-      btn.addEventListener('click', () => {
-        const view = btn.dataset.view;
-        viewBtns.forEach(b => b.classList.remove('view-btn-active'));
-        btn.classList.add('view-btn-active');
-        
-        if (view === 'list') {
-          voosContainer.classList.add('voos-list-view');
-          voosContainer.classList.remove('voos-card-view');
-        } else {
-          voosContainer.classList.add('voos-card-view');
-          voosContainer.classList.remove('voos-list-view');
-        }
-      });
-    });
-    
-    // Ativa view de cards por padrão
-    voosContainer.classList.add('voos-card-view');
   },
 
   criarCardVoo(voo, index) {
+    // Versão otimizada da criação de cards
     const cardVoo = document.createElement('div');
-    cardVoo.className = 'voo-card p-4 bg-white border-b';
+    cardVoo.className = 'voo-card p-3 bg-white border-b';
+    
+    // Define atributos de dados
     const vooId = voo.sign || `voo-idx-${index}`;
     cardVoo.dataset.vooId = vooId;
     cardVoo.dataset.vooIndex = index;
 
+    // Aplica classes especiais
+    if (index === 0) cardVoo.classList.add('voo-primeiro');
+    if (index % 2 === 0) cardVoo.classList.add('voo-par');
+    
+    // Extrai informações do voo
     const preco = this.obterPrecoVoo(voo);
     const moeda = this.finalResults?.meta?.currency || 'BRL';
     const precoFormatado = this.formatarPreco(preco, moeda);
@@ -788,13 +1151,11 @@ const BENETRIP_VOOS = {
     const isMelhorPreco = voo._melhorPreco || index === 0;
     const ehVooDireto = infoIda?.paradas === 0 && (!infoVolta || infoVolta.paradas === 0);
     
-    // Adiciona mais classes para destacar melhor os cards
+    // Aplica classes adicionais para estados especiais
     if (ehVooDireto) cardVoo.classList.add('voo-direto');
     if (isMelhorPreco) cardVoo.classList.add('voo-melhor-preco');
-    if (index === 0) cardVoo.classList.add('voo-primeiro');
-    if (index % 2 === 0) cardVoo.classList.add('voo-par');
     
-    // Tags especiais para o card
+    // Tags especiais
     let tagsSpeciais = '';
     if (isMelhorPreco) {
       tagsSpeciais += `<span class="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full absolute top-2 right-2 shadow-sm">Melhor preço</span>`;
@@ -803,132 +1164,134 @@ const BENETRIP_VOOS = {
       tagsSpeciais += `<span class="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full absolute top-2 left-2 shadow-sm">Voo Direto</span>`;
     }
     
-    // Ícones para indicar qualidade do voo
-    const qualityStars = index < 3 ? 
-      `<div class="quality-stars absolute bottom-2 right-2 text-yellow-500">
-         ${Array(4 - Math.min(index, 3)).fill('★').join('')}${Array(Math.min(index, 3)).fill('☆').join('')}
-       </div>` : '';
-    
-    // Formata os números de indicação do card
+    // Índice visual do card
     const indexDisplay = `<div class="card-index absolute top-0 left-0 w-6 h-6 flex items-center justify-center bg-gray-100 rounded-br-lg text-xs font-bold">${index + 1}</div>`;
 
+    // Constrói o HTML interno - versão simplificada para melhor performance
     cardVoo.innerHTML = `
-        <div class="relative">
-            ${indexDisplay}
-            ${tagsSpeciais}
-            <div class="flex justify-between items-start mb-4 mt-2"> 
-                <div> 
-                    <span class="text-2xl font-bold" style="color: #E87722;">${precoFormatado}</span> 
-                    ${economiaPercentual > 0 ? `<span class="text-xs bg-green-100 text-green-800 px-1 py-0.5 rounded ml-1 font-medium">-${economiaPercentual}%</span>` : ''} 
-                    <p class="text-xs text-gray-500">Por pessoa, ida${infoVolta ? ' e volta' : ''}</p> 
-                </div> 
-                <div class="flex items-center"> 
-                    <span class="text-xs bg-gray-100 px-2 py-1 rounded font-medium">${this.obterCompanhiasAereas(voo)}</span> 
-                </div> 
-            </div>
-            ${qualityStars}
+      <div class="relative">
+        ${indexDisplay}
+        ${tagsSpeciais}
+        <div class="flex justify-between items-start mb-3 mt-2"> 
+          <div> 
+            <span class="text-xl font-bold" style="color: #E87722;">${precoFormatado}</span> 
+            ${economiaPercentual > 0 ? `<span class="text-xs bg-green-100 text-green-800 px-1 py-0.5 rounded ml-1 font-medium">-${economiaPercentual}%</span>` : ''} 
+            <p class="text-xs text-gray-500">Por pessoa, ida${infoVolta ? ' e volta' : ''}</p> 
+          </div> 
+          <div class="text-right"> 
+            <span class="text-xs bg-gray-100 px-2 py-1 rounded font-medium">${this.obterCompanhiasAereas(voo)}</span> 
+          </div> 
+        </div>
+      </div>
+      
+      <div class="pt-2 border-t"> 
+        <div class="mb-3"> 
+          <div class="flex justify-between text-sm">
+            <div class="text-center">
+              <p class="font-bold">${infoIda?.horaPartida || '--:--'}</p>
+              <p class="text-xs text-gray-600">${infoIda?.aeroportoPartida || '---'}</p>
+            </div> 
+            <div class="flex-1 px-2"> 
+              <div class="text-xs text-center text-gray-500">${this.formatarDuracao(infoIda?.duracao || 0)}</div> 
+              <div class="flight-line relative">
+                <div class="border-t ${ehVooDireto ? 'border-blue-300' : 'border-gray-300'} my-2"></div>
+                <div class="flight-stops absolute inset-x-0 top-1/2 flex justify-center -mt-1">
+                  ${this.renderizarParadas(infoIda?.paradas || 0)}
+                </div>
+              </div> 
+              <div class="text-xs text-center text-gray-500">
+                ${ehVooDireto ? 
+                  '<span class="text-blue-600 font-medium">Voo Direto</span>' : 
+                  `${infoIda?.paradas || 0} ${infoIda?.paradas === 1 ? 'parada' : 'paradas'}`
+                }
+              </div> 
+            </div> 
+            <div class="text-center">
+              <p class="font-bold">${infoIda?.horaChegada || '--:--'}</p>
+              <p class="text-xs text-gray-600">${infoIda?.aeroportoChegada || '---'}</p>
+            </div> 
+          </div> 
         </div>
         
-        <div class="border-t pt-3"> 
-            <div class="mb-4"> 
-                <div class="flex justify-between items-center text-sm">
-                    <span class="font-medium bg-gray-50 px-2 py-0.5 rounded">IDA</span>
-                    <span class="text-xs text-gray-500">${this.formatarData(infoIda?.dataPartida)}</span>
-                </div> 
-                <div class="flex items-center justify-between mt-2"> 
-                    <div class="text-center">
-                        <p class="font-bold">${infoIda?.horaPartida}</p>
-                        <p class="text-xs text-gray-600">${infoIda?.aeroportoPartida}</p>
-                    </div> 
-                    <div class="flex-1 px-2"> 
-                        <div class="text-xs text-center text-gray-500">${this.formatarDuracao(infoIda?.duracao)}</div> 
-                        <div class="flight-line relative">
-                            <div class="border-t ${ehVooDireto ? 'border-blue-300' : 'border-gray-300'} my-2"></div>
-                            <div class="flight-stops absolute inset-x-0 top-1/2 flex justify-center -mt-1">
-                                ${this.renderizarParadas(infoIda?.paradas)}
-                            </div>
-                        </div> 
-                        <div class="text-xs text-center text-gray-500">
-                            ${ehVooDireto ? 
-                              '<span class="text-blue-600 font-medium">Voo Direto</span>' : 
-                              `${infoIda?.paradas ?? 0} ${infoIda?.paradas === 1 ? 'parada' : 'paradas'}`
-                            }
-                        </div> 
-                    </div> 
-                    <div class="text-center">
-                        <p class="font-bold">${infoIda?.horaChegada}</p>
-                        <p class="text-xs text-gray-600">${infoIda?.aeroportoChegada}</p>
-                    </div> 
-                </div> 
-            </div>
-            
-            ${infoVolta ? `
-            <div class="mt-4 pt-3 border-t"> 
-                <div class="flex justify-between items-center text-sm">
-                    <span class="font-medium bg-gray-50 px-2 py-0.5 rounded">VOLTA</span>
-                    <span class="text-xs text-gray-500">${this.formatarData(infoVolta?.dataPartida)}</span>
-                </div> 
-                <div class="flex items-center justify-between mt-2"> 
-                    <div class="text-center">
-                        <p class="font-bold">${infoVolta?.horaPartida}</p>
-                        <p class="text-xs text-gray-600">${infoVolta?.aeroportoPartida}</p>
-                    </div> 
-                    <div class="flex-1 px-2"> 
-                        <div class="text-xs text-center text-gray-500">${this.formatarDuracao(infoVolta?.duracao)}</div> 
-                        <div class="flight-line relative">
-                            <div class="border-t ${(!infoVolta || infoVolta.paradas === 0) ? 'border-blue-300' : 'border-gray-300'} my-2"></div>
-                            <div class="flight-stops absolute inset-x-0 top-1/2 flex justify-center -mt-1">
-                                ${this.renderizarParadas(infoVolta?.paradas)}
-                            </div>
-                        </div> 
-                        <div class="text-xs text-center text-gray-500">
-                            ${(!infoVolta || infoVolta.paradas === 0) ? 
-                              '<span class="text-blue-600 font-medium">Voo Direto</span>' : 
-                              `${infoVolta?.paradas ?? 0} ${infoVolta?.paradas === 1 ? 'parada' : 'paradas'}`
-                            }
-                        </div> 
-                    </div> 
-                    <div class="text-center">
-                        <p class="font-bold">${infoVolta?.horaChegada}</p>
-                        <p class="text-xs text-gray-600">${infoVolta?.aeroportoChegada}</p>
-                    </div> 
-                </div> 
-            </div>` : ''} 
+        ${infoVolta ? `
+        <div class="mt-3 pt-2 border-t"> 
+          <div class="flex justify-between text-sm">
+            <div class="text-center">
+              <p class="font-bold">${infoVolta.horaPartida || '--:--'}</p>
+              <p class="text-xs text-gray-600">${infoVolta.aeroportoPartida || '---'}</p>
+            </div> 
+            <div class="flex-1 px-2"> 
+              <div class="text-xs text-center text-gray-500">${this.formatarDuracao(infoVolta.duracao || 0)}</div> 
+              <div class="flight-line relative">
+                <div class="border-t ${(!infoVolta || infoVolta.paradas === 0) ? 'border-blue-300' : 'border-gray-300'} my-2"></div>
+                <div class="flight-stops absolute inset-x-0 top-1/2 flex justify-center -mt-1">
+                  ${this.renderizarParadas(infoVolta?.paradas || 0)}
+                </div>
+              </div> 
+              <div class="text-xs text-center text-gray-500">
+                ${(!infoVolta || infoVolta.paradas === 0) ? 
+                  '<span class="text-blue-600 font-medium">Voo Direto</span>' : 
+                  `${infoVolta?.paradas || 0} ${infoVolta?.paradas === 1 ? 'parada' : 'paradas'}`
+                }
+              </div> 
+            </div> 
+            <div class="text-center">
+              <p class="font-bold">${infoVolta.horaChegada || '--:--'}</p>
+              <p class="text-xs text-gray-600">${infoVolta.aeroportoChegada || '---'}</p>
+            </div> 
+          </div> 
+        </div>` : ''} 
+      </div>
+      
+      <div class="mt-3 pt-2 border-t flex justify-between items-center"> 
+        <button class="btn-detalhes-voo text-sm text-blue-600 hover:text-blue-800" data-voo-id="${vooId}">
+          Ver detalhes
+        </button> 
+        <div class="flex items-center text-xs text-gray-500">
+          <span class="mr-1">Restam</span>
+          <span class="bg-orange-100 text-orange-800 px-2 py-1 rounded font-medium">${voo._assentosDisponiveis || '?'}</span>
         </div>
-        
-        <div class="mt-4 pt-2 border-t flex justify-between items-center"> 
-            <button class="btn-detalhes-voo text-sm text-blue-600 hover:text-blue-800 hover:underline" data-voo-id="${vooId}">
-                Ver detalhes
-            </button> 
-            <div class="flex items-center text-xs text-gray-500">
-                <span class="mr-1">Restam</span>
-                <span class="bg-orange-100 text-orange-800 px-2 py-1 rounded font-medium">${voo._assentosDisponiveis || '?'}</span>
-            </div>
-            <button class="btn-select-voo text-xs bg-gray-100 hover:bg-gray-200 px-2 py-1 rounded transition-colors duration-200" data-voo-id="${vooId}">
-                Selecionar
-            </button>
-        </div>
+        <button class="btn-select-voo text-xs bg-gray-100 hover:bg-gray-200 px-2 py-1 rounded" data-voo-id="${vooId}">
+          Selecionar
+        </button>
+      </div>
     `;
     
     return cardVoo;
   },
 
   renderizarParadas(paradas) {
-     const numParadas = paradas ?? 0; 
-     if (numParadas === 0) return `<span class="inline-block w-3 h-3 bg-green-500 rounded-full" title="Voo direto"></span>`;
-     let html = ''; 
-     for (let i = 0; i < Math.min(numParadas, 3); i++) {
-         html += `<span class="inline-block w-2 h-2 bg-gray-400 rounded-full mx-1" title="${numParadas} parada${numParadas > 1 ? 's' : ''}"></span>`;
-     }
-     return html;
+    // Simplifica a renderização de paradas
+    const numParadas = paradas || 0;
+    
+    if (numParadas === 0) {
+      return `<span class="inline-block w-3 h-3 bg-green-500 rounded-full" title="Voo direto"></span>`;
+    }
+    
+    let html = ''; 
+    for (let i = 0; i < Math.min(numParadas, 3); i++) {
+      html += `<span class="inline-block w-2 h-2 bg-gray-400 rounded-full mx-1" title="${numParadas} parada${numParadas > 1 ? 's' : ''}"></span>`;
+    }
+    
+    return html;
   },
 
   renderizarBotaoSelecao(container) {
+    // Remove botão existente para evitar duplicatas
     const btnExistente = document.querySelector('.botao-selecao-fixo'); 
     if (btnExistente) btnExistente.remove();
+    
     const botaoFixo = document.createElement('div'); 
     botaoFixo.className = 'botao-selecao-fixo';
-    botaoFixo.innerHTML = `<button class="btn-selecionar-voo"><span>Escolher Este Voo</span><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"></path></svg></button>`;
+    botaoFixo.innerHTML = `
+      <button class="btn-selecionar-voo">
+        <span>Escolher Este Voo</span>
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M5 12h14M12 5l7 7-7 7"></path>
+        </svg>
+      </button>
+    `;
+    
     container.appendChild(botaoFixo);
   },
 
@@ -937,46 +1300,63 @@ const BENETRIP_VOOS = {
     hint.id = 'swipe-hint'; 
     hint.className = 'swipe-hint'; 
     hint.style.display = 'none';
-    hint.innerHTML = `<span class="swipe-hint-arrow mr-2">←</span> Arraste para ver outros voos <span class="swipe-hint-arrow ml-2">→</span>`;
+    hint.innerHTML = `
+      <span class="swipe-hint-arrow mr-2">←</span> 
+      Arraste para ver outros voos 
+      <span class="swipe-hint-arrow ml-2">→</span>
+    `;
+    
     container.appendChild(hint);
+    
+    // Mostra dica de swipe apenas se houver mais de um voo
     if (this.finalResults?.proposals?.length > 1) {
-        hint.style.display = 'flex';
+      hint.style.display = 'flex';
+      
+      // Esconde a dica depois de alguns segundos
+      setTimeout(() => { 
+        hint.style.opacity = '0'; 
         setTimeout(() => { 
-            hint.style.opacity = '0'; 
-            setTimeout(() => { hint.style.display = 'none'; }, 1000); 
-        }, 4000);
+          hint.style.display = 'none'; 
+        }, 1000); 
+      }, 4000);
     }
   },
 
   formatarPreco(preco, moeda = 'BRL') {
-    if (typeof preco !== 'number') return 'N/A';
+    if (typeof preco !== 'number' || isNaN(preco)) return 'N/A';
+    
     return new Intl.NumberFormat('pt-BR', { 
-        style: 'currency', 
-        currency: moeda, 
-        minimumFractionDigits: 0, 
-        maximumFractionDigits: 0 
+      style: 'currency', 
+      currency: moeda, 
+      minimumFractionDigits: 0, 
+      maximumFractionDigits: 0 
     }).format(preco);
   },
 
   formatarData(data) {
-    if (!(data instanceof Date) || isNaN(data)) return 'N/A';
+    if (!(data instanceof Date) || isNaN(data.getTime())) return 'N/A';
+    
     const d = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
     const m = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+    
     return `${d[data.getDay()]}, ${data.getDate()} ${m[data.getMonth()]}`;
   },
 
   formatarDuracao(duracaoMinutos) {
     if (typeof duracaoMinutos !== 'number' || duracaoMinutos < 0) return 'N/A';
+    
     const h = Math.floor(duracaoMinutos / 60), m = duracaoMinutos % 60;
     return `${h}h ${m > 0 ? m + 'm' : ''}`.trim();
   },
 
   obterPrecoVoo(voo) {
+    if (!voo || !voo.terms) return 0;
+    
     try {
-      if (!voo?.terms) return 0;
       const k = Object.keys(voo.terms)[0];
       return voo.terms[k]?.unified_price || voo.terms[k]?.price || 0;
-    } catch {
+    } catch (erro) {
+      console.warn('Erro ao obter preço do voo:', erro);
       return 0;
     }
   },
@@ -985,40 +1365,54 @@ const BENETRIP_VOOS = {
     try {
       const codigos = voo?.carriers;
       if (!codigos || codigos.length === 0) return 'N/A';
+      
       // Usa as airlines acumuladas
       if (this.accumulatedAirlines && this.accumulatedAirlines[codigos[0]]) {
-          const info = this.accumulatedAirlines[codigos[0]];
-          if (codigos.length > 1) return `${info?.name || codigos[0]} +${codigos.length - 1}`;
-          return info?.name || codigos[0];
+        const info = this.accumulatedAirlines[codigos[0]];
+        
+        if (codigos.length > 1) {
+          return `${info?.name || codigos[0]} +${codigos.length - 1}`;
+        }
+        
+        return info?.name || codigos[0];
       }
-      if (codigos.length > 1) return `${codigos[0]} +${codigos.length - 1}`;
+      
+      if (codigos.length > 1) {
+        return `${codigos[0]} +${codigos.length - 1}`;
+      }
+      
       return codigos[0];
-    } catch {
+    } catch (erro) {
+      console.warn('Erro ao obter companhias aéreas:', erro);
       return 'N/A';
     }
   },
 
   obterInfoSegmento(segmento) {
+    // Valores padrão para o caso de dados ausentes
     const def = { 
-        aeroportoPartida: 'N/A', 
-        aeroportoChegada: 'N/A', 
-        dataPartida: null, 
-        dataChegada: null, 
-        horaPartida: 'N/A', 
-        horaChegada: 'N/A', 
-        duracao: 0, 
-        paradas: 0 
+      aeroportoPartida: 'N/A', 
+      aeroportoChegada: 'N/A', 
+      dataPartida: null, 
+      dataChegada: null, 
+      horaPartida: 'N/A', 
+      horaChegada: 'N/A', 
+      duracao: 0, 
+      paradas: 0 
     };
     
     try {
       if (!segmento?.flight?.length) return def;
+      
       const pV = segmento.flight[0], uV = segmento.flight[segmento.flight.length - 1];
       if (!pV || !uV) return def;
       
+      // Converte timestamps para objetos Date
       const tsP = pV.local_departure_timestamp * 1000, tsC = uV.local_arrival_timestamp * 1000;
       if (isNaN(tsP) || isNaN(tsC)) return def;
       
       const dP = new Date(tsP), dC = new Date(tsC);
+      
       return {
         aeroportoPartida: pV.departure,
         aeroportoChegada: uV.arrival,
@@ -1029,13 +1423,15 @@ const BENETRIP_VOOS = {
         duracao: Math.round((tsC - tsP) / 60000),
         paradas: segmento.flight.length - 1
       };
-    } catch {
+    } catch (erro) {
+      console.warn('Erro ao obter informações do segmento:', erro);
       return def;
     }
   },
 
   proximoVoo() {
     if (!this.finalResults?.proposals?.length || this.finalResults.proposals.length <= 1) return;
+    
     this.indexVooAtivo = (this.indexVooAtivo + 1) % this.finalResults.proposals.length;
     this.vooAtivo = this.finalResults.proposals[this.indexVooAtivo];
     this.atualizarVooAtivo();
@@ -1043,83 +1439,164 @@ const BENETRIP_VOOS = {
 
   vooAnterior() {
     if (!this.finalResults?.proposals?.length || this.finalResults.proposals.length <= 1) return;
+    
     this.indexVooAtivo = (this.indexVooAtivo - 1 + this.finalResults.proposals.length) % this.finalResults.proposals.length;
     this.vooAtivo = this.finalResults.proposals[this.indexVooAtivo];
     this.atualizarVooAtivo();
   },
 
   atualizarVooAtivo() {
-    document.querySelectorAll('.voo-card').forEach(card => card.classList.remove('voo-card-ativo'));
+    // Otimiza as operações DOM agrupando leituras e depois escritas
+    // Evita múltiplos reflows ao modificar o DOM
+    
+    // 1. Fase de leitura - coleta referências DOM
+    const cardAtual = document.querySelector('.voo-card-ativo');
     const cardAtivo = document.querySelector(`.voo-card[data-voo-index="${this.indexVooAtivo}"]`);
-    if (cardAtivo) {
-      cardAtivo.classList.add('voo-card-ativo');
-      cardAtivo.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
-      cardAtivo.classList.add('voo-card-highlight');
-      setTimeout(() => cardAtivo.classList.remove('voo-card-highlight'), 500);
-    }
-    
-    // Atualiza o botão de seleção
     const btnSelecionar = document.querySelector('.btn-selecionar-voo');
-    if (btnSelecionar && this.vooAtivo) {
-      const preco = this.obterPrecoVoo(this.vooAtivo);
-      const moeda = this.finalResults?.meta?.currency || 'BRL';
-      btnSelecionar.innerHTML = `<span>Escolher Voo por ${this.formatarPreco(preco, moeda)}</span><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"></path></svg>`;
-    } else if (btnSelecionar) {
-        btnSelecionar.innerHTML = `<span>Escolher Este Voo</span><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"></path></svg>`;
-    }
-    
-    // Atualiza manualmente o elemento de índice e os dots de paginação
     const currentIndexElement = document.querySelector('.current-index');
-    if (currentIndexElement) {
-      currentIndexElement.textContent = (this.indexVooAtivo + 1).toString();
-    }
+    const dots = document.querySelectorAll('.pagination-dot');
     
-    // Atualiza dots de paginação
-    document.querySelectorAll('.pagination-dot').forEach((dot) => {
-      const dotIndex = parseInt(dot.dataset.index || '0');
-      if (dotIndex === this.indexVooAtivo) {
-        dot.classList.add('active');
-      } else {
-        dot.classList.remove('active');
+    // 2. Calcula valores antes de modificar o DOM
+    const preco = this.vooAtivo ? this.obterPrecoVoo(this.vooAtivo) : 0;
+    const moeda = this.finalResults?.meta?.currency || 'BRL';
+    const precoFormatado = this.formatarPreco(preco, moeda);
+    
+    // 3. Executa as mudanças DOM em batch usando requestAnimationFrame
+    requestAnimationFrame(() => {
+      // Atualiza classes dos cards
+      if (cardAtual) cardAtual.classList.remove('voo-card-ativo');
+      if (cardAtivo) {
+        cardAtivo.classList.add('voo-card-ativo');
+        
+        // Centraliza o card na visualização
+        cardAtivo.scrollIntoView({ 
+          behavior: 'smooth', 
+          block: 'nearest', 
+          inline: 'center' 
+        });
+        
+        // Adiciona destaque temporário
+        cardAtivo.classList.add('voo-card-highlight');
+        setTimeout(() => cardAtivo.classList.remove('voo-card-highlight'), 500);
       }
+      
+      // Atualiza o botão de seleção
+      if (btnSelecionar && this.vooAtivo) {
+        btnSelecionar.innerHTML = `
+          <span>Escolher Voo por ${precoFormatado}</span>
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M5 12h14M12 5l7 7-7 7"></path>
+          </svg>
+        `;
+      } else if (btnSelecionar) {
+        btnSelecionar.innerHTML = `
+          <span>Escolher Este Voo</span>
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M5 12h14M12 5l7 7-7 7"></path>
+          </svg>
+        `;
+      }
+      
+      // Atualiza elementos de navegação
+      if (currentIndexElement) {
+        currentIndexElement.textContent = (this.indexVooAtivo + 1).toString();
+      }
+      
+      // Atualiza dots de paginação
+      dots.forEach((dot) => {
+        const dotIndex = parseInt(dot.dataset.index || '0');
+        if (dotIndex === this.indexVooAtivo) {
+          dot.classList.add('active');
+        } else {
+          dot.classList.remove('active');
+        }
+      });
     });
   },
 
   selecionarVoo(vooId) {
     if (!this.finalResults?.proposals) return;
-    const vooEncontrado = this.finalResults.proposals.find((v, index) => (v.sign || `voo-idx-${index}`) === vooId);
-    if (!vooEncontrado) { console.error(`Voo ${vooId} não encontrado`); return; }
+    
+    // Encontra o voo pelo ID
+    const vooEncontrado = this.finalResults.proposals.find(
+      (v, index) => (v.sign || `voo-idx-${index}`) === vooId
+    );
+    
+    if (!vooEncontrado) { 
+      console.error(`Voo ${vooId} não encontrado`); 
+      return; 
+    }
+    
+    // Atualiza o voo selecionado
     this.vooSelecionado = vooEncontrado;
     console.log('Voo selecionado:', this.vooSelecionado);
-    const index = this.finalResults.proposals.findIndex((v, idx) => (v.sign || `voo-idx-${idx}`) === vooId);
-    if (index !== -1) { this.vooAtivo = vooEncontrado; this.indexVooAtivo = index; }
+    
+    // Também atualiza o voo ativo para o selecionado
+    const index = this.finalResults.proposals.findIndex(
+      (v, idx) => (v.sign || `voo-idx-${idx}`) === vooId
+    );
+    
+    if (index !== -1) { 
+      this.vooAtivo = vooEncontrado; 
+      this.indexVooAtivo = index; 
+    }
+    
+    // Atualiza a UI com a seleção
     document.querySelectorAll('.voo-card').forEach(card => { 
-        card.classList.remove('voo-selecionado'); 
-        if (card.dataset.vooId === vooId) card.classList.add('voo-selecionado'); 
+      card.classList.remove('voo-selecionado'); 
+      if (card.dataset.vooId === vooId) {
+        card.classList.add('voo-selecionado');
+      }
     });
+    
+    // Feedback ao usuário
     this.exibirToast('Voo selecionado! Confirme sua escolha', 'success');
+    
+    // Atualiza o botão de confirmação
     const btnConfirmar = document.querySelector('.btn-selecionar-voo');
     if (btnConfirmar) {
-        btnConfirmar.classList.add('btn-pulsante');
-        const preco = this.obterPrecoVoo(this.vooSelecionado);
-        const moeda = this.finalResults?.meta?.currency || 'BRL';
-        btnConfirmar.innerHTML = `<span>Escolher Voo por ${this.formatarPreco(preco, moeda)}</span><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"></path></svg>`;
-        setTimeout(() => btnConfirmar.classList.remove('btn-pulsante'), 2000);
+      btnConfirmar.classList.add('btn-pulsante');
+      
+      const preco = this.obterPrecoVoo(this.vooSelecionado);
+      const moeda = this.finalResults?.meta?.currency || 'BRL';
+      
+      btnConfirmar.innerHTML = `
+        <span>Escolher Voo por ${this.formatarPreco(preco, moeda)}</span>
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M5 12h14M12 5l7 7-7 7"></path>
+        </svg>
+      `;
+      
+      setTimeout(() => btnConfirmar.classList.remove('btn-pulsante'), 2000);
     }
   },
 
   exibirToast(mensagem, tipo = 'info') {
-    const c = document.getElementById('toast-container');
-    if (!c) return;
-    const t = document.createElement('div');
-    t.className = `toast toast-${tipo}`;
-    t.innerHTML = mensagem;
-    c.appendChild(t);
-    setTimeout(() => t.classList.add('toast-visible'), 50);
+    const toastContainer = document.getElementById('toast-container');
+    if (!toastContainer) return;
+    
+    // Cria o elemento toast
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${tipo}`;
+    toast.innerHTML = mensagem;
+    
+    // Adiciona ao container
+    toastContainer.appendChild(toast);
+    
+    // Anima a entrada do toast (em requestAnimationFrame para melhor performance)
+    requestAnimationFrame(() => {
+      setTimeout(() => toast.classList.add('toast-visible'), 10);
+    });
+    
+    // Configura a saída do toast
     setTimeout(() => {
-      t.classList.remove('toast-visible');
+      toast.classList.remove('toast-visible');
+      
+      // Remove o elemento após a transição
       setTimeout(() => {
-        if (c.contains(t)) c.removeChild(t);
+        if (toastContainer.contains(toast)) {
+          toastContainer.removeChild(toast);
+        }
       }, 300);
     }, 3000);
   },
@@ -1129,115 +1606,310 @@ const BENETRIP_VOOS = {
       console.error('Nenhum voo ativo');
       return;
     }
+    
     const vooId = this.vooAtivo.sign || `voo-idx-${this.indexVooAtivo}`;
     this.selecionarVoo(vooId);
   },
 
   mostrarDetalhesVoo(vooId) {
     if (!this.finalResults?.proposals) return;
-    const voo = this.finalResults.proposals.find((v, index) => (v.sign || `voo-idx-${index}`) === vooId);
-    if (!voo) { console.error(`Voo ${vooId} não encontrado`); return; }
+    
+    // Encontra o voo pelo ID
+    const voo = this.finalResults.proposals.find(
+      (v, index) => (v.sign || `voo-idx-${index}`) === vooId
+    );
+    
+    if (!voo) { 
+      console.error(`Voo ${vooId} não encontrado`); 
+      return; 
+    }
+    
+    // Remove modal existente se houver
     document.getElementById('modal-detalhes-voo')?.remove();
+    
+    // Extrai informações do voo
     const preco = this.obterPrecoVoo(voo);
     const moeda = this.finalResults?.meta?.currency || 'BRL';
     const precoFormatado = this.formatarPreco(preco, moeda);
     const infoIda = this.obterInfoSegmento(voo.segment?.[0]);
     const infoVolta = voo.segment?.length > 1 ? this.obterInfoSegmento(voo.segment[1]) : null;
+    
+    // Cria o modal
     const modalContainer = document.createElement('div');
     modalContainer.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
     modalContainer.id = 'modal-detalhes-voo';
+    
+    // Conteúdo do modal
     modalContainer.innerHTML = `
       <div class="bg-white rounded-lg w-full max-w-md p-4 max-h-90vh overflow-y-auto">
-        <div class="flex justify-between items-center mb-4"> <h3 class="text-lg font-bold">Detalhes do Voo</h3> <button id="btn-fechar-detalhes" class="text-gray-500 hover:text-gray-700"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button> </div>
-        <div class="border-b pb-3 mb-3"> <div class="flex justify-between items-center"> <div> <p class="text-2xl font-bold">${precoFormatado}</p> <p class="text-sm text-gray-600">Preço por pessoa</p> </div> <div> <p class="font-medium">${this.obterCompanhiasAereas(voo)}</p> <p class="text-sm text-gray-600">${infoIda?.paradas === 0 && (!infoVolta || infoVolta.paradas === 0) ? 'Voo direto' : `${(infoIda?.paradas ?? 0) + (infoVolta?.paradas ?? 0)} parada(s)`}</p> </div> </div> </div>
-        <div class="mb-4"> <h4 class="font-medium mb-2">Ida (${this.formatarData(infoIda?.dataPartida)})</h4> <div class="voo-timeline">${this.renderizarTimelineVoos(voo.segment?.[0]?.flight || [])}</div> </div>
-        ${infoVolta ? `<div class="mt-4 pt-3 border-t"> <h4 class="font-medium mb-2">Volta (${this.formatarData(infoVolta?.dataPartida)})</h4> <div class="voo-timeline">${this.renderizarTimelineVoos(voo.segment?.[1]?.flight || [])}</div> </div>` : ''}
-        <div class="mt-4 pt-3 border-t"> <h4 class="font-medium mb-2">Info</h4> <ul class="text-sm space-y-2"> <li class="flex items-start"><span class="text-blue-600 mr-2">✓</span><span>Bagagem de mão (1 peça)</span></li> <li class="flex items-start"><span class="text-blue-600 mr-2">✓</span><span>Refeição a bordo</span></li> <li class="flex items-start text-gray-600"><span class="mr-2">ℹ️</span><span>Bagagem despachada opcional</span></li> </ul> </div>
-        <div class="mt-4 pt-3 border-t flex justify-between"> <button id="btn-voltar-detalhes" class="py-2 px-4 border rounded">Voltar</button> <button id="btn-selecionar-este-voo" class="py-2 px-4 text-white rounded" style="background-color: #E87722;">Selecionar Voo</button> </div>
-      </div>`;
+        <div class="flex justify-between items-center mb-4"> 
+          <h3 class="text-lg font-bold">Detalhes do Voo</h3> 
+          <button id="btn-fechar-detalhes" class="text-gray-500 hover:text-gray-700">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button> 
+        </div>
+        
+        <div class="border-b pb-3 mb-3"> 
+          <div class="flex justify-between items-center"> 
+            <div> 
+              <p class="text-2xl font-bold">${precoFormatado}</p> 
+              <p class="text-sm text-gray-600">Preço por pessoa</p> 
+            </div> 
+            <div> 
+              <p class="font-medium">${this.obterCompanhiasAereas(voo)}</p> 
+              <p class="text-sm text-gray-600">
+                ${infoIda?.paradas === 0 && (!infoVolta || infoVolta.paradas === 0) ? 'Voo direto' : 
+                  `${(infoIda?.paradas ?? 0) + (infoVolta?.paradas ?? 0)} parada(s)`}
+              </p> 
+            </div> 
+          </div> 
+        </div>
+        
+        <div class="mb-4"> 
+          <h4 class="font-medium mb-2">Ida (${this.formatarData(infoIda?.dataPartida)})</h4> 
+          <div class="voo-timeline">${this.renderizarTimelineVoos(voo.segment?.[0]?.flight || [])}</div> 
+        </div>
+        
+        ${infoVolta ? `
+        <div class="mt-4 pt-3 border-t"> 
+          <h4 class="font-medium mb-2">Volta (${this.formatarData(infoVolta?.dataPartida)})</h4> 
+          <div class="voo-timeline">${this.renderizarTimelineVoos(voo.segment?.[1]?.flight || [])}</div> 
+        </div>` : ''}
+        
+        <div class="mt-4 pt-3 border-t"> 
+          <h4 class="font-medium mb-2">Info</h4> 
+          <ul class="text-sm space-y-2"> 
+            <li class="flex items-start">
+              <span class="text-blue-600 mr-2">✓</span>
+              <span>Bagagem de mão (1 peça)</span>
+            </li> 
+            <li class="flex items-start">
+              <span class="text-blue-600 mr-2">✓</span>
+              <span>Refeição a bordo</span>
+            </li> 
+            <li class="flex items-start text-gray-600">
+              <span class="mr-2">ℹ️</span>
+              <span>Bagagem despachada opcional</span>
+            </li> 
+          </ul> 
+        </div>
+        
+        <div class="mt-4 pt-3 border-t flex justify-between"> 
+          <button id="btn-voltar-detalhes" class="py-2 px-4 border rounded">Voltar</button> 
+          <button id="btn-selecionar-este-voo" class="py-2 px-4 text-white rounded" style="background-color: #E87722;">
+            Selecionar Voo
+          </button> 
+        </div>
+      </div>
+    `;
+    
+    // Adiciona o modal ao DOM
     document.body.appendChild(modalContainer);
+    
+    // Configura eventos do modal
     document.getElementById('btn-fechar-detalhes')?.addEventListener('click', () => modalContainer.remove());
     document.getElementById('btn-voltar-detalhes')?.addEventListener('click', () => modalContainer.remove());
     document.getElementById('btn-selecionar-este-voo')?.addEventListener('click', () => { 
-        this.selecionarVoo(vooId); 
-        modalContainer.remove(); 
-        this.mostrarConfirmacaoSelecao(voo); 
+      this.selecionarVoo(vooId); 
+      modalContainer.remove(); 
+      this.mostrarConfirmacaoSelecao(voo); 
     });
-    modalContainer.addEventListener('click', (e) => { if (e.target === modalContainer) modalContainer.remove(); });
+    
+    // Fecha ao clicar fora
+    modalContainer.addEventListener('click', (e) => { 
+      if (e.target === modalContainer) modalContainer.remove(); 
+    });
   },
 
   renderizarTimelineVoos(voos) {
     if (!voos || !voos.length) return '<p>N/A</p>';
+    
     let timeline = '';
+    
     voos.forEach((v, i) => {
       const last = i === voos.length - 1;
-      const dP = new Date(v.local_departure_timestamp * 1000), dC = new Date(v.local_arrival_timestamp * 1000);
+      
+      // Processa timestamps para exibição
+      const dP = new Date(v.local_departure_timestamp * 1000);
+      const dC = new Date(v.local_arrival_timestamp * 1000);
       const hP = dP.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
       const hC = dC.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+      
+      // Obtém informações da companhia
       let cInfo = v.marketing_carrier || v.operating_carrier || 'N/A';
-      if (this.accumulatedAirlines[cInfo]) cInfo = this.accumulatedAirlines[cInfo].name || cInfo;
-      timeline += `<div class="voo-leg mb-3 pb-3 ${!last ? 'border-b border-dashed' : ''}"><div class="flex justify-between mb-2"><div><p class="font-bold">${hP}</p><p class="text-sm">${v.departure}</p></div><div class="text-center flex-1 px-2"><p class="text-xs text-gray-500">${this.formatarDuracao(v.duration)}</p><div class="h-0.5 bg-gray-300 my-2 relative"><div class="absolute -top-1 left-0 w-2 h-2 rounded-full bg-gray-500"></div><div class="absolute -top-1 right-0 w-2 h-2 rounded-full bg-gray-500"></div></div><p class="text-xs">${cInfo}</p></div><div><p class="font-bold">${hC}</p><p class="text-sm">${v.arrival}</p></div></div><div class="text-xs text-gray-600"><p>Voo ${v.marketing_carrier || v.operating_carrier}${v.number}</p><p>Aeronave: ${v.aircraft || 'N/A'}</p></div></div>`;
+      if (this.accumulatedAirlines[cInfo]) {
+        cInfo = this.accumulatedAirlines[cInfo].name || cInfo;
+      }
+      
+      // Renderiza trecho do voo
+      timeline += `
+        <div class="voo-leg mb-3 pb-3 ${!last ? 'border-b border-dashed' : ''}">
+          <div class="flex justify-between mb-2">
+            <div>
+              <p class="font-bold">${hP}</p>
+              <p class="text-sm">${v.departure}</p>
+            </div>
+            <div class="text-center flex-1 px-2">
+              <p class="text-xs text-gray-500">${this.formatarDuracao(v.duration)}</p>
+              <div class="h-0.5 bg-gray-300 my-2 relative">
+                <div class="absolute -top-1 left-0 w-2 h-2 rounded-full bg-gray-500"></div>
+                <div class="absolute -top-1 right-0 w-2 h-2 rounded-full bg-gray-500"></div>
+              </div>
+              <p class="text-xs">${cInfo}</p>
+            </div>
+            <div>
+              <p class="font-bold">${hC}</p>
+              <p class="text-sm">${v.arrival}</p>
+            </div>
+          </div>
+          <div class="text-xs text-gray-600">
+            <p>Voo ${v.marketing_carrier || v.operating_carrier}${v.number}</p>
+            <p>Aeronave: ${v.aircraft || 'N/A'}</p>
+          </div>
+        </div>
+      `;
+      
+      // Adiciona informações de conexão se não for o último trecho
       if (!last) {
         const prox = voos[i + 1];
         if (prox) {
           const tCon = Math.round((prox.local_departure_timestamp - v.local_arrival_timestamp) / 60);
-          timeline += `<div class="conexao-info mb-3 text-sm"><div class="flex items-center text-orange-700"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg><span class="ml-1">Conexão em ${v.arrival} • ${this.formatarDuracao(tCon)}</span></div></div>`;
+          timeline += `
+            <div class="conexao-info mb-3 text-sm">
+              <div class="flex items-center text-orange-700">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <line x1="12" y1="8" x2="12" y2="12"></line>
+                  <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                </svg>
+                <span class="ml-1">Conexão em ${v.arrival} • ${this.formatarDuracao(tCon)}</span>
+              </div>
+            </div>
+          `;
         }
       }
     });
+    
     return timeline;
   },
 
   mostrarConfirmacaoSelecao(voo) {
+    // Remove modal existente se houver
     document.getElementById('modal-confirmacao')?.remove();
+    
+    // Prepara dados do voo
     const preco = this.obterPrecoVoo(voo);
     const moeda = this.finalResults?.meta?.currency || 'BRL';
     const precoFormatado = this.formatarPreco(preco, moeda);
     const numPassageiros = this.obterQuantidadePassageiros();
     const precoTotal = preco * numPassageiros;
     const precoTotalFormatado = this.formatarPreco(precoTotal, moeda);
+    
+    // Cria o modal
     const modalContainer = document.createElement('div');
     modalContainer.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
     modalContainer.id = 'modal-confirmacao';
+    
+    // Conteúdo do modal
     modalContainer.innerHTML = `
       <div class="bg-white rounded-lg w-full max-w-md p-4">
         <div class="p-4 rounded-lg" style="background-color: rgba(232, 119, 34, 0.1);">
           <div class="flex items-start gap-3">
-            <div class="w-10 h-10 rounded-full overflow-hidden flex-shrink-0 bg-orange-100 border-2 border-orange-200"><img src="assets/images/tripinha/avatar-normal.png" alt="Tripinha" class="w-full h-full object-cover"></div>
-            <div> <p class="font-bold">Ótima escolha! Voo por ${precoFormatado}/pessoa.</p> ${numPassageiros > 1 ? `<div class="mt-2 bg-white bg-opacity-70 p-2 rounded"><p class="text-sm font-medium">Resumo:</p><div class="flex justify-between text-sm"><span>${precoFormatado} × ${numPassageiros} pas.</span><span>${precoTotalFormatado}</span></div></div>` : ''} <div class="mt-3"><label class="flex items-center space-x-2 cursor-pointer"><input type="checkbox" id="confirmar-selecao" class="form-checkbox h-5 w-5 rounded" style="color: #E87722;"><span>Sim, continuar!</span></label></div> <p class="mt-3 text-sm">Valor por pessoa (ida/volta). Próxima etapa: hospedagem.</p> </div>
+            <div class="w-10 h-10 rounded-full overflow-hidden flex-shrink-0 bg-orange-100 border-2 border-orange-200">
+              <img src="assets/images/tripinha/avatar-normal.png" alt="Tripinha" class="w-full h-full object-cover">
+            </div>
+            <div> 
+              <p class="font-bold">Ótima escolha! Voo por ${precoFormatado}/pessoa.</p> 
+              ${numPassageiros > 1 ? `
+                <div class="mt-2 bg-white bg-opacity-70 p-2 rounded">
+                  <p class="text-sm font-medium">Resumo:</p>
+                  <div class="flex justify-between text-sm">
+                    <span>${precoFormatado} × ${numPassageiros} pas.</span>
+                    <span>${precoTotalFormatado}</span>
+                  </div>
+                </div>` : ''} 
+              <div class="mt-3">
+                <label class="flex items-center space-x-2 cursor-pointer">
+                  <input type="checkbox" id="confirmar-selecao" class="form-checkbox h-5 w-5 rounded" style="color: #E87722;">
+                  <span>Sim, continuar!</span>
+                </label>
+              </div> 
+              <p class="mt-3 text-sm">Valor por pessoa (ida/volta). Próxima etapa: hospedagem.</p> 
+            </div>
           </div>
         </div>
-        <div class="flex gap-2 mt-4"> <button id="btn-cancelar" class="flex-1 py-2 px-4 border rounded">Voltar</button> <button id="btn-confirmar" class="flex-1 py-2 px-4 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed" style="background-color: #E87722;" disabled>Confirmar</button> </div>
-      </div>`;
+        <div class="flex gap-2 mt-4"> 
+          <button id="btn-cancelar" class="flex-1 py-2 px-4 border rounded">Voltar</button> 
+          <button id="btn-confirmar" class="flex-1 py-2 px-4 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed" style="background-color: #E87722;" disabled>Confirmar</button> 
+        </div>
+      </div>
+    `;
+    
+    // Adiciona o modal ao DOM
     document.body.appendChild(modalContainer);
+    
+    // Configura eventos do modal
     const chk = document.getElementById('confirmar-selecao');
     const btnC = document.getElementById('btn-confirmar');
     const btnX = document.getElementById('btn-cancelar');
-    chk.addEventListener('change', () => { btnC.disabled = !chk.checked; });
-    btnX.addEventListener('click', () => { modalContainer.remove(); });
-    btnC.addEventListener('click', () => {
+    
+    if (chk) {
+      chk.addEventListener('change', () => { 
+        if (btnC) btnC.disabled = !chk.checked; 
+      });
+    }
+    
+    if (btnX) {
+      btnX.addEventListener('click', () => { 
+        modalContainer.remove(); 
+      });
+    }
+    
+    if (btnC) {
+      btnC.addEventListener('click', () => {
+        // Salva os dados do voo selecionado
         const dadosVoo = { 
-            voo: this.vooSelecionado, 
-            preco, 
-            precoTotal, 
-            moeda, 
-            numPassageiros, 
-            infoIda: this.obterInfoSegmento(this.vooSelecionado.segment?.[0]), 
-            infoVolta: this.vooSelecionado.segment?.length > 1 ? this.obterInfoSegmento(this.vooSelecionado.segment[1]) : null, 
-            companhiaAerea: this.obterCompanhiasAereas(this.vooSelecionado), 
-            dataSelecao: new Date().toISOString() 
+          voo: this.vooSelecionado, 
+          preco, 
+          precoTotal, 
+          moeda, 
+          numPassageiros, 
+          infoIda: this.obterInfoSegmento(this.vooSelecionado.segment?.[0]), 
+          infoVolta: this.vooSelecionado.segment?.length > 1 ? 
+            this.obterInfoSegmento(this.vooSelecionado.segment[1]) : null, 
+          companhiaAerea: this.obterCompanhiasAereas(this.vooSelecionado), 
+          dataSelecao: new Date().toISOString() 
         };
+        
         localStorage.setItem('benetrip_voo_selecionado', JSON.stringify(dadosVoo));
         this.exibirToast('Voo selecionado! Redirecionando...', 'success');
-        setTimeout(() => { window.location.href = 'hotels.html'; }, 1500);
+        
+        // Redireciona para a próxima página
+        setTimeout(() => { 
+          window.location.href = 'hotels.html'; 
+        }, 1500);
+      });
+    }
+    
+    // Fecha ao clicar fora do modal
+    modalContainer.addEventListener('click', function(e) { 
+      if (e.target === this) this.remove(); 
     });
-    modalContainer.addEventListener('click', function(e) { if (e.target === this) this.remove(); });
   },
 
   carregarDadosUsuario() {
+    // Cache para evitar múltiplas leituras do localStorage
+    if (this.dadosUsuarioCache) return this.dadosUsuarioCache;
+    
     try {
-      return JSON.parse(localStorage.getItem('benetrip_user_data') || '{}');
-    } catch {
+      const dados = JSON.parse(localStorage.getItem('benetrip_user_data') || '{}');
+      this.dadosUsuarioCache = dados;
+      return dados;
+    } catch (erro) {
+      console.warn('Erro ao carregar dados do usuário:', erro);
       return {};
     }
   },
@@ -1246,36 +1918,37 @@ const BENETRIP_VOOS = {
     try {
       const r = dadosUsuario?.respostas;
       if (!r) throw new Error("Sem respostas");
+      
+      // Tenta obter o código de origem de diferentes campos
       let c = r.cidade_partida || r.partida || null;
-      if (c && typeof c === 'object') c = c.code || c.value || c.name || c.iata || null;
-      const br = {
-        'sao paulo': 'GRU',
-        'rio de janeiro': 'GIG',
-        'brasilia': 'BSB',
-        'salvador': 'SSA',
-        'recife': 'REC',
-        'fortaleza': 'FOR',
-        'belo horizonte': 'CNF',
-        'porto alegre': 'POA',
-        'curitiba': 'CWB',
-        'belem': 'BEL',
-        'manaus': 'MAO',
-        'florianopolis': 'FLN',
-        'natal': 'NAT',
-        'goiania': 'GYN'
-      };
+      
+      // Se for um objeto, extrai o código
+      if (c && typeof c === 'object') {
+        c = c.code || c.value || c.name || c.iata || null;
+      }
+      
+      // Se for uma string, tenta extrair o código IATA
       if (typeof c === 'string') {
+        // Se já for um código IATA, retorna
         if (/^[A-Z]{3}$/.test(c)) return c;
+        
+        // Tenta extrair de um formato como "City (XXX)"
         const m = c.match(/\(([A-Z]{3})\)/);
         if (m?.[1]) return m[1];
+        
+        // Busca no mapeamento de cidades conhecidas
         const l = c.toLowerCase().trim();
-        if (br[l]) return br[l];
+        if (this.IATA_MAP[l]) return this.IATA_MAP[l];
+        
+        // Valor padrão se nada for encontrado
         return 'GRU';
       }
     } catch (e) {
-      console.error("Erro origem:", e);
+      console.error("Erro ao obter origem:", e);
     }
-    console.warn('Origem GRU padrão.');
+    
+    // Valor padrão como fallback
+    console.warn('Origem GRU padrão será usada.');
     return 'GRU';
   },
 
@@ -1283,85 +1956,158 @@ const BENETRIP_VOOS = {
     try {
       const d = this.carregarDadosUsuario()?.respostas?.datas;
       if (!d?.dataIda) return "N/A";
+      
+      // Função auxiliar para formatar data
       const fmt = (s) => {
         const dt = new Date(s + 'T00:00:00');
         if (isNaN(dt.getTime())) return "Inválida";
+        
         const m = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
         return `${dt.getDate()} ${m[dt.getMonth()]} ${dt.getFullYear()}`;
       };
+      
+      // Processa a data de ida
       const idaF = fmt(d.dataIda);
+      
+      // Se não tiver data de volta, é só ida
       if (!d.dataVolta) return `${idaF} (Só ida)`;
+      
+      // Com data de volta
       const voltaF = fmt(d.dataVolta);
+      
+      // Se as datas forem no mesmo mês/ano, simplifica a exibição
       const ida = new Date(d.dataIda), volta = new Date(d.dataVolta);
       if (ida.getMonth() === volta.getMonth() && ida.getFullYear() === volta.getFullYear()) {
         const m = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
         return `${ida.getDate()} a ${volta.getDate()} ${m[ida.getMonth()]}, ${ida.getFullYear()}`;
       }
+      
+      // Caso contrário, exibe as datas completas
       return `${idaF} a ${voltaF}`;
     } catch (e) {
-      console.error("Erro datas:", e);
+      console.error("Erro ao processar datas:", e);
     }
+    
     return "N/A";
   },
 
   obterQuantidadePassageiros() {
     try {
       const r = this.carregarDadosUsuario()?.respostas;
+      
+      // Tenta obter quantidade de passageiros de diferentes formatos
+      
+      // Formato completo (adultos, crianças, bebês)
       const p = r?.passageiros;
-      if (p) return Math.max(1, (parseInt(p.adultos) || 0) + (parseInt(p.criancas) || 0) + (parseInt(p.bebes) || 0));
-      const ad = parseInt(r?.adultos) || 0, cr = parseInt(r?.criancas) || 0, bb = parseInt(r?.bebes) || 0;
+      if (p) {
+        return Math.max(1, 
+          (parseInt(p.adultos) || 0) + 
+          (parseInt(p.criancas) || 0) + 
+          (parseInt(p.bebes) || 0)
+        );
+      }
+      
+      // Formato separado (adultos, crianças, bebês)
+      const ad = parseInt(r?.adultos) || 0;
+      const cr = parseInt(r?.criancas) || 0;
+      const bb = parseInt(r?.bebes) || 0;
       if (ad > 0) return ad + cr + bb;
-      const q = parseInt(r?.quantidade_familia) || parseInt(r?.quantidade_amigos) || parseInt(r?.quantidade_pessoas) || 0;
+      
+      // Formato quantidade total
+      const q = parseInt(r?.quantidade_familia) || 
+                parseInt(r?.quantidade_amigos) || 
+                parseInt(r?.quantidade_pessoas) || 0;
       if (q > 0) return q;
+      
+      // Formato tipo de companhia
       const comp = r?.companhia;
-      if (comp === 0) return 1;
-      if (comp === 1) return 2;
-      if (comp >= 2) return Math.max(2, comp);
+      if (comp === 0) return 1;  // Sozinho
+      if (comp === 1) return 2;  // Casal
+      if (comp >= 2) return Math.max(2, comp);  // Grupo/família
     } catch (e) {
-      console.error("Erro passageiros:", e);
+      console.error("Erro ao obter quantidade de passageiros:", e);
     }
+    
+    // Valor padrão: 1 passageiro
     return 1;
   },
 
   configurarEventosAposRenderizacao() {
-    // Configura swipe e scroll-snap
-    if (typeof Hammer !== 'undefined') {
-       const sc = document.getElementById('voos-swipe-container');
-       if (sc) {
-         if (this.hammerInstance) this.hammerInstance.destroy();
-         this.hammerInstance = new Hammer(sc);
-         this.hammerInstance.on('swipeleft', () => this.proximoVoo());
-         this.hammerInstance.on('swiperight', () => this.vooAnterior());
-         this.hammerInstance.on('swipeleft swiperight', () => {
-           try {
-             const s = new Audio('assets/sounds/swipe.mp3');
-             s.volume = 0.2;
-             s.play().catch(()=>{});
-           } catch(e){} 
-         });
-       }
-    }
+    // Configura swipe e scroll-snap com tratamento de erros adequado
+    this.configurarSwipeGestures();
     
     // Configura eventos de scroll para atualizar card ativo
-    const sc = document.getElementById('voos-swipe-container');
-    if (sc && 'onscrollend' in window) {
-      sc.onscrollend = () => this.atualizarVooAtivoBaseadoNoScroll(sc);
-    } else if (sc) {
-      let st;
-      sc.onscroll = () => {
-        clearTimeout(st);
-        st = setTimeout(() => this.atualizarVooAtivoBaseadoNoScroll(sc), 150);
-      };
-    }
+    this.configurarScrollBehavior();
     
     // Configura ações dos cartões individuais
+    this.configurarEventosBotoes();
+    
+    // Configura resposta visual ao atingir o fim da lista
+    this.configurarFeedbackNavegacao();
+    
+    // Destaque visual para o primeiro cartão
+    this.destacarPrimeiroCard();
+    
+    // Configura sombras para indicar scroll
+    this.configurarShadowScroll();
+  },
+  
+  configurarSwipeGestures() {
+    // Configura gestos de swipe com Hammer.js, se disponível
+    if (typeof Hammer !== 'undefined') {
+      const sc = document.getElementById('voos-swipe-container');
+      if (sc) {
+        // CORREÇÃO: Destrói instância anterior se existir
+        if (this.hammerInstance) {
+          this.hammerInstance.destroy();
+        }
+        
+        // Cria nova instância
+        this.hammerInstance = new Hammer(sc);
+        
+        // Configura eventos
+        this.hammerInstance.on('swipeleft', () => this.proximoVoo());
+        this.hammerInstance.on('swiperight', () => this.vooAnterior());
+        
+        // Feedback sonoro
+        this.hammerInstance.on('swipeleft swiperight', () => {
+          try {
+            const s = new Audio('assets/sounds/swipe.mp3');
+            s.volume = 0.2;
+            s.play().catch(() => {});
+          } catch(e) {
+            // Silenciamos erros de áudio, pois não são críticos
+          } 
+        });
+      }
+    }
+  },
+  
+  configurarScrollBehavior() {
+    const sc = document.getElementById('voos-swipe-container');
+    if (!sc) return;
+    
+    // Usa API moderna se disponível
+    if ('onscrollend' in window) {
+      sc.onscrollend = () => this.atualizarVooAtivoBaseadoNoScroll(sc);
+    } else {
+      // Fallback para browsers que não suportam scrollend
+      sc.onscroll = () => {
+        // Evita chamadas múltiplas durante o scroll
+        clearTimeout(this.scrollTimeoutId);
+        this.scrollTimeoutId = setTimeout(() => 
+          this.atualizarVooAtivoBaseadoNoScroll(sc), 150);
+      };
+    }
+  },
+  
+  configurarEventosBotoes() {
+    // Configura eventos para botões de seleção em cada cartão
     document.querySelectorAll('.btn-select-voo').forEach(btn => {
       btn.addEventListener('click', (e) => {
         e.preventDefault();
         const vooId = btn.dataset.vooId;
-        if (vooId) {
-          this.selecionarVoo(vooId);
-        }
+        if (vooId) this.selecionarVoo(vooId);
       });
     });
     
@@ -1377,42 +2123,118 @@ const BENETRIP_VOOS = {
       });
     });
     
-    // Configura resposta visual ao atingir o fim da lista
-    const nextBtn = document.querySelector('.next-btn');
-    const prevBtn = document.querySelector('.prev-btn');
-    if (nextBtn && prevBtn) {
-      this.proximoVooOriginal = this.proximoVoo;
-      this.vooAnteriorOriginal = this.vooAnterior;
-      
-      this.proximoVoo = () => {
-        const maxIndex = this.finalResults?.proposals?.length - 1 || 0;
-        const isLast = this.indexVooAtivo >= maxIndex;
+    // Configura eventos para botões de alternância de visualização
+    const viewBtns = document.querySelectorAll('.view-btn');
+    const voosContainer = document.getElementById('voos-swipe-container');
+    
+    viewBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const view = btn.dataset.view;
+        viewBtns.forEach(b => b.classList.remove('view-btn-active'));
+        btn.classList.add('view-btn-active');
         
-        if (isLast) {
-          // Feedback visual quando chegou ao fim
-          nextBtn.classList.add('opacity-50');
-          setTimeout(() => nextBtn.classList.remove('opacity-50'), 300);
-        } else {
-          // Chama o método original
-          this.proximoVooOriginal();
+        if (voosContainer) {
+          if (view === 'list') {
+            voosContainer.classList.add('voos-list-view');
+            voosContainer.classList.remove('voos-card-view');
+          } else {
+            voosContainer.classList.add('voos-card-view');
+            voosContainer.classList.remove('voos-list-view');
+          }
         }
-      };
-      
-      this.vooAnterior = () => {
-        const isFirst = this.indexVooAtivo <= 0;
-        
-        if (isFirst) {
-          // Feedback visual quando chegou ao início
-          prevBtn.classList.add('opacity-50');
-          setTimeout(() => prevBtn.classList.remove('opacity-50'), 300);
-        } else {
-          // Chama o método original
-          this.vooAnteriorOriginal();
-        }
-      };
+      });
+    });
+    
+    // Ativa view de cards por padrão
+    if (voosContainer) {
+      voosContainer.classList.add('voos-card-view');
     }
     
-    // Hack visual: destaca o primeiro voo com delay para chamar atenção
+    // Configura evento para botão "Carregar mais"
+    const loadMoreBtn = document.querySelector('.load-more-btn');
+    if (loadMoreBtn && this.finalResults?.proposals) {
+      loadMoreBtn.addEventListener('click', () => this.carregarMaisResultados(loadMoreBtn));
+    }
+  },
+  
+  carregarMaisResultados(loadMoreBtn) {
+    const voosContainer = document.getElementById('voos-swipe-container');
+    if (!voosContainer || !this.finalResults?.proposals) return;
+    
+    // Determina quantos voos já foram carregados
+    const currentCount = voosContainer.children.length;
+    
+    // Obtém o próximo lote de voos
+    const nextBatch = this.finalResults.proposals.slice(currentCount, currentCount + 20);
+    
+    // Usa fragment para melhorar performance
+    const fragment = document.createDocumentFragment();
+    
+    // Cria cards para cada voo do lote
+    nextBatch.forEach((voo, idx) => {
+      const index = currentCount + idx;
+      const cardVoo = this.criarCardVoo(voo, index);
+      fragment.appendChild(cardVoo);
+    });
+    
+    // Adiciona todos os cards de uma vez
+    voosContainer.appendChild(fragment);
+    
+    // Atualiza contador do botão ou remove se não houver mais
+    const remaining = this.finalResults.proposals.length - voosContainer.children.length;
+    if (remaining <= 0) {
+      loadMoreBtn.parentElement.remove();
+    } else {
+      loadMoreBtn.textContent = `Carregar mais resultados (${remaining} restantes)`;
+    }
+  },
+  
+  configurarFeedbackNavegacao() {
+    // Configura feedback visual ao navegar pelos voos
+    const nextBtn = document.querySelector('.next-btn');
+    const prevBtn = document.querySelector('.prev-btn');
+    
+    if (!nextBtn || !prevBtn) return;
+    
+    // Guarda as funções originais
+    this.proximoVooOriginal = this.proximoVoo;
+    this.vooAnteriorOriginal = this.vooAnterior;
+    
+    // Sobrescreve com versões que dão feedback visual
+    this.proximoVoo = () => {
+      const maxIndex = this.finalResults?.proposals?.length - 1 || 0;
+      const isLast = this.indexVooAtivo >= maxIndex;
+      
+      if (isLast) {
+        // Feedback visual quando chegou ao fim
+        nextBtn.classList.add('opacity-50');
+        setTimeout(() => nextBtn.classList.remove('opacity-50'), 300);
+      } else {
+        // Chama o método original
+        this.proximoVooOriginal();
+      }
+    };
+    
+    this.vooAnterior = () => {
+      const isFirst = this.indexVooAtivo <= 0;
+      
+      if (isFirst) {
+        // Feedback visual quando chegou ao início
+        prevBtn.classList.add('opacity-50');
+        setTimeout(() => prevBtn.classList.remove('opacity-50'), 300);
+      } else {
+        // Chama o método original
+        this.vooAnteriorOriginal();
+      }
+    };
+    
+    // Adiciona eventos de clique nos botões
+    nextBtn.addEventListener('click', () => this.proximoVoo());
+    prevBtn.addEventListener('click', () => this.vooAnterior());
+  },
+  
+  destacarPrimeiroCard() {
+    // Destaca o primeiro voo com delay para chamar atenção
     setTimeout(() => {
       const firstCard = document.querySelector('.voo-card[data-voo-index="0"]');
       if (firstCard && !this.vooSelecionado) {
@@ -1420,57 +2242,66 @@ const BENETRIP_VOOS = {
         setTimeout(() => firstCard.classList.remove('voo-card-highlight'), 800);
       }
     }, 1000);
-    
-    // Acrescenta estilo de sobra nas bordas para indicar scroll
+  },
+  
+  configurarShadowScroll() {
+    // Adiciona sombras nas bordas para indicar conteúdo disponível no scroll
     const addScrollShadows = () => {
       const container = document.getElementById('voos-swipe-container');
       if (!container) return;
       
-      // Verifica se tem conteúdo à direita
+      // Verifica se tem conteúdo fora da área visível
       const hasMoreRight = container.scrollWidth > container.clientWidth + container.scrollLeft + 10;
-      // Verifica se tem conteúdo à esquerda
       const hasMoreLeft = container.scrollLeft > 10;
       
-      if (hasMoreRight) {
-        container.classList.add('shadow-right');
-      } else {
-        container.classList.remove('shadow-right');
-      }
-      
-      if (hasMoreLeft) {
-        container.classList.add('shadow-left');
-      } else {
-        container.classList.remove('shadow-left');
-      }
+      // Aplica classes CSS baseadas na condição
+      container.classList.toggle('shadow-right', hasMoreRight);
+      container.classList.toggle('shadow-left', hasMoreLeft);
     };
     
     // Aplica inicialmente
     addScrollShadows();
     
-    // E configura para se repetir no scroll
-    sc?.addEventListener('scroll', addScrollShadows);
+    // Configura para atualizar durante scroll
+    const sc = document.getElementById('voos-swipe-container');
+    if (sc) {
+      sc.addEventListener('scroll', addScrollShadows);
+    }
   },
 
   atualizarVooAtivoBaseadoNoScroll(swipeContainer) {
-    if (!swipeContainer) return;
-    const sL = swipeContainer.scrollLeft;
-    const cW = swipeContainer.querySelector('.voo-card')?.offsetWidth || 0;
-    if (cW > 0 && this.finalResults?.proposals?.length > 0) {
-      const nI = Math.round(sL / cW);
-      if (nI >= 0 && nI < this.finalResults.proposals.length && nI !== this.indexVooAtivo) {
-        this.indexVooAtivo = nI;
+    if (!swipeContainer || !this.finalResults?.proposals?.length) return;
+    
+    // Calcula o índice do voo ativo baseado na posição de scroll
+    const scrollLeft = swipeContainer.scrollLeft;
+    const cardWidth = swipeContainer.querySelector('.voo-card')?.offsetWidth || 0;
+    
+    if (cardWidth > 0) {
+      const novoIndice = Math.round(scrollLeft / cardWidth);
+      
+      // Verifica se o índice é válido e diferente do atual
+      if (novoIndice >= 0 && 
+          novoIndice < this.finalResults.proposals.length && 
+          novoIndice !== this.indexVooAtivo) {
+        
+        // Atualiza índice e voo ativo
+        this.indexVooAtivo = novoIndice;
         this.vooAtivo = this.finalResults.proposals[this.indexVooAtivo];
+        
+        // Atualiza a interface
         this.atualizarVooAtivo();
       }
     }
   },
 
   aplicarEstilosModernos() {
+    // Evita aplicar estilos duplicados
     const id = 'benetrip-voos-styles';
     if (document.getElementById(id)) return;
-    const s = document.createElement('style');
-    s.id = id;
-    s.textContent = `
+    
+    const styleElement = document.createElement('style');
+    styleElement.id = id;
+    styleElement.textContent = `
       /* Cores da identidade Benetrip */
       :root {
         --benetrip-orange: #E87722;
@@ -1486,6 +2317,7 @@ const BENETRIP_VOOS = {
         max-width: 100%; 
         overflow-x: hidden; 
         background-color: #f8f8f8;
+        height: 100%;
       }
       
       /* Estilos para o swipe container */
@@ -1499,11 +2331,36 @@ const BENETRIP_VOOS = {
         padding: 4px 8px;
         min-height: 350px;
         scrollbar-width: thin;
+        position: relative;
+      }
+      
+      /* Shadow edges para indicar scroll */
+      .voos-swipe-container.shadow-right::after {
+        content: '';
+        position: absolute;
+        top: 0;
+        right: 0;
+        height: 100%;
+        width: 24px;
+        background: linear-gradient(to right, transparent, rgba(0,0,0,0.1));
+        pointer-events: none;
+      }
+      
+      .voos-swipe-container.shadow-left::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        height: 100%;
+        width: 24px;
+        background: linear-gradient(to left, transparent, rgba(0,0,0,0.1));
+        pointer-events: none;
+        z-index: 1;
       }
       
       /* Scrollbar personalizada */
       .voos-swipe-container::-webkit-scrollbar {
-        height: 8px;
+        height: 6px;
       }
       .voos-swipe-container::-webkit-scrollbar-track {
         background: #f1f1f1;
@@ -1563,7 +2420,9 @@ const BENETRIP_VOOS = {
         box-shadow: 0 0 0 3px var(--benetrip-orange), 0 4px 6px rgba(0,0,0,0.1); 
         transform: translateY(-2px);
       }
-      .voo-card-highlight { animation: pulse 1s; }
+      .voo-card-highlight { 
+        animation: pulse 1s;
+      }
       .voo-selecionado { 
         box-shadow: 0 0 0 3px var(--benetrip-blue), 0 4px 8px rgba(0,0,0,0.15); 
         background-color: #f0f9ff; 
@@ -1593,7 +2452,9 @@ const BENETRIP_VOOS = {
         100% { box-shadow: 0 0 0 0 rgba(232, 119, 34, 0); } 
       }
       
-      .btn-pulsante { animation: button-pulse 1.5s 2; }
+      .btn-pulsante { 
+        animation: button-pulse 1.5s 2; 
+      }
       
       @keyframes button-pulse { 
         0% { transform: scale(1); } 
@@ -1721,7 +2582,7 @@ const BENETRIP_VOOS = {
         50% { transform: translateX(3px); } 
       }
       
-      /* Novos elementos de UI */
+      /* Elementos de UI adicionais */
       .view-selector {
         background-color: #fff;
       }
@@ -1795,21 +2656,48 @@ const BENETRIP_VOOS = {
         background-color: #dbeafe;
       }
       
-      .quality-stars {
-        font-size: 0.75rem;
-        opacity: 0.8;
+      /* Melhorias para acessibilidade */
+      .sr-only {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border-width: 0;
+      }
+      
+      /* Otimização para dispositivos de baixo desempenho */
+      @media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after {
+          animation-duration: 0.01ms !important;
+          animation-iteration-count: 1 !important;
+          transition-duration: 0.01ms !important;
+          scroll-behavior: auto !important;
+        }
       }
     `;
-    document.head.appendChild(s);
+    
+    document.head.appendChild(styleElement);
   },
 
   mostrarErro(mensagem) {
     console.error("Erro exibido:", mensagem);
+    
+    // Para qualquer operação em andamento
     this.pararPolling();
+    
+    // Atualiza o estado
     this.temErro = true;
     this.estaCarregando = false;
     this.mensagemErro = mensagem || 'Erro desconhecido.';
+    
+    // Atualiza a interface
     this.renderizarInterface();
+    
+    // Reporta o erro
     this.reportarErro({
       mensagem,
       searchId: this.searchId,
@@ -1820,48 +2708,60 @@ const BENETRIP_VOOS = {
 
   reportarErro(dadosErro) {
     console.warn("Dados erro:", dadosErro);
+    
     try {
-      const errs = JSON.parse(localStorage.getItem('benetrip_erros') || '[]');
-      errs.push(dadosErro);
-      if (errs.length > 10) errs.shift();
-      localStorage.setItem('benetrip_erros', JSON.stringify(errs));
+      // Limitado a 10 erros para não sobrecarregar o localStorage
+      const erros = JSON.parse(localStorage.getItem('benetrip_erros') || '[]');
+      erros.push(dadosErro);
+      
+      // Mantém apenas os 10 erros mais recentes
+      if (erros.length > 10) erros.shift();
+      
+      localStorage.setItem('benetrip_erros', JSON.stringify(erros));
     } catch (e) {
-      console.error("Erro ao salvar erro:", e);
+      console.error("Erro ao salvar log de erro:", e);
     }
   }
 
 }; // Fim do objeto BENETRIP_VOOS
 
-// Inicializar
+// Inicializar quando o DOM estiver pronto
 document.addEventListener('DOMContentLoaded', () => {
   if (document.getElementById('voos-container')) {
-    console.log('Inicializando módulo de voos Benetrip (v2.5.1)...');
+    console.log('Inicializando módulo de voos Benetrip (v3.0.0)...');
     BENETRIP_VOOS.init();
   }
 });
 
 // Listener visibilitychange para pausar/retomar polling quando aba fica em background
 document.addEventListener('visibilitychange', () => {
-  if (document.getElementById('voos-container')) {
+  if (document.getElementById('voos-container') && BENETRIP_VOOS) {
     if (document.visibilityState === 'hidden') {
+      // Pausa o polling quando aba está em background
       if (BENETRIP_VOOS.isPolling) {
         console.log('Aba em background: pausando polling...');
         clearInterval(BENETRIP_VOOS.pollingIntervalId);
         BENETRIP_VOOS.pollingIntervalId = null;
       }
     } else if (document.visibilityState === 'visible') {
+      // Retoma o polling quando aba volta ao primeiro plano
       if (BENETRIP_VOOS.isPolling && !BENETRIP_VOOS.pollingIntervalId) {
         console.log('Aba voltou ao primeiro plano: retomando polling...');
-        BENETRIP_VOOS.pollingIntervalId = setInterval(() => BENETRIP_VOOS.verificarResultadosPolling(), BENETRIP_VOOS.POLLING_INTERVAL_MS);
-        BENETRIP_VOOS.verificarResultadosPolling(); // Executar imediatamente
+        BENETRIP_VOOS.pollingIntervalId = setInterval(
+          () => BENETRIP_VOOS.verificarResultadosPolling(), 
+          BENETRIP_VOOS.POLLING_INTERVAL_MS
+        );
+        // Executa imediatamente uma vez
+        BENETRIP_VOOS.verificarResultadosPolling();
       }
     }
   }
 });
 
-// Listener de erro global
+// Listener de erro global para capturar erros não tratados
 window.addEventListener('error', (event) => {
   console.error('Erro global:', event);
+  
   if (document.getElementById('voos-container') && BENETRIP_VOOS) {
     BENETRIP_VOOS.reportarErro({
       tipo: 'erro_global',
@@ -1869,6 +2769,19 @@ window.addEventListener('error', (event) => {
       fonte: event.filename,
       linha: event.lineno,
       coluna: event.colno,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+// Tratamento para erros de promessas não capturadas
+window.addEventListener('unhandledrejection', (event) => {
+  console.error('Promessa não tratada:', event.reason);
+  
+  if (document.getElementById('voos-container') && BENETRIP_VOOS) {
+    BENETRIP_VOOS.reportarErro({
+      tipo: 'promessa_nao_tratada',
+      mensagem: event.reason?.message || 'Erro em promessa',
       timestamp: new Date().toISOString()
     });
   }
