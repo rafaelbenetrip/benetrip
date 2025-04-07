@@ -20,6 +20,25 @@
   },
   "routes": [
     {
+      "src": "/assets/js/(.*)\\.js",
+      "headers": {
+        "Content-Type": "application/javascript; charset=utf-8",
+        "Access-Control-Allow-Origin": "*",
+        "Cache-Control": "public, max-age=86400",
+        "X-Content-Type-Options": "nosniff"
+      },
+      "continue": true
+    },
+    {
+      "src": "/assets/css/(.*)\\.css",
+      "headers": {
+        "Content-Type": "text/css; charset=utf-8",
+        "Access-Control-Allow-Origin": "*",
+        "Cache-Control": "public, max-age=86400"
+      },
+      "continue": true
+    },
+    {
       "src": "/api/(.*)",
       "headers": {
         "Access-Control-Allow-Origin": "*",
@@ -60,6 +79,10 @@
     },
     {
       "src": "/assets/(.*)",
+      "headers": {
+        "Access-Control-Allow-Origin": "*",
+        "Cache-Control": "public, max-age=86400"
+      },
       "dest": "/public/assets/$1"
     },
     {
