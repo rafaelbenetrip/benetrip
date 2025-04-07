@@ -1,0 +1,110 @@
+/* Correções de visibilidade para voos */
+#voos-container {
+  min-height: 100vh;
+  width: 100%;
+  max-width: 480px;
+  margin: 0 auto;
+  position: relative;
+  background-color: #f8f8f8;
+}
+
+.voos-content {
+  padding-bottom: 80px;
+}
+
+.voos-lista {
+  overflow: hidden;
+  background-color: #fff;
+  border-radius: 8px;
+  margin: 8px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.voos-swipe-container {
+  display: flex !important;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  gap: 8px;
+  padding: 8px;
+}
+
+.voo-card {
+  flex: 0 0 calc(100% - 16px);
+  min-width: calc(100% - 16px);
+  scroll-snap-align: center;
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+  overflow: hidden;
+}
+
+.botao-selecao-fixo {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 12px;
+  background-color: white;
+  box-shadow: 0 -2px 5px rgba(0,0,0,0.1);
+  z-index: 999;
+  display: flex;
+}
+
+.btn-selecionar-voo {
+  width: 100%;
+  background-color: #E87722;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 12px;
+  font-weight: bold;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+}
+
+.flight-line {
+  height: 2px;
+  position: relative;
+}
+
+/* Força visibilidade dos elementos principais */
+.loading-container, 
+.erro-container, 
+.sem-resultados-container,
+.viagem-resumo {
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+/* Corrige z-index para garantir que toasts são visíveis */
+#toast-container {
+  z-index: 9999;
+  bottom: 80px;
+}
+
+/* Melhora as sombras laterais para indicar scroll */
+.shadow-right:after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  height: 100%;
+  width: 20px;
+  background: linear-gradient(to right, rgba(255,255,255,0), rgba(0,0,0,0.1));
+  pointer-events: none;
+}
+
+.shadow-left:before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 20px;
+  background: linear-gradient(to left, rgba(255,255,255,0), rgba(0,0,0,0.1));
+  pointer-events: none;
+}
