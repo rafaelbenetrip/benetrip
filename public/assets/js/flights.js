@@ -1057,6 +1057,8 @@ const BENETRIP_VOOS = {
       cardAtivo.classList.add('voo-card-highlight');
       setTimeout(() => cardAtivo.classList.remove('voo-card-highlight'), 500);
     }
+    
+    // Atualiza o botão de seleção
     const btnSelecionar = document.querySelector('.btn-selecionar-voo');
     if (btnSelecionar && this.vooAtivo) {
       const preco = this.obterPrecoVoo(this.vooAtivo);
@@ -1065,6 +1067,22 @@ const BENETRIP_VOOS = {
     } else if (btnSelecionar) {
         btnSelecionar.innerHTML = `<span>Escolher Este Voo</span><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"></path></svg>`;
     }
+    
+    // Atualiza manualmente o elemento de índice e os dots de paginação
+    const currentIndexElement = document.querySelector('.current-index');
+    if (currentIndexElement) {
+      currentIndexElement.textContent = (this.indexVooAtivo + 1).toString();
+    }
+    
+    // Atualiza dots de paginação
+    document.querySelectorAll('.pagination-dot').forEach((dot) => {
+      const dotIndex = parseInt(dot.dataset.index || '0');
+      if (dotIndex === this.indexVooAtivo) {
+        dot.classList.add('active');
+      } else {
+        dot.classList.remove('active');
+      }
+    });
   },
 
   selecionarVoo(vooId) {
@@ -1347,32 +1365,6 @@ const BENETRIP_VOOS = {
       });
     });
     
-    // Configura atualização de elementos da interface
-    const currentIndexElement = document.querySelector('.current-index');
-    if (currentIndexElement) {
-      // Atualiza o índice na paginação ao navegar
-      this.indexObserver = new MutationObserver(() => {
-        if (currentIndexElement) {
-          currentIndexElement.textContent = (this.indexVooAtivo + 1).toString();
-        }
-        
-        // Atualiza também os dots de paginação
-        document.querySelectorAll('.pagination-dot').forEach((dot, idx) => {
-          if (parseInt(dot.dataset.index) === this.indexVooAtivo) {
-            dot.classList.add('active');
-          } else {
-            dot.classList.remove('active');
-          }
-        });
-      });
-      
-      // Observa mudanças na propriedade indexVooAtivo
-      this.indexObserver.observe(this, {
-        attributes: true,
-        attributeFilter: ['indexVooAtivo']
-      });
-    }
-    
     // Configura cliques nos dots de paginação
     document.querySelectorAll('.pagination-dot').forEach(dot => {
       dot.addEventListener('click', () => {
@@ -1384,17 +1376,6 @@ const BENETRIP_VOOS = {
         }
       });
     });
-    
-    // Cliques nos controles de navegação já foram configurados na renderização
-    
-    // Hack visual: destaca o primeiro voo com delay para chamar atenção
-    setTimeout(() => {
-      const firstCard = document.querySelector('.voo-card[data-voo-index="0"]');
-      if (firstCard && !this.vooSelecionado) {
-        firstCard.classList.add('voo-card-highlight');
-        setTimeout(() => firstCard.classList.remove('voo-card-highlight'), 800);
-      }
-    }, 1000);
     
     // Configura resposta visual ao atingir o fim da lista
     const nextBtn = document.querySelector('.next-btn');
@@ -1430,6 +1411,15 @@ const BENETRIP_VOOS = {
         }
       };
     }
+    
+    // Hack visual: destaca o primeiro voo com delay para chamar atenção
+    setTimeout(() => {
+      const firstCard = document.querySelector('.voo-card[data-voo-index="0"]');
+      if (firstCard && !this.vooSelecionado) {
+        firstCard.classList.add('voo-card-highlight');
+        setTimeout(() => firstCard.classList.remove('voo-card-highlight'), 800);
+      }
+    }, 1000);
     
     // Acrescenta estilo de sobra nas bordas para indicar scroll
     const addScrollShadows = () => {
