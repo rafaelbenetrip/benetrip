@@ -192,12 +192,8 @@
         });
     </script>
     
-    <!-- Script de verificação de inicialização (uma única vez) -->
+    <!-- Script de verificação de inicialização -->
     <script>
-        // Flag para controlar execução única
-        window.beneTripFixApplied = false;
-        
-        // Verifica e inicializa explicitamente o módulo de voos
         document.addEventListener('DOMContentLoaded', function() {
             console.log('DOM Carregado - Verificando inicialização dos voos');
             
@@ -207,41 +203,30 @@
                     console.log('Inicializando voos manualmente...');
                     window.BENETRIP_VOOS.init();
                 }
-                
-                // Verificar se os elementos foram renderizados
-                const loadingEl = document.querySelector('.loading-container');
-                const voosLista = document.querySelector('.voos-lista');
-                
-                if (!loadingEl && !voosLista) {
-                    console.error('Elementos não renderizados! Tentando novamente...');
-                    if (window.BENETRIP_VOOS) {
-                        window.BENETRIP_VOOS.renderizarInterface();
-                    }
-                }
             }, 500);
         });
     </script>
     
-    <!-- Script de correção de visibilidade (EXECUTADO UMA ÚNICA VEZ) -->
+    <!-- Script de correção de visibilidade (OTIMIZADO) -->
     <script>
-        // Executa após um delay maior para garantir que tudo foi carregado
-        var fixVisibilityTimeout = setTimeout(function() {
-            // Evita múltiplas execuções
-            if (window.beneTripFixApplied) {
-                console.log('Correção já aplicada anteriormente. Ignorando...');
+        // Função de correção de visibilidade com garantias de renderização
+        function fixVisibility() {
+            // Verificar se já executou antes
+            if (window.visibilityFixApplied) {
+                console.log('Correção já aplicada. Ignorando...');
                 return;
             }
             
             console.log('Executando correção de visibilidade...');
-            window.beneTripFixApplied = true;
+            window.visibilityFixApplied = true;
             
             const container = document.getElementById('voos-container');
             
-            // Se temos resultados mas nada aparece
+            // Verificar se temos resultados a exibir
             if (window.BENETRIP_VOOS?.finalResults?.proposals?.length > 0) {
-                console.log(`Encontrados ${window.BENETRIP_VOOS.finalResults.proposals.length} voos, forçando renderização...`);
+                console.log(`Encontrados ${window.BENETRIP_VOOS.finalResults.proposals.length} voos, aplicando correções...`);
                 
-                // Forçar visibilidade do conteúdo principal
+                // 1. Corrigir container principal
                 if (container) {
                     container.style.position = 'relative';
                     container.style.minHeight = '100vh';
@@ -252,36 +237,35 @@
                     container.style.margin = '0 auto';
                 }
                 
-                // Restaurar a lista de voos caso esteja invisível
-                const existingList = document.querySelector('.voos-lista');
-                if (existingList) {
-                    console.log('Lista de voos existe, forçando visibilidade');
-                    existingList.style.display = 'block';
-                    existingList.style.visibility = 'visible';
-                    existingList.style.opacity = '1';
-                    existingList.style.position = 'relative';
-                    existingList.style.zIndex = '10';
-                } else if (window.BENETRIP_VOOS?.finalResults?.proposals?.length > 0 && container) {
-                    console.log('Re-renderizando a lista de voos');
-                    // Força recriação dos elementos
-                    const main = document.createElement('main');
-                    main.className = 'voos-content';
-                    container.appendChild(main);
-                    
-                    if (window.BENETRIP_VOOS.renderizarResumoViagem) {
-                        window.BENETRIP_VOOS.renderizarResumoViagem(main);
-                    }
-                    
-                    if (window.BENETRIP_VOOS.renderizarListaVoos) {
-                        window.BENETRIP_VOOS.renderizarListaVoos(main);
-                    }
-                    
-                    if (window.BENETRIP_VOOS.renderizarBotaoSelecao) {
-                        window.BENETRIP_VOOS.renderizarBotaoSelecao(container);
-                    }
+                // 2. Corrigir ou criar o conteúdo principal
+                let mainContent = document.querySelector('.voos-content');
+                if (!mainContent && container) {
+                    mainContent = document.createElement('main');
+                    mainContent.className = 'voos-content';
+                    container.appendChild(mainContent);
                 }
                 
-                // Procurar por cards de voo escondidos e forçar visibilidade
+                if (mainContent) {
+                    mainContent.style.display = 'block';
+                    mainContent.style.visibility = 'visible';
+                    mainContent.style.opacity = '1';
+                    mainContent.style.paddingBottom = '80px';
+                }
+                
+                // 3. Corrigir lista de voos
+                const listaVoos = document.querySelector('.voos-lista');
+                if (listaVoos) {
+                    listaVoos.style.display = 'block';
+                    listaVoos.style.visibility = 'visible';
+                    listaVoos.style.opacity = '1';
+                    listaVoos.style.position = 'relative';
+                    listaVoos.style.zIndex = '10';
+                } else if (mainContent && window.BENETRIP_VOOS.renderizarListaVoos) {
+                    // Tentar recriar a lista se não existir
+                    window.BENETRIP_VOOS.renderizarListaVoos(mainContent);
+                }
+                
+                // 4. Corrigir cards de voos individuais
                 const cards = document.querySelectorAll('.voo-card');
                 if (cards.length > 0) {
                     console.log(`Encontrados ${cards.length} cards, corrigindo visibilidade`);
@@ -292,42 +276,74 @@
                         card.style.position = 'relative';
                         card.style.minHeight = '200px';
                         card.style.width = '100%';
-                        card.style.border = '1px solid #ddd';
-                        card.style.borderRadius = '8px';
-                        card.style.marginBottom = '8px';
                         card.style.backgroundColor = 'white';
+                        card.style.borderRadius = '8px';
+                        card.style.boxShadow = '0 1px 4px rgba(0,0,0,0.1)';
+                        card.style.marginBottom = '8px';
                     });
                 }
                 
-                // Verificar se o swipe container está visível
+                // 5. Corrigir container de swipe
                 const swipeContainer = document.querySelector('.voos-swipe-container');
                 if (swipeContainer) {
-                    console.log('Corrigindo swipe container');
                     swipeContainer.style.display = 'flex';
+                    swipeContainer.style.visibility = 'visible';
+                    swipeContainer.style.opacity = '1';
                     swipeContainer.style.overflow = 'auto';
                     swipeContainer.style.width = '100%';
-                    swipeContainer.style.minHeight = '300px';
-                    swipeContainer.style.padding = '8px';
                 }
                 
-                // Forçar botão de seleção para ser visível
+                // 6. Garantir que o botão de seleção está visível
                 const botaoSelecao = document.querySelector('.botao-selecao-fixo');
                 if (botaoSelecao) {
-                    console.log('Corrigindo botão de seleção');
                     botaoSelecao.style.display = 'flex';
+                    botaoSelecao.style.visibility = 'visible';
                     botaoSelecao.style.position = 'fixed';
                     botaoSelecao.style.bottom = '0';
                     botaoSelecao.style.left = '0';
                     botaoSelecao.style.right = '0';
-                    botaoSelecao.style.padding = '10px';
-                    botaoSelecao.style.backgroundColor = 'white';
-                    botaoSelecao.style.borderTop = '1px solid #ddd';
                     botaoSelecao.style.zIndex = '999';
+                    botaoSelecao.style.backgroundColor = 'white';
+                    botaoSelecao.style.padding = '12px';
+                    botaoSelecao.style.boxShadow = '0 -2px 5px rgba(0,0,0,0.1)';
+                } else if (container && window.BENETRIP_VOOS.renderizarBotaoSelecao) {
+                    // Tentar recriar o botão se não existir
+                    window.BENETRIP_VOOS.renderizarBotaoSelecao(container);
                 }
                 
                 console.log('Correção de visibilidade aplicada com sucesso');
+            } else {
+                console.log('Sem voos para exibir ou dados não carregados ainda');
             }
-        }, 3000);
+        }
+        
+        // Executar a correção em múltiplos momentos para garantir aplicação
+        // 1. Após carregamento do DOM
+        document.addEventListener('DOMContentLoaded', function() {
+            setTimeout(fixVisibility, 1000);
+        });
+        
+        // 2. Quando o estado mudar para resultados carregados
+        if (window.BENETRIP_VOOS) {
+            // Preservar a função original
+            const originalRenderizarInterface = window.BENETRIP_VOOS.renderizarInterface;
+            
+            // Substituir com versão que aplica as correções após renderização
+            window.BENETRIP_VOOS.renderizarInterface = function() {
+                try {
+                    // Chamar a função original primeiro
+                    originalRenderizarInterface.apply(this, arguments);
+                } catch (e) {
+                    console.error('Erro ao renderizar interface original:', e);
+                }
+                
+                // Aplicar correções após a renderização
+                setTimeout(fixVisibility, 500);
+            };
+        }
+        
+        // 3. Aplicar correção após um tempo maior para garantir que tudo foi carregado
+        setTimeout(fixVisibility, 3000);
     </script>
 </body>
 </html>
