@@ -309,7 +309,7 @@ const BENETRIP_VOOS = {
     this.isPolling = false;
   },
 
-  // Função principal de polling CORRIGIDA para processar chunks
+  // Função principal de polling com TRATAMENTO EXPANDIDO para processar chunks
   async verificarResultadosPolling() {
     if (!this.isPolling) return;
 
@@ -347,37 +347,62 @@ const BENETRIP_VOOS = {
       const chunkData = await resposta.json();
       console.log(`Chunk recebido (Tentativa ${this.pollingAttempts}):`, chunkData); // Log do chunk bruto
 
+      // --- DIAGNÓSTICO EXPANDIDO: Verifica todos os itens do array ---
+      let proposalsTotal = 0;
+      let proposalsEmTodosItens = [];
+      if (Array.isArray(chunkData)) {
+          console.log(`Analisando array de ${chunkData.length} itens para buscar propostas:`);
+          chunkData.forEach((item, idx) => {
+              if (item && typeof item === 'object') {
+                  // Conta propostas em cada item
+                  const proposalsNoItem = Array.isArray(item.proposals) ? item.proposals.length : 0;
+                  const temSearchId = item.search_id === this.searchId;
+                  
+                  console.log(`Item ${idx}: search_id correto: ${temSearchId ? 'SIM' : 'NÃO'}, Propostas: ${proposalsNoItem}`);
+                  
+                  if (proposalsNoItem > 0) {
+                      // Guarda todas as propostas encontradas em qualquer item
+                      proposalsEmTodosItens.push(...item.proposals);
+                      proposalsTotal += proposalsNoItem;
+                  }
+                  
+                  // Também extrai airlines, airports, gates_info de todos os itens
+                  if (item.airlines) Object.assign(this.accumulatedAirlines, item.airlines);
+                  if (item.airports) Object.assign(this.accumulatedAirports, item.airports);
+                  if (item.gates_info) Object.assign(this.accumulatedGatesInfo, item.gates_info);
+                  if (item.meta) this.accumulatedMeta = { ...this.accumulatedMeta, ...item.meta };
+              }
+          });
+          
+          if (proposalsTotal > 0) {
+              console.log(`!!! ENCONTRADAS ${proposalsTotal} propostas em TODOS os itens do array !!!`);
+              // Acumula todas as propostas encontradas em todos os itens
+              this.accumulatedProposals.push(...proposalsEmTodosItens);
+          }
+      }
+
       // --- AJUSTE: Encontrar o objeto de dados relevante ---
       let chunkObject = null;
       if (Array.isArray(chunkData)) {
           // Procura o objeto no array que contém o search_id esperado
-          // A API parece retornar múltiplos objetos em alguns casos, precisamos achar o principal
           chunkObject = chunkData.find(item => item && typeof item === 'object' && item.search_id === this.searchId);
           if (!chunkObject) {
-              // Pode ser um array de outros tipos de dados ou um chunk intermediário sem o objeto principal?
               console.warn(`Array recebido, mas nenhum objeto encontrado com search_id ${this.searchId}. Conteúdo:`, chunkData);
-              // Decide se continua ou para. Por segurança, vamos continuar por enquanto.
-              // Se isso acontecer consistentemente, a estrutura da API é diferente do esperado.
           } else {
               console.log("Objeto principal do chunk encontrado dentro do array:", chunkObject);
           }
       } else if (chunkData && typeof chunkData === 'object') {
           // Se não for array, assume que é o objeto diretamente
-          // Verifica se tem o search_id correto (importante!)
           if (chunkData.search_id === this.searchId) {
              chunkObject = chunkData;
              console.log("Chunk recebido como objeto único:", chunkObject);
           } else if (Object.keys(chunkData).length === 1 && chunkData.search_id) {
-             // Caso especial: resposta "ainda buscando" com apenas search_id
              console.log('Busca ainda em andamento (resposta apenas com search_id)...');
-             // Não define chunkObject, vai continuar polling
           } else {
              console.warn(`Objeto recebido, mas search_id (${chunkData.search_id}) não corresponde ao esperado (${this.searchId}). Conteúdo:`, chunkData);
-             // Pode ser um erro ou estrutura inesperada. Continua polling por segurança.
           }
       } else {
           console.warn("Chunk recebido com status 200 mas formato inesperado (não array/objeto):", chunkData);
-          // Continua polling, pode ser erro transitório.
           return;
       }
 
@@ -389,61 +414,69 @@ const BENETRIP_VOOS = {
           const gatesInfoInChunk = chunkObject.gates_info;
           const metaInChunk = chunkObject.meta;
 
-          // Acumula dados (SEMPRE acumula meta, airlines, airports, pois podem vir em chunks diferentes)
+          // Acumula dados de referência
           if (airlinesInChunk) Object.assign(this.accumulatedAirlines, airlinesInChunk);
           if (airportsInChunk) Object.assign(this.accumulatedAirports, airportsInChunk);
           if (gatesInfoInChunk) Object.assign(this.accumulatedGatesInfo, gatesInfoInChunk);
           if (metaInChunk) this.accumulatedMeta = { ...this.accumulatedMeta, ...metaInChunk };
 
-          // Verifica se é o FIM da busca (chunk com proposals VAZIO)
-          // Importante: Verifica se proposals existe e é um array
+          // CORREÇÃO CRÍTICA: Um array vazio de proposals só significa fim da busca se:
+          // 1. Não é a primeira tentativa de polling (pollingAttempts > 1) E
+          // 2. Propostas já foram acumuladas anteriormente OU fizemos várias tentativas sem resultados
           if (proposalsInChunk && Array.isArray(proposalsInChunk)) {
-              if (proposalsInChunk.length === 0) {
-                  // --- É O FIM ---
-                  console.log(`Polling concluído! (Chunk final com proposals vazio recebido na tentativa ${this.pollingAttempts})`);
-                  this.pararPolling();
-                  this.estaCarregando = false;
-                  this.atualizarProgresso('Finalizando...', 100);
-
-                  // Monta o objeto final de resultados
-                  this.finalResults = {
-                      proposals: this.accumulatedProposals, // Usa as propostas acumuladas
-                      airlines: this.accumulatedAirlines,
-                      airports: this.accumulatedAirports,
-                      gates_info: this.accumulatedGatesInfo,
-                      meta: this.accumulatedMeta,
-                      search_id: this.searchId,
-                      segments: chunkObject.segments, // Pega do último chunk
-                      market: chunkObject.market     // Pega do último chunk
-                  };
-
-                  // Pré-processa as propostas acumuladas
-                  this.finalResults.proposals = this.preprocessarPropostas(this.finalResults.proposals);
-
-                  if (this.finalResults.proposals.length > 0) {
-                      this.exibirToast(`${this.finalResults.proposals.length} voos encontrados! ✈️`, 'success');
-                      console.log("Resultados finais montados:", this.finalResults);
-                  } else {
-                      console.log('Busca concluída sem resultados acumulados.');
-                      this.exibirToast('Não encontramos voos disponíveis.', 'warning');
-                  }
-                  this.renderizarInterface(); // Renderiza com os resultados finais
-
-              } else {
-                  // --- NÃO É O FIM: Acumula propostas e continua ---
+              if (proposalsInChunk.length > 0) {
+                  // --- Propostas encontradas no objeto principal: acumula e continua ---
+                  // Nota: As propostas de outros itens do array já foram acumuladas acima
+                  console.log(`Acumulando ${proposalsInChunk.length} propostas do objeto principal com search_id. Total acumulado: ${this.accumulatedProposals.length + proposalsInChunk.length}`);
                   this.accumulatedProposals.push(...proposalsInChunk);
-                  console.log(`Acumuladas ${this.accumulatedProposals.length} propostas. Esperando próximo chunk...`);
-                  // Continua polling (não faz nada aqui, o setInterval chama de novo)
+              } else if (proposalsInChunk.length === 0) {
+                  // --- Objeto principal tem proposals vazio: é fim da busca ou primeira tentativa? ---
+                  const ehFimDaBusca = 
+                      // Não é primeira tentativa E (já temos propostas OU várias tentativas sem resultado)
+                      (this.pollingAttempts > 1 && (this.accumulatedProposals.length > 0 || this.pollingAttempts >= 5)) ||
+                      // OU é 1ª tentativa mas encontramos propostas em outros objetos do array
+                      (this.pollingAttempts === 1 && proposalsTotal > 0);
+                  
+                  if (ehFimDaBusca) {
+                      // --- É O FIM REAL DA BUSCA ---
+                      console.log(`Polling concluído! (Array proposals vazio é realmente o fim na tentativa ${this.pollingAttempts})`);
+                      this.pararPolling();
+                      this.estaCarregando = false;
+                      this.atualizarProgresso('Finalizando...', 100);
+
+                      // Monta o objeto final de resultados
+                      this.finalResults = {
+                          proposals: this.accumulatedProposals,
+                          airlines: this.accumulatedAirlines,
+                          airports: this.accumulatedAirports,
+                          gates_info: this.accumulatedGatesInfo,
+                          meta: this.accumulatedMeta,
+                          search_id: this.searchId,
+                          segments: chunkObject.segments,
+                          market: chunkObject.market
+                      };
+
+                      // Pré-processa as propostas acumuladas
+                      this.finalResults.proposals = this.preprocessarPropostas(this.finalResults.proposals);
+
+                      if (this.finalResults.proposals.length > 0) {
+                          this.exibirToast(`${this.finalResults.proposals.length} voos encontrados! ✈️`, 'success');
+                          console.log("Resultados finais montados:", this.finalResults);
+                      } else {
+                          console.log('Busca concluída sem resultados acumulados.');
+                          this.exibirToast('Não encontramos voos disponíveis.', 'warning');
+                      }
+                      this.renderizarInterface();
+                  } else {
+                      // --- NÃO É O FIM AINDA: Continua polling ---
+                      console.log(`Array proposals vazio na tentativa ${this.pollingAttempts}, mas NÃO é o fim: ${this.pollingAttempts === 1 ? "É a 1ª tentativa" : "Ainda não temos propostas suficientes"}. Continuando polling...`);
+                  }
               }
           } else {
-              // proposalsInChunk não é um array ou não existe no chunkObject encontrado
               console.warn(`Chunk object encontrado, mas 'proposals' não é um array ou está ausente. Conteúdo do chunkObject:`, chunkObject);
-              // Decide se continua ou para. Vamos continuar por enquanto.
           }
       } else {
-          // Nenhum chunkObject relevante encontrado nesta tentativa (ou era só search_id)
           console.log(`Nenhum objeto de dados principal encontrado na tentativa ${this.pollingAttempts}. Continuando polling...`);
-          // Continua polling (não faz nada aqui, o setInterval chama de novo)
       }
 
     } catch (erro) {
