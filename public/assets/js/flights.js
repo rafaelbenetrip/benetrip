@@ -6,6 +6,7 @@
 // Módulo de Voos do Benetrip
 const BENETRIP_VOOS = {
   // --- Constantes ---
+  initialized: false, // Added this flag to track initialization
   INITIAL_WAIT_MS: 5000,
   POLLING_INTERVAL_MS: 3000,
   MAX_POLLING_ATTEMPTS: 40,
@@ -37,6 +38,7 @@ const BENETRIP_VOOS = {
   // --- Inicialização ---
   init() {
     console.log('Inicializando sistema de busca de voos v2.5.1 (Chunk Processing Fix)...');
+    this.initialized = true; // Set the initialization flag
     this.resetState();
     this.configurarEventos();
     if (!document.getElementById('toast-container')) {
@@ -45,11 +47,11 @@ const BENETRIP_VOOS = {
       toastContainer.className = 'toast-container';
       document.body.appendChild(toastContainer);
     }
+    this.aplicarEstilosModernos();
+    this.renderizarInterface(); // Render interface first
     this.carregarDestino()
       .then(() => this.iniciarBuscaVoos())
       .catch(erro => this.mostrarErro('Erro ao carregar destino. Tente selecionar novamente.'));
-    this.aplicarEstilosModernos();
-    this.renderizarInterface();
   },
 
   resetState() {
@@ -513,48 +515,65 @@ const BENETRIP_VOOS = {
 
   renderizarInterface() {
     try {
-      const container = document.getElementById('voos-container');
-      if (!container) { console.error('Container não encontrado'); return; }
-
-      const headerExistente = container.querySelector('.app-header');
-      container.innerHTML = '';
-      if (headerExistente) container.appendChild(headerExistente);
-      else this.renderizarHeader(container);
-
-      if (this.estaCarregando) {
-        this.renderizarCarregamento(container);
-      } else if (this.temErro) {
-        this.renderizarErro(container);
-      } else if (!this.finalResults || !this.finalResults.proposals || this.finalResults.proposals.length === 0) {
-        this.renderizarSemResultados(container);
-      } else {
-        const mainContent = document.createElement('main');
-        mainContent.className = 'voos-content';
-        container.appendChild(mainContent);
-
-        this.renderizarResumoViagem(mainContent);
-        this.renderizarListaVoos(mainContent);
-        this.renderizarBotaoSelecao(container);
-
-        if (!container.querySelector('#swipe-hint')) this.renderizarSwipeHint(container);
-        this.configurarEventosAposRenderizacao();
-
-        // Seleciona primeiro voo
-        const primeiroVoo = this.finalResults.proposals[0];
-        if (primeiroVoo) {
-          this.vooAtivo = primeiroVoo;
-          this.indexVooAtivo = 0;
-          this.atualizarVooAtivo();
+        console.log('Renderizando interface...');
+        const container = document.getElementById('voos-container');
+        if (!container) { 
+            console.error('Container #voos-container não encontrado!'); 
+            return; 
         }
-      }
+
+        // Limpa o container, preservando apenas o header se existir
+        const headerExistente = container.querySelector('.app-header');
+        container.innerHTML = '';
+        if (headerExistente) container.appendChild(headerExistente);
+        else this.renderizarHeader(container);
+
+        // Adiciona conteúdo com base no estado atual
+        if (this.estaCarregando) {
+            console.log('Renderizando estado: Carregando');
+            this.renderizarCarregamento(container);
+        } else if (this.temErro) {
+            console.log('Renderizando estado: Erro', this.mensagemErro);
+            this.renderizarErro(container);
+        } else if (!this.finalResults || !this.finalResults.proposals || this.finalResults.proposals.length === 0) {
+            console.log('Renderizando estado: Sem Resultados');
+            this.renderizarSemResultados(container);
+        } else {
+            console.log('Renderizando estado: Voos Encontrados', this.finalResults.proposals.length);
+            const mainContent = document.createElement('main');
+            mainContent.className = 'voos-content';
+            container.appendChild(mainContent);
+
+            this.renderizarResumoViagem(mainContent);
+            this.renderizarListaVoos(mainContent);
+            this.renderizarBotaoSelecao(container);
+
+            if (!container.querySelector('#swipe-hint')) this.renderizarSwipeHint(container);
+            
+            // Seleciona primeiro voo com atraso para garantir que o DOM está pronto
+            setTimeout(() => {
+                this.configurarEventosAposRenderizacao();
+                const primeiroVoo = this.finalResults.proposals[0];
+                if (primeiroVoo) {
+                    this.vooAtivo = primeiroVoo;
+                    this.indexVooAtivo = 0;
+                    this.atualizarVooAtivo();
+                }
+            }, 100);
+        }
+        
+        // Adiciona classe para indicar que a renderização foi concluída
+        container.classList.add('interface-rendered');
+        console.log('Renderização concluída');
     } catch (erro) {
-      console.error('Erro ao renderizar interface:', erro);
-       if (container) {
-           container.innerHTML = '';
-           this.renderizarHeader(container);
-           this.mensagemErro = 'Ocorreu um erro ao exibir os voos.';
-           this.renderizarErro(container);
-       }
+        console.error('Erro ao renderizar interface:', erro);
+        const container = document.getElementById('voos-container');
+        if (container) {
+            container.innerHTML = '';
+            this.renderizarHeader(container);
+            this.mensagemErro = 'Ocorreu um erro ao exibir os voos: ' + erro.message;
+            this.renderizarErro(container);
+        }
     }
   },
 
@@ -579,7 +598,19 @@ const BENETRIP_VOOS = {
     const loadingImage = 'assets/images/tripinha/loading.gif';
     const loading = document.createElement('div');
     loading.className = 'loading-container';
-    loading.innerHTML = `<div style="text-align: center; padding: 2rem 0;"><img src="${loadingImage}" alt="Tripinha carregando" class="loading-avatar" style="width: 100px; height: 100px; margin: 0 auto;" /><div class="loading-text" style="margin: 1rem 0;">Iniciando busca...</div><div class="progress-bar-container"><div class="progress-bar" role="progressbar" style="width: 10%;" aria-valuenow="10" aria-valuemin="0" aria-valuemax="100"></div></div><div class="loading-tips" style="margin-top: 1.5rem; font-size: 0.9rem; color: #666;"><p>💡 Dica: Preços mudam, reserve logo!</p></div></div>`;
+    loading.style.display = 'block';
+    loading.style.padding = '2rem';
+    loading.style.textAlign = 'center';
+    loading.innerHTML = `
+        <img src="${loadingImage}" alt="Tripinha carregando" class="loading-avatar" style="width: 100px; height: 100px; margin: 0 auto;" />
+        <div class="loading-text" style="margin: 1rem 0;">Iniciando busca...</div>
+        <div class="progress-bar-container" style="height: 8px; background-color: #eee; border-radius: 4px; overflow: hidden; margin: 0 auto; width: 80%; max-width: 300px;">
+            <div class="progress-bar" role="progressbar" style="width: 10%; height: 100%; background-color: #E87722; border-radius: 4px;" aria-valuenow="10" aria-valuemin="0" aria-valuemax="100"></div>
+        </div>
+        <div class="loading-tips" style="margin-top: 1.5rem; font-size: 0.9rem; color: #666;">
+            <p>💡 Dica: Preços mudam, reserve logo!</p>
+        </div>
+    `;
     container.appendChild(loading);
     this.atualizarProgresso(document.querySelector('.loading-text')?.textContent || 'Buscando...', parseFloat(document.querySelector('.progress-bar')?.style.width || '10'));
     
@@ -1873,3 +1904,4 @@ window.addEventListener('error', (event) => {
     });
   }
 });
+        
