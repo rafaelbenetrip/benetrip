@@ -108,3 +108,52 @@
   background: linear-gradient(to left, rgba(255,255,255,0), rgba(0,0,0,0.1));
   pointer-events: none;
 }
+
+/* Forçar visibilidade em TODOS os elementos importantes */
+#voos-container,
+.voos-content,
+.voos-lista,
+.voos-swipe-container,
+.voo-card,
+.botao-selecao-fixo,
+.btn-selecionar-voo {
+  visibility: visible !important;
+  opacity: 1 !important;
+  position: relative !important;
+  z-index: auto !important;
+}
+
+/* Garantir display apropriado para cada elemento */
+#voos-container {
+  display: block !important;
+}
+
+.voos-content {
+  display: block !important;
+}
+
+.voos-lista {
+  display: block !important;
+}
+
+.voo-card {
+  display: block !important;
+  min-height: 200px !important;
+  border: 1px solid #ddd !important;
+  padding: 12px !important;
+}
+
+/* Correções adicionais para o botão */
+.botao-selecao-fixo {
+  display: flex !important;
+  z-index: 1000 !important;
+}
+
+/* Debug visual - adiciona bordas para identificar elementos */
+.voos-lista {
+  border: 2px solid #00A3E0 !important;
+}
+
+.voos-swipe-container {
+  border: 1px dashed #E87722 !important;
+}
