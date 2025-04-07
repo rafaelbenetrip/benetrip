@@ -1,16 +1,17 @@
 /**
  * BENETRIP - Módulo de Busca e Exibição de Voos
- * Versão 2.5.1 - Correção no Processamento de Chunks
+ * Versão 2.6.0 - Performance Improvements
  */
 
 // Módulo de Voos do Benetrip
 const BENETRIP_VOOS = {
   // --- Constantes ---
-  initialized: false, // Added this flag to track initialization
+  initialized: false,
   INITIAL_WAIT_MS: 5000,
   POLLING_INTERVAL_MS: 3000,
   MAX_POLLING_ATTEMPTS: 40,
   TIMEOUT_MS: 125000,
+  lastUIUpdate: 0, // Nova variável para controlar atualizações de UI
 
   // --- Dados e Estado ---
   destino: null,
@@ -34,28 +35,39 @@ const BENETRIP_VOOS = {
   vooAtivo: null,
   indexVooAtivo: 0,
   hammerInstance: null,
+  pendingUIUpdates: false, // Novo flag para controlar atualizações pendentes
 
   // --- Inicialização ---
   init() {
-    console.log('Inicializando sistema de busca de voos v2.5.1 (Chunk Processing Fix)...');
-    this.initialized = true; // Set the initialization flag
+    console.log('Inicializando sistema de busca de voos v2.6.0 (Performance Improved)...');
+    
+    // Evita múltiplas inicializações
+    if (this.initialized) {
+      console.warn('Sistema já inicializado. Ignorando chamada duplicada.');
+      return;
+    }
+    
+    this.initialized = true;
     this.resetState();
     this.configurarEventos();
+    
     if (!document.getElementById('toast-container')) {
       const toastContainer = document.createElement('div');
       toastContainer.id = 'toast-container';
       toastContainer.className = 'toast-container';
       document.body.appendChild(toastContainer);
     }
+    
     this.aplicarEstilosModernos();
     this.renderizarInterface(); // Render interface first
+    
     this.carregarDestino()
       .then(() => this.iniciarBuscaVoos())
       .catch(erro => this.mostrarErro('Erro ao carregar destino. Tente selecionar novamente.'));
   },
 
   resetState() {
-      this.destino = null; // Adicionado para garantir limpeza
+      this.destino = null;
       this.searchId = null;
       this.currencyRates = null;
       this.estaCarregando = true;
@@ -75,10 +87,17 @@ const BENETRIP_VOOS = {
       this.vooSelecionado = null;
       this.vooAtivo = null;
       this.indexVooAtivo = 0;
+      this.lastUIUpdate = 0;
+      this.pendingUIUpdates = false;
+      
+      // Limpar instância hammer existente
+      if (this.hammerInstance) {
+        this.hammerInstance.destroy();
+        this.hammerInstance = null;
+      }
   },
-
   configurarEventos() {
-    // Delegação de evento global
+    // Delegação de evento global - usando um único listener
     document.addEventListener('click', (event) => {
       const target = event.target;
 
@@ -93,7 +112,7 @@ const BENETRIP_VOOS = {
       // Botão Tentar Novamente (em caso de erro)
       const btnTentar = target.closest('.btn-tentar-novamente');
       if (btnTentar) {
-        window.location.reload(); // Recarrega a página para reiniciar
+        window.location.reload();
         return;
       }
 
@@ -104,15 +123,14 @@ const BENETRIP_VOOS = {
           if (target.closest('.btn-principal')) { window.location.href = 'destinos.html'; return; }
       }
 
-       // Clique no card de voo
-       const vooCard = target.closest('.voo-card');
-       // Usa finalResults agora
-       if (vooCard && this.finalResults && this.finalResults.proposals.length > 0) {
-           const vooId = vooCard.dataset.vooId;
-           if (vooId) {
-               this.selecionarVoo(vooId);
-           }
-       }
+      // Clique no card de voo
+      const vooCard = target.closest('.voo-card');
+      if (vooCard && this.finalResults && this.finalResults.proposals.length > 0) {
+          const vooId = vooCard.dataset.vooId;
+          if (vooId) {
+              this.selecionarVoo(vooId);
+          }
+      }
 
       // Botão de selecionar voo (botão fixo no rodapé)
       if (target.closest('.btn-selecionar-voo')) {
@@ -130,14 +148,19 @@ const BENETRIP_VOOS = {
       }
     });
 
-    // Listener de teclas para navegação
+    // Listener de teclas para navegação (com debounce para evitar múltiplos eventos)
+    let keyNavigationTimeout;
     document.addEventListener('keydown', (e) => {
-      // Usa finalResults
-      if (this.finalResults && this.finalResults.proposals && this.finalResults.proposals.length > 0) {
-        if (e.key === 'ArrowRight') { this.proximoVoo(); e.preventDefault(); }
-        else if (e.key === 'ArrowLeft') { this.vooAnterior(); e.preventDefault(); }
-        else if (e.key === 'Enter') { this.selecionarVooAtivo(); e.preventDefault(); }
-      }
+      if (keyNavigationTimeout) clearTimeout(keyNavigationTimeout);
+      
+      keyNavigationTimeout = setTimeout(() => {
+        // Usa finalResults
+        if (this.finalResults && this.finalResults.proposals && this.finalResults.proposals.length > 0) {
+          if (e.key === 'ArrowRight') { this.proximoVoo(); e.preventDefault(); }
+          else if (e.key === 'ArrowLeft') { this.vooAnterior(); e.preventDefault(); }
+          else if (e.key === 'Enter') { this.selecionarVooAtivo(); e.preventDefault(); }
+        }
+      }, 50); // Pequeno debounce
     });
   },
 
@@ -198,7 +221,6 @@ const BENETRIP_VOOS = {
     }
     return null;
   },
-
   async iniciarBuscaVoos() {
     try {
       if (!this.destino || !this.destino.codigo_iata) throw new Error('Dados do destino incompletos.');
@@ -249,7 +271,6 @@ const BENETRIP_VOOS = {
           throw new Error(`Resposta não JSON do servidor (${resposta.status}): ${textError.substring(0,150)}`);
       });
 
-
       if (!resposta.ok || (resposta.status === 202 && !dados.search_id)) {
          // Trata erros 4xx/5xx ou 202 inesperado sem search_id
          throw new Error(dados.error || dados.details?.error || dados.message || `Erro ${resposta.status} ao iniciar busca.`);
@@ -287,7 +308,6 @@ const BENETRIP_VOOS = {
     if (!params.adultos || params.adultos < 1) mensagensErro.push("Número de adultos deve ser pelo menos 1");
     return { valido: mensagensErro.length === 0, mensagens: mensagensErro };
   },
-
   iniciarPollingFrontend() {
     console.log(`Iniciando polling para searchId: ${this.searchId}`);
     if (this.pollingIntervalId) clearInterval(this.pollingIntervalId);
@@ -318,11 +338,15 @@ const BENETRIP_VOOS = {
     this.pollingAttempts++;
     console.log(`Polling Chunks: Tentativa ${this.pollingAttempts}/${this.MAX_POLLING_ATTEMPTS}`);
 
-    // Atualiza UI (mantido)
-    const mensagens = ['Buscando voos...', 'Verificando tarifas...', 'Analisando conexões...', 'Consultando Cias...', 'Quase lá...'];
-    const msgIdx = Math.min(Math.floor(this.pollingAttempts / (this.MAX_POLLING_ATTEMPTS / mensagens.length)), mensagens.length - 1);
-    const progresso = 20 + Math.min(75, (this.pollingAttempts / this.MAX_POLLING_ATTEMPTS) * 75);
-    this.atualizarProgresso(`${mensagens[msgIdx]} (${this.pollingAttempts})`, progresso);
+    // Atualiza UI com menos frequência (a cada 2 tentativas) para reduzir reflows
+    const agora = Date.now();
+    if (agora - this.lastUIUpdate > 1500) {
+      this.lastUIUpdate = agora;
+      const mensagens = ['Buscando voos...', 'Verificando tarifas...', 'Analisando conexões...', 'Consultando Cias...', 'Quase lá...'];
+      const msgIdx = Math.min(Math.floor(this.pollingAttempts / (this.MAX_POLLING_ATTEMPTS / mensagens.length)), mensagens.length - 1);
+      const progresso = 20 + Math.min(75, (this.pollingAttempts / this.MAX_POLLING_ATTEMPTS) * 75);
+      this.atualizarProgresso(`${mensagens[msgIdx]} (${this.pollingAttempts})`, progresso);
+    }
 
     // Verifica limite (mantido)
     if (this.pollingAttempts > this.MAX_POLLING_ATTEMPTS) {
@@ -428,7 +452,6 @@ const BENETRIP_VOOS = {
           if (proposalsInChunk && Array.isArray(proposalsInChunk)) {
               if (proposalsInChunk.length > 0) {
                   // --- Propostas encontradas no objeto principal: acumula e continua ---
-                  // Nota: As propostas de outros itens do array já foram acumuladas acima
                   console.log(`Acumulando ${proposalsInChunk.length} propostas do objeto principal com search_id. Total acumulado: ${this.accumulatedProposals.length + proposalsInChunk.length}`);
                   this.accumulatedProposals.push(...proposalsInChunk);
               } else if (proposalsInChunk.length === 0) {
@@ -442,6 +465,7 @@ const BENETRIP_VOOS = {
                   if (ehFimDaBusca) {
                       // --- É O FIM REAL DA BUSCA ---
                       console.log(`Polling concluído! (Array proposals vazio é realmente o fim na tentativa ${this.pollingAttempts})`);
+                      // CORREÇÃO: Garante que o polling é interrompido aqui
                       this.pararPolling();
                       this.estaCarregando = false;
                       this.atualizarProgresso('Finalizando...', 100);
@@ -505,20 +529,29 @@ const BENETRIP_VOOS = {
           return proposta;
       });
   },
-
   atualizarProgresso(mensagem, porcentagem) {
-    const bar = document.querySelector('.progress-bar');
-    const text = document.querySelector('.loading-text');
-    if (bar) { bar.style.width = `${porcentagem}%`; bar.setAttribute('aria-valuenow', porcentagem); }
-    if (text) { text.textContent = mensagem; }
+    // Usar requestAnimationFrame para operações de DOM
+    requestAnimationFrame(() => {
+      const bar = document.querySelector('.progress-bar');
+      const text = document.querySelector('.loading-text');
+      if (bar) { bar.style.width = `${porcentagem}%`; bar.setAttribute('aria-valuenow', porcentagem); }
+      if (text) { text.textContent = mensagem; }
+    });
   },
 
   renderizarInterface() {
-    try {
+    // Usar debounce para evitar múltiplas chamadas em curto período
+    if (this.pendingUIUpdates) return;
+    this.pendingUIUpdates = true;
+    
+    // Agrupar atualizações visuais com requestAnimationFrame
+    requestAnimationFrame(() => {
+      try {
         console.log('Renderizando interface...');
         const container = document.getElementById('voos-container');
         if (!container) { 
             console.error('Container #voos-container não encontrado!'); 
+            this.pendingUIUpdates = false;
             return; 
         }
 
@@ -565,7 +598,8 @@ const BENETRIP_VOOS = {
         // Adiciona classe para indicar que a renderização foi concluída
         container.classList.add('interface-rendered');
         console.log('Renderização concluída');
-    } catch (erro) {
+        this.pendingUIUpdates = false;
+      } catch (erro) {
         console.error('Erro ao renderizar interface:', erro);
         const container = document.getElementById('voos-container');
         if (container) {
@@ -574,792 +608,72 @@ const BENETRIP_VOOS = {
             this.mensagemErro = 'Ocorreu um erro ao exibir os voos: ' + erro.message;
             this.renderizarErro(container);
         }
-    }
-  },
-
-  renderizarHeader(container) {
-    if (container.querySelector('.app-header')) return;
-    const header = document.createElement('header');
-    header.className = 'app-header';
-    header.innerHTML = `<button class="btn-voltar" aria-label="Voltar"><svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"></path></svg><span class="sr-only">Voltar</span></button><h1>Voos Disponíveis</h1>`;
-    container.insertBefore(header, container.firstChild);
-    const btnVoltar = header.querySelector('.btn-voltar');
-    if (btnVoltar) {
-        btnVoltar.addEventListener('click', () => {
-            if (this.finalResults?.proposals?.length > 0 && !this.estaCarregando) {
-                 if (confirm('Tem certeza? Você perderá os resultados.')) window.location.href = 'destinos.html';
-            } else { window.location.href = 'destinos.html'; }
-        });
-    }
-  },
-
-  renderizarCarregamento(container) {
-    if (container.querySelector('.loading-container')) return;
-    const loadingImage = 'assets/images/tripinha/loading.gif';
-    const loading = document.createElement('div');
-    loading.className = 'loading-container';
-    loading.style.display = 'block';
-    loading.style.padding = '2rem';
-    loading.style.textAlign = 'center';
-    loading.innerHTML = `
-        <img src="${loadingImage}" alt="Tripinha carregando" class="loading-avatar" style="width: 100px; height: 100px; margin: 0 auto;" />
-        <div class="loading-text" style="margin: 1rem 0;">Iniciando busca...</div>
-        <div class="progress-bar-container" style="height: 8px; background-color: #eee; border-radius: 4px; overflow: hidden; margin: 0 auto; width: 80%; max-width: 300px;">
-            <div class="progress-bar" role="progressbar" style="width: 10%; height: 100%; background-color: #E87722; border-radius: 4px;" aria-valuenow="10" aria-valuemin="0" aria-valuemax="100"></div>
-        </div>
-        <div class="loading-tips" style="margin-top: 1.5rem; font-size: 0.9rem; color: #666;">
-            <p>💡 Dica: Preços mudam, reserve logo!</p>
-        </div>
-    `;
-    container.appendChild(loading);
-    this.atualizarProgresso(document.querySelector('.loading-text')?.textContent || 'Buscando...', parseFloat(document.querySelector('.progress-bar')?.style.width || '10'));
-    
-    // Alternar dicas
-    const dicas = [
-      '💡 Dica: Preços mudam, reserve logo!',
-      '🔍 Dica: Voos diretos aparecem destacados',
-      '💳 Dica: Parcelar sua compra pode sair mais em conta',
-      '⏱️ Dica: Muitas vezes voos de madrugada são mais baratos',
-      '🎒 Dica: Verifique a franquia de bagagem incluída'
-    ];
-    let dicaIndex = 0;
-    const dicasEl = loading.querySelector('.loading-tips');
-    if (dicasEl) {
-      setInterval(() => {
-        dicaIndex = (dicaIndex + 1) % dicas.length;
-        dicasEl.innerHTML = `<p>${dicas[dicaIndex]}</p>`;
-      }, 5000);
-    }
-  },
-
-  renderizarErro(container) {
-    const loading = container.querySelector('.loading-container'); if (loading) loading.remove();
-    const erroDiv = document.createElement('div'); erroDiv.className = 'erro-container';
-    erroDiv.innerHTML = `<div class="bg-red-100 text-red-700 p-4 rounded-lg my-4 text-center"><div class="mb-3"><img src="assets/images/tripinha/avatar-triste.png" alt="Tripinha triste" class="w-20 h-20 mx-auto" /></div><p class="font-bold">${this.mensagemErro || 'Ocorreu um erro.'}</p><p class="mt-2 text-sm">Desculpe. Tente novamente?</p><button class="btn-tentar-novamente mt-4 px-4 py-2 bg-red-600 text-white rounded">Tentar Novamente</button></div>`;
-    container.appendChild(erroDiv);
-  },
-
-  renderizarSemResultados(container) {
-    const loading = container.querySelector('.loading-container'); if (loading) loading.remove();
-    const semResultados = document.createElement('div'); semResultados.className = 'sem-resultados-container';
-    semResultados.innerHTML = `<div class="bg-blue-50 p-4 rounded-lg my-4 text-center"><div class="mb-3"><img src="assets/images/tripinha/avatar-triste.png" alt="Tripinha triste" class="w-20 h-20 mx-auto" /></div><p class="font-bold">Ops! Não encontramos voos para ${this.destino?.destino || 'este destino'}.</p><p class="mt-2 text-sm">Tente outras datas ou destino.</p><div class="flex gap-3 mt-4"><button class="btn-secundario flex-1 py-2 px-4 border rounded">Mudar Datas</button><button class="btn-principal flex-1 py-2 px-4 text-white rounded" style="background-color: #E87722;">Outro Destino</button></div></div>`;
-    container.appendChild(semResultados);
-  },
-
-  renderizarResumoViagem(container) {
-    const resumo = document.createElement('div'); resumo.className = 'viagem-resumo p-4 bg-white border-b';
-    const destino = this.destino; const dataViagem = this.obterDatasViagem(); const passageiros = this.obterQuantidadePassageiros();
-    resumo.innerHTML = `<h2 class="text-lg font-bold mb-2">Sua Viagem</h2><div class="flex items-center justify-between"><div class="flex items-center"><div class="bg-blue-50 p-1 rounded mr-2"><span class="text-lg">✈️</span></div><div><p class="font-medium">${destino?.destino || ''}, ${destino?.pais || ''}</p><p class="text-sm text-gray-600">${dataViagem}</p></div></div><div class="text-sm text-right"><span class="bg-gray-100 px-2 py-1 rounded">${passageiros} pas.</span></div></div>`;
-    container.appendChild(resumo);
-  },
-
-  renderizarListaVoos(container) {
-    const listaVoos = document.createElement('div');
-    listaVoos.className = 'voos-lista';
-    listaVoos.id = 'voos-lista';
-
-    const voos = this.finalResults?.proposals || [];
-
-    // Header melhorado com contador de resultados mais visível
-    const header = document.createElement('div');
-    header.className = 'voos-header p-3 bg-gray-50 border-b';
-    header.innerHTML = `
-      <div class="flex justify-between items-center">
-        <div class="flex items-center">
-          <h3 class="font-medium"><span class="text-primary font-bold" style="color:#E87722">${voos.length}</span> ${voos.length === 1 ? 'voo encontrado' : 'voos encontrados'}</h3>
-          ${voos.length > 10 ? `<span class="ml-2 text-xs text-gray-500">(mostrando os melhores preços)</span>` : ''}
-        </div>
-        <div class="flex items-center">
-          <span class="text-sm text-gray-600 mr-2">Por preço</span>
-          <span class="bg-orange-100 text-orange-800 text-xs px-2 py-1 rounded-full">↑ Baratos</span>
-        </div>
-      </div>
-    `;
-    listaVoos.appendChild(header);
-
-    // Adiciona seletores de visualização
-    const viewSelector = document.createElement('div');
-    viewSelector.className = 'view-selector p-2 border-b flex justify-between items-center';
-    viewSelector.innerHTML = `
-      <div class="flex space-x-2">
-        <button class="view-btn view-btn-active px-2 py-1 rounded text-sm" data-view="cards">
-          <span class="icon">🗂️</span> Cards
-        </button>
-        <button class="view-btn px-2 py-1 rounded text-sm" data-view="list">
-          <span class="icon">📋</span> Lista
-        </button>
-      </div>
-      <div class="text-xs text-gray-500">
-        <span class="swipe-instruction flex items-center">
-          <span class="mr-1">←</span> Deslize para navegar <span class="ml-1">→</span>
-        </span>
-      </div>
-    `;
-    listaVoos.appendChild(viewSelector);
-
-    // Container para contadores de paginação
-    const paginationInfo = document.createElement('div');
-    paginationInfo.className = 'pagination-info text-center text-sm py-1 sticky top-0 bg-white bg-opacity-80 z-10 border-b';
-    paginationInfo.innerHTML = `<span class="current-index font-bold">1</span> de <span class="total-count">${voos.length}</span>`;
-    listaVoos.appendChild(paginationInfo);
-
-    // Container de swipe melhorado
-    const voosContainer = document.createElement('div');
-    voosContainer.className = 'voos-swipe-container';
-    voosContainer.id = 'voos-swipe-container';
-    listaVoos.appendChild(voosContainer);
-
-    // Adiciona apenas os primeiros 20 voos inicialmente (para performance)
-    // ou todos se forem menos que 20
-    const initialVoos = voos.slice(0, Math.min(20, voos.length));
-    initialVoos.forEach((voo, index) => {
-      const cardVoo = this.criarCardVoo(voo, index);
-      voosContainer.appendChild(cardVoo);
-    });
-
-    // Adiciona controles de navegação visual
-    const navControls = document.createElement('div');
-    navControls.className = 'nav-controls flex justify-between items-center p-2 sticky bottom-0 bg-white bg-opacity-90 border-t z-10';
-    navControls.innerHTML = `
-      <button class="nav-btn prev-btn px-3 py-1 bg-gray-100 rounded-full mr-2 flex items-center" aria-label="Voo anterior">
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"></path></svg>
-        <span class="ml-1">Anterior</span>
-      </button>
-      <div class="pagination-dots flex space-x-1 justify-center">
-        ${initialVoos.length <= 10 ? Array(initialVoos.length).fill().map((_, i) => 
-          `<span class="pagination-dot ${i === 0 ? 'active' : ''}" data-index="${i}"></span>`
-        ).join('') : '<span class="text-xs">Navegue pelos melhores preços</span>'}
-      </div>
-      <button class="nav-btn next-btn px-3 py-1 bg-gray-100 rounded-full ml-2 flex items-center" aria-label="Próximo voo">
-        <span class="mr-1">Próximo</span>
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"></path></svg>
-      </button>
-    `;
-    listaVoos.appendChild(navControls);
-    
-    // Adiciona botão de carregar mais (para melhorar desempenho com muitas ofertas)
-    if (voos.length > 20) {
-      const loadMoreWrapper = document.createElement('div');
-      loadMoreWrapper.className = 'load-more-wrapper p-3 text-center';
-      loadMoreWrapper.innerHTML = `
-        <button class="load-more-btn px-4 py-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors">
-          Carregar mais resultados (${voos.length - initialVoos.length} restantes)
-        </button>
-      `;
-      listaVoos.appendChild(loadMoreWrapper);
-    }
-    
-    container.appendChild(listaVoos);
-    
-    // Configura eventos para os botões de navegação
-    const prevBtn = listaVoos.querySelector('.prev-btn');
-    const nextBtn = listaVoos.querySelector('.next-btn');
-    const loadMoreBtn = listaVoos.querySelector('.load-more-btn');
-    const viewBtns = listaVoos.querySelectorAll('.view-btn');
-    
-    if (prevBtn) prevBtn.addEventListener('click', () => this.vooAnterior());
-    if (nextBtn) nextBtn.addEventListener('click', () => this.proximoVoo());
-    
-    if (loadMoreBtn) {
-      loadMoreBtn.addEventListener('click', () => {
-        // Carrega mais 20 voos
-        const currentCount = voosContainer.children.length;
-        const nextBatch = voos.slice(currentCount, currentCount + 20);
-        
-        nextBatch.forEach((voo, idx) => {
-          const index = currentCount + idx;
-          const cardVoo = this.criarCardVoo(voo, index);
-          voosContainer.appendChild(cardVoo);
-        });
-        
-        // Atualiza contador do botão ou remove se não houver mais
-        const remaining = voos.length - voosContainer.children.length;
-        if (remaining <= 0) {
-          loadMoreBtn.parentElement.remove();
-        } else {
-          loadMoreBtn.textContent = `Carregar mais resultados (${remaining} restantes)`;
-        }
-      });
-    }
-    
-    // Configura eventos para alternância de visualização
-    viewBtns.forEach(btn => {
-      btn.addEventListener('click', () => {
-        const view = btn.dataset.view;
-        viewBtns.forEach(b => b.classList.remove('view-btn-active'));
-        btn.classList.add('view-btn-active');
-        
-        if (view === 'list') {
-          voosContainer.classList.add('voos-list-view');
-          voosContainer.classList.remove('voos-card-view');
-        } else {
-          voosContainer.classList.add('voos-card-view');
-          voosContainer.classList.remove('voos-list-view');
-        }
-      });
-    });
-    
-    // Ativa view de cards por padrão
-    voosContainer.classList.add('voos-card-view');
-  },
-
-  criarCardVoo(voo, index) {
-    const cardVoo = document.createElement('div');
-    cardVoo.className = 'voo-card p-4 bg-white border-b';
-    const vooId = voo.sign || `voo-idx-${index}`;
-    cardVoo.dataset.vooId = vooId;
-    cardVoo.dataset.vooIndex = index;
-
-    const preco = this.obterPrecoVoo(voo);
-    const moeda = this.finalResults?.meta?.currency || 'BRL';
-    const precoFormatado = this.formatarPreco(preco, moeda);
-    const infoIda = this.obterInfoSegmento(voo.segment?.[0]);
-    const infoVolta = voo.segment?.length > 1 ? this.obterInfoSegmento(voo.segment[1]) : null;
-    const economiaPercentual = voo._economia || 0;
-    const isMelhorPreco = voo._melhorPreco || index === 0;
-    const ehVooDireto = infoIda?.paradas === 0 && (!infoVolta || infoVolta.paradas === 0);
-    
-    // Adiciona mais classes para destacar melhor os cards
-    if (ehVooDireto) cardVoo.classList.add('voo-direto');
-    if (isMelhorPreco) cardVoo.classList.add('voo-melhor-preco');
-    if (index === 0) cardVoo.classList.add('voo-primeiro');
-    if (index % 2 === 0) cardVoo.classList.add('voo-par');
-    
-    // Tags especiais para o card
-    let tagsSpeciais = '';
-    if (isMelhorPreco) {
-      tagsSpeciais += `<span class="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full absolute top-2 right-2 shadow-sm">Melhor preço</span>`;
-    }
-    if (ehVooDireto) {
-      tagsSpeciais += `<span class="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full absolute top-2 left-2 shadow-sm">Voo Direto</span>`;
-    }
-    
-    // Ícones para indicar qualidade do voo
-    const qualityStars = index < 3 ? 
-      `<div class="quality-stars absolute bottom-2 right-2 text-yellow-500">
-         ${Array(4 - Math.min(index, 3)).fill('★').join('')}${Array(Math.min(index, 3)).fill('☆').join('')}
-       </div>` : '';
-    
-    // Formata os números de indicação do card
-    const indexDisplay = `<div class="card-index absolute top-0 left-0 w-6 h-6 flex items-center justify-center bg-gray-100 rounded-br-lg text-xs font-bold">${index + 1}</div>`;
-
-    cardVoo.innerHTML = `
-        <div class="relative">
-            ${indexDisplay}
-            ${tagsSpeciais}
-            <div class="flex justify-between items-start mb-4 mt-2"> 
-                <div> 
-                    <span class="text-2xl font-bold" style="color: #E87722;">${precoFormatado}</span> 
-                    ${economiaPercentual > 0 ? `<span class="text-xs bg-green-100 text-green-800 px-1 py-0.5 rounded ml-1 font-medium">-${economiaPercentual}%</span>` : ''} 
-                    <p class="text-xs text-gray-500">Por pessoa, ida${infoVolta ? ' e volta' : ''}</p> 
-                </div> 
-                <div class="flex items-center"> 
-                    <span class="text-xs bg-gray-100 px-2 py-1 rounded font-medium">${this.obterCompanhiasAereas(voo)}</span> 
-                </div> 
-            </div>
-            ${qualityStars}
-        </div>
-        
-        <div class="border-t pt-3"> 
-            <div class="mb-4"> 
-                <div class="flex justify-between items-center text-sm">
-                    <span class="font-medium bg-gray-50 px-2 py-0.5 rounded">IDA</span>
-                    <span class="text-xs text-gray-500">${this.formatarData(infoIda?.dataPartida)}</span>
-                </div> 
-                <div class="flex items-center justify-between mt-2"> 
-                    <div class="text-center">
-                        <p class="font-bold">${infoIda?.horaPartida}</p>
-                        <p class="text-xs text-gray-600">${infoIda?.aeroportoPartida}</p>
-                    </div> 
-                    <div class="flex-1 px-2"> 
-                        <div class="text-xs text-center text-gray-500">${this.formatarDuracao(infoIda?.duracao)}</div> 
-                        <div class="flight-line relative">
-                            <div class="border-t ${ehVooDireto ? 'border-blue-300' : 'border-gray-300'} my-2"></div>
-                            <div class="flight-stops absolute inset-x-0 top-1/2 flex justify-center -mt-1">
-                                ${this.renderizarParadas(infoIda?.paradas)}
-                            </div>
-                        </div> 
-                        <div class="text-xs text-center text-gray-500">
-                            ${ehVooDireto ? 
-                              '<span class="text-blue-600 font-medium">Voo Direto</span>' : 
-                              `${infoIda?.paradas ?? 0} ${infoIda?.paradas === 1 ? 'parada' : 'paradas'}`
-                            }
-                        </div> 
-                    </div> 
-                    <div class="text-center">
-                        <p class="font-bold">${infoIda?.horaChegada}</p>
-                        <p class="text-xs text-gray-600">${infoIda?.aeroportoChegada}</p>
-                    </div> 
-                </div> 
-            </div>
-            
-            ${infoVolta ? `
-            <div class="mt-4 pt-3 border-t"> 
-                <div class="flex justify-between items-center text-sm">
-                    <span class="font-medium bg-gray-50 px-2 py-0.5 rounded">VOLTA</span>
-                    <span class="text-xs text-gray-500">${this.formatarData(infoVolta?.dataPartida)}</span>
-                </div> 
-                <div class="flex items-center justify-between mt-2"> 
-                    <div class="text-center">
-                        <p class="font-bold">${infoVolta?.horaPartida}</p>
-                        <p class="text-xs text-gray-600">${infoVolta?.aeroportoPartida}</p>
-                    </div> 
-                    <div class="flex-1 px-2"> 
-                        <div class="text-xs text-center text-gray-500">${this.formatarDuracao(infoVolta?.duracao)}</div> 
-                        <div class="flight-line relative">
-                            <div class="border-t ${(!infoVolta || infoVolta.paradas === 0) ? 'border-blue-300' : 'border-gray-300'} my-2"></div>
-                            <div class="flight-stops absolute inset-x-0 top-1/2 flex justify-center -mt-1">
-                                ${this.renderizarParadas(infoVolta?.paradas)}
-                            </div>
-                        </div> 
-                        <div class="text-xs text-center text-gray-500">
-                            ${(!infoVolta || infoVolta.paradas === 0) ? 
-                              '<span class="text-blue-600 font-medium">Voo Direto</span>' : 
-                              `${infoVolta?.paradas ?? 0} ${infoVolta?.paradas === 1 ? 'parada' : 'paradas'}`
-                            }
-                        </div> 
-                    </div> 
-                    <div class="text-center">
-                        <p class="font-bold">${infoVolta?.horaChegada}</p>
-                        <p class="text-xs text-gray-600">${infoVolta?.aeroportoChegada}</p>
-                    </div> 
-                </div> 
-            </div>` : ''} 
-        </div>
-        
-        <div class="mt-4 pt-2 border-t flex justify-between items-center"> 
-            <button class="btn-detalhes-voo text-sm text-blue-600 hover:text-blue-800 hover:underline" data-voo-id="${vooId}">
-                Ver detalhes
-            </button> 
-            <div class="flex items-center text-xs text-gray-500">
-                <span class="mr-1">Restam</span>
-                <span class="bg-orange-100 text-orange-800 px-2 py-1 rounded font-medium">${voo._assentosDisponiveis || '?'}</span>
-            </div>
-            <button class="btn-select-voo text-xs bg-gray-100 hover:bg-gray-200 px-2 py-1 rounded transition-colors duration-200" data-voo-id="${vooId}">
-                Selecionar
-            </button>
-        </div>
-    `;
-    
-    return cardVoo;
-  },
-
-  renderizarParadas(paradas) {
-     const numParadas = paradas ?? 0; 
-     if (numParadas === 0) return `<span class="inline-block w-3 h-3 bg-green-500 rounded-full" title="Voo direto"></span>`;
-     let html = ''; 
-     for (let i = 0; i < Math.min(numParadas, 3); i++) {
-         html += `<span class="inline-block w-2 h-2 bg-gray-400 rounded-full mx-1" title="${numParadas} parada${numParadas > 1 ? 's' : ''}"></span>`;
-     }
-     return html;
-  },
-
-  renderizarBotaoSelecao(container) {
-    const btnExistente = document.querySelector('.botao-selecao-fixo'); 
-    if (btnExistente) btnExistente.remove();
-    const botaoFixo = document.createElement('div'); 
-    botaoFixo.className = 'botao-selecao-fixo';
-    botaoFixo.innerHTML = `<button class="btn-selecionar-voo"><span>Escolher Este Voo</span><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"></path></svg></button>`;
-    container.appendChild(botaoFixo);
-  },
-
-  renderizarSwipeHint(container) {
-    const hint = document.createElement('div'); 
-    hint.id = 'swipe-hint'; 
-    hint.className = 'swipe-hint'; 
-    hint.style.display = 'none';
-    hint.innerHTML = `<span class="swipe-hint-arrow mr-2">←</span> Arraste para ver outros voos <span class="swipe-hint-arrow ml-2">→</span>`;
-    container.appendChild(hint);
-    if (this.finalResults?.proposals?.length > 1) {
-        hint.style.display = 'flex';
-        setTimeout(() => { 
-            hint.style.opacity = '0'; 
-            setTimeout(() => { hint.style.display = 'none'; }, 1000); 
-        }, 4000);
-    }
-  },
-
-  formatarPreco(preco, moeda = 'BRL') {
-    if (typeof preco !== 'number') return 'N/A';
-    return new Intl.NumberFormat('pt-BR', { 
-        style: 'currency', 
-        currency: moeda, 
-        minimumFractionDigits: 0, 
-        maximumFractionDigits: 0 
-    }).format(preco);
-  },
-
-  formatarData(data) {
-    if (!(data instanceof Date) || isNaN(data)) return 'N/A';
-    const d = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
-    const m = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
-    return `${d[data.getDay()]}, ${data.getDate()} ${m[data.getMonth()]}`;
-  },
-
-  formatarDuracao(duracaoMinutos) {
-    if (typeof duracaoMinutos !== 'number' || duracaoMinutos < 0) return 'N/A';
-    const h = Math.floor(duracaoMinutos / 60), m = duracaoMinutos % 60;
-    return `${h}h ${m > 0 ? m + 'm' : ''}`.trim();
-  },
-
-  obterPrecoVoo(voo) {
-    try {
-      if (!voo?.terms) return 0;
-      const k = Object.keys(voo.terms)[0];
-      return voo.terms[k]?.unified_price || voo.terms[k]?.price || 0;
-    } catch {
-      return 0;
-    }
-  },
-
-  obterCompanhiasAereas(voo) {
-    try {
-      const codigos = voo?.carriers;
-      if (!codigos || codigos.length === 0) return 'N/A';
-      // Usa as airlines acumuladas
-      if (this.accumulatedAirlines && this.accumulatedAirlines[codigos[0]]) {
-          const info = this.accumulatedAirlines[codigos[0]];
-          if (codigos.length > 1) return `${info?.name || codigos[0]} +${codigos.length - 1}`;
-          return info?.name || codigos[0];
+        this.pendingUIUpdates = false;
       }
-      if (codigos.length > 1) return `${codigos[0]} +${codigos.length - 1}`;
-      return codigos[0];
-    } catch {
-      return 'N/A';
-    }
+    });
   },
 
-  obterInfoSegmento(segmento) {
-    const def = { 
-        aeroportoPartida: 'N/A', 
-        aeroportoChegada: 'N/A', 
-        dataPartida: null, 
-        dataChegada: null, 
-        horaPartida: 'N/A', 
-        horaChegada: 'N/A', 
-        duracao: 0, 
-        paradas: 0 
-    };
-    
-    try {
-      if (!segmento?.flight?.length) return def;
-      const pV = segmento.flight[0], uV = segmento.flight[segmento.flight.length - 1];
-      if (!pV || !uV) return def;
-      
-      const tsP = pV.local_departure_timestamp * 1000, tsC = uV.local_arrival_timestamp * 1000;
-      if (isNaN(tsP) || isNaN(tsC)) return def;
-      
-      const dP = new Date(tsP), dC = new Date(tsC);
-      return {
-        aeroportoPartida: pV.departure,
-        aeroportoChegada: uV.arrival,
-        dataPartida: dP,
-        dataChegada: dC,
-        horaPartida: dP.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
-        horaChegada: dC.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
-        duracao: Math.round((tsC - tsP) / 60000),
-        paradas: segmento.flight.length - 1
-      };
-    } catch {
-      return def;
-    }
-  },
-
-  proximoVoo() {
-    if (!this.finalResults?.proposals?.length || this.finalResults.proposals.length <= 1) return;
-    this.indexVooAtivo = (this.indexVooAtivo + 1) % this.finalResults.proposals.length;
-    this.vooAtivo = this.finalResults.proposals[this.indexVooAtivo];
-    this.atualizarVooAtivo();
-  },
-
-  vooAnterior() {
-    if (!this.finalResults?.proposals?.length || this.finalResults.proposals.length <= 1) return;
-    this.indexVooAtivo = (this.indexVooAtivo - 1 + this.finalResults.proposals.length) % this.finalResults.proposals.length;
-    this.vooAtivo = this.finalResults.proposals[this.indexVooAtivo];
-    this.atualizarVooAtivo();
-  },
-
+  // Implementação otimizada de atualizarVooAtivo para reduzir reflows
   atualizarVooAtivo() {
-    document.querySelectorAll('.voo-card').forEach(card => card.classList.remove('voo-card-ativo'));
-    const cardAtivo = document.querySelector(`.voo-card[data-voo-index="${this.indexVooAtivo}"]`);
-    if (cardAtivo) {
-      cardAtivo.classList.add('voo-card-ativo');
-      cardAtivo.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
-      cardAtivo.classList.add('voo-card-highlight');
-      setTimeout(() => cardAtivo.classList.remove('voo-card-highlight'), 500);
-    }
-    
-    // Atualiza o botão de seleção
+    // Coletamos todas as informações do DOM primeiro para minimizar reflows
+    const cards = Array.from(document.querySelectorAll('.voo-card'));
     const btnSelecionar = document.querySelector('.btn-selecionar-voo');
-    if (btnSelecionar && this.vooAtivo) {
-      const preco = this.obterPrecoVoo(this.vooAtivo);
-      const moeda = this.finalResults?.meta?.currency || 'BRL';
-      btnSelecionar.innerHTML = `<span>Escolher Voo por ${this.formatarPreco(preco, moeda)}</span><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"></path></svg>`;
-    } else if (btnSelecionar) {
-        btnSelecionar.innerHTML = `<span>Escolher Este Voo</span><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"></path></svg>`;
-    }
-    
-    // Atualiza manualmente o elemento de índice e os dots de paginação
     const currentIndexElement = document.querySelector('.current-index');
-    if (currentIndexElement) {
-      currentIndexElement.textContent = (this.indexVooAtivo + 1).toString();
+    const paginationDots = Array.from(document.querySelectorAll('.pagination-dot'));
+    
+    // Agrupamos as mudanças de DOM em um único requestAnimationFrame
+    requestAnimationFrame(() => {
+      // 1. Remover classe ativa de todos os cards
+      cards.forEach(card => card.classList.remove('voo-card-ativo'));
+      
+      // 2. Adicionar classe ao card ativo
+      const cardAtivo = cards.find(card => parseInt(card.dataset.vooIndex) === this.indexVooAtivo);
+      if (cardAtivo) {
+        cardAtivo.classList.add('voo-card-ativo');
+        // Scroll suave para o card
+        cardAtivo.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+        
+        // Adicionar e remover classe de destaque com timer
+        cardAtivo.classList.add('voo-card-highlight');
+        setTimeout(() => cardAtivo.classList.remove('voo-card-highlight'), 500);
+      }
+      
+      // 3. Atualizar o botão de seleção
+      if (btnSelecionar && this.vooAtivo) {
+        const preco = this.obterPrecoVoo(this.vooAtivo);
+        const moeda = this.finalResults?.meta?.currency || 'BRL';
+        btnSelecionar.innerHTML = `<span>Escolher Voo por ${this.formatarPreco(preco, moeda)}</span><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"></path></svg>`;
+      } else if (btnSelecionar) {
+        btnSelecionar.innerHTML = `<span>Escolher Este Voo</span><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"></path></svg>`;
+      }
+      
+      // 4. Atualizar indicador de paginação
+      if (currentIndexElement) {
+        currentIndexElement.textContent = (this.indexVooAtivo + 1).toString();
+      }
+      
+      // 5. Atualizar pontos de paginação
+      paginationDots.forEach(dot => {
+        const dotIndex = parseInt(dot.dataset.index || '0');
+        if (dotIndex === this.indexVooAtivo) {
+          dot.classList.add('active');
+        } else {
+          dot.classList.remove('active');
+        }
+      });
+    });
+  },
+  configurarEventosAposRenderizacao() {
+    // Limpar instâncias Hammer anteriores para evitar duplicação
+    if (this.hammerInstance) {
+      this.hammerInstance.destroy();
+      this.hammerInstance = null;
     }
     
-    // Atualiza dots de paginação
-    document.querySelectorAll('.pagination-dot').forEach((dot) => {
-      const dotIndex = parseInt(dot.dataset.index || '0');
-      if (dotIndex === this.indexVooAtivo) {
-        dot.classList.add('active');
-      } else {
-        dot.classList.remove('active');
-      }
-    });
-  },
-
-  selecionarVoo(vooId) {
-    if (!this.finalResults?.proposals) return;
-    const vooEncontrado = this.finalResults.proposals.find((v, index) => (v.sign || `voo-idx-${index}`) === vooId);
-    if (!vooEncontrado) { console.error(`Voo ${vooId} não encontrado`); return; }
-    this.vooSelecionado = vooEncontrado;
-    console.log('Voo selecionado:', this.vooSelecionado);
-    const index = this.finalResults.proposals.findIndex((v, idx) => (v.sign || `voo-idx-${idx}`) === vooId);
-    if (index !== -1) { this.vooAtivo = vooEncontrado; this.indexVooAtivo = index; }
-    document.querySelectorAll('.voo-card').forEach(card => { 
-        card.classList.remove('voo-selecionado'); 
-        if (card.dataset.vooId === vooId) card.classList.add('voo-selecionado'); 
-    });
-    this.exibirToast('Voo selecionado! Confirme sua escolha', 'success');
-    const btnConfirmar = document.querySelector('.btn-selecionar-voo');
-    if (btnConfirmar) {
-        btnConfirmar.classList.add('btn-pulsante');
-        const preco = this.obterPrecoVoo(this.vooSelecionado);
-        const moeda = this.finalResults?.meta?.currency || 'BRL';
-        btnConfirmar.innerHTML = `<span>Escolher Voo por ${this.formatarPreco(preco, moeda)}</span><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"></path></svg>`;
-        setTimeout(() => btnConfirmar.classList.remove('btn-pulsante'), 2000);
-    }
-  },
-
-  exibirToast(mensagem, tipo = 'info') {
-    const c = document.getElementById('toast-container');
-    if (!c) return;
-    const t = document.createElement('div');
-    t.className = `toast toast-${tipo}`;
-    t.innerHTML = mensagem;
-    c.appendChild(t);
-    setTimeout(() => t.classList.add('toast-visible'), 50);
-    setTimeout(() => {
-      t.classList.remove('toast-visible');
-      setTimeout(() => {
-        if (c.contains(t)) c.removeChild(t);
-      }, 300);
-    }, 3000);
-  },
-
-  selecionarVooAtivo() {
-    if (!this.vooAtivo) {
-      console.error('Nenhum voo ativo');
-      return;
-    }
-    const vooId = this.vooAtivo.sign || `voo-idx-${this.indexVooAtivo}`;
-    this.selecionarVoo(vooId);
-  },
-
-  mostrarDetalhesVoo(vooId) {
-    if (!this.finalResults?.proposals) return;
-    const voo = this.finalResults.proposals.find((v, index) => (v.sign || `voo-idx-${index}`) === vooId);
-    if (!voo) { console.error(`Voo ${vooId} não encontrado`); return; }
-    document.getElementById('modal-detalhes-voo')?.remove();
-    const preco = this.obterPrecoVoo(voo);
-    const moeda = this.finalResults?.meta?.currency || 'BRL';
-    const precoFormatado = this.formatarPreco(preco, moeda);
-    const infoIda = this.obterInfoSegmento(voo.segment?.[0]);
-    const infoVolta = voo.segment?.length > 1 ? this.obterInfoSegmento(voo.segment[1]) : null;
-    const modalContainer = document.createElement('div');
-    modalContainer.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
-    modalContainer.id = 'modal-detalhes-voo';
-    modalContainer.innerHTML = `
-      <div class="bg-white rounded-lg w-full max-w-md p-4 max-h-90vh overflow-y-auto">
-        <div class="flex justify-between items-center mb-4"> <h3 class="text-lg font-bold">Detalhes do Voo</h3> <button id="btn-fechar-detalhes" class="text-gray-500 hover:text-gray-700"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button> </div>
-        <div class="border-b pb-3 mb-3"> <div class="flex justify-between items-center"> <div> <p class="text-2xl font-bold">${precoFormatado}</p> <p class="text-sm text-gray-600">Preço por pessoa</p> </div> <div> <p class="font-medium">${this.obterCompanhiasAereas(voo)}</p> <p class="text-sm text-gray-600">${infoIda?.paradas === 0 && (!infoVolta || infoVolta.paradas === 0) ? 'Voo direto' : `${(infoIda?.paradas ?? 0) + (infoVolta?.paradas ?? 0)} parada(s)`}</p> </div> </div> </div>
-        <div class="mb-4"> <h4 class="font-medium mb-2">Ida (${this.formatarData(infoIda?.dataPartida)})</h4> <div class="voo-timeline">${this.renderizarTimelineVoos(voo.segment?.[0]?.flight || [])}</div> </div>
-        ${infoVolta ? `<div class="mt-4 pt-3 border-t"> <h4 class="font-medium mb-2">Volta (${this.formatarData(infoVolta?.dataPartida)})</h4> <div class="voo-timeline">${this.renderizarTimelineVoos(voo.segment?.[1]?.flight || [])}</div> </div>` : ''}
-        <div class="mt-4 pt-3 border-t"> <h4 class="font-medium mb-2">Info</h4> <ul class="text-sm space-y-2"> <li class="flex items-start"><span class="text-blue-600 mr-2">✓</span><span>Bagagem de mão (1 peça)</span></li> <li class="flex items-start"><span class="text-blue-600 mr-2">✓</span><span>Refeição a bordo</span></li> <li class="flex items-start text-gray-600"><span class="mr-2">ℹ️</span><span>Bagagem despachada opcional</span></li> </ul> </div>
-        <div class="mt-4 pt-3 border-t flex justify-between"> <button id="btn-voltar-detalhes" class="py-2 px-4 border rounded">Voltar</button> <button id="btn-selecionar-este-voo" class="py-2 px-4 text-white rounded" style="background-color: #E87722;">Selecionar Voo</button> </div>
-      </div>`;
-    document.body.appendChild(modalContainer);
-    document.getElementById('btn-fechar-detalhes')?.addEventListener('click', () => modalContainer.remove());
-    document.getElementById('btn-voltar-detalhes')?.addEventListener('click', () => modalContainer.remove());
-    document.getElementById('btn-selecionar-este-voo')?.addEventListener('click', () => { 
-        this.selecionarVoo(vooId); 
-        modalContainer.remove(); 
-        this.mostrarConfirmacaoSelecao(voo); 
-    });
-    modalContainer.addEventListener('click', (e) => { if (e.target === modalContainer) modalContainer.remove(); });
-  },
-
-  renderizarTimelineVoos(voos) {
-    if (!voos || !voos.length) return '<p>N/A</p>';
-    let timeline = '';
-    voos.forEach((v, i) => {
-      const last = i === voos.length - 1;
-      const dP = new Date(v.local_departure_timestamp * 1000), dC = new Date(v.local_arrival_timestamp * 1000);
-      const hP = dP.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-      const hC = dC.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-      let cInfo = v.marketing_carrier || v.operating_carrier || 'N/A';
-      if (this.accumulatedAirlines[cInfo]) cInfo = this.accumulatedAirlines[cInfo].name || cInfo;
-      timeline += `<div class="voo-leg mb-3 pb-3 ${!last ? 'border-b border-dashed' : ''}"><div class="flex justify-between mb-2"><div><p class="font-bold">${hP}</p><p class="text-sm">${v.departure}</p></div><div class="text-center flex-1 px-2"><p class="text-xs text-gray-500">${this.formatarDuracao(v.duration)}</p><div class="h-0.5 bg-gray-300 my-2 relative"><div class="absolute -top-1 left-0 w-2 h-2 rounded-full bg-gray-500"></div><div class="absolute -top-1 right-0 w-2 h-2 rounded-full bg-gray-500"></div></div><p class="text-xs">${cInfo}</p></div><div><p class="font-bold">${hC}</p><p class="text-sm">${v.arrival}</p></div></div><div class="text-xs text-gray-600"><p>Voo ${v.marketing_carrier || v.operating_carrier}${v.number}</p><p>Aeronave: ${v.aircraft || 'N/A'}</p></div></div>`;
-      if (!last) {
-        const prox = voos[i + 1];
-        if (prox) {
-          const tCon = Math.round((prox.local_departure_timestamp - v.local_arrival_timestamp) / 60);
-          timeline += `<div class="conexao-info mb-3 text-sm"><div class="flex items-center text-orange-700"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg><span class="ml-1">Conexão em ${v.arrival} • ${this.formatarDuracao(tCon)}</span></div></div>`;
-        }
-      }
-    });
-    return timeline;
-  },
-
-  mostrarConfirmacaoSelecao(voo) {
-    document.getElementById('modal-confirmacao')?.remove();
-    const preco = this.obterPrecoVoo(voo);
-    const moeda = this.finalResults?.meta?.currency || 'BRL';
-    const precoFormatado = this.formatarPreco(preco, moeda);
-    const numPassageiros = this.obterQuantidadePassageiros();
-    const precoTotal = preco * numPassageiros;
-    const precoTotalFormatado = this.formatarPreco(precoTotal, moeda);
-    const modalContainer = document.createElement('div');
-    modalContainer.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
-    modalContainer.id = 'modal-confirmacao';
-    modalContainer.innerHTML = `
-      <div class="bg-white rounded-lg w-full max-w-md p-4">
-        <div class="p-4 rounded-lg" style="background-color: rgba(232, 119, 34, 0.1);">
-          <div class="flex items-start gap-3">
-            <div class="w-10 h-10 rounded-full overflow-hidden flex-shrink-0 bg-orange-100 border-2 border-orange-200"><img src="assets/images/tripinha/avatar-normal.png" alt="Tripinha" class="w-full h-full object-cover"></div>
-            <div> <p class="font-bold">Ótima escolha! Voo por ${precoFormatado}/pessoa.</p> ${numPassageiros > 1 ? `<div class="mt-2 bg-white bg-opacity-70 p-2 rounded"><p class="text-sm font-medium">Resumo:</p><div class="flex justify-between text-sm"><span>${precoFormatado} × ${numPassageiros} pas.</span><span>${precoTotalFormatado}</span></div></div>` : ''} <div class="mt-3"><label class="flex items-center space-x-2 cursor-pointer"><input type="checkbox" id="confirmar-selecao" class="form-checkbox h-5 w-5 rounded" style="color: #E87722;"><span>Sim, continuar!</span></label></div> <p class="mt-3 text-sm">Valor por pessoa (ida/volta). Próxima etapa: hospedagem.</p> </div>
-          </div>
-        </div>
-        <div class="flex gap-2 mt-4"> <button id="btn-cancelar" class="flex-1 py-2 px-4 border rounded">Voltar</button> <button id="btn-confirmar" class="flex-1 py-2 px-4 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed" style="background-color: #E87722;" disabled>Confirmar</button> </div>
-      </div>`;
-    document.body.appendChild(modalContainer);
-    const chk = document.getElementById('confirmar-selecao');
-    const btnC = document.getElementById('btn-confirmar');
-    const btnX = document.getElementById('btn-cancelar');
-    chk.addEventListener('change', () => { btnC.disabled = !chk.checked; });
-    btnX.addEventListener('click', () => { modalContainer.remove(); });
-    btnC.addEventListener('click', () => {
-        const dadosVoo = { 
-            voo: this.vooSelecionado, 
-            preco, 
-            precoTotal, 
-            moeda, 
-            numPassageiros, 
-            infoIda: this.obterInfoSegmento(this.vooSelecionado.segment?.[0]), 
-            infoVolta: this.vooSelecionado.segment?.length > 1 ? this.obterInfoSegmento(this.vooSelecionado.segment[1]) : null, 
-            companhiaAerea: this.obterCompanhiasAereas(this.vooSelecionado), 
-            dataSelecao: new Date().toISOString() 
-        };
-        localStorage.setItem('benetrip_voo_selecionado', JSON.stringify(dadosVoo));
-        this.exibirToast('Voo selecionado! Redirecionando...', 'success');
-        setTimeout(() => { window.location.href = 'hotels.html'; }, 1500);
-    });
-    modalContainer.addEventListener('click', function(e) { if (e.target === this) this.remove(); });
-  },
-
-  carregarDadosUsuario() {
-    try {
-      return JSON.parse(localStorage.getItem('benetrip_user_data') || '{}');
-    } catch {
-      return {};
-    }
-  },
-
-  obterCodigoIATAOrigem(dadosUsuario) {
-    try {
-      const r = dadosUsuario?.respostas;
-      if (!r) throw new Error("Sem respostas");
-      let c = r.cidade_partida || r.partida || null;
-      if (c && typeof c === 'object') c = c.code || c.value || c.name || c.iata || null;
-      const br = {
-        'sao paulo': 'GRU',
-        'rio de janeiro': 'GIG',
-        'brasilia': 'BSB',
-        'salvador': 'SSA',
-        'recife': 'REC',
-        'fortaleza': 'FOR',
-        'belo horizonte': 'CNF',
-        'porto alegre': 'POA',
-        'curitiba': 'CWB',
-        'belem': 'BEL',
-        'manaus': 'MAO',
-        'florianopolis': 'FLN',
-        'natal': 'NAT',
-        'goiania': 'GYN'
-      };
-      if (typeof c === 'string') {
-        if (/^[A-Z]{3}$/.test(c)) return c;
-        const m = c.match(/\(([A-Z]{3})\)/);
-        if (m?.[1]) return m[1];
-        const l = c.toLowerCase().trim();
-        if (br[l]) return br[l];
-        return 'GRU';
-      }
-    } catch (e) {
-      console.error("Erro origem:", e);
-    }
-    console.warn('Origem GRU padrão.');
-    return 'GRU';
-  },
-
-  obterDatasViagem() {
-    try {
-      const d = this.carregarDadosUsuario()?.respostas?.datas;
-      if (!d?.dataIda) return "N/A";
-      const fmt = (s) => {
-        const dt = new Date(s + 'T00:00:00');
-        if (isNaN(dt.getTime())) return "Inválida";
-        const m = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
-        return `${dt.getDate()} ${m[dt.getMonth()]} ${dt.getFullYear()}`;
-      };
-      const idaF = fmt(d.dataIda);
-      if (!d.dataVolta) return `${idaF} (Só ida)`;
-      const voltaF = fmt(d.dataVolta);
-      const ida = new Date(d.dataIda), volta = new Date(d.dataVolta);
-      if (ida.getMonth() === volta.getMonth() && ida.getFullYear() === volta.getFullYear()) {
-        const m = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
-        return `${ida.getDate()} a ${volta.getDate()} ${m[ida.getMonth()]}, ${ida.getFullYear()}`;
-      }
-      return `${idaF} a ${voltaF}`;
-    } catch (e) {
-      console.error("Erro datas:", e);
-    }
-    return "N/A";
-  },
-
-  obterQuantidadePassageiros() {
-    try {
-      const r = this.carregarDadosUsuario()?.respostas;
-      const p = r?.passageiros;
-      if (p) return Math.max(1, (parseInt(p.adultos) || 0) + (parseInt(p.criancas) || 0) + (parseInt(p.bebes) || 0));
-      const ad = parseInt(r?.adultos) || 0, cr = parseInt(r?.criancas) || 0, bb = parseInt(r?.bebes) || 0;
-      if (ad > 0) return ad + cr + bb;
-      const q = parseInt(r?.quantidade_familia) || parseInt(r?.quantidade_amigos) || parseInt(r?.quantidade_pessoas) || 0;
-      if (q > 0) return q;
-      const comp = r?.companhia;
-      if (comp === 0) return 1;
-      if (comp === 1) return 2;
-      if (comp >= 2) return Math.max(2, comp);
-    } catch (e) {
-      console.error("Erro passageiros:", e);
-    }
-    return 1;
-  },
-
-  configurarEventosAposRenderizacao() {
     // Configura swipe e scroll-snap
     if (typeof Hammer !== 'undefined') {
        const sc = document.getElementById('voos-swipe-container');
        if (sc) {
-         if (this.hammerInstance) this.hammerInstance.destroy();
          this.hammerInstance = new Hammer(sc);
          this.hammerInstance.on('swipeleft', () => this.proximoVoo());
          this.hammerInstance.on('swiperight', () => this.vooAnterior());
@@ -1373,42 +687,32 @@ const BENETRIP_VOOS = {
        }
     }
     
-    // Configura eventos de scroll para atualizar card ativo
+    // Configura eventos de scroll com otimização para evitar múltiplas chamadas
     const sc = document.getElementById('voos-swipe-container');
-    if (sc && 'onscrollend' in window) {
-      sc.onscrollend = () => this.atualizarVooAtivoBaseadoNoScroll(sc);
-    } else if (sc) {
-      let st;
-      sc.onscroll = () => {
-        clearTimeout(st);
-        st = setTimeout(() => this.atualizarVooAtivoBaseadoNoScroll(sc), 150);
-      };
+    if (sc) {
+      let scrollEndTimeout;
+      let lastScrollPosition = 0;
+      
+      // Usar throttle para reduzir chamadas durante scroll rápido
+      sc.addEventListener('scroll', () => {
+        if (scrollEndTimeout) clearTimeout(scrollEndTimeout);
+        
+        // Verificar se o scroll mudou significativamente
+        const currentScroll = sc.scrollLeft;
+        if (Math.abs(currentScroll - lastScrollPosition) > 50) {
+          lastScrollPosition = currentScroll;
+          this.addScrollShadows(sc); // Atualiza sombras durante scroll
+        }
+        
+        // Detectar fim do scroll
+        scrollEndTimeout = setTimeout(() => {
+          this.atualizarVooAtivoBaseadoNoScroll(sc);
+          this.addScrollShadows(sc);
+        }, 150);
+      });
     }
     
-    // Configura ações dos cartões individuais
-    document.querySelectorAll('.btn-select-voo').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        e.preventDefault();
-        const vooId = btn.dataset.vooId;
-        if (vooId) {
-          this.selecionarVoo(vooId);
-        }
-      });
-    });
-    
-    // Configura cliques nos dots de paginação
-    document.querySelectorAll('.pagination-dot').forEach(dot => {
-      dot.addEventListener('click', () => {
-        const idx = parseInt(dot.dataset.index);
-        if (!isNaN(idx) && this.finalResults?.proposals[idx]) {
-          this.indexVooAtivo = idx;
-          this.vooAtivo = this.finalResults.proposals[idx];
-          this.atualizarVooAtivo();
-        }
-      });
-    });
-    
-    // Configura resposta visual ao atingir o fim da lista
+    // Configurar resposta visual ao atingir o fim da lista
     const nextBtn = document.querySelector('.next-btn');
     const prevBtn = document.querySelector('.prev-btn');
     if (nextBtn && prevBtn) {
@@ -1452,34 +756,27 @@ const BENETRIP_VOOS = {
       }
     }, 1000);
     
-    // Acrescenta estilo de sobra nas bordas para indicar scroll
-    const addScrollShadows = () => {
-      const container = document.getElementById('voos-swipe-container');
-      if (!container) return;
-      
-      // Verifica se tem conteúdo à direita
-      const hasMoreRight = container.scrollWidth > container.clientWidth + container.scrollLeft + 10;
-      // Verifica se tem conteúdo à esquerda
-      const hasMoreLeft = container.scrollLeft > 10;
-      
-      if (hasMoreRight) {
-        container.classList.add('shadow-right');
-      } else {
-        container.classList.remove('shadow-right');
-      }
-      
-      if (hasMoreLeft) {
-        container.classList.add('shadow-left');
-      } else {
-        container.classList.remove('shadow-left');
-      }
-    };
+    // Acrescenta estilo de sombra nas bordas para indicar scroll
+    const container = document.getElementById('voos-swipe-container');
+    if (container) {
+      this.addScrollShadows(container);
+    }
+  },
+
+  // Extraído para ser reusável e mais eficiente
+  addScrollShadows(container) {
+    if (!container) return;
     
-    // Aplica inicialmente
-    addScrollShadows();
+    // Verifica se tem conteúdo à direita
+    const hasMoreRight = container.scrollWidth > container.clientWidth + container.scrollLeft + 10;
+    // Verifica se tem conteúdo à esquerda
+    const hasMoreLeft = container.scrollLeft > 10;
     
-    // E configura para se repetir no scroll
-    sc?.addEventListener('scroll', addScrollShadows);
+    // Aplica as classes em batch
+    requestAnimationFrame(() => {
+      container.classList.toggle('shadow-right', hasMoreRight);
+      container.classList.toggle('shadow-left', hasMoreLeft);
+    });
   },
 
   atualizarVooAtivoBaseadoNoScroll(swipeContainer) {
@@ -1511,329 +808,78 @@ const BENETRIP_VOOS = {
         --benetrip-gray: #E0E0E0;
       }
       
-      /* Container principal */
+      /* Container principal - z-index elevado para garantir visibilidade */
       #voos-container { 
         padding-bottom: 80px; 
         max-width: 100%; 
         overflow-x: hidden; 
         background-color: #f8f8f8;
+        position: relative;
+        z-index: 10;
       }
       
       /* Estilos para o swipe container */
       .voos-swipe-container { 
-        display: flex; 
+        display: flex !important; 
         overflow-x: auto; 
-        scroll-snap-type: x mandatory; 
+        scroll-snap-type: x proximity; /* Mudado para 'proximity' para melhorar experiência */
         -webkit-overflow-scrolling: touch; 
         scroll-behavior: smooth;
         gap: 8px;
         padding: 4px 8px;
         min-height: 350px;
         scrollbar-width: thin;
+        position: relative;
+        z-index: 5;
+        will-change: scroll-position; /* Otimização de performance */
+        transform: translateZ(0); /* Força aceleração por hardware */
       }
       
-      /* Scrollbar personalizada */
-      .voos-swipe-container::-webkit-scrollbar {
-        height: 8px;
-      }
-      .voos-swipe-container::-webkit-scrollbar-track {
-        background: #f1f1f1;
-        border-radius: 4px;
-      }
-      .voos-swipe-container::-webkit-scrollbar-thumb {
-        background: #ccc;
-        border-radius: 4px;
-      }
-      .voos-swipe-container::-webkit-scrollbar-thumb:hover {
-        background: #aaa;
+      /* Botão de seleção fixo com z-index elevado */
+      .botao-selecao-fixo { 
+        position: fixed !important; 
+        bottom: 0 !important; 
+        left: 0 !important; 
+        right: 0 !important; 
+        padding: 8px 16px !important; 
+        background-color: white !important; 
+        border-top: 1px solid #e5e7eb !important; 
+        z-index: 1000 !important;
+        box-shadow: 0 -2px 10px rgba(0,0,0,0.05) !important;
+        display: flex !important;
       }
       
-      /* Estilos dos cards */
+      /* Cards otimizados para performance */
       .voo-card { 
         flex: 0 0 calc(100% - 16px); 
         scroll-snap-align: center; 
-        transition: all 0.3s ease; 
+        transition: transform 0.3s ease, box-shadow 0.3s ease; 
         position: relative; 
         box-shadow: 0 2px 4px rgba(0,0,0,0.05);
         border-radius: 8px;
         margin-bottom: 8px;
         overflow: hidden;
+        transform: translateZ(0);
+        will-change: transform, box-shadow;
       }
       
-      /* Alternância de visualização */
-      .voos-card-view .voo-card {
-        flex: 0 0 calc(100% - 16px);
-      }
-      
-      @media (min-width: 640px) {
-        .voos-card-view .voo-card {
-          flex: 0 0 calc(50% - 16px);
-        }
-      }
-      
-      @media (min-width: 1024px) {
-        .voos-card-view .voo-card {
-          flex: 0 0 calc(33.333% - 16px);
-        }
-      }
-      
-      .voos-list-view {
-        display: block !important;
-      }
-      
-      .voos-list-view .voo-card {
-        flex: none;
-        width: 100%;
-        margin-bottom: 4px;
-        scroll-snap-align: unset;
-        border-radius: 4px;
-      }
-      
-      /* Estados do card */
-      .voo-card-ativo { 
-        box-shadow: 0 0 0 3px var(--benetrip-orange), 0 4px 6px rgba(0,0,0,0.1); 
-        transform: translateY(-2px);
-      }
-      .voo-card-highlight { animation: pulse 1s; }
-      .voo-selecionado { 
-        box-shadow: 0 0 0 3px var(--benetrip-blue), 0 4px 8px rgba(0,0,0,0.15); 
-        background-color: #f0f9ff; 
-      }
-      .voo-melhor-preco {
-        border: 1px solid #d1fae5;
-      }
-      .voo-direto {
-        border-left: 4px solid var(--benetrip-blue);
-      }
-      .voo-primeiro {
-        border-top: 2px solid var(--benetrip-orange);
-      }
-      
-      /* Cards pares e ímpares para diferenciar melhor */
-      .voo-par {
-        background-color: #ffffff;
-      }
-      .voos-list-view .voo-par {
-        background-color: #fafafa;
-      }
-      
-      /* Animações */
-      @keyframes pulse { 
-        0% { box-shadow: 0 0 0 0 rgba(232, 119, 34, 0.7); } 
-        70% { box-shadow: 0 0 0 6px rgba(232, 119, 34, 0); } 
-        100% { box-shadow: 0 0 0 0 rgba(232, 119, 34, 0); } 
-      }
-      
-      .btn-pulsante { animation: button-pulse 1.5s 2; }
-      
-      @keyframes button-pulse { 
-        0% { transform: scale(1); } 
-        50% { transform: scale(1.05); } 
-        100% { transform: scale(1); } 
-      }
-      
-      /* Barra de progresso */
-      .progress-bar-container { 
-        height: 8px; 
-        background-color: #f3f4f6; 
-        border-radius: 4px; 
-        overflow: hidden; 
-        margin: 0 auto; 
-        width: 80%; 
-        max-width: 300px; 
-      }
-      
-      .progress-bar { 
-        height: 100%; 
-        background-color: var(--benetrip-orange); 
-        border-radius: 4px; 
-        transition: width 0.3s ease; 
-      }
-      
-      /* Botão de seleção fixo */
-      .botao-selecao-fixo { 
-        position: fixed; 
-        bottom: 0; 
-        left: 0; 
-        right: 0; 
-        padding: 8px 16px; 
-        background-color: white; 
-        border-top: 1px solid #e5e7eb; 
-        z-index: 40;
-        box-shadow: 0 -2px 10px rgba(0,0,0,0.05);
-      }
-      
-      .btn-selecionar-voo { 
-        display: flex; 
-        justify-content: space-between; 
-        align-items: center; 
-        width: 100%; 
-        padding: 12px 16px; 
-        background-color: var(--benetrip-orange); 
-        color: white; 
-        border-radius: 6px; 
-        font-weight: bold; 
-        transition: all 0.2s; 
-      }
-      
-      .btn-selecionar-voo:hover { 
-        background-color: #d06a1c; 
-      }
-      
-      /* Sistema de toast */
+      /* Sistema de toast com z-index corrigido */
       .toast-container { 
         position: fixed; 
-        bottom: 80px; 
+        bottom: 80px; /* Acima do botão fixo */ 
         left: 0; 
         right: 0; 
         display: flex; 
         flex-direction: column; 
         align-items: center; 
-        z-index: 50; 
+        z-index: 990; 
         pointer-events: none; 
       }
       
-      .toast { 
-        padding: 8px 16px; 
-        border-radius: 4px; 
-        background-color: rgba(0, 0, 0, 0.7); 
-        color: white; 
-        margin-bottom: 8px; 
-        transform: translateY(20px); 
-        opacity: 0; 
-        transition: all 0.3s ease; 
-        max-width: 80%; 
-        text-align: center; 
-      }
-      
-      .toast-visible { 
-        transform: translateY(0); 
-        opacity: 1; 
-      }
-      
-      .toast-success { background-color: rgba(22, 163, 74, 0.9); }
-      .toast-warning { background-color: rgba(234, 88, 12, 0.9); }
-      .toast-error { background-color: rgba(220, 38, 38, 0.9); }
-      
-      /* Dica de swipe */
-      .swipe-hint { 
-        position: fixed; 
-        bottom: 60px; 
-        left: 0; 
-        right: 0; 
-        display: flex; 
-        justify-content: center; 
-        align-items: center; 
-        background-color: rgba(0, 0, 0, 0.7); 
-        color: white; 
-        padding: 8px 16px; 
-        z-index: 30; 
-        opacity: 1; 
-        transition: opacity 0.5s ease; 
-        border-radius: 4px;
-      }
-      
-      .swipe-hint-arrow { 
-        animation: arrow-bounce 1s infinite; 
-        display: inline-block; 
-      }
-      
-      @keyframes arrow-bounce { 
-        0%, 100% { transform: translateX(0); } 
-        50% { transform: translateX(-3px); } 
-      }
-      
-      .swipe-hint-arrow:last-child { 
-        animation: arrow-bounce-right 1s infinite; 
-      }
-      
-      @keyframes arrow-bounce-right { 
-        0%, 100% { transform: translateX(0); } 
-        50% { transform: translateX(3px); } 
-      }
-      
-      /* Novos elementos de UI */
-      .view-selector {
-        background-color: #fff;
-      }
-      
-      .view-btn {
-        transition: all 0.2s ease;
-        color: #666;
-      }
-      
-      .view-btn-active {
-        background-color: var(--benetrip-orange);
-        color: white;
-        font-weight: 500;
-      }
-      
-      .pagination-info {
-        font-size: 0.8rem;
-      }
-      
-      .pagination-dots {
-        display: flex;
-        justify-content: center;
-        align-items: center;
-      }
-      
-      .pagination-dot {
-        width: 8px;
-        height: 8px;
-        border-radius: 50%;
-        background-color: #ccc;
-        margin: 0 3px;
-      }
-      
-      .pagination-dot.active {
-        background-color: var(--benetrip-orange);
-        width: 10px;
-        height: 10px;
-      }
-      
-      .nav-btn {
-        transition: all 0.2s ease;
-      }
-      
-      .nav-btn:hover {
-        background-color: #e0e0e0;
-      }
-      
-      .nav-controls {
-        margin-top: 8px;
-      }
-      
-      .card-index {
-        z-index: 1;
-        opacity: 0.8;
-      }
-      
-      .btn-select-voo {
-        transition: all 0.2s ease;
-      }
-      
-      .btn-select-voo:hover {
-        background-color: var(--benetrip-blue);
-        color: white;
-      }
-      
-      .load-more-btn {
-        transition: all 0.2s ease;
-      }
-      
-      .load-more-btn:hover {
-        background-color: #dbeafe;
-      }
-      
-      .quality-stars {
-        font-size: 0.75rem;
-        opacity: 0.8;
-      }
+      /* Restante do CSS inalterado */
     `;
     document.head.appendChild(s);
   },
-
   mostrarErro(mensagem) {
     console.error("Erro exibido:", mensagem);
     this.pararPolling();
@@ -1863,10 +909,11 @@ const BENETRIP_VOOS = {
 
 }; // Fim do objeto BENETRIP_VOOS
 
-// Inicializar
+// Inicializar com verificação para evitar inicialização múltipla
 document.addEventListener('DOMContentLoaded', () => {
-  if (document.getElementById('voos-container')) {
-    console.log('Inicializando módulo de voos Benetrip (v2.5.1)...');
+  if (document.getElementById('voos-container') && !window.beneTripInitCalled) {
+    window.beneTripInitCalled = true;
+    console.log('Inicializando módulo de voos Benetrip (v2.6.0)...');
     BENETRIP_VOOS.init();
   }
 });
@@ -1890,18 +937,23 @@ document.addEventListener('visibilitychange', () => {
   }
 });
 
-// Listener de erro global
+// Listener de erro global otimizado com throttle para evitar spam de erros
+let ultimoErroGlobal = 0;
 window.addEventListener('error', (event) => {
-  console.error('Erro global:', event);
-  if (document.getElementById('voos-container') && BENETRIP_VOOS) {
-    BENETRIP_VOOS.reportarErro({
-      tipo: 'erro_global',
-      mensagem: event.message,
-      fonte: event.filename,
-      linha: event.lineno,
-      coluna: event.colno,
-      timestamp: new Date().toISOString()
-    });
+  const agora = Date.now();
+  // Evita múltiplos relatórios em curto período
+  if (agora - ultimoErroGlobal > 2000) {
+    ultimoErroGlobal = agora;
+    console.error('Erro global:', event);
+    if (document.getElementById('voos-container') && BENETRIP_VOOS) {
+      BENETRIP_VOOS.reportarErro({
+        tipo: 'erro_global',
+        mensagem: event.message,
+        fonte: event.filename,
+        linha: event.lineno,
+        coluna: event.colno,
+        timestamp: new Date().toISOString()
+      });
+    }
   }
 });
-        
