@@ -8,7 +8,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;700&family=Montserrat:wght@400;500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="assets/css/styles.css">
     <link rel="stylesheet" href="assets/css/mobile-optimizations.css">
-    <!-- Nova referência ao CSS de correção -->
+    <!-- CSS de correção -->
     <link rel="stylesheet" href="assets/css/voos-fix.css">
     <style>
         /* Estilos para toast notification */
@@ -71,13 +71,41 @@
         .voo-direto {
             border-left: 3px solid #4CAF50;
         }
+        
+        /* CORREÇÕES CRÍTICAS DE VISIBILIDADE - adicionadas inline para garantir aplicação */
+        #voos-container,
+        .voos-content,
+        .voos-lista,
+        .voo-card,
+        .botao-selecao-fixo,
+        .btn-selecionar-voo {
+            visibility: visible !important;
+            opacity: 1 !important;
+            position: relative !important;
+            z-index: auto !important;
+        }
+        
+        .voos-swipe-container {
+            display: flex !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+        }
+        
+        /* Debug visual - adiciona bordas para identificar elementos */
+        .debug-mode .voos-lista {
+            border: 2px solid #00A3E0 !important;
+        }
+        
+        .debug-mode .voos-swipe-container {
+            border: 1px dashed #E87722 !important;
+        }
     </style>
 </head>
 <body class="mobile-optimized">
     <!-- Barra de status estilo app -->
     <div class="native-status-bar"></div>
     
-    <!-- Container simplificado -->
+    <!-- Container principal -->
     <div id="voos-container" class="app-container">
         <!-- O conteúdo será carregado dinamicamente pelo script flights.js -->
     </div>
@@ -147,7 +175,7 @@
             }
         });
     </script>
-
+    
     <!-- Script de verificação de inicialização -->
     <script>
         // Verifica e inicializa explicitamente o módulo de voos
@@ -173,6 +201,82 @@
                 }
             }, 500);
         });
+    </script>
+    
+    <!-- Script de correção de visibilidade -->
+    <script>
+        // Executa após um delay maior para garantir que tudo foi carregado
+        setTimeout(function() {
+            console.log('Executando correção de visibilidade...');
+            const container = document.getElementById('voos-container');
+            
+            // Adiciona modo debug para visualização
+            if (container) {
+                container.classList.add('debug-mode');
+            }
+            
+            // Se temos resultados mas nada aparece
+            if (window.BENETRIP_VOOS?.finalResults?.proposals?.length > 0) {
+                console.log(`Encontrados ${window.BENETRIP_VOOS.finalResults.proposals.length} voos, forçando renderização...`);
+                
+                // Verifica se a lista de voos existe
+                const existingList = document.querySelector('.voos-lista');
+                
+                if (!existingList && container) {
+                    console.log('Lista de voos não encontrada. Criando manualmente...');
+                    
+                    // Reset do container, preservando header
+                    const header = container.querySelector('.app-header');
+                    container.innerHTML = '';
+                    if (header) container.appendChild(header);
+                    
+                    // Criação manual dos elementos
+                    const main = document.createElement('main');
+                    main.className = 'voos-content';
+                    main.style.display = 'block';
+                    main.style.visibility = 'visible';
+                    container.appendChild(main);
+                    
+                    // Força renderização
+                    if (window.BENETRIP_VOOS.renderizarResumoViagem) {
+                        window.BENETRIP_VOOS.renderizarResumoViagem(main);
+                    }
+                    
+                    if (window.BENETRIP_VOOS.renderizarListaVoos) {
+                        window.BENETRIP_VOOS.renderizarListaVoos(main);
+                    }
+                    
+                    if (window.BENETRIP_VOOS.renderizarBotaoSelecao) {
+                        window.BENETRIP_VOOS.renderizarBotaoSelecao(container);
+                    }
+                    
+                    console.log('Renderização manual concluída');
+                } else if (existingList) {
+                    console.log('Lista de voos existe, forçando visibilidade...');
+                    existingList.style.display = 'block';
+                    existingList.style.visibility = 'visible';
+                    existingList.style.opacity = '1';
+                    
+                    // Forçar visibilidade dos cards
+                    const cards = document.querySelectorAll('.voo-card');
+                    if (cards.length > 0) {
+                        console.log(`Forçando visibilidade de ${cards.length} cards...`);
+                        cards.forEach(card => {
+                            card.style.display = 'block';
+                            card.style.visibility = 'visible';
+                            card.style.opacity = '1';
+                        });
+                    }
+                }
+                
+                // Força o botão de seleção
+                const botao = document.querySelector('.botao-selecao-fixo');
+                if (!botao && window.BENETRIP_VOOS.renderizarBotaoSelecao) {
+                    console.log('Botão de seleção não encontrado. Criando...');
+                    window.BENETRIP_VOOS.renderizarBotaoSelecao(container);
+                }
+            }
+        }, 3000); // Verifica após 3 segundos
     </script>
 </body>
 </html>
