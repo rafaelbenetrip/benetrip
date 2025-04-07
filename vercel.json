@@ -15,18 +15,32 @@
     },
     "api/flight-results.js": {
        "memory": 1024,
-       "maxDuration": 15
+       "maxDuration": 30
     }
   },
   "routes": [
     {
       "src": "/api/(.*)",
       "headers": {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization",
+        "Content-Type": "application/json",
         "Connection": "keep-alive",
         "Keep-Alive": "timeout=60",
         "Cache-Control": "public, max-age=60, stale-while-revalidate=300"
       },
       "continue": true
+    },
+    {
+      "src": "/api/flight-results",
+      "headers": {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, OPTIONS",
+        "Content-Type": "application/json; charset=utf-8",
+        "X-Content-Type-Options": "nosniff"
+      },
+      "dest": "/api/flight-results.js"
     },
     {
       "src": "/api/recommendations",
@@ -39,10 +53,6 @@
     {
       "src": "/api/image-search",
       "dest": "/api/image-search.js"
-    },
-    {
-      "src": "/api/flight-results",
-      "dest": "/api/flight-results.js"
     },
     {
       "src": "/destinos",
