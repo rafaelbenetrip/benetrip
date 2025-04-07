@@ -8,6 +8,8 @@
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;700&family=Montserrat:wght@400;500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="assets/css/styles.css">
     <link rel="stylesheet" href="assets/css/mobile-optimizations.css">
+    <!-- Nova referência ao CSS de correção -->
+    <link rel="stylesheet" href="assets/css/voos-fix.css">
     <style>
         /* Estilos para toast notification */
         #toast-container {
@@ -75,20 +77,9 @@
     <!-- Barra de status estilo app -->
     <div class="native-status-bar"></div>
     
-    <div id="voos-container">
-        <!-- O conteúdo será carregado dinamicamente -->
-        
-        <!-- Dica de swipe para cartões de voo -->
-        <div id="swipe-hint" class="swipe-hint" style="display:none;">
-            <div class="swipe-hint-arrow">←</div>
-            <div class="swipe-hint-text">Deslize para ver detalhes</div>
-        </div>
-        
-        <!-- Fixed bottom bar para ações principais -->
-        <div id="bottom-actions" class="fixed-bottom-bar" style="display:none;">
-            <button class="btn-secundario btn-voltar">Voltar</button>
-            <button class="btn-principal btn-selecionar-voo">Selecionar Voo</button>
-        </div>
+    <!-- Container simplificado -->
+    <div id="voos-container" class="app-container">
+        <!-- O conteúdo será carregado dinamicamente pelo script flights.js -->
     </div>
 
     <!-- Toast notification container -->
@@ -154,6 +145,33 @@
                     }, 300);
                 }, duration);
             }
+        });
+    </script>
+
+    <!-- Script de verificação de inicialização -->
+    <script>
+        // Verifica e inicializa explicitamente o módulo de voos
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('DOM Carregado - Verificando inicialização dos voos');
+            
+            // Forçar inicialização após pequeno delay
+            setTimeout(function() {
+                if (window.BENETRIP_VOOS && !window.BENETRIP_VOOS.initialized) {
+                    console.log('Inicializando voos manualmente...');
+                    window.BENETRIP_VOOS.init();
+                }
+                
+                // Verificar se os elementos foram renderizados
+                const loadingEl = document.querySelector('.loading-container');
+                const voosLista = document.querySelector('.voos-lista');
+                
+                if (!loadingEl && !voosLista) {
+                    console.error('Elementos não renderizados! Tentando novamente...');
+                    if (window.BENETRIP_VOOS) {
+                        window.BENETRIP_VOOS.renderizarInterface();
+                    }
+                }
+            }, 500);
         });
     </script>
 </body>
