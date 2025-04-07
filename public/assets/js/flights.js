@@ -1,78 +1,59 @@
 /**
  * BENETRIP - Módulo de Busca e Exibição de Voos
- * Versão 2.5.0 - Tratamento de Chunks + Assinatura Corrigida
- * Este módulo gerencia a busca de voos: inicia a busca, aguarda,
- * faz polling buscando chunks de resultados e os acumula até o fim.
+ * Versão 2.5.1 - Correção no Processamento de Chunks
  */
 
 // Módulo de Voos do Benetrip
 const BENETRIP_VOOS = {
   // --- Constantes ---
-  INITIAL_WAIT_MS: 5000,   // Tempo de espera inicial ANTES de começar o polling (5 segundos)
-  POLLING_INTERVAL_MS: 3000, // Intervalo entre chamadas de polling (3 segundos - pode ser mais curto agora)
-  MAX_POLLING_ATTEMPTS: 40,  // Máximo de tentativas de polling (após espera inicial ~2 min total)
-  TIMEOUT_MS: 125000,      // Timeout total para busca (inclui espera inicial + polling)
+  INITIAL_WAIT_MS: 5000,
+  POLLING_INTERVAL_MS: 3000,
+  MAX_POLLING_ATTEMPTS: 40,
+  TIMEOUT_MS: 125000,
 
   // --- Dados e Estado ---
   destino: null,
-  searchId: null,          // ID da busca retornado pelo backend
-  currencyRates: null,     // Taxas de câmbio (se retornadas)
-
-  // Estado do Polling e Resultados Acumulados (Ponto 2 - Frontend)
-  estaCarregando: true,    // Estado geral de carregamento
-  isPolling: false,        // Indica se o polling está ativo
-  pollingAttempts: 0,      // Contador de tentativas de polling
-  pollingIntervalId: null, // ID do intervalo do polling
-  initialWaitTimeoutId: null, // ID do timeout da espera inicial
-  timeoutId: null,         // ID do timeout global da busca
-
-  // Acumuladores para chunks
+  searchId: null,
+  currencyRates: null,
+  estaCarregando: true,
+  isPolling: false,
+  pollingAttempts: 0,
+  pollingIntervalId: null,
+  initialWaitTimeoutId: null,
+  timeoutId: null,
   accumulatedProposals: [],
   accumulatedAirlines: {},
   accumulatedAirports: {},
   accumulatedGatesInfo: {},
-  accumulatedMeta: {}, // Pode acumular ou sobrescrever meta, dependendo da necessidade
-  finalResults: null, // Objeto final montado após acumular tudo
-
-  // Estado de Erro
+  accumulatedMeta: {},
+  finalResults: null,
   temErro: false,
   mensagemErro: '',
-
-  // Estado de Seleção e Navegação
   vooSelecionado: null,
-  vooAtivo: null,          // Para navegação entre voos
+  vooAtivo: null,
   indexVooAtivo: 0,
-  hammerInstance: null,    // Instância do Hammer.js para swipe
+  hammerInstance: null,
 
   // --- Inicialização ---
   init() {
-    console.log('Inicializando sistema de busca de voos v2.5.0 (Tratamento de Chunks)...');
-    this.resetState(); // Garante que o estado está limpo
+    console.log('Inicializando sistema de busca de voos v2.5.1 (Chunk Processing Fix)...');
+    this.resetState();
     this.configurarEventos();
-
     if (!document.getElementById('toast-container')) {
       const toastContainer = document.createElement('div');
       toastContainer.id = 'toast-container';
       toastContainer.className = 'toast-container';
       document.body.appendChild(toastContainer);
     }
-
     this.carregarDestino()
-      .then(() => {
-        this.iniciarBuscaVoos();
-      })
-      .catch(erro => {
-        console.error('Erro crítico ao carregar destino:', erro);
-        this.mostrarErro('Não foi possível carregar informações do destino. Por favor, retorne e selecione o destino novamente.');
-      });
-
+      .then(() => this.iniciarBuscaVoos())
+      .catch(erro => this.mostrarErro('Erro ao carregar destino. Tente selecionar novamente.'));
     this.aplicarEstilosModernos();
-    this.renderizarInterface(); // Renderiza o estado inicial (carregando)
+    this.renderizarInterface();
   },
 
-  // Reseta o estado da busca e resultados acumulados
   resetState() {
-      this.resultados = null; // Mantido por compatibilidade, mas usar accumulated*
+      this.destino = null; // Adicionado para garantir limpeza
       this.searchId = null;
       this.currencyRates = null;
       this.estaCarregando = true;
@@ -94,8 +75,6 @@ const BENETRIP_VOOS = {
       this.indexVooAtivo = 0;
   },
 
-
-  // --- Configurar eventos ---
   configurarEventos() {
     // Delegação de evento global
     document.addEventListener('click', (event) => {
@@ -160,9 +139,7 @@ const BENETRIP_VOOS = {
     });
   },
 
-  // --- Carregar dados do destino selecionado ---
   async carregarDestino() {
-    // (Sem mudanças significativas aqui, mantida a lógica anterior)
     try {
         let destinoString = localStorage.getItem('benetrip_destino_selecionado');
         if (!destinoString) {
@@ -205,13 +182,14 @@ const BENETRIP_VOOS = {
     }
   },
 
-  // Método para extrair IATA de texto (backup)
   extrairCodigoIATA(texto) {
-    // (Sem mudanças)
     if (!texto || typeof texto !== 'string') return null;
     const match = texto.match(/\(([A-Z]{3})\)/);
     if (match && match[1]) return match[1];
-    const mapeamento = {'paris': 'CDG', 'londres': 'LHR', /* ... outros ... */ 'cidade do méxico': 'MEX'};
+    const mapeamento = {'paris': 'CDG', 'londres': 'LHR', 'nova york': 'JFK', 'nova iorque': 'JFK', 'tokyo': 'HND', 
+                      'tóquio': 'HND', 'madrid': 'MAD', 'roma': 'FCO', 'berlim': 'BER', 'amsterdam': 'AMS', 
+                      'dubai': 'DXB', 'bangkok': 'BKK', 'sidney': 'SYD', 'sydney': 'SYD', 'los angeles': 'LAX', 
+                      'miami': 'MIA', 'cancun': 'CUN', 'cidade do méxico': 'MEX'};
     const textoLower = texto.toLowerCase();
     for (const [cidade, codigo] of Object.entries(mapeamento)) {
         if (textoLower.includes(cidade)) return codigo;
@@ -219,7 +197,6 @@ const BENETRIP_VOOS = {
     return null;
   },
 
-  // --- Iniciar Busca de Voos ---
   async iniciarBuscaVoos() {
     try {
       if (!this.destino || !this.destino.codigo_iata) throw new Error('Dados do destino incompletos.');
@@ -237,8 +214,7 @@ const BENETRIP_VOOS = {
         criancas: dadosUsuario?.respostas?.passageiros?.criancas || 0,
         bebes: dadosUsuario?.respostas?.passageiros?.bebes || 0,
         classe: 'Y',
-        locale: "en" // Usando 'en' conforme documentação (Ponto 3)
-        // only_direct: false // Adicionar se necessário (Ponto 4)
+        locale: "en"
       };
 
       const validacao = this.validarDadosParaBusca(params);
@@ -296,7 +272,6 @@ const BENETRIP_VOOS = {
   },
 
   validarDadosParaBusca(params) {
-    // (Sem mudanças significativas)
     const mensagensErro = [];
     if (!params.origem) mensagensErro.push("Origem não especificada");
     if (!params.destino) mensagensErro.push("Destino não especificado");
@@ -311,7 +286,6 @@ const BENETRIP_VOOS = {
     return { valido: mensagensErro.length === 0, mensagens: mensagensErro };
   },
 
-  // --- Gerenciamento do Polling (Frontend com Chunks - Ponto 2) ---
   iniciarPollingFrontend() {
     console.log(`Iniciando polling para searchId: ${this.searchId}`);
     if (this.pollingIntervalId) clearInterval(this.pollingIntervalId);
@@ -335,20 +309,20 @@ const BENETRIP_VOOS = {
     this.isPolling = false;
   },
 
-  // Função principal de polling modificada para chunks
+  // Função principal de polling CORRIGIDA para processar chunks
   async verificarResultadosPolling() {
     if (!this.isPolling) return;
 
     this.pollingAttempts++;
     console.log(`Polling Chunks: Tentativa ${this.pollingAttempts}/${this.MAX_POLLING_ATTEMPTS}`);
 
-    // Atualiza UI
+    // Atualiza UI (mantido)
     const mensagens = ['Buscando voos...', 'Verificando tarifas...', 'Analisando conexões...', 'Consultando Cias...', 'Quase lá...'];
     const msgIdx = Math.min(Math.floor(this.pollingAttempts / (this.MAX_POLLING_ATTEMPTS / mensagens.length)), mensagens.length - 1);
-    const progresso = 20 + Math.min(75, (this.pollingAttempts / this.MAX_POLLING_ATTEMPTS) * 75); // Progresso até 95%
+    const progresso = 20 + Math.min(75, (this.pollingAttempts / this.MAX_POLLING_ATTEMPTS) * 75);
     this.atualizarProgresso(`${mensagens[msgIdx]} (${this.pollingAttempts})`, progresso);
 
-    // Verifica limite
+    // Verifica limite (mantido)
     if (this.pollingAttempts > this.MAX_POLLING_ATTEMPTS) {
       this.pararPolling();
       this.mostrarErro('A busca demorou mais que o esperado.');
@@ -356,119 +330,124 @@ const BENETRIP_VOOS = {
     }
 
     try {
-      // Chama o backend (que agora é um proxy)
+      // Chama o backend (proxy)
       const resposta = await fetch(`/api/flight-results?uuid=${this.searchId}`);
 
       // --- Processamento da Resposta (Chunk) ---
       if (!resposta.ok) {
-          // Trata erros HTTP retornados pelo proxy (404, 5xx, etc.)
-          const errorData = await resposta.json().catch(() => ({ error: `Erro ${resposta.status} ao buscar resultados (resposta não JSON)` }));
-          const errorMessage = errorData.error || `Erro ${resposta.status} ao buscar resultados.`;
+          // Trata erros HTTP (mantido)
+          const errorData = await resposta.json().catch(() => ({ error: `Erro ${resposta.status} (resposta não JSON)` }));
+          const errorMessage = errorData.error || `Erro ${resposta.status}.`;
           console.error(`Erro no polling (HTTP ${resposta.status}):`, errorMessage, errorData);
-          if (resposta.status === 404) {
-              this.pararPolling();
-              this.mostrarErro('A busca expirou ou é inválida.');
-          } else {
-              // Para outros erros, pode continuar tentando por um tempo
-              console.warn(`Erro ${resposta.status}, continuando polling (tentativa ${this.pollingAttempts})`);
-              if (this.pollingAttempts > this.MAX_POLLING_ATTEMPTS - 5) { // Desiste perto do fim
-                   this.pararPolling();
-                   this.mostrarErro(errorMessage);
-              }
-          }
-          return; // Não processa mais este chunk
-      }
-
-      // Resposta OK (200), processa o chunk
-      const chunkData = await resposta.json();
-      console.log('Chunk recebido:', chunkData);
-
-      // A API retorna um array, mesmo que vazio ou com um objeto.
-      // A documentação diz que o último chunk tem proposals: []
-      // Vamos assumir que a estrutura principal está no primeiro elemento do array, se for um array.
-      const chunkObject = Array.isArray(chunkData) ? chunkData[0] : chunkData;
-
-      // Caso MUITO estranho: resposta 200 mas sem dados ou sem ser objeto/array
-      if (!chunkObject || typeof chunkObject !== 'object') {
-          console.warn("Chunk recebido com status 200 mas formato inesperado:", chunkData);
-          // Continua polling, pode ser um erro transitório da API
+          if (resposta.status === 404) { this.pararPolling(); this.mostrarErro('Busca expirou/inválida.'); }
+          else if (this.pollingAttempts > this.MAX_POLLING_ATTEMPTS - 5) { this.pararPolling(); this.mostrarErro(errorMessage); }
           return;
       }
 
-      // Verifica se é a resposta "ainda buscando" (pode nem vir mais com o proxy, mas seguro verificar)
-      if (Object.keys(chunkObject).length === 1 && chunkObject.search_id === this.searchId) {
-          console.log('Busca ainda em andamento (resposta apenas com search_id)...');
-          return; // Continua polling
-      }
+      const chunkData = await resposta.json();
+      console.log(`Chunk recebido (Tentativa ${this.pollingAttempts}):`, chunkData); // Log do chunk bruto
 
-      // É um chunk de dados (ou o chunk final)
-      const proposalsInChunk = chunkObject.proposals;
-      const airlinesInChunk = chunkObject.airlines;
-      const airportsInChunk = chunkObject.airports;
-      const gatesInfoInChunk = chunkObject.gates_info;
-      const metaInChunk = chunkObject.meta; // Pode conter moeda, etc.
-
-      // Acumula os dados
-      if (proposalsInChunk && Array.isArray(proposalsInChunk) && proposalsInChunk.length > 0) {
-          this.accumulatedProposals.push(...proposalsInChunk);
-          console.log(`Acumuladas ${this.accumulatedProposals.length} propostas.`);
-      }
-      if (airlinesInChunk) {
-          Object.assign(this.accumulatedAirlines, airlinesInChunk);
-      }
-      if (airportsInChunk) {
-          Object.assign(this.accumulatedAirports, airportsInChunk);
-      }
-       if (gatesInfoInChunk) {
-          Object.assign(this.accumulatedGatesInfo, gatesInfoInChunk);
-      }
-      if (metaInChunk) {
-          // Sobrescreve ou mescla meta conforme necessário. Por exemplo, pegar a última moeda.
-          this.accumulatedMeta = { ...this.accumulatedMeta, ...metaInChunk };
-      }
-
-      // Verifica se é o FIM da busca (chunk com proposals vazio)
-      // A documentação diz "empty proposals array", então verificamos isso.
-      if (proposalsInChunk && proposalsInChunk.length === 0) {
-          console.log('Polling concluído! (Chunk final com proposals vazio recebido)');
-          this.pararPolling();
-          this.estaCarregando = false;
-          this.atualizarProgresso('Finalizando...', 100);
-
-          // Monta o objeto final de resultados
-          this.finalResults = {
-              proposals: this.accumulatedProposals,
-              airlines: this.accumulatedAirlines,
-              airports: this.accumulatedAirports,
-              gates_info: this.accumulatedGatesInfo,
-              meta: this.accumulatedMeta,
-              // Adiciona outros dados relevantes do último chunk se necessário
-              search_id: this.searchId,
-              // ... (outros campos do chunkObject como segments, market etc podem ser úteis)
-              segments: chunkObject.segments,
-              market: chunkObject.market
-          };
-
-          // Pré-processa as propostas acumuladas
-          this.finalResults.proposals = this.preprocessarPropostas(this.finalResults.proposals);
-
-          if (this.finalResults.proposals.length > 0) {
-               this.exibirToast(`${this.finalResults.proposals.length} voos encontrados! ✈️`, 'success');
-               console.log("Resultados finais montados:", this.finalResults);
+      // --- AJUSTE: Encontrar o objeto de dados relevante ---
+      let chunkObject = null;
+      if (Array.isArray(chunkData)) {
+          // Procura o objeto no array que contém o search_id esperado
+          // A API parece retornar múltiplos objetos em alguns casos, precisamos achar o principal
+          chunkObject = chunkData.find(item => item && typeof item === 'object' && item.search_id === this.searchId);
+          if (!chunkObject) {
+              // Pode ser um array de outros tipos de dados ou um chunk intermediário sem o objeto principal?
+              console.warn(`Array recebido, mas nenhum objeto encontrado com search_id ${this.searchId}. Conteúdo:`, chunkData);
+              // Decide se continua ou para. Por segurança, vamos continuar por enquanto.
+              // Se isso acontecer consistentemente, a estrutura da API é diferente do esperado.
           } else {
-               console.log('Busca concluída sem resultados acumulados.');
-               this.exibirToast('Não encontramos voos disponíveis para esta rota e datas.', 'warning');
+              console.log("Objeto principal do chunk encontrado dentro do array:", chunkObject);
           }
-
-          this.renderizarInterface(); // Renderiza com os resultados finais (ou sem resultados)
+      } else if (chunkData && typeof chunkData === 'object') {
+          // Se não for array, assume que é o objeto diretamente
+          // Verifica se tem o search_id correto (importante!)
+          if (chunkData.search_id === this.searchId) {
+             chunkObject = chunkData;
+             console.log("Chunk recebido como objeto único:", chunkObject);
+          } else if (Object.keys(chunkData).length === 1 && chunkData.search_id) {
+             // Caso especial: resposta "ainda buscando" com apenas search_id
+             console.log('Busca ainda em andamento (resposta apenas com search_id)...');
+             // Não define chunkObject, vai continuar polling
+          } else {
+             console.warn(`Objeto recebido, mas search_id (${chunkData.search_id}) não corresponde ao esperado (${this.searchId}). Conteúdo:`, chunkData);
+             // Pode ser um erro ou estrutura inesperada. Continua polling por segurança.
+          }
       } else {
-          // Ainda não é o fim, continua polling
-          console.log('Chunk processado, esperando próximo...');
+          console.warn("Chunk recebido com status 200 mas formato inesperado (não array/objeto):", chunkData);
+          // Continua polling, pode ser erro transitório.
+          return;
+      }
+
+      // --- Processa o chunkObject SE encontrado ---
+      if (chunkObject) {
+          const proposalsInChunk = chunkObject.proposals;
+          const airlinesInChunk = chunkObject.airlines;
+          const airportsInChunk = chunkObject.airports;
+          const gatesInfoInChunk = chunkObject.gates_info;
+          const metaInChunk = chunkObject.meta;
+
+          // Acumula dados (SEMPRE acumula meta, airlines, airports, pois podem vir em chunks diferentes)
+          if (airlinesInChunk) Object.assign(this.accumulatedAirlines, airlinesInChunk);
+          if (airportsInChunk) Object.assign(this.accumulatedAirports, airportsInChunk);
+          if (gatesInfoInChunk) Object.assign(this.accumulatedGatesInfo, gatesInfoInChunk);
+          if (metaInChunk) this.accumulatedMeta = { ...this.accumulatedMeta, ...metaInChunk };
+
+          // Verifica se é o FIM da busca (chunk com proposals VAZIO)
+          // Importante: Verifica se proposals existe e é um array
+          if (proposalsInChunk && Array.isArray(proposalsInChunk)) {
+              if (proposalsInChunk.length === 0) {
+                  // --- É O FIM ---
+                  console.log(`Polling concluído! (Chunk final com proposals vazio recebido na tentativa ${this.pollingAttempts})`);
+                  this.pararPolling();
+                  this.estaCarregando = false;
+                  this.atualizarProgresso('Finalizando...', 100);
+
+                  // Monta o objeto final de resultados
+                  this.finalResults = {
+                      proposals: this.accumulatedProposals, // Usa as propostas acumuladas
+                      airlines: this.accumulatedAirlines,
+                      airports: this.accumulatedAirports,
+                      gates_info: this.accumulatedGatesInfo,
+                      meta: this.accumulatedMeta,
+                      search_id: this.searchId,
+                      segments: chunkObject.segments, // Pega do último chunk
+                      market: chunkObject.market     // Pega do último chunk
+                  };
+
+                  // Pré-processa as propostas acumuladas
+                  this.finalResults.proposals = this.preprocessarPropostas(this.finalResults.proposals);
+
+                  if (this.finalResults.proposals.length > 0) {
+                      this.exibirToast(`${this.finalResults.proposals.length} voos encontrados! ✈️`, 'success');
+                      console.log("Resultados finais montados:", this.finalResults);
+                  } else {
+                      console.log('Busca concluída sem resultados acumulados.');
+                      this.exibirToast('Não encontramos voos disponíveis.', 'warning');
+                  }
+                  this.renderizarInterface(); // Renderiza com os resultados finais
+
+              } else {
+                  // --- NÃO É O FIM: Acumula propostas e continua ---
+                  this.accumulatedProposals.push(...proposalsInChunk);
+                  console.log(`Acumuladas ${this.accumulatedProposals.length} propostas. Esperando próximo chunk...`);
+                  // Continua polling (não faz nada aqui, o setInterval chama de novo)
+              }
+          } else {
+              // proposalsInChunk não é um array ou não existe no chunkObject encontrado
+              console.warn(`Chunk object encontrado, mas 'proposals' não é um array ou está ausente. Conteúdo do chunkObject:`, chunkObject);
+              // Decide se continua ou para. Vamos continuar por enquanto.
+          }
+      } else {
+          // Nenhum chunkObject relevante encontrado nesta tentativa (ou era só search_id)
+          console.log(`Nenhum objeto de dados principal encontrado na tentativa ${this.pollingAttempts}. Continuando polling...`);
+          // Continua polling (não faz nada aqui, o setInterval chama de novo)
       }
 
     } catch (erro) {
       console.error('Erro durante o polling ou processamento do chunk:', erro);
-      // Tenta continuar polling por um tempo em caso de erro de rede/JSON
       if (this.pollingAttempts > this.MAX_POLLING_ATTEMPTS - 5) {
           this.pararPolling();
           this.mostrarErro('Erro ao verificar resultados. Verifique sua conexão.');
@@ -476,7 +455,6 @@ const BENETRIP_VOOS = {
     }
   },
 
-  // Pré-processa as propostas acumuladas
   preprocessarPropostas(propostas) {
       if (!propostas || !Array.isArray(propostas)) return [];
       console.log(`Pré-processando ${propostas.length} propostas acumuladas...`);
@@ -492,11 +470,8 @@ const BENETRIP_VOOS = {
           return proposta;
       });
   },
-  // --- Fim Gerenciamento do Polling ---
 
-  // --- Renderização ---
   atualizarProgresso(mensagem, porcentagem) {
-    // (Sem mudanças)
     const bar = document.querySelector('.progress-bar');
     const text = document.querySelector('.loading-text');
     if (bar) { bar.style.width = `${porcentagem}%`; bar.setAttribute('aria-valuenow', porcentagem); }
@@ -504,7 +479,6 @@ const BENETRIP_VOOS = {
   },
 
   renderizarInterface() {
-    // Modificado para usar this.finalResults
     try {
       const container = document.getElementById('voos-container');
       if (!container) { console.error('Container não encontrado'); return; }
@@ -521,13 +495,12 @@ const BENETRIP_VOOS = {
       } else if (!this.finalResults || !this.finalResults.proposals || this.finalResults.proposals.length === 0) {
         this.renderizarSemResultados(container);
       } else {
-        // Renderiza com this.finalResults
         const mainContent = document.createElement('main');
         mainContent.className = 'voos-content';
         container.appendChild(mainContent);
 
         this.renderizarResumoViagem(mainContent);
-        this.renderizarListaVoos(mainContent); // Usará this.finalResults internamente
+        this.renderizarListaVoos(mainContent);
         this.renderizarBotaoSelecao(container);
 
         if (!container.querySelector('#swipe-hint')) this.renderizarSwipeHint(container);
@@ -552,7 +525,7 @@ const BENETRIP_VOOS = {
     }
   },
 
-  renderizarHeader(container) { /* (Sem mudanças) */
+  renderizarHeader(container) {
     if (container.querySelector('.app-header')) return;
     const header = document.createElement('header');
     header.className = 'app-header';
@@ -567,7 +540,8 @@ const BENETRIP_VOOS = {
         });
     }
   },
-  renderizarCarregamento(container) { /* (Sem mudanças significativas) */
+
+  renderizarCarregamento(container) {
     if (container.querySelector('.loading-container')) return;
     const loadingImage = 'assets/images/tripinha/loading.gif';
     const loading = document.createElement('div');
@@ -575,21 +549,40 @@ const BENETRIP_VOOS = {
     loading.innerHTML = `<div style="text-align: center; padding: 2rem 0;"><img src="${loadingImage}" alt="Tripinha carregando" class="loading-avatar" style="width: 100px; height: 100px; margin: 0 auto;" /><div class="loading-text" style="margin: 1rem 0;">Iniciando busca...</div><div class="progress-bar-container"><div class="progress-bar" role="progressbar" style="width: 10%;" aria-valuenow="10" aria-valuemin="0" aria-valuemax="100"></div></div><div class="loading-tips" style="margin-top: 1.5rem; font-size: 0.9rem; color: #666;"><p>💡 Dica: Preços mudam, reserve logo!</p></div></div>`;
     container.appendChild(loading);
     this.atualizarProgresso(document.querySelector('.loading-text')?.textContent || 'Buscando...', parseFloat(document.querySelector('.progress-bar')?.style.width || '10'));
-    // Lógica de dicas mantida...
+    
+    // Alternar dicas
+    const dicas = [
+      '💡 Dica: Preços mudam, reserve logo!',
+      '🔍 Dica: Voos diretos aparecem destacados',
+      '💳 Dica: Parcelar sua compra pode sair mais em conta',
+      '⏱️ Dica: Muitas vezes voos de madrugada são mais baratos',
+      '🎒 Dica: Verifique a franquia de bagagem incluída'
+    ];
+    let dicaIndex = 0;
+    const dicasEl = loading.querySelector('.loading-tips');
+    if (dicasEl) {
+      setInterval(() => {
+        dicaIndex = (dicaIndex + 1) % dicas.length;
+        dicasEl.innerHTML = `<p>${dicas[dicaIndex]}</p>`;
+      }, 5000);
+    }
   },
-  renderizarErro(container) { /* (Sem mudanças) */
+
+  renderizarErro(container) {
     const loading = container.querySelector('.loading-container'); if (loading) loading.remove();
     const erroDiv = document.createElement('div'); erroDiv.className = 'erro-container';
     erroDiv.innerHTML = `<div class="bg-red-100 text-red-700 p-4 rounded-lg my-4 text-center"><div class="mb-3"><img src="assets/images/tripinha/avatar-triste.png" alt="Tripinha triste" class="w-20 h-20 mx-auto" /></div><p class="font-bold">${this.mensagemErro || 'Ocorreu um erro.'}</p><p class="mt-2 text-sm">Desculpe. Tente novamente?</p><button class="btn-tentar-novamente mt-4 px-4 py-2 bg-red-600 text-white rounded">Tentar Novamente</button></div>`;
     container.appendChild(erroDiv);
   },
-  renderizarSemResultados(container) { /* (Sem mudanças) */
+
+  renderizarSemResultados(container) {
     const loading = container.querySelector('.loading-container'); if (loading) loading.remove();
     const semResultados = document.createElement('div'); semResultados.className = 'sem-resultados-container';
     semResultados.innerHTML = `<div class="bg-blue-50 p-4 rounded-lg my-4 text-center"><div class="mb-3"><img src="assets/images/tripinha/avatar-triste.png" alt="Tripinha triste" class="w-20 h-20 mx-auto" /></div><p class="font-bold">Ops! Não encontramos voos para ${this.destino?.destino || 'este destino'}.</p><p class="mt-2 text-sm">Tente outras datas ou destino.</p><div class="flex gap-3 mt-4"><button class="btn-secundario flex-1 py-2 px-4 border rounded">Mudar Datas</button><button class="btn-principal flex-1 py-2 px-4 text-white rounded" style="background-color: #E87722;">Outro Destino</button></div></div>`;
     container.appendChild(semResultados);
   },
-  renderizarResumoViagem(container) { /* (Sem mudanças) */
+
+  renderizarResumoViagem(container) {
     const resumo = document.createElement('div'); resumo.className = 'viagem-resumo p-4 bg-white border-b';
     const destino = this.destino; const dataViagem = this.obterDatasViagem(); const passageiros = this.obterQuantidadePassageiros();
     resumo.innerHTML = `<h2 class="text-lg font-bold mb-2">Sua Viagem</h2><div class="flex items-center justify-between"><div class="flex items-center"><div class="bg-blue-50 p-1 rounded mr-2"><span class="text-lg">✈️</span></div><div><p class="font-medium">${destino?.destino || ''}, ${destino?.pais || ''}</p><p class="text-sm text-gray-600">${dataViagem}</p></div></div><div class="text-sm text-right"><span class="bg-gray-100 px-2 py-1 rounded">${passageiros} pas.</span></div></div>`;
@@ -597,12 +590,11 @@ const BENETRIP_VOOS = {
   },
 
   renderizarListaVoos(container) {
-    // Modificado para usar this.finalResults
     const listaVoos = document.createElement('div');
     listaVoos.className = 'voos-lista';
     listaVoos.id = 'voos-lista';
 
-    const voos = this.finalResults?.proposals || []; // Usa propostas acumuladas
+    const voos = this.finalResults?.proposals || [];
 
     const header = document.createElement('div');
     header.className = 'voos-header p-3 bg-gray-50 border-b';
@@ -615,7 +607,7 @@ const BENETRIP_VOOS = {
     listaVoos.appendChild(voosContainer);
 
     voos.forEach((voo, index) => {
-      const cardVoo = this.criarCardVoo(voo, index); // Passa o voo acumulado
+      const cardVoo = this.criarCardVoo(voo, index);
       voosContainer.appendChild(cardVoo);
     });
 
@@ -623,7 +615,6 @@ const BENETRIP_VOOS = {
   },
 
   criarCardVoo(voo, index) {
-    // Modificado para usar this.finalResults.meta.currency
     const cardVoo = document.createElement('div');
     cardVoo.className = 'voo-card p-4 bg-white border-b';
     const vooId = voo.sign || `voo-idx-${index}`;
@@ -631,7 +622,6 @@ const BENETRIP_VOOS = {
     cardVoo.dataset.vooIndex = index;
 
     const preco = this.obterPrecoVoo(voo);
-    // Usa a moeda do meta acumulado ou BRL como fallback
     const moeda = this.finalResults?.meta?.currency || 'BRL';
     const precoFormatado = this.formatarPreco(preco, moeda);
     const infoIda = this.obterInfoSegmento(voo.segment?.[0]);
@@ -665,34 +655,76 @@ const BENETRIP_VOOS = {
     }
     return cardVoo;
   },
-  renderizarParadas(paradas) { /* (Sem mudanças) */
-     const numParadas = paradas ?? 0; if (numParadas === 0) return `<span class="inline-block w-3 h-3 bg-green-500 rounded-full" title="Voo direto"></span>`;
-     let html = ''; for (let i = 0; i < Math.min(numParadas, 3); i++) html += `<span class="inline-block w-2 h-2 bg-gray-400 rounded-full mx-1" title="${numParadas} parada${numParadas > 1 ? 's' : ''}"></span>`; return html;
+
+  renderizarParadas(paradas) {
+     const numParadas = paradas ?? 0; 
+     if (numParadas === 0) return `<span class="inline-block w-3 h-3 bg-green-500 rounded-full" title="Voo direto"></span>`;
+     let html = ''; 
+     for (let i = 0; i < Math.min(numParadas, 3); i++) {
+         html += `<span class="inline-block w-2 h-2 bg-gray-400 rounded-full mx-1" title="${numParadas} parada${numParadas > 1 ? 's' : ''}"></span>`;
+     }
+     return html;
   },
-  renderizarBotaoSelecao(container) { /* (Sem mudanças) */
-    const btnExistente = document.querySelector('.botao-selecao-fixo'); if (btnExistente) btnExistente.remove();
-    const botaoFixo = document.createElement('div'); botaoFixo.className = 'botao-selecao-fixo';
+
+  renderizarBotaoSelecao(container) {
+    const btnExistente = document.querySelector('.botao-selecao-fixo'); 
+    if (btnExistente) btnExistente.remove();
+    const botaoFixo = document.createElement('div'); 
+    botaoFixo.className = 'botao-selecao-fixo';
     botaoFixo.innerHTML = `<button class="btn-selecionar-voo"><span>Escolher Este Voo</span><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"></path></svg></button>`;
     container.appendChild(botaoFixo);
   },
-  renderizarSwipeHint(container) { /* (Sem mudanças) */
-    const hint = document.createElement('div'); hint.id = 'swipe-hint'; hint.className = 'swipe-hint'; hint.style.display = 'none';
+
+  renderizarSwipeHint(container) {
+    const hint = document.createElement('div'); 
+    hint.id = 'swipe-hint'; 
+    hint.className = 'swipe-hint'; 
+    hint.style.display = 'none';
     hint.innerHTML = `<span class="swipe-hint-arrow mr-2">←</span> Arraste para ver outros voos <span class="swipe-hint-arrow ml-2">→</span>`;
     container.appendChild(hint);
     if (this.finalResults?.proposals?.length > 1) {
         hint.style.display = 'flex';
-        setTimeout(() => { hint.style.opacity = '0'; setTimeout(() => { hint.style.display = 'none'; }, 1000); }, 4000);
+        setTimeout(() => { 
+            hint.style.opacity = '0'; 
+            setTimeout(() => { hint.style.display = 'none'; }, 1000); 
+        }, 4000);
     }
   },
 
-  // --- Métodos de Formatação e Extração de Dados ---
-  formatarPreco(preco, moeda = 'BRL') { /* (Sem mudanças) */ if (typeof preco !== 'number') return 'N/A'; return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: moeda, minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(preco); },
-  formatarData(data) { /* (Sem mudanças) */ if (!(data instanceof Date) || isNaN(data)) return 'N/A'; const d = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'], m = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']; return `${d[data.getDay()]}, ${data.getDate()} ${m[data.getMonth()]}`; },
-  formatarDuracao(duracaoMinutos) { /* (Sem mudanças) */ if (typeof duracaoMinutos !== 'number' || duracaoMinutos < 0) return 'N/A'; const h = Math.floor(duracaoMinutos / 60), m = duracaoMinutos % 60; return `${h}h ${m > 0 ? m + 'm' : ''}`.trim(); },
-  obterPrecoVoo(voo) { /* (Sem mudanças) */ try { if (!voo?.terms) return 0; const k = Object.keys(voo.terms)[0]; return voo.terms[k]?.unified_price || voo.terms[k]?.price || 0; } catch { return 0; } },
+  formatarPreco(preco, moeda = 'BRL') {
+    if (typeof preco !== 'number') return 'N/A';
+    return new Intl.NumberFormat('pt-BR', { 
+        style: 'currency', 
+        currency: moeda, 
+        minimumFractionDigits: 0, 
+        maximumFractionDigits: 0 
+    }).format(preco);
+  },
+
+  formatarData(data) {
+    if (!(data instanceof Date) || isNaN(data)) return 'N/A';
+    const d = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+    const m = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+    return `${d[data.getDay()]}, ${data.getDate()} ${m[data.getMonth()]}`;
+  },
+
+  formatarDuracao(duracaoMinutos) {
+    if (typeof duracaoMinutos !== 'number' || duracaoMinutos < 0) return 'N/A';
+    const h = Math.floor(duracaoMinutos / 60), m = duracaoMinutos % 60;
+    return `${h}h ${m > 0 ? m + 'm' : ''}`.trim();
+  },
+
+  obterPrecoVoo(voo) {
+    try {
+      if (!voo?.terms) return 0;
+      const k = Object.keys(voo.terms)[0];
+      return voo.terms[k]?.unified_price || voo.terms[k]?.price || 0;
+    } catch {
+      return 0;
+    }
+  },
 
   obterCompanhiasAereas(voo) {
-    // Modificado para usar this.accumulatedAirlines
     try {
       const codigos = voo?.carriers;
       if (!codigos || codigos.length === 0) return 'N/A';
@@ -704,26 +736,62 @@ const BENETRIP_VOOS = {
       }
       if (codigos.length > 1) return `${codigos[0]} +${codigos.length - 1}`;
       return codigos[0];
-    } catch { return 'N/A'; }
+    } catch {
+      return 'N/A';
+    }
   },
-  obterInfoSegmento(segmento) { /* (Sem mudanças significativas) */ const def = { aeroportoPartida: 'N/A', aeroportoChegada: 'N/A', dataPartida: null, dataChegada: null, horaPartida: 'N/A', horaChegada: 'N/A', duracao: 0, paradas: 0 }; try { if (!segmento?.flight?.length) return def; const pV = segmento.flight[0], uV = segmento.flight[segmento.flight.length - 1]; if (!pV || !uV) return def; const tsP = pV.local_departure_timestamp * 1000, tsC = uV.local_arrival_timestamp * 1000; if (isNaN(tsP) || isNaN(tsC)) return def; const dP = new Date(tsP), dC = new Date(tsC); return { aeroportoPartida: pV.departure, aeroportoChegada: uV.arrival, dataPartida: dP, dataChegada: dC, horaPartida: dP.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }), horaChegada: dC.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }), duracao: Math.round((tsC - tsP) / 60000), paradas: segmento.flight.length - 1 }; } catch { return def; } },
 
-  // --- Navegação e Interação ---
-  // Modificadas para usar this.finalResults
+  obterInfoSegmento(segmento) {
+    const def = { 
+        aeroportoPartida: 'N/A', 
+        aeroportoChegada: 'N/A', 
+        dataPartida: null, 
+        dataChegada: null, 
+        horaPartida: 'N/A', 
+        horaChegada: 'N/A', 
+        duracao: 0, 
+        paradas: 0 
+    };
+    
+    try {
+      if (!segmento?.flight?.length) return def;
+      const pV = segmento.flight[0], uV = segmento.flight[segmento.flight.length - 1];
+      if (!pV || !uV) return def;
+      
+      const tsP = pV.local_departure_timestamp * 1000, tsC = uV.local_arrival_timestamp * 1000;
+      if (isNaN(tsP) || isNaN(tsC)) return def;
+      
+      const dP = new Date(tsP), dC = new Date(tsC);
+      return {
+        aeroportoPartida: pV.departure,
+        aeroportoChegada: uV.arrival,
+        dataPartida: dP,
+        dataChegada: dC,
+        horaPartida: dP.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+        horaChegada: dC.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+        duracao: Math.round((tsC - tsP) / 60000),
+        paradas: segmento.flight.length - 1
+      };
+    } catch {
+      return def;
+    }
+  },
+
   proximoVoo() {
     if (!this.finalResults?.proposals?.length || this.finalResults.proposals.length <= 1) return;
     this.indexVooAtivo = (this.indexVooAtivo + 1) % this.finalResults.proposals.length;
     this.vooAtivo = this.finalResults.proposals[this.indexVooAtivo];
     this.atualizarVooAtivo();
   },
+
   vooAnterior() {
     if (!this.finalResults?.proposals?.length || this.finalResults.proposals.length <= 1) return;
     this.indexVooAtivo = (this.indexVooAtivo - 1 + this.finalResults.proposals.length) % this.finalResults.proposals.length;
     this.vooAtivo = this.finalResults.proposals[this.indexVooAtivo];
     this.atualizarVooAtivo();
   },
+
   atualizarVooAtivo() {
-    // Modificado para usar this.finalResults
     document.querySelectorAll('.voo-card').forEach(card => card.classList.remove('voo-card-ativo'));
     const cardAtivo = document.querySelector(`.voo-card[data-voo-index="${this.indexVooAtivo}"]`);
     if (cardAtivo) {
@@ -735,14 +803,14 @@ const BENETRIP_VOOS = {
     const btnSelecionar = document.querySelector('.btn-selecionar-voo');
     if (btnSelecionar && this.vooAtivo) {
       const preco = this.obterPrecoVoo(this.vooAtivo);
-      const moeda = this.finalResults?.meta?.currency || 'BRL'; // Usa moeda acumulada
+      const moeda = this.finalResults?.meta?.currency || 'BRL';
       btnSelecionar.innerHTML = `<span>Escolher Voo por ${this.formatarPreco(preco, moeda)}</span><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"></path></svg>`;
     } else if (btnSelecionar) {
         btnSelecionar.innerHTML = `<span>Escolher Este Voo</span><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"></path></svg>`;
     }
   },
+
   selecionarVoo(vooId) {
-    // Modificado para usar this.finalResults
     if (!this.finalResults?.proposals) return;
     const vooEncontrado = this.finalResults.proposals.find((v, index) => (v.sign || `voo-idx-${index}`) === vooId);
     if (!vooEncontrado) { console.error(`Voo ${vooId} não encontrado`); return; }
@@ -750,7 +818,10 @@ const BENETRIP_VOOS = {
     console.log('Voo selecionado:', this.vooSelecionado);
     const index = this.finalResults.proposals.findIndex((v, idx) => (v.sign || `voo-idx-${idx}`) === vooId);
     if (index !== -1) { this.vooAtivo = vooEncontrado; this.indexVooAtivo = index; }
-    document.querySelectorAll('.voo-card').forEach(card => { card.classList.remove('voo-selecionado'); if (card.dataset.vooId === vooId) card.classList.add('voo-selecionado'); });
+    document.querySelectorAll('.voo-card').forEach(card => { 
+        card.classList.remove('voo-selecionado'); 
+        if (card.dataset.vooId === vooId) card.classList.add('voo-selecionado'); 
+    });
     this.exibirToast('Voo selecionado! Confirme sua escolha', 'success');
     const btnConfirmar = document.querySelector('.btn-selecionar-voo');
     if (btnConfirmar) {
@@ -761,11 +832,33 @@ const BENETRIP_VOOS = {
         setTimeout(() => btnConfirmar.classList.remove('btn-pulsante'), 2000);
     }
   },
-  exibirToast(mensagem, tipo = 'info') { /* (Sem mudanças) */ const c = document.getElementById('toast-container'); if (!c) return; const t = document.createElement('div'); t.className = `toast toast-${tipo}`; t.innerHTML = mensagem; c.appendChild(t); setTimeout(() => t.classList.add('toast-visible'), 50); setTimeout(() => { t.classList.remove('toast-visible'); setTimeout(() => { if (c.contains(t)) c.removeChild(t); }, 300); }, 3000); },
-  selecionarVooAtivo() { /* (Sem mudanças) */ if (!this.vooAtivo) { console.error('Nenhum voo ativo'); return; } const vooId = this.vooAtivo.sign || `voo-idx-${this.indexVooAtivo}`; this.selecionarVoo(vooId); },
+
+  exibirToast(mensagem, tipo = 'info') {
+    const c = document.getElementById('toast-container');
+    if (!c) return;
+    const t = document.createElement('div');
+    t.className = `toast toast-${tipo}`;
+    t.innerHTML = mensagem;
+    c.appendChild(t);
+    setTimeout(() => t.classList.add('toast-visible'), 50);
+    setTimeout(() => {
+      t.classList.remove('toast-visible');
+      setTimeout(() => {
+        if (c.contains(t)) c.removeChild(t);
+      }, 300);
+    }, 3000);
+  },
+
+  selecionarVooAtivo() {
+    if (!this.vooAtivo) {
+      console.error('Nenhum voo ativo');
+      return;
+    }
+    const vooId = this.vooAtivo.sign || `voo-idx-${this.indexVooAtivo}`;
+    this.selecionarVoo(vooId);
+  },
 
   mostrarDetalhesVoo(vooId) {
-    // Modificado para usar this.finalResults
     if (!this.finalResults?.proposals) return;
     const voo = this.finalResults.proposals.find((v, index) => (v.sign || `voo-idx-${index}`) === vooId);
     if (!voo) { console.error(`Voo ${vooId} não encontrado`); return; }
@@ -775,7 +868,9 @@ const BENETRIP_VOOS = {
     const precoFormatado = this.formatarPreco(preco, moeda);
     const infoIda = this.obterInfoSegmento(voo.segment?.[0]);
     const infoVolta = voo.segment?.length > 1 ? this.obterInfoSegmento(voo.segment[1]) : null;
-    const modalContainer = document.createElement('div'); modalContainer.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4'; modalContainer.id = 'modal-detalhes-voo';
+    const modalContainer = document.createElement('div');
+    modalContainer.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
+    modalContainer.id = 'modal-detalhes-voo';
     modalContainer.innerHTML = `
       <div class="bg-white rounded-lg w-full max-w-md p-4 max-h-90vh overflow-y-auto">
         <div class="flex justify-between items-center mb-4"> <h3 class="text-lg font-bold">Detalhes do Voo</h3> <button id="btn-fechar-detalhes" class="text-gray-500 hover:text-gray-700"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button> </div>
@@ -788,13 +883,37 @@ const BENETRIP_VOOS = {
     document.body.appendChild(modalContainer);
     document.getElementById('btn-fechar-detalhes')?.addEventListener('click', () => modalContainer.remove());
     document.getElementById('btn-voltar-detalhes')?.addEventListener('click', () => modalContainer.remove());
-    document.getElementById('btn-selecionar-este-voo')?.addEventListener('click', () => { this.selecionarVoo(vooId); modalContainer.remove(); this.mostrarConfirmacaoSelecao(voo); });
+    document.getElementById('btn-selecionar-este-voo')?.addEventListener('click', () => { 
+        this.selecionarVoo(vooId); 
+        modalContainer.remove(); 
+        this.mostrarConfirmacaoSelecao(voo); 
+    });
     modalContainer.addEventListener('click', (e) => { if (e.target === modalContainer) modalContainer.remove(); });
   },
-  renderizarTimelineVoos(voos) { /* (Sem mudanças significativas) */ if (!voos || !voos.length) return '<p>N/A</p>'; let timeline = ''; voos.forEach((v, i) => { const last = i === voos.length - 1; const dP = new Date(v.local_departure_timestamp * 1000), dC = new Date(v.local_arrival_timestamp * 1000); const hP = dP.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }), hC = dC.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }); let cInfo = v.marketing_carrier || v.operating_carrier || 'N/A'; if (this.accumulatedAirlines[cInfo]) cInfo = this.accumulatedAirlines[cInfo].name || cInfo; timeline += `<div class="voo-leg mb-3 pb-3 ${!last ? 'border-b border-dashed' : ''}"><div class="flex justify-between mb-2"><div><p class="font-bold">${hP}</p><p class="text-sm">${v.departure}</p></div><div class="text-center flex-1 px-2"><p class="text-xs text-gray-500">${this.formatarDuracao(v.duration)}</p><div class="h-0.5 bg-gray-300 my-2 relative"><div class="absolute -top-1 left-0 w-2 h-2 rounded-full bg-gray-500"></div><div class="absolute -top-1 right-0 w-2 h-2 rounded-full bg-gray-500"></div></div><p class="text-xs">${cInfo}</p></div><div><p class="font-bold">${hC}</p><p class="text-sm">${v.arrival}</p></div></div><div class="text-xs text-gray-600"><p>Voo ${v.marketing_carrier || v.operating_carrier}${v.number}</p><p>Aeronave: ${v.aircraft || 'N/A'}</p></div></div>`; if (!last) { const prox = voos[i + 1]; if (prox) { const tCon = Math.round((prox.local_departure_timestamp - v.local_arrival_timestamp) / 60); timeline += `<div class="conexao-info mb-3 text-sm"><div class="flex items-center text-orange-700"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg><span class="ml-1">Conexão em ${v.arrival} • ${this.formatarDuracao(tCon)}</span></div></div>`; } } }); return timeline; },
+
+  renderizarTimelineVoos(voos) {
+    if (!voos || !voos.length) return '<p>N/A</p>';
+    let timeline = '';
+    voos.forEach((v, i) => {
+      const last = i === voos.length - 1;
+      const dP = new Date(v.local_departure_timestamp * 1000), dC = new Date(v.local_arrival_timestamp * 1000);
+      const hP = dP.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+      const hC = dC.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+      let cInfo = v.marketing_carrier || v.operating_carrier || 'N/A';
+      if (this.accumulatedAirlines[cInfo]) cInfo = this.accumulatedAirlines[cInfo].name || cInfo;
+      timeline += `<div class="voo-leg mb-3 pb-3 ${!last ? 'border-b border-dashed' : ''}"><div class="flex justify-between mb-2"><div><p class="font-bold">${hP}</p><p class="text-sm">${v.departure}</p></div><div class="text-center flex-1 px-2"><p class="text-xs text-gray-500">${this.formatarDuracao(v.duration)}</p><div class="h-0.5 bg-gray-300 my-2 relative"><div class="absolute -top-1 left-0 w-2 h-2 rounded-full bg-gray-500"></div><div class="absolute -top-1 right-0 w-2 h-2 rounded-full bg-gray-500"></div></div><p class="text-xs">${cInfo}</p></div><div><p class="font-bold">${hC}</p><p class="text-sm">${v.arrival}</p></div></div><div class="text-xs text-gray-600"><p>Voo ${v.marketing_carrier || v.operating_carrier}${v.number}</p><p>Aeronave: ${v.aircraft || 'N/A'}</p></div></div>`;
+      if (!last) {
+        const prox = voos[i + 1];
+        if (prox) {
+          const tCon = Math.round((prox.local_departure_timestamp - v.local_arrival_timestamp) / 60);
+          timeline += `<div class="conexao-info mb-3 text-sm"><div class="flex items-center text-orange-700"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg><span class="ml-1">Conexão em ${v.arrival} • ${this.formatarDuracao(tCon)}</span></div></div>`;
+        }
+      }
+    });
+    return timeline;
+  },
 
   mostrarConfirmacaoSelecao(voo) {
-    // Modificado para usar this.finalResults
     document.getElementById('modal-confirmacao')?.remove();
     const preco = this.obterPrecoVoo(voo);
     const moeda = this.finalResults?.meta?.currency || 'BRL';
@@ -802,7 +921,9 @@ const BENETRIP_VOOS = {
     const numPassageiros = this.obterQuantidadePassageiros();
     const precoTotal = preco * numPassageiros;
     const precoTotalFormatado = this.formatarPreco(precoTotal, moeda);
-    const modalContainer = document.createElement('div'); modalContainer.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4'; modalContainer.id = 'modal-confirmacao';
+    const modalContainer = document.createElement('div');
+    modalContainer.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
+    modalContainer.id = 'modal-confirmacao';
     modalContainer.innerHTML = `
       <div class="bg-white rounded-lg w-full max-w-md p-4">
         <div class="p-4 rounded-lg" style="background-color: rgba(232, 119, 34, 0.1);">
@@ -814,11 +935,23 @@ const BENETRIP_VOOS = {
         <div class="flex gap-2 mt-4"> <button id="btn-cancelar" class="flex-1 py-2 px-4 border rounded">Voltar</button> <button id="btn-confirmar" class="flex-1 py-2 px-4 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed" style="background-color: #E87722;" disabled>Confirmar</button> </div>
       </div>`;
     document.body.appendChild(modalContainer);
-    const chk = document.getElementById('confirmar-selecao'), btnC = document.getElementById('btn-confirmar'), btnX = document.getElementById('btn-cancelar');
+    const chk = document.getElementById('confirmar-selecao');
+    const btnC = document.getElementById('btn-confirmar');
+    const btnX = document.getElementById('btn-cancelar');
     chk.addEventListener('change', () => { btnC.disabled = !chk.checked; });
     btnX.addEventListener('click', () => { modalContainer.remove(); });
     btnC.addEventListener('click', () => {
-        const dadosVoo = { voo: this.vooSelecionado, preco, precoTotal, moeda, numPassageiros, infoIda: this.obterInfoSegmento(this.vooSelecionado.segment?.[0]), infoVolta: this.vooSelecionado.segment?.length > 1 ? this.obterInfoSegmento(this.vooSelecionado.segment[1]) : null, companhiaAerea: this.obterCompanhiasAereas(this.vooSelecionado), dataSelecao: new Date().toISOString() };
+        const dadosVoo = { 
+            voo: this.vooSelecionado, 
+            preco, 
+            precoTotal, 
+            moeda, 
+            numPassageiros, 
+            infoIda: this.obterInfoSegmento(this.vooSelecionado.segment?.[0]), 
+            infoVolta: this.vooSelecionado.segment?.length > 1 ? this.obterInfoSegmento(this.vooSelecionado.segment[1]) : null, 
+            companhiaAerea: this.obterCompanhiasAereas(this.vooSelecionado), 
+            dataSelecao: new Date().toISOString() 
+        };
         localStorage.setItem('benetrip_voo_selecionado', JSON.stringify(dadosVoo));
         this.exibirToast('Voo selecionado! Redirecionando...', 'success');
         setTimeout(() => { window.location.href = 'hotels.html'; }, 1500);
@@ -826,11 +959,94 @@ const BENETRIP_VOOS = {
     modalContainer.addEventListener('click', function(e) { if (e.target === this) this.remove(); });
   },
 
-  // --- Métodos Auxiliares ---
-  carregarDadosUsuario() { /* (Sem mudanças) */ try { return JSON.parse(localStorage.getItem('benetrip_user_data') || '{}'); } catch { return {}; } },
-  obterCodigoIATAOrigem(dadosUsuario) { /* (Sem mudanças) */ try { const r = dadosUsuario?.respostas; if (!r) throw new Error("Sem respostas"); let c = r.cidade_partida || r.partida || null; if (c && typeof c === 'object') c = c.code || c.value || c.name || c.iata || null; const br = {'sao paulo': 'GRU', /*...*/ 'goiania': 'GYN'}; if (typeof c === 'string') { if (/^[A-Z]{3}$/.test(c)) return c; const m = c.match(/\(([A-Z]{3})\)/); if (m?.[1]) return m[1]; const l = c.toLowerCase().trim(); if (br[l]) return br[l]; return 'GRU'; } } catch (e) { console.error("Erro origem:", e); } console.warn('Origem GRU padrão.'); return 'GRU'; },
-  obterDatasViagem() { /* (Sem mudanças) */ try { const d = this.carregarDadosUsuario()?.respostas?.datas; if (!d?.dataIda) return "N/A"; const fmt = (s) => { const dt = new Date(s + 'T00:00:00'); if (isNaN(dt.getTime())) return "Inválida"; const m = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']; return `${dt.getDate()} ${m[dt.getMonth()]} ${dt.getFullYear()}`; }; const idaF = fmt(d.dataIda); if (!d.dataVolta) return `${idaF} (Só ida)`; const voltaF = fmt(d.dataVolta); const ida = new Date(d.dataIda), volta = new Date(d.dataVolta); if (ida.getMonth() === volta.getMonth() && ida.getFullYear() === volta.getFullYear()) { const m = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']; return `${ida.getDate()} a ${volta.getDate()} ${m[ida.getMonth()]}, ${ida.getFullYear()}`; } return `${idaF} a ${voltaF}`; } catch (e) { console.error("Erro datas:", e); } return "N/A"; },
-  obterQuantidadePassageiros() { /* (Sem mudanças) */ try { const r = this.carregarDadosUsuario()?.respostas; const p = r?.passageiros; if (p) return Math.max(1, (parseInt(p.adultos) || 0) + (parseInt(p.criancas) || 0) + (parseInt(p.bebes) || 0)); const ad = parseInt(r?.adultos) || 0, cr = parseInt(r?.criancas) || 0, bb = parseInt(r?.bebes) || 0; if (ad > 0) return ad + cr + bb; const q = parseInt(r?.quantidade_familia) || parseInt(r?.quantidade_amigos) || parseInt(r?.quantidade_pessoas) || 0; if (q > 0) return q; const comp = r?.companhia; if (comp === 0) return 1; if (comp === 1) return 2; if (comp >= 2) return Math.max(2, comp); } catch (e) { console.error("Erro passageiros:", e); } return 1; },
+  carregarDadosUsuario() {
+    try {
+      return JSON.parse(localStorage.getItem('benetrip_user_data') || '{}');
+    } catch {
+      return {};
+    }
+  },
+
+  obterCodigoIATAOrigem(dadosUsuario) {
+    try {
+      const r = dadosUsuario?.respostas;
+      if (!r) throw new Error("Sem respostas");
+      let c = r.cidade_partida || r.partida || null;
+      if (c && typeof c === 'object') c = c.code || c.value || c.name || c.iata || null;
+      const br = {
+        'sao paulo': 'GRU',
+        'rio de janeiro': 'GIG',
+        'brasilia': 'BSB',
+        'salvador': 'SSA',
+        'recife': 'REC',
+        'fortaleza': 'FOR',
+        'belo horizonte': 'CNF',
+        'porto alegre': 'POA',
+        'curitiba': 'CWB',
+        'belem': 'BEL',
+        'manaus': 'MAO',
+        'florianopolis': 'FLN',
+        'natal': 'NAT',
+        'goiania': 'GYN'
+      };
+      if (typeof c === 'string') {
+        if (/^[A-Z]{3}$/.test(c)) return c;
+        const m = c.match(/\(([A-Z]{3})\)/);
+        if (m?.[1]) return m[1];
+        const l = c.toLowerCase().trim();
+        if (br[l]) return br[l];
+        return 'GRU';
+      }
+    } catch (e) {
+      console.error("Erro origem:", e);
+    }
+    console.warn('Origem GRU padrão.');
+    return 'GRU';
+  },
+
+  obterDatasViagem() {
+    try {
+      const d = this.carregarDadosUsuario()?.respostas?.datas;
+      if (!d?.dataIda) return "N/A";
+      const fmt = (s) => {
+        const dt = new Date(s + 'T00:00:00');
+        if (isNaN(dt.getTime())) return "Inválida";
+        const m = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+        return `${dt.getDate()} ${m[dt.getMonth()]} ${dt.getFullYear()}`;
+      };
+      const idaF = fmt(d.dataIda);
+      if (!d.dataVolta) return `${idaF} (Só ida)`;
+      const voltaF = fmt(d.dataVolta);
+      const ida = new Date(d.dataIda), volta = new Date(d.dataVolta);
+      if (ida.getMonth() === volta.getMonth() && ida.getFullYear() === volta.getFullYear()) {
+        const m = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+        return `${ida.getDate()} a ${volta.getDate()} ${m[ida.getMonth()]}, ${ida.getFullYear()}`;
+      }
+      return `${idaF} a ${voltaF}`;
+    } catch (e) {
+      console.error("Erro datas:", e);
+    }
+    return "N/A";
+  },
+
+  obterQuantidadePassageiros() {
+    try {
+      const r = this.carregarDadosUsuario()?.respostas;
+      const p = r?.passageiros;
+      if (p) return Math.max(1, (parseInt(p.adultos) || 0) + (parseInt(p.criancas) || 0) + (parseInt(p.bebes) || 0));
+      const ad = parseInt(r?.adultos) || 0, cr = parseInt(r?.criancas) || 0, bb = parseInt(r?.bebes) || 0;
+      if (ad > 0) return ad + cr + bb;
+      const q = parseInt(r?.quantidade_familia) || parseInt(r?.quantidade_amigos) || parseInt(r?.quantidade_pessoas) || 0;
+      if (q > 0) return q;
+      const comp = r?.companhia;
+      if (comp === 0) return 1;
+      if (comp === 1) return 2;
+      if (comp >= 2) return Math.max(2, comp);
+    } catch (e) {
+      console.error("Erro passageiros:", e);
+    }
+    return 1;
+  },
 
   configurarEventosAposRenderizacao() {
     // Configura swipe e scroll-snap
@@ -841,36 +1057,143 @@ const BENETRIP_VOOS = {
          this.hammerInstance = new Hammer(sc);
          this.hammerInstance.on('swipeleft', () => this.proximoVoo());
          this.hammerInstance.on('swiperight', () => this.vooAnterior());
-         this.hammerInstance.on('swipeleft swiperight', () => { try { const s = new Audio('assets/sounds/swipe.mp3'); s.volume = 0.2; s.play().catch(()=>{}); } catch(e){} });
+         this.hammerInstance.on('swipeleft swiperight', () => {
+           try {
+             const s = new Audio('assets/sounds/swipe.mp3');
+             s.volume = 0.2;
+             s.play().catch(()=>{});
+           } catch(e){} 
+         });
        }
     }
     const sc = document.getElementById('voos-swipe-container');
-    if (sc && 'onscrollend' in window) { sc.onscrollend = () => this.atualizarVooAtivoBaseadoNoScroll(sc); }
-    else if (sc) { let st; sc.onscroll = () => { clearTimeout(st); st = setTimeout(() => this.atualizarVooAtivoBaseadoNoScroll(sc), 150); }; }
-
-    // Botão voltar (já configurado no renderHeader)
-
-    // Botão selecionar fixo (já configurado no configurarEventos por delegação)
-
-    // Cards de voo (já configurado no configurarEventos por delegação)
+    if (sc && 'onscrollend' in window) {
+      sc.onscrollend = () => this.atualizarVooAtivoBaseadoNoScroll(sc);
+    } else if (sc) {
+      let st;
+      sc.onscroll = () => {
+        clearTimeout(st);
+        st = setTimeout(() => this.atualizarVooAtivoBaseadoNoScroll(sc), 150);
+      };
+    }
   },
 
-  atualizarVooAtivoBaseadoNoScroll(swipeContainer) { /* (Sem mudanças) */ if (!swipeContainer) return; const sL = swipeContainer.scrollLeft; const cW = swipeContainer.querySelector('.voo-card')?.offsetWidth || 0; if (cW > 0 && this.finalResults?.proposals?.length > 0) { const nI = Math.round(sL / cW); if (nI >= 0 && nI < this.finalResults.proposals.length && nI !== this.indexVooAtivo) { this.indexVooAtivo = nI; this.vooAtivo = this.finalResults.proposals[this.indexVooAtivo]; this.atualizarVooAtivo(); } } },
+  atualizarVooAtivoBaseadoNoScroll(swipeContainer) {
+    if (!swipeContainer) return;
+    const sL = swipeContainer.scrollLeft;
+    const cW = swipeContainer.querySelector('.voo-card')?.offsetWidth || 0;
+    if (cW > 0 && this.finalResults?.proposals?.length > 0) {
+      const nI = Math.round(sL / cW);
+      if (nI >= 0 && nI < this.finalResults.proposals.length && nI !== this.indexVooAtivo) {
+        this.indexVooAtivo = nI;
+        this.vooAtivo = this.finalResults.proposals[this.indexVooAtivo];
+        this.atualizarVooAtivo();
+      }
+    }
+  },
 
-  // --- Estilos e UI ---
-  aplicarEstilosModernos() { /* (Sem mudanças significativas, estilos mantidos) */ const id = 'benetrip-voos-styles'; if (document.getElementById(id)) return; const s = document.createElement('style'); s.id = id; s.textContent = `/* Estilos ... (mantidos como antes) ... */ #voos-container { padding-bottom: 80px; }`; document.head.appendChild(s); },
-  mostrarErro(mensagem) { /* (Sem mudanças significativas) */ console.error("Erro exibido:", mensagem); this.pararPolling(); this.temErro = true; this.estaCarregando = false; this.mensagemErro = mensagem || 'Erro desconhecido.'; this.renderizarInterface(); this.reportarErro({ mensagem, searchId: this.searchId, timestamp: new Date().toISOString(), tentativas: this.pollingAttempts }); },
-  reportarErro(dadosErro) { /* (Sem mudanças) */ console.warn("Dados erro:", dadosErro); try { const errs = JSON.parse(localStorage.getItem('benetrip_erros') || '[]'); errs.push(dadosErro); if (errs.length > 10) errs.shift(); localStorage.setItem('benetrip_erros', JSON.stringify(errs)); } catch (e) { console.error("Erro ao salvar erro:", e); } }
+  aplicarEstilosModernos() {
+    const id = 'benetrip-voos-styles';
+    if (document.getElementById(id)) return;
+    const s = document.createElement('style');
+    s.id = id;
+    s.textContent = `
+      .voos-swipe-container { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch; }
+      .voo-card { flex: 0 0 100%; scroll-snap-align: center; transition: all 0.3s ease; position: relative; }
+      .voo-card-ativo { box-shadow: 0 0 0 2px #E87722; }
+      .voo-card-highlight { animation: pulse 1s; }
+      .voo-selecionado { box-shadow: 0 0 0 3px #00A3E0; background-color: #f0f9ff; }
+      @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(232, 119, 34, 0.7); } 70% { box-shadow: 0 0 0 6px rgba(232, 119, 34, 0); } 100% { box-shadow: 0 0 0 0 rgba(232, 119, 34, 0); } }
+      .btn-pulsante { animation: button-pulse 1.5s 2; }
+      @keyframes button-pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
+      .progress-bar-container { height: 8px; background-color: #f3f4f6; border-radius: 4px; overflow: hidden; margin: 0 auto; width: 80%; max-width: 300px; }
+      .progress-bar { height: 100%; background-color: #E87722; border-radius: 4px; transition: width 0.3s ease; }
+      .botao-selecao-fixo { position: fixed; bottom: 0; left: 0; right: 0; padding: 8px 16px; background-color: white; border-top: 1px solid #e5e7eb; z-index: 40; }
+      .btn-selecionar-voo { display: flex; justify-content: space-between; align-items: center; width: 100%; padding: 12px 16px; background-color: #E87722; color: white; border-radius: 6px; font-weight: bold; transition: all 0.2s; }
+      .btn-selecionar-voo:hover { background-color: #d06a1c; }
+      .toast-container { position: fixed; bottom: 80px; left: 0; right: 0; display: flex; flex-direction: column; align-items: center; z-index: 50; pointer-events: none; }
+      .toast { padding: 8px 16px; border-radius: 4px; background-color: rgba(0, 0, 0, 0.7); color: white; margin-bottom: 8px; transform: translateY(20px); opacity: 0; transition: all 0.3s ease; max-width: 80%; text-align: center; }
+      .toast-visible { transform: translateY(0); opacity: 1; }
+      .toast-success { background-color: rgba(22, 163, 74, 0.9); }
+      .toast-warning { background-color: rgba(234, 88, 12, 0.9); }
+      .toast-error { background-color: rgba(220, 38, 38, 0.9); }
+      .swipe-hint { position: fixed; bottom: 60px; left: 0; right: 0; display: flex; justify-content: center; align-items: center; background-color: rgba(0, 0, 0, 0.7); color: white; padding: 8px 16px; z-index: 30; opacity: 1; transition: opacity 0.5s ease; }
+      .swipe-hint-arrow { animation: arrow-bounce 1s infinite; display: inline-block; }
+      @keyframes arrow-bounce { 0%, 100% { transform: translateX(0); } 50% { transform: translateX(-3px); } }
+      .swipe-hint-arrow:last-child { animation: arrow-bounce-right 1s infinite; }
+      @keyframes arrow-bounce-right { 0%, 100% { transform: translateX(0); } 50% { transform: translateX(3px); } }
+      #voos-container { padding-bottom: 80px; }
+    `;
+    document.head.appendChild(s);
+  },
+
+  mostrarErro(mensagem) {
+    console.error("Erro exibido:", mensagem);
+    this.pararPolling();
+    this.temErro = true;
+    this.estaCarregando = false;
+    this.mensagemErro = mensagem || 'Erro desconhecido.';
+    this.renderizarInterface();
+    this.reportarErro({
+      mensagem,
+      searchId: this.searchId,
+      timestamp: new Date().toISOString(),
+      tentativas: this.pollingAttempts
+    });
+  },
+
+  reportarErro(dadosErro) {
+    console.warn("Dados erro:", dadosErro);
+    try {
+      const errs = JSON.parse(localStorage.getItem('benetrip_erros') || '[]');
+      errs.push(dadosErro);
+      if (errs.length > 10) errs.shift();
+      localStorage.setItem('benetrip_erros', JSON.stringify(errs));
+    } catch (e) {
+      console.error("Erro ao salvar erro:", e);
+    }
+  }
 
 }; // Fim do objeto BENETRIP_VOOS
 
 // Inicializar
 document.addEventListener('DOMContentLoaded', () => {
   if (document.getElementById('voos-container')) {
-    console.log('Inicializando módulo de voos Benetrip (v2.5.0)...');
+    console.log('Inicializando módulo de voos Benetrip (v2.5.1)...');
     BENETRIP_VOOS.init();
   }
-  // Listener visibilitychange mantido...
 });
-// Listener de erro global mantido...
-window.addEventListener('error', (event) => { /* ... */ });
+
+// Listener visibilitychange para pausar/retomar polling quando aba fica em background
+document.addEventListener('visibilitychange', () => {
+  if (document.getElementById('voos-container')) {
+    if (document.visibilityState === 'hidden') {
+      if (BENETRIP_VOOS.isPolling) {
+        console.log('Aba em background: pausando polling...');
+        clearInterval(BENETRIP_VOOS.pollingIntervalId);
+        BENETRIP_VOOS.pollingIntervalId = null;
+      }
+    } else if (document.visibilityState === 'visible') {
+      if (BENETRIP_VOOS.isPolling && !BENETRIP_VOOS.pollingIntervalId) {
+        console.log('Aba voltou ao primeiro plano: retomando polling...');
+        BENETRIP_VOOS.pollingIntervalId = setInterval(() => BENETRIP_VOOS.verificarResultadosPolling(), BENETRIP_VOOS.POLLING_INTERVAL_MS);
+        BENETRIP_VOOS.verificarResultadosPolling(); // Executar imediatamente
+      }
+    }
+  }
+});
+
+// Listener de erro global
+window.addEventListener('error', (event) => {
+  console.error('Erro global:', event);
+  if (document.getElementById('voos-container') && BENETRIP_VOOS) {
+    BENETRIP_VOOS.reportarErro({
+      tipo: 'erro_global',
+      mensagem: event.message,
+      fonte: event.filename,
+      linha: event.lineno,
+      coluna: event.colno,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
