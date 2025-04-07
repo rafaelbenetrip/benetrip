@@ -72,7 +72,7 @@
             border-left: 3px solid #4CAF50;
         }
         
-        /* CORREÇÕES CRÍTICAS DE VISIBILIDADE - adicionadas inline para garantir aplicação */
+        /* CORREÇÕES CRÍTICAS DE VISIBILIDADE */
         #voos-container,
         .voos-content,
         .voos-lista,
@@ -91,13 +91,29 @@
             opacity: 1 !important;
         }
         
-        /* Debug visual - adiciona bordas para identificar elementos */
-        .debug-mode .voos-lista {
-            border: 2px solid #00A3E0 !important;
+        /* Ajustes para garantir visibilidade */
+        .voos-content {
+            display: block !important;
+            background-color: #f8f8f8 !important;
+            padding-bottom: 80px !important;
         }
         
-        .debug-mode .voos-swipe-container {
-            border: 1px dashed #E87722 !important;
+        .voo-card {
+            min-height: 200px !important;
+            background-color: white !important;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.1) !important;
+        }
+        
+        .botao-selecao-fixo {
+            display: flex !important;
+            position: fixed !important;
+            bottom: 0 !important;
+            left: 0 !important;
+            right: 0 !important;
+            z-index: 999 !important;
+            background-color: white !important;
+            padding: 12px !important;
+            box-shadow: 0 -2px 5px rgba(0,0,0,0.1) !important;
         }
     </style>
 </head>
@@ -176,8 +192,11 @@
         });
     </script>
     
-    <!-- Script de verificação de inicialização -->
+    <!-- Script de verificação de inicialização (uma única vez) -->
     <script>
+        // Flag para controlar execução única
+        window.beneTripFixApplied = false;
+        
         // Verifica e inicializa explicitamente o módulo de voos
         document.addEventListener('DOMContentLoaded', function() {
             console.log('DOM Carregado - Verificando inicialização dos voos');
@@ -203,41 +222,52 @@
         });
     </script>
     
-    <!-- Script de correção de visibilidade -->
+    <!-- Script de correção de visibilidade (EXECUTADO UMA ÚNICA VEZ) -->
     <script>
         // Executa após um delay maior para garantir que tudo foi carregado
-        setTimeout(function() {
-            console.log('Executando correção de visibilidade...');
-            const container = document.getElementById('voos-container');
-            
-            // Adiciona modo debug para visualização
-            if (container) {
-                container.classList.add('debug-mode');
+        var fixVisibilityTimeout = setTimeout(function() {
+            // Evita múltiplas execuções
+            if (window.beneTripFixApplied) {
+                console.log('Correção já aplicada anteriormente. Ignorando...');
+                return;
             }
+            
+            console.log('Executando correção de visibilidade...');
+            window.beneTripFixApplied = true;
+            
+            const container = document.getElementById('voos-container');
             
             // Se temos resultados mas nada aparece
             if (window.BENETRIP_VOOS?.finalResults?.proposals?.length > 0) {
                 console.log(`Encontrados ${window.BENETRIP_VOOS.finalResults.proposals.length} voos, forçando renderização...`);
                 
-                // Verifica se a lista de voos existe
-                const existingList = document.querySelector('.voos-lista');
+                // Forçar visibilidade do conteúdo principal
+                if (container) {
+                    container.style.position = 'relative';
+                    container.style.minHeight = '100vh';
+                    container.style.overflowX = 'hidden';
+                    container.style.display = 'block';
+                    container.style.width = '100%';
+                    container.style.maxWidth = '480px';
+                    container.style.margin = '0 auto';
+                }
                 
-                if (!existingList && container) {
-                    console.log('Lista de voos não encontrada. Criando manualmente...');
-                    
-                    // Reset do container, preservando header
-                    const header = container.querySelector('.app-header');
-                    container.innerHTML = '';
-                    if (header) container.appendChild(header);
-                    
-                    // Criação manual dos elementos
+                // Restaurar a lista de voos caso esteja invisível
+                const existingList = document.querySelector('.voos-lista');
+                if (existingList) {
+                    console.log('Lista de voos existe, forçando visibilidade');
+                    existingList.style.display = 'block';
+                    existingList.style.visibility = 'visible';
+                    existingList.style.opacity = '1';
+                    existingList.style.position = 'relative';
+                    existingList.style.zIndex = '10';
+                } else if (window.BENETRIP_VOOS?.finalResults?.proposals?.length > 0 && container) {
+                    console.log('Re-renderizando a lista de voos');
+                    // Força recriação dos elementos
                     const main = document.createElement('main');
                     main.className = 'voos-content';
-                    main.style.display = 'block';
-                    main.style.visibility = 'visible';
                     container.appendChild(main);
                     
-                    // Força renderização
                     if (window.BENETRIP_VOOS.renderizarResumoViagem) {
                         window.BENETRIP_VOOS.renderizarResumoViagem(main);
                     }
@@ -249,34 +279,55 @@
                     if (window.BENETRIP_VOOS.renderizarBotaoSelecao) {
                         window.BENETRIP_VOOS.renderizarBotaoSelecao(container);
                     }
-                    
-                    console.log('Renderização manual concluída');
-                } else if (existingList) {
-                    console.log('Lista de voos existe, forçando visibilidade...');
-                    existingList.style.display = 'block';
-                    existingList.style.visibility = 'visible';
-                    existingList.style.opacity = '1';
-                    
-                    // Forçar visibilidade dos cards
-                    const cards = document.querySelectorAll('.voo-card');
-                    if (cards.length > 0) {
-                        console.log(`Forçando visibilidade de ${cards.length} cards...`);
-                        cards.forEach(card => {
-                            card.style.display = 'block';
-                            card.style.visibility = 'visible';
-                            card.style.opacity = '1';
-                        });
-                    }
                 }
                 
-                // Força o botão de seleção
-                const botao = document.querySelector('.botao-selecao-fixo');
-                if (!botao && window.BENETRIP_VOOS.renderizarBotaoSelecao) {
-                    console.log('Botão de seleção não encontrado. Criando...');
-                    window.BENETRIP_VOOS.renderizarBotaoSelecao(container);
+                // Procurar por cards de voo escondidos e forçar visibilidade
+                const cards = document.querySelectorAll('.voo-card');
+                if (cards.length > 0) {
+                    console.log(`Encontrados ${cards.length} cards, corrigindo visibilidade`);
+                    cards.forEach(card => {
+                        card.style.display = 'block';
+                        card.style.visibility = 'visible';
+                        card.style.opacity = '1';
+                        card.style.position = 'relative';
+                        card.style.minHeight = '200px';
+                        card.style.width = '100%';
+                        card.style.border = '1px solid #ddd';
+                        card.style.borderRadius = '8px';
+                        card.style.marginBottom = '8px';
+                        card.style.backgroundColor = 'white';
+                    });
                 }
+                
+                // Verificar se o swipe container está visível
+                const swipeContainer = document.querySelector('.voos-swipe-container');
+                if (swipeContainer) {
+                    console.log('Corrigindo swipe container');
+                    swipeContainer.style.display = 'flex';
+                    swipeContainer.style.overflow = 'auto';
+                    swipeContainer.style.width = '100%';
+                    swipeContainer.style.minHeight = '300px';
+                    swipeContainer.style.padding = '8px';
+                }
+                
+                // Forçar botão de seleção para ser visível
+                const botaoSelecao = document.querySelector('.botao-selecao-fixo');
+                if (botaoSelecao) {
+                    console.log('Corrigindo botão de seleção');
+                    botaoSelecao.style.display = 'flex';
+                    botaoSelecao.style.position = 'fixed';
+                    botaoSelecao.style.bottom = '0';
+                    botaoSelecao.style.left = '0';
+                    botaoSelecao.style.right = '0';
+                    botaoSelecao.style.padding = '10px';
+                    botaoSelecao.style.backgroundColor = 'white';
+                    botaoSelecao.style.borderTop = '1px solid #ddd';
+                    botaoSelecao.style.zIndex = '999';
+                }
+                
+                console.log('Correção de visibilidade aplicada com sucesso');
             }
-        }, 3000); // Verifica após 3 segundos
+        }, 3000);
     </script>
 </body>
 </html>
