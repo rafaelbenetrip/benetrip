@@ -1603,7 +1603,7 @@ getAgencyLogoUrl(gateId, width = 110, height = 40, retina = false) {
 },
 
   // Função auxiliar para obter o nome da cidade a partir do código do aeroporto
-function obterNomeCidade(codigoAeroporto) {
+obterNomeCidade(codigoAeroporto) {
   if (!codigoAeroporto) return '';
   
   const aeroporto = this.accumulatedAirports[codigoAeroporto];
