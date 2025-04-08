@@ -912,7 +912,7 @@ function getAirlineLogoUrl(iataCode, width = 40, height = 40, retina = false) {
   const retinaSuffix = retina ? '@2x' : '';
   
   return `https://pics.avs.io/${width}/${height}/${code}${retinaSuffix}.png`;
-}
+},
 
 // Função para obter URL do logo da agência (gateway)
 function getAgencyLogoUrl(gateId, width = 110, height = 40, retina = false) {
