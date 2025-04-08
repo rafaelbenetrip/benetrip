@@ -762,79 +762,311 @@ const BENETRIP_VOOS = {
     });
   },
 
-  renderizarInterface() {
-    try {
-      const container = document.getElementById('voos-container');
-      if (!container) { 
-        console.error('Container não encontrado'); 
-        return; 
-      }
-
-      // Preserva o header se existir
-      const headerExistente = container.querySelector('.app-header');
-      container.innerHTML = '';
-      
-      if (headerExistente) {
-        container.appendChild(headerExistente);
-      } else {
-        this.renderizarHeader(container);
-      }
-
-      // Decide qual estado renderizar
-      if (this.estaCarregando) {
-        this.renderizarCarregamento(container);
-      } else if (this.temErro) {
-        this.renderizarErro(container);
-      } else if (!this.finalResults || !this.finalResults.proposals || this.finalResults.proposals.length === 0) {
-        this.renderizarSemResultados(container);
-      } else {
-        this.renderizarResultados(container);
-      }
-    } catch (erro) {
-      console.error('Erro ao renderizar interface:', erro);
-      
-      // Tenta renderizar tela de erro de forma robusta
-      const container = document.getElementById('voos-container');
-      if (container) {
-        container.innerHTML = '';
-        this.renderizarHeader(container);
-        this.mensagemErro = 'Ocorreu um erro ao exibir os voos.';
-        this.renderizarErro(container);
-      }
-      
-      // Reporta o erro
-      this.reportarErro({
-        tipo: 'erro_renderizacao_interface',
-        mensagem: erro.message,
-        timestamp: new Date().toISOString()
-      });
+  renderizarInterface: function() {
+  try {
+    const container = document.getElementById('voos-container');
+    if (!container) { 
+      console.error('Container não encontrado'); 
+      return; 
     }
-  },
+
+    // Preserva o header se existir
+    const headerExistente = container.querySelector('.app-header');
+    if (!headerExistente) {
+      this.renderizarHeader(container);
+    }
+
+    // Limpa o conteúdo principal, mas mantém o header
+    const mainContent = container.querySelector('.voos-content');
+    if (mainContent) {
+      mainContent.innerHTML = '';
+    } else {
+      const newMainContent = document.createElement('main');
+      newMainContent.className = 'voos-content';
+      container.appendChild(newMainContent);
+    }
+
+    // Decide qual estado renderizar no mainContent
+    const contentContainer = container.querySelector('.voos-content');
+    if (this.estaCarregando) {
+      this.renderizarCarregamento(contentContainer);
+    } else if (this.temErro) {
+      this.renderizarErro(contentContainer);
+    } else if (!this.finalResults || !this.finalResults.proposals || this.finalResults.proposals.length === 0) {
+      this.renderizarSemResultados(contentContainer);
+    } else {
+      this.renderizarResultados(contentContainer);
+    }
+  } catch (erro) {
+    console.error('Erro ao renderizar interface:', erro);
+    
+    // Tenta renderizar tela de erro de forma robusta
+    const container = document.getElementById('voos-container');
+    if (container) {
+      const mainContent = container.querySelector('.voos-content') || document.createElement('main');
+      mainContent.className = 'voos-content';
+      if (!container.contains(mainContent)) {
+        container.appendChild(mainContent);
+      }
+      mainContent.innerHTML = '';
+      this.mensagemErro = 'Ocorreu um erro ao exibir os voos.';
+      this.renderizarErro(mainContent);
+    }
+    
+    // Reporta o erro
+    this.reportarErro({
+      tipo: 'erro_renderizacao_interface',
+      mensagem: erro.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+},
+
+  renderizarTripinhaMessage: function(container) {
+  // Preserva mensagem existente se houver
+  let tripinhaMessage = container.querySelector('.tripinha-message');
   
-  renderizarResultados(container) {
-    const mainContent = document.createElement('main');
-    mainContent.className = 'voos-content';
-    container.appendChild(mainContent);
-
-    this.renderizarResumoViagem(mainContent);
-    this.renderizarListaVoos(mainContent);
-    this.renderizarBotaoSelecao(container);
-
-    if (!container.querySelector('#swipe-hint')) {
-      this.renderizarSwipeHint(container);
+  if (!tripinhaMessage) {
+    tripinhaMessage = document.createElement('div');
+    tripinhaMessage.className = 'tripinha-message';
+    tripinhaMessage.innerHTML = `
+      <div class="tripinha-avatar">
+        <img src="assets/images/tripinha/avatar-normal.png" alt="Tripinha">
+      </div>
+      <div class="tripinha-bubble">
+        <p>Eu farejei por aí e encontrei alguns voos incríveis para sua aventura! 🐾 
+           Deslize para ver todas as opções e escolha a que melhor se encaixa no seu plano!</p>
+      </div>
+    `;
+    container.appendChild(tripinhaMessage);
+  }
+  
+  // Atualiza o texto com base na quantidade de voos
+  const numVoos = this.finalResults.proposals.length;
+  const textoBubble = tripinhaMessage.querySelector('.tripinha-bubble');
+  
+  if (textoBubble) {
+    if (numVoos > 0) {
+      textoBubble.innerHTML = `<p>Encontrei ${numVoos} voos para seu destino! 🐾 
+                               Deslize para ver todas as opções e escolha a que melhor se encaixa no seu plano!</p>`;
+    } else {
+      textoBubble.innerHTML = `<p>Busquei em todos os cantos, mas não encontrei voos disponíveis para seu destino. 
+                               Tente outras datas ou destinos! 🐾</p>`;
     }
+  }
+},
+  
+  renderizarResultados: function(container) {
+  // Renderiza a mensagem da Tripinha
+  this.renderizarTripinhaMessage(container);
+  
+  // Renderiza o resumo da viagem/busca
+  this.renderizarResumoViagem(container);
+  
+  // Resumo de quantidade de voos
+  const flightsSummary = document.createElement('div');
+  flightsSummary.className = 'flights-summary';
+  flightsSummary.innerHTML = `
+    <div class="flights-summary-header">
+      <div>
+        <span class="flights-count">${this.finalResults.proposals.length}</span> voos encontrados
+      </div>
+      <div class="flights-sort">
+        <span>Por preço</span>
+      </div>
+    </div>
+  `;
+  container.appendChild(flightsSummary);
+  
+  // Container de swipe para voos
+  const voosContainer = document.createElement('div');
+  voosContainer.className = 'voos-swipe-container';
+  voosContainer.id = 'voos-swipe-container';
+  container.appendChild(voosContainer);
+  
+  // Renderiza cards usando o novo formato
+  this.renderizarCards(voosContainer);
+  
+  // Adiciona indicadores de paginação
+  this.renderizarPaginacao(container);
+  
+  // Adiciona controles de navegação
+  this.renderizarControlesNavegacao(container);
+  
+  // Renderizar botão de seleção fixo
+  this.renderizarBotaoSelecao(document.getElementById('voos-container'));
+  
+  // Configura navegação após renderização
+  this.configurarEventosAposRenderizacao();
+},
+
+  renderizarCards: function(container) {
+  const propostas = this.finalResults.proposals || [];
+  
+  // Carregamento otimizado de voos - apenas os primeiros 20 inicialmente
+  const initialVoos = propostas.slice(0, Math.min(20, propostas.length));
+  
+  // Usa DocumentFragment para melhorar performance
+  const fragment = document.createDocumentFragment();
+  initialVoos.forEach((voo, index) => {
+    const cardVoo = this.criarCardVooAprimorado(voo, index);
+    fragment.appendChild(cardVoo);
+  });
+  container.appendChild(fragment);
+},
+
+  criarCardVooAprimorado: function(voo, index) {
+  const cardVoo = document.createElement('div');
+  cardVoo.className = 'voo-card';
+  
+  // Define atributos de dados
+  const vooId = voo.sign || `voo-idx-${index}`;
+  cardVoo.dataset.vooId = vooId;
+  cardVoo.dataset.vooIndex = index;
+
+  // Aplica classes especiais
+  if (index === 0) cardVoo.classList.add('voo-primeiro');
+  if (index % 2 === 0) cardVoo.classList.add('voo-par');
+  
+  // Extrai informações do voo
+  const preco = this.obterPrecoVoo(voo);
+  const moeda = this.finalResults?.meta?.currency || 'BRL';
+  const precoFormatado = this.formatarPreco(preco, moeda);
+  const infoIda = this.obterInfoSegmento(voo.segment?.[0]);
+  const infoVolta = voo.segment?.length > 1 ? this.obterInfoSegmento(voo.segment[1]) : null;
+  const economiaPercentual = voo._economia || 0;
+  const isMelhorPreco = voo._melhorPreco || index === 0;
+  const ehVooDireto = infoIda?.paradas === 0 && (!infoVolta || infoVolta.paradas === 0);
+  
+  // Aplica classes adicionais para estados especiais
+  if (ehVooDireto) cardVoo.classList.add('voo-direto');
+  if (isMelhorPreco) cardVoo.classList.add('voo-melhor-preco');
+  
+  // Constrói o HTML interno usando o novo design
+  cardVoo.innerHTML = `
+    ${isMelhorPreco ? '<div class="card-tag melhor-preco">Melhor preço</div>' : ''}
+    ${ehVooDireto ? '<div class="card-tag voo-direto">Voo Direto</div>' : ''}
     
-    // Configura eventos e seleciona primeiro voo
-    this.configurarEventosAposRenderizacao();
+    <div class="voo-card-header">
+      <div class="voo-price">
+        ${precoFormatado}
+        ${economiaPercentual > 0 ? `<span class="discount-badge">-${economiaPercentual}%</span>` : ''}
+      </div>
+      <div class="voo-price-details">Por pessoa, ida${infoVolta ? ' e volta' : ''}</div>
+      <div class="airline-info">${this.obterCompanhiasAereas(voo)}</div>
+    </div>
     
-    // Seleciona primeiro voo
-    const primeiroVoo = this.finalResults.proposals[0];
-    if (primeiroVoo) {
-      this.vooAtivo = primeiroVoo;
-      this.indexVooAtivo = 0;
-      this.atualizarVooAtivo();
+    <div class="voo-card-content">
+      <!-- Rota de ida -->
+      <div class="flight-route">
+        <div class="route-point">
+          <div class="route-time">${infoIda?.horaPartida || '--:--'}</div>
+          <div class="route-airport">${infoIda?.aeroportoPartida || '---'}</div>
+        </div>
+        <div class="route-line">
+          <div class="route-duration">${this.formatarDuracao(infoIda?.duracao || 0)}</div>
+          <div class="route-line-bar ${ehVooDireto ? 'route-line-direct' : ''}">
+            <span class="stop-marker start"></span>
+            ${!ehVooDireto ? '<span class="stop-marker mid"></span>' : ''}
+            <span class="stop-marker end"></span>
+          </div>
+          <div class="route-stops ${ehVooDireto ? 'route-stops-direct' : ''}">
+            ${ehVooDireto ? 'Voo Direto' : `${infoIda?.paradas || 0} ${infoIda?.paradas === 1 ? 'parada' : 'paradas'}`}
+          </div>
+        </div>
+        <div class="route-point">
+          <div class="route-time">${infoIda?.horaChegada || '--:--'}</div>
+          <div class="route-airport">${infoIda?.aeroportoChegada || '---'}</div>
+        </div>
+      </div>
+      
+      ${infoVolta ? `
+      <!-- Rota de volta -->
+      <div class="flight-route return-route">
+        <div class="route-point">
+          <div class="route-time">${infoVolta.horaPartida || '--:--'}</div>
+          <div class="route-airport">${infoVolta.aeroportoPartida || '---'}</div>
+        </div>
+        <div class="route-line">
+          <div class="route-duration">${this.formatarDuracao(infoVolta.duracao || 0)}</div>
+          <div class="route-line-bar ${infoVolta.paradas === 0 ? 'route-line-direct' : ''}">
+            <span class="stop-marker start"></span>
+            ${infoVolta.paradas > 0 ? '<span class="stop-marker mid"></span>' : ''}
+            <span class="stop-marker end"></span>
+          </div>
+          <div class="route-stops ${infoVolta.paradas === 0 ? 'route-stops-direct' : ''}">
+            ${infoVolta.paradas === 0 ? 'Voo Direto' : `${infoVolta.paradas} ${infoVolta.paradas === 1 ? 'parada' : 'paradas'}`}
+          </div>
+        </div>
+        <div class="route-point">
+          <div class="route-time">${infoVolta.horaChegada || '--:--'}</div>
+          <div class="route-airport">${infoVolta.aeroportoChegada || '---'}</div>
+        </div>
+      </div>
+      ` : ''}
+      
+      <!-- Detalhes adicionais -->
+      <div class="flight-details">
+        <div>
+          <span>✓</span> 1 bagagem incluída
+        </div>
+        <div>
+          <span>⏱️</span> Duração: ${this.formatarDuracao(infoIda?.duracao || 0)}
+        </div>
+      </div>
+    </div>
+    
+    <div class="voo-card-footer">
+      <button class="btn-detalhes-voo" data-voo-id="${vooId}">Ver detalhes</button>
+      <div class="remaining-seats">
+        Restam <span class="seats-number">${voo._assentosDisponiveis || '?'}</span>
+      </div>
+    </div>
+  `;
+  
+  return cardVoo;
+},
+
+  renderizarPaginacao: function(container) {
+  const paginationIndicator = document.createElement('div');
+  paginationIndicator.className = 'pagination-indicator';
+  
+  const numVoos = this.finalResults.proposals.length;
+  const maxDots = Math.min(numVoos, 10);
+  
+  for (let i = 0; i < maxDots; i++) {
+    const dot = document.createElement('div');
+    dot.className = 'pagination-dot';
+    if (i === 0) {
+      dot.classList.add('active');
     }
-  },
+    dot.dataset.index = i;
+    paginationIndicator.appendChild(dot);
+  }
+  
+  container.appendChild(paginationIndicator);
+},
+
+renderizarControlesNavegacao: function(container) {
+  const navControls = document.createElement('div');
+  navControls.className = 'nav-controls';
+  navControls.innerHTML = `
+    <button class="nav-btn prev-btn">
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M19 12H5M12 19l-7-7 7-7"></path>
+      </svg>
+      Anterior
+    </button>
+    <button class="nav-btn next-btn">
+      Próximo
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M5 12h14M12 5l7 7-7 7"></path>
+      </svg>
+    </button>
+  `;
+  
+  container.appendChild(navControls);
+},
 
   renderizarHeader(container) {
     if (container.querySelector('.app-header')) return;
@@ -867,118 +1099,129 @@ const BENETRIP_VOOS = {
     }
   },
 
-  renderizarCarregamento(container) {
-    // Evita renderização duplicada
-    if (container.querySelector('.loading-container')) return;
+  renderizarCarregamento: function(container) {
+  const loading = document.createElement('div');
+  loading.className = 'loading-container';
+  loading.innerHTML = `
+    <img src="assets/images/tripinha/loading.gif" alt="Tripinha carregando" class="loading-avatar">
+    <div class="loading-text">Farejando os melhores voos para você...</div>
+    <div class="progress-bar-container">
+      <div class="progress-bar" role="progressbar" style="width: 10%;" aria-valuenow="10" aria-valuemin="0" aria-valuemax="100"></div>
+    </div>
+    <div class="loading-tips">
+      <p>💡 Dica: Voos diretos aparecem destacados em azul!</p>
+    </div>
+  `;
+  
+  container.appendChild(loading);
+  
+  // Recupera e aplica o progresso atual
+  this.atualizarProgresso(
+    document.querySelector('.loading-text')?.textContent || 'Buscando...',
+    parseFloat(document.querySelector('.progress-bar')?.style.width || '10')
+  );
+  
+  // Alternar dicas
+  const dicas = [
+    '💡 Dica: Preços mudam, reserve logo!',
+    '🔍 Dica: Voos diretos aparecem destacados',
+    '💳 Dica: Parcelar sua compra pode sair mais em conta',
+    '⏱️ Dica: Muitas vezes voos de madrugada são mais baratos',
+    '🎒 Dica: Verifique a franquia de bagagem incluída'
+  ];
+  
+  let dicaIndex = 0;
+  const dicasEl = loading.querySelector('.loading-tips');
+  
+  if (dicasEl) {
+    const dicasInterval = setInterval(() => {
+      dicaIndex = (dicaIndex + 1) % dicas.length;
+      dicasEl.innerHTML = `<p>${dicas[dicaIndex]}</p>`;
+    }, 5000);
     
-    const loadingImage = 'assets/images/tripinha/loading.gif';
-    const loading = document.createElement('div');
-    loading.className = 'loading-container';
-    loading.innerHTML = `
-      <div style="text-align: center; padding: 2rem 0;">
-        <img src="${loadingImage}" alt="Tripinha carregando" class="loading-avatar" style="width: 100px; height: 100px; margin: 0 auto;" />
-        <div class="loading-text" style="margin: 1rem 0;">Iniciando busca...</div>
-        <div class="progress-bar-container">
-          <div class="progress-bar" role="progressbar" style="width: 10%;" aria-valuenow="10" aria-valuemin="0" aria-valuemax="100"></div>
-        </div>
-        <div class="loading-tips" style="margin-top: 1.5rem; font-size: 0.9rem; color: #666;">
-          <p>💡 Dica: Preços mudam, reserve logo!</p>
-        </div>
-      </div>
-    `;
-    
-    container.appendChild(loading);
-    
-    // Recupera e aplica o progresso atual
-    this.atualizarProgresso(
-      document.querySelector('.loading-text')?.textContent || 'Buscando...', 
-      parseFloat(document.querySelector('.progress-bar')?.style.width || '10')
-    );
-    
-    // Alternar dicas
-    const dicas = [
-      '💡 Dica: Preços mudam, reserve logo!',
-      '🔍 Dica: Voos diretos aparecem destacados',
-      '💳 Dica: Parcelar sua compra pode sair mais em conta',
-      '⏱️ Dica: Muitas vezes voos de madrugada são mais baratos',
-      '🎒 Dica: Verifique a franquia de bagagem incluída'
-    ];
-    
-    let dicaIndex = 0;
-    const dicasEl = loading.querySelector('.loading-tips');
-    
-    if (dicasEl) {
-      const dicasInterval = setInterval(() => {
-        dicaIndex = (dicaIndex + 1) % dicas.length;
-        dicasEl.innerHTML = `<p>${dicas[dicaIndex]}</p>`;
-      }, 5000);
-      
-      // Limpa intervalo quando carregamento for removido
-      const observer = new MutationObserver((mutations) => {
-        mutations.forEach((mutation) => {
-          if (mutation.removedNodes) {
-            mutation.removedNodes.forEach((node) => {
-              if (node === loading || node.contains(loading)) {
-                clearInterval(dicasInterval);
-                observer.disconnect();
-              }
-            });
-          }
-        });
+    // Limpa intervalo quando carregamento for removido
+    const observer = new MutationObserver((mutations) => {
+      mutations.forEach((mutation) => {
+        if (mutation.removedNodes) {
+          mutation.removedNodes.forEach((node) => {
+            if (node === loading || node.contains(loading)) {
+              clearInterval(dicasInterval);
+              observer.disconnect();
+            }
+          });
+        }
       });
-      
-      observer.observe(container, { childList: true, subtree: true });
-    }
-  },
+    });
+    
+    observer.observe(container, { childList: true, subtree: true });
+  }
+},
 
-  renderizarErro(container) {
-    // Limpa o container de carregamento se existir
-    const loading = container.querySelector('.loading-container'); 
-    if (loading) loading.remove();
-    
-    const erroDiv = document.createElement('div'); 
-    erroDiv.className = 'erro-container';
-    erroDiv.innerHTML = `
-      <div class="bg-red-100 text-red-700 p-4 rounded-lg my-4 text-center">
-        <div class="mb-3">
-          <img src="assets/images/tripinha/avatar-triste.png" alt="Tripinha triste" class="w-20 h-20 mx-auto" />
-        </div>
-        <p class="font-bold">${this.mensagemErro || 'Ocorreu um erro.'}</p>
-        <p class="mt-2 text-sm">Desculpe. Tente novamente?</p>
-        <button class="btn-tentar-novamente mt-4 px-4 py-2 bg-red-600 text-white rounded">
-          Tentar Novamente
-        </button>
+  renderizarErro: function(container) {
+  // Limpa o container de carregamento se existir
+  const loading = container.querySelector('.loading-container'); 
+  if (loading) loading.remove();
+  
+  const erroDiv = document.createElement('div'); 
+  erroDiv.className = 'erro-container';
+  erroDiv.innerHTML = `
+    <div class="error-message-box">
+      <div class="error-image">
+        <img src="assets/images/tripinha/avatar-triste.png" alt="Tripinha triste" class="tripinha-error-avatar">
       </div>
-    `;
-    
-    container.appendChild(erroDiv);
-  },
+      <h3 class="error-title">${this.mensagemErro || 'Ocorreu um erro.'}</h3>
+      <p class="error-description">Desculpe pelo inconveniente. Podemos tentar novamente?</p>
+      <button class="btn-tentar-novamente">
+        Tentar Novamente
+      </button>
+    </div>
+  `;
+  
+  container.appendChild(erroDiv);
+},
 
-  renderizarSemResultados(container) {
-    // Limpa o container de carregamento se existir
-    const loading = container.querySelector('.loading-container'); 
-    if (loading) loading.remove();
-    
-    const semResultados = document.createElement('div'); 
-    semResultados.className = 'sem-resultados-container';
-    semResultados.innerHTML = `
-      <div class="bg-blue-50 p-4 rounded-lg my-4 text-center">
-        <div class="mb-3">
-          <img src="assets/images/tripinha/avatar-triste.png" alt="Tripinha triste" class="w-20 h-20 mx-auto" />
-        </div>
-        <p class="font-bold">Ops! Não encontramos voos para ${this.destino?.destino || 'este destino'}.</p>
-        <p class="mt-2 text-sm">Tente outras datas ou destino.</p>
-        <div class="flex gap-3 mt-4">
-          <button class="btn-secundario flex-1 py-2 px-4 border rounded">Mudar Datas</button>
-          <button class="btn-principal flex-1 py-2 px-4 text-white rounded" style="background-color: #E87722;">
-            Outro Destino
-          </button>
-        </div>
+  renderizarSemResultados: function(container) {
+  // Limpa o container de carregamento se existir
+  const loading = container.querySelector('.loading-container'); 
+  if (loading) loading.remove();
+  
+  const semResultados = document.createElement('div'); 
+  semResultados.className = 'sem-resultados-container';
+  semResultados.innerHTML = `
+    <div class="tripinha-message">
+      <div class="tripinha-avatar">
+        <img src="assets/images/tripinha/avatar-triste.png" alt="Tripinha triste">
       </div>
-    `;
+      <div class="tripinha-bubble">
+        <p>Ops! Cheirei todos os cantos e não encontrei voos para ${this.destino?.destino || 'este destino'} nas datas selecionadas. 🐾</p>
+        <p>Podemos tentar outras datas ou destinos!</p>
+      </div>
+    </div>
     
-    container.appendChild(semResultados);
-  },
+    <div class="no-results-actions">
+      <button class="btn-secundario">Mudar Datas</button>
+      <button class="btn-principal">Outro Destino</button>
+    </div>
+  `;
+  
+  container.appendChild(semResultados);
+  
+  // Adiciona eventos aos botões
+  const btnMudarDatas = semResultados.querySelector('.btn-secundario');
+  const btnOutroDestino = semResultados.querySelector('.btn-principal');
+  
+  if (btnMudarDatas) {
+    btnMudarDatas.addEventListener('click', () => {
+      window.location.href = 'index.html';
+    });
+  }
+  
+  if (btnOutroDestino) {
+    btnOutroDestino.addEventListener('click', () => {
+      window.location.href = 'destinos.html';
+    });
+  }
+},
 
   renderizarResumoViagem(container) {
     const resumo = document.createElement('div'); 
@@ -1276,24 +1519,33 @@ const BENETRIP_VOOS = {
     return html;
   },
 
-  renderizarBotaoSelecao(container) {
-    // Remove botão existente para evitar duplicatas
-    const btnExistente = document.querySelector('.botao-selecao-fixo'); 
-    if (btnExistente) btnExistente.remove();
-    
-    const botaoFixo = document.createElement('div'); 
-    botaoFixo.className = 'botao-selecao-fixo';
-    botaoFixo.innerHTML = `
-      <button class="btn-selecionar-voo">
-        <span>Escolher Este Voo</span>
-        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M5 12h14M12 5l7 7-7 7"></path>
-        </svg>
-      </button>
-    `;
-    
-    container.appendChild(botaoFixo);
-  },
+  renderizarBotaoSelecao: function(container) {
+  // Remove botão existente para evitar duplicatas
+  const btnExistente = container.querySelector('.botao-selecao-fixo'); 
+  if (btnExistente) btnExistente.remove();
+  
+  const botaoFixo = document.createElement('div'); 
+  botaoFixo.className = 'botao-selecao-fixo';
+  
+  // Tenta obter o preço do voo ativo
+  let precoTexto = 'Escolher Este Voo';
+  if (this.vooAtivo) {
+    const preco = this.obterPrecoVoo(this.vooAtivo);
+    const moeda = this.finalResults?.meta?.currency || 'BRL';
+    precoTexto = `Escolher Voo por ${this.formatarPreco(preco, moeda)}`;
+  }
+  
+  botaoFixo.innerHTML = `
+    <button class="btn-selecionar-voo">
+      <span>${precoTexto}</span>
+      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M5 12h14M12 5l7 7-7 7"></path>
+      </svg>
+    </button>
+  `;
+  
+  container.appendChild(botaoFixo);
+},
 
   renderizarSwipeHint(container) {
     const hint = document.createElement('div'); 
