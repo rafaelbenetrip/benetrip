@@ -3116,3 +3116,43 @@ body {
   border-radius: 20px;
   box-shadow: 0 2px 8px rgba(0,0,0,0.05);
 }
+
+/* Adicione estas regras ao arquivo voos-styles.css */
+.voo-card {
+  transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.voo-card:hover {
+  transform: translateY(-3px);
+}
+
+.voo-card-ativo {
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% { box-shadow: 0 0 0 0 rgba(232, 119, 34, 0.4); }
+  70% { box-shadow: 0 0 0 10px rgba(232, 119, 34, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(232, 119, 34, 0); }
+}
+
+/* Adicione suporte a dark mode */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --benetrip-orange: #FF8A3D;
+    --benetrip-blue: #25B4EF;
+    --benetrip-white: #1A1A1A;
+    --benetrip-dark: #F5F5F5;
+    --benetrip-light-gray: #2A2A2A;
+    --benetrip-medium-gray: #3A3A3A;
+  }
+  
+  .voo-card {
+    background-color: #252525;
+    color: #E0E0E0;
+  }
+  
+  .voo-price {
+    color: #FF8A3D;
+  }
+}
