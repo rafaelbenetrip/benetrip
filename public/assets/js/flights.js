@@ -1695,7 +1695,7 @@ obterNomeCidade(codigoAeroporto) {
     return timeline;
   },
 
-  function mostrarConfirmacaoSelecao(voo) {
+  mostrarConfirmacaoSelecao(voo) {
   // Remove modal existente se houver
   document.getElementById('modal-confirmacao')?.remove();
   
