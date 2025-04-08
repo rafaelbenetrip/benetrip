@@ -6,12 +6,11 @@
     <meta name="theme-color" content="#E87722">
     <title>Benetrip - Voos Disponíveis</title>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Montserrat:wght@400;500&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="assets/css/styles.css">
-    <link rel="stylesheet" href="assets/css/voos-styles.css"> <!-- Novo arquivo de estilos -->
+    <link rel="stylesheet" href="assets/css/voos-unified.css"> <!-- Arquivo CSS unificado -->
 </head>
-<body class="mobile-optimized">
+<body>
     <!-- Container principal -->
-    <div id="voos-container" class="app-container">
+    <div id="voos-container">
         <!-- Header fixo -->
         <header class="app-header">
             <button class="btn-voltar" aria-label="Voltar">
@@ -22,133 +21,8 @@
             <h1>Voos Disponíveis</h1>
         </header>
         
-        <!-- O conteúdo será carregado dinamicamente pelo script flights.js, mas adicionamos o template base -->
-        <main class="voos-content">
-            <!-- Mensagem da Tripinha (será preenchida pelo JavaScript) -->
-            <div class="tripinha-message">
-                <div class="tripinha-avatar">
-                    <img src="assets/images/tripinha/avatar-normal.png" alt="Tripinha">
-                </div>
-                <div class="tripinha-bubble">
-                    <p>Eu farejei por aí e encontrei alguns voos incríveis para sua aventura! 🐾 
-                       Deslize para ver todas as opções e escolha a que melhor se encaixa no seu plano!</p>
-                </div>
-            </div>
-            
-            <!-- Resumo da busca (será preenchido pelo JavaScript) -->
-            <div class="flights-summary">
-                <div class="flights-summary-header">
-                    <div>
-                        <span class="flights-count">0</span> voos encontrados
-                    </div>
-                    <div class="flights-sort">
-                        <span>Por preço</span>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Container de swipe para os voos (será preenchido pelo JavaScript) -->
-            <div class="voos-swipe-container" id="voos-swipe-container">
-                <!-- Cards de voo serão inseridos aqui pelo JS -->
-            </div>
-            
-            <!-- Template para um card de voo (não visível, usado pelo JS) -->
-            <template id="voo-card-template">
-                <div class="voo-card">
-                    <div class="card-tag melhor-preco">Melhor preço</div>
-                    <div class="card-tag voo-direto">Voo Direto</div>
-                    
-                    <div class="voo-card-header">
-                        <div class="voo-price">
-                            R$ 1.800
-                            <span class="discount-badge">-15%</span>
-                        </div>
-                        <div class="voo-price-details">Por pessoa, ida e volta</div>
-                        <div class="airline-info">LATAM</div>
-                    </div>
-                    
-                    <div class="voo-card-content">
-                        <!-- Rota de ida -->
-                        <div class="flight-route">
-                            <div class="route-point">
-                                <div class="route-time">08:30</div>
-                                <div class="route-airport">GRU</div>
-                            </div>
-                            <div class="route-line">
-                                <div class="route-duration">5h 30min</div>
-                                <div class="route-line-bar">
-                                    <span class="stop-marker start"></span>
-                                    <span class="stop-marker end"></span>
-                                </div>
-                                <div class="route-stops route-stops-direct">Voo Direto</div>
-                            </div>
-                            <div class="route-point">
-                                <div class="route-time">14:00</div>
-                                <div class="route-airport">MDE</div>
-                            </div>
-                        </div>
-                        
-                        <!-- Rota de volta (opcional, será mostrada/ocultada pelo JS) -->
-                        <div class="flight-route return-route">
-                            <div class="route-point">
-                                <div class="route-time">16:45</div>
-                                <div class="route-airport">MDE</div>
-                            </div>
-                            <div class="route-line">
-                                <div class="route-duration">5h 45min</div>
-                                <div class="route-line-bar">
-                                    <span class="stop-marker start"></span>
-                                    <span class="stop-marker end"></span>
-                                </div>
-                                <div class="route-stops route-stops-direct">Voo Direto</div>
-                            </div>
-                            <div class="route-point">
-                                <div class="route-time">22:30</div>
-                                <div class="route-airport">GRU</div>
-                            </div>
-                        </div>
-                        
-                        <!-- Detalhes adicionais -->
-                        <div class="flight-details">
-                            <div>
-                                <span>✓</span> 1 bagagem incluída
-                            </div>
-                            <div>
-                                <span>⏱️</span> Duração total: 11h 15min
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="voo-card-footer">
-                        <button class="btn-detalhes-voo">Ver detalhes</button>
-                        <div class="remaining-seats">
-                            Restam <span class="seats-number">5</span>
-                        </div>
-                    </div>
-                </div>
-            </template>
-            
-            <!-- Indicadores de paginação -->
-            <div class="pagination-indicator">
-                <!-- Dots serão inseridos pelo JS -->
-            </div>
-            
-            <!-- Controles de navegação -->
-            <div class="nav-controls">
-                <button class="nav-btn prev-btn">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M19 12H5M12 19l-7-7 7-7"></path>
-                    </svg>
-                    Anterior
-                </button>
-                <button class="nav-btn next-btn">
-                    Próximo
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M5 12h14M12 5l7 7-7 7"></path>
-                    </svg>
-                </button>
-            </div>
-        </main>
+        <!-- Conteúdo principal - será preenchido pelo JavaScript -->
+        <main class="voos-content"></main>
         
         <!-- Botão fixo de seleção -->
         <div class="botao-selecao-fixo">
@@ -159,47 +33,13 @@
                 </svg>
             </button>
         </div>
-        
-        <!-- Hint de swipe -->
-        <div class="swipe-hint">
-            <span class="swipe-arrow left">←</span>
-            Deslize para ver mais voos
-            <span class="swipe-arrow right">→</span>
-        </div>
     </div>
 
     <!-- Toast notification container -->
     <div id="toast-container"></div>
 
-    <!-- Template para modal de confirmação -->
-    <template id="confirmacao-modal-template">
-        <div class="modal-backdrop">
-            <div class="modal-content">
-                <div class="confirmacao-tripinha">
-                    <div class="confirmacao-avatar">
-                        <img src="assets/images/tripinha/avatar-normal.png" alt="Tripinha">
-                    </div>
-                    <div class="confirmacao-mensagem">
-                        <p class="font-bold">Ótima escolha! Voo por R$ 1.800/pessoa.</p>
-                        <div class="confirmacao-checkbox">
-                            <input type="checkbox" id="confirmar-selecao">
-                            <label for="confirmar-selecao">Sim, continuar!</label>
-                        </div>
-                        <p class="confirmacao-aviso">Valor por pessoa (ida/volta). Próxima etapa: hospedagem.</p>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button class="modal-btn modal-btn-secondary" id="btn-cancelar">Voltar</button>
-                    <button class="modal-btn modal-btn-primary" id="btn-confirmar" disabled>Confirmar</button>
-                </div>
-            </div>
-        </div>
-    </template>
-
     <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/hammer.js@2.0.8/hammer.min.js"></script>
-    <script src="assets/js/api.js"></script>
     <script src="assets/js/flights.js"></script>
-    <script src="assets/js/voos-interface.js"></script> <!-- Novo script para gerenciar a interface -->
 </body>
 </html>
