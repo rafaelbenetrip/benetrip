@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="theme-color" content="#E87722">
+    <meta name="description" content="Encontre os melhores voos com a Benetrip - sua assistente de viagem">
     <title>Benetrip - Voos Disponíveis</title>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Montserrat:wght@400;500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="assets/css/styles.css">
@@ -24,7 +25,17 @@
         
         <!-- O conteúdo será carregado dinamicamente pelo script flights.js -->
         <main class="voos-content">
-            <!-- Conteúdo carregado dinamicamente -->
+            <!-- Inicial loading state -->
+            <div class="loading-container">
+                <img src="assets/images/tripinha/loading.gif" alt="Tripinha carregando" class="loading-avatar">
+                <div class="loading-text">Farejando os melhores voos para você...</div>
+                <div class="progress-bar-container">
+                    <div class="progress-bar" role="progressbar" style="width: 10%;" aria-valuenow="10" aria-valuemin="0" aria-valuemax="100"></div>
+                </div>
+                <div class="loading-tips">
+                    <p>💡 Dica: Voos diretos aparecem destacados em azul!</p>
+                </div>
+            </div>
         </main>
         
         <!-- Botão fixo de seleção -->
@@ -45,6 +56,10 @@
     <div id="modal-container"></div>
 
     <!-- Scripts -->
+    <script>
+        // Fallback caso Hammer.js não carregue
+        window.Hammer = window.Hammer || { on: function() { console.warn('Hammer.js não disponível'); } };
+    </script>
     <script src="https://cdn.jsdelivr.net/npm/hammer.js@2.0.8/hammer.min.js"></script>
     <script src="assets/js/api.js"></script>
     <script src="assets/js/flights.js"></script>
