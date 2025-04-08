@@ -152,11 +152,20 @@ function carregarTemplatesModais() {
 
 // Função para configurar navegação entre cards de voo
 function configurarNavegacaoCards() {
+    console.log('Configurando navegação dos cards de voo...');
     const swipeContainer = document.getElementById('voos-swipe-container');
-    if (!swipeContainer) return;
+    if (!swipeContainer) {
+        console.warn('Container de swipe não encontrado');
+        return;
+    }
     
     const cards = swipeContainer.querySelectorAll('.voo-card');
-    if (!cards.length) return;
+    if (!cards.length) {
+        console.warn('Nenhum card de voo encontrado');
+        return;
+    }
+    
+    console.log(`${cards.length} cards de voo encontrados`);
     
     const paginationDots = document.querySelectorAll('.pagination-dot');
     let currentCardIndex = 0;
@@ -259,6 +268,8 @@ function configurarNavegacaoCards() {
                 });
             }
         });
+    } else {
+        console.warn('Hammer.js não encontrado. Funcionalidade de swipe desativada.');
     }
     
     // Configurar detecção de scroll para atualizar card ativo
@@ -292,15 +303,30 @@ function configurarNavegacaoCards() {
             }
         }, 150);
     });
+    
+    // Configurar clique nos cards
+    cards.forEach((card, index) => {
+        card.addEventListener('click', (e) => {
+            // Ignora cliques em botões dentro do card
+            if (!e.target.closest('.btn-detalhes-voo')) {
+                updateActiveCard(index);
+            }
+        });
+    });
+    
+    console.log('Navegação de cards configurada com sucesso');
 }
 
 // ======= GESTÃO DE MODAIS =======
 
 // Função para mostrar detalhes do voo em modal
 function mostrarDetalhesVoo(vooId) {
+    console.log(`Mostrando detalhes do voo: ${vooId}`);
+    
     // Verifica se o módulo BENETRIP_VOOS está disponível e inicializado
     if (!window.BENETRIP_VOOS?.finalResults?.proposals) {
         console.error('Dados de voos não disponíveis');
+        exibirToast('Erro ao carregar detalhes do voo', 'error');
         return;
     }
     
@@ -311,6 +337,7 @@ function mostrarDetalhesVoo(vooId) {
     
     if (!voo) {
         console.error(`Voo ${vooId} não encontrado`);
+        exibirToast('Voo não encontrado', 'error');
         return;
     }
     
@@ -532,9 +559,12 @@ function obterNomeCidade(codigoAeroporto) {
 
 // Função para mostrar confirmação de seleção
 function mostrarConfirmacaoSelecao() {
+    console.log('Mostrando confirmação de seleção');
+    
     // Verifica se o módulo está disponível
     if (!window.BENETRIP_VOOS) {
         console.error('Módulo BENETRIP_VOOS não disponível');
+        exibirToast('Erro ao carregar dados do voo', 'error');
         return;
     }
     
@@ -779,16 +809,7 @@ function configurarBotoesConfirmacao() {
 
 // Configura eventos gerais da interface
 function configurarEventosInterface() {
-    // Esconder dica de swipe após alguns segundos
-    setTimeout(() => {
-        const swipeHint = document.querySelector('.swipe-hint');
-        if (swipeHint) {
-            swipeHint.style.opacity = '0';
-            setTimeout(() => {
-                if (swipeHint.parentNode) swipeHint.parentNode.removeChild(swipeHint);
-            }, 1000);
-        }
-    }, 5000);
+    console.log('Configurando eventos de interface...');
     
     // Botão de voltar
     const btnVoltar = document.querySelector('.btn-voltar');
@@ -834,36 +855,102 @@ function configurarEventosInterface() {
             }
         }
     });
+    
+    console.log('Eventos de interface configurados com sucesso');
+}
+
+// Função para verificar se os dados de voo estão disponíveis
+function verificarDadosDisponiveisEConfigurar() {
+    console.log('Verificando disponibilidade de dados de voo...');
+    
+    // Verifica se o módulo principal já existe
+    if (typeof window.BENETRIP_VOOS !== 'undefined') {
+        // Verifica status de carregamento
+        if (!window.BENETRIP_VOOS.estaCarregando && window.BENETRIP_VOOS.finalResults) {
+            console.log('Dados de voo já disponíveis, configurando interface...');
+            configurarNavegacaoCards();
+            return true;
+        } else {
+            console.log('Módulo existe mas ainda está carregando dados...');
+            return false;
+        }
+    } else {
+        console.warn('Módulo BENETRIP_VOOS não encontrado');
+        return false;
+    }
 }
 
 // ======= INICIALIZAÇÃO =======
 
 // Inicialização principal
 document.addEventListener('DOMContentLoaded', function() {
+    console.log('DOM carregado, inicializando interface de voos...');
+    
     // Carrega os templates dos modais
     carregarTemplatesModais();
     
     // Configura eventos gerais da interface
     configurarEventosInterface();
     
-    // Verifica se o módulo principal já foi carregado
-    if (typeof window.BENETRIP_VOOS !== 'undefined') {
-        // Verifica se os dados já estão carregados
-        if (!window.BENETRIP_VOOS.estaCarregando && window.BENETRIP_VOOS.finalResults) {
-            configurarNavegacaoCards();
-        } else {
-            // Aguarda carregamento de dados
-            const intervalId = setInterval(() => {
-                if (!window.BENETRIP_VOOS.estaCarregando && window.BENETRIP_VOOS.finalResults) {
-                    configurarNavegacaoCards();
-                    clearInterval(intervalId);
-                }
-            }, 500);
-            
-            // Timeout de segurança
+    // Esconder dica de swipe após alguns segundos
+    setTimeout(() => {
+        const swipeHint = document.querySelector('.swipe-hint');
+        if (swipeHint) {
+            swipeHint.style.opacity = '0';
             setTimeout(() => {
-                clearInterval(intervalId);
-            }, 30000);
+                if (swipeHint && swipeHint.parentNode) swipeHint.parentNode.removeChild(swipeHint);
+            }, 1000);
         }
+    }, 5000);
+    
+    // Verifica e configura ou espera por dados
+    if (!verificarDadosDisponiveisEConfigurar()) {
+        console.log('Aguardando carregamento de dados de voo...');
+        
+        // Configurar verificação periódica por dados
+        const maxTentativas = 20;
+        let tentativas = 0;
+        
+        const intervaloVerificacao = setInterval(() => {
+            tentativas++;
+            console.log(`Verificação ${tentativas}/${maxTentativas} por dados disponíveis...`);
+            
+            // Se conseguir configurar ou tentar muitas vezes, para de verificar
+            if (verificarDadosDisponiveisEConfigurar() || tentativas >= maxTentativas) {
+                clearInterval(intervaloVerificacao);
+                
+                if (tentativas >= maxTentativas && !window.BENETRIP_VOOS?.finalResults) {
+                    console.warn(`Dados não disponíveis após ${maxTentativas} tentativas`);
+                    
+                    // Verifica se o módulo BENETRIP_VOOS foi inicializado corretamente
+                    if (!window.BENETRIP_VOOS) {
+                        console.error('Módulo BENETRIP_VOOS não encontrado após espera. Verificando scripts...');
+                        
+                        // Verifica se o script foi carregado
+                        const scriptElement = document.querySelector('script[src*="flights.js"]');
+                        if (!scriptElement) {
+                            console.error('Script flights.js não encontrado na página!');
+                            
+                            // Tentar carregar o script manualmente
+                            const script = document.createElement('script');
+                            script.src = 'assets/js/flights.js';
+                            script.onload = () => {
+                                console.log('Script flights.js carregado manualmente, iniciando...');
+                                if (window.BENETRIP_VOOS) {
+                                    window.BENETRIP_VOOS.init();
+                                }
+                            };
+                            document.body.appendChild(script);
+                        }
+                    }
+                }
+            }
+        }, 500);
     }
 });
+
+// Expõe funções importantes globalmente
+window.mostrarDetalhesVoo = mostrarDetalhesVoo;
+window.mostrarConfirmacaoSelecao = mostrarConfirmacaoSelecao;
+window.configurarNavegacaoCards = configurarNavegacaoCards;
+window.exibirToast = exibirToast;
