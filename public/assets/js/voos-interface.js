@@ -160,10 +160,13 @@ function configurarNavegacaoCards() {
         });
     }
     
-    // Configurar swipe com Hammer.js
-    if (typeof Hammer !== 'undefined') {
-        try {
-            const hammerInstance = new Hammer(swipeContainer);
+    // Configurar swipe com Hammer.js (de forma segura)
+    let hammerInstance = null;
+    
+    try {
+        // Verifica se Hammer é realmente um construtor válido antes de tentar usá-lo
+        if (typeof Hammer === 'function') {
+            hammerInstance = new Hammer(swipeContainer);
             hammerInstance.on('swipeleft', () => {
                 if (currentCardIndex < cards.length - 1) {
                     updateActiveCard(currentCardIndex + 1);
@@ -186,10 +189,16 @@ function configurarNavegacaoCards() {
                 }
             });
             
-            console.log('Hammer.js configurado para swipe');
-        } catch (erro) {
-            console.error('Erro ao configurar Hammer.js:', erro);
+            console.log('Hammer.js configurado com sucesso para swipe');
+        } else {
+            console.log('Hammer não é um construtor válido, usando fallback para navegação touch');
+            // Implementa solução alternativa para swipe (scrolling)
+            implementarScrollingTouch(swipeContainer, updateActiveCard, cards, currentCardIndex);
         }
+    } catch (erro) {
+        console.error('Erro ao configurar Hammer.js:', erro);
+        // Implementa solução alternativa para swipe (scrolling)
+        implementarScrollingTouch(swipeContainer, updateActiveCard, cards, currentCardIndex);
     }
     
     // Configurar detecção de scroll para atualizar card ativo
@@ -219,6 +228,53 @@ function configurarNavegacaoCards() {
                 const index = Array.from(cards).indexOf(closestCard);
                 if (index !== -1 && index !== currentCardIndex) {
                     updateActiveCard(index);
+                }
+            }
+        }, 150);
+    });
+}
+
+// Função alternativa para controle de navegação via scrolling padrão
+function implementarScrollingTouch(swipeContainer, updateActiveCardFn, cards, currentCardIndex) {
+    console.log('Usando navegação baseada em scroll como fallback');
+    
+    // Garante que o container seja scrollável
+    swipeContainer.style.overflowX = 'auto';
+    swipeContainer.style.scrollBehavior = 'smooth';
+    swipeContainer.style.scrollSnapType = 'x mandatory';
+    
+    // Adiciona scroll-snap para cada card
+    cards.forEach(card => {
+        card.style.scrollSnapAlign = 'center';
+    });
+    
+    // Configura detecção de scroll para atualizar card ativo
+    let scrollTimeoutId = null;
+    swipeContainer.addEventListener('scroll', () => {
+        clearTimeout(scrollTimeoutId);
+        scrollTimeoutId = setTimeout(() => {
+            // Encontra o card no centro da visualização
+            const containerRect = swipeContainer.getBoundingClientRect();
+            const containerCenter = containerRect.left + containerRect.width / 2;
+            
+            let closestCard = null;
+            let closestDistance = Infinity;
+            
+            cards.forEach((card) => {
+                const cardRect = card.getBoundingClientRect();
+                const cardCenter = cardRect.left + cardRect.width / 2;
+                const distance = Math.abs(containerCenter - cardCenter);
+                
+                if (distance < closestDistance) {
+                    closestDistance = distance;
+                    closestCard = card;
+                }
+            });
+            
+            if (closestCard) {
+                const index = Array.from(cards).indexOf(closestCard);
+                if (index !== -1 && index !== currentCardIndex) {
+                    updateActiveCardFn(index);
                 }
             }
         }, 150);
@@ -873,6 +929,43 @@ document.addEventListener('mostrarDetalhesVoo', function(event) {
     const vooId = event.detail.vooId;
     if (vooId) {
         mostrarDetalhesVoo(vooId);
+    }
+});
+
+// Adicionar evento para escutar quando Hammer não estiver disponível
+document.addEventListener('hammerjs-not-available', function() {
+    console.log('Evento recebido: hammerjs-not-available - Revertendo para navegação alternativa');
+    
+    // Se já houver cartões de voo na tela, reconfigurar navegação
+    if (document.querySelector('.voo-card')) {
+        configurarNavegacaoCards();
+    }
+});
+
+// Também adicionar navegação por teclado para acessibilidade
+document.addEventListener('keydown', function(event) {
+    // Verificar se estamos na tela de voos
+    if (!document.getElementById('voos-swipe-container')) return;
+    
+    switch(event.key) {
+        case 'ArrowLeft':
+            // Navegar para o cartão anterior
+            if (window.BENETRIP_VOOS) {
+                window.BENETRIP_VOOS.vooAnterior();
+            }
+            break;
+        case 'ArrowRight':
+            // Navegar para o próximo cartão
+            if (window.BENETRIP_VOOS) {
+                window.BENETRIP_VOOS.proximoVoo();
+            }
+            break;
+        case 'Enter':
+            // Selecionar o voo atual
+            if (window.BENETRIP_VOOS) {
+                window.BENETRIP_VOOS.selecionarVooAtivo();
+            }
+            break;
     }
 });
 
