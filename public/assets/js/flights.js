@@ -898,6 +898,33 @@ const BENETRIP_VOOS = {
     // Exibe dica de swipe
     this.exibirDicaSwipe();
   },
+
+// Função para obter URL do logo da companhia aérea
+function getAirlineLogoUrl(iataCode, width = 40, height = 40, retina = false) {
+  if (!iataCode || typeof iataCode !== 'string') {
+    return `https://pics.avs.io/${width}/${height}/default.png`;
+  }
+  
+  // Converte para maiúsculas e remove espaços
+  const code = iataCode.trim().toUpperCase();
+  
+  // Adiciona sufixo @2x para versão retina, se solicitado
+  const retinaSuffix = retina ? '@2x' : '';
+  
+  return `https://pics.avs.io/${width}/${height}/${code}${retinaSuffix}.png`;
+}
+
+// Função para obter URL do logo da agência (gateway)
+function getAgencyLogoUrl(gateId, width = 110, height = 40, retina = false) {
+  if (!gateId) {
+    return null;
+  }
+  
+  // Adiciona sufixo @2x para versão retina, se solicitado
+  const retinaSuffix = retina ? '@2x' : '';
+  
+  return `https://pics.avs.io/as_gates/${width}/${height}/${gateId}${retinaSuffix}.png`;
+},
   
   function criarCardVoo(voo, index) {
   const cardVoo = document.createElement('div');
@@ -1002,7 +1029,26 @@ const BENETRIP_VOOS = {
       </div>
     </div>
   `;
+
+  // Extrai código IATA da companhia aérea
+  const companhiaIATA = voo.carriers?.[0];
+  const companhiaAerea = this.obterNomeCompanhiaAerea(companhiaIATA);
   
+  // Constrói o HTML interno com o logo da companhia aérea
+  cardVoo.innerHTML = `
+    <div class="voo-card-header">
+      <div class="voo-price-container">
+        <div class="voo-price">${this.formatarPreco(preco, moeda)}</div>
+        ${economiaPercentual > 0 ? `<span class="discount-badge">-${economiaPercentual}%</span>` : ''}
+        ${isMelhorPreco ? '<span class="card-tag melhor-preco">Melhor preço</span>' : ''}
+      </div>
+      <div class="voo-price-details">Por pessoa, ida${infoVolta ? ' e volta' : ''}</div>
+      <div class="airline-info">
+        <img src="${getAirlineLogoUrl(companhiaIATA, 20, 20)}" alt="${companhiaAerea}" class="airline-logo">
+        ${companhiaAerea}
+      </div>
+    </div>
+    `;
   return cardVoo;
 },
 
@@ -1330,6 +1376,7 @@ const BENETRIP_VOOS = {
   const moeda = this.finalResults?.meta?.currency || 'BRL';
   const infoIda = this.obterInfoSegmento(voo.segment?.[0]);
   const infoVolta = voo.segment?.length > 1 ? this.obterInfoSegmento(voo.segment[1]) : null;
+  const companhiaIATA = voo.carriers?.[0];
   const companhiaAerea = this.obterNomeCompanhiaAerea(voo.carriers?.[0]);
   const ehVooDireto = infoIda?.paradas === 0 && (!infoVolta || infoVolta.paradas === 0);
   
@@ -1352,22 +1399,21 @@ const BENETRIP_VOOS = {
       </div>
       
       <div class="detalhes-content">
-        <!-- Resumo de preço e companhia -->
-        <div class="detalhes-sumario">
-          <div class="detalhes-preco">
-            <div class="preco-valor">${this.formatarPreco(preco, moeda)}</div>
-            <div class="preco-info">Por pessoa, ida${infoVolta ? ' e volta' : ''}</div>
-          </div>
-          <div class="detalhes-companhia">
-            <div class="companhia-logo">
-              <!-- Tenta carregar logo da companhia, senão usa padrão -->
-              <img src="assets/images/airlines/${(voo.carriers?.[0] || '').toLowerCase()}.png" 
-                   alt="${companhiaAerea}" 
-                   onerror="this.src='assets/images/airlines/default.png'">
-            </div>
-            <div class="companhia-nome">${companhiaAerea}</div>
-          </div>
+      <!-- Resumo de preço e companhia -->
+      <div class="detalhes-sumario">
+        <div class="detalhes-preco">
+          <div class="preco-valor">${this.formatarPreco(preco, moeda)}</div>
+          <div class="preco-info">Por pessoa, ida${infoVolta ? ' e volta' : ''}</div>
         </div>
+        <div class="detalhes-companhia">
+          <div class="companhia-logo">
+            <img src="${getAirlineLogoUrl(companhiaIATA, 60, 60)}" 
+                 alt="${companhiaAerea}" 
+                 onerror="this.src='${getAirlineLogoUrl('default', 60, 60)}'">
+          </div>
+          <div class="companhia-nome">${companhiaAerea}</div>
+        </div>
+      </div>
         
         <!-- Visualização da rota com timeline -->
         <div class="detalhes-secao">
