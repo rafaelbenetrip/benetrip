@@ -1,6 +1,6 @@
 /**
  * BENETRIP - Módulo de Busca e Exibição de Voos
- * Versão otimizada para performance e confiabilidade
+ * Versão otimizada para performance e confiabilidade_
  */
 
 // Módulo de Voos do Benetrip
