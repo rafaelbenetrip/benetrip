@@ -1208,3 +1208,39 @@
   border-radius: 6px;
   padding: 4px;
 }
+
+/* Estilo para voo selecionado */
+.voo-card.voo-selecionado {
+  box-shadow: 0 0 0 2px var(--benetrip-blue), 0 4px 12px rgba(0, 0, 0, 0.1);
+  border: 1px solid var(--benetrip-blue);
+}
+
+/* Estilo para ícone inline de companhia aérea */
+.inline-airline-logo {
+  width: 16px;
+  height: 16px;
+  vertical-align: middle;
+  margin-right: 4px;
+  object-fit: contain;
+}
+
+/* Spinner para botões de carregamento */
+.spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  border-top-color: white;
+  animation: spinner-rotate 0.6s linear infinite;
+  margin-right: 8px;
+}
+
+@keyframes spinner-rotate {
+  to { transform: rotate(360deg); }
+}
+
+/* Estilos para elementos dinamicamente criados */
+.modal-backdrop:not([style*="display: none"]) {
+  display: flex !important;
+}
