@@ -1178,3 +1178,33 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* Estilo para logo pequeno no card de voo */
+.airline-info {
+  display: flex;
+  align-items: center;
+  background-color: #f8f9fa;
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.airline-logo {
+  width: 20px;
+  height: 20px;
+  margin-right: 6px;
+  object-fit: contain;
+}
+
+/* Estilo para logo grande no modal de detalhes */
+.companhia-logo {
+  width: 60px;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #f8f9fa;
+  border-radius: 6px;
+  padding: 4px;
+}
