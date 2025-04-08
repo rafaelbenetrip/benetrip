@@ -979,13 +979,17 @@ const BENETRIP_VOOS = {
     // Exibe dica de swipe
     this.exibirDicaSwipe();
     
-    // IMPORTANTE: Após renderizar os cards, inicializa a navegação entre eles
-    // Isso garante que o swipe e os botões de navegação funcionem corretamente
+    // MODIFICADO: Tenta inicializar navegação com tratamento de fallback
     if (typeof window.inicializarNavegacaoVoos === 'function') {
         console.log('Inicializando navegação de voos via função global...');
-        window.inicializarNavegacaoVoos();
+        try {
+            window.inicializarNavegacaoVoos();
+        } catch (erro) {
+            console.warn('Erro ao inicializar navegação global, usando método local:', erro);
+            this.configurarNavegacaoCards();
+        }
     } else {
-        console.log('Configurando navegação de cards diretamente...');
+        console.log('Função global de navegação não disponível, configurando navegação diretamente...');
         this.configurarNavegacaoCards();
     }
   },
@@ -1187,12 +1191,17 @@ const BENETRIP_VOOS = {
     const paginationDots = document.querySelectorAll('.pagination-dot');
     let currentCardIndex = 0;
     
-    // Configurar swipe com Hammer.js
-    if (typeof Hammer !== 'undefined') {
-        try {
+    // Configurar swipe com Hammer.js - COM TRATAMENTO DE ERRO MELHORADO
+    try {
+        // Verifica se Hammer realmente é um construtor válido
+        if (typeof Hammer === 'function') {
             // Limpar instância anterior se existir
             if (this.hammerInstance) {
-                this.hammerInstance.destroy();
+                try {
+                    this.hammerInstance.destroy();
+                } catch (e) {
+                    console.warn('Erro ao destruir instância anterior de Hammer', e);
+                }
             }
             
             this.hammerInstance = new Hammer(swipeContainer);
@@ -1209,14 +1218,17 @@ const BENETRIP_VOOS = {
             });
             
             console.log('Hammer.js configurado para swipe');
-        } catch (erro) {
-            console.error('Erro ao configurar Hammer.js:', erro);
+        } else {
+            console.log('Hammer não é um construtor válido, usando alternativa de navegação');
+            this.configurarNavegacaoAlternativa(swipeContainer, cards);
         }
-    } else {
-        console.warn('Hammer.js não disponível para configurar swipe');
+    } catch (erro) {
+        console.error('Erro ao configurar Hammer.js:', erro);
+        // Implementa navegação alternativa baseada em scroll
+        this.configurarNavegacaoAlternativa(swipeContainer, cards);
     }
     
-    // Configurar botões de navegação
+    // Configurar botões de navegação (mantido como está)
     const btnNext = document.querySelector('.next-btn');
     const btnPrev = document.querySelector('.prev-btn');
     
@@ -1262,6 +1274,80 @@ const BENETRIP_VOOS = {
                 });
                 document.dispatchEvent(evento);
             };
+        }
+    });
+  },
+
+  /**
+   * Configura uma alternativa de navegação baseada em scroll para quando Hammer não funciona
+   * @param {HTMLElement} container - Container de swipe
+   * @param {NodeList} cards - Lista de cards de voo
+   */
+  configurarNavegacaoAlternativa(container, cards) {
+    console.log('Configurando navegação alternativa baseada em scroll');
+    
+    // Garante que o container seja scrollável
+    container.style.overflowX = 'auto';
+    container.style.scrollBehavior = 'smooth';
+    container.style.scrollSnapType = 'x mandatory';
+    
+    // Adiciona scroll-snap para cada card
+    Array.from(cards).forEach(card => {
+        card.style.scrollSnapAlign = 'center';
+    });
+    
+    // Configura eventos de click nos próprios cards
+    Array.from(cards).forEach((card, index) => {
+        card.addEventListener('click', (e) => {
+            // Evita ativar se clicou em um botão
+            if (!e.target.closest('button')) {
+                this.indexVooAtivo = index;
+                this.vooAtivo = this.finalResults.proposals[index];
+                this.atualizarVooAtivo();
+            }
+        });
+    });
+    
+    // Detecta mudanças no scroll para atualizar card ativo
+    let scrollTimeout = null;
+    container.addEventListener('scroll', () => {
+        clearTimeout(scrollTimeout);
+        scrollTimeout = setTimeout(() => {
+            // Encontra o card mais visível no centro
+            const containerRect = container.getBoundingClientRect();
+            const containerCenter = containerRect.left + containerRect.width / 2;
+            
+            let closestCard = null;
+            let closestDistance = Infinity;
+            
+            Array.from(cards).forEach(card => {
+                const cardRect = card.getBoundingClientRect();
+                const cardCenter = cardRect.left + cardRect.width / 2;
+                const distance = Math.abs(containerCenter - cardCenter);
+                
+                if (distance < closestDistance) {
+                    closestDistance = distance;
+                    closestCard = card;
+                }
+            });
+            
+            if (closestCard) {
+                const index = Array.from(cards).indexOf(closestCard);
+                if (index !== -1 && index !== this.indexVooAtivo) {
+                    this.indexVooAtivo = index;
+                    this.vooAtivo = this.finalResults.proposals[index];
+                    this.atualizarVooAtivo();
+                }
+            }
+        }, 150);
+    });
+    
+    // Adiciona navegação por teclado
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowLeft') {
+            this.vooAnterior();
+        } else if (e.key === 'ArrowRight') {
+            this.proximoVoo();
         }
     });
   },
