@@ -1,6 +1,6 @@
 /**
  * BENETRIP - Módulo de Busca e Exibição de Voos
- * Versão otimizada para performance e confiabilidade_
+ * Versão otimizada para performance e confiabilidade
  */
 
 // Módulo de Voos do Benetrip
@@ -15,9 +15,7 @@ const BENETRIP_VOOS = {
     'recife': 'REC', 'fortaleza': 'FOR', 'belo horizonte': 'CNF', 'porto alegre': 'POA',
     'curitiba': 'CWB', 'belem': 'BEL', 'manaus': 'MAO', 'florianopolis': 'FLN',
     'natal': 'NAT', 'goiania': 'GYN', 'paris': 'CDG', 'londres': 'LHR', 
-    'nova york': 'JFK', 'nova iorque': 'JFK', 'tokyo': 'HND', 'tóquio': 'HND',
-    'medellin': 'MDE', 'medellín': 'MDE', 'cartagena': 'CTG', 'bogota': 'BOG',
-    'miami': 'MIA', 'orlando': 'MCO', 'lisboa': 'LIS', 'barcelona': 'BCN'
+    'nova york': 'JFK', 'nova iorque': 'JFK', 'tokyo': 'HND', 'tóquio': 'HND'
   },
 
   // --- Dados e Estado ---
@@ -48,31 +46,9 @@ const BENETRIP_VOOS = {
     console.log('Inicializando sistema de busca de voos...');
     this.resetState();
     this.criarToastContainerSeNecessario();
-    
-    // Tenta carregar destino com tratamento de erro melhorado
     this.carregarDestino()
-      .then(() => {
-        console.log('Destino carregado com sucesso:', this.destino);
-        this.iniciarBuscaVoos();
-      })
-      .catch(erro => {
-        console.error('Falha ao carregar destino:', erro);
-        // Verifica se é um ambiente de teste/desenvolvimento
-        if (window.location.href.includes('localhost') || 
-            window.location.href.includes('127.0.0.1') || 
-            window.location.href.includes('?mock=true')) {
-          console.log('Ambiente de desenvolvimento detectado, usando destino mock...');
-          // Cria um destino padrão para testes
-          this.destino = {
-            destino: "Medellín, Colômbia",
-            codigo_iata: "MDE",
-            pais: "Colômbia"
-          };
-          this.iniciarBuscaVoos();
-        } else {
-          this.mostrarErro('Não foi possível encontrar o destino selecionado. Por favor, selecione um destino primeiro.');
-        }
-      });
+      .then(() => this.iniciarBuscaVoos())
+      .catch(erro => this.mostrarErro('Erro ao carregar destino. Tente selecionar novamente.'));
   },
 
   /**
@@ -126,80 +102,31 @@ const BENETRIP_VOOS = {
    */
   async carregarDestino() {
     try {
-      // Tenta carregar o destino do localStorage com múltiplas chaves possíveis
-      const possiveisChaves = [
-        'benetrip_destino_selecionado',
-        'benetrip_destino_escolhido',
-        'benetrip_destino',
-        'benetrip_destino_surpresa',
-        'destino_selecionado',
-        'destino_benetrip'
-      ];
-      
-      let destinoString = null;
-      for (const chave of possiveisChaves) {
-        const valor = localStorage.getItem(chave);
-        if (valor) {
-          destinoString = valor;
-          console.log(`Destino encontrado na chave: ${chave}`);
-          break;
-        }
+      // Tenta carregar o destino do localStorage
+      let destinoString = localStorage.getItem('benetrip_destino_selecionado');
+      if (!destinoString) {
+        destinoString = localStorage.getItem('benetrip_destino_escolhido') || 
+                        localStorage.getItem('benetrip_destino');
       }
       
       if (!destinoString) {
-        throw new Error('Nenhum destino selecionado no localStorage');
+        throw new Error('Nenhum destino selecionado');
       }
       
-      try {
-        this.destino = JSON.parse(destinoString);
-      } catch (parseError) {
-        console.error('Erro ao fazer parse do JSON do destino:', parseError);
-        // Tenta criar um objeto destino a partir de uma string
-        if (typeof destinoString === 'string') {
-          this.destino = {
-            destino: destinoString,
-            nome: destinoString
-          };
-        } else {
-          throw parseError;
-        }
-      }
-      
-      // Verificação e normalização do objeto destino
-      if (!this.destino || typeof this.destino !== 'object') {
-        throw new Error('Formato de destino inválido');
-      }
-      
-      console.log('Destino carregado (bruto):', this.destino);
+      this.destino = JSON.parse(destinoString);
+      console.log('Destino carregado:', this.destino);
       
       // Garante que o código IATA está presente
       if (!this.destino.codigo_iata) {
-        // Tenta extrair de diferentes propriedades possíveis
-        let codigoEncontrado = null;
-        
-        // Tenta extrair de aeroporto.codigo
         if (this.destino.aeroporto?.codigo) {
-          codigoEncontrado = this.destino.aeroporto.codigo;
-        } 
-        // Tenta extrair de código direto
-        else if (this.destino.codigo) {
-          codigoEncontrado = this.destino.codigo;
-        }
-        // Tenta extrair de iata direto
-        else if (this.destino.iata) {
-          codigoEncontrado = this.destino.iata;
-        }
-        // Tenta extrair do texto do destino
-        else {
-          const textoDestino = this.destino.destino || this.destino.nome || '';
-          codigoEncontrado = this.extrairCodigoIATA(textoDestino);
-        }
-        
-        if (codigoEncontrado) {
-          this.destino.codigo_iata = codigoEncontrado;
-          console.log('Código IATA extraído:', codigoEncontrado);
+          this.destino.codigo_iata = this.destino.aeroporto.codigo;
         } else {
-          throw new Error('Não foi possível identificar o código IATA do destino');
+          const codigoExtraido = this.extrairCodigoIATA(this.destino.destino || this.destino.nome);
+          if (codigoExtraido) {
+            this.destino.codigo_iata = codigoExtraido;
+          } else {
+            throw new Error('Código IATA do destino não encontrado');
+          }
         }
       }
       
@@ -220,28 +147,12 @@ const BENETRIP_VOOS = {
     
     // Tenta extrair o código IATA de um formato como "Cidade (XXX)"
     const match = texto.match(/\(([A-Z]{3})\)/);
-    if (match && match[1]) {
-      return match[1];
-    }
+    if (match && match[1]) return match[1];
     
     // Se não encontrou pelo formato parenteses, busca no mapeamento de cidades
-    const textoLower = texto.toLowerCase().trim();
-    
-    // Verificação direta no mapa
-    if (this.IATA_MAP[textoLower]) {
-      return this.IATA_MAP[textoLower];
-    }
-    
-    // Verificação por substring - procura por cidades que podem estar contidas no texto
+    const textoLower = texto.toLowerCase();
     for (const [cidade, codigo] of Object.entries(this.IATA_MAP)) {
-      if (textoLower.includes(cidade)) {
-        return codigo;
-      }
-    }
-    
-    // Se for um código IATA direto (3 letras maiúsculas)
-    if (/^[A-Z]{3}$/.test(texto)) {
-      return texto;
+      if (textoLower.includes(cidade)) return codigo;
     }
     
     return null;
@@ -259,55 +170,20 @@ const BENETRIP_VOOS = {
       
       // Carrega dados do usuário e verifica datas
       const dadosUsuario = this.carregarDadosUsuario();
-      console.log('Dados do usuário carregados:', dadosUsuario);
-      
-      let dataIda, dataVolta;
-      
-      // Busca datas em diferentes formatos possíveis
       const datas = dadosUsuario?.respostas?.datas;
-      if (datas) {
-        dataIda = datas.dataIda || datas.ida;
-        dataVolta = datas.dataVolta || datas.volta;
-      }
-      
-      // Se não encontrou, tenta buscar datas individuais
-      if (!dataIda) {
-        dataIda = dadosUsuario?.respostas?.dataIda || 
-                 dadosUsuario?.respostas?.ida ||
-                 dadosUsuario?.dataIda;
-      }
-      
-      if (!dataVolta) {
-        dataVolta = dadosUsuario?.respostas?.dataVolta || 
-                   dadosUsuario?.respostas?.volta ||
-                   dadosUsuario?.dataVolta;
-      }
-      
-      // Se ainda não tiver datas, gera datas fictícias para demonstração
-      if (!dataIda) {
-        const hoje = new Date();
-        const idaEm60Dias = new Date(hoje);
-        idaEm60Dias.setDate(hoje.getDate() + 60);
-        
-        const voltaEm67Dias = new Date(hoje);
-        voltaEm67Dias.setDate(hoje.getDate() + 67);
-        
-        dataIda = this.formatarDataYYYYMMDD(idaEm60Dias);
-        dataVolta = this.formatarDataYYYYMMDD(voltaEm67Dias);
-        
-        console.log('Usando datas fictícias para demonstração:', { dataIda, dataVolta });
+      if (!datas || !datas.dataIda) {
+        throw new Error('Datas de viagem não disponíveis.');
       }
       
       // Obtém código de origem
       const origemIATA = this.obterCodigoIATAOrigem(dadosUsuario);
-      console.log('Origem IATA identificada:', origemIATA);
 
       // Prepara parâmetros de busca
       const params = {
         origem: origemIATA,
         destino: this.destino.codigo_iata,
-        dataIda: dataIda,
-        dataVolta: dataVolta,
+        dataIda: datas.dataIda,
+        dataVolta: datas.dataVolta,
         adultos: dadosUsuario?.respostas?.passageiros?.adultos || 1,
         criancas: dadosUsuario?.respostas?.passageiros?.criancas || 0,
         bebes: dadosUsuario?.respostas?.passageiros?.bebes || 0,
@@ -329,9 +205,7 @@ const BENETRIP_VOOS = {
       }, this.TIMEOUT_MS);
 
       // Simular busca para testes de interface
-      if (window.location.href.includes('localhost') || 
-          window.location.href.includes('127.0.0.1') || 
-          window.location.href.includes('?mock=true')) {
+      if (window.location.href.includes('localhost') || window.location.href.includes('?mock=true')) {
         console.log('Ambiente de desenvolvimento detectado, usando dados de mock...');
         setTimeout(() => {
           this.searchId = 'mock-search-id';
@@ -340,64 +214,38 @@ const BENETRIP_VOOS = {
         return;
       }
 
-      // Tenta fazer requisição à API real
-      try {
-        // Chama backend para iniciar busca
-        const resposta = await fetch('/api/flight-search', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(params)
-        });
+      // Chama backend para iniciar busca
+      const resposta = await fetch('/api/flight-search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(params)
+      });
 
-        if (!resposta.ok) {
-          const errorData = await resposta.text();
-          throw new Error(`Erro ${resposta.status} ao iniciar busca: ${errorData}`);
-        }
-
-        // Processa resposta
-        const dados = await resposta.json();
-        if (!dados.search_id) {
-          throw new Error('ID de busca não retornado pelo servidor.');
-        }
-
-        console.log('Busca iniciada. Search ID:', dados.search_id);
-        this.searchId = dados.search_id;
-        this.currencyRates = dados.currency_rates;
-
-        // Inicia polling após breve espera
-        this.atualizarProgresso('Busca iniciada. Aguardando primeiros resultados...', 15);
-        setTimeout(() => {
-          this.iniciarPolling();
-        }, this.INITIAL_WAIT_MS);
-      } catch (apiError) {
-        console.error('Falha na comunicação com a API. Usando dados de mock:', apiError);
-        // Fallback para dados mock em caso de erro de API
-        setTimeout(() => {
-          this.searchId = 'mock-search-id-fallback';
-          this.buscarResultadosMock();
-        }, this.INITIAL_WAIT_MS);
+      if (!resposta.ok) {
+        const errorData = await resposta.text();
+        throw new Error(`Erro ${resposta.status} ao iniciar busca: ${errorData}`);
       }
+
+      // Processa resposta
+      const dados = await resposta.json();
+      if (!dados.search_id) {
+        throw new Error('ID de busca não retornado pelo servidor.');
+      }
+
+      console.log('Busca iniciada. Search ID:', dados.search_id);
+      this.searchId = dados.search_id;
+      this.currencyRates = dados.currency_rates;
+
+      // Inicia polling após breve espera
+      this.atualizarProgresso('Busca iniciada. Aguardando primeiros resultados...', 15);
+      setTimeout(() => {
+        this.iniciarPolling();
+      }, this.INITIAL_WAIT_MS);
 
     } catch (erro) {
       console.error('Erro ao iniciar busca de voos:', erro);
-      // Tenta usar dados mock mesmo em erro
-      setTimeout(() => {
-        this.searchId = 'mock-search-id-error';
-        this.buscarResultadosMock();
-      }, this.INITIAL_WAIT_MS);
+      this.mostrarErro(erro.message);
     }
-  },
-
-  /**
-   * Formata uma data para o formato YYYY-MM-DD
-   * @param {Date} data - Data para formatar
-   * @returns {string} Data formatada
-   */
-  formatarDataYYYYMMDD(data) {
-    const year = data.getFullYear();
-    const month = String(data.getMonth() + 1).padStart(2, '0');
-    const day = String(data.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
   },
 
   /**
@@ -443,258 +291,220 @@ const BENETRIP_VOOS = {
   },
 
   /**
-   * Verifica se há resultados disponíveis
-   */
-  async verificarResultados() {
-    if (!this.isPolling) return;
+ * Verifica se há resultados disponíveis
+ */
+async verificarResultados() {
+  if (!this.isPolling) return;
 
-    this.pollingAttempts++;
-    console.log(`Polling: Tentativa ${this.pollingAttempts}/${this.MAX_POLLING_ATTEMPTS}`);
+  this.pollingAttempts++;
+  console.log(`Polling: Tentativa ${this.pollingAttempts}/${this.MAX_POLLING_ATTEMPTS}`);
 
-    // Atualiza UI com mensagens dinâmicas
-    const mensagens = [
-      'Buscando voos...', 
-      'Verificando tarifas...', 
-      'Analisando conexões...', 
-      'Consultando companhias...', 
-      'Quase lá...'
-    ];
-    const msgIdx = Math.min(
-      Math.floor(this.pollingAttempts / (this.MAX_POLLING_ATTEMPTS / mensagens.length)), 
-      mensagens.length - 1
-    );
-    const progresso = 20 + Math.min(75, (this.pollingAttempts / this.MAX_POLLING_ATTEMPTS) * 75);
-    
-    this.atualizarProgresso(`${mensagens[msgIdx]} (${this.pollingAttempts})`, progresso);
+  // Atualiza UI com mensagens dinâmicas
+  const mensagens = [
+    'Buscando voos...', 
+    'Verificando tarifas...', 
+    'Analisando conexões...', 
+    'Consultando companhias...', 
+    'Quase lá...'
+  ];
+  const msgIdx = Math.min(
+    Math.floor(this.pollingAttempts / (this.MAX_POLLING_ATTEMPTS / mensagens.length)), 
+    mensagens.length - 1
+  );
+  const progresso = 20 + Math.min(75, (this.pollingAttempts / this.MAX_POLLING_ATTEMPTS) * 75);
+  
+  this.atualizarProgresso(`${mensagens[msgIdx]} (${this.pollingAttempts})`, progresso);
 
-    // Verifica limite de tentativas
-    if (this.pollingAttempts > this.MAX_POLLING_ATTEMPTS) {
-      console.log('Limite de tentativas atingido, finalizando polling.');
-      this.pararPolling();
+  // Verifica limite de tentativas
+  if (this.pollingAttempts > this.MAX_POLLING_ATTEMPTS) {
+    this.pararPolling();
+    this.mostrarErro('A busca demorou mais que o esperado.');
+    return;
+  }
+
+  try {
+    // Chama o backend
+    const resposta = await fetch(`/api/flight-results?uuid=${this.searchId}`);
+
+    // Trata erros HTTP
+    if (!resposta.ok) {
+      const errorData = await resposta.json()
+        .catch(() => ({ error: `Erro ${resposta.status} (resposta não JSON)` }));
+        
+      const errorMessage = errorData.error || `Erro ${resposta.status}.`;
+      console.error(`Erro no polling (HTTP ${resposta.status}):`, errorMessage);
       
-      // Se temos resultados, finalizamos. Senão, mostramos erro.
-      if (this.accumulatedProposals.length > 0) {
-        this.estaCarregando = false;
-        this.atualizarProgresso('Finalizando...', 100);
-        this.concluirBusca();
-      } else {
-        this.mostrarErro('A busca demorou mais que o esperado.');
+      if (resposta.status === 404) { 
+        this.pararPolling(); 
+        this.mostrarErro('Busca expirou/inválida.'); 
+      } else if (this.pollingAttempts > this.MAX_POLLING_ATTEMPTS - 5) { 
+        this.pararPolling(); 
+        this.mostrarErro(errorMessage); 
       }
       return;
     }
 
-    try {
-      // Chama o backend
-      const resposta = await fetch(`/api/flight-results?uuid=${this.searchId}`);
+    // Processa a resposta JSON
+    const chunkData = await resposta.json();
+    console.log(`Chunk recebido (Tentativa ${this.pollingAttempts})`);
 
-      // Trata erros HTTP
-      if (!resposta.ok) {
-        const errorData = await resposta.json()
-          .catch(() => ({ error: `Erro ${resposta.status} (resposta não JSON)` }));
-          
-        const errorMessage = errorData.error || `Erro ${resposta.status}.`;
-        console.error(`Erro no polling (HTTP ${resposta.status}):`, errorMessage);
-        
-        if (resposta.status === 404) { 
-          this.pararPolling(); 
-          
-          // Se já temos algumas propostas acumuladas, podemos finalizar
-          if (this.accumulatedProposals.length > 0) {
-            this.estaCarregando = false;
-            this.concluirBusca();
-          } else if (this.pollingAttempts >= 5) {
-            // Se já tentamos várias vezes sem sucesso, usamos mock
-            console.log('Finalizando polling sem resultados. Usando dados mock...');
-            this.buscarResultadosMock();
-          } else {
-            this.mostrarErro('Busca expirou/inválida.'); 
-          }
-        } else if (this.pollingAttempts > this.MAX_POLLING_ATTEMPTS - 5) { 
-          this.pararPolling(); 
-          
-          // Se já temos algumas propostas acumuladas, podemos finalizar
-          if (this.accumulatedProposals.length > 0) {
-            this.estaCarregando = false;
-            this.concluirBusca();
-          } else {
-            // Tenta usar mock como fallback
-            console.log('Finalizando polling com erro. Usando dados mock...');
-            this.buscarResultadosMock();
-          }
-        }
-        return;
-      }
-
-      // Processa a resposta JSON
-      const chunkData = await resposta.json();
-      console.log(`Chunk recebido (Tentativa ${this.pollingAttempts})`);
-
-      // --- Diagnóstico: Verifica todos os itens do array ---
-      let proposalsTotal = 0;
-      let proposalsEmTodosItens = [];
-      
-      if (Array.isArray(chunkData)) {
-        console.log(`Analisando array de ${chunkData.length} itens para buscar propostas:`);
-        
-        chunkData.forEach((item, idx) => {
-          if (item && typeof item === 'object') {
-            // Conta propostas em cada item
-            const proposalsNoItem = Array.isArray(item.proposals) ? item.proposals.length : 0;
-            const temSearchId = item.search_id === this.searchId;
-            
-            console.log(`Item ${idx}: search_id correto: ${temSearchId ? 'SIM' : 'NÃO'}, Propostas: ${proposalsNoItem}`);
-            
-            if (proposalsNoItem > 0) {
-              // Guarda todas as propostas encontradas em qualquer item
-              proposalsEmTodosItens.push(...item.proposals);
-              proposalsTotal += proposalsNoItem;
-            }
-            
-            // Extrai dados auxiliares de todos os itens
-            this.extrairDadosAuxiliares(item);
-          }
-        });
-        
-        if (proposalsTotal > 0) {
-          console.log(`!!! ENCONTRADAS ${proposalsTotal} propostas em TODOS os itens do array !!!`);
-          // Acumula todas as propostas encontradas em todos os itens
-          this.accumulatedProposals.push(...proposalsEmTodosItens);
-        }
-      }
-
-      // --- Encontrar o objeto de dados relevante ---
-      let chunkObject = this.encontrarObjetoRelevante(chunkData);
-
-      // --- Processa o chunkObject SE encontrado ---
-      if (chunkObject) {
-        const proposalsInChunk = chunkObject.proposals;
-        
-        // CORREÇÃO CRÍTICA: Um array vazio de proposals só significa fim da busca se:
-        // 1. Não é a primeira tentativa de polling (pollingAttempts > 1) E
-        // 2. Propostas já foram acumuladas anteriormente OU fizemos várias tentativas sem resultados
-        if (proposalsInChunk && Array.isArray(proposalsInChunk)) {
-          if (proposalsInChunk.length > 0) {
-            // --- Propostas encontradas no objeto principal: acumula e continua ---
-            console.log(`Acumulando ${proposalsInChunk.length} propostas do objeto principal com search_id`);
-            this.accumulatedProposals.push(...proposalsInChunk);
-          } else if (proposalsInChunk.length === 0) {
-            // --- Objeto principal tem proposals vazio: é fim da busca ou primeira tentativa? ---
-            const ehFimDaBusca = 
-              // Não é primeira tentativa E (já temos propostas OU várias tentativas sem resultado)
-              (this.pollingAttempts > 1 && (this.accumulatedProposals.length > 0 || this.pollingAttempts >= 5)) ||
-              // OU é 1ª tentativa mas encontramos propostas em outros objetos do array
-              (this.pollingAttempts === 1 && proposalsTotal > 0);
-            
-            if (ehFimDaBusca) {
-              // --- É O FIM REAL DA BUSCA ---
-              console.log(`Polling concluído! (Array proposals vazio é o fim na tentativa ${this.pollingAttempts})`);
-              
-              this.pararPolling();
-              this.estaCarregando = false;
-              
-              this.atualizarProgresso('Finalizando...', 100);
-
-              // Finaliza busca com sucesso
-              this.concluirBusca();
-            } else {
-              // --- NÃO É O FIM AINDA: Continua polling ---
-              console.log(`Array proposals vazio na tentativa ${this.pollingAttempts}, mas NÃO é o fim: ` +
-                `${this.pollingAttempts === 1 ? "É a 1ª tentativa" : "Ainda não temos propostas suficientes"}. ` +
-                `Continuando polling...`);
-            }
-          }
-        }
-      } else {
-        // --- Verifica se esse é o fim simples da busca (último item só com search_id) ---
-        const finalItem = Array.isArray(chunkData) && chunkData.find(item => 
-          item && typeof item === 'object' && 
-          Object.keys(item).length === 1 && 
-          item.search_id === this.searchId
-        );
-        
-        if (finalItem && this.accumulatedProposals.length > 0 && this.pollingAttempts > 2) {
-          console.log('Busca concluída! (Último item com apenas search_id)');
-          this.pararPolling();
-          this.estaCarregando = false;
-          this.atualizarProgresso('Finalizando...', 100);
-          this.concluirBusca();
-        } else {
-          console.log(`Nenhum objeto de dados principal encontrado na tentativa ${this.pollingAttempts}. ` +
-            `Continuando polling...`);
-        }
-      }
-
-    } catch (erro) {
-      console.error('Erro durante o polling ou processamento do chunk:', erro);
-      
-      // Se já tentamos muitas vezes, desiste
-      if (this.pollingAttempts > this.MAX_POLLING_ATTEMPTS - 5) {
-        this.pararPolling();
-        
-        // Se já temos algumas propostas acumuladas, podemos finalizar
-        if (this.accumulatedProposals.length > 0) {
-          this.estaCarregando = false;
-          this.concluirBusca();
-        } else {
-          // Tenta usar mock como fallback
-          console.log('Erro no polling sem resultados. Usando dados mock...');
-          this.buscarResultadosMock();
-        }
-      }
-    }
-  },
-
-  /**
-   * Extrai dados auxiliares de um item da resposta
-   * @param {Object} item - Item da resposta
-   */
-  extrairDadosAuxiliares(item) {
-    if (!item || typeof item !== 'object') return;
-    
-    // Extrai dados de referência
-    if (item.airlines) Object.assign(this.accumulatedAirlines, item.airlines);
-    if (item.airports) Object.assign(this.accumulatedAirports, item.airports);
-    if (item.gates_info) Object.assign(this.accumulatedGatesInfo, item.gates_info);
-    if (item.meta) this.accumulatedMeta = { ...this.accumulatedMeta, ...item.meta };
-  },
-
-  /**
-   * Encontra o objeto relevante na resposta
-   * @param {Object|Array} chunkData - Dados recebidos
-   * @returns {Object|null} - Objeto relevante ou null
-   */
-  encontrarObjetoRelevante(chunkData) {
-    if (!chunkData) return null;
+    // --- Diagnóstico: Verifica todos os itens do array ---
+    let proposalsTotal = 0;
+    let proposalsEmTodosItens = [];
     
     if (Array.isArray(chunkData)) {
-      // Procura o objeto no array que contém o search_id esperado
-      const objRelevante = chunkData.find(item => 
-        item && typeof item === 'object' && item.search_id === this.searchId);
-        
-      if (!objRelevante) {
-        console.warn(`Array recebido, mas nenhum objeto encontrado com search_id ${this.searchId}`);
-      } else {
-        console.log("Objeto principal do chunk encontrado dentro do array");
-      }
+      console.log(`Analisando array de ${chunkData.length} itens para buscar propostas:`);
       
-      return objRelevante;
-    } else if (chunkData && typeof chunkData === 'object') {
-      // Se não for array, assume que é o objeto diretamente
-      if (chunkData.search_id === this.searchId) {
-        console.log("Chunk recebido como objeto único");
-        return chunkData;
-      } else if (Object.keys(chunkData).length === 1 && chunkData.search_id) {
-        console.log('Busca ainda em andamento (resposta apenas com search_id)...');
-      } else {
-        console.warn(`Objeto recebido, mas search_id (${chunkData.search_id}) ` +
-          `não corresponde ao esperado (${this.searchId})`);
+      chunkData.forEach((item, idx) => {
+        if (item && typeof item === 'object') {
+          // Conta propostas em cada item
+          const proposalsNoItem = Array.isArray(item.proposals) ? item.proposals.length : 0;
+          const temSearchId = item.search_id === this.searchId;
+          
+          console.log(`Item ${idx}: search_id correto: ${temSearchId ? 'SIM' : 'NÃO'}, Propostas: ${proposalsNoItem}`);
+          
+          if (proposalsNoItem > 0) {
+            // Guarda todas as propostas encontradas em qualquer item
+            proposalsEmTodosItens.push(...item.proposals);
+            proposalsTotal += proposalsNoItem;
+          }
+          
+          // Extrai dados auxiliares de todos os itens
+          this.extrairDadosAuxiliares(item);
+        }
+      });
+      
+      if (proposalsTotal > 0) {
+        console.log(`!!! ENCONTRADAS ${proposalsTotal} propostas em TODOS os itens do array !!!`);
+        // Acumula todas as propostas encontradas em todos os itens
+        this.accumulatedProposals.push(...proposalsEmTodosItens);
+      }
+    }
+
+    // --- Encontrar o objeto de dados relevante ---
+    let chunkObject = this.encontrarObjetoRelevante(chunkData);
+
+    // --- Processa o chunkObject SE encontrado ---
+    if (chunkObject) {
+      const proposalsInChunk = chunkObject.proposals;
+      
+      // CORREÇÃO CRÍTICA: Um array vazio de proposals só significa fim da busca se:
+      // 1. Não é a primeira tentativa de polling (pollingAttempts > 1) E
+      // 2. Propostas já foram acumuladas anteriormente OU fizemos várias tentativas sem resultados
+      if (proposalsInChunk && Array.isArray(proposalsInChunk)) {
+        if (proposalsInChunk.length > 0) {
+          // --- Propostas encontradas no objeto principal: acumula e continua ---
+          console.log(`Acumulando ${proposalsInChunk.length} propostas do objeto principal com search_id`);
+          this.accumulatedProposals.push(...proposalsInChunk);
+        } else if (proposalsInChunk.length === 0) {
+          // --- Objeto principal tem proposals vazio: é fim da busca ou primeira tentativa? ---
+          const ehFimDaBusca = 
+            // Não é primeira tentativa E (já temos propostas OU várias tentativas sem resultado)
+            (this.pollingAttempts > 1 && (this.accumulatedProposals.length > 0 || this.pollingAttempts >= 5)) ||
+            // OU é 1ª tentativa mas encontramos propostas em outros objetos do array
+            (this.pollingAttempts === 1 && proposalsTotal > 0);
+          
+          if (ehFimDaBusca) {
+            // --- É O FIM REAL DA BUSCA ---
+            console.log(`Polling concluído! (Array proposals vazio é o fim na tentativa ${this.pollingAttempts})`);
+            
+            this.pararPolling();
+            this.estaCarregando = false;
+            
+            this.atualizarProgresso('Finalizando...', 100);
+
+            // Finaliza busca com sucesso
+            this.concluirBusca();
+          } else {
+            // --- NÃO É O FIM AINDA: Continua polling ---
+            console.log(`Array proposals vazio na tentativa ${this.pollingAttempts}, mas NÃO é o fim: ` +
+              `${this.pollingAttempts === 1 ? "É a 1ª tentativa" : "Ainda não temos propostas suficientes"}. ` +
+              `Continuando polling...`);
+          }
+        }
       }
     } else {
-      console.warn("Chunk recebido com status 200 mas formato inesperado (não array/objeto)");
+      // --- Verifica se esse é o fim simples da busca (último item só com search_id) ---
+      const finalItem = Array.isArray(chunkData) && chunkData.find(item => 
+        item && typeof item === 'object' && 
+        Object.keys(item).length === 1 && 
+        item.search_id === this.searchId
+      );
+      
+      if (finalItem && this.accumulatedProposals.length > 0 && this.pollingAttempts > 2) {
+        console.log('Busca concluída! (Último item com apenas search_id)');
+        this.pararPolling();
+        this.estaCarregando = false;
+        this.atualizarProgresso('Finalizando...', 100);
+        this.concluirBusca();
+      } else {
+        console.log(`Nenhum objeto de dados principal encontrado na tentativa ${this.pollingAttempts}. ` +
+          `Continuando polling...`);
+      }
+    }
+
+  } catch (erro) {
+    console.error('Erro durante o polling ou processamento do chunk:', erro);
+    
+    // Se já tentamos muitas vezes, desiste
+    if (this.pollingAttempts > this.MAX_POLLING_ATTEMPTS - 5) {
+      this.pararPolling();
+      this.mostrarErro('Erro ao verificar resultados. Verifique sua conexão.');
+    }
+  }
+},
+
+/**
+ * Extrai dados auxiliares de um item da resposta
+ * @param {Object} item - Item da resposta
+ */
+extrairDadosAuxiliares(item) {
+  if (!item || typeof item !== 'object') return;
+  
+  // Extrai dados de referência
+  if (item.airlines) Object.assign(this.accumulatedAirlines, item.airlines);
+  if (item.airports) Object.assign(this.accumulatedAirports, item.airports);
+  if (item.gates_info) Object.assign(this.accumulatedGatesInfo, item.gates_info);
+  if (item.meta) this.accumulatedMeta = { ...this.accumulatedMeta, ...item.meta };
+},
+
+/**
+ * Encontra o objeto relevante na resposta
+ * @param {Object|Array} chunkData - Dados recebidos
+ * @returns {Object|null} - Objeto relevante ou null
+ */
+encontrarObjetoRelevante(chunkData) {
+  if (!chunkData) return null;
+  
+  if (Array.isArray(chunkData)) {
+    // Procura o objeto no array que contém o search_id esperado
+    const objRelevante = chunkData.find(item => 
+      item && typeof item === 'object' && item.search_id === this.searchId);
+      
+    if (!objRelevante) {
+      console.warn(`Array recebido, mas nenhum objeto encontrado com search_id ${this.searchId}`);
+    } else {
+      console.log("Objeto principal do chunk encontrado dentro do array");
     }
     
-    return null;
-  },
+    return objRelevante;
+  } else if (chunkData && typeof chunkData === 'object') {
+    // Se não for array, assume que é o objeto diretamente
+    if (chunkData.search_id === this.searchId) {
+      console.log("Chunk recebido como objeto único");
+      return chunkData;
+    } else if (Object.keys(chunkData).length === 1 && chunkData.search_id) {
+      console.log('Busca ainda em andamento (resposta apenas com search_id)...');
+    } else {
+      console.warn(`Objeto recebido, mas search_id (${chunkData.search_id}) ` +
+        `não corresponde ao esperado (${this.searchId})`);
+    }
+  } else {
+    console.warn("Chunk recebido com status 200 mas formato inesperado (não array/objeto)");
+  }
+  
+  return null;
+},
   
   /**
    * Carrega dados de mock para testes
@@ -942,7 +752,7 @@ const BENETRIP_VOOS = {
         // Finaliza busca
         this.concluirBusca();
       }
-    }, 400);
+    }, 500);
   },
   
   /**
@@ -985,27 +795,12 @@ const BENETRIP_VOOS = {
     
     console.log(`Pré-processando ${propostas.length} propostas...`);
     
-    // Remove duplicatas baseadas no sign (identificador único)
-    const propostasUnicas = [];
-    const signsProcessados = new Set();
-    
-    propostas.forEach(p => {
-      if (p && typeof p === 'object') {
-        const sign = p.sign || '';
-        if (sign && !signsProcessados.has(sign)) {
-          signsProcessados.add(sign);
-          propostasUnicas.push(p);
-        }
-      }
-    });
-    
-    console.log(`${propostasUnicas.length} propostas únicas após remoção de duplicatas`);
-    
     // Ordena por preço (menor primeiro)
-    propostasUnicas.sort((a, b) => this.obterPrecoVoo(a) - this.obterPrecoVoo(b));
+    const propostasValidas = propostas.filter(p => p && typeof p === 'object');
+    propostasValidas.sort((a, b) => this.obterPrecoVoo(a) - this.obterPrecoVoo(b));
     
     // Adiciona informações calculadas
-    return propostasUnicas.map((proposta, index) => {
+    return propostasValidas.map((proposta, index) => {
       // Se já tem as propriedades adicionais, mantém
       if (proposta._melhorPreco !== undefined) return proposta;
       
@@ -1159,38 +954,6 @@ const BENETRIP_VOOS = {
     
     // Exibe dica de swipe
     this.exibirDicaSwipe();
-    
-    // Configurar navegação cards de voo
-    if (typeof window.configurarNavegacaoCards === 'function') {
-      window.configurarNavegacaoCards();
-    } else {
-      // Configuração básica de eventos mesmo sem o módulo de interface
-      const cards = document.querySelectorAll('.voo-card');
-      cards.forEach((card, i) => {
-        card.addEventListener('click', (e) => {
-          if (!e.target.closest('.btn-detalhes-voo')) {
-            this.indexVooAtivo = i;
-            this.vooAtivo = this.finalResults.proposals[i];
-            this.atualizarVooAtivo();
-          }
-        });
-      });
-      
-      const prevBtn = document.querySelector('.prev-btn');
-      const nextBtn = document.querySelector('.next-btn');
-      
-      if (prevBtn) prevBtn.addEventListener('click', () => this.vooAnterior());
-      if (nextBtn) nextBtn.addEventListener('click', () => this.proximoVoo());
-      
-      const dots = document.querySelectorAll('.pagination-dot');
-      dots.forEach((dot, i) => {
-        dot.addEventListener('click', () => {
-          this.indexVooAtivo = i;
-          this.vooAtivo = this.finalResults.proposals[i];
-          this.atualizarVooAtivo();
-        });
-      });
-    }
   },
 
   /**
@@ -1459,20 +1222,6 @@ const BENETRIP_VOOS = {
     `;
     
     container.appendChild(erroDiv);
-    
-    // Adiciona evento ao botão tentar novamente
-    const btnTentarNovamente = erroDiv.querySelector('.btn-tentar-novamente');
-    if (btnTentarNovamente) {
-      btnTentarNovamente.addEventListener('click', () => {
-        // Tenta usar dados mock para avançar
-        this.temErro = false;
-        this.estaCarregando = true;
-        this.atualizarInterfaceCarregamento();
-        setTimeout(() => {
-          this.buscarResultadosMock();
-        }, 1000);
-      });
-    }
   },
 
   /**
@@ -1732,21 +1481,7 @@ const BENETRIP_VOOS = {
    */
   carregarDadosUsuario() {
     try {
-      const chavesPossiveis = [
-        'benetrip_user_data',
-        'benetrip_dados_usuario',
-        'user_data_benetrip',
-        'dados_usuario'
-      ];
-      
-      for (const chave of chavesPossiveis) {
-        const valor = localStorage.getItem(chave);
-        if (valor) {
-          return JSON.parse(valor);
-        }
-      }
-      
-      return {};
+      return JSON.parse(localStorage.getItem('benetrip_user_data') || '{}');
     } catch (erro) {
       console.warn('Erro ao carregar dados do usuário:', erro);
       return {};
@@ -1879,26 +1614,6 @@ document.addEventListener('DOMContentLoaded', () => {
   if (document.getElementById('voos-container')) {
     console.log('Inicializando módulo de voos Benetrip...');
     BENETRIP_VOOS.init();
-    
-    // Expõe a função de navegação para o módulo de interface
-    window.configurarNavegacaoCards = function() {
-      const swipeContainer = document.getElementById('voos-swipe-container');
-      if (!swipeContainer) return;
-      
-      const cards = swipeContainer.querySelectorAll('.voo-card');
-      if (!cards.length) return;
-      
-      // Configurar click nos cards para selecionar
-      cards.forEach((card, index) => {
-        card.addEventListener('click', (e) => {
-          if (!e.target.closest('.btn-detalhes-voo')) {
-            BENETRIP_VOOS.indexVooAtivo = index;
-            BENETRIP_VOOS.vooAtivo = BENETRIP_VOOS.finalResults.proposals[index];
-            BENETRIP_VOOS.atualizarVooAtivo();
-          }
-        });
-      });
-    };
   }
 });
 
