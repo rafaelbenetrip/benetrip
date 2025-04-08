@@ -1989,63 +1989,27 @@ renderizarControlesNavegacao: function(container) {
     
     if (btnC) {
       btnC.addEventListener('click', () => {
-        // <<< PASSO 1: Define qual voo foi selecionado (já estava implícito) >>>
-            const vooSelecionado = voo; // Usamos a variável 'voo' passada para a função
-
-            // <<< PASSO 2: Tenta encontrar o Link de Compra dentro dos dados do voo >>>
-            let bookingUrl = null; // Começa sem link definido
-            try {
-                // Pega as "chaves" (identificadores) das ofertas dentro de 'terms'
-                const termKeys = Object.keys(vooSelecionado.terms);
-                if (termKeys.length > 0) { // Verifica se existe alguma oferta
-                    const firstTermKey = termKeys[0]; // Pega o ID da primeira oferta encontrada
-                    // Busca o campo 'url' dentro dessa primeira oferta
-                    bookingUrl = vooSelecionado.terms[firstTermKey]?.url; // O ?. evita erro se 'url' não existir
-                }
-            } catch (error) {
-                // Se der erro ao tentar pegar o link, apenas informa no console
-                console.error("Erro ao extrair booking URL dos termos:", error, vooSelecionado.terms);
-            }
-
-            // <<< PASSO 3: Abre o Link de Compra em uma NOVA ABA/JANELA, se ele foi encontrado >>>
-            if (bookingUrl) { // Só abre se encontrou uma URL válida
-                console.log("Abrindo link de compra:", bookingUrl);
-                window.open(bookingUrl, '_blank'); // <<< Comando para abrir em NOVA ABA >>>
-            } else {
-                // Se não achou link, informa no console (poderia mostrar um aviso pro usuário)
-                console.warn("Booking URL não encontrada para o voo selecionado:", vooSelecionado.sign);
-            }
-
-            // <<< PASSO 4: Prepara os dados para salvar (código parecido com o ANTES, mas adiciona o bookingUrl) >>>
-            const preco = this.obterPrecoVoo(vooSelecionado);
-            const moeda = this.finalResults?.meta?.currency || 'BRL';
-            const numPassageiros = this.obterQuantidadePassageiros();
-            const precoTotal = preco * numPassageiros;
-
-            const dadosVoo = {
-                voo: vooSelecionado,
-                precoPorPessoa: preco,
-                precoTotal: precoTotal,
-                moeda: moeda,
-                numPassageiros: numPassageiros,
-                infoIda: this.obterInfoSegmento(vooSelecionado.segment?.[0]),
-                infoVolta: vooSelecionado.segment?.length > 1 ?
-                    this.obterInfoSegmento(vooSelecionado.segment[1]) : null,
-                companhiaAerea: this.obterCompanhiasAereas(vooSelecionado),
-                bookingUrl: bookingUrl, // <<< Adicionamos o link encontrado aos dados salvos >>>
-                dataSelecao: new Date().toISOString()
-            };
-
-            // <<< PASSO 5: Salva os dados no navegador (igual ao ANTES) >>>
-            localStorage.setItem('benetrip_voo_selecionado', JSON.stringify(dadosVoo));
-
-            // <<< PASSO 6: Mostra a mensagem para o usuário (igual ao ANTES) >>>
-            this.exibirToast('Voo selecionado! Abrindo link de compra e redirecionando...', 'success'); // Mensagem um pouco diferente
-
-            // <<< PASSO 7: Redireciona a JANELA ATUAL para a página de hotéis (igual ao ANTES) >>>
-            setTimeout(() => {
-                window.location.href = 'hotels.html'; // <<< Muda a página ATUAL >>>
-            }, 1500);
+        // Salva os dados do voo selecionado
+        const dadosVoo = { 
+          voo: this.vooSelecionado, 
+          preco, 
+          precoTotal, 
+          moeda, 
+          numPassageiros, 
+          infoIda: this.obterInfoSegmento(this.vooSelecionado.segment?.[0]), 
+          infoVolta: this.vooSelecionado.segment?.length > 1 ? 
+            this.obterInfoSegmento(this.vooSelecionado.segment[1]) : null, 
+          companhiaAerea: this.obterCompanhiasAereas(this.vooSelecionado), 
+          dataSelecao: new Date().toISOString() 
+        };
+        
+        localStorage.setItem('benetrip_voo_selecionado', JSON.stringify(dadosVoo));
+        this.exibirToast('Voo selecionado! Redirecionando...', 'success');
+        
+        // Redireciona para a próxima página
+        setTimeout(() => { 
+          window.location.href = 'hotels.html'; 
+        }, 1500);
       });
     }
     
