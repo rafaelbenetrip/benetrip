@@ -7,7 +7,496 @@
     <title>Benetrip - Voos Disponíveis</title>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Montserrat:wght@400;500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="assets/css/styles.css">
-    <link rel="stylesheet" href="assets/css/voos-styles.css"> <!-- Novo arquivo de estilos -->
+    <link rel="stylesheet" href="assets/css/voos-styles.css">
+    <!-- CSS com as melhorias propostas -->
+    <style>
+    /* Modificações nos indicadores de cards */
+    .card-tag {
+      display: inline-flex;
+      align-items: center;
+      padding: 3px 6px;
+      border-radius: 4px;
+      font-size: 0.65rem;
+      font-weight: 600;
+      margin-left: 8px;
+    }
+    
+    .card-tag.melhor-preco {
+      background-color: #d1fae5;
+      color: #065f46;
+    }
+    
+    .card-tag.voo-direto {
+      background-color: #dbeafe;
+      color: #1e40af;
+    }
+    
+    /* Atualizamos o header do card */
+    .voo-card-header {
+      padding: 16px;
+      border-bottom: 1px solid #f3f4f6;
+      position: relative;
+    }
+    
+    .voo-price-container {
+      display: flex;
+      align-items: center;
+      margin-bottom: 4px;
+    }
+    
+    /* Ajuste para a linha de rota */
+    .route-line {
+      position: relative;
+    }
+    
+    .route-info-badge {
+      position: absolute;
+      top: -22px;
+      left: 50%;
+      transform: translateX(-50%);
+      white-space: nowrap;
+    }
+    
+    /* Melhoria visual para a linha de conexão */
+    .route-line-direct {
+      background-color: #93c5fd;
+      height: 3px;
+    }
+    
+    /* Melhorias no modal de confirmação */
+    .modal-backdrop {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: rgba(0, 0, 0, 0.6);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      animation: fadeIn 0.2s ease;
+    }
+    
+    .modal-content {
+      background-color: white;
+      border-radius: 16px;
+      width: 90%;
+      max-width: 380px;
+      max-height: 90vh;
+      overflow-y: auto;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+      animation: slideUp 0.3s ease;
+    }
+    
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px;
+      border-bottom: 1px solid #f0f0f0;
+    }
+    
+    .modal-title {
+      font-size: 1.1rem;
+      font-weight: 600;
+      margin: 0;
+      color: #21272A;
+    }
+    
+    .btn-fechar {
+      background: none;
+      border: none;
+      color: #6c757d;
+      cursor: pointer;
+      padding: 4px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background-color 0.2s;
+    }
+    
+    .confirmacao-tripinha {
+      background-color: rgba(232, 119, 34, 0.1);
+      border-radius: 12px;
+      padding: 16px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+    
+    .confirmacao-avatar {
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      overflow: hidden;
+      flex-shrink: 0;
+      border: 2px solid #E87722;
+      box-shadow: 0 2px 8px rgba(232, 119, 34, 0.2);
+    }
+    
+    .confirmacao-avatar img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    
+    .confirmacao-content {
+      flex: 1;
+    }
+    
+    .confirmacao-titulo {
+      font-weight: 700;
+      font-size: 1.1rem;
+      margin: 0 0 8px 0;
+      color: #21272A;
+    }
+    
+    .confirmacao-resumo {
+      background-color: rgba(255, 255, 255, 0.7);
+      padding: 10px;
+      border-radius: 8px;
+      margin-bottom: 12px;
+    }
+    
+    .resumo-item {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.9rem;
+      margin-bottom: 6px;
+    }
+    
+    .resumo-item:last-child {
+      margin-bottom: 0;
+      padding-top: 6px;
+      border-top: 1px dashed #e0e0e0;
+    }
+    
+    .resumo-valor.destaque {
+      font-weight: 700;
+      color: #E87722;
+    }
+    
+    .confirmacao-checkbox {
+      display: flex;
+      align-items: center;
+      margin-top: 14px;
+      cursor: pointer;
+      background-color: white;
+      padding: 8px 12px;
+      border-radius: 6px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+    
+    .confirmacao-checkbox input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      margin-right: 10px;
+      accent-color: #E87722;
+    }
+    
+    .confirmacao-aviso {
+      font-size: 0.8rem;
+      color: #6c757d;
+      margin-top: 12px;
+      line-height: 1.4;
+    }
+    
+    .modal-footer {
+      padding: 16px;
+      display: flex;
+      gap: 12px;
+      border-top: 1px solid #f0f0f0;
+    }
+    
+    .modal-btn {
+      flex: 1;
+      padding: 12px 16px;
+      border-radius: 8px;
+      font-weight: 500;
+      cursor: pointer;
+      border: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: all 0.2s;
+    }
+    
+    .modal-btn-secondary {
+      background-color: #f3f4f6;
+      color: #4b5563;
+    }
+    
+    .modal-btn-secondary:hover {
+      background-color: #e5e7eb;
+    }
+    
+    .modal-btn-primary {
+      background-color: #E87722;
+      color: white;
+    }
+    
+    .modal-btn-primary:hover:not(:disabled) {
+      background-color: #d96a1e;
+      transform: translateY(-1px);
+      box-shadow: 0 2px 4px rgba(232, 119, 34, 0.3);
+    }
+    
+    .modal-btn-primary:disabled {
+      opacity: 0.65;
+      cursor: not-allowed;
+    }
+    
+    .icon-info {
+      display: inline-block;
+      margin-right: 4px;
+    }
+    
+    /* Estilos para o modal de detalhes do voo */
+    .modal-detalhes-voo {
+      max-width: 400px;
+    }
+    
+    .detalhes-content {
+      padding: 0 16px;
+    }
+    
+    .detalhes-sumario {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px 0;
+      border-bottom: 1px solid #f0f0f0;
+    }
+    
+    .detalhes-preco {
+      text-align: left;
+    }
+    
+    .preco-valor {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: #E87722;
+    }
+    
+    .preco-info {
+      font-size: 0.8rem;
+      color: #6c757d;
+    }
+    
+    .detalhes-companhia {
+      text-align: right;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    
+    .companhia-logo {
+      width: 40px;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 4px;
+    }
+    
+    .companhia-logo img {
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+    }
+    
+    .companhia-nome {
+      font-size: 0.8rem;
+      font-weight: 600;
+    }
+    
+    .detalhes-secao {
+      padding: 16px 0;
+      border-bottom: 1px solid #f0f0f0;
+    }
+    
+    .secao-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+    
+    .secao-titulo {
+      font-size: 1rem;
+      font-weight: 600;
+      margin: 0;
+    }
+    
+    .secao-etiqueta {
+      display: flex;
+      align-items: center;
+      padding: 4px 8px;
+      border-radius: 16px;
+      font-size: 0.75rem;
+      font-weight: 500;
+    }
+    
+    .secao-etiqueta.voo-direto {
+      background-color: #dbeafe;
+      color: #1e40af;
+    }
+    
+    .etiqueta-icone {
+      margin-right: 4px;
+    }
+    
+    /* Timeline de voo */
+    .timeline-voo {
+      background-color: #f9f9f9;
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 12px;
+    }
+    
+    .timeline-item {
+      display: flex;
+      align-items: flex-start;
+      position: relative;
+    }
+    
+    .timeline-ponto {
+      flex: 0 0 auto;
+      width: 80px;
+      text-align: center;
+    }
+    
+    .timeline-tempo {
+      font-size: 1.1rem;
+      font-weight: 700;
+    }
+    
+    .timeline-codigo {
+      font-weight: 600;
+      font-size: 0.9rem;
+    }
+    
+    .timeline-cidade {
+      font-size: 0.7rem;
+      color: #6c757d;
+    }
+    
+    .timeline-linha {
+      flex: 1;
+      position: relative;
+      margin: 0 8px;
+      height: 60px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .timeline-linha::before {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background-color: #93c5fd;
+      transform: translateY(-50%);
+    }
+    
+    .duracao-badge {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background-color: white;
+      border: 1px solid #93c5fd;
+      border-radius: 12px;
+      padding: 2px 8px;
+      font-size: 0.75rem;
+      font-weight: 500;
+      color: #1e40af;
+      white-space: nowrap;
+    }
+    
+    /* Informações do voo */
+    .voo-info {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 16px;
+    }
+    
+    .info-item {
+      display: flex;
+      align-items: center;
+      font-size: 0.8rem;
+      color: #4b5563;
+    }
+    
+    .info-icone {
+      margin-right: 4px;
+    }
+    
+    /* Serviços */
+    .servicos-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+      margin-top: 12px;
+    }
+    
+    .servico-item {
+      display: flex;
+      align-items: center;
+      padding: 8px;
+      border-radius: 8px;
+      font-size: 0.8rem;
+    }
+    
+    .servico-item.incluido {
+      background-color: #d1fae5;
+      color: #065f46;
+    }
+    
+    .servico-item.opcional {
+      background-color: #f3f4f6;
+      color: #6b7280;
+    }
+    
+    .servico-icone {
+      margin-right: 8px;
+    }
+    
+    /* Política de cancelamento */
+    .politica-toggle {
+      cursor: pointer;
+    }
+    
+    .politica-conteudo {
+      margin-top: 8px;
+      font-size: 0.8rem;
+      color: #4b5563;
+      line-height: 1.5;
+    }
+    
+    .politica-texto {
+      margin: 0;
+    }
+    
+    /* Animações */
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    
+    @keyframes slideUp {
+      from { transform: translateY(20px); opacity: 0.8; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+    </style>
 </head>
 <body class="mobile-optimized">
     <!-- Container principal -->
@@ -22,9 +511,9 @@
             <h1>Voos Disponíveis</h1>
         </header>
         
-        <!-- O conteúdo será carregado dinamicamente pelo script flights.js, mas adicionamos o template base -->
+        <!-- O conteúdo será carregado dinamicamente pelo script flights.js -->
         <main class="voos-content">
-            <!-- Mensagem da Tripinha (será preenchida pelo JavaScript) -->
+            <!-- Mensagem da Tripinha -->
             <div class="tripinha-message">
                 <div class="tripinha-avatar">
                     <img src="assets/images/tripinha/avatar-normal.png" alt="Tripinha">
@@ -35,7 +524,7 @@
                 </div>
             </div>
             
-            <!-- Resumo da busca (será preenchido pelo JavaScript) -->
+            <!-- Resumo da busca -->
             <div class="flights-summary">
                 <div class="flights-summary-header">
                     <div>
@@ -47,21 +536,15 @@
                 </div>
             </div>
             
-            <!-- Container de swipe para os voos (será preenchido pelo JavaScript) -->
+            <!-- Container de swipe para os voos -->
             <div class="voos-swipe-container" id="voos-swipe-container">
-                <!-- Cards de voo serão inseridos aqui pelo JS -->
-            </div>
-            
-            <!-- Template para um card de voo (não visível, usado pelo JS) -->
-            <template id="voo-card-template">
-                <div class="voo-card">
-                    <div class="card-tag melhor-preco">Melhor preço</div>
-                    <div class="card-tag voo-direto">Voo Direto</div>
-                    
+                <!-- Exemplo de card de voo atualizado (será substituído pelo JavaScript) -->
+                <div class="voo-card voo-card-ativo voo-direto">
                     <div class="voo-card-header">
-                        <div class="voo-price">
-                            R$ 1.800
+                        <div class="voo-price-container">
+                            <div class="voo-price">R$ 1.800</div>
                             <span class="discount-badge">-15%</span>
+                            <span class="card-tag melhor-preco">Melhor preço</span>
                         </div>
                         <div class="voo-price-details">Por pessoa, ida e volta</div>
                         <div class="airline-info">LATAM</div>
@@ -75,12 +558,15 @@
                                 <div class="route-airport">GRU</div>
                             </div>
                             <div class="route-line">
+                                <div class="route-info-badge">
+                                    <span class="card-tag voo-direto">Voo Direto</span>
+                                </div>
                                 <div class="route-duration">5h 30min</div>
-                                <div class="route-line-bar">
+                                <div class="route-line-bar route-line-direct">
                                     <span class="stop-marker start"></span>
                                     <span class="stop-marker end"></span>
                                 </div>
-                                <div class="route-stops route-stops-direct">Voo Direto</div>
+                                <div class="route-stops route-stops-direct">Sem escalas</div>
                             </div>
                             <div class="route-point">
                                 <div class="route-time">14:00</div>
@@ -88,19 +574,22 @@
                             </div>
                         </div>
                         
-                        <!-- Rota de volta (opcional, será mostrada/ocultada pelo JS) -->
+                        <!-- Rota de volta -->
                         <div class="flight-route return-route">
                             <div class="route-point">
                                 <div class="route-time">16:45</div>
                                 <div class="route-airport">MDE</div>
                             </div>
                             <div class="route-line">
+                                <div class="route-info-badge">
+                                    <span class="card-tag voo-direto">Voo Direto</span>
+                                </div>
                                 <div class="route-duration">5h 45min</div>
-                                <div class="route-line-bar">
+                                <div class="route-line-bar route-line-direct">
                                     <span class="stop-marker start"></span>
                                     <span class="stop-marker end"></span>
                                 </div>
-                                <div class="route-stops route-stops-direct">Voo Direto</div>
+                                <div class="route-stops route-stops-direct">Sem escalas</div>
                             </div>
                             <div class="route-point">
                                 <div class="route-time">22:30</div>
@@ -120,17 +609,19 @@
                     </div>
                     
                     <div class="voo-card-footer">
-                        <button class="btn-detalhes-voo">Ver detalhes</button>
+                        <button class="btn-detalhes-voo" data-voo-id="voo-1">Ver detalhes</button>
                         <div class="remaining-seats">
                             Restam <span class="seats-number">5</span>
                         </div>
                     </div>
                 </div>
-            </template>
+            </div>
             
             <!-- Indicadores de paginação -->
             <div class="pagination-indicator">
-                <!-- Dots serão inseridos pelo JS -->
+                <div class="pagination-dot active" data-index="0"></div>
+                <div class="pagination-dot" data-index="1"></div>
+                <div class="pagination-dot" data-index="2"></div>
             </div>
             
             <!-- Controles de navegação -->
@@ -153,7 +644,7 @@
         <!-- Botão fixo de seleção -->
         <div class="botao-selecao-fixo">
             <button class="btn-selecionar-voo">
-                <span>Escolher Este Voo</span>
+                <span>Escolher Voo por R$ 1.800</span>
                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M5 12h14M12 5l7 7-7 7"></path>
                 </svg>
@@ -171,35 +662,295 @@
     <!-- Toast notification container -->
     <div id="toast-container"></div>
 
-    <!-- Template para modal de confirmação -->
-    <template id="confirmacao-modal-template">
-        <div class="modal-backdrop">
-            <div class="modal-content">
-                <div class="confirmacao-tripinha">
-                    <div class="confirmacao-avatar">
-                        <img src="assets/images/tripinha/avatar-normal.png" alt="Tripinha">
+    <!-- Modal de detalhes do voo (versão atualizada) -->
+    <div id="modal-detalhes-voo" class="modal-backdrop" style="display:none;">
+        <div class="modal-content modal-detalhes-voo">
+            <div class="modal-header">
+                <h3 class="modal-title">Detalhes do Voo</h3>
+                <button id="btn-fechar-detalhes" class="btn-fechar">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+            
+            <div class="detalhes-content">
+                <!-- Resumo de preço e companhia -->
+                <div class="detalhes-sumario">
+                    <div class="detalhes-preco">
+                        <div class="preco-valor">R$ 1.800</div>
+                        <div class="preco-info">Por pessoa, ida e volta</div>
                     </div>
-                    <div class="confirmacao-mensagem">
-                        <p class="font-bold">Ótima escolha! Voo por R$ 1.800/pessoa.</p>
-                        <div class="confirmacao-checkbox">
-                            <input type="checkbox" id="confirmar-selecao">
-                            <label for="confirmar-selecao">Sim, continuar!</label>
+                    <div class="detalhes-companhia">
+                        <div class="companhia-logo">
+                            <img src="assets/images/airlines/latam.png" alt="LATAM" onerror="this.src='assets/images/airlines/default.png'">
                         </div>
-                        <p class="confirmacao-aviso">Valor por pessoa (ida/volta). Próxima etapa: hospedagem.</p>
+                        <div class="companhia-nome">LATAM</div>
                     </div>
                 </div>
-                <div class="modal-footer">
-                    <button class="modal-btn modal-btn-secondary" id="btn-cancelar">Voltar</button>
-                    <button class="modal-btn modal-btn-primary" id="btn-confirmar" disabled>Confirmar</button>
+                
+                <!-- Visualização da rota com timeline -->
+                <div class="detalhes-secao">
+                    <div class="secao-header">
+                        <h4 class="secao-titulo">Ida • Qua, 5 Ago</h4>
+                        <div class="secao-etiqueta voo-direto">
+                            <span class="etiqueta-icone">✈️</span>
+                            <span>Voo Direto</span>
+                        </div>
+                    </div>
+                    
+                    <div class="timeline-voo">
+                        <div class="timeline-item">
+                            <div class="timeline-ponto partida">
+                                <div class="timeline-tempo">08:30</div>
+                                <div class="timeline-local">
+                                    <div class="timeline-codigo">GRU</div>
+                                    <div class="timeline-cidade">São Paulo</div>
+                                </div>
+                            </div>
+                            <div class="timeline-linha">
+                                <div class="duracao-badge">5h 30min</div>
+                            </div>
+                            <div class="timeline-ponto chegada">
+                                <div class="timeline-tempo">14:00</div>
+                                <div class="timeline-local">
+                                    <div class="timeline-codigo">MDE</div>
+                                    <div class="timeline-cidade">Medellín</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="voo-info">
+                            <div class="info-item">
+                                <span class="info-icone">🛫</span>
+                                <span class="info-texto">Voo LA1234</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-icone">🪑</span>
+                                <span class="info-texto">Classe Econômica</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-icone">✓</span>
+                                <span class="info-texto">Aeronave: Boeing 737-800</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Volta -->
+                <div class="detalhes-secao">
+                    <div class="secao-header">
+                        <h4 class="secao-titulo">Volta • Sáb, 15 Ago</h4>
+                        <div class="secao-etiqueta voo-direto">
+                            <span class="etiqueta-icone">✈️</span>
+                            <span>Voo Direto</span>
+                        </div>
+                    </div>
+                    
+                    <div class="timeline-voo">
+                        <div class="timeline-item">
+                            <div class="timeline-ponto partida">
+                                <div class="timeline-tempo">16:45</div>
+                                <div class="timeline-local">
+                                    <div class="timeline-codigo">MDE</div>
+                                    <div class="timeline-cidade">Medellín</div>
+                                </div>
+                            </div>
+                            <div class="timeline-linha">
+                                <div class="duracao-badge">5h 45min</div>
+                            </div>
+                            <div class="timeline-ponto chegada">
+                                <div class="timeline-tempo">22:30</div>
+                                <div class="timeline-local">
+                                    <div class="timeline-codigo">GRU</div>
+                                    <div class="timeline-cidade">São Paulo</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="voo-info">
+                            <div class="info-item">
+                                <span class="info-icone">🛫</span>
+                                <span class="info-texto">Voo LA1235</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-icone">🪑</span>
+                                <span class="info-texto">Classe Econômica</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Serviços e bagagem -->
+                <div class="detalhes-secao">
+                    <h4 class="secao-titulo">Serviços Incluídos</h4>
+                    <div class="servicos-grid">
+                        <div class="servico-item incluido">
+                            <span class="servico-icone">🧳</span>
+                            <span class="servico-nome">1 Bagagem de Mão</span>
+                        </div>
+                        <div class="servico-item incluido">
+                            <span class="servico-icone">🍽️</span>
+                            <span class="servico-nome">Refeição a Bordo</span>
+                        </div>
+                        <div class="servico-item incluido">
+                            <span class="servico-icone">🔄</span>
+                            <span class="servico-nome">Remarcação Flexível</span>
+                        </div>
+                        <div class="servico-item opcional">
+                            <span class="servico-icone">💼</span>
+                            <span class="servico-nome">Bagagem Despachada</span>
+                        </div>
+                        <div class="servico-item opcional">
+                            <span class="servico-icone">🪑</span>
+                            <span class="servico-nome">Escolha de Assento</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Política de cancelamento -->
+                <div class="detalhes-secao">
+                    <div class="secao-header">
+                        <h4 class="secao-titulo">Política de Cancelamento</h4>
+                        <div class="politica-toggle">
+                            <span class="politica-icone">▼</span>
+                        </div>
+                    </div>
+                    <div class="politica-conteudo">
+                        <p class="politica-texto">
+                            Cancelamento até 24h antes da partida: cobrança de taxa de R$ 350 por passageiro.
+                            Cancelamento em menos de 24h: não reembolsável.
+                        </p>
+                    </div>
                 </div>
             </div>
+            
+            <div class="modal-footer">
+                <button class="modal-btn modal-btn-secondary" id="btn-voltar-lista">
+                    Voltar
+                </button>
+                <button class="modal-btn modal-btn-primary" id="btn-selecionar-este-voo">
+                    Selecionar Voo
+                </button>
+            </div>
         </div>
-    </template>
+    </div>
+
+    <!-- Modal de confirmação de seleção (versão atualizada) -->
+    <div id="modal-confirmacao" class="modal-backdrop" style="display:none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">Confirmar Seleção</h3>
+                <button id="btn-fechar-modal" class="btn-fechar">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+            
+            <div class="confirmacao-tripinha">
+                <div class="confirmacao-avatar">
+                    <img src="assets/images/tripinha/avatar-normal.png" alt="Tripinha">
+                </div>
+                <div class="confirmacao-content">
+                    <p class="confirmacao-titulo">Ótima escolha!</p>
+                    
+                    <div class="confirmacao-resumo">
+                        <div class="resumo-item">
+                            <span class="resumo-label">Preço por pessoa:</span>
+                            <span class="resumo-valor">R$ 1.800</span>
+                        </div>
+                        <div class="resumo-item">
+                            <span class="resumo-label">Total (2 pessoas):</span>
+                            <span class="resumo-valor destaque">R$ 3.600</span>
+                        </div>
+                    </div>
+                    
+                    <div class="confirmacao-checkbox">
+                        <input type="checkbox" id="confirmar-selecao">
+                        <label for="confirmar-selecao">Confirmo que desejo prosseguir com este voo</label>
+                    </div>
+                    
+                    <p class="confirmacao-aviso">
+                        <span class="icon-info">ℹ️</span> 
+                        Após a confirmação, você será direcionado para selecionar sua hospedagem.
+                    </p>
+                </div>
+            </div>
+            
+            <div class="modal-footer">
+                <button class="modal-btn modal-btn-secondary" id="btn-continuar-buscando">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M19 12H5M12 19l-7-7 7-7"></path>
+                    </svg>
+                    Voltar aos Voos
+                </button>
+                <button class="modal-btn modal-btn-primary" id="btn-confirmar" disabled>
+                    Confirmar e Prosseguir
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M5 12h14M12 5l7 7-7 7"></path>
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </div>
 
     <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/hammer.js@2.0.8/hammer.min.js"></script>
     <script src="assets/js/api.js"></script>
     <script src="assets/js/flights.js"></script>
-    <script src="assets/js/voos-interface.js"></script> <!-- Novo script para gerenciar a interface -->
+    <script src="assets/js/voos-interface.js"></script>
+    
+    <!-- Script de inicialização para demonstração -->
+    <script>
+        // Para fins de demonstração, podemos exibir os modais com eventos de clique
+        document.addEventListener('DOMContentLoaded', function() {
+            // Configurar botão de ver detalhes
+            document.querySelector('.btn-detalhes-voo')?.addEventListener('click', function() {
+                document.getElementById('modal-detalhes-voo').style.display = 'flex';
+            });
+            
+            // Configurar botão de selecionar voo
+            document.querySelector('.btn-selecionar-voo')?.addEventListener('click', function() {
+                document.getElementById('modal-confirmacao').style.display = 'flex';
+            });
+            
+            // Configurar fechamento dos modais
+            document.querySelectorAll('.btn-fechar, #btn-voltar-lista, #btn-continuar-buscando').forEach(element => {
+                element.addEventListener('click', function() {
+                    document.getElementById('modal-detalhes-voo').style.display = 'none';
+                    document.getElementById('modal-confirmacao').style.display = 'none';
+                });
+            });
+            
+            // Configurar checkbox e botão confirmar
+            document.getElementById('confirmar-selecao')?.addEventListener('change', function() {
+                document.getElementById('btn-confirmar').disabled = !this.checked;
+            });
+            
+            document.getElementById('btn-confirmar')?.addEventListener('click', function() {
+                alert('Voo confirmado! Redirecionando para seleção de hospedagem...');
+                setTimeout(function() {
+                    document.getElementById('modal-confirmacao').style.display = 'none';
+                }, 1500);
+            });
+            
+            // Configurar política de cancelamento
+            document.querySelector('.politica-toggle')?.addEventListener('click', function() {
+                const icone = this.querySelector('.politica-icone');
+                const conteudo = document.querySelector('.politica-conteudo');
+                
+                if (conteudo.style.display === 'none') {
+                    conteudo.style.display = 'block';
+                    icone.textContent = '▼';
+                } else {
+                    conteudo.style.display = 'none';
+                    icone.textContent = '▶';
+                }
+            });
+        });
+    </script>
 </body>
 </html>
