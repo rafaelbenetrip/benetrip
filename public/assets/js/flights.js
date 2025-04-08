@@ -900,7 +900,7 @@ const BENETRIP_VOOS = {
   },
 
 // Função para obter URL do logo da companhia aérea
-function getAirlineLogoUrl(iataCode, width = 40, height = 40, retina = false) {
+getAirlineLogoUrl(iataCode, width = 40, height = 40, retina = false) {
   if (!iataCode || typeof iataCode !== 'string') {
     return `https://pics.avs.io/${width}/${height}/default.png`;
   }
@@ -915,7 +915,7 @@ function getAirlineLogoUrl(iataCode, width = 40, height = 40, retina = false) {
 },
 
 // Função para obter URL do logo da agência (gateway)
-function getAgencyLogoUrl(gateId, width = 110, height = 40, retina = false) {
+getAgencyLogoUrl(gateId, width = 110, height = 40, retina = false) {
   if (!gateId) {
     return null;
   }
@@ -926,7 +926,7 @@ function getAgencyLogoUrl(gateId, width = 110, height = 40, retina = false) {
   return `https://pics.avs.io/as_gates/${width}/${height}/${gateId}${retinaSuffix}.png`;
 },
   
-  function criarCardVoo(voo, index) {
+  criarCardVoo(voo, index) {
   const cardVoo = document.createElement('div');
   cardVoo.className = 'voo-card';
   if (index === 0) cardVoo.classList.add('voo-card-ativo');
@@ -1044,7 +1044,7 @@ function getAgencyLogoUrl(gateId, width = 110, height = 40, retina = false) {
       </div>
       <div class="voo-price-details">Por pessoa, ida${infoVolta ? ' e volta' : ''}</div>
       <div class="airline-info">
-        <img src="${getAirlineLogoUrl(companhiaIATA, 20, 20)}" alt="${companhiaAerea}" class="airline-logo">
+        <img src="${this.getAirlineLogoUrl(companhiaIATA, 20, 20)}" alt="${companhiaAerea}" class="airline-logo">
         ${companhiaAerea}
       </div>
     </div>
@@ -1355,7 +1355,7 @@ function getAgencyLogoUrl(gateId, width = 110, height = 40, retina = false) {
     this.selecionarVoo(vooId);
   },
 
-  function mostrarDetalhesVoo(vooId) {
+  mostrarDetalhesVoo(vooId) {
   if (!this.finalResults?.proposals) return;
   
   // Encontra o voo pelo ID
@@ -1407,9 +1407,9 @@ function getAgencyLogoUrl(gateId, width = 110, height = 40, retina = false) {
         </div>
         <div class="detalhes-companhia">
           <div class="companhia-logo">
-            <img src="${getAirlineLogoUrl(companhiaIATA, 60, 60)}" 
+            <img src="${this.getAirlineLogoUrl(companhiaIATA, 60, 60)}" 
                  alt="${companhiaAerea}" 
-                 onerror="this.src='${getAirlineLogoUrl('default', 60, 60)}'">
+                 onerror="this.src='${this.getAirlineLogoUrl('default', 60, 60)}'">
           </div>
           <div class="companhia-nome">${companhiaAerea}</div>
         </div>
