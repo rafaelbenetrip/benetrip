@@ -899,158 +899,146 @@ const BENETRIP_VOOS = {
     this.exibirDicaSwipe();
   },
 
-// Função para obter URL do logo da companhia aérea
-getAirlineLogoUrl(iataCode, width = 40, height = 40, retina = false) {
-  if (!iataCode || typeof iataCode !== 'string') {
-    return `https://pics.avs.io/${width}/${height}/default.png`;
-  }
-  
-  // Converte para maiúsculas e remove espaços
-  const code = iataCode.trim().toUpperCase();
-  
-  // Adiciona sufixo @2x para versão retina, se solicitado
-  const retinaSuffix = retina ? '@2x' : '';
-  
-  return `https://pics.avs.io/${width}/${height}/${code}${retinaSuffix}.png`;
-},
+  // Função para obter URL do logo da companhia aérea
+  getAirlineLogoUrl(iataCode, width = 40, height = 40, retina = false) {
+    if (!iataCode || typeof iataCode !== 'string') {
+      return `https://pics.avs.io/${width}/${height}/default.png`;
+    }
+    
+    // Converte para maiúsculas e remove espaços
+    const code = iataCode.trim().toUpperCase();
+    
+    // Adiciona sufixo @2x para versão retina, se solicitado
+    const retinaSuffix = retina ? '@2x' : '';
+    
+    return `https://pics.avs.io/${width}/${height}/${code}${retinaSuffix}.png`;
+  },
 
-// Função para obter URL do logo da agência (gateway)
-getAgencyLogoUrl(gateId, width = 110, height = 40, retina = false) {
-  if (!gateId) {
-    return null;
-  }
-  
-  // Adiciona sufixo @2x para versão retina, se solicitado
-  const retinaSuffix = retina ? '@2x' : '';
-  
-  return `https://pics.avs.io/as_gates/${width}/${height}/${gateId}${retinaSuffix}.png`;
-},
+  // Função para obter URL do logo da agência (gateway)
+  getAgencyLogoUrl(gateId, width = 110, height = 40, retina = false) {
+    if (!gateId) {
+      return null;
+    }
+    
+    // Adiciona sufixo @2x para versão retina, se solicitado
+    const retinaSuffix = retina ? '@2x' : '';
+    
+    return `https://pics.avs.io/as_gates/${width}/${height}/${gateId}${retinaSuffix}.png`;
+  },
   
   criarCardVoo(voo, index) {
-  const cardVoo = document.createElement('div');
-  cardVoo.className = 'voo-card';
-  if (index === 0) cardVoo.classList.add('voo-card-ativo');
-  
-  // Define atributos de dados
-  const vooId = voo.sign || `voo-idx-${index}`;
-  cardVoo.dataset.vooId = vooId;
-  cardVoo.dataset.vooIndex = index.toString();
-  
-  // Extrai informações do voo
-  const preco = this.obterPrecoVoo(voo);
-  const moeda = this.finalResults?.meta?.currency || 'BRL';
-  const infoIda = this.obterInfoSegmento(voo.segment?.[0]);
-  const infoVolta = voo.segment?.length > 1 ? this.obterInfoSegmento(voo.segment[1]) : null;
-  const economiaPercentual = voo._economia || 0;
-  const isMelhorPreco = voo._melhorPreco || index === 0;
-  const ehVooDireto = infoIda?.paradas === 0 && (!infoVolta || infoVolta.paradas === 0);
-  
-  // Adiciona classes especiais
-  if (ehVooDireto) cardVoo.classList.add('voo-direto');
-  
-  // Constrói o HTML interno com o novo layout
-  cardVoo.innerHTML = `
-    <div class="voo-card-header">
-      <div class="voo-price-container">
-        <div class="voo-price">${this.formatarPreco(preco, moeda)}</div>
-        ${economiaPercentual > 0 ? `<span class="discount-badge">-${economiaPercentual}%</span>` : ''}
-        ${isMelhorPreco ? '<span class="card-tag melhor-preco">Melhor preço</span>' : ''}
-      </div>
-      <div class="voo-price-details">Por pessoa, ida${infoVolta ? ' e volta' : ''}</div>
-      <div class="airline-info">${this.obterNomeCompanhiaAerea(voo.carriers?.[0])}</div>
-    </div>
+    const cardVoo = document.createElement('div');
+    cardVoo.className = 'voo-card';
+    if (index === 0) cardVoo.classList.add('voo-card-ativo');
     
-    <div class="voo-card-content">
-      <!-- Rota de ida -->
-      <div class="flight-route">
-        <div class="route-point">
-          <div class="route-time">${infoIda?.horaPartida || '--:--'}</div>
-          <div class="route-airport">${infoIda?.aeroportoPartida || '---'}</div>
+    // Define atributos de dados
+    const vooId = voo.sign || `voo-idx-${index}`;
+    cardVoo.dataset.vooId = vooId;
+    cardVoo.dataset.vooIndex = index.toString();
+    
+    // Extrai informações do voo
+    const preco = this.obterPrecoVoo(voo);
+    const moeda = this.finalResults?.meta?.currency || 'BRL';
+    const infoIda = this.obterInfoSegmento(voo.segment?.[0]);
+    const infoVolta = voo.segment?.length > 1 ? this.obterInfoSegmento(voo.segment[1]) : null;
+    const economiaPercentual = voo._economia || 0;
+    const isMelhorPreco = voo._melhorPreco || index === 0;
+    const ehVooDireto = infoIda?.paradas === 0 && (!infoVolta || infoVolta.paradas === 0);
+    
+    // Adiciona classes especiais
+    if (ehVooDireto) cardVoo.classList.add('voo-direto');
+    
+    // Extrai código IATA da companhia aérea
+    const companhiaIATA = voo.carriers?.[0];
+    const companhiaAerea = this.obterNomeCompanhiaAerea(companhiaIATA);
+    
+    // Constrói o HTML interno com o logo da companhia aérea
+    cardVoo.innerHTML = `
+      <div class="voo-card-header">
+        <div class="voo-price-container">
+          <div class="voo-price">${this.formatarPreco(preco, moeda)}</div>
+          ${economiaPercentual > 0 ? `<span class="discount-badge">-${economiaPercentual}%</span>` : ''}
+          ${isMelhorPreco ? '<span class="card-tag melhor-preco">Melhor preço</span>' : ''}
         </div>
-        <div class="route-line">
-          ${ehVooDireto ? '<div class="route-info-badge"><span class="card-tag voo-direto">Voo Direto</span></div>' : ''}
-          <div class="route-duration">${this.formatarDuracao(infoIda?.duracao || 0)}</div>
-          <div class="route-line-bar ${ehVooDireto ? 'route-line-direct' : ''}">
-            <span class="stop-marker start"></span>
-            ${infoIda?.paradas > 0 ? '<span class="stop-marker mid"></span>' : ''}
-            <span class="stop-marker end"></span>
-          </div>
-          <div class="route-stops ${ehVooDireto ? 'route-stops-direct' : ''}">
-            ${infoIda?.paradas === 0 ? 'Sem escalas' : `${infoIda?.paradas || 0} ${infoIda?.paradas === 1 ? 'parada' : 'paradas'}`}
-          </div>
-        </div>
-        <div class="route-point">
-          <div class="route-time">${infoIda?.horaChegada || '--:--'}</div>
-          <div class="route-airport">${infoIda?.aeroportoChegada || '---'}</div>
+        <div class="voo-price-details">Por pessoa, ida${infoVolta ? ' e volta' : ''}</div>
+        <div class="airline-info">
+          <img src="${this.getAirlineLogoUrl(companhiaIATA, 20, 20)}" alt="${companhiaAerea}" class="airline-logo">
+          ${companhiaAerea}
         </div>
       </div>
       
-      ${infoVolta ? `
-      <!-- Rota de volta -->
-      <div class="flight-route return-route">
-        <div class="route-point">
-          <div class="route-time">${infoVolta.horaPartida || '--:--'}</div>
-          <div class="route-airport">${infoVolta.aeroportoPartida || '---'}</div>
-        </div>
-        <div class="route-line">
-          ${infoVolta.paradas === 0 ? '<div class="route-info-badge"><span class="card-tag voo-direto">Voo Direto</span></div>' : ''}
-          <div class="route-duration">${this.formatarDuracao(infoVolta.duracao || 0)}</div>
-          <div class="route-line-bar ${infoVolta.paradas === 0 ? 'route-line-direct' : ''}">
-            <span class="stop-marker start"></span>
-            ${infoVolta.paradas > 0 ? '<span class="stop-marker mid"></span>' : ''}
-            <span class="stop-marker end"></span>
+      <div class="voo-card-content">
+        <!-- Rota de ida -->
+        <div class="flight-route">
+          <div class="route-point">
+            <div class="route-time">${infoIda?.horaPartida || '--:--'}</div>
+            <div class="route-airport">${infoIda?.aeroportoPartida || '---'}</div>
           </div>
-          <div class="route-stops ${infoVolta.paradas === 0 ? 'route-stops-direct' : ''}">
-            ${infoVolta.paradas === 0 ? 'Sem escalas' : `${infoVolta.paradas} ${infoVolta.paradas === 1 ? 'parada' : 'paradas'}`}
+          <div class="route-line">
+            ${ehVooDireto ? '<div class="route-info-badge"><span class="card-tag voo-direto">Voo Direto</span></div>' : ''}
+            <div class="route-duration">${this.formatarDuracao(infoIda?.duracao || 0)}</div>
+            <div class="route-line-bar ${ehVooDireto ? 'route-line-direct' : ''}">
+              <span class="stop-marker start"></span>
+              ${infoIda?.paradas > 0 ? '<span class="stop-marker mid"></span>' : ''}
+              <span class="stop-marker end"></span>
+            </div>
+            <div class="route-stops ${ehVooDireto ? 'route-stops-direct' : ''}">
+              ${infoIda?.paradas === 0 ? 'Sem escalas' : `${infoIda?.paradas || 0} ${infoIda?.paradas === 1 ? 'parada' : 'paradas'}`}
+            </div>
+          </div>
+          <div class="route-point">
+            <div class="route-time">${infoIda?.horaChegada || '--:--'}</div>
+            <div class="route-airport">${infoIda?.aeroportoChegada || '---'}</div>
           </div>
         </div>
-        <div class="route-point">
-          <div class="route-time">${infoVolta.horaChegada || '--:--'}</div>
-          <div class="route-airport">${infoVolta.aeroportoChegada || '---'}</div>
+        
+        ${infoVolta ? `
+        <!-- Rota de volta -->
+        <div class="flight-route return-route">
+          <div class="route-point">
+            <div class="route-time">${infoVolta.horaPartida || '--:--'}</div>
+            <div class="route-airport">${infoVolta.aeroportoPartida || '---'}</div>
+          </div>
+          <div class="route-line">
+            ${infoVolta.paradas === 0 ? '<div class="route-info-badge"><span class="card-tag voo-direto">Voo Direto</span></div>' : ''}
+            <div class="route-duration">${this.formatarDuracao(infoVolta.duracao || 0)}</div>
+            <div class="route-line-bar ${infoVolta.paradas === 0 ? 'route-line-direct' : ''}">
+              <span class="stop-marker start"></span>
+              ${infoVolta.paradas > 0 ? '<span class="stop-marker mid"></span>' : ''}
+              <span class="stop-marker end"></span>
+            </div>
+            <div class="route-stops ${infoVolta.paradas === 0 ? 'route-stops-direct' : ''}">
+              ${infoVolta.paradas === 0 ? 'Sem escalas' : `${infoVolta.paradas} ${infoVolta.paradas === 1 ? 'parada' : 'paradas'}`}
+            </div>
+          </div>
+          <div class="route-point">
+            <div class="route-time">${infoVolta.horaChegada || '--:--'}</div>
+            <div class="route-airport">${infoVolta.aeroportoChegada || '---'}</div>
+          </div>
+        </div>
+        ` : ''}
+        
+        <!-- Detalhes adicionais -->
+        <div class="flight-details">
+          <div>
+            <span>✓</span> 1 bagagem incluída
+          </div>
+          <div>
+            <span>⏱️</span> Duração: ${this.formatarDuracao(infoIda?.duracao || 0)}
+          </div>
         </div>
       </div>
-      ` : ''}
       
-      <!-- Detalhes adicionais -->
-      <div class="flight-details">
-        <div>
-          <span>✓</span> 1 bagagem incluída
-        </div>
-        <div>
-          <span>⏱️</span> Duração: ${this.formatarDuracao(infoIda?.duracao || 0)}
+      <div class="voo-card-footer">
+        <button class="btn-detalhes-voo" data-voo-id="${vooId}">Ver detalhes</button>
+        <div class="remaining-seats">
+          Restam <span class="seats-number">${voo._assentosDisponiveis || '?'}</span>
         </div>
       </div>
-    </div>
-    
-    <div class="voo-card-footer">
-      <button class="btn-detalhes-voo" data-voo-id="${vooId}">Ver detalhes</button>
-      <div class="remaining-seats">
-        Restam <span class="seats-number">${voo._assentosDisponiveis || '?'}</span>
-      </div>
-    </div>
-  `;
-
-  // Extrai código IATA da companhia aérea
-  const companhiaIATA = voo.carriers?.[0];
-  const companhiaAerea = this.obterNomeCompanhiaAerea(companhiaIATA);
-  
-  // Constrói o HTML interno com o logo da companhia aérea
-  cardVoo.innerHTML = `
-    <div class="voo-card-header">
-      <div class="voo-price-container">
-        <div class="voo-price">${this.formatarPreco(preco, moeda)}</div>
-        ${economiaPercentual > 0 ? `<span class="discount-badge">-${economiaPercentual}%</span>` : ''}
-        ${isMelhorPreco ? '<span class="card-tag melhor-preco">Melhor preço</span>' : ''}
-      </div>
-      <div class="voo-price-details">Por pessoa, ida${infoVolta ? ' e volta' : ''}</div>
-      <div class="airline-info">
-        <img src="${this.getAirlineLogoUrl(companhiaIATA, 20, 20)}" alt="${companhiaAerea}" class="airline-logo">
-        ${companhiaAerea}
-      </div>
-    </div>
     `;
-  return cardVoo;
-},
+
+    return cardVoo;
+  },
 
   renderizarSemResultados() {
     const container = document.querySelector('.voos-content');
@@ -1356,263 +1344,263 @@ getAgencyLogoUrl(gateId, width = 110, height = 40, retina = false) {
   },
 
   mostrarDetalhesVoo(vooId) {
-  if (!this.finalResults?.proposals) return;
-  
-  // Encontra o voo pelo ID
-  const voo = this.finalResults.proposals.find(
-    (v, index) => (v.sign || `voo-idx-${index}`) === vooId
-  );
-  
-  if (!voo) { 
-    console.error(`Voo ${vooId} não encontrado`); 
-    return; 
-  }
-  
-  // Remove modal existente se houver
-  document.getElementById('modal-detalhes-voo')?.remove();
-  
-  // Extrai informações do voo
-  const preco = this.obterPrecoVoo(voo);
-  const moeda = this.finalResults?.meta?.currency || 'BRL';
-  const infoIda = this.obterInfoSegmento(voo.segment?.[0]);
-  const infoVolta = voo.segment?.length > 1 ? this.obterInfoSegmento(voo.segment[1]) : null;
-  const companhiaIATA = voo.carriers?.[0];
-  const companhiaAerea = this.obterNomeCompanhiaAerea(voo.carriers?.[0]);
-  const ehVooDireto = infoIda?.paradas === 0 && (!infoVolta || infoVolta.paradas === 0);
-  
-  // Cria o modal com o novo design
-  const modalContainer = document.createElement('div');
-  modalContainer.className = 'modal-backdrop';
-  modalContainer.id = 'modal-detalhes-voo';
-  
-  // Conteúdo do modal
-  modalContainer.innerHTML = `
-    <div class="modal-content modal-detalhes-voo">
-      <div class="modal-header">
-        <h3 class="modal-title">Detalhes do Voo</h3>
-        <button id="btn-fechar-detalhes" class="btn-fechar">
-          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <line x1="18" y1="6" x2="6" y2="18"></line>
-            <line x1="6" y1="6" x2="18" y2="18"></line>
-          </svg>
-        </button>
-      </div>
-      
-      <div class="detalhes-content">
-      <!-- Resumo de preço e companhia -->
-      <div class="detalhes-sumario">
-        <div class="detalhes-preco">
-          <div class="preco-valor">${this.formatarPreco(preco, moeda)}</div>
-          <div class="preco-info">Por pessoa, ida${infoVolta ? ' e volta' : ''}</div>
+    if (!this.finalResults?.proposals) return;
+    
+    // Encontra o voo pelo ID
+    const voo = this.finalResults.proposals.find(
+      (v, index) => (v.sign || `voo-idx-${index}`) === vooId
+    );
+    
+    if (!voo) { 
+      console.error(`Voo ${vooId} não encontrado`); 
+      return; 
+    }
+    
+    // Remove modal existente se houver
+    document.getElementById('modal-detalhes-voo')?.remove();
+    
+    // Extrai informações do voo
+    const preco = this.obterPrecoVoo(voo);
+    const moeda = this.finalResults?.meta?.currency || 'BRL';
+    const infoIda = this.obterInfoSegmento(voo.segment?.[0]);
+    const infoVolta = voo.segment?.length > 1 ? this.obterInfoSegmento(voo.segment[1]) : null;
+    const companhiaIATA = voo.carriers?.[0];
+    const companhiaAerea = this.obterNomeCompanhiaAerea(voo.carriers?.[0]);
+    const ehVooDireto = infoIda?.paradas === 0 && (!infoVolta || infoVolta.paradas === 0);
+    
+    // Cria o modal com o novo design
+    const modalContainer = document.createElement('div');
+    modalContainer.className = 'modal-backdrop';
+    modalContainer.id = 'modal-detalhes-voo';
+    
+    // Conteúdo do modal
+    modalContainer.innerHTML = `
+      <div class="modal-content modal-detalhes-voo">
+        <div class="modal-header">
+          <h3 class="modal-title">Detalhes do Voo</h3>
+          <button id="btn-fechar-detalhes" class="btn-fechar">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
         </div>
-        <div class="detalhes-companhia">
-          <div class="companhia-logo">
-            <img src="${this.getAirlineLogoUrl(companhiaIATA, 60, 60)}" 
-                 alt="${companhiaAerea}" 
-                 onerror="this.src='${this.getAirlineLogoUrl('default', 60, 60)}'">
-          </div>
-          <div class="companhia-nome">${companhiaAerea}</div>
-        </div>
-      </div>
         
-        <!-- Visualização da rota com timeline -->
-        <div class="detalhes-secao">
-          <div class="secao-header">
-            <h4 class="secao-titulo">Ida • ${this.formatarData(infoIda?.dataPartida)}</h4>
-            ${ehVooDireto ? `
-            <div class="secao-etiqueta voo-direto">
-              <span class="etiqueta-icone">✈️</span>
-              <span>Voo Direto</span>
-            </div>` : ''}
+        <div class="detalhes-content">
+        <!-- Resumo de preço e companhia -->
+        <div class="detalhes-sumario">
+          <div class="detalhes-preco">
+            <div class="preco-valor">${this.formatarPreco(preco, moeda)}</div>
+            <div class="preco-info">Por pessoa, ida${infoVolta ? ' e volta' : ''}</div>
           </div>
-          
-          <div class="timeline-voo">
-            <div class="timeline-item">
-              <div class="timeline-ponto partida">
-                <div class="timeline-tempo">${infoIda?.horaPartida || '--:--'}</div>
-                <div class="timeline-local">
-                  <div class="timeline-codigo">${infoIda?.aeroportoPartida || '---'}</div>
-                  <div class="timeline-cidade">${this.obterNomeCidade(infoIda?.aeroportoPartida) || 'Origem'}</div>
-                </div>
-              </div>
-              <div class="timeline-linha">
-                <div class="duracao-badge">${this.formatarDuracao(infoIda?.duracao || 0)}</div>
-              </div>
-              <div class="timeline-ponto chegada">
-                <div class="timeline-tempo">${infoIda?.horaChegada || '--:--'}</div>
-                <div class="timeline-local">
-                  <div class="timeline-codigo">${infoIda?.aeroportoChegada || '---'}</div>
-                  <div class="timeline-cidade">${this.obterNomeCidade(infoIda?.aeroportoChegada) || 'Destino'}</div>
-                </div>
-              </div>
+          <div class="detalhes-companhia">
+            <div class="companhia-logo">
+              <img src="${this.getAirlineLogoUrl(companhiaIATA, 60, 60)}" 
+                   alt="${companhiaAerea}" 
+                   onerror="this.src='${this.getAirlineLogoUrl('default', 60, 60)}'">
             </div>
-            
-            <div class="voo-info">
-              <div class="info-item">
-                <span class="info-icone">🛫</span>
-                <span class="info-texto">Voo ${voo.segment?.[0]?.flight?.[0]?.marketing_carrier || ''}${voo.segment?.[0]?.flight?.[0]?.number || ''}</span>
-              </div>
-              <div class="info-item">
-                <span class="info-icone">🪑</span>
-                <span class="info-texto">Classe Econômica</span>
-              </div>
-              ${voo.segment?.[0]?.flight?.[0]?.aircraft ? `
-              <div class="info-item">
-                <span class="info-icone">✓</span>
-                <span class="info-texto">Aeronave: ${voo.segment?.[0]?.flight?.[0]?.aircraft}</span>
+            <div class="companhia-nome">${companhiaAerea}</div>
+          </div>
+        </div>
+          
+          <!-- Visualização da rota com timeline -->
+          <div class="detalhes-secao">
+            <div class="secao-header">
+              <h4 class="secao-titulo">Ida • ${this.formatarData(infoIda?.dataPartida)}</h4>
+              ${ehVooDireto ? `
+              <div class="secao-etiqueta voo-direto">
+                <span class="etiqueta-icone">✈️</span>
+                <span>Voo Direto</span>
               </div>` : ''}
             </div>
-          </div>
-        </div>
-        
-        ${infoVolta ? `
-        <!-- Volta -->
-        <div class="detalhes-secao">
-          <div class="secao-header">
-            <h4 class="secao-titulo">Volta • ${this.formatarData(infoVolta.dataPartida)}</h4>
-            ${infoVolta.paradas === 0 ? `
-            <div class="secao-etiqueta voo-direto">
-              <span class="etiqueta-icone">✈️</span>
-              <span>Voo Direto</span>
-            </div>` : ''}
+            
+            <div class="timeline-voo">
+              <div class="timeline-item">
+                <div class="timeline-ponto partida">
+                  <div class="timeline-tempo">${infoIda?.horaPartida || '--:--'}</div>
+                  <div class="timeline-local">
+                    <div class="timeline-codigo">${infoIda?.aeroportoPartida || '---'}</div>
+                    <div class="timeline-cidade">${this.obterNomeCidade(infoIda?.aeroportoPartida) || 'Origem'}</div>
+                  </div>
+                </div>
+                <div class="timeline-linha">
+                  <div class="duracao-badge">${this.formatarDuracao(infoIda?.duracao || 0)}</div>
+                </div>
+                <div class="timeline-ponto chegada">
+                  <div class="timeline-tempo">${infoIda?.horaChegada || '--:--'}</div>
+                  <div class="timeline-local">
+                    <div class="timeline-codigo">${infoIda?.aeroportoChegada || '---'}</div>
+                    <div class="timeline-cidade">${this.obterNomeCidade(infoIda?.aeroportoChegada) || 'Destino'}</div>
+                  </div>
+                </div>
+              </div>
+              
+              <div class="voo-info">
+                <div class="info-item">
+                  <span class="info-icone">🛫</span>
+                  <span class="info-texto">Voo ${voo.segment?.[0]?.flight?.[0]?.marketing_carrier || ''}${voo.segment?.[0]?.flight?.[0]?.number || ''}</span>
+                </div>
+                <div class="info-item">
+                  <span class="info-icone">🪑</span>
+                  <span class="info-texto">Classe Econômica</span>
+                </div>
+                ${voo.segment?.[0]?.flight?.[0]?.aircraft ? `
+                <div class="info-item">
+                  <span class="info-icone">✓</span>
+                  <span class="info-texto">Aeronave: ${voo.segment?.[0]?.flight?.[0]?.aircraft}</span>
+                </div>` : ''}
+              </div>
+            </div>
           </div>
           
-          <div class="timeline-voo">
-            <div class="timeline-item">
-              <div class="timeline-ponto partida">
-                <div class="timeline-tempo">${infoVolta.horaPartida || '--:--'}</div>
-                <div class="timeline-local">
-                  <div class="timeline-codigo">${infoVolta.aeroportoPartida || '---'}</div>
-                  <div class="timeline-cidade">${this.obterNomeCidade(infoVolta.aeroportoPartida) || 'Origem'}</div>
-                </div>
-              </div>
-              <div class="timeline-linha">
-                <div class="duracao-badge">${this.formatarDuracao(infoVolta.duracao || 0)}</div>
-              </div>
-              <div class="timeline-ponto chegada">
-                <div class="timeline-tempo">${infoVolta.horaChegada || '--:--'}</div>
-                <div class="timeline-local">
-                  <div class="timeline-codigo">${infoVolta.aeroportoChegada || '---'}</div>
-                  <div class="timeline-cidade">${this.obterNomeCidade(infoVolta.aeroportoChegada) || 'Destino'}</div>
-                </div>
-              </div>
+          ${infoVolta ? `
+          <!-- Volta -->
+          <div class="detalhes-secao">
+            <div class="secao-header">
+              <h4 class="secao-titulo">Volta • ${this.formatarData(infoVolta.dataPartida)}</h4>
+              ${infoVolta.paradas === 0 ? `
+              <div class="secao-etiqueta voo-direto">
+                <span class="etiqueta-icone">✈️</span>
+                <span>Voo Direto</span>
+              </div>` : ''}
             </div>
             
-            <div class="voo-info">
-              <div class="info-item">
-                <span class="info-icone">🛫</span>
-                <span class="info-texto">Voo ${voo.segment?.[1]?.flight?.[0]?.marketing_carrier || ''}${voo.segment?.[1]?.flight?.[0]?.number || ''}</span>
+            <div class="timeline-voo">
+              <div class="timeline-item">
+                <div class="timeline-ponto partida">
+                  <div class="timeline-tempo">${infoVolta.horaPartida || '--:--'}</div>
+                  <div class="timeline-local">
+                    <div class="timeline-codigo">${infoVolta.aeroportoPartida || '---'}</div>
+                    <div class="timeline-cidade">${this.obterNomeCidade(infoVolta.aeroportoPartida) || 'Origem'}</div>
+                  </div>
+                </div>
+                <div class="timeline-linha">
+                  <div class="duracao-badge">${this.formatarDuracao(infoVolta.duracao || 0)}</div>
+                </div>
+                <div class="timeline-ponto chegada">
+                  <div class="timeline-tempo">${infoVolta.horaChegada || '--:--'}</div>
+                  <div class="timeline-local">
+                    <div class="timeline-codigo">${infoVolta.aeroportoChegada || '---'}</div>
+                    <div class="timeline-cidade">${this.obterNomeCidade(infoVolta.aeroportoChegada) || 'Destino'}</div>
+                  </div>
+                </div>
               </div>
-              <div class="info-item">
-                <span class="info-icone">🪑</span>
-                <span class="info-texto">Classe Econômica</span>
+              
+              <div class="voo-info">
+                <div class="info-item">
+                  <span class="info-icone">🛫</span>
+                  <span class="info-texto">Voo ${voo.segment?.[1]?.flight?.[0]?.marketing_carrier || ''}${voo.segment?.[1]?.flight?.[0]?.number || ''}</span>
+                </div>
+                <div class="info-item">
+                  <span class="info-icone">🪑</span>
+                  <span class="info-texto">Classe Econômica</span>
+                </div>
               </div>
+            </div>
+          </div>
+          ` : ''}
+          
+          <!-- Serviços e bagagem -->
+          <div class="detalhes-secao">
+            <h4 class="secao-titulo">Serviços Incluídos</h4>
+            <div class="servicos-grid">
+              <div class="servico-item incluido">
+                <span class="servico-icone">🧳</span>
+                <span class="servico-nome">1 Bagagem de Mão</span>
+              </div>
+              <div class="servico-item incluido">
+                <span class="servico-icone">🍽️</span>
+                <span class="servico-nome">Refeição a Bordo</span>
+              </div>
+              <div class="servico-item incluido">
+                <span class="servico-icone">🔄</span>
+                <span class="servico-nome">Remarcação Flexível</span>
+              </div>
+              <div class="servico-item opcional">
+                <span class="servico-icone">💼</span>
+                <span class="servico-nome">Bagagem Despachada</span>
+              </div>
+              <div class="servico-item opcional">
+                <span class="servico-icone">🪑</span>
+                <span class="servico-nome">Escolha de Assento</span>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Política de cancelamento -->
+          <div class="detalhes-secao">
+            <div class="secao-header">
+              <h4 class="secao-titulo">Política de Cancelamento</h4>
+              <div class="politica-toggle">
+                <span class="politica-icone">▼</span>
+              </div>
+            </div>
+            <div class="politica-conteudo">
+              <p class="politica-texto">
+                Cancelamento até 24h antes da partida: cobrança de taxa de ${this.formatarPreco(350, moeda)} por passageiro.
+                Cancelamento em menos de 24h: não reembolsável.
+              </p>
             </div>
           </div>
         </div>
-        ` : ''}
         
-        <!-- Serviços e bagagem -->
-        <div class="detalhes-secao">
-          <h4 class="secao-titulo">Serviços Incluídos</h4>
-          <div class="servicos-grid">
-            <div class="servico-item incluido">
-              <span class="servico-icone">🧳</span>
-              <span class="servico-nome">1 Bagagem de Mão</span>
-            </div>
-            <div class="servico-item incluido">
-              <span class="servico-icone">🍽️</span>
-              <span class="servico-nome">Refeição a Bordo</span>
-            </div>
-            <div class="servico-item incluido">
-              <span class="servico-icone">🔄</span>
-              <span class="servico-nome">Remarcação Flexível</span>
-            </div>
-            <div class="servico-item opcional">
-              <span class="servico-icone">💼</span>
-              <span class="servico-nome">Bagagem Despachada</span>
-            </div>
-            <div class="servico-item opcional">
-              <span class="servico-icone">🪑</span>
-              <span class="servico-nome">Escolha de Assento</span>
-            </div>
-          </div>
-        </div>
-        
-        <!-- Política de cancelamento -->
-        <div class="detalhes-secao">
-          <div class="secao-header">
-            <h4 class="secao-titulo">Política de Cancelamento</h4>
-            <div class="politica-toggle">
-              <span class="politica-icone">▼</span>
-            </div>
-          </div>
-          <div class="politica-conteudo">
-            <p class="politica-texto">
-              Cancelamento até 24h antes da partida: cobrança de taxa de ${this.formatarPreco(350, moeda)} por passageiro.
-              Cancelamento em menos de 24h: não reembolsável.
-            </p>
-          </div>
+        <div class="modal-footer">
+          <button class="modal-btn modal-btn-secondary" id="btn-voltar-lista">
+            Voltar
+          </button>
+          <button class="modal-btn modal-btn-primary" id="btn-selecionar-este-voo">
+            Selecionar Voo
+          </button>
         </div>
       </div>
-      
-      <div class="modal-footer">
-        <button class="modal-btn modal-btn-secondary" id="btn-voltar-lista">
-          Voltar
-        </button>
-        <button class="modal-btn modal-btn-primary" id="btn-selecionar-este-voo">
-          Selecionar Voo
-        </button>
-      </div>
-    </div>
-  `;
-  
-  // Adiciona o modal ao DOM
-  document.body.appendChild(modalContainer);
-  
-  // Configura eventos
-  document.getElementById('btn-fechar-detalhes')?.addEventListener('click', () => modalContainer.remove());
-  document.getElementById('btn-voltar-lista')?.addEventListener('click', () => modalContainer.remove());
-  document.getElementById('btn-selecionar-este-voo')?.addEventListener('click', () => { 
-    this.selecionarVoo(vooId); 
-    modalContainer.remove(); 
-    this.mostrarConfirmacaoSelecao(voo); 
-  });
-  
-  // Configura o toggle da política de cancelamento
-  const politicaToggle = modalContainer.querySelector('.politica-toggle');
-  const politicaConteudo = modalContainer.querySelector('.politica-conteudo');
-  
-  if (politicaToggle && politicaConteudo) {
-    politicaToggle.addEventListener('click', () => {
-      const icone = politicaToggle.querySelector('.politica-icone');
-      if (politicaConteudo.style.display === 'none') {
-        politicaConteudo.style.display = 'block';
-        icone.textContent = '▼';
-      } else {
-        politicaConteudo.style.display = 'none';
-        icone.textContent = '▶';
-      }
+    `;
+    
+    // Adiciona o modal ao DOM
+    document.body.appendChild(modalContainer);
+    
+    // Configura eventos
+    document.getElementById('btn-fechar-detalhes')?.addEventListener('click', () => modalContainer.remove());
+    document.getElementById('btn-voltar-lista')?.addEventListener('click', () => modalContainer.remove());
+    document.getElementById('btn-selecionar-este-voo')?.addEventListener('click', () => { 
+      this.selecionarVoo(vooId); 
+      modalContainer.remove(); 
+      this.mostrarConfirmacaoSelecao(voo); 
     });
-  }
-  
-  // Fecha ao clicar fora
-  modalContainer.addEventListener('click', (e) => { 
-    if (e.target === modalContainer) modalContainer.remove(); 
-  });
-},
+    
+    // Configura o toggle da política de cancelamento
+    const politicaToggle = modalContainer.querySelector('.politica-toggle');
+    const politicaConteudo = modalContainer.querySelector('.politica-conteudo');
+    
+    if (politicaToggle && politicaConteudo) {
+      politicaToggle.addEventListener('click', () => {
+        const icone = politicaToggle.querySelector('.politica-icone');
+        if (politicaConteudo.style.display === 'none') {
+          politicaConteudo.style.display = 'block';
+          icone.textContent = '▼';
+        } else {
+          politicaConteudo.style.display = 'none';
+          icone.textContent = '▶';
+        }
+      });
+    }
+    
+    // Fecha ao clicar fora
+    modalContainer.addEventListener('click', (e) => { 
+      if (e.target === modalContainer) modalContainer.remove(); 
+    });
+  },
 
   // Função auxiliar para obter o nome da cidade a partir do código do aeroporto
-obterNomeCidade(codigoAeroporto) {
-  if (!codigoAeroporto) return '';
-  
-  const aeroporto = this.accumulatedAirports[codigoAeroporto];
-  if (aeroporto?.city) return aeroporto.city;
-  
-  // Se não encontrar no accumulated, tenta buscar no finalResults
-  const finalAeroporto = this.finalResults?.airports?.[codigoAeroporto];
-  return finalAeroporto?.city || '';
-},
+  obterNomeCidade(codigoAeroporto) {
+    if (!codigoAeroporto) return '';
+    
+    const aeroporto = this.accumulatedAirports[codigoAeroporto];
+    if (aeroporto?.city) return aeroporto.city;
+    
+    // Se não encontrar no accumulated, tenta buscar no finalResults
+    const finalAeroporto = this.finalResults?.airports?.[codigoAeroporto];
+    return finalAeroporto?.city || '';
+  },
 
   renderizarTimelineVoos(voos) {
     if (!voos || !voos.length) return '<p>Informações não disponíveis</p>';
@@ -1696,156 +1684,156 @@ obterNomeCidade(codigoAeroporto) {
   },
 
   mostrarConfirmacaoSelecao(voo) {
-  // Remove modal existente se houver
-  document.getElementById('modal-confirmacao')?.remove();
-  
-  // Prepara dados do voo
-  const preco = this.obterPrecoVoo(voo);
-  const moeda = this.finalResults?.meta?.currency || 'BRL';
-  const precoFormatado = this.formatarPreco(preco, moeda);
-  const numPassageiros = this.obterQuantidadePassageiros();
-  const precoTotal = preco * numPassageiros;
-  const precoTotalFormatado = this.formatarPreco(precoTotal, moeda);
-  
-  // Cria o modal
-  const modalContainer = document.createElement('div');
-  modalContainer.className = 'modal-backdrop';
-  modalContainer.id = 'modal-confirmacao';
-  
-  // Conteúdo do modal com o novo design
-  modalContainer.innerHTML = `
-    <div class="modal-content">
-      <div class="modal-header">
-        <h3 class="modal-title">Confirmar Seleção</h3>
-        <button id="btn-fechar-modal" class="btn-fechar">
-          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <line x1="18" y1="6" x2="6" y2="18"></line>
-            <line x1="6" y1="6" x2="18" y2="18"></line>
-          </svg>
-        </button>
-      </div>
-      
-      <div class="confirmacao-tripinha">
-        <div class="confirmacao-avatar">
-          <img src="assets/images/tripinha/avatar-normal.png" alt="Tripinha">
+    // Remove modal existente se houver
+    document.getElementById('modal-confirmacao')?.remove();
+    
+    // Prepara dados do voo
+    const preco = this.obterPrecoVoo(voo);
+    const moeda = this.finalResults?.meta?.currency || 'BRL';
+    const precoFormatado = this.formatarPreco(preco, moeda);
+    const numPassageiros = this.obterQuantidadePassageiros();
+    const precoTotal = preco * numPassageiros;
+    const precoTotalFormatado = this.formatarPreco(precoTotal, moeda);
+    
+    // Cria o modal
+    const modalContainer = document.createElement('div');
+    modalContainer.className = 'modal-backdrop';
+    modalContainer.id = 'modal-confirmacao';
+    
+    // Conteúdo do modal com o novo design
+    modalContainer.innerHTML = `
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3 class="modal-title">Confirmar Seleção</h3>
+          <button id="btn-fechar-modal" class="btn-fechar">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
         </div>
-        <div class="confirmacao-content">
-          <p class="confirmacao-titulo">Ótima escolha!</p>
-          
-          ${numPassageiros > 1 ? `
-          <div class="confirmacao-resumo">
-            <div class="resumo-item">
-              <span class="resumo-label">Preço por pessoa:</span>
-              <span class="resumo-valor">${precoFormatado}</span>
-            </div>
-            <div class="resumo-item">
-              <span class="resumo-label">Total (${numPassageiros} pessoas):</span>
-              <span class="resumo-valor destaque">${precoTotalFormatado}</span>
-            </div>
+        
+        <div class="confirmacao-tripinha">
+          <div class="confirmacao-avatar">
+            <img src="assets/images/tripinha/avatar-normal.png" alt="Tripinha">
           </div>
-          ` : `
-          <div class="confirmacao-resumo">
-            <div class="resumo-item">
-              <span class="resumo-label">Preço total:</span>
-              <span class="resumo-valor destaque">${precoFormatado}</span>
+          <div class="confirmacao-content">
+            <p class="confirmacao-titulo">Ótima escolha!</p>
+            
+            ${numPassageiros > 1 ? `
+            <div class="confirmacao-resumo">
+              <div class="resumo-item">
+                <span class="resumo-label">Preço por pessoa:</span>
+                <span class="resumo-valor">${precoFormatado}</span>
+              </div>
+              <div class="resumo-item">
+                <span class="resumo-label">Total (${numPassageiros} pessoas):</span>
+                <span class="resumo-valor destaque">${precoTotalFormatado}</span>
+              </div>
             </div>
+            ` : `
+            <div class="confirmacao-resumo">
+              <div class="resumo-item">
+                <span class="resumo-label">Preço total:</span>
+                <span class="resumo-valor destaque">${precoFormatado}</span>
+              </div>
+            </div>
+            `}
+            
+            <div class="confirmacao-checkbox">
+              <input type="checkbox" id="confirmar-selecao">
+              <label for="confirmar-selecao">Confirmo que desejo prosseguir com este voo</label>
+            </div>
+            
+            <p class="confirmacao-aviso">
+              <span class="icon-info">ℹ️</span> 
+              Após a confirmação, você será direcionado para selecionar sua hospedagem.
+            </p>
           </div>
-          `}
-          
-          <div class="confirmacao-checkbox">
-            <input type="checkbox" id="confirmar-selecao">
-            <label for="confirmar-selecao">Confirmo que desejo prosseguir com este voo</label>
-          </div>
-          
-          <p class="confirmacao-aviso">
-            <span class="icon-info">ℹ️</span> 
-            Após a confirmação, você será direcionado para selecionar sua hospedagem.
-          </p>
+        </div>
+        
+        <div class="modal-footer">
+          <button class="modal-btn modal-btn-secondary" id="btn-continuar-buscando">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M19 12H5M12 19l-7-7 7-7"></path>
+            </svg>
+            Voltar aos Voos
+          </button>
+          <button class="modal-btn modal-btn-primary" id="btn-confirmar" disabled>
+            Confirmar e Prosseguir
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M5 12h14M12 5l7 7-7 7"></path>
+            </svg>
+          </button>
         </div>
       </div>
-      
-      <div class="modal-footer">
-        <button class="modal-btn modal-btn-secondary" id="btn-continuar-buscando">
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M19 12H5M12 19l-7-7 7-7"></path>
-          </svg>
-          Voltar aos Voos
-        </button>
-        <button class="modal-btn modal-btn-primary" id="btn-confirmar" disabled>
-          Confirmar e Prosseguir
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M5 12h14M12 5l7 7-7 7"></path>
-          </svg>
-        </button>
-      </div>
-    </div>
-  `;
-  
-  // Adiciona o modal ao DOM
-  document.body.appendChild(modalContainer);
-  
-  // Configura eventos
-  const chk = document.getElementById('confirmar-selecao');
-  const btnC = document.getElementById('btn-confirmar');
-  const btnX = document.getElementById('btn-fechar-modal');
-  const btnB = document.getElementById('btn-continuar-buscando');
-  
-  if (chk) {
-    chk.addEventListener('change', () => { 
-      if (btnC) btnC.disabled = !chk.checked; 
+    `;
+    
+    // Adiciona o modal ao DOM
+    document.body.appendChild(modalContainer);
+    
+    // Configura eventos
+    const chk = document.getElementById('confirmar-selecao');
+    const btnC = document.getElementById('btn-confirmar');
+    const btnX = document.getElementById('btn-fechar-modal');
+    const btnB = document.getElementById('btn-continuar-buscando');
+    
+    if (chk) {
+      chk.addEventListener('change', () => { 
+        if (btnC) btnC.disabled = !chk.checked; 
+      });
+    }
+    
+    if (btnX) {
+      btnX.addEventListener('click', () => { 
+        modalContainer.remove(); 
+      });
+    }
+    
+    if (btnB) {
+      btnB.addEventListener('click', () => { 
+        modalContainer.remove(); 
+      });
+    }
+    
+    if (btnC) {
+      btnC.addEventListener('click', () => {
+        // Salva os dados do voo selecionado
+        const dadosVoo = { 
+          voo: this.vooSelecionado, 
+          preco, 
+          precoTotal, 
+          moeda, 
+          numPassageiros, 
+          infoIda: this.obterInfoSegmento(this.vooSelecionado.segment?.[0]), 
+          infoVolta: this.vooSelecionado.segment?.length > 1 ? 
+            this.obterInfoSegmento(this.vooSelecionado.segment[1]) : null, 
+          companhiaAerea: this.obterNomeCompanhiaAerea(this.vooSelecionado.carriers?.[0]), 
+          dataSelecao: new Date().toISOString() 
+        };
+        
+        localStorage.setItem('benetrip_voo_selecionado', JSON.stringify(dadosVoo));
+        this.exibirToast('Voo selecionado! Redirecionando...', 'success');
+        
+        // Adiciona efeito de loading no botão
+        btnC.innerHTML = `
+          <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+          Processando...
+        `;
+        btnC.disabled = true;
+        
+        // Redireciona para a próxima página
+        setTimeout(() => { 
+          window.location.href = 'hotels.html'; 
+        }, 1500);
+      });
+    }
+    
+    // Fecha ao clicar fora
+    modalContainer.addEventListener('click', (e) => { 
+      if (e.target === modalContainer) modalContainer.remove(); 
     });
-  }
-  
-  if (btnX) {
-    btnX.addEventListener('click', () => { 
-      modalContainer.remove(); 
-    });
-  }
-  
-  if (btnB) {
-    btnB.addEventListener('click', () => { 
-      modalContainer.remove(); 
-    });
-  }
-  
-  if (btnC) {
-    btnC.addEventListener('click', () => {
-      // Salva os dados do voo selecionado
-      const dadosVoo = { 
-        voo: this.vooSelecionado, 
-        preco, 
-        precoTotal, 
-        moeda, 
-        numPassageiros, 
-        infoIda: this.obterInfoSegmento(this.vooSelecionado.segment?.[0]), 
-        infoVolta: this.vooSelecionado.segment?.length > 1 ? 
-          this.obterInfoSegmento(this.vooSelecionado.segment[1]) : null, 
-        companhiaAerea: this.obterNomeCompanhiaAerea(this.vooSelecionado.carriers?.[0]), 
-        dataSelecao: new Date().toISOString() 
-      };
-      
-      localStorage.setItem('benetrip_voo_selecionado', JSON.stringify(dadosVoo));
-      this.exibirToast('Voo selecionado! Redirecionando...', 'success');
-      
-      // Adiciona efeito de loading no botão
-      btnC.innerHTML = `
-        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
-        Processando...
-      `;
-      btnC.disabled = true;
-      
-      // Redireciona para a próxima página
-      setTimeout(() => { 
-        window.location.href = 'hotels.html'; 
-      }, 1500);
-    });
-  }
-  
-  // Fecha ao clicar fora
-  modalContainer.addEventListener('click', (e) => { 
-    if (e.target === modalContainer) modalContainer.remove(); 
-  });
-},
+  },
 
   exibirToast(mensagem, tipo = 'info') {
     const toastContainer = document.getElementById('toast-container');
