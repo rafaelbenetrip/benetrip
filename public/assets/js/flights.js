@@ -769,26 +769,30 @@ const BENETRIP_VOOS = {
         console.error('Container não encontrado'); 
         return; 
       }
-
       // Preserva o header se existir
       const headerExistente = container.querySelector('.app-header');
-      container.innerHTML = '';
-      
-      if (headerExistente) {
-        container.appendChild(headerExistente);
-      } else {
+      if (!headerExistente) {
         this.renderizarHeader(container);
       }
-
-      // Decide qual estado renderizar
-      if (this.estaCarregando) {
-        this.renderizarCarregamento(container);
-      } else if (this.temErro) {
-        this.renderizarErro(container);
-      } else if (!this.finalResults || !this.finalResults.proposals || this.finalResults.proposals.length === 0) {
-        this.renderizarSemResultados(container);
+      // Limpa o conteúdo principal, mas mantém o header
+      const mainContent = container.querySelector('.voos-content');
+      if (mainContent) {
+        mainContent.innerHTML = '';
       } else {
-        this.renderizarResultados(container);
+        const newMainContent = document.createElement('main');
+        newMainContent.className = 'voos-content';
+        container.appendChild(newMainContent);
+      }
+      // Decide qual estado renderizar no mainContent
+      const contentContainer = container.querySelector('.voos-content');
+      if (this.estaCarregando) {
+        this.renderizarCarregamento(contentContainer);
+      } else if (this.temErro) {
+        this.renderizarErro(contentContainer);
+      } else if (!this.finalResults || !this.finalResults.proposals || this.finalResults.proposals.length === 0) {
+        this.renderizarSemResultados(contentContainer);
+      } else {
+        this.renderizarResultados(contentContainer);
       }
     } catch (erro) {
       console.error('Erro ao renderizar interface:', erro);
@@ -796,10 +800,14 @@ const BENETRIP_VOOS = {
       // Tenta renderizar tela de erro de forma robusta
       const container = document.getElementById('voos-container');
       if (container) {
-        container.innerHTML = '';
-        this.renderizarHeader(container);
+        const mainContent = container.querySelector('.voos-content') || document.createElement('main');
+        mainContent.className = 'voos-content';
+        if (!container.contains(mainContent)) {
+          container.appendChild(mainContent);
+        }
+        mainContent.innerHTML = '';
         this.mensagemErro = 'Ocorreu um erro ao exibir os voos.';
-        this.renderizarErro(container);
+        this.renderizarErro(mainContent);
       }
       
       // Reporta o erro
@@ -810,32 +818,41 @@ const BENETRIP_VOOS = {
       });
     }
   },
-  
-  renderizarResultados(container) {
-    const mainContent = document.createElement('main');
-    mainContent.className = 'voos-content';
-    container.appendChild(mainContent);
 
-    this.renderizarResumoViagem(mainContent);
-    this.renderizarListaVoos(mainContent);
-    this.renderizarBotaoSelecao(container);
-
-    if (!container.querySelector('#swipe-hint')) {
-      this.renderizarSwipeHint(container);
+  renderizarTripinhaMessage(container) {
+    // Preserva mensagem existente se houver
+    let tripinhaMessage = container.querySelector('.tripinha-message');
+    
+    if (!tripinhaMessage) {
+      tripinhaMessage = document.createElement('div');
+      tripinhaMessage.className = 'tripinha-message';
+      tripinhaMessage.innerHTML = `
+        <div class="tripinha-avatar">
+          <img src="assets/images/tripinha/avatar-normal.png" alt="Tripinha">
+        </div>
+        <div class="tripinha-bubble">
+          <p>Eu farejei por aí e encontrei alguns voos incríveis para sua aventura! 🐾 
+             Deslize para ver todas as opções e escolha a que melhor se encaixa no seu plano!</p>
+        </div>
+      `;
+      container.appendChild(tripinhaMessage);
     }
     
-    // Configura eventos e seleciona primeiro voo
-    this.configurarEventosAposRenderizacao();
+    // Atualiza o texto com base na quantidade de voos
+    const numVoos = this.finalResults.proposals.length;
+    const textoBubble = tripinhaMessage.querySelector('.tripinha-bubble');
     
-    // Seleciona primeiro voo
-    const primeiroVoo = this.finalResults.proposals[0];
-    if (primeiroVoo) {
-      this.vooAtivo = primeiroVoo;
-      this.indexVooAtivo = 0;
-      this.atualizarVooAtivo();
+    if (textoBubble) {
+      if (numVoos > 0) {
+        textoBubble.innerHTML = `<p>Encontrei ${numVoos} voos para seu destino! 🐾 
+                                 Deslize para ver todas as opções e escolha a que melhor se encaixa no seu plano!</p>`;
+      } else {
+        textoBubble.innerHTML = `<p>Busquei em todos os cantos, mas não encontrei voos disponíveis para seu destino. 
+                                 Tente outras datas ou destinos! 🐾</p>`;
+      }
     }
   },
-
+  
   renderizarHeader(container) {
     if (container.querySelector('.app-header')) return;
     
@@ -868,22 +885,16 @@ const BENETRIP_VOOS = {
   },
 
   renderizarCarregamento(container) {
-    // Evita renderização duplicada
-    if (container.querySelector('.loading-container')) return;
-    
-    const loadingImage = 'assets/images/tripinha/loading.gif';
     const loading = document.createElement('div');
     loading.className = 'loading-container';
     loading.innerHTML = `
-      <div style="text-align: center; padding: 2rem 0;">
-        <img src="${loadingImage}" alt="Tripinha carregando" class="loading-avatar" style="width: 100px; height: 100px; margin: 0 auto;" />
-        <div class="loading-text" style="margin: 1rem 0;">Iniciando busca...</div>
-        <div class="progress-bar-container">
-          <div class="progress-bar" role="progressbar" style="width: 10%;" aria-valuenow="10" aria-valuemin="0" aria-valuemax="100"></div>
-        </div>
-        <div class="loading-tips" style="margin-top: 1.5rem; font-size: 0.9rem; color: #666;">
-          <p>💡 Dica: Preços mudam, reserve logo!</p>
-        </div>
+      <img src="assets/images/tripinha/loading.gif" alt="Tripinha carregando" class="loading-avatar">
+      <div class="loading-text">Farejando os melhores voos para você...</div>
+      <div class="progress-bar-container">
+        <div class="progress-bar" role="progressbar" style="width: 10%;" aria-valuenow="10" aria-valuemin="0" aria-valuemax="100"></div>
+      </div>
+      <div class="loading-tips">
+        <p>💡 Dica: Voos diretos aparecem destacados em azul!</p>
       </div>
     `;
     
@@ -891,7 +902,7 @@ const BENETRIP_VOOS = {
     
     // Recupera e aplica o progresso atual
     this.atualizarProgresso(
-      document.querySelector('.loading-text')?.textContent || 'Buscando...', 
+      document.querySelector('.loading-text')?.textContent || 'Buscando...',
       parseFloat(document.querySelector('.progress-bar')?.style.width || '10')
     );
     
@@ -939,13 +950,13 @@ const BENETRIP_VOOS = {
     const erroDiv = document.createElement('div'); 
     erroDiv.className = 'erro-container';
     erroDiv.innerHTML = `
-      <div class="bg-red-100 text-red-700 p-4 rounded-lg my-4 text-center">
-        <div class="mb-3">
-          <img src="assets/images/tripinha/avatar-triste.png" alt="Tripinha triste" class="w-20 h-20 mx-auto" />
+      <div class="error-message-box">
+        <div class="error-image">
+          <img src="assets/images/tripinha/avatar-triste.png" alt="Tripinha triste" class="tripinha-error-avatar">
         </div>
-        <p class="font-bold">${this.mensagemErro || 'Ocorreu um erro.'}</p>
-        <p class="mt-2 text-sm">Desculpe. Tente novamente?</p>
-        <button class="btn-tentar-novamente mt-4 px-4 py-2 bg-red-600 text-white rounded">
+        <h3 class="error-title">${this.mensagemErro || 'Ocorreu um erro.'}</h3>
+        <p class="error-description">Desculpe pelo inconveniente. Podemos tentar novamente?</p>
+        <button class="btn-tentar-novamente">
           Tentar Novamente
         </button>
       </div>
@@ -962,22 +973,250 @@ const BENETRIP_VOOS = {
     const semResultados = document.createElement('div'); 
     semResultados.className = 'sem-resultados-container';
     semResultados.innerHTML = `
-      <div class="bg-blue-50 p-4 rounded-lg my-4 text-center">
-        <div class="mb-3">
-          <img src="assets/images/tripinha/avatar-triste.png" alt="Tripinha triste" class="w-20 h-20 mx-auto" />
+      <div class="tripinha-message">
+        <div class="tripinha-avatar">
+          <img src="assets/images/tripinha/avatar-triste.png" alt="Tripinha triste">
         </div>
-        <p class="font-bold">Ops! Não encontramos voos para ${this.destino?.destino || 'este destino'}.</p>
-        <p class="mt-2 text-sm">Tente outras datas ou destino.</p>
-        <div class="flex gap-3 mt-4">
-          <button class="btn-secundario flex-1 py-2 px-4 border rounded">Mudar Datas</button>
-          <button class="btn-principal flex-1 py-2 px-4 text-white rounded" style="background-color: #E87722;">
-            Outro Destino
-          </button>
+        <div class="tripinha-bubble">
+          <p>Ops! Cheirei todos os cantos e não encontrei voos para ${this.destino?.destino || 'este destino'} nas datas selecionadas. 🐾</p>
+          <p>Podemos tentar outras datas ou destinos!</p>
         </div>
+      </div>
+      
+      <div class="no-results-actions">
+        <button class="btn-secundario">Mudar Datas</button>
+        <button class="btn-principal">Outro Destino</button>
       </div>
     `;
     
     container.appendChild(semResultados);
+    
+    // Adiciona eventos aos botões
+    const btnMudarDatas = semResultados.querySelector('.btn-secundario');
+    const btnOutroDestino = semResultados.querySelector('.btn-principal');
+    
+    if (btnMudarDatas) {
+      btnMudarDatas.addEventListener('click', () => {
+        window.location.href = 'index.html';
+      });
+    }
+    
+    if (btnOutroDestino) {
+      btnOutroDestino.addEventListener('click', () => {
+        window.location.href = 'destinos.html';
+      });
+    }
+  },
+
+  renderizarResultados(container) {
+    // Renderiza a mensagem da Tripinha
+    this.renderizarTripinhaMessage(container);
+    
+    // Renderiza o resumo da viagem/busca
+    this.renderizarResumoViagem(container);
+    
+    // Resumo de quantidade de voos
+    const flightsSummary = document.createElement('div');
+    flightsSummary.className = 'flights-summary';
+    flightsSummary.innerHTML = `
+      <div class="flights-summary-header">
+        <div>
+          <span class="flights-count">${this.finalResults.proposals.length}</span> voos encontrados
+        </div>
+        <div class="flights-sort">
+          <span>Por preço</span>
+        </div>
+      </div>
+    `;
+    container.appendChild(flightsSummary);
+    
+    // Container de swipe para voos
+    const voosContainer = document.createElement('div');
+    voosContainer.className = 'voos-swipe-container';
+    voosContainer.id = 'voos-swipe-container';
+    container.appendChild(voosContainer);
+    
+    // Renderiza cards usando o novo formato
+    this.renderizarCards(voosContainer);
+    
+    // Adiciona indicadores de paginação
+    this.renderizarPaginacao(container);
+    
+    // Adiciona controles de navegação
+    this.renderizarControlesNavegacao(container);
+    
+    // Renderizar botão de seleção fixo
+    this.renderizarBotaoSelecao(document.getElementById('voos-container'));
+    
+    // Configura navegação após renderização
+    this.configurarEventosAposRenderizacao();
+  },
+
+  renderizarCards(container) {
+    const propostas = this.finalResults.proposals || [];
+    
+    // Carregamento otimizado de voos - apenas os primeiros 20 inicialmente
+    const initialVoos = propostas.slice(0, Math.min(20, propostas.length));
+    
+    // Usa DocumentFragment para melhorar performance
+    const fragment = document.createDocumentFragment();
+    initialVoos.forEach((voo, index) => {
+      const cardVoo = this.criarCardVooAprimorado(voo, index);
+      fragment.appendChild(cardVoo);
+    });
+    container.appendChild(fragment);
+  },
+
+  criarCardVooAprimorado(voo, index) {
+    const cardVoo = document.createElement('div');
+    cardVoo.className = 'voo-card';
+    
+    // Define atributos de dados
+    const vooId = voo.sign || `voo-idx-${index}`;
+    cardVoo.dataset.vooId = vooId;
+    cardVoo.dataset.vooIndex = index;
+    // Aplica classes especiais
+    if (index === 0) cardVoo.classList.add('voo-primeiro');
+    if (index % 2 === 0) cardVoo.classList.add('voo-par');
+    
+    // Extrai informações do voo
+    const preco = this.obterPrecoVoo(voo);
+    const moeda = this.finalResults?.meta?.currency || 'BRL';
+    const precoFormatado = this.formatarPreco(preco, moeda);
+    const infoIda = this.obterInfoSegmento(voo.segment?.[0]);
+    const infoVolta = voo.segment?.length > 1 ? this.obterInfoSegmento(voo.segment[1]) : null;
+    const economiaPercentual = voo._economia || 0;
+    const isMelhorPreco = voo._melhorPreco || index === 0;
+    const ehVooDireto = infoIda?.paradas === 0 && (!infoVolta || infoVolta.paradas === 0);
+    
+    // Aplica classes adicionais para estados especiais
+    if (ehVooDireto) cardVoo.classList.add('voo-direto');
+    if (isMelhorPreco) cardVoo.classList.add('voo-melhor-preco');
+    
+    // Constrói o HTML interno usando o novo design
+    cardVoo.innerHTML = `
+      ${isMelhorPreco ? '<div class="card-tag melhor-preco">Melhor preço</div>' : ''}
+      ${ehVooDireto ? '<div class="card-tag voo-direto">Voo Direto</div>' : ''}
+      
+      <div class="voo-card-header">
+        <div class="voo-price">
+          ${precoFormatado}
+          ${economiaPercentual > 0 ? `<span class="discount-badge">-${economiaPercentual}%</span>` : ''}
+        </div>
+        <div class="voo-price-details">Por pessoa, ida${infoVolta ? ' e volta' : ''}</div>
+        <div class="airline-info">${this.obterCompanhiasAereas(voo)}</div>
+      </div>
+      
+      <div class="voo-card-content">
+        <!-- Rota de ida -->
+        <div class="flight-route">
+          <div class="route-point">
+            <div class="route-time">${infoIda?.horaPartida || '--:--'}</div>
+            <div class="route-airport">${infoIda?.aeroportoPartida || '---'}</div>
+          </div>
+          <div class="route-line">
+            <div class="route-duration">${this.formatarDuracao(infoIda?.duracao || 0)}</div>
+            <div class="route-line-bar ${ehVooDireto ? 'route-line-direct' : ''}">
+              <span class="stop-marker start"></span>
+              ${!ehVooDireto ? '<span class="stop-marker mid"></span>' : ''}
+              <span class="stop-marker end"></span>
+            </div>
+            <div class="route-stops ${ehVooDireto ? 'route-stops-direct' : ''}">
+              ${ehVooDireto ? 'Voo Direto' : `${infoIda?.paradas || 0} ${infoIda?.paradas === 1 ? 'parada' : 'paradas'}`}
+            </div>
+          </div>
+          <div class="route-point">
+            <div class="route-time">${infoIda?.horaChegada || '--:--'}</div>
+            <div class="route-airport">${infoIda?.aeroportoChegada || '---'}</div>
+          </div>
+        </div>
+        
+        ${infoVolta ? `
+        <!-- Rota de volta -->
+        <div class="flight-route return-route">
+          <div class="route-point">
+            <div class="route-time">${infoVolta.horaPartida || '--:--'}</div>
+            <div class="route-airport">${infoVolta.aeroportoPartida || '---'}</div>
+          </div>
+          <div class="route-line">
+            <div class="route-duration">${this.formatarDuracao(infoVolta.duracao || 0)}</div>
+            <div class="route-line-bar ${infoVolta.paradas === 0 ? 'route-line-direct' : ''}">
+              <span class="stop-marker start"></span>
+              ${infoVolta.paradas > 0 ? '<span class="stop-marker mid"></span>' : ''}
+              <span class="stop-marker end"></span>
+            </div>
+            <div class="route-stops ${infoVolta.paradas === 0 ? 'route-stops-direct' : ''}">
+              ${infoVolta.paradas === 0 ? 'Voo Direto' : `${infoVolta.paradas} ${infoVolta.paradas === 1 ? 'parada' : 'paradas'}`}
+            </div>
+          </div>
+          <div class="route-point">
+            <div class="route-time">${infoVolta.horaChegada || '--:--'}</div>
+            <div class="route-airport">${infoVolta.aeroportoChegada || '---'}</div>
+          </div>
+        </div>
+        ` : ''}
+        
+        <!-- Detalhes adicionais -->
+        <div class="flight-details">
+          <div>
+            <span>✓</span> 1 bagagem incluída
+          </div>
+          <div>
+            <span>⏱️</span> Duração: ${this.formatarDuracao(infoIda?.duracao || 0)}
+          </div>
+        </div>
+      </div>
+      
+      <div class="voo-card-footer">
+        <button class="btn-detalhes-voo" data-voo-id="${vooId}">Ver detalhes</button>
+        <div class="remaining-seats">
+          Restam <span class="seats-number">${voo._assentosDisponiveis || '?'}</span>
+        </div>
+      </div>
+    `;
+    
+    return cardVoo;
+  },
+
+  renderizarPaginacao(container) {
+    const paginationIndicator = document.createElement('div');
+    paginationIndicator.className = 'pagination-indicator';
+    
+    const numVoos = this.finalResults.proposals.length;
+    const maxDots = Math.min(numVoos, 10);
+    
+    for (let i = 0; i < maxDots; i++) {
+      const dot = document.createElement('div');
+      dot.className = 'pagination-dot';
+      if (i === 0) {
+        dot.classList.add('active');
+      }
+      dot.dataset.index = i;
+      paginationIndicator.appendChild(dot);
+    }
+    
+    container.appendChild(paginationIndicator);
+  },
+
+  renderizarControlesNavegacao(container) {
+    const navControls = document.createElement('div');
+    navControls.className = 'nav-controls';
+    navControls.innerHTML = `
+      <button class="nav-btn prev-btn">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M19 12H5M12 19l-7-7 7-7"></path>
+        </svg>
+        Anterior
+      </button>
+      <button class="nav-btn next-btn">
+        Próximo
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M5 12h14M12 5l7 7-7 7"></path>
+        </svg>
+      </button>
+    `;
+    
+    container.appendChild(navControls);
   },
 
   renderizarResumoViagem(container) {
@@ -1010,282 +1249,25 @@ const BENETRIP_VOOS = {
     container.appendChild(resumo);
   },
 
-  renderizarListaVoos(container) {
-    const listaVoos = document.createElement('div');
-    listaVoos.className = 'voos-lista';
-    listaVoos.id = 'voos-lista';
-
-    const voos = this.finalResults?.proposals || [];
-
-    // Header com contador de resultados
-    const header = document.createElement('div');
-    header.className = 'voos-header p-3 bg-gray-50 border-b';
-    header.innerHTML = `
-      <div class="flex justify-between items-center">
-        <div class="flex items-center">
-          <h3 class="font-medium">
-            <span class="text-primary font-bold" style="color:#E87722">${voos.length}</span> 
-            ${voos.length === 1 ? 'voo encontrado' : 'voos encontrados'}
-          </h3>
-          ${voos.length > 10 ? 
-            `<span class="ml-2 text-xs text-gray-500">(mostrando os melhores preços)</span>` : 
-            ''}
-        </div>
-        <div class="flex items-center">
-          <span class="text-sm text-gray-600 mr-2">Por preço</span>
-          <span class="bg-orange-100 text-orange-800 text-xs px-2 py-1 rounded-full">↑ Baratos</span>
-        </div>
-      </div>
-    `;
-    listaVoos.appendChild(header);
-
-    // Adiciona seletores de visualização
-    const viewSelector = document.createElement('div');
-    viewSelector.className = 'view-selector p-2 border-b flex justify-between items-center';
-    viewSelector.innerHTML = `
-      <div class="flex space-x-2">
-        <button class="view-btn view-btn-active px-2 py-1 rounded text-sm" data-view="cards">
-          <span class="icon">🗂️</span> Cards
-        </button>
-        <button class="view-btn px-2 py-1 rounded text-sm" data-view="list">
-          <span class="icon">📋</span> Lista
-        </button>
-      </div>
-      <div class="text-xs text-gray-500">
-        <span class="swipe-instruction flex items-center">
-          <span class="mr-1">←</span> Deslize para navegar <span class="ml-1">→</span>
-        </span>
-      </div>
-    `;
-    listaVoos.appendChild(viewSelector);
-
-    // Container para contadores de paginação
-    const paginationInfo = document.createElement('div');
-    paginationInfo.className = 'pagination-info text-center text-sm py-1 sticky top-0 bg-white bg-opacity-80 z-10 border-b';
-    paginationInfo.innerHTML = `
-      <span class="current-index font-bold">1</span> de 
-      <span class="total-count">${voos.length}</span>
-    `;
-    listaVoos.appendChild(paginationInfo);
-
-    // Container de swipe melhorado
-    const voosContainer = document.createElement('div');
-    voosContainer.className = 'voos-swipe-container';
-    voosContainer.id = 'voos-swipe-container';
-    listaVoos.appendChild(voosContainer);
-
-    // Carregamento otimizado de voos - apenas os primeiros 20 inicialmente
-    const initialVoos = voos.slice(0, Math.min(20, voos.length));
-    
-    // Usa DocumentFragment para melhorar performance
-    const fragment = document.createDocumentFragment();
-    initialVoos.forEach((voo, index) => {
-      const cardVoo = this.criarCardVoo(voo, index);
-      fragment.appendChild(cardVoo);
-    });
-    voosContainer.appendChild(fragment);
-
-    // Adiciona controles de navegação visual
-    const navControls = document.createElement('div');
-    navControls.className = 'nav-controls flex justify-between items-center p-2 sticky bottom-0 bg-white bg-opacity-90 border-t z-10';
-    navControls.innerHTML = `
-      <button class="nav-btn prev-btn px-3 py-1 bg-gray-100 rounded-full mr-2 flex items-center" aria-label="Voo anterior">
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M19 12H5M12 19l-7-7 7-7"></path>
-        </svg>
-        <span class="ml-1">Anterior</span>
-      </button>
-      <div class="pagination-dots flex space-x-1 justify-center">
-        ${initialVoos.length <= 10 ? 
-          Array(initialVoos.length).fill().map((_, i) => 
-            `<span class="pagination-dot ${i === 0 ? 'active' : ''}" data-index="${i}"></span>`
-          ).join('') : 
-          '<span class="text-xs">Navegue pelos melhores preços</span>'
-        }
-      </div>
-      <button class="nav-btn next-btn px-3 py-1 bg-gray-100 rounded-full ml-2 flex items-center" aria-label="Próximo voo">
-        <span class="mr-1">Próximo</span>
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M5 12h14M12 5l7 7-7 7"></path>
-        </svg>
-      </button>
-    `;
-    listaVoos.appendChild(navControls);
-    
-    // Adiciona botão de carregar mais (para melhorar desempenho com muitas ofertas)
-    if (voos.length > 20) {
-      const loadMoreWrapper = document.createElement('div');
-      loadMoreWrapper.className = 'load-more-wrapper p-3 text-center';
-      loadMoreWrapper.innerHTML = `
-        <button class="load-more-btn px-4 py-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors">
-          Carregar mais resultados (${voos.length - initialVoos.length} restantes)
-        </button>
-      `;
-      listaVoos.appendChild(loadMoreWrapper);
-    }
-    
-    container.appendChild(listaVoos);
-  },
-
-  criarCardVoo(voo, index) {
-    // Versão otimizada da criação de cards
-    const cardVoo = document.createElement('div');
-    cardVoo.className = 'voo-card p-3 bg-white border-b';
-    
-    // Define atributos de dados
-    const vooId = voo.sign || `voo-idx-${index}`;
-    cardVoo.dataset.vooId = vooId;
-    cardVoo.dataset.vooIndex = index;
-
-    // Aplica classes especiais
-    if (index === 0) cardVoo.classList.add('voo-primeiro');
-    if (index % 2 === 0) cardVoo.classList.add('voo-par');
-    
-    // Extrai informações do voo
-    const preco = this.obterPrecoVoo(voo);
-    const moeda = this.finalResults?.meta?.currency || 'BRL';
-    const precoFormatado = this.formatarPreco(preco, moeda);
-    const infoIda = this.obterInfoSegmento(voo.segment?.[0]);
-    const infoVolta = voo.segment?.length > 1 ? this.obterInfoSegmento(voo.segment[1]) : null;
-    const economiaPercentual = voo._economia || 0;
-    const isMelhorPreco = voo._melhorPreco || index === 0;
-    const ehVooDireto = infoIda?.paradas === 0 && (!infoVolta || infoVolta.paradas === 0);
-    
-    // Aplica classes adicionais para estados especiais
-    if (ehVooDireto) cardVoo.classList.add('voo-direto');
-    if (isMelhorPreco) cardVoo.classList.add('voo-melhor-preco');
-    
-    // Tags especiais
-    let tagsSpeciais = '';
-    if (isMelhorPreco) {
-      tagsSpeciais += `<span class="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full absolute top-2 right-2 shadow-sm">Melhor preço</span>`;
-    }
-    if (ehVooDireto) {
-      tagsSpeciais += `<span class="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full absolute top-2 left-2 shadow-sm">Voo Direto</span>`;
-    }
-    
-    // Índice visual do card
-    const indexDisplay = `<div class="card-index absolute top-0 left-0 w-6 h-6 flex items-center justify-center bg-gray-100 rounded-br-lg text-xs font-bold">${index + 1}</div>`;
-
-    // Constrói o HTML interno - versão simplificada para melhor performance
-    cardVoo.innerHTML = `
-      <div class="relative">
-        ${indexDisplay}
-        ${tagsSpeciais}
-        <div class="flex justify-between items-start mb-3 mt-2"> 
-          <div> 
-            <span class="text-xl font-bold" style="color: #E87722;">${precoFormatado}</span> 
-            ${economiaPercentual > 0 ? `<span class="text-xs bg-green-100 text-green-800 px-1 py-0.5 rounded ml-1 font-medium">-${economiaPercentual}%</span>` : ''} 
-            <p class="text-xs text-gray-500">Por pessoa, ida${infoVolta ? ' e volta' : ''}</p> 
-          </div> 
-          <div class="text-right"> 
-            <span class="text-xs bg-gray-100 px-2 py-1 rounded font-medium">${this.obterCompanhiasAereas(voo)}</span> 
-          </div> 
-        </div>
-      </div>
-      
-      <div class="pt-2 border-t"> 
-        <div class="mb-3"> 
-          <div class="flex justify-between text-sm">
-            <div class="text-center">
-              <p class="font-bold">${infoIda?.horaPartida || '--:--'}</p>
-              <p class="text-xs text-gray-600">${infoIda?.aeroportoPartida || '---'}</p>
-            </div> 
-            <div class="flex-1 px-2"> 
-              <div class="text-xs text-center text-gray-500">${this.formatarDuracao(infoIda?.duracao || 0)}</div> 
-              <div class="flight-line relative">
-                <div class="border-t ${ehVooDireto ? 'border-blue-300' : 'border-gray-300'} my-2"></div>
-                <div class="flight-stops absolute inset-x-0 top-1/2 flex justify-center -mt-1">
-                  ${this.renderizarParadas(infoIda?.paradas || 0)}
-                </div>
-              </div> 
-              <div class="text-xs text-center text-gray-500">
-                ${ehVooDireto ? 
-                  '<span class="text-blue-600 font-medium">Voo Direto</span>' : 
-                  `${infoIda?.paradas || 0} ${infoIda?.paradas === 1 ? 'parada' : 'paradas'}`
-                }
-              </div> 
-            </div> 
-            <div class="text-center">
-              <p class="font-bold">${infoIda?.horaChegada || '--:--'}</p>
-              <p class="text-xs text-gray-600">${infoIda?.aeroportoChegada || '---'}</p>
-            </div> 
-          </div> 
-        </div>
-        
-        ${infoVolta ? `
-        <div class="mt-3 pt-2 border-t"> 
-          <div class="flex justify-between text-sm">
-            <div class="text-center">
-              <p class="font-bold">${infoVolta.horaPartida || '--:--'}</p>
-              <p class="text-xs text-gray-600">${infoVolta.aeroportoPartida || '---'}</p>
-            </div> 
-            <div class="flex-1 px-2"> 
-              <div class="text-xs text-center text-gray-500">${this.formatarDuracao(infoVolta.duracao || 0)}</div> 
-              <div class="flight-line relative">
-                <div class="border-t ${(!infoVolta || infoVolta.paradas === 0) ? 'border-blue-300' : 'border-gray-300'} my-2"></div>
-                <div class="flight-stops absolute inset-x-0 top-1/2 flex justify-center -mt-1">
-                  ${this.renderizarParadas(infoVolta?.paradas || 0)}
-                </div>
-              </div> 
-              <div class="text-xs text-center text-gray-500">
-                ${(!infoVolta || infoVolta.paradas === 0) ? 
-                  '<span class="text-blue-600 font-medium">Voo Direto</span>' : 
-                  `${infoVolta?.paradas || 0} ${infoVolta?.paradas === 1 ? 'parada' : 'paradas'}`
-                }
-              </div> 
-            </div> 
-            <div class="text-center">
-              <p class="font-bold">${infoVolta.horaChegada || '--:--'}</p>
-              <p class="text-xs text-gray-600">${infoVolta.aeroportoChegada || '---'}</p>
-            </div> 
-          </div> 
-        </div>` : ''} 
-      </div>
-      
-      <div class="mt-3 pt-2 border-t flex justify-between items-center"> 
-        <button class="btn-detalhes-voo text-sm text-blue-600 hover:text-blue-800" data-voo-id="${vooId}">
-          Ver detalhes
-        </button> 
-        <div class="flex items-center text-xs text-gray-500">
-          <span class="mr-1">Restam</span>
-          <span class="bg-orange-100 text-orange-800 px-2 py-1 rounded font-medium">${voo._assentosDisponiveis || '?'}</span>
-        </div>
-        <button class="btn-select-voo text-xs bg-gray-100 hover:bg-gray-200 px-2 py-1 rounded" data-voo-id="${vooId}">
-          Selecionar
-        </button>
-      </div>
-    `;
-    
-    return cardVoo;
-  },
-
-  renderizarParadas(paradas) {
-    // Simplifica a renderização de paradas
-    const numParadas = paradas || 0;
-    
-    if (numParadas === 0) {
-      return `<span class="inline-block w-3 h-3 bg-green-500 rounded-full" title="Voo direto"></span>`;
-    }
-    
-    let html = ''; 
-    for (let i = 0; i < Math.min(numParadas, 3); i++) {
-      html += `<span class="inline-block w-2 h-2 bg-gray-400 rounded-full mx-1" title="${numParadas} parada${numParadas > 1 ? 's' : ''}"></span>`;
-    }
-    
-    return html;
-  },
-
   renderizarBotaoSelecao(container) {
     // Remove botão existente para evitar duplicatas
-    const btnExistente = document.querySelector('.botao-selecao-fixo'); 
+    const btnExistente = container.querySelector('.botao-selecao-fixo'); 
     if (btnExistente) btnExistente.remove();
     
     const botaoFixo = document.createElement('div'); 
     botaoFixo.className = 'botao-selecao-fixo';
+    
+    // Tenta obter o preço do voo ativo
+    let precoTexto = 'Escolher Este Voo';
+    if (this.vooAtivo) {
+      const preco = this.obterPrecoVoo(this.vooAtivo);
+      const moeda = this.finalResults?.meta?.currency || 'BRL';
+      precoTexto = `Escolher Voo por ${this.formatarPreco(preco, moeda)}`;
+    }
+    
     botaoFixo.innerHTML = `
       <button class="btn-selecionar-voo">
-        <span>Escolher Este Voo</span>
+        <span>${precoTexto}</span>
         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M5 12h14M12 5l7 7-7 7"></path>
         </svg>
@@ -2103,11 +2085,11 @@ const BENETRIP_VOOS = {
   
   configurarEventosBotoes() {
     // Configura eventos para botões de seleção em cada cartão
-    document.querySelectorAll('.btn-select-voo').forEach(btn => {
+    document.querySelectorAll('.btn-detalhes-voo').forEach(btn => {
       btn.addEventListener('click', (e) => {
         e.preventDefault();
         const vooId = btn.dataset.vooId;
-        if (vooId) this.selecionarVoo(vooId);
+        if (vooId) this.mostrarDetalhesVoo(vooId);
       });
     });
     
@@ -2123,31 +2105,16 @@ const BENETRIP_VOOS = {
       });
     });
     
-    // Configura eventos para botões de alternância de visualização
-    const viewBtns = document.querySelectorAll('.view-btn');
-    const voosContainer = document.getElementById('voos-swipe-container');
+    // Configura eventos para botões de navegação
+    const prevBtn = document.querySelector('.prev-btn');
+    const nextBtn = document.querySelector('.next-btn');
     
-    viewBtns.forEach(btn => {
-      btn.addEventListener('click', () => {
-        const view = btn.dataset.view;
-        viewBtns.forEach(b => b.classList.remove('view-btn-active'));
-        btn.classList.add('view-btn-active');
-        
-        if (voosContainer) {
-          if (view === 'list') {
-            voosContainer.classList.add('voos-list-view');
-            voosContainer.classList.remove('voos-card-view');
-          } else {
-            voosContainer.classList.add('voos-card-view');
-            voosContainer.classList.remove('voos-list-view');
-          }
-        }
-      });
-    });
+    if (prevBtn) {
+      prevBtn.addEventListener('click', () => this.vooAnterior());
+    }
     
-    // Ativa view de cards por padrão
-    if (voosContainer) {
-      voosContainer.classList.add('voos-card-view');
+    if (nextBtn) {
+      nextBtn.addEventListener('click', () => this.proximoVoo());
     }
     
     // Configura evento para botão "Carregar mais"
@@ -2173,7 +2140,7 @@ const BENETRIP_VOOS = {
     // Cria cards para cada voo do lote
     nextBatch.forEach((voo, idx) => {
       const index = currentCount + idx;
-      const cardVoo = this.criarCardVoo(voo, index);
+      const cardVoo = this.criarCardVooAprimorado(voo, index);
       fragment.appendChild(cardVoo);
     });
     
@@ -2227,10 +2194,6 @@ const BENETRIP_VOOS = {
         this.vooAnteriorOriginal();
       }
     };
-    
-    // Adiciona eventos de clique nos botões
-    nextBtn.addEventListener('click', () => this.proximoVoo());
-    prevBtn.addEventListener('click', () => this.vooAnterior());
   },
   
   destacarPrimeiroCard() {
@@ -2320,6 +2283,79 @@ const BENETRIP_VOOS = {
         height: 100%;
       }
       
+      /* Tripinha Message */
+      .tripinha-message {
+        display: flex;
+        padding: 12px;
+        margin-bottom: 16px;
+        background-color: #fff;
+        border-radius: 12px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+      }
+      
+      .tripinha-avatar {
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+        overflow: hidden;
+        margin-right: 12px;
+        border: 2px solid var(--benetrip-orange);
+      }
+      
+      .tripinha-avatar img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+      
+      .tripinha-bubble {
+        flex: 1;
+        background-color: #f0f9ff;
+        border-radius: 12px;
+        padding: 12px;
+        position: relative;
+      }
+      
+      .tripinha-bubble:before {
+        content: '';
+        position: absolute;
+        left: -8px;
+        top: 12px;
+        width: 0;
+        height: 0;
+        border-top: 8px solid transparent;
+        border-right: 10px solid #f0f9ff;
+        border-bottom: 8px solid transparent;
+      }
+      
+      /* Flights summary */
+      .flights-summary {
+        background-color: white;
+        padding: 12px;
+        margin-bottom: 10px;
+        border-radius: 8px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+      }
+      
+      .flights-summary-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      
+      .flights-count {
+        font-weight: bold;
+        color: var(--benetrip-orange);
+      }
+      
+      .flights-sort {
+        font-size: 0.8rem;
+        color: #666;
+        background-color: #f0f0f0;
+        padding: 4px 8px;
+        border-radius: 12px;
+      }
+      
       /* Estilos para o swipe container */
       .voos-swipe-container { 
         display: flex; 
@@ -2328,7 +2364,7 @@ const BENETRIP_VOOS = {
         -webkit-overflow-scrolling: touch; 
         scroll-behavior: smooth;
         gap: 8px;
-        padding: 4px 8px;
+        padding: 8px;
         min-height: 350px;
         scrollbar-width: thin;
         position: relative;
@@ -2360,7 +2396,7 @@ const BENETRIP_VOOS = {
       
       /* Scrollbar personalizada */
       .voos-swipe-container::-webkit-scrollbar {
-        height: 6px;
+        height: 4px;
       }
       .voos-swipe-container::-webkit-scrollbar-track {
         background: #f1f1f1;
@@ -2374,308 +2410,537 @@ const BENETRIP_VOOS = {
         background: #aaa;
       }
       
-      /* Estilos dos cards */
+      /* Cartões de voo aprimorados */
       .voo-card { 
         flex: 0 0 calc(100% - 16px); 
         scroll-snap-align: center; 
         transition: all 0.3s ease; 
         position: relative; 
-        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        border-radius: 12px;
         margin-bottom: 8px;
         overflow: hidden;
+        background-color: white;
+        border: 1px solid #eee;
       }
       
-      /* Alternância de visualização */
-      .voos-card-view .voo-card {
-        flex: 0 0 calc(100% - 16px);
+      /* Estilos do card */
+      .voo-card-header {
+        padding: 16px;
+        border-bottom: 1px solid #f5f5f5;
       }
       
-      @media (min-width: 640px) {
-        .voos-card-view .voo-card {
-          flex: 0 0 calc(50% - 16px);
-        }
+      .voo-price {
+        font-size: 1.5rem;
+        font-weight: bold;
+        color: var(--benetrip-orange);
+        display: flex;
+        align-items: center;
       }
       
-      @media (min-width: 1024px) {
-        .voos-card-view .voo-card {
-          flex: 0 0 calc(33.333% - 16px);
-        }
+      .discount-badge {
+        background-color: #d1fae5;
+        color: #065f46;
+        font-size: 0.7rem;
+        padding: 2px 6px;
+        border-radius: 8px;
+        margin-left: 8px;
       }
       
-      .voos-list-view {
-        display: block !important;
+      .voo-price-details {
+        font-size: 0.8rem;
+        color: #666;
+        margin-top: 2px;
       }
       
-      .voos-list-view .voo-card {
-        flex: none;
-        width: 100%;
-        margin-bottom: 4px;
-        scroll-snap-align: unset;
+      .airline-info {
+        background-color: #f8f8f8;
+        display: inline-block;
+        padding: 4px 8px;
         border-radius: 4px;
+        font-size: 0.85rem;
+        margin-top: 8px;
       }
       
-      /* Estados do card */
-      .voo-card-ativo { 
-        box-shadow: 0 0 0 3px var(--benetrip-orange), 0 4px 6px rgba(0,0,0,0.1); 
-        transform: translateY(-2px);
-      }
-      .voo-card-highlight { 
-        animation: pulse 1s;
-      }
-      .voo-selecionado { 
-        box-shadow: 0 0 0 3px var(--benetrip-blue), 0 4px 8px rgba(0,0,0,0.15); 
-        background-color: #f0f9ff; 
-      }
-      .voo-melhor-preco {
-        border: 1px solid #d1fae5;
-      }
-      .voo-direto {
-        border-left: 4px solid var(--benetrip-blue);
-      }
-      .voo-primeiro {
-        border-top: 2px solid var(--benetrip-orange);
+      .voo-card-content {
+        padding: 16px;
       }
       
-      /* Cards pares e ímpares para diferenciar melhor */
-      .voo-par {
-        background-color: #ffffff;
-      }
-      .voos-list-view .voo-par {
-        background-color: #fafafa;
+      .flight-route {
+        display: flex;
+        align-items: center;
+        margin-bottom: 12px;
       }
       
-      /* Animações */
-      @keyframes pulse { 
-        0% { box-shadow: 0 0 0 0 rgba(232, 119, 34, 0.7); } 
-        70% { box-shadow: 0 0 0 6px rgba(232, 119, 34, 0); } 
-        100% { box-shadow: 0 0 0 0 rgba(232, 119, 34, 0); } 
+      .return-route {
+        padding-top: 12px;
+        border-top: 1px dashed #eee;
       }
       
-      .btn-pulsante { 
-        animation: button-pulse 1.5s 2; 
+      .route-point {
+        flex: 0 0 auto;
+        text-align: center;
       }
       
-      @keyframes button-pulse { 
-        0% { transform: scale(1); } 
-        50% { transform: scale(1.05); } 
-        100% { transform: scale(1); } 
+      .route-time {
+        font-weight: bold;
+        font-size: 1.1rem;
       }
       
-      /* Barra de progresso */
-      .progress-bar-container { 
-        height: 8px; 
-        background-color: #f3f4f6; 
-        border-radius: 4px; 
-        overflow: hidden; 
-        margin: 0 auto; 
-        width: 80%; 
-        max-width: 300px; 
-      }
-      
-      .progress-bar { 
-        height: 100%; 
-        background-color: var(--benetrip-orange); 
-        border-radius: 4px; 
-        transition: width 0.3s ease; 
-      }
-      
-      /* Botão de seleção fixo */
-      .botao-selecao-fixo { 
-        position: fixed; 
-        bottom: 0; 
-        left: 0; 
-        right: 0; 
-        padding: 8px 16px; 
-        background-color: white; 
-        border-top: 1px solid #e5e7eb; 
-        z-index: 40;
-        box-shadow: 0 -2px 10px rgba(0,0,0,0.05);
-      }
-      
-      .btn-selecionar-voo { 
-        display: flex; 
-        justify-content: space-between; 
-        align-items: center; 
-        width: 100%; 
-        padding: 12px 16px; 
-        background-color: var(--benetrip-orange); 
-        color: white; 
-        border-radius: 6px; 
-        font-weight: bold; 
-        transition: all 0.2s; 
-      }
-      
-      .btn-selecionar-voo:hover { 
-        background-color: #d06a1c; 
-      }
-      
-      /* Sistema de toast */
-      .toast-container { 
-        position: fixed; 
-        bottom: 80px; 
-        left: 0; 
-        right: 0; 
-        display: flex; 
-        flex-direction: column; 
-        align-items: center; 
-        z-index: 50; 
-        pointer-events: none; 
-      }
-      
-      .toast { 
-        padding: 8px 16px; 
-        border-radius: 4px; 
-        background-color: rgba(0, 0, 0, 0.7); 
-        color: white; 
-        margin-bottom: 8px; 
-        transform: translateY(20px); 
-        opacity: 0; 
-        transition: all 0.3s ease; 
-        max-width: 80%; 
-        text-align: center; 
-      }
-      
-      .toast-visible { 
-        transform: translateY(0); 
-        opacity: 1; 
-      }
-      
-      .toast-success { background-color: rgba(22, 163, 74, 0.9); }
-      .toast-warning { background-color: rgba(234, 88, 12, 0.9); }
-      .toast-error { background-color: rgba(220, 38, 38, 0.9); }
-      
-      /* Dica de swipe */
-      .swipe-hint { 
-        position: fixed; 
-        bottom: 60px; 
-        left: 0; 
-        right: 0; 
-        display: flex; 
-        justify-content: center; 
-        align-items: center; 
-        background-color: rgba(0, 0, 0, 0.7); 
-        color: white; 
-        padding: 8px 16px; 
-        z-index: 30; 
-        opacity: 1; 
-        transition: opacity 0.5s ease; 
-        border-radius: 4px;
-      }
-      
-      .swipe-hint-arrow { 
-        animation: arrow-bounce 1s infinite; 
-        display: inline-block; 
-      }
-      
-      @keyframes arrow-bounce { 
-        0%, 100% { transform: translateX(0); } 
-        50% { transform: translateX(-3px); } 
-      }
-      
-      .swipe-hint-arrow:last-child { 
-        animation: arrow-bounce-right 1s infinite; 
-      }
-      
-      @keyframes arrow-bounce-right { 
-        0%, 100% { transform: translateX(0); } 
-        50% { transform: translateX(3px); } 
-      }
-      
-      /* Elementos de UI adicionais */
-      .view-selector {
-        background-color: #fff;
-      }
-      
-      .view-btn {
-        transition: all 0.2s ease;
+      .route-airport {
+        font-size: 0.8rem;
         color: #666;
       }
       
-      .view-btn-active {
-        background-color: var(--benetrip-orange);
-        color: white;
+      .route-line {
+        flex: 1;
+        padding: 0 8px;
+        position: relative;
+      }
+      
+      .route-duration {
+        text-align: center;
+        font-size: 0.75rem;
+        color: #666;
+        margin-bottom: 4px;
+      }
+      
+      .route-line-bar {
+        height: 2px;
+        background-color: #ddd;
+        position: relative;
+        margin: 8px 0;
+      }
+      
+      .route-line-direct {
+        background-color: var(--benetrip-blue);
+      }
+      
+      .stop-marker {
+        width: 6px;
+        height: 6px;
+        background-color: #777;
+        border-radius: 50%;
+        position: absolute;
+        top: -2px;
+      }
+      
+      .stop-marker.start {
+        left: 0;
+      }
+      
+      .stop-marker.mid {
+        left: 50%;
+        transform: translateX(-50%);
+      }
+      
+      .stop-marker.end {
+        right: 0;
+      }
+      
+      .route-stops {
+        text-align: center;
+        font-size: 0.75rem;
+        color: #666;
+      }
+      
+      .route-stops-direct {
+        color: var(--benetrip-blue);
         font-weight: 500;
       }
       
-      .pagination-info {
+      .flight-details {
+        display: flex;
+        justify-content: space-between;
         font-size: 0.8rem;
+        color: #666;
+        margin-top: 12px;
+        padding-top: 12px;
+        border-top: 1px solid #f5f5f5;
       }
       
-      .pagination-dots {
+      .voo-card-footer {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 12px 16px;
+        border-top: 1px solid #f5f5f5;
+        background-color: #fafafa;
+      }
+      
+      .btn-detalhes-voo {
+        color: var(--benetrip-blue);
+        font-size: 0.85rem;
+        padding: 4px 8px;
+        border-radius: 4px;
+        transition: all 0.2s;
+      }
+      
+      .btn-detalhes-voo:hover {
+        background-color: #e6f7ff;
+      }
+      
+      .remaining-seats {
+        font-size: 0.8rem;
+        color: #666;
+      }
+      
+      .seats-number {
+        background-color: #fff0e5;
+        color: var(--benetrip-orange);
+        font-weight: 500;
+        padding: 2px 6px;
+        border-radius: 4px;
+      }
+      
+      /* Tags do card */
+      .card-tag {
+        position: absolute;
+        padding: 4px 8px;
+        font-size: 0.7rem;
+        font-weight: 500;
+        border-radius: 4px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        z-index: 1;
+      }
+      
+      .melhor-preco {
+        background-color: #d1fae5;
+        color: #065f46;
+        top: 8px;
+        right: 8px;
+      }
+      
+      .voo-direto {
+        background-color: #e0f2fe;
+        color: #0369a1;
+        top: 8px;
+        left: 8px;
+      }
+      
+      /* Paginação */
+      .pagination-indicator {
         display: flex;
         justify-content: center;
-        align-items: center;
+        margin: 16px 0;
+        gap: 4px;
       }
       
       .pagination-dot {
         width: 8px;
         height: 8px;
         border-radius: 50%;
-        background-color: #ccc;
-        margin: 0 3px;
+        background-color: #ddd;
+        transition: all 0.2s;
+        cursor: pointer;
       }
       
       .pagination-dot.active {
         background-color: var(--benetrip-orange);
-        width: 10px;
-        height: 10px;
+        transform: scale(1.2);
+      }
+      
+      /* Controles de navegação */
+      .nav-controls {
+        display: flex;
+        justify-content: space-between;
+        margin: 12px 8px 20px;
       }
       
       .nav-btn {
-        transition: all 0.2s ease;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        background-color: #f0f0f0;
+        color: #333;
+        border: none;
+        padding: 8px 16px;
+        border-radius: 8px;
+        font-size: 0.9rem;
+        transition: all 0.2s;
+        cursor: pointer;
       }
       
       .nav-btn:hover {
         background-color: #e0e0e0;
       }
       
-      .nav-controls {
-        margin-top: 8px;
+      /* Erro e mensagens */
+      .error-message-box {
+        text-align: center;
+        padding: 24px;
+        background-color: white;
+        border-radius: 12px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        margin: 16px;
       }
       
-      .card-index {
-        z-index: 1;
-        opacity: 0.8;
+      .error-image {
+        margin-bottom: 16px;
       }
       
-      .btn-select-voo {
-        transition: all 0.2s ease;
+      .tripinha-error-avatar {
+        width: 80px;
+        height: 80px;
+        border-radius: 50%;
+        border: 3px solid #fecaca;
       }
       
-      .btn-select-voo:hover {
-        background-color: var(--benetrip-blue);
+      .error-title {
+        font-size: 1.2rem;
+        font-weight: bold;
+        color: #b91c1c;
+        margin-bottom: 8px;
+      }
+      
+      .error-description {
+        color: #666;
+        margin-bottom: 16px;
+      }
+      
+      .btn-tentar-novamente {
+        background-color: var(--benetrip-orange);
         color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 8px;
+        font-weight: 500;
+        transition: all 0.2s;
+        cursor: pointer;
       }
       
-      .load-more-btn {
-        transition: all 0.2s ease;
+      .btn-tentar-novamente:hover {
+        background-color: #d86016;
       }
       
-      .load-more-btn:hover {
-        background-color: #dbeafe;
+      /* Sem resultados */
+      .no-results-actions {
+        display: flex;
+        gap: 8px;
+        margin-top: 20px;
+        justify-content: center;
       }
       
-      /* Melhorias para acessibilidade */
-      .sr-only {
-        position: absolute;
-        width: 1px;
-        height: 1px;
-        padding: 0;
-        margin: -1px;
+      .btn-secundario {
+        flex: 1;
+        background-color: #f0f0f0;
+        color: #333;
+        border: none;
+        padding: 10px;
+        border-radius: 8px;
+        font-weight: 500;
+        transition: all 0.2s;
+        cursor: pointer;
+        max-width: 160px;
+      }
+      
+      .btn-principal {
+        flex: 1;
+        background-color: var(--benetrip-orange);
+        color: white;
+        border: none;
+        padding: 10px;
+        border-radius: 8px;
+        font-weight: 500;
+        transition: all 0.2s;
+        cursor: pointer;
+        max-width: 160px;
+      }
+      
+      .btn-secundario:hover {
+        background-color: #e0e0e0;
+      }
+      
+      .btn-principal:hover {
+        background-color: #d86016;
+      }
+      
+      /* Loading */
+      .loading-container {
+        text-align: center;
+        padding: 24px;
+      }
+      
+      .loading-avatar {
+        width: 100px;
+        height: 100px;
+        border-radius: 50%;
+        margin-bottom: 16px;
+      }
+      
+      .loading-text {
+        margin-bottom: 12px;
+        font-weight: 500;
+      }
+      
+      .progress-bar-container {
+        height: 8px;
+        background-color: #f3f4f6;
+        border-radius: 4px;
         overflow: hidden;
-        clip: rect(0, 0, 0, 0);
-        white-space: nowrap;
-        border-width: 0;
+        margin: 0 auto;
+        width: 80%;
+        max-width: 300px;
       }
       
-      /* Otimização para dispositivos de baixo desempenho */
-      @media (prefers-reduced-motion: reduce) {
-        *, *::before, *::after {
-          animation-duration: 0.01ms !important;
-          animation-iteration-count: 1 !important;
-          transition-duration: 0.01ms !important;
-          scroll-behavior: auto !important;
+      .progress-bar {
+        height: 100%;
+        background-color: var(--benetrip-orange);
+        border-radius: 4px;
+        transition: width 0.3s ease;
+      }
+      
+      .loading-tips {
+        margin-top: 20px;
+        color: #666;
+        font-style: italic;
+      }
+      
+      /* Botão de seleção fixo */
+      .botao-selecao-fixo {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        padding: 12px 16px;
+        background-color: white;
+        border-top: 1px solid #eee;
+        box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+        z-index: 10;
+      }
+      
+      .btn-selecionar-voo {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        width: 100%;
+        padding: 14px 20px;
+        background-color: var(--benetrip-orange);
+        color: white;
+        border: none;
+        border-radius: 8px;
+        font-weight: bold;
+        transition: all 0.2s;
+        cursor: pointer;
+      }
+      
+      .btn-selecionar-voo:hover {
+        background-color: #d86016;
+      }
+      
+      /* Toast */
+      .toast-container {
+        position: fixed;
+        bottom: 80px;
+        left: 0;
+        right: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        z-index: 50;
+        pointer-events: none;
+      }
+      
+      .toast {
+        padding: 10px 16px;
+        border-radius: 8px;
+        background-color: rgba(0, 0, 0, 0.7);
+        color: white;
+        margin-bottom: 8px;
+        transform: translateY(20px);
+        opacity: 0;
+        transition: all 0.3s ease;
+        max-width: 80%;
+        text-align: center;
+      }
+      
+      .toast-visible {
+        transform: translateY(0);
+        opacity: 1;
+      }
+      
+      .toast-success {
+        background-color: rgba(22, 163, 74, 0.9);
+      }
+      
+      .toast-warning {
+        background-color: rgba(234, 88, 12, 0.9);
+      }
+      
+      .toast-error {
+        background-color: rgba(220, 38, 38, 0.9);
+      }
+      
+      /* Swipe hint */
+      .swipe-hint {
+        position: fixed;
+        bottom: 70px;
+        left: 50%;
+        transform: translateX(-50%);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        background-color: rgba(0, 0, 0, 0.7);
+        color: white;
+        padding: 8px 16px;
+        border-radius: 20px;
+        z-index: 5;
+        opacity: 1;
+        transition: opacity 0.5s ease;
+      }
+      
+      .swipe-hint-arrow {
+        animation: arrow-bounce 1s infinite;
+        display: inline-block;
+      }
+      
+      @keyframes arrow-bounce {
+        0%, 100% { transform: translateX(0); }
+        50% { transform: translateX(-3px); }
+      }
+      
+      /* Estados do card */
+      .voo-card-ativo {
+        box-shadow: 0 0 0 3px var(--benetrip-orange), 0 4px 8px rgba(0,0,0,0.1);
+        transform: translateY(-2px);
+      }
+      
+      .voo-card-highlight {
+        animation: pulse 1s;
+      }
+      
+      .voo-selecionado {
+        box-shadow: 0 0 0 3px var(--benetrip-blue), 0 4px 8px rgba(0,0,0,0.15);
+        background-color: #f0f9ff;
+      }
+      
+      /* Animações */
+      @keyframes pulse {
+        0% { box-shadow: 0 0 0 0 rgba(232, 119, 34, 0.7); }
+        70% { box-shadow: 0 0 0 6px rgba(232, 119, 34, 0); }
+        100% { box-shadow: 0 0 0 0 rgba(232, 119, 34, 0); }
+      }
+      
+      .btn-pulsante {
+        animation: button-pulse 1.5s 2;
+      }
+      
+      @keyframes button-pulse {
+        0% { transform: scale(1); }
+        50% { transform: scale(1.05); }
+        100% { transform: scale(1); }
+      }
+      
+      /* Responsividade */
+      @media (min-width: 640px) {
+        .voo-card {
+          flex: 0 0 calc(50% - 16px);
+        }
+      }
+      
+      @media (min-width: 1024px) {
+        .voo-card {
+          flex: 0 0 calc(33.333% - 16px);
         }
       }
     `;
@@ -2722,67 +2987,3 @@ const BENETRIP_VOOS = {
       console.error("Erro ao salvar log de erro:", e);
     }
   }
-
-}; // Fim do objeto BENETRIP_VOOS
-
-// Inicializar quando o DOM estiver pronto
-document.addEventListener('DOMContentLoaded', () => {
-  if (document.getElementById('voos-container')) {
-    console.log('Inicializando módulo de voos Benetrip (v3.0.0)...');
-    BENETRIP_VOOS.init();
-  }
-});
-
-// Listener visibilitychange para pausar/retomar polling quando aba fica em background
-document.addEventListener('visibilitychange', () => {
-  if (document.getElementById('voos-container') && BENETRIP_VOOS) {
-    if (document.visibilityState === 'hidden') {
-      // Pausa o polling quando aba está em background
-      if (BENETRIP_VOOS.isPolling) {
-        console.log('Aba em background: pausando polling...');
-        clearInterval(BENETRIP_VOOS.pollingIntervalId);
-        BENETRIP_VOOS.pollingIntervalId = null;
-      }
-    } else if (document.visibilityState === 'visible') {
-      // Retoma o polling quando aba volta ao primeiro plano
-      if (BENETRIP_VOOS.isPolling && !BENETRIP_VOOS.pollingIntervalId) {
-        console.log('Aba voltou ao primeiro plano: retomando polling...');
-        BENETRIP_VOOS.pollingIntervalId = setInterval(
-          () => BENETRIP_VOOS.verificarResultadosPolling(), 
-          BENETRIP_VOOS.POLLING_INTERVAL_MS
-        );
-        // Executa imediatamente uma vez
-        BENETRIP_VOOS.verificarResultadosPolling();
-      }
-    }
-  }
-});
-
-// Listener de erro global para capturar erros não tratados
-window.addEventListener('error', (event) => {
-  console.error('Erro global:', event);
-  
-  if (document.getElementById('voos-container') && BENETRIP_VOOS) {
-    BENETRIP_VOOS.reportarErro({
-      tipo: 'erro_global',
-      mensagem: event.message,
-      fonte: event.filename,
-      linha: event.lineno,
-      coluna: event.colno,
-      timestamp: new Date().toISOString()
-    });
-  }
-});
-
-// Tratamento para erros de promessas não capturadas
-window.addEventListener('unhandledrejection', (event) => {
-  console.error('Promessa não tratada:', event.reason);
-  
-  if (document.getElementById('voos-container') && BENETRIP_VOOS) {
-    BENETRIP_VOOS.reportarErro({
-      tipo: 'promessa_nao_tratada',
-      mensagem: event.reason?.message || 'Erro em promessa',
-      timestamp: new Date().toISOString()
-    });
-  }
-});
