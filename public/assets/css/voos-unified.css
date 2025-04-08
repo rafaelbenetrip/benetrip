@@ -1,0 +1,467 @@
+/* voos-unified.css - Versão consolidada e simplificada */
+:root {
+  --benetrip-orange: #E87722;
+  --benetrip-blue: #00A3E0;
+  --benetrip-dark: #21272A;
+  --benetrip-light-gray: #F5F5F5;
+  --benetrip-medium-gray: #E0E0E0;
+  --benetrip-white: #FFFFFF;
+}
+
+/* Reset e base */
+#voos-container * {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+/* Layout principal */
+#voos-container {
+  min-height: 100vh;
+  max-width: 480px;
+  margin: 0 auto;
+  background-color: var(--benetrip-light-gray);
+  font-family: 'Poppins', sans-serif;
+  position: relative;
+  padding-bottom: 80px; /* Espaço para o botão fixo */
+}
+
+/* Header */
+.app-header {
+  display: flex;
+  align-items: center;
+  padding: 16px;
+  background-color: white;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+
+.app-header h1 {
+  font-size: 1.2rem;
+  font-weight: 600;
+  margin: 0 0 0 16px;
+}
+
+.btn-voltar {
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+/* Mensagem da Tripinha */
+.tripinha-message {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  background-color: white;
+  border-radius: 12px;
+  padding: 16px;
+  margin: 16px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+
+.tripinha-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.tripinha-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.tripinha-bubble {
+  background-color: var(--benetrip-light-gray);
+  border-radius: 12px;
+  padding: 12px;
+  position: relative;
+  flex: 1;
+}
+
+/* Resumo da busca */
+.flights-summary {
+  background-color: white;
+  border-radius: 8px;
+  margin: 16px;
+  padding: 12px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+
+.flights-count {
+  font-weight: 600;
+  color: var(--benetrip-orange);
+}
+
+/* Container de swipe */
+.voos-swipe-container {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  padding: 8px 16px;
+  margin-bottom: 24px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none; /* Firefox */
+}
+
+.voos-swipe-container::-webkit-scrollbar {
+  display: none; /* Chrome, Safari e Edge */
+}
+
+/* Card de voo */
+.voo-card {
+  flex: 0 0 calc(100% - 16px);
+  scroll-snap-align: center;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  overflow: hidden;
+  border: 1px solid var(--benetrip-medium-gray);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.voo-card-ativo {
+  box-shadow: 0 0 0 2px var(--benetrip-orange), 0 4px 12px rgba(0,0,0,0.1);
+  transform: translateY(-2px);
+}
+
+.voo-card.voo-direto {
+  border-left: 3px solid var(--benetrip-blue);
+}
+
+/* Tags do card de voo */
+.card-tag {
+  position: absolute;
+  top: 10px;
+  padding: 4px 8px;
+  border-radius: 100px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  z-index: 5;
+}
+
+.card-tag.melhor-preco {
+  right: 10px;
+  background-color: #d1fae5;
+  color: #065f46;
+}
+
+.card-tag.voo-direto {
+  left: 10px;
+  background-color: #dbeafe;
+  color: #1e40af;
+}
+
+/* Cabeçalho do card */
+.voo-card-header {
+  padding: 16px;
+  border-bottom: 1px solid #f3f4f6;
+  position: relative;
+}
+
+.voo-price {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--benetrip-orange);
+  margin-bottom: 4px;
+  display: inline-flex;
+  align-items: center;
+}
+
+.discount-badge {
+  font-size: 0.7rem;
+  background-color: #d1fae5;
+  color: #065f46;
+  padding: 2px 6px;
+  border-radius: 100px;
+  margin-left: 8px;
+  font-weight: 600;
+}
+
+.airline-info {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  background-color: #f8f9fa;
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+/* Conteúdo do card */
+.voo-card-content {
+  padding: 16px;
+}
+
+/* Rota de voo */
+.flight-route {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.route-point {
+  text-align: center;
+  min-width: 60px;
+}
+
+.route-time {
+  font-weight: 700;
+  font-size: 1.1rem;
+}
+
+.route-airport {
+  font-size: 0.75rem;
+  color: #6c757d;
+}
+
+.route-line {
+  flex: 1;
+  position: relative;
+  height: 40px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.route-line-bar {
+  width: 100%;
+  height: 2px;
+  background-color: #e0e0e0;
+  position: relative;
+}
+
+.route-line-direct {
+  background-color: #93c5fd;
+}
+
+.route-duration {
+  font-size: 0.7rem;
+  color: #6c757d;
+  margin-bottom: 4px;
+}
+
+.route-stops {
+  font-size: 0.7rem;
+  color: #6c757d;
+  margin-top: 4px;
+}
+
+.route-stops-direct {
+  color: var(--benetrip-blue);
+  font-weight: 500;
+}
+
+/* Stops markers */
+.stop-marker {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  background-color: #e0e0e0;
+  border-radius: 50%;
+  top: -2px;
+}
+
+.stop-marker.start {
+  left: 0;
+}
+
+.stop-marker.end {
+  right: 0;
+}
+
+.stop-marker.mid {
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+/* Rodapé do card */
+.voo-card-footer {
+  padding: 12px 16px;
+  border-top: 1px solid #f3f4f6;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.btn-detalhes-voo {
+  font-size: 0.8rem;
+  color: var(--benetrip-blue);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+}
+
+.remaining-seats {
+  font-size: 0.7rem;
+  color: #6c757d;
+  display: flex;
+  align-items: center;
+}
+
+.seats-number {
+  background-color: #fed7aa;
+  color: #9a3412;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 4px;
+  margin-left: 4px;
+}
+
+/* Navegação */
+.pagination-indicator {
+  display: flex;
+  justify-content: center;
+  margin: 12px 0;
+}
+
+.pagination-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: #e0e0e0;
+  margin: 0 4px;
+}
+
+.pagination-dot.active {
+  background-color: var(--benetrip-orange);
+  width: 10px;
+  height: 10px;
+}
+
+.nav-controls {
+  display: flex;
+  justify-content: space-between;
+  margin: 16px;
+}
+
+.nav-btn {
+  display: flex;
+  align-items: center;
+  background-color: #f3f4f6;
+  border: none;
+  border-radius: 100px;
+  padding: 6px 12px;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+/* Botão de seleção fixo */
+.botao-selecao-fixo {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background-color: white;
+  padding: 12px 16px;
+  box-shadow: 0 -4px 10px rgba(0, 0, 0, 0.1);
+  z-index: 30;
+  max-width: 480px;
+  margin: 0 auto;
+}
+
+.btn-selecionar-voo {
+  width: 100%;
+  background-color: var(--benetrip-orange);
+  color: white;
+  font-weight: 600;
+  border: none;
+  border-radius: 8px;
+  padding: 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+}
+
+/* Modais */
+.modal-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background-color: white;
+  border-radius: 12px;
+  width: 90%;
+  max-width: 360px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+}
+
+/* Toast notifications */
+#toast-container {
+  position: fixed;
+  bottom: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 999;
+  width: 90%;
+  max-width: 320px;
+}
+
+.toast {
+  background-color: rgba(0, 0, 0, 0.8);
+  color: white;
+  padding: 12px 16px;
+  border-radius: 8px;
+  margin-bottom: 8px;
+  text-align: center;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  opacity: 0;
+  transform: translateY(20px);
+  transition: all 0.3s ease;
+}
+
+.toast-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Estado de carregamento */
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 50vh;
+  padding: 24px;
+  text-align: center;
+}
+
+.loading-avatar {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  margin-bottom: 20px;
+}
+
+/* Animações */
+@keyframes pulse {
+  0% { box-shadow: 0 0 0 0 rgba(232, 119, 34, 0.4); }
+  70% { box-shadow: 0 0 0 10px rgba(232, 119, 34, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(232, 119, 34, 0); }
+}
+
+.btn-pulsante {
+  animation: pulse 1.5s infinite;
+}
