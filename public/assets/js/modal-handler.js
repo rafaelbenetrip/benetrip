@@ -352,3 +352,60 @@ document.addEventListener('DOMContentLoaded', function() {
         };
     }
 });
+
+// Garantir funcionamento do modal de confirmação
+(function() {
+  const garantirVisibilidadeModal = function() {
+    const btnConfirmar = document.getElementById('btn-confirmar');
+    if (btnConfirmar) {
+      const novoBtn = btnConfirmar.cloneNode(true);
+      btnConfirmar.parentNode.replaceChild(novoBtn, btnConfirmar);
+      
+      novoBtn.addEventListener('click', function() {
+        const checkbox = document.getElementById('confirmar-selecao');
+        if (checkbox && !checkbox.checked) {
+          alert('Por favor, confirme sua seleção marcando a caixa');
+          return;
+        }
+        
+        this.innerHTML = '<span class="spinner"></span> Processando...';
+        this.disabled = true;
+        
+        if (window.BENETRIP_REDIRECT && typeof window.BENETRIP_REDIRECT.processarConfirmacao === 'function') {
+          let vooId = null;
+          if (window.BENETRIP_VOOS) {
+            const voo = window.BENETRIP_VOOS.vooSelecionado || window.BENETRIP_VOOS.vooAtivo;
+            if (voo) {
+              vooId = voo.sign || `voo-idx-${window.BENETRIP_VOOS.indexVooAtivo || 0}`;
+            }
+          }
+经理          window.BENETRIP_REDIRECT.processarConfirmacao(vooId);
+        } else {
+          // Fallback
+          setTimeout(() => {
+            localStorage.setItem('benetrip_reserva_pendente', 'true');
+            window.location.href = 'hotels.html';
+          }, 2000);
+        }
+      });
+    }
+  };
+  
+  // Aplicar quando modal for aberto
+  const originalMostrarConfirmacao = window.mostrarConfirmacaoSelecao;
+  if (originalMostrarConfirmacao) {
+    window.mostrarConfirmacaoSelecao = function() {
+      originalMostrarConfirmacao.apply(this, arguments);
+      setTimeout(garantirVisibilidadeModal, 100);
+      
+      // Garantir visibilidade do modal
+      setTimeout(() => {
+        const modal = document.getElementById('modal-confirmacao');
+        if (modal) {
+          modal.style.display = 'flex';
+          modal.classList.add('modal-active');
+        }
+      }, 50);
+    };
+  }
+})();
