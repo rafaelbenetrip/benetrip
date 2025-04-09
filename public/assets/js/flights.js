@@ -188,7 +188,7 @@ const BENETRIP_VOOS = {
         criancas: dadosUsuario?.respostas?.passageiros?.criancas || 0,
         bebes: dadosUsuario?.respostas?.passageiros?.bebes || 0,
         classe: 'Y',
-        locale: "en"
+        locale: "pt-BR"
       };
 
       console.log('Iniciando busca com parâmetros:', params);
