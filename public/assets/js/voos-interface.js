@@ -4,6 +4,7 @@
  * Este arquivo gerencia a interface do usuário para a página de voos,
  * incluindo a navegação entre cards, modais e elementos interativos.
  * Funciona em conjunto com o módulo flights.js que processa os dados.
+ * Versão adaptada para layout vertical conforme protótipo.
  */
 
 // ======= UTILITÁRIOS =======
@@ -57,6 +58,150 @@ function formatarData(data) {
 }
 
 /**
+ * Aplicar estilos CSS para layout vertical
+ */
+function aplicarEstilosVerticais() {
+    // Criar elemento de estilo
+    const style = document.createElement('style');
+    style.textContent = `
+    /* Alteramos o container de swipe para lista vertical */
+    .voos-swipe-container {
+      display: flex;
+      flex-direction: column; /* Alterado de row para column */
+      gap: 16px;
+      overflow-y: auto; /* Alterado de overflow-x para overflow-y */
+      overflow-x: hidden; /* Esconder overflow horizontal */
+      scroll-snap-type: y mandatory; /* Alterado de x para y */
+      padding: 8px 16px 80px; /* Aumentado o padding inferior para dar espaço */
+      margin-bottom: 16px;
+      max-height: calc(100vh - 240px); /* Altura máxima para garantir scroll */
+      scrollbar-width: thin;
+      
+      /* Remover gradiente horizontal */
+      background: none;
+    }
+
+    /* Ajustes para os cards */
+    .voo-card {
+      flex: 0 0 auto; /* Remover constraint de largura */
+      width: 100%; /* Fazer o card ocupar a largura completa */
+      max-width: none; /* Remover limitação de largura máxima */
+      scroll-snap-align: start; /* Alterado de center para start */
+      min-width: 0; /* Remover a largura mínima */
+      margin: 0 0 12px 0; /* Ajustar margens para empilhamento vertical */
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    /* Botão de customização da busca */
+    .customize-search-button {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background-color: white;
+      border: 1px solid #e0e0e0;
+      border-radius: 8px;
+      padding: 10px 16px;
+      margin: 12px 16px;
+      font-size: 0.9rem;
+      font-weight: 500;
+      color: var(--benetrip-blue);
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+
+    .customize-search-button:hover {
+      background-color: #f8f9fa;
+    }
+
+    .customize-search-button svg {
+      margin-right: 6px;
+    }
+
+    /* Remover/ajustar os controles de navegação */
+    .pagination-indicator {
+      display: none; /* Não precisamos dos pontos de paginação em layout vertical */
+    }
+
+    .nav-controls {
+      display: none; /* Esconder botões de navegação anterior/próximo */
+    }
+
+    /* Novo layout para o botão de escolha */
+    .choose-flight-button {
+      width: 100%;
+      background-color: var(--benetrip-orange);
+      color: white;
+      font-weight: 600;
+      border: none;
+      border-radius: 4px;
+      padding: 10px 16px;
+      margin-top: 8px;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+
+    .choose-flight-button:hover {
+      background-color: #d06a1c;
+    }
+
+    /* Corrigir comportamento do modal */
+    .modal-backdrop {
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.3s ease, visibility 0.3s ease;
+    }
+
+    .modal-backdrop.modal-active {
+      opacity: 1;
+      visibility: visible;
+      display: flex !important;
+      pointer-events: auto !important;
+    }
+
+    /* Remover swipe hint para layout vertical */
+    .swipe-hint {
+      display: none;
+    }
+    `;
+    
+    // Adicionar ao head do documento
+    document.head.appendChild(style);
+    console.log('Estilos para layout vertical aplicados');
+}
+
+/**
+ * Adicionar botão de customização
+ */
+function adicionarBotaoCustomizacao() {
+    // Se já existe, não adicionar novamente
+    if (document.querySelector('.customize-search-button')) return;
+    
+    const header = document.querySelector('.app-header');
+    if (!header) return;
+    
+    const button = document.createElement('button');
+    button.className = 'customize-search-button';
+    button.innerHTML = `
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+        </svg>
+        Personalizar Minha Busca
+    `;
+    
+    // Inserir logo após o header
+    header.parentNode.insertBefore(button, header.nextSibling);
+    
+    // Adicionar evento de clique
+    button.addEventListener('click', function() {
+        localStorage.setItem('benetrip_customizar_busca', 'true');
+        window.location.href = 'index.html';
+    });
+    
+    console.log('Botão de customização adicionado');
+}
+
+/**
  * Inicialização para navegação de voos - função global para ser chamada por outros módulos
  */
 window.inicializarNavegacaoVoos = function() {
@@ -68,220 +213,150 @@ window.inicializarNavegacaoVoos = function() {
  * Função para configurar navegação entre cards de voo
  */
 function configurarNavegacaoCards() {
-    console.log('Configurando navegação de cards...');
-    const swipeContainer = document.getElementById('voos-swipe-container');
-    if (!swipeContainer) {
-        console.error('Container de swipe não encontrado');
+    console.log('Configurando navegação de cards (layout vertical)...');
+    const container = document.getElementById('voos-swipe-container');
+    if (!container) {
+        console.error('Container de voos não encontrado');
         return;
     }
     
-    const cards = swipeContainer.querySelectorAll('.voo-card');
+    const cards = container.querySelectorAll('.voo-card');
     if (!cards.length) {
-        console.error('Nenhum card de voo encontrado. Total de cards:', cards.length);
+        console.error('Nenhum card de voo encontrado para configurar navegação');
         return;
     }
     
-    console.log(`Configurando navegação para ${cards.length} cards de voo`);
-    
-    const paginationDots = document.querySelectorAll('.pagination-dot');
-    let currentCardIndex = 0;
-    
-    // Função para atualizar o card ativo
-    function updateActiveCard(index) {
-        cards.forEach((card, i) => {
-            card.classList.toggle('voo-card-ativo', i === index);
-        });
+    // Limpar eventos existentes e configurar novos
+    cards.forEach((card, index) => {
+        // Remover handlers existentes para evitar duplicação
+        const newCard = card.cloneNode(true);
+        card.parentNode.replaceChild(newCard, card);
         
-        if (paginationDots.length) {
-            paginationDots.forEach((dot, i) => {
-                dot.classList.toggle('active', i === index);
-            });
-        }
-        
-        // Atualiza o texto do botão se o módulo BENETRIP_VOOS estiver disponível
-        const btnSelectText = document.querySelector('.btn-selecionar-voo span');
-        if (btnSelectText && window.BENETRIP_VOOS?.finalResults?.proposals?.length > index) {
-            const voo = window.BENETRIP_VOOS.finalResults.proposals[index];
-            const preco = window.BENETRIP_VOOS.obterPrecoVoo(voo);
-            const moeda = window.BENETRIP_VOOS.finalResults?.meta?.currency || 'BRL';
-            btnSelectText.textContent = `Escolher Voo por ${window.BENETRIP_VOOS.formatarPreco(preco, moeda)}`;
-        }
-        
-        currentCardIndex = index;
-        
-        // Se o BENETRIP_VOOS estiver disponível, atualiza o voo ativo
-        if (window.BENETRIP_VOOS && window.BENETRIP_VOOS.finalResults?.proposals) {
-            window.BENETRIP_VOOS.vooAtivo = window.BENETRIP_VOOS.finalResults.proposals[index];
-            window.BENETRIP_VOOS.indexVooAtivo = index;
-        }
-    }
-    
-    // Configurar botões de navegação
-    const btnNext = document.querySelector('.next-btn');
-    const btnPrev = document.querySelector('.prev-btn');
-    
-    if (btnNext) {
-        btnNext.addEventListener('click', function() {
-            if (currentCardIndex < cards.length - 1) {
-                updateActiveCard(currentCardIndex + 1);
-                cards[currentCardIndex].scrollIntoView({ 
-                    behavior: 'smooth', 
-                    block: 'nearest', 
-                    inline: 'center' 
-                });
+        // Adicionar evento de clique no card
+        newCard.addEventListener('click', function(e) {
+            // Ignorar se o clique foi em um botão
+            if (e.target.closest('button')) return;
+            
+            // Atualizar card ativo
+            document.querySelectorAll('.voo-card').forEach(c => 
+                c.classList.remove('voo-card-ativo')
+            );
+            this.classList.add('voo-card-ativo');
+            
+            // Atualizar o voo ativo no módulo principal
+            if (window.BENETRIP_VOOS && window.BENETRIP_VOOS.finalResults?.proposals) {
+                const vooIndex = parseInt(this.dataset.vooIndex);
+                if (!isNaN(vooIndex)) {
+                    window.BENETRIP_VOOS.indexVooAtivo = vooIndex;
+                    window.BENETRIP_VOOS.vooAtivo = window.BENETRIP_VOOS.finalResults.proposals[vooIndex];
+                    window.BENETRIP_VOOS.atualizarBotaoSelecao();
+                }
             }
         });
-    }
-    
-    if (btnPrev) {
-        btnPrev.addEventListener('click', function() {
-            if (currentCardIndex > 0) {
-                updateActiveCard(currentCardIndex - 1);
-                cards[currentCardIndex].scrollIntoView({ 
-                    behavior: 'smooth', 
-                    block: 'nearest', 
-                    inline: 'center' 
-                });
-            }
-        });
-    }
-    
-    // Configurar clique nas bolinhas de paginação
-    if (paginationDots.length) {
-        paginationDots.forEach((dot, index) => {
-            dot.addEventListener('click', function() {
-                updateActiveCard(index);
-                cards[index].scrollIntoView({ 
-                    behavior: 'smooth', 
-                    block: 'nearest', 
-                    inline: 'center' 
-                });
-            });
-        });
-    }
-    
-    // Configurar swipe com Hammer.js (de forma segura)
-    let hammerInstance = null;
-    
-    try {
-        // Verifica se Hammer é realmente um construtor válido antes de tentar usá-lo
-        if (typeof Hammer === 'function') {
-            hammerInstance = new Hammer(swipeContainer);
-            hammerInstance.on('swipeleft', () => {
-                if (currentCardIndex < cards.length - 1) {
-                    updateActiveCard(currentCardIndex + 1);
-                    cards[currentCardIndex].scrollIntoView({ 
-                        behavior: 'smooth', 
-                        block: 'nearest', 
-                        inline: 'center' 
-                    });
+        
+        // Configurar botão de detalhes dentro do card
+        const btnDetalhes = newCard.querySelector('.btn-detalhes-voo');
+        if (btnDetalhes) {
+            btnDetalhes.addEventListener('click', function(e) {
+                e.stopPropagation(); // Evitar que o clique afete o card
+                const vooId = this.dataset.vooId;
+                if (vooId) {
+                    mostrarDetalhesVoo(vooId);
                 }
             });
-            
-            hammerInstance.on('swiperight', () => {
-                if (currentCardIndex > 0) {
-                    updateActiveCard(currentCardIndex - 1);
-                    cards[currentCardIndex].scrollIntoView({ 
-                        behavior: 'smooth', 
-                        block: 'nearest', 
-                        inline: 'center' 
-                    });
-                }
-            });
-            
-            console.log('Hammer.js configurado com sucesso para swipe');
-        } else {
-            console.log('Hammer não é um construtor válido, usando fallback para navegação touch');
-            // Implementa solução alternativa para swipe (scrolling)
-            implementarScrollingTouch(swipeContainer, updateActiveCard, cards, currentCardIndex);
         }
-    } catch (erro) {
-        console.error('Erro ao configurar Hammer.js:', erro);
-        // Implementa solução alternativa para swipe (scrolling)
-        implementarScrollingTouch(swipeContainer, updateActiveCard, cards, currentCardIndex);
+    });
+    
+    // Verificar se temos botões de escolha direta
+    const chooseButtons = document.querySelectorAll('.choose-flight-button');
+    if (chooseButtons.length) {
+        chooseButtons.forEach(button => {
+            button.addEventListener('click', function(e) {
+                e.stopPropagation(); // Evitar que o clique afete o card
+                const vooId = this.dataset.vooId;
+                if (vooId && window.BENETRIP_VOOS) {
+                    window.BENETRIP_VOOS.selecionarVoo(vooId);
+                    mostrarConfirmacaoSelecao();
+                }
+            });
+        });
     }
     
-    // Configurar detecção de scroll para atualizar card ativo
-    let scrollTimeoutId = null;
-    swipeContainer.addEventListener('scroll', () => {
-        clearTimeout(scrollTimeoutId);
-        scrollTimeoutId = setTimeout(() => {
-            // Encontra o card no centro da visualização
-            const containerRect = swipeContainer.getBoundingClientRect();
-            const containerCenter = containerRect.left + containerRect.width / 2;
+    // Configurar navegação por teclado
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+            e.preventDefault(); // Evitar scroll padrão
             
-            let closestCard = null;
-            let closestDistance = Infinity;
+            const activeCard = document.querySelector('.voo-card-ativo');
+            if (!activeCard) return;
             
-            cards.forEach((card, index) => {
-                const cardRect = card.getBoundingClientRect();
-                const cardCenter = cardRect.left + cardRect.width / 2;
-                const distance = Math.abs(containerCenter - cardCenter);
+            const currentIndex = Array.from(cards).indexOf(activeCard);
+            let newIndex = currentIndex;
+            
+            if (e.key === 'ArrowUp' && currentIndex > 0) {
+                newIndex = currentIndex - 1;
+            } else if (e.key === 'ArrowDown' && currentIndex < cards.length - 1) {
+                newIndex = currentIndex + 1;
+            }
+            
+            if (newIndex !== currentIndex) {
+                // Simular clique no novo card
+                cards[newIndex].click();
                 
-                if (distance < closestDistance) {
-                    closestDistance = distance;
-                    closestCard = card;
-                }
-            });
-            
-            if (closestCard) {
-                const index = Array.from(cards).indexOf(closestCard);
-                if (index !== -1 && index !== currentCardIndex) {
-                    updateActiveCard(index);
-                }
+                // Garantir que o card seja visível
+                cards[newIndex].scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'nearest'
+                });
             }
-        }, 150);
+        }
     });
 }
 
-// Função alternativa para controle de navegação via scrolling padrão
-function implementarScrollingTouch(swipeContainer, updateActiveCardFn, cards, currentCardIndex) {
-    console.log('Usando navegação baseada em scroll como fallback');
-    
-    // Garante que o container seja scrollável
-    swipeContainer.style.overflowX = 'auto';
-    swipeContainer.style.scrollBehavior = 'smooth';
-    swipeContainer.style.scrollSnapType = 'x mandatory';
-    
-    // Adiciona scroll-snap para cada card
-    cards.forEach(card => {
-        card.style.scrollSnapAlign = 'center';
-    });
-    
-    // Configura detecção de scroll para atualizar card ativo
-    let scrollTimeoutId = null;
-    swipeContainer.addEventListener('scroll', () => {
-        clearTimeout(scrollTimeoutId);
-        scrollTimeoutId = setTimeout(() => {
-            // Encontra o card no centro da visualização
-            const containerRect = swipeContainer.getBoundingClientRect();
-            const containerCenter = containerRect.left + containerRect.width / 2;
-            
-            let closestCard = null;
-            let closestDistance = Infinity;
-            
-            cards.forEach((card) => {
-                const cardRect = card.getBoundingClientRect();
-                const cardCenter = cardRect.left + cardRect.width / 2;
-                const distance = Math.abs(containerCenter - cardCenter);
-                
-                if (distance < closestDistance) {
-                    closestDistance = distance;
-                    closestCard = card;
-                }
-            });
-            
-            if (closestCard) {
-                const index = Array.from(cards).indexOf(closestCard);
-                if (index !== -1 && index !== currentCardIndex) {
-                    updateActiveCardFn(index);
-                }
-            }
-        }, 150);
-    });
-}
+// ======= GESTÃO DE MODAIS =======
 
-// ======= CARREGAMENTO DE TEMPLATES =======
+/**
+ * Modificar a função do BENETRIP_VOOS para adicionar botão de escolha nos cards
+ */
+function modificarCriarCardVoo() {
+    // Verificar se o objeto BENETRIP_VOOS existe
+    if (!window.BENETRIP_VOOS || !window.BENETRIP_VOOS.criarCardVoo) {
+        console.log('BENETRIP_VOOS ainda não disponível, tentando novamente em 100ms');
+        setTimeout(modificarCriarCardVoo, 100);
+        return;
+    }
+    
+    // Guardar referência à função original
+    const funcaoOriginal = window.BENETRIP_VOOS.criarCardVoo;
+    
+    // Sobrescrever com nova função
+    window.BENETRIP_VOOS.criarCardVoo = function(voo, index) {
+        // Chamar função original para criar o card base
+        const cardVoo = funcaoOriginal.call(this, voo, index);
+        
+        if (cardVoo) {
+            // Substituir o footer do card com o botão de escolha
+            const footer = cardVoo.querySelector('.voo-card-footer');
+            if (footer) {
+                const vooId = voo.sign || `voo-idx-${index}`;
+                
+                // Criar o botão de escolha
+                const chooseButton = document.createElement('button');
+                chooseButton.className = 'choose-flight-button';
+                chooseButton.textContent = 'Escolher Este Voo';
+                chooseButton.dataset.vooId = vooId;
+                
+                // Substituir o conteúdo do footer
+                footer.innerHTML = '';
+                footer.appendChild(chooseButton);
+            }
+        }
+        
+        return cardVoo;
+    };
+    
+    console.log('Função criarCardVoo modificada para incluir botão de escolha');
+}
 
 // Função para carregar templates de modais dinamicamente
 function carregarTemplatesModais() {
@@ -371,12 +446,12 @@ function carregarTemplatesModais() {
             </div>
         </div>
     `;
-// Garantir que os modais estão ocultos
+    
+    // Garantir que os modais estão ocultos
     document.getElementById('modal-confirmacao').style.display = 'none';
     document.getElementById('modal-detalhes-voo').style.display = 'none';
+    console.log('Templates de modais carregados');
 }
-
-// ======= GESTÃO DE MODAIS =======
 
 // Função para mostrar detalhes do voo em modal
 function mostrarDetalhesVoo(vooId) {
@@ -508,6 +583,9 @@ function mostrarDetalhesVoo(vooId) {
     const modal = document.getElementById('modal-detalhes-voo');
     if (modal) {
         modal.style.display = 'flex';
+        setTimeout(() => {
+            modal.classList.add('modal-active');
+        }, 10);
         configurarBotoesDetalhesVoo(vooId);
     }
 }
@@ -612,7 +690,7 @@ function obterNomeCidade(codigoAeroporto) {
     return finalAeroporto?.city || '';
 }
 
-// Função para mostrar confirmação de seleção
+// Função para mostrar confirmação de seleção - MODIFICADA para resolver problemas de modal
 function mostrarConfirmacaoSelecao() {
     // Verifica se o módulo está disponível
     if (!window.BENETRIP_VOOS) {
@@ -659,30 +737,35 @@ function mostrarConfirmacaoSelecao() {
         }
     }
     
-    // Exibe o modal
+    // CORREÇÃO: Exibir o modal com a classe modal-active
     const modal = document.getElementById('modal-confirmacao');
     if (modal) {
+        // Resetar o estado do modal para garantir que ele esteja fechado antes de abrir
         modal.style.display = 'flex';
+        
+        // Timeout para garantir que o display:flex seja aplicado antes de adicionar a classe
+        setTimeout(() => {
+            modal.classList.add('modal-active');
+        }, 10);
+        
         configurarBotoesConfirmacao();
     }
 }
 
-// Exibe o modal com classe ativa
-    const modal = document.getElementById('modal-confirmacao');
-    if (modal) {
-        modal.style.display = 'flex';
-        modal.classList.add('modal-active'); // Adiciona a classe modal-active
-        configurarBotoesConfirmacao();
-    }
-}
-
-// Função para fechar modais
+// Função para fechar modais - MODIFICADA
 function fecharModal(modalId) {
     const modal = document.getElementById(modalId);
-    if (modal) {
-        modal.style.display = 'none';
-        modal.classList.remove('modal-active'); // Remove a classe modal-active
-    }
+    if (!modal) return;
+    
+    // Remover a classe modal-active
+    modal.classList.remove('modal-active');
+    
+    // Aguardar a animação terminar antes de setar display: none
+    setTimeout(() => {
+        if (!modal.classList.contains('modal-active')) {
+            modal.style.display = 'none';
+        }
+    }, 300); // Mesmo tempo da transição CSS
 }
 
 // Função para exibir toasts (mensagens temporárias)
@@ -871,17 +954,6 @@ function configurarBotoesConfirmacao() {
 
 // Configura eventos gerais da interface
 function configurarEventosInterface() {
-    // Esconder dica de swipe após alguns segundos
-    setTimeout(() => {
-        const swipeHint = document.querySelector('.swipe-hint');
-        if (swipeHint) {
-            swipeHint.style.opacity = '0';
-            setTimeout(() => {
-                if (swipeHint.parentNode) swipeHint.parentNode.removeChild(swipeHint);
-            }, 1000);
-        }
-    }, 5000);
-    
     // Botão de voltar
     const btnVoltar = document.querySelector('.btn-voltar');
     if (btnVoltar) {
@@ -919,10 +991,24 @@ function configurarEventosInterface() {
         
         // Clique em cards de voo
         const vooCard = event.target.closest('.voo-card');
-        if (vooCard && !event.target.closest('.btn-detalhes-voo')) {
+        if (vooCard && !event.target.closest('button')) {
             const vooId = vooCard.dataset.vooId;
-            if (vooId && window.BENETRIP_VOOS) {
-                window.BENETRIP_VOOS.selecionarVoo(vooId);
+            const vooIndex = vooCard.dataset.vooIndex;
+            
+            // Atualizar UI
+            document.querySelectorAll('.voo-card').forEach(c => 
+                c.classList.remove('voo-card-ativo')
+            );
+            vooCard.classList.add('voo-card-ativo');
+            
+            // Atualizar estado no módulo BENETRIP_VOOS
+            if (window.BENETRIP_VOOS && window.BENETRIP_VOOS.finalResults?.proposals) {
+                const index = parseInt(vooIndex);
+                if (!isNaN(index)) {
+                    window.BENETRIP_VOOS.indexVooAtivo = index;
+                    window.BENETRIP_VOOS.vooAtivo = window.BENETRIP_VOOS.finalResults.proposals[index];
+                    window.BENETRIP_VOOS.atualizarBotaoSelecao();
+                }
             }
         }
     });
@@ -945,28 +1031,20 @@ document.addEventListener('mostrarDetalhesVoo', function(event) {
     }
 });
 
-// Adicionar evento para escutar quando Hammer não estiver disponível
-document.addEventListener('hammerjs-not-available', function() {
-    console.log('Evento recebido: hammerjs-not-available - Revertendo para navegação alternativa');
-    
-    // Se já houver cartões de voo na tela, reconfigurar navegação
-    if (document.querySelector('.voo-card')) {
-        configurarNavegacaoCards();
-    }
-});
-
 // Também adicionar navegação por teclado para acessibilidade
 document.addEventListener('keydown', function(event) {
     // Verificar se estamos na tela de voos
     if (!document.getElementById('voos-swipe-container')) return;
     
     switch(event.key) {
+        case 'ArrowUp':
         case 'ArrowLeft':
             // Navegar para o cartão anterior
             if (window.BENETRIP_VOOS) {
                 window.BENETRIP_VOOS.vooAnterior();
             }
             break;
+        case 'ArrowDown':
         case 'ArrowRight':
             // Navegar para o próximo cartão
             if (window.BENETRIP_VOOS) {
@@ -986,7 +1064,16 @@ document.addEventListener('keydown', function(event) {
 
 // Inicialização principal
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('DOM carregado - inicializando interface de voos...');
+    console.log('DOM carregado - inicializando interface de voos com layout vertical...');
+    
+    // Aplicar estilos para layout vertical
+    aplicarEstilosVerticais();
+    
+    // Adicionar botão de customização
+    adicionarBotaoCustomizacao();
+    
+    // Modificar criação de cards
+    modificarCriarCardVoo();
     
     // Carrega os templates dos modais
     carregarTemplatesModais();
