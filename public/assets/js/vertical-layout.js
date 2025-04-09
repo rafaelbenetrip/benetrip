@@ -134,6 +134,23 @@ function injetarCSSVertical() {
     .swipe-hint {
       display: none;
     }
+
+    // Dentro da função injetarCSSVertical(), adicione estas regras:
+.voo-card {
+  opacity: 1 !important;
+  visibility: visible !important;
+  background-color: white !important;
+  position: relative !important;
+  z-index: 1 !important;
+  min-height: 150px !important;
+  display: block !important;
+  border: 1px solid #e0e0e0 !important;
+}
+
+.voo-swipe-container {
+  min-height: 300px !important;
+  display: flex !important;
+}
     `;
 
     // Criar elemento de estilo e inserir na head
