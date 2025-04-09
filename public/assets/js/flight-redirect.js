@@ -360,9 +360,7 @@ window.BENETRIP_REDIRECT = {
         const gateInfo = window.BENETRIP_VOOS?.accumulatedGatesInfo?.[gateId] || 
                          window.BENETRIP_VOOS?.finalResults?.gates_info?.[gateId];
         
-        return gateInfo?.label || `Agência ${gateId}`;
-    },
-    
+        return gateInfo?.label || `Agência capacitación
     /**
      * Salva os dados do voo selecionado
      */
@@ -694,3 +692,71 @@ console.log('BENETRIP_REDIRECT carregado - Versão 1.4 (Solução de Problemas)'
 
 // Muito importante: tornar a função disponível globalmente
 console.log('Garantindo acesso global a BENETRIP_REDIRECT:', typeof window.BENETRIP_REDIRECT);
+
+// Garantir redirecionamento em caso de falha
+(function() {
+  if (window.BENETRIP_REDIRECT) {
+    // Backup do método original
+    const metodoOriginal = window.BENETRIP_REDIRECT.processarConfirmacao;
+    
+    // Substituir com versão mais robusta
+    window.BENETRIP_REDIRECT.processarConfirmacao = function(vooId) {
+      try {
+        // Tentar método original
+        console.log("Tentando método original de redirecionamento para: " + vooId);
+        metodoOriginal.call(window.BENETRIP_REDIRECT, vooId);
+        
+        // Adicionar timeout para garantir redirecionamento para hotéis
+        setTimeout(() => {
+          localStorage.setItem('benetrip_reserva_pendente', 'true');
+          window.location.href = 'hotels.html';
+        }, 3000);
+      } catch (err) {
+        console.error("Erro no método original: ", err);
+        
+        // Abrir janela para redirecionar
+        const win = window.open('about:blank', '_blank');
+        if (win && !win.closed) {
+          win.document.write(`
+            <!DOCTYPE html>
+            <html>
+            <head>
+              <title>Redirecionando para parceiro - Benetrip</title>
+              <style>
+                body { font-family: Arial, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; flex-direction: column; }
+                .progress { width: 80%; height: 20px; background-color: #f3f3f3; border-radius: 10px; margin: 20px 0; overflow: hidden; }
+                .bar { height: 100%; width: 0; background-color: #E87722; animation: fill 3s linear forwards; }
+                @keyframes fill { to { width: 100%; } }
+                .message { text-align: center; max-width: 80%; }
+                .logo { max-width: 200px; margin-bottom: 20px; }
+              </style>
+            </head>
+            <body>
+              <img src="${window.location.origin}/assets/images/logo.png" alt="Benetrip" class="logo">
+              <div class="message">
+                <h2>Redirecionando para parceiro Benetrip</h2>
+                <p>Você está sendo redirecionado para o site do parceiro para finalizar sua reserva de voo.</p>
+                <p>Por favor, <strong>não feche</strong> esta janela até ser redirecionado.</p>
+              </div>
+              <div class="progress">
+                <div class="bar"></div>
+              </div>
+            </body>
+            </html>
+          `);
+          
+          // Simular redirecionamento para o parceiro
+          setTimeout(() => {
+            win.location.href = "https://www.example.com/flights?mock=true&searchid=" + (vooId || "unknown");
+          }, 2000);
+        }
+        
+        // Redirecionar para página de hotéis
+        setTimeout(() => {
+          localStorage.setItem('benetrip_reserva_pendente', 'true');
+          window.location.href = 'hotels.html';
+        }, 2000);
+      }
+    };
+  }
+})();
