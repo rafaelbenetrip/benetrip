@@ -46,9 +46,10 @@
   max-width: 480px;
   margin: 0 auto;
   min-height: 100vh;
-  padding-bottom: 80px;
+  padding-bottom: 100px; /* Aumentado para dar espaço ao botão fixo */
   position: relative;
   overflow-x: hidden;
+  overflow-y: auto; /* Permitir scroll vertical */
 }
 
 /* Header da página */
@@ -77,6 +78,31 @@
   color: var(--benetrip-dark);
   cursor: pointer;
   padding: 0.25rem;
+}
+
+/* Botão de customização da busca */
+.customize-search-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 10px 16px;
+  margin: 12px 16px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--benetrip-blue);
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.customize-search-button:hover {
+  background-color: #f8f9fa;
+}
+
+.customize-search-button svg {
+  margin-right: 6px;
 }
 
 /* Mensagem da Tripinha */
@@ -151,27 +177,25 @@
   color: #6c757d;
 }
 
-/* Container de swipe para voos */
+/* Container de voos - MODIFICADO PARA LAYOUT VERTICAL */
 .voos-swipe-container {
   display: flex;
-  gap: 12px;
-  overflow-x: auto;
-  scroll-snap-type: x mandatory;
-  scroll-behavior: smooth;
-  -webkit-overflow-scrolling: touch;
-  padding: 8px 16px;
+  flex-direction: column; /* Alterado de row para column */
+  gap: 16px;
+  overflow-y: auto; /* Alterado de overflow-x para overflow-y */
+  overflow-x: hidden; /* Esconder overflow horizontal */
+  scroll-snap-type: y mandatory; /* Alterado de x para y */
+  padding: 8px 16px 80px; /* Aumentado o padding inferior para dar espaço */
   margin-bottom: 16px;
-  min-height: 300px; /* Garante espaço mínimo para os cards */
+  max-height: calc(100vh - 240px); /* Altura máxima para garantir scroll */
   scrollbar-width: thin; /* Para Firefox */
   
-  /* Adiciona indicador visual de rolagem nas bordas */
-  background:
-    linear-gradient(90deg, white 0%, rgba(255,255,255,0) 2%),
-    linear-gradient(90deg, rgba(255,255,255,0) 98%, white 100%);
+  /* Remove gradiente horizontal */
+  background: none;
 }
 
 .voos-swipe-container::-webkit-scrollbar {
-  height: 6px;
+  width: 6px; /* Alterado de height para width para scroll vertical */
 }
 
 .voos-swipe-container::-webkit-scrollbar-track {
@@ -188,20 +212,21 @@
   background: #aaa;
 }
 
-/* Cards de voo */
+/* Cards de voo - MODIFICADO PARA LAYOUT VERTICAL */
 .voo-card {
   background: white;
   border-radius: 12px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-  flex: 0 0 calc(100% - 24px); /* Alarga um pouco para melhor visualização */
-  scroll-snap-align: center;
+  flex: 0 0 auto; /* Remover constraint de largura */
+  width: 100%; /* Fazer o card ocupar a largura completa */
+  scroll-snap-align: start; /* Alterado de center para start */
   overflow: hidden;
   border: 1px solid var(--benetrip-medium-gray);
   transition: transform 0.3s ease, box-shadow 0.3s ease;
   position: relative;
-  min-width: 280px; /* Garante tamanho mínimo */
-  max-width: 420px; /* Limita largura em telas grandes */
-  margin: 2px; /* Adiciona margem sutil */
+  min-width: 0; /* Remover a largura mínima */
+  max-width: none; /* Remover limitação de largura máxima */
+  margin: 0 0 12px 0; /* Ajustar margens para empilhamento vertical */
 }
 
 .voo-card.voo-card-ativo {
@@ -248,18 +273,21 @@
   color: #1e40af;
 }
 
-/* Cabeçalho do card de voo */
+/* Cabeçalho do card de voo - MODIFICADO */
 .voo-card-header {
   padding: 16px;
   border-bottom: 1px solid #f3f4f6;
   position: relative;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
 /* Container para preço e tags */
 .voo-price-container {
   display: flex;
-  align-items: center;
-  margin-bottom: 4px;
+  flex-direction: column;
+  align-items: flex-start;
 }
 
 .voo-price {
@@ -284,9 +312,7 @@
 }
 
 .airline-info {
-  position: absolute;
-  top: 16px;
-  right: 16px;
+  position: static; /* Reposicionado de absolute */
   background-color: #f8f9fa;
   border-radius: 4px;
   padding: 4px 8px;
@@ -447,73 +473,32 @@
   margin-left: 4px;
 }
 
-/* Indicadores de paginação */
-.pagination-indicator {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  margin: 12px 0 16px; /* Aumentar margem inferior */
-  height: 16px; /* Altura fixa */
-}
-
-.pagination-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background-color: #e0e0e0;
-  margin: 0 4px;
-  transition: all 0.2s ease; /* Animação mais suave */
-  cursor: pointer; /* Indica interatividade */
-}
-
-.pagination-dot:hover {
-  background-color: #c0c0c0;
-}
-
-.pagination-dot.active {
+/* Novo botão de escolher voo */
+.choose-flight-button {
+  width: 100%;
   background-color: var(--benetrip-orange);
-  width: 12px; /* Um pouco maior */
-  height: 12px; /* Um pouco maior */
-  transform: scale(1.1); /* Efeito sutil de escala */
-}
-
-/* Melhorar a visualização dos botões de navegação */
-.nav-controls {
-  display: flex;
-  justify-content: space-between;
-  margin: 12px 16px 20px; /* Aumentar margem inferior */
-}
-
-.nav-btn {
-  display: flex;
-  align-items: center;
-  background-color: #f3f4f6;
+  color: white;
+  font-weight: 600;
   border: none;
-  border-radius: 100px;
-  padding: 8px 16px; /* Botões um pouco maiores */
-  font-size: 0.8rem;
-  font-weight: 500; /* Um pouco mais bold */
+  border-radius: 4px;
+  padding: 10px 16px;
+  margin-top: 8px;
   cursor: pointer;
-  transition: all 0.2s ease;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  transition: background-color 0.2s;
 }
 
-.nav-btn:hover {
-  background-color: #e5e7eb;
-  transform: translateY(-1px);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+.choose-flight-button:hover {
+  background-color: #d06a1c;
 }
 
-.nav-btn:active {
-  transform: translateY(0);
+/* Indicadores de paginação - ESCONDIDOS PARA LAYOUT VERTICAL */
+.pagination-indicator {
+  display: none; /* Removido para layout vertical */
 }
 
-.nav-btn.prev-btn svg {
-  margin-right: 4px;
-}
-
-.nav-btn.next-btn svg {
-  margin-left: 4px;
+/* Controles de navegação - ESCONDIDOS PARA LAYOUT VERTICAL */
+.nav-controls {
+  display: none; /* Removido para layout vertical */
 }
 
 /* Botão de seleção fixo */
@@ -544,57 +529,23 @@
   align-items: center;
   cursor: pointer;
   transition: background-color 0.2s;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .btn-selecionar-voo:hover {
   background-color: #d06a1c;
 }
 
-/* Hint de swipe */
+/* Hint de swipe - ESCONDIDO PARA LAYOUT VERTICAL */
 .swipe-hint {
-  position: fixed;
-  bottom: 80px; /* Um pouco mais alto para não sobrepor o botão de seleção */
-  left: 50%;
-  transform: translateX(-50%);
-  background-color: rgba(0, 0, 0, 0.8);
-  color: white;
-  padding: 8px 16px;
-  border-radius: 20px;
-  font-size: 0.8rem;
-  z-index: 20;
-  display: flex;
-  align-items: center;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-  opacity: 0.9; /* Um pouco mais opaco */
-}
-
-.swipe-arrow {
-  display: inline-block;
-  margin: 0 4px;
-}
-
-.swipe-arrow.left {
-  animation: bounceXLeft 1s infinite;
-}
-
-.swipe-arrow.right {
-  animation: bounceX 1s infinite;
-}
-
-@keyframes bounceX {
-  0%, 100% { transform: translateX(0); }
-  50% { transform: translateX(3px); }
-}
-
-@keyframes bounceXLeft {
-  0%, 100% { transform: translateX(0); }
-  50% { transform: translateX(-3px); }
+  display: none; /* Removido para layout vertical */
 }
 
 /* Toast notifications */
 #toast-container {
   position: fixed;
-  bottom: 80px;
+  bottom: 100px; /* Ajustado para layout vertical */
   left: 50%;
   transform: translateX(-50%);
   z-index: 999;
@@ -789,12 +740,17 @@
   align-items: center;
   justify-content: center;
   z-index: 1000;
-  animation: fadeIn 0.2s ease;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.3s ease, visibility 0.3s ease;
 }
 
 /* Permitir visualização apenas quando JavaScript explicitamente ativa o modal */
 .modal-backdrop.modal-active {
+  opacity: 1;
+  visibility: visible;
   display: flex !important;
+  pointer-events: auto !important;
 }
 
 .modal-content {
@@ -1272,7 +1228,7 @@
 /* Responsividade */
 @media (max-width: 480px) {
   .voo-card {
-    flex: 0 0 calc(100% - 16px);
+    margin: 0 0 10px 0;
   }
   
   .botao-selecao-fixo {
@@ -1291,8 +1247,7 @@
 /* Corrigir exibição para telas muito pequenas */
 @media (max-width: 360px) {
   .voo-card {
-    min-width: 240px;
-    flex: 0 0 calc(100% - 16px);
+    margin: 0 0 8px 0;
   }
   
   .flight-route {
