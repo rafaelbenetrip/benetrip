@@ -45,9 +45,9 @@ window.BENETRIP_REDIRECT = {
                 
                 const vooId = btnCard.dataset.vooId;
                 if (vooId && window.BENETRIP_VOOS) {
-                    // Seleciona o voo e mostra confirmação
+                    // Seleciona o voo e processa diretamente
                     window.BENETRIP_VOOS.selecionarVoo(vooId);
-                    this.mostrarConfirmacaoComRedirecionamento(vooId);
+                    this.processarConfirmacao(vooId);
                 } else {
                     console.log('ID do voo não encontrado ou BENETRIP_VOOS indisponível');
                     // Fallback: redirecionamento direto
@@ -61,9 +61,6 @@ window.BENETRIP_REDIRECT = {
                 }
             }
         });
-        
-        // Configura o modal de confirmação
-        this.configurarModalConfirmacao();
         
         // Notificar que a inicialização foi concluída
         console.log('BENETRIP_REDIRECT inicializado com sucesso e disponível globalmente');
@@ -97,86 +94,13 @@ window.BENETRIP_REDIRECT = {
             return;
         }
         
-        const vooId = voo.sign || `voo-idx-${window.BENETRIP_VOOS.indexVooAtivo}`;
-        this.mostrarConfirmacaoComRedirecionamento(vooId);
-    },
-    
-    /**
-     * Exibe o modal de confirmação e configura o redirecionamento
-     */
-    mostrarConfirmacaoComRedirecionamento: function(vooId) {
-        console.log('Mostrando confirmação para voo:', vooId);
-        
-        try {
-            // Se a função original mostrarConfirmacaoSelecao existir, usa ela
-            if (typeof window.mostrarConfirmacaoSelecao === 'function') {
-                window.mostrarConfirmacaoSelecao();
-            } else if (window.BENETRIP_VOOS && typeof window.BENETRIP_VOOS.mostrarConfirmacaoSelecao === 'function') {
-                window.BENETRIP_VOOS.mostrarConfirmacaoSelecao();
-            } else {
-                // Fallback caso a função não exista
-                const modal = document.getElementById('modal-confirmacao');
-                if (modal) {
-                    modal.style.display = 'flex';
-                    setTimeout(() => {
-                        modal.classList.add('modal-active');
-                    }, 10);
-                } else {
-                    console.error('Modal de confirmação não encontrado');
-                }
-            }
-            
-            // Configura o botão confirmar para redirecionar
-            const btnConfirmar = document.getElementById('btn-confirmar');
-            if (btnConfirmar) {
-                console.log('Configurando botão de confirmação');
-                // Remove event listeners anteriores
-                const btnClone = btnConfirmar.cloneNode(true);
-                btnConfirmar.parentNode.replaceChild(btnClone, btnConfirmar);
-                
-                // Adiciona novo event listener
-                btnClone.addEventListener('click', () => {
-                    console.log('Botão confirmar clicado para voo:', vooId);
-                    this.processarConfirmacao(vooId);
-                });
-            } else {
-                console.error('Botão de confirmação não encontrado');
-            }
-        } catch (error) {
-            console.error('Erro ao mostrar confirmação:', error);
-            // Fallback em caso de erro: processar diretamente
+        // Usar a função global de confirmação
+        if (typeof window.mostrarConfirmacaoSelecao === 'function') {
+            window.mostrarConfirmacaoSelecao();
+        } else {
+            // Fallback se a função global não estiver disponível
+            const vooId = voo.sign || `voo-idx-${window.BENETRIP_VOOS.indexVooAtivo}`;
             this.processarConfirmacao(vooId);
-        }
-    },
-    
-    /**
-     * Configura o comportamento do modal de confirmação
-     */
-    configurarModalConfirmacao: function() {
-        try {
-            // Checkbox de confirmação
-            const checkbox = document.getElementById('confirmar-selecao');
-            const btnConfirmar = document.getElementById('btn-confirmar');
-            
-            if (checkbox && btnConfirmar) {
-                checkbox.addEventListener('change', function() {
-                    btnConfirmar.disabled = !this.checked;
-                });
-            }
-            
-            // Botão para fechar o modal
-            const btnFechar = document.getElementById('btn-fechar-modal');
-            if (btnFechar) {
-                btnFechar.addEventListener('click', () => this.fecharModal('modal-confirmacao'));
-            }
-            
-            // Botão para continuar buscando
-            const btnContinuar = document.getElementById('btn-continuar-buscando');
-            if (btnContinuar) {
-                btnContinuar.addEventListener('click', () => this.fecharModal('modal-confirmacao'));
-            }
-        } catch (error) {
-            console.error('Erro ao configurar modal:', error);
         }
     },
     
