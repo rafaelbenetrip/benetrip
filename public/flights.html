@@ -88,55 +88,169 @@
     <script src="assets/js/fix-cards.js"></script>
     <script src="assets/js/flight-redirect.js"></script>
     <script>
-  // Fix de emergência para botões que não funcionam
-  document.addEventListener('DOMContentLoaded', function() {
-    console.log("Aplicando fix de redirecionamento direto");
-    
-    // Fix para botão principal
-    const fixButtons = function() {
-      // Botão principal
-      const btnPrincipal = document.querySelector('.btn-selecionar-voo');
-      if (btnPrincipal) {
-        console.log("Aplicando fix no botão principal");
-        btnPrincipal.onclick = function(e) {
-          e.preventDefault();
-          console.log("Botão principal clicado (fix direto)");
-          
-          // Redireciona diretamente para hotéis
-          localStorage.setItem('benetrip_reserva_pendente', 'true');
-          window.location.href = 'hotels.html';
+    // Versão corrigida do fix de emergência
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log("Aplicando fix de redirecionamento melhorado");
+        
+        // Verificar se o módulo de redirecionamento está disponível
+        const verificarModuloRedirecionamento = function() {
+            return window.BENETRIP_REDIRECT && typeof window.BENETRIP_REDIRECT.processarConfirmacao === 'function';
         };
-      }
-      
-      // Botões nos cards
-      const botoesCards = document.querySelectorAll('.choose-flight-button, .escolher-este-voo');
-      botoesCards.forEach(btn => {
-        console.log("Aplicando fix em botão de card");
-        btn.onclick = function(e) {
-          e.preventDefault();
-          console.log("Botão de card clicado (fix direto)");
-          
-          // Redireciona diretamente para hotéis
-          localStorage.setItem('benetrip_reserva_pendente', 'true');
-          window.location.href = 'hotels.html';
+        
+        // Fix para botões que gerencia corretamente o redirecionamento
+        const fixButtons = function() {
+            // Botão principal
+            const btnPrincipal = document.querySelector('.btn-selecionar-voo');
+            if (btnPrincipal) {
+                console.log("Aplicando fix melhorado no botão principal");
+                btnPrincipal.onclick = function(e) {
+                    e.preventDefault();
+                    console.log("Botão principal clicado (fix melhorado)");
+                    
+                    // Verificar se o módulo BENETRIP_VOOS está disponível
+                    if (window.BENETRIP_VOOS) {
+                        // Selecionar o voo ativo se nenhum estiver selecionado
+                        if (!window.BENETRIP_VOOS.vooSelecionado && window.BENETRIP_VOOS.vooAtivo) {
+                            window.BENETRIP_VOOS.selecionarVooAtivo();
+                        }
+                        
+                        // Se temos módulo de redirecionamento disponível, usar o fluxo correto
+                        if (verificarModuloRedirecionamento()) {
+                            // Pegar o voo selecionado ou ativo
+                            const voo = window.BENETRIP_VOOS.vooSelecionado || window.BENETRIP_VOOS.vooAtivo;
+                            if (voo) {
+                                // Processar confirmação (isso abre nova janela + continua)
+                                const vooId = voo.sign || `voo-idx-${window.BENETRIP_VOOS.indexVooAtivo || 0}`;
+                                window.BENETRIP_REDIRECT.processarConfirmacao(vooId);
+                                return;
+                            }
+                        }
+                    }
+                    
+                    // Fallback: redirecionar diretamente para hotéis se algo falhar
+                    console.warn("Usando fallback de redirecionamento direto (módulos não carregados)");
+                    localStorage.setItem('benetrip_reserva_pendente', 'true');
+                    window.location.href = 'hotels.html';
+                };
+            }
+            
+            // Botões nos cards de voos
+            const botoesCards = document.querySelectorAll('.choose-flight-button, .escolher-este-voo');
+            botoesCards.forEach(btn => {
+                console.log("Aplicando fix melhorado em botão de card");
+                btn.onclick = function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    console.log("Botão de card clicado (fix melhorado)");
+                    
+                    // Pegar ID do voo do botão
+                    const vooId = this.dataset.vooId;
+                    if (vooId && window.BENETRIP_VOOS) {
+                        // Selecionar este voo
+                        window.BENETRIP_VOOS.selecionarVoo(vooId);
+                        
+                        // Se o modal de confirmação estiver implementado, mostrá-lo
+                        if (typeof window.mostrarConfirmacaoSelecao === 'function') {
+                            window.mostrarConfirmacaoSelecao();
+                        } else if (window.BENETRIP_VOOS && typeof window.BENETRIP_VOOS.mostrarConfirmacaoSelecao === 'function') {
+                            window.BENETRIP_VOOS.mostrarConfirmacaoSelecao();
+                        } else {
+                            // Se não puder mostrar o modal de confirmação, processar diretamente
+                            if (verificarModuloRedirecionamento()) {
+                                window.BENETRIP_REDIRECT.processarConfirmacao(vooId);
+                                return;
+                            } else {
+                                // Fallback como último recurso
+                                localStorage.setItem('benetrip_reserva_pendente', 'true');
+                                window.location.href = 'hotels.html';
+                            }
+                        }
+                        return;
+                    }
+                    
+                    // Fallback se não conseguir obter ID do voo
+                    console.warn("ID do voo não disponível, usando fallback");
+                    localStorage.setItem('benetrip_reserva_pendente', 'true');
+                    window.location.href = 'hotels.html';
+                };
+            });
+            
+            // Botão confirmar no modal
+            const btnConfirmar = document.getElementById('btn-confirmar');
+            if (btnConfirmar) {
+                console.log("Aplicando fix melhorado em botão confirmar");
+                btnConfirmar.onclick = function(e) {
+                    e.preventDefault();
+                    console.log("Botão confirmar clicado (fix melhorado)");
+                    
+                    // Verificar se o checkbox está marcado
+                    const checkbox = document.getElementById('confirmar-selecao');
+                    if (checkbox && !checkbox.checked) {
+                        alert("Por favor, confirme sua seleção marcando a caixa.");
+                        return;
+                    }
+                    
+                    // Adicionar efeito de loading
+                    this.innerHTML = '<span class="spinner"></span> Processando...';
+                    this.disabled = true;
+                    
+                    if (window.BENETRIP_VOOS && window.BENETRIP_VOOS.vooSelecionado) {
+                        const vooId = window.BENETRIP_VOOS.vooSelecionado.sign || 
+                                    `voo-idx-${window.BENETRIP_VOOS.indexVooAtivo || 0}`;
+                        
+                        // Se temos o módulo de redirecionamento, usar
+                        if (verificarModuloRedirecionamento()) {
+                            window.BENETRIP_REDIRECT.processarConfirmacao(vooId);
+                            return;
+                        }
+                    }
+                    
+                    // Fallback em último caso
+                    console.warn("Módulo de redirecionamento não disponível, usando fallback");
+                    localStorage.setItem('benetrip_reserva_pendente', 'true');
+                    setTimeout(() => { window.location.href = 'hotels.html'; }, 1500);
+                };
+            }
         };
-      });
-    };
-    
-    // Aplicar o fix agora
-    fixButtons();
-    
-    // E também quando os resultados estiverem prontos
-    document.addEventListener('resultadosVoosProntos', fixButtons);
-    
-    // Tentar a cada 2 segundos por 10 segundos
-    let tentativas = 0;
-    const intervalId = setInterval(function() {
-      tentativas++;
-      fixButtons();
-      if (tentativas >= 5) clearInterval(intervalId);
-    }, 2000);
-  });
-</script>
+        
+        // Aguardar o carregamento do módulo de redirecionamento
+        const esperarPorModulos = function() {
+            if (verificarModuloRedirecionamento() && window.BENETRIP_VOOS) {
+                console.log("Módulos necessários carregados, aplicando fix final");
+                fixButtons();
+                return true;
+            }
+            return false;
+        };
+        
+        // Tentar imediatamente
+        if (!esperarPorModulos()) {
+            console.log("Aguardando carregamento dos módulos necessários...");
+            
+            // Tentar quando os resultados de voos estiverem prontos
+            document.addEventListener('resultadosVoosProntos', function() {
+                console.log("Evento resultadosVoosProntos recebido, tentando aplicar fix");
+                esperarPorModulos();
+            });
+            
+            // Tentar a cada 1 segundo por 10 segundos
+            let tentativas = 0;
+            const intervalId = setInterval(function() {
+                tentativas++;
+                console.log(`Tentativa ${tentativas} de aplicar fix melhorado`);
+                
+                if (esperarPorModulos() || tentativas >= 10) {
+                    clearInterval(intervalId);
+                    
+                    // Se depois de 10 tentativas ainda não temos os módulos, aplicar fix simples
+                    if (tentativas >= 10 && !verificarModuloRedirecionamento()) {
+                        console.warn("Módulos necessários não carregaram após 10 tentativas, aplicando fix simples");
+                        fixButtons();
+                    }
+                }
+            }, 1000);
+        }
+    });
+    </script>
 </body>
 </html>
