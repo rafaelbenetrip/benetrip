@@ -371,6 +371,9 @@ function carregarTemplatesModais() {
             </div>
         </div>
     `;
+// Garantir que os modais estão ocultos
+    document.getElementById('modal-confirmacao').style.display = 'none';
+    document.getElementById('modal-detalhes-voo').style.display = 'none';
 }
 
 // ======= GESTÃO DE MODAIS =======
@@ -617,7 +620,7 @@ function mostrarConfirmacaoSelecao() {
         return;
     }
     
-    // Obtém o voo selecionado ou ativo
+    // CORREÇÃO: Verifica explicitamente se um voo foi selecionado
     const voo = window.BENETRIP_VOOS.vooSelecionado || window.BENETRIP_VOOS.vooAtivo;
     if (!voo) {
         exibirToast('Selecione um voo primeiro', 'warning');
