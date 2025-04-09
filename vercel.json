@@ -16,7 +16,11 @@
     "api/flight-results.js": {
        "memory": 1024,
        "maxDuration": 30
-    }
+    },
+    "api/flight-redirect.js": {
+  "memory": 1024,
+  "maxDuration": 30
+} 
   },
   "routes": [
     {
@@ -96,6 +100,16 @@
     {
       "src": "/(.*)",
       "dest": "/public/$1"
-    }
+    },
+    {
+  "src": "/api/flight-redirect",
+  "headers": {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "GET, OPTIONS",
+    "Content-Type": "application/json; charset=utf-8",
+    "X-Content-Type-Options": "nosniff"
+  },
+  "dest": "/api/flight-redirect.js"
+}
   ]
 }
