@@ -78,15 +78,13 @@
             }, 1000);
         });
     </script>
-    <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8/hammer.min.js"></script>
-    <script src="assets/js/api.js"></script>
-    <script src="assets/js/flights.js"></script>
-    <script src="assets/js/voos-interface.js"></script>
-    
-    <!-- Script para layout vertical (nova adição) -->
-    <script src="assets/js/vertical-layout.js"></script>
-    <script src="assets/js/fix-cards.js"></script>
-    <script src="assets/js/flight-redirect.js"></script>
+<!-- Na seção de scripts, adicionar antes dos outros scripts -->
+<script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8/hammer.min.js"></script>
+<script src="assets/js/api.js"></script>
+<script src="assets/js/modal-handler.js"></script><!-- Novo arquivo -->
+<script src="assets/js/flights.js"></script>
+<script src="assets/js/flight-redirect.js"></script>
+<script src="assets/js/voos-interface.js"></script>
     <script>
     // Versão corrigida do fix de emergência
     document.addEventListener('DOMContentLoaded', function() {
