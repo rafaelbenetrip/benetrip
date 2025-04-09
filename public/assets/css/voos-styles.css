@@ -21,6 +21,24 @@
   padding: 0;
 }
 
+/* REGRAS CRÍTICAS: Impedir visualização de modais no carregamento da página */
+.modal-backdrop,
+#modal-confirmacao,
+#modal-detalhes-voo {
+  display: none !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  visibility: hidden !important;
+}
+
+/* Permitir visualização apenas quando explicitamente habilitado via JS */
+.modal-backdrop.modal-active {
+  display: flex !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+  visibility: visible !important;
+}
+
 /* Container principal */
 #voos-container {
   background-color: var(--benetrip-light-gray);
@@ -143,6 +161,13 @@
   -webkit-overflow-scrolling: touch;
   padding: 8px 16px;
   margin-bottom: 16px;
+  min-height: 300px; /* Garante espaço mínimo para os cards */
+  scrollbar-width: thin; /* Para Firefox */
+  
+  /* Adiciona indicador visual de rolagem nas bordas */
+  background:
+    linear-gradient(90deg, white 0%, rgba(255,255,255,0) 2%),
+    linear-gradient(90deg, rgba(255,255,255,0) 98%, white 100%);
 }
 
 .voos-swipe-container::-webkit-scrollbar {
@@ -168,21 +193,38 @@
   background: white;
   border-radius: 12px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-  flex: 0 0 calc(100% - 16px);
+  flex: 0 0 calc(100% - 24px); /* Alarga um pouco para melhor visualização */
   scroll-snap-align: center;
   overflow: hidden;
   border: 1px solid var(--benetrip-medium-gray);
   transition: transform 0.3s ease, box-shadow 0.3s ease;
   position: relative;
+  min-width: 280px; /* Garante tamanho mínimo */
+  max-width: 420px; /* Limita largura em telas grandes */
+  margin: 2px; /* Adiciona margem sutil */
 }
 
 .voo-card.voo-card-ativo {
   box-shadow: 0 0 0 2px var(--benetrip-orange), 0 4px 12px rgba(0, 0, 0, 0.1);
   transform: translateY(-2px);
+  z-index: 2; /* Garante que o card ativo fique visualmente acima dos outros */
 }
 
 .voo-card.voo-direto {
   border-left: 3px solid var(--benetrip-blue);
+}
+
+/* Melhoria na interatividade dos cards */
+.voo-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+  transform: translateY(-1px);
+  cursor: pointer;
+}
+
+/* Garantir que os botões dentro dos cards não propagam a interatividade */
+.voo-card button {
+  position: relative;
+  z-index: 3;
 }
 
 /* Tags do card de voo - Versão atualizada */
@@ -250,6 +292,15 @@
   padding: 4px 8px;
   font-size: 0.75rem;
   font-weight: 500;
+  display: flex;
+  align-items: center;
+}
+
+.airline-logo {
+  width: 20px;
+  height: 20px;
+  margin-right: 6px;
+  object-fit: contain;
 }
 
 /* Conteúdo do card de voo */
@@ -400,7 +451,9 @@
 .pagination-indicator {
   display: flex;
   justify-content: center;
-  margin: 12px 0;
+  align-items: center;
+  margin: 12px 0 16px; /* Aumentar margem inferior */
+  height: 16px; /* Altura fixa */
 }
 
 .pagination-dot {
@@ -409,19 +462,26 @@
   border-radius: 50%;
   background-color: #e0e0e0;
   margin: 0 4px;
+  transition: all 0.2s ease; /* Animação mais suave */
+  cursor: pointer; /* Indica interatividade */
+}
+
+.pagination-dot:hover {
+  background-color: #c0c0c0;
 }
 
 .pagination-dot.active {
   background-color: var(--benetrip-orange);
-  width: 10px;
-  height: 10px;
+  width: 12px; /* Um pouco maior */
+  height: 12px; /* Um pouco maior */
+  transform: scale(1.1); /* Efeito sutil de escala */
 }
 
-/* Controles de navegação */
+/* Melhorar a visualização dos botões de navegação */
 .nav-controls {
   display: flex;
   justify-content: space-between;
-  margin: 12px 16px;
+  margin: 12px 16px 20px; /* Aumentar margem inferior */
 }
 
 .nav-btn {
@@ -430,14 +490,22 @@
   background-color: #f3f4f6;
   border: none;
   border-radius: 100px;
-  padding: 6px 12px;
+  padding: 8px 16px; /* Botões um pouco maiores */
   font-size: 0.8rem;
+  font-weight: 500; /* Um pouco mais bold */
   cursor: pointer;
-  transition: background-color 0.2s;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
 }
 
 .nav-btn:hover {
   background-color: #e5e7eb;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+}
+
+.nav-btn:active {
+  transform: translateY(0);
 }
 
 .nav-btn.prev-btn svg {
@@ -460,6 +528,7 @@
   z-index: 30;
   max-width: 480px;
   margin: 0 auto;
+  border-top: 1px solid rgba(0, 0, 0, 0.05); /* Borda sutil */
 }
 
 .btn-selecionar-voo {
@@ -484,10 +553,10 @@
 /* Hint de swipe */
 .swipe-hint {
   position: fixed;
-  bottom: 70px;
+  bottom: 80px; /* Um pouco mais alto para não sobrepor o botão de seleção */
   left: 50%;
   transform: translateX(-50%);
-  background-color: rgba(0, 0, 0, 0.7);
+  background-color: rgba(0, 0, 0, 0.8);
   color: white;
   padding: 8px 16px;
   border-radius: 20px;
@@ -495,6 +564,8 @@
   z-index: 20;
   display: flex;
   align-items: center;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  opacity: 0.9; /* Um pouco mais opaco */
 }
 
 .swipe-arrow {
@@ -714,11 +785,16 @@
   right: 0;
   bottom: 0;
   background-color: rgba(0, 0, 0, 0.6);
-  display: flex;
+  display: none !important; /* O !important garante prioridade */
   align-items: center;
   justify-content: center;
   z-index: 1000;
   animation: fadeIn 0.2s ease;
+}
+
+/* Permitir visualização apenas quando JavaScript explicitamente ativa o modal */
+.modal-backdrop.modal-active {
+  display: flex !important;
 }
 
 .modal-content {
@@ -948,12 +1024,14 @@
 }
 
 .companhia-logo {
-  width: 40px;
-  height: 40px;
+  width: 60px;
+  height: 60px;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-bottom: 4px;
+  background-color: #f8f9fa;
+  border-radius: 6px;
+  padding: 4px;
 }
 
 .companhia-logo img {
@@ -1139,6 +1217,37 @@
   margin: 0;
 }
 
+/* Estilo para voo selecionado */
+.voo-card.voo-selecionado {
+  box-shadow: 0 0 0 2px var(--benetrip-blue), 0 4px 12px rgba(0, 0, 0, 0.1);
+  border: 1px solid var(--benetrip-blue);
+}
+
+/* Estilo para ícone inline de companhia aérea */
+.inline-airline-logo {
+  width: 16px;
+  height: 16px;
+  vertical-align: middle;
+  margin-right: 4px;
+  object-fit: contain;
+}
+
+/* Spinner para botões de carregamento */
+.spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  border-top-color: white;
+  animation: spinner-rotate 0.6s linear infinite;
+  margin-right: 8px;
+}
+
+@keyframes spinner-rotate {
+  to { transform: rotate(360deg); }
+}
+
 /* Animações */
 @keyframes fadeIn {
   from { opacity: 0; }
@@ -1179,203 +1288,6 @@
   }
 }
 
-/* Estilo para logo pequeno no card de voo */
-.airline-info {
-  display: flex;
-  align-items: center;
-  background-color: #f8f9fa;
-  border-radius: 4px;
-  padding: 4px 8px;
-  font-size: 0.75rem;
-  font-weight: 500;
-}
-
-.airline-logo {
-  width: 20px;
-  height: 20px;
-  margin-right: 6px;
-  object-fit: contain;
-}
-
-/* Estilo para logo grande no modal de detalhes */
-.companhia-logo {
-  width: 60px;
-  height: 60px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background-color: #f8f9fa;
-  border-radius: 6px;
-  padding: 4px;
-}
-
-/* Estilo para voo selecionado */
-.voo-card.voo-selecionado {
-  box-shadow: 0 0 0 2px var(--benetrip-blue), 0 4px 12px rgba(0, 0, 0, 0.1);
-  border: 1px solid var(--benetrip-blue);
-}
-
-/* Estilo para ícone inline de companhia aérea */
-.inline-airline-logo {
-  width: 16px;
-  height: 16px;
-  vertical-align: middle;
-  margin-right: 4px;
-  object-fit: contain;
-}
-
-/* Spinner para botões de carregamento */
-.spinner {
-  display: inline-block;
-  width: 16px;
-  height: 16px;
-  border: 2px solid rgba(255, 255, 255, 0.3);
-  border-radius: 50%;
-  border-top-color: white;
-  animation: spinner-rotate 0.6s linear infinite;
-  margin-right: 8px;
-}
-
-@keyframes spinner-rotate {
-  to { transform: rotate(360deg); }
-}
-
-/* Estilos para elementos dinamicamente criados */
-.modal-backdrop:not([style*="display: none"]) {
-  display: flex !important;
-}
-
-/* Ajustes para o container de swipe */
-.voos-swipe-container {
-  display: flex;
-  gap: 12px;
-  overflow-x: auto;
-  scroll-snap-type: x mandatory;
-  scroll-behavior: smooth;
-  -webkit-overflow-scrolling: touch;
-  padding: 8px 16px;
-  margin-bottom: 16px;
-  min-height: 300px; /* Garante espaço mínimo para os cards */
-  scrollbar-width: thin; /* Para Firefox */
-  
-  /* Adiciona indicador visual de rolagem nas bordas */
-  background:
-    linear-gradient(90deg, white 0%, rgba(255,255,255,0) 2%),
-    linear-gradient(90deg, rgba(255,255,255,0) 98%, white 100%);
-}
-
-/* Ajustes para os cards de voo */
-.voo-card {
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-  flex: 0 0 calc(100% - 24px); /* Alarga um pouco para melhor visualização */
-  scroll-snap-align: center;
-  overflow: hidden;
-  border: 1px solid var(--benetrip-medium-gray);
-  transition: transform 0.3s ease, box-shadow 0.3s ease;
-  position: relative;
-  min-width: 280px; /* Garante tamanho mínimo */
-  max-width: 420px; /* Limita largura em telas grandes */
-  margin: 2px; /* Adiciona margem sutil */
-}
-
-/* Deixa o card ativo mais evidente */
-.voo-card.voo-card-ativo {
-  box-shadow: 0 0 0 2px var(--benetrip-orange), 0 4px 12px rgba(0, 0, 0, 0.1);
-  transform: translateY(-2px);
-  z-index: 2; /* Garante que o card ativo fique visualmente acima dos outros */
-}
-
-/* Melhoria na interatividade dos cards */
-.voo-card:hover {
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
-  transform: translateY(-1px);
-  cursor: pointer;
-}
-
-/* Garantir que os botões dentro dos cards não propagam a interatividade */
-.voo-card button {
-  position: relative;
-  z-index: 3;
-}
-
-/* Melhorar a visualização dos botões de navegação */
-.nav-controls {
-  display: flex;
-  justify-content: space-between;
-  margin: 12px 16px 20px; /* Aumentar margem inferior */
-}
-
-.nav-btn {
-  display: flex;
-  align-items: center;
-  background-color: #f3f4f6;
-  border: none;
-  border-radius: 100px;
-  padding: 8px 16px; /* Botões um pouco maiores */
-  font-size: 0.8rem;
-  font-weight: 500; /* Um pouco mais bold */
-  cursor: pointer;
-  transition: all 0.2s ease;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
-}
-
-.nav-btn:hover {
-  background-color: #e5e7eb;
-  transform: translateY(-1px);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
-}
-
-.nav-btn:active {
-  transform: translateY(0);
-}
-
-/* Fazer os indicadores de paginação mais visíveis */
-.pagination-indicator {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  margin: 12px 0 16px; /* Aumentar margem inferior */
-  height: 16px; /* Altura fixa */
-}
-
-.pagination-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background-color: #e0e0e0;
-  margin: 0 4px;
-  transition: all 0.2s ease; /* Animação mais suave */
-  cursor: pointer; /* Indica interatividade */
-}
-
-.pagination-dot:hover {
-  background-color: #c0c0c0;
-}
-
-.pagination-dot.active {
-  background-color: var(--benetrip-orange);
-  width: 12px; /* Um pouco maior */
-  height: 12px; /* Um pouco maior */
-  transform: scale(1.1); /* Efeito sutil de escala */
-}
-
-/* Garantir que o botão de seleção fixo esteja sempre visível e acessível */
-.botao-selecao-fixo {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  background-color: white;
-  padding: 12px 16px;
-  box-shadow: 0 -4px 10px rgba(0, 0, 0, 0.1);
-  z-index: 30;
-  max-width: 480px;
-  margin: 0 auto;
-  border-top: 1px solid rgba(0, 0, 0, 0.05); /* Borda sutil */
-}
-
 /* Corrigir exibição para telas muito pequenas */
 @media (max-width: 360px) {
   .voo-card {
@@ -1390,34 +1302,4 @@
   .route-line {
     min-width: 60px; /* Garante espaço mínimo */
   }
-}
-
-/* Melhorar a visibilidade da dica de swipe */
-.swipe-hint {
-  position: fixed;
-  bottom: 80px; /* Um pouco mais alto para não sobrepor o botão de seleção */
-  left: 50%;
-  transform: translateX(-50%);
-  background-color: rgba(0, 0, 0, 0.8);
-  color: white;
-  padding: 8px 16px;
-  border-radius: 20px;
-  font-size: 0.8rem;
-  z-index: 20;
-  display: flex;
-  align-items: center;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-  opacity: 0.9; /* Um pouco mais opaco */
-}
-
-/* Regras específicas para garantir que os modais estejam ocultos */
-.modal-backdrop, 
-#modal-confirmacao, 
-#modal-detalhes-voo {
-    display: none !important; /* O !important garante prioridade */
-}
-
-/* Remover o !important apenas quando JS explicitamente ativar o modal */
-.modal-backdrop[style*="display: flex"] {
-    display: flex !important;
 }
