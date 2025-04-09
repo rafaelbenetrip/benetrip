@@ -1409,3 +1409,15 @@
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
   opacity: 0.9; /* Um pouco mais opaco */
 }
+
+/* Regras específicas para garantir que os modais estejam ocultos */
+.modal-backdrop, 
+#modal-confirmacao, 
+#modal-detalhes-voo {
+    display: none !important; /* O !important garante prioridade */
+}
+
+/* Remover o !important apenas quando JS explicitamente ativar o modal */
+.modal-backdrop[style*="display: flex"] {
+    display: flex !important;
+}
