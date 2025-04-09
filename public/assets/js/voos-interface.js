@@ -667,11 +667,21 @@ function mostrarConfirmacaoSelecao() {
     }
 }
 
+// Exibe o modal com classe ativa
+    const modal = document.getElementById('modal-confirmacao');
+    if (modal) {
+        modal.style.display = 'flex';
+        modal.classList.add('modal-active'); // Adiciona a classe modal-active
+        configurarBotoesConfirmacao();
+    }
+}
+
 // Função para fechar modais
 function fecharModal(modalId) {
     const modal = document.getElementById(modalId);
     if (modal) {
         modal.style.display = 'none';
+        modal.classList.remove('modal-active'); // Remove a classe modal-active
     }
 }
 
