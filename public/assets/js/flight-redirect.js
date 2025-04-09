@@ -328,46 +328,56 @@ const BENETRIP_REDIRECT = {
     },
     
     /**
-     * Obtém o link de redirecionamento da API
-     */
-    obterLinkRedirecionamento: function(voo) {
-        console.log('Obtendo link de redirecionamento para voo:', voo.sign);
-        
-        // Obter o search_id e o URL do termo dos dados do voo
-        const searchId = window.BENETRIP_VOOS.searchId;
-        
-        // Encontrar o termo (url) do voo selecionado
-        let termUrl = null;
-        try {
-            // Obter a primeira chave de voo.terms
-            const termsKey = Object.keys(voo.terms)[0];
-            termUrl = voo.terms[termsKey].url;
-            console.log('Term URL encontrada:', termUrl);
-        } catch (e) {
-            console.error('Erro ao obter URL do termo:', e);
-        }
-        
-        if (!searchId || !termUrl) {
-            console.error('searchId ou termUrl não disponíveis', { searchId, termUrl });
-            return Promise.reject(new Error('Dados insuficientes para redirecionamento'));
-        }
-        
-        // Construir URL da API
-        const apiUrl = `${this.config.apiBase}/flight_searches/${searchId}/clicks/${termUrl}.json?marker=${this.config.marker}`;
-        console.log('URL da API para redirecionamento:', apiUrl);
-        
-        // PARA TESTE: simular resposta em desenvolvimento
-        if (window.location.href.includes('localhost') || window.location.href.includes('127.0.0.1')) {
-            console.log('Ambiente de desenvolvimento detectado, retornando URL simulada');
-            return Promise.resolve({
-                gate_id: 112,
-                click_id: Date.now(),
-                str_click_id: Date.now().toString(),
-                url: "https://www.example.com/flights?mock=true",
-                method: "GET",
-                params: {}
-            });
-        }
+ * Obtém o link de redirecionamento da API
+ */
+obterLinkRedirecionamento: function(voo) {
+    console.log('Obtendo link de redirecionamento para voo:', voo.sign);
+    
+    // Obter o search_id e o URL do termo dos dados do voo
+    const searchId = window.BENETRIP_VOOS.searchId;
+    
+    // Encontrar o termo (url) do voo selecionado
+    let termUrl = null;
+    try {
+        // Obter a primeira chave de voo.terms
+        const termsKey = Object.keys(voo.terms)[0];
+        termUrl = voo.terms[termsKey].url;
+        console.log('Term URL encontrada:', termUrl);
+    } catch (e) {
+        console.error('Erro ao obter URL do termo:', e);
+    }
+    
+    if (!searchId || !termUrl) {
+        console.error('searchId ou termUrl não disponíveis', { searchId, termUrl });
+        return Promise.reject(new Error('Dados insuficientes para redirecionamento'));
+    }
+    
+    // Em vez de chamar a API externa diretamente, chama o proxy da nossa API
+    const apiUrl = `/api/flight-redirect?search_id=${encodeURIComponent(searchId)}&term_url=${encodeURIComponent(termUrl)}&marker=${encodeURIComponent(this.config.marker)}`;
+    console.log('Chamando API proxy para redirecionamento:', apiUrl);
+    
+    // PARA TESTE: simular resposta em desenvolvimento
+    if (window.location.href.includes('localhost') || window.location.href.includes('127.0.0.1')) {
+        console.log('Ambiente de desenvolvimento detectado, retornando URL simulada');
+        return Promise.resolve({
+            gate_id: 112,
+            click_id: Date.now(),
+            str_click_id: Date.now().toString(),
+            url: "https://www.example.com/flights?mock=true",
+            method: "GET",
+            params: {}
+        });
+    }
+    
+    // Fazer a requisição ao nosso proxy da API
+    return fetch(apiUrl)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`Erro na requisição: ${response.status}`);
+            }
+            return response.json();
+        });
+},
         
         // Tenta fazer uma chamada JSONP para evitar problemas de CORS
         return this.fetchJsonp(apiUrl)
