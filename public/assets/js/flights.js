@@ -330,7 +330,7 @@ const BENETRIP_VOOS = {
       if (!resposta.ok) {
         const errorData = await resposta.json()
           .catch(() => ({ error: `Erro ${resposta.status} (resposta não JSON)` }));
-          
+        
         const errorMessage = errorData.error || `Erro ${resposta.status}.`;
         console.error(`Erro no polling (HTTP ${resposta.status}):`, errorMessage);
         
@@ -480,7 +480,7 @@ const BENETRIP_VOOS = {
       // Procura o objeto no array que contém o search_id esperado
       const objRelevante = chunkData.find(item => 
         item && typeof item === 'object' && item.search_id === this.searchId);
-        
+      
       if (!objRelevante) {
         console.warn(`Array recebido, mas nenhum objeto encontrado com search_id ${this.searchId}`);
       } else {
@@ -763,7 +763,7 @@ const BENETRIP_VOOS = {
     this.pararPolling();
     this.estaCarregando = false;
     
-    // Prepara resultados finais
+    // Prepara plenamente os resultados finais
     this.finalResults = {
         proposals: this.preprocessarPropostas(this.accumulatedProposals),
         airlines: this.accumulatedAirlines,
@@ -798,7 +798,7 @@ const BENETRIP_VOOS = {
         this.renderizarSemResultados();
     }
   },
-  
+
   /**
    * Pré-processa as propostas de voos para uso na interface
    * @param {Array} propostas - Lista de propostas de voos
@@ -1646,6 +1646,11 @@ const BENETRIP_VOOS = {
     
     // Atualiza o botão de confirmação
     this.atualizarBotaoSelecao();
+    
+    // Usar a função global para mostrar o modal de confirmação
+    if (typeof window.mostrarConfirmacaoSelecao === 'function') {
+        window.mostrarConfirmacaoSelecao();
+    }
   },
 
   /**
