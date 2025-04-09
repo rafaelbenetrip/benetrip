@@ -9,6 +9,48 @@
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Montserrat:wght@400;500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="assets/css/styles.css">
     <link rel="stylesheet" href="assets/css/voos-styles.css">
+    <!-- Estilos críticos para garantir visibilidade -->
+    <style id="critical-styles">
+        /* Estilos críticos para garantir visibilidade */
+        .voos-swipe-container {
+            display: flex !important;
+            flex-direction: column !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+            min-height: 300px !important;
+        }
+        
+        .voo-card {
+            display: block !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+            background-color: white !important;
+            border: 1px solid #e0e0e0 !important;
+            border-radius: 8px !important;
+            margin: 0 0 16px 0 !important;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
+            min-height: 150px !important;
+            position: relative !important;
+            z-index: 1 !important;
+        }
+        
+        .botao-selecao-fixo {
+            display: flex !important;
+            position: fixed !important;
+            bottom: 0 !important;
+            left: 0 !important;
+            right: 0 !important;
+            z-index: 999 !important;
+            background-color: white !important;
+        }
+        
+        .modal-backdrop.modal-active {
+            display: flex !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+            z-index: 9999 !important;
+        }
+    </style>
 </head>
 <body class="mobile-optimized">
     <!-- Container principal -->
@@ -78,13 +120,12 @@
             }, 1000);
         });
     </script>
-<!-- Na seção de scripts, adicionar antes dos outros scripts -->
-<script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8/hammer.min.js"></script>
-<script src="assets/js/api.js"></script>
-<script src="assets/js/modal-handler.js"></script><!-- Novo arquivo -->
-<script src="assets/js/flights.js"></script>
-<script src="assets/js/flight-redirect.js"></script>
-<script src="assets/js/voos-interface.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8/hammer.min.js"></script>
+    <script src="assets/js/api.js"></script>
+    <script src="assets/js/modal-handler.js"></script><!-- Novo arquivo -->
+    <script src="assets/js/flights.js"></script>
+    <script src="assets/js/flight-redirect.js"></script>
+    <script src="assets/js/voos-interface.js"></script>
     <script>
     // Versão corrigida do fix de emergência
     document.addEventListener('DOMContentLoaded', function() {
