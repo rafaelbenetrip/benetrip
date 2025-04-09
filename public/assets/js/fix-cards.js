@@ -1,4 +1,4 @@
-// Script de correção de emergência para os cards invisíveis
+// Script de correção de emergência para os cards invisíveis_
 (function() {
   // Função para corrigir display dos cards
   function corrigirDisplayCards() {
