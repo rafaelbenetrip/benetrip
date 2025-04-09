@@ -2,121 +2,294 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Redirecionando para parceiro - Benetrip</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Redirecionando para Site Parceiro - Benetrip</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Montserrat:wght@400;500&display=swap" rel="stylesheet">
     <style>
+        :root {
+            --benetrip-orange: #E87722;
+            --benetrip-blue: #00A3E0;
+            --benetrip-dark: #21272A;
+            --benetrip-light-gray: #F5F5F5;
+            --benetrip-medium-gray: #E0E0E0;
+        }
+        
         body {
             font-family: 'Poppins', sans-serif;
-            background-color: #f5f5f5;
+            background-color: var(--benetrip-light-gray);
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            color: var(--benetrip-dark);
+        }
+        
+        .redirect-container {
+            background-color: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+            width: 90%;
+            max-width: 500px;
+            padding: 24px;
+            text-align: center;
+            overflow: hidden;
+        }
+        
+        .logo-container {
+            margin-bottom: 20px;
             display: flex;
             align-items: center;
             justify-content: center;
-            height: 100vh;
-            margin: 0;
         }
-        .redirect-container {
-            text-align: center;
-            background-color: white;
-            padding: 30px;
-            border-radius: 10px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-            max-width: 500px;
-        }
+        
         .logo {
-            margin-bottom: 20px;
+            width: 120px;
+            height: auto;
         }
-        .progress {
-            margin: 20px auto;
-            width: 80%;
-            height: 6px;
-            background-color: #e0e0e0;
-            border-radius: 3px;
+        
+        .tripinha {
+            width: 90px;
+            height: auto;
+            margin-left: -20px;
+            transform: scaleX(-1);
+        }
+        
+        .title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin: 0 0 16px 0;
+            color: var(--benetrip-dark);
+        }
+        
+        .message {
+            font-size: 1rem;
+            line-height: 1.5;
+            margin-bottom: 24px;
+            color: #555;
+        }
+        
+        .partner {
+            font-weight: 600;
+            color: var(--benetrip-orange);
+        }
+        
+        .progress-container {
+            width: 100%;
+            background-color: var(--benetrip-medium-gray);
+            height: 8px;
+            border-radius: 4px;
             overflow: hidden;
+            margin: 20px 0;
         }
+        
         .progress-bar {
             height: 100%;
             width: 0;
-            background-color: #E87722;
-            animation: progress 3s linear forwards;
+            background-color: var(--benetrip-orange);
+            border-radius: 4px;
+            animation: progress 3s ease-in-out forwards;
         }
+        
         @keyframes progress {
             0% { width: 0; }
             100% { width: 100%; }
         }
-        .message {
-            margin-bottom: 15px;
-            color: #21272A;
+        
+        .footer {
+            margin-top: 20px;
+            font-size: 0.9rem;
+            color: #777;
         }
-        .partner {
-            font-weight: bold;
-            color: #E87722;
+        
+        .error-message {
+            color: #e74c3c;
+            background-color: #fdf1f0;
+            padding: 12px;
+            border-radius: 6px;
+            margin: 16px 0;
+            display: none;
+        }
+        
+        .auto-redirect {
+            font-size: 0.9rem;
+            margin-top: 16px;
+            color: #666;
+        }
+        
+        .countdown {
+            font-weight: 600;
+            color: var(--benetrip-orange);
+        }
+        
+        /* Animação de pulsação */
+        .pulse {
+            animation: pulse 1.5s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
         }
     </style>
 </head>
 <body>
     <div class="redirect-container">
-        <div class="logo">
-            <img src="assets/images/logo.png" alt="Benetrip" height="40">
+        <div class="logo-container">
+            <img src="assets/images/logo.png" alt="Benetrip" class="logo" onerror="this.src='https://benetrip.com.br/assets/images/logo.png'">
+            <img src="assets/images/tripinha/avatar-feliz.png" alt="Tripinha" class="tripinha" onerror="this.src='https://benetrip.com.br/assets/images/tripinha/avatar-feliz.png'">
         </div>
+
+        <h1 class="title">Redirecionando para nosso parceiro</h1>
+        
         <div class="message">
-            <p>Você está sendo redirecionado para o site do nosso parceiro <span class="partner" id="partner-name">parceiro</span>...</p>
-            <p>Esta página fechará automaticamente em alguns segundos.</p>
+            Estamos redirecionando você para o site do parceiro <span class="partner" id="partner-name">parceiro</span> para finalizar sua reserva.
+            <br><br>
+            Não feche esta página até ser redirecionado.
         </div>
-        <div class="progress">
+        
+        <div class="progress-container">
             <div class="progress-bar"></div>
         </div>
         
-        <!-- Pixel de rastreamento -->
-        <img width="0" height="0" id="pixel" src="">
+        <div class="auto-redirect">
+            Você será redirecionado automaticamente em <span class="countdown" id="countdown">3</span> segundos...
+        </div>
         
-        <!-- Elemento para formulário POST -->
-        <div id="form-container"></div>
+        <div class="error-message" id="error-message">
+            Ocorreu um erro no redirecionamento. Por favor, tente novamente ou entre em contato com o suporte.
+        </div>
+        
+        <div class="footer">
+            Reserva segura garantida pela Benetrip
+        </div>
     </div>
+    
+    <!-- Pixel de tracking (invisível) -->
+    <img width="0" height="0" id="pixel" src="">
+    
+    <!-- Container para formulário POST -->
+    <div id="form-container" style="display:none;"></div>
 
     <script>
-        // Pegar parâmetros da URL
-        const urlParams = new URLSearchParams(window.location.search);
-        const clickId = urlParams.get('click_id');
-        const gateId = urlParams.get('gate_id');
-        const url = urlParams.get('url');
-        const method = urlParams.get('method') || 'GET';
-        const partnerName = urlParams.get('partner') || 'parceiro';
-        
-        // Atualizar nome do parceiro
-        document.getElementById('partner-name').textContent = partnerName;
-        
-        // Configurar pixel de rastreamento
-        if (clickId && gateId) {
-            document.getElementById('pixel').src = `//yasen.aviasales.com/adaptors/pixel_click.png?click_id=${clickId}&gate_id=${gateId}`;
+        // Função para extrair parâmetros da URL
+        function getParameterByName(name) {
+            const url = window.location.href;
+            name = name.replace(/[\[\]]/g, '\\$&');
+            const regex = new RegExp('[?&]' + name + '(=([^&#]*)|&|#|$)');
+            const results = regex.exec(url);
+            if (!results) return null;
+            if (!results[2]) return '';
+            return decodeURIComponent(results[2].replace(/\+/g, ' '));
         }
         
-        // Redirecionar após 3 segundos
-        setTimeout(function() {
-            if (method === 'GET' && url) {
-                window.location.href = url;
-            } else if (method === 'POST' && url) {
-                // TODO: Processar parâmetros POST
-                const params = JSON.parse(urlParams.get('params') || '{}');
+        // Contador regressivo
+        function startCountdown(seconds) {
+            const countdownElement = document.getElementById('countdown');
+            if (!countdownElement) return;
+            
+            let count = seconds;
+            countdownElement.textContent = count;
+            
+            const interval = setInterval(() => {
+                count--;
+                countdownElement.textContent = count;
                 
-                // Criar formulário dinamicamente
-                const form = document.createElement('form');
-                form.method = 'POST';
-                form.action = url;
-                
-                // Adicionar campos ao formulário
-                Object.entries(params).forEach(([key, value]) => {
-                    const input = document.createElement('input');
-                    input.type = 'hidden';
-                    input.name = key;
-                    input.value = value;
-                    form.appendChild(input);
-                });
-                
-                // Adicionar ao documento e submeter
-                document.getElementById('form-container').appendChild(form);
-                form.submit();
+                if (count <= 0) {
+                    clearInterval(interval);
+                }
+            }, 1000);
+        }
+        
+        // Processar redirecionamento
+        function processRedirect() {
+            // Obter parâmetros da URL
+            const clickId = getParameterByName('click_id');
+            const gateId = getParameterByName('gate_id');
+            const url = getParameterByName('url');
+            const method = getParameterByName('method') || 'GET';
+            const partnerName = getParameterByName('partner') || 'parceiro';
+            let paramsString = getParameterByName('params');
+            let params = {};
+            
+            try {
+                if (paramsString) {
+                    params = JSON.parse(paramsString);
+                }
+            } catch (e) {
+                console.error('Erro ao processar parâmetros:', e);
+                showError('Dados de redirecionamento inválidos');
+                return;
             }
-        }, 3000);
+            
+            // Definir nome do parceiro
+            document.getElementById('partner-name').textContent = partnerName;
+            
+            // Configurar pixel de tracking
+            if (clickId && gateId) {
+                document.getElementById('pixel').src = `//yasen.aviasales.com/adaptors/pixel_click.png?click_id=${clickId}&gate_id=${gateId}`;
+            }
+            
+            // Iniciar contagem regressiva
+            startCountdown(3);
+            
+            // Verificar dados necessários
+            if (!url) {
+                showError('URL de redirecionamento não fornecida');
+                return;
+            }
+            
+            // Redirecionar após 3 segundos
+            setTimeout(() => {
+                try {
+                    if (method.toUpperCase() === 'GET') {
+                        // Redirecionamento GET
+                        window.location.href = url;
+                    } else if (method.toUpperCase() === 'POST') {
+                        // Redirecionamento POST via formulário
+                        const form = document.createElement('form');
+                        form.method = 'POST';
+                        form.action = url;
+                        form.target = '_self';
+                        
+                        // Adicionar cada parâmetro como input
+                        Object.entries(params).forEach(([key, value]) => {
+                            const input = document.createElement('input');
+                            input.type = 'hidden';
+                            input.name = key;
+                            input.value = value;
+                            form.appendChild(input);
+                        });
+                        
+                        // Adicionar ao DOM e submeter
+                        const formContainer = document.getElementById('form-container');
+                        formContainer.innerHTML = '';
+                        formContainer.appendChild(form);
+                        form.submit();
+                    } else {
+                        showError(`Método de redirecionamento não suportado: ${method}`);
+                    }
+                } catch (e) {
+                    showError('Erro ao processar redirecionamento: ' + e.message);
+                }
+            }, 3000);
+        }
+        
+        // Exibir mensagem de erro
+        function showError(message) {
+            const errorElement = document.getElementById('error-message');
+            if (errorElement) {
+                errorElement.textContent = message;
+                errorElement.style.display = 'block';
+            }
+            console.error('Erro de redirecionamento:', message);
+        }
+        
+        // Iniciar o processamento quando a página carregar
+        window.addEventListener('DOMContentLoaded', processRedirect);
     </script>
 </body>
 </html>
