@@ -87,5 +87,56 @@
     <script src="assets/js/vertical-layout.js"></script>
     <script src="assets/js/fix-cards.js"></script>
     <script src="assets/js/flight-redirect.js"></script>
+    <script>
+  // Fix de emergência para botões que não funcionam
+  document.addEventListener('DOMContentLoaded', function() {
+    console.log("Aplicando fix de redirecionamento direto");
+    
+    // Fix para botão principal
+    const fixButtons = function() {
+      // Botão principal
+      const btnPrincipal = document.querySelector('.btn-selecionar-voo');
+      if (btnPrincipal) {
+        console.log("Aplicando fix no botão principal");
+        btnPrincipal.onclick = function(e) {
+          e.preventDefault();
+          console.log("Botão principal clicado (fix direto)");
+          
+          // Redireciona diretamente para hotéis
+          localStorage.setItem('benetrip_reserva_pendente', 'true');
+          window.location.href = 'hotels.html';
+        };
+      }
+      
+      // Botões nos cards
+      const botoesCards = document.querySelectorAll('.choose-flight-button, .escolher-este-voo');
+      botoesCards.forEach(btn => {
+        console.log("Aplicando fix em botão de card");
+        btn.onclick = function(e) {
+          e.preventDefault();
+          console.log("Botão de card clicado (fix direto)");
+          
+          // Redireciona diretamente para hotéis
+          localStorage.setItem('benetrip_reserva_pendente', 'true');
+          window.location.href = 'hotels.html';
+        };
+      });
+    };
+    
+    // Aplicar o fix agora
+    fixButtons();
+    
+    // E também quando os resultados estiverem prontos
+    document.addEventListener('resultadosVoosProntos', fixButtons);
+    
+    // Tentar a cada 2 segundos por 10 segundos
+    let tentativas = 0;
+    const intervalId = setInterval(function() {
+      tentativas++;
+      fixButtons();
+      if (tentativas >= 5) clearInterval(intervalId);
+    }, 2000);
+  });
+</script>
 </body>
 </html>
