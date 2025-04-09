@@ -15,45 +15,33 @@ function getAirlineLogoUrl(iataCode, width = 40, height = 40, retina = false) {
         return `https://pics.avs.io/${width}/${height}/default.png`;
     }
     
-    // Converte para maiúsculas e remove espaços
     const code = iataCode.trim().toUpperCase();
-    
-    // Adiciona sufixo @2x para versão retina, se solicitado
     const retinaSuffix = retina ? '@2x' : '';
     
     return `https://pics.avs.io/${width}/${height}/${code}${retinaSuffix}.png`;
 }
 
 function getAgencyLogoUrl(gateId, width = 110, height = 40, retina = false) {
-    if (!gateId) {
-        return null;
-    }
+    if (!gateId) return null;
     
-    // Adiciona sufixo @2x para versão retina, se solicitado
     const retinaSuffix = retina ? '@2x' : '';
-    
     return `https://pics.avs.io/as_gates/${width}/${height}/${gateId}${retinaSuffix}.png`;
 }
 
 // Função para formatar duração de voo
 function formatarDuracao(minutos) {
     if (typeof minutos !== 'number' || minutos < 0) return 'N/A';
-    
     const horas = Math.floor(minutos / 60);
     const mins = minutos % 60;
-    
     return `${horas}h${mins > 0 ? ` ${mins}m` : ''}`;
 }
 
 // Função para formatar data
 function formatarData(data) {
-    if (!data || !(data instanceof Date) || isNaN(data.getTime())) {
-        return 'N/A';
-    }
+    if (!data || !(data instanceof Date) || isNaN(data.getTime())) return 'N/A';
     
     const diasSemana = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
     const meses = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
-    
     return `${diasSemana[data.getDay()]}, ${data.getDate()} ${meses[data.getMonth()]}`;
 }
 
@@ -61,38 +49,32 @@ function formatarData(data) {
  * Aplicar estilos CSS para layout vertical
  */
 function aplicarEstilosVerticais() {
-    // Criar elemento de estilo
     const style = document.createElement('style');
     style.textContent = `
-    /* Alteramos o container de swipe para lista vertical */
     .voos-swipe-container {
       display: flex;
-      flex-direction: column; /* Alterado de row para column */
+      flex-direction: column;
       gap: 16px;
-      overflow-y: auto; /* Alterado de overflow-x para overflow-y */
-      overflow-x: hidden; /* Esconder overflow horizontal */
-      scroll-snap-type: y mandatory; /* Alterado de x para y */
-      padding: 8px 16px 80px; /* Aumentado o padding inferior para dar espaço */
+      overflow-y: auto;
+      overflow-x: hidden;
+      scroll-snap-type: y mandatory;
+      padding: 8px 16px 80px;
       margin-bottom: 16px;
-      max-height: calc(100vh - 240px); /* Altura máxima para garantir scroll */
+      max-height: calc(100vh - 240px);
       scrollbar-width: thin;
-      
-      /* Remover gradiente horizontal */
       background: none;
     }
 
-    /* Ajustes para os cards */
     .voo-card {
-      flex: 0 0 auto; /* Remover constraint de largura */
-      width: 100%; /* Fazer o card ocupar a largura completa */
-      max-width: none; /* Remover limitação de largura máxima */
-      scroll-snap-align: start; /* Alterado de center para start */
-      min-width: 0; /* Remover a largura mínima */
-      margin: 0 0 12px 0; /* Ajustar margens para empilhamento vertical */
+      flex: 0 0 auto;
+      width: 100%;
+      max-width: none;
+      scroll-snap-align: start;
+      min-width: 0;
+      margin: 0 0 12px 0;
       transition: transform 0.2s ease, box-shadow 0.2s ease;
     }
 
-    /* Botão de customização da busca */
     .customize-search-button {
       display: flex;
       align-items: center;
@@ -117,16 +99,12 @@ function aplicarEstilosVerticais() {
       margin-right: 6px;
     }
 
-    /* Remover/ajustar os controles de navegação */
-    .pagination-indicator {
-      display: none; /* Não precisamos dos pontos de paginação em layout vertical */
+    .pagination-indicator,
+    .nav-controls,
+    .swipe-hint {
+      display: none;
     }
 
-    .nav-controls {
-      display: none; /* Esconder botões de navegação anterior/próximo */
-    }
-
-    /* Novo layout para o botão de escolha */
     .choose-flight-button {
       width: 100%;
       background-color: var(--benetrip-orange);
@@ -144,7 +122,6 @@ function aplicarEstilosVerticais() {
       background-color: #d06a1c;
     }
 
-    /* Corrigir comportamento do modal */
     .modal-backdrop {
       opacity: 0;
       visibility: hidden;
@@ -157,14 +134,7 @@ function aplicarEstilosVerticais() {
       display: flex !important;
       pointer-events: auto !important;
     }
-
-    /* Remover swipe hint para layout vertical */
-    .swipe-hint {
-      display: none;
-    }
     `;
-    
-    // Adicionar ao head do documento
     document.head.appendChild(style);
     console.log('Estilos para layout vertical aplicados');
 }
@@ -173,7 +143,6 @@ function aplicarEstilosVerticais() {
  * Adicionar botão de customização
  */
 function adicionarBotaoCustomizacao() {
-    // Se já existe, não adicionar novamente
     if (document.querySelector('.customize-search-button')) return;
     
     const header = document.querySelector('.app-header');
@@ -189,10 +158,8 @@ function adicionarBotaoCustomizacao() {
         Personalizar Minha Busca
     `;
     
-    // Inserir logo após o header
     header.parentNode.insertBefore(button, header.nextSibling);
     
-    // Adicionar evento de clique
     button.addEventListener('click', function() {
         localStorage.setItem('benetrip_customizar_busca', 'true');
         window.location.href = 'index.html';
@@ -202,7 +169,7 @@ function adicionarBotaoCustomizacao() {
 }
 
 /**
- * Inicialização para navegação de voos - função global para ser chamada por outros módulos
+ * Inicialização para navegação de voos - função global
  */
 window.inicializarNavegacaoVoos = function() {
     console.log('Inicializando navegação de voos (função global)...');
@@ -226,24 +193,18 @@ function configurarNavegacaoCards() {
         return;
     }
     
-    // Limpar eventos existentes e configurar novos
     cards.forEach((card, index) => {
-        // Remover handlers existentes para evitar duplicação
         const newCard = card.cloneNode(true);
         card.parentNode.replaceChild(newCard, card);
         
-        // Adicionar evento de clique no card
         newCard.addEventListener('click', function(e) {
-            // Ignorar se o clique foi em um botão
             if (e.target.closest('button')) return;
             
-            // Atualizar card ativo
             document.querySelectorAll('.voo-card').forEach(c => 
                 c.classList.remove('voo-card-ativo')
             );
             this.classList.add('voo-card-ativo');
             
-            // Atualizar o voo ativo no módulo principal
             if (window.BENETRIP_VOOS && window.BENETRIP_VOOS.finalResults?.proposals) {
                 const vooIndex = parseInt(this.dataset.vooIndex);
                 if (!isNaN(vooIndex)) {
@@ -254,11 +215,10 @@ function configurarNavegacaoCards() {
             }
         });
         
-        // Configurar botão de detalhes dentro do card
         const btnDetalhes = newCard.querySelector('.btn-detalhes-voo');
         if (btnDetalhes) {
             btnDetalhes.addEventListener('click', function(e) {
-                e.stopPropagation(); // Evitar que o clique afete o card
+                e.stopPropagation();
                 const vooId = this.dataset.vooId;
                 if (vooId) {
                     mostrarDetalhesVoo(vooId);
@@ -267,26 +227,25 @@ function configurarNavegacaoCards() {
         }
     });
     
-    // Verificar se temos botões de escolha direta
     const chooseButtons = document.querySelectorAll('.choose-flight-button');
     if (chooseButtons.length) {
         chooseButtons.forEach(button => {
             button.addEventListener('click', function(e) {
-                e.stopPropagation(); // Evitar que o clique afete o card
+                e.stopPropagation();
                 const vooId = this.dataset.vooId;
                 if (vooId && window.BENETRIP_VOOS) {
                     window.BENETRIP_VOOS.selecionarVoo(vooId);
-                    mostrarConfirmacaoSelecao();
+                    if (typeof window.mostrarConfirmacaoSelecao === 'function') {
+                        window.mostrarConfirmacaoSelecao();
+                    }
                 }
             });
         });
     }
     
-    // Configurar navegação por teclado
     document.addEventListener('keydown', function(e) {
         if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
-            e.preventDefault(); // Evitar scroll padrão
-            
+            e.preventDefault();
             const activeCard = document.querySelector('.voo-card-ativo');
             if (!activeCard) return;
             
@@ -300,10 +259,7 @@ function configurarNavegacaoCards() {
             }
             
             if (newIndex !== currentIndex) {
-                // Simular clique no novo card
                 cards[newIndex].click();
-                
-                // Garantir que o card seja visível
                 cards[newIndex].scrollIntoView({
                     behavior: 'smooth',
                     block: 'nearest'
@@ -319,34 +275,25 @@ function configurarNavegacaoCards() {
  * Modificar a função do BENETRIP_VOOS para adicionar botão de escolha nos cards
  */
 function modificarCriarCardVoo() {
-    // Verificar se o objeto BENETRIP_VOOS existe
     if (!window.BENETRIP_VOOS || !window.BENETRIP_VOOS.criarCardVoo) {
         console.log('BENETRIP_VOOS ainda não disponível, tentando novamente em 100ms');
         setTimeout(modificarCriarCardVoo, 100);
         return;
     }
     
-    // Guardar referência à função original
     const funcaoOriginal = window.BENETRIP_VOOS.criarCardVoo;
     
-    // Sobrescrever com nova função
     window.BENETRIP_VOOS.criarCardVoo = function(voo, index) {
-        // Chamar função original para criar o card base
         const cardVoo = funcaoOriginal.call(this, voo, index);
         
         if (cardVoo) {
-            // Substituir o footer do card com o botão de escolha
             const footer = cardVoo.querySelector('.voo-card-footer');
             if (footer) {
                 const vooId = voo.sign || `voo-idx-${index}`;
-                
-                // Criar o botão de escolha
                 const chooseButton = document.createElement('button');
                 chooseButton.className = 'choose-flight-button';
                 chooseButton.textContent = 'Escolher Este Voo';
                 chooseButton.dataset.vooId = vooId;
-                
-                // Substituir o conteúdo do footer
                 footer.innerHTML = '';
                 footer.appendChild(chooseButton);
             }
@@ -354,7 +301,6 @@ function modificarCriarCardVoo() {
         
         return cardVoo;
     };
-    
     console.log('Função criarCardVoo modificada para incluir botão de escolha');
 }
 
@@ -363,9 +309,7 @@ function carregarTemplatesModais() {
     const modalContainer = document.getElementById('modal-container');
     if (!modalContainer) return;
     
-    // Carrega os templates de modais
     modalContainer.innerHTML = `
-        <!-- Modal de detalhes do voo -->
         <div id="modal-detalhes-voo" class="modal-backdrop" style="display:none;">
             <div class="modal-content modal-detalhes-voo">
                 <div class="modal-header">
@@ -377,11 +321,8 @@ function carregarTemplatesModais() {
                         </svg>
                     </button>
                 </div>
-                
                 <div class="detalhes-content" id="detalhes-voo-content">
-                    <!-- Conteúdo preenchido dinamicamente -->
                 </div>
-                
                 <div class="modal-footer">
                     <button class="modal-btn modal-btn-secondary" id="btn-voltar-lista">
                         Voltar
@@ -393,7 +334,6 @@ function carregarTemplatesModais() {
             </div>
         </div>
 
-        <!-- Modal de confirmação de seleção -->
         <div id="modal-confirmacao" class="modal-backdrop" style="display:none;">
             <div class="modal-content">
                 <div class="modal-header">
@@ -405,30 +345,24 @@ function carregarTemplatesModais() {
                         </svg>
                     </button>
                 </div>
-                
                 <div class="confirmacao-tripinha">
                     <div class="confirmacao-avatar">
                         <img src="assets/images/tripinha/avatar-normal.png" alt="Tripinha">
                     </div>
                     <div class="confirmacao-content">
                         <p class="confirmacao-titulo">Ótima escolha!</p>
-                        
                         <div id="resumo-valores" class="confirmacao-resumo">
-                            <!-- Resumo de valores preenchido dinamicamente -->
                         </div>
-                        
                         <div class="confirmacao-checkbox">
                             <input type="checkbox" id="confirmar-selecao">
                             <label for="confirmar-selecao">Confirmo que desejo prosseguir com este voo</label>
                         </div>
-                        
                         <p class="confirmacao-aviso">
                             <span class="icon-info">ℹ️</span> 
                             Após a confirmação, você será direcionado para selecionar sua hospedagem.
                         </p>
                     </div>
                 </div>
-                
                 <div class="modal-footer">
                     <button class="modal-btn modal-btn-secondary" id="btn-continuar-buscando">
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -447,7 +381,6 @@ function carregarTemplatesModais() {
         </div>
     `;
     
-    // Garantir que os modais estão ocultos
     document.getElementById('modal-confirmacao').style.display = 'none';
     document.getElementById('modal-detalhes-voo').style.display = 'none';
     console.log('Templates de modais carregados');
@@ -455,13 +388,11 @@ function carregarTemplatesModais() {
 
 // Função para mostrar detalhes do voo em modal
 function mostrarDetalhesVoo(vooId) {
-    // Verifica se o módulo BENETRIP_VOOS está disponível e inicializado
     if (!window.BENETRIP_VOOS?.finalResults?.proposals) {
         console.error('Dados de voos não disponíveis');
         return;
     }
     
-    // Encontra o voo pelo ID
     const voo = window.BENETRIP_VOOS.finalResults.proposals.find(
         (v, index) => (v.sign || `voo-idx-${index}`) === vooId
     );
@@ -471,25 +402,20 @@ function mostrarDetalhesVoo(vooId) {
         return;
     }
     
-    // Prepara dados do voo
     const preco = window.BENETRIP_VOOS.obterPrecoVoo(voo);
     const moeda = window.BENETRIP_VOOS.finalResults?.meta?.currency || 'BRL';
     const infoIda = window.BENETRIP_VOOS.obterInfoSegmento(voo.segment?.[0]);
     const infoVolta = voo.segment?.length > 1 ? window.BENETRIP_VOOS.obterInfoSegmento(voo.segment[1]) : null;
     const companhiaIATA = voo.carriers?.[0];
     const companhiaAerea = window.BENETRIP_VOOS.obterNomeCompanhiaAerea(companhiaIATA);
-    const ehVooDireto = infoIda?.paradas === 0 && (!infoVolta || infoVolta.paradas === 0);
     
-    // Obter container de conteúdo do modal
     const detalhesContent = document.getElementById('detalhes-voo-content');
     if (!detalhesContent) {
         console.error('Container de detalhes não encontrado');
         return;
     }
     
-    // Gerar HTML do conteúdo
     detalhesContent.innerHTML = `
-        <!-- Resumo de preço e companhia -->
         <div class="detalhes-sumario">
             <div class="detalhes-preco">
                 <div class="preco-valor">${window.BENETRIP_VOOS.formatarPreco(preco, moeda)}</div>
@@ -504,8 +430,6 @@ function mostrarDetalhesVoo(vooId) {
                 <div class="companhia-nome">${companhiaAerea}</div>
             </div>
         </div>
-        
-        <!-- Visualização da rota com timeline - IDA -->
         <div class="detalhes-secao">
             <div class="secao-header">
                 <h4 class="secao-titulo">Ida • ${formatarData(infoIda?.dataPartida)}</h4>
@@ -515,12 +439,9 @@ function mostrarDetalhesVoo(vooId) {
                     <span>Voo Direto</span>
                 </div>` : ''}
             </div>
-            
             ${renderizarTimelineVoo(voo.segment?.[0]?.flight)}
         </div>
-        
         ${infoVolta ? `
-        <!-- Visualização da rota com timeline - VOLTA -->
         <div class="detalhes-secao">
             <div class="secao-header">
                 <h4 class="secao-titulo">Volta • ${formatarData(infoVolta.dataPartida)}</h4>
@@ -530,12 +451,9 @@ function mostrarDetalhesVoo(vooId) {
                     <span>Voo Direto</span>
                 </div>` : ''}
             </div>
-            
             ${renderizarTimelineVoo(voo.segment?.[1]?.flight)}
         </div>
         ` : ''}
-        
-        <!-- Serviços e bagagem -->
         <div class="detalhes-secao">
             <h4 class="secao-titulo">Serviços Incluídos</h4>
             <div class="servicos-grid">
@@ -561,8 +479,6 @@ function mostrarDetalhesVoo(vooId) {
                 </div>
             </div>
         </div>
-        
-        <!-- Política de cancelamento -->
         <div class="detalhes-secao">
             <div class="secao-header">
                 <h4 class="secao-titulo">Política de Cancelamento</h4>
@@ -579,7 +495,6 @@ function mostrarDetalhesVoo(vooId) {
         </div>
     `;
     
-    // Mostra o modal
     const modal = document.getElementById('modal-detalhes-voo');
     if (modal) {
         modal.style.display = 'flex';
@@ -597,8 +512,6 @@ function renderizarTimelineVoo(voos) {
     }
     
     let html = '';
-    
-    // Processa cada trecho de voo
     for (let i = 0; i < voos.length; i++) {
         const voo = voos[i];
         const ultimo = i === voos.length - 1;
@@ -624,7 +537,6 @@ function renderizarTimelineVoo(voos) {
                         </div>
                     </div>
                 </div>
-                
                 <div class="voo-info">
                     <div class="info-item">
                         <span class="info-icone">🛫</span>
@@ -647,25 +559,18 @@ function renderizarTimelineVoo(voos) {
             </div>
         `;
         
-        // Adiciona informação de conexão entre trechos
         if (!ultimo && voos[i+1]) {
-            // Calcula tempo de conexão (usando strings de hora)
-            let tempoConexao = 60; // Valor padrão
-            
+            let tempoConexao = 60;
             if (voo.arrival_time && voos[i+1].departure_time) {
                 const [horaC, minC] = voo.arrival_time.split(':').map(Number);
                 const [horaP, minP] = voos[i+1].departure_time.split(':').map(Number);
-                
                 if (!isNaN(horaC) && !isNaN(minC) && !isNaN(horaP) && !isNaN(minP)) {
                     const minutosC = horaC * 60 + minC;
                     const minutosP = horaP * 60 + minP;
                     tempoConexao = minutosP - minutosC;
-                    
-                    // Se negativo, assume que é no dia seguinte
                     if (tempoConexao < 0) tempoConexao += 24 * 60;
                 }
             }
-            
             html += `
                 <div style="text-align: center; margin: 8px 0; color: #E87722; font-size: 0.8rem; font-weight: 500;">
                     <span>⏱️</span> Conexão em ${voo.arrival} • ${formatarDuracao(tempoConexao)}
@@ -673,104 +578,20 @@ function renderizarTimelineVoo(voos) {
             `;
         }
     }
-    
     return html;
 }
 
 // Função para obter nome da cidade a partir do código do aeroporto
 function obterNomeCidade(codigoAeroporto) {
     if (!codigoAeroporto || !window.BENETRIP_VOOS) return '';
-    
-    // Tenta obter do objeto cached
     const aeroporto = window.BENETRIP_VOOS.accumulatedAirports?.[codigoAeroporto];
     if (aeroporto?.city) return aeroporto.city;
-    
-    // Tenta obter do finalResults
     const finalAeroporto = window.BENETRIP_VOOS.finalResults?.airports?.[codigoAeroporto];
     return finalAeroporto?.city || '';
 }
 
-// Função para mostrar confirmação de seleção - MODIFICADA para resolver problemas de modal
-function mostrarConfirmacaoSelecao() {
-    // Verifica se o módulo está disponível
-    if (!window.BENETRIP_VOOS) {
-        console.error('Módulo BENETRIP_VOOS não disponível');
-        return;
-    }
-    
-    // CORREÇÃO: Verifica explicitamente se um voo foi selecionado
-    const voo = window.BENETRIP_VOOS.vooSelecionado || window.BENETRIP_VOOS.vooAtivo;
-    if (!voo) {
-        exibirToast('Selecione um voo primeiro', 'warning');
-        return;
-    }
-    
-    // Prepara dados do voo
-    const preco = window.BENETRIP_VOOS.obterPrecoVoo(voo);
-    const moeda = window.BENETRIP_VOOS.finalResults?.meta?.currency || 'BRL';
-    const precoFormatado = window.BENETRIP_VOOS.formatarPreco(preco, moeda);
-    const numPassageiros = window.BENETRIP_VOOS.obterQuantidadePassageiros();
-    const precoTotal = preco * numPassageiros;
-    const precoTotalFormatado = window.BENETRIP_VOOS.formatarPreco(precoTotal, moeda);
-    
-    // Preenche o resumo de valores
-    const resumoContainer = document.getElementById('resumo-valores');
-    if (resumoContainer) {
-        if (numPassageiros > 1) {
-            resumoContainer.innerHTML = `
-                <div class="resumo-item">
-                    <span class="resumo-label">Preço por pessoa:</span>
-                    <span class="resumo-valor">${precoFormatado}</span>
-                </div>
-                <div class="resumo-item">
-                    <span class="resumo-label">Total (${numPassageiros} pessoas):</span>
-                    <span class="resumo-valor destaque">${precoTotalFormatado}</span>
-                </div>
-            `;
-        } else {
-            resumoContainer.innerHTML = `
-                <div class="resumo-item">
-                    <span class="resumo-label">Preço total:</span>
-                    <span class="resumo-valor destaque">${precoFormatado}</span>
-                </div>
-            `;
-        }
-    }
-    
-    // CORREÇÃO: Exibir o modal com a classe modal-active
-    const modal = document.getElementById('modal-confirmacao');
-    if (modal) {
-        // Resetar o estado do modal para garantir que ele esteja fechado antes de abrir
-        modal.style.display = 'flex';
-        
-        // Timeout para garantir que o display:flex seja aplicado antes de adicionar a classe
-        setTimeout(() => {
-            modal.classList.add('modal-active');
-        }, 10);
-        
-        configurarBotoesConfirmacao();
-    }
-}
-
-// Função para fechar modais - MODIFICADA
-function fecharModal(modalId) {
-    const modal = document.getElementById(modalId);
-    if (!modal) return;
-    
-    // Remover a classe modal-active
-    modal.classList.remove('modal-active');
-    
-    // Aguardar a animação terminar antes de setar display: none
-    setTimeout(() => {
-        if (!modal.classList.contains('modal-active')) {
-            modal.style.display = 'none';
-        }
-    }, 300); // Mesmo tempo da transição CSS
-}
-
-// Função para exibir toasts (mensagens temporárias)
+// Função para exibir toasts
 function exibirToast(mensagem, tipo = 'info') {
-    // Cria container se não existir
     let toastContainer = document.getElementById('toast-container');
     if (!toastContainer) {
         toastContainer = document.createElement('div');
@@ -778,23 +599,19 @@ function exibirToast(mensagem, tipo = 'info') {
         document.body.appendChild(toastContainer);
     }
     
-    // Remove toasts existentes
     const existingToasts = toastContainer.querySelectorAll('.toast');
     existingToasts.forEach(toast => {
         toast.classList.remove('toast-visible');
         setTimeout(() => toast.remove(), 300);
     });
     
-    // Cria novo toast
     const toast = document.createElement('div');
     toast.className = `toast toast-${tipo}`;
     toast.textContent = mensagem;
     
-    // Adiciona ao container e anima
     toastContainer.appendChild(toast);
     setTimeout(() => toast.classList.add('toast-visible'), 10);
     
-    // Remove após alguns segundos
     setTimeout(() => {
         toast.classList.remove('toast-visible');
         setTimeout(() => toast.remove(), 300);
@@ -805,43 +622,45 @@ function exibirToast(mensagem, tipo = 'info') {
 
 // Configurar botões do modal de detalhes do voo
 function configurarBotoesDetalhesVoo(vooId) {
-    // Botão para fechar modal
     const btnFechar = document.getElementById('btn-fechar-detalhes');
     if (btnFechar) {
-        btnFechar.onclick = () => fecharModal('modal-detalhes-voo');
-    }
-    
-    // Botão para voltar à lista
-    const btnVoltar = document.getElementById('btn-voltar-lista');
-    if (btnVoltar) {
-        btnVoltar.onclick = () => fecharModal('modal-detalhes-voo');
-    }
-    
-    // Botão para selecionar o voo
-    const btnSelecionar = document.getElementById('btn-selecionar-este-voo');
-    if (btnSelecionar) {
-        btnSelecionar.onclick = () => {
-            // Fechar modal de detalhes
-            fecharModal('modal-detalhes-voo');
-            
-            // Selecionar o voo se o módulo estiver disponível
-            if (window.BENETRIP_VOOS && vooId) {
-                window.BENETRIP_VOOS.selecionarVoo(vooId);
-                
-                // Exibir confirmação
-                mostrarConfirmacaoSelecao();
+        btnFechar.onclick = () => {
+            if (typeof window.fecharModal === 'function') {
+                window.fecharModal('modal-detalhes-voo');
             }
         };
     }
     
-    // Configurar toggle da política de cancelamento
+    const btnVoltar = document.getElementById('btn-voltar-lista');
+    if (btnVoltar) {
+        btnVoltar.onclick = () => {
+            if (typeof window.fecharModal === 'function') {
+                window.fecharModal('modal-detalhes-voo');
+            }
+        };
+    }
+    
+    const btnSelecionar = document.getElementById('btn-selecionar-este-voo');
+    if (btnSelecionar) {
+        btnSelecionar.onclick = () => {
+            if (typeof window.fecharModal === 'function') {
+                window.fecharModal('modal-detalhes-voo');
+            }
+            
+            if (window.BENETRIP_VOOS && vooId) {
+                window.BENETRIP_VOOS.selecionarVoo(vooId);
+                if (typeof window.mostrarConfirmacaoSelecao === 'function') {
+                    window.mostrarConfirmacaoSelecao();
+                }
+            }
+        };
+    }
+    
     const politicaToggle = document.querySelector('.politica-toggle');
     const politicaConteudo = document.querySelector('.politica-conteudo');
-    
     if (politicaToggle && politicaConteudo) {
         politicaToggle.onclick = function() {
             const icone = this.querySelector('.politica-icone');
-            
             if (politicaConteudo.style.display === 'none') {
                 politicaConteudo.style.display = 'block';
                 icone.textContent = '▼';
@@ -852,101 +671,13 @@ function configurarBotoesDetalhesVoo(vooId) {
         };
     }
     
-    // Fechar modal ao clicar fora
     const modal = document.getElementById('modal-detalhes-voo');
     if (modal) {
         modal.onclick = function(e) {
             if (e.target === modal) {
-                fecharModal('modal-detalhes-voo');
-            }
-        };
-    }
-}
-
-// Configura botões do modal de confirmação
-function configurarBotoesConfirmacao() {
-    // Checkbox de confirmação
-    const checkbox = document.getElementById('confirmar-selecao');
-    const btnConfirmar = document.getElementById('btn-confirmar');
-    
-    if (checkbox && btnConfirmar) {
-        // Reset do estado
-        checkbox.checked = false;
-        btnConfirmar.disabled = true;
-        
-        // Configurar evento de alteração
-        checkbox.onchange = function() {
-            btnConfirmar.disabled = !this.checked;
-        };
-    }
-    
-    // Botão de fechar modal
-    const btnFechar = document.getElementById('btn-fechar-modal');
-    if (btnFechar) {
-        btnFechar.onclick = () => fecharModal('modal-confirmacao');
-    }
-    
-    // Botão para continuar buscando
-    const btnContinuar = document.getElementById('btn-continuar-buscando');
-    if (btnContinuar) {
-        btnContinuar.onclick = () => fecharModal('modal-confirmacao');
-    }
-    
-    // Botão de confirmar seleção
-    if (btnConfirmar) {
-        btnConfirmar.onclick = function() {
-            if (window.BENETRIP_VOOS && window.BENETRIP_VOOS.vooSelecionado) {
-                // Adiciona efeito de loading
-                this.innerHTML = `
-                    <span class="spinner"></span>
-                    Processando...
-                `;
-                this.disabled = true;
-                
-                // Salvar dados
-                const voo = window.BENETRIP_VOOS.vooSelecionado;
-                const preco = window.BENETRIP_VOOS.obterPrecoVoo(voo);
-                const moeda = window.BENETRIP_VOOS.finalResults?.meta?.currency || 'BRL';
-                const numPassageiros = window.BENETRIP_VOOS.obterQuantidadePassageiros();
-                const precoTotal = preco * numPassageiros;
-                
-                const dadosVoo = { 
-                    voo, 
-                    preco, 
-                    precoTotal, 
-                    moeda, 
-                    numPassageiros, 
-                    infoIda: window.BENETRIP_VOOS.obterInfoSegmento(voo.segment?.[0]), 
-                    infoVolta: voo.segment?.length > 1 ? 
-                        window.BENETRIP_VOOS.obterInfoSegmento(voo.segment[1]) : null, 
-                    companhiaAerea: window.BENETRIP_VOOS.obterNomeCompanhiaAerea(voo.carriers?.[0]), 
-                    dataSelecao: new Date().toISOString() 
-                };
-                
-                try {
-                    localStorage.setItem('benetrip_voo_selecionado', JSON.stringify(dadosVoo));
-                    exibirToast('Voo selecionado! Redirecionando...', 'success');
-                    
-                    // Redireciona após breve espera
-                    setTimeout(() => {
-                        window.location.href = 'hotels.html';
-                    }, 1500);
-                } catch (erro) {
-                    console.error('Erro ao salvar seleção de voo:', erro);
-                    exibirToast('Erro ao processar seleção', 'error');
-                    this.disabled = false;
-                    this.innerHTML = 'Confirmar e Prosseguir';
+                if (typeof window.fecharModal === 'function') {
+                    window.fecharModal('modal-detalhes-voo');
                 }
-            }
-        };
-    }
-    
-    // Fechar modal ao clicar fora
-    const modal = document.getElementById('modal-confirmacao');
-    if (modal) {
-        modal.onclick = function(e) {
-            if (e.target === modal) {
-                fecharModal('modal-confirmacao');
             }
         };
     }
@@ -954,7 +685,6 @@ function configurarBotoesConfirmacao() {
 
 // Configura eventos gerais da interface
 function configurarEventosInterface() {
-    // Botão de voltar
     const btnVoltar = document.querySelector('.btn-voltar');
     if (btnVoltar) {
         btnVoltar.addEventListener('click', () => {
@@ -962,24 +692,25 @@ function configurarEventosInterface() {
         });
     }
     
-    // Botão de selecionar voo
     const btnSelecionar = document.querySelector('.btn-selecionar-voo');
     if (btnSelecionar) {
         btnSelecionar.addEventListener('click', () => {
             if (window.BENETRIP_VOOS?.vooSelecionado) {
-                mostrarConfirmacaoSelecao();
+                if (typeof window.mostrarConfirmacaoSelecao === 'function') {
+                    window.mostrarConfirmacaoSelecao();
+                }
             } else if (window.BENETRIP_VOOS?.vooAtivo) {
                 window.BENETRIP_VOOS.selecionarVooAtivo();
-                mostrarConfirmacaoSelecao();
+                if (typeof window.mostrarConfirmacaoSelecao === 'function') {
+                    window.mostrarConfirmacaoSelecao();
+                }
             } else {
                 exibirToast('Selecione um voo primeiro', 'warning');
             }
         });
     }
     
-    // Delegação de eventos para botões de detalhes dos voos
     document.addEventListener('click', (event) => {
-        // Botões de detalhes
         const btnDetalhes = event.target.closest('.btn-detalhes-voo');
         if (btnDetalhes) {
             const vooId = btnDetalhes.dataset.vooId;
@@ -989,19 +720,16 @@ function configurarEventosInterface() {
             return;
         }
         
-        // Clique em cards de voo
         const vooCard = event.target.closest('.voo-card');
         if (vooCard && !event.target.closest('button')) {
             const vooId = vooCard.dataset.vooId;
             const vooIndex = vooCard.dataset.vooIndex;
             
-            // Atualizar UI
             document.querySelectorAll('.voo-card').forEach(c => 
                 c.classList.remove('voo-card-ativo')
             );
             vooCard.classList.add('voo-card-ativo');
             
-            // Atualizar estado no módulo BENETRIP_VOOS
             if (window.BENETRIP_VOOS && window.BENETRIP_VOOS.finalResults?.proposals) {
                 const index = parseInt(vooIndex);
                 if (!isNaN(index)) {
@@ -1017,7 +745,6 @@ function configurarEventosInterface() {
 // Adicionar eventos para ouvir quando os resultados estiverem prontos
 document.addEventListener('resultadosVoosProntos', function(event) {
     console.log(`Evento recebido: resultadosVoosProntos - ${event.detail.quantidadeVoos} voos`);
-    // Espera um pouco para garantir que os elementos DOM estejam completos
     setTimeout(() => {
         configurarNavegacaoCards();
     }, 100);
@@ -1031,65 +758,42 @@ document.addEventListener('mostrarDetalhesVoo', function(event) {
     }
 });
 
-// Também adicionar navegação por teclado para acessibilidade
+// Navegação por teclado para acessibilidade
 document.addEventListener('keydown', function(event) {
-    // Verificar se estamos na tela de voos
     if (!document.getElementById('voos-swipe-container')) return;
     
     switch(event.key) {
         case 'ArrowUp':
         case 'ArrowLeft':
-            // Navegar para o cartão anterior
-            if (window.BENETRIP_VOOS) {
-                window.BENETRIP_VOOS.vooAnterior();
-            }
+            if (window.BENETRIP_VOOS) window.BENETRIP_VOOS.vooAnterior();
             break;
         case 'ArrowDown':
         case 'ArrowRight':
-            // Navegar para o próximo cartão
-            if (window.BENETRIP_VOOS) {
-                window.BENETRIP_VOOS.proximoVoo();
-            }
+            if (window.BENETRIP_VOOS) window.BENETRIP_VOOS.proximoVoo();
             break;
         case 'Enter':
-            // Selecionar o voo atual
-            if (window.BENETRIP_VOOS) {
-                window.BENETRIP_VOOS.selecionarVooAtivo();
-            }
+            if (window.BENETRIP_VOOS) window.BENETRIP_VOOS.selecionarVooAtivo();
             break;
     }
 });
 
 // ======= INICIALIZAÇÃO =======
 
-// Inicialização principal
 document.addEventListener('DOMContentLoaded', function() {
     console.log('DOM carregado - inicializando interface de voos com layout vertical...');
     
-    // Aplicar estilos para layout vertical
     aplicarEstilosVerticais();
-    
-    // Adicionar botão de customização
     adicionarBotaoCustomizacao();
-    
-    // Modificar criação de cards
     modificarCriarCardVoo();
-    
-    // Carrega os templates dos modais
     carregarTemplatesModais();
-    
-    // Configura eventos gerais da interface
     configurarEventosInterface();
     
-    // Verifica se o módulo principal já foi carregado e tem resultados
     if (typeof window.BENETRIP_VOOS !== 'undefined' && 
         !window.BENETRIP_VOOS.estaCarregando && 
         window.BENETRIP_VOOS.finalResults) {
-        
         console.log('BENETRIP_VOOS já tem resultados - configurando navegação imediatamente');
         configurarNavegacaoCards();
     } else {
         console.log('Aguardando BENETRIP_VOOS carregar dados...');
-        // Será acionado pelo evento 'resultadosVoosProntos'
     }
 });
