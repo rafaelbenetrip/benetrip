@@ -234,7 +234,15 @@ const BENETRIP_VOOS = {
 
       console.log('Busca iniciada. Search ID:', dados.search_id);
       this.searchId = dados.search_id;
-      this.currencyRates = dados.currency_rates;
+      
+      // Logging detalhado das taxas de conversão para debug
+      if (dados.currency_rates) {
+        console.log('Taxas de conversão recebidas:', dados.currency_rates);
+        this.currencyRates = dados.currency_rates;
+      } else {
+        console.warn('ATENÇÃO: Taxas de conversão não recebidas do servidor');
+        this.currencyRates = null;
+      }
 
       // Inicia polling após breve espera
       this.atualizarProgresso('Busca iniciada. Aguardando primeiros resultados...', 15);
@@ -759,6 +767,36 @@ const BENETRIP_VOOS = {
    * Finaliza o processo de busca e prepara os resultados
    */
   concluirBusca() {
+    // Verificação e log das taxas de conversão ao concluir a busca
+    console.log('=== DEBUG DE CONVERSÃO DE MOEDA ===');
+    console.log('searchId:', this.searchId);
+    console.log('currencyRates disponível:', !!this.currencyRates);
+    if (this.currencyRates) {
+      console.log('Taxas de conversão:', this.currencyRates);
+    }
+    
+    const moedaUsuario = this.obterMoedaAtual();
+    console.log('Moeda do usuário detectada:', moedaUsuario);
+    
+    // Se existirem propostas, mostra o preço original e convertido da primeira
+    if (this.accumulatedProposals.length > 0) {
+      const primeiraProposta = this.accumulatedProposals[0];
+      const k = Object.keys(primeiraProposta.terms)[0];
+      const precoOriginal = primeiraProposta.terms[k]?.unified_price || primeiraProposta.terms[k]?.price || 0;
+      
+      console.log('Exemplo - Preço original:', precoOriginal);
+      const taxaConversao = this.currencyRates ? this.currencyRates[moedaUsuario.toLowerCase()] : null;
+      console.log(`Taxa de conversão para ${moedaUsuario}:`, taxaConversao);
+      
+      if (taxaConversao) {
+        const precoConvertido = Math.round(precoOriginal * taxaConversao);
+        console.log(`Preço convertido: ${precoOriginal} * ${taxaConversao} = ${precoConvertido} ${moedaUsuario}`);
+      } else {
+        console.log('Conversão não aplicada - taxa não disponível');
+      }
+    }
+    console.log('=== FIM DEBUG CONVERSÃO ===');
+    
     // Para o polling
     this.pararPolling();
     this.estaCarregando = false;
@@ -769,7 +807,7 @@ const BENETRIP_VOOS = {
         airlines: this.accumulatedAirlines,
         airports: this.accumulatedAirports,
         gates_info: this.accumulatedGatesInfo,
-        meta: { currency: 'BRL' }
+        meta: { currency: this.obterMoedaAtual() } // Atualiza a moeda nos metadados
     };
     
     console.log(`Busca concluída com ${this.finalResults.proposals.length} propostas processadas`);
@@ -1450,72 +1488,182 @@ const BENETRIP_VOOS = {
    * @returns {number} Preço do voo na moeda selecionada
    */
   obterPrecoVoo(voo) {
-    if (!voo || !voo.terms) return 0;
+    if (!voo || !voo.terms) {
+      console.log('Voo sem termos ou inválido', voo);
+      return 0;
+    }
     
     try {
-      // Extrai o preço original em rublos russos
+      // Extrai o preço original
       const k = Object.keys(voo.terms)[0];
+      if (!k) {
+        console.warn('Nenhuma chave encontrada em voo.terms', voo.terms);
+        return 0;
+      }
+      
+      // Obter o preço original (geralmente em rublos russos)
       const precoOriginal = voo.terms[k]?.unified_price || voo.terms[k]?.price || 0;
+      
+      // Log do preço original
+      console.log(`Preço original: ${precoOriginal} RUB`);
       
       // Obter a moeda selecionada pelo usuário
       const moedaUsuario = this.obterMoedaAtual();
+      console.log(`Moeda selecionada: ${moedaUsuario}`);
       
-      // Se não temos taxas de conversão ou a moeda é a padrão da API, retorna o preço original
-      if (!this.currencyRates || moedaUsuario === 'RUB') {
+      // Se não temos taxas de conversão, retorna o preço original com aviso
+      if (!this.currencyRates) {
+        console.warn('Taxas de conversão não disponíveis. Usando preço original:', precoOriginal);
         return precoOriginal;
       }
       
-      // Encontrar a taxa de conversão para a moeda selecionada
-      const taxaConversao = this.currencyRates?.[moedaUsuario.toLowerCase()];
+      // Log das taxas de conversão disponíveis para debug
+      console.log('Taxas de conversão disponíveis:', this.currencyRates);
+      
+      // Se a moeda já é a mesma da API (RUB) ou a taxa não existe
+      if (moedaUsuario === 'RUB') {
+        return precoOriginal;
+      }
+      
+      // Encontrar a taxa de conversão para a moeda selecionada (minúsculo conforme formato da API)
+      const moedaLower = moedaUsuario.toLowerCase();
+      const taxaConversao = this.currencyRates[moedaLower];
+      
       if (!taxaConversao) {
-        console.warn(`Taxa de conversão não encontrada para ${moedaUsuario}, usando preço original`);
+        console.warn(`Taxa de conversão não encontrada para ${moedaUsuario}. Taxas disponíveis:`, this.currencyRates);
+        
+        // Tentativa usando outra forma de acesso
+        if (typeof this.currencyRates === 'object') {
+          // Procura pela chave em qualquer formato (maiúsculo/minúsculo)
+          const todasChaves = Object.keys(this.currencyRates);
+          const chaveEncontrada = todasChaves.find(k => 
+            k.toLowerCase() === moedaLower || 
+            k.toUpperCase() === moedaUsuario.toUpperCase()
+          );
+          
+          if (chaveEncontrada) {
+            const taxaAlternativa = this.currencyRates[chaveEncontrada];
+            console.log(`Taxa alternativa encontrada para ${chaveEncontrada}: ${taxaAlternativa}`);
+            return Math.round(precoOriginal * taxaAlternativa);
+          }
+        }
+        
+        // Fallback: retorna o preço original com aviso
+        console.warn(`Usando preço original devido à falta de taxa de conversão: ${precoOriginal}`);
         return precoOriginal;
       }
       
-      // Aplicar a conversão (arredondando para evitar valores com muitas casas decimais)
-      return Math.round(precoOriginal * taxaConversao);
+      // Aplicar a conversão com a taxa encontrada
+      const precoConvertido = precoOriginal * taxaConversao;
+      console.log(`Preço convertido: ${precoOriginal} RUB * ${taxaConversao} = ${precoConvertido} ${moedaUsuario}`);
+      
+      // Retorna o valor convertido arredondado
+      return Math.round(precoConvertido);
     } catch (erro) {
-      console.warn('Erro ao obter/converter preço do voo:', erro);
+      console.error('Erro ao obter/converter preço do voo:', erro);
       return 0;
     }
   },
-  
+
   /**
-   * Obtém a moeda selecionada pelo usuário
+   * Obtém a moeda selecionada pelo usuário de forma mais robusta
    * @returns {string} Código da moeda (BRL, USD, EUR)
    */
   obterMoedaAtual() {
     try {
-      const dadosUsuario = this.carregarDadosUsuario();
-      // Verificar no formato direto
-      let moeda = dadosUsuario?.respostas?.moeda_escolhida;
+      // Obtém dados do usuário do localStorage
+      const dadosUsuarioString = localStorage.getItem('benetrip_user_data');
+      console.log('Dados do usuário (string):', dadosUsuarioString);
       
-      // Verificar formato de objeto com mapeamento
-      const currency_map = dadosUsuario?.respostas?.currency_map;
-      if (currency_map && typeof currency_map === 'object') {
-        const opcaoSelecionada = dadosUsuario?.respostas?.moeda_escolhida;
-        if (opcaoSelecionada && currency_map[opcaoSelecionada]) {
-          moeda = currency_map[opcaoSelecionada];
-        }
+      if (!dadosUsuarioString) {
+        console.warn('Dados do usuário não encontrados no localStorage');
+        return 'BRL'; // Default
       }
       
-      // Se for uma string direta do formato com texto descritivo
-      if (typeof moeda === 'string' && moeda.includes('(')) {
-        // Extrai o código entre parênteses, ex: "Real Brasileiro (BRL)" -> "BRL"
-        const match = moeda.match(/\(([A-Z]{3})\)/);
-        if (match && match[1]) {
-          moeda = match[1];
-        }
-      }
+      const dadosUsuario = JSON.parse(dadosUsuarioString);
+      console.log('Dados do usuário (objeto):', dadosUsuario);
       
-      // Fallback para BRL se nenhuma moeda válida for encontrada
-      if (!moeda || typeof moeda !== 'string' || moeda.length !== 3) {
+      // Verificar diferentes formatos possíveis
+      const respostas = dadosUsuario?.respostas;
+      if (!respostas) {
+        console.warn('Respostas não encontradas nos dados do usuário');
         return 'BRL';
       }
       
-      return moeda.toUpperCase();
+      console.log('Respostas do usuário:', respostas);
+      
+      // 1. Verificar formato direto (string com código da moeda)
+      if (respostas.moeda_escolhida) {
+        const moeda = respostas.moeda_escolhida;
+        console.log('Moeda encontrada (formato direto):', moeda);
+        
+        // Se for código direto de 3 letras
+        if (typeof moeda === 'string' && /^[A-Z]{3}$/.test(moeda)) {
+          return moeda;
+        }
+        
+        // Se for string com formato "Moeda (XXX)"
+        if (typeof moeda === 'string' && moeda.includes('(')) {
+          const match = moeda.match(/\(([A-Z]{3})\)/);
+          if (match && match[1]) {
+            return match[1];
+          }
+        }
+        
+        // Se for índice numérico (0=BRL, 1=USD, 2=EUR)
+        if (typeof moeda === 'number' || !isNaN(parseInt(moeda))) {
+          const indice = parseInt(moeda);
+          const moedasPadrao = ['BRL', 'USD', 'EUR'];
+          if (indice >= 0 && indice < moedasPadrao.length) {
+            return moedasPadrao[indice];
+          }
+        }
+      }
+      
+      // 2. Verificar mapeamento de moedas
+      // Formato esperado: currency_map = { "opção selecionada": "BRL" }
+      if (respostas.currency_map) {
+        console.log('Currency map encontrado:', respostas.currency_map);
+        
+        // Se for objeto
+        if (typeof respostas.currency_map === 'object') {
+          // Encontra a opção selecionada
+          const opcaoSelecionada = respostas.moeda_escolhida;
+          if (opcaoSelecionada && respostas.currency_map[opcaoSelecionada]) {
+            return respostas.currency_map[opcaoSelecionada];
+          }
+          
+          // Se não encontrou pela opção selecionada, pega o primeiro valor
+          const primeiroValor = Object.values(respostas.currency_map)[0];
+          if (primeiroValor && typeof primeiroValor === 'string') {
+            return primeiroValor;
+          }
+        }
+      }
+      
+      // 3. Verificar outros campos possíveis
+      if (respostas.moeda && typeof respostas.moeda === 'string') {
+        if (/^[A-Z]{3}$/.test(respostas.moeda)) {
+          return respostas.moeda;
+        }
+      }
+      
+      // 4. Verificar texto descritivo
+      const camposPossiveis = ['moeda_escolhida', 'moeda', 'currency'];
+      for (const campo of camposPossiveis) {
+        if (respostas[campo] && typeof respostas[campo] === 'string') {
+          // Verificar por texto padrão como "Real Brasileiro (BRL)"
+          if (respostas[campo].includes('BRL')) return 'BRL';
+          if (respostas[campo].includes('USD')) return 'USD';
+          if (respostas[campo].includes('EUR')) return 'EUR';
+        }
+      }
+      
+      // Nenhuma moeda encontrada, retorna o padrão
+      console.warn('Nenhuma moeda encontrada nos dados. Usando BRL como padrão.');
+      return 'BRL';
     } catch (e) {
-      console.warn('Erro ao obter moeda atual:', e);
+      console.error('Erro ao obter moeda atual:', e);
       return 'BRL';
     }
   },
