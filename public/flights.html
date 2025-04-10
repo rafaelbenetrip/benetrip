@@ -74,6 +74,8 @@
             Personalizar Minha Busca
         </button>
         
+        <!-- Oავ
+
         <!-- O conteúdo será carregado dinamicamente pelo script flights.js -->
         <main class="voos-content">
             <!-- Inicial loading state -->
@@ -263,7 +265,7 @@
                 const btnClone = btnPrincipal.cloneNode(true);
                 btnPrincipal.parentNode.replaceChild(btnClone, btnPrincipal);
                 
-                // Adicionar novo event listener
+                // Adicionar novo event listener (atualizado conforme a query)
                 btnClone.addEventListener('click', function(e) {
                     e.preventDefault();
                     console.log("Botão principal clicado (fix corrigido)");
@@ -273,17 +275,6 @@
                         // Selecionar voo ativo se nenhum estiver selecionado
                         if (!window.BENETRIP_VOOS.vooSelecionado && window.BENETRIP_VOOS.vooAtivo) {
                             window.BENETRIP_VOOS.selecionarVooAtivo();
-                        }
-                        
-                        // Mostrar modal de confirmação se disponível
-                        if (typeof window.mostrarConfirmacaoSelecao === 'function') {
-                            window.mostrarConfirmacaoSelecao();
-                            fixBotaoConfirmar(); // Corrigir o botão de confirmação no modal
-                            return;
-                        } else if (window.BENETRIP_VOOS.mostrarConfirmacaoSelecao) {
-                            window.BENETRIP_VOOS.mostrarConfirmacaoSelecao();
-                            fixBotaoConfirmar(); // Corrigir o botão de confirmação no modal
-                            return;
                         }
                         
                         // Pegar voo selecionado/ativo
