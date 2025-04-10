@@ -172,201 +172,73 @@
     <!-- Funções utilitárias e modal handler -->
     <script src="assets/js/api.js"></script>
     <script src="assets/js/modal-handler.js"></script>
-    <script src="assets/js/utils.js"></script>
     
     <!-- Sistema de voos e redirecionamento -->
     <script src="assets/js/flights.js"></script>
-    <script src="assets/js/flight-redirect.js" onerror="window.redirectScriptFailed = true;"></script>
-    <script>
-    // Verificar se o script carregou corretamente
-    if (typeof window.redirectScriptFailed !== 'undefined') {
-        console.error('⚠️ Erro crítico: flight-redirect.js não carregou corretamente');
-        // Criar um registro no console para rastrear problemas
-        console.trace('Stacktrace da falha de carregamento');
-    }
-
-    // Criar uma implementação mínima de fallback caso necessário
-    if (typeof window.BENETRIP_REDIRECT === 'undefined') {
-        console.warn('⚠️ Criando implementação mínima de BENETRIP_REDIRECT como fallback');
-        window.BENETRIP_REDIRECT = {
-            init: function() {
-                console.log('Inicialização de emergência do BENETRIP_REDIRECT');
-            },
-            processarConfirmacao: function(vooId) {
-                console.log('Processando confirmação de emergência para:', vooId);
-                // Implementação simples que apenas redireciona para hotéis após informar o usuário
-                alert('Não foi possível conectar ao sistema de reservas. Redirecionando para seleção de hotéis.');
-                setTimeout(function() {
-                    window.location.href = 'hotels.html';
-                }, 1000);
-            }
-        };
-    }
-    </script>
+    <script src="assets/js/flight-redirect.js"></script>
     <script src="assets/js/voos-interface.js"></script>
     
-    <!-- Script de inicialização e gerenciamento de erros -->
+    <!-- Script simplificado de inicialização -->
     <script>
-    /**
-     * Benetrip - Script de inicialização e gerenciamento de sistemas
-     * Versão: 1.0.0
-     * Data: 10/04/2025
-     */
+    // Script minimalista que apenas garante que o BENETRIP_REDIRECT seja inicializado
     document.addEventListener('DOMContentLoaded', function() {
-        console.log('Inicializando sistemas da Benetrip...');
+        console.log('Inicializando sistemas...');
         
-        // Sistema de tratamento de erros global
-        const setupErrorHandling = function() {
+        // Função para exibir erros globais
+        window.showGlobalError = function(message) {
             const errorElement = document.getElementById('global-error');
             const errorMessage = document.getElementById('global-error-message');
-            const errorClose = document.getElementById('global-error-close');
             
-            if (errorClose) {
-                errorClose.addEventListener('click', function() {
+            if (errorMessage && errorElement) {
+                errorMessage.textContent = message;
+                errorElement.classList.add('visible');
+                
+                // Auto-esconder após 8 segundos
+                setTimeout(() => {
                     errorElement.classList.remove('visible');
-                });
+                }, 8000);
             }
-            
-            // Expõe função para mostrar erro global
-            window.showGlobalError = function(message) {
-                if (errorMessage && errorElement) {
-                    errorMessage.textContent = message;
-                    errorElement.classList.add('visible');
-                    
-                    // Auto-esconder após 8 segundos
-                    setTimeout(() => {
-                        errorElement.classList.remove('visible');
-                    }, 8000);
-                }
-                console.error('ERRO GLOBAL:', message);
-            };
-            
-            // Tratamento global de erros não capturados
-            window.addEventListener('error', function(event) {
-                console.error('Erro não capturado:', event.error);
-                window.showGlobalError('Ocorreu um erro inesperado. Tente novamente em alguns instantes.');
-                return false;
-            });
-            
-            // Tratamento de rejeições de promessas não capturadas
-            window.addEventListener('unhandledrejection', function(event) {
-                console.error('Promessa rejeitada não capturada:', event.reason);
-                // Só mostra erro global se for um erro crítico (não para cancelamentos normais)
-                if (!(event.reason instanceof DOMException && event.reason.name === 'AbortError')) {
-                    window.showGlobalError('Ocorreu um erro ao carregar dados. Verifique sua conexão.');
-                }
-                return false;
-            });
+            console.error('ERRO GLOBAL:', message);
         };
-
-        // Inicializa sistema de tratamento de erros
-        setupErrorHandling();
         
-        // Verifica disponibilidade do Hammer.js
+        // Configurar botão de fechar erro
+        const errorClose = document.getElementById('global-error-close');
+        if (errorClose) {
+            errorClose.addEventListener('click', function() {
+                document.getElementById('global-error').classList.remove('visible');
+            });
+        }
+        
+        // Verificar status do sistema de redirecionamento
         setTimeout(function() {
-            if (typeof Hammer !== 'function') {
-                console.warn('Hammer.js não carregou corretamente, usando navegação alternativa');
-                document.dispatchEvent(new CustomEvent('hammerjs-not-available'));
+            if (window.BENETRIP_REDIRECT && !window.BENETRIP_REDIRECT._initialized) {
+                console.log('Inicializando BENETRIP_REDIRECT...');
+                try {
+                    window.BENETRIP_REDIRECT.init();
+                    window.BENETRIP_REDIRECT._initialized = true;
+                } catch (e) {
+                    console.error('Erro ao inicializar sistema de redirecionamento:', e);
+                    window.showGlobalError('Erro ao inicializar sistema de reserva. Tente novamente em instantes.');
+                }
             }
         }, 1000);
         
-        // Inicializa sistema de redirecionamento
-        const initializeRedirectSystem = function() {
-            console.log('Inicializando sistema de redirecionamento...');
-            
-            // Verificar se o BENETRIP_REDIRECT está disponível imediatamente
-            if (window.BENETRIP_REDIRECT && typeof window.BENETRIP_REDIRECT.init === 'function') {
-                console.log('Módulo BENETRIP_REDIRECT já disponível, inicializando imediatamente...');
-                try {
-                    window.BENETRIP_REDIRECT.init();
-                    console.log('✅ Sistema de redirecionamento inicializado com sucesso');
-                    return; // Retorna se inicialização bem-sucedida
-                } catch (error) {
-                    console.error('❌ Erro ao inicializar sistema de redirecionamento:', error);
-                }
+        // Configurar tratamento de erros global
+        window.addEventListener('error', function(event) {
+            console.error('Erro não capturado:', event.error);
+            window.showGlobalError('Ocorreu um erro inesperado. Tente novamente em alguns instantes.');
+            return false;
+        });
+        
+        // Tratamento de rejeições de promessas não capturadas
+        window.addEventListener('unhandledrejection', function(event) {
+            console.error('Promessa rejeitada não capturada:', event.reason);
+            // Só mostra erro global se for um erro crítico (não para cancelamentos normais)
+            if (!(event.reason instanceof DOMException && event.reason.name === 'AbortError')) {
+                window.showGlobalError('Ocorreu um erro ao carregar dados. Verifique sua conexão.');
             }
-            
-            // Contador de tentativas
-            let tentativas = 0;
-            const maxTentativas = 20; // Aumentado de 10s para 20s (40 tentativas de 500ms)
-            
-            // Verificar se o BENETRIP_REDIRECT está disponível periodicamente
-            const verificarDisponibilidade = setInterval(() => {
-                tentativas++;
-                console.log(`Tentativa ${tentativas}/${maxTentativas} de encontrar BENETRIP_REDIRECT`);
-                
-                if (window.BENETRIP_REDIRECT && typeof window.BENETRIP_REDIRECT.init === 'function') {
-                    console.log('Módulo BENETRIP_REDIRECT encontrado, inicializando...');
-                    clearInterval(verificarDisponibilidade);
-                    
-                    try {
-                        window.BENETRIP_REDIRECT.init();
-                        console.log('✅ Sistema de redirecionamento inicializado com sucesso');
-                    } catch (error) {
-                        console.error('❌ Erro ao inicializar sistema de redirecionamento:', error);
-                        window.showGlobalError('Erro ao inicializar sistema de redirecionamento. Algumas funcionalidades podem não estar disponíveis.');
-                    }
-                } else if (tentativas >= maxTentativas) {
-                    clearInterval(verificarDisponibilidade);
-                    console.error('⚠️ Tempo limite excedido para encontrar BENETRIP_REDIRECT');
-                    window.showGlobalError('Sistema de redirecionamento não disponível. A reserva de voos pode não funcionar corretamente.');
-                    
-                    // Tentar forçar a criação do objeto se não existir
-                    if (typeof window.BENETRIP_REDIRECT === 'undefined') {
-                        console.warn('Criando implementação mínima de BENETRIP_REDIRECT após timeout');
-                        // A implementação foi definida anteriormente
-                    }
-                }
-            }, 500);
-        };
-        
-        // Inicializa sistema de busca de voos
-        const initializeFlightSystem = function() {
-            console.log('Inicializando sistema de busca de voos...');
-            if (window.BENETRIP_VOOS && typeof window.BENETRIP_VOOS.init === 'function') {
-                try {
-                    window.BENETRIP_VOOS.init();
-                    console.log('✅ Sistema de busca de voos inicializado com sucesso');
-                } catch (error) {
-                    console.error('❌ Erro ao inicializar sistema de busca de voos:', error);
-                    window.showGlobalError('Erro ao inicializar busca de voos. Tente novamente em alguns instantes.');
-                }
-            } else {
-                console.warn('⚠️ Sistema de busca de voos não disponível no momento da inicialização');
-                
-                // Verificar periodicamente
-                const checkFlightSystem = setInterval(() => {
-                    if (window.BENETRIP_VOOS && typeof window.BENETRIP_VOOS.init === 'function') {
-                        clearInterval(checkFlightSystem);
-                        try {
-                            window.BENETRIP_VOOS.init();
-                            console.log('✅ Sistema de busca de voos inicializado com atraso');
-                        } catch (error) {
-                            console.error('❌ Erro ao inicializar sistema de busca de voos (retry):', error);
-                        }
-                    }
-                }, 500);
-                
-                // Limitar tentativas
-                setTimeout(() => {
-                    clearInterval(checkFlightSystem);
-                }, 8000);
-            }
-        };
-        
-        // Inicializa interface de voos
-        const initializeFlightInterface = function() {
-            console.log('Inicializando interface de voos...');
-            // Esta função é chamada automaticamente pelo voos-interface.js
-            // quando o DOM é carregado
-        };
-        
-        // Inicializa todos os sistemas
-        initializeRedirectSystem();
-        initializeFlightSystem();
-        initializeFlightInterface();
-        
-        console.log('✅ Inicialização dos sistemas Benetrip concluída');
+            return false;
+        });
     });
     </script>
 </body>
