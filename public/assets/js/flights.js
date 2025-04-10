@@ -789,8 +789,8 @@ const BENETRIP_VOOS = {
       console.log(`Taxa de conversão para ${moedaUsuario}:`, taxaConversao);
       
       if (taxaConversao) {
-        const precoConvertido = Math.round(precoOriginal * taxaConversao);
-        console.log(`Preço convertido: ${precoOriginal} * ${taxaConversao} = ${precoConvertido} ${moedaUsuario}`);
+        const precoConvertido = Math.round(precoOriginal / taxaConversao);
+        console.log(`Preço convertido: ${precoOriginal} / ${taxaConversao} = ${precoConvertido} ${moedaUsuario}`);
       } else {
         console.log('Conversão não aplicada - taxa não disponível');
       }
