@@ -1364,7 +1364,7 @@ const BENETRIP_VOOS = {
     if (this.vooAtivo) {
       const preco = this.obterPrecoVoo(this.vooAtivo);
       const moeda = this.finalResults?.meta?.currency || 'BRL';
-      precoTexto = `Escolher Voo por ${this.formatarPreco(preco, moeda)}`;
+      precoTexto = `Reservar Voo por ${this.formatarPreco(preco, moeda)}`;
     }
     
     const btnSelecionar = botaoFixo.querySelector('.btn-selecionar-voo');
