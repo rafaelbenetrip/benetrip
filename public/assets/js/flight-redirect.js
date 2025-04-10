@@ -1,171 +1,282 @@
 /**
- * BENETRIP - Redirecionamento para compra de voos e página de hotéis
- * Versão corrigida para resolver problemas de redirecionamento
+ * BENETRIP - Sistema de Redirecionamento para Parceiros de Voos
+ * Versão: 2.0.0 (Otimizada e em conformidade com as diretrizes da API)
  */
 
 /**
- * IMPORTANTE: Garantir que BENETRIP_REDIRECT seja disponibilizado globalmente
+ * Módulo global de redirecionamento
  */
-
-// Declaração explícita no escopo global
 window.BENETRIP_REDIRECT = {
     // Configurações
     config: {
         apiBase: 'https://api.travelpayouts.com/v1',
-        marker: '604241', // Seu AffiliateMarker
-        redirectTemplate: 'redirect.html'
+        marker: '604241', // AffiliateMarker conforme documentação
+        redirectTemplate: 'redirect.html',
+        pixelTrackingUrl: '//yasen.aviasales.com/adaptors/pixel_click.png',
+        linkLifetimeMs: 15 * 60 * 1000, // 15 minutos em milissegundos
+        retryAttempts: 3,
+        retryDelay: 1000,
+        requestTimeout: 10000
     },
     
     /**
-     * Inicializa os eventos de redirecionamento
+     * Inicializa o módulo de redirecionamento
      */
     init: function() {
-        console.log('Inicializando handlers de redirecionamento de voos...');
+        console.log('Inicializando sistema de redirecionamento de voos...');
         
-        // Adiciona listener para o botão principal
-        const btnSelecionar = document.querySelector('.btn-selecionar-voo');
-        if (btnSelecionar) {
-            console.log('Botão principal encontrado, configurando listener');
-            // Clone o botão para remover listeners antigos
-            const btnClone = btnSelecionar.cloneNode(true);
-            btnSelecionar.parentNode.replaceChild(btnClone, btnSelecionar);
-            btnClone.addEventListener('click', this.handleBotaoSelecionar.bind(this));
-        } else {
-            console.error('Botão principal não encontrado');
-        }
+        // Limpa dados anteriores
+        this.clearCachedLinks();
         
-        // Adiciona listeners para botões nos cards
-        document.addEventListener('click', (e) => {
-            // Verificar se é um botão de "Escolher Este Voo"
-            const btnCard = e.target.closest('.choose-flight-button, .voo-card button, .escolher-este-voo');
-            if (btnCard) {
-                console.log('Clique em botão de card detectado:', btnCard);
-                e.preventDefault();
-                e.stopPropagation();
-                
-                const vooId = btnCard.dataset.vooId;
-                if (vooId && window.BENETRIP_VOOS) {
-                    // Seleciona o voo e processa diretamente
-                    window.BENETRIP_VOOS.selecionarVoo(vooId);
-                    this.processarConfirmacao(vooId);
-                } else {
-                    console.log('ID do voo não encontrado ou BENETRIP_VOOS indisponível');
-                    // Fallback: redirecionamento direto
-                    const voo = window.BENETRIP_VOOS?.vooAtivo || window.BENETRIP_VOOS?.finalResults?.proposals?.[0];
-                    if (voo) {
-                        this.processarConfirmacao(voo.sign || 'voo-0');
-                    } else {
-                        // Último recurso: ir direto para hotéis
-                        window.location.href = 'hotels.html';
-                    }
-                }
-            }
-        });
+        // Configura eventos básicos
+        this.setupButtonListeners();
+        this.setupCardListeners();
         
-        // Notificar que a inicialização foi concluída
-        console.log('BENETRIP_REDIRECT inicializado com sucesso e disponível globalmente');
-        
-        // Simular um "ready event" para notificar que o módulo está pronto
+        // Notificar inicialização
+        console.log('Sistema de redirecionamento inicializado com sucesso');
         document.dispatchEvent(new CustomEvent('benetrip_redirect_ready'));
     },
     
     /**
-     * Trata o clique no botão principal de seleção
+     * Configura event listeners para botões principais
      */
-    handleBotaoSelecionar: function(e) {
-        console.log('Botão principal clicado');
-        if (e) {
-            e.preventDefault();
-            e.stopPropagation();
+    setupButtonListeners: function() {
+        // Botão principal de seleção
+        const btnSelecionar = document.querySelector('.btn-selecionar-voo');
+        if (btnSelecionar) {
+            console.log('Botão principal encontrado, configurando listener');
+            
+            // Clone o botão para remover listeners antigos
+            const btnClone = btnSelecionar.cloneNode(true);
+            btnSelecionar.parentNode.replaceChild(btnClone, btnSelecionar);
+            
+            // Adiciona novo evento
+            btnClone.addEventListener('click', (e) => {
+                e.preventDefault();
+                console.log('Botão principal de seleção clicado');
+                
+                // Verifica se um voo foi selecionado
+                if (!window.BENETRIP_VOOS) {
+                    console.error('Módulo BENETRIP_VOOS não disponível');
+                    this.showErrorMessage('Sistema de voos não inicializado corretamente');
+                    return;
+                }
+                
+                const voo = window.BENETRIP_VOOS.vooSelecionado || window.BENETRIP_VOOS.vooAtivo;
+                if (!voo) {
+                    console.warn('Nenhum voo selecionado');
+                    this.showErrorMessage('Por favor, selecione um voo primeiro');
+                    return;
+                }
+                
+                // Processa o voo selecionado
+                const vooId = voo.sign || `voo-idx-${window.BENETRIP_VOOS.indexVooAtivo}`;
+                this.processarConfirmacao(vooId);
+            });
+        } else {
+            console.warn('Botão principal de seleção não encontrado');
         }
         
-        if (!window.BENETRIP_VOOS) {
-            console.error('Módulo BENETRIP_VOOS não disponível');
-            // Fallback: ir direto para hotéis
-            window.location.href = 'hotels.html';
-            return;
+        // Botão de confirmação no modal (se existir)
+        const btnConfirmar = document.getElementById('btn-confirmar');
+        if (btnConfirmar) {
+            console.log('Botão de confirmação encontrado, configurando listener');
+            
+            // Clone o botão para remover listeners antigos
+            const btnClone = btnConfirmar.cloneNode(true);
+            btnConfirmar.parentNode.replaceChild(btnClone, btnConfirmar);
+            
+            // Adiciona novo evento
+            btnClone.addEventListener('click', (e) => {
+                e.preventDefault();
+                console.log('Botão de confirmação clicado');
+                
+                // Verifica checkbox
+                const checkbox = document.getElementById('confirmar-selecao');
+                if (checkbox && !checkbox.checked) {
+                    this.showErrorMessage('Por favor, confirme sua seleção marcando a caixa');
+                    return;
+                }
+                
+                // Obtém o voo selecionado
+                if (!window.BENETRIP_VOOS) {
+                    console.error('Módulo BENETRIP_VOOS não disponível');
+                    this.showErrorMessage('Sistema de voos não inicializado corretamente');
+                    return;
+                }
+                
+                const voo = window.BENETRIP_VOOS.vooSelecionado || window.BENETRIP_VOOS.vooAtivo;
+                if (!voo) {
+                    console.warn('Nenhum voo selecionado');
+                    this.showErrorMessage('Nenhum voo selecionado para confirmação');
+                    return;
+                }
+                
+                // Atualiza visual do botão
+                btnClone.innerHTML = '<span class="spinner"></span> Processando...';
+                btnClone.disabled = true;
+                
+                // Processa o voo selecionado
+                const vooId = voo.sign || `voo-idx-${window.BENETRIP_VOOS.indexVooAtivo}`;
+                this.processarConfirmacao(vooId);
+            });
         }
-        
-        // Verifica se um voo foi selecionado
-        const voo = window.BENETRIP_VOOS.vooSelecionado || window.BENETRIP_VOOS.vooAtivo;
-        if (!voo) {
-            console.warn('Nenhum voo selecionado');
-            alert('Por favor, selecione um voo primeiro');
-            return;
-        }
-        
-        // Processar diretamente, sem mostrar o modal de confirmação
-        const vooId = voo.sign || `voo-idx-${window.BENETRIP_VOOS.indexVooAtivo}`;
-        this.processarConfirmacao(vooId);
     },
     
     /**
-     * Processa a confirmação e redireciona o usuário
-     * Versão simplificada e mais robusta
+     * Configura event listeners para cards de voos
+     */
+    setupCardListeners: function() {
+        document.addEventListener('click', (e) => {
+            // Verifica se é um botão de escolha de voo
+            const btnCard = e.target.closest('.choose-flight-button, .voo-card button, .escolher-este-voo');
+            if (btnCard) {
+                e.preventDefault();
+                e.stopPropagation();
+                
+                console.log('Botão de card de voo clicado');
+                const vooId = btnCard.dataset.vooId;
+                
+                if (vooId && window.BENETRIP_VOOS) {
+                    // Seleciona o voo
+                    window.BENETRIP_VOOS.selecionarVoo(vooId);
+                    
+                    // Processa a seleção
+                    this.processarConfirmacao(vooId);
+                } else {
+                    console.warn('ID do voo não encontrado ou BENETRIP_VOOS indisponível');
+                    this.showErrorMessage('Não foi possível identificar o voo selecionado');
+                }
+            }
+        });
+    },
+    
+    /**
+     * Processa a confirmação do voo e redireciona para o parceiro
+     * @param {string} vooId - ID do voo selecionado
      */
     processarConfirmacao: function(vooId) {
         console.log('Processando confirmação para voo:', vooId);
         
-        // MODIFICAÇÃO: Sempre tratar como se temos objeto local BENETRIP_VOOS para fallback
-        const localBeneTripVoos = window.BENETRIP_VOOS;
-        
-        // Encontra o voo pelo ID (com mais proteções contra falhas)
-        let voo;
-        if (localBeneTripVoos && localBeneTripVoos.finalResults && localBeneTripVoos.finalResults.proposals) {
-            voo = localBeneTripVoos.finalResults.proposals.find(
-                (v, index) => (v.sign || `voo-idx-${index}`) === vooId
-            );
-        }
-        
-        // Se não encontrou pelos proposals, tenta outros lugares
-        if (!voo) {
-            voo = localBeneTripVoos?.vooSelecionado || localBeneTripVoos?.vooAtivo;
-        }
-        
-        // Se mesmo assim não encontrou, cria um mock para evitar erro
-        if (!voo) {
-            console.warn(`Voo ${vooId} não encontrado, usando mock para evitar erro`);
-            voo = {
-                sign: vooId || 'mock-voo',
-                terms: {'default': {url: '123456'}}
-            };
-        }
-        
-        // Exibe indicador de carregamento no botão
-        const btnConfirmar = document.getElementById('btn-confirmar');
-        if (btnConfirmar) {
-            btnConfirmar.innerHTML = '<span class="spinner"></span> Processando...';
-            btnConfirmar.disabled = true;
-        }
-        
-        // Tenta salvar dados do voo, mas não falha se erro
-        try {
-            if (localBeneTripVoos) {
-                this.salvarDadosVoo(voo);
-            }
-        } catch (err) {
-            console.warn('Erro ao salvar dados do voo (não crítico):', err);
-        }
-        
-        // IMPORTANTE: Abrir nova janela antes do fetch (para evitar bloqueio de popups)
-        console.log('Abrindo janela para redirecionamento...');
-        const partnerWindow = window.open('about:blank', '_blank');
-        
-        // Se a janela foi bloqueada, notificar
-        if (!partnerWindow || partnerWindow.closed) {
-            console.error('Popup bloqueado pelo navegador');
-            alert('A janela para o site do parceiro foi bloqueada. Por favor, permita popups para este site.');
-            
-            // Redirecionar para hotéis como fallback
-            setTimeout(() => {
-                window.location.href = 'hotels.html';
-            }, 1000);
+        // Verificações de voo
+        if (!window.BENETRIP_VOOS) {
+            console.error('Módulo BENETRIP_VOOS não disponível');
+            this.showErrorMessage('Sistema de voos não inicializado corretamente');
             return;
         }
         
-        // Exibir página de carregamento na nova janela
+        // Encontra o voo pelo ID
+        const voo = this.encontrarVooPorId(vooId);
+        if (!voo) {
+            console.error(`Voo com ID ${vooId} não encontrado`);
+            this.showErrorMessage('Voo selecionado não encontrado');
+            return;
+        }
+        
+        // Verifica se o voo tem os dados necessários
+        if (!voo.terms || !Object.keys(voo.terms).length) {
+            console.error('Voo sem informações de termos necessárias para redirecionamento');
+            this.showErrorMessage('Informações insuficientes para prosseguir com a reserva');
+            return;
+        }
+        
+        // Salva dados do voo
         try {
-            partnerWindow.document.write(`
+            this.salvarDadosVoo(voo);
+        } catch (err) {
+            console.warn('Erro ao salvar dados do voo:', err);
+        }
+        
+        // IMPORTANTE: Abre nova janela antes do fetch (evita bloqueio de popups)
+        console.log('Abrindo janela para redirecionamento...');
+        const partnerWindow = window.open('about:blank', '_blank');
+        
+        // Verifica se a janela foi bloqueada
+        if (!partnerWindow || partnerWindow.closed) {
+            console.error('Popup bloqueado pelo navegador');
+            this.showErrorMessage('A janela para o site do parceiro foi bloqueada. Por favor, permita popups para este site.');
+            
+            // Fallback para a página de hotéis
+            this.redirecionarParaHoteis(3000);
+            return;
+        }
+        
+        // Exibe página de carregamento na nova janela
+        this.mostrarPaginaCarregamento(partnerWindow);
+        
+        // Verifica se já temos o link em cache
+        const linkCached = this.getCachedLink(vooId);
+        if (linkCached && !this.isLinkExpired(linkCached)) {
+            console.log('Link em cache encontrado e ainda válido, usando-o diretamente');
+            this.redirecionarPartner(partnerWindow, linkCached);
+            this.redirecionarParaHoteis(2000);
+            return;
+        }
+        
+        // Obtém o link de redirecionamento
+        console.log('Obtendo link de redirecionamento da API...');
+        this.obterLinkRedirecionamento(voo)
+            .then(redirectData => {
+                console.log('Link de redirecionamento obtido com sucesso:', 
+                    redirectData.url ? redirectData.url.substring(0, 50) + '...' : 'N/A');
+                
+                // Salva o link em cache
+                this.cacheLink(vooId, redirectData);
+                
+                // Redireciona para o parceiro
+                this.redirecionarPartner(partnerWindow, redirectData);
+                
+                // Redireciona para hotéis após delay
+                this.redirecionarParaHoteis(2000);
+            })
+            .catch(error => {
+                console.error('Erro ao obter link de redirecionamento:', error);
+                
+                // Exibe erro na janela do parceiro
+                this.mostrarErroNaJanela(partnerWindow, error.message || 'Erro ao processar redirecionamento');
+                
+                // Redireciona para hotéis após delay
+                this.redirecionarParaHoteis(3000);
+            });
+    },
+    
+    /**
+     * Encontra um voo pelo ID
+     * @param {string} vooId - ID do voo
+     * @returns {Object|null} Objeto do voo ou null se não encontrado
+     */
+    encontrarVooPorId: function(vooId) {
+        if (!window.BENETRIP_VOOS?.finalResults?.proposals) {
+            return null;
+        }
+        
+        return window.BENETRIP_VOOS.finalResults.proposals.find(
+            (v, index) => (v.sign || `voo-idx-${index}`) === vooId
+        );
+    },
+    
+    /**
+     * Exibe uma mensagem de erro ao usuário
+     * @param {string} message - Mensagem de erro
+     */
+    showErrorMessage: function(message) {
+        if (typeof window.BENETRIP_VOOS?.exibirToast === 'function') {
+            window.BENETRIP_VOOS.exibirToast(message, 'error');
+        } else {
+            alert(message);
+        }
+    },
+    
+    /**
+     * Mostra uma página de carregamento na janela do parceiro
+     * @param {Window} window - Referência à janela aberta
+     */
+    mostrarPaginaCarregamento: function(window) {
+        if (!window || window.closed) return;
+        
+        try {
+            const logoUrl = this.getAssetUrl('logo.png');
+            window.document.write(`
                 <!DOCTYPE html>
                 <html>
                 <head>
@@ -180,7 +291,7 @@ window.BENETRIP_REDIRECT = {
                     </style>
                 </head>
                 <body>
-                    <img src="${window.location.origin}/assets/images/logo.png" alt="Benetrip" class="logo">
+                    <img src="${logoUrl}" alt="Benetrip" class="logo">
                     <div class="message">
                         <h2>Redirecionando para parceiro Benetrip</h2>
                         <p>Você está sendo redirecionado para o site do parceiro para finalizar sua reserva de voo.</p>
@@ -195,140 +306,221 @@ window.BENETRIP_REDIRECT = {
         } catch (err) {
             console.error('Erro ao escrever na janela do parceiro:', err);
         }
-        
-        // Obtém o link de redirecionamento
-        console.log('Obtendo link de redirecionamento...');
-        this.obterLinkRedirecionamento(voo)
-            .then(redirectData => {
-                console.log('Dados de redirecionamento recebidos:', redirectData);
-                
-                if (redirectData && redirectData.url) {
-                    // Redirecionar a janela aberta para o URL do parceiro
-                    if (partnerWindow && !partnerWindow.closed) {
-                        console.log('Redirecionando janela para:', 
-                            redirectData.method === 'GET' ? redirectData.url : 'página de redirect (POST)');
-                        
-                        try {
-                            if (redirectData.method === 'GET') {
-                                partnerWindow.location.href = redirectData.url;
-                            } else if (redirectData.method === 'POST') {
-                                // Para POST, redirecionar para a página de redirecionamento
-                                const redirectUrl = this.construirUrlRedirecao(redirectData);
-                                partnerWindow.location.href = redirectUrl;
-                            }
-                        } catch (err) {
-                            console.error('Erro ao redirecionar janela:', err);
-                            
-                            // Tentar escrever formulário diretamente na janela aberta
-                            try {
-                                partnerWindow.document.write(`
-                                    <!DOCTYPE html>
-                                    <html>
-                                    <head>
-                                        <title>Redirecionando...</title>
-                                    </head>
-                                    <body>
-                                        <h2>Redirecionando para o parceiro...</h2>
-                                        <form id="redirectForm" method="${redirectData.method}" action="${redirectData.url}">
-                                        </form>
-                                        <script>
-                                            document.getElementById('redirectForm').submit();
-                                        </script>
-                                    </body>
-                                    </html>
-                                `);
-                            } catch (err2) {
-                                console.error('Tentativa de fallback também falhou:', err2);
-                            }
-                        }
-                    } else {
-                        console.warn('Janela do parceiro foi fechada pelo usuário');
-                        alert('A janela do parceiro foi fechada. Você será redirecionado para a página de hotéis.');
-                    }
-                } else {
-                    console.error('Dados de redirecionamento inválidos', redirectData);
-                    if (partnerWindow && !partnerWindow.closed) {
-                        // Exibir mensagem de erro na janela aberta
-                        try {
-                            partnerWindow.document.write(`
-                                <!DOCTYPE html>
-                                <html>
-                                <head>
-                                    <title>Erro de Redirecionamento - Benetrip</title>
-                                    <style>
-                                        body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
-                                        .error { color: #e74c3c; margin: 20px 0; }
-                                    </style>
-                                </head>
-                                <body>
-                                    <h2>Erro de Redirecionamento</h2>
-                                    <p class="error">Não foi possível obter os dados para redirecionamento.</p>
-                                    <p>Você pode fechar esta janela e continuar o processo de reserva na Benetrip.</p>
-                                    <button onclick="window.close()">Fechar Janela</button>
-                                </body>
-                                </html>
-                            `);
-                        } catch (err) {
-                            console.error('Erro ao exibir mensagem de erro na janela:', err);
-                            partnerWindow.close();
-                        }
-                    }
-                }
-                
-                // Redireciona para a página de hotéis após um delay
-                setTimeout(() => {
-                    window.location.href = 'hotels.html';
-                }, 2000);
-            })
-            .catch(error => {
-                console.error('Erro ao obter link de redirecionamento:', error);
-                
-                // Exibir mensagem de erro na janela aberta
-                if (partnerWindow && !partnerWindow.closed) {
-                    try {
-                        partnerWindow.document.write(`
-                            <!DOCTYPE html>
-                            <html>
-                            <head>
-                                <title>Erro de Redirecionamento - Benetrip</title>
-                                <style>
-                                    body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
-                                    .error { color: #e74c3c; margin: 20px 0; }
-                                </style>
-                            </head>
-                            <body>
-                                <h2>Erro de Redirecionamento</h2>
-                                <p class="error">Ocorreu um erro ao processar o redirecionamento para o parceiro.</p>
-                                <p>Erro: ${error.message || 'Erro desconhecido'}</p>
-                                <p>Você pode fechar esta janela e continuar o processo de reserva na Benetrip.</p>
-                                <button onclick="window.close()">Fechar Janela</button>
-                            </body>
-                            </html>
-                        `);
-                    } catch (err) {
-                        console.error('Erro ao exibir mensagem de erro na janela:', err);
-                        partnerWindow.close();
-                    }
-                }
-                
-                // Restaura o botão
-                if (btnConfirmar) {
-                    btnConfirmar.innerHTML = 'Confirmar e Prosseguir';
-                    btnConfirmar.disabled = false;
-                }
-                
-                // Mostrar alerta
-                alert('Ocorreu um erro ao processar a reserva com o parceiro. Você será redirecionado para selecionar seu hotel.');
-                
-                // Redireciona para a página de hotéis mesmo em caso de erro
-                setTimeout(() => {
-                    window.location.href = 'hotels.html';
-                }, 1000);
-            });
     },
     
     /**
-     * Construir URL para a página de redirecionamento
+     * Exibe mensagem de erro na janela do parceiro
+     * @param {Window} window - Referência à janela aberta
+     * @param {string} message - Mensagem de erro
+     */
+    mostrarErroNaJanela: function(window, message) {
+        if (!window || window.closed) return;
+        
+        try {
+            const logoUrl = this.getAssetUrl('logo.png');
+            window.document.write(`
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <title>Erro de Redirecionamento - Benetrip</title>
+                    <style>
+                        body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
+                        .error { color: #e74c3c; margin: 20px 0; padding: 15px; background-color: #fdf1f0; border-radius: 5px; }
+                        .logo { max-width: 180px; margin-bottom: 30px; }
+                    </style>
+                </head>
+                <body>
+                    <img src="${logoUrl}" alt="Benetrip" class="logo">
+                    <h2>Erro de Redirecionamento</h2>
+                    <div class="error">${message}</div>
+                    <p>Você pode fechar esta janela e continuar o processo de reserva na Benetrip.</p>
+                    <button onclick="window.close()" style="padding: 10px 20px; background-color: #E87722; color: white; border: none; border-radius: 5px; cursor: pointer;">Fechar Janela</button>
+                </body>
+                </html>
+            `);
+        } catch (err) {
+            console.error('Erro ao exibir mensagem de erro na janela:', err);
+            try {
+                window.close();
+            } catch (closeErr) {
+                console.error('Erro ao fechar janela:', closeErr);
+            }
+        }
+    },
+    
+    /**
+     * Redireciona a janela do parceiro para o destino
+     * @param {Window} window - Referência à janela aberta
+     * @param {Object} redirectData - Dados de redirecionamento
+     */
+    redirecionarPartner: function(window, redirectData) {
+        if (!window || window.closed) {
+            console.warn('Janela do parceiro foi fechada pelo usuário');
+            return false;
+        }
+        
+        try {
+            if (redirectData.method === 'GET') {
+                // Redirecionamento GET simples
+                console.log('Redirecionando via GET para:', redirectData.url.substring(0, 50) + '...');
+                window.location.href = redirectData.url;
+                return true;
+            } else if (redirectData.method === 'POST') {
+                // Redirecionamento via página de redirecionamento para lidar com POST
+                const redirectUrl = this.construirUrlRedirecao(redirectData);
+                console.log('Redirecionando via POST para página intermediária');
+                window.location.href = redirectUrl;
+                return true;
+            } else {
+                console.error('Método de redirecionamento desconhecido:', redirectData.method);
+                this.mostrarErroNaJanela(window, `Método de redirecionamento não suportado: ${redirectData.method}`);
+                return false;
+            }
+        } catch (err) {
+            console.error('Erro ao redirecionar para parceiro:', err);
+            this.mostrarErroNaJanela(window, 'Erro ao redirecionar para o parceiro');
+            return false;
+        }
+    },
+    
+    /**
+     * Redireciona para a página de hotéis após um delay
+     * @param {number} delay - Delay em milissegundos
+     */
+    redirecionarParaHoteis: function(delay = 2000) {
+        console.log(`Redirecionando para hotéis em ${delay}ms...`);
+        
+        setTimeout(() => {
+            try {
+                localStorage.setItem('benetrip_reserva_pendente', 'true');
+                window.location.href = 'hotels.html';
+            } catch (err) {
+                console.error('Erro ao redirecionar para hotéis:', err);
+                // Tentativa direta
+                window.location.href = 'hotels.html';
+            }
+        }, delay);
+    },
+    
+    /**
+     * Obtém o link de redirecionamento da API
+     * @param {Object} voo - Objeto do voo
+     * @returns {Promise<Object>} Dados de redirecionamento
+     */
+    obterLinkRedirecionamento: function(voo) {
+        console.log('Obtendo link de redirecionamento para voo:', voo.sign);
+        
+        // Obter o search_id e o URL do termo dos dados do voo
+        const searchId = window.BENETRIP_VOOS?.searchId;
+        
+        // Encontrar o termo (url) do voo selecionado
+        let termUrl = null;
+        try {
+            // Obter a primeira chave de voo.terms
+            if (voo.terms) {
+                const termsKey = Object.keys(voo.terms)[0];
+                termUrl = voo.terms[termsKey].url;
+                console.log('Term URL encontrada:', termUrl);
+            }
+        } catch (e) {
+            console.error('Erro ao obter URL do termo:', e);
+            return Promise.reject(new Error('Não foi possível obter os parâmetros necessários para redirecionamento'));
+        }
+        
+        // Validação dos parâmetros obrigatórios
+        if (!searchId || !termUrl) {
+            const erro = new Error('Parâmetros obrigatórios indisponíveis (searchId ou termUrl)');
+            console.error(erro.message);
+            return Promise.reject(erro);
+        }
+        
+        // AMBIENTE DE DESENVOLVIMENTO - apenas para testes locais, não em produção
+        if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+            console.warn('⚠️ AMBIENTE DE DESENVOLVIMENTO - Usando URL simulada apenas para teste');
+            return Promise.resolve({
+                gate_id: 112,
+                click_id: Date.now(),
+                str_click_id: Date.now().toString(),
+                url: `https://parceiro-simulado.travelpayouts.com/book?searchid=${searchId}&dev=true`,
+                method: "GET",
+                params: {},
+                gate_name: "Teste (Desenvolvimento)"
+            });
+        }
+        
+        // Construir URL para API
+        const apiUrl = `/api/flight-redirect?search_id=${encodeURIComponent(searchId)}&term_url=${encodeURIComponent(termUrl)}&marker=${encodeURIComponent(this.config.marker)}`;
+        console.log('Chamando API proxy para redirecionamento:', apiUrl);
+        
+        // Implementa fetch com timeout e retry
+        return this.fetchWithRetry(apiUrl, this.config.retryAttempts, this.config.retryDelay, this.config.requestTimeout);
+    },
+    
+    /**
+     * Implementação robusta de fetch com retry e timeout
+     * @param {string} url - URL para requisição
+     * @param {number} maxRetries - Número máximo de tentativas
+     * @param {number} retryDelay - Delay entre tentativas em ms
+     * @param {number} timeoutMs - Timeout da requisição em ms
+     * @returns {Promise<Object>} Dados da resposta
+     */
+    fetchWithRetry: function(url, maxRetries = 2, retryDelay = 1000, timeoutMs = 8000) {
+        let attempts = 0;
+        
+        const attemptFetch = () => {
+            attempts++;
+            console.log(`Tentativa ${attempts}/${maxRetries+1} para: ${url}`);
+            
+            return new Promise((resolve, reject) => {
+                // Configura timeout
+                const controller = new AbortController();
+                const signal = controller.signal;
+                const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+                
+                fetch(url, { signal })
+                    .then(response => {
+                        clearTimeout(timeoutId);
+                        
+                        if (!response.ok) {
+                            throw new Error(`HTTP error ${response.status}: ${response.statusText}`);
+                        }
+                        
+                        return response.json();
+                    })
+                    .then(data => {
+                        // Validar resposta
+                        if (!data || !data.url) {
+                            throw new Error('Resposta inválida: URL de redirecionamento ausente');
+                        }
+                        
+                        resolve(data);
+                    })
+                    .catch(error => {
+                        clearTimeout(timeoutId);
+                        
+                        if (error.name === 'AbortError') {
+                            console.error('Timeout excedido ao buscar link de redirecionamento');
+                            reject(new Error('Tempo limite excedido ao buscar dados do parceiro'));
+                        } else {
+                            console.error(`Erro na tentativa ${attempts}:`, error);
+                            
+                            if (attempts <= maxRetries) {
+                                setTimeout(() => attemptFetch().then(resolve).catch(reject), retryDelay);
+                            } else {
+                                reject(error);
+                            }
+                        }
+                    });
+            });
+        };
+        
+        return attemptFetch();
+    },
+    
+    /**
+     * Construir URL para redirecionamento via página redirect.html
+     * @param {Object} redirectData - Dados de redirecionamento
+     * @returns {string} URL para redirecionamento
      */
     construirUrlRedirecao: function(redirectData) {
         // Codificar os parâmetros para URL
@@ -337,16 +529,18 @@ window.BENETRIP_REDIRECT = {
         
         // Construir URL para página redirect.html
         return `${this.config.redirectTemplate}?` +
-               `click_id=${redirectData.click_id || ''}&` +
-               `gate_id=${redirectData.gate_id || ''}&` +
+               `click_id=${encodeURIComponent(redirectData.click_id || '')}&` +
+               `gate_id=${encodeURIComponent(redirectData.gate_id || '')}&` +
                `url=${encodeURIComponent(redirectData.url)}&` +
-               `method=${redirectData.method}&` +
+               `method=${encodeURIComponent(redirectData.method)}&` +
                `params=${paramsEncoded}&` +
                `partner=${encodeURIComponent(gateName)}`;
     },
     
     /**
      * Obter nome da agência a partir do ID
+     * @param {string|number} gateId - ID da agência
+     * @returns {string} Nome da agência ou valor default
      */
     obterNomeAgencia: function(gateId) {
         if (!gateId) return 'Parceiro';
@@ -360,8 +554,18 @@ window.BENETRIP_REDIRECT = {
     
     /**
      * Salva os dados do voo selecionado
+     * @param {Object} voo - Dados do voo
      */
     salvarDadosVoo: function(voo) {
+        if (!window.BENETRIP_VOOS) {
+            console.warn('BENETRIP_VOOS não disponível, não foi possível salvar dados completos do voo');
+            localStorage.setItem('benetrip_voo_selecionado', JSON.stringify({
+                voo,
+                dataSelecao: new Date().toISOString()
+            }));
+            return;
+        }
+        
         try {
             const preco = window.BENETRIP_VOOS.obterPrecoVoo(voo);
             const moeda = window.BENETRIP_VOOS.finalResults?.meta?.currency || 'BRL';
@@ -386,283 +590,126 @@ window.BENETRIP_REDIRECT = {
             
         } catch (erro) {
             console.error('Erro ao salvar dados do voo:', erro);
+            // Tenta salvar versão simplificada
+            localStorage.setItem('benetrip_voo_selecionado', JSON.stringify({
+                voo,
+                dataSelecao: new Date().toISOString()
+            }));
         }
     },
     
     /**
-     * Obtém o link de redirecionamento da API
-     * Versão simplificada e sem dependências externas
+     * Obtém URL de um asset
+     * @param {string} filename - Nome do arquivo
+     * @returns {string} URL completa do asset
      */
-    obterLinkRedirecionamento: function(voo) {
-        console.log('Obtendo link de redirecionamento para voo:', voo.sign);
-        
-        // Obter o search_id e o URL do termo dos dados do voo
-        const searchId = window.BENETRIP_VOOS?.searchId;
-        
-        // Encontrar o termo (url) do voo selecionado
-        let termUrl = null;
+    getAssetUrl: function(filename) {
         try {
-            // Obter a primeira chave de voo.terms
-            if (voo.terms) {
-                const termsKey = Object.keys(voo.terms)[0];
-                termUrl = voo.terms[termsKey].url;
-                console.log('Term URL encontrada:', termUrl);
-            }
+            return `${window.location.origin}/assets/images/${filename}`;
         } catch (e) {
-            console.error('Erro ao obter URL do termo:', e);
+            return `assets/images/${filename}`;
         }
-        
-        // PARA AMBIENTE DE TESTE: sempre usar dados simulados
-        if (window.location.href.includes('localhost') || 
-            window.location.href.includes('127.0.0.1') || 
-            window.location.href.includes('?test=true')) {
-            console.log('Ambiente de teste detectado, retornando URL simulada');
-            return Promise.resolve({
-                gate_id: 112,
-                click_id: Date.now(),
-                str_click_id: Date.now().toString(),
-                url: "https://www.example.com/flights?mock=true&searchid=" + (searchId || 'unknown'),
-                method: "GET",
-                params: {},
-                gate_name: "Teste"
-            });
-        }
-        
-        // Se está faltando dados, usar valores simulados
-        if (!searchId || !termUrl) {
-            console.warn('searchId ou termUrl não disponíveis, usando valores simulados');
-            return Promise.resolve({
-                gate_id: 112,
-                click_id: Date.now(),
-                str_click_id: Date.now().toString(),
-                url: "https://www.example.com/flights?mock=true&searchid=" + (searchId || 'unknown'),
-                method: "GET",
-                params: {},
-                gate_name: "Simulado (dados incompletos)"
-            });
-        }
-        
-        // Construir URL para API
-        const apiUrl = `/api/flight-redirect?search_id=${encodeURIComponent(searchId)}&term_url=${encodeURIComponent(termUrl)}&marker=${encodeURIComponent(this.config.marker)}`;
-        console.log('Chamando API proxy para redirecionamento:', apiUrl);
-        
-        // Implementa fetch com timeout para evitar bloqueio
-        return new Promise((resolve, reject) => {
-            // Configura timeout
-            const timeoutId = setTimeout(() => {
-                console.warn('Timeout ao obter link de redirecionamento');
-                // Resolver com dados simulados em vez de rejeitar
-                resolve({
-                    gate_id: 112,
-                    click_id: Date.now(),
-                    str_click_id: Date.now().toString(),
-                    url: "https://www.example.com/flights?mock=true&timeout=true",
-                    method: "GET",
-                    params: {},
-                    gate_name: "Parceiro (timeout)"
-                });
-            }, 5000);
-            
-            // Faz a requisição
-            fetch(apiUrl)
-                .then(response => {
-                    clearTimeout(timeoutId);
-                    if (!response.ok) {
-                        throw new Error(`Erro na requisição: ${response.status}`);
-                    }
-                    return response.json();
-                })
-                .then(data => {
-                    resolve(data);
-                })
-                .catch(error => {
-                    clearTimeout(timeoutId);
-                    console.error('Erro ao obter link de redirecionamento:', error);
-                    // Resolver com dados simulados em vez de rejeitar
-                    resolve({
-                        gate_id: 112,
-                        click_id: Date.now(),
-                        str_click_id: Date.now().toString(),
-                        url: "https://www.example.com/flights?mock=true&error=true",
-                        method: "GET",
-                        params: {},
-                        gate_name: "Parceiro (erro)"
-                    });
-                });
-        });
     },
     
     /**
-     * Implementação de fetch com retry para maior confiabilidade
+     * Coloca um link de redirecionamento em cache
+     * @param {string} vooId - ID do voo
+     * @param {Object} redirectData - Dados de redirecionamento
      */
-    fetchWithRetry: function(url, maxRetries = 3, retryDelay = 1000) {
-        return new Promise((resolve, reject) => {
-            const attemptFetch = (retriesLeft) => {
-                fetch(url)
-                    .then(response => {
-                        if (!response.ok) {
-                            throw new Error(`Erro na requisição: ${response.status}`);
-                        }
-                        return response.json();
-                    })
-                    .then(resolve)
-                    .catch(error => {
-                        console.warn(`Tentativa de fetch falhou, ${retriesLeft} tentativas restantes`, error);
-                        
-                        if (retriesLeft <= 0) {
-                            reject(error);
-                            return;
-                        }
-                        
-                        // Espera antes de tentar novamente
-                        setTimeout(() => {
-                            attemptFetch(retriesLeft - 1);
-                        }, retryDelay);
-                    });
-            };
-            
-            attemptFetch(maxRetries);
-        });
-    },
-    
-    /**
-     * JSONP workaround para problemas de CORS
-     */
-    fetchJsonp: function(url) {
-        return new Promise((resolve, reject) => {
-            // Criar um ID único para a callback
-            const callbackName = 'jsonp_callback_' + Math.round(100000 * Math.random());
-            
-            // Adicionar a callback ao objeto window
-            window[callbackName] = function(data) {
-                // Limpar o timeout
-                clearTimeout(jsonpTimeout);
-                
-                // Remover o script
-                document.body.removeChild(script);
-                
-                // Resolver a Promise com os dados
-                resolve(data);
-                
-                // Limpar a função de callback
-                delete window[callbackName];
-            };
-            
-            // Adicionar o parâmetro de callback à URL
-            const jsonpUrl = url + (url.indexOf('?') >= 0 ? '&' : '?') + 'callback=' + callbackName;
-            
-            // Criar e adicionar o script
-            const script = document.createElement('script');
-            script.src = jsonpUrl;
-            script.onerror = function() {
-                // Limpar o timeout
-                clearTimeout(jsonpTimeout);
-                
-                // Remover o script
-                document.body.removeChild(script);
-                
-                // Rejeitar a Promise
-                reject(new Error('Erro ao carregar o script JSONP'));
-                
-                // Limpar a função de callback
-                delete window[callbackName];
-            };
-            document.body.appendChild(script);
-            
-            // Configurar um timeout para rejeitar a Promise se demorar muito
-            const jsonpTimeout = setTimeout(function() {
-                // Remover o script
-                if (script.parentNode) document.body.removeChild(script);
-                
-                // Rejeitar a Promise
-                reject(new Error('Timeout para JSONP'));
-                
-                // Limpar a função de callback
-                delete window[callbackName];
-            }, 10000); // 10 segundos de timeout
-        });
-    },
-    
-    /**
-     * Redireciona o usuário para o site do parceiro
-     */
-    redirecionarParaParceiro: function(redirectData) {
-        console.log('Redirecionando para parceiro:', redirectData);
+    cacheLink: function(vooId, redirectData) {
+        if (!vooId || !redirectData || !redirectData.url) return;
         
         try {
-            if (redirectData.method === 'GET') {
-                // Para método GET, simplesmente abre a URL em nova aba
-                window.open(redirectData.url, '_blank');
-            } else if (redirectData.method === 'POST') {
-                // Para método POST, usa a página de redirecionamento
-                const redirectUrl = this.construirUrlRedirecao(redirectData);
-                window.open(redirectUrl, '_blank');
-            }
-        } catch (error) {
-            console.error('Erro ao redirecionar para parceiro:', error);
+            const cacheItem = {
+                data: redirectData,
+                timestamp: Date.now(),
+                expires: Date.now() + this.config.linkLifetimeMs
+            };
+            
+            localStorage.setItem(`benetrip_redirect_${vooId}`, JSON.stringify(cacheItem));
+            console.log(`Link para voo ${vooId} salvo em cache (válido por 15 minutos)`);
+        } catch (err) {
+            console.warn('Erro ao salvar link em cache:', err);
         }
     },
     
     /**
-     * Redireciona via POST usando um formulário dinâmico
-     * (Mantido como fallback, mas substituído pelo método do redirect.html)
+     * Obtém um link de redirecionamento do cache
+     * @param {string} vooId - ID do voo
+     * @returns {Object|null} Dados de redirecionamento ou null
      */
-    redirecionarViaPost: function(redirectData) {
-        console.log('Redirecionando via POST:', redirectData);
+    getCachedLink: function(vooId) {
+        if (!vooId) return null;
         
         try {
-            // Cria um iframe oculto
-            const iframe = document.createElement('iframe');
-            iframe.style.display = 'none';
-            iframe.name = 'partner_iframe';
-            document.body.appendChild(iframe);
+            const cacheJson = localStorage.getItem(`benetrip_redirect_${vooId}`);
+            if (!cacheJson) return null;
             
-            // Cria o formulário
-            const form = document.createElement('form');
-            form.method = 'POST';
-            form.action = redirectData.url;
-            form.target = 'partner_iframe';
+            const cache = JSON.parse(cacheJson);
+            if (!cache || !cache.data || !cache.expires) return null;
             
-            // Adiciona os campos do formulário
-            for (const [key, value] of Object.entries(redirectData.params || {})) {
-                const input = document.createElement('input');
-                input.type = 'hidden';
-                input.name = key;
-                input.value = value;
-                form.appendChild(input);
+            // Verifica se não expirou
+            if (cache.expires < Date.now()) {
+                console.log(`Link em cache para voo ${vooId} expirou`);
+                localStorage.removeItem(`benetrip_redirect_${vooId}`);
+                return null;
             }
             
-            // Adiciona o pixel de rastreamento
-            const img = document.createElement('img');
-            img.width = 0;
-            img.height = 0;
-            img.src = `//yasen.aviasales.com/adaptors/pixel_click.png?click_id=${redirectData.click_id}&gate_id=${redirectData.gate_id}`;
-            form.appendChild(img);
-            
-            // Adiciona ao documento e submete
-            document.body.appendChild(form);
-            form.submit();
-            
-            console.log('Formulário POST submetido com sucesso');
-        } catch (error) {
-            console.error('Erro ao redirecionar via POST:', error);
+            console.log(`Link em cache para voo ${vooId} encontrado (expira em ${Math.round((cache.expires - Date.now()) / 1000)}s)`);
+            return cache.data;
+        } catch (err) {
+            console.warn('Erro ao recuperar link do cache:', err);
+            return null;
         }
     },
     
     /**
-     * Fecha um modal
+     * Verifica se um link está expirado
+     * @param {Object} redirectData - Dados de redirecionamento
+     * @returns {boolean} true se expirado, false caso contrário
      */
-    fecharModal: function(modalId) {
-        const modal = document.getElementById(modalId);
-        if (!modal) return;
-        
-        modal.classList.remove('modal-active');
-        
-        setTimeout(() => {
-            if (!modal.classList.contains('modal-active')) {
-                modal.style.display = 'none';
+    isLinkExpired: function(redirectData) {
+        // Links da API têm validade de 15 minutos
+        // Verifica quando o link foi obtido através do timestamp do cache
+        try {
+            const cacheJson = localStorage.getItem(`benetrip_redirect_${redirectData.vooId}`);
+            if (!cacheJson) return true;
+            
+            const cache = JSON.parse(cacheJson);
+            if (!cache || !cache.timestamp) return true;
+            
+            const age = Date.now() - cache.timestamp;
+            return age > this.config.linkLifetimeMs;
+        } catch (err) {
+            console.warn('Erro ao verificar expiração do link:', err);
+            return true; // Em caso de dúvida, considera expirado
+        }
+    },
+    
+    /**
+     * Limpa links em cache
+     */
+    clearCachedLinks: function() {
+        try {
+            const keysToRemove = [];
+            
+            // Encontra todas as chaves de links em cache
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key && key.startsWith('benetrip_redirect_')) {
+                    keysToRemove.push(key);
+                }
             }
-        }, 300);
+            
+            // Remove as chaves
+            keysToRemove.forEach(key => localStorage.removeItem(key));
+            
+            if (keysToRemove.length > 0) {
+                console.log(`${keysToRemove.length} links de redirecionamento removidos do cache`);
+            }
+        } catch (err) {
+            console.warn('Erro ao limpar links em cache:', err);
+        }
     }
 };
 
@@ -685,75 +732,4 @@ if (window.BENETRIP_VOOS) {
 }
 
 // Reportar versão do script
-console.log('BENETRIP_REDIRECT carregado - Versão 1.4 (Solução de Problemas)');
-
-// Muito importante: tornar a função disponível globalmente
-console.log('Garantindo acesso global a BENETRIP_REDIRECT:', typeof window.BENETRIP_REDIRECT);
-
-// Garantir redirecionamento em caso de falha
-(function() {
-  if (window.BENETRIP_REDIRECT) {
-    // Backup do método original
-    const metodoOriginal = window.BENETRIP_REDIRECT.processarConfirmacao;
-    
-    // Substituir com versão mais robusta
-    window.BENETRIP_REDIRECT.processarConfirmacao = function(vooId) {
-      try {
-        // Tentar método original
-        console.log("Tentando método original de redirecionamento para: " + vooId);
-        metodoOriginal.call(window.BENETRIP_REDIRECT, vooId);
-        
-        // Adicionar timeout para garantir redirecionamento para hotéis
-        setTimeout(() => {
-          localStorage.setItem('benetrip_reserva_pendente', 'true');
-          window.location.href = 'hotels.html';
-        }, 3000);
-      } catch (err) {
-        console.error("Erro no método original: ", err);
-        
-        // Abrir janela para redirecionar
-        const win = window.open('about:blank', '_blank');
-        if (win && !win.closed) {
-          win.document.write(`
-            <!DOCTYPE html>
-            <html>
-            <head>
-              <title>Redirecionando para parceiro - Benetrip</title>
-              <style>
-                body { font-family: Arial, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; flex-direction: column; }
-                .progress { width: 80%; height: 20px; background-color: #f3f3f3; border-radius: 10px; margin: 20px 0; overflow: hidden; }
-                .bar { height: 100%; width: 0; background-color: #E87722; animation: fill 3s linear forwards; }
-                @keyframes fill { to { width: 100%; } }
-                .message { text-align: center; max-width: 80%; }
-                .logo { max-width: 200px; margin-bottom: 20px; }
-              </style>
-            </head>
-            <body>
-              <img src="${window.location.origin}/assets/images/logo.png" alt="Benetrip" class="logo">
-              <div class="message">
-                <h2>Redirecionando para parceiro Benetrip</h2>
-                <p>Você está sendo redirecionado para o site do parceiro para finalizar sua reserva de voo.</p>
-                <p>Por favor, <strong>não feche</strong> esta janela até ser redirecionado.</p>
-              </div>
-              <div class="progress">
-                <div class="bar"></div>
-              </div>
-            </body>
-            </html>
-          `);
-          
-          // Simular redirecionamento para o parceiro
-          setTimeout(() => {
-            win.location.href = "https://www.example.com/flights?mock=true&searchid=" + (vooId || "unknown");
-          }, 2000);
-        }
-        
-        // Redirecionar para página de hotéis
-        setTimeout(() => {
-          localStorage.setItem('benetrip_reserva_pendente', 'true');
-          window.location.href = 'hotels.html';
-        }, 2000);
-      }
-    };
-  }
-})();
+console.log('BENETRIP_REDIRECT carregado - Versão 2.0.0 (Otimizada e em conformidade com as diretrizes da API)');
