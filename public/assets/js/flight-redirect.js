@@ -1,6 +1,6 @@
 /**
  * BENETRIP - Redirecionamento para compra de voos e página de hotéis
- * Versão corrigida para resolver problemas de redirecionamento
+ * Versão final corrigida para resolver problemas de redirecionamento e duplicação
  * Data: 10/04/2025
  */
 
@@ -17,10 +17,20 @@ window.BENETRIP_REDIRECT = {
         redirectTemplate: 'redirect.html'
     },
     
+    // Flags para controle de estado
+    _initialized: false,
+    _redirectInProgress: false,
+    
     /**
      * Inicializa os eventos de redirecionamento
      */
     init: function() {
+        // Evita inicialização duplicada
+        if (this._initialized) {
+            console.log('BENETRIP_REDIRECT já inicializado, ignorando.');
+            return;
+        }
+        
         console.log('Inicializando handlers de redirecionamento de voos...');
         
         // Adiciona listener para o botão principal
@@ -63,6 +73,9 @@ window.BENETRIP_REDIRECT = {
             }
         });
         
+        // Marca como inicializado
+        this._initialized = true;
+        
         // Notificar que a inicialização foi concluída
         console.log('BENETRIP_REDIRECT inicializado com sucesso e disponível globalmente');
         
@@ -102,9 +115,18 @@ window.BENETRIP_REDIRECT = {
     
     /**
      * Processa a confirmação e redireciona o usuário
-     * Versão simplificada e mais robusta
+     * Versão final aprimorada com prevenção de duplicação
      */
     processarConfirmacao: function(vooId) {
+        // BLOQUEIO ANTI-DUPLICAÇÃO
+        if (this._redirectInProgress) {
+            console.warn('Redirecionamento já em andamento, ignorando nova solicitação');
+            return;
+        }
+        
+        // Marca que um redirecionamento está em progresso
+        this._redirectInProgress = true;
+        
         console.log('Processando confirmação para voo:', vooId);
         
         // MODIFICAÇÃO: Sempre tratar como se temos objeto local BENETRIP_VOOS para fallback
@@ -157,6 +179,9 @@ window.BENETRIP_REDIRECT = {
             console.error('Popup bloqueado pelo navegador');
             alert('A janela para o site do parceiro foi bloqueada. Por favor, permita popups para este site.');
             
+            // Resetar flag de redirecionamento
+            this._redirectInProgress = false;
+            
             // Redirecionar para hotéis como fallback
             setTimeout(() => {
                 window.location.href = 'hotels.html';
@@ -181,7 +206,7 @@ window.BENETRIP_REDIRECT = {
                     </style>
                 </head>
                 <body>
-                    <img src="${window.location.origin}/assets/images/logo.png" alt="Benetrip" class="logo">
+                    <img src="${window.location.origin}/assets/images/logo.png" alt="Benetrip" class="logo" onerror="this.src='https://benetrip.com.br/assets/images/logo.png'">
                     <div class="message">
                         <h2>Redirecionando para parceiro Benetrip</h2>
                         <p>Você está sendo redirecionado para o site do parceiro para finalizar sua reserva de voo.</p>
@@ -276,12 +301,18 @@ window.BENETRIP_REDIRECT = {
                     }
                 }
                 
+                // Reseta flag de redirecionamento
+                this._redirectInProgress = false;
+                
                 // Redireciona para a página de hotéis após um delay
                 setTimeout(() => {
                     window.location.href = 'hotels.html';
                 }, 2000);
             })
             .catch(error => {
+                // Reseta flag de redirecionamento
+                this._redirectInProgress = false;
+                
                 console.error('Erro ao obter link de redirecionamento:', error);
                 
                 // Exibir mensagem de erro na janela aberta
@@ -392,7 +423,7 @@ window.BENETRIP_REDIRECT = {
     
     /**
      * Obtém o link de redirecionamento da API
-     * VERSÃO CORRIGIDA: Acessa diretamente a API Travelpayouts em produção
+     * VERSÃO FINAL CORRIGIDA: Acessa diretamente a API Travelpayouts em produção
      */
     obterLinkRedirecionamento: function(voo) {
         console.log('Obtendo link de redirecionamento para voo:', voo.sign);
@@ -549,7 +580,7 @@ if (window.BENETRIP_VOOS) {
 }
 
 // Reportar versão do script
-console.log('BENETRIP_REDIRECT carregado - Versão 2.0 (Correção Acesso Direto API)');
+console.log('BENETRIP_REDIRECT carregado - Versão 2.1 (Prevenção de Duplicação e Acesso Direto API)');
 
 // Muito importante: tornar a função disponível globalmente
 console.log('Garantindo acesso global a BENETRIP_REDIRECT:', typeof window.BENETRIP_REDIRECT);
