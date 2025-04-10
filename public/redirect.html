@@ -2,419 +2,188 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta http-equiv="X-UA-Compatible" content="ie=edge">
-    <title>Redirecionando para Site Parceiro - Benetrip</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Montserrat:wght@400;500&display=swap" rel="stylesheet">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Redirecionando para Parceiro - Benetrip</title>
     <style>
-        :root {
-            --benetrip-orange: #E87722;
-            --benetrip-blue: #00A3E0;
-            --benetrip-dark: #21272A;
-            --benetrip-light-gray: #F5F5F5;
-            --benetrip-medium-gray: #E0E0E0;
-        }
-        
         body {
-            font-family: 'Poppins', sans-serif;
-            background-color: var(--benetrip-light-gray);
+            font-family: Arial, sans-serif;
+            text-align: center;
             margin: 0;
             padding: 0;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            min-height: 100vh;
-            color: var(--benetrip-dark);
+            height: 100vh;
+            background-color: #f8f8f8;
         }
-        
-        .redirect-container {
-            background-color: white;
-            border-radius: 12px;
-            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
-            width: 90%;
-            max-width: 500px;
-            padding: 24px;
-            text-align: center;
-            overflow: hidden;
-        }
-        
-        .logo-container {
-            margin-bottom: 20px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        
         .logo {
-            width: 120px;
-            height: auto;
+            max-width: 200px;
+            margin-bottom: 20px;
         }
-        
-        .tripinha {
-            width: 90px;
-            height: auto;
-            margin-left: -20px;
-            transform: scaleX(-1);
+        .container {
+            max-width: 600px;
+            padding: 20px;
+            border-radius: 8px;
+            background-color: white;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         }
-        
-        .title {
-            font-size: 1.5rem;
-            font-weight: 600;
-            margin: 0 0 16px 0;
-            color: var(--benetrip-dark);
-        }
-        
-        .message {
-            font-size: 1rem;
-            line-height: 1.5;
-            margin-bottom: 24px;
-            color: #555;
-        }
-        
-        .partner {
-            font-weight: 600;
-            color: var(--benetrip-orange);
-        }
-        
-        .progress-container {
+        .progress {
             width: 100%;
-            background-color: var(--benetrip-medium-gray);
-            height: 8px;
-            border-radius: 4px;
-            overflow: hidden;
+            height: 10px;
+            background-color: #eee;
+            border-radius: 10px;
             margin: 20px 0;
+            overflow: hidden;
         }
-        
         .progress-bar {
             height: 100%;
-            width: 0;
-            background-color: var(--benetrip-orange);
-            border-radius: 4px;
-            animation: progress 3s ease-in-out forwards;
+            background-color: #E87722;
+            animation: progress 1s linear forwards;
         }
-        
-        @keyframes progress {
-            0% { width: 0; }
-            100% { width: 100%; }
-        }
-        
-        .footer {
-            margin-top: 20px;
-            font-size: 0.9rem;
-            color: #777;
-        }
-        
-        .error-message {
-            color: #e74c3c;
-            background-color: #fdf1f0;
-            padding: 12px;
-            border-radius: 6px;
-            margin: 16px 0;
+        .manual-btn {
             display: none;
-            border: 1px solid #f1c1bd;
-        }
-        
-        .auto-redirect {
-            font-size: 0.9rem;
-            margin-top: 16px;
-            color: #666;
-        }
-        
-        .countdown {
-            font-weight: 600;
-            color: var(--benetrip-orange);
-        }
-        
-        /* Animação de pulsação */
-        .pulse {
-            animation: pulse 1.5s infinite;
-        }
-        
-        @keyframes pulse {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.05); }
-            100% { transform: scale(1); }
-        }
-        
-        /* Botão para tentar novamente */
-        .retry-button {
-            background-color: var(--benetrip-blue);
+            margin-top: 20px;
+            padding: 10px 20px;
+            background-color: #E87722;
             color: white;
             border: none;
             border-radius: 4px;
-            padding: 8px 16px;
-            font-weight: 500;
-            margin-top: 16px;
             cursor: pointer;
-            display: none;
+            font-weight: bold;
         }
-        
-        .retry-button:hover {
-            background-color: #0091c7;
+        .manual-btn:hover {
+            background-color: #d26a1e;
         }
-        
-        /* Indicador de carregamento */
-        .loading-indicator {
-            display: inline-block;
-            width: 16px;
-            height: 16px;
-            border: 2px solid rgba(232, 119, 34, 0.3);
-            border-radius: 50%;
-            border-top-color: var(--benetrip-orange);
-            animation: spin 1s linear infinite;
-            margin-right: 8px;
-            vertical-align: middle;
-        }
-        
-        @keyframes spin {
-            to { transform: rotate(360deg); }
+        @keyframes progress {
+            from { width: 0; }
+            to { width: 100%; }
         }
     </style>
 </head>
 <body>
-    <div class="redirect-container">
-        <div class="logo-container">
-            <img src="assets/images/logo.png" alt="Benetrip" class="logo" onerror="this.src='https://benetrip.com.br/assets/images/logo.png'">
-            <img src="assets/images/tripinha/avatar-feliz.png" alt="Tripinha" class="tripinha" onerror="this.src='https://benetrip.com.br/assets/images/tripinha/avatar-feliz.png'">
-        </div>
-
-        <h1 class="title">Redirecionando para nosso parceiro</h1>
+    <img src="assets/images/logo.png" alt="Benetrip" class="logo" onerror="this.src='https://benetrip.com.br/assets/images/logo.png'">
+    
+    <div class="container">
+        <h1>Redirecionando para parceiro Benetrip</h1>
+        <p>Você está sendo redirecionado para o site do parceiro para finalizar sua reserva de voo.</p>
+        <p><strong>Por favor, não feche esta janela até ser redirecionado.</strong></p>
         
-        <div class="message">
-            Estamos redirecionando você para o site do parceiro <span class="partner" id="partner-name">parceiro</span> para finalizar sua reserva.
-            <br><br>
-            <strong>Não feche esta página até ser redirecionado.</strong>
-        </div>
-        
-        <div class="progress-container">
+        <div class="progress">
             <div class="progress-bar"></div>
         </div>
         
-        <div class="auto-redirect">
-            <span id="redirect-status">Processando seu redirecionamento...</span><br>
-            Redirecionamento em <span class="countdown" id="countdown">3</span> segundos...
-        </div>
+        <p id="status">Redirecionando...</p>
         
-        <div class="error-message" id="error-message">
-            Ocorreu um erro no redirecionamento. Por favor, tente novamente ou entre em contato com o suporte.
-        </div>
-        
-        <button class="retry-button" id="retry-button">
-            Tentar Novamente
-        </button>
-        
-        <div class="footer">
-            Reserva segura garantida pela Benetrip
-        </div>
+        <button id="manual-redirect" class="manual-btn">Clique aqui para continuar manualmente</button>
     </div>
     
-    <!-- Pixel de tracking (conforme especificação da API Aviasales) -->
-    <img width="0" height="0" id="pixel" src="" alt="" style="position:absolute;visibility:hidden">
+    <!-- Pixel de rastreamento (invisível) -->
+    <img width="0" height="0" id="tracking-pixel" alt="" style="position:absolute;visibility:hidden">
     
-    <!-- Container para formulário POST -->
-    <div id="form-container" style="display:none;"></div>
-
-    // Substitua todo o bloco de script atual por este:
-<script>
-    // Função para extrair parâmetros da URL
-    function getParameterByName(name) {
-        const url = window.location.href;
-        name = name.replace(/[\[\]]/g, '\\$&');
-        const regex = new RegExp('[?&]' + name + '(=([^&#]*)|&|#|$)');
-        const results = regex.exec(url);
-        if (!results) return null;
-        if (!results[2]) return '';
-        return decodeURIComponent(results[2].replace(/\+/g, ' '));
-    }
-    
-    // Contador regressivo
-    function startCountdown(seconds) {
-        const countdownElement = document.getElementById('countdown');
-        if (!countdownElement) return;
-        
-        let count = seconds;
-        countdownElement.textContent = count;
-        
-        const interval = setInterval(() => {
-            count--;
-            countdownElement.textContent = count;
-            
-            if (count <= 0) {
-                clearInterval(interval);
-            }
-        }, 1000);
-    }
-    
-    // Exibir mensagem de erro
-    function showError(message) {
-        const errorElement = document.getElementById('error-message');
-        if (errorElement) {
-            errorElement.textContent = message;
-            errorElement.style.display = 'block';
+    <script>
+        // Função simplificada para obter parâmetros da URL
+        function getParam(name) {
+            const urlParams = new URLSearchParams(window.location.search);
+            return urlParams.get(name);
         }
-        console.error('Erro de redirecionamento:', message);
-    }
-    
-    // Processar redirecionamento
-    function processRedirect() {
-        try {
-            // Obter parâmetros da URL
-            const clickId = getParameterByName('click_id');
-            const gateId = getParameterByName('gate_id');
-            const url = getParameterByName('url');
-            const method = getParameterByName('method') || 'GET';
-            const partnerName = getParameterByName('partner') || 'parceiro';
-            let paramsString = getParameterByName('params');
-            let params = {};
+        
+        // Função para redirecionar de forma confiável
+        function redirectToPartner() {
+            const url = getParam('url');
+            const method = getParam('method') || 'GET';
             
-            // Registro para diagnóstico
-            console.log('Parâmetros de redirecionamento:');
-            console.log('- URL:', url);
-            console.log('- Método:', method);
-            console.log('- Click ID:', clickId);
-            console.log('- Gate ID:', gateId);
+            console.log('Redirecionando para:', url, 'via método:', method);
             
-            try {
-                if (paramsString) {
-                    params = JSON.parse(paramsString);
-                    console.log('- Params:', params);
-                }
-            } catch (e) {
-                console.error('Erro ao processar parâmetros:', e);
-                showError('Dados de redirecionamento inválidos');
-                return;
-            }
-            
-            // Definir nome do parceiro
-            document.getElementById('partner-name').textContent = partnerName;
-            
-            // Configurar pixel de tracking
-            if (clickId && gateId) {
-                const pixelUrl = `//yasen.aviasales.com/adaptors/pixel_click.png?click_id=${clickId}&gate_id=${gateId}`;
-                console.log('Configurando pixel de tracking:', pixelUrl);
-                document.getElementById('pixel').src = pixelUrl;
-            }
-            
-            // Verificar dados necessários
             if (!url) {
-                showError('URL de redirecionamento não fornecida');
-                console.error('URL de redirecionamento ausente ou vazia');
+                document.getElementById('status').textContent = 'Erro: URL de redirecionamento não encontrada';
                 return;
             }
             
-            // Iniciar contagem regressiva
-            startCountdown(3);
-            
-            // Verificar tipo de URL para garantir segurança
-            if (!url.startsWith('http://') && !url.startsWith('https://')) {
-                showError('URL de redirecionamento inválida');
-                console.error('URL de redirecionamento não começa com http:// ou https://', url);
-                return;
-            }
-            
-            console.log(`Redirecionamento agendado para ${method} ${url} em 3 segundos`);
-            
-            // Redirecionar após 3 segundos (FIX: Adicionando force=true para garantir o redirecionamento)
-            const redirectFunction = function() {
-                console.log('Executando redirecionamento agora...');
+            // Para método GET, redirecionamento direto
+            if (method.toUpperCase() === 'GET') {
+                // Notificar usuário
+                document.getElementById('status').textContent = 'Redirecionando agora...';
                 
+                // SOLUÇÃO ROBUSTA: Usar location.replace para redirecionamento direto
+                window.location.replace(url);
+                
+                // Mostrar botão manual após 3 segundos (caso o redirecionamento automático falhe)
+                setTimeout(() => {
+                    document.getElementById('manual-redirect').style.display = 'inline-block';
+                    document.getElementById('status').textContent = 'Aguardando redirecionamento...';
+                }, 3000);
+            } 
+            // Para método POST, criamos um formulário
+            else if (method.toUpperCase() === 'POST') {
                 try {
-                    if (method.toUpperCase() === 'GET') {
-                        // LOG adicional para DEBUG
-                        console.log('Redirecionamento GET para:', url);
-                        
-                        // CORREÇÃO CRÍTICA: usando assign em vez de href para forçar navegação
-                        window.location.assign(url);
-                        
-                        // Fallback se assign não funcionar
-                        setTimeout(function() {
-                            console.log('Tentando redirecionamento via href como fallback...');
-                            window.location.href = url;
-                            
-                            // Último recurso: abrir em nova janela
-                            setTimeout(function() {
-                                console.log('Último recurso: abrindo em nova janela...');
-                                window.open(url, '_self');
-                            }, 1000);
-                        }, 1000);
-                    } else if (method.toUpperCase() === 'POST') {
-                        // LOG adicional para DEBUG
-                        console.log('Redirecionamento POST para:', url);
-                        console.log('Parâmetros POST:', params);
-                        
-                        // Redirecionamento POST via formulário
-                        const form = document.createElement('form');
-                        form.method = 'POST';
-                        form.action = url;
-                        form.target = '_self';
-                        
-                        // Adicionar cada parâmetro como input
-                        Object.entries(params).forEach(([key, value]) => {
-                            const input = document.createElement('input');
-                            input.type = 'hidden';
-                            input.name = key;
-                            input.value = value;
-                            form.appendChild(input);
-                        });
-                        
-                        // Adicionar ao DOM e submeter
-                        const formContainer = document.getElementById('form-container');
-                        formContainer.innerHTML = '';
-                        formContainer.appendChild(form);
-                        
-                        // NOVO: Adicionar mensagem visual antes de submeter
-                        document.querySelector('.message').innerHTML += '<p><strong>Enviando dados ao parceiro agora...</strong></p>';
-                        
-                        // CORREÇÃO CRÍTICA: Garantir que o form é submetido
-                        try {
-                            form.submit();
-                            console.log('Formulário POST submetido');
-                        } catch (e) {
-                            console.error('Erro ao submeter formulário:', e);
-                            showError('Erro ao submeter dados para o parceiro');
-                        }
-                    } else {
-                        showError(`Método de redirecionamento não suportado: ${method}`);
-                    }
-                } catch (e) {
-                    console.error('Erro no redirecionamento final:', e);
-                    showError('Erro ao processar redirecionamento: ' + e.message);
+                    const paramsStr = getParam('params');
+                    const params = paramsStr ? JSON.parse(paramsStr) : {};
                     
-                    // Botão de redirecionamento manual como último recurso
-                    document.querySelector('.auto-redirect').innerHTML = 
-                        '<p>Redirecionamento automático falhou. <button onclick="window.location.href=\'' + 
-                        url + '\'" style="background:#E87722;color:white;border:none;padding:8px 16px;border-radius:4px;cursor:pointer;">Clique aqui para continuar</button></p>';
+                    document.getElementById('status').textContent = 'Enviando requisição para o parceiro...';
+                    
+                    // Criar e submeter formulário
+                    const form = document.createElement('form');
+                    form.method = 'POST';
+                    form.action = url;
+                    
+                    // Adicionar os campos
+                    Object.entries(params).forEach(([key, value]) => {
+                        const input = document.createElement('input');
+                        input.type = 'hidden';
+                        input.name = key;
+                        input.value = value;
+                        form.appendChild(input);
+                    });
+                    
+                    // Adicionar ao documento e submeter
+                    document.body.appendChild(form);
+                    form.submit();
+                } catch (error) {
+                    console.error('Erro ao processar redirecionamento POST:', error);
+                    document.getElementById('status').textContent = 'Erro ao processar redirecionamento';
+                    document.getElementById('manual-redirect').style.display = 'inline-block';
                 }
-            };
-            
-            // Executar o redirecionamento
-            setTimeout(redirectFunction, 3000);
-            
-        } catch (e) {
-            console.error('Erro crítico no processamento de redirecionamento:', e);
-            showError('Erro ao processar dados de redirecionamento. Por favor, tente novamente.');
-            
-            // Mostrar botão para voltar como último recurso
-            document.querySelector('.auto-redirect').innerHTML = 
-                '<p>Ocorreu um erro no redirecionamento. <button onclick="window.history.back()" style="background:#00A3E0;color:white;border:none;padding:8px 16px;border-radius:4px;cursor:pointer;">Voltar para a seleção de voos</button></p>';
+            }
         }
-    }
-    
-    // Iniciar o processamento quando a página carregar
-    window.addEventListener('DOMContentLoaded', processRedirect);
-    
-    // Verificação adicional de segurança para garantir que o redirecionamento aconteça
-    setTimeout(function() {
-        const url = getParameterByName('url');
-        if (url && window.location.href.startsWith('about:blank')) {
-            console.warn('Verificação de segurança: ainda na página about:blank após 5 segundos');
-            console.log('Tentando redirecionamento direto para:', url);
-            window.location.href = url;
+        
+        // Configurar pixel de rastreamento
+        function setupTrackingPixel() {
+            const clickId = getParam('click_id');
+            const gateId = getParam('gate_id');
+            
+            if (clickId && gateId) {
+                const pixel = document.getElementById('tracking-pixel');
+                pixel.src = `//yasen.aviasales.com/adaptors/pixel_click.png?click_id=${clickId}&gate_id=${gateId}`;
+                console.log('Configurando pixel de rastreamento');
+            }
         }
-    }, 5000);
-</script>
+        
+        // Inicializar quando o documento estiver pronto
+        document.addEventListener('DOMContentLoaded', function() {
+            // Configurar pixel de rastreamento
+            setupTrackingPixel();
+            
+            // Configurar botão manual
+            document.getElementById('manual-redirect').addEventListener('click', function() {
+                const url = getParam('url');
+                if (url) {
+                    window.location.href = url;
+                }
+            });
+            
+            // Redirecionar após um pequeno atraso (1 segundo)
+            setTimeout(redirectToPartner, 1000);
+        });
+        
+        // Garantia adicional - tentar redirecionamento depois de 2 segundos se a página ainda estiver aberta
+        setTimeout(function() {
+            const url = getParam('url');
+            if (url) {
+                console.log('Tentativa adicional de redirecionamento após 2s');
+                window.location.href = url;
+            }
+        }, 2000);
+    </script>
 </body>
 </html>
