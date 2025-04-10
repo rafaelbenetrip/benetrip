@@ -94,14 +94,9 @@ window.BENETRIP_REDIRECT = {
             return;
         }
         
-        // Usar a função global de confirmação
-        if (typeof window.mostrarConfirmacaoSelecao === 'function') {
-            window.mostrarConfirmacaoSelecao();
-        } else {
-            // Fallback se a função global não estiver disponível
-            const vooId = voo.sign || `voo-idx-${window.BENETRIP_VOOS.indexVooAtivo}`;
-            this.processarConfirmacao(vooId);
-        }
+        // Processar diretamente, sem mostrar o modal de confirmação
+        const vooId = voo.sign || `voo-idx-${window.BENETRIP_VOOS.indexVooAtivo}`;
+        this.processarConfirmacao(vooId);
     },
     
     /**
@@ -360,7 +355,9 @@ window.BENETRIP_REDIRECT = {
         const gateInfo = window.BENETRIP_VOOS?.accumulatedGatesInfo?.[gateId] || 
                          window.BENETRIP_VOOS?.finalResults?.gates_info?.[gateId];
         
-        return gateInfo?.label || `Agência capacitación
+        return gateInfo?.label || `Agência ${gateId}`;
+    },
+    
     /**
      * Salva os dados do voo selecionado
      */
