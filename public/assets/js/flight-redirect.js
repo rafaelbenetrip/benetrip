@@ -1,6 +1,6 @@
 /**
  * BENETRIP - Redirecionamento para compra de voos e página de hotéis
- * Versão final corrigida para resolver problemas de redirecionamento e duplicação
+ * Versão final corrigida com suporte aprimorado para dispositivos móveis
  * Data: 10/04/2025
  */
 
@@ -20,6 +20,13 @@ window.BENETRIP_REDIRECT = {
     // Flags para controle de estado
     _initialized: false,
     _redirectInProgress: false,
+    
+    /**
+     * Verifica se o dispositivo atual é um dispositivo móvel
+     */
+    isMobileDevice: function() {
+        return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    },
     
     /**
      * Inicializa os eventos de redirecionamento
@@ -115,7 +122,7 @@ window.BENETRIP_REDIRECT = {
     
     /**
      * Processa a confirmação e redireciona o usuário
-     * Versão final aprimorada com prevenção de duplicação
+     * Versão adaptada para melhor suporte mobile
      */
     processarConfirmacao: function(vooId) {
         // BLOQUEIO ANTI-DUPLICAÇÃO
@@ -170,111 +177,232 @@ window.BENETRIP_REDIRECT = {
             console.warn('Erro ao salvar dados do voo (não crítico):', err);
         }
         
-        // IMPORTANTE: Abrir nova janela antes do fetch (para evitar bloqueio de popups)
-        console.log('Abrindo janela para redirecionamento...');
-        const partnerWindow = window.open('about:blank', '_blank');
+        // NOVA LÓGICA: Verificar se é dispositivo móvel
+        const isMobile = this.isMobileDevice();
+        console.log('Dispositivo é mobile?', isMobile);
         
-        // Se a janela foi bloqueada, notificar
-        if (!partnerWindow || partnerWindow.closed) {
-            console.error('Popup bloqueado pelo navegador');
-            alert('A janela para o site do parceiro foi bloqueada. Por favor, permita popups para este site.');
+        // Abordagem diferente para dispositivos móveis
+        if (isMobile) {
+            console.log('Usando abordagem de redirecionamento para mobile');
             
-            // Resetar flag de redirecionamento
-            this._redirectInProgress = false;
+            // Mostrar indicador de carregamento para mobile
+            const loadingDiv = document.createElement('div');
+            loadingDiv.id = 'mobile-redirect-loading';
+            loadingDiv.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(255,255,255,0.9);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;';
+            loadingDiv.innerHTML = `
+                <img src="${window.location.origin}/assets/images/logo.png" alt="Benetrip" style="max-width:200px;margin-bottom:20px;">
+                <h2 style="margin:10px 0;color:#333;font-family:Arial;">Redirecionando para parceiro</h2>
+                <p style="margin:5px 0;text-align:center;padding:0 20px;">Aguarde enquanto preparamos seu redirecionamento...</p>
+                <div style="width:80%;height:10px;background:#eee;border-radius:5px;margin:20px 0;overflow:hidden;">
+                    <div style="height:100%;width:0;background:#E87722;animation:fillBar 2s linear forwards;"></div>
+                </div>
+                <style>@keyframes fillBar { to { width: 100%; } }</style>
+            `;
+            document.body.appendChild(loadingDiv);
             
-            // Redirecionar para hotéis como fallback
-            setTimeout(() => {
-                window.location.href = 'hotels.html';
-            }, 1000);
-            return;
-        }
-        
-        // Exibir página de carregamento na nova janela
-        try {
-            partnerWindow.document.write(`
-                <!DOCTYPE html>
-                <html>
-                <head>
-                    <title>Redirecionando para parceiro - Benetrip</title>
-                    <style>
-                        body { font-family: Arial, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; flex-direction: column; }
-                        .progress { width: 80%; height: 20px; background-color: #f3f3f3; border-radius: 10px; margin: 20px 0; overflow: hidden; }
-                        .bar { height: 100%; width: 0; background-color: #E87722; animation: fill 3s linear forwards; }
-                        @keyframes fill { to { width: 100%; } }
-                        .message { text-align: center; max-width: 80%; }
-                        .logo { max-width: 200px; margin-bottom: 20px; }
-                    </style>
-                </head>
-                <body>
-                    <img src="${window.location.origin}/assets/images/logo.png" alt="Benetrip" class="logo" onerror="this.src='https://benetrip.com.br/assets/images/logo.png'">
-                    <div class="message">
-                        <h2>Redirecionando para parceiro Benetrip</h2>
-                        <p>Você está sendo redirecionado para o site do parceiro para finalizar sua reserva de voo.</p>
-                        <p>Por favor, <strong>não feche</strong> esta janela até ser redirecionado.</p>
-                    </div>
-                    <div class="progress">
-                        <div class="bar"></div>
-                    </div>
-                </body>
-                </html>
-            `);
-        } catch (err) {
-            console.error('Erro ao escrever na janela do parceiro:', err);
-        }
-        
-        // Obtém o link de redirecionamento
-        console.log('Obtendo link de redirecionamento...');
-        this.obterLinkRedirecionamento(voo)
-            .then(redirectData => {
-                console.log('Dados de redirecionamento recebidos:', redirectData);
-                
-                if (redirectData && redirectData.url) {
-                    // Redirecionar a janela aberta para o URL do parceiro
-                    if (partnerWindow && !partnerWindow.closed) {
-                        console.log('Redirecionando janela para:', 
-                            redirectData.method === 'GET' ? redirectData.url : 'página de redirect (POST)');
+            // Obter link diretamente e redirecionar na mesma janela para mobile
+            this.obterLinkRedirecionamento(voo)
+                .then(redirectData => {
+                    console.log('Dados de redirecionamento recebidos para mobile:', redirectData);
+                    
+                    if (redirectData && redirectData.url) {
+                        // Salvar dados na localStorage antes de redirecionar
+                        localStorage.setItem('benetrip_redirect_destination', 'hotels.html');
+                        localStorage.setItem('benetrip_parceiro_aberto', 'true');
                         
-                        try {
-                            if (redirectData.method === 'GET') {
-                                partnerWindow.location.href = redirectData.url;
-                            } else if (redirectData.method === 'POST') {
-                                // Para POST, redirecionar para a página de redirecionamento
-                                const redirectUrl = this.construirUrlRedirecao(redirectData);
-                                partnerWindow.location.href = redirectUrl;
-                            }
-                        } catch (err) {
-                            console.error('Erro ao redirecionar janela:', err);
+                        // Configurar pixel de tracking se disponível
+                        if (redirectData.click_id && redirectData.gate_id) {
+                            const img = document.createElement('img');
+                            img.width = 0;
+                            img.height = 0;
+                            img.src = `//yasen.aviasales.com/adaptors/pixel_click.png?click_id=${redirectData.click_id}&gate_id=${redirectData.gate_id}`;
+                            document.body.appendChild(img);
+                        }
+                        
+                        // Redirecionar na mesma janela para mobile
+                        console.log('Redirecionando para parceiro em dispositivo mobile:', redirectData.url);
+                        setTimeout(() => {
+                            // Usar window.location.replace para forçar redirecionamento
+                            window.location.replace(redirectData.url);
+                        }, 1500);
+                    } else {
+                        // Limpar loading e mostrar erro
+                        document.getElementById('mobile-redirect-loading').remove();
+                        alert('Erro ao obter link do parceiro. Você será redirecionado para selecionar seu hotel.');
+                        
+                        // Reseta flag de redirecionamento
+                        this._redirectInProgress = false;
+                        
+                        // Redirecionar para hotéis como fallback
+                        window.location.href = 'hotels.html';
+                    }
+                })
+                .catch(error => {
+                    // Limpar loading e mostrar erro
+                    if (document.getElementById('mobile-redirect-loading')) {
+                        document.getElementById('mobile-redirect-loading').remove();
+                    }
+                    
+                    console.error('Erro ao obter link de redirecionamento em mobile:', error);
+                    alert('Erro ao conectar com o parceiro. Redirecionando para hotéis.');
+                    
+                    // Reseta flag de redirecionamento
+                    this._redirectInProgress = false;
+                    
+                    // Redireciona para a página de hotéis em caso de erro
+                    window.location.href = 'hotels.html';
+                });
+        } else {
+            // Abordagem desktop (original)
+            console.log('Usando abordagem de redirecionamento para desktop');
+            
+            // IMPORTANTE: Abrir nova janela antes do fetch (para evitar bloqueio de popups)
+            console.log('Abrindo janela para redirecionamento...');
+            const partnerWindow = window.open('about:blank', '_blank');
+            
+            // Se a janela foi bloqueada, notificar
+            if (!partnerWindow || partnerWindow.closed) {
+                console.error('Popup bloqueado pelo navegador');
+                alert('A janela para o site do parceiro foi bloqueada. Por favor, permita popups para este site.');
+                
+                // Resetar flag de redirecionamento
+                this._redirectInProgress = false;
+                
+                // Redirecionar para hotéis como fallback
+                setTimeout(() => {
+                    window.location.href = 'hotels.html';
+                }, 1000);
+                return;
+            }
+            
+            // Exibir página de carregamento na nova janela
+            try {
+                partnerWindow.document.write(`
+                    <!DOCTYPE html>
+                    <html>
+                    <head>
+                        <title>Redirecionando para parceiro - Benetrip</title>
+                        <style>
+                            body { font-family: Arial, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; flex-direction: column; }
+                            .progress { width: 80%; height: 20px; background-color: #f3f3f3; border-radius: 10px; margin: 20px 0; overflow: hidden; }
+                            .bar { height: 100%; width: 0; background-color: #E87722; animation: fill 3s linear forwards; }
+                            @keyframes fill { to { width: 100%; } }
+                            .message { text-align: center; max-width: 80%; }
+                            .logo { max-width: 200px; margin-bottom: 20px; }
+                        </style>
+                    </head>
+                    <body>
+                        <img src="${window.location.origin}/assets/images/logo.png" alt="Benetrip" class="logo" onerror="this.src='https://benetrip.com.br/assets/images/logo.png'">
+                        <div class="message">
+                            <h2>Redirecionando para parceiro Benetrip</h2>
+                            <p>Você está sendo redirecionado para o site do parceiro para finalizar sua reserva de voo.</p>
+                            <p>Por favor, <strong>não feche</strong> esta janela até ser redirecionado.</p>
+                        </div>
+                        <div class="progress">
+                            <div class="bar"></div>
+                        </div>
+                    </body>
+                    </html>
+                `);
+            } catch (err) {
+                console.error('Erro ao escrever na janela do parceiro:', err);
+            }
+            
+            // Obtém o link de redirecionamento
+            console.log('Obtendo link de redirecionamento...');
+            this.obterLinkRedirecionamento(voo)
+                .then(redirectData => {
+                    console.log('Dados de redirecionamento recebidos:', redirectData);
+                    
+                    if (redirectData && redirectData.url) {
+                        // Redirecionar a janela aberta para o URL do parceiro
+                        if (partnerWindow && !partnerWindow.closed) {
+                            console.log('Redirecionando janela para:', 
+                                redirectData.method === 'GET' ? redirectData.url : 'página de redirect (POST)');
                             
-                            // Tentar escrever formulário diretamente na janela aberta
+                            try {
+                                if (redirectData.method === 'GET') {
+                                    partnerWindow.location.href = redirectData.url;
+                                } else if (redirectData.method === 'POST') {
+                                    // Para POST, redirecionar para a página de redirecionamento
+                                    const redirectUrl = this.construirUrlRedirecao(redirectData);
+                                    partnerWindow.location.href = redirectUrl;
+                                }
+                            } catch (err) {
+                                console.error('Erro ao redirecionar janela:', err);
+                                
+                                // Tentar escrever formulário diretamente na janela aberta
+                                try {
+                                    partnerWindow.document.write(`
+                                        <!DOCTYPE html>
+                                        <html>
+                                        <head>
+                                            <title>Redirecionando...</title>
+                                        </head>
+                                        <body>
+                                            <h2>Redirecionando para o parceiro...</h2>
+                                            <form id="redirectForm" method="${redirectData.method}" action="${redirectData.url}">
+                                            </form>
+                                            <script>
+                                                document.getElementById('redirectForm').submit();
+                                            </script>
+                                        </body>
+                                        </html>
+                                    `);
+                                } catch (err2) {
+                                    console.error('Tentativa de fallback também falhou:', err2);
+                                }
+                            }
+                        } else {
+                            console.warn('Janela do parceiro foi fechada pelo usuário');
+                            alert('A janela do parceiro foi fechada. Você será redirecionado para a página de hotéis.');
+                        }
+                    } else {
+                        console.error('Dados de redirecionamento inválidos', redirectData);
+                        if (partnerWindow && !partnerWindow.closed) {
+                            // Exibir mensagem de erro na janela aberta
                             try {
                                 partnerWindow.document.write(`
                                     <!DOCTYPE html>
                                     <html>
                                     <head>
-                                        <title>Redirecionando...</title>
+                                        <title>Erro de Redirecionamento - Benetrip</title>
+                                        <style>
+                                            body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
+                                            .error { color: #e74c3c; margin: 20px 0; }
+                                        </style>
                                     </head>
                                     <body>
-                                        <h2>Redirecionando para o parceiro...</h2>
-                                        <form id="redirectForm" method="${redirectData.method}" action="${redirectData.url}">
-                                        </form>
-                                        <script>
-                                            document.getElementById('redirectForm').submit();
-                                        </script>
+                                        <h2>Erro de Redirecionamento</h2>
+                                        <p class="error">Não foi possível obter os dados para redirecionamento.</p>
+                                        <p>Você pode fechar esta janela e continuar o processo de reserva na Benetrip.</p>
+                                        <button onclick="window.close()">Fechar Janela</button>
                                     </body>
                                     </html>
                                 `);
-                            } catch (err2) {
-                                console.error('Tentativa de fallback também falhou:', err2);
+                            } catch (err) {
+                                console.error('Erro ao exibir mensagem de erro na janela:', err);
+                                partnerWindow.close();
                             }
                         }
-                    } else {
-                        console.warn('Janela do parceiro foi fechada pelo usuário');
-                        alert('A janela do parceiro foi fechada. Você será redirecionado para a página de hotéis.');
                     }
-                } else {
-                    console.error('Dados de redirecionamento inválidos', redirectData);
+                    
+                    // Reseta flag de redirecionamento
+                    this._redirectInProgress = false;
+                    
+                    // Redireciona para a página de hotéis após um delay
+                    setTimeout(() => {
+                        window.location.href = 'hotels.html';
+                    }, 2000);
+                })
+                .catch(error => {
+                    // Reseta flag de redirecionamento
+                    this._redirectInProgress = false;
+                    
+                    console.error('Erro ao obter link de redirecionamento:', error);
+                    
+                    // Exibir mensagem de erro na janela aberta
                     if (partnerWindow && !partnerWindow.closed) {
-                        // Exibir mensagem de erro na janela aberta
                         try {
                             partnerWindow.document.write(`
                                 <!DOCTYPE html>
@@ -288,7 +416,8 @@ window.BENETRIP_REDIRECT = {
                                 </head>
                                 <body>
                                     <h2>Erro de Redirecionamento</h2>
-                                    <p class="error">Não foi possível obter os dados para redirecionamento.</p>
+                                    <p class="error">Ocorreu um erro ao processar o redirecionamento para o parceiro.</p>
+                                    <p>Erro: ${error.message || 'Erro desconhecido'}</p>
                                     <p>Você pode fechar esta janela e continuar o processo de reserva na Benetrip.</p>
                                     <button onclick="window.close()">Fechar Janela</button>
                                 </body>
@@ -299,64 +428,22 @@ window.BENETRIP_REDIRECT = {
                             partnerWindow.close();
                         }
                     }
-                }
-                
-                // Reseta flag de redirecionamento
-                this._redirectInProgress = false;
-                
-                // Redireciona para a página de hotéis após um delay
-                setTimeout(() => {
-                    window.location.href = 'hotels.html';
-                }, 2000);
-            })
-            .catch(error => {
-                // Reseta flag de redirecionamento
-                this._redirectInProgress = false;
-                
-                console.error('Erro ao obter link de redirecionamento:', error);
-                
-                // Exibir mensagem de erro na janela aberta
-                if (partnerWindow && !partnerWindow.closed) {
-                    try {
-                        partnerWindow.document.write(`
-                            <!DOCTYPE html>
-                            <html>
-                            <head>
-                                <title>Erro de Redirecionamento - Benetrip</title>
-                                <style>
-                                    body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
-                                    .error { color: #e74c3c; margin: 20px 0; }
-                                </style>
-                            </head>
-                            <body>
-                                <h2>Erro de Redirecionamento</h2>
-                                <p class="error">Ocorreu um erro ao processar o redirecionamento para o parceiro.</p>
-                                <p>Erro: ${error.message || 'Erro desconhecido'}</p>
-                                <p>Você pode fechar esta janela e continuar o processo de reserva na Benetrip.</p>
-                                <button onclick="window.close()">Fechar Janela</button>
-                            </body>
-                            </html>
-                        `);
-                    } catch (err) {
-                        console.error('Erro ao exibir mensagem de erro na janela:', err);
-                        partnerWindow.close();
+                    
+                    // Restaura o botão
+                    if (btnConfirmar) {
+                        btnConfirmar.innerHTML = 'Confirmar e Prosseguir';
+                        btnConfirmar.disabled = false;
                     }
-                }
-                
-                // Restaura o botão
-                if (btnConfirmar) {
-                    btnConfirmar.innerHTML = 'Confirmar e Prosseguir';
-                    btnConfirmar.disabled = false;
-                }
-                
-                // Mostrar alerta
-                alert('Ocorreu um erro ao processar a reserva com o parceiro. Você será redirecionado para selecionar seu hotel.');
-                
-                // Redireciona para a página de hotéis mesmo em caso de erro
-                setTimeout(() => {
-                    window.location.href = 'hotels.html';
-                }, 1000);
-            });
+                    
+                    // Mostrar alerta
+                    alert('Ocorreu um erro ao processar a reserva com o parceiro. Você será redirecionado para selecionar seu hotel.');
+                    
+                    // Redireciona para a página de hotéis mesmo em caso de erro
+                    setTimeout(() => {
+                        window.location.href = 'hotels.html';
+                    }, 1000);
+                });
+        }
     },
     
     /**
@@ -423,7 +510,7 @@ window.BENETRIP_REDIRECT = {
     
     /**
      * Obtém o link de redirecionamento da API
-     * VERSÃO FINAL CORRIGIDA: Acessa diretamente a API Travelpayouts em produção
+     * Versão adaptada para melhor suporte mobile
      */
     obterLinkRedirecionamento: function(voo) {
         console.log('Obtendo link de redirecionamento para voo:', voo.sign);
@@ -449,18 +536,20 @@ window.BENETRIP_REDIRECT = {
             return Promise.reject(new Error('Dados insuficientes para obter link de redirecionamento (searchId ou termUrl ausentes)'));
         }
         
+        // Verificar se é dispositivo móvel
+        const isMobile = this.isMobileDevice();
+        console.log('Dispositivo é mobile?', isMobile);
+        
         // Determinar o endpoint correto baseado no ambiente
         let apiUrl;
         
-        // Em ambiente de desenvolvimento, usa o endpoint local
-        if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+        // NOVA LÓGICA PARA MOBILE: Sempre usar o endpoint direto em dispositivos móveis
+        if (isMobile || window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+            apiUrl = `https://api.travelpayouts.com/v1/flight_searches/${encodeURIComponent(searchId)}/clicks/${encodeURIComponent(termUrl)}.json?marker=${encodeURIComponent(this.config.marker)}`;
+            console.log('Usando endpoint direto da Travelpayouts:', apiUrl);
+        } else {
             apiUrl = `/api/flight-redirect?search_id=${encodeURIComponent(searchId)}&term_url=${encodeURIComponent(termUrl)}&marker=${encodeURIComponent(this.config.marker)}`;
             console.log('Ambiente de desenvolvimento, usando API local:', apiUrl);
-        } 
-        // Em ambiente de produção, chama diretamente a API da Travelpayouts
-        else {
-            apiUrl = `https://api.travelpayouts.com/v1/flight_searches/${encodeURIComponent(searchId)}/clicks/${encodeURIComponent(termUrl)}.json?marker=${encodeURIComponent(this.config.marker)}`;
-            console.log('Ambiente de produção, acessando API Travelpayouts diretamente:', apiUrl);
         }
         
         // Implementa fetch com timeout e retry para maior confiabilidade
@@ -579,8 +668,42 @@ if (window.BENETRIP_VOOS) {
     });
 }
 
+// Verificar se existe algum redirecionamento pendente da sessão anterior
+document.addEventListener('DOMContentLoaded', function() {
+    if (localStorage.getItem('benetrip_parceiro_aberto')) {
+        console.log('Detectada sessão de retorno do parceiro');
+        localStorage.removeItem('benetrip_parceiro_aberto');
+        
+        // Verificar destino de retorno
+        const returnDestination = localStorage.getItem('benetrip_redirect_destination');
+        if (returnDestination) {
+            localStorage.removeItem('benetrip_redirect_destination');
+            console.log('Redirecionando para destino de retorno:', returnDestination);
+            
+            // Exibir mensagem de boas-vindas de volta
+            if (!document.getElementById('welcome-back-message')) {
+                const welcomeMsg = document.createElement('div');
+                welcomeMsg.id = 'welcome-back-message';
+                welcomeMsg.style.cssText = 'position:fixed;top:20px;right:20px;background:#E87722;color:white;padding:10px 15px;border-radius:5px;z-index:9999;box-shadow:0 2px 10px rgba(0,0,0,0.2);animation:slideIn 0.5s ease;';
+                welcomeMsg.innerHTML = '<strong>Bem-vindo de volta à Benetrip!</strong> Continuando sua jornada...';
+                welcomeMsg.innerHTML += '<style>@keyframes slideIn{from{transform:translateX(100px);opacity:0}to{transform:translateX(0);opacity:1}}</style>';
+                document.body.appendChild(welcomeMsg);
+                
+                // Remover após alguns segundos
+                setTimeout(() => {
+                    if (welcomeMsg.parentNode) {
+                        welcomeMsg.style.animation = 'slideOut 0.5s ease forwards';
+                        welcomeMsg.innerHTML += '<style>@keyframes slideOut{to{transform:translateX(100px);opacity:0}}</style>';
+                        setTimeout(() => welcomeMsg.remove(), 500);
+                    }
+                }, 4000);
+            }
+        }
+    }
+});
+
 // Reportar versão do script
-console.log('BENETRIP_REDIRECT carregado - Versão 2.1 (Prevenção de Duplicação e Acesso Direto API)');
+console.log('BENETRIP_REDIRECT carregado - Versão 2.2 (Suporte aprimorado para Mobile)');
 
 // Muito importante: tornar a função disponível globalmente
 console.log('Garantindo acesso global a BENETRIP_REDIRECT:', typeof window.BENETRIP_REDIRECT);
