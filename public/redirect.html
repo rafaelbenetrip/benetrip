@@ -217,283 +217,204 @@
     <!-- Container para formulário POST -->
     <div id="form-container" style="display:none;"></div>
 
-    <script>
-        // Configuração
-        const CONFIG = {
-            redirectDelay: 3000, // ms
-            retryDelay: 500, // ms
-            maxRetries: 2
-        };
+    // Substitua todo o bloco de script atual por este:
+<script>
+    // Função para extrair parâmetros da URL
+    function getParameterByName(name) {
+        const url = window.location.href;
+        name = name.replace(/[\[\]]/g, '\\$&');
+        const regex = new RegExp('[?&]' + name + '(=([^&#]*)|&|#|$)');
+        const results = regex.exec(url);
+        if (!results) return null;
+        if (!results[2]) return '';
+        return decodeURIComponent(results[2].replace(/\+/g, ' '));
+    }
+    
+    // Contador regressivo
+    function startCountdown(seconds) {
+        const countdownElement = document.getElementById('countdown');
+        if (!countdownElement) return;
         
-        // Iniciar log de debug
-        console.log('[Benetrip Redirect] Página de redirecionamento inicializada');
-        console.log('[Benetrip Redirect] URL:', window.location.href);
+        let count = seconds;
+        countdownElement.textContent = count;
         
-        // Registrar tempo de carregamento para monitoramento
-        const pageLoadTime = new Date();
-        
-        // Função para extrair parâmetros da URL com validação
-        function getParameterByName(name) {
-            try {
-                const url = window.location.href;
-                name = name.replace(/[\[\]]/g, '\\$&');
-                const regex = new RegExp('[?&]' + name + '(=([^&#]*)|&|#|$)');
-                const results = regex.exec(url);
-                if (!results) return null;
-                if (!results[2]) return '';
-                return decodeURIComponent(results[2].replace(/\+/g, ' '));
-            } catch (e) {
-                console.error('[Benetrip Redirect] Erro ao obter parâmetro:', name, e);
-                return null;
-            }
-        }
-        
-        // Contador regressivo com callbacks de início e fim
-        function startCountdown(seconds, onStart, onFinish) {
-            const countdownElement = document.getElementById('countdown');
-            if (!countdownElement) return;
-            
-            let count = seconds;
+        const interval = setInterval(() => {
+            count--;
             countdownElement.textContent = count;
             
-            if (typeof onStart === 'function') onStart();
-            
-            const interval = setInterval(() => {
-                count--;
-                countdownElement.textContent = count;
-                
-                if (count <= 0) {
-                    clearInterval(interval);
-                    if (typeof onFinish === 'function') onFinish();
-                }
-            }, 1000);
-            
-            return {
-                stop: () => {
-                    clearInterval(interval);
-                    countdownElement.textContent = '–';
-                }
-            };
+            if (count <= 0) {
+                clearInterval(interval);
+            }
+        }, 1000);
+    }
+    
+    // Exibir mensagem de erro
+    function showError(message) {
+        const errorElement = document.getElementById('error-message');
+        if (errorElement) {
+            errorElement.textContent = message;
+            errorElement.style.display = 'block';
         }
-        
-        // Atualizar mensagem de status
-        function updateStatus(message, isLoading = false) {
-            const statusElement = document.getElementById('redirect-status');
-            if (statusElement) {
-                statusElement.innerHTML = isLoading ? 
-                    `<span class="loading-indicator"></span>${message}` : 
-                    message;
-            }
-        }
-        
-        // Exibir mensagem de erro
-        function showError(message, canRetry = true) {
-            const errorElement = document.getElementById('error-message');
-            const retryButton = document.getElementById('retry-button');
+        console.error('Erro de redirecionamento:', message);
+    }
+    
+    // Processar redirecionamento
+    function processRedirect() {
+        try {
+            // Obter parâmetros da URL
+            const clickId = getParameterByName('click_id');
+            const gateId = getParameterByName('gate_id');
+            const url = getParameterByName('url');
+            const method = getParameterByName('method') || 'GET';
+            const partnerName = getParameterByName('partner') || 'parceiro';
+            let paramsString = getParameterByName('params');
+            let params = {};
             
-            if (errorElement) {
-                errorElement.textContent = message;
-                errorElement.style.display = 'block';
-            }
-            
-            if (retryButton && canRetry) {
-                retryButton.style.display = 'inline-block';
-                retryButton.onclick = processRedirect;
-            }
-            
-            updateStatus('Redirecionamento interrompido');
-            console.error('[Benetrip Redirect] Erro:', message);
-        }
-        
-        // Configurar pixel de tracking para comprovação de conversão
-        function setupTrackingPixel(clickId, gateId) {
-            if (!clickId || !gateId) {
-                console.warn('[Benetrip Redirect] Parâmetros incompletos para pixel de tracking');
-                return false;
-            }
+            // Registro para diagnóstico
+            console.log('Parâmetros de redirecionamento:');
+            console.log('- URL:', url);
+            console.log('- Método:', method);
+            console.log('- Click ID:', clickId);
+            console.log('- Gate ID:', gateId);
             
             try {
+                if (paramsString) {
+                    params = JSON.parse(paramsString);
+                    console.log('- Params:', params);
+                }
+            } catch (e) {
+                console.error('Erro ao processar parâmetros:', e);
+                showError('Dados de redirecionamento inválidos');
+                return;
+            }
+            
+            // Definir nome do parceiro
+            document.getElementById('partner-name').textContent = partnerName;
+            
+            // Configurar pixel de tracking
+            if (clickId && gateId) {
                 const pixelUrl = `//yasen.aviasales.com/adaptors/pixel_click.png?click_id=${clickId}&gate_id=${gateId}`;
-                console.log('[Benetrip Redirect] Configurando pixel de tracking:', pixelUrl);
-                const pixelElement = document.getElementById('pixel');
-                if (pixelElement) {
-                    pixelElement.src = pixelUrl;
-                    return true;
-                } else {
-                    console.error('[Benetrip Redirect] Elemento pixel não encontrado no DOM');
-                    return false;
-                }
-            } catch (e) {
-                console.error('[Benetrip Redirect] Erro ao configurar pixel:', e);
-                return false;
+                console.log('Configurando pixel de tracking:', pixelUrl);
+                document.getElementById('pixel').src = pixelUrl;
             }
-        }
-        
-        // Redirecionar via método GET
-        function redirectGet(url) {
-            console.log('[Benetrip Redirect] Redirecionando via GET para:', url);
-            window.location.href = url;
-        }
-        
-        // Redirecionar via método POST
-        function redirectPost(url, params = {}) {
-            console.log('[Benetrip Redirect] Redirecionando via POST para:', url);
-            console.log('[Benetrip Redirect] Parâmetros POST:', params);
             
-            try {
-                const form = document.createElement('form');
-                form.method = 'POST';
-                form.action = url;
-                form.target = '_self';
-                
-                // Adicionar cada parâmetro como input
-                Object.entries(params).forEach(([key, value]) => {
-                    const input = document.createElement('input');
-                    input.type = 'hidden';
-                    input.name = key;
-                    input.value = value;
-                    form.appendChild(input);
-                });
-                
-                // Adicionar ao DOM e submeter
-                const formContainer = document.getElementById('form-container');
-                formContainer.innerHTML = '';
-                formContainer.appendChild(form);
-                
-                // Último log antes do redirecionamento
-                console.log('[Benetrip Redirect] Submetendo formulário POST...');
-                
-                // Submeter formulário
-                form.submit();
-                return true;
-            } catch (e) {
-                console.error('[Benetrip Redirect] Erro ao redirecionar via POST:', e);
-                showError('Erro ao processar redirecionamento: ' + e.message);
-                return false;
-            }
-        }
-        
-        // Validar parâmetros obrigatórios
-        function validateParams(url, method) {
+            // Verificar dados necessários
             if (!url) {
-                showError('URL de redirecionamento não fornecida ou inválida');
-                return false;
+                showError('URL de redirecionamento não fornecida');
+                console.error('URL de redirecionamento ausente ou vazia');
+                return;
             }
             
-            if (method !== 'GET' && method !== 'POST') {
-                showError(`Método de redirecionamento não suportado: ${method}`);
-                return false;
+            // Iniciar contagem regressiva
+            startCountdown(3);
+            
+            // Verificar tipo de URL para garantir segurança
+            if (!url.startsWith('http://') && !url.startsWith('https://')) {
+                showError('URL de redirecionamento inválida');
+                console.error('URL de redirecionamento não começa com http:// ou https://', url);
+                return;
             }
             
-            return true;
-        }
-        
-        // Função principal de processamento do redirecionamento
-        function processRedirect() {
-            try {
-                console.log('[Benetrip Redirect] Iniciando processamento de redirecionamento');
-                updateStatus('Processando seu redirecionamento...', true);
+            console.log(`Redirecionamento agendado para ${method} ${url} em 3 segundos`);
+            
+            // Redirecionar após 3 segundos (FIX: Adicionando force=true para garantir o redirecionamento)
+            const redirectFunction = function() {
+                console.log('Executando redirecionamento agora...');
                 
-                // Limpar mensagens de erro anteriores
-                document.getElementById('error-message').style.display = 'none';
-                document.getElementById('retry-button').style.display = 'none';
-                
-                // Obter parâmetros da URL
-                const clickId = getParameterByName('click_id');
-                const gateId = getParameterByName('gate_id');
-                const url = getParameterByName('url');
-                const method = (getParameterByName('method') || 'GET').toUpperCase();
-                const partnerName = getParameterByName('partner') || 'parceiro';
-                let paramsString = getParameterByName('params');
-                let params = {};
-                
-                console.log('[Benetrip Redirect] Parâmetros obtidos:');
-                console.log('- clickId:', clickId);
-                console.log('- gateId:', gateId);
-                console.log('- url:', url);
-                console.log('- method:', method);
-                console.log('- partner:', partnerName);
-                console.log('- paramsString:', paramsString ? 'presente' : 'ausente');
-                
-                // Validar URL (protocolo seguro)
-                if (url && !url.startsWith('https://') && !url.startsWith('http://')) {
-                    showError('URL de redirecionamento inválida');
-                    return;
-                }
-                
-                // Processar parâmetros POST
                 try {
-                    if (paramsString) {
-                        params = JSON.parse(paramsString);
+                    if (method.toUpperCase() === 'GET') {
+                        // LOG adicional para DEBUG
+                        console.log('Redirecionamento GET para:', url);
+                        
+                        // CORREÇÃO CRÍTICA: usando assign em vez de href para forçar navegação
+                        window.location.assign(url);
+                        
+                        // Fallback se assign não funcionar
+                        setTimeout(function() {
+                            console.log('Tentando redirecionamento via href como fallback...');
+                            window.location.href = url;
+                            
+                            // Último recurso: abrir em nova janela
+                            setTimeout(function() {
+                                console.log('Último recurso: abrindo em nova janela...');
+                                window.open(url, '_self');
+                            }, 1000);
+                        }, 1000);
+                    } else if (method.toUpperCase() === 'POST') {
+                        // LOG adicional para DEBUG
+                        console.log('Redirecionamento POST para:', url);
+                        console.log('Parâmetros POST:', params);
+                        
+                        // Redirecionamento POST via formulário
+                        const form = document.createElement('form');
+                        form.method = 'POST';
+                        form.action = url;
+                        form.target = '_self';
+                        
+                        // Adicionar cada parâmetro como input
+                        Object.entries(params).forEach(([key, value]) => {
+                            const input = document.createElement('input');
+                            input.type = 'hidden';
+                            input.name = key;
+                            input.value = value;
+                            form.appendChild(input);
+                        });
+                        
+                        // Adicionar ao DOM e submeter
+                        const formContainer = document.getElementById('form-container');
+                        formContainer.innerHTML = '';
+                        formContainer.appendChild(form);
+                        
+                        // NOVO: Adicionar mensagem visual antes de submeter
+                        document.querySelector('.message').innerHTML += '<p><strong>Enviando dados ao parceiro agora...</strong></p>';
+                        
+                        // CORREÇÃO CRÍTICA: Garantir que o form é submetido
+                        try {
+                            form.submit();
+                            console.log('Formulário POST submetido');
+                        } catch (e) {
+                            console.error('Erro ao submeter formulário:', e);
+                            showError('Erro ao submeter dados para o parceiro');
+                        }
+                    } else {
+                        showError(`Método de redirecionamento não suportado: ${method}`);
                     }
                 } catch (e) {
-                    console.error('[Benetrip Redirect] Erro ao processar parâmetros JSON:', e);
-                    showError('Dados de redirecionamento inválidos (parâmetros mal-formados)');
-                    return;
+                    console.error('Erro no redirecionamento final:', e);
+                    showError('Erro ao processar redirecionamento: ' + e.message);
+                    
+                    // Botão de redirecionamento manual como último recurso
+                    document.querySelector('.auto-redirect').innerHTML = 
+                        '<p>Redirecionamento automático falhou. <button onclick="window.location.href=\'' + 
+                        url + '\'" style="background:#E87722;color:white;border:none;padding:8px 16px;border-radius:4px;cursor:pointer;">Clique aqui para continuar</button></p>';
                 }
-                
-                // Definir nome do parceiro
-                document.getElementById('partner-name').textContent = partnerName;
-                
-                // Configurar pixel de tracking exatamente conforme especificação da Aviasales
-                if (clickId && gateId) {
-                    setupTrackingPixel(clickId, gateId);
-                } else {
-                    console.warn('[Benetrip Redirect] clickId ou gateId ausente, pixel de tracking não configurado');
-                }
-                
-                // Validar parâmetros obrigatórios
-                if (!validateParams(url, method)) {
-                    return;
-                }
-                
-                updateStatus('Preparando redirecionamento...', true);
-                
-                // Iniciar contagem regressiva e redirecionar
-                const countdown = startCountdown(
-                    CONFIG.redirectDelay / 1000,
-                    () => {
-                        console.log('[Benetrip Redirect] Contagem regressiva iniciada');
-                    },
-                    () => {
-                        console.log('[Benetrip Redirect] Contagem regressiva concluída, executando redirecionamento');
-                        
-                        try {
-                            if (method === 'GET') {
-                                redirectGet(url);
-                            } else if (method === 'POST') {
-                                redirectPost(url, params);
-                            }
-                        } catch (e) {
-                            console.error('[Benetrip Redirect] Erro durante redirecionamento:', e);
-                            showError('Erro ao processar redirecionamento: ' + e.message);
-                        }
-                    }
-                );
-                
-            } catch (e) {
-                console.error('[Benetrip Redirect] Erro crítico no processamento:', e);
-                showError('Erro ao processar dados de redirecionamento. Por favor, tente novamente.');
-            }
+            };
+            
+            // Executar o redirecionamento
+            setTimeout(redirectFunction, 3000);
+            
+        } catch (e) {
+            console.error('Erro crítico no processamento de redirecionamento:', e);
+            showError('Erro ao processar dados de redirecionamento. Por favor, tente novamente.');
+            
+            // Mostrar botão para voltar como último recurso
+            document.querySelector('.auto-redirect').innerHTML = 
+                '<p>Ocorreu um erro no redirecionamento. <button onclick="window.history.back()" style="background:#00A3E0;color:white;border:none;padding:8px 16px;border-radius:4px;cursor:pointer;">Voltar para a seleção de voos</button></p>';
         }
-        
-        // Iniciar o processamento quando o DOM estiver carregado
-        window.addEventListener('DOMContentLoaded', () => {
-            console.log('[Benetrip Redirect] DOM carregado, iniciando redirecionamento...');
-            
-            // Adicionar listener de erro para imagens
-            document.getElementById('pixel').addEventListener('error', () => {
-                console.warn('[Benetrip Redirect] Erro ao carregar pixel de tracking');
-            });
-            
-            processRedirect();
-        });
-        
-        // Registrar timestamp de saída da página
-        window.addEventListener('beforeunload', () => {
-            const timeOnPage = new Date() - pageLoadTime;
-            console.log(`[Benetrip Redirect] Saindo da página após ${timeOnPage}ms`);
-        });
-    </script>
+    }
+    
+    // Iniciar o processamento quando a página carregar
+    window.addEventListener('DOMContentLoaded', processRedirect);
+    
+    // Verificação adicional de segurança para garantir que o redirecionamento aconteça
+    setTimeout(function() {
+        const url = getParameterByName('url');
+        if (url && window.location.href.startsWith('about:blank')) {
+            console.warn('Verificação de segurança: ainda na página about:blank após 5 segundos');
+            console.log('Tentando redirecionamento direto para:', url);
+            window.location.href = url;
+        }
+    }, 5000);
+</script>
 </body>
 </html>
