@@ -1555,7 +1555,7 @@ const BENETRIP_VOOS = {
       
       // Aplicar a conversão com a taxa encontrada
       const precoConvertido = precoOriginal * taxaConversao;
-      console.log(`Preço convertido: ${precoOriginal} RUB * ${taxaConversao} = ${precoConvertido} ${moedaUsuario}`);
+      console.log(`Preço convertido: ${precoOriginal} RUB / ${taxaConversao} = ${precoConvertido} ${moedaUsuario}`);
       
       // Retorna o valor convertido arredondado
       return Math.round(precoConvertido);
