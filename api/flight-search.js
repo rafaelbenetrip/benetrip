@@ -181,17 +181,30 @@ module.exports = async function handler(req, res) {
     // --- Fim Enviar requisição ---
 
     console.log("Resposta inicial da Travelpayouts (Status):", apiResponse.status);
+    
+    // Registra a resposta completa para debug
+    console.log("Resposta completa da API Travelpayouts:", JSON.stringify(apiResponse.data, null, 2));
 
     const searchId = apiResponse.data?.search_id;
+    
+    // CORREÇÃO: Preservar o formato original das taxas de câmbio exatamente como recebido
     const currencyRates = apiResponse.data?.currency_rates;
+    
+    if (currencyRates) {
+      console.log("Taxas de câmbio recebidas da API:", JSON.stringify(currencyRates, null, 2));
+    } else {
+      console.warn("ATENÇÃO: API não retornou taxas de câmbio!");
+    }
 
     // Tratar status 200 ou 202 como sucesso se tiver search_id
     if (searchId && (apiResponse.status === 200 || apiResponse.status === 202)) {
       console.log("Busca iniciada com sucesso. Search ID:", searchId);
-      // Retorna 202 para indicar processo assíncrono ao frontend
+      
+      // IMPORTANTE: Retorna os dados exatamente como recebidos da API
       return res.status(202).json({
         search_id: searchId,
-        currency_rates: currencyRates,
+        currency_rates: currencyRates, // Manter as taxas no formato original da API
+        raw_response: apiResponse.data, // Incluir resposta completa para diagnóstico
         message: "Busca de voos iniciada. Use o search_id para verificar os resultados."
       });
     } else {
