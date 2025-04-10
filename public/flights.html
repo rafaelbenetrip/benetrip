@@ -176,7 +176,33 @@
     
     <!-- Sistema de voos e redirecionamento -->
     <script src="assets/js/flights.js"></script>
-    <script src="assets/js/flight-redirect.js"></script>
+    <script src="assets/js/flight-redirect.js" onerror="window.redirectScriptFailed = true;"></script>
+    <script>
+    // Verificar se o script carregou corretamente
+    if (typeof window.redirectScriptFailed !== 'undefined') {
+        console.error('⚠️ Erro crítico: flight-redirect.js não carregou corretamente');
+        // Criar um registro no console para rastrear problemas
+        console.trace('Stacktrace da falha de carregamento');
+    }
+
+    // Criar uma implementação mínima de fallback caso necessário
+    if (typeof window.BENETRIP_REDIRECT === 'undefined') {
+        console.warn('⚠️ Criando implementação mínima de BENETRIP_REDIRECT como fallback');
+        window.BENETRIP_REDIRECT = {
+            init: function() {
+                console.log('Inicialização de emergência do BENETRIP_REDIRECT');
+            },
+            processarConfirmacao: function(vooId) {
+                console.log('Processando confirmação de emergência para:', vooId);
+                // Implementação simples que apenas redireciona para hotéis após informar o usuário
+                alert('Não foi possível conectar ao sistema de reservas. Redirecionando para seleção de hotéis.');
+                setTimeout(function() {
+                    window.location.href = 'hotels.html';
+                }, 1000);
+            }
+        };
+    }
+    </script>
     <script src="assets/js/voos-interface.js"></script>
     
     <!-- Script de inicialização e gerenciamento de erros -->
@@ -248,8 +274,27 @@
         const initializeRedirectSystem = function() {
             console.log('Inicializando sistema de redirecionamento...');
             
+            // Verificar se o BENETRIP_REDIRECT está disponível imediatamente
+            if (window.BENETRIP_REDIRECT && typeof window.BENETRIP_REDIRECT.init === 'function') {
+                console.log('Módulo BENETRIP_REDIRECT já disponível, inicializando imediatamente...');
+                try {
+                    window.BENETRIP_REDIRECT.init();
+                    console.log('✅ Sistema de redirecionamento inicializado com sucesso');
+                    return; // Retorna se inicialização bem-sucedida
+                } catch (error) {
+                    console.error('❌ Erro ao inicializar sistema de redirecionamento:', error);
+                }
+            }
+            
+            // Contador de tentativas
+            let tentativas = 0;
+            const maxTentativas = 20; // Aumentado de 10s para 20s (40 tentativas de 500ms)
+            
             // Verificar se o BENETRIP_REDIRECT está disponível periodicamente
             const verificarDisponibilidade = setInterval(() => {
+                tentativas++;
+                console.log(`Tentativa ${tentativas}/${maxTentativas} de encontrar BENETRIP_REDIRECT`);
+                
                 if (window.BENETRIP_REDIRECT && typeof window.BENETRIP_REDIRECT.init === 'function') {
                     console.log('Módulo BENETRIP_REDIRECT encontrado, inicializando...');
                     clearInterval(verificarDisponibilidade);
@@ -261,25 +306,18 @@
                         console.error('❌ Erro ao inicializar sistema de redirecionamento:', error);
                         window.showGlobalError('Erro ao inicializar sistema de redirecionamento. Algumas funcionalidades podem não estar disponíveis.');
                     }
+                } else if (tentativas >= maxTentativas) {
+                    clearInterval(verificarDisponibilidade);
+                    console.error('⚠️ Tempo limite excedido para encontrar BENETRIP_REDIRECT');
+                    window.showGlobalError('Sistema de redirecionamento não disponível. A reserva de voos pode não funcionar corretamente.');
+                    
+                    // Tentar forçar a criação do objeto se não existir
+                    if (typeof window.BENETRIP_REDIRECT === 'undefined') {
+                        console.warn('Criando implementação mínima de BENETRIP_REDIRECT após timeout');
+                        // A implementação foi definida anteriormente
+                    }
                 }
             }, 500);
-            
-            // Parar de verificar após 10 segundos para evitar loops infinitos
-            setTimeout(() => {
-                clearInterval(verificarDisponibilidade);
-                console.warn('⚠️ Tempo limite excedido para encontrar BENETRIP_REDIRECT');
-            }, 10000);
-            
-            // Função para verificar se o módulo já está carregado
-            if (window.BENETRIP_REDIRECT && typeof window.BENETRIP_REDIRECT.init === 'function') {
-                console.log('Módulo BENETRIP_REDIRECT já disponível, inicializando imediatamente...');
-                try {
-                    window.BENETRIP_REDIRECT.init();
-                    console.log('✅ Sistema de redirecionamento inicializado com sucesso');
-                } catch (error) {
-                    console.error('❌ Erro ao inicializar sistema de redirecionamento:', error);
-                }
-            }
         };
         
         // Inicializa sistema de busca de voos
