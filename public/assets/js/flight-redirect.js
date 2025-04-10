@@ -408,68 +408,53 @@ window.BENETRIP_REDIRECT = {
      * @returns {Promise<Object>} Dados de redirecionamento
      */
     obterLinkRedirecionamento: function(voo) {
-    console.log('Obtendo link de redirecionamento para voo:', voo.sign);
-    
-    // Obter o search_id e o URL do termo dos dados do voo
-    const searchId = window.BENETRIP_VOOS?.searchId;
-    
-    // Encontrar o termo (url) do voo selecionado
-    let termUrl = null;
-    try {
-        // Obter a primeira chave de voo.terms
-        if (voo.terms) {
-            const termsKey = Object.keys(voo.terms)[0];
-            termUrl = voo.terms[termsKey].url;
-            console.log('Term URL encontrada:', termUrl);
-        }
-    } catch (e) {
-        console.error('Erro ao obter URL do termo:', e);
-    }
-    
-    // ALTERAÇÃO CRÍTICA: Corrigir URL da API para ambiente de produção
-    // Construir URL para API usando URL relativa ou API externa conforme ambiente
-    let apiUrl;
-    
-    // Verificar se estamos em ambiente de desenvolvimento
-    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-        apiUrl = `/api/flight-redirect?search_id=${encodeURIComponent(searchId)}&term_url=${encodeURIComponent(termUrl)}&marker=${encodeURIComponent(this.config.marker)}`;
-        console.log('Usando endpoint de desenvolvimento:', apiUrl);
-    } else {
-        // SOLUÇÃO: Fazer a chamada diretamente para a API da Travelpayouts em produção
-        apiUrl = `https://api.travelpayouts.com/v1/flight_searches/${encodeURIComponent(searchId)}/clicks/${encodeURIComponent(termUrl)}.json?marker=${encodeURIComponent(this.config.marker)}`;
-        console.log('Usando endpoint de produção:', apiUrl);
-    }
-
-    console.log('Chamando API para redirecionamento:', apiUrl);
-    
-    // Implementa fetch com timeout para evitar bloqueio
-    return new Promise((resolve, reject) => {
-        // Configura timeout
-        const timeoutId = setTimeout(() => {
-            console.warn('Timeout ao obter link de redirecionamento');
-            reject(new Error('Tempo limite excedido ao tentar obter link de redirecionamento'));
-        }, 8000);
+        console.log('Obtendo link de redirecionamento para voo:', voo.sign);
         
-        // Faz a requisição
-        fetch(apiUrl)
-            .then(response => {
-                clearTimeout(timeoutId);
-                if (!response.ok) {
-                    throw new Error(`Erro na requisição: ${response.status}`);
-                }
-                return response.json();
-            })
-            .then(data => {
-                console.log('Link de redirecionamento obtido com sucesso:', data);
-                resolve(data);
-            })
-            .catch(error => {
-                clearTimeout(timeoutId);
-                console.error('Erro ao obter link de redirecionamento:', error);
-                reject(error);
+        // Obter o search_id e o URL do termo dos dados do voo
+        const searchId = window.BENETRIP_VOOS?.searchId;
+        
+        // Encontrar o termo (url) do voo selecionado
+        let termUrl = null;
+        try {
+            // Obter a primeira chave de voo.terms
+            if (voo.terms) {
+                const termsKey = Object.keys(voo.terms)[0];
+                termUrl = voo.terms[termsKey].url;
+                console.log('Term URL encontrada:', termUrl);
+            }
+        } catch (e) {
+            console.error('Erro ao obter URL do termo:', e);
+            return Promise.reject(new Error('Não foi possível obter os parâmetros necessários para redirecionamento'));
+        }
+        
+        // Validação dos parâmetros obrigatórios
+        if (!searchId || !termUrl) {
+            const erro = new Error('Parâmetros obrigatórios indisponíveis (searchId ou termUrl)');
+            console.error(erro.message);
+            return Promise.reject(erro);
+        }
+        
+        // AMBIENTE DE DESENVOLVIMENTO - apenas para testes locais, não em produção
+        if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+            console.warn('⚠️ AMBIENTE DE DESENVOLVIMENTO - Usando URL simulada apenas para teste');
+            return Promise.resolve({
+                gate_id: 112,
+                click_id: Date.now(),
+                str_click_id: Date.now().toString(),
+                url: `https://parceiro-simulado.travelpayouts.com/book?searchid=${searchId}&dev=true`,
+                method: "GET",
+                params: {},
+                gate_name: "Teste (Desenvolvimento)"
             });
-    });
-},
+        }
+        
+        // Construir URL para API
+        const apiUrl = `/api/flight-redirect?search_id=${encodeURIComponent(searchId)}&term_url=${encodeURIComponent(termUrl)}&marker=${encodeURIComponent(this.config.marker)}`;
+        console.log('Chamando API proxy para redirecionamento:', apiUrl);
+        
+        // Implementa fetch com timeout e retry
+        return this.fetchWithRetry(apiUrl, this.config.retryAttempts, this.config.retryDelay, this.config.requestTimeout);
+    },
     
     /**
      * Implementação robusta de fetch com retry e timeout
