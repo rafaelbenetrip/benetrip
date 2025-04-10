@@ -1059,7 +1059,7 @@ const BENETRIP_VOOS = {
     
     // Extrai informações do voo
     const preco = this.obterPrecoVoo(voo);
-    const moeda = this.finalResults?.meta?.currency || 'BRL';
+    const moeda = this.obterMoedaAtual();
     const infoIda = this.obterInfoSegmento(voo.segment?.[0]);
     const infoVolta = voo.segment?.length > 1 ? this.obterInfoSegmento(voo.segment[1]) : null;
     const economiaPercentual = voo._economia || 0;
@@ -1363,7 +1363,7 @@ const BENETRIP_VOOS = {
     let precoTexto = 'Escolher Este Voo';
     if (this.vooAtivo) {
       const preco = this.obterPrecoVoo(this.vooAtivo);
-      const moeda = this.finalResults?.meta?.currency || 'BRL';
+      const moeda = this.obterMoedaAtual();
       precoTexto = `Reservar Voo por ${this.formatarPreco(preco, moeda)}`;
     }
     
@@ -1445,19 +1445,78 @@ const BENETRIP_VOOS = {
   },
 
   /**
-   * Obtém o preço de um voo
+   * Obtém o preço de um voo convertido para a moeda selecionada pelo usuário
    * @param {Object} voo - Dados do voo
-   * @returns {number} Preço do voo
+   * @returns {number} Preço do voo na moeda selecionada
    */
   obterPrecoVoo(voo) {
     if (!voo || !voo.terms) return 0;
     
     try {
+      // Extrai o preço original em rublos russos
       const k = Object.keys(voo.terms)[0];
-      return voo.terms[k]?.unified_price || voo.terms[k]?.price || 0;
+      const precoOriginal = voo.terms[k]?.unified_price || voo.terms[k]?.price || 0;
+      
+      // Obter a moeda selecionada pelo usuário
+      const moedaUsuario = this.obterMoedaAtual();
+      
+      // Se não temos taxas de conversão ou a moeda é a padrão da API, retorna o preço original
+      if (!this.currencyRates || moedaUsuario === 'RUB') {
+        return precoOriginal;
+      }
+      
+      // Encontrar a taxa de conversão para a moeda selecionada
+      const taxaConversao = this.currencyRates?.[moedaUsuario.toLowerCase()];
+      if (!taxaConversao) {
+        console.warn(`Taxa de conversão não encontrada para ${moedaUsuario}, usando preço original`);
+        return precoOriginal;
+      }
+      
+      // Aplicar a conversão (arredondando para evitar valores com muitas casas decimais)
+      return Math.round(precoOriginal * taxaConversao);
     } catch (erro) {
-      console.warn('Erro ao obter preço do voo:', erro);
+      console.warn('Erro ao obter/converter preço do voo:', erro);
       return 0;
+    }
+  },
+  
+  /**
+   * Obtém a moeda selecionada pelo usuário
+   * @returns {string} Código da moeda (BRL, USD, EUR)
+   */
+  obterMoedaAtual() {
+    try {
+      const dadosUsuario = this.carregarDadosUsuario();
+      // Verificar no formato direto
+      let moeda = dadosUsuario?.respostas?.moeda_escolhida;
+      
+      // Verificar formato de objeto com mapeamento
+      const currency_map = dadosUsuario?.respostas?.currency_map;
+      if (currency_map && typeof currency_map === 'object') {
+        const opcaoSelecionada = dadosUsuario?.respostas?.moeda_escolhida;
+        if (opcaoSelecionada && currency_map[opcaoSelecionada]) {
+          moeda = currency_map[opcaoSelecionada];
+        }
+      }
+      
+      // Se for uma string direta do formato com texto descritivo
+      if (typeof moeda === 'string' && moeda.includes('(')) {
+        // Extrai o código entre parênteses, ex: "Real Brasileiro (BRL)" -> "BRL"
+        const match = moeda.match(/\(([A-Z]{3})\)/);
+        if (match && match[1]) {
+          moeda = match[1];
+        }
+      }
+      
+      // Fallback para BRL se nenhuma moeda válida for encontrada
+      if (!moeda || typeof moeda !== 'string' || moeda.length !== 3) {
+        return 'BRL';
+      }
+      
+      return moeda.toUpperCase();
+    } catch (e) {
+      console.warn('Erro ao obter moeda atual:', e);
+      return 'BRL';
     }
   },
   
@@ -1797,6 +1856,11 @@ const BENETRIP_VOOS = {
    */
   formatarPreco(preco, moeda = 'BRL') {
     if (typeof preco !== 'number' || isNaN(preco)) return 'N/A';
+    
+    // Se moeda não foi especificada, tenta obter do usuário
+    if (arguments.length === 1) {
+      moeda = this.obterMoedaAtual();
+    }
     
     return new Intl.NumberFormat('pt-BR', { 
       style: 'currency', 
