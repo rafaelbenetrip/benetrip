@@ -23,6 +23,9 @@ module.exports = async function handler(req, res) {
 
   // Obter parâmetros obrigatórios da query string
   const { search_id, term_url, marker } = req.query;
+  
+  // Obter parâmetro opcional de moeda
+  const currency = req.query.currency;
 
   // Validar presença de todos os parâmetros obrigatórios
   if (!search_id || !term_url || !marker) {
@@ -33,10 +36,17 @@ module.exports = async function handler(req, res) {
     });
   }
 
-  console.log(`[Proxy Redirect] Buscando link para search_id: ${search_id}, term_url: ${term_url}, marker: ${marker}`);
+  console.log(`[Proxy Redirect] Buscando link para search_id: ${search_id}, term_url: ${term_url}, marker: ${marker}${currency ? `, currency: ${currency}` : ''}`);
   
   // Construir a URL da API da Travelpayouts - FORMATO EXATO CONFORME DOCUMENTAÇÃO
-  const redirectUrl = `https://api.travelpayouts.com/v1/flight_searches/${search_id}/clicks/${term_url}.json?marker=${marker}`;
+  // Adiciona o parâmetro currency à URL se ele estiver presente
+  let redirectUrl = `https://api.travelpayouts.com/v1/flight_searches/${search_id}/clicks/${term_url}.json?marker=${marker}`;
+  
+  // Adicionamos o parâmetro currency se fornecido
+  if (currency) {
+    redirectUrl += `&currency=${currency}`;
+  }
+  
   console.log(`[Proxy Redirect] URL construída: ${redirectUrl}`);
 
   try {
@@ -92,12 +102,23 @@ module.exports = async function handler(req, res) {
     res.setHeader('Pragma', 'no-cache');
     res.setHeader('Expires', '0');
     
+    // Caso a moeda tenha sido especificada mas não esteja no URL, vamos tentar adicioná-la
+    // Esta parte é necessária porque alguns parceiros aceitam a moeda como parâmetro na URL
+    if (currency && redirectResponse.data.url && !redirectResponse.data.url.includes('currency=')) {
+      // Verifica se a URL já tem parâmetros
+      const separator = redirectResponse.data.url.includes('?') ? '&' : '?';
+      redirectResponse.data.url += `${separator}currency=${currency}`;
+      
+      console.log(`[Proxy Redirect] Adicionada moeda ${currency} à URL de redirecionamento`);
+    }
+    
     // Repassar a resposta da API
     return res.status(200).json({
       ...redirectResponse.data,
       _benetrip_info: {
         expires_in: 15 * 60, // 15 minutos em segundos
-        timestamp: Date.now()
+        timestamp: Date.now(),
+        currency: currency || 'default'
       }
     });
 
