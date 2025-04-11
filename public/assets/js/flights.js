@@ -1413,8 +1413,21 @@ const BENETRIP_VOOS = {
           <path d="M5 12h14M12 5l7 7-7 7"></path>
         </svg>
       `;
-    }
-  },
+      
+          // Adicione este event listener
+    btnSelecionar.onclick = () => {
+      if (this.vooAtivo) {
+        // Seleciona o voo ativo se ainda não estiver selecionado
+        if (!this.vooSelecionado) {
+          this.selecionarVooAtivo();
+        }
+        
+        // Redireciona para o site de compra
+        this.redirecionarParaSiteCompra(this.vooAtivo);
+      }
+    };
+  }
+},
   
   /**
    * Exibe uma dica de swipe na interface
@@ -1882,6 +1895,10 @@ obterPrecoVoo(voo) {
     
     const vooId = this.vooAtivo.sign || `voo-idx-${this.indexVooAtivo}`;
     this.selecionarVoo(vooId);
+      // Exibe confirmação antes de redirecionar
+  if (confirm('Deseja prosseguir para o site de reserva do voo?')) {
+    this.redirecionarParaSiteCompra(this.vooAtivo);
+  }
   },
 
   /**
@@ -2053,7 +2070,66 @@ obterPrecoVoo(voo) {
     
     const h = Math.floor(duracaoMinutos / 60), m = duracaoMinutos % 60;
     return `${h}h ${m > 0 ? m + 'm' : ''}`.trim();
+  },
+
+  /**
+ * Redireciona o usuário para o site parceiro de compra do voo
+ * @param {Object} voo - Dados do voo a ser comprado
+ */
+redirecionarParaSiteCompra(voo) {
+  if (!voo || !voo.terms) {
+    this.exibirToast('Não foi possível obter informações do voo para compra.', 'error');
+    return;
   }
+  
+  try {
+    // Obtém a chave do voo para redirecionamento
+    const k = Object.keys(voo.terms)[0];
+    if (!k) {
+      this.exibirToast('Informações de compra indisponíveis.', 'error');
+      return;
+    }
+    
+    // Obtém o URL para redirecionamento
+    const termUrl = voo.terms[k]?.url;
+    if (!termUrl) {
+      this.exibirToast('Link de redirecionamento não encontrado.', 'error');
+      return;
+    }
+    
+    // Obtém a moeda selecionada pelo usuário
+    const moedaUsuario = this.obterMoedaAtual();
+    
+    // Exibe mensagem de loading
+    this.exibirToast('Redirecionando para o site de compra...', 'info');
+    
+    // Constrói a URL da API de redirecionamento com o parâmetro de moeda
+    const redirectUrl = `/api/flight-redirect?search_id=${this.searchId}&term_url=${termUrl}&marker=${process.env.AVIASALES_MARKER || '604241'}&currency=${moedaUsuario}`;
+    
+    console.log(`Redirecionando para compra com moeda ${moedaUsuario}:`, redirectUrl);
+    
+    // Faz a requisição para obter a URL final
+    fetch(redirectUrl)
+      .then(response => response.json())
+      .then(data => {
+        if (!data.url) {
+          throw new Error('URL de redirecionamento não encontrada na resposta');
+        }
+        
+        console.log('URL de redirecionamento recebida:', data.url.substring(0, 50) + '...');
+        
+        // Redireciona para o site parceiro em uma nova aba
+        window.open(data.url, '_blank');
+      })
+      .catch(error => {
+        console.error('Erro ao obter URL de redirecionamento:', error);
+        this.exibirToast('Erro ao redirecionar para o site de compra. Tente novamente.', 'error');
+      });
+  } catch (error) {
+    console.error('Erro ao redirecionar para site de compra:', error);
+    this.exibirToast('Ocorreu um erro ao processar sua solicitação.', 'error');
+  }
+}
 
 }; // Fim do objeto BENETRIP_VOOS
 
