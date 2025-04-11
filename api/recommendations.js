@@ -8,7 +8,7 @@ const https = require('https');
 // =======================
 const REQUEST_TIMEOUT = 50000; // 50 segundos para requisições externas
 const HANDLER_TIMEOUT = 55000; // 55 segundos para processamento total
-const AVIASALES_TIMEOUT = 15000; // 15 segundos para requisições à Aviasales (Calendar)
+const AVIASALES_TIMEOUT = 15000; // 15 segundos para requisições à API Flights Search
 const RETRY_DELAY = 1500; // 1.5 segundos entre tentativas
 const MAX_RETRY = 2; // Número máximo de tentativas para cada método
 
@@ -55,59 +55,33 @@ function logDetalhado(mensagem, dados, limite = MAX_LOG_LENGTH) {
 }
 
 // =======================
-// Função de busca de preço de voo via Aviasales Calendar
+// NOVA FUNÇÃO: Busca de preço de voo via Flights Search API
 // =======================
-async function buscarPrecoVooAviasales(origemIATA, destinoIATA, datas, moeda) {
-  if (!origemIATA || !destinoIATA || !datas) {
-    logDetalhado(`Parâmetros incompletos para busca de voo:`, { origem: origemIATA, destino: destinoIATA });
-    return null;
-  }
+async function buscarPrecoVooFlightsSearch(origemIATA, destinoIATA, datas, moeda) {
   try {
-    logDetalhado(`Buscando voo de ${origemIATA} para ${destinoIATA} via Aviasales (Calendar)...`, null);
-    const params = {
-      origin: origemIATA,
-      destination: destinoIATA,
-      depart_date: datas.dataIda,
-      return_date: datas.dataVolta,
-      currency: moeda,
-      token: process.env.AVIASALES_TOKEN,
-      marker: process.env.AVIASALES_MARKER
-    };
-    logDetalhado('Parâmetros da requisição Aviasales Calendar:', params);
-    const response = await axios({
-      method: 'get',
-      url: 'https://api.travelpayouts.com/v1/prices/calendar',
-      params: params,
+    const response = await axios.get('https://api.travelpayouts.com/v2/flight_search', {
+      params: {
+        origin: origemIATA,
+        destination: destinoIATA,
+        depart_date: datas.dataIda,
+        return_date: datas.dataVolta,
+        token: process.env.AVIASALES_TOKEN,
+        marker: process.env.AVIASALES_MARKER,
+        user_ip: '191.19.187.101'
+      },
       timeout: AVIASALES_TIMEOUT
     });
-    if (response.data && response.data.success && response.data.data) {
-      // A resposta contém várias datas, ex:
-      // { "2025-06-04": { "MCZ": 350 }, "2025-06-05": { "MCZ": 360 }, ... }
-      let menorPreco = Infinity;
-      for (const date in response.data.data) {
-        const precosPorDestino = response.data.data[date];
-        if (precosPorDestino && precosPorDestino[destinoIATA] !== undefined) {
-          const preco = parseFloat(precosPorDestino[destinoIATA]);
-          if (preco < menorPreco) {
-            menorPreco = preco;
-          }
-        }
-      }
-      if (menorPreco !== Infinity) {
-        // Como o Calendar não retorna detalhes como companhia ou horários, usamos dados mínimos
-        const detalhesVoo = {
-          companhia: 'Não informado',
-          departure_at: '',
-          return_at: ''
-        };
-        return { precoReal: menorPreco, detalhesVoo, fonte: 'Aviasales Calendar' };
-      }
-    }
-    logDetalhado('Nenhuma oferta válida encontrada no Calendar', null);
-    return null;
+
+    const voo = response.data?.data?.[0];
+    const taxa = response.data?.currency_rates?.[moeda] || 1;
+    const precoConvertido = voo ? Math.round(voo.price * taxa) : 0;
+
+    return {
+      precoConvertido,
+      moeda
+    };
   } catch (erro) {
-    console.error(`Erro ao buscar preços via Aviasales Calendar: ${erro.message}`);
-    logDetalhado('Detalhes do erro:', erro.response ? erro.response.data : erro);
+    console.error(`Erro ao buscar preço via Flights Search: ${erro.message}`);
     return null;
   }
 }
@@ -157,7 +131,26 @@ function estimarPrecoVoo(origemIATA, destinoIATA) {
 }
 
 // =======================
-// Processamento de destinos para enriquecer com preços reais via Aviasales Calendar
+// FUNÇÃO GERAR PROMPT PARA DESTINOS (AJUSTADA)
+// =======================
+function gerarPromptParaDestinos(requestData) {
+  const orcamento = requestData.orcamento_valor || "não especificado";
+  return `
+Por favor, gere recomendações de destinos de viagem personalizados com base nas preferências do usuário.
+Considere o orçamento informado (${orcamento}) como teto máximo para os voos.
+Priorize destinos com o menor custo possível que se encaixem no perfil do usuário.
+Se o orçamento for muito baixo, retorne sugestões realistas e explique com empatia as limitações de opções.
+Se o orçamento for alto, evite destinos excessivamente baratos, a menos que representem experiências realmente incríveis.
+11. Priorize destinos com o menor custo possível que se encaixem no perfil do usuário. Caso o orçamento seja muito baixo, explique com empatia e mostre o melhor que dá para fazer.
+12. Quando o orçamento for alto, prefira destinos que estejam entre 70% e 100% do valor informado.
+Forneça exatamente 4 destinos alternativos, incluindo o destino principal (topPick), alternativas e um destino surpresa.
+Inclua pontos turísticos específicos e o código IATA de cada aeroporto.
+Responda estritamente em formato JSON.
+  `.trim();
+}
+
+// =======================
+// Processamento de destinos para enriquecer com preços reais via Flights Search API
 // =======================
 async function processarDestinos(recomendacoes, origemIATA, datas, moeda) {
   if (!validarCodigoIATA(origemIATA)) {
@@ -166,143 +159,144 @@ async function processarDestinos(recomendacoes, origemIATA, datas, moeda) {
     logDetalhado(`Usando código IATA de fallback: ${origemIATA}`, null);
   }
   
-  try {
-    logDetalhado('Iniciando processamento de destinos com Aviasales Calendar...', null);
-    
-    // Processa o destino principal (topPick)
-    if (recomendacoes.topPick && recomendacoes.topPick.aeroporto && recomendacoes.topPick.aeroporto.codigo) {
+  logDetalhado('Iniciando processamento de destinos com Flights Search API...', null);
+  
+  // Processamento dos destinos de forma paralela para evitar timeout na Vercel
+  const promises = [];
+  
+  // Processa o destino principal (topPick)
+  if (recomendacoes.topPick && recomendacoes.topPick.aeroporto && recomendacoes.topPick.aeroporto.codigo) {
+    promises.push((async () => {
       const destinoIATA = recomendacoes.topPick.aeroporto.codigo;
       logDetalhado(`Processando destino principal: ${recomendacoes.topPick.destino} (${destinoIATA})`, null);
-      
       if (validarCodigoIATA(destinoIATA)) {
-        const resultado = await retryAsync(
-          async () => await buscarPrecoVooAviasales(origemIATA, destinoIATA, datas, moeda)
-        );
+        const resultado = await retryAsync(() => buscarPrecoVooFlightsSearch(origemIATA, destinoIATA, datas, moeda));
         if (resultado) {
-          recomendacoes.topPick.preco = recomendacoes.topPick.preco || {};
-          recomendacoes.topPick.preco.voo = resultado.precoReal;
-          recomendacoes.topPick.preco.fonte = resultado.fonte || 'Aviasales Calendar';
-          recomendacoes.topPick.detalhesVoo = resultado.detalhesVoo;
+          recomendacoes.topPick.preco = {
+            voo: resultado.precoConvertido,
+            moeda: resultado.moeda,
+            fonte: 'Aviasales Flights Search'
+          };
+          // Caso a API retorne detalhes adicionais (opcional)
+          if (resultado.detalhesVoo) {
+            recomendacoes.topPick.detalhesVoo = resultado.detalhesVoo;
+          }
           logDetalhado(`Preço atualizado para ${recomendacoes.topPick.destino}: ${moeda} ${recomendacoes.topPick.preco.voo}`, null);
         } else {
-          console.warn(`Consulta Aviasales Calendar falhou para ${recomendacoes.topPick.destino}.`);
-          // MODIFICAÇÃO: Não utilizar estimativa
+          console.warn(`Consulta Flights Search falhou para ${recomendacoes.topPick.destino}.`);
           recomendacoes.topPick.preco = {
-            voo: recomendacoes.topPick.preco?.voo || 0, // Manter o preço da IA ou zero
+            voo: recomendacoes.topPick.preco?.voo || 0,
             fonte: 'Indisponível - API não retornou dados'
           };
         }
       } else {
         console.warn(`Código IATA inválido para ${recomendacoes.topPick.destino}: ${destinoIATA}`);
       }
-      
-      await new Promise(resolve => setTimeout(resolve, 2000));
-    }
-    
-    // Processa as alternativas (uma por uma)
-    if (recomendacoes.alternativas && Array.isArray(recomendacoes.alternativas)) {
-      for (let i = 0; i < recomendacoes.alternativas.length; i++) {
-        const alternativa = recomendacoes.alternativas[i];
+    })());
+  }
+  
+  // Processa as alternativas (todas em paralelo)
+  if (recomendacoes.alternativas && Array.isArray(recomendacoes.alternativas)) {
+    recomendacoes.alternativas.forEach((alternativa, index) => {
+      promises.push((async () => {
         if (alternativa.aeroporto && alternativa.aeroporto.codigo) {
           const destinoIATA = alternativa.aeroporto.codigo;
-          
+          logDetalhado(`Processando alternativa ${index + 1}/${recomendacoes.alternativas.length}: ${alternativa.destino} (${destinoIATA})`, null);
           if (validarCodigoIATA(destinoIATA)) {
-            logDetalhado(`Processando alternativa ${i+1}/${recomendacoes.alternativas.length}: ${alternativa.destino} (${destinoIATA})`, null);
-            const resultado = await retryAsync(
-              async () => await buscarPrecoVooAviasales(origemIATA, destinoIATA, datas, moeda)
-            );
+            const resultado = await retryAsync(() => buscarPrecoVooFlightsSearch(origemIATA, destinoIATA, datas, moeda));
             if (resultado) {
-              alternativa.preco = alternativa.preco || {};
-              alternativa.preco.voo = resultado.precoReal;
-              alternativa.preco.fonte = resultado.fonte || 'Aviasales Calendar';
-              alternativa.detalhesVoo = resultado.detalhesVoo;
+              alternativa.preco = {
+                voo: resultado.precoConvertido,
+                moeda: resultado.moeda,
+                fonte: 'Aviasales Flights Search'
+              };
+              if (resultado.detalhesVoo) {
+                alternativa.detalhesVoo = resultado.detalhesVoo;
+              }
               logDetalhado(`Preço atualizado para ${alternativa.destino}: ${moeda} ${alternativa.preco.voo}`, null);
             } else {
-              console.warn(`Consulta Aviasales Calendar falhou para ${alternativa.destino}.`);
-              // MODIFICAÇÃO: Não utilizar estimativa
+              console.warn(`Consulta Flights Search falhou para ${alternativa.destino}.`);
               alternativa.preco = {
-                voo: alternativa.preco?.voo || 0, // Manter o preço da IA ou zero
+                voo: alternativa.preco?.voo || 0,
                 fonte: 'Indisponível - API não retornou dados'
               };
             }
           } else {
             console.warn(`Código IATA inválido para ${alternativa.destino}: ${destinoIATA}`);
           }
-          
-          if (i < recomendacoes.alternativas.length - 1) {
-            await new Promise(resolve => setTimeout(resolve, 2000));
-          }
         }
-      }
-    }
-    
-    // Processa o destino surpresa
-    if (recomendacoes.surpresa && recomendacoes.surpresa.aeroporto && recomendacoes.surpresa.aeroporto.codigo) {
+      })());
+    });
+  }
+  
+  // Processa o destino surpresa
+  if (recomendacoes.surpresa && recomendacoes.surpresa.aeroporto && recomendacoes.surpresa.aeroporto.codigo) {
+    promises.push((async () => {
       const destinoIATA = recomendacoes.surpresa.aeroporto.codigo;
-      
+      logDetalhado(`Processando destino surpresa: ${recomendacoes.surpresa.destino} (${destinoIATA})`, null);
       if (validarCodigoIATA(destinoIATA)) {
-        logDetalhado(`Processando destino surpresa: ${recomendacoes.surpresa.destino} (${destinoIATA})`, null);
-        const resultado = await retryAsync(
-          async () => await buscarPrecoVooAviasales(origemIATA, destinoIATA, datas, moeda)
-        );
+        const resultado = await retryAsync(() => buscarPrecoVooFlightsSearch(origemIATA, destinoIATA, datas, moeda));
         if (resultado) {
-          recomendacoes.surpresa.preco = recomendacoes.surpresa.preco || {};
-          recomendacoes.surpresa.preco.voo = resultado.precoReal;
-          recomendacoes.surpresa.preco.fonte = resultado.fonte || 'Aviasales Calendar';
-          recomendacoes.surpresa.detalhesVoo = resultado.detalhesVoo;
+          recomendacoes.surpresa.preco = {
+            voo: resultado.precoConvertido,
+            moeda: resultado.moeda,
+            fonte: 'Aviasales Flights Search'
+          };
+          if (resultado.detalhesVoo) {
+            recomendacoes.surpresa.detalhesVoo = resultado.detalhesVoo;
+          }
           logDetalhado(`Preço atualizado para ${recomendacoes.surpresa.destino}: ${moeda} ${recomendacoes.surpresa.preco.voo}`, null);
         } else {
-          console.warn(`Consulta Aviasales Calendar falhou para ${recomendacoes.surpresa.destino}.`);
-          // MODIFICAÇÃO: Não utilizar estimativa
+          console.warn(`Consulta Flights Search falhou para ${recomendacoes.surpresa.destino}.`);
           recomendacoes.surpresa.preco = {
-            voo: recomendacoes.surpresa.preco?.voo || 0, // Manter o preço da IA ou zero
+            voo: recomendacoes.surpresa.preco?.voo || 0,
             fonte: 'Indisponível - API não retornou dados'
           };
         }
       } else {
         console.warn(`Código IATA inválido para ${recomendacoes.surpresa.destino}: ${destinoIATA}`);
       }
-    }
-    
-   // Assegurar que temos a estação do ano armazenada
-    if (!recomendacoes.estacaoViagem) {
-      try {
-        if (datas.dataIda) {
-          const dataObj = new Date(datas.dataIda);
-          const mes = dataObj.getMonth();
-          let estacaoViagem = '';
-          
-          if (mes >= 2 && mes <= 4) estacaoViagem = 'primavera';
-          else if (mes >= 5 && mes <= 7) estacaoViagem = 'verão';
-          else if (mes >= 8 && mes <= 10) estacaoViagem = 'outono';
-          else estacaoViagem = 'inverno';
-          
-          // Determinar hemisfério baseado na origem
-          const hemisferio = determinarHemisferioDestino(origemIATA);
-          
-          if (hemisferio === 'sul') {
-            if (estacaoViagem === 'verão') estacaoViagem = 'inverno';
-            else if (estacaoViagem === 'inverno') estacaoViagem = 'verão';
-            else if (estacaoViagem === 'primavera') estacaoViagem = 'outono';
-            else if (estacaoViagem === 'outono') estacaoViagem = 'primavera';
-          }
-          
-          recomendacoes.estacaoViagem = estacaoViagem;
-          logDetalhado(`Estação do ano definida: ${estacaoViagem}`, null);
-        }
-      } catch (error) {
-        console.warn('Erro ao determinar estação do ano:', error);
-      }
-    }
-    
-    return recomendacoes;
-  } catch (error) {
-    console.error(`Erro ao processar destinos: ${error.message}`);
-    return recomendacoes;
+    })());
   }
+  
+  // Aguarda que todos os destinos sejam processados
+  await Promise.all(promises);
+  
+  // Assegurar que temos a estação do ano armazenada
+  if (!recomendacoes.estacaoViagem) {
+    try {
+      if (datas.dataIda) {
+        const dataObj = new Date(datas.dataIda);
+        const mes = dataObj.getMonth();
+        let estacaoViagem = '';
+        
+        if (mes >= 2 && mes <= 4) estacaoViagem = 'primavera';
+        else if (mes >= 5 && mes <= 7) estacaoViagem = 'verão';
+        else if (mes >= 8 && mes <= 10) estacaoViagem = 'outono';
+        else estacaoViagem = 'inverno';
+        
+        // Determinar hemisfério baseado na origem
+        const hemisferio = determinarHemisferioDestino(origemIATA);
+        
+        if (hemisferio === 'sul') {
+          if (estacaoViagem === 'verão') estacaoViagem = 'inverno';
+          else if (estacaoViagem === 'inverno') estacaoViagem = 'verão';
+          else if (estacaoViagem === 'primavera') estacaoViagem = 'outono';
+          else if (estacaoViagem === 'outono') estacaoViagem = 'primavera';
+        }
+        
+        recomendacoes.estacaoViagem = estacaoViagem;
+        logDetalhado(`Estação do ano definida: ${estacaoViagem}`, null);
+      }
+    } catch (error) {
+      console.warn('Erro ao determinar estação do ano:', error);
+    }
+  }
+  
+  return recomendacoes;
 }
 
-// Adicione esta função para determinar hemisferio por IATA
+// Adicione esta função para determinar hemisfério por IATA
 function determinarHemisferioDestino(iataCode) {
   // IATA codes para países do hemisfério sul
   const hemisfSulIATA = [
@@ -659,6 +653,7 @@ module.exports = async function handler(req, res) {
         }
       }
       
+      // Em cada tentativa, complementa o prompt com urgência e regras de orçamento estritas
       prompt = `${prompt}\n\nURGENTE: O ORÇAMENTO MÁXIMO para voos (${requestData.orcamento_valor || 'informado'} ${requestData.moeda_escolhida || 'BRL'}) precisa ser RIGOROSAMENTE RESPEITADO. TODOS os destinos devem ter voos abaixo desse valor. Forneça um mix equilibrado: inclua tanto destinos populares quanto alternativas.`;
     }
     
@@ -1231,7 +1226,7 @@ function obterCodigoIATAPadrao(cidade, pais) {
     'Buenos Aires': 'EZE',
     'Santiago': 'SCL',
     'Lima': 'LIM',
-    'Bogotá': 'BOG',
+    'Bogotá': 'FCO',
     'Cartagena': 'CTG',
     'Cidade do México': 'MEX',
     'Cancún': 'CUN',
@@ -1397,7 +1392,7 @@ function generateEmergencyData(dadosUsuario = {}) {
         descricao: "Capital tranquila com excelente qualidade de vida e praias urbanas.",
         porque: "Destino menos procurado, mas com rica cultura, gastronomia excepcional e povo acolhedor.",
         destaque: "Degustar carnes uruguaias premium com vinhos tannat locais",
-        comentario: "Montevidéu é uma descoberta incrível! Passeei pelo Mercado del Puerto, onde os aromas das parrillas me deixaram babando, e a Rambla é o lugar mais lindo para ver o pôr do sol! 🐾",
+        comentario: "Montevidéu é uma descoberta incrível! Passeiei pelo Mercado del Puerto, onde os aromas das parrillas me deixaram babando, e a Rambla é o lugar mais lindo para ver o pôr do sol! 🐾",
         pontosTuristicos: [
           "Mercado del Puerto",
           "Rambla de Montevidéu"
@@ -1703,306 +1698,44 @@ function generateEmergencyData(dadosUsuario = {}) {
             nome: "Aeroporto Internacional José María Córdova"
           },
           preco: {
-            voo: Math.round(orcamento * 0.75),
-            hotel: 180
+            voo: Math.round(orcamento * 0.8),
+            hotel: 210
           }
         }
       ],
       surpresa: {
-        destino: "Kotor",
-        pais: "Montenegro",
-        codigoPais: "ME",
-        descricao: "Cidade medieval incrustada em um fiorde deslumbrante.",
-        porque: "Joia escondida dos Bálcãs com paisagens de tirar o fôlego, preços acessíveis e poucos turistas.",
-        destaque: "Subir 1.350 degraus até a fortaleza para a vista mais incrível da baía",
-        comentario: "Kotor parece saída de um conto de fadas! Explorei as ruelas estreitas da Cidade Antiga e subi até as Muralhas de Kotor - a vista é de outro mundo! Mesmo com minhas patinhas cansadas, valeu cada degrau! 🐾",
+        destino: "Medellín",
+        pais: "Colômbia",
+        codigoPais: "CO",
+        descricao: "Cidade vibrante e moderna, com clima primaveril e cenas culturais intensas.",
+        porque: "Apesar de ser bem conhecida, Medellín surpreende pela qualidade de vida, inovação urbana e clima agradável durante todo o ano.",
+        destaque: "Experiência cultural nos bairros vibrantes e na Comuna 13",
+        comentario: "Medellín é realmente incrível! A energia da cidade e a criatividade em cada esquina fazem dela um destino imperdível para quem busca experiências autênticas.",
         pontosTuristicos: [
-          "Cidade Antiga",
-          "Muralhas de Kotor"
+          "Comuna 13",
+          "Plaza Botero"
         ],
         aeroporto: {
-          codigo: "TIV",
-          nome: "Aeroporto de Tivat"
+          codigo: "MDE",
+          nome: "Aeroporto Internacional José María Córdova"
         },
         preco: {
-          voo: Math.round(orcamento * 0.88),
-          hotel: 190
+          voo: Math.round(orcamento * 0.85),
+          hotel: 200
         }
       }
     }
   };
-  
-  const dadosRegiao = destinosEmergencia[regiao] || destinosEmergencia.global;
-  
-  // (Ajuste de preços para orçamento foi removido)
-  
-  dadosRegiao.alternativas = embaralharArray([...dadosRegiao.alternativas]);
-  return dadosRegiao;
-}
 
-function determinarRegiaoOrigem(cidadeOrigem) {
-  if (cidadeOrigem.toLowerCase().includes('são paulo') || 
-      cidadeOrigem.toLowerCase().includes('rio') ||
-      cidadeOrigem.toLowerCase().includes('brasil') ||
-      cidadeOrigem.toLowerCase().includes('brasilia')) {
-    return 'americas';
-  }
-  if (cidadeOrigem.toLowerCase().includes('london') || 
-      cidadeOrigem.toLowerCase().includes('paris') ||
-      cidadeOrigem.toLowerCase().includes('madrid') ||
-      cidadeOrigem.toLowerCase().includes('roma')) {
-    return 'europa';
-  }
-  if (cidadeOrigem.toLowerCase().includes('tokyo') || 
-      cidadeOrigem.toLowerCase().includes('beijing') ||
-      cidadeOrigem.toLowerCase().includes('bangkok') ||
-      cidadeOrigem.toLowerCase().includes('delhi')) {
-    return 'asia';
-  }
-  return 'global';
-}
-
-function embaralharArray(array) {
-  for (let i = array.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [array[i], array[j]] = [array[j], array[i]];
-  }
-  return array;
-}
-
-function gerarPromptParaDestinos(dados) {
-  const companhia = getCompanhiaText(dados.companhia || 0);
-  const preferencia = getPreferenciaText(dados.preferencia_viagem || 0);
-  const cidadeOrigem = dados.cidade_partida?.name || 'origem não especificada';
-  const orcamento = dados.orcamento_valor || 'flexível';
-  const moeda = dados.moeda_escolhida || 'BRL';
-  const quantidadePessoas = dados.quantidade_familia || dados.quantidade_amigos || 1;
-  const conheceDestino = dados.conhece_destino || 0;
-  const tipoDestino = dados.tipo_destino || 'qualquer';
-  const famaDestino = dados.fama_destino || 'qualquer';
-  
-  let dataIda = 'não especificada';
-  let dataVolta = 'não especificada';
-  
-  if (dados.datas) {
-    if (typeof dados.datas === 'string' && dados.datas.includes(',')) {
-      const partes = dados.datas.split(',');
-      dataIda = partes[0] || 'não especificada';
-      dataVolta = partes[1] || 'não especificada';
-    } else if (dados.datas.dataIda && dados.datas.dataVolta) {
-      dataIda = dados.datas.dataIda;
-      dataVolta = dados.datas.dataVolta;
-    }
+  // Função auxiliar para determinar a região de origem (pode ser expandida conforme necessário)
+  function determinarRegiaoOrigem(cidade) {
+    if (/Brasil/i.test(cidade)) return "americas";
+    if (/Europa/i.test(cidade)) return "europa";
+    if (/Ásia|China|Japão|Índia/i.test(cidade)) return "asia";
+    return "global";
   }
   
-  let duracaoViagem = 'não especificada';
-  try {
-    if (dataIda !== 'não especificada' && dataVolta !== 'não especificada') {
-      const ida = new Date(dataIda);
-      const volta = new Date(dataVolta);
-      const diff = Math.abs(volta - ida);
-      const dias = Math.ceil(diff / (1000 * 60 * 60 * 24));
-      duracaoViagem = `${dias} dias`;
-    }
-  } catch (e) {
-    console.log("Erro ao calcular duração da viagem:", e);
-  }
-  
-  let estacaoViagem = 'não determinada';
-  let hemisferio = determinarHemisferio(cidadeOrigem);
-  
-  try {
-    if (dataIda !== 'não especificada') {
-      const dataObj = new Date(dataIda);
-      const mes = dataObj.getMonth();
-      
-      if (mes >= 2 && mes <= 4) estacaoViagem = 'primavera';
-      else if (mes >= 5 && mes <= 7) estacaoViagem = 'verão';
-      else if (mes >= 8 && mes <= 10) estacaoViagem = 'outono';
-      else estacaoViagem = 'inverno';
-      
-      if (hemisferio === 'sul') {
-        if (estacaoViagem === 'verão') estacaoViagem = 'inverno';
-        else if (estacaoViagem === 'inverno') estacaoViagem = 'verão';
-        else if (estacaoViagem === 'primavera') estacaoViagem = 'outono';
-        else if (estacaoViagem === 'outono') estacaoViagem = 'primavera';
-      }
-    }
-  } catch (e) {
-    console.log("Erro ao determinar estação do ano:", e);
-  }
-  
-  const mensagemOrcamento = orcamento !== 'flexível' ?
-    `⚠️ ORÇAMENTO MÁXIMO: ${orcamento} ${moeda} para voos. Todos os destinos DEVEM ter preços abaixo deste valor.` : 
-    'Orçamento flexível';
-  
-  const sugestaoDistancia = gerarSugestaoDistancia(cidadeOrigem, tipoDestino);
-  
-  // Modificação: adicionando seção sobre clima
-  return `Crie recomendações de viagem que respeitam ESTRITAMENTE o orçamento do usuário:
-
-${mensagemOrcamento}
-
-PERFIL DO VIAJANTE:
-- Partindo de: ${cidadeOrigem} ${sugestaoDistancia}
-- Viajando: ${companhia}
-- Número de pessoas: ${quantidadePessoas}
-- Atividades preferidas: ${preferencia}
-- Período da viagem: ${dataIda} a ${dataVolta} (${duracaoViagem})
-- Estação do ano na viagem: ${estacaoViagem}
-- Experiência como viajante: ${conheceDestino === 1 ? 'Com experiência' : 'Iniciante'} 
-- Preferência por destinos: ${getTipoDestinoText(tipoDestino)}
-- Popularidade do destino: ${getFamaDestinoText(famaDestino)}
-
-IMPORTANTE:
-1. O preço do VOO de CADA destino DEVE ser MENOR que o orçamento máximo de ${orcamento} ${moeda}.
-2. Forneça um mix equilibrado: inclua tanto destinos populares quanto alternativas.
-3. Forneça EXATAMENTE 4 destinos alternativos diferentes entre si.
-4. Considere a ÉPOCA DO ANO (${estacaoViagem}) para sugerir destinos com clima adequado.
-5. Inclua destinos de diferentes continentes/regiões.
-6. Garanta que os preços sejam realistas para voos de ida e volta partindo de ${cidadeOrigem}.
-7. Para CADA destino, inclua o código IATA (3 letras) do aeroporto principal.
-8. Para cada destino, INCLUA PONTOS TURÍSTICOS ESPECÍFICOS E CONHECIDOS.
-9. Os comentários da Tripinha DEVEM mencionar pelo menos um dos pontos turísticos do destino.
-10. NOVO: Forneça informações sobre o CLIMA esperado no destino durante a viagem (temperatura média e condições).
-
-Forneça no formato JSON exato abaixo, SEM formatação markdown:
-{
-  "topPick": {
-    "destino": "Nome da Cidade",
-    "pais": "Nome do País",
-    "codigoPais": "XX",
-    "descricao": "Breve descrição do destino",
-    "porque": "Razão específica para visitar",
-    "destaque": "Uma experiência única neste destino",
-    "comentario": "Comentário entusiasmado da Tripinha, mencionando pelo menos um ponto turístico",
-    "pontosTuristicos": [
-      "Nome do Primeiro Ponto Turístico", 
-      "Nome do Segundo Ponto Turístico"
-    ],
-    "clima": {
-      "temperatura": "Faixa de temperatura média esperada",
-      "condicoes": "Descrição das condições climáticas esperadas",
-      "recomendacoes": "Dicas relacionadas ao clima"
-    },
-    "aeroporto": {
-      "codigo": "XYZ",
-      "nome": "Nome do Aeroporto Principal"
-    },
-    "preco": {
-      "voo": número,
-      "hotel": número
-    }
-  },
-  "alternativas": [
-    {
-      "destino": "Nome da Cidade 1",
-      "pais": "Nome do País 1", 
-      "codigoPais": "XX",
-      "porque": "Razão específica para visitar",
-      "pontoTuristico": "Nome de um Ponto Turístico",
-      "clima": {
-        "temperatura": "Faixa de temperatura média esperada"
-      },
-      "aeroporto": {
-        "codigo": "XYZ",
-        "nome": "Nome do Aeroporto Principal"
-      },
-      "preco": {
-        "voo": número,
-        "hotel": número
-      }
-    },
-    ...
-  ],
-  "surpresa": {
-    "destino": "Nome da Cidade",
-    "pais": "Nome do País",
-    "codigoPais": "XX",
-    "descricao": "Breve descrição do destino",
-    "porque": "Razão para visitar, destacando o fator surpresa",
-    "destaque": "Uma experiência única neste destino",
-    "comentario": "Comentário entusiasmado da Tripinha, mencionando pelo menos um ponto turístico",
-    "pontosTuristicos": [
-      "Nome do Primeiro Ponto Turístico", 
-      "Nome do Segundo Ponto Turístico"
-    ],
-    "clima": {
-      "temperatura": "Faixa de temperatura média esperada",
-      "condicoes": "Descrição das condições climáticas esperadas",
-      "recomendacoes": "Dicas relacionadas ao clima"
-    },
-    "aeroporto": {
-      "codigo": "XYZ",
-      "nome": "Nome do Aeroporto Principal"
-    },
-    "preco": {
-      "voo": número,
-      "hotel": número
-    }
-  },
-  "estacaoViagem": "${estacaoViagem}"
-}`;
+  return destinosEmergencia[deteminarRegiaoOrigem(cidadeOrigem)] || destinosEmergencia["global"];
 }
 
-function getCompanhiaText(value) {
-  if (typeof value === 'string') value = parseInt(value, 10);
-  const options = {
-    0: "sozinho(a)",
-    1: "em casal (viagem romântica)",
-    2: "em família",
-    3: "com amigos"
-  };
-  return options[value] || "sozinho(a)";
-}
-
-function getPreferenciaText(value) {
-  if (typeof value === 'string') value = parseInt(value, 10);
-  const options = {
-    0: "relaxamento e descanso",
-    1: "aventura e atividades ao ar livre",
-    2: "cultura, história e gastronomia",
-    3: "experiência urbana, compras e vida noturna"
-  };
-  return options[value] || "experiências diversificadas";
-}
-
-function getTipoDestinoText(value) {
-  if (typeof value === 'string') value = parseInt(value, 10);
-  const options = {
-    0: "nacional",
-    1: "internacional",
-    2: "qualquer (nacional ou internacional)"
-  };
-  return options[value] || "qualquer";
-}
-
-function getFamaDestinoText(value) {
-  if (typeof value === 'string') value = parseInt(value, 10);
-  const options = {
-    0: "famoso e turístico",
-    1: "fora do circuito turístico comum",
-    2: "mistura de ambos"
-  };
-  return options[value] || "qualquer";
-}
-
-function determinarHemisferio(cidadeOrigem) {
-  const indicadoresSul = ['brasil', 'argentina', 'chile', 'austrália', 'nova zelândia', 'áfrica do sul', 'peru', 'uruguai', 'paraguai', 'bolívia'];
-  if (!cidadeOrigem || cidadeOrigem === 'origem não especificada') return 'norte';
-  const cidadeLowerCase = cidadeOrigem.toLowerCase();
-  if (indicadoresSul.some(termo => cidadeLowerCase.includes(termo))) {
-    return 'sul';
-  }
-  return 'norte';
-}
-
-function gerarSugestaoDistancia(cidadeOrigem, tipoDestino) {
-  if (cidadeOrigem === 'origem não especificada' || tipoDestino === 0) return '';
-  const grandeshubs = ['nova york', 'londres', 'paris', 'tóquio', 'dubai', 'são paulo'];
-  const cidadeLowerCase = cidadeOrigem.toLowerCase();
-  if (grandeshubs.some(cidade => cidadeLowerCase.includes(cidade))) {
-    return '(considere incluir destinos intercontinentais)';
-  }
-  return '(considere a distância e acessibilidade)';
-}
+// Fim do arquivo recommendations.js
