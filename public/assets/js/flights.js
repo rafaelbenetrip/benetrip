@@ -1544,7 +1544,7 @@ const BENETRIP_VOOS = {
           if (chaveEncontrada) {
             const taxaAlternativa = this.currencyRates[chaveEncontrada];
             console.log(`Taxa alternativa encontrada para ${chaveEncontrada}: ${taxaAlternativa}`);
-            return Math.round(precoOriginal * taxaAlternativa);
+            return Math.round(precoOriginal / taxaAlternativa);
           }
         }
         
@@ -1554,7 +1554,7 @@ const BENETRIP_VOOS = {
       }
       
       // Aplicar a conversão com a taxa encontrada
-      const precoConvertido = precoOriginal * taxaConversao;
+      const precoConvertido = precoOriginal / taxaConversao;
       console.log(`Preço convertido: ${precoOriginal} RUB / ${taxaConversao} = ${precoConvertido} ${moedaUsuario}`);
       
       // Retorna o valor convertido arredondado
