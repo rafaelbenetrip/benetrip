@@ -1483,87 +1483,98 @@ const BENETRIP_VOOS = {
   },
 
   /**
-   * Obtém o preço de um voo convertido para a moeda selecionada pelo usuário
-   * @param {Object} voo - Dados do voo
-   * @returns {number} Preço do voo na moeda selecionada
-   */
-  obterPrecoVoo(voo) {
-    if (!voo || !voo.terms) {
-      console.log('Voo sem termos ou inválido', voo);
+ * Obtém o preço de um voo convertido para a moeda selecionada pelo usuário
+ * @param {Object} voo - Dados do voo
+ * @returns {number} Preço do voo na moeda selecionada (por pessoa)
+ */
+obterPrecoVoo(voo) {
+  if (!voo || !voo.terms) {
+    console.log('Voo sem termos ou inválido', voo);
+    return 0;
+  }
+  
+  try {
+    // Extrai o preço original
+    const k = Object.keys(voo.terms)[0];
+    if (!k) {
+      console.warn('Nenhuma chave encontrada em voo.terms', voo.terms);
       return 0;
     }
     
-    try {
-      // Extrai o preço original
-      const k = Object.keys(voo.terms)[0];
-      if (!k) {
-        console.warn('Nenhuma chave encontrada em voo.terms', voo.terms);
-        return 0;
-      }
-      
-      // Obter o preço original (geralmente em rublos russos)
-      const precoOriginal = voo.terms[k]?.unified_price || voo.terms[k]?.price || 0;
-      
-      // Log do preço original
-      console.log(`Preço original: ${precoOriginal} RUB`);
-      
-      // Obter a moeda selecionada pelo usuário
-      const moedaUsuario = this.obterMoedaAtual();
-      console.log(`Moeda selecionada: ${moedaUsuario}`);
-      
-      // Se não temos taxas de conversão, retorna o preço original com aviso
-      if (!this.currencyRates) {
-        console.warn('Taxas de conversão não disponíveis. Usando preço original:', precoOriginal);
-        return precoOriginal;
-      }
-      
-      // Log das taxas de conversão disponíveis para debug
-      console.log('Taxas de conversão disponíveis:', this.currencyRates);
-      
-      // Se a moeda já é a mesma da API (RUB) ou a taxa não existe
-      if (moedaUsuario === 'RUB') {
-        return precoOriginal;
-      }
-      
-      // Encontrar a taxa de conversão para a moeda selecionada (minúsculo conforme formato da API)
-      const moedaLower = moedaUsuario.toLowerCase();
-      const taxaConversao = this.currencyRates[moedaLower];
-      
-      if (!taxaConversao) {
-        console.warn(`Taxa de conversão não encontrada para ${moedaUsuario}. Taxas disponíveis:`, this.currencyRates);
-        
-        // Tentativa usando outra forma de acesso
-        if (typeof this.currencyRates === 'object') {
-          // Procura pela chave em qualquer formato (maiúsculo/minúsculo)
-          const todasChaves = Object.keys(this.currencyRates);
-          const chaveEncontrada = todasChaves.find(k => 
-            k.toLowerCase() === moedaLower || 
-            k.toUpperCase() === moedaUsuario.toUpperCase()
-          );
-          
-          if (chaveEncontrada) {
-            const taxaAlternativa = this.currencyRates[chaveEncontrada];
-            console.log(`Taxa alternativa encontrada para ${chaveEncontrada}: ${taxaAlternativa}`);
-            return Math.round(precoOriginal / taxaAlternativa);
-          }
-        }
-        
-        // Fallback: retorna o preço original com aviso
-        console.warn(`Usando preço original devido à falta de taxa de conversão: ${precoOriginal}`);
-        return precoOriginal;
-      }
-      
-      // Aplicar a conversão com a taxa encontrada
-      const precoConvertido = precoOriginal / taxaConversao;
-      console.log(`Preço convertido: ${precoOriginal} RUB / ${taxaConversao} = ${precoConvertido} ${moedaUsuario}`);
-      
-      // Retorna o valor convertido arredondado
-      return Math.round(precoConvertido);
-    } catch (erro) {
-      console.error('Erro ao obter/converter preço do voo:', erro);
-      return 0;
+    // Obter o preço original (geralmente em rublos russos)
+    const precoOriginal = voo.terms[k]?.unified_price || voo.terms[k]?.price || 0;
+    
+    // Log do preço original
+    console.log(`Preço original: ${precoOriginal} RUB`);
+    
+    // Obter a moeda selecionada pelo usuário
+    const moedaUsuario = this.obterMoedaAtual();
+    console.log(`Moeda selecionada: ${moedaUsuario}`);
+    
+    // NOVO: Obter o número de passageiros
+    const numeroPassageiros = this.obterQuantidadePassageiros();
+    console.log(`Número de passageiros: ${numeroPassageiros}`);
+    
+    // Se não temos taxas de conversão, retorna o preço original com aviso
+    if (!this.currencyRates) {
+      console.warn('Taxas de conversão não disponíveis. Usando preço original:', precoOriginal);
+      // NOVO: Retorna preço dividido por passageiros
+      return Math.round(precoOriginal / numeroPassageiros);
     }
-  },
+    
+    // Log das taxas de conversão disponíveis para debug
+    console.log('Taxas de conversão disponíveis:', this.currencyRates);
+    
+    // Se a moeda já é a mesma da API (RUB) ou a taxa não existe
+    if (moedaUsuario === 'RUB') {
+      // NOVO: Dividir pelo número de passageiros
+      return Math.round(precoOriginal / numeroPassageiros);
+    }
+    
+    // Encontrar a taxa de conversão para a moeda selecionada (minúsculo conforme formato da API)
+    const moedaLower = moedaUsuario.toLowerCase();
+    const taxaConversao = this.currencyRates[moedaLower];
+    
+    if (!taxaConversao) {
+      console.warn(`Taxa de conversão não encontrada para ${moedaUsuario}. Taxas disponíveis:`, this.currencyRates);
+      
+      // Tentativa usando outra forma de acesso
+      if (typeof this.currencyRates === 'object') {
+        // Procura pela chave em qualquer formato (maiúsculo/minúsculo)
+        const todasChaves = Object.keys(this.currencyRates);
+        const chaveEncontrada = todasChaves.find(k => 
+          k.toLowerCase() === moedaLower || 
+          k.toUpperCase() === moedaUsuario.toUpperCase()
+        );
+        
+        if (chaveEncontrada) {
+          const taxaAlternativa = this.currencyRates[chaveEncontrada];
+          console.log(`Taxa alternativa encontrada para ${chaveEncontrada}: ${taxaAlternativa}`);
+          // NOVO: Dividido pelo número de passageiros
+          return Math.round((precoOriginal / taxaAlternativa) / numeroPassageiros);
+        }
+      }
+      
+      // Fallback: retorna o preço original com aviso dividido por passageiros
+      console.warn(`Usando preço original devido à falta de taxa de conversão: ${precoOriginal}`);
+      return Math.round(precoOriginal / numeroPassageiros);
+    }
+    
+    // Aplicar a conversão com a taxa encontrada (CORRIGIDO: divisão em vez de multiplicação)
+    const precoConvertido = precoOriginal / taxaConversao;
+    console.log(`Preço convertido: ${precoOriginal} RUB / ${taxaConversao} = ${precoConvertido} ${moedaUsuario}`);
+    
+    // NOVO: Dividimos pelo número de passageiros
+    const precoPorPessoa = precoConvertido / numeroPassageiros;
+    console.log(`Preço por pessoa: ${precoConvertido} / ${numeroPassageiros} = ${precoPorPessoa} ${moedaUsuario}`);
+    
+    // Retorna o valor convertido por pessoa, arredondado
+    return Math.round(precoPorPessoa);
+  } catch (erro) {
+    console.error('Erro ao obter/converter preço do voo:', erro);
+    return 0;
+  }
+},
 
   /**
    * Obtém a moeda selecionada pelo usuário de forma mais robusta
