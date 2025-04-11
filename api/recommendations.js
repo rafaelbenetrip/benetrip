@@ -498,60 +498,7 @@ module.exports = async function handler(req, res) {
     
     while (tentativas < maxTentativas) {
       tentativas++;
-      logDetalhado(`Tentativa ${tentativas} de ${maxTentativas}`, null);
-      
-      if (process.env.PERPLEXITY_API_KEY) {
-        try {
-          logDetalhado('Chamando API Perplexity...', null);
-          const responsePerplexity = await callPerplexityAPI(prompt, requestData);
-          let processedResponse = responsePerplexity;
-          if (responsePerplexity && isPartiallyValidJSON(responsePerplexity)) {
-            processedResponse = ensureTouristAttractionsAndComments(responsePerplexity, requestData);
-          }
-          if (processedResponse && isValidDestinationJSON(processedResponse, requestData)) {
-            logDetalhado('Resposta Perplexity válida recebida', null);
-            try {
-              const recomendacoes = typeof processedResponse === 'string' ? JSON.parse(processedResponse) : processedResponse;
-              if (orcamento) {
-                recomendacoes.orcamentoMaximo = orcamento;
-              }
-              const origemIATA = obterCodigoIATAOrigem(requestData);
-              const datas = obterDatasViagem(requestData);
-              if (origemIATA) {
-                logDetalhado(`Origem IATA identificada: ${origemIATA}, processando destinos...`, null);
-                const recomendacoesEnriquecidas = await processarDestinos(recomendacoes, origemIATA, datas, moeda);
-                logDetalhado('Recomendações enriquecidas com sucesso', null);
-                if (!isResponseSent) {
-                  isResponseSent = true;
-                  clearTimeout(serverTimeout);
-                  return res.status(200).json({
-                    tipo: "perplexity-enriquecido",
-                    conteudo: JSON.stringify(recomendacoesEnriquecidas),
-                    tentativa: tentativas
-                  });
-                }
-                return;
-              }
-            } catch (enriquecerError) {
-              console.error('Erro ao enriquecer recomendações:', enriquecerError.message);
-            }
-            if (!isResponseSent) {
-              isResponseSent = true;
-              clearTimeout(serverTimeout);
-              return res.status(200).json({
-                tipo: "perplexity",
-                conteudo: processedResponse,
-                tentativa: tentativas
-              });
-            }
-            return;
-          } else {
-            logDetalhado('Resposta Perplexity inválida ou incompleta, tentando próxima API', null);
-          }
-        } catch (perplexityError) {
-          console.error('Erro ao usar Perplexity:', perplexityError.message);
-        }
-      }
+      logDetalhado(`Tentativa ${tentativas} de ${maxTentativas}`, null)
       
       if (process.env.OPENAI_API_KEY) {
         try {
@@ -656,6 +603,59 @@ module.exports = async function handler(req, res) {
           }
         } catch (claudeError) {
           console.error('Erro ao usar Claude:', claudeError.message);
+        }
+      }
+
+if (process.env.PERPLEXITY_API_KEY) {
+        try {
+          logDetalhado('Chamando API Perplexity...', null);
+          const responsePerplexity = await callPerplexityAPI(prompt, requestData);
+          let processedResponse = responsePerplexity;
+          if (responsePerplexity && isPartiallyValidJSON(responsePerplexity)) {
+            processedResponse = ensureTouristAttractionsAndComments(responsePerplexity, requestData);
+          }
+          if (processedResponse && isValidDestinationJSON(processedResponse, requestData)) {
+            logDetalhado('Resposta Perplexity válida recebida', null);
+            try {
+              const recomendacoes = typeof processedResponse === 'string' ? JSON.parse(processedResponse) : processedResponse;
+              if (orcamento) {
+                recomendacoes.orcamentoMaximo = orcamento;
+              }
+              const origemIATA = obterCodigoIATAOrigem(requestData);
+              const datas = obterDatasViagem(requestData);
+              if (origemIATA) {
+                logDetalhado(`Origem IATA identificada: ${origemIATA}, processando destinos...`, null);
+                const recomendacoesEnriquecidas = await processarDestinos(recomendacoes, origemIATA, datas, moeda);
+                logDetalhado('Recomendações enriquecidas com sucesso', null);
+                if (!isResponseSent) {
+                  isResponseSent = true;
+                  clearTimeout(serverTimeout);
+                  return res.status(200).json({
+                    tipo: "perplexity-enriquecido",
+                    conteudo: JSON.stringify(recomendacoesEnriquecidas),
+                    tentativa: tentativas
+                  });
+                }
+                return;
+              }
+            } catch (enriquecerError) {
+              console.error('Erro ao enriquecer recomendações:', enriquecerError.message);
+            }
+            if (!isResponseSent) {
+              isResponseSent = true;
+              clearTimeout(serverTimeout);
+              return res.status(200).json({
+                tipo: "perplexity",
+                conteudo: processedResponse,
+                tentativa: tentativas
+              });
+            }
+            return;
+          } else {
+            logDetalhado('Resposta Perplexity inválida ou incompleta, tentando próxima API', null);
+          }
+        } catch (perplexityError) {
+          console.error('Erro ao usar Perplexity:', perplexityError.message);
         }
       }
       
