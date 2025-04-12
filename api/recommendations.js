@@ -765,7 +765,7 @@ IMPORTANTE:
           }
         ],
         temperature: 0.7,
-        max_tokens: 3000,
+        max_tokens: 2000,
         response_format: { type: "text" }
       },
       timeout: REQUEST_TIMEOUT,
@@ -833,7 +833,7 @@ IMPORTANTE:
           }
         ],
         temperature: 0.7,
-        max_tokens: 3000
+        max_tokens: 2000
       },
       timeout: REQUEST_TIMEOUT,
       httpAgent: new http.Agent({ keepAlive: true }),
@@ -881,7 +881,7 @@ IMPORTANTE:
       },
       data: {
         model: "claude-3-haiku-20240307",
-        max_tokens: 3000,
+        max_tokens: 2000,
         messages: [
           {
             role: "system",
