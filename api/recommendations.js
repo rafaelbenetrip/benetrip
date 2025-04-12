@@ -1,3 +1,4 @@
+
 // api/recommendations.js - Endpoint da API Vercel para recomendações de destino
 const axios = require('axios');
 const http = require('http');
@@ -652,7 +653,7 @@ async function callAIAPI(provider, prompt, requestData) {
         { role: 'system', content: config.systemMessage },
         { role: 'user', content: prompt }
       ],
-      temperature: 1.3
+      temperature: 0.7
     };
   }
 
