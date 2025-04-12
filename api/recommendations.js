@@ -416,6 +416,175 @@ function obterDatasViagem(dadosUsuario) {
 }
 
 // =======================
+// Novo prompt específico para Deepseek Reasoner
+// =======================
+function gerarPromptParaDeepseekReasoner(dados) {
+  const infoViajante = {
+    companhia: getCompanhiaText(dados.companhia || 0),
+    preferencia: getPreferenciaText(dados.preferencia_viagem || 0),
+    cidadeOrigem: dados.cidade_partida?.name || 'origem não especificada',
+    orcamento: dados.orcamento_valor || 'flexível',
+    moeda: dados.moeda_escolhida || 'BRL',
+    pessoas: dados.quantidade_familia || dados.quantidade_amigos || 1,
+    tipoDestino: dados.tipo_destino || 'qualquer',
+    famaDestino: dados.fama_destino || 'qualquer'
+  };
+  
+  // Processar datas
+  let dataIda = 'não especificada';
+  let dataVolta = 'não especificada';
+  let duracaoViagem = 'não especificada';
+  
+  if (dados.datas) {
+    if (typeof dados.datas === 'string' && dados.datas.includes(',')) {
+      const partes = dados.datas.split(',');
+      dataIda = partes[0] || 'não especificada';
+      dataVolta = partes[1] || 'não especificada';
+    } else if (dados.datas.dataIda && dados.datas.dataVolta) {
+      dataIda = dados.datas.dataIda;
+      dataVolta = dados.datas.dataVolta;
+    }
+    
+    try {
+      if (dataIda !== 'não especificada' && dataVolta !== 'não especificada') {
+        const ida = new Date(dataIda);
+        const volta = new Date(dataVolta);
+        const diff = Math.abs(volta - ida);
+        duracaoViagem = `${Math.ceil(diff / (1000 * 60 * 60 * 24))} dias`;
+      }
+    } catch {}
+  }
+  
+  // Determinar estação
+  let estacaoViagem = 'não determinada';
+  let hemisferio = infoViajante.cidadeOrigem.toLowerCase().includes('brasil') ? 'sul' : 'norte';
+  
+  try {
+    if (dataIda !== 'não especificada') {
+      const dataObj = new Date(dataIda);
+      const mes = dataObj.getMonth();
+      
+      if (mes >= 2 && mes <= 4) estacaoViagem = 'primavera';
+      else if (mes >= 5 && mes <= 7) estacaoViagem = 'verão';
+      else if (mes >= 8 && mes <= 10) estacaoViagem = 'outono';
+      else estacaoViagem = 'inverno';
+      
+      if (hemisferio === 'sul') {
+        const mapaEstacoes = {
+          'verão': 'inverno',
+          'inverno': 'verão',
+          'primavera': 'outono',
+          'outono': 'primavera'
+        };
+        estacaoViagem = mapaEstacoes[estacaoViagem] || estacaoViagem;
+      }
+    }
+  } catch {}
+  
+  // Configuração de adaptações específicas por tipo de viajante
+  const adaptacoesPorTipo = {
+    "sozinho(a)": "Destinos seguros para viajantes solo, hostels bem avaliados, atividades para conhecer pessoas",
+    "em casal (viagem romântica)": "Cenários românticos, jantares especiais, passeios a dois, hotéis boutique",
+    "em família": "Atividades para todas as idades, opções kid-friendly, segurança, acomodações espaçosas",
+    "com amigos": "Vida noturna, atividades em grupo, opções de compartilhamento, diversão coletiva"
+  };
+  
+  const mensagemOrcamento = infoViajante.orcamento !== 'flexível' ?
+    `ORÇAMENTO MÁXIMO: ${infoViajante.orcamento} ${infoViajante.moeda}` : 
+    'Orçamento flexível';
+
+  return `# Tarefa: Recomendações de Destinos de Viagem
+  
+## RESTRIÇÃO CRÍTICA DE ORÇAMENTO
+${mensagemOrcamento} para voos (NUNCA EXCEDA ESTE VALOR)
+
+## Dados do Viajante
+- Origem: ${infoViajante.cidadeOrigem}
+- Composição: ${infoViajante.companhia}
+- Quantidade: ${infoViajante.pessoas} pessoa(s)
+- Interesses: ${infoViajante.preferencia}
+- Período: ${dataIda} a ${dataVolta} (${duracaoViagem})
+- Estação na viagem: ${estacaoViagem}
+- Tipo de destino preferido: ${getTipoDestinoText(infoViajante.tipoDestino)}
+- Nível de popularidade desejado: ${getFamaDestinoText(infoViajante.famaDestino)}
+
+## ASPECTOS SAZONAIS CRÍTICOS
+- Verifique eventos especiais no período (${dataIda} a ${dataVolta})
+- Evite destinos com condições climáticas adversas: monções, furacões, frio/calor extremo
+- Priorize destinos com festivais, eventos culturais ou temporadas especiais relevantes
+- Considere alta/baixa temporada e impacto em preços e lotação
+
+## ADAPTAÇÕES PARA TIPO DE VIAJANTE: ${infoViajante.companhia.toUpperCase()}
+${adaptacoesPorTipo[infoViajante.companhia] || "Considere experiências versáteis para diferentes perfis"}
+
+## PERSONALIDADE DA TRIPINHA
+- A Tripinha é uma cachorrinha vira-lata caramelo, entusiasmada e curiosa
+- Seus comentários devem ser autênticos, divertidos e ESPECÍFICOS ao destino
+- SEMPRE mencione pelo menos um ponto turístico específico no comentário
+- Use emoji 🐾 para dar personalidade
+- Inclua uma observação sensorial (cheiros, sons, texturas) que um cachorro notaria
+
+## Processo de Raciocínio Passo a Passo
+1) Identifique destinos adequados considerando:
+   - Clima apropriado para ${estacaoViagem}
+   - Eventos especiais/festivais no período
+   - Adaptação para viajantes ${infoViajante.companhia}
+   - Compatibilidade com orçamento de ${infoViajante.orcamento} ${infoViajante.moeda}
+
+2) Para cada destino, determine:
+   - Preço realista de voo ABAIXO DO ORÇAMENTO MÁXIMO
+   - Pontos turísticos específicos e conhecidos
+   - Eventos sazonais ou especiais no período da viagem
+   - Comentário personalizado da Tripinha mencionando detalhes sensoriais
+
+3) Diversifique suas recomendações:
+   - topPick: Destino com máxima adequação ao perfil
+   - alternativas: 4 destinos diversos em geografia, custo e experiências
+   - surpresa: Destino incomum mas encantador
+
+## Formato de Retorno (JSON estrito)
+{
+  "topPick": {
+    "destino": "Nome da Cidade",
+    "pais": "Nome do País",
+    "codigoPais": "XX",
+    "descricao": "Breve descrição do destino",
+    "porque": "Razão específica para visitar baseada no perfil do viajante",
+    "destaque": "Uma experiência única neste destino",
+    "comentario": "Comentário entusiasmado da Tripinha mencionando um ponto turístico e aspectos sensoriais",
+    "pontosTuristicos": ["Nome do Primeiro Ponto", "Nome do Segundo Ponto"],
+    "eventos": ["Festival ou evento especial durante o período", "Outro evento relevante"],
+    "clima": {
+      "temperatura": "Faixa de temperatura média esperada",
+      "condicoes": "Descrição das condições climáticas",
+      "recomendacoes": "Dicas relacionadas ao clima"
+    },
+    "aeroporto": {
+      "codigo": "XYZ",
+      "nome": "Nome do Aeroporto Principal"
+    },
+    "preco": {
+      "voo": 1500,
+      "hotel": 200
+    }
+  },
+  "alternativas": [
+    // EXATAMENTE 4 destinos com estrutura similar à descrita acima
+  ],
+  "surpresa": {
+    // Mesma estrutura do topPick
+  },
+  "estacaoViagem": "${estacaoViagem}"
+}
+
+## Verificação Final Obrigatória
+- Confirme que TODOS os preços de voo estão abaixo de ${infoViajante.orcamento} ${infoViajante.moeda}
+- Verifique que considerou eventos sazonais e clima para CADA destino
+- Confirme que os comentários da Tripinha mencionam pontos turísticos específicos e incluem observações sensoriais
+- Verifique que as recomendações estão adaptadas para viajantes ${infoViajante.companhia}`;
+}
+
+// =======================
 // Funções para chamadas às APIs de IA
 // =======================
 async function callAIAPI(provider, prompt, requestData) {
@@ -461,10 +630,10 @@ async function callAIAPI(provider, prompt, requestData) {
     throw new Error(`Chave da API ${provider} não configurada`);
   }
   
-  const orcamentoMessage = requestData.orcamento_valor ? 
-    `\n\n⚠️ ORÇAMENTO MÁXIMO: ${requestData.orcamento_valor} ${requestData.moeda_escolhida || 'BRL'} para voos.` : '';
-    
-  const enhancedPrompt = `${prompt}${orcamentoMessage}
+  // Usar o prompt especializado para Deepseek
+  const finalPrompt = provider === 'deepseek' 
+    ? gerarPromptParaDeepseekReasoner(requestData)
+    : `${prompt}
   
 IMPORTANTE: 
 1. Cada voo DEVE respeitar o orçamento.
@@ -490,7 +659,7 @@ IMPORTANTE:
           },
           {
             role: "user",
-            content: enhancedPrompt
+            content: finalPrompt
           }
         ],
         temperature: 0.7
@@ -505,7 +674,7 @@ IMPORTANTE:
           },
           {
             role: "user",
-            content: enhancedPrompt
+            content: finalPrompt
           }
         ],
         temperature: 0.7,
@@ -895,7 +1064,7 @@ function generateEmergencyData(dadosUsuario = {}) {
 }
 
 // =======================
-// Geração de prompt
+// Geração de prompt padrão
 // =======================
 function gerarPromptParaDestinos(dados) {
   const infoViajante = {
