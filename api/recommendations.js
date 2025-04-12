@@ -590,7 +590,7 @@ ${adaptacoesPorTipo[infoViajante.companhia] || "Considere experiências versáte
 async function callAIAPI(provider, prompt, requestData) {
   const apiConfig = {
     deepseek: {
-      url: 'https://api.deepseek.com', 
+      url: 'https://api.deepseek.com/v1/chat/completions',
       header: 'Authorization',
       prefix: 'Bearer',
       model: 'deepseek-reasoner',
@@ -617,19 +617,58 @@ async function callAIAPI(provider, prompt, requestData) {
       model: 'claude-3-haiku-20240307',
       systemMessage: 'Você é um especialista em viagens. Retorne apenas JSON com 4 destinos alternativos, respeitando o orçamento para voos.'
     }
-    
   };
-  
+
   if (!apiConfig[provider]) {
     throw new Error(`Provedor ${provider} não suportado`);
   }
-  
+
   const config = apiConfig[provider];
   const apiKey = process.env[`${provider.toUpperCase()}_API_KEY`];
-  
+
   if (!apiKey) {
     throw new Error(`Chave da API ${provider} não configurada`);
   }
+
+  const headers = {
+    'Content-Type': 'application/json',
+    [config.header]: `${config.prefix} ${apiKey}`
+  };
+
+  let data;
+
+  if (provider === 'claude') {
+    data = {
+      model: config.model,
+      max_tokens: 1024,
+      messages: [
+        { role: 'user', content: config.systemMessage + '\n\n' + prompt }
+      ]
+    };
+  } else {
+    data = {
+      model: config.model,
+      messages: [
+        { role: 'system', content: config.systemMessage },
+        { role: 'user', content: prompt }
+      ],
+      temperature: 0.7
+    };
+  }
+
+  try {
+    const response = await axios.post(config.url, data, { headers });
+
+    if (provider === 'claude') {
+      return response.data?.content?.[0]?.text || response.data;
+    } else {
+      return response.data?.choices?.[0]?.message?.content || response.data;
+    }
+  } catch (error) {
+    console.error(`Erro ao chamar API ${provider}:`, error.response?.data || error.message);
+    throw error;
+  }
+}
   
   // Usar o prompt especializado para Deepseek
   const finalPrompt = provider === 'deepseek' 
