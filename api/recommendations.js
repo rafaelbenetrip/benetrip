@@ -58,10 +58,15 @@ function logDetalhado(mensagem, dados, limite = MAX_LOG_LENGTH) {
 // Função de busca de preço de voo via Aviasales Calendar
 // =======================
 async function buscarPrecoVooAviasales(origemIATA, destinoIATA, datas, moeda) {
+  if (!process.env.AVIASALES_TOKEN || !process.env.AVIASALES_MARKER) {
+    throw new Error("Token ou marker da API Aviasales não configurados.");
+  }
+
   if (!origemIATA || !destinoIATA || !datas) {
     logDetalhado(`Parâmetros incompletos para busca de voo:`, { origem: origemIATA, destino: destinoIATA });
     return null;
   }
+
   try {
     logDetalhado(`Buscando voo de ${origemIATA} para ${destinoIATA} via Aviasales (Calendar)...`, null);
     const params = {
@@ -73,36 +78,45 @@ async function buscarPrecoVooAviasales(origemIATA, destinoIATA, datas, moeda) {
       token: process.env.AVIASALES_TOKEN,
       marker: process.env.AVIASALES_MARKER
     };
+
     logDetalhado('Parâmetros da requisição Aviasales Calendar:', params);
+
     const response = await axios({
       method: 'get',
       url: 'https://api.travelpayouts.com/v1/prices/calendar',
       params: params,
+      headers: {
+        'Accept-Encoding': 'gzip, deflate' // Adicionado para compactação
+      },
       timeout: AVIASALES_TIMEOUT
     });
-    if (response.data && response.data.success && response.data.data) {
-      // A resposta contém várias datas, ex:
-      // { "2025-06-04": { "MCZ": 350 }, "2025-06-05": { "MCZ": 360 }, ... }
-      let menorPreco = Infinity;
-      for (const date in response.data.data) {
-        const precosPorDestino = response.data.data[date];
-        if (precosPorDestino && precosPorDestino[destinoIATA] !== undefined) {
-          const preco = parseFloat(precosPorDestino[destinoIATA]);
-          if (preco < menorPreco) {
-            menorPreco = preco;
-          }
+
+    if (!response.data || !response.data.success || !response.data.data) {
+      throw new Error("Resposta inválida ou incompleta da API Aviasales");
+    }
+
+    // Processa a resposta
+    let menorPreco = Infinity;
+    for (const date in response.data.data) {
+      const precosPorDestino = response.data.data[date];
+      if (precosPorDestino && precosPorDestino[destinoIATA] !== undefined) {
+        const preco = parseFloat(precosPorDestino[destinoIATA]);
+        if (preco < menorPreco) {
+          menorPreco = preco;
         }
       }
-      if (menorPreco !== Infinity) {
-        // Como o Calendar não retorna detalhes como companhia ou horários, usamos dados mínimos
-        const detalhesVoo = {
-          companhia: 'Não informado',
-          departure_at: '',
-          return_at: ''
-        };
-        return { precoReal: menorPreco, detalhesVoo, fonte: 'Aviasales Calendar' };
-      }
     }
+
+    if (menorPreco !== Infinity) {
+      // Como o Calendar não retorna detalhes como companhia ou horários, usamos dados mínimos
+      const detalhesVoo = {
+        companhia: 'Não informado',
+        departure_at: '',
+        return_at: ''
+      };
+      return { precoReal: menorPreco, detalhesVoo, fonte: 'Aviasales Calendar' };
+    }
+
     logDetalhado('Nenhuma oferta válida encontrada no Calendar', null);
     return null;
   } catch (erro) {
