@@ -513,6 +513,59 @@ module.exports = async function handler(req, res) {
     while (tentativas < maxTentativas) {
       tentativas++;
       logDetalhado(`Tentativa ${tentativas} de ${maxTentativas}`, null)
+
+      if (process.env.DEEPSEEK_API_KEY) {
+  try {
+    logDetalhado('Chamando API Deepseek...', null);
+    const responseDeepseek = await callDeepseekAPI(prompt, requestData);
+    let processedResponse = responseDeepseek;
+    if (responseDeepseek && isPartiallyValidJSON(responseDeepseek)) {
+      processedResponse = ensureTouristAttractionsAndComments(responseDeepseek, requestData);
+    }
+    if (processedResponse && isValidDestinationJSON(processedResponse, requestData)) {
+      logDetalhado('Resposta Deepseek válida recebida', null);
+      try {
+        const recomendacoes = typeof processedResponse === 'string' ? JSON.parse(processedResponse) : processedResponse;
+        if (orcamento) {
+          recomendacoes.orcamentoMaximo = orcamento;
+        }
+        const origemIATA = obterCodigoIATAOrigem(requestData);
+        const datas = obterDatasViagem(requestData);
+        if (origemIATA) {
+          logDetalhado(`Origem IATA identificada: ${origemIATA}, processando destinos...`, null);
+          const recomendacoesEnriquecidas = await processarDestinos(recomendacoes, origemIATA, datas, moeda);
+          logDetalhado('Recomendações enriquecidas com sucesso', null);
+          if (!isResponseSent) {
+            isResponseSent = true;
+            clearTimeout(serverTimeout);
+            return res.status(200).json({
+              tipo: "deepseek-enriquecido",
+              conteudo: JSON.stringify(recomendacoesEnriquecidas),
+              tentativa: tentativas
+            });
+          }
+          return;
+        }
+      } catch (enriquecerError) {
+        console.error('Erro ao enriquecer recomendações:', enriquecerError.message);
+      }
+      if (!isResponseSent) {
+        isResponseSent = true;
+        clearTimeout(serverTimeout);
+        return res.status(200).json({
+          tipo: "deepseek",
+          conteudo: processedResponse,
+          tentativa: tentativas
+        });
+      }
+      return;
+    } else {
+      logDetalhado('Resposta Deepseek inválida ou incompleta, tentando próxima API', null);
+    }
+  } catch (deepseekError) {
+    console.error('Erro ao usar Deepseek:', deepseekError.message);
+  }
+}
       
       if (process.env.OPENAI_API_KEY) {
         try {
@@ -920,6 +973,74 @@ IMPORTANTE:
     return extrairJSONDaResposta(content);
   } catch (error) {
     console.error('Erro detalhado na chamada à API Claude:');
+    if (error.response) {
+      console.error('Status:', error.response.status);
+      logDetalhado('Dados do erro:', error.response.data);
+    }
+    throw error;
+  }
+}
+
+// Adicione esta função após os outros métodos de chamada de API (callOpenAIAPI, callClaudeAPI, etc.)
+async function callDeepseekAPI(prompt, requestData) {
+  try {
+    const apiKey = process.env.DEEPSEEK_API_KEY;
+    if (!apiKey) throw new Error('Chave da API Deepseek não configurada');
+    
+    logDetalhado('Enviando requisição para Deepseek Reasoner...', null);
+    
+    const orcamentoMessage = requestData.orcamento_valor ? 
+      `\n\n⚠️ ORÇAMENTO MÁXIMO: ${requestData.orcamento_valor} ${requestData.moeda_escolhida || 'BRL'} para voos.` : '';
+    
+    const enhancedPrompt = `${prompt}${orcamentoMessage}
+    
+IMPORTANTE: 
+1. Cada voo DEVE respeitar o orçamento.
+2. Retorne apenas JSON.
+3. Forneça 4 destinos alternativos.
+4. Inclua pontos turísticos específicos.
+5. Inclua o código IATA de cada aeroporto.`;
+
+    const response = await axios({
+      method: 'post',
+      url: 'https://api.deepseek.com/v1/chat/completions', // Ajuste a URL conforme a documentação do Deepseek
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      data: {
+        model: "deepseek-reasoner", // Use o nome correto do modelo
+        messages: [
+          {
+            role: "system",
+            content: "Você é um especialista em viagens. Retorne apenas JSON com 4 destinos alternativos, respeitando o orçamento para voos."
+          },
+          {
+            role: "user",
+            content: enhancedPrompt
+          }
+        ],
+        temperature: 0.7,
+        max_tokens: 2000
+      },
+      timeout: REQUEST_TIMEOUT,
+      httpAgent: new http.Agent({ keepAlive: true }),
+      httpsAgent: new https.Agent({ keepAlive: true })
+    });
+    
+    // Ajuste para o formato de resposta específico do Deepseek
+    // Este é um exemplo genérico - adapte conforme a resposta real da API
+    if (!response.data || !response.data.choices || !response.data.choices[0] || 
+        !response.data.choices[0].message || !response.data.choices[0].message.content) {
+      throw new Error('Formato de resposta do Deepseek inválido');
+    }
+    
+    const content = response.data.choices[0].message.content;
+    logDetalhado('Conteúdo recebido da API Deepseek (primeiros 200 caracteres):', content.substring(0, 200));
+    
+    return extrairJSONDaResposta(content);
+  } catch (error) {
+    console.error('Erro detalhado na chamada à API Deepseek:');
     if (error.response) {
       console.error('Status:', error.response.status);
       logDetalhado('Dados do erro:', error.response.data);
