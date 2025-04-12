@@ -1336,7 +1336,7 @@ module.exports = async function handler(req, res) {
     const orcamento = requestData.orcamento_valor ? parseFloat(requestData.orcamento_valor) : null;
     
     // Lista de provedores de IA a tentar
-    const providers = ['deepseek', 'perplexity', 'openai', 'claude'].filter(
+    const providers = ['claude', 'perplexity', 'openai', 'deepseek'].filter(
       provider => process.env[`${provider.toUpperCase()}_API_KEY`]
     );
     
