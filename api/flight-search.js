@@ -127,8 +127,8 @@ module.exports = async function handler(req, res) {
       marker: marker,
       host: hostEnv,
       user_ip: userIp,
-      // Mantém locale 'pt' e validação
-      locale: params.locale && supportedLocales.includes(params.locale) ? params.locale : "pt",
+      // Mantém locale 'pt_br' e validação
+      locale: params.locale && supportedLocales.includes(params.locale) ? params.locale : "pt_br",
       trip_class: params.classe ? params.classe.toUpperCase() : "Y",
       passengers: {
         adults: parseInt(params.adultos || 1, 10),
