@@ -593,7 +593,7 @@ async function callAIAPI(provider, prompt, requestData) {
       url: 'https://api.deepseek.com/v1/chat/completions', 
       header: 'Authorization',
       prefix: 'Bearer',
-      model: 'deepseek-r1',
+      model: 'deepseek-chat',
       systemMessage: 'Você é um especialista em viagens. Retorne apenas JSON com 4 destinos alternativos, respeitando o orçamento para voos.'
     },
     perplexity: {
