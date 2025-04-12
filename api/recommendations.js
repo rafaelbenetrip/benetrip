@@ -10,7 +10,6 @@ const CONFIG = {
   timeout: {
     request: 50000,
     handler: 55000,
-    aviasales: 15000,
     retry: 1500
   },
   retries: 2,
@@ -18,7 +17,6 @@ const CONFIG = {
     enabled: true,
     maxLength: 500
   },
-  // Nova ordem de provedores, com Deepseek Reasoner como principal
   providerOrder: ['deepseek', 'perplexity', 'openai', 'claude']
 };
 
@@ -80,12 +78,10 @@ const utils = {
         return JSON.stringify(texto);
       }
       
-      // Tentar parse direto
       try {
         return JSON.stringify(JSON.parse(texto));
       } catch {}
       
-      // Limpar e extrair JSON
       const textoProcessado = texto
         .replace(/```json/g, '')
         .replace(/```/g, '')
@@ -121,16 +117,13 @@ const utils = {
     try {
       const data = typeof jsonString === 'string' ? JSON.parse(jsonString) : jsonString;
       
-      // Verificações básicas
       if (!data.topPick?.destino || !data.alternativas || !data.surpresa?.destino) return false;
       if (!data.topPick.pontosTuristicos?.length || data.topPick.pontosTuristicos.length < 2) return false;
       if (!data.surpresa.pontosTuristicos?.length || data.surpresa.pontosTuristicos.length < 2) return false;
       if (!Array.isArray(data.alternativas) || data.alternativas.length !== 4) return false;
       
-      // Verificar pontos turísticos em alternativas
       if (!data.alternativas.every(alt => alt.pontoTuristico)) return false;
       
-      // Verificar comentários mencionam pontos turísticos
       if (!data.topPick.comentario || !data.topPick.pontosTuristicos.some(
         attraction => data.topPick.comentario.toLowerCase().includes(attraction.toLowerCase())
       )) return false;
@@ -139,7 +132,6 @@ const utils = {
         attraction => data.surpresa.comentario.toLowerCase().includes(attraction.toLowerCase())
       )) return false;
       
-      // Verificar orçamento
       if (requestData?.orcamento_valor && !isNaN(parseFloat(requestData.orcamento_valor))) {
         const orcamentoMax = parseFloat(requestData.orcamento_valor);
         if (data.topPick.preco?.voo > orcamentoMax || data.alternativas[0]?.preco?.voo > orcamentoMax) {
@@ -147,12 +139,10 @@ const utils = {
         }
       }
       
-      // Verificar destinos únicos
       if (data.topPick.destino?.toLowerCase() === data.alternativas[0]?.destino?.toLowerCase()) {
         return false;
       }
       
-      // Verificar códigos IATA
       if (!data.topPick.aeroporto?.codigo || !data.surpresa.aeroporto?.codigo) {
         return false;
       }
@@ -164,77 +154,6 @@ const utils = {
     }
   }
 };
-
-// =======================
-// Função de busca de preço de voo via Aviasales
-// =======================
-async function buscarPrecoVooAviasales(origemIATA, destinoIATA, datas, moeda) {
-  if (!process.env.AVIASALES_TOKEN || !process.env.AVIASALES_MARKER) {
-    throw new Error("Token ou marker da API Aviasales não configurados.");
-  }
-
-  if (!origemIATA || !destinoIATA || !datas) {
-    utils.log(`Parâmetros incompletos para busca de voo:`, { origem: origemIATA, destino: destinoIATA });
-    return null;
-  }
-
-  try {
-    utils.log(`Buscando voo de ${origemIATA} para ${destinoIATA} via Aviasales (Calendar)...`, null);
-    
-    const response = await apiClient({
-      method: 'get',
-      url: 'https://api.travelpayouts.com/v1/prices/calendar',
-      params: {
-        origin: origemIATA,
-        destination: destinoIATA,
-        depart_date: datas.dataIda,
-        return_date: datas.dataVolta,
-        currency: moeda,
-        token: process.env.AVIASALES_TOKEN,
-        marker: process.env.AVIASALES_MARKER
-      },
-      headers: {
-        'Accept-Encoding': 'gzip, deflate'
-      },
-      timeout: CONFIG.timeout.aviasales
-    });
-
-    if (!response.data?.success || !response.data?.data) {
-      throw new Error("Resposta inválida ou incompleta da API Aviasales");
-    }
-
-    // Processa a resposta
-    let menorPreco = Infinity;
-    for (const date in response.data.data) {
-      const precosPorDestino = response.data.data[date];
-      if (precosPorDestino && precosPorDestino[destinoIATA] !== undefined) {
-        const preco = parseFloat(precosPorDestino[destinoIATA]);
-        if (preco < menorPreco) {
-          menorPreco = preco;
-        }
-      }
-    }
-
-    if (menorPreco !== Infinity) {
-      return { 
-        precoReal: menorPreco, 
-        detalhesVoo: {
-          companhia: 'Não informado',
-          departure_at: '',
-          return_at: ''
-        }, 
-        fonte: 'Aviasales Calendar' 
-      };
-    }
-
-    utils.log('Nenhuma oferta válida encontrada no Calendar', null);
-    return null;
-  } catch (erro) {
-    console.error(`Erro ao buscar preços via Aviasales Calendar: ${erro.message}`);
-    utils.log('Detalhes do erro:', erro.response ? erro.response.data : erro);
-    return null;
-  }
-}
 
 // =======================
 // Função genérica de retentativa
@@ -262,53 +181,10 @@ async function retryAsync(fn, maxAttempts = CONFIG.retries, initialDelay = CONFI
 }
 
 // =======================
-// Processamento de destinos (enriquecimento com preços)
+// Processamento de destinos (sem enriquecimento com preços de voos)
 // =======================
-async function processarDestinos(recomendacoes, origemIATA, datas, moeda) {
-  if (!utils.validarCodigoIATA(origemIATA)) {
-    console.error(`Código IATA de origem inválido: ${origemIATA}`);
-    origemIATA = 'GRU';
-  }
-  
+async function processarDestinos(recomendacoes, datas) {
   try {
-    // Processar destinos principais e alternativos
-    const destinos = [
-      { tipo: 'topPick', item: recomendacoes.topPick },
-      ...recomendacoes.alternativas.map(alt => ({ tipo: 'alternativa', item: alt })),
-      { tipo: 'surpresa', item: recomendacoes.surpresa }
-    ];
-    
-    for (const destino of destinos) {
-      if (!destino.item?.aeroporto?.codigo) continue;
-      
-      const destinoIATA = destino.item.aeroporto.codigo;
-      if (!utils.validarCodigoIATA(destinoIATA)) continue;
-      
-      utils.log(`Processando ${destino.tipo}: ${destino.item.destino} (${destinoIATA})`, null);
-      
-      const resultado = await retryAsync(
-        async () => await buscarPrecoVooAviasales(origemIATA, destinoIATA, datas, moeda)
-      );
-      
-      if (resultado) {
-        destino.item.preco = destino.item.preco || {};
-        destino.item.preco.voo = resultado.precoReal;
-        destino.item.preco.fonte = resultado.fonte || 'Aviasales Calendar';
-        destino.item.detalhesVoo = resultado.detalhesVoo;
-      } else {
-        destino.item.preco = {
-          voo: destino.item.preco?.voo || 0,
-          fonte: 'Indisponível - API não retornou dados'
-        };
-      }
-      
-      // Pausa entre requisições para evitar rate limiting
-      if (destino.tipo !== 'surpresa') {
-        await new Promise(resolve => setTimeout(resolve, 2000));
-      }
-    }
-    
-    // Determinar estação do ano
     if (!recomendacoes.estacaoViagem && datas.dataIda) {
       try {
         const dataObj = new Date(datas.dataIda);
@@ -320,9 +196,7 @@ async function processarDestinos(recomendacoes, origemIATA, datas, moeda) {
         else if (mes >= 8 && mes <= 10) estacaoViagem = 'outono';
         else estacaoViagem = 'inverno';
         
-        // Ajustar para hemisfério sul
-        const hemisferio = determinarHemisferioDestino(origemIATA);
-        if (hemisferio === 'sul') {
+        if (recomendacoes.topPick?.pais?.toLowerCase().includes('brasil')) {
           const mapaEstacoes = {
             'verão': 'inverno',
             'inverno': 'verão',
@@ -343,17 +217,6 @@ async function processarDestinos(recomendacoes, origemIATA, datas, moeda) {
     console.error(`Erro ao processar destinos: ${error.message}`);
     return recomendacoes;
   }
-}
-
-// Função para determinar hemisfério por IATA
-function determinarHemisferioDestino(iataCode) {
-  const hemisfSulIATA = [
-    'GRU', 'GIG', 'SSA', 'REC', 'FOR', 'BSB', 'CNF', 'CWB', 'POA', 'CGH', 'SDU', 'FLN',
-    'SYD', 'MEL', 'BNE', 'PER', 'ADL', 'AKL', 'CHC', 'ZQN',
-    'JNB', 'CPT', 'DUR'
-  ];
-  
-  return hemisfSulIATA.includes(iataCode) ? 'sul' : 'norte';
 }
 
 // =======================
@@ -423,7 +286,7 @@ function obterDatasViagem(dadosUsuario) {
 }
 
 // =======================
-// Prompt Deepseek Reasoner aprimorado para melhor aproveitamento do modelo
+// Prompt Deepseek Reasoner aprimorado
 // =======================
 function gerarPromptParaDeepseekReasoner(dados) {
   const infoViajante = {
@@ -437,7 +300,6 @@ function gerarPromptParaDeepseekReasoner(dados) {
     famaDestino: dados.fama_destino || 'qualquer'
   };
   
-  // Processar datas
   let dataIda = 'não especificada';
   let dataVolta = 'não especificada';
   let duracaoViagem = 'não especificada';
@@ -464,7 +326,6 @@ function gerarPromptParaDeepseekReasoner(dados) {
     }
   }
   
-  // Determinar estação
   let estacaoViagem = 'não determinada';
   let hemisferio = infoViajante.cidadeOrigem.toLowerCase().includes('brasil') ? 'sul' : 'norte';
   
@@ -492,7 +353,6 @@ function gerarPromptParaDeepseekReasoner(dados) {
     console.error('Erro ao determinar estação do ano:', error.message);
   }
   
-  // Configuração de adaptações específicas por tipo de viajante
   const adaptacoesPorTipo = {
     "sozinho(a)": "Destinos seguros para viajantes solo, hostels bem avaliados, atividades para conhecer pessoas, bairros com boa vida noturna e transporte público eficiente",
     "em casal (viagem romântica)": "Cenários românticos, jantares especiais, passeios a dois, hotéis boutique, praias privativas, mirantes com vistas panorâmicas e vinícolas",
@@ -615,10 +475,10 @@ async function callAIAPI(provider, prompt, requestData) {
       prefix: 'Bearer',
       model: 'deepseek-reasoner',
       systemMessage: 'Você é um especialista em viagens com experiência em destinos globais. Retorne apenas JSON com destinos detalhados, respeitando o orçamento para voos.',
-      temperature: 0.5, // Temperatura mais baixa para resposta mais focada
-      max_tokens: 3000, // Maior limite para respostas mais detalhadas
+      temperature: 0.5,
+      max_tokens: 3000,
       additionalParams: {
-        reasoner_enabled: true // Habilitar o reasoner para melhor análise
+        reasoner_enabled: true
       }
     },
     perplexity: {
@@ -661,7 +521,6 @@ async function callAIAPI(provider, prompt, requestData) {
     throw new Error(`Chave da API ${provider} não configurada`);
   }
   
-  // Usar o prompt especializado para Deepseek
   const finalPrompt = provider === 'deepseek' 
     ? gerarPromptParaDeepseekReasoner(requestData)
     : `${prompt}
@@ -678,7 +537,6 @@ IMPORTANTE:
     
     let requestData;
     
-    // Preparar dados específicos para cada provedor
     if (provider === 'claude') {
       requestData = {
         model: config.model,
@@ -712,12 +570,10 @@ IMPORTANTE:
         max_tokens: config.max_tokens || 2000
       };
       
-      // Adicionar parâmetros específicos para cada provedor
       if (config.additionalParams) {
         Object.assign(requestData, config.additionalParams);
       }
       
-      // Ajustes específicos para Perplexity
       if (provider === 'perplexity') {
         requestData.response_format = { type: "text" };
       }
@@ -728,7 +584,6 @@ IMPORTANTE:
     };
     headers[config.header] = config.prefix ? `${config.prefix} ${apiKey}` : apiKey;
     
-    // Para Claude, adicionar versão da API
     if (provider === 'claude') {
       headers['anthropic-version'] = '2023-06-01';
     }
@@ -741,7 +596,6 @@ IMPORTANTE:
       timeout: config.timeout || CONFIG.timeout.request
     });
     
-    // Extrair conteúdo de acordo com o formato de resposta do provedor
     let content;
     
     if (provider === 'claude') {
@@ -758,7 +612,6 @@ IMPORTANTE:
     
     utils.log(`Conteúdo recebido da API ${provider} (primeiros 200 caracteres):`, content.substring(0, 200));
     
-    // Depuração adicional se for Deepseek
     if (provider === 'deepseek') {
       try {
         const jsonConteudo = utils.extrairJSONDaResposta(content);
@@ -847,9 +700,7 @@ function ensureTouristAttractionsAndComments(jsonString, requestData) {
     const data = typeof jsonString === 'string' ? JSON.parse(jsonString) : jsonString;
     let modificado = false;
     
-    // Melhorar topPick
     if (data.topPick) {
-      // Adicionar pontos turísticos se necessário
       if (!data.topPick.pontosTuristicos?.length || data.topPick.pontosTuristicos.length < 2) {
         const destino = data.topPick.destino;
         data.topPick.pontosTuristicos = pontosPopulares[destino] || 
@@ -857,7 +708,6 @@ function ensureTouristAttractionsAndComments(jsonString, requestData) {
         modificado = true;
       }
       
-      // Melhorar comentário
       if (data.topPick.comentario) {
         const novoComentario = enriquecerComentarioTripinha(
           data.topPick.comentario, data.topPick.pontosTuristicos
@@ -872,7 +722,6 @@ function ensureTouristAttractionsAndComments(jsonString, requestData) {
         modificado = true;
       }
       
-      // Adicionar aeroporto se necessário
       if (!data.topPick.aeroporto?.codigo) {
         data.topPick.aeroporto = {
           codigo: obterCodigoIATAPadrao(data.topPick.destino, data.topPick.pais),
@@ -881,7 +730,6 @@ function ensureTouristAttractionsAndComments(jsonString, requestData) {
         modificado = true;
       }
       
-      // Adicionar clima se necessário
       if (!data.topPick.clima) {
         data.topPick.clima = {
           temperatura: "Temperatura típica para a estação",
@@ -892,9 +740,7 @@ function ensureTouristAttractionsAndComments(jsonString, requestData) {
       }
     }
     
-    // Melhorar destino surpresa
     if (data.surpresa) {
-      // Processar de forma semelhante ao topPick
       if (!data.surpresa.pontosTuristicos?.length || data.surpresa.pontosTuristicos.length < 2) {
         const destino = data.surpresa.destino;
         data.surpresa.pontosTuristicos = pontosPopulares[destino] || 
@@ -924,7 +770,6 @@ function ensureTouristAttractionsAndComments(jsonString, requestData) {
         modificado = true;
       }
       
-      // Adicionar clima se necessário
       if (!data.surpresa.clima) {
         data.surpresa.clima = {
           temperatura: "Temperatura típica para a estação",
@@ -935,13 +780,11 @@ function ensureTouristAttractionsAndComments(jsonString, requestData) {
       }
     }
     
-    // Verificar e melhorar alternativas
     if (!data.alternativas || !Array.isArray(data.alternativas)) {
       data.alternativas = [];
       modificado = true;
     }
     
-    // Processar alternativas existentes
     data.alternativas.forEach(alternativa => {
       if (!alternativa.pontoTuristico) {
         const destino = alternativa.destino;
@@ -957,7 +800,6 @@ function ensureTouristAttractionsAndComments(jsonString, requestData) {
         modificado = true;
       }
       
-      // Adicionar clima se necessário
       if (!alternativa.clima) {
         alternativa.clima = {
           temperatura: "Temperatura típica para a estação"
@@ -966,7 +808,6 @@ function ensureTouristAttractionsAndComments(jsonString, requestData) {
       }
     });
     
-    // Adicionar alternativas se necessário
     const destinosReserva = ["Lisboa", "Barcelona", "Roma", "Tóquio"];
     const paisesReserva = ["Portugal", "Espanha", "Itália", "Japão"];
     const codigosPaisesReserva = ["PT", "ES", "IT", "JP"];
@@ -1001,7 +842,6 @@ function ensureTouristAttractionsAndComments(jsonString, requestData) {
       modificado = true;
     }
     
-    // Limitar a 4 alternativas se houver mais
     if (data.alternativas.length > 4) {
       data.alternativas = data.alternativas.slice(0, 4);
       modificado = true;
@@ -1056,7 +896,6 @@ function generateEmergencyData(dadosUsuario = {}) {
   const cidadeOrigem = dadosUsuario.cidade_partida?.name || '';
   const regiao = cidadeOrigem.toLowerCase().includes('brasil') ? 'americas' : 'global';
   
-  // Mapa simplificado de destinos de emergência por região
   const destinosEmergencia = {
     'americas': {
       topPick: {
@@ -1223,7 +1062,6 @@ function gerarPromptParaDestinos(dados) {
     famaDestino: dados.fama_destino || 'qualquer'
   };
   
-  // Processar datas
   let dataIda = 'não especificada';
   let dataVolta = 'não especificada';
   let duracaoViagem = 'não especificada';
@@ -1248,7 +1086,6 @@ function gerarPromptParaDestinos(dados) {
     } catch {}
   }
   
-  // Determinar estação
   let estacaoViagem = 'não determinada';
   let hemisferio = infoViajante.cidadeOrigem.toLowerCase().includes('brasil') ? 'sul' : 'norte';
   
@@ -1445,7 +1282,6 @@ module.exports = async function handler(req, res) {
     }
   }, CONFIG.timeout.handler);
 
-  // Configuração de CORS e headers
   res.setHeader('Access-Control-Allow-Credentials', true);
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,POST');
@@ -1470,20 +1306,15 @@ module.exports = async function handler(req, res) {
       return res.status(400).json({ error: "Nenhum dado fornecido na requisição" });
     }
     
-    // Processar dados da requisição
     const requestData = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
     
-    // Gerar prompt e obter configurações
     const prompt = gerarPromptParaDestinos(requestData);
-    const moeda = requestData.moeda_escolhida || 'BRL';
     const orcamento = requestData.orcamento_valor ? parseFloat(requestData.orcamento_valor) : null;
     
-    // Usar a ordem de provedores definida na configuração
     const providers = CONFIG.providerOrder.filter(
       provider => process.env[`${provider.toUpperCase()}_API_KEY`]
     );
     
-    // Tentar cada provedor de IA na ordem definida
     for (const provider of providers) {
       try {
         console.log(`Tentando obter recomendações via ${provider}...`);
@@ -1497,7 +1328,6 @@ module.exports = async function handler(req, res) {
         if (processedResponse && utils.isValidDestinationJSON(processedResponse, requestData)) {
           utils.log(`Resposta ${provider} válida recebida`, null);
           
-          // Log detalhado para análise de qualidade das respostas do Deepseek
           if (provider === 'deepseek') {
             try {
               const parsedResponse = JSON.parse(processedResponse);
@@ -1509,7 +1339,6 @@ module.exports = async function handler(req, res) {
             }
           }
           
-          // Enrichecimento dos dados
           try {
             const recomendacoes = typeof processedResponse === 'string' ? 
               JSON.parse(processedResponse) : processedResponse;
@@ -1518,29 +1347,22 @@ module.exports = async function handler(req, res) {
               recomendacoes.orcamentoMaximo = orcamento;
             }
             
-            const origemIATA = obterCodigoIATAOrigem(requestData);
             const datas = obterDatasViagem(requestData);
+            const recomendacoesProcessadas = await processarDestinos(recomendacoes, datas);
             
-            if (origemIATA) {
-              const recomendacoesEnriquecidas = await processarDestinos(
-                recomendacoes, origemIATA, datas, moeda
-              );
-              
-              if (!isResponseSent) {
-                isResponseSent = true;
-                clearTimeout(serverTimeout);
-                return res.status(200).json({
-                  tipo: `${provider}-enriquecido`,
-                  conteudo: JSON.stringify(recomendacoesEnriquecidas)
-                });
-              }
-              return;
+            if (!isResponseSent) {
+              isResponseSent = true;
+              clearTimeout(serverTimeout);
+              return res.status(200).json({
+                tipo: provider,
+                conteudo: JSON.stringify(recomendacoesProcessadas)
+              });
             }
-          } catch (enriquecerError) {
-            console.error('Erro ao enriquecer:', enriquecerError.message);
+            return;
+          } catch (processError) {
+            console.error('Erro ao processar recomendações:', processError.message);
           }
           
-          // Se o enriquecimento falhar, retornar a resposta original
           if (!isResponseSent) {
             isResponseSent = true;
             clearTimeout(serverTimeout);
@@ -1558,38 +1380,25 @@ module.exports = async function handler(req, res) {
       }
     }
     
-    // Se todos os provedores falharem, gerar resposta de emergência
     console.log('Todos os provedores falharam, gerando resposta de emergência...');
     const emergencyData = generateEmergencyData(requestData);
     
     try {
-      const origemIATA = obterCodigoIATAOrigem(requestData);
       const datas = obterDatasViagem(requestData);
+      const dadosProcessados = await processarDestinos(emergencyData, datas);
       
-      if (origemIATA) {
-        if (orcamento) {
-          emergencyData.orcamentoMaximo = orcamento;
-        }
-        
-        const dadosEnriquecidos = await processarDestinos(
-          emergencyData, origemIATA, datas, moeda
-        );
-        
-        if (!isResponseSent) {
-          isResponseSent = true;
-          clearTimeout(serverTimeout);
-          return res.status(200).json({
-            tipo: "emergencia-enriquecida",
-            conteudo: JSON.stringify(dadosEnriquecidos)
-          });
-        }
-        return;
+      if (!isResponseSent) {
+        isResponseSent = true;
+        clearTimeout(serverTimeout);
+        return res.status(200).json({
+          tipo: "emergencia",
+          conteudo: JSON.stringify(dadosProcessados)
+        });
       }
     } catch (emergencyError) {
-      console.error('Erro ao enriquecer dados de emergência:', emergencyError.message);
+      console.error('Erro ao processar dados de emergência:', emergencyError.message);
     }
     
-    // Retornar dados de emergência sem enriquecimento se tudo falhar
     if (!isResponseSent) {
       isResponseSent = true;
       clearTimeout(serverTimeout);
