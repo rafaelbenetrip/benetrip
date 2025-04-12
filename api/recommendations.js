@@ -663,7 +663,7 @@ IMPORTANTE:
             content: finalPrompt
           }
         ],
-        temperature: 0.7
+        temperature: 1.3
       };
     } else {
       requestData = {
