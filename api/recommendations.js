@@ -987,7 +987,7 @@ async function callDeepseekAPI(prompt, requestData) {
     const apiKey = process.env.DEEPSEEK_API_KEY;
     if (!apiKey) throw new Error('Chave da API Deepseek não configurada');
     
-    logDetalhado('Enviando requisição para Deepseek Reasoner...', null);
+    logDetalhado('Enviando requisição para Deepseek Chat...', null);
     
     const orcamentoMessage = requestData.orcamento_valor ? 
       `\n\n⚠️ ORÇAMENTO MÁXIMO: ${requestData.orcamento_valor} ${requestData.moeda_escolhida || 'BRL'} para voos.` : '';
@@ -1009,7 +1009,7 @@ IMPORTANTE:
         'Content-Type': 'application/json'
       },
       data: {
-        model: "deepseek-reasoner", // Use o nome correto do modelo
+        model: "deepseek-chat", // Use o nome correto do modelo
         messages: [
           {
             role: "system",
