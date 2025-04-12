@@ -652,7 +652,7 @@ async function callAIAPI(provider, prompt, requestData) {
         { role: 'system', content: config.systemMessage },
         { role: 'user', content: prompt }
       ],
-      temperature: 0.7
+      temperature: 1.3
     };
   }
 
