@@ -589,6 +589,13 @@ ${adaptacoesPorTipo[infoViajante.companhia] || "Considere experiências versáte
 // =======================
 async function callAIAPI(provider, prompt, requestData) {
   const apiConfig = {
+    deepseek: {
+      url: 'https://api.deepseek.com', 
+      header: 'Authorization',
+      prefix: 'Bearer',
+      model: 'deepseek-reasoner',
+      systemMessage: 'Você é um especialista em viagens. Retorne apenas JSON com 4 destinos alternativos, respeitando o orçamento para voos.'
+    },
     perplexity: {
       url: 'https://api.perplexity.ai/chat/completions',
       header: 'Authorization',
@@ -609,14 +616,8 @@ async function callAIAPI(provider, prompt, requestData) {
       prefix: '',
       model: 'claude-3-haiku-20240307',
       systemMessage: 'Você é um especialista em viagens. Retorne apenas JSON com 4 destinos alternativos, respeitando o orçamento para voos.'
-    },
-    deepseek: {
-      url: 'https://api.deepseek.com', 
-      header: 'Authorization',
-      prefix: 'Bearer',
-      model: 'deepseek-reasoner',
-      systemMessage: 'Você é um especialista em viagens. Retorne apenas JSON com 4 destinos alternativos, respeitando o orçamento para voos.'
     }
+    
   };
   
   if (!apiConfig[provider]) {
