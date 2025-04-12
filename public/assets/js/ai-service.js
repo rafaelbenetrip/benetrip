@@ -1,400 +1,1313 @@
-// Serviço de IA para o Benetrip - Versão Vercel com Perplexity
-window.BENETRIP_AI = {
-  // Configurações do serviço
-  config: {
-    apiEndpoint: '/api/recommendations', // Endpoint Vercel
-    imageApiEndpoint: '/api/image-search', // Endpoint Vercel para busca de imagens
-    apiTimeout: 90000, // 90 segundos de timeout (aumentado de 60s para 90s)
-    maxRetries: 3, // Número máximo de tentativas em caso de falha (aumentado de 2 para 3)
-    retryDelay: 2000, // Tempo entre tentativas em ms (aumentado para melhor backoff)
-    // Configuração de imagens por tipo de destino
-    imagensQtdPorTipo: {
-      topPick: 2,
-      alternativa: 1,
-      surpresa: 2
-    },
-    mockData: { // Dados de exemplo para casos de falha
-      "topPick": {
-        "destino": "Medellín",
-        "pais": "Colômbia",
-        "codigoPais": "CO",
-        "descricao": "Cidade da eterna primavera com clima perfeito o ano todo",
-        "porque": "Clima primaveril o ano todo com paisagens montanhosas deslumbrantes",
-        "destaque": "Passeio de teleférico, Comuna 13 e fazendas de café próximas",
-        "comentario": "Eu simplesmente AMEI Medellín! Perfeito para quem busca um mix de cultura e natureza! 🐾",
-        "pontosTuristicos": ["Comuna 13", "Parque Arví", "Plaza Botero", "Pueblito Paisa"],
-        "clima": {
-          "temperatura": "20-25°C durante todo o ano",
-          "condicoes": "Clima primaveril constante com sol e chuvas ocasionais",
-          "recomendacoes": "Leve roupas leves e um casaco leve para as noites"
-        },
-        "aeroporto": {
-          "codigo": "MDE",
-          "nome": "Aeroporto Internacional José María Córdova"
-        },
-        "preco": {
-          "voo": 1800,
-          "hotel": 350
-        }
-      },
-      "alternativas": [
-        {
-          "destino": "Montevidéu",
-          "pais": "Uruguai",
-          "codigoPais": "UY",
-          "porque": "Clima costeiro tranquilo com frutos do mar deliciosos e espaços culturais",
-          "pontosTuristicos": ["Rambla de Montevideo", "Ciudad Vieja", "Mercado del Puerto"],
-          "clima": {
-            "temperatura": "15-25°C dependendo da estação"
-          },
-          "aeroporto": {
-            "codigo": "MVD",
-            "nome": "Aeroporto Internacional de Carrasco"
-          },
-          "preco": {
-            "voo": 1500,
-            "hotel": 300
-          }
-        },
-        {
-          "destino": "Buenos Aires",
-          "pais": "Argentina",
-          "codigoPais": "AR",
-          "porque": "Capital cosmopolita com rica vida cultural, teatros e arquitetura europeia",
-          "pontosTuristicos": ["Teatro Colón", "La Boca", "Recoleta"],
-          "clima": {
-            "temperatura": "15-30°C dependendo da estação"
-          },
-          "aeroporto": {
-            "codigo": "EZE",
-            "nome": "Aeroporto Internacional Ministro Pistarini"
-          },
-          "preco": {
-            "voo": 1400,
-            "hotel": 280
-          }
-        },
-        {
-          "destino": "Santiago",
-          "pais": "Chile",
-          "codigoPais": "CL",
-          "porque": "Moderna capital cercada pela Cordilheira dos Andes com excelentes vinhos",
-          "pontosTuristicos": ["Santa Lucía Hill", "La Moneda", "Sky Costanera"],
-          "clima": {
-            "temperatura": "10-30°C dependendo da estação"
-          },
-          "aeroporto": {
-            "codigo": "SCL",
-            "nome": "Aeroporto Internacional Arturo Merino Benítez"
-          },
-          "preco": {
-            "voo": 1600,
-            "hotel": 350
-          }
-        },
-        {
-          "destino": "Cusco",
-          "pais": "Peru",
-          "codigoPais": "PE",
-          "porque": "Portal para Machu Picchu com rica história inca e arquitetura colonial",
-          "pontosTuristicos": ["Sacsayhuamán", "Plaza de Armas", "Machu Picchu"],
-          "clima": {
-            "temperatura": "10-20°C durante o dia, mais frio à noite"
-          },
-          "aeroporto": {
-            "codigo": "CUZ",
-            "nome": "Aeroporto Internacional Alejandro Velasco Astete"
-          },
-          "preco": {
-            "voo": 1700,
-            "hotel": 250
-          }
-        }
-      ],
-      "surpresa": {
-        "destino": "Cartagena",
-        "pais": "Colômbia",
-        "codigoPais": "CO",
-        "descricao": "Joia colonial no Caribe colombiano com praias paradisíacas",
-        "porque": "Cidade murada histórica com ruas coloridas, cultura vibrante e praias maravilhosas",
-        "destaque": "Passeio de barco pelas Ilhas do Rosário com águas cristalinas",
-        "comentario": "Cartagena é um tesouro escondido que vai te conquistar! As cores, a música e a comida caribenha formam uma experiência inesquecível! 🐾🌴",
-        "pontosTuristicos": ["Ciudad Amurallada", "Castillo San Felipe", "Islas del Rosario", "Plaza Santo Domingo"],
-        "clima": {
-          "temperatura": "27-32°C durante todo o ano",
-          "condicoes": "Quente e úmido com brisa do mar, clima tropical perfeito para praia",
-          "recomendacoes": "Leve roupas muito leves, protetor solar e chapéu"
-        },
-        "aeroporto": {
-          "codigo": "CTG",
-          "nome": "Aeroporto Internacional Rafael Núñez"
-        },
-        "preco": {
-          "voo": 1950,
-          "hotel": 320
-        }
-      }
-    }
-  },
-  
-  // Inicialização do serviço
-  init() {
-    console.log('Inicializando serviço de IA do Benetrip');
-    this.initialized = true;
-    this._ultimaRequisicao = null;
-    this._requestsInProgress = {};
-    this._cacheImagens = {};
-    
-    // Registrar listener para eventos de progresso
-    window.addEventListener('benetrip_progress', (event) => {
-      console.log(`Evento de progresso: ${JSON.stringify(event.detail)}`);
-    });
-    
-    return this;
-  },
-  
-  // Verifica se o serviço foi inicializado
-  isInitialized() {
-    return this.initialized === true;
-  },
+// api/recommendations.js - Endpoint da API Vercel para recomendações de destino
+const axios = require('axios');
+const http = require('http');
+const https = require('https');
 
-  // Gera um ID de requisição baseado nas preferências
-  generateRequestId(preferences) {
-    // Extrair valores relevantes para formar uma chave de identificação
-    const companhia = preferences.companhia || '0';
-    const preferencia = preferences.preferencia_viagem || '0';
-    const moeda = preferences.moeda_escolhida || 'BRL';
-    const origem = preferences.cidade_partida?.name || 'default';
-    
-    return `${origem}_${companhia}_${preferencia}_${moeda}`;
+// =======================
+// Configurações
+// =======================
+const CONFIG = {
+  timeout: {
+    request: 50000,
+    handler: 55000,
+    aviasales: 15000,
+    retry: 1500
   },
+  retries: 2,
+  logging: {
+    enabled: true,
+    maxLength: 500
+  },
+  // Nova ordem de provedores, com Deepseek Reasoner como principal
+  providerOrder: ['deepseek', 'perplexity', 'openai', 'claude']
+};
+
+// =======================
+// Cliente HTTP configurado
+// =======================
+const apiClient = axios.create({
+  timeout: CONFIG.timeout.request,
+  httpAgent: new http.Agent({ keepAlive: true }),
+  httpsAgent: new https.Agent({ keepAlive: true })
+});
+
+// =======================
+// Funções utilitárias
+// =======================
+const utils = {
+  validarCodigoIATA: codigo => codigo && /^[A-Z]{3}$/.test(codigo),
   
-  // Método para extrair JSON de texto, lidando com diferentes formatos
-  extrairJSON(texto) {
-    // Se já for um objeto, retornar diretamente
-    if (texto && typeof texto === 'object') {
-      return texto;
-    }
-    
-    // Se for nulo ou undefined, retorna objeto vazio
-    if (!texto) {
-      console.warn('Texto de resposta vazio');
-      return {};
-    }
-    
-    // Primeiro, tenta fazer parse direto
+  formatarDuracao: duracao => {
+    if (!duracao) return null;
     try {
-      return JSON.parse(texto);
+      const horas = (duracao.match(/(\d+)H/) || [])[1] || 0;
+      const minutos = (duracao.match(/(\d+)M/) || [])[1] || 0;
+      return `${horas}h${minutos > 0 ? ` ${minutos}m` : ''}`;
     } catch (e) {
-      console.log('Erro ao fazer parse direto, tentando extrair do texto:', e.message);
-      
-      // Se falhar, tenta extrair JSON de bloco de código ou texto
-      try {
-        // Busca por blocos de código JSON
-        const blocoCodigo = texto.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-        if (blocoCodigo && blocoCodigo[1]) {
-          const jsonLimpo = blocoCodigo[1].trim();
-          console.log('JSON extraído de bloco de código:', jsonLimpo.substring(0, 100) + '...');
-          return JSON.parse(jsonLimpo);
-        }
-        
-        // Busca pela primeira ocorrência de chaves balanceadas
-        let depth = 0;
-        let start = -1;
-        
-        for (let i = 0; i < texto.length; i++) {
-          if (texto[i] === '{') {
-            if (depth === 0) start = i;
-            depth++;
-          } else if (texto[i] === '}') {
-            depth--;
-            if (depth === 0 && start !== -1) {
-              const jsonStr = texto.substring(start, i + 1);
-              console.log('JSON extraído do texto usando análise de profundidade:', jsonStr.substring(0, 100) + '...');
-              return JSON.parse(jsonStr);
-            }
-          }
-        }
-        
-        // Último recurso: busca por regex simples
-        const match = texto.match(/(\{[\s\S]*\})/);
-        if (match && match[0]) {
-          const jsonPotencial = match[0];
-          console.log('JSON extraído de texto usando regex:', jsonPotencial.substring(0, 100) + '...');
-          return JSON.parse(jsonPotencial);
-        }
-        
-        // Se nada funcionar, retorna um objeto vazio
-        console.warn('Não foi possível extrair JSON válido da resposta, retornando objeto vazio');
-        return {};
-      } catch (innerError) {
-        console.error('Erro ao extrair JSON do texto:', innerError);
-        return {};
-      }
+      console.warn(`Erro ao formatar duração "${duracao}":`, e);
+      return null;
     }
-  },
-
-  // Delay de espera - útil para retries
-  sleep(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
   },
   
-  // Funções auxiliares para formatação do prompt
-  getTipoDestinoText(tipoDestino) {
-    switch(tipoDestino) {
-      case 0: return "Nacional - Prefere viajar dentro do próprio país";
-      case 1: return "Internacional - Prefere viajar para fora do país";
-      default: return "Destinos nacionais ou internacionais";
+  log: (mensagem, dados, limite = CONFIG.logging.maxLength) => {
+    if (!CONFIG.logging.enabled) return;
+    console.log(mensagem);
+    if (dados) {
+      const dadosStr = typeof dados === 'string' ? dados : JSON.stringify(dados);
+      console.log(dadosStr.length > limite ? dadosStr.substring(0, limite) + '...' : dadosStr);
     }
   },
-
-  getFamaDestinoText(famaDestino) {
-    switch(famaDestino) {
-      case 0: return "Destinos famosos e populares";
-      case 1: return "Destinos menos conhecidos e alternativos";
-      default: return "Mix de destinos populares e alternativos";
+  
+  formatarData: data => {
+    const ano = data.getFullYear();
+    const mes = String(data.getMonth() + 1).padStart(2, '0');
+    const dia = String(data.getDate()).padStart(2, '0');
+    return `${ano}-${mes}-${dia}`;
+  },
+  
+  embaralharArray: array => {
+    const resultado = [...array];
+    for (let i = resultado.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [resultado[i], resultado[j]] = [resultado[j], resultado[i]];
+    }
+    return resultado;
+  },
+  
+  extrairJSONDaResposta: texto => {
+    try {
+      if (typeof texto === 'object' && texto !== null) {
+        return JSON.stringify(texto);
+      }
+      
+      // Tentar parse direto
+      try {
+        return JSON.stringify(JSON.parse(texto));
+      } catch {}
+      
+      // Limpar e extrair JSON
+      const textoProcessado = texto
+        .replace(/```json/g, '')
+        .replace(/```/g, '')
+        .replace(/\/\/.*$/gm, '')
+        .replace(/\/\*[\s\S]*?\*\//g, '')
+        .replace(/\r\n/g, '\n')
+        .trim();
+        
+      const match = textoProcessado.match(/(\{[\s\S]*\})/);
+      if (match && match[0]) {
+        return JSON.stringify(JSON.parse(match[0]));
+      }
+      
+      return null;
+    } catch (error) {
+      console.error('Erro ao extrair JSON:', error.message);
+      return null;
     }
   },
+  
+  isPartiallyValidJSON: jsonString => {
+    if (!jsonString) return false;
+    try {
+      const data = typeof jsonString === 'string' ? JSON.parse(jsonString) : jsonString;
+      return data && (data.topPick || data.alternativas || data.surpresa);
+    } catch (error) {
+      console.error('Erro ao verificar JSON parcialmente válido:', error.message);
+      return false;
+    }
+  },
+  
+  isValidDestinationJSON: (jsonString, requestData) => {
+    try {
+      const data = typeof jsonString === 'string' ? JSON.parse(jsonString) : jsonString;
+      
+      // Verificações básicas
+      if (!data.topPick?.destino || !data.alternativas || !data.surpresa?.destino) return false;
+      if (!data.topPick.pontosTuristicos?.length || data.topPick.pontosTuristicos.length < 2) return false;
+      if (!data.surpresa.pontosTuristicos?.length || data.surpresa.pontosTuristicos.length < 2) return false;
+      if (!Array.isArray(data.alternativas) || data.alternativas.length !== 4) return false;
+      
+      // Verificar pontos turísticos em alternativas
+      if (!data.alternativas.every(alt => alt.pontoTuristico)) return false;
+      
+      // Verificar comentários mencionam pontos turísticos
+      if (!data.topPick.comentario || !data.topPick.pontosTuristicos.some(
+        attraction => data.topPick.comentario.toLowerCase().includes(attraction.toLowerCase())
+      )) return false;
+      
+      if (!data.surpresa.comentario || !data.surpresa.pontosTuristicos.some(
+        attraction => data.surpresa.comentario.toLowerCase().includes(attraction.toLowerCase())
+      )) return false;
+      
+      // Verificar orçamento
+      if (requestData?.orcamento_valor && !isNaN(parseFloat(requestData.orcamento_valor))) {
+        const orcamentoMax = parseFloat(requestData.orcamento_valor);
+        if (data.topPick.preco?.voo > orcamentoMax || data.alternativas[0]?.preco?.voo > orcamentoMax) {
+          return false;
+        }
+      }
+      
+      // Verificar destinos únicos
+      if (data.topPick.destino?.toLowerCase() === data.alternativas[0]?.destino?.toLowerCase()) {
+        return false;
+      }
+      
+      // Verificar códigos IATA
+      if (!data.topPick.aeroporto?.codigo || !data.surpresa.aeroporto?.codigo) {
+        return false;
+      }
+      
+      return true;
+    } catch (error) {
+      console.error('Erro ao validar JSON de destino:', error.message);
+      return false;
+    }
+  }
+};
 
-  // Função para determinar a estação do ano em uma data
-  determinarEstacaoDoAno(data, hemisferio = 'sul') {
-    const mes = new Date(data).getMonth();
+// =======================
+// Função de busca de preço de voo via Aviasales
+// =======================
+async function buscarPrecoVooAviasales(origemIATA, destinoIATA, datas, moeda) {
+  if (!process.env.AVIASALES_TOKEN || !process.env.AVIASALES_MARKER) {
+    throw new Error("Token ou marker da API Aviasales não configurados.");
+  }
+
+  if (!origemIATA || !destinoIATA || !datas) {
+    utils.log(`Parâmetros incompletos para busca de voo:`, { origem: origemIATA, destino: destinoIATA });
+    return null;
+  }
+
+  try {
+    utils.log(`Buscando voo de ${origemIATA} para ${destinoIATA} via Aviasales (Calendar)...`, null);
     
-    if (hemisferio === 'sul') {
-      if (mes >= 2 && mes <= 4) return 'Outono';
-      if (mes >= 5 && mes <= 7) return 'Inverno';
-      if (mes >= 8 && mes <= 10) return 'Primavera';
-      return 'Verão';
-    } else {
-      if (mes >= 2 && mes <= 4) return 'Primavera';
-      if (mes >= 5 && mes <= 7) return 'Verão';
-      if (mes >= 8 && mes <= 10) return 'Outono';
-      return 'Inverno';
+    const response = await apiClient({
+      method: 'get',
+      url: 'https://api.travelpayouts.com/v1/prices/calendar',
+      params: {
+        origin: origemIATA,
+        destination: destinoIATA,
+        depart_date: datas.dataIda,
+        return_date: datas.dataVolta,
+        currency: moeda,
+        token: process.env.AVIASALES_TOKEN,
+        marker: process.env.AVIASALES_MARKER
+      },
+      headers: {
+        'Accept-Encoding': 'gzip, deflate'
+      },
+      timeout: CONFIG.timeout.aviasales
+    });
+
+    if (!response.data?.success || !response.data?.data) {
+      throw new Error("Resposta inválida ou incompleta da API Aviasales");
     }
-  },
 
-  // Função para calcular a duração da viagem em dias
-  calcularDuracaoViagem(dataIda, dataVolta) {
-    const ida = new Date(dataIda);
-    const volta = new Date(dataVolta);
-    const diffTime = Math.abs(volta - ida);
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays;
-  },
+    // Processa a resposta
+    let menorPreco = Infinity;
+    for (const date in response.data.data) {
+      const precosPorDestino = response.data.data[date];
+      if (precosPorDestino && precosPorDestino[destinoIATA] !== undefined) {
+        const preco = parseFloat(precosPorDestino[destinoIATA]);
+        if (preco < menorPreco) {
+          menorPreco = preco;
+        }
+      }
+    }
 
-  // Gerar prompt aprimorado para recomendações de destinos
-  gerarPromptParaDestinos(dados) {
-    // Extrair dados relevantes das preferências
-    const {
-      cidade_partida,
-      moeda_escolhida = 'BRL',
-      orcamento_valor,
-      datas = {},
-      companhia = 0,
-      destino_imaginado = 2,
-      tipo_viagem = 1,
-      fama_destino = 2,
-      tipo_destino = 2,
-      item_essencial = 4,
-      quantidade_familia = 0,
-      quantidade_amigos = 0,
-      conhece_destino = 0
-    } = dados;
+    if (menorPreco !== Infinity) {
+      return { 
+        precoReal: menorPreco, 
+        detalhesVoo: {
+          companhia: 'Não informado',
+          departure_at: '',
+          return_at: ''
+        }, 
+        fonte: 'Aviasales Calendar' 
+      };
+    }
 
-    // Valores formatados para uso no prompt
-    const cidadeOrigem = cidade_partida?.name || "Cidade não especificada";
-    const moeda = moeda_escolhida;
-    const orcamento = orcamento_valor ? parseInt(orcamento_valor, 10) : 2500;
+    utils.log('Nenhuma oferta válida encontrada no Calendar', null);
+    return null;
+  } catch (erro) {
+    console.error(`Erro ao buscar preços via Aviasales Calendar: ${erro.message}`);
+    utils.log('Detalhes do erro:', erro.response ? erro.response.data : erro);
+    return null;
+  }
+}
+
+// =======================
+// Função genérica de retentativa
+// =======================
+async function retryAsync(fn, maxAttempts = CONFIG.retries, initialDelay = CONFIG.timeout.retry) {
+  let attempt = 1;
+  let delay = initialDelay;
+  
+  while (attempt <= maxAttempts) {
+    try {
+      const result = await fn();
+      if (result) return result;
+    } catch (error) {
+      console.error(`Tentativa ${attempt} falhou: ${error.message}`);
+    }
     
-    // Tratar datas e calcular duração
-    const dataIda = datas.dataIda || new Date().toISOString().split('T')[0];
-    const dataVolta = datas.dataVolta || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-    const duracaoViagem = this.calcularDuracaoViagem(dataIda, dataVolta);
+    if (attempt === maxAttempts) return null;
+    
+    await new Promise(resolve => setTimeout(resolve, delay));
+    delay = Math.min(delay * 1.5, 5000);
+    attempt++;
+  }
+  
+  return null;
+}
+
+// =======================
+// Processamento de destinos (enriquecimento com preços)
+// =======================
+async function processarDestinos(recomendacoes, origemIATA, datas, moeda) {
+  if (!utils.validarCodigoIATA(origemIATA)) {
+    console.error(`Código IATA de origem inválido: ${origemIATA}`);
+    origemIATA = 'GRU';
+  }
+  
+  try {
+    // Processar destinos principais e alternativos
+    const destinos = [
+      { tipo: 'topPick', item: recomendacoes.topPick },
+      ...recomendacoes.alternativas.map(alt => ({ tipo: 'alternativa', item: alt })),
+      { tipo: 'surpresa', item: recomendacoes.surpresa }
+    ];
+    
+    for (const destino of destinos) {
+      if (!destino.item?.aeroporto?.codigo) continue;
+      
+      const destinoIATA = destino.item.aeroporto.codigo;
+      if (!utils.validarCodigoIATA(destinoIATA)) continue;
+      
+      utils.log(`Processando ${destino.tipo}: ${destino.item.destino} (${destinoIATA})`, null);
+      
+      const resultado = await retryAsync(
+        async () => await buscarPrecoVooAviasales(origemIATA, destinoIATA, datas, moeda)
+      );
+      
+      if (resultado) {
+        destino.item.preco = destino.item.preco || {};
+        destino.item.preco.voo = resultado.precoReal;
+        destino.item.preco.fonte = resultado.fonte || 'Aviasales Calendar';
+        destino.item.detalhesVoo = resultado.detalhesVoo;
+      } else {
+        destino.item.preco = {
+          voo: destino.item.preco?.voo || 0,
+          fonte: 'Indisponível - API não retornou dados'
+        };
+      }
+      
+      // Pausa entre requisições para evitar rate limiting
+      if (destino.tipo !== 'surpresa') {
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      }
+    }
     
     // Determinar estação do ano
-    const estacaoViagem = this.determinarEstacaoDoAno(dataIda);
-    
-    // Calcular número de pessoas
-    let quantidadePessoas = 1;
-    if (companhia === 1) quantidadePessoas = 2; // Casal
-    else if (companhia === 2) quantidadePessoas = parseInt(quantidade_familia, 10) || 3; // Família
-    else if (companhia === 3) quantidadePessoas = parseInt(quantidade_amigos, 10) || 4; // Amigos
-    
-    // Formatar preferência de companhia
-    let companheiroTexto;
-    switch(companhia) {
-      case 0: companheiroTexto = "Sozinho"; break;
-      case 1: companheiroTexto = "Em casal"; break;
-      case 2: companheiroTexto = "Em família"; break;
-      case 3: companheiroTexto = "Com amigos"; break;
-      default: companheiroTexto = "Sozinho";
+    if (!recomendacoes.estacaoViagem && datas.dataIda) {
+      try {
+        const dataObj = new Date(datas.dataIda);
+        const mes = dataObj.getMonth();
+        let estacaoViagem = '';
+        
+        if (mes >= 2 && mes <= 4) estacaoViagem = 'primavera';
+        else if (mes >= 5 && mes <= 7) estacaoViagem = 'verão';
+        else if (mes >= 8 && mes <= 10) estacaoViagem = 'outono';
+        else estacaoViagem = 'inverno';
+        
+        // Ajustar para hemisfério sul
+        const hemisferio = determinarHemisferioDestino(origemIATA);
+        if (hemisferio === 'sul') {
+          const mapaEstacoes = {
+            'verão': 'inverno',
+            'inverno': 'verão',
+            'primavera': 'outono',
+            'outono': 'primavera'
+          };
+          estacaoViagem = mapaEstacoes[estacaoViagem] || estacaoViagem;
+        }
+        
+        recomendacoes.estacaoViagem = estacaoViagem;
+      } catch (error) {
+        console.warn('Erro ao determinar estação do ano:', error);
+      }
     }
     
-    // Formatar preferência de viagem
-    let preferenciaTexto;
-    switch(tipo_viagem) {
-      case 0: preferenciaTexto = "relaxamento e tranquilidade"; break;
-      case 1: preferenciaTexto = "exploração e descoberta"; break;
-      case 2: preferenciaTexto = "aventura e adrenalina"; break;
-      case 3: preferenciaTexto = "cultura, gastronomia e experiências locais"; break;
-      default: preferenciaTexto = "experiências variadas";
-    }
-    
-    // Formatar preferência de atrações
-    let atracaoTexto;
-    switch(item_essencial) {
-      case 0: atracaoTexto = "diversão e entretenimento"; break;
-      case 1: atracaoTexto = "natureza e atividades ao ar livre"; break;
-      case 2: atracaoTexto = "cultura, história e museus"; break;
-      case 3: atracaoTexto = "compras e vida urbana"; break;
-      default: atracaoTexto = "experiências variadas";
-    }
-    
-    // Sugestão de distância baseada no tipo de destino
-    let sugestaoDistancia = "";
-    if (tipo_destino === 0) {
-      sugestaoDistancia = "(buscar destinos domésticos)";
-    } else if (tipo_destino === 1) {
-      sugestaoDistancia = "(buscar destinos internacionais)";
-    }
-    
-    // Mensagem específica para orçamento
-    let mensagemOrcamento;
-    if (orcamento < 1000) {
-      mensagemOrcamento = `Orçamento muito restrito de ${orcamento} ${moeda} por pessoa para voos (ida e volta). Priorize destinos próximos e econômicos.`;
-    } else if (orcamento < 2000) {
-      mensagemOrcamento = `Orçamento econômico de ${orcamento} ${moeda} por pessoa para voos (ida e volta). Foque em opções com boa relação custo-benefício.`;
-    } else if (orcamento < 4000) {
-      mensagemOrcamento = `Orçamento moderado de ${orcamento} ${moeda} por pessoa para voos (ida e volta). Pode incluir destinos de médio alcance com preços acessíveis.`;
-    } else {
-      mensagemOrcamento = `Orçamento confortável de ${orcamento} ${moeda} por pessoa para voos (ida e volta). Pode incluir destinos mais distantes e premium.`;
-    }
+    return recomendacoes;
+  } catch (error) {
+    console.error(`Erro ao processar destinos: ${error.message}`);
+    return recomendacoes;
+  }
+}
 
-    return `Crie recomendações de viagem que respeitam ESTRITAMENTE o orçamento do usuário:
+// Função para determinar hemisfério por IATA
+function determinarHemisferioDestino(iataCode) {
+  const hemisfSulIATA = [
+    'GRU', 'GIG', 'SSA', 'REC', 'FOR', 'BSB', 'CNF', 'CWB', 'POA', 'CGH', 'SDU', 'FLN',
+    'SYD', 'MEL', 'BNE', 'PER', 'ADL', 'AKL', 'CHC', 'ZQN',
+    'JNB', 'CPT', 'DUR'
+  ];
+  
+  return hemisfSulIATA.includes(iataCode) ? 'sul' : 'norte';
+}
+
+// =======================
+// Funções para dados de entrada
+// =======================
+function obterCodigoIATAOrigem(dadosUsuario) {
+  try {
+    if (!dadosUsuario?.cidade_partida) return null;
+    if (dadosUsuario.cidade_partida.iata) return dadosUsuario.cidade_partida.iata;
+    
+    const mapeamentoIATA = {
+      'São Paulo': 'GRU', 'Rio de Janeiro': 'GIG', 'Brasília': 'BSB',
+      'Buenos Aires': 'EZE', 'Santiago': 'SCL', 'Lima': 'LIM',
+      'Bogotá': 'BOG', 'Cidade do México': 'MEX', 'Nova York': 'JFK',
+      'Los Angeles': 'LAX', 'Miami': 'MIA', 'Londres': 'LHR',
+      'Paris': 'CDG', 'Roma': 'FCO', 'Madri': 'MAD',
+      'Lisboa': 'LIS', 'Tóquio': 'HND', 'Dubai': 'DXB',
+      'Sydney': 'SYD'
+    };
+    
+    const cidadeNome = dadosUsuario.cidade_partida.name || '';
+    for (const [cidade, iata] of Object.entries(mapeamentoIATA)) {
+      if (cidadeNome.toLowerCase().includes(cidade.toLowerCase())) {
+        return iata;
+      }
+    }
+    
+    return 'GRU';
+  } catch (error) {
+    console.error('Erro ao obter código IATA de origem:', error.message);
+    return 'GRU';
+  }
+}
+
+function obterDatasViagem(dadosUsuario) {
+  try {
+    let datas = dadosUsuario.datas || (dadosUsuario.respostas ? dadosUsuario.respostas.datas : null);
+    
+    if (!datas) {
+      const hoje = new Date();
+      const mesQueVem = new Date(hoje);
+      mesQueVem.setMonth(hoje.getMonth() + 1);
+      const dataIdaPadrao = utils.formatarData(mesQueVem);
+      const dataVoltaPadrao = new Date(mesQueVem);
+      dataVoltaPadrao.setDate(dataVoltaPadrao.getDate() + 7);
+      
+      return { 
+        dataIda: dataIdaPadrao, 
+        dataVolta: utils.formatarData(dataVoltaPadrao) 
+      };
+    }
+    
+    if (typeof datas === 'string' && datas.includes(',')) {
+      const [dataIda, dataVolta] = datas.split(',');
+      return { dataIda: dataIda.trim(), dataVolta: dataVolta.trim() };
+    }
+    
+    if (datas.dataIda && datas.dataVolta) {
+      return { dataIda: datas.dataIda, dataVolta: datas.dataVolta };
+    }
+    
+    return { dataIda: '2025-08-05', dataVolta: '2025-08-12' };
+  } catch (error) {
+    console.error('Erro ao obter datas de viagem:', error.message);
+    return { dataIda: '2025-08-05', dataVolta: '2025-08-12' };
+  }
+}
+
+// =======================
+// Prompt Deepseek Reasoner aprimorado para melhor aproveitamento do modelo
+// =======================
+function gerarPromptParaDeepseekReasoner(dados) {
+  const infoViajante = {
+    companhia: getCompanhiaText(dados.companhia || 0),
+    preferencia: getPreferenciaText(dados.preferencia_viagem || 0),
+    cidadeOrigem: dados.cidade_partida?.name || 'origem não especificada',
+    orcamento: dados.orcamento_valor || 'flexível',
+    moeda: dados.moeda_escolhida || 'BRL',
+    pessoas: dados.quantidade_familia || dados.quantidade_amigos || 1,
+    tipoDestino: dados.tipo_destino || 'qualquer',
+    famaDestino: dados.fama_destino || 'qualquer'
+  };
+  
+  // Processar datas
+  let dataIda = 'não especificada';
+  let dataVolta = 'não especificada';
+  let duracaoViagem = 'não especificada';
+  
+  if (dados.datas) {
+    if (typeof dados.datas === 'string' && dados.datas.includes(',')) {
+      const partes = dados.datas.split(',');
+      dataIda = partes[0] || 'não especificada';
+      dataVolta = partes[1] || 'não especificada';
+    } else if (dados.datas.dataIda && dados.datas.dataVolta) {
+      dataIda = dados.datas.dataIda;
+      dataVolta = dados.datas.dataVolta;
+    }
+    
+    try {
+      if (dataIda !== 'não especificada' && dataVolta !== 'não especificada') {
+        const ida = new Date(dataIda);
+        const volta = new Date(dataVolta);
+        const diff = Math.abs(volta - ida);
+        duracaoViagem = `${Math.ceil(diff / (1000 * 60 * 60 * 24))} dias`;
+      }
+    } catch (error) {
+      console.error('Erro ao calcular duração da viagem:', error.message);
+    }
+  }
+  
+  // Determinar estação
+  let estacaoViagem = 'não determinada';
+  let hemisferio = infoViajante.cidadeOrigem.toLowerCase().includes('brasil') ? 'sul' : 'norte';
+  
+  try {
+    if (dataIda !== 'não especificada') {
+      const dataObj = new Date(dataIda);
+      const mes = dataObj.getMonth();
+      
+      if (mes >= 2 && mes <= 4) estacaoViagem = 'primavera';
+      else if (mes >= 5 && mes <= 7) estacaoViagem = 'verão';
+      else if (mes >= 8 && mes <= 10) estacaoViagem = 'outono';
+      else estacaoViagem = 'inverno';
+      
+      if (hemisferio === 'sul') {
+        const mapaEstacoes = {
+          'verão': 'inverno',
+          'inverno': 'verão',
+          'primavera': 'outono',
+          'outono': 'primavera'
+        };
+        estacaoViagem = mapaEstacoes[estacaoViagem] || estacaoViagem;
+      }
+    }
+  } catch (error) {
+    console.error('Erro ao determinar estação do ano:', error.message);
+  }
+  
+  // Configuração de adaptações específicas por tipo de viajante
+  const adaptacoesPorTipo = {
+    "sozinho(a)": "Destinos seguros para viajantes solo, hostels bem avaliados, atividades para conhecer pessoas, bairros com boa vida noturna e transporte público eficiente",
+    "em casal (viagem romântica)": "Cenários românticos, jantares especiais, passeios a dois, hotéis boutique, praias privativas, mirantes com vistas panorâmicas e vinícolas",
+    "em família": "Atividades para todas as idades, opções kid-friendly, segurança, acomodações espaçosas, parques temáticos, atrações educativas e opções de transporte facilitado",
+    "com amigos": "Vida noturna, atividades em grupo, opções de compartilhamento, diversão coletiva, esportes de aventura, festivais locais e culinária diversificada"
+  };
+  
+  const mensagemOrcamento = infoViajante.orcamento !== 'flexível' ?
+    `ORÇAMENTO MÁXIMO: ${infoViajante.orcamento} ${infoViajante.moeda}` : 
+    'Orçamento flexível';
+
+  return `# Tarefa: Recomendações Personalizadas de Destinos de Viagem
+  
+## RESTRIÇÃO CRÍTICA DE ORÇAMENTO
+${mensagemOrcamento} para voos (NUNCA EXCEDA ESTE VALOR)
+
+## Dados do Viajante
+- Origem: ${infoViajante.cidadeOrigem}
+- Composição: ${infoViajante.companhia}
+- Quantidade: ${infoViajante.pessoas} pessoa(s)
+- Interesses: ${infoViajante.preferencia}
+- Período: ${dataIda} a ${dataVolta} (${duracaoViagem})
+- Estação na viagem: ${estacaoViagem}
+- Tipo de destino preferido: ${getTipoDestinoText(infoViajante.tipoDestino)}
+- Nível de popularidade desejado: ${getFamaDestinoText(infoViajante.famaDestino)}
+
+## ASPECTOS SAZONAIS E CLIMÁTICOS CRÍTICOS
+- Para o período ${dataIda} a ${dataVolta}, verifique:
+  * Festivais, feriados e eventos especiais que agregam valor à viagem
+  * Condições climáticas adversas a evitar: monções, furacões, temperaturas extremas
+  * Temporada turística (alta/baixa) e impacto em preços, disponibilidade e experiência
+
+## ADAPTAÇÕES ESPECÍFICAS PARA: ${infoViajante.companhia.toUpperCase()}
+${adaptacoesPorTipo[infoViajante.companhia] || "Considere experiências versáteis para diferentes perfis"}
+
+## PERSONALIDADE DA TRIPINHA (MASCOTE)
+- A Tripinha é uma cachorrinha vira-lata caramelo, curiosa e aventureira
+- Seus comentários devem ser:
+  * Autênticos e entusiasmados
+  * Mencionar PELO MENOS UM ponto turístico específico do destino
+  * Incluir uma observação sensorial que um cachorro notaria (cheiros, sons, texturas)
+  * Usar emoji 🐾 para dar personalidade
+  * Tom amigável e conversacional
+
+## Processo de Raciocínio Passo a Passo
+1) Identifique destinos adequados considerando:
+   - Clima apropriado para ${estacaoViagem}
+   - Eventos especiais/festivais no período
+   - Adaptação para viajantes ${infoViajante.companhia}
+   - Compatibilidade com orçamento de ${infoViajante.orcamento} ${infoViajante.moeda}
+   - Se viagem internacional, considere facilidade de visto/documentação
+   - Se viagem nacional, priorize destinos com infraestrutura adequada
+
+2) Para cada destino, determine:
+   - Preço realista de voo ABAIXO DO ORÇAMENTO MÁXIMO
+   - Pontos turísticos específicos e conhecidos
+   - Eventos sazonais ou especiais no período da viagem
+   - Comentário personalizado da Tripinha mencionando detalhes sensoriais
+   - Informações práticas de clima para o período
+
+3) Diversifique suas recomendações:
+   - topPick: Destino com máxima adequação ao perfil
+   - alternativas: 4 destinos diversos em geografia, custo e experiências
+   - surpresa: Destino incomum mas encantador (pode ser mais desafiador, desde que viável)
+
+## Formato de Retorno (JSON estrito)
+{
+  "topPick": {
+    "destino": "Nome da Cidade",
+    "pais": "Nome do País",
+    "codigoPais": "XX",
+    "descricao": "Breve descrição de 1-2 frases sobre o destino",
+    "porque": "Razão específica para este viajante visitar este destino",
+    "destaque": "Uma experiência/atividade única neste destino",
+    "comentario": "Comentário entusiasmado da Tripinha mencionando um ponto turístico específico e aspectos sensoriais",
+    "pontosTuristicos": ["Nome do Primeiro Ponto", "Nome do Segundo Ponto"],
+    "eventos": ["Festival ou evento especial durante o período", "Outro evento relevante se houver"],
+    "clima": {
+      "temperatura": "Faixa de temperatura média esperada (ex: 15°C-25°C)",
+      "condicoes": "Descrição das condições típicas (ex: ensolarado com chuvas ocasionais)",
+      "recomendacoes": "Dicas relacionadas ao clima (o que levar/vestir)"
+    },
+    "aeroporto": {
+      "codigo": "XYZ",
+      "nome": "Nome do Aeroporto Principal"
+    },
+    "preco": {
+      "voo": 1500,
+      "hotel": 200
+    }
+  },
+  "alternativas": [
+    // EXATAMENTE 4 destinos com estrutura similar à descrita acima
+    // Cada destino alternativo deve ser de uma região/continente diferente para maximizar a diversidade
+  ],
+  "surpresa": {
+    // Mesma estrutura do topPick
+    // Deve ser um destino menos óbvio, mas igualmente adequado
+  },
+  "estacaoViagem": "${estacaoViagem}"
+}
+
+## Verificação Final Obrigatória - CONFIRME QUE:
+- ✓ TODOS os preços de voo estão ABAIXO de ${infoViajante.orcamento} ${infoViajante.moeda}
+- ✓ Considerou eventos sazonais, clima e atrações para CADA destino
+- ✓ Todos os comentários da Tripinha mencionam pontos turísticos específicos e incluem observações sensoriais
+- ✓ As recomendações estão adaptadas para viajantes ${infoViajante.companhia}
+- ✓ Todos os destinos incluem código IATA válido do aeroporto
+- ✓ Diversificou geograficamente as alternativas`;
+}
+
+// =======================
+// Funções para chamadas às APIs de IA
+// =======================
+async function callAIAPI(provider, prompt, requestData) {
+  const apiConfig = {
+    deepseek: {
+      url: 'https://api.deepseek.com/v1/chat/completions', 
+      header: 'Authorization',
+      prefix: 'Bearer',
+      model: 'deepseek-reasoner',
+      systemMessage: 'Você é um especialista em viagens com experiência em destinos globais. Retorne apenas JSON com destinos detalhados, respeitando o orçamento para voos.',
+      temperature: 0.5, // Temperatura mais baixa para resposta mais focada
+      max_tokens: 3000, // Maior limite para respostas mais detalhadas
+      additionalParams: {
+        reasoner_enabled: true // Habilitar o reasoner para melhor análise
+      }
+    },
+    perplexity: {
+      url: 'https://api.perplexity.ai/chat/completions',
+      header: 'Authorization',
+      prefix: 'Bearer',
+      model: 'sonar',
+      systemMessage: 'Você é um especialista em viagens. Sua prioridade é não exceder o orçamento para voos. Retorne apenas JSON puro com 4 destinos alternativos.',
+      temperature: 0.7,
+      max_tokens: 2000
+    },
+    openai: {
+      url: 'https://api.openai.com/v1/chat/completions',
+      header: 'Authorization',
+      prefix: 'Bearer',
+      model: 'gpt-3.5-turbo',
+      systemMessage: 'Você é um especialista em viagens. Retorne apenas JSON com 4 destinos alternativos, respeitando o orçamento para voos.',
+      temperature: 0.7,
+      max_tokens: 2000
+    },
+    claude: {
+      url: 'https://api.anthropic.com/v1/messages',
+      header: 'anthropic-api-key',
+      prefix: '',
+      model: 'claude-3-haiku-20240307',
+      systemMessage: 'Você é um especialista em viagens. Retorne apenas JSON com 4 destinos alternativos, respeitando o orçamento para voos.',
+      temperature: 0.7,
+      max_tokens: 2000
+    }
+  };
+  
+  if (!apiConfig[provider]) {
+    throw new Error(`Provedor ${provider} não suportado`);
+  }
+  
+  const config = apiConfig[provider];
+  const apiKey = process.env[`${provider.toUpperCase()}_API_KEY`];
+  
+  if (!apiKey) {
+    throw new Error(`Chave da API ${provider} não configurada`);
+  }
+  
+  // Usar o prompt especializado para Deepseek
+  const finalPrompt = provider === 'deepseek' 
+    ? gerarPromptParaDeepseekReasoner(requestData)
+    : `${prompt}
+  
+IMPORTANTE: 
+1. Cada voo DEVE respeitar o orçamento.
+2. Retorne apenas JSON.
+3. Forneça 4 destinos alternativos.
+4. Inclua pontos turísticos específicos.
+5. Inclua o código IATA de cada aeroporto.`;
+
+  try {
+    utils.log(`Enviando requisição para ${provider}...`, null);
+    
+    let requestPayload;
+    
+    // Preparar dados específicos para cada provedor
+    if (provider === 'claude') {
+      requestPayload = {
+        model: config.model,
+        max_tokens: config.max_tokens || 2000,
+        messages: [
+          {
+            role: "system",
+            content: config.systemMessage
+          },
+          {
+            role: "user",
+            content: finalPrompt
+          }
+        ],
+        temperature: config.temperature || 0.7
+      };
+    } else {
+      requestPayload = {
+        model: config.model,
+        messages: [
+          {
+            role: "system",
+            content: config.systemMessage
+          },
+          {
+            role: "user",
+            content: finalPrompt
+          }
+        ],
+        temperature: config.temperature || 0.7,
+        max_tokens: config.max_tokens || 2000
+      };
+      
+      // Adicionar parâmetros específicos para cada provedor
+      if (config.additionalParams) {
+        Object.assign(requestPayload, config.additionalParams);
+      }
+      
+      // Ajustes específicos para Perplexity
+      if (provider === 'perplexity') {
+        requestPayload.response_format = { type: "text" };
+      }
+    }
+    
+    const headers = {
+      'Content-Type': 'application/json'
+    };
+    headers[config.header] = config.prefix ? `${config.prefix} ${apiKey}` : apiKey;
+    
+    // Para Claude, adicionar versão da API
+    if (provider === 'claude') {
+      headers['anthropic-version'] = '2023-06-01';
+    }
+    
+    const response = await apiClient({
+      method: 'post',
+      url: config.url,
+      headers,
+      data: requestPayload,
+      timeout: config.timeout || CONFIG.timeout.request
+    });
+    
+    // Extrair conteúdo de acordo com o formato de resposta do provedor
+    let content;
+    
+    if (provider === 'claude') {
+      if (!response.data?.content?.[0]?.text) {
+        throw new Error(`Formato de resposta do ${provider} inválido`);
+      }
+      content = response.data.content[0].text;
+    } else {
+      if (!response.data?.choices?.[0]?.message?.content) {
+        throw new Error(`Formato de resposta do ${provider} inválido`);
+      }
+      content = response.data.choices[0].message.content;
+    }
+    
+    utils.log(`Conteúdo recebido da API ${provider} (primeiros 200 caracteres):`, content.substring(0, 200));
+    
+    // Depuração adicional se for Deepseek
+    if (provider === 'deepseek') {
+      try {
+        const jsonConteudo = utils.extrairJSONDaResposta(content);
+        if (jsonConteudo) {
+          const dados = JSON.parse(jsonConteudo);
+          utils.log('Deepseek forneceu destinos válidos:', {
+            topPick: dados.topPick?.destino,
+            alternativas: dados.alternativas?.map(a => a.destino).join(', '),
+            surpresa: dados.surpresa?.destino
+          });
+        }
+      } catch (error) {
+        console.error('Erro ao analisar resposta do Deepseek:', error.message);
+      }
+    }
+    
+    return utils.extrairJSONDaResposta(content);
+  } catch (error) {
+    console.error(`Erro na chamada à API ${provider}:`, error.message);
+    if (error.response) {
+      utils.log(`Resposta de erro (${provider}):`, error.response.data);
+    }
+    throw error;
+  }
+}
+
+// =======================
+// Funções para processamento e melhoria de JSON
+// =======================
+function enriquecerComentarioTripinha(comentario, pontosTuristicos) {
+  if (!comentario || !pontosTuristicos?.length) return null;
+  
+  const mencionaAtual = pontosTuristicos.some(ponto => 
+    comentario.toLowerCase().includes(ponto.toLowerCase())
+  );
+  
+  if (mencionaAtual) return comentario;
+  
+  const pontoParaMencionar = pontosTuristicos[0];
+  const padroes = [
+    `${comentario} Adorei especialmente ${pontoParaMencionar}! 🐾`,
+    `${comentario.replace(/🐾.*$/, '')} Fiquei impressionada com ${pontoParaMencionar}! 🐾`,
+    comentario.includes('!') 
+      ? comentario.replace(/!([^!]*)$/, `! ${pontoParaMencionar} é incrível!$1`)
+      : `${comentario} ${pontoParaMencionar} é um lugar que todo cachorro devia visitar! 🐾`
+  ];
+  
+  return padroes[Math.floor(Math.random() * padroes.length)];
+}
+
+const pontosPopulares = {
+  "Paris": ["Torre Eiffel", "Museu do Louvre"],
+  "Roma": ["Coliseu", "Vaticano"],
+  "Nova York": ["Central Park", "Times Square"],
+  "Tóquio": ["Torre de Tóquio", "Shibuya Crossing"],
+  "Rio de Janeiro": ["Cristo Redentor", "Pão de Açúcar"],
+  "Lisboa": ["Torre de Belém", "Alfama"],
+  "Barcelona": ["Sagrada Família", "Parque Güell"],
+  "Londres": ["Big Ben", "London Eye"],
+  "Cidade do México": ["Zócalo", "Teotihuacán"],
+  "Dubai": ["Burj Khalifa", "Dubai Mall"],
+  "Bangkok": ["Grande Palácio", "Templo do Buda de Esmeralda"],
+  "Buenos Aires": ["Casa Rosada", "La Boca"],
+  "Amsterdã": ["Museu Van Gogh", "Canais"],
+  "Berlim": ["Portão de Brandemburgo", "Muro de Berlim"],
+  "Praga": ["Castelo de Praga", "Ponte Carlos"],
+  "Istambul": ["Hagia Sophia", "Grande Bazar"],
+  "Cairo": ["Pirâmides de Gizé", "Museu Egípcio"],
+  "Machu Picchu": ["Cidadela Inca", "Huayna Picchu"],
+  "Sydney": ["Opera House", "Harbour Bridge"],
+  "Veneza": ["Praça São Marcos", "Canal Grande"],
+  "Marrakech": ["Medina", "Jardim Majorelle"],
+  "Kyoto": ["Templo Kinkaku-ji", "Floresta de Bambu Arashiyama"],
+  "Santorini": ["Oia", "Praias Vulcânicas"],
+  "Cartagena": ["Cidade Amuralhada", "Praias Ilhas Rosário"],
+  "Medellín": ["Comuna 13", "Parque Arví"],
+  "San José": ["Teatro Nacional", "Vulcão Poás"],
+  "generico_Brasil": ["Praias paradisíacas", "Parques nacionais"],
+  "generico_Europa": ["Praças históricas", "Museus de arte"],
+  "generico_Asia": ["Templos antigos", "Mercados tradicionais"],
+  "generico_America": ["Parques nacionais", "Centros urbanos"]
+};
+
+function ensureTouristAttractionsAndComments(jsonString, requestData) {
+  try {
+    const data = typeof jsonString === 'string' ? JSON.parse(jsonString) : jsonString;
+    let modificado = false;
+    
+    // Melhorar topPick
+    if (data.topPick) {
+      // Adicionar pontos turísticos se necessário
+      if (!data.topPick.pontosTuristicos?.length || data.topPick.pontosTuristicos.length < 2) {
+        const destino = data.topPick.destino;
+        data.topPick.pontosTuristicos = pontosPopulares[destino] || 
+          ["Principais atrativos da cidade", "Pontos históricos"];
+        modificado = true;
+      }
+      
+      // Melhorar comentário
+      if (data.topPick.comentario) {
+        const novoComentario = enriquecerComentarioTripinha(
+          data.topPick.comentario, data.topPick.pontosTuristicos
+        );
+        if (novoComentario && novoComentario !== data.topPick.comentario) {
+          data.topPick.comentario = novoComentario;
+          modificado = true;
+        }
+      } else {
+        const pontoTuristico = data.topPick.pontosTuristicos[0] || "esse lugar incrível";
+        data.topPick.comentario = `${data.topPick.destino} é um sonho! Adorei passear por ${pontoTuristico} e sentir todos aqueles cheiros novos! Uma aventura incrível para qualquer cachorro explorador! 🐾`;
+        modificado = true;
+      }
+      
+      // Adicionar aeroporto se necessário
+      if (!data.topPick.aeroporto?.codigo) {
+        data.topPick.aeroporto = {
+          codigo: obterCodigoIATAPadrao(data.topPick.destino, data.topPick.pais),
+          nome: `Aeroporto de ${data.topPick.destino}`
+        };
+        modificado = true;
+      }
+      
+      // Adicionar clima se necessário
+      if (!data.topPick.clima) {
+        data.topPick.clima = {
+          temperatura: "Temperatura típica para a estação",
+          condicoes: "Condições climáticas normais para o período",
+          recomendacoes: "Leve roupas adequadas para a estação"
+        };
+        modificado = true;
+      }
+    }
+    
+    // Melhorar destino surpresa
+    if (data.surpresa) {
+      // Processar de forma semelhante ao topPick
+      if (!data.surpresa.pontosTuristicos?.length || data.surpresa.pontosTuristicos.length < 2) {
+        const destino = data.surpresa.destino;
+        data.surpresa.pontosTuristicos = pontosPopulares[destino] || 
+          ["Locais exclusivos", "Atrativos menos conhecidos"];
+        modificado = true;
+      }
+      
+      if (data.surpresa.comentario) {
+        const novoComentario = enriquecerComentarioTripinha(
+          data.surpresa.comentario, data.surpresa.pontosTuristicos
+        );
+        if (novoComentario && novoComentario !== data.surpresa.comentario) {
+          data.surpresa.comentario = novoComentario;
+          modificado = true;
+        }
+      } else {
+        const pontoTuristico = data.surpresa.pontosTuristicos[0] || "esse lugar secreto";
+        data.surpresa.comentario = `${data.surpresa.destino} é uma descoberta incrível! Poucos conhecem ${pontoTuristico}, mas é um paraíso para cachorros curiosos como eu! Tantos aromas novos para farejar! 🐾🌟`;
+        modificado = true;
+      }
+      
+      if (!data.surpresa.aeroporto?.codigo) {
+        data.surpresa.aeroporto = {
+          codigo: obterCodigoIATAPadrao(data.surpresa.destino, data.surpresa.pais),
+          nome: `Aeroporto de ${data.surpresa.destino}`
+        };
+        modificado = true;
+      }
+      
+      // Adicionar clima se necessário
+      if (!data.surpresa.clima) {
+        data.surpresa.clima = {
+          temperatura: "Temperatura típica para a estação",
+          condicoes: "Condições climáticas normais para o período",
+          recomendacoes: "Leve roupas adequadas para a estação"
+        };
+        modificado = true;
+      }
+    }
+    
+    // Verificar e melhorar alternativas
+    if (!data.alternativas || !Array.isArray(data.alternativas)) {
+      data.alternativas = [];
+      modificado = true;
+    }
+    
+    // Processar alternativas existentes
+    data.alternativas.forEach(alternativa => {
+      if (!alternativa.pontoTuristico) {
+        const destino = alternativa.destino;
+        alternativa.pontoTuristico = (pontosPopulares[destino] || ["Atrações turísticas"])[0];
+        modificado = true;
+      }
+      
+      if (!alternativa.aeroporto?.codigo) {
+        alternativa.aeroporto = {
+          codigo: obterCodigoIATAPadrao(alternativa.destino, alternativa.pais),
+          nome: `Aeroporto de ${alternativa.destino}`
+        };
+        modificado = true;
+      }
+      
+      // Adicionar clima se necessário
+      if (!alternativa.clima) {
+        alternativa.clima = {
+          temperatura: "Temperatura típica para a estação"
+        };
+        modificado = true;
+      }
+    });
+    
+    // Adicionar alternativas se necessário
+    const destinosReserva = ["Lisboa", "Barcelona", "Roma", "Tóquio"];
+    const paisesReserva = ["Portugal", "Espanha", "Itália", "Japão"];
+    const codigosPaisesReserva = ["PT", "ES", "IT", "JP"];
+    const codigosIATAReserva = ["LIS", "BCN", "FCO", "HND"];
+    
+    while (data.alternativas.length < 4) {
+      const index = data.alternativas.length % destinosReserva.length;
+      const destino = destinosReserva[index];
+      const pontosConhecidos = pontosPopulares[destino] || ["Atrações turísticas"];
+      const precoBase = requestData?.orcamento_valor ? 
+        Math.round(parseFloat(requestData.orcamento_valor) * 0.7) : 2000;
+      
+      data.alternativas.push({
+        destino: destino,
+        pais: paisesReserva[index],
+        codigoPais: codigosPaisesReserva[index],
+        porque: `Cidade com rica história, gastronomia única e atmosfera encantadora`,
+        pontoTuristico: pontosConhecidos[0] || "Atrações turísticas",
+        aeroporto: {
+          codigo: codigosIATAReserva[index],
+          nome: `Aeroporto de ${destino}`
+        },
+        clima: {
+          temperatura: "Temperatura típica para a estação"
+        },
+        preco: {
+          voo: precoBase - (index * 100),
+          hotel: 200 + (index * 20)
+        }
+      });
+      
+      modificado = true;
+    }
+    
+    // Limitar a 4 alternativas se houver mais
+    if (data.alternativas.length > 4) {
+      data.alternativas = data.alternativas.slice(0, 4);
+      modificado = true;
+    }
+    
+    return modificado ? JSON.stringify(data) : jsonString;
+  } catch (error) {
+    console.error("Erro ao processar pontos turísticos:", error);
+    return jsonString;
+  }
+}
+
+function obterCodigoIATAPadrao(cidade, pais) {
+  const mapeamentoIATA = {
+    'São Paulo': 'GRU', 'Rio de Janeiro': 'GIG', 'Buenos Aires': 'EZE',
+    'Santiago': 'SCL', 'Lima': 'LIM', 'Bogotá': 'BOG',
+    'Cartagena': 'CTG', 'Cidade do México': 'MEX', 'Cancún': 'CUN',
+    'Nova York': 'JFK', 'Los Angeles': 'LAX', 'Miami': 'MIA',
+    'Londres': 'LHR', 'Paris': 'CDG', 'Roma': 'FCO',
+    'Madri': 'MAD', 'Lisboa': 'LIS', 'Barcelona': 'BCN',
+    'Tóquio': 'HND', 'Dubai': 'DXB', 'Sydney': 'SYD',
+    'Amsterdã': 'AMS', 'Berlim': 'BER', 'Munique': 'MUC',
+    'Porto': 'OPO', 'Praga': 'PRG', 'Viena': 'VIE',
+    'Bangkok': 'BKK', 'Singapura': 'SIN', 'Hong Kong': 'HKG',
+    'Toronto': 'YYZ', 'Vancouver': 'YVR', 'Montreal': 'YUL'
+  };
+  
+  if (mapeamentoIATA[cidade]) return mapeamentoIATA[cidade];
+  
+  const mapeamentoPais = {
+    'Brasil': 'GRU', 'Estados Unidos': 'JFK', 'México': 'MEX',
+    'Reino Unido': 'LHR', 'França': 'CDG', 'Itália': 'FCO',
+    'Espanha': 'MAD', 'Portugal': 'LIS', 'Japão': 'HND',
+    'China': 'PEK', 'Austrália': 'SYD', 'Alemanha': 'FRA',
+    'Canadá': 'YYZ', 'Tailândia': 'BKK', 'Emirados Árabes': 'DXB',
+    'Colômbia': 'BOG', 'Peru': 'LIM', 'Chile': 'SCL',
+    'Argentina': 'EZE', 'Uruguai': 'MVD', 'Costa Rica': 'SJO'
+  };
+  
+  if (mapeamentoPais[pais]) return mapeamentoPais[pais];
+  
+  if (cidade?.length >= 3) return cidade.substring(0, 3).toUpperCase();
+  
+  return "AAA";
+}
+
+// =======================
+// Dados de emergência
+// =======================
+function generateEmergencyData(dadosUsuario = {}) {
+  const orcamento = dadosUsuario.orcamento_valor ? parseFloat(dadosUsuario.orcamento_valor) : 3000;
+  const cidadeOrigem = dadosUsuario.cidade_partida?.name || '';
+  const regiao = cidadeOrigem.toLowerCase().includes('brasil') ? 'americas' : 'global';
+  
+  // Mapa simplificado de destinos de emergência por região
+  const destinosEmergencia = {
+    'americas': {
+      topPick: {
+        destino: "Cartagena",
+        pais: "Colômbia",
+        codigoPais: "CO",
+        descricao: "Cidade histórica colonial à beira-mar com arquitetura colorida.",
+        porque: "Excelente custo-benefício, praias paradisíacas e centro histórico deslumbrante.",
+        destaque: "Explorar a cidade amuralhada ao pôr do sol",
+        comentario: "Cartagena me conquistou! A Cidade Amuralhada tem tantos cheiros diferentes que eu não sabia onde focar meu focinho! As Ilhas do Rosário são maravilhosas! 🐾",
+        pontosTuristicos: ["Cidade Amuralhada", "Ilhas do Rosário"],
+        eventos: ["Festival Internacional de Cinema de Cartagena", "Festival de Música do Caribe"],
+        clima: {
+          temperatura: "28°C-32°C",
+          condicoes: "Clima tropical, quente e úmido com sol constante",
+          recomendacoes: "Roupas leves, protetor solar e chapéu"
+        },
+        aeroporto: { codigo: "CTG", nome: "Aeroporto Internacional Rafael Núñez" },
+        preco: { voo: Math.round(orcamento * 0.85), hotel: 220 }
+      },
+      alternativas: [
+        {
+          destino: "Medellín", pais: "Colômbia", codigoPais: "CO",
+          porque: "Cidade moderna com clima primaveril o ano todo",
+          pontoTuristico: "Comuna 13",
+          clima: { temperatura: "20°C-25°C" },
+          aeroporto: { codigo: "MDE", nome: "Aeroporto Internacional José María Córdova" },
+          preco: { voo: Math.round(orcamento * 0.75), hotel: 180 }
+        },
+        {
+          destino: "Santiago", pais: "Chile", codigoPais: "CL",
+          porque: "Cidade moderna cercada por montanhas",
+          pontoTuristico: "Cerro San Cristóbal",
+          clima: { temperatura: "15°C-25°C" },
+          aeroporto: { codigo: "SCL", nome: "Aeroporto Internacional Arturo Merino Benítez" },
+          preco: { voo: Math.round(orcamento * 0.75), hotel: 220 }
+        },
+        {
+          destino: "Cidade do Panamá", pais: "Panamá", codigoPais: "PA",
+          porque: "Mistura de moderno e histórico com o Canal do Panamá",
+          pontoTuristico: "Canal do Panamá",
+          clima: { temperatura: "26°C-30°C" },
+          aeroporto: { codigo: "PTY", nome: "Aeroporto Internacional de Tocumen" },
+          preco: { voo: Math.round(orcamento * 0.65), hotel: 180 }
+        },
+        {
+          destino: "San José", pais: "Costa Rica", codigoPais: "CR",
+          porque: "Portal para as aventuras de ecoturismo",
+          pontoTuristico: "Vulcão Poás",
+          clima: { temperatura: "22°C-27°C" },
+          aeroporto: { codigo: "SJO", nome: "Aeroporto Internacional Juan Santamaría" },
+          preco: { voo: Math.round(orcamento * 0.8), hotel: 210 }
+        }
+      ],
+      surpresa: {
+        destino: "Montevidéu",
+        pais: "Uruguai",
+        codigoPais: "UY",
+        descricao: "Capital tranquila com praias urbanas.",
+        porque: "Destino menos procurado com rica cultura e gastronomia.",
+        destaque: "Degustar carnes uruguaias premium",
+        comentario: "Montevidéu é uma descoberta incrível! Passeei pelo Mercado del Puerto, onde os aromas das parrillas me deixaram babando! A Rambla é maravilhosa! 🐾",
+        pontosTuristicos: ["Mercado del Puerto", "Rambla de Montevidéu"],
+        eventos: ["Carnaval Uruguaio", "Festival de Tango"],
+        clima: {
+          temperatura: "15°C-22°C",
+          condicoes: "Temperado com brisa marítima",
+          recomendacoes: "Casaco leve para as noites"
+        },
+        aeroporto: { codigo: "MVD", nome: "Aeroporto Internacional de Carrasco" },
+        preco: { voo: Math.round(orcamento * 0.75), hotel: 180 }
+      }
+    },
+    'global': {
+      topPick: {
+        destino: "Lisboa",
+        pais: "Portugal",
+        codigoPais: "PT",
+        descricao: "Capital histórica com vista para o rio Tejo.",
+        porque: "Excelente custo-benefício, rica gastronomia e cultura acessível.",
+        destaque: "Passear pelos bairros históricos ao pôr do sol",
+        comentario: "Lisboa me encantou! Os miradouros têm vistas de tirar o fôlego e explorar a Torre de Belém foi uma aventura e tanto! 🐾",
+        pontosTuristicos: ["Torre de Belém", "Alfama"],
+        eventos: ["Festas de Lisboa", "Festival de Fado"],
+        clima: {
+          temperatura: "16°C-26°C",
+          condicoes: "Clima mediterrâneo com muitos dias ensolarados",
+          recomendacoes: "Roupas leves e um casaco fino para as noites"
+        },
+        aeroporto: { codigo: "LIS", nome: "Aeroporto Humberto Delgado" },
+        preco: { voo: Math.round(orcamento * 0.8), hotel: 250 }
+      },
+      alternativas: [
+        {
+          destino: "Budapeste", pais: "Hungria", codigoPais: "HU",
+          porque: "Deslumbrante arquitetura e banhos termais",
+          pontoTuristico: "Parlamento Húngaro",
+          clima: { temperatura: "15°C-25°C" },
+          aeroporto: { codigo: "BUD", nome: "Aeroporto de Budapeste-Ferenc Liszt" },
+          preco: { voo: Math.round(orcamento * 0.8), hotel: 180 }
+        },
+        {
+          destino: "Cidade do México", pais: "México", codigoPais: "MX",
+          porque: "Metrópole com rica história e gastronomia",
+          pontoTuristico: "Teotihuacán",
+          clima: { temperatura: "18°C-25°C" },
+          aeroporto: { codigo: "MEX", nome: "Aeroporto Internacional Benito Juárez" },
+          preco: { voo: Math.round(orcamento * 0.7), hotel: 200 }
+        },
+        {
+          destino: "Bangkok", pais: "Tailândia", codigoPais: "TH",
+          porque: "Cidade vibrante com templos deslumbrantes",
+          pontoTuristico: "Grande Palácio",
+          clima: { temperatura: "28°C-34°C" },
+          aeroporto: { codigo: "BKK", nome: "Aeroporto Suvarnabhumi" },
+          preco: { voo: Math.round(orcamento * 0.9), hotel: 150 }
+        },
+        {
+          destino: "Porto", pais: "Portugal", codigoPais: "PT",
+          porque: "Cidade histórica à beira do Rio Douro",
+          pontoTuristico: "Vale do Douro",
+          clima: { temperatura: "15°C-25°C" },
+          aeroporto: { codigo: "OPO", nome: "Aeroporto Francisco Sá Carneiro" },
+          preco: { voo: Math.round(orcamento * 0.75), hotel: 180 }
+        }
+      ],
+      surpresa: {
+        destino: "Ljubljana",
+        pais: "Eslovênia",
+        codigoPais: "SI",
+        descricao: "Pequena capital europeia encantadora.",
+        porque: "Joia escondida com arquitetura única e natureza exuberante.",
+        destaque: "Visita ao deslumbrante Lago Bled",
+        comentario: "Ljubljana é um segredo que poucos conhecem! Adorei correr pelo parque Tivoli e explorar a Ponte do Dragão! Que lugar mágico! 🐾",
+        pontosTuristicos: ["Parque Tivoli", "Ponte do Dragão"],
+        eventos: ["Festival de Verão de Ljubljana", "Mercado de Natal"],
+        clima: {
+          temperatura: "12°C-22°C",
+          condicoes: "Clima continental com quatro estações bem definidas",
+          recomendacoes: "Roupas em camadas para adaptar às mudanças de temperatura"
+        },
+        aeroporto: { codigo: "LJU", nome: "Aeroporto Jože Pučnik" },
+        preco: { voo: Math.round(orcamento * 0.9), hotel: 170 }
+      }
+    }
+  };
+  
+  return destinosEmergencia[regiao] || destinosEmergencia.global;
+}
+
+// =======================
+// Geração de prompt padrão
+// =======================
+function gerarPromptParaDestinos(dados) {
+  const infoViajante = {
+    companhia: getCompanhiaText(dados.companhia || 0),
+    preferencia: getPreferenciaText(dados.preferencia_viagem || 0),
+    cidadeOrigem: dados.cidade_partida?.name || 'origem não especificada',
+    orcamento: dados.orcamento_valor || 'flexível',
+    moeda: dados.moeda_escolhida || 'BRL',
+    pessoas: dados.quantidade_familia || dados.quantidade_amigos || 1,
+    conheceDestino: dados.conhece_destino || 0,
+    tipoDestino: dados.tipo_destino || 'qualquer',
+    famaDestino: dados.fama_destino || 'qualquer'
+  };
+  
+  // Processar datas
+  let dataIda = 'não especificada';
+  let dataVolta = 'não especificada';
+  let duracaoViagem = 'não especificada';
+  
+  if (dados.datas) {
+    if (typeof dados.datas === 'string' && dados.datas.includes(',')) {
+      const partes = dados.datas.split(',');
+      dataIda = partes[0] || 'não especificada';
+      dataVolta = partes[1] || 'não especificada';
+    } else if (dados.datas.dataIda && dados.datas.dataVolta) {
+      dataIda = dados.datas.dataIda;
+      dataVolta = dados.datas.dataVolta;
+    }
+    
+    try {
+      if (dataIda !== 'não especificada' && dataVolta !== 'não especificada') {
+        const ida = new Date(dataIda);
+        const volta = new Date(dataVolta);
+        const diff = Math.abs(volta - ida);
+        duracaoViagem = `${Math.ceil(diff / (1000 * 60 * 60 * 24))} dias`;
+      }
+    } catch {}
+  }
+  
+  // Determinar estação
+  let estacaoViagem = 'não determinada';
+  let hemisferio = infoViajante.cidadeOrigem.toLowerCase().includes('brasil') ? 'sul' : 'norte';
+  
+  try {
+    if (dataIda !== 'não especificada') {
+      const dataObj = new Date(dataIda);
+      const mes = dataObj.getMonth();
+      
+      if (mes >= 2 && mes <= 4) estacaoViagem = 'primavera';
+      else if (mes >= 5 && mes <= 7) estacaoViagem = 'verão';
+      else if (mes >= 8 && mes <= 10) estacaoViagem = 'outono';
+      else estacaoViagem = 'inverno';
+      
+      if (hemisferio === 'sul') {
+        const mapaEstacoes = {
+          'verão': 'inverno',
+          'inverno': 'verão',
+          'primavera': 'outono',
+          'outono': 'primavera'
+        };
+        estacaoViagem = mapaEstacoes[estacaoViagem] || estacaoViagem;
+      }
+    }
+  } catch {}
+  
+  const mensagemOrcamento = infoViajante.orcamento !== 'flexível' ?
+    `⚠️ ORÇAMENTO MÁXIMO: ${infoViajante.orcamento} ${infoViajante.moeda} para voos. Todos os destinos DEVEM ter preços abaixo deste valor.` : 
+    'Orçamento flexível';
+  
+  const sugestaoDistancia = infoViajante.cidadeOrigem.toLowerCase().includes('são paulo') || 
+                           infoViajante.cidadeOrigem.toLowerCase().includes('nova york') ? 
+    '(considere incluir destinos intercontinentais)' : '(considere a distância e acessibilidade)';
+
+  return `Crie recomendações de viagem que respeitam ESTRITAMENTE o orçamento do usuário:
+
 ${mensagemOrcamento}
+
 PERFIL DO VIAJANTE:
-- Partindo de: ${cidadeOrigem} ${sugestaoDistancia}
-- Viajando: ${companheiroTexto}
-- Número de pessoas: ${quantidadePessoas}
-- Atividades preferidas: ${preferenciaTexto} e ${atracaoTexto}
-- Período da viagem: ${dataIda} a ${dataVolta} (${duracaoViagem} dias)
+- Partindo de: ${infoViajante.cidadeOrigem} ${sugestaoDistancia}
+- Viajando: ${infoViajante.companhia}
+- Número de pessoas: ${infoViajante.pessoas}
+- Atividades preferidas: ${infoViajante.preferencia}
+- Período da viagem: ${dataIda} a ${dataVolta} (${duracaoViagem})
 - Estação do ano na viagem: ${estacaoViagem}
-- Experiência como viajante: ${conhece_destino === 1 ? 'Com experiência' : 'Iniciante'} 
-- Preferência por destinos: ${this.getTipoDestinoText(tipo_destino)}
-- Popularidade do destino: ${this.getFamaDestinoText(fama_destino)}
+- Experiência como viajante: ${infoViajante.conheceDestino === 1 ? 'Com experiência' : 'Iniciante'} 
+- Preferência por destinos: ${getTipoDestinoText(infoViajante.tipoDestino)}
+- Popularidade do destino: ${getFamaDestinoText(infoViajante.famaDestino)}
 
 IMPORTANTE:
-1. O preço do VOO de CADA destino DEVE ser MENOR que o orçamento máximo de ${orcamento} ${moeda}.
-2. INCLUA ESTIMATIVAS REALISTAS de preços para voos (ida e volta) e hospedagem por noite para TODOS os destinos.
-3. FORNEÇA INFORMAÇÕES CLIMÁTICAS detalhadas para o destino na época da viagem (temperatura, condições e recomendações).
-4. Forneça um mix equilibrado: inclua tanto destinos populares quanto alternativas.
-5. Forneça EXATAMENTE 4 destinos alternativos diferentes entre si.
-6. Considere a ÉPOCA DO ANO (${estacaoViagem}) para sugerir destinos com clima adequado.
-7. Inclua destinos de diferentes continentes/regiões.
-8. Garanta que os preços sejam realistas para voos de ida e volta partindo de ${cidadeOrigem}.
-9. Para CADA destino, inclua o código IATA (3 letras) do aeroporto principal.
-10. Para cada destino, INCLUA PONTOS TURÍSTICOS ESPECÍFICOS E CONHECIDOS.
-11. Os comentários da Tripinha DEVEM mencionar pelo menos um dos pontos turísticos do destino e ser escritos em primeira pessoa, como se ela tivesse visitado o local.
+1. O preço do VOO de CADA destino DEVE ser MENOR que o orçamento máximo de ${infoViajante.orcamento} ${infoViajante.moeda}.
+2. Forneça um mix equilibrado: inclua tanto destinos populares quanto alternativas.
+3. Forneça EXATAMENTE 4 destinos alternativos diferentes entre si.
+4. Considere a ÉPOCA DO ANO (${estacaoViagem}) para sugerir destinos com clima adequado.
+5. Inclua destinos de diferentes continentes/regiões.
+6. Garanta que os preços sejam realistas para voos de ida e volta partindo de ${infoViajante.cidadeOrigem}.
+7. Para CADA destino, inclua o código IATA (3 letras) do aeroporto principal.
+8. Para cada destino, INCLUA PONTOS TURÍSTICOS ESPECÍFICOS E CONHECIDOS.
+9. Os comentários da Tripinha DEVEM mencionar pelo menos um dos pontos turísticos do destino.
+10. NOVO: Forneça informações sobre o CLIMA esperado no destino durante a viagem (temperatura média e condições).
 
 Forneça no formato JSON exato abaixo, SEM formatação markdown:
 {
@@ -405,7 +1318,7 @@ Forneça no formato JSON exato abaixo, SEM formatação markdown:
     "descricao": "Breve descrição do destino",
     "porque": "Razão específica para visitar",
     "destaque": "Uma experiência única neste destino",
-    "comentario": "Comentário da Tripinha em primeira pessoa, mencionando pelo menos um ponto turístico como se ela tivesse visitado o local",
+    "comentario": "Comentário entusiasmado da Tripinha, mencionando pelo menos um ponto turístico",
     "pontosTuristicos": [
       "Nome do Primeiro Ponto Turístico", 
       "Nome do Segundo Ponto Turístico"
@@ -430,7 +1343,7 @@ Forneça no formato JSON exato abaixo, SEM formatação markdown:
       "pais": "Nome do País 1", 
       "codigoPais": "XX",
       "porque": "Razão específica para visitar",
-      "pontosTuristicos": ["Nome do Primeiro Ponto Turístico", "Nome do Segundo Ponto Turístico"],
+      "pontoTuristico": "Nome de um Ponto Turístico",
       "clima": {
         "temperatura": "Faixa de temperatura média esperada"
       },
@@ -452,7 +1365,7 @@ Forneça no formato JSON exato abaixo, SEM formatação markdown:
     "descricao": "Breve descrição do destino",
     "porque": "Razão para visitar, destacando o fator surpresa",
     "destaque": "Uma experiência única neste destino",
-    "comentario": "Comentário da Tripinha em primeira pessoa, mencionando pelo menos um ponto turístico como se ela tivesse visitado o local",
+    "comentario": "Comentário entusiasmado da Tripinha, mencionando pelo menos um ponto turístico",
     "pontosTuristicos": [
       "Nome do Primeiro Ponto Turístico", 
       "Nome do Segundo Ponto Turístico"
@@ -473,770 +1386,254 @@ Forneça no formato JSON exato abaixo, SEM formatação markdown:
   },
   "estacaoViagem": "${estacaoViagem}"
 }`;
-  },
+}
+
+// Funções auxiliares simplificadas
+function getCompanhiaText(value) {
+  const options = {
+    0: "sozinho(a)",
+    1: "em casal (viagem romântica)",
+    2: "em família",
+    3: "com amigos"
+  };
+  return options[typeof value === 'string' ? parseInt(value, 10) : value] || "sozinho(a)";
+}
+
+function getPreferenciaText(value) {
+  const options = {
+    0: "relaxamento e descanso",
+    1: "aventura e atividades ao ar livre",
+    2: "cultura, história e gastronomia",
+    3: "experiência urbana, compras e vida noturna"
+  };
+  return options[typeof value === 'string' ? parseInt(value, 10) : value] || "experiências diversificadas";
+}
+
+function getTipoDestinoText(value) {
+  const options = {
+    0: "nacional",
+    1: "internacional",
+    2: "qualquer (nacional ou internacional)"
+  };
+  return options[typeof value === 'string' ? parseInt(value, 10) : value] || "qualquer";
+}
+
+function getFamaDestinoText(value) {
+  const options = {
+    0: "famoso e turístico",
+    1: "fora do circuito turístico comum",
+    2: "mistura de ambos"
+  };
+  return options[typeof value === 'string' ? parseInt(value, 10) : value] || "qualquer";
+}
+
+// =======================
+// Função principal - Handler da API
+// =======================
+module.exports = async function handler(req, res) {
+  let isResponseSent = false;
+  const serverTimeout = setTimeout(() => {
+    if (!isResponseSent) {
+      isResponseSent = true;
+      console.log('Timeout do servidor atingido, enviando resposta de emergência');
+      const emergencyData = generateEmergencyData(req.body);
+      return res.status(200).json({
+        tipo: "emergencia-timeout",
+        conteudo: JSON.stringify(emergencyData),
+        message: "Timeout do servidor"
+      });
+    }
+  }, CONFIG.timeout.handler);
+
+  // Configuração de CORS e headers
+  res.setHeader('Access-Control-Allow-Credentials', true);
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,POST');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   
-  // NOVA FUNÇÃO: Extrair pontos turísticos do texto
-  extrairPontosTuristicos(texto, destino) {
-    if (!texto || typeof texto !== 'string') return [];
-    
-    const pontosTuristicos = [];
-    const textoLower = texto.toLowerCase();
-    const destinoLower = destino.toLowerCase();
-    
-    // Lista de palavras-chave que podem indicar pontos turísticos
-    const keywords = [
-      'visite', 'visitar', 'conhecer', 'explorar', 'turismo', 'turístico', 'atração', 
-      'atrações', 'monumento', 'museu', 'parque', 'catedral', 'igreja', 'templo', 
-      'palácio', 'castelo', 'jardim', 'plaza', 'praça', 'mercado', 'feira', 'torre',
-      'ponte', 'praia', 'montanha', 'lago', 'rio', 'passeio', 'tour', 'excursão'
-    ];
-    
-    // Expressões regulares para encontrar pontos turísticos
-    
-    // 1. Nomes próprios entre aspas
-    const aspasRegex = /"([^"]+)"/g;
-    let match;
-    while ((match = aspasRegex.exec(texto)) !== null) {
-      const ponto = match[1].trim();
-      if (ponto.length > 3 && !pontosTuristicos.includes(ponto) && !ponto.toLowerCase().includes(destinoLower)) {
-        pontosTuristicos.push(ponto);
-      }
-    }
-    
-    // 2. Nomes com letra maiúscula seguidos por nomes de locais
-    const nomesPropriosRegex = /\b([A-Z][a-zÀ-ú]+(?: [A-Z][a-zÀ-ú]+)*) (?:Park|Museum|Cathedral|Castle|Beach|Palace|Temple|Church|Bridge|Tower|Plaza|Square|Market|Garden|Mountain|Lake|Island|Falls)/g;
-    while ((match = nomesPropriosRegex.exec(texto)) !== null) {
-      const ponto = match[0].trim();
-      if (ponto.length > 3 && !pontosTuristicos.includes(ponto) && !ponto.toLowerCase().includes(destinoLower)) {
-        pontosTuristicos.push(ponto);
-      }
-    }
-    
-    // 3. No campo "destaque", geralmente o primeiro item mencionado é um ponto turístico
-    if (texto.length < 100) {  // Provavelmente é um campo curto como "destaque"
-      // Tentar extrair lugares específicos que estão entre vírgulas ou no início
-      const destaquesRegex = /^([^,]+)|(?:, ?| e )([^,]+)/g;
-      while ((match = destaquesRegex.exec(texto)) !== null) {
-        const ponto = (match[1] || match[2])?.trim();
-        if (ponto && ponto.length > 3 && !pontosTuristicos.includes(ponto) && !ponto.toLowerCase().includes(destinoLower)) {
-          // Verificar se não é apenas uma frase genérica
-          const palavrasGenéricas = ['passeio', 'visita', 'experiência', 'tour', 'excursão', 'atividade'];
-          if (!palavrasGenéricas.some(palavra => ponto.toLowerCase().startsWith(palavra))) {
-            pontosTuristicos.push(ponto);
-          }
-        }
-      }
-    }
-    
-    // 4. Frases com palavras-chave seguidas por nomes próprios
-    for (const keyword of keywords) {
-      const keywordRegex = new RegExp(`${keyword} (?:a|o|as|os|ao|à|do|da|no|na|pelo|pela)? ([A-Z][a-zÀ-ú]+(?: [A-Z][a-zÀ-ú]+){0,4})`, 'g');
-      while ((match = keywordRegex.exec(texto)) !== null) {
-        const ponto = match[1].trim();
-        if (ponto.length > 3 && !pontosTuristicos.includes(ponto) && !ponto.toLowerCase().includes(destinoLower)) {
-          pontosTuristicos.push(ponto);
-        }
-      }
-    }
-    
-    // 5. Se já temos o campo pontosTuristicos no JSON, usá-lo diretamente
-    if (typeof texto === 'object' && texto.pontosTuristicos && Array.isArray(texto.pontosTuristicos)) {
-      for (const ponto of texto.pontosTuristicos) {
-        if (!pontosTuristicos.includes(ponto)) {
-          pontosTuristicos.push(ponto);
-        }
-      }
-    }
-    
-    // Limitar a quantidade de pontos turísticos para não sobrecarregar
-    return pontosTuristicos.slice(0, 5);
-  },
+  // Configurações adicionais para evitar o erro 499
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('Keep-Alive', 'timeout=60');
+
+  if (req.method === 'OPTIONS') {
+    isResponseSent = true;
+    clearTimeout(serverTimeout);
+    return res.status(200).end();
+  }
   
-  // Método para chamar a API do Vercel com suporte a retry e exponential backoff
-  async callVercelAPI(data, retryCount = 0) {
-    try {
-      console.log(`Chamando API Vercel com dados:`, data);
-      
-      // URL absoluta da API
-      const apiUrl = this.config.apiEndpoint;
-      const baseUrl = window.location.origin;
-      
-      // Criar URL completa se for relativa
-      const fullUrl = apiUrl.startsWith('http') ? apiUrl : baseUrl + apiUrl;
-      
-      console.log('Enviando requisição para:', fullUrl);
+  if (req.method !== 'POST') {
+    isResponseSent = true;
+    clearTimeout(serverTimeout);
+    return res.status(405).json({ error: "Método não permitido" });
+  }
 
-      // Gerar o prompt otimizado para recomendações
-      const prompt = this.gerarPromptParaDestinos(data);
-      
-      // Adicionar o prompt aos dados
-      const requestData = {
-        ...data,
-        prompt: prompt
-      };
-
-      // Implementar retry automático com exponential backoff
-      let retryDelay = this.config.retryDelay;
-      let maxRetries = this.config.maxRetries;
-      let lastError = null;
-
-      for (let attempt = 0; attempt <= maxRetries; attempt++) {
-        if (attempt > 0) {
-          console.log(`Tentativa ${attempt} de ${maxRetries} após ${retryDelay}ms...`);
-          await this.sleep(retryDelay);
-          retryDelay *= 2; // Backoff exponencial
-        }
-
-        try {
-          // Criar controller para timeout
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), this.config.apiTimeout);
-          
-          const response = await fetch(fullUrl, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Connection': 'keep-alive',
-              'Keep-Alive': 'timeout=90'
-            },
-            body: JSON.stringify(requestData),
-            signal: controller.signal,
-            // Adicionando keepalive para manter conexão
-            keepalive: true
+  try {
+    if (!req.body) {
+      isResponseSent = true;
+      clearTimeout(serverTimeout);
+      return res.status(400).json({ error: "Nenhum dado fornecido na requisição" });
+    }
+    
+    // Processar dados da requisição
+    const requestData = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
+    
+    // Gerar prompt e obter configurações
+    const prompt = gerarPromptParaDestinos(requestData);
+    const moeda = requestData.moeda_escolhida || 'BRL';
+    const orcamento = requestData.orcamento_valor ? parseFloat(requestData.orcamento_valor) : null;
+    
+    // Usar a ordem de provedores definida na configuração
+    const providers = CONFIG.providerOrder.filter(
+      provider => process.env[`${provider.toUpperCase()}_API_KEY`]
+    );
+    
+    // Tentar cada provedor de IA na ordem definida
+    for (const provider of providers) {
+      try {
+        console.log(`Tentando obter recomendações via ${provider}...`);
+        
+        // Para prevenir timeouts do cliente, enviar um heartbeat parcial
+        if (!isResponseSent) {
+          // Enviar um cabeçalho com informações parciais para manter a conexão viva
+          res.writeHead(202, {
+            'Content-Type': 'application/json',
+            'X-Processing': 'true'
           });
+        }
+        
+        const responseAI = await callAIAPI(provider, prompt, requestData);
+        
+        let processedResponse = responseAI;
+        if (responseAI && utils.isPartiallyValidJSON(responseAI)) {
+          processedResponse = ensureTouristAttractionsAndComments(responseAI, requestData);
+        }
+        
+        if (processedResponse && utils.isValidDestinationJSON(processedResponse, requestData)) {
+          utils.log(`Resposta ${provider} válida recebida`, null);
           
-          // Limpar timeout
-          clearTimeout(timeoutId);
-          
-          // Verificar se a resposta foi bem-sucedida
-          if (!response.ok) {
-            let errorText = '';
+          // Log detalhado para análise de qualidade das respostas do Deepseek
+          if (provider === 'deepseek') {
             try {
-              const errorData = await response.json();
-              errorText = errorData.error || `${response.status} ${response.statusText}`;
-            } catch (e) {
-              errorText = `${response.status} ${response.statusText}`;
+              const parsedResponse = JSON.parse(processedResponse);
+              console.log(`[Deepseek] TopPick: ${parsedResponse.topPick?.destino} (${parsedResponse.topPick?.pais})`);
+              console.log(`[Deepseek] Alternativas: ${parsedResponse.alternativas?.map(a => a.destino).join(', ')}`);
+              console.log(`[Deepseek] Surpresa: ${parsedResponse.surpresa?.destino} (${parsedResponse.surpresa?.pais})`);
+            } catch (error) {
+              console.error('Erro ao analisar resposta Deepseek para log:', error.message);
             }
-            throw new Error(`Erro na API: ${errorText}`);
           }
           
-          const responseData = await response.json();
-          console.log('Resposta da API Vercel recebida:', responseData.tipo || 'sem tipo');
-          
-          return responseData;
-          
-        } catch (fetchError) {
-          lastError = fetchError;
-          console.warn(`Tentativa ${attempt + 1} falhou:`, fetchError.message);
-          
-          // Verificar se é um erro de timeout ou aborto
-          const isTimeoutError = fetchError.name === 'AbortError' || fetchError.message.includes('timeout');
-          
-          // Verificar se temos mais tentativas disponíveis
-          if (attempt < maxRetries) {
-            // Continuar para próxima tentativa
-            this.reportarProgresso('retry', 50, `Tentando novamente... (${attempt + 1}/${maxRetries})`);
-            continue;
-          } else {
-            // Se for a última tentativa, lançar o erro
-            throw fetchError;
-          }
-        }
-      }
-      
-      // Se chegou aqui, todas as tentativas falharam
-      throw lastError || new Error('Falha em todas as tentativas de conexão');
-      
-    } catch (error) {
-      console.error('Erro ao chamar API Vercel:', error);
-      
-      // Se for erro de CORS, tentar com formatos alternativos
-      if (error.message.includes('CORS') && retryCount < 1) {
-        console.log('Erro de CORS detectado, tentando abordagem alternativa...');
-        try {
-          // Tentar com jsonp ou outro método
-          // Esta é apenas uma simulação de resposta para não travar o fluxo
-          console.log('Retornando dados simulados devido ao erro de CORS');
-          return {
-            tipo: "simulado-cors",
-            conteudo: JSON.stringify(this.config.mockData)
-          };
-        } catch (corsError) {
-          console.error('Erro na abordagem alternativa para CORS:', corsError);
-        }
-      }
-      
-      // Simulação de resposta para não travar o fluxo
-      console.log('Retornando dados simulados devido ao erro');
-      return {
-        tipo: "simulado-error",
-        conteudo: JSON.stringify(this.config.mockData)
-      };
-    }
-  },
-  
-  // Método atualizado para buscar imagens para um destino, utilizando pontos turísticos
-  async buscarImagensParaDestino(destino, pais, descricao = '', porque = '', 
-                               pontosTuristicos = [], quantidadeImagens = 2) {
-    try {
-      // Verificar se já temos no cache para este destino e ponto turístico
-      const cacheKey = `${destino}_${pontosTuristicos.join('_')}`;
-      if (this._cacheImagens[cacheKey]) {
-        console.log(`Usando imagens em cache para: ${destino}`);
-        // Selecionar apenas a quantidade solicitada
-        return this._cacheImagens[cacheKey].slice(0, quantidadeImagens);
-      }
-      
-      // Se não temos pontos turísticos explícitos, tentar extraí-los do texto
-      if (!pontosTuristicos || pontosTuristicos.length === 0) {
-        // Combinar descrição e motivo para melhorar a extração
-        const textoCompleto = `${descricao} ${porque}`.trim();
-        pontosTuristicos = this.extrairPontosTuristicos(textoCompleto, destino);
-        console.log(`Pontos turísticos extraídos para ${destino}:`, pontosTuristicos);
-      }
-      
-      // Tratar o caso em que pontosTuristicos é uma string única
-      if (typeof pontosTuristicos === 'string') {
-        pontosTuristicos = [pontosTuristicos];
-      }
-      
-      // Combinar descrição e motivo para melhorar a consulta
-      const descricaoCompleta = `${descricao} ${porque}`.trim();
-      const query = `${destino} ${pais}`;
-      
-      console.log(`Buscando imagens para: ${query} com pontos turísticos:`, pontosTuristicos);
-      
-      // URL da API de imagens
-      const apiUrl = this.config.imageApiEndpoint;
-      const baseUrl = window.location.origin;
-      
-      // Criar URL completa se for relativa
-      const fullUrl = apiUrl.startsWith('http') ? apiUrl : baseUrl + apiUrl;
-      
-      // Adicionar parâmetros como query string
-      const url = new URL(fullUrl);
-      url.searchParams.append('query', query);
-      url.searchParams.append('perPage', quantidadeImagens); // Usar a quantidade solicitada
-      url.searchParams.append('descricao', descricaoCompleta);
-      
-      // Adicionar pontos turísticos se existirem
-      if (pontosTuristicos && pontosTuristicos.length > 0) {
-        url.searchParams.append('pontosTuristicos', JSON.stringify(pontosTuristicos));
-      }
-      
-      console.log('Enviando requisição para API de imagens:', url.toString());
-      
-      // Implementar retry automático com exponential backoff
-      let retryDelay = this.config.retryDelay;
-      let maxRetries = 2; // Menos tentativas para imagens
-      let lastError = null;
-
-      for (let attempt = 0; attempt <= maxRetries; attempt++) {
-        if (attempt > 0) {
-          console.log(`Tentativa de imagem ${attempt} de ${maxRetries} após ${retryDelay}ms...`);
-          await this.sleep(retryDelay);
-          retryDelay *= 2; // Backoff exponencial
-        }
-
-        try {
-          // Criar controller para timeout
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 30000); // Timeout mais curto para imagens
-          
-          const response = await fetch(url.toString(), {
-            method: 'GET',
-            headers: {
-              'Content-Type': 'application/json',
-              'Cache-Control': 'no-cache',
-              'Connection': 'keep-alive'
-            },
-            signal: controller.signal,
-            keepalive: true
-          });
-          
-          // Limpar timeout
-          clearTimeout(timeoutId);
-          
-          // Verificar se a resposta foi bem-sucedida
-          if (!response.ok) {
-            throw new Error(`Erro ao buscar imagens: ${response.status} ${response.statusText}`);
-          }
-          
-          const data = await response.json();
-          console.log(`Imagens recebidas para ${destino}:`, data.images?.length || 0);
-          
-          if (data.images && data.images.length > 0) {
-            // Verificar e completar metadados se estiverem faltando
-            data.images = data.images.map(img => ({
-              ...img,
-              photographerUrl: img.photographerUrl || '#',
-              sourceUrl: img.sourceUrl || '#',
-              alt: img.alt || `${destino}, ${pais}`,
-              photographerId: img.photographerId || 'unknown',
-              pontoTuristico: img.pontoTuristico || (pontosTuristicos.length > 0 ? pontosTuristicos[0] : null)
-            }));
+          // Enrichecimento dos dados
+          try {
+            const recomendacoes = typeof processedResponse === 'string' ? 
+              JSON.parse(processedResponse) : processedResponse;
             
-            // Salvar no cache
-            this._cacheImagens[cacheKey] = data.images;
+            if (orcamento) {
+              recomendacoes.orcamentoMaximo = orcamento;
+            }
             
-            return data.images.slice(0, quantidadeImagens);
-          } else {
-            throw new Error('Nenhuma imagem encontrada');
+            const origemIATA = obterCodigoIATAOrigem(requestData);
+            const datas = obterDatasViagem(requestData);
+            
+            if (origemIATA) {
+              const recomendacoesEnriquecidas = await processarDestinos(
+                recomendacoes, origemIATA, datas, moeda
+              );
+              
+              if (!isResponseSent) {
+                isResponseSent = true;
+                clearTimeout(serverTimeout);
+                return res.status(200).json({
+                  tipo: `${provider}-enriquecido`,
+                  conteudo: JSON.stringify(recomendacoesEnriquecidas)
+                });
+              }
+              return;
+            }
+          } catch (enriquecerError) {
+            console.error('Erro ao enriquecer:', enriquecerError.message);
           }
           
-        } catch (fetchError) {
-          lastError = fetchError;
-          console.warn(`Tentativa de imagem ${attempt + 1} falhou:`, fetchError.message);
-          
-          // Continuar para próxima tentativa exceto na última
-          if (attempt === maxRetries) throw fetchError;
-        }
-      }
-      
-      // Se chegou aqui, todas as tentativas falharam
-      throw lastError || new Error('Falha em todas as tentativas de busca de imagens');
-      
-    } catch (error) {
-      console.error(`Erro ao buscar imagens para ${destino}:`, error);
-      
-      // Retornar imagens FALLBACK mais robustas usando múltiplas estratégias
-      const fallbackImages = [
-        {
-          url: `https://source.unsplash.com/featured/?${encodeURIComponent(destino + ' ' + pais)}`,
-          source: "unsplash-fallback",
-          photographer: "Unsplash",
-          photographerId: "unsplash",
-          photographerUrl: "https://unsplash.com",
-          sourceUrl: `https://unsplash.com/s/photos/${encodeURIComponent(destino)}`,
-          downloadUrl: `https://source.unsplash.com/featured/?${encodeURIComponent(destino + ' ' + pais)}`,
-          alt: `${destino}, ${pais}`,
-          pontoTuristico: pontosTuristicos.length > 0 ? pontosTuristicos[0] : null
-        }
-      ];
-      
-      // Adicionar uma segunda imagem se necessário
-      if (quantidadeImagens > 1) {
-        fallbackImages.push({
-          url: `https://source.unsplash.com/featured/?${encodeURIComponent(destino + ' tourism')}`,
-          source: "unsplash-fallback",
-          photographer: "Unsplash",
-          photographerId: "unsplash",
-          photographerUrl: "https://unsplash.com",
-          sourceUrl: `https://unsplash.com/s/photos/${encodeURIComponent(destino + '-tourism')}`,
-          downloadUrl: `https://source.unsplash.com/featured/?${encodeURIComponent(destino + ' tourism')}`,
-          alt: `${destino}, ${pais} - Atrações turísticas`,
-          pontoTuristico: pontosTuristicos.length > 1 ? pontosTuristicos[1] : (pontosTuristicos.length > 0 ? pontosTuristicos[0] : null)
-        });
-      }
-      
-      // Adicionar placeholder como último recurso se necessário
-      if (fallbackImages.length < quantidadeImagens) {
-        fallbackImages.push({
-          url: `https://via.placeholder.com/800x600.png?text=${encodeURIComponent(destino)}`,
-          source: "placeholder",
-          photographer: "Placeholder",
-          photographerId: "placeholder",
-          photographerUrl: "#",
-          sourceUrl: "#",
-          downloadUrl: `https://via.placeholder.com/800x600.png?text=${encodeURIComponent(destino)}`,
-          alt: `${destino}, ${pais}`,
-          pontoTuristico: null
-        });
-      }
-      
-      return fallbackImages.slice(0, quantidadeImagens);
-    }
-  },
-  
-  // Método atualizado para buscar imagens para todos os destinos nas recomendações
-  async enriquecerRecomendacoesComImagens(recomendacoes) {
-    if (!recomendacoes) return recomendacoes;
-    
-    this.reportarProgresso('imagens', 80, 'Buscando imagens para os destinos...');
-    
-    try {
-      // Clonar objeto para não modificar o original
-      const recomendacoesEnriquecidas = JSON.parse(JSON.stringify(recomendacoes));
-      
-      // Array de promessas para buscar todas as imagens em paralelo
-      const promessasImagens = [];
-      
-      // Buscar imagens para o destino principal (2 imagens)
-      if (recomendacoesEnriquecidas.topPick) {
-        // Extrair pontos turísticos do topPick
-        let pontosTuristicos = [];
-        
-        // Verificar se já temos pontos turísticos explícitos
-        if (recomendacoesEnriquecidas.topPick.pontosTuristicos && 
-            Array.isArray(recomendacoesEnriquecidas.topPick.pontosTuristicos)) {
-          pontosTuristicos = recomendacoesEnriquecidas.topPick.pontosTuristicos;
+          // Se o enriquecimento falhar, retornar a resposta original
+          if (!isResponseSent) {
+            isResponseSent = true;
+            clearTimeout(serverTimeout);
+            return res.status(200).json({
+              tipo: provider,
+              conteudo: processedResponse
+            });
+          }
+          return;
         } else {
-          // Combinar todos os campos de texto para extração
-          const textoCompleto = `${recomendacoesEnriquecidas.topPick.descricao || ''} 
-                             ${recomendacoesEnriquecidas.topPick.porque || ''} 
-                             ${recomendacoesEnriquecidas.topPick.destaque || ''}`.trim();
-          
-          pontosTuristicos = this.extrairPontosTuristicos(textoCompleto, recomendacoesEnriquecidas.topPick.destino);
-          
-          // Guardar os pontos turísticos extraídos no objeto
-          recomendacoesEnriquecidas.topPick.pontosTuristicos = pontosTuristicos;
+          console.log(`Resposta de ${provider} não passou na validação. Tentando próximo provedor...`);
         }
-        
-        promessasImagens.push(
-          this.buscarImagensParaDestino(
-            recomendacoesEnriquecidas.topPick.destino,
-            recomendacoesEnriquecidas.topPick.pais,
-            recomendacoesEnriquecidas.topPick.descricao,
-            recomendacoesEnriquecidas.topPick.porque,
-            pontosTuristicos,
-            this.config.imagensQtdPorTipo.topPick
-          ).then(imagens => {
-            recomendacoesEnriquecidas.topPick.imagens = imagens;
-          })
-        );
-      }
-      
-      // Buscar imagens para as alternativas (1 imagem por alternativa)
-      if (recomendacoesEnriquecidas.alternativas && Array.isArray(recomendacoesEnriquecidas.alternativas)) {
-        recomendacoesEnriquecidas.alternativas.forEach((alternativa, index) => {
-          // Extrair pontos turísticos de cada alternativa
-          let pontosTuristicos = [];
-          
-          // Verificar se já temos pontos turísticos explícitos
-          if (alternativa.pontosTuristicos && Array.isArray(alternativa.pontosTuristicos)) {
-            pontosTuristicos = alternativa.pontosTuristicos;
-          } else {
-            // Usar o campo "porque" para extrair pontos turísticos
-            pontosTuristicos = this.extrairPontosTuristicos(alternativa.porque || '', alternativa.destino);
-            
-            // Guardar os pontos turísticos extraídos no objeto
-            alternativa.pontosTuristicos = pontosTuristicos;
-          }
-          
-          promessasImagens.push(
-            this.buscarImagensParaDestino(
-              alternativa.destino,
-              alternativa.pais,
-              "", // Sem descrição dedicada
-              alternativa.porque, // Usar o campo "porque" como descrição
-              pontosTuristicos,
-              this.config.imagensQtdPorTipo.alternativa
-            ).then(imagens => {
-              recomendacoesEnriquecidas.alternativas[index].imagens = imagens;
-            })
-          );
-        });
-      }
-      
-      // Buscar imagens para o destino surpresa (2 imagens)
-      if (recomendacoesEnriquecidas.surpresa) {
-        // Extrair pontos turísticos da surpresa
-        let pontosTuristicos = [];
-        
-        // Verificar se já temos pontos turísticos explícitos
-        if (recomendacoesEnriquecidas.surpresa.pontosTuristicos && 
-            Array.isArray(recomendacoesEnriquecidas.surpresa.pontosTuristicos)) {
-          pontosTuristicos = recomendacoesEnriquecidas.surpresa.pontosTuristicos;
-        } else {
-          // Combinar todos os campos de texto para extração
-          const textoCompleto = `${recomendacoesEnriquecidas.surpresa.descricao || ''} 
-                             ${recomendacoesEnriquecidas.surpresa.porque || ''} 
-                             ${recomendacoesEnriquecidas.surpresa.destaque || ''}`.trim();
-          
-          pontosTuristicos = this.extrairPontosTuristicos(textoCompleto, recomendacoesEnriquecidas.surpresa.destino);
-          
-          // Guardar os pontos turísticos extraídos no objeto
-          recomendacoesEnriquecidas.surpresa.pontosTuristicos = pontosTuristicos;
-        }
-        
-        promessasImagens.push(
-          this.buscarImagensParaDestino(
-            recomendacoesEnriquecidas.surpresa.destino,
-            recomendacoesEnriquecidas.surpresa.pais,
-            recomendacoesEnriquecidas.surpresa.descricao,
-            recomendacoesEnriquecidas.surpresa.porque,
-            pontosTuristicos,
-            this.config.imagensQtdPorTipo.surpresa
-          ).then(imagens => {
-            recomendacoesEnriquecidas.surpresa.imagens = imagens;
-          })
-        );
-      }
-      
-      // Aguardar todas as promessas com um timeout geral
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Timeout ao buscar imagens')), 45000)
-      );
-      
-      // Race entre o timeout e todas as promessas de imagens
-      await Promise.race([
-        // allSettled permite que algumas falhem sem interromper todo o processo
-        Promise.allSettled(promessasImagens),
-        timeoutPromise
-      ]);
-      
-      this.reportarProgresso('imagens', 100, 'Imagens carregadas com sucesso!');
-      
-      console.log('Recomendações enriquecidas com imagens:', recomendacoesEnriquecidas);
-      return recomendacoesEnriquecidas;
-    } catch (error) {
-      console.error('Erro ao enriquecer recomendações com imagens:', error);
-      this.reportarProgresso('imagens', 100, 'Erro ao carregar algumas imagens');
-      
-      // Retornar recomendações originais em caso de erro
-      return recomendacoes;
-    }
-  },
-  
-  // Método para validar a estrutura dos dados das recomendações
-  validarEstruturaDados(dados) {
-    // Verificar se dados é nulo ou undefined
-    if (!dados) {
-      console.error('Dados de recomendações são nulos ou indefinidos');
-      return {...this.config.mockData};
-    }
-    
-    // Verificar estrutura básica
-    if (!dados.topPick) {
-      console.error('Destino principal não encontrado nos dados');
-      dados.topPick = this.config.mockData.topPick;
-    }
-    
-    // Verificar se alternativas existem
-    if (!dados.alternativas || !Array.isArray(dados.alternativas)) {
-      console.error('Alternativas não encontradas ou não são um array');
-      dados.alternativas = [...this.config.mockData.alternativas];
-    }
-    
-    // Garantir que haja alternativas suficientes
-    if (dados.alternativas.length < 1) {
-      console.warn('Alternativas insuficientes, adicionando dados fictícios');
-      dados.alternativas = [...this.config.mockData.alternativas];
-    }
-    
-    // Garantir que temos o destino surpresa
-    if (!dados.surpresa && dados.alternativas.length > 0) {
-      console.log('Destino surpresa não encontrado, criando a partir de alternativa');
-      dados.surpresa = {
-        ...dados.alternativas.pop(),
-        descricao: "Um destino surpreendente que poucos conhecem!",
-        destaque: "Experiência única que vai te surpreender",
-        comentario: "Este é um destino surpresa especial que farejei só para você! Confie no meu faro! 🐾🎁"
-      };
-    }
-    
-    // Se ainda não tivermos surpresa, criar uma fictícia
-    if (!dados.surpresa) {
-      console.log('Criando destino surpresa fictício');
-      dados.surpresa = this.config.mockData.surpresa;
-    }
-    
-    // Verificar e adicionar pontos turísticos se estiverem faltando
-    if (!dados.topPick.pontosTuristicos) {
-      dados.topPick.pontosTuristicos = [];
-    }
-    
-    if (dados.alternativas) {
-      dados.alternativas.forEach(alt => {
-        if (!alt.pontosTuristicos) {
-          alt.pontosTuristicos = [];
-        }
-      });
-    }
-    
-    if (!dados.surpresa.pontosTuristicos) {
-      dados.surpresa.pontosTuristicos = [];
-    }
-    
-    // Verificar e adicionar informações climáticas se estiverem faltando
-    if (!dados.topPick.clima) {
-      dados.topPick.clima = {
-        temperatura: "Indisponível",
-        condicoes: "Informações climáticas não disponíveis",
-        recomendacoes: "Consulte a previsão do tempo antes de viajar"
-      };
-    }
-    
-    if (dados.alternativas) {
-      dados.alternativas.forEach(alt => {
-        if (!alt.clima) {
-          alt.clima = {
-            temperatura: "Indisponível"
-          };
-        }
-      });
-    }
-    
-    if (!dados.surpresa.clima) {
-      dados.surpresa.clima = {
-        temperatura: "Indisponível",
-        condicoes: "Informações climáticas não disponíveis",
-        recomendacoes: "Consulte a previsão do tempo antes de viajar"
-      };
-    }
-    
-    return dados;
-  },
-  
-  // Método para registrar eventos de progresso
-  reportarProgresso(fase, porcentagem, mensagem) {
-    const evento = new CustomEvent('benetrip_progress', {
-      detail: {
-        fase,
-        porcentagem,
-        mensagem
-      }
-    });
-    
-    window.dispatchEvent(evento);
-    document.dispatchEvent(evento);
-    console.log(`Progresso: ${fase} ${porcentagem}% - ${mensagem}`);
-  },
-  
-  // Método para obter recomendações de destinos com Perplexity
-  async obterRecomendacoes(preferenciasUsuario) {
-    if (!this.isInitialized()) {
-      this.init();
-    }
-    
-    // Validar entrada
-    if (!preferenciasUsuario) {
-      throw new Error('Preferências de usuário não fornecidas');
-    }
-    
-    console.log('Recebendo pedido de recomendações com preferências:', preferenciasUsuario);
-    
-    // Gerar ID para rastrear requisições duplicadas
-    const requestId = this.generateRequestId(preferenciasUsuario);
-    
-    // Evitar chamadas duplicadas para o mesmo requestId
-    if (this._requestsInProgress[requestId]) {
-      console.log('Requisição já em andamento para:', requestId);
-      this.reportarProgresso('aguardando', 50, 'Aguardando requisição em andamento...');
-      
-      // Aguardar a requisição em andamento ser concluída
-      try {
-        return await this._requestsInProgress[requestId];
       } catch (error) {
-        console.error('Erro na requisição em andamento:', error);
-        // Continuar com uma nova requisição
+        console.error(`Erro ao usar ${provider}:`, error.message);
       }
     }
     
-    // Criar uma promise para esta requisição e armazená-la
-    const requestPromise = (async () => {
-      try {
-        // Reportar progresso inicial
-        this.reportarProgresso('inicializando', 10, 'Preparando recomendações personalizadas...');
-        
-        // Reportar progresso
-        this.reportarProgresso('processando', 30, 'Analisando suas preferências de viagem...');
-        
-        // Chamar a API do Vercel para processamento com IA
-        const resposta = await this.callVercelAPI(preferenciasUsuario);
-        
-        // Verificar formato da resposta
-        if (!resposta) {
-          throw new Error('Resposta vazia do serviço de IA');
+    // Se todos os provedores falharem, gerar resposta de emergência
+    console.log('Todos os provedores falharam, gerando resposta de emergência...');
+    const emergencyData = generateEmergencyData(requestData);
+    
+    try {
+      const origemIATA = obterCodigoIATAOrigem(requestData);
+      const datas = obterDatasViagem(requestData);
+      
+      if (origemIATA) {
+        if (orcamento) {
+          emergencyData.orcamentoMaximo = orcamento;
         }
         
-        // Reportar progresso
-        this.reportarProgresso('finalizando', 70, 'Encontrando os destinos perfeitos para você...');
+        const dadosEnriquecidos = await processarDestinos(
+          emergencyData, origemIATA, datas, moeda
+        );
         
-        // Extrair e processar recomendações
-        let recomendacoes;
-        try {
-          // Se for tipo erro mas com dados fallback
-          if (resposta.tipo === 'erro' && resposta.conteudo) {
-            const conteudoObj = this.extrairJSON(resposta.conteudo);
-            if (conteudoObj.data) {
-              console.log('Usando dados de fallback da resposta de erro');
-              recomendacoes = conteudoObj.data;
-            } else {
-              throw new Error('Formato inválido nos dados de fallback');
-            }
-          } else if (resposta.conteudo) {
-            recomendacoes = this.extrairJSON(resposta.conteudo);
-            console.log('Recomendações extraídas com sucesso:', recomendacoes);
-          } else {
-            throw new Error('Conteúdo da resposta não encontrado');
-          }
-        } catch (extractError) {
-          console.error('Erro ao extrair JSON da resposta:', extractError);
-          console.log('Usando dados mockados devido a erro de extração');
-          this.reportarProgresso('fallback', 80, 'Usando dados padrão devido a erro de processamento');
-          recomendacoes = {...this.config.mockData};
+        if (!isResponseSent) {
+          isResponseSent = true;
+          clearTimeout(serverTimeout);
+          return res.status(200).json({
+            tipo: "emergencia-enriquecida",
+            conteudo: JSON.stringify(dadosEnriquecidos)
+          });
         }
-        
-        // Validar e corrigir estrutura das recomendações
-        try {
-          recomendacoes = this.validarEstruturaDados(recomendacoes);
-        } catch (validationError) {
-          console.error('Erro na validação dos dados:', validationError);
-          console.log('Usando dados mockados devido a erro de validação');
-          this.reportarProgresso('fallback', 85, 'Usando dados padrão devido a erro de validação');
-          recomendacoes = {...this.config.mockData};
-        }
-        
-        // Garantir que temos 4 alternativas exatamente
-        while (recomendacoes.alternativas && recomendacoes.alternativas.length > 4) {
-          recomendacoes.alternativas.pop();
-        }
-        
-        // Adicionar alternativas se estiverem faltando
-        if (recomendacoes.alternativas) {
-          while (recomendacoes.alternativas.length < 4) {
-            const mockAlternativa = this.config.mockData.alternativas[recomendacoes.alternativas.length];
-            if (mockAlternativa) {
-              console.log('Adicionando alternativa fictícia');
-              recomendacoes.alternativas.push(mockAlternativa);
-            } else {
-              break;
-            }
-          }
-        }
-        
-        // Enriquecer com imagens
-        this.reportarProgresso('imagens', 85, 'Buscando imagens para os destinos...');
-        try {
-          recomendacoes = await this.enriquecerRecomendacoesComImagens(recomendacoes);
-        } catch (imageError) {
-          console.error('Erro ao adicionar imagens às recomendações:', imageError);
-          // Continuar com as recomendações sem imagens
-        }
-        
-        // Reportar progresso final
-        this.reportarProgresso('concluido', 100, 'Destinos encontrados!');
-        
-        // Salvar no localStorage apenas para uso em outras páginas se necessário
-        localStorage.setItem('benetrip_recomendacoes', JSON.stringify(recomendacoes));
-        
-        return recomendacoes;
-      } catch (erro) {
-        console.error('Erro ao obter recomendações:', erro);
-        
-        // Usar dados mockados em caso de erro
-        console.log('Usando dados mockados devido a erro');
-        this.reportarProgresso('mockados', 100, 'Usando recomendações padrão devido a erro...');
-        
-        const dadosMockados = {...this.config.mockData};
-        
-        // Salvar no localStorage para uso em outras páginas se necessário
-        localStorage.setItem('benetrip_recomendacoes', JSON.stringify(dadosMockados));
-        
-        return dadosMockados;
-      } finally {
-        // Remover a promise em andamento quando terminar
-        delete this._requestsInProgress[requestId];
+        return;
       }
-    })();
+    } catch (emergencyError) {
+      console.error('Erro ao enriquecer dados de emergência:', emergencyError.message);
+    }
     
-    // Armazenar a promise para evitar chamadas duplicadas
-    this._requestsInProgress[requestId] = requestPromise;
+    // Retornar dados de emergência sem enriquecimento se tudo falhar
+    if (!isResponseSent) {
+      isResponseSent = true;
+      clearTimeout(serverTimeout);
+      return res.status(200).json({
+        tipo: "emergencia",
+        conteudo: JSON.stringify(emergencyData)
+      });
+    }
     
-    return requestPromise;
+  } catch (globalError) {
+    console.error('Erro global:', globalError.message);
+    
+    if (!isResponseSent) {
+      isResponseSent = true;
+      clearTimeout(serverTimeout);
+      return res.status(200).json({ 
+        tipo: "erro",
+        conteudo: JSON.stringify(generateEmergencyData(req.body)),
+        error: globalError.message
+      });
+    }
+  } finally {
+    if (!isResponseSent) {
+      isResponseSent = true;
+      clearTimeout(serverTimeout);
+      res.status(200).json({
+        tipo: "erro-finally",
+        conteudo: JSON.stringify(generateEmergencyData(req.body)),
+        message: "Erro interno no servidor"
+      });
+    }
   }
 };
-
-// Inicializar o serviço quando o script for carregado
-window.BENETRIP_AI.init();
