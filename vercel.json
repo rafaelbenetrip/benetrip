@@ -3,11 +3,11 @@
   "functions": {
     "api/recommendations.js": {
       "memory": 1024,
-      "maxDuration": 60
+      "maxDuration": 300
     },
     "api/flight-search.js": {
       "memory": 1024,
-      "maxDuration": 60
+      "maxDuration": 30
     },
     "api/image-search.js": {
       "memory": 1024,
