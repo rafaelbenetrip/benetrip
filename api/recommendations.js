@@ -1003,13 +1003,13 @@ IMPORTANTE:
 
     const response = await axios({
       method: 'post',
-      url: 'https://api.deepseek.com/v1/chat/completions', // Ajuste a URL conforme a documentação do Deepseek
+      url: 'https://api.deepseek.com', // Ajuste a URL conforme a documentação do Deepseek
       headers: {
         'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json'
       },
       data: {
-        model: "deepseek-chat", // Use o nome correto do modelo
+        model: "deepseek-reasoner", // Use o nome correto do modelo
         messages: [
           {
             role: "system",
