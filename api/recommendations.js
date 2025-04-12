@@ -590,7 +590,7 @@ ${adaptacoesPorTipo[infoViajante.companhia] || "Considere experiências versáte
 async function callAIAPI(provider, prompt, requestData) {
   const apiConfig = {
     deepseek: {
-      url: 'https://api.deepseek.com', 
+      url: 'https://api.deepseek.com/v1/chat/completions', 
       header: 'Authorization',
       prefix: 'Bearer',
       model: 'deepseek-reasoner',
