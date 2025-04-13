@@ -218,7 +218,7 @@ async function callOpenRouterAPI(prompt, requestData, modelName = CONFIG.openRou
         }
       ],
       temperature: 0.7,
-      max_tokens: 3000,
+      max_tokens: 4000,
       response_format: { type: "json_object" }
     };
     
@@ -229,68 +229,55 @@ async function callOpenRouterAPI(prompt, requestData, modelName = CONFIG.openRou
       };
     }
     
-    const response = await apiClient({
-      method: 'post',
-      url: 'https://openrouter.ai/api/v1/chat/completions',
-      headers: {
-        'Authorization': `Bearer ${openRouterKey}`,
-        'HTTP-Referer': 'https://benetrip.com.br',
-        'X-Title': 'Benetrip - Recomendação de Destinos'
-      },
-      data: requestParams
-    });
+    // Implementação com timeout melhorado
+    const response = await Promise.race([
+      apiClient({
+        method: 'post',
+        url: 'https://openrouter.ai/api/v1/chat/completions',
+        headers: {
+          'Authorization': `Bearer ${openRouterKey}`,
+          'HTTP-Referer': 'https://benetrip.com.br',
+          'X-Title': 'Benetrip - Recomendação de Destinos'
+        },
+        data: requestParams,
+        timeout: 60000 // 60 segundos
+      }),
+      new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Timeout da requisição OpenRouter')), 65000)
+      )
+    ]);
+    
+    // Verificar se temos uma resposta válida
+    if (!response.data) {
+      throw new Error('Resposta vazia recebida do OpenRouter');
+    }
     
     if (!response.data?.choices?.[0]?.message?.content) {
       throw new Error(`Formato de resposta do OpenRouter inválido`);
     }
     
     const content = response.data.choices[0].message.content;
+    
+    // Verificar se o conteúdo é um JSON válido antes de processá-lo
+    try {
+      JSON.parse(content); // Testa se é um JSON válido
+      utils.log(`JSON válido recebido de ${modelName}`, null);
+    } catch (jsonError) {
+      utils.log(`JSON inválido recebido de ${modelName}, tentando recuperação...`, null);
+      // Se não for JSON válido, vamos lançar um erro para cair no tratamento de erro
+      throw new Error(`Resposta inválida: ${jsonError.message}`);
+    }
+    
     utils.log(`Conteúdo recebido da OpenRouter (primeiros 200 caracteres):`, content.substring(0, 200));
     
-    return utils.extrairJSONDaResposta(content);
+    return content; // Retorna o conteúdo diretamente se for JSON válido
   } catch (error) {
-    console.error(`Erro na chamada à API OpenRouter:`, error.message);
+    console.error(`Erro na chamada à API OpenRouter (${modelName}):`, error.message);
     if (error.response) {
       utils.log(`Resposta de erro (OpenRouter):`, error.response.data);
     }
     throw error;
   }
-}
-
-// =======================
-// Função para tentativas com diferentes modelos
-// =======================
-async function tryWithMultipleModels(prompt, requestData) {
-  // Primeiro tenta com o modelo principal
-  try {
-    const response = await callOpenRouterAPI(prompt, requestData, CONFIG.openRouter.defaultModel);
-    if (response && utils.isPartiallyValidJSON(response)) {
-      return {
-        data: response,
-        model: CONFIG.openRouter.defaultModel
-      };
-    }
-  } catch (error) {
-    console.error(`Erro com modelo principal:`, error.message);
-  }
-  
-  // Se falhar, tenta os modelos de backup sequencialmente
-  for (const backupModel of CONFIG.openRouter.backupModels) {
-    try {
-      console.log(`Tentando modelo de backup: ${backupModel}`);
-      const response = await callOpenRouterAPI(prompt, requestData, backupModel);
-      if (response && utils.isPartiallyValidJSON(response)) {
-        return {
-          data: response,
-          model: backupModel
-        };
-      }
-    } catch (error) {
-      console.error(`Erro com modelo ${backupModel}:`, error.message);
-    }
-  }
-  
-  return null;
 }
 
 // =======================
