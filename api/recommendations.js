@@ -19,9 +19,9 @@ const CONFIG = {
   },
   // Configuração OpenRouter
   openRouter: {
-    defaultModel: 'deepseek/deepseek-chat-v1',  // Ative reasoner_enabled ao usar
+    defaultModel: 'deepseek/deepseek-llm',  // Ative reasoner_enabled ao usar
     backupModels: [
-      'anthropic/claude-3-sonnet:beta',
+      'anthropic/claude-3-sonnet',
       'google/gemini-pro',
       'meta-llama/llama-3-70b-instruct'
     ]
@@ -192,7 +192,7 @@ const utils = {
   }
 };
 // =======================
-// Integração com OpenRouter
+// ação com OpenRouter corrigida
 // =======================
 async function callOpenRouterAPI(prompt, requestData, modelName = CONFIG.openRouter.defaultModel) {
   const openRouterKey = process.env.OPENROUTER_API_KEY;
@@ -218,59 +218,38 @@ async function callOpenRouterAPI(prompt, requestData, modelName = CONFIG.openRou
         }
       ],
       temperature: 0.7,
-      max_tokens: 4000,
+      max_tokens: 3000,
       response_format: { type: "json_object" }
     };
     
-    // Adiciona reasoner_enabled para Deepseek
+    // Adiciona reasoner_enabled apenas para Deepseek
     if (modelName.includes('deepseek')) {
       requestParams.additional_model_parameters = {
         reasoner_enabled: true
       };
     }
     
-    // Implementação com timeout melhorado
-    const response = await Promise.race([
-      apiClient({
-        method: 'post',
-        url: 'https://openrouter.ai/api/v1/chat/completions',
-        headers: {
-          'Authorization': `Bearer ${openRouterKey}`,
-          'HTTP-Referer': 'https://benetrip.com.br',
-          'X-Title': 'Benetrip - Recomendação de Destinos'
-        },
-        data: requestParams,
-        timeout: 60000 // 60 segundos
-      }),
-      new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Timeout da requisição OpenRouter')), 65000)
-      )
-    ]);
-    
-    // Verificar se temos uma resposta válida
-    if (!response.data) {
-      throw new Error('Resposta vazia recebida do OpenRouter');
-    }
+    // Defina um timeout menor para cada requisição individual
+    const response = await apiClient({
+      method: 'post',
+      url: 'https://openrouter.ai/api/v1/chat/completions',
+      headers: {
+        'Authorization': `Bearer ${openRouterKey}`,
+        'HTTP-Referer': 'https://benetrip.com.br',
+        'X-Title': 'Benetrip - Recomendação de Destinos'
+      },
+      data: requestParams,
+      timeout: 60000  // 60 segundos para cada chamada individual
+    });
     
     if (!response.data?.choices?.[0]?.message?.content) {
       throw new Error(`Formato de resposta do OpenRouter inválido`);
     }
     
     const content = response.data.choices[0].message.content;
-    
-    // Verificar se o conteúdo é um JSON válido antes de processá-lo
-    try {
-      JSON.parse(content); // Testa se é um JSON válido
-      utils.log(`JSON válido recebido de ${modelName}`, null);
-    } catch (jsonError) {
-      utils.log(`JSON inválido recebido de ${modelName}, tentando recuperação...`, null);
-      // Se não for JSON válido, vamos lançar um erro para cair no tratamento de erro
-      throw new Error(`Resposta inválida: ${jsonError.message}`);
-    }
-    
     utils.log(`Conteúdo recebido da OpenRouter (primeiros 200 caracteres):`, content.substring(0, 200));
     
-    return content; // Retorna o conteúdo diretamente se for JSON válido
+    return utils.extrairJSONDaResposta(content);
   } catch (error) {
     console.error(`Erro na chamada à API OpenRouter (${modelName}):`, error.message);
     if (error.response) {
@@ -559,7 +538,7 @@ async function buscarPrecoVoo(origemIATA, destinoIATA, datas, moeda) {
 
   try {
     // Implementação para obter preços reais de APIs externas
-    // Aqui você pode integrar com Aviasales, Skyscanner ou qualquer outra API
+    // Aqui você pode ar com Aviasales, Skyscanner ou qualquer outra API
     utils.log(`Buscando informações de voo de ${origemIATA} para ${destinoIATA}...`, null);
     
     // Por enquanto, retornamos null para indicar que não temos preços reais
@@ -871,7 +850,7 @@ module.exports = async function handler(req, res) {
         message: "Timeout do servidor"
       });
     }
-  }, CONFIG.timeout.handler);
+  }, 270000); // 270 segundos (menor que os 300s do Vercel)
 
   // Configuração de CORS e headers
   res.setHeader('Access-Control-Allow-Credentials', true);
