@@ -9,7 +9,7 @@ const https = require('https');
 const CONFIG = {
   timeout: {
     request: 50000,
-    handler: 55000,
+    handler: 120000,
     retry: 1500
   },
   retries: 2,
