@@ -9,7 +9,7 @@ const https = require('https');
 const CONFIG = {
   timeout: {
     request: 50000,
-    handler: 55000,
+    handler: 300000,
     retry: 1500
   },
   retries: 2,
@@ -354,7 +354,7 @@ function gerarPromptParaDeepseekReasoner(dados) {
   }
   
   const adaptacoesPorTipo = {
-    "sozinho(a)": "Destinos seguros para viajantes solo, hostels bem avaliados, atividades para conhecer pessoas, bairros com boa vida noturna e transporte público eficiente",
+    "sozinho(a)": "Destinos seguros para viajantes solo, atividades para conhecer pessoas, bairros com boa vida noturna e transporte público eficiente",
     "em casal (viagem romântica)": "Cenários românticos, jantares especiais, passeios a dois, hotéis boutique, praias privativas, mirantes com vistas panorâmicas e vinícolas",
     "em família": "Atividades para todas as idades, opções kid-friendly, segurança, acomodações espaçosas, parques temáticos, atrações educativas e opções de transporte facilitado",
     "com amigos": "Vida noturna, atividades em grupo, opções de compartilhamento, diversão coletiva, esportes de aventura, festivais locais e culinária diversificada"
@@ -365,9 +365,6 @@ function gerarPromptParaDeepseekReasoner(dados) {
     'Orçamento flexível';
 
   return `# Tarefa: Recomendações Personalizadas de Destinos de Viagem
-  
-## RESTRIÇÃO CRÍTICA DE ORÇAMENTO
-${mensagemOrcamento} para voos (NUNCA EXCEDA ESTE VALOR)
 
 ## Dados do Viajante
 - Origem: ${infoViajante.cidadeOrigem}
@@ -389,7 +386,7 @@ ${mensagemOrcamento} para voos (NUNCA EXCEDA ESTE VALOR)
 ${adaptacoesPorTipo[infoViajante.companhia] || "Considere experiências versáteis para diferentes perfis"}
 
 ## PERSONALIDADE DA TRIPINHA (MASCOTE)
-- A Tripinha é uma cachorrinha vira-lata caramelo, curiosa e aventureira
+- A Tripinha é uma cachorrinha vira-lata caramelo, curiosa e aventureira e que conhece todos os lugares do mundo
 - Seus comentários devem ser:
   * Autênticos e entusiasmados
   * Mencionar PELO MENOS UM ponto turístico específico do destino
@@ -402,12 +399,10 @@ ${adaptacoesPorTipo[infoViajante.companhia] || "Considere experiências versáte
    - Clima apropriado para ${estacaoViagem}
    - Eventos especiais/festivais no período
    - Adaptação para viajantes ${infoViajante.companhia}
-   - Compatibilidade com orçamento de ${infoViajante.orcamento} ${infoViajante.moeda}
-   - Se viagem internacional, considere facilidade de visto/documentação
-   - Se viagem nacional, priorize destinos com infraestrutura adequada
+   - Destinos que fiquem entre 80% e 105% orçamento estipulado para voos de ${infoViajante.orcamento} ${infoViajante.moeda}
 
 2) Para cada destino, determine:
-   - Preço realista de voo ABAIXO DO ORÇAMENTO MÁXIMO
+   - Preço realista de voo
    - Pontos turísticos específicos e conhecidos
    - Eventos sazonais ou especiais no período da viagem
    - Comentário personalizado da Tripinha mencionando detalhes sensoriais
@@ -456,7 +451,6 @@ ${adaptacoesPorTipo[infoViajante.companhia] || "Considere experiências versáte
 }
 
 ## Verificação Final Obrigatória - CONFIRME QUE:
-- ✓ TODOS os preços de voo estão ABAIXO de ${infoViajante.orcamento} ${infoViajante.moeda}
 - ✓ Considerou eventos sazonais, clima e atrações para CADA destino
 - ✓ Todos os comentários da Tripinha mencionam pontos turísticos específicos e incluem observações sensoriais
 - ✓ As recomendações estão adaptadas para viajantes ${infoViajante.companhia}
