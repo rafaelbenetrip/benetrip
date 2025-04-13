@@ -19,7 +19,7 @@ const CONFIG = {
   },
   // Configuração OpenRouter
   openRouter: {
-    defaultModel: 'anthropic/claude-3-opus:beta',
+    defaultModel: 'deepseek/deepseek-chat-v1',  // Ative reasoner_enabled ao usar
     backupModels: [
       'anthropic/claude-3-sonnet:beta',
       'google/gemini-pro',
