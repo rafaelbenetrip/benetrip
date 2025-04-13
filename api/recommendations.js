@@ -286,7 +286,7 @@ function obterDatasViagem(dadosUsuario) {
 }
 
 // =======================
-// Prompt Deepseek Reasoner aprimorado
+// Prompt Deepseek Reasoner otimizado e simplificado
 // =======================
 function gerarPromptParaDeepseekReasoner(dados) {
   const infoViajante = {
@@ -299,11 +299,11 @@ function gerarPromptParaDeepseekReasoner(dados) {
     tipoDestino: dados.tipo_destino || 'qualquer',
     famaDestino: dados.fama_destino || 'qualquer'
   };
-  
+
   let dataIda = 'não especificada';
   let dataVolta = 'não especificada';
   let duracaoViagem = 'não especificada';
-  
+
   if (dados.datas) {
     if (typeof dados.datas === 'string' && dados.datas.includes(',')) {
       const partes = dados.datas.split(',');
@@ -313,7 +313,7 @@ function gerarPromptParaDeepseekReasoner(dados) {
       dataIda = dados.datas.dataIda;
       dataVolta = dados.datas.dataVolta;
     }
-    
+
     try {
       if (dataIda !== 'não especificada' && dataVolta !== 'não especificada') {
         const ida = new Date(dataIda);
@@ -325,20 +325,18 @@ function gerarPromptParaDeepseekReasoner(dados) {
       console.error('Erro ao calcular duração da viagem:', error.message);
     }
   }
-  
+
   let estacaoViagem = 'não determinada';
-  let hemisferio = infoViajante.cidadeOrigem.toLowerCase().includes('brasil') ? 'sul' : 'norte';
-  
+  const hemisferio = infoViajante.cidadeOrigem.toLowerCase().includes('brasil') ? 'sul' : 'norte';
+
   try {
     if (dataIda !== 'não especificada') {
       const dataObj = new Date(dataIda);
       const mes = dataObj.getMonth();
-      
       if (mes >= 2 && mes <= 4) estacaoViagem = 'primavera';
       else if (mes >= 5 && mes <= 7) estacaoViagem = 'verão';
       else if (mes >= 8 && mes <= 10) estacaoViagem = 'outono';
       else estacaoViagem = 'inverno';
-      
       if (hemisferio === 'sul') {
         const mapaEstacoes = {
           'verão': 'inverno',
@@ -352,117 +350,35 @@ function gerarPromptParaDeepseekReasoner(dados) {
   } catch (error) {
     console.error('Erro ao determinar estação do ano:', error.message);
   }
-  
-  const adaptacoesPorTipo = {
-    "sozinho(a)": "Destinos seguros para viajantes solo, hostels bem avaliados, atividades para conhecer pessoas, bairros com boa vida noturna e transporte público eficiente",
-    "em casal (viagem romântica)": "Cenários românticos, jantares especiais, passeios a dois, hotéis boutique, praias privativas, mirantes com vistas panorâmicas e vinícolas",
-    "em família": "Atividades para todas as idades, opções kid-friendly, segurança, acomodações espaçosas, parques temáticos, atrações educativas e opções de transporte facilitado",
-    "com amigos": "Vida noturna, atividades em grupo, opções de compartilhamento, diversão coletiva, esportes de aventura, festivais locais e culinária diversificada"
-  };
-  
-  const mensagemOrcamento = infoViajante.orcamento !== 'flexível' ?
-    `ORÇAMENTO MÁXIMO: ${infoViajante.orcamento} ${infoViajante.moeda}` : 
-    'Orçamento flexível';
 
-  return `# Tarefa: Recomendações Personalizadas de Destinos de Viagem
-  
-## RESTRIÇÃO CRÍTICA DE ORÇAMENTO
-${mensagemOrcamento} para voos (NUNCA EXCEDA ESTE VALOR)
+  return `Você é a Tripinha, uma cachorrinha especialista em viagens. Com base no perfil abaixo, recomende:
 
-## Dados do Viajante
+1️⃣ topPick: o melhor destino
+2️⃣ alternativas: 4 destinos variados (geografia + estilo)
+3️⃣ surpresa: um destino inusitado
+
+Cada destino deve conter:
+- Cidade, país e aeroporto (código IATA)
+- Pontos turísticos famosos (mínimo 2 para topPick e surpresa)
+- Preço estimado de voo e hotel
+- Comentário da Tripinha mencionando um ponto turístico e sensação (cheiro, som, vista)
+- Clima no período (temperatura média, condições e dica de roupa)
+
+⚠️ O voo deve custar menos de ${infoViajante.orcamento} ${infoViajante.moeda}
+
+Perfil do viajante:
 - Origem: ${infoViajante.cidadeOrigem}
-- Composição: ${infoViajante.companhia}
-- Quantidade: ${infoViajante.pessoas} pessoa(s)
-- Interesses: ${infoViajante.preferencia}
+- Companhia: ${infoViajante.companhia}
+- Pessoas: ${infoViajante.pessoas}
+- Preferência: ${infoViajante.preferencia}
 - Período: ${dataIda} a ${dataVolta} (${duracaoViagem})
-- Estação na viagem: ${estacaoViagem}
-- Tipo de destino preferido: ${getTipoDestinoText(infoViajante.tipoDestino)}
-- Nível de popularidade desejado: ${getFamaDestinoText(infoViajante.famaDestino)}
+- Estação: ${estacaoViagem}
+- Tipo de destino: ${getTipoDestinoText(infoViajante.tipoDestino)}
+- Fama desejada: ${getFamaDestinoText(infoViajante.famaDestino)}
 
-## ASPECTOS SAZONAIS E CLIMÁTICOS CRÍTICOS
-- Para o período ${dataIda} a ${dataVolta}, verifique:
-  * Festivais, feriados e eventos especiais que agregam valor à viagem
-  * Condições climáticas adversas a evitar: monções, furacões, temperaturas extremas
-  * Temporada turística (alta/baixa) e impacto em preços, disponibilidade e experiência
-
-## ADAPTAÇÕES ESPECÍFICAS PARA: ${infoViajante.companhia.toUpperCase()}
-${adaptacoesPorTipo[infoViajante.companhia] || "Considere experiências versáteis para diferentes perfis"}
-
-## PERSONALIDADE DA TRIPINHA (MASCOTE)
-- A Tripinha é uma cachorrinha vira-lata caramelo, curiosa e aventureira
-- Seus comentários devem ser:
-  * Autênticos e entusiasmados
-  * Mencionar PELO MENOS UM ponto turístico específico do destino
-  * Incluir uma observação sensorial que um cachorro notaria (cheiros, sons, texturas)
-  * Usar emoji 🐾 para dar personalidade
-  * Tom amigável e conversacional
-
-## Processo de Raciocínio Passo a Passo
-1) Identifique destinos adequados considerando:
-   - Clima apropriado para ${estacaoViagem}
-   - Eventos especiais/festivais no período
-   - Adaptação para viajantes ${infoViajante.companhia}
-   - Compatibilidade com orçamento de ${infoViajante.orcamento} ${infoViajante.moeda}
-   - Se viagem internacional, considere facilidade de visto/documentação
-   - Se viagem nacional, priorize destinos com infraestrutura adequada
-
-2) Para cada destino, determine:
-   - Preço realista de voo ABAIXO DO ORÇAMENTO MÁXIMO
-   - Pontos turísticos específicos e conhecidos
-   - Eventos sazonais ou especiais no período da viagem
-   - Comentário personalizado da Tripinha mencionando detalhes sensoriais
-   - Informações práticas de clima para o período
-
-3) Diversifique suas recomendações:
-   - topPick: Destino com máxima adequação ao perfil
-   - alternativas: 4 destinos diversos em geografia, custo e experiências
-   - surpresa: Destino incomum mas encantador (pode ser mais desafiador, desde que viável)
-
-## Formato de Retorno (JSON estrito)
-{
-  "topPick": {
-    "destino": "Nome da Cidade",
-    "pais": "Nome do País",
-    "codigoPais": "XX",
-    "descricao": "Breve descrição de 1-2 frases sobre o destino",
-    "porque": "Razão específica para este viajante visitar este destino",
-    "destaque": "Uma experiência/atividade única neste destino",
-    "comentario": "Comentário entusiasmado da Tripinha mencionando um ponto turístico específico e aspectos sensoriais",
-    "pontosTuristicos": ["Nome do Primeiro Ponto", "Nome do Segundo Ponto"],
-    "eventos": ["Festival ou evento especial durante o período", "Outro evento relevante se houver"],
-    "clima": {
-      "temperatura": "Faixa de temperatura média esperada (ex: 15°C-25°C)",
-      "condicoes": "Descrição das condições típicas (ex: ensolarado com chuvas ocasionais)",
-      "recomendacoes": "Dicas relacionadas ao clima (o que levar/vestir)"
-    },
-    "aeroporto": {
-      "codigo": "XYZ",
-      "nome": "Nome do Aeroporto Principal"
-    },
-    "preco": {
-      "voo": 1500,
-      "hotel": 200
-    }
-  },
-  "alternativas": [
-    // EXATAMENTE 4 destinos com estrutura similar à descrita acima
-    // Cada destino alternativo deve ser de uma região/continente diferente para maximizar a diversidade
-  ],
-  "surpresa": {
-    // Mesma estrutura do topPick
-    // Deve ser um destino menos óbvio, mas igualmente adequado
-  },
-  "estacaoViagem": "${estacaoViagem}"
+Responda apenas em JSON com os campos obrigatórios para cada destino.`;
 }
 
-## Verificação Final Obrigatória - CONFIRME QUE:
-- ✓ TODOS os preços de voo estão ABAIXO de ${infoViajante.orcamento} ${infoViajante.moeda}
-- ✓ Considerou eventos sazonais, clima e atrações para CADA destino
-- ✓ Todos os comentários da Tripinha mencionam pontos turísticos específicos e incluem observações sensoriais
-- ✓ As recomendações estão adaptadas para viajantes ${infoViajante.companhia}
-- ✓ Todos os destinos incluem código IATA válido do aeroporto
-- ✓ Diversificou geograficamente as alternativas`;
-}
 
 // =======================
 // Funções para chamadas às APIs de IA
