@@ -514,6 +514,15 @@ async function callAIAPI(provider, prompt, requestData) {
   if (!apiKey) {
     throw new Error(`Chave da API ${provider} não configurada`);
   }
+
+    // Configuração dos cabeçalhos
+  const headers = {
+    'Content-Type': 'application/json'
+  };
+  headers[config.header] = config.prefix ? `${config.prefix} ${apiKey}` : apiKey;
+
+  // Adicione um log para verificar os headers
+  console.log('Headers:', headers);
   
   const finalPrompt = provider === 'deepseek' 
     ? gerarPromptParaDeepseekReasoner(requestData)
