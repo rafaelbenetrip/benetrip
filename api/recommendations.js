@@ -204,6 +204,31 @@ async function callOpenRouterAPI(prompt, requestData, modelName = CONFIG.openRou
   try {
     utils.log(`Enviando requisição para OpenRouter (${modelName})...`, null);
     
+    // Parâmetros base para a requisição
+    const requestParams = {
+      model: modelName,
+      messages: [
+        {
+          role: "system",
+          content: "Você é um especialista em viagens com experiência em destinos globais. Retorne apenas JSON com destinos detalhados, respeitando o formato solicitado."
+        },
+        {
+          role: "user",
+          content: prompt
+        }
+      ],
+      temperature: 0.7,
+      max_tokens: 3000,
+      response_format: { type: "json_object" }
+    };
+    
+    // Adiciona reasoner_enabled para Deepseek
+    if (modelName.includes('deepseek')) {
+      requestParams.additional_model_parameters = {
+        reasoner_enabled: true
+      };
+    }
+    
     const response = await apiClient({
       method: 'post',
       url: 'https://openrouter.ai/api/v1/chat/completions',
@@ -212,22 +237,7 @@ async function callOpenRouterAPI(prompt, requestData, modelName = CONFIG.openRou
         'HTTP-Referer': 'https://benetrip.com.br',
         'X-Title': 'Benetrip - Recomendação de Destinos'
       },
-      data: {
-        model: modelName,
-        messages: [
-          {
-            role: "system",
-            content: "Você é um especialista em viagens com experiência em destinos globais. Retorne apenas JSON com destinos detalhados, respeitando o formato solicitado."
-          },
-          {
-            role: "user",
-            content: prompt
-          }
-        ],
-        temperature: 0.7,
-        max_tokens: 3000,
-        response_format: { type: "json_object" }
-      }
+      data: requestParams
     });
     
     if (!response.data?.choices?.[0]?.message?.content) {
