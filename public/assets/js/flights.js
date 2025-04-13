@@ -6,10 +6,10 @@
 // Módulo de Voos do Benetrip
 const BENETRIP_VOOS = {
   // --- Constantes ---
-  INITIAL_WAIT_MS: 5000,
+  INITIAL_WAIT_MS: 10000,
   POLLING_INTERVAL_MS: 3000,
   MAX_POLLING_ATTEMPTS: 40,
-  TIMEOUT_MS: 120000,
+  TIMEOUT_MS: 300000,
   IATA_MAP: {
     'sao paulo': 'GRU', 'rio de janeiro': 'GIG', 'brasilia': 'BSB', 'salvador': 'SSA',
     'recife': 'REC', 'fortaleza': 'FOR', 'belo horizonte': 'CNF', 'porto alegre': 'POA',
