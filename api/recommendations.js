@@ -8,7 +8,7 @@ const https = require('https');
 // =======================
 const CONFIG = {
   timeout: {
-    request: 120000,
+    request: 50000,
     handler: 300000,
     retry: 1500
   },
@@ -17,7 +17,7 @@ const CONFIG = {
     enabled: true,
     maxLength: 500
   },
-  providerOrder: ['deepseek', 'perplexity', 'openai', 'claude']
+  providerOrder: ['perplexity', 'openai', 'claude', 'deepseek']
 };
 
 // =======================
@@ -481,7 +481,7 @@ async function callAIAPI(provider, prompt, requestData) {
       prefix: 'Bearer',
       model: 'sonar',
       systemMessage: 'Você é um especialista em viagens. Sua prioridade é não exceder o orçamento para voos. Retorne apenas JSON puro com 4 destinos alternativos.',
-      temperature: 0.7,
+      temperature: 0.5,
       max_tokens: 2000
     },
     openai: {
@@ -820,8 +820,6 @@ function ensureTouristAttractionsAndComments(jsonString, requestData) {
       const index = data.alternativas.length % destinosReserva.length;
       const destino = destinosReserva[index];
       const pontosConhecidos = pontosPopulares[destino] || ["Atrações turísticas"];
-      const precoBase = requestData?.orcamento_valor ? 
-        Math.round(parseFloat(requestData.orcamento_valor) * 0.7) : 2000;
       
       data.alternativas.push({
         destino: destino,
@@ -836,10 +834,7 @@ function ensureTouristAttractionsAndComments(jsonString, requestData) {
         clima: {
           temperatura: "Temperatura típica para a estação"
         },
-        preco: {
-          voo: precoBase - (index * 100),
-          hotel: 200 + (index * 20)
-        }
+
       });
       
       modificado = true;
