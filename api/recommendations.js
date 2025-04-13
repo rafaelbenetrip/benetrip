@@ -1092,12 +1092,12 @@ function gerarPromptParaDestinos(dados) {
       const dataObj = new Date(dataIda);
       const mes = dataObj.getMonth();
       
-      if (mes >= 2 && mes <= 4) estacaoViagem = 'primavera';
-      else if (mes >= 5 && mes <= 7) estacaoViagem = 'verão';
-      else if (mes >= 8 && mes <= 10) estacaoViagem = 'outono';
-      else estacaoViagem = 'inverno';
+      if (mes >= 2 && mes <= 4) estacaoViagem = 'outono';
+      else if (mes >= 5 && mes <= 7) estacaoViagem = 'inverno';
+      else if (mes >= 8 && mes <= 10) estacaoViagem = 'primavera';
+      else estacaoViagem = 'verão';
       
-      if (hemisferio === 'sul') {
+      if (hemisferio === 'norte') {
         const mapaEstacoes = {
           'verão': 'inverno',
           'inverno': 'verão',
@@ -1110,7 +1110,7 @@ function gerarPromptParaDestinos(dados) {
   } catch {}
   
   const mensagemOrcamento = infoViajante.orcamento !== 'flexível' ?
-    `⚠️ ORÇAMENTO MÁXIMO: ${infoViajante.orcamento} ${infoViajante.moeda} para voos. Todos os destinos DEVEM ter preços abaixo deste valor.` : 
+    `⚠️ ORÇAMENTO MÁXIMO: ${infoViajante.orcamento} ${infoViajante.moeda} para voos. Todos os destinos DEVEM ter preços próximos a este valor.` : 
     'Orçamento flexível';
   
   const sugestaoDistancia = infoViajante.cidadeOrigem.toLowerCase().includes('são paulo') || 
