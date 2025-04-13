@@ -1133,16 +1133,14 @@ PERFIL DO VIAJANTE:
 - Popularidade do destino: ${getFamaDestinoText(infoViajante.famaDestino)}
 
 IMPORTANTE:
-1. O preço do VOO de CADA destino DEVE ser MENOR que o orçamento máximo de ${infoViajante.orcamento} ${infoViajante.moeda}.
+1. Com base na sua experiência traga destinos em que o preço do VOO de IDA e VOLTA sejam PRÓXIMOS do orçamento de ${infoViajante.orcamento} ${infoViajante.moeda}.
 2. Forneça um mix equilibrado: inclua tanto destinos populares quanto alternativas.
 3. Forneça EXATAMENTE 4 destinos alternativos diferentes entre si.
-4. Considere a ÉPOCA DO ANO (${estacaoViagem}) para sugerir destinos com clima adequado.
-5. Inclua destinos de diferentes continentes/regiões.
-6. Garanta que os preços sejam realistas para voos de ida e volta partindo de ${infoViajante.cidadeOrigem}.
-7. Para CADA destino, inclua o código IATA (3 letras) do aeroporto principal.
-8. Para cada destino, INCLUA PONTOS TURÍSTICOS ESPECÍFICOS E CONHECIDOS.
-9. Os comentários da Tripinha DEVEM mencionar pelo menos um dos pontos turísticos do destino.
-10. NOVO: Forneça informações sobre o CLIMA esperado no destino durante a viagem (temperatura média e condições).
+4. Garanta que os preços sejam realistas para voos de ida e volta partindo de ${infoViajante.cidadeOrigem}.
+5. Para CADA destino, inclua o código IATA (3 letras) do aeroporto principal.
+6. Para cada destino, INCLUA PONTOS TURÍSTICOS ESPECÍFICOS E CONHECIDOS.
+7. Os comentários da Tripinha DEVEM mencionar pelo menos um dos pontos turísticos do destino.
+8. NOVO: Forneça informações sobre o CLIMA esperado no destino durante a viagem (temperatura média e condições).
 
 Forneça no formato JSON exato abaixo, SEM formatação markdown:
 {
