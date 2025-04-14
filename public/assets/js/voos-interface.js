@@ -166,6 +166,7 @@ function adicionarBotaoCustomizacao() {
         console.log('Evento adicionado ao botão de customização existente');
         return;
     }
+}
 
 // Função para abrir modal de filtros
 function abrirModalFiltros() {
