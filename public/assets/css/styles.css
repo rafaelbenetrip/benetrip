@@ -3759,3 +3759,52 @@ input[type="range"]::-moz-range-thumb {
   pointer-events: auto;
   z-index: 3;
 }
+
+.filtro-expandivel-content {
+  overflow: hidden;
+  max-height: 0;
+  transition: max-height 0.3s ease;
+  padding: 0 10px;
+}
+
+.filtro-subitem {
+  margin: 12px 0;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.filtro-subitem:last-child {
+  border-bottom: none;
+}
+
+.filtro-sublabel {
+  font-size: 13px;
+  font-weight: 500;
+  margin-bottom: 6px;
+  color: #555;
+}
+
+.double-slider {
+  position: relative;
+  height: 24px;
+  margin: 10px 0;
+}
+
+.double-slider:before {
+  content: '';
+  position: absolute;
+  width: 100%;
+  height: 5px;
+  background-color: #d7dcdf;
+  border-radius: 5px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 1;
+}
+
+.entre-voos-valor-container {
+  text-align: center;
+  margin-top: 5px;
+  font-weight: 500;
+  color: var(--benetrip-orange);
+}
