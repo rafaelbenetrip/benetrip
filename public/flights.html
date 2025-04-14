@@ -173,6 +173,45 @@
                     </label>
                 </div>
             </div>
+
+                        <!-- Preço Máximo -->
+            <div class="filtro-item">
+                <div class="filtro-label">
+                    <span class="filtro-icone">💲</span>
+                    <span>Preço Máximo</span>
+                </div>
+                <div class="filtro-control">
+                    <div class="preco-slider-container">
+                        <input type="range" id="preco-slider" min="0" max="100" value="100" 
+                               aria-label="Preço máximo">
+                        <div class="preco-valor-container">
+                            <span id="preco-valor">Qualquer</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+<div class="filtro-viagem-tabs">
+  <div class="filtro-tab-header">
+    <h4>Filtrar por:</h4>
+    <div class="filtro-tab-buttons">
+      <button class="filtro-tab-btn active" data-target="ida">Voo de Ida</button>
+      <button class="filtro-tab-btn" data-target="volta">Voo de Volta</button>
+    </div>
+  </div>
+  
+  <div class="filtro-tab-content">
+    <!-- Conteúdo do filtro de ida (visível por padrão) -->
+    <div class="filtro-tab-pane active" id="tab-ida">
+      <!-- Os filtros de horário do voo de ida serão inseridos aqui -->
+    </div>
+    
+    <!-- Conteúdo do filtro de volta (oculto inicialmente) -->
+    <div class="filtro-tab-pane" id="tab-volta">
+      <!-- Os filtros de horário do voo de volta serão inseridos aqui -->
+    </div>
+  </div>
+</div>
             
             <!-- Horário de partida -->
             <div class="filtro-item">
@@ -229,23 +268,6 @@
                     <input type="range" id="duracao-slider" 
                            min="0" max="24" value="24" 
                            aria-label="Duração máxima do voo">
-                </div>
-            </div>
-            
-            <!-- Preço Máximo -->
-            <div class="filtro-item">
-                <div class="filtro-label">
-                    <span class="filtro-icone">💲</span>
-                    <span>Preço Máximo</span>
-                </div>
-                <div class="filtro-control">
-                    <div class="preco-slider-container">
-                        <input type="range" id="preco-slider" min="0" max="100" value="100" 
-                               aria-label="Preço máximo">
-                        <div class="preco-valor-container">
-                            <span id="preco-valor">Qualquer</span>
-                        </div>
-                    </div>
                 </div>
             </div>
             
