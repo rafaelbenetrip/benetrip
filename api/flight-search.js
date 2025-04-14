@@ -122,13 +122,15 @@ module.exports = async function handler(req, res) {
 
 
     // --- Montar objeto da requisição ---
-    const supportedLocales = ['en', 'ru', 'de', 'fr', 'it', 'pl', 'th', 'zh-Hans', 'ko', 'ja', 'vi', 'pt', 'uk', 'es', 'id', 'ms', 'zh-Hant', 'tr'];
+    const supportedLocales = ['en', 'ru', 'de', 'fr', 'it', 'pl', 'th', 'zh-Hans', 'ko', 'ja', 'vi', 'pt', 'pt-BR', 'uk', 'es', 'id', 'ms', 'zh-Hant', 'tr'];
+    // MODIFICADO: Garante locale padrão "pt-BR" otimizado para parceiros
+    const localeParam = params.locale && supportedLocales.includes(params.locale) ? params.locale : "pt-BR";
     const requestData = {
       marker: marker,
       host: hostEnv,
       user_ip: userIp,
-      // Mantém locale 'pt' e validação
-      locale: params.locale && supportedLocales.includes(params.locale) ? params.locale : "pt",
+      // MODIFICADO: locale padrão pt-BR
+      locale: localeParam,
       trip_class: params.classe ? params.classe.toUpperCase() : "Y",
       passengers: {
         adults: parseInt(params.adultos || 1, 10),
@@ -139,18 +141,22 @@ module.exports = async function handler(req, res) {
       // Opcionais serão adicionados abaixo se vierem dos params
     };
 
-     // Adiciona opcionais se vierem do frontend
+    // NOVO: Adiciona preferência para parceiros que suportam português
+    if (requestData.locale && requestData.locale.toLowerCase().startsWith("pt")) {
+      requestData.know_english = false;
+    }
+
+    // Adiciona opcionais se vierem do frontend
     if (params.know_english !== undefined) {
         requestData.know_english = (String(params.know_english).toLowerCase() === 'true');
     }
     if (params.currency) {
         requestData.currency = String(params.currency).toUpperCase().substring(0, 3);
     }
-     if (params.only_direct !== undefined) {
+    if (params.only_direct !== undefined) {
         requestData.only_direct = (String(params.only_direct).toLowerCase() === 'true');
     }
     // Adicione outros opcionais aqui se necessário
-
 
     requestData.segments.push({ origin: origem, destination: destino, date: params.dataIda });
     if (params.dataVolta) {
