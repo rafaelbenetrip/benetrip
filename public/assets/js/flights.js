@@ -972,9 +972,10 @@ async carregarDestino() {
         <img src="assets/images/tripinha/avatar-normal.png" alt="Tripinha">
       </div>
       <div class="tripinha-bubble">
-        <p>Farejei o mundo todo e encontrei ${this.finalResults.proposals.length} voos incríveis com parceiros de vários cantos! 🐾
-Deslize para ver as opções e escolher a que mais combina com você.
+<p>Farejei o mundo todo e encontrei ${this.finalResults.proposals.length} voos incríveis com parceiros de vários cantos! 🐾  
+Deslize para ver as opções e escolher a que mais combina com você.  
 Alguns parceiros podem mostrar preços em outra moeda ou idioma, mas são de confiança! ✈️🐶</p>
+
       </div>
     `;
     container.appendChild(tripinhaMessage);
