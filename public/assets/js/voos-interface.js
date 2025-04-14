@@ -1247,7 +1247,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Atualiza badge no botão de filtros se houver filtros salvos
     atualizarBadgeFiltros();
 });
-},
+}
 
 /**
  * Inicialização para navegação de voos - função global
