@@ -1,376 +1,443 @@
-// api/flight-search.js - Endpoint Vercel para busca de voos
+// api/image-search.js - Endpoint Vercel para busca de imagens
 const axios = require('axios');
-const crypto = require('crypto');
+
+// Função de logging estruturado
+function logEvent(type, message, data = {}) {
+  const log = {
+    timestamp: new Date().toISOString(),
+    type,
+    message,
+    ...data
+  };
+  console.log(JSON.stringify(log));
+  return log;
+}
+
+// Base de dados de pontos turísticos populares para destinos comuns
+const PONTOS_TURISTICOS_POPULARES = {
+  "Paris": ["Torre Eiffel", "Museu do Louvre", "Arco do Triunfo", "Notre Dame", "Montmartre"],
+  "Nova York": ["Times Square", "Estátua da Liberdade", "Central Park", "Empire State Building", "Brooklyn Bridge"],
+  "Londres": ["London Eye", "Big Ben", "Tower Bridge", "Buckingham Palace", "British Museum"],
+  "Roma": ["Coliseu", "Fontana di Trevi", "Vaticano", "Pantheon", "Fórum Romano"],
+  "Tóquio": ["Torre de Tóquio", "Templo Senso-ji", "Shibuya Crossing", "Palácio Imperial", "Meiji Shrine"],
+  "Rio de Janeiro": ["Cristo Redentor", "Pão de Açúcar", "Praia de Copacabana", "Maracanã", "Escadaria Selarón"],
+  "Sydney": ["Opera House", "Harbour Bridge", "Bondi Beach", "Darling Harbour", "Sydney Tower"],
+  "Barcelona": ["Sagrada Família", "Park Güell", "La Rambla", "Casa Batlló", "Barri Gòtic"]
+  // ...outros destinos, se houver...
+};
+
+// Lista expandida de keywords para diferentes tipos de destinos
+const CATEGORIAS_DESTINO = {
+  // (Mantido igual ao original)
+};
+
+// Função simplificada para extrair pontos turísticos
+function classificarDestino(query, descricao = '', pontosTuristicos = []) {
+  let cidade = query;
+  let pais = '';
+
+  // Tentar separar cidade e país se houver vírgula
+  if (query.includes(',')) {
+    const partes = query.split(',').map(parte => parte.trim());
+    cidade = partes[0];
+    pais = partes[1] || '';
+  }
+
+  // Normalizar nome da cidade para busca no banco de dados
+  const cidadeNormalizada = normalizarNomeDestino(cidade);
+
+  // Verificar pontos turísticos conhecidos para este destino
+  const pontosTuristicosConhecidos = PONTOS_TURISTICOS_POPULARES[cidadeNormalizada] || [];
+
+  // Se temos pontos turísticos específicos fornecidos (ex: sugerido pela IA), usar esse array
+  if (pontosTuristicos && pontosTuristicos.length > 0) {
+    const pontoAleatorio = pontosTuristicos[Math.floor(Math.random() * pontosTuristicos.length)];
+    return {
+      tipo: 'ponto_turistico_especifico',
+      termo: pontoAleatorio,
+      cidade,
+      pais
+    };
+  }
+
+  // Se há pontos turísticos conhecidos na base interna, usa um deles
+  if (pontosTuristicosConhecidos.length > 0) {
+    const pontoAleatorio = pontosTuristicosConhecidos[Math.floor(Math.random() * pontosTuristicosConhecidos.length)];
+    return {
+      tipo: 'ponto_turistico_conhecido',
+      termo: pontoAleatorio,
+      cidade,
+      pais
+    };
+  }
+
+  // Fallback: usar um termo padrão mais significativo
+  return {
+    tipo: 'landmark',
+    termo: 'Ponto Turístico',
+    cidade,
+    pais
+  };
+}
+
+// Função para normalizar nome de destino para correspondência com a base de dados
+function normalizarNomeDestino(destino) {
+  const substituicoes = {
+    'nyc': 'Nova York',
+    'new york': 'Nova York',
+    'ny': 'Nova York',
+    'rio': 'Rio de Janeiro',
+    'cdmx': 'Cidade do México',
+    'mexico city': 'Cidade do México',
+    'la': 'Los Angeles',
+    'sf': 'San Francisco',
+    'sp': 'São Paulo',
+    'tokyo': 'Tóquio',
+    'bsas': 'Buenos Aires',
+    'london': 'Londres',
+    'paris': 'Paris',
+    'rome': 'Roma'
+  };
+
+  const nomeNormalizado = destino.toLowerCase();
+  for (const [abreviacao, nomeCompleto] of Object.entries(substituicoes)) {
+    if (nomeNormalizado.includes(abreviacao)) {
+      return nomeCompleto;
+    }
+  }
+  for (const nomeDestino of Object.keys(PONTOS_TURISTICOS_POPULARES)) {
+    if (nomeDestino.toLowerCase().includes(nomeNormalizado) ||
+        nomeNormalizado.includes(nomeDestino.toLowerCase())) {
+      return nomeDestino;
+    }
+  }
+  return destino.charAt(0).toUpperCase() + destino.slice(1);
+}
+
+// Função para buscar imagens do Pexels
+async function fetchPexelsImages(query, options = {}) {
+  const { 
+    perPage = 2, 
+    orientation = "landscape", 
+    quality = "large",
+    descricao = "",
+    pontosTuristicos = []
+  } = options;
+  
+  const classificacao = classificarDestino(query, descricao, pontosTuristicos);
+
+  // Monta a query sempre como: [termo] [cidade] [país]
+  let searchQuery = `${classificacao.termo} ${classificacao.cidade}`;
+  if (classificacao.pais) {
+    searchQuery += ` ${classificacao.pais}`;
+  }
+
+  try {
+    logEvent('info', 'Buscando no Pexels', { 
+      query: searchQuery, 
+      orientation,
+      classificacao
+    });
+    
+    const response = await axios.get(
+      'https://api.pexels.com/v1/search',
+      {
+        params: {
+          query: searchQuery,
+          per_page: perPage,
+          orientation: orientation,
+          size: "large" // Prioriza imagens de alta qualidade
+        },
+        headers: {
+          Authorization: process.env.PEXELS_API_KEY
+        }
+      }
+    );
+    
+    if (response.data.photos && response.data.photos.length > 0) {
+      const sizeMap = {
+        small: 'small',
+        medium: 'medium',
+        large: 'large',
+        regular: 'large',
+        full: 'original'
+      };
+      const size = sizeMap[quality] || 'large';
+      const altText = `${classificacao.termo} em ${classificacao.cidade}` + (classificacao.pais ? `, ${classificacao.pais}` : '');
+      
+      return {
+        success: true,
+        images: response.data.photos.map(img => ({
+          url: img.src[size] || img.src.large,
+          source: "pexels",
+          photographer: img.photographer,
+          photographerId: img.photographer_id,
+          photographerUrl: img.photographer_url,
+          sourceUrl: img.url,
+          downloadUrl: img.src.original,
+          alt: altText,
+          pontoTuristico: (classificacao.tipo === 'ponto_turistico_especifico' ||
+                           classificacao.tipo === 'ponto_turistico_conhecido')
+                           ? classificacao.termo : null
+        }))
+      };
+    }
+    return { success: false, images: [] };
+  } catch (error) {
+    logEvent('error', 'Erro ao buscar no Pexels', { 
+      query: searchQuery, 
+      error: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
+    return { success: false, images: [], error };
+  }
+}
+
+// Função para buscar imagens do Unsplash
+async function fetchUnsplashImages(query, options = {}) {
+  const { 
+    perPage = 2, 
+    orientation = "landscape", 
+    quality = "regular",
+    descricao = "",
+    pontosTuristicos = []
+  } = options;
+  
+  const classificacao = classificarDestino(query, descricao, pontosTuristicos);
+  
+  let searchQuery = `${classificacao.termo} ${classificacao.cidade}`;
+  if (classificacao.pais) {
+    searchQuery += ` ${classificacao.pais}`;
+  }
+  
+  try {
+    logEvent('info', 'Buscando no Unsplash', { 
+      query: searchQuery, 
+      orientation,
+      classificacao
+    });
+    
+    const response = await axios.get(
+      'https://api.unsplash.com/search/photos',
+      {
+        params: {
+          query: searchQuery,
+          per_page: perPage,
+          orientation: orientation,
+          order_by: "relevant"
+        },
+        headers: {
+          Authorization: `Client-ID ${process.env.UNSPLASH_ACCESS_KEY}`
+        }
+      }
+    );
+    
+    if (response.data.results && response.data.results.length > 0) {
+      const altText = `${classificacao.termo} em ${classificacao.cidade}` + (classificacao.pais ? `, ${classificacao.pais}` : '');
+      
+      return {
+        success: true,
+        images: response.data.results.map(img => ({
+          url: img.urls[quality] || img.urls.regular,
+          source: "unsplash",
+          photographer: img.user.name,
+          photographerId: img.user.username,
+          photographerUrl: img.user.links.html,
+          sourceUrl: img.links.html,
+          downloadUrl: img.links.download,
+          alt: img.alt_description || altText,
+          pontoTuristico: (classificacao.tipo === 'ponto_turistico_especifico' ||
+                           classificacao.tipo === 'ponto_turistico_conhecido')
+                           ? classificacao.termo : null
+        }))
+      };
+    }
+    return { success: false, images: [] };
+  } catch (error) {
+    logEvent('error', 'Erro ao buscar no Unsplash', { 
+      query: searchQuery, 
+      error: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
+    return { success: false, images: [], error };
+  }
+}
+
+// Função para gerar imagens de placeholder
+function getPlaceholderImages(query, options = {}) {
+  const { width = 800, height = 600, descricao = "", pontosTuristicos = [] } = options;
+  const classificacao = classificarDestino(query, descricao, pontosTuristicos);
+  
+  let placeholderText = `${classificacao.termo} em ${classificacao.cidade}`;
+  if (classificacao.pais) {
+    placeholderText += `, ${classificacao.pais}`;
+  }
+  
+  return {
+    success: true,
+    images: [
+      {
+        url: `https://via.placeholder.com/${width}x${height}.png?text=${encodeURIComponent(placeholderText)}`,
+        source: "placeholder",
+        photographer: "Placeholder",
+        photographerId: "placeholder",
+        photographerUrl: "#",
+        sourceUrl: "#",
+        downloadUrl: `https://via.placeholder.com/${width}x${height}.png?text=${encodeURIComponent(placeholderText)}`,
+        alt: placeholderText,
+        pontoTuristico: (classificacao.tipo === 'ponto_turistico_especifico' ||
+                         classificacao.tipo === 'ponto_turistico_conhecido')
+                         ? classificacao.termo : null
+      },
+      {
+        url: `https://via.placeholder.com/${width}x${height}.png?text=${encodeURIComponent(placeholderText + ' - Vista 2')}`,
+        source: "placeholder",
+        photographer: "Placeholder",
+        photographerId: "placeholder",
+        photographerUrl: "#",
+        sourceUrl: "#",
+        downloadUrl: `https://via.placeholder.com/${width}x${height}.png?text=${encodeURIComponent(placeholderText)}`,
+        alt: `${placeholderText} - Vista alternativa`,
+        pontoTuristico: (classificacao.tipo === 'ponto_turistico_especifico' ||
+                         classificacao.tipo === 'ponto_turistico_conhecido')
+                         ? classificacao.termo : null
+      }
+    ]
+  };
+}
 
 module.exports = async function handler(req, res) {
-  // Configurar cabeçalhos CORS
   res.setHeader('Access-Control-Allow-Credentials', true);
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   
-  // Lidar com requisições OPTIONS (CORS preflight)
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
   
-  // Apenas permitir requisições POST
-  if (req.method !== 'POST') {
+  if (req.method !== 'GET') {
     return res.status(405).json({ error: "Método não permitido" });
   }
 
+  const { 
+    query, 
+    source, 
+    perPage = 2, 
+    orientation = "landscape",
+    width = 800,
+    height = 600,
+    quality = "regular",
+    descricao = "",
+    pontosTuristicos = ""
+  } = req.query || {};
+  
+  if (!query) {
+    return res.status(400).json({ error: "Parâmetro 'query' é obrigatório" });
+  }
+  
   try {
-    console.log('Recebendo requisição de busca de voos no Vercel');
-    const params = req.body;
-    
-    // Obter token da API e marker do ambiente
-    const token = process.env.AVIASALES_TOKEN || process.env.FLIGHT_API_KEY;
-    const marker = process.env.AVIASALES_MARKER;
-    const host = process.env.HOST || "benetrip.com.br";
-    
-    // Verificar se o token e marker estão configurados
-    if (!token || !marker) {
-      console.error("Token ou Marker da API Aviasales não configurados!");
-      console.error("Token:", token ? "Configurado" : "NÃO CONFIGURADO");
-      console.error("Marker:", marker ? "Configurado" : "NÃO CONFIGURADO");
-      return res.status(500).json({ 
-        error: "Configuração da API incompleta", 
-        success: false,
-        details: {
-          tokenConfigured: !!token,
-          markerConfigured: !!marker
+    let pontosTuristicosArray = [];
+    if (pontosTuristicos) {
+      try {
+        if (pontosTuristicos.startsWith('[')) {
+          pontosTuristicosArray = JSON.parse(pontosTuristicos);
+        } else {
+          pontosTuristicosArray = pontosTuristicos.split(',').map(p => p.trim());
         }
-      });
+      } catch (e) {
+        pontosTuristicosArray = [pontosTuristicos];
+      }
     }
     
-    console.log('Token:', token.substring(0, 4) + '****');
-    console.log('Marker:', marker);
-    
-    // Validar parâmetros obrigatórios
-    if (!params.origem || !params.destino || !params.dataIda) {
-      return res.status(400).json({ 
-        error: "Parâmetros obrigatórios faltando: origem, destino ou dataIda", 
-        params: params,
-        success: false
-      });
-    }
-    
-    // Certificar que os códigos IATA estão em maiúsculas
-    const origemIATA = params.origem.toUpperCase();
-    const destinoIATA = params.destino.toUpperCase();
-
-    // Preparar dados para a requisição
-    const data = {
-      marker: marker,
-      host: host,
-      user_ip: req.headers['x-forwarded-for'] || req.headers['client-ip'] || req.connection.remoteAddress || "127.0.0.1",
-      locale: params.locale || "pt",
-      trip_class: params.classe || "Y",
-      passengers: {
-        adults: params.adultos || 1,
-        children: params.criancas || 0,
-        infants: params.bebes || 0
-      },
-      segments: []
-    };
-    
-    // Adicionar segmento de ida
-    data.segments.push({
-      origin: origemIATA,
-      destination: destinoIATA,
-      date: params.dataIda
+    logEvent('info', `Buscando imagens para '${query}'`, { 
+      query, 
+      source, 
+      perPage, 
+      orientation, 
+      descricao,
+      pontosTuristicosArray
     });
     
-    // Adicionar segmento de volta, se aplicável
-    if (params.dataVolta) {
-      data.segments.push({
-        origin: destinoIATA,
-        destination: origemIATA,
-        date: params.dataVolta
+    let images = [];
+    let pexelsResult = { success: false, images: [] };
+    let unsplashResult = { success: false, images: [] };
+    
+    if (source === "pexels" || !source) {
+      pexelsResult = await fetchPexelsImages(query, {
+        perPage: parseInt(perPage),
+        orientation,
+        quality,
+        descricao,
+        pontosTuristicos: pontosTuristicosArray
       });
-    }
-    
-    // Gerar assinatura para a API Aviasales usando o token
-    const signature = generateSignature(data, token);
-    if (!signature) {
-      return res.status(500).json({
-        error: "Falha ao gerar assinatura",
-        success: false
-      });
-    }
-    
-    // Adicionar assinatura aos dados
-    data.signature = signature;
-    
-    console.log('Dados da requisição:', JSON.stringify(data, null, 2));
-    
-    // Fazer a requisição à API Aviasales
-    const searchResponse = await axios.post(
-      "https://api.travelpayouts.com/v1/flight_search",
-      data,
-      {
-        headers: {
-          "Content-Type": "application/json"
-        },
-        timeout: 15000 // 15 segundos
-      }
-    );
-    
-    console.log('Resposta da API: status', searchResponse.status);
-    console.log('Headers da resposta:', JSON.stringify(searchResponse.headers, null, 2));
-    
-    const searchId = searchResponse.data.search_id;
-    console.log('Search ID:', searchId);
-    
-    if (!searchId) {
-      console.error('Nenhum search_id retornado:', searchResponse.data);
-      return res.status(500).json({ 
-        error: "Falha na busca: API não retornou ID de busca", 
-        success: false, 
-        apiResponse: searchResponse.data 
-      });
-    }
-    
-    // Fazer várias tentativas para obter resultados
-    let resultados = null;
-    let tentativas = 0;
-    const maxTentativas = 5;
-    
-    while (tentativas < maxTentativas) {
-      tentativas++;
-      console.log(`Tentativa ${tentativas} de ${maxTentativas} para obter resultados...`);
       
-      // Esperar entre as tentativas
-      await new Promise(resolve => setTimeout(resolve, 3000));
-      
-      // Buscar resultados
-      const resultsResponse = await axios.get(
-        `https://api.travelpayouts.com/v1/flight_search_results?uuid=${searchId}`,
-        { timeout: 10000 }
-      );
-      
-      // Verificar se já temos resultados completos
-      if (resultsResponse.data && 
-          resultsResponse.data.proposals && 
-          resultsResponse.data.proposals.length > 0) {
-        console.log(`Encontrados ${resultsResponse.data.proposals.length} resultados`);
-        resultados = resultsResponse.data;
-        break;
-      }
-      
-      // Se for a última resposta com apenas search_id, significa que a busca continua
-      if (tentativas === maxTentativas && 
-          resultsResponse.data && 
-          Object.keys(resultsResponse.data).length === 1 &&
-          resultsResponse.data.search_id) {
-        console.log('A busca ainda está em andamento. Retornando o search_id para polling posterior');
-        return res.status(202).json({
-          success: true,
-          searchId: searchId,
-          message: "A busca está em andamento. Use o searchId para verificar os resultados posteriormente.",
-          tentativas: tentativas
+      if (pexelsResult.success) {
+        images = pexelsResult.images;
+        logEvent('success', 'Imagens do Pexels obtidas com sucesso', { 
+          count: images.length,
+          query,
+          pontosTuristicos: pontosTuristicosArray.join(', ')
         });
       }
     }
     
-    // Retornar resultados processados
-    return res.status(200).json({
-      success: true,
-      searchId: searchId,
-      resultados: resultados,
-      tentativas: tentativas
+    if ((!pexelsResult.success && source !== "pexels") || source === "unsplash") {
+      unsplashResult = await fetchUnsplashImages(query, {
+        perPage: parseInt(perPage),
+        orientation,
+        quality,
+        descricao,
+        pontosTuristicos: pontosTuristicosArray
+      });
+      
+      if (unsplashResult.success) {
+        images = [...images, ...unsplashResult.images];
+        logEvent('success', 'Imagens do Unsplash obtidas com sucesso', { 
+          count: unsplashResult.images.length,
+          query,
+          pontosTuristicos: pontosTuristicosArray.join(', ')
+        });
+      }
+    }
+    
+    if (!pexelsResult.success && !unsplashResult.success) {
+      const placeholderResult = getPlaceholderImages(query, {
+        width: parseInt(width),
+        height: parseInt(height),
+        descricao,
+        pontosTuristicos: pontosTuristicosArray
+      });
+      
+      images = placeholderResult.images;
+      logEvent('info', 'Utilizando imagens de placeholder', { 
+        count: images.length,
+        query,
+        pontosTuristicos: pontosTuristicosArray.join(', ')
+      });
+    }
+    
+    return res.status(200).json({ 
+      images,
+      cache: true,
+      timestamp: new Date().toISOString(),
+      pontosTuristicos: pontosTuristicosArray.length > 0 ? pontosTuristicosArray : undefined
     });
     
   } catch (error) {
-    console.error("Erro na busca de voos no Vercel:", error);
+    logEvent('error', 'Erro ao buscar imagens', { 
+      query, 
+      error: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
     
-    // Verificar se é um erro da API
-    if (error.response) {
-      console.error("Status da resposta:", error.response.status);
-      console.error("Dados da resposta:", error.response.data);
-      
-      // Erro 401 - Problema de autenticação
-      if (error.response.status === 401) {
-        return res.status(500).json({
-          error: "Erro de autenticação na API. Verifique o token e a assinatura.",
-          status: error.response.status,
-          data: error.response.data,
-          success: false
-        });
-      }
-      
-      // Outros erros com resposta
-      return res.status(500).json({
-        error: `Erro na API: ${error.response.status} - ${error.response.statusText}`,
-        data: error.response.data,
-        success: false
-      });
-    }
-    
-    // Erros genéricos
     return res.status(500).json({ 
-      error: error.message || "Erro desconhecido",
-      success: false
+      error: error.message,
+      images: getPlaceholderImages(query, {
+        width: parseInt(width),
+        height: parseInt(height),
+        descricao
+      }).images
     });
   }
-}
-
-/**
- * Gera a assinatura para a API Travelpayouts seguindo sua especificação
- * 
- * A assinatura é construída a partir do token, marker e todos os valores
- * dos parâmetros de consulta ordenados alfabeticamente e separados por dois pontos.
- * 
- * @param {Object} params - Parâmetros da requisição
- * @param {string} token - Token de acesso da API
- * @returns {string} - Assinatura MD5 para autenticação
- */
-function generateSignature(params, token) {
-  if (!token) {
-    console.error("Token da API Aviasales não configurado!");
-    return null;
-  }
-  
-  try {
-    // Clone dos parâmetros para não modificar original
-    const paramsClone = JSON.parse(JSON.stringify(params));
-    delete paramsClone.signature; // Remover a assinatura se existir
-    
-    // Array para armazenar todos os valores em formato plano
-    const flatValues = [];
-    
-    // Função auxiliar para extrair valores recursivamente
-    function extractValues(obj) {
-      if (!obj) return;
-      
-      // Percorrer as chaves em ordem alfabética
-      Object.keys(obj).sort().forEach(key => {
-        const value = obj[key];
-        
-        if (typeof value === 'object' && value !== null) {
-          if (Array.isArray(value)) {
-            // Para arrays, adicionar cada item recursivamente
-            value.forEach(item => {
-              if (typeof item === 'object' && item !== null) {
-                extractValues(item);
-              } else if (item !== undefined) {
-                flatValues.push(String(item));
-              }
-            });
-          } else {
-            // Para objetos, extrair valores recursivamente
-            extractValues(value);
-          }
-        } else if (value !== undefined) {
-          // Adicionar valores simples
-          flatValues.push(String(value));
-        }
-      });
-    }
-    
-    // Extrair todos os valores
-    extractValues(paramsClone);
-    
-    // Ordenar valores
-    const sortedValues = flatValues.sort();
-    
-    // Construir a string de assinatura: token + valores separados por :
-    const signatureString = token + sortedValues.join(':');
-    
-    console.log('String base para assinatura (primeiros e últimos 30 chars):', 
-      signatureString.substring(0, 30) + '...' + 
-      signatureString.substring(signatureString.length - 30));
-    
-    // Gerar hash MD5
-    const signature = crypto.createHash('md5').update(signatureString).digest('hex');
-    console.log('Assinatura gerada:', signature);
-    
-    return signature;
-  } catch (error) {
-    console.error("Erro ao gerar assinatura:", error);
-    
-    // Método de fallback mais simples
-    try {
-      console.log("Tentando método de fallback para assinatura...");
-      
-      // Abordagem alternativa mais direta
-      const paramsClone = JSON.parse(JSON.stringify(params));
-      delete paramsClone.signature;
-      
-      // Obter todos os valores planos, concatenando tudo
-      let values = [];
-      
-      // Adicionar valores de nível superior
-      for (const [key, value] of Object.entries(paramsClone)) {
-        if (typeof value !== 'object') {
-          values.push(String(value));
-        }
-      }
-      
-      // Adicionar valores de passageiros
-      if (paramsClone.passengers) {
-        for (const [key, value] of Object.entries(paramsClone.passengers)) {
-          values.push(String(value));
-        }
-      }
-      
-      // Adicionar valores de segmentos
-      if (paramsClone.segments && Array.isArray(paramsClone.segments)) {
-        for (const segment of paramsClone.segments) {
-          for (const [key, value] of Object.entries(segment)) {
-            values.push(String(value));
-          }
-        }
-      }
-      
-      // Ordenar valores
-      values = values.sort();
-      
-      // Concatenar com token
-      const signatureString = token + values.join(':');
-      console.log('String de fallback:', signatureString.substring(0, 30) + '...');
-      
-      // Gerar hash
-      const fallbackSignature = crypto.createHash('md5').update(signatureString).digest('hex');
-      console.log('Assinatura de fallback:', fallbackSignature);
-      
-      return fallbackSignature;
-    } catch (fallbackError) {
-      console.error("Erro no método de fallback:", fallbackError);
-      return null;
-    }
-  }
-}
-
-// Função auxiliar para verificação de parâmetros (debug)
-function validarParametrosBusca(params) {
-  console.log('Validando parâmetros de busca de voos:');
-  console.log('Origem:', params.origem);
-  console.log('Destino:', params.destino);
-  console.log('Data de Ida:', params.dataIda);
-  console.log('Data de Volta:', params.dataVolta);
-  
-  let valido = true;
-  let mensagensErro = [];
-  
-  if (!params.origem) {
-    valido = false;
-    mensagensErro.push('Código IATA de origem não encontrado');
-  }
-  
-  if (!params.destino) {
-    valido = false;
-    mensagensErro.push('Código IATA de destino não encontrado');
-  }
-  
-  if (!params.dataIda) {
-    valido = false;
-    mensagensErro.push('Data de ida não encontrada');
-  }
-  
-  return {
-    valido,
-    mensagensErro,
-    params
-  };
-}
+};
