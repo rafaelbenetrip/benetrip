@@ -3809,3 +3809,59 @@ input[type="range"]::-moz-range-thumb {
   font-weight: 500;
   color: var(--benetrip-orange);
 }
+
+/* Estilos para o seletor de tabs */
+.filtro-viagem-tabs {
+  margin: 16px 0;
+  border-radius: var(--border-radius-md);
+  overflow: hidden;
+}
+
+.filtro-tab-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 12px;
+  padding: 0 4px;
+}
+
+.filtro-tab-header h4 {
+  font-size: var(--font-size-sm);
+  margin: 0;
+  margin-right: 12px;
+  color: var(--gray-dark);
+}
+
+.filtro-tab-buttons {
+  display: flex;
+  border: 1px solid var(--gray-medium);
+  border-radius: 20px;
+  overflow: hidden;
+}
+
+.filtro-tab-btn {
+  padding: 6px 12px;
+  background: var(--white);
+  border: none;
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  color: var(--gray-dark);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.filtro-tab-btn.active {
+  background-color: var(--orange-primary);
+  color: var(--white);
+}
+
+.filtro-tab-content {
+  position: relative;
+}
+
+.filtro-tab-pane {
+  display: none;
+}
+
+.filtro-tab-pane.active {
+  display: block;
+}
