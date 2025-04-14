@@ -126,6 +126,187 @@
             </svg>
             Personalizar Minha Busca
         </button>
+
+        <!-- Adicionar dentro da div id="modal-container" -->
+<div id="modal-filtros" class="modal-backdrop" style="display:none;" 
+     role="dialog" aria-labelledby="filtros-titulo" aria-modal="true">
+    <div class="modal-content modal-filtros">
+        <!-- Cabeçalho Modal -->
+        <div class="modal-header">
+            <h3 class="modal-title" id="filtros-titulo">Personalizar Busca</h3>
+            <button id="btn-fechar-filtros" class="btn-fechar" aria-label="Fechar">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+            </button>
+        </div>
+        
+        <!-- Filtros Rápidos -->
+        <div class="filtros-rapidos">
+            <button class="filtro-rapido" data-tipo="diretos">
+                <span class="filtro-rapido-icon">✈️</span>
+                Voos Diretos
+            </button>
+            <button class="filtro-rapido" data-tipo="manha">
+                <span class="filtro-rapido-icon">🌅</span>
+                Saída Matinal
+            </button>
+            <button class="filtro-rapido" data-tipo="economicos">
+                <span class="filtro-rapido-icon">💰</span>
+                Melhor Preço
+            </button>
+        </div>
+        
+        <!-- Conteúdo dos Filtros -->
+        <div class="filtros-content">
+            <!-- Voos diretos apenas -->
+            <div class="filtro-item">
+                <div class="filtro-label">
+                    <span class="filtro-icone">✈️</span>
+                    <span>Voos diretos apenas</span>
+                </div>
+                <div class="filtro-control">
+                    <label class="switch" for="filtro-voos-diretos">
+                        <input type="checkbox" id="filtro-voos-diretos" aria-label="Filtrar apenas voos diretos">
+                        <span class="slider round"></span>
+                    </label>
+                </div>
+            </div>
+            
+            <!-- Horário de partida -->
+            <div class="filtro-item">
+                <div class="filtro-label">
+                    <span class="filtro-icone">🛫</span>
+                    <span>Horário de Partida</span>
+                </div>
+                <div class="filtro-control range-slider">
+                    <div class="range-values">
+                        <span id="partida-min">00:00</span> - <span id="partida-max">23:59</span>
+                    </div>
+                    <div class="double-slider">
+                        <input type="range" id="partida-slider-min" 
+                               min="0" max="1439" value="0" 
+                               aria-label="Horário mínimo de partida">
+                        <input type="range" id="partida-slider-max" 
+                               min="0" max="1439" value="1439" 
+                               aria-label="Horário máximo de partida">
+                    </div>
+                </div>
+            </div>
+            
+            <!-- NOVO: Horário de chegada -->
+            <div class="filtro-item">
+                <div class="filtro-label">
+                    <span class="filtro-icone">🛬</span>
+                    <span>Horário de Chegada</span>
+                </div>
+                <div class="filtro-control range-slider">
+                    <div class="range-values">
+                        <span id="chegada-min">00:00</span> - <span id="chegada-max">23:59</span>
+                    </div>
+                    <div class="double-slider">
+                        <input type="range" id="chegada-slider-min" 
+                               min="0" max="1439" value="0" 
+                               aria-label="Horário mínimo de chegada">
+                        <input type="range" id="chegada-slider-max" 
+                               min="0" max="1439" value="1439" 
+                               aria-label="Horário máximo de chegada">
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Duração da viagem -->
+            <div class="filtro-item">
+                <div class="filtro-label">
+                    <span class="filtro-icone">⌛</span>
+                    <span>Duração Máxima</span>
+                </div>
+                <div class="filtro-control range-slider">
+                    <div class="range-values">
+                        <span id="duracao-valor">Qualquer</span>
+                    </div>
+                    <input type="range" id="duracao-slider" 
+                           min="0" max="24" value="24" 
+                           aria-label="Duração máxima do voo">
+                </div>
+            </div>
+            
+            <!-- Preço Máximo -->
+            <div class="filtro-item">
+                <div class="filtro-label">
+                    <span class="filtro-icone">💲</span>
+                    <span>Preço Máximo</span>
+                </div>
+                <div class="filtro-control">
+                    <div class="preco-slider-container">
+                        <input type="range" id="preco-slider" min="0" max="100" value="100" 
+                               aria-label="Preço máximo">
+                        <div class="preco-valor-container">
+                            <span id="preco-valor">Qualquer</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Companhias aéreas -->
+            <div class="filtro-item filtro-expandivel">
+                <div class="filtro-header" aria-expanded="false" aria-controls="companhias-content">
+                    <div class="filtro-label">
+                        <span class="filtro-icone">🛫</span>
+                        <span>Companhias Aéreas</span>
+                    </div>
+                    <div class="filtro-toggle">▼</div>
+                </div>
+                <div class="filtro-expandivel-content" id="companhias-content" data-carregado="false">
+                    <div class="loading-placeholder">Carregando companhias...</div>
+                </div>
+            </div>
+            
+            <!-- Aeroportos -->
+            <div class="filtro-item filtro-expandivel">
+                <div class="filtro-header" aria-expanded="false" aria-controls="aeroportos-content">
+                    <div class="filtro-label">
+                        <span class="filtro-icone">🏢</span>
+                        <span>Aeroportos</span>
+                    </div>
+                    <div class="filtro-toggle">▼</div>
+                </div>
+                <div class="filtro-expandivel-content" id="aeroportos-content" data-carregado="false">
+                    <div class="loading-placeholder">Carregando aeroportos...</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Resumo & Aplicar -->
+        <div class="resumo-filtros">
+            <div class="resultados-preview">
+                <span id="total-resultados-filtrados">0</span> de <span id="total-resultados">0</span> voos
+            </div>
+        </div>
+        
+        <!-- Footer do Modal -->
+        <div class="modal-footer">
+            <button class="modal-btn modal-btn-secondary" id="btn-limpar-filtros">
+                Limpar Filtros
+            </button>
+            <button class="modal-btn modal-btn-primary" id="btn-aplicar-filtros">
+                Aplicar Filtros
+                <span class="badge" id="filtros-count">0</span>
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Template para estado vazio de resultados -->
+<template id="template-sem-resultados">
+    <div class="filtro-sem-resultados">
+        <img src="assets/images/tripinha/avatar-triste.png" alt="Tripinha">
+        <h3>Nenhum voo corresponde aos filtros selecionados</h3>
+        <p>Tente ajustar ou remover alguns filtros</p>
+        <button class="btn-limpar-filtros-todos">Limpar Todos os Filtros</button>
+    </div>
+</template>
         
         <!-- O conteúdo será carregado dinamicamente pelo script flights.js -->
         <main class="voos-content">
