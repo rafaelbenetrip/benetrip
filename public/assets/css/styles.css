@@ -1767,19 +1767,19 @@ body {
 
 /* Painel de filtros */
 .painel-filtros {
-    position: fixed;
-    top: 0;
-    right: 0;
-    bottom: 0;
-    width: 100%;
-    max-width: 360px;
-    background-color: var(--white);
-    box-shadow: var(--shadow-lg);
-    display: flex;
-    flex-direction: column;
-    z-index: 1000;
-    transform: translateX(100%);
-    transition: transform var(--transition-medium);
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  max-width: 360px;
+  background-color: var(--white);
+  box-shadow: -4px 0 20px rgba(0, 0, 0, 0.15); /* Sombra aprimorada */
+  display: flex;
+  flex-direction: column;
+  z-index: 1000;
+  transform: translateX(100%);
+  transition: transform var(--transition-medium);
 }
 
 .painel-filtros.show {
@@ -3241,12 +3241,14 @@ body {
 
 /* Modal de Filtros */
 .modal-filtros {
-    max-width: 450px;
-    max-height: 88vh;
-    overflow-y: auto;
-    overflow-x: hidden;
-    scrollbar-width: thin;
-    scrollbar-color: #ccc transparent;
+  max-width: 450px;
+  max-height: 88vh;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: #ccc transparent;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.18); /* Sombra mais evidente */
+  border-radius: 12px;
 }
 
 .modal-filtros::-webkit-scrollbar {
