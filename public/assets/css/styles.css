@@ -3156,3 +3156,85 @@ body {
     color: #FF8A3D;
   }
 }
+
+/* Estilos para toasts */
+#toast-container {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 9999;
+}
+
+.toast {
+    padding: 12px 20px;
+    margin-bottom: 10px;
+    border-radius: 8px;
+    box-shadow: 0 3px 10px rgba(0,0,0,0.15);
+    background: white;
+    color: #333;
+    font-size: 14px;
+    transition: transform 0.3s, opacity 0.3s;
+    transform: translateY(20px);
+    opacity: 0;
+    max-width: 90vw;
+}
+
+.toast.show {
+    transform: translateY(0);
+    opacity: 1;
+}
+
+.toast-info {
+    background-color: #e3f2fd;
+    border-left: 4px solid #2196f3;
+}
+
+.toast-success {
+    background-color: #e8f5e9;
+    border-left: 4px solid #4caf50;
+}
+
+.toast-warning {
+    background-color: #fff8e1;
+    border-left: 4px solid #ffc107;
+}
+
+.toast-error {
+    background-color: #ffebee;
+    border-left: 4px solid #f44336;
+}
+
+/* Botão de ação grande */
+.action-button-container {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    margin: 20px 0;
+    padding: 0 16px;
+}
+
+.action-button-large {
+    background-color: var(--orange-primary, #E87722);
+    color: white;
+    border-radius: 30px;
+    padding: 14px 24px;
+    font-weight: 700;
+    font-size: 16px;
+    border: none;
+    width: 100%;
+    max-width: 300px;
+    cursor: pointer;
+    transition: background-color 0.2s, transform 0.2s;
+    box-shadow: 0 2px 8px rgba(232, 119, 34, 0.3);
+}
+
+.action-button-large:hover {
+    background-color: #d96b1a;
+    transform: translateY(-2px);
+}
+
+.action-button-large:active {
+    transform: translateY(0);
+    box-shadow: 0 1px 4px rgba(232, 119, 34, 0.3);
+}
