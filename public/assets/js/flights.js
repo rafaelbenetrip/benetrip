@@ -903,7 +903,7 @@ const BENETRIP_VOOS = {
     const loading = document.createElement('div');
     loading.className = 'loading-container';
     loading.innerHTML = `
-      <img src="assets/images/tripinha/loading.gif" alt="Tripinha carregando" class="loading-avatar">
+      <img src="assets/images/tripinha/loading2.png" alt="Tripinha carregando" class="loading-avatar">
       <div class="loading-text">Farejando os melhores voos para você...</div>
       <div class="progress-bar-container">
         <div class="progress-bar" role="progressbar" style="width: 10%;" aria-valuenow="10" aria-valuemin="0" aria-valuemax="100"></div>
