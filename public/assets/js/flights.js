@@ -1046,7 +1046,7 @@ const BENETRIP_VOOS = {
     semResultados.innerHTML = `
       <div class="tripinha-message">
         <div class="tripinha-avatar">
-          <img src="assets/images/tripinha/avatar-triste.png" alt="Tripinha triste">
+          <img src="assets/images/tripinha/triste.png" alt="Tripinha triste">
         </div>
         <div class="tripinha-bubble">
           <p>Ops! Cheirei todos os cantos e não encontrei voos para ${this.destino?.destino || 'este destino'} nas datas selecionadas. 🐾</p>
