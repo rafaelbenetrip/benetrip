@@ -561,15 +561,17 @@ function coletarFiltrosAtuais() {
         const aeroportos = Array.from(document.querySelectorAll('.filtro-aeroporto:checked'))
             .map(checkbox => checkbox.value);
         
-        // Cria objeto com os filtros
-        return {
-            voosDiretos,
-            horarioPartida: { min: partidaMin, max: partidaMax },
-            horarioChegada: { min: chegadaMin, max: chegadaMax }, // NOVO
-            duracaoMaxima,
-            precoMaximo,
-            companhias,
-            aeroportos
+    // Separar filtros por ida e volta
+    return {
+      voosDiretos,
+      horarioPartidaIda: { min: partidaIdaMin, max: partidaIdaMax },
+      horarioChegadaIda: { min: chegadaIdaMin, max: chegadaIdaMax },
+      horarioPartidaVolta: { min: partidaVoltaMin, max: partidaVoltaMax },
+      horarioChegadaVolta: { min: chegadaVoltaMin, max: chegadaVoltaMax },
+      duracaoMaxima,
+      precoMaximo,
+      companhias,
+      aeroportos
         };
     } catch (error) {
         console.error('Erro ao coletar filtros atuais:', error);
@@ -1120,6 +1122,35 @@ function inicializarFiltrosRapidos() {
             atualizarContadorFiltros();
         });
     });
+}
+
+// Função para alternar entre tabs de ida e volta
+function inicializarTabsViagem() {
+  const tabBtns = document.querySelectorAll('.filtro-tab-btn');
+  if (!tabBtns.length) return;
+  
+  tabBtns.forEach(btn => {
+    btn.addEventListener('click', function() {
+      // Remove classe ativa de todos os botões
+      tabBtns.forEach(b => b.classList.remove('active'));
+      
+      // Adiciona classe ativa ao botão clicado
+      this.classList.add('active');
+      
+      // Obtém o target do tab
+      const target = this.dataset.target;
+      
+      // Atualiza visibilidade dos painéis
+      document.querySelectorAll('.filtro-tab-pane').forEach(pane => {
+        pane.classList.remove('active');
+      });
+      
+      document.getElementById(`tab-${target}`).classList.add('active');
+      
+      // Atualiza contadores
+      atualizarContadorFiltros();
+    });
+  });
 }
 
 // Configurar eventos dos filtros
@@ -1862,6 +1893,7 @@ document.addEventListener('DOMContentLoaded', function() {
     modificarCriarCardVoo();
     carregarTemplatesModais();
     configurarEventosInterface();
+    inicializarTabsViagem();
     
     if (typeof window.BENETRIP_VOOS !== 'undefined' && 
         !window.BENETRIP_VOOS.estaCarregando && 
