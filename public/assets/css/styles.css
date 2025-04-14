@@ -3716,3 +3716,44 @@ input[type="range"]::-moz-range-thumb {
         padding: 12px 16px;
     }
 }
+
+/* Estilos para o container do dual slider */
+.dual-slider-container {
+  position: relative;
+  background-color: #f5f5f5;
+  border-radius: 8px;
+  padding: 20px 10px 10px;
+  margin: 15px 0;
+}
+
+/* Estilos para a base do slider (faixa cinza) */
+.slider-track {
+  position: absolute;
+  width: calc(100% - 20px);
+  height: 5px;
+  background-color: #d7dcdf;
+  border-radius: 5px;
+  top: 50%;
+  left: 10px;
+  transform: translateY(-50%);
+  z-index: 1;
+}
+
+/* Ajustes para os inputs dentro do container */
+.dual-slider-container input[type="range"] {
+  position: absolute;
+  width: calc(100% - 20px);
+  height: 5px;
+  top: 50%;
+  left: 10px;
+  transform: translateY(-50%);
+  z-index: 2;
+  pointer-events: none;
+}
+
+/* Garantir que os thumbs (bolinhas) estejam visíveis e funcionais */
+.dual-slider-container input[type="range"]::-webkit-slider-thumb,
+.dual-slider-container input[type="range"]::-moz-range-thumb {
+  pointer-events: auto;
+  z-index: 3;
+}
