@@ -940,8 +940,9 @@ const BENETRIP_VOOS = {
         <img src="assets/images/tripinha/avatar-normal.png" alt="Tripinha">
       </div>
       <div class="tripinha-bubble">
-        <p>Eu farejei por aí e encontrei ${this.finalResults.proposals.length} voos incríveis para sua aventura! 🐾 
-           Deslize para ver todas as opções e escolha a que melhor se encaixa no seu plano!</p>
+        <p>Farejei o mundo todo e encontrei ${this.finalResults.proposals.length} voos incríveis com parceiros de vários cantos! 🐾
+Deslize para ver as opções e escolher a que mais combina com você.
+Alguns parceiros podem mostrar preços em outra moeda ou idioma, mas são de confiança! ✈️🐶</p>
       </div>
     `;
     container.appendChild(tripinhaMessage);
