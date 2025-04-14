@@ -203,57 +203,77 @@
   <div class="filtro-tab-content">
     <!-- Conteúdo do filtro de ida (visível por padrão) -->
     <div class="filtro-tab-pane active" id="tab-ida">
-      <!-- Os filtros de horário do voo de ida serão inseridos aqui -->
+      <!-- No tab-ida -->
+<div class="filtro-item">
+  <div class="filtro-expandivel">
+    <div class="filtro-header" aria-expanded="false" aria-controls="partida-ida-content">
+      <div class="filtro-label">
+        <span class="filtro-icone">🛫</span>
+        Horário de Partida
+      </div>
+      <span class="filtro-toggle">▼</span>
+    </div>
+    <div class="filtro-expandivel-content" id="partida-ida-content">
+      <!-- Conteúdo existente do slider de partida, ajustado para ida -->
+    </div>
+  </div>
+</div>
+
+<div class="filtro-item">
+  <div class="filtro-expandivel">
+    <div class="filtro-header" aria-expanded="false" aria-controls="chegada-ida-content">
+      <div class="filtro-label">
+        <span class="filtro-icone">🛬</span>
+        Horário de Chegada
+      </div>
+      <span class="filtro-toggle">▼</span>
+    </div>
+    <div class="filtro-expandivel-content" id="chegada-ida-content">
+      <!-- Conteúdo existente do slider de chegada, ajustado para ida -->
+    </div>
+  </div>
+</div>
+
+<!-- No tab-volta (estrutura similar) -->
     </div>
     
     <!-- Conteúdo do filtro de volta (oculto inicialmente) -->
     <div class="filtro-tab-pane" id="tab-volta">
-      <!-- Os filtros de horário do voo de volta serão inseridos aqui -->
+      <!-- No tab-ida -->
+<div class="filtro-item">
+  <div class="filtro-expandivel">
+    <div class="filtro-header" aria-expanded="false" aria-controls="partida-ida-content">
+      <div class="filtro-label">
+        <span class="filtro-icone">🛫</span>
+        Horário de Partida
+      </div>
+      <span class="filtro-toggle">▼</span>
+    </div>
+    <div class="filtro-expandivel-content" id="partida-ida-content">
+      <!-- Conteúdo existente do slider de partida, ajustado para ida -->
     </div>
   </div>
 </div>
-            
-            <!-- Horário de partida -->
-            <div class="filtro-item">
-                <div class="filtro-label">
-                    <span class="filtro-icone">🛫</span>
-                    <span>Horário de Partida</span>
-                </div>
-                <div class="filtro-control range-slider">
-                    <div class="range-values">
-                        <span id="partida-min">00:00</span> - <span id="partida-max">23:59</span>
-                    </div>
-                    <div class="double-slider">
-                        <input type="range" id="partida-slider-min" 
-                               min="0" max="1439" value="0" 
-                               aria-label="Horário mínimo de partida">
-                        <input type="range" id="partida-slider-max" 
-                               min="0" max="1439" value="1439" 
-                               aria-label="Horário máximo de partida">
-                    </div>
-                </div>
-            </div>
-            
-            <!-- NOVO: Horário de chegada -->
-            <div class="filtro-item">
-                <div class="filtro-label">
-                    <span class="filtro-icone">🛬</span>
-                    <span>Horário de Chegada</span>
-                </div>
-                <div class="filtro-control range-slider">
-                    <div class="range-values">
-                        <span id="chegada-min">00:00</span> - <span id="chegada-max">23:59</span>
-                    </div>
-                    <div class="double-slider">
-                        <input type="range" id="chegada-slider-min" 
-                               min="0" max="1439" value="0" 
-                               aria-label="Horário mínimo de chegada">
-                        <input type="range" id="chegada-slider-max" 
-                               min="0" max="1439" value="1439" 
-                               aria-label="Horário máximo de chegada">
-                    </div>
-                </div>
-            </div>
+
+<div class="filtro-item">
+  <div class="filtro-expandivel">
+    <div class="filtro-header" aria-expanded="false" aria-controls="chegada-ida-content">
+      <div class="filtro-label">
+        <span class="filtro-icone">🛬</span>
+        Horário de Chegada
+      </div>
+      <span class="filtro-toggle">▼</span>
+    </div>
+    <div class="filtro-expandivel-content" id="chegada-ida-content">
+      <!-- Conteúdo existente do slider de chegada, ajustado para ida -->
+    </div>
+  </div>
+</div>
+
+<!-- No tab-volta (estrutura similar) -->
+    </div>
+  </div>
+</div>
             
             <!-- Duração da viagem -->
             <div class="filtro-item">
