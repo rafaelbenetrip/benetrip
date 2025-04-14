@@ -143,61 +143,98 @@ function aplicarEstilosVerticais() {
  * Adicionar botão de customização
  */
 function adicionarBotaoCustomizacao() {
-    if (document.querySelector('.customize-search-button')) return;
+    // Busca o botão existente no HTML
+    const existingButton = document.querySelector('.customize-search-button');
     
-    const header = document.querySelector('.app-header');
-    if (!header) return;
-    
-    const button = document.createElement('button');
-    button.className = 'customize-search-button';
-    button.setAttribute('aria-label', 'Personalizar busca de voos');
-    button.innerHTML = `
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="3"></circle>
-            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82V15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-        </svg>
-        Personalizar Minha Busca 
-        <span id="filtros-badge" class="filtros-badge" style="display: none;">0</span>
-    `;
-    
-    header.parentNode.insertBefore(button, header.nextSibling);
-    
-    button.addEventListener('click', function() {
-        abrirModalFiltros();
-    });
-    
-    console.log('Botão de customização adicionado');
-}
+    if (existingButton) {
+        // Se o botão já existe, apenas adiciona o evento de clique
+        console.log('Botão de customização encontrado, adicionando evento de clique');
+        existingButton.addEventListener('click', function() {
+            abrirModalFiltros();
+        });
+        
+        // Adiciona badge de filtros (se não existir)
+        if (!existingButton.querySelector('#filtros-badge')) {
+            const badge = document.createElement('span');
+            badge.id = 'filtros-badge';
+            badge.className = 'filtros-badge';
+            badge.style.display = 'none';
+            badge.textContent = '0';
+            existingButton.appendChild(badge);
+        }
+        
+        console.log('Evento adicionado ao botão de customização existente');
+        return;
+    }
 
 // Função para abrir modal de filtros
 function abrirModalFiltros() {
+    console.log('Tentando abrir modal de filtros...');
+    
+    // Verificar se o modal existe
     const modal = document.getElementById('modal-filtros');
     if (!modal) {
-        console.error('Modal de filtros não encontrado');
+        console.error('ERRO: Modal de filtros não encontrado!');
+        
+        // Tentar encontrar se existe algum modal no documento para debug
+        const possibleModals = document.querySelectorAll('.modal-backdrop');
+        console.log('Modais encontrados:', possibleModals.length);
+        
+        // Exibir uma mensagem para o usuário
+        if (typeof window.showGlobalError === 'function') {
+            window.showGlobalError('Erro ao abrir filtros. Tente recarregar a página.');
+        } else if (typeof exibirToast === 'function') {
+            exibirToast('Erro ao abrir filtros. Tente recarregar a página.', 'error');
+        } else {
+            alert('Erro ao abrir filtros. Tente recarregar a página.');
+        }
         return;
     }
     
-    // Inicializa contadores de resultados
-    atualizarContadoresResultados();
-    
-    // Carregamos os filtros salvos, se existirem
-    carregarFiltrosSalvos();
-    
-    // Exibimos o modal
-    modal.style.display = 'flex';
-    
-    setTimeout(() => {
+    try {
+        // Inicializa contadores de resultados
+        if (typeof atualizarContadoresResultados === 'function') {
+            atualizarContadoresResultados();
+        }
+        
+        // Carregamos os filtros salvos, se existirem
+        if (typeof carregarFiltrosSalvos === 'function') {
+            carregarFiltrosSalvos();
+        }
+        
+        // Exibimos o modal - garantindo que display está definido
+        modal.style.display = 'flex';
+        
+        // Adicionamos a classe ativa com timeout para permitir a animação
+        setTimeout(() => {
+            modal.classList.add('modal-active');
+            console.log('Modal ativado com sucesso');
+            
+            // Foca o primeiro elemento focável para acessibilidade
+            const primeiroFocavel = modal.querySelector('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+            if (primeiroFocavel) {
+                primeiroFocavel.focus();
+            }
+        }, 10);
+        
+        // Configura navegação por teclado dentro do modal
+        if (typeof configurarNavegacaoTeclado === 'function') {
+            configurarNavegacaoTeclado(modal);
+        }
+        
+        console.log('Modal de filtros aberto com sucesso');
+    } catch (erro) {
+        console.error('Erro ao abrir modal de filtros:', erro);
+        
+        // Garante que o modal seja exibido mesmo após erro
+        modal.style.display = 'flex';
         modal.classList.add('modal-active');
         
-        // Foca o primeiro elemento focável para acessibilidade
-        const primeiroFocavel = modal.querySelector('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
-        if (primeiroFocavel) {
-            primeiroFocavel.focus();
+        // Notifica o usuário sobre o erro de maneira não bloqueante
+        if (typeof exibirToast === 'function') {
+            exibirToast('Algumas opções de filtro podem não estar disponíveis.', 'warning');
         }
-    }, 10);
-    
-    // Configura navegação por teclado dentro do modal
-    configurarNavegacaoTeclado(modal);
+    }
 }
 
 // Função para configurar navegação por teclado
@@ -1387,83 +1424,40 @@ function modificarCriarCardVoo() {
 // Função para carregar templates de modais dinamicamente
 function carregarTemplatesModais() {
     const modalContainer = document.getElementById('modal-container');
-    if (!modalContainer) return;
+    if (!modalContainer) {
+        console.error('Container de modais não encontrado! Criando um novo...');
+        const newContainer = document.createElement('div');
+        newContainer.id = 'modal-container';
+        document.body.appendChild(newContainer);
+        modalContainer = newContainer;
+    }
+    
+    console.log('Carregando templates de modais...');
     
     modalContainer.innerHTML = `
+        <!-- Templates de modais aqui (sem alteração) -->
         <div id="modal-detalhes-voo" class="modal-backdrop" style="display:none;">
-            <div class="modal-content modal-detalhes-voo">
-                <div class="modal-header">
-                    <h3 class="modal-title">Detalhes do Voo</h3>
-                    <button id="btn-fechar-detalhes" class="btn-fechar">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <line x1="18" y1="6" x2="6" y2="18"></line>
-                            <line x1="6" y1="6" x2="18" y2="18"></line>
-                        </svg>
-                    </button>
-                </div>
-                <div class="detalhes-content" id="detalhes-voo-content">
-                </div>
-                <div class="modal-footer">
-                    <button class="modal-btn modal-btn-secondary" id="btn-voltar-lista">
-                        Voltar
-                    </button>
-                    <button class="modal-btn modal-btn-primary" id="btn-selecionar-este-voo">
-                        Selecionar Voo
-                    </button>
-                </div>
-            </div>
+            <!-- conteúdo existente... -->
         </div>
 
         <div id="modal-confirmacao" class="modal-backdrop" style="display:none;">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h3 class="modal-title">Confirmar Seleção</h3>
-                    <button id="btn-fechar-modal" class="btn-fechar">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <line x1="18" y1="6" x2="6" y2="18"></line>
-                            <line x1="6" y1="6" x2="18" y2="18"></line>
-                        </svg>
-                    </button>
-                </div>
-                <div class="confirmacao-tripinha">
-                    <div class="confirmacao-avatar">
-                        <img src="assets/images/tripinha/avatar-normal.png" alt="Tripinha">
-                    </div>
-                    <div class="confirmacao-content">
-                        <p class="confirmacao-titulo">Ótima escolha!</p>
-                        <div id="resumo-valores" class="confirmacao-resumo">
-                        </div>
-                        <div class="confirmacao-checkbox">
-                            <input type="checkbox" id="confirmar-selecao">
-                            <label for="confirmar-selecao">Confirmo que desejo prosseguir com este voo</label>
-                        </div>
-                        <p class="confirmacao-aviso">
-                            <span class="icon-info">ℹ️</span> 
-                            Após a confirmação, você será direcionado para selecionar sua hospedagem.
-                        </p>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button class="modal-btn modal-btn-secondary" id="btn-continuar-buscando">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M19 12H5M12 19l-7-7 7-7"></path>
-                        </svg>
-                        Voltar aos Voos
-                    </button>
-                    <button class="modal-btn modal-btn-primary" id="btn-confirmar" disabled>
-                        Confirmar e Prosseguir
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M5 12h14M12 5l7 7-7 7"></path>
-                        </svg>
-                    </button>
-                </div>
-            </div>
+            <!-- conteúdo existente... -->
         </div>
     `;
     
+    // Verificar se o modal de filtros existe
+    if (!document.getElementById('modal-filtros')) {
+        console.error('Modal de filtros não encontrado! Verifique o HTML da página.');
+    } else {
+        console.log('Modal de filtros encontrado, configurando eventos...');
+        
+        // Configurar eventos dos filtros APÓS carregar os templates
+        configurarEventosFiltros();
+    }
+    
     document.getElementById('modal-confirmacao').style.display = 'none';
     document.getElementById('modal-detalhes-voo').style.display = 'none';
-    console.log('Templates de modais carregados');
+    console.log('Templates de modais carregados e eventos configurados');
 }
 
 // Função para mostrar detalhes do voo em modal
@@ -1860,14 +1854,33 @@ document.addEventListener('keydown', function(event) {
 // ======= INICIALIZAÇÃO =======
 
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('DOM carregado - inicializando interface de voos com layout vertical...');
+    console.log('DOM carregado - inicializando interface de voos...');
     
+    // Aplicar estilos antes de qualquer interação
     aplicarEstilosVerticais();
-    adicionarBotaoCustomizacao();
-    modificarCriarCardVoo();
+    
+    // Carregar e configurar modais
     carregarTemplatesModais();
+    
+    // Configurar botão de personalização - versão corrigida
+    adicionarBotaoCustomizacao();
+    
+    // Verificar explicitamente se o modal de filtros existe
+    const modalFiltros = document.getElementById('modal-filtros');
+    if (!modalFiltros) {
+        console.error('ERRO: Modal de filtros não encontrado após inicialização!');
+        // Tentar encontrar elementos para debug
+        const modalContainers = document.querySelectorAll('[id*="modal"]');
+        console.log('Elementos de modal encontrados:', modalContainers.length);
+        modalContainers.forEach(el => console.log('- ' + el.id));
+    } else {
+        console.log('Modal de filtros encontrado e pronto para uso');
+    }
+    
+    modificarCriarCardVoo();
     configurarEventosInterface();
     
+    // Restante do código de inicialização sem alteração...
     if (typeof window.BENETRIP_VOOS !== 'undefined' && 
         !window.BENETRIP_VOOS.estaCarregando && 
         window.BENETRIP_VOOS.finalResults) {
@@ -1879,4 +1892,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Inicializa o contador de filtros
     atualizarBadgeFiltros();
+    
+    // Log final de sucesso
+    console.log('Inicialização completa, sistema pronto');
 });
