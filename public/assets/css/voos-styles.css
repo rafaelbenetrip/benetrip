@@ -1335,3 +1335,8 @@
   font-weight: 500;
   color: var(--benetrip-orange);
 }
+
+.modal-filtros {
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+    border: 1px solid #e0e0e0;
+}
