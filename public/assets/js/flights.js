@@ -770,93 +770,33 @@ const BENETRIP_VOOS = {
    * @returns {Array} proposals apenas de parceiros adequados
    */
   filterProposalsBRLPT(proposals, gates_info) {
-    if (!Array.isArray(proposals) || typeof gates_info !== 'object') return [];
-    return proposals.filter(proposal => {
-      if (!proposal.gate_id || !gates_info[proposal.gate_id]) return false;
-      const gate = gates_info[proposal.gate_id];
-      const moedaOK =
-        Array.isArray(gate.supported_currencies) &&
-        gate.supported_currencies.includes('BRL');
-      const idiomaOK =
-        Array.isArray(gate.supported_locales) &&
-        gate.supported_locales.some(loc => loc.toLowerCase().startsWith('pt'));
-      return moedaOK && idiomaOK;
-    });
-  },
-  
-  /**
-   * Finaliza o processo de busca e prepara os resultados
-   */
-  concluirBusca() {
-    // Verificação e log das taxas de conversão ao concluir a busca
-    console.log('=== DEBUG DE CONVERSÃO DE MOEDA ===');
-    console.log('searchId:', this.searchId);
-    console.log('currencyRates disponível:', !!this.currencyRates);
-    if (this.currencyRates) {
-      console.log('Taxas de conversão:', this.currencyRates);
+  if (!Array.isArray(proposals) || typeof gates_info !== 'object') return [];
+  return proposals.filter(proposal => {
+    const gid = proposal.gate_id || proposal.gate;
+    if (!gid) {
+      console.warn("Proposal sem gate_id:", proposal);
+      return false;
     }
-    
-    const moedaUsuario = this.obterMoedaAtual();
-    console.log('Moeda do usuário detectada:', moedaUsuario);
-    
-    // Se existirem propostas, mostra o preço original e convertido da primeira
-    if (this.accumulatedProposals.length > 0) {
-      const primeiraProposta = this.accumulatedProposals[0];
-      const k = Object.keys(primeiraProposta.terms)[0];
-      const precoOriginal = primeiraProposta.terms[k]?.unified_price || primeiraProposta.terms[k]?.price || 0;
-      
-      console.log('Exemplo - Preço original:', precoOriginal);
-      const taxaConversao = this.currencyRates ? this.currencyRates[moedaUsuario.toLowerCase()] : null;
-      console.log(`Taxa de conversão para ${moedaUsuario}:`, taxaConversao);
-      
-      if (taxaConversao) {
-        const precoConvertido = Math.round(precoOriginal / taxaConversao);
-        console.log(`Preço convertido: ${precoOriginal} / ${taxaConversao} = ${precoConvertido} ${moedaUsuario}`);
-      } else {
-        console.log('Conversão não aplicada - taxa não disponível');
-      }
+    const gate = gates_info[gid];
+    if (!gate) {
+      console.warn("Gate não encontrado para:", gid, proposal);
+      return false;
     }
-    console.log('=== FIM DEBUG CONVERSÃO ===');
-    
-    // Para o polling
-    this.pararPolling();
-    this.estaCarregando = false;
-    
-    // Prepara plenamente os resultados finais
-    this.finalResults = {
-        proposals: this.preprocessarPropostas(this.accumulatedProposals),
-        airlines: this.accumulatedAirlines,
-        airports: this.accumulatedAirports,
-        gates_info: this.accumulatedGatesInfo,
-        meta: { currency: this.obterMoedaAtual() } // Atualiza a moeda nos metadados
-    };
-    
-    console.log(`Busca concluída com ${this.finalResults.proposals.length} propostas processadas`);
-    
-    // Atualiza UI
-    if (this.finalResults.proposals.length > 0) {
-        this.vooAtivo = this.finalResults.proposals[0];
-        this.indexVooAtivo = 0;
-        
-        this.exibirToast(`${this.finalResults.proposals.length} voos encontrados! ✈️`, 'success');
-        
-        // Render com delay mínimo para garantir que o DOM esteja pronto
-        setTimeout(() => {
-            this.renderizarResultados();
-            
-            // Notifica outros módulos que os resultados estão prontos
-            const evento = new CustomEvent('resultadosVoosProntos', {
-                detail: { 
-                    quantidadeVoos: this.finalResults.proposals.length 
-                }
-            });
-            document.dispatchEvent(evento);
-        }, 10);
-    } else {
-        this.exibirToast('Não encontramos voos disponíveis.', 'warning');
-        this.renderizarSemResultados();
+    // log o gate para ver se existe os campos usados
+    console.log("Gate:", gid, gate);
+
+    // temporário: retorne true, só para comparar, e veja se começa aparecer resultados
+    // return true;
+
+    // continue criterioso agora
+    const moedaOK = Array.isArray(gate.supported_currencies) && gate.supported_currencies.includes('BRL');
+    const idiomaOK = Array.isArray(gate.supported_locales) && gate.supported_locales.some(loc => loc.toLowerCase().startsWith('pt'));
+    if (!moedaOK || !idiomaOK) {
+      console.warn("Gate não suporta BRL/PT:", gid, gate);
     }
-  },
+    return moedaOK && idiomaOK;
+  });
+},
 
    /**
    * Finaliza o processo de busca e prepara os resultados
