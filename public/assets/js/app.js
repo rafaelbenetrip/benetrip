@@ -171,6 +171,36 @@ const BENETRIP = {
         
         // Configurar eventos específicos para o tipo de pergunta
         this.configurarEventosPergunta(pergunta);
+        
+        // ADICIONADO: Botão de segurança para a última pergunta do fluxo de destino conhecido
+        if (this.estado.fluxo === 'destino_conhecido' && pergunta.key === 'datas') {
+            setTimeout(() => {
+                // Verificar se o elemento container de mensagens ainda existe
+                const chatMessages = document.getElementById('chat-messages');
+                if (!chatMessages) return;
+                
+                // Criar container para o botão
+                const btnContainer = document.createElement('div');
+                btnContainer.className = 'action-button-container';
+                btnContainer.style.marginTop = '20px';
+                
+                // Criar o botão
+                const btnBuscarVoos = document.createElement('button');
+                btnBuscarVoos.textContent = 'Buscar Voos ✈️';
+                btnBuscarVoos.className = 'action-button-large';
+                btnBuscarVoos.onclick = () => {
+                    if (this.estado.respostas.datas) {
+                        this.finalizarQuestionario();
+                    } else {
+                        this.exibirToast('Por favor, selecione as datas da viagem primeiro.');
+                    }
+                };
+                
+                // Adicionar botão ao container e container à mensagem
+                btnContainer.appendChild(btnBuscarVoos);
+                chatMessages.appendChild(btnContainer);
+            }, 2000);
+        }
     },
 
     /**
@@ -1023,8 +1053,18 @@ const BENETRIP = {
      * Verifica se atingimos o limite de perguntas para este fluxo
      */
     verificarLimitePerguntas() {
-        // Desativar verificação de limite para garantir que todas as perguntas sejam exibidas
-        return false; // Sempre retorna falso para não finalizar prematuramente
+        // Garantir que o questionário termine se todas as perguntas obrigatórias foram respondidas
+        if (this.estado.fluxo === 'destino_conhecido') {
+            const perguntasObrigatorias = ['conhece_destino', 'destino_conhecido', 'cidade_partida', 'datas'];
+            const todasRespondidas = perguntasObrigatorias.every(key => this.estado.respostas[key] !== undefined);
+            
+            if (todasRespondidas && this.estado.perguntaAtual >= 3) {
+                console.log("Todas perguntas obrigatórias respondidas, finalizando questionário");
+                return true;
+            }
+        }
+        
+        return false; // Mantém comportamento padrão para outros casos
     },
 
     /**
@@ -1081,6 +1121,10 @@ const BENETRIP = {
      * Finaliza o questionário e passa para a próxima etapa
      */
     finalizarQuestionario() {
+        // Adicionar logs para depuração
+        console.log("Finalizando questionário com fluxo:", this.estado.fluxo);
+        console.log("Dados salvos:", this.estado.respostas);
+
         // Salvar dados do usuário
         this.salvarDadosUsuario();
         
@@ -1280,23 +1324,36 @@ const BENETRIP = {
      * Busca voos para o destino escolhido pelo usuário
      */
     buscarVoos() {
+        // Garantir que haja um redirecionamento, mesmo se API falhar
+        const redirecionarParaVoos = () => {
+            console.log("Redirecionando para página de voos...");
+            this.atualizarBarraProgresso(100, "Redirecionando para voos...");
+            setTimeout(() => {
+                window.location.href = 'flights.html';
+            }, 2000);
+        };
+        
         // Verificar se o serviço de API está disponível
         if (!window.BENETRIP_API) {
             console.error("Serviço de API não disponível");
             this.atualizarBarraProgresso(100, "Erro ao buscar voos. Redirecionando...");
-            
-            // Redirecionar para página de voos após delay
-            setTimeout(() => {
-                window.location.href = 'flights.html';
-            }, 2000);
+            redirecionarParaVoos();
             return;
         }
         
-        // Preparar parâmetros para busca de voos
+        // Verificar dados essenciais
         const destino = this.estado.respostas.destino_conhecido;
         const origem = this.estado.respostas.cidade_partida;
         const datas = this.estado.respostas.datas;
         
+        if (!destino || !origem || !datas || !datas.dataIda) {
+            console.error("Dados incompletos para busca de voos:", {destino, origem, datas});
+            this.atualizarBarraProgresso(100, "Dados incompletos. Redirecionando...");
+            redirecionarParaVoos();
+            return;
+        }
+        
+        // Preparar parâmetros para busca de voos
         const params = {
             origem: origem.code,
             destino: destino.code,
@@ -1304,6 +1361,9 @@ const BENETRIP = {
             dataVolta: datas.dataVolta,
             adultos: this.getNumeroAdultos()
         };
+        
+        console.log('Iniciando busca de voos com parâmetros:', params);
+        this.atualizarBarraProgresso(15, "Iniciando busca...");
         
         // Chamar serviço de API para busca de voos
         window.BENETRIP_API.buscarVoos(params)
@@ -1318,20 +1378,12 @@ const BENETRIP = {
                 
                 // Mostrar mensagem de conclusão
                 this.atualizarBarraProgresso(100, "Voos encontrados! Redirecionando...");
-                
-                // Redirecionar para página de voos após delay
-                setTimeout(() => {
-                    window.location.href = 'flights.html';
-                }, 2000);
+                redirecionarParaVoos();
             })
             .catch(erro => {
                 console.error("Erro ao buscar voos:", erro);
                 this.atualizarBarraProgresso(100, "Erro ao buscar voos. Redirecionando...");
-                
-                // Redirecionar para página de voos após delay
-                setTimeout(() => {
-                    window.location.href = 'flights.html';
-                }, 2000);
+                redirecionarParaVoos();
             });
     },
 
@@ -1422,6 +1474,20 @@ const BENETRIP = {
         }
         
         localStorage.setItem('benetrip_user_data', JSON.stringify(dadosPadronizados));
+        
+        // NOVO: Salvar o destino em formato compatível com a página de voos quando fluxo for destino_conhecido
+        if (this.estado.fluxo === 'destino_conhecido' && this.estado.respostas.destino_conhecido) {
+            const destino = this.estado.respostas.destino_conhecido;
+            if (destino) {
+                const destinoFormatado = {
+                    codigo_iata: destino.code,
+                    destino: destino.name,
+                    pais: destino.country || 'País não especificado'
+                };
+                localStorage.setItem('benetrip_destino_selecionado', JSON.stringify(destinoFormatado));
+                console.log('Destino salvo para página de voos:', destinoFormatado);
+            }
+        }
     },
 
     /**
@@ -1541,6 +1607,39 @@ const BENETRIP = {
             setTimeout(() => {
                 document.body.removeChild(errorElement);
             }, 300);
+        }, 3000);
+    },
+
+    /**
+     * Exibe uma mensagem toast
+     * @param {string} mensagem - Mensagem a ser exibida
+     * @param {string} tipo - Tipo da mensagem (info, warning, error, success)
+     */
+    exibirToast(mensagem, tipo = 'info') {
+        // Verificar se container de toast existe
+        let toastContainer = document.getElementById('toast-container');
+        if (!toastContainer) {
+            // Criar container se não existir
+            toastContainer = document.createElement('div');
+            toastContainer.id = 'toast-container';
+            document.body.appendChild(toastContainer);
+        }
+        
+        // Criar toast
+        const toast = document.createElement('div');
+        toast.className = `toast toast-${tipo}`;
+        toast.textContent = mensagem;
+        
+        // Adicionar ao container
+        toastContainer.appendChild(toast);
+        
+        // Adicionar classe para mostrar com animação
+        setTimeout(() => toast.classList.add('show'), 10);
+        
+        // Remover após timeout
+        setTimeout(() => {
+            toast.classList.remove('show');
+            setTimeout(() => toast.remove(), 300);
         }, 3000);
     },
 
