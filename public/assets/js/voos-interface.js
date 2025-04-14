@@ -392,6 +392,29 @@ function calcularPrecoMaximoReal(percentual) {
     return menorPreco + ((maiorPreco - menorPreco) * percentual / 100);
 }
 
+// NOVA FUNÇÃO: Atualizar slider de horário de chegada
+function atualizarSliderChegada() {
+    const min = parseInt(document.getElementById('chegada-slider-min').value);
+    const max = parseInt(document.getElementById('chegada-slider-max').value);
+    
+    // Garante que min não ultrapasse max
+    if (min > max) {
+        document.getElementById('chegada-slider-min').value = max;
+    }
+    
+    // Converte minutos para formato de hora
+    const minHora = Math.floor(min / 60).toString().padStart(2, '0');
+    const minMinuto = (min % 60).toString().padStart(2, '0');
+    
+    const maxHora = Math.floor(max / 60).toString().padStart(2, '0');
+    const maxMinuto = (max % 60).toString().padStart(2, '0');
+    
+    // Atualiza os textos
+    document.getElementById('chegada-min').textContent = `${minHora}:${minMinuto}`;
+    document.getElementById('chegada-max').textContent = `${maxHora}:${maxMinuto}`;
+}
+
+
 // Carrega filtros salvos no localStorage
 function carregarFiltrosSalvos() {
     try {
@@ -412,6 +435,15 @@ function carregarFiltrosSalvos() {
             atualizarSliderPartida();
         }
         
+        // NOVO: Horário de chegada
+        const chegadaMinSlider = document.getElementById('chegada-slider-min');
+        const chegadaMaxSlider = document.getElementById('chegada-slider-max');
+        if (chegadaMinSlider && chegadaMaxSlider && filtrosSalvos.horarioChegada) {
+            chegadaMinSlider.value = filtrosSalvos.horarioChegada.min || 0;
+            chegadaMaxSlider.value = filtrosSalvos.horarioChegada.max || 1439;
+            atualizarSliderChegada();
+        }
+        
         // Duração
         const duracaoSlider = document.getElementById('duracao-slider');
         if (duracaoSlider && filtrosSalvos.duracaoMaxima) {
@@ -426,50 +458,48 @@ function carregarFiltrosSalvos() {
             atualizarSliderPreco();
         }
         
-        // Configura callback para expandir as categorias se tiverem itens selecionados
-        setTimeout(() => {
-            // Companhias
-            if (filtrosSalvos.companhias && filtrosSalvos.companhias.length) {
-                // Expande o painel de companhias
+        // Companhias
+        if (filtrosSalvos.companhias && filtrosSalvos.companhias.length) {
+            setTimeout(() => {
                 const companhiasHeader = document.querySelector('[aria-controls="companhias-content"]');
                 if (companhiasHeader) {
                     expandirOpcoesFiltro('companhias', companhiasHeader);
                 }
                 
-                // Marca os checkboxes após carregar as opções
                 setTimeout(() => {
                     document.querySelectorAll('.filtro-companhia').forEach(checkbox => {
                         checkbox.checked = filtrosSalvos.companhias.includes(checkbox.value);
                     });
                 }, 300);
-            }
-            
-            // Aeroportos
-            if (filtrosSalvos.aeroportos && filtrosSalvos.aeroportos.length) {
-                // Expande o painel de aeroportos
+            }, 100);
+        }
+        
+        // Aeroportos
+        if (filtrosSalvos.aeroportos && filtrosSalvos.aeroportos.length) {
+            setTimeout(() => {
                 const aeroportosHeader = document.querySelector('[aria-controls="aeroportos-content"]');
                 if (aeroportosHeader) {
                     expandirOpcoesFiltro('aeroportos', aeroportosHeader);
                 }
                 
-                // Marca os checkboxes após carregar as opções
                 setTimeout(() => {
                     document.querySelectorAll('.filtro-aeroporto').forEach(checkbox => {
                         checkbox.checked = filtrosSalvos.aeroportos.includes(checkbox.value);
                     });
                 }, 300);
-            }
-            
-            // Atualiza contador de filtros
-            atualizarContadorFiltros();
-            
-            // Atualiza preview de resultados
-            atualizarPreviewResultadosFiltrados();
-        }, 100);
+            }, 100);
+        }
+        
+        // Atualiza contador de filtros
+        atualizarContadorFiltros();
+        
+        // Atualiza preview de resultados
+        atualizarPreviewResultadosFiltrados();
     } catch (error) {
         console.error('Erro ao carregar filtros salvos:', error);
     }
 }
+
 
 // Coleta os filtros atuais do modal
 function coletarFiltrosAtuais() {
@@ -479,6 +509,10 @@ function coletarFiltrosAtuais() {
         
         const partidaMin = parseInt(document.getElementById('partida-slider-min')?.value || 0);
         const partidaMax = parseInt(document.getElementById('partida-slider-max')?.value || 1439);
+        
+        // NOVO: Coletar valores do horário de chegada
+        const chegadaMin = parseInt(document.getElementById('chegada-slider-min')?.value || 0);
+        const chegadaMax = parseInt(document.getElementById('chegada-slider-max')?.value || 1439);
         
         const duracaoMaxima = parseInt(document.getElementById('duracao-slider')?.value || 24);
         
@@ -494,6 +528,7 @@ function coletarFiltrosAtuais() {
         return {
             voosDiretos,
             horarioPartida: { min: partidaMin, max: partidaMax },
+            horarioChegada: { min: chegadaMin, max: chegadaMax }, // NOVO
             duracaoMaxima,
             precoMaximo,
             companhias,
@@ -537,6 +572,9 @@ function atualizarContadorFiltros() {
     if (filtros.voosDiretos) count++;
     
     if (filtros.horarioPartida.min > 0 || filtros.horarioPartida.max < 1439) count++;
+    
+    // NOVO: Contar filtro de horário de chegada
+    if (filtros.horarioChegada.min > 0 || filtros.horarioChegada.max < 1439) count++;
     
     if (filtros.duracaoMaxima < 24) count++;
     
@@ -891,6 +929,11 @@ function limparFiltros() {
     document.getElementById('partida-slider-max').value = 1439;
     atualizarSliderPartida();
     
+    // NOVO: Limpar horário de chegada
+    document.getElementById('chegada-slider-min').value = 0;
+    document.getElementById('chegada-slider-max').value = 1439;
+    atualizarSliderChegada();
+    
     document.getElementById('duracao-slider').value = 24;
     atualizarSliderDuracao();
     
@@ -1044,7 +1087,7 @@ function configurarEventosFiltros() {
     // Filtros rápidos
     inicializarFiltrosRapidos();
     
-    // Sliders de horário
+    // Sliders de horário de partida
     const partidaMinSlider = document.getElementById('partida-slider-min');
     const partidaMaxSlider = document.getElementById('partida-slider-max');
     
@@ -1082,6 +1125,29 @@ function configurarEventosFiltros() {
                 atualizarContadorFiltros();
             }, 300);
         });
+    }
+
+    // NOVO: Sliders de horário de chegada
+    const chegadaMinSlider = document.getElementById('chegada-slider-min');
+    const chegadaMaxSlider = document.getElementById('chegada-slider-max');
+    
+    if (chegadaMinSlider && chegadaMaxSlider) {
+        // Função com debounce para evitar excesso de atualizações
+        let debouncedTimerChegada;
+        
+        const atualizarComDebounce = () => {
+            // Atualiza UI imediatamente
+            atualizarSliderChegada();
+            
+            // Debounce para atualizar contador
+            clearTimeout(debouncedTimerChegada);
+            debouncedTimerChegada = setTimeout(() => {
+                atualizarContadorFiltros();
+            }, 300);
+        };
+        
+        chegadaMinSlider.addEventListener('input', atualizarComDebounce);
+        chegadaMaxSlider.addEventListener('input', atualizarComDebounce);
     }
     
     // Slider de preço
