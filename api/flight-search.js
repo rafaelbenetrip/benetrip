@@ -132,7 +132,6 @@ module.exports = async function handler(req, res) {
       // MODIFICADO: locale padrão pt-BR
       locale: localeParam,
       trip_class: params.classe ? params.classe.toUpperCase() : "Y",
-      market: "br", // Mercado brasileiro
       passengers: {
         adults: parseInt(params.adultos || 1, 10),
         children: parseInt(params.criancas || 0, 10),
