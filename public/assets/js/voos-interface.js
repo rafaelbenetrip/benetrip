@@ -732,7 +732,7 @@ function atualizarSliderPreco() {
         } else {
             // Valor estimado quando não temos dados
             // Criamos um range de preço aproximado baseado na porcentagem
-            const precoBase = 2000; // Valor base aproximado
+            const precoBase = 10000; // Valor base aproximado
             const precoEstimado = precoBase * (valor / 100);
             const moeda = 'BRL'; // Moeda padrão
             
