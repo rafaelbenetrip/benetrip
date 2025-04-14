@@ -142,6 +142,7 @@ function aplicarEstilosVerticais() {
 /**
  * Adicionar botão de customização
  */
+// Modificar função para adicionar botão de customização
 function adicionarBotaoCustomizacao() {
     if (document.querySelector('.customize-search-button')) return;
     
@@ -150,22 +151,1036 @@ function adicionarBotaoCustomizacao() {
     
     const button = document.createElement('button');
     button.className = 'customize-search-button';
+    button.setAttribute('aria-label', 'Personalizar busca de voos');
     button.innerHTML = `
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <circle cx="12" cy="12" r="3"></circle>
-            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l-.06-.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
         </svg>
-        Personalizar Minha Busca
+        Personalizar Minha Busca 
+        <span id="filtros-badge" class="filtros-badge" style="display: none;">0</span>
     `;
     
     header.parentNode.insertBefore(button, header.nextSibling);
     
     button.addEventListener('click', function() {
-        localStorage.setItem('benetrip_customizar_busca', 'true');
-        window.location.href = 'index.html';
+        abrirModalFiltros();
     });
     
     console.log('Botão de customização adicionado');
+}
+
+// Função para abrir modal de filtros
+function abrirModalFiltros() {
+    const modal = document.getElementById('modal-filtros');
+    if (!modal) {
+        console.error('Modal de filtros não encontrado');
+        return;
+    }
+    
+    // Inicializa contadores de resultados
+    atualizarContadoresResultados();
+    
+    // Carregamos os filtros salvos, se existirem
+    carregarFiltrosSalvos();
+    
+    // Exibimos o modal
+    modal.style.display = 'flex';
+    
+    setTimeout(() => {
+        modal.classList.add('modal-active');
+        
+        // Foca o primeiro elemento focável para acessibilidade
+        const primeiroFocavel = modal.querySelector('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+        if (primeiroFocavel) {
+            primeiroFocavel.focus();
+        }
+    }, 10);
+    
+    // Configura navegação por teclado dentro do modal
+    configurarNavegacaoTeclado(modal);
+}
+
+// Função para configurar navegação por teclado
+function configurarNavegacaoTeclado(modal) {
+    if (!modal) return;
+    
+    const focusables = modal.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+    const firstFocusable = focusables[0];
+    const lastFocusable = focusables[focusables.length - 1];
+    
+    // Salva o elemento que estava em foco antes de abrir o modal
+    const focoAnterior = document.activeElement;
+    
+    modal.addEventListener('keydown', function modalKeyHandler(e) {
+        if (e.key === 'Escape') {
+            fecharModalFiltros();
+            
+            // Remove o event listener quando o modal é fechado
+            modal.removeEventListener('keydown', modalKeyHandler);
+        }
+        
+        if (e.key === 'Tab') {
+            if (e.shiftKey && document.activeElement === firstFocusable) {
+                e.preventDefault();
+                lastFocusable.focus();
+            } else if (!e.shiftKey && document.activeElement === lastFocusable) {
+                e.preventDefault();
+                firstFocusable.focus();
+            }
+        }
+    });
+    
+    // Quando o modal for fechado, restaura o foco para o elemento anterior
+    document.addEventListener('modal-fechado', function restoreFocus() {
+        if (focoAnterior && typeof focoAnterior.focus === 'function') {
+            focoAnterior.focus();
+        }
+        
+        // Remove o event listener após restaurar o foco
+        document.removeEventListener('modal-fechado', restoreFocus);
+    });
+}
+
+// Função para fechar o modal de filtros
+function fecharModalFiltros() {
+    const modal = document.getElementById('modal-filtros');
+    if (modal) {
+        modal.classList.remove('modal-active');
+        setTimeout(() => {
+            modal.style.display = 'none';
+            
+            // Dispara evento para avisar que o modal foi fechado
+            document.dispatchEvent(new CustomEvent('modal-fechado'));
+        }, 300);
+    }
+}
+
+// Pré-visualização de resultados filtrados
+function atualizarPreviewResultadosFiltrados() {
+    // Se não tem dados de voos, não faz nada
+    if (!window.BENETRIP_VOOS?.resultadosOriginais?.proposals) {
+        return;
+    }
+    
+    // Obtém os filtros atuais
+    const filtros = coletarFiltrosAtuais();
+    
+    // Simula a filtragem para ver quantos resultados seriam encontrados
+    const propostas = window.BENETRIP_VOOS.resultadosOriginais.proposals;
+    const filtradas = filtrarVoosSimulado(propostas, filtros);
+    
+    // Atualiza o contador de resultados
+    const totalElement = document.getElementById('total-resultados');
+    const filtradosElement = document.getElementById('total-resultados-filtrados');
+    
+    if (totalElement && filtradosElement) {
+        totalElement.textContent = propostas.length;
+        filtradosElement.textContent = filtradas.length;
+    }
+}
+
+// Simula filtragem sem alterar resultados reais
+function filtrarVoosSimulado(propostas, filtros) {
+    if (!propostas || !filtros || !window.BENETRIP_VOOS) {
+        return propostas || [];
+    }
+    
+    return propostas.filter(voo => {
+        // Filtro de voos diretos
+        if (filtros.voosDiretos) {
+            const infoIda = window.BENETRIP_VOOS.obterInfoSegmento(voo.segment?.[0]);
+            const infoVolta = voo.segment?.length > 1 ? 
+                window.BENETRIP_VOOS.obterInfoSegmento(voo.segment[1]) : null;
+            
+            const ehVooDireto = infoIda?.paradas === 0 && (!infoVolta || infoVolta.paradas === 0);
+            if (!ehVooDireto) return false;
+        }
+        
+        // Filtro de horário de partida
+        if (filtros.horarioPartida && filtros.horarioPartida.min !== 0 || filtros.horarioPartida.max !== 1439) {
+            const infoIda = window.BENETRIP_VOOS.obterInfoSegmento(voo.segment?.[0]);
+            if (infoIda && infoIda.horaPartida) {
+                const [hora, minuto] = infoIda.horaPartida.split(':').map(Number);
+                const minutosTotal = hora * 60 + minuto;
+                
+                if (minutosTotal < filtros.horarioPartida.min || 
+                    minutosTotal > filtros.horarioPartida.max) {
+                    return false;
+                }
+            }
+        }
+        
+        // Filtro de duração máxima
+        if (filtros.duracaoMaxima && filtros.duracaoMaxima < 24) {
+            const infoIda = window.BENETRIP_VOOS.obterInfoSegmento(voo.segment?.[0]);
+            if (infoIda && infoIda.duracao) {
+                const duracaoHoras = infoIda.duracao / 60;
+                if (duracaoHoras > filtros.duracaoMaxima) {
+                    return false;
+                }
+            }
+        }
+        
+        // Filtro de preço máximo
+        if (filtros.precoMaximo && filtros.precoMaximo < 100) {
+            const precoVoo = window.BENETRIP_VOOS.obterPrecoVoo(voo);
+            const precoMaximoValor = calcularPrecoMaximoReal(filtros.precoMaximo);
+            
+            if (precoVoo > precoMaximoValor) {
+                return false;
+            }
+        }
+        
+        // Filtro de companhias aéreas
+        if (filtros.companhias && filtros.companhias.length > 0) {
+            const companhiasVoo = voo.carriers || [];
+            const temCompanhiaFiltrada = companhiasVoo.some(comp => 
+                filtros.companhias.includes(comp)
+            );
+            if (!temCompanhiaFiltrada) return false;
+        }
+        
+        // Filtro de aeroportos
+        if (filtros.aeroportos && filtros.aeroportos.length > 0) {
+            // Verifica se algum dos aeroportos do voo está na lista de aeroportos filtrados
+            const aeroportosVoo = [];
+            
+            // Adiciona aeroportos de ida
+            const segmentoIda = voo.segment?.[0]?.flight || [];
+            segmentoIda.forEach(trecho => {
+                if (trecho.departure) aeroportosVoo.push(trecho.departure);
+                if (trecho.arrival) aeroportosVoo.push(trecho.arrival);
+            });
+            
+            // Adiciona aeroportos de volta
+            const segmentoVolta = voo.segment?.[1]?.flight || [];
+            segmentoVolta.forEach(trecho => {
+                if (trecho.departure) aeroportosVoo.push(trecho.departure);
+                if (trecho.arrival) aeroportosVoo.push(trecho.arrival);
+            });
+            
+            // Verifica se pelo menos um aeroporto está na lista de filtrados
+            const temAeroportoFiltrado = aeroportosVoo.some(aero => 
+                filtros.aeroportos.includes(aero)
+            );
+            if (!temAeroportoFiltrado) return false;
+        }
+        
+        // Se passou por todos os filtros, inclui o voo
+        return true;
+    });
+}
+
+// Função auxiliar para calcular o preço máximo real com base no percentual do slider
+function calcularPrecoMaximoReal(percentual) {
+    if (!window.BENETRIP_VOOS?.resultadosOriginais?.proposals) {
+        return Infinity;
+    }
+    
+    // Obtém o maior e menor preço disponíveis
+    let menorPreco = Infinity;
+    let maiorPreco = 0;
+    
+    window.BENETRIP_VOOS.resultadosOriginais.proposals.forEach(voo => {
+        const preco = window.BENETRIP_VOOS.obterPrecoVoo(voo);
+        if (preco < menorPreco) menorPreco = preco;
+        if (preco > maiorPreco) maiorPreco = preco;
+    });
+    
+    // Calcula o preço máximo com base no percentual
+    return menorPreco + ((maiorPreco - menorPreco) * percentual / 100);
+}
+
+// Carrega filtros salvos no localStorage
+function carregarFiltrosSalvos() {
+    try {
+        const filtrosSalvos = JSON.parse(localStorage.getItem('benetrip_filtros_voos') || '{}');
+        
+        // Voos diretos
+        const voosDirectosCheckbox = document.getElementById('filtro-voos-diretos');
+        if (voosDirectosCheckbox && filtrosSalvos.voosDiretos) {
+            voosDirectosCheckbox.checked = filtrosSalvos.voosDiretos;
+        }
+        
+        // Horário de partida
+        const partidaMinSlider = document.getElementById('partida-slider-min');
+        const partidaMaxSlider = document.getElementById('partida-slider-max');
+        if (partidaMinSlider && partidaMaxSlider && filtrosSalvos.horarioPartida) {
+            partidaMinSlider.value = filtrosSalvos.horarioPartida.min || 0;
+            partidaMaxSlider.value = filtrosSalvos.horarioPartida.max || 1439;
+            atualizarSliderPartida();
+        }
+        
+        // Duração
+        const duracaoSlider = document.getElementById('duracao-slider');
+        if (duracaoSlider && filtrosSalvos.duracaoMaxima) {
+            duracaoSlider.value = filtrosSalvos.duracaoMaxima;
+            atualizarSliderDuracao();
+        }
+        
+        // Preço máximo
+        const precoSlider = document.getElementById('preco-slider');
+        if (precoSlider && filtrosSalvos.precoMaximo) {
+            precoSlider.value = filtrosSalvos.precoMaximo;
+            atualizarSliderPreco();
+        }
+        
+        // Configura callback para expandir as categorias se tiverem itens selecionados
+        setTimeout(() => {
+            // Companhias
+            if (filtrosSalvos.companhias && filtrosSalvos.companhias.length) {
+                // Expande o painel de companhias
+                const companhiasHeader = document.querySelector('[aria-controls="companhias-content"]');
+                if (companhiasHeader) {
+                    expandirOpcoesFiltro('companhias', companhiasHeader);
+                }
+                
+                // Marca os checkboxes após carregar as opções
+                setTimeout(() => {
+                    document.querySelectorAll('.filtro-companhia').forEach(checkbox => {
+                        checkbox.checked = filtrosSalvos.companhias.includes(checkbox.value);
+                    });
+                }, 300);
+            }
+            
+            // Aeroportos
+            if (filtrosSalvos.aeroportos && filtrosSalvos.aeroportos.length) {
+                // Expande o painel de aeroportos
+                const aeroportosHeader = document.querySelector('[aria-controls="aeroportos-content"]');
+                if (aeroportosHeader) {
+                    expandirOpcoesFiltro('aeroportos', aeroportosHeader);
+                }
+                
+                // Marca os checkboxes após carregar as opções
+                setTimeout(() => {
+                    document.querySelectorAll('.filtro-aeroporto').forEach(checkbox => {
+                        checkbox.checked = filtrosSalvos.aeroportos.includes(checkbox.value);
+                    });
+                }, 300);
+            }
+            
+            // Atualiza contador de filtros
+            atualizarContadorFiltros();
+            
+            // Atualiza preview de resultados
+            atualizarPreviewResultadosFiltrados();
+        }, 100);
+    } catch (error) {
+        console.error('Erro ao carregar filtros salvos:', error);
+    }
+}
+
+// Coleta os filtros atuais do modal
+function coletarFiltrosAtuais() {
+    try {
+        // Coleta os valores dos filtros
+        const voosDiretos = document.getElementById('filtro-voos-diretos')?.checked || false;
+        
+        const partidaMin = parseInt(document.getElementById('partida-slider-min')?.value || 0);
+        const partidaMax = parseInt(document.getElementById('partida-slider-max')?.value || 1439);
+        
+        const duracaoMaxima = parseInt(document.getElementById('duracao-slider')?.value || 24);
+        
+        const precoMaximo = parseInt(document.getElementById('preco-slider')?.value || 100);
+        
+        const companhias = Array.from(document.querySelectorAll('.filtro-companhia:checked'))
+            .map(checkbox => checkbox.value);
+            
+        const aeroportos = Array.from(document.querySelectorAll('.filtro-aeroporto:checked'))
+            .map(checkbox => checkbox.value);
+        
+        // Cria objeto com os filtros
+        return {
+            voosDiretos,
+            horarioPartida: { min: partidaMin, max: partidaMax },
+            duracaoMaxima,
+            precoMaximo,
+            companhias,
+            aeroportos
+        };
+    } catch (error) {
+        console.error('Erro ao coletar filtros atuais:', error);
+        return {};
+    }
+}
+
+// Salva os filtros atuais no localStorage
+function salvarFiltrosAtuais() {
+    try {
+        const filtros = coletarFiltrosAtuais();
+        
+        // Salva no localStorage
+        localStorage.setItem('benetrip_filtros_voos', JSON.stringify(filtros));
+        
+        // Atualiza badge no botão de filtros
+        atualizarBadgeFiltros();
+        
+        return filtros;
+    } catch (error) {
+        console.error('Erro ao salvar filtros:', error);
+        return {};
+    }
+}
+
+// Atualiza o contador de filtros ativos
+function atualizarContadorFiltros() {
+    const countElement = document.getElementById('filtros-count');
+    if (!countElement) return;
+    
+    // Coleta os filtros atuais
+    const filtros = coletarFiltrosAtuais();
+    
+    let count = 0;
+    
+    // Conta os filtros ativos
+    if (filtros.voosDiretos) count++;
+    
+    if (filtros.horarioPartida.min > 0 || filtros.horarioPartida.max < 1439) count++;
+    
+    if (filtros.duracaoMaxima < 24) count++;
+    
+    if (filtros.precoMaximo < 100) count++;
+    
+    if (filtros.companhias.length > 0) count++;
+    
+    if (filtros.aeroportos.length > 0) count++;
+    
+    // Atualiza o contador
+    countElement.textContent = count;
+    
+    // Também atualiza a pré-visualização dos resultados
+    atualizarPreviewResultadosFiltrados();
+}
+
+// Atualiza o badge no botão de filtros
+function atualizarBadgeFiltros() {
+    const badge = document.getElementById('filtros-badge');
+    if (!badge) return;
+    
+    try {
+        const filtros = JSON.parse(localStorage.getItem('benetrip_filtros_voos') || '{}');
+        
+        let count = 0;
+        if (filtros.voosDiretos) count++;
+        if (filtros.horarioPartida && (filtros.horarioPartida.min > 0 || filtros.horarioPartida.max < 1439)) count++;
+        if (filtros.duracaoMaxima && filtros.duracaoMaxima < 24) count++;
+        if (filtros.precoMaximo && filtros.precoMaximo < 100) count++;
+        if (filtros.companhias && filtros.companhias.length) count++;
+        if (filtros.aeroportos && filtros.aeroportos.length) count++;
+        
+        if (count > 0) {
+            badge.textContent = count;
+            badge.style.display = 'inline-flex';
+        } else {
+            badge.style.display = 'none';
+        }
+    } catch (error) {
+        console.error('Erro ao atualizar badge de filtros:', error);
+        badge.style.display = 'none';
+    }
+}
+
+// Atualiza os contadores de resultados totais
+function atualizarContadoresResultados() {
+    if (!window.BENETRIP_VOOS?.finalResults?.proposals) {
+        return;
+    }
+    
+    const totalElement = document.getElementById('total-resultados');
+    const filtradosElement = document.getElementById('total-resultados-filtrados');
+    
+    if (totalElement && filtradosElement) {
+        const total = window.BENETRIP_VOOS.resultadosOriginais?.proposals?.length || 
+                     window.BENETRIP_VOOS.finalResults.proposals.length;
+                     
+        totalElement.textContent = total;
+        filtradosElement.textContent = window.BENETRIP_VOOS.finalResults.proposals.length;
+    }
+}
+
+// Funções para os sliders
+function atualizarSliderPartida() {
+    const min = parseInt(document.getElementById('partida-slider-min').value);
+    const max = parseInt(document.getElementById('partida-slider-max').value);
+    
+    // Garante que min não ultrapasse max
+    if (min > max) {
+        document.getElementById('partida-slider-min').value = max;
+    }
+    
+    // Converte minutos para formato de hora
+    const minHora = Math.floor(min / 60).toString().padStart(2, '0');
+    const minMinuto = (min % 60).toString().padStart(2, '0');
+    
+    const maxHora = Math.floor(max / 60).toString().padStart(2, '0');
+    const maxMinuto = (max % 60).toString().padStart(2, '0');
+    
+    // Atualiza os textos
+    document.getElementById('partida-min').textContent = `${minHora}:${minMinuto}`;
+    document.getElementById('partida-max').textContent = `${maxHora}:${maxMinuto}`;
+}
+
+function atualizarSliderDuracao() {
+    const valor = parseInt(document.getElementById('duracao-slider').value);
+    
+    if (valor >= 24) {
+        document.getElementById('duracao-valor').textContent = 'Qualquer';
+    } else {
+        document.getElementById('duracao-valor').textContent = `Até ${valor}h`;
+    }
+}
+
+function atualizarSliderPreco() {
+    const valor = parseInt(document.getElementById('preco-slider').value);
+    const precoElement = document.getElementById('preco-valor');
+    
+    if (!precoElement) return;
+    
+    if (valor >= 100) {
+        precoElement.textContent = 'Qualquer';
+    } else {
+        // Calcula o preço real com base no percentual
+        if (window.BENETRIP_VOOS?.resultadosOriginais?.proposals) {
+            const precoReal = calcularPrecoMaximoReal(valor);
+            const moeda = window.BENETRIP_VOOS.obterMoedaAtual();
+            
+            const formattedPrice = new Intl.NumberFormat('pt-BR', { 
+                style: 'currency', 
+                currency: moeda, 
+                minimumFractionDigits: 0, 
+                maximumFractionDigits: 0 
+            }).format(precoReal);
+            
+            precoElement.textContent = `Até ${formattedPrice}`;
+        } else {
+            precoElement.textContent = `${valor}%`;
+        }
+    }
+}
+
+// Funções para expandir painéis de filtro
+let debouncedSearchTimer;
+
+function expandirOpcoesFiltro(tipo, header) {
+    // Referências aos elementos
+    const content = document.getElementById(`${tipo}-content`);
+    const toggle = header.querySelector('.filtro-toggle');
+    
+    if (!content || !toggle) return;
+    
+    // Se já está expandido, colapsa
+    if (header.getAttribute('aria-expanded') === 'true') {
+        content.style.maxHeight = null;
+        toggle.textContent = '▼';
+        header.setAttribute('aria-expanded', 'false');
+        return;
+    }
+    
+    // Expande o painel
+    header.setAttribute('aria-expanded', 'true');
+    toggle.textContent = '▲';
+    
+    // Verifica se já está carregado
+    if (content.dataset.carregado === "true") {
+        content.style.maxHeight = content.scrollHeight + 'px';
+        return;
+    }
+    
+    // Mostra loader
+    content.innerHTML = `
+        <div class="loading-placeholder">
+            <span class="loading-spinner"></span>
+            Carregando opções...
+        </div>
+    `;
+    
+    // Carrega as opções
+    if (tipo === 'companhias') {
+        // Carrega com pequeno delay para mostrar o loading
+        setTimeout(() => {
+            preencherOpcoesCompanhias();
+            content.dataset.carregado = "true";
+            
+            // Ajusta altura após o preenchimento
+            setTimeout(() => {
+                content.style.maxHeight = content.scrollHeight + 'px';
+                
+                // Configura busca para companhias, se tiver muitas opções
+                if (content.querySelectorAll('.checkbox-item').length > 10) {
+                    adicionarBuscaFiltro(content, 'companhias');
+                }
+            }, 50);
+        }, 300);
+    } else if (tipo === 'aeroportos') {
+        setTimeout(() => {
+            preencherOpcoesAeroportos();
+            content.dataset.carregado = "true";
+            
+            // Ajusta altura após o preenchimento
+            setTimeout(() => {
+                content.style.maxHeight = content.scrollHeight + 'px';
+                
+                // Adiciona busca para aeroportos
+                adicionarBuscaFiltro(content, 'aeroportos');
+            }, 50);
+        }, 300);
+    }
+}
+
+// Adiciona campo de busca para filtros extensos
+function adicionarBuscaFiltro(container, tipo) {
+    // Verifica se já existe
+    if (container.querySelector('.filtro-search')) return;
+    
+    // Cria o campo de busca
+    const searchDiv = document.createElement('div');
+    searchDiv.className = 'filtro-search';
+    searchDiv.innerHTML = `
+        <span class="filtro-search-icon">🔍</span>
+        <input type="search" class="filtro-search-input" placeholder="Buscar..." 
+               aria-label="Buscar ${tipo === 'companhias' ? 'companhias aéreas' : 'aeroportos'}">
+    `;
+    
+    // Insere no início do container
+    container.insertBefore(searchDiv, container.firstChild);
+    
+    // Atualiza a altura máxima
+    container.style.maxHeight = container.scrollHeight + 'px';
+    
+    // Configura o evento de busca
+    const searchInput = searchDiv.querySelector('.filtro-search-input');
+    searchInput.addEventListener('input', function() {
+        clearTimeout(debouncedSearchTimer);
+        const valorBusca = this.value.toLowerCase();
+        
+        debouncedSearchTimer = setTimeout(() => {
+            const itens = container.querySelectorAll('.checkbox-item');
+            
+            // Se não tem valor, mostra todos
+            if (!valorBusca) {
+                itens.forEach(item => {
+                    item.style.display = 'block';
+                });
+                return;
+            }
+            
+            // Filtra os itens
+            itens.forEach(item => {
+                const texto = item.textContent.toLowerCase();
+                item.style.display = texto.includes(valorBusca) ? 'block' : 'none';
+            });
+        }, 300);
+    });
+}
+
+// Preenche as opções de companhias aéreas
+function preencherOpcoesCompanhias() {
+    if (!window.BENETRIP_VOOS?.finalResults?.airlines) {
+        console.log('Dados de companhias aéreas não disponíveis ainda');
+        return;
+    }
+    
+    const container = document.getElementById('companhias-content');
+    if (!container) return;
+    
+    const airlines = window.BENETRIP_VOOS.finalResults.airlines;
+    const airlinesList = Object.keys(airlines).map(code => ({
+        code: code,
+        name: airlines[code].name || code
+    }));
+    
+    // Ordena por nome
+    airlinesList.sort((a, b) => a.name.localeCompare(b.name));
+    
+    // Limpa o conteúdo atual
+    container.innerHTML = '';
+    
+    // Se não houver companhias, mostra mensagem
+    if (airlinesList.length === 0) {
+        container.innerHTML = '<div class="empty-message">Nenhuma companhia disponível</div>';
+        return;
+    }
+    
+    // Preenche com as companhias disponíveis
+    airlinesList.forEach(airline => {
+        const item = document.createElement('div');
+        item.className = 'checkbox-item';
+        item.innerHTML = `
+            <label class="checkbox-label">
+                <input type="checkbox" class="filtro-companhia" value="${airline.code}" 
+                       aria-label="Companhia ${airline.name}">
+                <span class="checkbox-text">
+                    <img src="${getAirlineLogoUrl(airline.code, 16, 16)}" alt="" 
+                         class="mini-logo" onerror="this.style.display='none'">
+                    ${airline.name}
+                </span>
+            </label>
+        `;
+        container.appendChild(item);
+    });
+    
+    // Configura eventos dos checkboxes
+    container.querySelectorAll('.filtro-companhia').forEach(checkbox => {
+        checkbox.addEventListener('change', function() {
+            atualizarContadorFiltros();
+        });
+    });
+}
+
+// Preenche as opções de aeroportos
+function preencherOpcoesAeroportos() {
+    if (!window.BENETRIP_VOOS?.finalResults?.airports) {
+        console.log('Dados de aeroportos não disponíveis ainda');
+        return;
+    }
+    
+    const container = document.getElementById('aeroportos-content');
+    if (!container) return;
+    
+    const airports = window.BENETRIP_VOOS.finalResults.airports;
+    const airportsList = Object.keys(airports).map(code => ({
+        code: code,
+        name: airports[code].name || code,
+        city: airports[code].city || ''
+    }));
+    
+    // Ordena por código IATA
+    airportsList.sort((a, b) => a.code.localeCompare(b.code));
+    
+    // Limpa o conteúdo atual
+    container.innerHTML = '';
+    
+    // Se não houver aeroportos, mostra mensagem
+    if (airportsList.length === 0) {
+        container.innerHTML = '<div class="empty-message">Nenhum aeroporto disponível</div>';
+        return;
+    }
+    
+    // Preenche com os aeroportos disponíveis
+    airportsList.forEach(airport => {
+        const item = document.createElement('div');
+        item.className = 'checkbox-item';
+        item.innerHTML = `
+            <label class="checkbox-label">
+                <input type="checkbox" class="filtro-aeroporto" value="${airport.code}"
+                       aria-label="Aeroporto ${airport.code}">
+                <span class="checkbox-text">
+                    <strong>${airport.code}</strong> - ${airport.name}
+                    ${airport.city ? `(${airport.city})` : ''}
+                </span>
+            </label>
+        `;
+        container.appendChild(item);
+    });
+    
+    // Configura eventos dos checkboxes
+    container.querySelectorAll('.filtro-aeroporto').forEach(checkbox => {
+        checkbox.addEventListener('change', function() {
+            atualizarContadorFiltros();
+        });
+    });
+}
+
+// Limpa todos os filtros
+function limparFiltros() {
+    // Reseta todos os filtros
+    document.getElementById('filtro-voos-diretos').checked = false;
+    
+    document.getElementById('partida-slider-min').value = 0;
+    document.getElementById('partida-slider-max').value = 1439;
+    atualizarSliderPartida();
+    
+    document.getElementById('duracao-slider').value = 24;
+    atualizarSliderDuracao();
+    
+    document.getElementById('preco-slider').value = 100;
+    atualizarSliderPreco();
+    
+    document.querySelectorAll('.filtro-companhia, .filtro-aeroporto').forEach(checkbox => {
+        checkbox.checked = false;
+    });
+    
+    // Remove os filtros rápidos ativos
+    document.querySelectorAll('.filtro-rapido.active').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    
+    // Atualiza contador
+    atualizarContadorFiltros();
+}
+
+// Mostra estado de "sem resultados"
+function mostrarEstadoSemResultados() {
+    // Verifica se o template existe
+    const template = document.getElementById('template-sem-resultados');
+    if (!template) return;
+    
+    // Cria um clone do template
+    const semResultados = document.importNode(template.content, true);
+    
+    // Adiciona evento ao botão de limpar filtros
+    const btnLimpar = semResultados.querySelector('.btn-limpar-filtros-todos');
+    if (btnLimpar) {
+        btnLimpar.addEventListener('click', function() {
+            limparFiltros();
+            aplicarFiltros();
+        });
+    }
+    
+    // Adiciona ao container de voos
+    const container = document.querySelector('.voos-content');
+    if (container) {
+        // Remove elemento anterior se existir
+        const anterior = container.querySelector('.filtro-sem-resultados');
+        if (anterior) {
+            anterior.remove();
+        }
+        
+        container.appendChild(semResultados);
+    }
+}
+
+// Aplica os filtros nos resultados
+function aplicarFiltros() {
+    // Salva os filtros
+    const filtros = salvarFiltrosAtuais();
+    
+    // Verifica se temos filtros para aplicar
+    const temFiltros = (
+        filtros.voosDiretos || 
+        filtros.horarioPartida.min > 0 || 
+        filtros.horarioPartida.max < 1439 ||
+        filtros.duracaoMaxima < 24 ||
+        filtros.precoMaximo < 100 ||
+        filtros.companhias.length > 0 ||
+        filtros.aeroportos.length > 0
+    );
+    
+    // Se não tem filtros, simplesmente restaura resultados originais
+    if (!temFiltros) {
+        if (window.BENETRIP_VOOS?.restaurarResultadosOriginais) {
+            window.BENETRIP_VOOS.restaurarResultadosOriginais();
+            exibirToast('Filtros removidos. Mostrando todos os voos.', 'info');
+        }
+        fecharModalFiltros();
+        return;
+    }
+    
+    // Aplica os filtros nos resultados
+    if (window.BENETRIP_VOOS?.filtrarResultados) {
+        const resultadosAntes = window.BENETRIP_VOOS.finalResults.proposals.length;
+        
+        window.BENETRIP_VOOS.filtrarResultados(filtros);
+        
+        const resultadosDepois = window.BENETRIP_VOOS.finalResults.proposals.length;
+        
+        // Fecha o modal
+        fecharModalFiltros();
+        
+        // Se não encontrou resultados, mostra estado vazio
+        if (resultadosDepois === 0) {
+            mostrarEstadoSemResultados();
+            exibirToast('Nenhum voo corresponde aos filtros selecionados.', 'warning');
+        } else {
+            // Exibe mensagem de confirmação
+            const numFiltros = parseInt(document.getElementById('filtros-count').textContent);
+            exibirToast(`${resultadosDepois} de ${resultadosAntes} voos correspondem aos filtros.`, 'success');
+        }
+    } else {
+        fecharModalFiltros();
+        exibirToast('Erro ao aplicar filtros. Tente novamente.', 'error');
+    }
+}
+
+// Inicializa filtros rápidos
+function inicializarFiltrosRapidos() {
+    document.querySelectorAll('.filtro-rapido').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const tipo = this.dataset.tipo;
+            
+            // Toggle do estado ativo
+            this.classList.toggle('active');
+            
+            // Aplica o filtro rápido
+            switch (tipo) {
+                case 'diretos':
+                    document.getElementById('filtro-voos-diretos').checked = this.classList.contains('active');
+                    break;
+                    
+                case 'manha':
+                    // Define horário de partida matinal (4:00-12:00)
+                    if (this.classList.contains('active')) {
+                        document.getElementById('partida-slider-min').value = 4 * 60;  // 4:00
+                        document.getElementById('partida-slider-max').value = 12 * 60; // 12:00
+                        atualizarSliderPartida();
+                    } else {
+                        document.getElementById('partida-slider-min').value = 0;
+                        document.getElementById('partida-slider-max').value = 1439;
+                        atualizarSliderPartida();
+                    }
+                    break;
+                    
+                case 'economicos':
+                    // Define preço máximo na metade do range
+                    if (this.classList.contains('active')) {
+                        document.getElementById('preco-slider').value = 50;
+                        atualizarSliderPreco();
+                    } else {
+                        document.getElementById('preco-slider').value = 100;
+                        atualizarSliderPreco();
+                    }
+                    break;
+            }
+            
+            // Atualiza contador de filtros
+            atualizarContadorFiltros();
+        });
+    });
+}
+
+// Configurar eventos dos filtros
+function configurarEventosFiltros() {
+    // Filtros rápidos
+    inicializarFiltrosRapidos();
+    
+    // Sliders de horário
+    const partidaMinSlider = document.getElementById('partida-slider-min');
+    const partidaMaxSlider = document.getElementById('partida-slider-max');
+    
+    if (partidaMinSlider && partidaMaxSlider) {
+        // Função com debounce para evitar excesso de atualizações
+        let debouncedTimerPartida;
+        
+        const atualizarComDebounce = () => {
+            // Atualiza UI imediatamente
+            atualizarSliderPartida();
+            
+            // Debounce para atualizar contador
+            clearTimeout(debouncedTimerPartida);
+            debouncedTimerPartida = setTimeout(() => {
+                atualizarContadorFiltros();
+            }, 300);
+        };
+        
+        partidaMinSlider.addEventListener('input', atualizarComDebounce);
+        partidaMaxSlider.addEventListener('input', atualizarComDebounce);
+    }
+    
+    // Slider de duração
+    const duracaoSlider = document.getElementById('duracao-slider');
+    if (duracaoSlider) {
+        let debouncedTimerDuracao;
+        
+        duracaoSlider.addEventListener('input', () => {
+            // Atualiza UI imediatamente
+            atualizarSliderDuracao();
+            
+            // Debounce para atualizar contador
+            clearTimeout(debouncedTimerDuracao);
+            debouncedTimerDuracao = setTimeout(() => {
+                atualizarContadorFiltros();
+            }, 300);
+        });
+    }
+    
+    // Slider de preço
+    const precoSlider = document.getElementById('preco-slider');
+    if (precoSlider) {
+        let debouncedTimerPreco;
+        
+        precoSlider.addEventListener('input', () => {
+            // Atualiza UI imediatamente
+            atualizarSliderPreco();
+            
+            // Debounce para atualizar contador
+            clearTimeout(debouncedTimerPreco);
+            debouncedTimerPreco = setTimeout(() => {
+                atualizarContadorFiltros();
+            }, 300);
+        });
+    }
+    
+    // Toggle de voos diretos
+    document.getElementById('filtro-voos-diretos')?.addEventListener('change', atualizarContadorFiltros);
+    
+    // Expandíveis
+    document.querySelectorAll('.filtro-expandivel .filtro-header').forEach(header => {
+        header.addEventListener('click', function() {
+            const tipo = this.getAttribute('aria-controls').replace('-content', '');
+            expandirOpcoesFiltro(tipo, this);
+        });
+    });
+    
+    // Botões de ação
+    document.getElementById('btn-fechar-filtros')?.addEventListener('click', fecharModalFiltros);
+    document.getElementById('btn-limpar-filtros')?.addEventListener('click', limparFiltros);
+    document.getElementById('btn-aplicar-filtros')?.addEventListener('click', aplicarFiltros);
+    
+    // Botão de refazer busca
+    document.getElementById('btn-refazer-busca')?.addEventListener('click', () => {
+        const filtros = coletarFiltrosAtuais();
+        
+        // Salva os filtros atualizados
+        localStorage.setItem('benetrip_filtros_voos', JSON.stringify(filtros));
+        
+        // Volta para a página inicial com flag para mostrar formulário
+        localStorage.setItem('benetrip_refazer_busca', 'true');
+        window.location.href = 'index.html';
+    });
+}
+
+// Ouvir evento quando resultados estiverem prontos
+document.addEventListener('resultadosVoosProntos', function(event) {
+    console.log(`Evento recebido: resultadosVoosProntos - ${event.detail.quantidadeVoos} voos`);
+    
+    // Verifica se há filtros salvos para aplicar automaticamente
+    setTimeout(() => {
+        const filtrosSalvos = JSON.parse(localStorage.getItem('benetrip_filtros_voos') || '{}');
+        
+        // Verifica se há filtros ativos
+        const temFiltros = (
+            filtrosSalvos.voosDiretos || 
+            (filtrosSalvos.horarioPartida && (filtrosSalvos.horarioPartida.min > 0 || filtrosSalvos.horarioPartida.max < 1439)) ||
+            (filtrosSalvos.duracaoMaxima && filtrosSalvos.duracaoMaxima < 24) ||
+            (filtrosSalvos.precoMaximo && filtrosSalvos.precoMaximo < 100) ||
+            (filtrosSalvos.companhias && filtrosSalvos.companhias.length > 0) ||
+            (filtrosSalvos.aeroportos && filtrosSalvos.aeroportos.length > 0)
+        );
+        
+        if (temFiltros) {
+            // Atualiza o badge no botão de filtros
+            atualizarBadgeFiltros();
+            
+            // Aplica os filtros automaticamente
+            if (window.BENETRIP_VOOS?.filtrarResultados) {
+                window.BENETRIP_VOOS.filtrarResultados(filtrosSalvos);
+                
+                const numFiltros = Object.values(filtrosSalvos).filter(v => 
+                    v === true || 
+                    (Array.isArray(v) && v.length > 0) || 
+                    (typeof v === 'object' && Object.values(v).some(x => x !== 0 && x !== 1439))
+                ).length;
+                
+                // Mostra mensagem de filtros aplicados
+                if (numFiltros > 0) {
+                    setTimeout(() => {
+                        exibirToast(`${numFiltros} filtros aplicados automaticamente`, 'info');
+                    }, 1000);
+                }
+            }
+        }
+    }, 500);
+});
+
+// Inicializar no carregamento da página
+document.addEventListener('DOMContentLoaded', function() {
+    // Configura eventos do modal de filtros quando o DOM estiver pronto
+    configurarEventosFiltros();
+    
+    // Atualiza badge no botão de filtros se houver filtros salvos
+    atualizarBadgeFiltros();
+});
 }
 
 /**
