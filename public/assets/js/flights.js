@@ -97,45 +97,77 @@ const BENETRIP_VOOS = {
   },
 
   /**
-   * Carrega os dados do destino da viagem
-   * @returns {Promise<boolean>}
-   */
-  async carregarDestino() {
-    try {
-      // Tenta carregar o destino do localStorage
-      let destinoString = localStorage.getItem('benetrip_destino_selecionado');
-      if (!destinoString) {
-        destinoString = localStorage.getItem('benetrip_destino_escolhido') || 
-                        localStorage.getItem('benetrip_destino');
-      }
-      
-      if (!destinoString) {
-        throw new Error('Nenhum destino selecionado');
-      }
-      
-      this.destino = JSON.parse(destinoString);
-      console.log('Destino carregado:', this.destino);
-      
-      // Garante que o código IATA está presente
-      if (!this.destino.codigo_iata) {
-        if (this.destino.aeroporto?.codigo) {
-          this.destino.codigo_iata = this.destino.aeroporto.codigo;
-        } else {
-          const codigoExtraido = this.extrairCodigoIATA(this.destino.destino || this.destino.nome);
-          if (codigoExtraido) {
-            this.destino.codigo_iata = codigoExtraido;
-          } else {
-            throw new Error('Código IATA do destino não encontrado');
+ * Carrega os dados do destino da viagem
+ * @returns {Promise<boolean>}
+ */
+async carregarDestino() {
+  try {
+    // Tenta carregar o destino do localStorage
+    let destinoString = localStorage.getItem('benetrip_destino_selecionado');
+    if (!destinoString) {
+      destinoString = localStorage.getItem('benetrip_destino_escolhido') || 
+                    localStorage.getItem('benetrip_destino');
+    }
+    
+    // ADICIONAR ESTE TRECHO:
+    // Se ainda não encontrou, tenta extrair dos dados do usuário
+    if (!destinoString) {
+      console.log('Tentando extrair destino dos dados do usuário...');
+      const dadosUsuarioString = localStorage.getItem('benetrip_user_data');
+      if (dadosUsuarioString) {
+        try {
+          const dadosUsuario = JSON.parse(dadosUsuarioString);
+          console.log('Dados do usuário encontrados:', dadosUsuario);
+          
+          if (dadosUsuario?.fluxo === 'destino_conhecido' && 
+              dadosUsuario?.respostas?.destino_conhecido) {
+            const destConhecido = dadosUsuario.respostas.destino_conhecido;
+            
+            // Criar objeto de destino formatado
+            this.destino = {
+              codigo_iata: destConhecido.code,
+              destino: destConhecido.name,
+              pais: destConhecido.country || 'País não especificado'
+            };
+            
+            // Salvar para uso futuro
+            localStorage.setItem('benetrip_destino_selecionado', JSON.stringify(this.destino));
+            console.log('Destino extraído dos dados do usuário:', this.destino);
+            return true;
           }
+        } catch (e) {
+          console.error('Erro ao processar dados do usuário:', e);
         }
       }
-      
-      return true;
-    } catch (erro) {
-      console.error('Erro ao carregar destino:', erro);
-      throw erro;
     }
-  },
+    
+    if (!destinoString) {
+      throw new Error('Nenhum destino selecionado');
+    }
+    
+    this.destino = JSON.parse(destinoString);
+    console.log('Destino carregado:', this.destino);
+    
+    // Garante que o código IATA está presente
+    if (!this.destino.codigo_iata) {
+      if (this.destino.aeroporto?.codigo) {
+        this.destino.codigo_iata = this.destino.aeroporto.codigo;
+      } else {
+        const codigoExtraido = this.extrairCodigoIATA(this.destino.destino || this.destino.nome);
+        if (codigoExtraido) {
+          this.destino.codigo_iata = codigoExtraido;
+        } else {
+          throw new Error('Código IATA do destino não encontrado');
+        }
+      }
+    }
+    
+    return true;
+  } catch (erro) {
+    console.error('Erro ao carregar destino:', erro);
+    throw erro;
+  }
+},
 
   /**
    * Extrai o código IATA de um texto
