@@ -50,11 +50,8 @@ module.exports = async function handler(req, res) {
     redirectUrl += `&currency=${encodeURIComponent(currency)}`;
   }
 
-  // Adicionar preferência de idioma (locale)
+  // NOVO: Adicionar preferência de idioma (locale)
   redirectUrl += `&locale=${encodeURIComponent(wantsPtBr ? 'pt-BR' : 'en-US')}`;
-
-  // ADICIONAR: Mercado brasileiro explícito
-  redirectUrl += `&market=br`;
 
   console.log(`[Proxy Redirect] URL construída: ${redirectUrl}`);
 
