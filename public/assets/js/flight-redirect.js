@@ -510,7 +510,7 @@ window.BENETRIP_REDIRECT = {
     
     /**
      * Obtém o link de redirecionamento da API
-     * Versão adaptada para melhor suporte mobile
+     * Versão adaptada para melhor suporte mobile e preferências de idioma/moeda
      */
     obterLinkRedirecionamento: function(voo) {
         console.log('Obtendo link de redirecionamento para voo:', voo.sign);
@@ -533,23 +533,33 @@ window.BENETRIP_REDIRECT = {
         
         // Validação básica dos dados necessários
         if (!searchId || !termUrl) {
-            return Promise.reject(new Error('Dados insuficientes para obter link de redirecionamento (searchId ou termUrl ausentes)'));
+            return Promise.reject(new Error('Dados insuficientes para obter link de redirecionamento'));
         }
         
-        // Verificar se é dispositivo móvel
+        // NOVO: Verificar se é dispositivo móvel
         const isMobile = this.isMobileDevice();
         console.log('Dispositivo é mobile?', isMobile);
         
-        // Determinar o endpoint correto baseado no ambiente
+        // NOVO: Obter a moeda do usuário
+        const moedaUsuario = window.BENETRIP_VOOS?.obterMoedaAtual() || 'BRL';
+        
+        // NOVO: Obter o idioma preferido do navegador, ou padrão pt-BR
+        // Se preferir aceitar query, pode usar algo como: window.navigator.language || 'pt-BR'
+        const idioma =
+            (typeof navigator !== 'undefined' && navigator.language) ? navigator.language :
+            (window.BENETRIP_VOOS?.obterIdiomaAtual && window.BENETRIP_VOOS.obterIdiomaAtual()) || 'pt-BR';
+        
+        // Determinar o endpoint correto baseado no ambiente, agora adicionando parâmetros de moeda e idioma
         let apiUrl;
         
-        // NOVA LÓGICA PARA MOBILE: Sempre usar o endpoint direto em dispositivos móveis
-        if (isMobile || window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
-            apiUrl = `https://api.travelpayouts.com/v1/flight_searches/${encodeURIComponent(searchId)}/clicks/${encodeURIComponent(termUrl)}.json?marker=${encodeURIComponent(this.config.marker)}`;
-            console.log('Usando endpoint direto da Travelpayouts:', apiUrl);
+        if (isMobile || (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1')) {
+            // MODIFICADO: Adicionar parâmetros de moeda e idioma
+            apiUrl = `https://api.travelpayouts.com/v1/flight_searches/${encodeURIComponent(searchId)}/clicks/${encodeURIComponent(termUrl)}.json?marker=${encodeURIComponent(this.config.marker)}&currency=${encodeURIComponent(moedaUsuario)}&language=${encodeURIComponent(idioma)}`;
+            console.log('Usando endpoint direto da Travelpayouts com preferências de idioma/moeda:', apiUrl);
         } else {
-            apiUrl = `/api/flight-redirect?search_id=${encodeURIComponent(searchId)}&term_url=${encodeURIComponent(termUrl)}&marker=${encodeURIComponent(this.config.marker)}`;
-            console.log('Ambiente de desenvolvimento, usando API local:', apiUrl);
+            // MODIFICADO: Adicionar parâmetros de moeda e idioma também ao endpoint local
+            apiUrl = `/api/flight-redirect?search_id=${encodeURIComponent(searchId)}&term_url=${encodeURIComponent(termUrl)}&marker=${encodeURIComponent(this.config.marker)}&currency=${encodeURIComponent(moedaUsuario)}&language=${encodeURIComponent(idioma)}`;
+            console.log('Ambiente de desenvolvimento, usando API local com preferências:', apiUrl);
         }
         
         // Implementa fetch com timeout e retry para maior confiabilidade
@@ -707,3 +717,4 @@ console.log('BENETRIP_REDIRECT carregado - Versão 2.2 (Suporte aprimorado para 
 
 // Muito importante: tornar a função disponível globalmente
 console.log('Garantindo acesso global a BENETRIP_REDIRECT:', typeof window.BENETRIP_REDIRECT);
+
