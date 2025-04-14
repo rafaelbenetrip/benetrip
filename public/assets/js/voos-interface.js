@@ -142,7 +142,6 @@ function aplicarEstilosVerticais() {
 /**
  * Adicionar botão de customização
  */
-// Modificar função para adicionar botão de customização
 function adicionarBotaoCustomizacao() {
     if (document.querySelector('.customize-search-button')) return;
     
@@ -602,6 +601,7 @@ function atualizarBadgeFiltros() {
         let count = 0;
         if (filtros.voosDiretos) count++;
         if (filtros.horarioPartida && (filtros.horarioPartida.min > 0 || filtros.horarioPartida.max < 1439)) count++;
+        if (filtros.horarioChegada && (filtros.horarioChegada.min > 0 || filtros.horarioChegada.max < 1439)) count++;
         if (filtros.duracaoMaxima && filtros.duracaoMaxima < 24) count++;
         if (filtros.precoMaximo && filtros.precoMaximo < 100) count++;
         if (filtros.companhias && filtros.companhias.length) count++;
@@ -994,6 +994,8 @@ function aplicarFiltros() {
         filtros.voosDiretos || 
         filtros.horarioPartida.min > 0 || 
         filtros.horarioPartida.max < 1439 ||
+        filtros.horarioChegada.min > 0 || 
+        filtros.horarioChegada.max < 1439 ||
         filtros.duracaoMaxima < 24 ||
         filtros.precoMaximo < 100 ||
         filtros.companhias.length > 0 ||
@@ -1208,6 +1210,7 @@ document.addEventListener('resultadosVoosProntos', function(event) {
         const temFiltros = (
             filtrosSalvos.voosDiretos || 
             (filtrosSalvos.horarioPartida && (filtrosSalvos.horarioPartida.min > 0 || filtrosSalvos.horarioPartida.max < 1439)) ||
+            (filtrosSalvos.horarioChegada && (filtrosSalvos.horarioChegada.min > 0 || filtrosSalvos.horarioChegada.max < 1439)) ||
             (filtrosSalvos.duracaoMaxima && filtrosSalvos.duracaoMaxima < 24) ||
             (filtrosSalvos.precoMaximo && filtrosSalvos.precoMaximo < 100) ||
             (filtrosSalvos.companhias && filtrosSalvos.companhias.length > 0) ||
@@ -1238,16 +1241,6 @@ document.addEventListener('resultadosVoosProntos', function(event) {
         }
     }, 500);
 });
-
-// Inicializar no carregamento da página
-document.addEventListener('DOMContentLoaded', function() {
-    // Configura eventos do modal de filtros quando o DOM estiver pronto
-    configurarEventosFiltros();
-    
-    // Atualiza badge no botão de filtros se houver filtros salvos
-    atualizarBadgeFiltros();
-});
-}
 
 /**
  * Inicialização para navegação de voos - função global
@@ -1883,4 +1876,7 @@ document.addEventListener('DOMContentLoaded', function() {
     } else {
         console.log('Aguardando BENETRIP_VOOS carregar dados...');
     }
+    
+    // Inicializa o contador de filtros
+    atualizarBadgeFiltros();
 });
