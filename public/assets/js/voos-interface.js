@@ -1854,33 +1854,14 @@ document.addEventListener('keydown', function(event) {
 // ======= INICIALIZAÇÃO =======
 
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('DOM carregado - inicializando interface de voos...');
+    console.log('DOM carregado - inicializando interface de voos com layout vertical...');
     
-    // Aplicar estilos antes de qualquer interação
     aplicarEstilosVerticais();
-    
-    // Carregar e configurar modais
-    carregarTemplatesModais();
-    
-    // Configurar botão de personalização - versão corrigida
     adicionarBotaoCustomizacao();
-    
-    // Verificar explicitamente se o modal de filtros existe
-    const modalFiltros = document.getElementById('modal-filtros');
-    if (!modalFiltros) {
-        console.error('ERRO: Modal de filtros não encontrado após inicialização!');
-        // Tentar encontrar elementos para debug
-        const modalContainers = document.querySelectorAll('[id*="modal"]');
-        console.log('Elementos de modal encontrados:', modalContainers.length);
-        modalContainers.forEach(el => console.log('- ' + el.id));
-    } else {
-        console.log('Modal de filtros encontrado e pronto para uso');
-    }
-    
     modificarCriarCardVoo();
+    carregarTemplatesModais();
     configurarEventosInterface();
     
-    // Restante do código de inicialização sem alteração...
     if (typeof window.BENETRIP_VOOS !== 'undefined' && 
         !window.BENETRIP_VOOS.estaCarregando && 
         window.BENETRIP_VOOS.finalResults) {
@@ -1892,7 +1873,4 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Inicializa o contador de filtros
     atualizarBadgeFiltros();
-    
-    // Log final de sucesso
-    console.log('Inicialização completa, sistema pronto');
 });
