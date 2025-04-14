@@ -317,96 +317,185 @@ function atualizarPreviewResultadosFiltrados() {
     }
 }
 
-// Simula filtragem sem alterar resultados reais
+/**
+ * Simula filtragem sem alterar resultados reais
+ * @param {Array} propostas - Lista de propostas de voos
+ * @param {Object} filtros - Critérios de filtragem
+ * @returns {Array} - Lista filtrada de propostas
+ */
 function filtrarVoosSimulado(propostas, filtros) {
-    if (!propostas || !filtros || !window.BENETRIP_VOOS) {
-        return propostas || [];
+  if (!propostas || !filtros || !window.BENETRIP_VOOS) {
+    return propostas || [];
+  }
+  
+  return propostas.filter(voo => {
+    // Filtro de voos diretos
+    if (filtros.voosDiretos) {
+      const infoIda = window.BENETRIP_VOOS.obterInfoSegmento(voo.segment?.[0]);
+      const infoVolta = voo.segment?.length > 1 ? 
+        window.BENETRIP_VOOS.obterInfoSegmento(voo.segment[1]) : null;
+      
+      const ehVooDireto = infoIda?.paradas === 0 && (!infoVolta || infoVolta.paradas === 0);
+      if (!ehVooDireto) return false;
     }
     
-    return propostas.filter(voo => {
-        // Filtro de voos diretos
-        if (filtros.voosDiretos) {
-            const infoIda = window.BENETRIP_VOOS.obterInfoSegmento(voo.segment?.[0]);
-            const infoVolta = voo.segment?.length > 1 ? 
-                window.BENETRIP_VOOS.obterInfoSegmento(voo.segment[1]) : null;
-            
-            const ehVooDireto = infoIda?.paradas === 0 && (!infoVolta || infoVolta.paradas === 0);
-            if (!ehVooDireto) return false;
-        }
+    // Filtros de voo de ida - Horário de Partida
+    if (filtros.ida?.horarioPartida && (filtros.ida.horarioPartida.min > 0 || filtros.ida.horarioPartida.max < 1439)) {
+      const infoIda = window.BENETRIP_VOOS.obterInfoSegmento(voo.segment?.[0]);
+      if (infoIda && infoIda.horaPartida) {
+        const [hora, minuto] = infoIda.horaPartida.split(':').map(Number);
+        const minutosTotal = hora * 60 + minuto;
         
-        // Filtro de horário de partida
-        if (filtros.horarioPartida && filtros.horarioPartida.min !== 0 || filtros.horarioPartida.max !== 1439) {
-            const infoIda = window.BENETRIP_VOOS.obterInfoSegmento(voo.segment?.[0]);
-            if (infoIda && infoIda.horaPartida) {
-                const [hora, minuto] = infoIda.horaPartida.split(':').map(Number);
-                const minutosTotal = hora * 60 + minuto;
-                
-                if (minutosTotal < filtros.horarioPartida.min || 
-                    minutosTotal > filtros.horarioPartida.max) {
-                    return false;
-                }
-            }
+        if (minutosTotal < filtros.ida.horarioPartida.min || 
+            minutosTotal > filtros.ida.horarioPartida.max) {
+          return false;
         }
+      }
+    }
+    
+    // Filtros de voo de ida - Horário de Chegada
+    if (filtros.ida?.horarioChegada && (filtros.ida.horarioChegada.min > 0 || filtros.ida.horarioChegada.max < 1439)) {
+      const infoIda = window.BENETRIP_VOOS.obterInfoSegmento(voo.segment?.[0]);
+      if (infoIda && infoIda.horaChegada) {
+        const [hora, minuto] = infoIda.horaChegada.split(':').map(Number);
+        const minutosTotal = hora * 60 + minuto;
         
-        // Filtro de duração máxima
-        if (filtros.duracaoMaxima && filtros.duracaoMaxima < 24) {
-            const infoIda = window.BENETRIP_VOOS.obterInfoSegmento(voo.segment?.[0]);
-            if (infoIda && infoIda.duracao) {
-                const duracaoHoras = infoIda.duracao / 60;
-                if (duracaoHoras > filtros.duracaoMaxima) {
-                    return false;
-                }
-            }
+        if (minutosTotal < filtros.ida.horarioChegada.min || 
+            minutosTotal > filtros.ida.horarioChegada.max) {
+          return false;
         }
+      }
+    }
+    
+    // Filtros de voo de volta - Horário de Partida
+    if (filtros.volta?.horarioPartida && (filtros.volta.horarioPartida.min > 0 || filtros.volta.horarioPartida.max < 1439)) {
+      const infoVolta = voo.segment?.length > 1 ? 
+        window.BENETRIP_VOOS.obterInfoSegmento(voo.segment[1]) : null;
+      
+      if (infoVolta && infoVolta.horaPartida) {
+        const [hora, minuto] = infoVolta.horaPartida.split(':').map(Number);
+        const minutosTotal = hora * 60 + minuto;
         
-        // Filtro de preço máximo
-        if (filtros.precoMaximo && filtros.precoMaximo < 100) {
-            const precoVoo = window.BENETRIP_VOOS.obterPrecoVoo(voo);
-            const precoMaximoValor = calcularPrecoMaximoReal(filtros.precoMaximo);
-            
-            if (precoVoo > precoMaximoValor) {
-                return false;
-            }
+        if (minutosTotal < filtros.volta.horarioPartida.min || 
+            minutosTotal > filtros.volta.horarioPartida.max) {
+          return false;
         }
+      }
+    }
+    
+    // Filtros de voo de volta - Horário de Chegada
+    if (filtros.volta?.horarioChegada && (filtros.volta.horarioChegada.min > 0 || filtros.volta.horarioChegada.max < 1439)) {
+      const infoVolta = voo.segment?.length > 1 ? 
+        window.BENETRIP_VOOS.obterInfoSegmento(voo.segment[1]) : null;
+      
+      if (infoVolta && infoVolta.horaChegada) {
+        const [hora, minuto] = infoVolta.horaChegada.split(':').map(Number);
+        const minutosTotal = hora * 60 + minuto;
         
-        // Filtro de companhias aéreas
-        if (filtros.companhias && filtros.companhias.length > 0) {
-            const companhiasVoo = voo.carriers || [];
-            const temCompanhiaFiltrada = companhiasVoo.some(comp => 
-                filtros.companhias.includes(comp)
-            );
-            if (!temCompanhiaFiltrada) return false;
+        if (minutosTotal < filtros.volta.horarioChegada.min || 
+            minutosTotal > filtros.volta.horarioChegada.max) {
+          return false;
         }
+      }
+    }
+    
+    // Filtro de tempo entre voos
+    if (filtros.tempoEntreVoos && filtros.tempoEntreVoos < 168) {
+      const infoIda = window.BENETRIP_VOOS.obterInfoSegmento(voo.segment?.[0]);
+      const infoVolta = voo.segment?.length > 1 ? 
+        window.BENETRIP_VOOS.obterInfoSegmento(voo.segment[1]) : null;
+      
+      if (infoIda && infoVolta && infoIda.dataChegada && infoVolta.dataPartida) {
+        const diferencaMs = infoVolta.dataPartida.getTime() - infoIda.dataChegada.getTime();
+        const diferencaHoras = diferencaMs / (1000 * 60 * 60);
         
-        // Filtro de aeroportos
-        if (filtros.aeroportos && filtros.aeroportos.length > 0) {
-            // Verifica se algum dos aeroportos do voo está na lista de aeroportos filtrados
-            const aeroportosVoo = [];
-            
-            // Adiciona aeroportos de ida
-            const segmentoIda = voo.segment?.[0]?.flight || [];
-            segmentoIda.forEach(trecho => {
-                if (trecho.departure) aeroportosVoo.push(trecho.departure);
-                if (trecho.arrival) aeroportosVoo.push(trecho.arrival);
-            });
-            
-            // Adiciona aeroportos de volta
-            const segmentoVolta = voo.segment?.[1]?.flight || [];
-            segmentoVolta.forEach(trecho => {
-                if (trecho.departure) aeroportosVoo.push(trecho.departure);
-                if (trecho.arrival) aeroportosVoo.push(trecho.arrival);
-            });
-            
-            // Verifica se pelo menos um aeroporto está na lista de filtrados
-            const temAeroportoFiltrado = aeroportosVoo.some(aero => 
-                filtros.aeroportos.includes(aero)
-            );
-            if (!temAeroportoFiltrado) return false;
+        if (diferencaHoras > filtros.tempoEntreVoos) {
+          return false;
         }
-        
-        // Se passou por todos os filtros, inclui o voo
-        return true;
-    });
+      }
+    }
+    
+    // Filtro de duração máxima
+    if (filtros.duracaoMaxima && filtros.duracaoMaxima < 24) {
+      const infoIda = window.BENETRIP_VOOS.obterInfoSegmento(voo.segment?.[0]);
+      if (infoIda && infoIda.duracao) {
+        const duracaoHoras = infoIda.duracao / 60;
+        if (duracaoHoras > filtros.duracaoMaxima) {
+          return false;
+        }
+      }
+      
+      // Também aplicar para voo de volta se existir
+      const infoVolta = voo.segment?.length > 1 ? 
+        window.BENETRIP_VOOS.obterInfoSegmento(voo.segment[1]) : null;
+      if (infoVolta && infoVolta.duracao) {
+        const duracaoHoras = infoVolta.duracao / 60;
+        if (duracaoHoras > filtros.duracaoMaxima) {
+          return false;
+        }
+      }
+    }
+    
+    // Filtro de preço máximo
+    if (filtros.precoMaximo && filtros.precoMaximo < 100) {
+      const precoVoo = window.BENETRIP_VOOS.obterPrecoVoo(voo);
+      
+      // Calcula o maior e menor preço disponíveis
+      let menorPreco = Infinity;
+      let maiorPreco = 0;
+      
+      window.BENETRIP_VOOS.resultadosOriginais.proposals.forEach(v => {
+        const preco = window.BENETRIP_VOOS.obterPrecoVoo(v);
+        if (preco < menorPreco) menorPreco = preco;
+        if (preco > maiorPreco) maiorPreco = preco;
+      });
+      
+      // Calcula o preço máximo com base no percentual
+      const precoMaximoReal = menorPreco + ((maiorPreco - menorPreco) * filtros.precoMaximo / 100);
+      
+      if (precoVoo > precoMaximoReal) {
+        return false;
+      }
+    }
+    
+    // Filtro de companhias aéreas
+    if (filtros.companhias && filtros.companhias.length > 0) {
+      const companhiasVoo = voo.carriers || [];
+      const temCompanhiaFiltrada = companhiasVoo.some(comp => 
+        filtros.companhias.includes(comp)
+      );
+      if (!temCompanhiaFiltrada) return false;
+    }
+    
+    // Filtro de aeroportos
+    if (filtros.aeroportos && filtros.aeroportos.length > 0) {
+      // Verifica se algum dos aeroportos do voo está na lista de aeroportos filtrados
+      const aeroportosVoo = [];
+      
+      // Adiciona aeroportos de ida
+      const segmentoIda = voo.segment?.[0]?.flight || [];
+      segmentoIda.forEach(trecho => {
+        if (trecho.departure) aeroportosVoo.push(trecho.departure);
+        if (trecho.arrival) aeroportosVoo.push(trecho.arrival);
+      });
+      
+      // Adiciona aeroportos de volta
+      const segmentoVolta = voo.segment?.[1]?.flight || [];
+      segmentoVolta.forEach(trecho => {
+        if (trecho.departure) aeroportosVoo.push(trecho.departure);
+        if (trecho.arrival) aeroportosVoo.push(trecho.arrival);
+      });
+      
+      // Verifica se pelo menos um aeroporto está na lista de filtrados
+      const temAeroportoFiltrado = aeroportosVoo.some(aero => 
+        filtros.aeroportos.includes(aero)
+      );
+      if (!temAeroportoFiltrado) return false;
+    }
+    
+    // Se passou por todos os filtros, inclui o voo
+    return true;
+  });
 }
 
 // Função auxiliar para calcular o preço máximo real com base no percentual do slider
