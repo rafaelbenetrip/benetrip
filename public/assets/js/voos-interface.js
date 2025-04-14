@@ -1289,9 +1289,14 @@ document.addEventListener('resultadosVoosProntos', function(event) {
                     }, 1000);
                 }
             }
-        // Atualiza o slider de preço com dados reais
+        }
+        
+        // ADICIONAR AQUI: Atualiza os sliders com dados reais
         if (document.getElementById('preco-slider')) {
-            atualizarSliderPreco();
+            setTimeout(() => {
+                atualizarSliderPreco();
+                console.log('Slider de preço atualizado com dados reais');
+            }, 100);
         }
     }, 500);
 });
