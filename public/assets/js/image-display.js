@@ -1,5 +1,6 @@
 // =============================
 // image-display.js - Módulo de exibição de imagens com suporte ao Google Places e Pexels
+// Atualizado com srcset, fallback visual, alt dinâmico e controle de lazy loading
 // =============================
 
 window.BENETRIP_IMAGES = {
@@ -10,7 +11,7 @@ window.BENETRIP_IMAGES = {
       alternativa: '120x120',
       surpresa: '400x224'
     },
-    cacheDuration: 24 * 60 * 60 * 1000, // 24h
+    cacheDuration: 24 * 60 * 60 * 1000,
     pontosIconicos: {}
   },
 
@@ -83,7 +84,7 @@ window.BENETRIP_IMAGES = {
 
       const response = await fetch(`/api/image-search?${params.toString()}`);
       const data = await response.json();
-      const image = data.images?.[0]?.url;
+      const image = data.images?.[0];
       if (image) {
         this.addToCache(cacheKey, image);
         return image;
@@ -92,15 +93,20 @@ window.BENETRIP_IMAGES = {
       console.error('Erro ao buscar imagem:', err);
     }
 
-    return `${this.config.placeholderUrl}${this.config.sizes[size]}?text=${encodeURIComponent(destino)}`;
+    return {
+      url: `${this.config.placeholderUrl}${this.config.sizes[size]}?text=${encodeURIComponent(destino)}`,
+      source: 'placeholder'
+    };
   },
 
   renderImage(imageData, container, options = {}) {
     const {
-      url, alt, pontoTuristico, source = "google_places"
+      url, srcset, alt, pontoTuristico, source = "google_places"
     } = imageData;
 
-    const { width = '100%', height = 'auto', className = '', showCredits = true } = options;
+    const {
+      width = '100%', height = 'auto', className = '', showCredits = true, lazy = true
+    } = options;
 
     const box = document.createElement('div');
     box.className = `image-container ${className}`;
@@ -109,11 +115,16 @@ window.BENETRIP_IMAGES = {
 
     const img = document.createElement('img');
     img.src = url;
-    img.alt = alt;
-    img.loading = 'lazy';
+    if (srcset) img.setAttribute('srcset', srcset);
+    img.alt = alt || `Imagem de ${pontoTuristico || 'destino'}`;
+    img.loading = lazy ? 'lazy' : 'eager';
     img.style.width = '100%';
     img.style.height = '100%';
     img.style.objectFit = 'cover';
+    img.onerror = () => {
+      img.style.filter = 'grayscale(1)';
+      img.style.opacity = 0.5;
+    };
 
     box.appendChild(img);
 
@@ -143,5 +154,4 @@ window.BENETRIP_IMAGES = {
   }
 };
 
-// Inicializar no carregamento
 window.BENETRIP_IMAGES.init();
