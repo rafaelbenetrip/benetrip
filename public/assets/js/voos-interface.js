@@ -163,6 +163,15 @@ function adicionarBotaoCustomizacao() {
             existingButton.appendChild(badge);
         }
         
+        // Atualiza o texto do botão para uma versão mais simples
+        existingButton.innerHTML = `
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M4 8h16M8 4v8M12 4v8M16 4v8"/>
+            </svg>
+            Filtrar Voos
+            <span id="filtros-badge" class="filtros-badge" style="display: none;">0</span>
+        `;
+        
         console.log('Evento adicionado ao botão de customização existente');
         return;
     }
@@ -506,88 +515,87 @@ function inicializarTabsViagem() {
 
 // Funções para atualizar os sliders de horário para ida
 function atualizarSliderPartidaIda() {
-  const min = parseInt(document.getElementById('partida-ida-slider-min').value);
-  const max = parseInt(document.getElementById('partida-ida-slider-max').value);
-  
-  // Garante que min não ultrapasse max
-  if (min > max) {
-    document.getElementById('partida-ida-slider-min').value = max;
-  }
-  
-  // Converte minutos para formato de hora
-  const minHora = Math.floor(min / 60).toString().padStart(2, '0');
-  const minMinuto = (min % 60).toString().padStart(2, '0');
-  
-  const maxHora = Math.floor(max / 60).toString().padStart(2, '0');
-  const maxMinuto = (max % 60).toString().padStart(2, '0');
-  
-  // Atualiza os textos
-  document.getElementById('partida-ida-min').textContent = `${minHora}:${minMinuto}`;
-  document.getElementById('partida-ida-max').textContent = `${maxHora}:${maxMinuto}`;
+    const min = parseInt(document.getElementById('partida-ida-slider-min').value);
+    const max = parseInt(document.getElementById('partida-ida-slider-max').value);
+    
+    // Garante que min não ultrapasse max
+    if (min > max) {
+        document.getElementById('partida-ida-slider-min').value = max;
+    }
+    
+    // Converte minutos para formato de hora
+    const minHora = Math.floor(min / 60).toString().padStart(2, '0');
+    const minMinuto = (min % 60).toString().padStart(2, '0');
+    
+    const maxHora = Math.floor(max / 60).toString().padStart(2, '0');
+    const maxMinuto = (max % 60).toString().padStart(2, '0');
+    
+    // Atualiza os textos
+    document.getElementById('partida-ida-min').textContent = `${minHora}:${minMinuto}`;
+    document.getElementById('partida-ida-max').textContent = `${maxHora}:${maxMinuto}`;
 }
 
 function atualizarSliderChegadaIda() {
-  const min = parseInt(document.getElementById('chegada-ida-slider-min').value);
-  const max = parseInt(document.getElementById('chegada-ida-slider-max').value);
-  
-  // Garante que min não ultrapasse max
-  if (min > max) {
-    document.getElementById('chegada-ida-slider-min').value = max;
-  }
-  
-  // Converte minutos para formato de hora
-  const minHora = Math.floor(min / 60).toString().padStart(2, '0');
-  const minMinuto = (min % 60).toString().padStart(2, '0');
-  
-  const maxHora = Math.floor(max / 60).toString().padStart(2, '0');
-  const maxMinuto = (max % 60).toString().padStart(2, '0');
-  
-  // Atualiza os textos
-  document.getElementById('chegada-ida-min').textContent = `${minHora}:${minMinuto}`;
-  document.getElementById('chegada-ida-max').textContent = `${maxHora}:${maxMinuto}`;
+    const min = parseInt(document.getElementById('chegada-ida-slider-min').value);
+    const max = parseInt(document.getElementById('chegada-ida-slider-max').value);
+    
+    // Garante que min não ultrapasse max
+    if (min > max) {
+        document.getElementById('chegada-ida-slider-min').value = max;
+    }
+    
+    // Converte minutos para formato de hora
+    const minHora = Math.floor(min / 60).toString().padStart(2, '0');
+    const minMinuto = (min % 60).toString().padStart(2, '0');
+    
+    const maxHora = Math.floor(max / 60).toString().padStart(2, '0');
+    const maxMinuto = (max % 60).toString().padStart(2, '0');
+    
+    // Atualiza os textos
+    document.getElementById('chegada-ida-min').textContent = `${minHora}:${minMinuto}`;
+    document.getElementById('chegada-ida-max').textContent = `${maxHora}:${maxMinuto}`;
 }
 
-// Funções para atualizar os sliders de horário para volta
 function atualizarSliderPartidaVolta() {
-  const min = parseInt(document.getElementById('partida-volta-slider-min').value);
-  const max = parseInt(document.getElementById('partida-volta-slider-max').value);
-  
-  // Garante que min não ultrapasse max
-  if (min > max) {
-    document.getElementById('partida-volta-slider-min').value = max;
-  }
-  
-  // Converte minutos para formato de hora
-  const minHora = Math.floor(min / 60).toString().padStart(2, '0');
-  const minMinuto = (min % 60).toString().padStart(2, '0');
-  
-  const maxHora = Math.floor(max / 60).toString().padStart(2, '0');
-  const maxMinuto = (max % 60).toString().padStart(2, '0');
-  
-  // Atualiza os textos
-  document.getElementById('partida-volta-min').textContent = `${minHora}:${minMinuto}`;
-  document.getElementById('partida-volta-max').textContent = `${maxHora}:${maxMinuto}`;
+    const min = parseInt(document.getElementById('partida-volta-slider-min').value);
+    const max = parseInt(document.getElementById('partida-volta-slider-max').value);
+    
+    // Garante que min não ultrapasse max
+    if (min > max) {
+        document.getElementById('partida-volta-slider-min').value = max;
+    }
+    
+    // Converte minutos para formato de hora
+    const minHora = Math.floor(min / 60).toString().padStart(2, '0');
+    const minMinuto = (min % 60).toString().padStart(2, '0');
+    
+    const maxHora = Math.floor(max / 60).toString().padStart(2, '0');
+    const maxMinuto = (max % 60).toString().padStart(2, '0');
+    
+    // Atualiza os textos
+    document.getElementById('partida-volta-min').textContent = `${minHora}:${minMinuto}`;
+    document.getElementById('partida-volta-max').textContent = `${maxHora}:${maxMinuto}`;
 }
 
 function atualizarSliderChegadaVolta() {
-  const min = parseInt(document.getElementById('chegada-volta-slider-min').value);
-  const max = parseInt(document.getElementById('chegada-volta-slider-max').value);
-  
-  // Garante que min não ultrapasse max
-  if (min > max) {
-    document.getElementById('chegada-volta-slider-min').value = max;
-  }
-  
-  // Converte minutos para formato de hora
-  const minHora = Math.floor(min / 60).toString().padStart(2, '0');
-  const minMinuto = (min % 60).toString().padStart(2, '0');
-  
-  const maxHora = Math.floor(max / 60).toString().padStart(2, '0');
-  const maxMinuto = (max % 60).toString().padStart(2, '0');
-  
-  // Atualiza os textos
-  document.getElementById('chegada-volta-min').textContent = `${minHora}:${minMinuto}`;
-  document.getElementById('chegada-volta-max').textContent = `${maxHora}:${maxMinuto}`;
+    const min = parseInt(document.getElementById('chegada-volta-slider-min').value);
+    const max = parseInt(document.getElementById('chegada-volta-slider-max').value);
+    
+    // Garante que min não ultrapasse max
+    if (min > max) {
+        document.getElementById('chegada-volta-slider-min').value = max;
+    }
+    
+    // Converte minutos para formato de hora
+    const minHora = Math.floor(min / 60).toString().padStart(2, '0');
+    const minMinuto = (min % 60).toString().padStart(2, '0');
+    
+    const maxHora = Math.floor(max / 60).toString().padStart(2, '0');
+    const maxMinuto = (max % 60).toString().padStart(2, '0');
+    
+    // Atualiza os textos
+    document.getElementById('chegada-volta-min').textContent = `${minHora}:${minMinuto}`;
+    document.getElementById('chegada-volta-max').textContent = `${maxHora}:${maxMinuto}`;
 }
 
 // Carrega filtros salvos no localStorage
@@ -635,38 +643,6 @@ function carregarFiltrosSalvos() {
             atualizarSliderChegadaVolta();
         }
         
-        // Horário de partida (compatibilidade com versão anterior)
-        const partidaMinSlider = document.getElementById('partida-slider-min');
-        const partidaMaxSlider = document.getElementById('partida-slider-max');
-        if (partidaMinSlider && partidaMaxSlider && filtrosSalvos.horarioPartida) {
-            partidaMinSlider.value = filtrosSalvos.horarioPartida.min || 0;
-            partidaMaxSlider.value = filtrosSalvos.horarioPartida.max || 1439;
-            atualizarSliderPartida();
-        }
-        
-        // NOVO: Horário de chegada (compatibilidade com versão anterior)
-        const chegadaMinSlider = document.getElementById('chegada-slider-min');
-        const chegadaMaxSlider = document.getElementById('chegada-slider-max');
-        if (chegadaMinSlider && chegadaMaxSlider && filtrosSalvos.horarioChegada) {
-            chegadaMinSlider.value = filtrosSalvos.horarioChegada.min || 0;
-            chegadaMaxSlider.value = filtrosSalvos.horarioChegada.max || 1439;
-            atualizarSliderChegada();
-        }
-        
-        // Duração
-        const duracaoSlider = document.getElementById('duracao-slider');
-        if (duracaoSlider && filtrosSalvos.duracaoMaxima) {
-            duracaoSlider.value = filtrosSalvos.duracaoMaxima;
-            atualizarSliderDuracao();
-        }
-        
-        // Preço máximo
-        const precoSlider = document.getElementById('preco-slider');
-        if (precoSlider && filtrosSalvos.precoMaximo) {
-            precoSlider.value = filtrosSalvos.precoMaximo;
-            atualizarSliderPreco();
-        }
-        
         // Companhias
         if (filtrosSalvos.companhias && filtrosSalvos.companhias.length) {
             setTimeout(() => {
@@ -708,7 +684,6 @@ function carregarFiltrosSalvos() {
         console.error('Erro ao carregar filtros salvos:', error);
     }
 }
-
 
 // Coleta os filtros atuais do modal
 function coletarFiltrosAtuais() {
@@ -1350,8 +1325,8 @@ function configurarEventosFiltros() {
     // Adicionar inicialização do sistema de tabs
     inicializarTabsViagem();
     
-    // Filtros rápidos
-    inicializarFiltrosRapidos();
+    // Toggle de voos diretos
+    document.getElementById('filtro-voos-diretos')?.addEventListener('change', atualizarContadorFiltros);
     
     // Sliders de horário de partida/chegada de IDA
     const partidaIdaMinSlider = document.getElementById('partida-ida-slider-min');
@@ -1420,7 +1395,6 @@ function configurarEventosFiltros() {
         partidaVoltaMinSlider.addEventListener('input', atualizarComDebounce);
         partidaVoltaMaxSlider.addEventListener('input', atualizarComDebounce);
     }
-    
     const chegadaVoltaMinSlider = document.getElementById('chegada-volta-slider-min');
     const chegadaVoltaMaxSlider = document.getElementById('chegada-volta-slider-max');
     
@@ -1443,90 +1417,7 @@ function configurarEventosFiltros() {
         chegadaVoltaMaxSlider.addEventListener('input', atualizarComDebounce);
     }
     
-    // Compatibilidade com versão anterior - Sliders de horário de partida
-    const partidaMinSlider = document.getElementById('partida-slider-min');
-    const partidaMaxSlider = document.getElementById('partida-slider-max');
-    
-    if (partidaMinSlider && partidaMaxSlider) {
-        // Função com debounce para evitar excesso de atualizações
-        let debouncedTimerPartida;
-        
-        const atualizarComDebounce = () => {
-            // Atualiza UI imediatamente
-            atualizarSliderPartida();
-            
-            // Debounce para atualizar contador
-            clearTimeout(debouncedTimerPartida);
-            debouncedTimerPartida = setTimeout(() => {
-                atualizarContadorFiltros();
-            }, 300);
-        };
-        
-        partidaMinSlider.addEventListener('input', atualizarComDebounce);
-        partidaMaxSlider.addEventListener('input', atualizarComDebounce);
-    }
-    
-    // Slider de duração
-    const duracaoSlider = document.getElementById('duracao-slider');
-    if (duracaoSlider) {
-        let debouncedTimerDuracao;
-        
-        duracaoSlider.addEventListener('input', () => {
-            // Atualiza UI imediatamente
-            atualizarSliderDuracao();
-            
-            // Debounce para atualizar contador
-            clearTimeout(debouncedTimerDuracao);
-            debouncedTimerDuracao = setTimeout(() => {
-                atualizarContadorFiltros();
-            }, 300);
-        });
-    }
-
-    // Compatibilidade com versão anterior - Sliders de horário de chegada
-    const chegadaMinSlider = document.getElementById('chegada-slider-min');
-    const chegadaMaxSlider = document.getElementById('chegada-slider-max');
-    
-    if (chegadaMinSlider && chegadaMaxSlider) {
-        // Função com debounce para evitar excesso de atualizações
-        let debouncedTimerChegada;
-        
-        const atualizarComDebounce = () => {
-            // Atualiza UI imediatamente
-            atualizarSliderChegada();
-            
-            // Debounce para atualizar contador
-            clearTimeout(debouncedTimerChegada);
-            debouncedTimerChegada = setTimeout(() => {
-                atualizarContadorFiltros();
-            }, 300);
-        };
-        
-        chegadaMinSlider.addEventListener('input', atualizarComDebounce);
-        chegadaMaxSlider.addEventListener('input', atualizarComDebounce);
-    }
-    
-    // Slider de preço
-    const precoSlider = document.getElementById('preco-slider');
-    if (precoSlider) {
-        let debouncedTimerPreco;
-        
-        precoSlider.addEventListener('input', () => {
-            // Atualiza UI imediatamente
-            atualizarSliderPreco();
-            
-            // Debounce para atualizar contador
-            clearTimeout(debouncedTimerPreco);
-            debouncedTimerPreco = setTimeout(() => {
-                atualizarContadorFiltros();
-            }, 300);
-        });
-    }
-    
-    // Toggle de voos diretos
-    document.getElementById('filtro-voos-diretos')?.addEventListener('change', atualizarContadorFiltros);
-    
-    // Expandíveis
+    // Expandíveis (apenas para companhias e aeroportos agora)
     document.querySelectorAll('.filtro-expandivel .filtro-header').forEach(header => {
         header.addEventListener('click', function() {
             const tipo = this.getAttribute('aria-controls').replace('-content', '');
@@ -1538,18 +1429,6 @@ function configurarEventosFiltros() {
     document.getElementById('btn-fechar-filtros')?.addEventListener('click', fecharModalFiltros);
     document.getElementById('btn-limpar-filtros')?.addEventListener('click', limparFiltros);
     document.getElementById('btn-aplicar-filtros')?.addEventListener('click', aplicarFiltros);
-    
-    // Botão de refazer busca
-    document.getElementById('btn-refazer-busca')?.addEventListener('click', () => {
-        const filtros = coletarFiltrosAtuais();
-        
-        // Salva os filtros atualizados
-        localStorage.setItem('benetrip_filtros_voos', JSON.stringify(filtros));
-        
-        // Volta para a página inicial com flag para mostrar formulário
-        localStorage.setItem('benetrip_refazer_busca', 'true');
-        window.location.href = 'index.html';
-    });
 }
 
 // Ouvir evento quando resultados estiverem prontos
