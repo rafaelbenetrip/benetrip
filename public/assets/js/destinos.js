@@ -1,7 +1,7 @@
 /**
  * BENETRIP - Visualização de Destinos Recomendados
  * Controla a exibição e interação dos destinos recomendados pela IA
- * Versão 2.3 - Layout otimizado, suporte melhorado a dados dinâmicos e experiência do usuário aprimorada
+ * Versão 2.4 - Layout otimizado, suporte melhorado a dados dinâmicos e experiência do usuário aprimorada
  */
 
 // Módulo de Destinos do Benetrip
@@ -473,28 +473,71 @@ const BENETRIP_DESTINOS = {
     `;
   },
   
-  // Método auxiliar para renderizar imagem com créditos - CORRIGIDO PARA MELHOR ACESSO AOS LINKS
-  renderizarImagemComCreditos(imagem, fallbackText, classes = '') {
+  // Nova implementação da função para renderizar imagens com melhor integração
+  renderizarImagemComCreditos(destino, containerElement, tipo = 'destaque') {
+    if (!destino || !containerElement) return;
+    
+    const imagens = destino.imagens || [];
+    const pontoTuristico = destino.pontoTuristico || (destino.pontosTuristicos && destino.pontosTuristicos[0]) || '';
+    const destName = destino.destino || 'Destino';
+    
+    // Configurações baseadas no tipo
+    const config = {
+      width: tipo === 'destaque' ? '400px' : (tipo === 'surpresa' ? '400px' : '200px'),
+      height: tipo === 'destaque' ? '224px' : (tipo === 'surpresa' ? '224px' : '180px'),
+      showCredits: true,
+      showLabel: true,
+      labelText: pontoTuristico || destName
+    };
+    
+    // Limpar o container
+    containerElement.innerHTML = '';
+    
+    // Se temos acesso à função BENETRIP_IMAGES e imagens disponíveis
+    if (window.BENETRIP_IMAGES && typeof window.BENETRIP_IMAGES.renderImage === 'function' && imagens.length > 0) {
+      // Usar a função moderna de renderização
+      window.BENETRIP_IMAGES.renderImage(imagens[0], containerElement, config);
+      return;
+    }
+    
+    // Fallback para o método antigo caso o BENETRIP_IMAGES não esteja disponível
+    let fallbackText = destName;
+    if (pontoTuristico) fallbackText += ` - ${pontoTuristico}`;
+    
+    const imagem = imagens.length > 0 ? imagens[0] : null;
+    const classes = `h-${tipo === 'destaque' ? '48' : '32'} w-full`;
+
     if (!imagem) {
-      return `
-        <div class="bg-gray-200 ${classes}">
-          <img src="https://via.placeholder.com/400x224?text=${encodeURIComponent(fallbackText)}" alt="${fallbackText}" class="w-full h-full object-cover">
+      containerElement.innerHTML = `
+        <div class="bg-gray-200 ${classes} flex items-center justify-center">
+          <span class="text-gray-500 text-center">
+            <span class="block text-3xl mb-2">📷</span>
+            <span class="text-sm">Imagem não disponível</span>
+          </span>
         </div>
       `;
+      return;
     }
     
     // Construir os créditos da imagem com link clicável garantido
     const photographerLink = imagem.photographerUrl || '#';
     const sourceLink = imagem.sourceUrl || '#';
     const photographer = imagem.photographer || 'Desconhecido';
+    const source = imagem.source || 'Pexels';
 
-    return `
+    containerElement.innerHTML = `
       <div class="image-container loading bg-gray-200 ${classes} relative">
         <img src="${imagem.url}" alt="${imagem.alt || fallbackText}" class="w-full h-full object-cover" 
+             srcset="${imagem.url} 1x, ${imagem.url_2x || imagem.url} 2x"
              onload="this.parentNode.classList.remove('loading')" 
              onerror="this.onerror=null; this.src='https://via.placeholder.com/400x224?text=${encodeURIComponent(fallbackText)}'; this.parentNode.classList.remove('loading')">
         
-        <!-- Icone de lupa com link para fonte original -->
+        <!-- Label com nome do ponto turístico -->
+        <div class="absolute top-2 left-2 bg-black bg-opacity-70 text-white text-sm px-3 py-1 rounded-full z-10 max-w-[80%] truncate">
+          ${pontoTuristico || destName}
+        </div>
+        
+        <!-- Ícone de lupa com link para fonte original -->
         <a href="${sourceLink}" target="_blank" rel="noopener noreferrer" 
            class="absolute top-2 right-2 bg-white bg-opacity-80 p-1.5 rounded-full z-10 hover:bg-opacity-100 transition-all"
            onclick="event.stopPropagation(); window.open('${sourceLink}', '_blank');">
@@ -506,10 +549,11 @@ const BENETRIP_DESTINOS = {
         
         <!-- Créditos do fotógrafo com melhor posicionamento e visibilidade -->
         <div class="absolute bottom-0 left-0 right-0 p-1.5 bg-black bg-opacity-70 text-white text-xs z-10">
+          <span>Foto via ${source} por </span>
           <a href="${photographerLink}" target="_blank" rel="noopener noreferrer" 
              class="text-white hover:underline"
              onclick="event.stopPropagation(); window.open('${photographerLink}', '_blank');">
-            Foto por ${photographer}
+            ${photographer}
           </a>
         </div>
       </div>
@@ -527,18 +571,14 @@ const BENETRIP_DESTINOS = {
     const precoClasse = precoReal ? 'text-green-700 font-semibold' : '';
     const estacaoAno = this.obterEstacaoAno() || 'primavera';
     
-    // Imagem de cabeçalho expandida
+    // Container para a imagem de cabeçalho
     let headerHtml = `
       <div class="relative rounded-t-lg overflow-hidden">
         <div class="absolute top-0 left-0 py-1 px-3 z-10 font-bold text-white" style="background-color: #E87722;">
           Escolha Top da Tripinha!
         </div>
-        <div class="h-48">
-          ${this.renderizarImagemComCreditos(
-            destino.imagens && destino.imagens.length > 0 ? destino.imagens[0] : null,
-            destino.destino,
-            'h-full w-full'
-          )}
+        <div id="destino-destaque-imagem" class="h-48 bg-gray-200">
+          <!-- Imagem será renderizada aqui -->
         </div>
       </div>
     `;
@@ -626,25 +666,9 @@ const BENETRIP_DESTINOS = {
     let pontosTuristicosHtml = `
       <div id="conteudo-pontos-turisticos" class="conteudo-aba p-4 hidden">
         <p class="text-sm text-gray-600 mb-3">Atrações imperdíveis em ${destino.destino}:</p>
-        ${destino.pontosTuristicos && destino.pontosTuristicos.length > 0 ? 
-          destino.pontosTuristicos.map((ponto, idx) => `
-            <div class="bg-white border border-gray-200 rounded-lg p-3 mb-3 shadow-sm hover:shadow-md transition-all">
-              <div class="flex items-center">
-                <span class="flex items-center justify-center w-8 h-8 rounded-full mr-3 text-white font-bold" style="background-color: #00A3E0;">${idx + 1}</span>
-                <h5 class="font-medium">${ponto}</h5>
-              </div>
-              <p class="text-sm text-gray-600 mt-2 ml-11">
-                ${this.gerarDescricaoAutomatica(ponto, destino.destino)}
-              </p>
-              ${idx === 0 && destino.imagens && destino.imagens.length > 1 ? `
-                <div class="mt-2 ml-11 rounded-lg overflow-hidden h-28">
-                  <img src="${destino.imagens[1].url}" alt="${ponto}" class="w-full h-full object-cover">
-                </div>
-              ` : ''}
-            </div>
-          `).join('') : 
-          '<p class="text-center text-gray-500 my-6">Informações sobre pontos turísticos não disponíveis</p>'
-        }
+        <div id="pontos-turisticos-container">
+          <!-- Os pontos turísticos serão renderizados aqui -->
+        </div>
       </div>
     `;
     
@@ -723,6 +747,59 @@ const BENETRIP_DESTINOS = {
         ${botaoSelecaoHtml}
       </div>
     `;
+    
+    // Renderizar a imagem do destino destaque usando a nova função
+    const containerImagem = document.getElementById('destino-destaque-imagem');
+    if (containerImagem) {
+      this.renderizarImagemComCreditos(destino, containerImagem, 'destaque');
+    }
+    
+    // Renderizar pontos turísticos de forma dinâmica
+    const pontosTuristicosContainer = document.getElementById('pontos-turisticos-container');
+    if (pontosTuristicosContainer && destino.pontosTuristicos && destino.pontosTuristicos.length > 0) {
+      let pontosTuristicosConteudo = '';
+      
+      destino.pontosTuristicos.forEach((ponto, idx) => {
+        // Procurar imagem específica para este ponto turístico, se disponível
+        const imagemPonto = destino.imagens && destino.imagens.length > idx + 1 ? 
+                            destino.imagens[idx + 1] : null;
+        
+        pontosTuristicosConteudo += `
+          <div class="bg-white border border-gray-200 rounded-lg p-3 mb-3 shadow-sm hover:shadow-md transition-all">
+            <div class="flex items-center">
+              <span class="flex items-center justify-center w-8 h-8 rounded-full mr-3 text-white font-bold" style="background-color: #00A3E0;">${idx + 1}</span>
+              <h5 class="font-medium">${ponto}</h5>
+            </div>
+            <p class="text-sm text-gray-600 mt-2 ml-11">
+              ${this.gerarDescricaoAutomatica(ponto, destino.destino)}
+            </p>
+            <div id="ponto-turistico-imagem-${idx}" class="mt-2 ml-11 rounded-lg overflow-hidden h-28">
+              <!-- A imagem será renderizada aqui -->
+            </div>
+          </div>
+        `;
+      });
+      
+      pontosTuristicosContainer.innerHTML = pontosTuristicosConteudo;
+      
+      // Renderizar imagens para cada ponto turístico
+      destino.pontosTuristicos.forEach((ponto, idx) => {
+        const containerImagemPonto = document.getElementById(`ponto-turistico-imagem-${idx}`);
+        if (containerImagemPonto) {
+          // Criar um "mini-destino" específico para este ponto
+          const pontoDestino = {
+            destino: destino.destino,
+            pais: destino.pais,
+            pontoTuristico: ponto,
+            imagens: destino.imagens && destino.imagens.length > idx + 1 ? 
+                    [destino.imagens[idx + 1]] : 
+                    (destino.imagens && destino.imagens.length > 0 ? [destino.imagens[0]] : [])
+          };
+          
+          this.renderizarImagemComCreditos(pontoDestino, containerImagemPonto, 'ponto-turistico');
+        }
+      });
+    }
   },
   
   // Renderizar destinos alternativos em grid - MELHORADO COM IDS ÚNICOS E LISTENERS ESPECÍFICOS
@@ -738,7 +815,7 @@ const BENETRIP_DESTINOS = {
     container.appendChild(gridContainer);
     
     const destinosLimitados = destinos.slice(0, 4);
-    destinosLimitados.forEach(destino => {
+    destinosLimitados.forEach((destino, index) => {
       const precoReal = destino.detalhesVoo ? true : false;
       const precoClasse = precoReal ? 'text-green-700 font-semibold' : '';
       
@@ -751,14 +828,13 @@ const BENETRIP_DESTINOS = {
       
       // ID único para o botão baseado no nome do destino
       const btnId = `btn-destino-${destino.destino.replace(/\s+/g, '-').toLowerCase()}`;
+      const imagemId = `imagem-alternativa-${index}`;
       
       elementoDestino.innerHTML = `
         <div class="relative">
-          ${this.renderizarImagemComCreditos(
-            destino.imagens && destino.imagens.length > 0 ? destino.imagens[0] : null,
-            destino.destino,
-            'h-32'
-          )}
+          <div id="${imagemId}" class="h-32 bg-gray-200">
+            <!-- A imagem será renderizada aqui -->
+          </div>
           <div class="absolute top-2 right-2 bg-white bg-opacity-90 rounded-full p-1 shadow-sm">
             <span class="text-lg">${iconeTipo}</span>
           </div>
@@ -799,8 +875,14 @@ const BENETRIP_DESTINOS = {
       
       gridContainer.appendChild(elementoDestino);
       
-      // Adicionar event listener específico para cada botão após renderizar
+      // Renderizar a imagem para este destino alternativo
       setTimeout(() => {
+        const containerImagem = document.getElementById(imagemId);
+        if (containerImagem) {
+          this.renderizarImagemComCreditos(destino, containerImagem, 'alternativa');
+        }
+        
+        // Adicionar event listener específico para cada botão após renderizar
         const btnDestino = document.getElementById(btnId);
         if (btnDestino) {
           btnDestino.addEventListener('click', (e) => {
@@ -888,12 +970,8 @@ const BENETRIP_DESTINOS = {
       <div class="bg-white rounded-lg w-full max-w-md relative max-h-[90vh] overflow-hidden transform transition-transform duration-500 modal-surpresa-content">
         <!-- Imagem com banner e botão de fechar -->
         <div class="relative">
-          <div class="h-48 bg-gray-200">
-            ${this.renderizarImagemComCreditos(
-              destino.imagens && destino.imagens.length > 0 ? destino.imagens[0] : null,
-              destino.destino,
-              'h-full w-full'
-            )}
+          <div id="surpresa-destino-imagem" class="h-48 bg-gray-200">
+            <!-- A imagem será renderizada aqui -->
           </div>
           
           <!-- Banner de Destino Surpresa (Azul) -->
@@ -993,26 +1071,9 @@ const BENETRIP_DESTINOS = {
         <!-- Conteúdo da aba Pontos Turísticos -->
         <div id="conteudo-surpresa-pontos" class="conteudo-aba-surpresa p-4 overflow-y-auto hidden" style="max-height: calc(90vh - 280px);">
           <p class="text-sm text-gray-600 mb-3">Atrações imperdíveis em ${destino.destino}:</p>
-          
-          ${destino.pontosTuristicos && destino.pontosTuristicos.length > 0 ? 
-            destino.pontosTuristicos.map((ponto, idx) => `
-              <div class="bg-white border border-gray-200 rounded-lg p-3 mb-3 shadow-sm hover:shadow-md transition-all">
-                <div class="flex items-center">
-                  <span class="flex items-center justify-center w-8 h-8 rounded-full mr-3 text-white font-bold" style="background-color: #00A3E0;">${idx + 1}</span>
-                  <h5 class="font-medium">${ponto}</h5>
-                </div>
-                <p class="text-sm text-gray-600 mt-2 ml-11">
-                  ${this.gerarDescricaoAutomatica(ponto, destino.destino)}
-                </p>
-                ${idx === 0 && destino.imagens && destino.imagens.length > 1 ? `
-                  <div class="mt-2 ml-11 rounded-lg overflow-hidden h-28">
-                    <img src="${destino.imagens[1].url}" alt="${ponto}" class="w-full h-full object-cover">
-                  </div>
-                ` : ''}
-              </div>
-            `).join('') : 
-            '<p class="text-center text-gray-500 my-6">Informações sobre pontos turísticos não disponíveis</p>'
-          }
+          <div id="surpresa-pontos-container">
+            <!-- Os pontos turísticos serão renderizados aqui -->
+          </div>
         </div>
         
         <!-- Conteúdo da aba Clima -->
@@ -1079,6 +1140,57 @@ const BENETRIP_DESTINOS = {
     
     document.body.appendChild(modalContainer);
     
+    // Renderizar a imagem do destino surpresa
+    setTimeout(() => {
+      const imagemContainer = document.getElementById('surpresa-destino-imagem');
+      if (imagemContainer) {
+        this.renderizarImagemComCreditos(destino, imagemContainer, 'surpresa');
+      }
+      
+      // Renderizar pontos turísticos de forma dinâmica
+      const pontosTuristicosContainer = document.getElementById('surpresa-pontos-container');
+      if (pontosTuristicosContainer && destino.pontosTuristicos && destino.pontosTuristicos.length > 0) {
+        let pontosTuristicosConteudo = '';
+        
+        destino.pontosTuristicos.forEach((ponto, idx) => {
+          pontosTuristicosConteudo += `
+            <div class="bg-white border border-gray-200 rounded-lg p-3 mb-3 shadow-sm hover:shadow-md transition-all">
+              <div class="flex items-center">
+                <span class="flex items-center justify-center w-8 h-8 rounded-full mr-3 text-white font-bold" style="background-color: #00A3E0;">${idx + 1}</span>
+                <h5 class="font-medium">${ponto}</h5>
+              </div>
+              <p class="text-sm text-gray-600 mt-2 ml-11">
+                ${this.gerarDescricaoAutomatica(ponto, destino.destino)}
+              </p>
+              <div id="surpresa-ponto-turistico-imagem-${idx}" class="mt-2 ml-11 rounded-lg overflow-hidden h-28">
+                <!-- A imagem será renderizada aqui -->
+              </div>
+            </div>
+          `;
+        });
+        
+        pontosTuristicosContainer.innerHTML = pontosTuristicosConteudo;
+        
+        // Renderizar imagens para cada ponto turístico
+        destino.pontosTuristicos.forEach((ponto, idx) => {
+          const containerImagemPonto = document.getElementById(`surpresa-ponto-turistico-imagem-${idx}`);
+          if (containerImagemPonto) {
+            // Criar um "mini-destino" específico para este ponto
+            const pontoDestino = {
+              destino: destino.destino,
+              pais: destino.pais,
+              pontoTuristico: ponto,
+              imagens: destino.imagens && destino.imagens.length > idx + 1 ? 
+                      [destino.imagens[idx + 1]] : 
+                      (destino.imagens && destino.imagens.length > 0 ? [destino.imagens[0]] : [])
+            };
+            
+            this.renderizarImagemComCreditos(pontoDestino, containerImagemPonto, 'ponto-turistico');
+          }
+        });
+      }
+    }, 10);
+    
     // Adicionar classe para animar entrada após um pequeno delay
     setTimeout(() => {
       const modalContent = document.querySelector('.modal-surpresa-content');
@@ -1086,7 +1198,7 @@ const BENETRIP_DESTINOS = {
         modalContent.classList.add('scale-100');
         modalContent.classList.remove('scale-95', 'opacity-0');
       }
-    }, 10);
+    }, 50);
     
     // Fechar modal ao clicar fora
     modalContainer.addEventListener('click', function(e) {
