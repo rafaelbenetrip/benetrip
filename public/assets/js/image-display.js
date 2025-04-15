@@ -1,7 +1,5 @@
 // =============================
 // image-display.js - Módulo de exibição de imagens com suporte ao Google Places e Pexels
-// Adaptado para usar srcset em telas de alta densidade (retina)
-// Com melhorias: alt dinâmico, fallback visual e controle de lazy loading
 // =============================
 
 window.BENETRIP_IMAGES = {
@@ -85,7 +83,7 @@ window.BENETRIP_IMAGES = {
 
       const response = await fetch(`/api/image-search?${params.toString()}`);
       const data = await response.json();
-      const image = data.images?.[0];
+      const image = data.images?.[0]?.url;
       if (image) {
         this.addToCache(cacheKey, image);
         return image;
@@ -94,24 +92,15 @@ window.BENETRIP_IMAGES = {
       console.error('Erro ao buscar imagem:', err);
     }
 
-    return {
-      url: `${this.config.placeholderUrl}${this.config.sizes[size]}?text=${encodeURIComponent(destino)}`,
-      source: 'placeholder'
-    };
+    return `${this.config.placeholderUrl}${this.config.sizes[size]}?text=${encodeURIComponent(destino)}`;
   },
 
   renderImage(imageData, container, options = {}) {
     const {
-      url, srcset, alt, pontoTuristico, source = "google_places"
+      url, alt, pontoTuristico, source = "google_places"
     } = imageData;
 
-    const {
-      width = '100%',
-      height = 'auto',
-      className = '',
-      showCredits = true,
-      lazy = true
-    } = options;
+    const { width = '100%', height = 'auto', className = '', showCredits = true } = options;
 
     const box = document.createElement('div');
     box.className = `image-container ${className}`;
@@ -120,16 +109,11 @@ window.BENETRIP_IMAGES = {
 
     const img = document.createElement('img');
     img.src = url;
-    if (srcset) img.setAttribute('srcset', srcset);
-    img.alt = alt || `Imagem de ${pontoTuristico || 'destino'}`;
-    img.loading = lazy ? 'lazy' : 'eager';
+    img.alt = alt;
+    img.loading = 'lazy';
     img.style.width = '100%';
     img.style.height = '100%';
     img.style.objectFit = 'cover';
-    img.onerror = () => {
-      img.style.filter = 'grayscale(1)';
-      img.style.opacity = 0.5;
-    };
 
     box.appendChild(img);
 
