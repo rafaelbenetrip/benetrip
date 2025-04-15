@@ -394,27 +394,6 @@ function filtrarVoosSimulado(propostas, filtros) {
             }
         }
         
-        // Filtro de duração máxima
-        if (filtros.duracaoMaxima && filtros.duracaoMaxima < 24) {
-            const infoIda = window.BENETRIP_VOOS.obterInfoSegmento(voo.segment?.[0]);
-            if (infoIda && infoIda.duracao) {
-                const duracaoHoras = infoIda.duracao / 60;
-                if (duracaoHoras > filtros.duracaoMaxima) {
-                    return false;
-                }
-            }
-        }
-        
-        // Filtro de preço máximo
-        if (filtros.precoMaximo && filtros.precoMaximo < 100) {
-            const precoVoo = window.BENETRIP_VOOS.obterPrecoVoo(voo);
-            const precoMaximoValor = calcularPrecoMaximoReal(filtros.precoMaximo);
-            
-            if (precoVoo > precoMaximoValor) {
-                return false;
-            }
-        }
-        
         // Filtro de companhias aéreas
         if (filtros.companhias && filtros.companhias.length > 0) {
             const companhiasVoo = voo.carriers || [];
@@ -454,7 +433,6 @@ function filtrarVoosSimulado(propostas, filtros) {
         return true;
     });
 }
-
 // Função auxiliar para calcular o preço máximo real com base no percentual do slider
 function calcularPrecoMaximoReal(percentual) {
     if (!window.BENETRIP_VOOS?.resultadosOriginais?.proposals) {
@@ -735,33 +713,24 @@ function carregarFiltrosSalvos() {
 // Coleta os filtros atuais do modal
 function coletarFiltrosAtuais() {
     try {
-        // Coleta os filtros básicos
+        // Coleta apenas os filtros que permaneceram
         const voosDiretos = document.getElementById('filtro-voos-diretos')?.checked || false;
         
-        // Agora coleta separadamente para ida e volta
+        // Horários de IDA
         const partidaIdaMin = parseInt(document.getElementById('partida-ida-slider-min')?.value || 0);
         const partidaIdaMax = parseInt(document.getElementById('partida-ida-slider-max')?.value || 1439);
         
         const chegadaIdaMin = parseInt(document.getElementById('chegada-ida-slider-min')?.value || 0);
         const chegadaIdaMax = parseInt(document.getElementById('chegada-ida-slider-max')?.value || 1439);
         
+        // Horários de VOLTA
         const partidaVoltaMin = parseInt(document.getElementById('partida-volta-slider-min')?.value || 0);
         const partidaVoltaMax = parseInt(document.getElementById('partida-volta-slider-max')?.value || 1439);
         
         const chegadaVoltaMin = parseInt(document.getElementById('chegada-volta-slider-min')?.value || 0);
         const chegadaVoltaMax = parseInt(document.getElementById('chegada-volta-slider-max')?.value || 1439);
         
-        // Compatibilidade com versão anterior
-        const partidaMin = parseInt(document.getElementById('partida-slider-min')?.value || 0);
-        const partidaMax = parseInt(document.getElementById('partida-slider-max')?.value || 1439);
-        
-        const chegadaMin = parseInt(document.getElementById('chegada-slider-min')?.value || 0);
-        const chegadaMax = parseInt(document.getElementById('chegada-slider-max')?.value || 1439);
-        
-        const duracaoMaxima = parseInt(document.getElementById('duracao-slider')?.value || 24);
-        
-        const precoMaximo = parseInt(document.getElementById('preco-slider')?.value || 100);
-        
+        // Companhias e aeroportos
         const companhias = Array.from(document.querySelectorAll('.filtro-companhia:checked'))
             .map(checkbox => checkbox.value);
             
@@ -775,10 +744,6 @@ function coletarFiltrosAtuais() {
             horarioChegadaIda: { min: chegadaIdaMin, max: chegadaIdaMax },
             horarioPartidaVolta: { min: partidaVoltaMin, max: partidaVoltaMax },
             horarioChegadaVolta: { min: chegadaVoltaMin, max: chegadaVoltaMax },
-            horarioPartida: { min: partidaMin, max: partidaMax }, // compatibilidade
-            horarioChegada: { min: chegadaMin, max: chegadaMax }, // compatibilidade
-            duracaoMaxima,
-            precoMaximo,
             companhias,
             aeroportos
         };
@@ -787,7 +752,6 @@ function coletarFiltrosAtuais() {
         return {};
     }
 }
-
 // Salva os filtros atuais no localStorage
 function salvarFiltrosAtuais() {
     try {
@@ -827,14 +791,6 @@ function atualizarContadorFiltros() {
     if (filtros.horarioPartidaVolta.min > 0 || filtros.horarioPartidaVolta.max < 1439) count++;
     if (filtros.horarioChegadaVolta.min > 0 || filtros.horarioChegadaVolta.max < 1439) count++;
     
-    // Compatibilidade com versão anterior
-    if (filtros.horarioPartida.min > 0 || filtros.horarioPartida.max < 1439) count++;
-    if (filtros.horarioChegada.min > 0 || filtros.horarioChegada.max < 1439) count++;
-    
-    if (filtros.duracaoMaxima < 24) count++;
-    
-    if (filtros.precoMaximo < 100) count++;
-    
     if (filtros.companhias.length > 0) count++;
     
     if (filtros.aeroportos.length > 0) count++;
@@ -845,7 +801,6 @@ function atualizarContadorFiltros() {
     // Também atualiza a pré-visualização dos resultados
     atualizarPreviewResultadosFiltrados();
 }
-
 // Atualiza o badge no botão de filtros
 function atualizarBadgeFiltros() {
     const badge = document.getElementById('filtros-badge');
@@ -865,12 +820,6 @@ function atualizarBadgeFiltros() {
         if (filtros.horarioPartidaVolta && (filtros.horarioPartidaVolta.min > 0 || filtros.horarioPartidaVolta.max < 1439)) count++;
         if (filtros.horarioChegadaVolta && (filtros.horarioChegadaVolta.min > 0 || filtros.horarioChegadaVolta.max < 1439)) count++;
         
-        // Compatibilidade com versão anterior
-        if (filtros.horarioPartida && (filtros.horarioPartida.min > 0 || filtros.horarioPartida.max < 1439)) count++;
-        if (filtros.horarioChegada && (filtros.horarioChegada.min > 0 || filtros.horarioChegada.max < 1439)) count++;
-        
-        if (filtros.duracaoMaxima && filtros.duracaoMaxima < 24) count++;
-        if (filtros.precoMaximo && filtros.precoMaximo < 100) count++;
         if (filtros.companhias && filtros.companhias.length) count++;
         if (filtros.aeroportos && filtros.aeroportos.length) count++;
         
@@ -885,7 +834,6 @@ function atualizarBadgeFiltros() {
         badge.style.display = 'none';
     }
 }
-
 // Atualiza os contadores de resultados totais
 function atualizarContadoresResultados() {
     if (!window.BENETRIP_VOOS?.finalResults?.proposals) {
@@ -1202,7 +1150,7 @@ function preencherOpcoesAeroportos() {
 
 // Limpa todos os filtros
 function limparFiltros() {
-    // Reseta todos os filtros
+    // Reseta voos diretos
     document.getElementById('filtro-voos-diretos').checked = false;
     
     // Limpar sliders de IDA
@@ -1231,32 +1179,9 @@ function limparFiltros() {
         atualizarSliderChegadaVolta();
     }
     
-    // Compatibilidade com versão anterior
-    if (document.getElementById('partida-slider-min')) {
-        document.getElementById('partida-slider-min').value = 0;
-        document.getElementById('partida-slider-max').value = 1439;
-        atualizarSliderPartida();
-    }
-    
-    if (document.getElementById('chegada-slider-min')) {
-        document.getElementById('chegada-slider-min').value = 0;
-        document.getElementById('chegada-slider-max').value = 1439;
-        atualizarSliderChegada();
-    }
-    
-    document.getElementById('duracao-slider').value = 24;
-    atualizarSliderDuracao();
-    
-    document.getElementById('preco-slider').value = 100;
-    atualizarSliderPreco();
-    
+    // Limpar companhias e aeroportos
     document.querySelectorAll('.filtro-companhia, .filtro-aeroporto').forEach(checkbox => {
         checkbox.checked = false;
-    });
-    
-    // Remove os filtros rápidos ativos
-    document.querySelectorAll('.filtro-rapido.active').forEach(btn => {
-        btn.classList.remove('active');
     });
     
     // Atualiza contador
