@@ -103,6 +103,99 @@
             margin-left: 16px;
             padding: 4px 8px;
         }
+
+        /* Estilos para dual sliders de horário */
+        .range-slider {
+          position: relative;
+          height: 40px;
+          padding: 0;
+          margin: 10px 0;
+        }
+
+        .range-values {
+          display: flex;
+          justify-content: space-between;
+          margin-bottom: 8px;
+          font-size: 14px;
+          font-weight: 500;
+          color: #666;
+        }
+
+        .slider-track {
+          position: absolute;
+          width: calc(100% - 10px);
+          height: 6px;
+          background-color: #e0e0e0;
+          border-radius: 3px;
+          left: 5px;
+          top: 50%;
+          transform: translateY(-50%);
+        }
+
+        input[type="range"].range-slider-min,
+        input[type="range"].range-slider-max {
+          position: absolute;
+          width: 100%;
+          height: 0;
+          background: none;
+          -webkit-appearance: none;
+          pointer-events: none;
+          z-index: 3;
+          top: 50%;
+          transform: translateY(-50%);
+        }
+
+        input[type="range"].range-slider-min::-webkit-slider-thumb,
+        input[type="range"].range-slider-max::-webkit-slider-thumb {
+          -webkit-appearance: none;
+          width: 18px;
+          height: 18px;
+          border-radius: 50%;
+          background: #E87722;
+          border: 2px solid white;
+          box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+          cursor: pointer;
+          pointer-events: auto;
+          z-index: 5;
+        }
+
+        input[type="range"].range-slider-min::-moz-range-thumb,
+        input[type="range"].range-slider-max::-moz-range-thumb {
+          width: 18px;
+          height: 18px;
+          border-radius: 50%;
+          background: #E87722;
+          border: 2px solid white;
+          box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+          cursor: pointer;
+          pointer-events: auto;
+          z-index: 5;
+        }
+
+        /* Estilo para tabs de ida/volta */
+        .filtro-por-tabs {
+          display: flex;
+          background-color: #f5f5f5;
+          border-radius: 20px;
+          padding: 4px;
+          margin: 15px 0;
+        }
+
+        .filtro-tab {
+          flex: 1;
+          text-align: center;
+          padding: 8px 12px;
+          border-radius: 16px;
+          font-size: 14px;
+          font-weight: 500;
+          cursor: pointer;
+          transition: all 0.2s ease;
+        }
+
+        .filtro-tab.active {
+          background-color: #E87722;
+          color: white;
+        }
     </style>
 </head>
 <body class="mobile-optimized">
@@ -118,172 +211,176 @@
         
         <button class="customize-search-button">
             <!-- SVG engrenagem -->
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle> <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
-            Personalizar Minha Busca
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 8h16M8 4v8M12 4v8M16 4v8"/></svg>
+            Filtrar Voos
+            <span id="filtros-badge" class="filtros-badge" style="display: none;">0</span>
         </button>
 
-        <!-- MODAL DE FILTROS AJUSTADO CONFORME SOLICITAÇÃO -->
-        <!-- Substitua todo o conteúdo do div id="modal-filtros" pelo código abaixo -->
-<div id="modal-filtros" class="modal-backdrop" style="display:none;" 
-     role="dialog" aria-labelledby="filtros-titulo" aria-modal="true">
-    <div class="modal-content modal-filtros">
-        <!-- Cabeçalho Modal -->
-        <div class="modal-header">
-            <h3 class="modal-title" id="filtros-titulo">Personalizar Busca</h3>
-            <button id="btn-fechar-filtros" class="btn-fechar" aria-label="Fechar">
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
-                    <line x1="18" y1="6" x2="6" y2="18"></line>
-                    <line x1="6" y1="6" x2="18" y2="18"></line>
-                </svg>
-            </button>
-        </div>
-        
-        <!-- Conteúdo dos Filtros Simplificado -->
-        <div class="filtros-content">
-            <!-- Voos diretos apenas -->
-            <div class="filtro-item">
-                <div class="filtro-label">
-                    <span class="filtro-icone">✈️</span>
-                    <span>Voos diretos apenas</span>
+        <!-- MODAL DE FILTROS AJUSTADO -->
+        <div id="modal-filtros" class="modal-backdrop" style="display:none;" 
+             role="dialog" aria-labelledby="filtros-titulo" aria-modal="true">
+            <div class="modal-content modal-filtros">
+                <!-- Cabeçalho Modal -->
+                <div class="modal-header">
+                    <h3 class="modal-title" id="filtros-titulo">Personalizar Busca</h3>
+                    <button id="btn-fechar-filtros" class="btn-fechar" aria-label="Fechar">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                        </svg>
+                    </button>
                 </div>
-                <div class="filtro-control">
-                    <label class="switch" for="filtro-voos-diretos">
-                        <input type="checkbox" id="filtro-voos-diretos" aria-label="Filtrar apenas voos diretos">
-                        <span class="slider round"></span>
-                    </label>
-                </div>
-            </div>
-
-            <!-- TABS DE FILTRO DE VIAGEM -->
-            <div class="filtro-viagem-tabs">
-                <div class="filtro-tab-header">
-                    <h4>Filtrar por:</h4>
-                    <div class="filtro-tab-buttons">
-                        <button class="filtro-tab-btn active" data-target="ida">Voo de Ida</button>
-                        <button class="filtro-tab-btn" data-target="volta">Voo de Volta</button>
+                
+                <!-- Conteúdo dos Filtros Simplificado -->
+                <div class="filtros-content">
+                    <!-- Voos diretos apenas -->
+                    <div class="filtro-item">
+                        <div class="filtro-label">
+                            <span class="filtro-icone">✈️</span>
+                            <span>Voos diretos apenas</span>
+                        </div>
+                        <div class="filtro-control">
+                            <label class="switch" for="filtro-voos-diretos">
+                                <input type="checkbox" id="filtro-voos-diretos" aria-label="Filtrar apenas voos diretos">
+                                <span class="slider round"></span>
+                            </label>
+                        </div>
                     </div>
-                </div>
-                <div class="filtro-tab-content">
-                    <!-- TAB IDA -->
-                    <div class="filtro-tab-pane active" id="tab-ida">
-                        <!-- Horário de Partida -->
-<div class="filtro-item">
-    <div class="filtro-label">
-        <span class="filtro-icone">🛫</span>
-        <span>Horário de Partida</span>
-    </div>
-    <div class="filtro-control range-slider">
-        <div class="range-values">
-            <span id="partida-min">00:00</span> - <span id="partida-max">23:59</span>
-        </div>
-        <div class="slider-track"></div>
-        <input type="range" id="partida-slider-min" min="0" max="1439" value="0" class="range-slider-min" aria-label="Horário mínimo de partida">
-        <input type="range" id="partida-slider-max" min="0" max="1439" value="1439" class="range-slider-max" aria-label="Horário máximo de partida">
-    </div>
-</div>
 
-<!-- Horário de Chegada -->
-<div class="filtro-item">
-    <div class="filtro-label">
-        <span class="filtro-icone">🛬</span>
-        <span>Horário de Chegada</span>
-    </div>
-    <div class="filtro-control range-slider">
-        <div class="range-values">
-            <span id="chegada-min">00:00</span> - <span id="chegada-max">23:59</span>
-        </div>
-        <div class="slider-track"></div>
-        <input type="range" id="chegada-slider-min" min="0" max="1439" value="0" class="range-slider-min" aria-label="Horário mínimo de chegada">
-        <input type="range" id="chegada-slider-max" min="0" max="1439" value="1439" class="range-slider-max" aria-label="Horário máximo de chegada">
-    </div>
-</div>
+                    <!-- Filtrar por: Ida/Volta -->
+                    <div class="filtro-item">
+                        <div class="filtro-label">Filtrar por:</div>
+                        <div class="filtro-por-tabs">
+                            <div class="filtro-tab active" data-target="ida">Voo de Ida</div>
+                            <div class="filtro-tab" data-target="volta">Voo de Volta</div>
+                        </div>
+                    </div>
 
+                    <!-- Container para tabs -->
+                    <div class="filtro-tab-container">
+                        <!-- Tab Ida (visível por padrão) -->
+                        <div class="filtro-tab-content" id="tab-ida" style="display: block;">
+                            <!-- Horário de Partida -->
+                            <div class="filtro-item">
+                                <div class="filtro-label">
+                                    <span class="filtro-icone">🛫</span>
+                                    <span>Horário de Partida</span>
+                                </div>
+                                <div class="filtro-control range-slider">
+                                    <div class="range-values">
+                                        <span id="partida-ida-min">00:00</span> - 
+                                        <span id="partida-ida-max">23:59</span>
+                                    </div>
+                                    <div class="slider-track"></div>
+                                    <input type="range" id="partida-ida-slider-min" min="0" max="1439" value="0" class="range-slider-min" aria-label="Horário mínimo de partida">
+                                    <input type="range" id="partida-ida-slider-max" min="0" max="1439" value="1439" class="range-slider-max" aria-label="Horário máximo de partida">
+                                </div>
+                            </div>
+                            
+                            <!-- Horário de Chegada -->
+                            <div class="filtro-item">
+                                <div class="filtro-label">
+                                    <span class="filtro-icone">🛬</span>
+                                    <span>Horário de Chegada</span>
+                                </div>
+                                <div class="filtro-control range-slider">
+                                    <div class="range-values">
+                                        <span id="chegada-ida-min">00:00</span> - 
+                                        <span id="chegada-ida-max">23:59</span>
+                                    </div>
+                                    <div class="slider-track"></div>
+                                    <input type="range" id="chegada-ida-slider-min" min="0" max="1439" value="0" class="range-slider-min" aria-label="Horário mínimo de chegada">
+                                    <input type="range" id="chegada-ida-slider-max" min="0" max="1439" value="1439" class="range-slider-max" aria-label="Horário máximo de chegada">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Tab Volta (oculto por padrão) -->
+                        <div class="filtro-tab-content" id="tab-volta" style="display: none;">
+                            <!-- Horário de Partida -->
+                            <div class="filtro-item">
+                                <div class="filtro-label">
+                                    <span class="filtro-icone">🛫</span>
+                                    <span>Horário de Partida</span>
+                                </div>
+                                <div class="filtro-control range-slider">
+                                    <div class="range-values">
+                                        <span id="partida-volta-min">00:00</span> - 
+                                        <span id="partida-volta-max">23:59</span>
+                                    </div>
+                                    <div class="slider-track"></div>
+                                    <input type="range" id="partida-volta-slider-min" min="0" max="1439" value="0" class="range-slider-min" aria-label="Horário mínimo de partida">
+                                    <input type="range" id="partida-volta-slider-max" min="0" max="1439" value="1439" class="range-slider-max" aria-label="Horário máximo de partida">
+                                </div>
+                            </div>
+                            
+                            <!-- Horário de Chegada -->
+                            <div class="filtro-item">
+                                <div class="filtro-label">
+                                    <span class="filtro-icone">🛬</span>
+                                    <span>Horário de Chegada</span>
+                                </div>
+                                <div class="filtro-control range-slider">
+                                    <div class="range-values">
+                                        <span id="chegada-volta-min">00:00</span> - 
+                                        <span id="chegada-volta-max">23:59</span>
+                                    </div>
+                                    <div class="slider-track"></div>
+                                    <input type="range" id="chegada-volta-slider-min" min="0" max="1439" value="0" class="range-slider-min" aria-label="Horário mínimo de chegada">
+                                    <input type="range" id="chegada-volta-slider-max" min="0" max="1439" value="1439" class="range-slider-max" aria-label="Horário máximo de chegada">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                     
-                    <!-- TAB VOLTA -->
-                    <div class="filtro-tab-pane" id="tab-volta">
-                        <!-- Horário de Partida -->
-<div class="filtro-item">
-    <div class="filtro-label">
-        <span class="filtro-icone">🛫</span>
-        <span>Horário de Partida</span>
-    </div>
-    <div class="filtro-control range-slider">
-        <div class="range-values">
-            <span id="partida-min">00:00</span> - <span id="partida-max">23:59</span>
-        </div>
-        <div class="slider-track"></div>
-        <input type="range" id="partida-slider-min" min="0" max="1439" value="0" class="range-slider-min" aria-label="Horário mínimo de partida">
-        <input type="range" id="partida-slider-max" min="0" max="1439" value="1439" class="range-slider-max" aria-label="Horário máximo de partida">
-    </div>
-</div>
-
-<!-- Horário de Chegada -->
-<div class="filtro-item">
-    <div class="filtro-label">
-        <span class="filtro-icone">🛬</span>
-        <span>Horário de Chegada</span>
-    </div>
-    <div class="filtro-control range-slider">
-        <div class="range-values">
-            <span id="chegada-min">00:00</span> - <span id="chegada-max">23:59</span>
-        </div>
-        <div class="slider-track"></div>
-        <input type="range" id="chegada-slider-min" min="0" max="1439" value="0" class="range-slider-min" aria-label="Horário mínimo de chegada">
-        <input type="range" id="chegada-slider-max" min="0" max="1439" value="1439" class="range-slider-max" aria-label="Horário máximo de chegada">
-    </div>
-</div>
+                    <!-- Companhias aéreas -->
+                    <div class="filtro-item filtro-expandivel">
+                        <div class="filtro-header" aria-expanded="false" aria-controls="companhias-content">
+                            <div class="filtro-label">
+                                <span class="filtro-icone">🛫</span>
+                                <span>Companhias Aéreas</span>
+                            </div>
+                            <div class="filtro-toggle">▼</div>
+                        </div>
+                        <div class="filtro-expandivel-content" id="companhias-content" data-carregado="false">
+                            <div class="loading-placeholder">Carregando companhias...</div>
+                        </div>
                     </div>
-                </div> <!-- fim filtro-tab-content -->
-            </div> <!-- fim filtro-viagem-tabs (TABS) -->
-            
-            <!-- Companhias aéreas -->
-            <div class="filtro-item filtro-expandivel">
-                <div class="filtro-header" aria-expanded="false" aria-controls="companhias-content">
-                    <div class="filtro-label">
-                        <span class="filtro-icone">🛫</span>
-                        <span>Companhias Aéreas</span>
+                    
+                    <!-- Aeroportos -->
+                    <div class="filtro-item filtro-expandivel">
+                        <div class="filtro-header" aria-expanded="false" aria-controls="aeroportos-content">
+                            <div class="filtro-label">
+                                <span class="filtro-icone">🏢</span>
+                                <span>Aeroportos</span>
+                            </div>
+                            <div class="filtro-toggle">▼</div>
+                        </div>
+                        <div class="filtro-expandivel-content" id="aeroportos-content" data-carregado="false">
+                            <div class="loading-placeholder">Carregando aeroportos...</div>
+                        </div>
                     </div>
-                    <div class="filtro-toggle">▼</div>
                 </div>
-                <div class="filtro-expandivel-content" id="companhias-content" data-carregado="false">
-                    <div class="loading-placeholder">Carregando companhias...</div>
-                </div>
-            </div>
-            
-            <!-- Aeroportos -->
-            <div class="filtro-item filtro-expandivel">
-                <div class="filtro-header" aria-expanded="false" aria-controls="aeroportos-content">
-                    <div class="filtro-label">
-                        <span class="filtro-icone">🏢</span>
-                        <span>Aeroportos</span>
+                
+                <!-- Resumo & Aplicar -->
+                <div class="resumo-filtros">
+                    <div class="resultados-preview">
+                        <span id="total-resultados-filtrados">0</span> de <span id="total-resultados">0</span> voos
                     </div>
-                    <div class="filtro-toggle">▼</div>
                 </div>
-                <div class="filtro-expandivel-content" id="aeroportos-content" data-carregado="false">
-                    <div class="loading-placeholder">Carregando aeroportos...</div>
+                
+                <!-- Footer Modal -->
+                <div class="modal-footer">
+                    <button class="modal-btn modal-btn-secondary" id="btn-limpar-filtros">
+                        Limpar Filtros
+                    </button>
+                    <button class="modal-btn modal-btn-primary" id="btn-aplicar-filtros">
+                        Aplicar Filtros
+                        <span class="badge" id="filtros-count">0</span>
+                    </button>
                 </div>
             </div>
         </div>
-        
-        <!-- Resumo & Aplicar -->
-        <div class="resumo-filtros">
-            <div class="resultados-preview">
-                <span id="total-resultados-filtrados">0</span> de <span id="total-resultados">0</span> voos
-            </div>
-        </div>
-        
-        <!-- Footer Modal -->
-        <div class="modal-footer">
-            <button class="modal-btn modal-btn-secondary" id="btn-limpar-filtros">
-                Limpar Filtros
-            </button>
-            <button class="modal-btn modal-btn-primary" id="btn-aplicar-filtros">
-                Aplicar Filtros
-                <span class="badge" id="filtros-count">0</span>
-            </button>
-        </div>
-    </div>
-</div>
         
         <!-- Template estado vazio -->
         <template id="template-sem-resultados">
@@ -294,6 +391,7 @@
                 <button class="btn-limpar-filtros-todos">Limpar Todos os Filtros</button>
             </div>
         </template>
+        
         <!-- Conteúdo dinâmico do sistema de voos -->
         <main class="voos-content">
             <div class="loading-container">
@@ -307,46 +405,11 @@
                 </div>
             </div>
         </main>
+        
         <div class="botao-selecao-fixo">
             <button class="btn-selecionar-voo">
                 <span>Escolher Voo</span>
                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"></path></svg>
-            </button>
-        </div>
-    </div>
-
-<!-- Template para estado vazio de resultados -->
-<template id="template-sem-resultados">
-    <div class="filtro-sem-resultados">
-        <img src="assets/images/tripinha/avatar-triste.png" alt="Tripinha">
-        <h3>Nenhum voo corresponde aos filtros selecionados</h3>
-        <p>Tente ajustar ou remover alguns filtros</p>
-        <button class="btn-limpar-filtros-todos">Limpar Todos os Filtros</button>
-    </div>
-</template>
-        
-        <!-- O conteúdo será carregado dinamicamente pelo script flights.js -->
-        <main class="voos-content">
-            <!-- Inicial loading state -->
-            <div class="loading-container">
-                <img src="assets/images/tripinha/loading2.png" alt="Tripinha carregando" class="loading-avatar">
-                <div class="loading-text">Farejando os melhores voos para você...</div>
-                <div class="progress-bar-container">
-                    <div class="progress-bar" role="progressbar" style="width: 10%;" aria-valuenow="10" aria-valuemin="0" aria-valuemax="100"></div>
-                </div>
-                <div class="loading-tips">
-                    <p>💡 Dica: Voos diretos aparecem destacados em azul!</p>
-                </div>
-            </div>
-        </main>
-        
-        <!-- Botão fixo de seleção -->
-        <div class="botao-selecao-fixo">
-            <button class="btn-selecionar-voo">
-                <span>Escolher Voo</span>
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M5 12h14M12 5l7 7-7 7"></path>
-                </svg>
             </button>
         </div>
     </div>
@@ -376,11 +439,140 @@
     <script src="assets/js/flight-redirect.js"></script>
     <script src="assets/js/voos-interface.js"></script>
     
-    <!-- Script simplificado de inicialização -->
+    <!-- Script adicional para os sliders -->
     <script>
+    // Funções para os sliders de horário
+    function inicializarSlidersHorario() {
+        // Inicializar sliders de partida IDA
+        atualizarSliderPartidaIda();
+        document.getElementById('partida-ida-slider-min').addEventListener('input', atualizarSliderPartidaIda);
+        document.getElementById('partida-ida-slider-max').addEventListener('input', atualizarSliderPartidaIda);
+        
+        // Inicializar sliders de chegada IDA
+        atualizarSliderChegadaIda();
+        document.getElementById('chegada-ida-slider-min').addEventListener('input', atualizarSliderChegadaIda);
+        document.getElementById('chegada-ida-slider-max').addEventListener('input', atualizarSliderChegadaIda);
+        
+        // Inicializar sliders de partida VOLTA
+        atualizarSliderPartidaVolta();
+        document.getElementById('partida-volta-slider-min').addEventListener('input', atualizarSliderPartidaVolta);
+        document.getElementById('partida-volta-slider-max').addEventListener('input', atualizarSliderPartidaVolta);
+        
+        // Inicializar sliders de chegada VOLTA
+        atualizarSliderChegadaVolta();
+        document.getElementById('chegada-volta-slider-min').addEventListener('input', atualizarSliderChegadaVolta);
+        document.getElementById('chegada-volta-slider-max').addEventListener('input', atualizarSliderChegadaVolta);
+        
+        // Inicializar tabs de Ida/Volta
+        document.querySelectorAll('.filtro-tab').forEach(tab => {
+            tab.addEventListener('click', function() {
+                // Remover classe active de todas as tabs
+                document.querySelectorAll('.filtro-tab').forEach(t => t.classList.remove('active'));
+                // Adicionar classe active à tab clicada
+                this.classList.add('active');
+                
+                // Ocultar todos os conteúdos de tab
+                document.querySelectorAll('.filtro-tab-content').forEach(content => {
+                    content.style.display = 'none';
+                });
+                
+                // Mostrar o conteúdo relacionado à tab clicada
+                const targetId = 'tab-' + this.dataset.target;
+                document.getElementById(targetId).style.display = 'block';
+            });
+        });
+    }
+
+    function atualizarSliderPartidaIda() {
+        const min = parseInt(document.getElementById('partida-ida-slider-min').value);
+        const max = parseInt(document.getElementById('partida-ida-slider-max').value);
+        
+        // Garante que min não ultrapasse max
+        if (min > max) {
+            document.getElementById('partida-ida-slider-min').value = max;
+        }
+        
+        // Converte minutos para formato de hora
+        const minHora = Math.floor(min / 60).toString().padStart(2, '0');
+        const minMinuto = (min % 60).toString().padStart(2, '0');
+        
+        const maxHora = Math.floor(max / 60).toString().padStart(2, '0');
+        const maxMinuto = (max % 60).toString().padStart(2, '0');
+        
+        // Atualiza os textos
+        document.getElementById('partida-ida-min').textContent = `${minHora}:${minMinuto}`;
+        document.getElementById('partida-ida-max').textContent = `${maxHora}:${maxMinuto}`;
+    }
+
+    function atualizarSliderChegadaIda() {
+        const min = parseInt(document.getElementById('chegada-ida-slider-min').value);
+        const max = parseInt(document.getElementById('chegada-ida-slider-max').value);
+        
+        // Garante que min não ultrapasse max
+        if (min > max) {
+            document.getElementById('chegada-ida-slider-min').value = max;
+        }
+        
+        // Converte minutos para formato de hora
+        const minHora = Math.floor(min / 60).toString().padStart(2, '0');
+        const minMinuto = (min % 60).toString().padStart(2, '0');
+        
+        const maxHora = Math.floor(max / 60).toString().padStart(2, '0');
+        const maxMinuto = (max % 60).toString().padStart(2, '0');
+        
+        // Atualiza os textos
+        document.getElementById('chegada-ida-min').textContent = `${minHora}:${minMinuto}`;
+        document.getElementById('chegada-ida-max').textContent = `${maxHora}:${maxMinuto}`;
+    }
+
+    function atualizarSliderPartidaVolta() {
+        const min = parseInt(document.getElementById('partida-volta-slider-min').value);
+        const max = parseInt(document.getElementById('partida-volta-slider-max').value);
+        
+        // Garante que min não ultrapasse max
+        if (min > max) {
+            document.getElementById('partida-volta-slider-min').value = max;
+        }
+        
+        // Converte minutos para formato de hora
+        const minHora = Math.floor(min / 60).toString().padStart(2, '0');
+        const minMinuto = (min % 60).toString().padStart(2, '0');
+        
+        const maxHora = Math.floor(max / 60).toString().padStart(2, '0');
+        const maxMinuto = (max % 60).toString().padStart(2, '0');
+        
+        // Atualiza os textos
+        document.getElementById('partida-volta-min').textContent = `${minHora}:${minMinuto}`;
+        document.getElementById('partida-volta-max').textContent = `${maxHora}:${maxMinuto}`;
+    }
+
+    function atualizarSliderChegadaVolta() {
+        const min = parseInt(document.getElementById('chegada-volta-slider-min').value);
+        const max = parseInt(document.getElementById('chegada-volta-slider-max').value);
+        
+        // Garante que min não ultrapasse max
+        if (min > max) {
+            document.getElementById('chegada-volta-slider-min').value = max;
+        }
+        
+        // Converte minutos para formato de hora
+        const minHora = Math.floor(min / 60).toString().padStart(2, '0');
+        const minMinuto = (min % 60).toString().padStart(2, '0');
+        
+        const maxHora = Math.floor(max / 60).toString().padStart(2, '0');
+        const maxMinuto = (max % 60).toString().padStart(2, '0');
+        
+        // Atualiza os textos
+        document.getElementById('chegada-volta-min').textContent = `${minHora}:${minMinuto}`;
+        document.getElementById('chegada-volta-max').textContent = `${maxHora}:${maxMinuto}`;
+    }
+
     // Script minimalista que apenas garante que o BENETRIP_REDIRECT seja inicializado
     document.addEventListener('DOMContentLoaded', function() {
         console.log('Inicializando sistemas...');
+        
+        // Inicializar os sliders de horário
+        inicializarSlidersHorario();
         
         // Função para exibir erros globais
         window.showGlobalError = function(message) {
