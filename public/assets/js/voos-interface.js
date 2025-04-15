@@ -334,15 +334,61 @@ function filtrarVoosSimulado(propostas, filtros) {
             if (!ehVooDireto) return false;
         }
         
-        // Filtro de horário de partida
-        if (filtros.horarioPartida && filtros.horarioPartida.min !== 0 || filtros.horarioPartida.max !== 1439) {
+        // Filtro de horário de partida IDA
+        if (filtros.horarioPartidaIda && (filtros.horarioPartidaIda.min > 0 || filtros.horarioPartidaIda.max < 1439)) {
             const infoIda = window.BENETRIP_VOOS.obterInfoSegmento(voo.segment?.[0]);
             if (infoIda && infoIda.horaPartida) {
                 const [hora, minuto] = infoIda.horaPartida.split(':').map(Number);
                 const minutosTotal = hora * 60 + minuto;
                 
-                if (minutosTotal < filtros.horarioPartida.min || 
-                    minutosTotal > filtros.horarioPartida.max) {
+                if (minutosTotal < filtros.horarioPartidaIda.min || 
+                    minutosTotal > filtros.horarioPartidaIda.max) {
+                    return false;
+                }
+            }
+        }
+        
+        // Filtro de horário de chegada IDA
+        if (filtros.horarioChegadaIda && (filtros.horarioChegadaIda.min > 0 || filtros.horarioChegadaIda.max < 1439)) {
+            const infoIda = window.BENETRIP_VOOS.obterInfoSegmento(voo.segment?.[0]);
+            if (infoIda && infoIda.horaChegada) {
+                const [hora, minuto] = infoIda.horaChegada.split(':').map(Number);
+                const minutosTotal = hora * 60 + minuto;
+                
+                if (minutosTotal < filtros.horarioChegadaIda.min || 
+                    minutosTotal > filtros.horarioChegadaIda.max) {
+                    return false;
+                }
+            }
+        }
+        
+        // Filtro de horário de partida VOLTA (se existir voo de volta)
+        if (voo.segment?.length > 1 && 
+            filtros.horarioPartidaVolta && 
+            (filtros.horarioPartidaVolta.min > 0 || filtros.horarioPartidaVolta.max < 1439)) {
+            const infoVolta = window.BENETRIP_VOOS.obterInfoSegmento(voo.segment[1]);
+            if (infoVolta && infoVolta.horaPartida) {
+                const [hora, minuto] = infoVolta.horaPartida.split(':').map(Number);
+                const minutosTotal = hora * 60 + minuto;
+                
+                if (minutosTotal < filtros.horarioPartidaVolta.min || 
+                    minutosTotal > filtros.horarioPartidaVolta.max) {
+                    return false;
+                }
+            }
+        }
+        
+        // Filtro de horário de chegada VOLTA (se existir voo de volta)
+        if (voo.segment?.length > 1 && 
+            filtros.horarioChegadaVolta && 
+            (filtros.horarioChegadaVolta.min > 0 || filtros.horarioChegadaVolta.max < 1439)) {
+            const infoVolta = window.BENETRIP_VOOS.obterInfoSegmento(voo.segment[1]);
+            if (infoVolta && infoVolta.horaChegada) {
+                const [hora, minuto] = infoVolta.horaChegada.split(':').map(Number);
+                const minutosTotal = hora * 60 + minuto;
+                
+                if (minutosTotal < filtros.horarioChegadaVolta.min || 
+                    minutosTotal > filtros.horarioChegadaVolta.max) {
                     return false;
                 }
             }
@@ -451,6 +497,120 @@ function atualizarSliderChegada() {
     document.getElementById('chegada-max').textContent = `${maxHora}:${maxMinuto}`;
 }
 
+// Função para inicializar o sistema de tabs de ida/volta
+function inicializarTabsViagem() {
+  const tabBtns = document.querySelectorAll('.filtro-tab-btn');
+  if (!tabBtns.length) return;
+  
+  tabBtns.forEach(btn => {
+    btn.addEventListener('click', function() {
+      // Remove classe ativa de todos os botões
+      tabBtns.forEach(b => b.classList.remove('active'));
+      
+      // Adiciona classe ativa ao botão clicado
+      this.classList.add('active');
+      
+      // Obtém o target do tab
+      const target = this.dataset.target;
+      
+      // Atualiza visibilidade dos painéis
+      document.querySelectorAll('.filtro-tab-pane').forEach(pane => {
+        pane.classList.remove('active');
+      });
+      
+      document.getElementById(`tab-${target}`).classList.add('active');
+      
+      // Atualiza contadores
+      atualizarContadorFiltros();
+    });
+  });
+}
+
+// Funções para atualizar os sliders de horário para ida
+function atualizarSliderPartidaIda() {
+  const min = parseInt(document.getElementById('partida-ida-slider-min').value);
+  const max = parseInt(document.getElementById('partida-ida-slider-max').value);
+  
+  // Garante que min não ultrapasse max
+  if (min > max) {
+    document.getElementById('partida-ida-slider-min').value = max;
+  }
+  
+  // Converte minutos para formato de hora
+  const minHora = Math.floor(min / 60).toString().padStart(2, '0');
+  const minMinuto = (min % 60).toString().padStart(2, '0');
+  
+  const maxHora = Math.floor(max / 60).toString().padStart(2, '0');
+  const maxMinuto = (max % 60).toString().padStart(2, '0');
+  
+  // Atualiza os textos
+  document.getElementById('partida-ida-min').textContent = `${minHora}:${minMinuto}`;
+  document.getElementById('partida-ida-max').textContent = `${maxHora}:${maxMinuto}`;
+}
+
+function atualizarSliderChegadaIda() {
+  const min = parseInt(document.getElementById('chegada-ida-slider-min').value);
+  const max = parseInt(document.getElementById('chegada-ida-slider-max').value);
+  
+  // Garante que min não ultrapasse max
+  if (min > max) {
+    document.getElementById('chegada-ida-slider-min').value = max;
+  }
+  
+  // Converte minutos para formato de hora
+  const minHora = Math.floor(min / 60).toString().padStart(2, '0');
+  const minMinuto = (min % 60).toString().padStart(2, '0');
+  
+  const maxHora = Math.floor(max / 60).toString().padStart(2, '0');
+  const maxMinuto = (max % 60).toString().padStart(2, '0');
+  
+  // Atualiza os textos
+  document.getElementById('chegada-ida-min').textContent = `${minHora}:${minMinuto}`;
+  document.getElementById('chegada-ida-max').textContent = `${maxHora}:${maxMinuto}`;
+}
+
+// Funções para atualizar os sliders de horário para volta
+function atualizarSliderPartidaVolta() {
+  const min = parseInt(document.getElementById('partida-volta-slider-min').value);
+  const max = parseInt(document.getElementById('partida-volta-slider-max').value);
+  
+  // Garante que min não ultrapasse max
+  if (min > max) {
+    document.getElementById('partida-volta-slider-min').value = max;
+  }
+  
+  // Converte minutos para formato de hora
+  const minHora = Math.floor(min / 60).toString().padStart(2, '0');
+  const minMinuto = (min % 60).toString().padStart(2, '0');
+  
+  const maxHora = Math.floor(max / 60).toString().padStart(2, '0');
+  const maxMinuto = (max % 60).toString().padStart(2, '0');
+  
+  // Atualiza os textos
+  document.getElementById('partida-volta-min').textContent = `${minHora}:${minMinuto}`;
+  document.getElementById('partida-volta-max').textContent = `${maxHora}:${maxMinuto}`;
+}
+
+function atualizarSliderChegadaVolta() {
+  const min = parseInt(document.getElementById('chegada-volta-slider-min').value);
+  const max = parseInt(document.getElementById('chegada-volta-slider-max').value);
+  
+  // Garante que min não ultrapasse max
+  if (min > max) {
+    document.getElementById('chegada-volta-slider-min').value = max;
+  }
+  
+  // Converte minutos para formato de hora
+  const minHora = Math.floor(min / 60).toString().padStart(2, '0');
+  const minMinuto = (min % 60).toString().padStart(2, '0');
+  
+  const maxHora = Math.floor(max / 60).toString().padStart(2, '0');
+  const maxMinuto = (max % 60).toString().padStart(2, '0');
+  
+  // Atualiza os textos
+  document.getElementById('chegada-volta-min').textContent = `${minHora}:${minMinuto}`;
+  document.getElementById('chegada-volta-max').textContent = `${maxHora}:${maxMinuto}`;
+}
 
 // Carrega filtros salvos no localStorage
 function carregarFiltrosSalvos() {
@@ -463,7 +623,41 @@ function carregarFiltrosSalvos() {
             voosDirectosCheckbox.checked = filtrosSalvos.voosDiretos;
         }
         
-        // Horário de partida
+        // Horários de partida/chegada IDA
+        const partidaIdaMinSlider = document.getElementById('partida-ida-slider-min');
+        const partidaIdaMaxSlider = document.getElementById('partida-ida-slider-max');
+        if (partidaIdaMinSlider && partidaIdaMaxSlider && filtrosSalvos.horarioPartidaIda) {
+            partidaIdaMinSlider.value = filtrosSalvos.horarioPartidaIda.min || 0;
+            partidaIdaMaxSlider.value = filtrosSalvos.horarioPartidaIda.max || 1439;
+            atualizarSliderPartidaIda();
+        }
+        
+        const chegadaIdaMinSlider = document.getElementById('chegada-ida-slider-min');
+        const chegadaIdaMaxSlider = document.getElementById('chegada-ida-slider-max');
+        if (chegadaIdaMinSlider && chegadaIdaMaxSlider && filtrosSalvos.horarioChegadaIda) {
+            chegadaIdaMinSlider.value = filtrosSalvos.horarioChegadaIda.min || 0;
+            chegadaIdaMaxSlider.value = filtrosSalvos.horarioChegadaIda.max || 1439;
+            atualizarSliderChegadaIda();
+        }
+        
+        // Horários de partida/chegada VOLTA
+        const partidaVoltaMinSlider = document.getElementById('partida-volta-slider-min');
+        const partidaVoltaMaxSlider = document.getElementById('partida-volta-slider-max');
+        if (partidaVoltaMinSlider && partidaVoltaMaxSlider && filtrosSalvos.horarioPartidaVolta) {
+            partidaVoltaMinSlider.value = filtrosSalvos.horarioPartidaVolta.min || 0;
+            partidaVoltaMaxSlider.value = filtrosSalvos.horarioPartidaVolta.max || 1439;
+            atualizarSliderPartidaVolta();
+        }
+        
+        const chegadaVoltaMinSlider = document.getElementById('chegada-volta-slider-min');
+        const chegadaVoltaMaxSlider = document.getElementById('chegada-volta-slider-max');
+        if (chegadaVoltaMinSlider && chegadaVoltaMaxSlider && filtrosSalvos.horarioChegadaVolta) {
+            chegadaVoltaMinSlider.value = filtrosSalvos.horarioChegadaVolta.min || 0;
+            chegadaVoltaMaxSlider.value = filtrosSalvos.horarioChegadaVolta.max || 1439;
+            atualizarSliderChegadaVolta();
+        }
+        
+        // Horário de partida (compatibilidade com versão anterior)
         const partidaMinSlider = document.getElementById('partida-slider-min');
         const partidaMaxSlider = document.getElementById('partida-slider-max');
         if (partidaMinSlider && partidaMaxSlider && filtrosSalvos.horarioPartida) {
@@ -472,7 +666,7 @@ function carregarFiltrosSalvos() {
             atualizarSliderPartida();
         }
         
-        // NOVO: Horário de chegada
+        // NOVO: Horário de chegada (compatibilidade com versão anterior)
         const chegadaMinSlider = document.getElementById('chegada-slider-min');
         const chegadaMaxSlider = document.getElementById('chegada-slider-max');
         if (chegadaMinSlider && chegadaMaxSlider && filtrosSalvos.horarioChegada) {
@@ -541,13 +735,26 @@ function carregarFiltrosSalvos() {
 // Coleta os filtros atuais do modal
 function coletarFiltrosAtuais() {
     try {
-        // Coleta os valores dos filtros
+        // Coleta os filtros básicos
         const voosDiretos = document.getElementById('filtro-voos-diretos')?.checked || false;
         
+        // Agora coleta separadamente para ida e volta
+        const partidaIdaMin = parseInt(document.getElementById('partida-ida-slider-min')?.value || 0);
+        const partidaIdaMax = parseInt(document.getElementById('partida-ida-slider-max')?.value || 1439);
+        
+        const chegadaIdaMin = parseInt(document.getElementById('chegada-ida-slider-min')?.value || 0);
+        const chegadaIdaMax = parseInt(document.getElementById('chegada-ida-slider-max')?.value || 1439);
+        
+        const partidaVoltaMin = parseInt(document.getElementById('partida-volta-slider-min')?.value || 0);
+        const partidaVoltaMax = parseInt(document.getElementById('partida-volta-slider-max')?.value || 1439);
+        
+        const chegadaVoltaMin = parseInt(document.getElementById('chegada-volta-slider-min')?.value || 0);
+        const chegadaVoltaMax = parseInt(document.getElementById('chegada-volta-slider-max')?.value || 1439);
+        
+        // Compatibilidade com versão anterior
         const partidaMin = parseInt(document.getElementById('partida-slider-min')?.value || 0);
         const partidaMax = parseInt(document.getElementById('partida-slider-max')?.value || 1439);
         
-        // NOVO: Coletar valores do horário de chegada
         const chegadaMin = parseInt(document.getElementById('chegada-slider-min')?.value || 0);
         const chegadaMax = parseInt(document.getElementById('chegada-slider-max')?.value || 1439);
         
@@ -564,8 +771,12 @@ function coletarFiltrosAtuais() {
         // Cria objeto com os filtros
         return {
             voosDiretos,
-            horarioPartida: { min: partidaMin, max: partidaMax },
-            horarioChegada: { min: chegadaMin, max: chegadaMax }, // NOVO
+            horarioPartidaIda: { min: partidaIdaMin, max: partidaIdaMax },
+            horarioChegadaIda: { min: chegadaIdaMin, max: chegadaIdaMax },
+            horarioPartidaVolta: { min: partidaVoltaMin, max: partidaVoltaMax },
+            horarioChegadaVolta: { min: chegadaVoltaMin, max: chegadaVoltaMax },
+            horarioPartida: { min: partidaMin, max: partidaMax }, // compatibilidade
+            horarioChegada: { min: chegadaMin, max: chegadaMax }, // compatibilidade
             duracaoMaxima,
             precoMaximo,
             companhias,
@@ -608,9 +819,16 @@ function atualizarContadorFiltros() {
     // Conta os filtros ativos
     if (filtros.voosDiretos) count++;
     
-    if (filtros.horarioPartida.min > 0 || filtros.horarioPartida.max < 1439) count++;
+    // Horários de IDA
+    if (filtros.horarioPartidaIda.min > 0 || filtros.horarioPartidaIda.max < 1439) count++;
+    if (filtros.horarioChegadaIda.min > 0 || filtros.horarioChegadaIda.max < 1439) count++;
     
-    // NOVO: Contar filtro de horário de chegada
+    // Horários de VOLTA
+    if (filtros.horarioPartidaVolta.min > 0 || filtros.horarioPartidaVolta.max < 1439) count++;
+    if (filtros.horarioChegadaVolta.min > 0 || filtros.horarioChegadaVolta.max < 1439) count++;
+    
+    // Compatibilidade com versão anterior
+    if (filtros.horarioPartida.min > 0 || filtros.horarioPartida.max < 1439) count++;
     if (filtros.horarioChegada.min > 0 || filtros.horarioChegada.max < 1439) count++;
     
     if (filtros.duracaoMaxima < 24) count++;
@@ -638,8 +856,19 @@ function atualizarBadgeFiltros() {
         
         let count = 0;
         if (filtros.voosDiretos) count++;
+        
+        // Horários de IDA
+        if (filtros.horarioPartidaIda && (filtros.horarioPartidaIda.min > 0 || filtros.horarioPartidaIda.max < 1439)) count++;
+        if (filtros.horarioChegadaIda && (filtros.horarioChegadaIda.min > 0 || filtros.horarioChegadaIda.max < 1439)) count++;
+        
+        // Horários de VOLTA
+        if (filtros.horarioPartidaVolta && (filtros.horarioPartidaVolta.min > 0 || filtros.horarioPartidaVolta.max < 1439)) count++;
+        if (filtros.horarioChegadaVolta && (filtros.horarioChegadaVolta.min > 0 || filtros.horarioChegadaVolta.max < 1439)) count++;
+        
+        // Compatibilidade com versão anterior
         if (filtros.horarioPartida && (filtros.horarioPartida.min > 0 || filtros.horarioPartida.max < 1439)) count++;
         if (filtros.horarioChegada && (filtros.horarioChegada.min > 0 || filtros.horarioChegada.max < 1439)) count++;
+        
         if (filtros.duracaoMaxima && filtros.duracaoMaxima < 24) count++;
         if (filtros.precoMaximo && filtros.precoMaximo < 100) count++;
         if (filtros.companhias && filtros.companhias.length) count++;
@@ -976,14 +1205,44 @@ function limparFiltros() {
     // Reseta todos os filtros
     document.getElementById('filtro-voos-diretos').checked = false;
     
-    document.getElementById('partida-slider-min').value = 0;
-    document.getElementById('partida-slider-max').value = 1439;
-    atualizarSliderPartida();
+    // Limpar sliders de IDA
+    if (document.getElementById('partida-ida-slider-min')) {
+        document.getElementById('partida-ida-slider-min').value = 0;
+        document.getElementById('partida-ida-slider-max').value = 1439;
+        atualizarSliderPartidaIda();
+    }
     
-    // NOVO: Limpar horário de chegada
-    document.getElementById('chegada-slider-min').value = 0;
-    document.getElementById('chegada-slider-max').value = 1439;
-    atualizarSliderChegada();
+    if (document.getElementById('chegada-ida-slider-min')) {
+        document.getElementById('chegada-ida-slider-min').value = 0;
+        document.getElementById('chegada-ida-slider-max').value = 1439;
+        atualizarSliderChegadaIda();
+    }
+    
+    // Limpar sliders de VOLTA
+    if (document.getElementById('partida-volta-slider-min')) {
+        document.getElementById('partida-volta-slider-min').value = 0;
+        document.getElementById('partida-volta-slider-max').value = 1439;
+        atualizarSliderPartidaVolta();
+    }
+    
+    if (document.getElementById('chegada-volta-slider-min')) {
+        document.getElementById('chegada-volta-slider-min').value = 0;
+        document.getElementById('chegada-volta-slider-max').value = 1439;
+        atualizarSliderChegadaVolta();
+    }
+    
+    // Compatibilidade com versão anterior
+    if (document.getElementById('partida-slider-min')) {
+        document.getElementById('partida-slider-min').value = 0;
+        document.getElementById('partida-slider-max').value = 1439;
+        atualizarSliderPartida();
+    }
+    
+    if (document.getElementById('chegada-slider-min')) {
+        document.getElementById('chegada-slider-min').value = 0;
+        document.getElementById('chegada-slider-max').value = 1439;
+        atualizarSliderChegada();
+    }
     
     document.getElementById('duracao-slider').value = 24;
     atualizarSliderDuracao();
@@ -1043,14 +1302,26 @@ function aplicarFiltros() {
     // Verifica se temos filtros para aplicar
     const temFiltros = (
         filtros.voosDiretos || 
-        filtros.horarioPartida.min > 0 || 
-        filtros.horarioPartida.max < 1439 ||
-        filtros.horarioChegada.min > 0 || 
-        filtros.horarioChegada.max < 1439 ||
+        // Horários de IDA
+        filtros.horarioPartidaIda?.min > 0 || 
+        filtros.horarioPartidaIda?.max < 1439 ||
+        filtros.horarioChegadaIda?.min > 0 || 
+        filtros.horarioChegadaIda?.max < 1439 ||
+        // Horários de VOLTA
+        filtros.horarioPartidaVolta?.min > 0 || 
+        filtros.horarioPartidaVolta?.max < 1439 ||
+        filtros.horarioChegadaVolta?.min > 0 || 
+        filtros.horarioChegadaVolta?.max < 1439 ||
+        // Compatibilidade com versão anterior
+        filtros.horarioPartida?.min > 0 || 
+        filtros.horarioPartida?.max < 1439 ||
+        filtros.horarioChegada?.min > 0 || 
+        filtros.horarioChegada?.max < 1439 ||
+        // Outros filtros
         filtros.duracaoMaxima < 24 ||
         filtros.precoMaximo < 100 ||
-        filtros.companhias.length > 0 ||
-        filtros.aeroportos.length > 0
+        filtros.companhias?.length > 0 ||
+        filtros.aeroportos?.length > 0
     );
     
     // Se não tem filtros, simplesmente restaura resultados originais
@@ -1107,13 +1378,27 @@ function inicializarFiltrosRapidos() {
                 case 'manha':
                     // Define horário de partida matinal (4:00-12:00)
                     if (this.classList.contains('active')) {
-                        document.getElementById('partida-slider-min').value = 4 * 60;  // 4:00
-                        document.getElementById('partida-slider-max').value = 12 * 60; // 12:00
-                        atualizarSliderPartida();
+                        // Verifica se estamos usando sliders de ida/volta ou os antigos
+                        if (document.getElementById('partida-ida-slider-min')) {
+                            document.getElementById('partida-ida-slider-min').value = 4 * 60;  // 4:00
+                            document.getElementById('partida-ida-slider-max').value = 12 * 60; // 12:00
+                            atualizarSliderPartidaIda();
+                        } else if (document.getElementById('partida-slider-min')) {
+                            document.getElementById('partida-slider-min').value = 4 * 60;  // 4:00
+                            document.getElementById('partida-slider-max').value = 12 * 60; // 12:00
+                            atualizarSliderPartida();
+                        }
                     } else {
-                        document.getElementById('partida-slider-min').value = 0;
-                        document.getElementById('partida-slider-max').value = 1439;
-                        atualizarSliderPartida();
+                        // Reseta os sliders
+                        if (document.getElementById('partida-ida-slider-min')) {
+                            document.getElementById('partida-ida-slider-min').value = 0;
+                            document.getElementById('partida-ida-slider-max').value = 1439;
+                            atualizarSliderPartidaIda();
+                        } else if (document.getElementById('partida-slider-min')) {
+                            document.getElementById('partida-slider-min').value = 0;
+                            document.getElementById('partida-slider-max').value = 1439;
+                            atualizarSliderPartida();
+                        }
                     }
                     break;
                     
@@ -1137,10 +1422,103 @@ function inicializarFiltrosRapidos() {
 
 // Configurar eventos dos filtros
 function configurarEventosFiltros() {
+    // Adicionar inicialização do sistema de tabs
+    inicializarTabsViagem();
+    
     // Filtros rápidos
     inicializarFiltrosRapidos();
     
-    // Sliders de horário de partida
+    // Sliders de horário de partida/chegada de IDA
+    const partidaIdaMinSlider = document.getElementById('partida-ida-slider-min');
+    const partidaIdaMaxSlider = document.getElementById('partida-ida-slider-max');
+    
+    if (partidaIdaMinSlider && partidaIdaMaxSlider) {
+        // Função com debounce para evitar excesso de atualizações
+        let debouncedTimerPartidaIda;
+        
+        const atualizarComDebounce = () => {
+            // Atualiza UI imediatamente
+            atualizarSliderPartidaIda();
+            
+            // Debounce para atualizar contador
+            clearTimeout(debouncedTimerPartidaIda);
+            debouncedTimerPartidaIda = setTimeout(() => {
+                atualizarContadorFiltros();
+            }, 300);
+        };
+        
+        partidaIdaMinSlider.addEventListener('input', atualizarComDebounce);
+        partidaIdaMaxSlider.addEventListener('input', atualizarComDebounce);
+    }
+    
+    const chegadaIdaMinSlider = document.getElementById('chegada-ida-slider-min');
+    const chegadaIdaMaxSlider = document.getElementById('chegada-ida-slider-max');
+    
+    if (chegadaIdaMinSlider && chegadaIdaMaxSlider) {
+        // Função com debounce para evitar excesso de atualizações
+        let debouncedTimerChegadaIda;
+        
+        const atualizarComDebounce = () => {
+            // Atualiza UI imediatamente
+            atualizarSliderChegadaIda();
+            
+            // Debounce para atualizar contador
+            clearTimeout(debouncedTimerChegadaIda);
+            debouncedTimerChegadaIda = setTimeout(() => {
+                atualizarContadorFiltros();
+            }, 300);
+        };
+        
+        chegadaIdaMinSlider.addEventListener('input', atualizarComDebounce);
+        chegadaIdaMaxSlider.addEventListener('input', atualizarComDebounce);
+    }
+    
+    // Sliders de horário de partida/chegada de VOLTA
+    const partidaVoltaMinSlider = document.getElementById('partida-volta-slider-min');
+    const partidaVoltaMaxSlider = document.getElementById('partida-volta-slider-max');
+    
+    if (partidaVoltaMinSlider && partidaVoltaMaxSlider) {
+        // Função com debounce para evitar excesso de atualizações
+        let debouncedTimerPartidaVolta;
+        
+        const atualizarComDebounce = () => {
+            // Atualiza UI imediatamente
+            atualizarSliderPartidaVolta();
+            
+            // Debounce para atualizar contador
+            clearTimeout(debouncedTimerPartidaVolta);
+            debouncedTimerPartidaVolta = setTimeout(() => {
+                atualizarContadorFiltros();
+            }, 300);
+        };
+        
+        partidaVoltaMinSlider.addEventListener('input', atualizarComDebounce);
+        partidaVoltaMaxSlider.addEventListener('input', atualizarComDebounce);
+    }
+    
+    const chegadaVoltaMinSlider = document.getElementById('chegada-volta-slider-min');
+    const chegadaVoltaMaxSlider = document.getElementById('chegada-volta-slider-max');
+    
+    if (chegadaVoltaMinSlider && chegadaVoltaMaxSlider) {
+        // Função com debounce para evitar excesso de atualizações
+        let debouncedTimerChegadaVolta;
+        
+        const atualizarComDebounce = () => {
+            // Atualiza UI imediatamente
+            atualizarSliderChegadaVolta();
+            
+            // Debounce para atualizar contador
+            clearTimeout(debouncedTimerChegadaVolta);
+            debouncedTimerChegadaVolta = setTimeout(() => {
+                atualizarContadorFiltros();
+            }, 300);
+        };
+        
+        chegadaVoltaMinSlider.addEventListener('input', atualizarComDebounce);
+        chegadaVoltaMaxSlider.addEventListener('input', atualizarComDebounce);
+    }
+    
+    // Compatibilidade com versão anterior - Sliders de horário de partida
     const partidaMinSlider = document.getElementById('partida-slider-min');
     const partidaMaxSlider = document.getElementById('partida-slider-max');
     
@@ -1180,7 +1558,7 @@ function configurarEventosFiltros() {
         });
     }
 
-    // NOVO: Sliders de horário de chegada
+    // Compatibilidade com versão anterior - Sliders de horário de chegada
     const chegadaMinSlider = document.getElementById('chegada-slider-min');
     const chegadaMaxSlider = document.getElementById('chegada-slider-max');
     
@@ -1260,6 +1638,10 @@ document.addEventListener('resultadosVoosProntos', function(event) {
         // Verifica se há filtros ativos
         const temFiltros = (
             filtrosSalvos.voosDiretos || 
+            (filtrosSalvos.horarioPartidaIda && (filtrosSalvos.horarioPartidaIda.min > 0 || filtrosSalvos.horarioPartidaIda.max < 1439)) ||
+            (filtrosSalvos.horarioChegadaIda && (filtrosSalvos.horarioChegadaIda.min > 0 || filtrosSalvos.horarioChegadaIda.max < 1439)) ||
+            (filtrosSalvos.horarioPartidaVolta && (filtrosSalvos.horarioPartidaVolta.min > 0 || filtrosSalvos.horarioPartidaVolta.max < 1439)) ||
+            (filtrosSalvos.horarioChegadaVolta && (filtrosSalvos.horarioChegadaVolta.min > 0 || filtrosSalvos.horarioChegadaVolta.max < 1439)) ||
             (filtrosSalvos.horarioPartida && (filtrosSalvos.horarioPartida.min > 0 || filtrosSalvos.horarioPartida.max < 1439)) ||
             (filtrosSalvos.horarioChegada && (filtrosSalvos.horarioChegada.min > 0 || filtrosSalvos.horarioChegada.max < 1439)) ||
             (filtrosSalvos.duracaoMaxima && filtrosSalvos.duracaoMaxima < 24) ||
@@ -1556,7 +1938,6 @@ function mostrarDetalhesVoo(vooId) {
                 <div class="servico-item incluido">
                     <span class="servico-icone">🧳</span>
                     <span class="servico-nome">1 Bagagem de Mão</span>
-                </div>
                 <div class="servico-item incluido">
                     <span class="servico-icone">🍽️</span>
                     <span class="servico-nome">Refeição a Bordo</span>
