@@ -716,7 +716,7 @@ function atualizarSliderPreco() {
     if (valor >= 100) {
         precoElement.textContent = 'Qualquer';
     } else {
-        // Se temos dados de voos, calcula o preço real
+        // Calcula o preço real com base no percentual
         if (window.BENETRIP_VOOS?.resultadosOriginais?.proposals) {
             const precoReal = calcularPrecoMaximoReal(valor);
             const moeda = window.BENETRIP_VOOS.obterMoedaAtual();
@@ -730,20 +730,7 @@ function atualizarSliderPreco() {
             
             precoElement.textContent = `Até ${formattedPrice}`;
         } else {
-            // Valor estimado quando não temos dados
-            // Criamos um range de preço aproximado baseado na porcentagem
-            const precoBase = 10000; // Valor base aproximado
-            const precoEstimado = precoBase * (valor / 100);
-            const moeda = 'BRL'; // Moeda padrão
-            
-            const formattedPrice = new Intl.NumberFormat('pt-BR', { 
-                style: 'currency', 
-                currency: moeda, 
-                minimumFractionDigits: 0, 
-                maximumFractionDigits: 0 
-            }).format(precoEstimado);
-            
-            precoElement.textContent = `Aprox. ${formattedPrice}`;
+            precoElement.textContent = `${valor}%`;
         }
     }
 }
@@ -1289,14 +1276,6 @@ document.addEventListener('resultadosVoosProntos', function(event) {
                     }, 1000);
                 }
             }
-        }
-        
-        // ADICIONAR AQUI: Atualiza os sliders com dados reais
-        if (document.getElementById('preco-slider')) {
-            setTimeout(() => {
-                atualizarSliderPreco();
-                console.log('Slider de preço atualizado com dados reais');
-            }, 100);
         }
     }, 500);
 });
