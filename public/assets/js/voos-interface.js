@@ -1320,6 +1320,61 @@ function inicializarFiltrosRapidos() {
     });
 }
 
+// Função para inicializar os sliders de horário
+function inicializarSlidersHorario() {
+    // Inicializar sliders de partida
+    atualizarSliderPartida();
+    // Adicionar eventos aos sliders de partida
+    document.getElementById('partida-slider-min').addEventListener('input', atualizarSliderPartida);
+    document.getElementById('partida-slider-max').addEventListener('input', atualizarSliderPartida);
+    
+    // Inicializar sliders de chegada
+    atualizarSliderChegada();
+    // Adicionar eventos aos sliders de chegada
+    document.getElementById('chegada-slider-min').addEventListener('input', atualizarSliderChegada);
+    document.getElementById('chegada-slider-max').addEventListener('input', atualizarSliderChegada);
+}
+
+// Função para atualizar o slider de partida
+function atualizarSliderPartida() {
+    const min = parseInt(document.getElementById('partida-slider-min').value);
+    const max = parseInt(document.getElementById('partida-slider-max').value);
+    
+    // Convertendo minutos para formato de horas
+    const minHours = Math.floor(min / 60);
+    const minMinutes = min % 60;
+    const maxHours = Math.floor(max / 60);
+    const maxMinutes = max % 60;
+    
+    // Formatando para exibição
+    const minFormatted = `${String(minHours).padStart(2, '0')}:${String(minMinutes).padStart(2, '0')}`;
+    const maxFormatted = `${String(maxHours).padStart(2, '0')}:${String(maxMinutes).padStart(2, '0')}`;
+    
+    // Atualizando o texto exibido
+    document.getElementById('partida-min').textContent = minFormatted;
+    document.getElementById('partida-max').textContent = maxFormatted;
+}
+
+// Função para atualizar o slider de chegada
+function atualizarSliderChegada() {
+    const min = parseInt(document.getElementById('chegada-slider-min').value);
+    const max = parseInt(document.getElementById('chegada-slider-max').value);
+    
+    // Convertendo minutos para formato de horas
+    const minHours = Math.floor(min / 60);
+    const minMinutes = min % 60;
+    const maxHours = Math.floor(max / 60);
+    const maxMinutes = max % 60;
+    
+    // Formatando para exibição
+    const minFormatted = `${String(minHours).padStart(2, '0')}:${String(minMinutes).padStart(2, '0')}`;
+    const maxFormatted = `${String(maxHours).padStart(2, '0')}:${String(maxMinutes).padStart(2, '0')}`;
+    
+    // Atualizando o texto exibido
+    document.getElementById('chegada-min').textContent = minFormatted;
+    document.getElementById('chegada-max').textContent = maxFormatted;
+}
+
 // Configurar eventos dos filtros
 function configurarEventosFiltros() {
     // Adicionar inicialização do sistema de tabs
@@ -2068,6 +2123,7 @@ document.addEventListener('DOMContentLoaded', function() {
     modificarCriarCardVoo();
     carregarTemplatesModais();
     configurarEventosInterface();
+    inicializarSlidersHorario();
     
     if (typeof window.BENETRIP_VOOS !== 'undefined' && 
         !window.BENETRIP_VOOS.estaCarregando && 
@@ -2080,4 +2136,5 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Inicializa o contador de filtros
     atualizarBadgeFiltros();
+    
 });
