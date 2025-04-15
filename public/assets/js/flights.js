@@ -1185,53 +1185,42 @@ filtrarResultados: function(filtros) {
         
         // Filtro de aeroportos
         if (filtros.aeroportos && Array.isArray(filtros.aeroportos) && filtros.aeroportos.length > 0) {
-    console.log('Aplicando filtro de aeroportos:', filtros.aeroportos);
-    
-    // Extrai todos os códigos de aeroportos usados neste voo
-    let aeroportosVoo = [];
-    
-    // Função auxiliar para extrair aeroportos de um segmento
-    const extrairAeroportos = (segmento) => {
-        if (!segmento || !segmento.flight || !Array.isArray(segmento.flight)) {
-            return [];
+            // Verifica se algum dos aeroportos do voo está na lista de aeroportos filtrados
+            const aeroportosVoo = [];
+            
+            // Adiciona aeroportos de ida
+            const segmentoIda = voo.segment?.[0]?.flight || [];
+            segmentoIda.forEach(trecho => {
+                if (trecho.departure) aeroportosVoo.push(trecho.departure);
+                if (trecho.arrival) aeroportosVoo.push(trecho.arrival);
+            });
+            
+            // Adiciona aeroportos de volta
+            const segmentoVolta = voo.segment?.[1]?.flight || [];
+            segmentoVolta.forEach(trecho => {
+                if (trecho.departure) aeroportosVoo.push(trecho.departure);
+                if (trecho.arrival) aeroportosVoo.push(trecho.arrival);
+            });
+            
+            // Verifica se pelo menos um aeroporto está na lista de filtrados
+            const temAeroportoFiltrado = aeroportosVoo.some(aero => 
+                filtros.aeroportos.includes(aero)
+            );
+            if (!temAeroportoFiltrado) return false;
         }
         
-        let aeroportos = [];
-        segmento.flight.forEach(trecho => {
-            if (trecho.departure) aeroportos.push(trecho.departure);
-            if (trecho.arrival) aeroportos.push(trecho.arrival);
-            
-            // Também considerar escalas se disponíveis
-            if (trecho.stops && Array.isArray(trecho.stops)) {
-                aeroportos = aeroportos.concat(trecho.stops);
-            }
-        });
-        
-        return aeroportos;
-    };
+        // Se passou por todos os filtros, inclui o voo
+        return true;
+    });
     
-    // Extrair aeroportos de cada segmento
-    if (voo.segment && Array.isArray(voo.segment)) {
-        voo.segment.forEach(segmento => {
-            aeroportosVoo = aeroportosVoo.concat(extrairAeroportos(segmento));
-        });
-    }
+    // Atualiza os resultados filtrados
+    this.finalResults = resultadosFiltrados;
     
-    // Remover duplicatas
-    aeroportosVoo = [...new Set(aeroportosVoo)];
+    // Atualiza a interface
+    this.renderizarResultados();
     
-    // Adicionar log para debug
-    console.log('Aeroportos do voo:', aeroportosVoo);
-    
-    // Verificar interseção entre os aeroportos do voo e os aeroportos selecionados
-    const temAeroportoFiltrado = aeroportosVoo.some(aero => 
-        filtros.aeroportos.includes(aero)
-    );
-    
-    if (!temAeroportoFiltrado) {
-        console.log('Voo não contém aeroportos filtrados');
-        return false;
-    }
+    // Retorna a quantidade de voos após filtro
+    return resultadosFiltrados.proposals.length;
 },
 
 /**
