@@ -1066,6 +1066,163 @@ Alguns parceiros podem mostrar preços em outra moeda ou idioma, mas são de con
     }
   },
 
+  /**
+ * Filtra os resultados de voos com base nos critérios de filtragem
+ * @param {Object} filtros - Objeto com os filtros a serem aplicados
+ */
+filtrarResultados: function(filtros) {
+    // Salva os resultados originais, se ainda não existirem
+    if (!this.resultadosOriginais) {
+        this.resultadosOriginais = JSON.parse(JSON.stringify(this.finalResults));
+    }
+    
+    // Se não há filtros ou não há propostas, retorna
+    if (!filtros || !this.resultadosOriginais || !this.resultadosOriginais.proposals) {
+        console.warn('Sem dados para filtrar ou filtros não definidos');
+        return;
+    }
+    
+    // Faz uma cópia dos resultados originais para trabalhar
+    const resultadosFiltrados = JSON.parse(JSON.stringify(this.resultadosOriginais));
+    
+    // Filtra as propostas com base nos critérios
+    resultadosFiltrados.proposals = this.resultadosOriginais.proposals.filter(voo => {
+        // Filtro de voos diretos
+        if (filtros.voosDiretos) {
+            const infoIda = this.obterInfoSegmento(voo.segment?.[0]);
+            const infoVolta = voo.segment?.length > 1 ? 
+                this.obterInfoSegmento(voo.segment[1]) : null;
+            
+            const ehVooDireto = infoIda?.paradas === 0 && (!infoVolta || infoVolta.paradas === 0);
+            if (!ehVooDireto) return false;
+        }
+        
+        // Filtro de horário de partida IDA
+        if (filtros.horarioPartidaIda && typeof filtros.horarioPartidaIda === 'object' && 
+            (filtros.horarioPartidaIda.min > 0 || filtros.horarioPartidaIda.max < 1439)) {
+            const infoIda = this.obterInfoSegmento(voo.segment?.[0]);
+            if (infoIda && infoIda.horaPartida) {
+                const [hora, minuto] = infoIda.horaPartida.split(':').map(Number);
+                const minutosTotal = hora * 60 + minuto;
+                
+                if (minutosTotal < filtros.horarioPartidaIda.min || 
+                    minutosTotal > filtros.horarioPartidaIda.max) {
+                    return false;
+                }
+            }
+        }
+        
+        // Filtro de horário de chegada IDA
+        if (filtros.horarioChegadaIda && typeof filtros.horarioChegadaIda === 'object' && 
+            (filtros.horarioChegadaIda.min > 0 || filtros.horarioChegadaIda.max < 1439)) {
+            const infoIda = this.obterInfoSegmento(voo.segment?.[0]);
+            if (infoIda && infoIda.horaChegada) {
+                const [hora, minuto] = infoIda.horaChegada.split(':').map(Number);
+                const minutosTotal = hora * 60 + minuto;
+                
+                if (minutosTotal < filtros.horarioChegadaIda.min || 
+                    minutosTotal > filtros.horarioChegadaIda.max) {
+                    return false;
+                }
+            }
+        }
+        
+        // Filtro de horário de partida VOLTA (se existir voo de volta)
+        if (voo.segment?.length > 1 && 
+            filtros.horarioPartidaVolta && typeof filtros.horarioPartidaVolta === 'object' && 
+            (filtros.horarioPartidaVolta.min > 0 || filtros.horarioPartidaVolta.max < 1439)) {
+            const infoVolta = this.obterInfoSegmento(voo.segment[1]);
+            if (infoVolta && infoVolta.horaPartida) {
+                const [hora, minuto] = infoVolta.horaPartida.split(':').map(Number);
+                const minutosTotal = hora * 60 + minuto;
+                
+                if (minutosTotal < filtros.horarioPartidaVolta.min || 
+                    minutosTotal > filtros.horarioPartidaVolta.max) {
+                    return false;
+                }
+            }
+        }
+        
+        // Filtro de horário de chegada VOLTA (se existir voo de volta)
+        if (voo.segment?.length > 1 && 
+            filtros.horarioChegadaVolta && typeof filtros.horarioChegadaVolta === 'object' && 
+            (filtros.horarioChegadaVolta.min > 0 || filtros.horarioChegadaVolta.max < 1439)) {
+            const infoVolta = this.obterInfoSegmento(voo.segment[1]);
+            if (infoVolta && infoVolta.horaChegada) {
+                const [hora, minuto] = infoVolta.horaChegada.split(':').map(Number);
+                const minutosTotal = hora * 60 + minuto;
+                
+                if (minutosTotal < filtros.horarioChegadaVolta.min || 
+                    minutosTotal > filtros.horarioChegadaVolta.max) {
+                    return false;
+                }
+            }
+        }
+        
+        // Filtro para horário de partida (compatibilidade com versão anterior)
+        if (filtros.horarioPartida && typeof filtros.horarioPartida === 'object' && 
+            (filtros.horarioPartida.min > 0 || filtros.horarioPartida.max < 1439)) {
+            const infoIda = this.obterInfoSegmento(voo.segment?.[0]);
+            if (infoIda && infoIda.horaPartida) {
+                const [hora, minuto] = infoIda.horaPartida.split(':').map(Number);
+                const minutosTotal = hora * 60 + minuto;
+                
+                if (minutosTotal < filtros.horarioPartida.min || 
+                    minutosTotal > filtros.horarioPartida.max) {
+                    return false;
+                }
+            }
+        }
+        
+        // Filtro de companhias aéreas
+        if (filtros.companhias && Array.isArray(filtros.companhias) && filtros.companhias.length > 0) {
+            const companhiasVoo = voo.carriers || [];
+            const temCompanhiaFiltrada = companhiasVoo.some(comp => 
+                filtros.companhias.includes(comp)
+            );
+            if (!temCompanhiaFiltrada) return false;
+        }
+        
+        // Filtro de aeroportos
+        if (filtros.aeroportos && Array.isArray(filtros.aeroportos) && filtros.aeroportos.length > 0) {
+            // Verifica se algum dos aeroportos do voo está na lista de aeroportos filtrados
+            const aeroportosVoo = [];
+            
+            // Adiciona aeroportos de ida
+            const segmentoIda = voo.segment?.[0]?.flight || [];
+            segmentoIda.forEach(trecho => {
+                if (trecho.departure) aeroportosVoo.push(trecho.departure);
+                if (trecho.arrival) aeroportosVoo.push(trecho.arrival);
+            });
+            
+            // Adiciona aeroportos de volta
+            const segmentoVolta = voo.segment?.[1]?.flight || [];
+            segmentoVolta.forEach(trecho => {
+                if (trecho.departure) aeroportosVoo.push(trecho.departure);
+                if (trecho.arrival) aeroportosVoo.push(trecho.arrival);
+            });
+            
+            // Verifica se pelo menos um aeroporto está na lista de filtrados
+            const temAeroportoFiltrado = aeroportosVoo.some(aero => 
+                filtros.aeroportos.includes(aero)
+            );
+            if (!temAeroportoFiltrado) return false;
+        }
+        
+        // Se passou por todos os filtros, inclui o voo
+        return true;
+    });
+    
+    // Atualiza os resultados filtrados
+    this.finalResults = resultadosFiltrados;
+    
+    // Atualiza a interface
+    this.renderizarResultados();
+    
+    // Retorna a quantidade de voos após filtro
+    return resultadosFiltrados.proposals.length;
+},
+
 /**
  * Restaura os resultados originais (remove filtros)
  */
