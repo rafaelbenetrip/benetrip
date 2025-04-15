@@ -2123,6 +2123,7 @@ document.addEventListener('DOMContentLoaded', function() {
     modificarCriarCardVoo();
     carregarTemplatesModais();
     configurarEventosInterface();
+    inicializarSlidersHorario();
     
     if (typeof window.BENETRIP_VOOS !== 'undefined' && 
         !window.BENETRIP_VOOS.estaCarregando && 
@@ -2135,7 +2136,5 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Inicializa o contador de filtros
     atualizarBadgeFiltros();
-
-        // Adicione aqui a chamada para inicializarSlidersHorario()
-    inicializarSlidersHorario();
+    
 });
