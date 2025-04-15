@@ -2135,4 +2135,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Inicializa o contador de filtros
     atualizarBadgeFiltros();
+
+        // Adicione aqui a chamada para inicializarSlidersHorario()
+    inicializarSlidersHorario();
 });
