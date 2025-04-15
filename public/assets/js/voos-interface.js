@@ -688,43 +688,71 @@ function carregarFiltrosSalvos() {
 // Coleta os filtros atuais do modal
 function coletarFiltrosAtuais() {
     try {
-        // Coleta apenas os filtros que permaneceram
-        const voosDiretos = document.getElementById('filtro-voos-diretos')?.checked || false;
+        // Inicializa com valores padrão
+        const filtros = {
+            voosDiretos: false,
+            horarioPartidaIda: { min: 0, max: 1439 },
+            horarioChegadaIda: { min: 0, max: 1439 },
+            horarioPartidaVolta: { min: 0, max: 1439 },
+            horarioChegadaVolta: { min: 0, max: 1439 },
+            horarioPartida: { min: 0, max: 1439 }, // compatibilidade
+            horarioChegada: { min: 0, max: 1439 }, // compatibilidade
+            companhias: [],
+            aeroportos: []
+        };
+        
+        // Coleta os valores atuais
+        filtros.voosDiretos = document.getElementById('filtro-voos-diretos')?.checked || false;
         
         // Horários de IDA
         const partidaIdaMin = parseInt(document.getElementById('partida-ida-slider-min')?.value || 0);
         const partidaIdaMax = parseInt(document.getElementById('partida-ida-slider-max')?.value || 1439);
+        filtros.horarioPartidaIda = { min: partidaIdaMin, max: partidaIdaMax };
         
         const chegadaIdaMin = parseInt(document.getElementById('chegada-ida-slider-min')?.value || 0);
         const chegadaIdaMax = parseInt(document.getElementById('chegada-ida-slider-max')?.value || 1439);
+        filtros.horarioChegadaIda = { min: chegadaIdaMin, max: chegadaIdaMax };
         
         // Horários de VOLTA
         const partidaVoltaMin = parseInt(document.getElementById('partida-volta-slider-min')?.value || 0);
         const partidaVoltaMax = parseInt(document.getElementById('partida-volta-slider-max')?.value || 1439);
+        filtros.horarioPartidaVolta = { min: partidaVoltaMin, max: partidaVoltaMax };
         
         const chegadaVoltaMin = parseInt(document.getElementById('chegada-volta-slider-min')?.value || 0);
         const chegadaVoltaMax = parseInt(document.getElementById('chegada-volta-slider-max')?.value || 1439);
+        filtros.horarioChegadaVolta = { min: chegadaVoltaMin, max: chegadaVoltaMax };
+        
+        // Compatibilidade com versão anterior
+        const partidaMin = parseInt(document.getElementById('partida-slider-min')?.value || 0);
+        const partidaMax = parseInt(document.getElementById('partida-slider-max')?.value || 1439);
+        filtros.horarioPartida = { min: partidaMin, max: partidaMax };
+        
+        const chegadaMin = parseInt(document.getElementById('chegada-slider-min')?.value || 0);
+        const chegadaMax = parseInt(document.getElementById('chegada-slider-max')?.value || 1439);
+        filtros.horarioChegada = { min: chegadaMin, max: chegadaMax };
         
         // Companhias e aeroportos
-        const companhias = Array.from(document.querySelectorAll('.filtro-companhia:checked'))
+        filtros.companhias = Array.from(document.querySelectorAll('.filtro-companhia:checked'))
             .map(checkbox => checkbox.value);
             
-        const aeroportos = Array.from(document.querySelectorAll('.filtro-aeroporto:checked'))
+        filtros.aeroportos = Array.from(document.querySelectorAll('.filtro-aeroporto:checked'))
             .map(checkbox => checkbox.value);
         
-        // Cria objeto com os filtros
-        return {
-            voosDiretos,
-            horarioPartidaIda: { min: partidaIdaMin, max: partidaIdaMax },
-            horarioChegadaIda: { min: chegadaIdaMin, max: chegadaIdaMax },
-            horarioPartidaVolta: { min: partidaVoltaMin, max: partidaVoltaMax },
-            horarioChegadaVolta: { min: chegadaVoltaMin, max: chegadaVoltaMax },
-            companhias,
-            aeroportos
-        };
+        return filtros;
     } catch (error) {
         console.error('Erro ao coletar filtros atuais:', error);
-        return {};
+        // Retorna filtros padrão em caso de erro
+        return {
+            voosDiretos: false,
+            horarioPartidaIda: { min: 0, max: 1439 },
+            horarioChegadaIda: { min: 0, max: 1439 },
+            horarioPartidaVolta: { min: 0, max: 1439 },
+            horarioChegadaVolta: { min: 0, max: 1439 },
+            horarioPartida: { min: 0, max: 1439 },
+            horarioChegada: { min: 0, max: 1439 },
+            companhias: [],
+            aeroportos: []
+        };
     }
 }
 // Salva os filtros atuais no localStorage
