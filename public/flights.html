@@ -202,36 +202,36 @@
                     <!-- TAB VOLTA -->
                     <div class="filtro-tab-pane" id="tab-volta">
                         <!-- Horário de Partida -->
-                        <div class="filtro-item">
-                            <div class="filtro-label">
-                                <span class="filtro-icone">🛫</span>
-                                <span>Horário de Partida</span>
-                            </div>
-                            <div class="filtro-control range-slider">
-                                <div class="range-values">
-                                    <span id="partida-volta-min">00:00</span> - 
-                                    <span id="partida-volta-max">23:59</span>
-                                </div>
-                                <input type="range" id="partida-volta-slider-min" min="0" max="1439" value="0" class="range-slider-min" aria-label="Horário mínimo de partida">
-                                <input type="range" id="partida-volta-slider-max" min="0" max="1439" value="1439" class="range-slider-max" aria-label="Horário máximo de partida">
-                            </div>
-                        </div>
-                        
-                        <!-- Horário de Chegada -->
-                        <div class="filtro-item">
-                            <div class="filtro-label">
-                                <span class="filtro-icone">🛬</span>
-                                <span>Horário de Chegada</span>
-                            </div>
-                            <div class="filtro-control range-slider">
-                                <div class="range-values">
-                                    <span id="chegada-volta-min">00:00</span> - 
-                                    <span id="chegada-volta-max">23:59</span>
-                                </div>
-                                <input type="range" id="chegada-volta-slider-min" min="0" max="1439" value="0" class="range-slider-min" aria-label="Horário mínimo de chegada">
-                                <input type="range" id="chegada-volta-slider-max" min="0" max="1439" value="1439" class="range-slider-max" aria-label="Horário máximo de chegada">
-                            </div>
-                        </div>
+<div class="filtro-item">
+    <div class="filtro-label">
+        <span class="filtro-icone">🛫</span>
+        <span>Horário de Partida</span>
+    </div>
+    <div class="filtro-control range-slider">
+        <div class="range-values">
+            <span id="partida-min">00:00</span> - <span id="partida-max">23:59</span>
+        </div>
+        <div class="slider-track"></div>
+        <input type="range" id="partida-slider-min" min="0" max="1439" value="0" class="range-slider-min" aria-label="Horário mínimo de partida">
+        <input type="range" id="partida-slider-max" min="0" max="1439" value="1439" class="range-slider-max" aria-label="Horário máximo de partida">
+    </div>
+</div>
+
+<!-- Horário de Chegada -->
+<div class="filtro-item">
+    <div class="filtro-label">
+        <span class="filtro-icone">🛬</span>
+        <span>Horário de Chegada</span>
+    </div>
+    <div class="filtro-control range-slider">
+        <div class="range-values">
+            <span id="chegada-min">00:00</span> - <span id="chegada-max">23:59</span>
+        </div>
+        <div class="slider-track"></div>
+        <input type="range" id="chegada-slider-min" min="0" max="1439" value="0" class="range-slider-min" aria-label="Horário mínimo de chegada">
+        <input type="range" id="chegada-slider-max" min="0" max="1439" value="1439" class="range-slider-max" aria-label="Horário máximo de chegada">
+    </div>
+</div>
                     </div>
                 </div> <!-- fim filtro-tab-content -->
             </div> <!-- fim filtro-viagem-tabs (TABS) -->
