@@ -735,8 +735,13 @@ function coletarFiltrosAtuais() {
         filtros.companhias = Array.from(document.querySelectorAll('.filtro-companhia:checked'))
             .map(checkbox => checkbox.value);
             
-        filtros.aeroportos = Array.from(document.querySelectorAll('.filtro-aeroporto:checked'))
-            .map(checkbox => checkbox.value);
+// Versão mais robusta para capturar os aeroportos selecionados
+let checkboxesAeroportos = document.querySelectorAll('.filtro-aeroporto:checked, input[name="aeroporto"]:checked');
+filtros.aeroportos = Array.from(checkboxesAeroportos)
+    .map(checkbox => checkbox.value)
+    .filter(value => value && value.trim() !== ''); // Filtra valores vazios
+    
+console.log('Aeroportos selecionados:', filtros.aeroportos); // Log para debug
         
         return filtros;
     } catch (error) {
@@ -1099,19 +1104,42 @@ function preencherOpcoesCompanhias() {
 
 // Preenche as opções de aeroportos
 function preencherOpcoesAeroportos() {
+    console.log('Preenchendo opções de aeroportos...');
+    
     if (!window.BENETRIP_VOOS?.finalResults?.airports) {
-        console.log('Dados de aeroportos não disponíveis ainda');
+        console.warn('Dados de aeroportos não disponíveis ainda');
+        
+        // Tentar usar dados acumulados se disponíveis
+        if (window.BENETRIP_VOOS?.accumulatedAirports) {
+            console.log('Usando dados acumulados de aeroportos');
+            renderizarOpcoesAeroportos(window.BENETRIP_VOOS.accumulatedAirports);
+            return;
+        }
+        
+        // Definir um estado de carregamento
+        const container = document.getElementById('aeroportos-content');
+        if (container) {
+            container.innerHTML = '<div class="loading-placeholder">Aguardando dados de aeroportos...</div>';
+        }
         return;
     }
     
+    // Adicionar logs para debug
+    console.log('Quantidade de aeroportos:', Object.keys(window.BENETRIP_VOOS.finalResults.airports).length);
+    
+    renderizarOpcoesAeroportos(window.BENETRIP_VOOS.finalResults.airports);
+}
+
+// Função auxiliar para renderizar opções de aeroportos
+function renderizarOpcoesAeroportos(airports) {
     const container = document.getElementById('aeroportos-content');
     if (!container) return;
     
-    const airports = window.BENETRIP_VOOS.finalResults.airports;
     const airportsList = Object.keys(airports).map(code => ({
         code: code,
         name: airports[code].name || code,
-        city: airports[code].city || ''
+        city: airports[code].city || '',
+        country: airports[code].country || ''
     }));
     
     // Ordena por código IATA
@@ -1126,17 +1154,37 @@ function preencherOpcoesAeroportos() {
         return;
     }
     
+    // Adiciona campo de busca
+    const searchContainer = document.createElement('div');
+    searchContainer.className = 'filtro-search';
+    searchContainer.innerHTML = `
+        <span class="filtro-search-icon">🔍</span>
+        <input type="search" class="filtro-search-input" placeholder="Buscar aeroportos..." 
+               aria-label="Buscar aeroportos">
+    `;
+    container.appendChild(searchContainer);
+    
+    // Configura evento de busca
+    const searchInput = searchContainer.querySelector('.filtro-search-input');
+    searchInput.addEventListener('input', function() {
+        const valorBusca = this.value.toLowerCase();
+        document.querySelectorAll('#aeroportos-content .checkbox-item').forEach(item => {
+            const texto = item.textContent.toLowerCase();
+            item.style.display = texto.includes(valorBusca) ? 'block' : 'none';
+        });
+    });
+    
     // Preenche com os aeroportos disponíveis
     airportsList.forEach(airport => {
         const item = document.createElement('div');
         item.className = 'checkbox-item';
         item.innerHTML = `
             <label class="checkbox-label">
-                <input type="checkbox" class="filtro-aeroporto" value="${airport.code}"
-                       aria-label="Aeroporto ${airport.code}">
+                <input type="checkbox" class="filtro-aeroporto" value="${airport.code}" name="aeroporto"
+                       data-code="${airport.code}" aria-label="Aeroporto ${airport.code}">
                 <span class="checkbox-text">
                     <strong>${airport.code}</strong> - ${airport.name}
-                    ${airport.city ? `(${airport.city})` : ''}
+                    ${airport.city ? `(${airport.city}${airport.country ? `, ${airport.country}` : ''})` : ''}
                 </span>
             </label>
         `;
@@ -1146,9 +1194,15 @@ function preencherOpcoesAeroportos() {
     // Configura eventos dos checkboxes
     container.querySelectorAll('.filtro-aeroporto').forEach(checkbox => {
         checkbox.addEventListener('change', function() {
+            console.log(`Aeroporto ${this.value} ${this.checked ? 'selecionado' : 'desmarcado'}`);
             atualizarContadorFiltros();
         });
     });
+    
+    // Marca o container como carregado
+    container.dataset.carregado = "true";
+    
+    console.log(`Renderizados ${airportsList.length} aeroportos`);
 }
 
 // Limpa todos os filtros
