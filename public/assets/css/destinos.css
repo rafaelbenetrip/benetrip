@@ -803,3 +803,48 @@ h3 {
   left: 0;
   z-index: 10 !important; /* Garantir que fique acima de outros elementos */
 }
+
+/* Ajuste para posicionamento correto das tags */
+.tourist-spot-label {
+  position: absolute;
+  top: auto !important; 
+  bottom: 10px !important;
+  left: 10px;
+  background-color: rgba(232, 119, 34, 0.85);
+  color: white;
+  padding: 4px 8px;
+  font-size: 11px;
+  border-radius: 4px;
+  max-width: 90%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  z-index: 5;
+}
+
+/* Ajustar z-index e posição das tags principais */
+.tag-escolha-top, .tag-destino-surpresa {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 10 !important;
+}
+
+/* Ajuste para os créditos de imagem */
+.image-credits {
+  opacity: 0.7;
+  transition: opacity 0.3s ease;
+  z-index: 4;
+  font-size: 9px !important;
+}
+
+.image-credits:hover {
+  opacity: 1;
+}
+
+/* Para cards menores, ocultar créditos em telas pequenas */
+@media (max-width: 480px) {
+  .card-destino .image-credits {
+    display: none;
+  }
+}
