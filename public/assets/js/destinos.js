@@ -1210,7 +1210,7 @@ mostrarConfirmacaoSelecao(destino) {
       this.remove();
     }
   });
-}},
+},
   
   // Método auxiliar para obter período de datas da viagem
   obterDatasViagem() {
