@@ -162,39 +162,47 @@ const BENETRIP_DESTINOS = {
   
   // Buscar imagens para um destino – melhoria na montagem da URL
   async buscarImagensDestino(destino) {
-    try {
-      if (!destino) return null;
-      
-      // Construir a query unindo destino e país em uma única string
-      let queryCompleta = destino.destino + ' ' + destino.pais;
-      let url = `/api/image-search?query=${encodeURIComponent(queryCompleta)}`;
-      
-      // Adicionar pontos turísticos específicos à query
-      if (destino.pontosTuristicos && destino.pontosTuristicos.length > 0) {
-        url += `&pontosTuristicos=${encodeURIComponent(JSON.stringify(destino.pontosTuristicos))}`;
-      } else if (destino.pontoTuristico) {
-        url += `&pontosTuristicos=${encodeURIComponent(JSON.stringify([destino.pontoTuristico]))}`;
-      }
-      
-      console.log(`Buscando imagens para ${destino.destino} com pontos turísticos`, 
-        destino.pontosTuristicos || destino.pontoTuristico);
-      console.log('URL construída:', url);
-      
-      const resposta = await fetch(url);
-      const dados = await resposta.json();
-      
-      if (dados && dados.images && dados.images.length > 0) {
-        console.log(`Encontradas ${dados.images.length} imagens para ${destino.destino}`);
-        return dados.images;
-      }
-      
-      console.warn(`Nenhuma imagem encontrada para ${destino.destino}`);
-      return null;
-    } catch (erro) {
-      console.error(`Erro ao buscar imagens para ${destino.destino}:`, erro);
-      return null;
+  try {
+    if (!destino) return null;
+    
+    // Construir a query unindo destino e país em uma única string
+    let queryCompleta = destino.destino + ' ' + destino.pais;
+    let url = `/api/image-search?query=${encodeURIComponent(queryCompleta)}`;
+    
+    // Adicionar pontos turísticos específicos à query
+    if (destino.pontosTuristicos && destino.pontosTuristicos.length > 0) {
+      url += `&pontosTuristicos=${encodeURIComponent(JSON.stringify(destino.pontosTuristicos))}`;
+    } else if (destino.pontoTuristico) {
+      url += `&pontosTuristicos=${encodeURIComponent(JSON.stringify([destino.pontoTuristico]))}`;
     }
-  },
+    
+    // Adicionar preferência de fonte (Google como primeira opção)
+    url += `&source=google`;
+    
+    // Adicionar parâmetro de descrição para melhorar a busca
+    if (destino.porque) {
+      url += `&descricao=${encodeURIComponent(destino.porque)}`;
+    }
+    
+    console.log(`Buscando imagens para ${destino.destino} com pontos turísticos`, 
+      destino.pontosTuristicos || destino.pontoTuristico);
+    console.log('URL construída:', url);
+    
+    const resposta = await fetch(url);
+    const dados = await resposta.json();
+    
+    if (dados && dados.images && dados.images.length > 0) {
+      console.log(`Encontradas ${dados.images.length} imagens para ${destino.destino} de fonte: ${dados.source || 'desconhecida'}`);
+      return dados.images;
+    }
+    
+    console.warn(`Nenhuma imagem encontrada para ${destino.destino}`);
+    return null;
+  } catch (erro) {
+    console.error(`Erro ao buscar imagens para ${destino.destino}:`, erro);
+    return null;
+  }
+},
   
   // Buscar imagens para todos os destinos
   async enriquecerComImagens() {
@@ -475,13 +483,130 @@ const BENETRIP_DESTINOS = {
   
   // Método auxiliar para renderizar imagem com créditos - CORRIGIDO PARA MELHOR ACESSO AOS LINKS
   renderizarImagemComCreditos(imagem, fallbackText, classes = '') {
-    if (!imagem) {
-      return `
-        <div class="bg-gray-200 ${classes}">
-          <img src="https://via.placeholder.com/400x224?text=${encodeURIComponent(fallbackText)}" alt="${fallbackText}" class="w-full h-full object-cover">
-        </div>
-      `;
+  if (!imagem) {
+    return `
+      <div class="bg-gray-200 ${classes}">
+        <img src="https://via.placeholder.com/400x224?text=${encodeURIComponent(fallbackText)}" alt="${fallbackText}" class="w-full h-full object-cover">
+      </div>
+    `;
+  }
+  
+  // Construir os créditos da imagem com link clicável garantido
+  const photographerLink = imagem.photographerUrl || '#';
+  const sourceLink = imagem.sourceUrl || '#';
+  const photographer = imagem.photographer || 'Desconhecido';
+  const source = imagem.source || 'unsplash'; // Default para compatibilidade
+  
+  // Badge de fonte (Google, Unsplash, etc)
+  const sourceBadge = source === 'google' ? 
+    `<span class="absolute top-2 left-2 px-2 py-1 bg-white bg-opacity-80 rounded-md text-xs font-medium">Google Images</span>` : 
+    '';
+
+  return `
+    <div class="image-container loading bg-gray-200 ${classes} relative">
+      <img src="${imagem.url}" 
+           alt="${imagem.alt || fallbackText}" 
+           class="w-full h-full object-cover" 
+           data-source="${source}"
+           onload="this.parentNode.classList.remove('loading')" 
+           onerror="this.onerror=null; this.src='https://via.placeholder.com/400x224?text=${encodeURIComponent(fallbackText)}'; this.parentNode.classList.remove('loading')">
+      
+      ${sourceBadge}
+      
+      <!-- Icone de lupa com link para fonte original -->
+      <a href="${sourceLink}" target="_blank" rel="noopener noreferrer" 
+         class="absolute top-2 right-2 bg-white bg-opacity-80 p-1.5 rounded-full z-10 hover:bg-opacity-100 transition-all"
+         onclick="event.stopPropagation(); window.open('${sourceLink}', '_blank');">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="8"></circle>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
+      </a>
+      
+      <!-- Créditos do fotógrafo com melhor posicionamento e visibilidade -->
+      <div class="absolute bottom-0 left-0 right-0 p-1.5 bg-black bg-opacity-70 text-white text-xs z-10">
+        <a href="${photographerLink}" target="_blank" rel="noopener noreferrer" 
+           class="text-white hover:underline"
+           onclick="event.stopPropagation(); window.open('${photographerLink}', '_blank');">
+          Foto por ${photographer}
+        </a>
+        ${source === 'google' ? ' via Google Images' : ''}
+      </div>
+    </div>
+  `;
+}
+
+  // Adicionar após a função enriquecerComImagens
+verificarQualidadeImagens() {
+  if (!this.recomendacoes) return;
+  
+  // Verifique a relevância das imagens e aplique correções se necessário
+  const verificarImagens = async (destino) => {
+    if (!destino || !destino.imagens || !destino.imagens.length) return;
+    
+    // Número mínimo de palavras-chave que devem corresponder
+    const correspondenciasNecessarias = 1;
+    
+    for (let i = 0; i < destino.imagens.length; i++) {
+      const imagem = destino.imagens[i];
+      
+      // Verificar relevância da imagem
+      if (imagem.alt && imagem.alt.length > 0) {
+        // Termos a serem verificados
+        const termos = [
+          destino.destino.toLowerCase(),
+          destino.pais.toLowerCase()
+        ];
+        
+        // Adicionar pontos turísticos, se disponíveis
+        if (destino.pontosTuristicos && destino.pontosTuristicos.length) {
+          termos.push(...destino.pontosTuristicos.map(pt => pt.toLowerCase()));
+        }
+        
+        // Verificar se pelo menos um termo corresponde
+        const altText = imagem.alt.toLowerCase();
+        let correspondencias = 0;
+        
+        for (const termo of termos) {
+          if (altText.includes(termo)) {
+            correspondencias++;
+          }
+        }
+        
+        // Se a imagem não parece relevante, marcar para substituição
+        if (correspondencias < correspondenciasNecessarias) {
+          console.warn(`Imagem possivelmente irrelevante para ${destino.destino}:`, imagem.url);
+          imagem.baixaRelevancia = true;
+        }
+      }
     }
+    
+    // Reordenar imagens para priorizar as mais relevantes
+    destino.imagens.sort((a, b) => {
+      // Colocar imagens de baixa relevância no final
+      if (a.baixaRelevancia && !b.baixaRelevancia) return 1;
+      if (!a.baixaRelevancia && b.baixaRelevancia) return -1;
+      return 0;
+    });
+  };
+  
+  // Verificar todos os destinos
+  if (this.recomendacoes.topPick) {
+    verificarImagens(this.recomendacoes.topPick);
+  }
+  
+  if (this.recomendacoes.surpresa) {
+    verificarImagens(this.recomendacoes.surpresa);
+  }
+  
+  if (this.recomendacoes.alternativas && this.recomendacoes.alternativas.length) {
+    for (const destino of this.recomendacoes.alternativas) {
+      verificarImagens(destino);
+    }
+  }
+  
+  console.log('Verificação de qualidade de imagens concluída');
+}
     
     // Construir os créditos da imagem com link clicável garantido
     const photographerLink = imagem.photographerUrl || '#';
