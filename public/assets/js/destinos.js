@@ -445,46 +445,58 @@ const BENETRIP_DESTINOS = {
   
   // Método auxiliar para renderizar imagem com créditos - CORRIGIDO PARA MELHOR ACESSO AOS LINKS
   renderizarImagemComCreditos(imagem, fallbackText, classes = '') {
-    if (!imagem) {
-      return `
-        <div class="bg-gray-200 ${classes}">
-          <img src="https://via.placeholder.com/400x224?text=${encodeURIComponent(fallbackText)}" alt="${fallbackText}" class="w-full h-full object-cover">
-        </div>
-      `;
-    }
-    
-    // Construir os créditos da imagem com link clicável garantido
-    const photographerLink = imagem.photographerUrl || '#';
-    const sourceLink = imagem.sourceUrl || '#';
-    const photographer = imagem.photographer || 'Desconhecido';
-
+  if (!imagem) {
     return `
-      <div class="image-container loading bg-gray-200 ${classes} relative">
-        <img src="${imagem.url}" alt="${imagem.alt || fallbackText}" class="w-full h-full object-cover" 
-             onload="this.parentNode.classList.remove('loading')" 
-             onerror="this.onerror=null; this.src='https://via.placeholder.com/400x224?text=${encodeURIComponent(fallbackText)}'; this.parentNode.classList.remove('loading')">
-        
-        <!-- Icone de lupa com link para fonte original -->
-        <a href="${sourceLink}" target="_blank" rel="noopener noreferrer" 
-           class="absolute top-2 right-2 bg-white bg-opacity-80 p-1.5 rounded-full z-10 hover:bg-opacity-100 transition-all"
-           onclick="event.stopPropagation(); window.open('${sourceLink}', '_blank');">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="11" cy="11" r="8"></circle>
-            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-          </svg>
-        </a>
-        
-        <!-- Créditos do fotógrafo com melhor posicionamento e visibilidade -->
-        <div class="absolute bottom-0 left-0 right-0 p-1.5 bg-black bg-opacity-70 text-white text-xs z-10">
-          <a href="${photographerLink}" target="_blank" rel="noopener noreferrer" 
-             class="text-white hover:underline"
-             onclick="event.stopPropagation(); window.open('${photographerLink}', '_blank');">
-            Foto por ${photographer}
-          </a>
-        </div>
+      <div class="bg-gray-200 ${classes}">
+        <img src="https://via.placeholder.com/400x224?text=${encodeURIComponent(fallbackText)}" alt="${fallbackText}" class="w-full h-full object-cover">
       </div>
     `;
-  },
+  }
+  
+  // Construir os créditos da imagem com link clicável garantido
+  const photographerLink = imagem.photographerUrl || '#';
+  const sourceLink = imagem.sourceUrl || '#';
+  const photographer = imagem.photographer || 'Desconhecido';
+  const source = imagem.source || 'unsplash'; // Default para compatibilidade
+  
+  // Badge de fonte (Google, Unsplash, etc)
+  const sourceBadge = source === 'google' ? 
+    `<span class="absolute top-2 left-2 px-2 py-1 bg-white bg-opacity-80 rounded-md text-xs font-medium">Google Images</span>` : 
+    '';
+
+  return `
+    <div class="image-container loading bg-gray-200 ${classes} relative">
+      <img src="${imagem.url}" 
+           alt="${imagem.alt || fallbackText}" 
+           class="w-full h-full object-cover" 
+           data-source="${source}"
+           onload="this.parentNode.classList.remove('loading')" 
+           onerror="this.onerror=null; this.src='https://via.placeholder.com/400x224?text=${encodeURIComponent(fallbackText)}'; this.parentNode.classList.remove('loading')">
+      
+      ${sourceBadge}
+      
+      <!-- Icone de lupa com link para fonte original -->
+      <a href="${sourceLink}" target="_blank" rel="noopener noreferrer" 
+         class="absolute top-2 right-2 bg-white bg-opacity-80 p-1.5 rounded-full z-10 hover:bg-opacity-100 transition-all"
+         onclick="event.stopPropagation(); window.open('${sourceLink}', '_blank');">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="8"></circle>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
+      </a>
+      
+      <!-- Créditos do fotógrafo com melhor posicionamento e visibilidade -->
+      <div class="absolute bottom-0 left-0 right-0 p-1.5 bg-black bg-opacity-70 text-white text-xs z-10">
+        <a href="${photographerLink}" target="_blank" rel="noopener noreferrer" 
+           class="text-white hover:underline"
+           onclick="event.stopPropagation(); window.open('${photographerLink}', '_blank');">
+          Foto por ${photographer}
+        </a>
+        ${source === 'google' ? ' via Google Images' : ''}
+      </div>
+    </div>
+  `;
+},
   
   // Renderizar destino destaque com sistema de abas
   renderizarDestinoDestaque(destino) {
