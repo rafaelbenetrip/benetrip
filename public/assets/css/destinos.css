@@ -769,3 +769,37 @@ h3 {
   max-height: calc(90vh - 280px);
   padding: 16px;
 }
+
+/* Ajuste para posicionamento correto das tags */
+.tourist-spot-label {
+  position: absolute;
+  top: auto !important; /* Substituir posição top fixa */
+  bottom: 10px !important; /* Posicionar na parte inferior */
+  left: 10px;
+  background-color: rgba(232, 119, 34, 0.85);
+  color: white;
+  padding: 4px 8px;
+  font-size: 11px;
+  border-radius: 4px;
+  max-width: 90%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  z-index: 5; /* Garantir que fique acima de elementos básicos */
+}
+
+/* Ajustar z-index e posição da tag de escolha principal */
+.tag-escolha-top {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 10 !important; /* Garantir que fique acima de outros elementos */
+}
+
+/* Ajustar z-index e posição da tag de destino surpresa */
+.tag-destino-surpresa {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 10 !important; /* Garantir que fique acima de outros elementos */
+}
