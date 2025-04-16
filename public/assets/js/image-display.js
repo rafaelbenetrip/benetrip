@@ -10,6 +10,7 @@ window.BENETRIP_IMAGES = {
     // URLs base para imagens de fallback
     placeholderUrl: 'https://via.placeholder.com/',
     unsplashBaseUrl: 'https://source.unsplash.com/featured/',
+    googleBaseUrl: 'https://source.unsplash.com/featured/', // URL de fallback enquanto não usa diretamente a API
     // Tempo máximo para verificar se uma imagem existe
     timeoutVerify: 5000,
     // Opções de tamanhos para diferentes contextos
@@ -29,7 +30,11 @@ window.BENETRIP_IMAGES = {
       "Taj Mahal": "https://source.unsplash.com/featured/?taj+mahal",
       "Times Square": "https://source.unsplash.com/featured/?times+square+new+york",
       "Sagrada Família": "https://source.unsplash.com/featured/?sagrada+familia+barcelona"
-    }
+    },
+    // Configurações de verificação de relevância de imagens
+    preferredSource: 'google', // Priorizar o Google nas buscas
+    validationThreshold: 0.6, // Limite de confiança para considerar uma imagem válida
+    minimumTermLength: 3 // Comprimento mínimo de termos para validação
   },
   
   // Inicialização do serviço
@@ -164,6 +169,55 @@ window.BENETRIP_IMAGES = {
           grid-template-columns: 1fr;
         }
       }
+      
+      /* Estilos para o painel de diagnóstico de qualidade */
+      .quality-diagnostic {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background-color: white;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        padding: 20px;
+        border-radius: 8px;
+        z-index: 10000;
+        max-width: 90%;
+        max-height: 80vh;
+        overflow: auto;
+      }
+      
+      .quality-score {
+        display: inline-block;
+        padding: 2px 6px;
+        border-radius: 10px;
+        color: white;
+        font-size: 11px;
+        margin-left: 5px;
+      }
+      
+      .quality-score.high {
+        background-color: #22c55e; /* Verde */
+      }
+      
+      .quality-score.medium {
+        background-color: #f59e0b; /* Laranja */
+      }
+      
+      .quality-score.low {
+        background-color: #ef4444; /* Vermelho */
+      }
+      
+      .image-validation-list {
+        margin-top: 10px;
+        border-top: 1px solid #e5e7eb;
+        padding-top: 10px;
+      }
+      
+      .validation-item {
+        margin-bottom: 8px;
+        padding-bottom: 8px;
+        border-bottom: 1px solid #f3f4f6;
+      }
     `;
     
     document.head.appendChild(style);
@@ -245,6 +299,62 @@ window.BENETRIP_IMAGES = {
     }
     
     return entry.data;
+  },
+  
+  // Nova função: Validar relevância da imagem para o destino
+  validateImageRelevance(imageData, destination) {
+    if (!imageData || !destination) return { isValid: false, score: 0 };
+    
+    // Extrair termos relevantes da imagem
+    const imageMetadata = [
+      imageData.alt || '',
+      imageData.photographer || '',
+      imageData.source || ''
+    ].join(' ').toLowerCase();
+    
+    // Termos relevantes do destino
+    const destTerms = [
+      destination.destino.toLowerCase(),
+      destination.pais?.toLowerCase() || '',
+      ...(destination.pontosTuristicos || []).map(pt => pt.toLowerCase())
+    ].filter(Boolean); // Remover elementos vazios
+    
+    // Calcular pontuação
+    let matchScore = 0;
+    let totalTerms = 0;
+    
+    destTerms.forEach(term => {
+      if (term && term.length > this.config.minimumTermLength) { // Ignorar termos muito curtos
+        totalTerms++;
+        if (imageMetadata.includes(term)) {
+          // Termos mais longos recebem pontuação maior
+          matchScore += (term.length > 5) ? 2 : 1;
+        }
+      }
+    });
+    
+    // Normalizar a pontuação (0-1)
+    const normalizedScore = totalTerms > 0 ? matchScore / (totalTerms * 2) : 0;
+    
+    // Adicionar bônus para imagens que têm ponto turístico específico
+    const hasTouristSpot = Boolean(imageData.pontoTuristico && imageData.pontoTuristico.length > 0);
+    const bonusScore = hasTouristSpot ? 0.3 : 0;
+    
+    // Se a imagem vem do Google, adicionar bônus
+    const isFromGoogle = imageData.source === 'google';
+    const googleBonus = isFromGoogle ? 0.2 : 0;
+    
+    // Pontuação final (limitado a 1.0)
+    const finalScore = Math.min(normalizedScore + bonusScore + googleBonus, 1.0);
+    
+    return {
+      isValid: finalScore >= this.config.validationThreshold,
+      score: finalScore,
+      matched: matchScore,
+      total: totalTerms,
+      hasTouristSpot,
+      isFromGoogle
+    };
   },
   
   // Tratar erro de carregamento de imagem com suporte a pontos turísticos
@@ -339,12 +449,22 @@ window.BENETRIP_IMAGES = {
     
     // Verificar se temos imagens no objeto de destino
     if (destination.imagens && destination.imagens.length > index) {
-      const imageUrl = destination.imagens[index].url;
-      const imageExists = await this.checkImageExists(imageUrl);
+      const imageData = destination.imagens[index];
       
-      if (imageExists) {
-        this.addToCache(cacheKey, imageUrl);
-        return imageUrl;
+      // Validar a relevância da imagem
+      const validation = this.validateImageRelevance(imageData, destination);
+      
+      // Se a imagem for considerada válida, usá-la
+      if (validation.isValid) {
+        // Verificar se a URL da imagem é acessível
+        const imageExists = await this.checkImageExists(imageData.url);
+        
+        if (imageExists) {
+          this.addToCache(cacheKey, imageData.url);
+          return imageData.url;
+        }
+      } else {
+        console.log(`Imagem rejeitada para ${destination.destino}: pontuação ${validation.score.toFixed(2)} < ${this.config.validationThreshold} (pontoTuristico: ${pontoTuristico || 'nenhum'})`);
       }
     }
     
@@ -761,7 +881,16 @@ window.BENETRIP_IMAGES = {
     
     // Adicionar imagens se disponíveis e solicitadas
     if (showImagens && destination.imagens && destination.imagens.length > 0) {
-      const imagesToShow = destination.imagens.slice(0, maxImagens);
+      // Validar cada imagem e ordenar por pontuação de relevância
+      const validatedImages = destination.imagens
+        .map(img => {
+          const validation = this.validateImageRelevance(img, destination);
+          return { ...img, validation };
+        })
+        .sort((a, b) => b.validation.score - a.validation.score); // Ordenar por pontuação
+      
+      // Usar apenas as melhores imagens
+      const imagesToShow = validatedImages.slice(0, maxImagens);
       
       this.renderImagesGallery(imagesToShow, destinationContainer, {
         aspectRatio,
@@ -775,7 +904,114 @@ window.BENETRIP_IMAGES = {
     return destinationContainer;
   },
   
-  // Método para adicionar botão de debug na interface
+  // NOVA FUNÇÃO: Testar a qualidade das imagens dos destinos
+  testImageQuality(destinations) {
+    const results = {
+      totalImages: 0,
+      validImages: 0,
+      rejectedImages: 0,
+      byDestination: {}
+    };
+    
+    if (!destinations) return results;
+    
+    // Testar imagens do destino principal
+    if (destinations.topPick?.imagens) {
+      results.byDestination[destinations.topPick.destino] = {
+        images: [],
+        validCount: 0
+      };
+      
+      destinations.topPick.imagens.forEach(img => {
+        results.totalImages++;
+        const validation = this.validateImageRelevance(img, destinations.topPick);
+        
+        results.byDestination[destinations.topPick.destino].images.push({
+          url: img.url,
+          isValid: validation.isValid,
+          score: validation.score,
+          pontoTuristico: img.pontoTuristico,
+          source: img.source || 'desconhecido'
+        });
+        
+        if (validation.isValid) {
+          results.validImages++;
+          results.byDestination[destinations.topPick.destino].validCount++;
+        } else {
+          results.rejectedImages++;
+        }
+      });
+    }
+    
+    // Testar imagens das alternativas
+    if (destinations.alternativas) {
+      destinations.alternativas.forEach(alt => {
+        if (alt.imagens) {
+          results.byDestination[alt.destino] = {
+            images: [],
+            validCount: 0
+          };
+          
+          alt.imagens.forEach(img => {
+            results.totalImages++;
+            const validation = this.validateImageRelevance(img, alt);
+            
+            results.byDestination[alt.destino].images.push({
+              url: img.url,
+              isValid: validation.isValid,
+              score: validation.score,
+              pontoTuristico: img.pontoTuristico,
+              source: img.source || 'desconhecido'
+            });
+            
+            if (validation.isValid) {
+              results.validImages++;
+              results.byDestination[alt.destino].validCount++;
+            } else {
+              results.rejectedImages++;
+            }
+          });
+        }
+      });
+    }
+    
+    // Testar imagens do destino surpresa
+    if (destinations.surpresa?.imagens) {
+      results.byDestination[destinations.surpresa.destino] = {
+        images: [],
+        validCount: 0
+      };
+      
+      destinations.surpresa.imagens.forEach(img => {
+        results.totalImages++;
+        const validation = this.validateImageRelevance(img, destinations.surpresa);
+        
+        results.byDestination[destinations.surpresa.destino].images.push({
+          url: img.url,
+          isValid: validation.isValid,
+          score: validation.score,
+          pontoTuristico: img.pontoTuristico,
+          source: img.source || 'desconhecido'
+        });
+        
+        if (validation.isValid) {
+          results.validImages++;
+          results.byDestination[destinations.surpresa.destino].validCount++;
+        } else {
+          results.rejectedImages++;
+        }
+      });
+    }
+    
+    // Calcular taxa de sucesso
+    results.successRate = results.totalImages > 0 ? 
+      (results.validImages / results.totalImages * 100).toFixed(2) + '%' : '0%';
+    
+    console.log('Resultados da análise de qualidade das imagens:', results);
+    return results;
+  },
+  
+  // Método para adicionar botões de debug na interface
   addDebugButton() {
     const btn = document.createElement('button');
     btn.textContent = '🔍 Debug Imagens';
@@ -809,6 +1045,89 @@ window.BENETRIP_IMAGES = {
     });
     
     document.body.appendChild(btn);
+    
+    // Adicionar opção para testar qualidade das imagens
+    const btnQuality = document.createElement('button');
+    btnQuality.textContent = '🔍 Verificar Qualidade';
+    btnQuality.style.position = 'fixed';
+    btnQuality.style.bottom = '50px';
+    btnQuality.style.left = '10px';
+    btnQuality.style.zIndex = '9999';
+    btnQuality.style.background = '#00A3E0'; // Azul Benetrip
+    btnQuality.style.color = 'white';
+    btnQuality.style.border = 'none';
+    btnQuality.style.borderRadius = '4px';
+    btnQuality.style.padding = '8px';
+    btnQuality.style.fontSize = '12px';
+    btnQuality.style.cursor = 'pointer';
+    
+    btnQuality.addEventListener('click', () => {
+      try {
+        const recomendacoesStr = localStorage.getItem('benetrip_recomendacoes');
+        if (recomendacoesStr) {
+          const recomendacoes = JSON.parse(recomendacoesStr);
+          const qualityResults = this.testImageQuality(recomendacoes);
+          
+          // Criar um relatório visual
+          const resultDiv = document.createElement('div');
+          resultDiv.className = 'quality-diagnostic';
+          
+          // Criar HTML para o relatório
+          let htmlContent = `
+            <h3>Análise de Qualidade das Imagens</h3>
+            <p>Total de imagens: ${qualityResults.totalImages}</p>
+            <p>Imagens válidas: ${qualityResults.validImages} (${qualityResults.successRate})</p>
+            <p>Imagens rejeitadas: ${qualityResults.rejectedImages}</p>
+          `;
+          
+          // Adicionar detalhes por destino
+          htmlContent += '<div class="image-validation-list">';
+          for (const [destino, info] of Object.entries(qualityResults.byDestination)) {
+            htmlContent += `
+              <div class="validation-item">
+                <h4>${destino} (${info.validCount}/${info.images.length} válidas)</h4>
+                <ul>
+            `;
+            
+            info.images.forEach(img => {
+              const scoreClass = img.score >= 0.8 ? 'high' : (img.score >= 0.6 ? 'medium' : 'low');
+              htmlContent += `
+                <li>
+                  <span>${img.pontoTuristico || 'Sem ponto turístico'}</span>
+                  <span class="quality-score ${scoreClass}">${(img.score * 100).toFixed(0)}%</span>
+                  <small>(${img.source})</small>
+                </li>
+              `;
+            });
+            
+            htmlContent += `
+                </ul>
+              </div>
+            `;
+          }
+          htmlContent += '</div>';
+          
+          // Adicionar botão para fechar
+          htmlContent += `
+            <button id="close-debug" style="background:#E87722;color:white;border:none;padding:5px 10px;border-radius:4px;margin-top:10px;">Fechar</button>
+          `;
+          
+          resultDiv.innerHTML = htmlContent;
+          document.body.appendChild(resultDiv);
+          
+          document.getElementById('close-debug').addEventListener('click', () => {
+            document.body.removeChild(resultDiv);
+          });
+        } else {
+          alert('Nenhuma recomendação encontrada no localStorage!');
+        }
+      } catch (e) {
+        console.error('Erro ao testar qualidade das imagens:', e);
+        alert('Erro ao verificar qualidade: ' + e.message);
+      }
+    });
+    
+    document.body.appendChild(btnQuality);
   }
 };
 
