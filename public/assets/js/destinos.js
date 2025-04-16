@@ -130,35 +130,115 @@ const BENETRIP_DESTINOS = {
   },
   
   // Carregar dados do usuário e recomendações
-  async carregarDados() {
-    try {
-      // Obter dados do usuário do localStorage
-      this.dadosUsuario = this.carregarDadosUsuario();
-      
-      if (!this.dadosUsuario) {
-        throw new Error('Dados do usuário não encontrados');
-      }
-      
-      console.log('Dados do usuário carregados:', this.dadosUsuario);
-      
-      // Iniciar carregamento das recomendações
-      this.atualizarProgresso('Buscando melhores destinos para você...', 10);
-      this.recomendacoes = await this.buscarRecomendacoes();
-      
-      // Buscar imagens para os destinos recomendados
-      this.atualizarProgresso('Buscando imagens dos destinos...', 70);
-      await this.enriquecerComImagens();
-      
-      this.estaCarregando = false;
-      return true;
-    } catch (erro) {
-      console.error('Erro ao carregar dados:', erro);
-      this.estaCarregando = false;
-      this.temErro = true;
-      this.mensagemErro = erro.message;
-      throw erro;
+  // Carregar dados do usuário e recomendações
+async carregarDados() {
+  try {
+    // Obter dados do usuário do localStorage
+    this.dadosUsuario = this.carregarDadosUsuario();
+    
+    if (!this.dadosUsuario) {
+      throw new Error('Dados do usuário não encontrados');
     }
-  },
+    
+    console.log('Dados do usuário carregados:', this.dadosUsuario);
+    
+    // Iniciar carregamento das recomendações
+    this.atualizarProgresso('Buscando melhores destinos para você...', 10);
+    this.recomendacoes = await this.buscarRecomendacoes();
+    
+    // Buscar imagens para os destinos recomendados
+    this.atualizarProgresso('Buscando imagens dos destinos...', 70);
+    await this.enriquecerComImagens();
+    
+    // Novo: Verificar qualidade das imagens e reclassificar se necessário
+    this.verificarQualidadeImagens();
+    
+    this.estaCarregando = false;
+    return true;
+  } catch (erro) {
+    console.error('Erro ao carregar dados:', erro);
+    this.estaCarregando = false;
+    this.temErro = true;
+    this.mensagemErro = erro.message;
+    throw erro;
+  }
+}
+
+// Método adicional para verificar qualidade das imagens
+verificarQualidadeImagens() {
+  if (!this.recomendacoes) return;
+  
+  console.log('Iniciando verificação de qualidade das imagens...');
+  
+  // Verifique a relevância das imagens e aplique correções se necessário
+  const verificarImagens = async (destino) => {
+    if (!destino || !destino.imagens || !destino.imagens.length) return;
+    
+    // Número mínimo de palavras-chave que devem corresponder
+    const correspondenciasNecessarias = 1;
+    
+    for (let i = 0; i < destino.imagens.length; i++) {
+      const imagem = destino.imagens[i];
+      
+      // Verificar relevância da imagem
+      if (imagem.alt && imagem.alt.length > 0) {
+        // Termos a serem verificados
+        const termos = [
+          destino.destino.toLowerCase(),
+          destino.pais.toLowerCase()
+        ];
+        
+        // Adicionar pontos turísticos, se disponíveis
+        if (destino.pontosTuristicos && destino.pontosTuristicos.length) {
+          termos.push(...destino.pontosTuristicos.map(pt => pt.toLowerCase()));
+        } else if (destino.pontoTuristico) {
+          termos.push(destino.pontoTuristico.toLowerCase());
+        }
+        
+        // Verificar se pelo menos um termo corresponde
+        const altText = imagem.alt.toLowerCase();
+        let correspondencias = 0;
+        
+        for (const termo of termos) {
+          if (termo && altText.includes(termo)) {
+            correspondencias++;
+          }
+        }
+        
+        // Se a imagem não parece relevante, marcar para substituição
+        if (correspondencias < correspondenciasNecessarias) {
+          console.warn(`Imagem possivelmente irrelevante para ${destino.destino}:`, imagem.url);
+          imagem.baixaRelevancia = true;
+        }
+      }
+    }
+    
+    // Reordenar imagens para priorizar as mais relevantes
+    destino.imagens.sort((a, b) => {
+      // Colocar imagens de baixa relevância no final
+      if (a.baixaRelevancia && !b.baixaRelevancia) return 1;
+      if (!a.baixaRelevancia && b.baixaRelevancia) return -1;
+      return 0;
+    });
+  };
+  
+  // Verificar todos os destinos
+  if (this.recomendacoes.topPick) {
+    verificarImagens(this.recomendacoes.topPick);
+  }
+  
+  if (this.recomendacoes.surpresa) {
+    verificarImagens(this.recomendacoes.surpresa);
+  }
+  
+  if (this.recomendacoes.alternativas && this.recomendacoes.alternativas.length) {
+    for (const destino of this.recomendacoes.alternativas) {
+      verificarImagens(destino);
+    }
+  }
+  
+  console.log('Verificação de qualidade de imagens concluída');
+},
   
   // Buscar imagens para um destino – melhoria na montagem da URL
   async buscarImagensDestino(destino) {
