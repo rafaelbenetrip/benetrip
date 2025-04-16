@@ -495,8 +495,15 @@ async enriquecerComImagens() {
     `;
   },
   
-  // Método auxiliar para renderizar imagem com créditos - USANDO BENETRIP_IMAGES
-renderizarImagemComCreditos(imagem, fallbackText, classes = '') {
+  // Método auxiliar para renderizar imagem com créditos - CORRIGIDO PARA POSICIONAMENTO DE TAGS
+renderizarImagemComCreditos(imagem, fallbackText, classes = '', options = {}) {
+  // Options para controlar comportamento
+  const { 
+    isTopChoice = false, 
+    isSurpriseDestination = false,
+    showPontoTuristico = true
+  } = options || {};
+  
   if (!imagem) {
     return `
       <div class="bg-gray-200 ${classes}">
@@ -505,19 +512,61 @@ renderizarImagemComCreditos(imagem, fallbackText, classes = '') {
     `;
   }
   
-  // Criar um container temporário para renderizar a imagem
-  const tempContainer = document.createElement('div');
+  // HTML para tags de destaque
+  let topChoiceTag = '';
+  if (isTopChoice) {
+    topChoiceTag = `
+      <div class="absolute top-0 left-0 py-1 px-3 z-10 font-bold text-white tag-escolha-top" style="background-color: #E87722;">
+        Escolha Top da Tripinha!
+      </div>
+    `;
+  }
   
-  // Usar o método do BENETRIP_IMAGES
-  window.BENETRIP_IMAGES.renderImageWithCredits(imagem, tempContainer, {
-    className: classes,
-    showCredits: true,
-    showPontoTuristico: true,
-    clickable: true
-  });
+  let surpriseTag = '';
+  if (isSurpriseDestination) {
+    surpriseTag = `
+      <div class="absolute top-0 left-0 py-1 px-3 z-10 font-bold text-white tag-destino-surpresa rounded-br-lg" style="background-color: #00A3E0;">
+        ✨ Destino Surpresa!
+      </div>
+    `;
+  }
   
-  // Retornar o HTML do container
-  return tempContainer.innerHTML;
+  // HTML para tag de ponto turístico
+  let pontoTuristicoTag = '';
+  if (showPontoTuristico && imagem.pontoTuristico) {
+    pontoTuristicoTag = `
+      <div class="tourist-spot-label">
+        ${imagem.pontoTuristico}
+      </div>
+    `;
+  }
+
+  // Garantir que temos URLs e textos alternativos
+  const imageUrl = imagem.url || `https://via.placeholder.com/400x224?text=${encodeURIComponent(fallbackText)}`;
+  const imageAlt = imagem.alt || fallbackText;
+  const photographer = imagem.photographer || 'Benetrip';
+  const sourceUrl = imagem.sourceUrl || '#';
+  
+  // Montar HTML final
+  return `
+    <div class="relative ${classes}">
+      <img 
+        src="${imageUrl}" 
+        alt="${imageAlt}" 
+        class="w-full h-full object-cover"
+        data-ponto-turistico="${imagem.pontoTuristico || ''}"
+        onerror="this.onerror=null; this.src='https://via.placeholder.com/400x224?text=${encodeURIComponent(fallbackText)}';"
+      >
+      ${topChoiceTag}
+      ${surpriseTag}
+      ${pontoTuristicoTag}
+      <div class="absolute bottom-0 right-0 text-white text-xs bg-black bg-opacity-50 px-1 py-0.5">
+        <a href="${sourceUrl}" target="_blank" rel="noopener noreferrer" class="text-white hover:underline">
+          Foto: ${photographer}
+        </a>
+      </div>
+    </div>
+  `;
 },
   
   // Renderizar destino destaque com sistema de abas
@@ -531,19 +580,17 @@ renderizarDestinoDestaque(destino) {
     
     // Imagem de cabeçalho expandida
     let headerHtml = `
-      <div class="relative rounded-t-lg overflow-hidden">
-        <div class="absolute top-0 left-0 py-1 px-3 z-10 font-bold text-white" style="background-color: #E87722;">
-          Escolha Top da Tripinha!
-        </div>
-        <div class="h-48">
-          ${this.renderizarImagemComCreditos(
-            destino.imagens && destino.imagens.length > 0 ? destino.imagens[0] : null,
-            destino.destino,
-            'h-full w-full'
-          )}
-        </div>
-      </div>
-    `;
+  <div class="relative rounded-t-lg overflow-hidden">
+    <div class="h-48">
+      ${this.renderizarImagemComCreditos(
+        destino.imagens && destino.imagens.length > 0 ? destino.imagens[0] : null,
+        destino.destino,
+        'h-full w-full',
+        { isTopChoice: true }
+      )}
+    </div>
+  </div>
+`;
     
     // Cabeçalho com título e país
     let tituloHtml = `
@@ -882,17 +929,13 @@ mostrarDestinoSurpresa() {
       <!-- Imagem com banner e botão de fechar -->
       <div class="relative">
         <div class="h-48 bg-gray-200">
-          ${this.renderizarImagemComCreditos(
-            destino.imagens && destino.imagens.length > 0 ? destino.imagens[0] : null,
-            destino.destino,
-            'h-full w-full'
-          )}
-        </div>
-        
-        <!-- Banner de Destino Surpresa (Azul) -->
-        <div class="absolute top-0 left-0 py-1 px-3 z-10 font-bold text-white rounded-br-lg" style="background-color: #00A3E0;">
-          ✨ Destino Surpresa!
-        </div>
+  ${this.renderizarImagemComCreditos(
+    destino.imagens && destino.imagens.length > 0 ? destino.imagens[0] : null,
+    destino.destino,
+    'h-full w-full',
+    { isSurpriseDestination: true }
+  )}
+</div>
         
         <!-- Botão de fechar no canto superior direito -->
         <button class="absolute top-2 right-2 z-10 w-8 h-8 flex items-center justify-center text-white bg-black bg-opacity-60 rounded-full hover:bg-opacity-80 transition-all" 
