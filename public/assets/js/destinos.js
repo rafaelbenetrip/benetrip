@@ -495,7 +495,7 @@ async enriquecerComImagens() {
     `;
   },
   
-  // Método auxiliar para renderizar imagem com créditos - VERSÃO CORRIGIDA COMPLETA
+  // Método auxiliar para renderizar imagem com créditos - AJUSTADO PARA CRÉDITOS DISCRETOS
 renderizarImagemComCreditos(imagem, fallbackText, classes = '', options = {}) {
   // Options para controlar comportamento
   const { 
@@ -548,15 +548,18 @@ renderizarImagemComCreditos(imagem, fallbackText, classes = '', options = {}) {
   const photographer = imagem.photographer || 'Benetrip';
   const sourceUrl = imagem.sourceUrl || '#';
   
-  // Créditos da imagem (adicionado opção para ocultá-los)
-  let creditsHtml = '';
+  // HTML para créditos de forma abreviada no canto inferior direito
+  let creditsTag = '';
   if (showCredits) {
-    creditsHtml = `
-      <div class="absolute bottom-0 right-0 text-white text-xs bg-black bg-opacity-50 px-1 py-0.5 image-credits z-5">
-        <a href="${sourceUrl}" target="_blank" rel="noopener noreferrer" class="text-white hover:underline">
-          Foto: ${photographer}
-        </a>
-      </div>
+    creditsTag = `
+      <a href="${sourceUrl}" target="_blank" rel="noopener noreferrer" 
+         class="absolute bottom-1 right-1 bg-black bg-opacity-50 rounded-sm px-1.5 py-0.5 text-white text-xs flex items-center hover:bg-opacity-70 z-5"
+         title="Foto por ${photographer}">
+        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-0.5">
+          <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7l-5-5z"></path>
+          <polyline points="14 2 14 8 20 8"></polyline>
+        </svg>
+      </a>
     `;
   }
   
@@ -573,7 +576,7 @@ renderizarImagemComCreditos(imagem, fallbackText, classes = '', options = {}) {
       ${topChoiceTag}
       ${surpriseTag}
       ${pontoTuristicoTag}
-      ${creditsHtml}
+      ${creditsTag}
     </div>
   `;
 },
@@ -835,11 +838,10 @@ renderizarDestinosAlternativos(destinos) {
     elementoDestino.innerHTML = `
       <div class="relative">
         ${this.renderizarImagemComCreditos(
-  destino.imagens && destino.imagens.length > 0 ? destino.imagens[0] : null,
-  destino.destino,
-  'h-32',
-  { showCredits: false }  // Ocultar créditos nos cards pequenos
-)}
+          destino.imagens && destino.imagens.length > 0 ? destino.imagens[0] : null,
+          destino.destino,
+          'h-32'
+        )}
         <div class="absolute top-2 right-2 bg-white bg-opacity-90 rounded-full p-1 shadow-sm">
           <span class="text-lg">${iconeTipo}</span>
         </div>
