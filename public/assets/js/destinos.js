@@ -162,77 +162,47 @@ const BENETRIP_DESTINOS = {
   
   // Buscar imagens para um destino – melhoria na montagem da URL
   async buscarImagensDestino(destino) {
-    try {
-      if (!destino) return null;
-      
-      // Construir a query unindo destino e país em uma única string
-      let queryCompleta = destino.destino + ' ' + destino.pais;
-      let url = `/api/image-search?query=${encodeURIComponent(queryCompleta)}`;
-      
-      // Adicionar pontos turísticos específicos à query
-      if (destino.pontosTuristicos && destino.pontosTuristicos.length > 0) {
-        url += `&pontosTuristicos=${encodeURIComponent(JSON.stringify(destino.pontosTuristicos))}`;
-      } else if (destino.pontoTuristico) {
-        url += `&pontosTuristicos=${encodeURIComponent(JSON.stringify([destino.pontoTuristico]))}`;
-      }
-      
-      console.log(`Buscando imagens para ${destino.destino} com pontos turísticos`, 
-        destino.pontosTuristicos || destino.pontoTuristico);
-      console.log('URL construída:', url);
-      
-      const resposta = await fetch(url);
-      const dados = await resposta.json();
-      
-      if (dados && dados.images && dados.images.length > 0) {
-        console.log(`Encontradas ${dados.images.length} imagens para ${destino.destino}`);
-        return dados.images;
-      }
-      
-      console.warn(`Nenhuma imagem encontrada para ${destino.destino}`);
-      return null;
-    } catch (erro) {
-      console.error(`Erro ao buscar imagens para ${destino.destino}:`, erro);
-      return null;
+  try {
+    if (!destino) return null;
+    
+    // Construir a query unindo destino e país em uma única string
+    let queryCompleta = destino.destino + ' ' + destino.pais;
+    let url = `/api/image-search?query=${encodeURIComponent(queryCompleta)}`;
+    
+    // Adicionar pontos turísticos específicos à query
+    if (destino.pontosTuristicos && destino.pontosTuristicos.length > 0) {
+      url += `&pontosTuristicos=${encodeURIComponent(JSON.stringify(destino.pontosTuristicos))}`;
+    } else if (destino.pontoTuristico) {
+      url += `&pontosTuristicos=${encodeURIComponent(JSON.stringify([destino.pontoTuristico]))}`;
     }
-  },
-  
-  // Buscar imagens para todos os destinos
-  async enriquecerComImagens() {
-    try {
-      console.log('Enriquecendo destinos com imagens...');
-      
-      // Destino principal
-      if (this.recomendacoes.topPick) {
-        this.recomendacoes.topPick.imagens = 
-          await this.buscarImagensDestino(this.recomendacoes.topPick);
-      }
-      
-      // Destino surpresa
-      if (this.recomendacoes.surpresa) {
-        this.recomendacoes.surpresa.imagens = 
-          await this.buscarImagensDestino(this.recomendacoes.surpresa);
-      }
-      
-      // Alternativas
-      if (this.recomendacoes.alternativas && this.recomendacoes.alternativas.length > 0) {
-        for (let i = 0; i < this.recomendacoes.alternativas.length; i++) {
-          this.recomendacoes.alternativas[i].imagens = 
-            await this.buscarImagensDestino(this.recomendacoes.alternativas[i]);
-          
-          // Pequena pausa para não sobrecarregar a API
-          if (i < this.recomendacoes.alternativas.length - 1) {
-            await new Promise(resolve => setTimeout(resolve, 300));
-          }
-        }
-      }
-      
-      console.log('Destinos enriquecidos com imagens com sucesso');
-      return true;
-    } catch (erro) {
-      console.error('Erro ao enriquecer destinos com imagens:', erro);
-      return false;
+    
+    // Adicionar preferência de fonte (Google como primeira opção)
+    url += `&source=google`;
+    
+    // Adicionar parâmetro de descrição para melhorar a busca
+    if (destino.porque) {
+      url += `&descricao=${encodeURIComponent(destino.porque)}`;
     }
-  },
+    
+    console.log(`Buscando imagens para ${destino.destino} com pontos turísticos`, 
+      destino.pontosTuristicos || destino.pontoTuristico);
+    console.log('URL construída:', url);
+    
+    const resposta = await fetch(url);
+    const dados = await resposta.json();
+    
+    if (dados && dados.images && dados.images.length > 0) {
+      console.log(`Encontradas ${dados.images.length} imagens para ${destino.destino} de fonte: ${dados.source || 'desconhecida'}`);
+      return dados.images;
+    }
+    
+    console.warn(`Nenhuma imagem encontrada para ${destino.destino}`);
+    return null;
+  } catch (erro) {
+    console.error(`Erro ao buscar imagens para ${destino.destino}:`, erro);
+    return null;
+  }
+},
   
   // Carregar dados do usuário do localStorage
   carregarDadosUsuario() {
