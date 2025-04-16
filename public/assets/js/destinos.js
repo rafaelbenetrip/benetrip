@@ -495,13 +495,14 @@ async enriquecerComImagens() {
     `;
   },
   
-  // Método auxiliar para renderizar imagem com créditos - CORRIGIDO PARA POSICIONAMENTO DE TAGS
+  // Método auxiliar para renderizar imagem com créditos - VERSÃO CORRIGIDA COMPLETA
 renderizarImagemComCreditos(imagem, fallbackText, classes = '', options = {}) {
   // Options para controlar comportamento
   const { 
     isTopChoice = false, 
     isSurpriseDestination = false,
-    showPontoTuristico = true
+    showPontoTuristico = true,
+    showCredits = true
   } = options || {};
   
   if (!imagem) {
@@ -547,6 +548,18 @@ renderizarImagemComCreditos(imagem, fallbackText, classes = '', options = {}) {
   const photographer = imagem.photographer || 'Benetrip';
   const sourceUrl = imagem.sourceUrl || '#';
   
+  // Créditos da imagem (adicionado opção para ocultá-los)
+  let creditsHtml = '';
+  if (showCredits) {
+    creditsHtml = `
+      <div class="absolute bottom-0 right-0 text-white text-xs bg-black bg-opacity-50 px-1 py-0.5 image-credits z-5">
+        <a href="${sourceUrl}" target="_blank" rel="noopener noreferrer" class="text-white hover:underline">
+          Foto: ${photographer}
+        </a>
+      </div>
+    `;
+  }
+  
   // Montar HTML final
   return `
     <div class="relative ${classes}">
@@ -560,11 +573,7 @@ renderizarImagemComCreditos(imagem, fallbackText, classes = '', options = {}) {
       ${topChoiceTag}
       ${surpriseTag}
       ${pontoTuristicoTag}
-      <div class="absolute bottom-0 right-0 text-white text-xs bg-black bg-opacity-50 px-1 py-0.5">
-        <a href="${sourceUrl}" target="_blank" rel="noopener noreferrer" class="text-white hover:underline">
-          Foto: ${photographer}
-        </a>
-      </div>
+      ${creditsHtml}
     </div>
   `;
 },
@@ -826,10 +835,11 @@ renderizarDestinosAlternativos(destinos) {
     elementoDestino.innerHTML = `
       <div class="relative">
         ${this.renderizarImagemComCreditos(
-          destino.imagens && destino.imagens.length > 0 ? destino.imagens[0] : null,
-          destino.destino,
-          'h-32'
-        )}
+  destino.imagens && destino.imagens.length > 0 ? destino.imagens[0] : null,
+  destino.destino,
+  'h-32',
+  { showCredits: false }  // Ocultar créditos nos cards pequenos
+)}
         <div class="absolute top-2 right-2 bg-white bg-opacity-90 rounded-full p-1 shadow-sm">
           <span class="text-lg">${iconeTipo}</span>
         </div>
