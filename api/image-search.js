@@ -6,6 +6,13 @@ const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
 const GOOGLE_SEARCH_ENGINE_ID = process.env.GOOGLE_SEARCH_ENGINE_ID;
 const GOOGLE_PLACES_API_KEY = process.env.GOOGLE_PLACES_API_KEY || process.env.GOOGLE_API_KEY;
 
+// Adicione este log para diagnóstico (remova após a correção)
+console.log('Credenciais Google:', { 
+  keyDefined: !!GOOGLE_API_KEY, 
+  keyLength: GOOGLE_API_KEY?.length,
+  searchEngineIdDefined: !!GOOGLE_SEARCH_ENGINE_ID
+});
+
 // Cache temporário para pontos turísticos obtidos via Google Places
 const pontosTuristicosCache = new Map();
 // Tempo de expiração do cache (24 horas)
@@ -122,6 +129,12 @@ async function fetchGoogleImages(query, options = {}) {
       destination,
       pontosTuristicos: pontosTuristicos.join(', ')
     });
+
+    // Verificar se as credenciais estão configuradas
+    if (!GOOGLE_API_KEY || !GOOGLE_SEARCH_ENGINE_ID) {
+      logEvent('error', 'Credenciais Google não configuradas corretamente');
+      return { success: false, images: [], error: { message: 'Credenciais não configuradas' } };
+    }
     
     const response = await axios.get(
       'https://www.googleapis.com/customsearch/v1',
@@ -168,12 +181,20 @@ async function fetchGoogleImages(query, options = {}) {
     }
     
     return { success: false, images: [] };
-  } catch (error) {
+   } catch (error) {
+    // Melhor tratamento de erro com detalhes da resposta
+    const errorDetails = error.response ? {
+      status: error.response.status,
+      statusText: error.response.statusText,
+      data: error.response.data
+    } : { message: error.message };
+    
     logEvent('error', 'Erro ao buscar no Google Custom Search', { 
       query: searchQuery, 
       error: error.message,
-      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      details: errorDetails
     });
+    
     return { success: false, images: [], error };
   }
 }
