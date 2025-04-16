@@ -160,79 +160,100 @@ const BENETRIP_DESTINOS = {
     }
   },
   
-  // Buscar imagens para um destino – melhoria na montagem da URL
-  async buscarImagensDestino(destino) {
-    try {
-      if (!destino) return null;
-      
-      // Construir a query unindo destino e país em uma única string
-      let queryCompleta = destino.destino + ' ' + destino.pais;
-      let url = `/api/image-search?query=${encodeURIComponent(queryCompleta)}`;
-      
-      // Adicionar pontos turísticos específicos à query
-      if (destino.pontosTuristicos && destino.pontosTuristicos.length > 0) {
-        url += `&pontosTuristicos=${encodeURIComponent(JSON.stringify(destino.pontosTuristicos))}`;
-      } else if (destino.pontoTuristico) {
-        url += `&pontosTuristicos=${encodeURIComponent(JSON.stringify([destino.pontoTuristico]))}`;
-      }
-      
-      console.log(`Buscando imagens para ${destino.destino} com pontos turísticos`, 
-        destino.pontosTuristicos || destino.pontoTuristico);
-      console.log('URL construída:', url);
-      
-      const resposta = await fetch(url);
-      const dados = await resposta.json();
-      
-      if (dados && dados.images && dados.images.length > 0) {
-        console.log(`Encontradas ${dados.images.length} imagens para ${destino.destino}`);
-        return dados.images;
-      }
-      
-      console.warn(`Nenhuma imagem encontrada para ${destino.destino}`);
-      return null;
-    } catch (erro) {
-      console.error(`Erro ao buscar imagens para ${destino.destino}:`, erro);
-      return null;
+  // Buscar imagens para um destino – VERSÃO OTIMIZADA
+async buscarImagensDestino(destino) {
+  try {
+    if (!destino) return null;
+    
+    // Verificar se já temos no cache do BENETRIP_IMAGES
+    const cacheKey = `${destino.destino}_${destino.pais}_images`;
+    const cachedImages = window.BENETRIP_IMAGES.getFromCache(cacheKey);
+    if (cachedImages) {
+      console.log(`Usando imagens em cache para ${destino.destino}`);
+      return cachedImages;
     }
-  },
+    
+    // Construir a query unindo destino e país em uma única string
+    let queryCompleta = destino.destino + ' ' + destino.pais;
+    let url = `/api/image-search?query=${encodeURIComponent(queryCompleta)}`;
+    
+    // Adicionar pontos turísticos específicos à query
+    if (destino.pontosTuristicos && destino.pontosTuristicos.length > 0) {
+      url += `&pontosTuristicos=${encodeURIComponent(JSON.stringify(destino.pontosTuristicos))}`;
+    } else if (destino.pontoTuristico) {
+      url += `&pontosTuristicos=${encodeURIComponent(JSON.stringify([destino.pontoTuristico]))}`;
+    }
+    
+    console.log(`Buscando imagens para ${destino.destino} com pontos turísticos`, 
+      destino.pontosTuristicos || destino.pontoTuristico);
+    
+    const resposta = await fetch(url);
+    const dados = await resposta.json();
+    
+    if (dados && dados.images && dados.images.length > 0) {
+      console.log(`Encontradas ${dados.images.length} imagens para ${destino.destino}`);
+      
+      // Adicionar ao cache do BENETRIP_IMAGES
+      window.BENETRIP_IMAGES.addToCache(cacheKey, dados.images);
+      
+      return dados.images;
+    }
+    
+    console.warn(`Nenhuma imagem encontrada para ${destino.destino}`);
+    return null;
+  } catch (erro) {
+    console.error(`Erro ao buscar imagens para ${destino.destino}:`, erro);
+    return null;
+  }
+},
   
-  // Buscar imagens para todos os destinos
-  async enriquecerComImagens() {
-    try {
-      console.log('Enriquecendo destinos com imagens...');
-      
-      // Destino principal
-      if (this.recomendacoes.topPick) {
-        this.recomendacoes.topPick.imagens = 
-          await this.buscarImagensDestino(this.recomendacoes.topPick);
+  // Buscar imagens para todos os destinos - VERSÃO MELHORADA
+async enriquecerComImagens() {
+  try {
+    console.log('Enriquecendo destinos com imagens...');
+    
+    // Destino principal
+    if (this.recomendacoes.topPick) {
+      this.recomendacoes.topPick.imagens = 
+        await this.buscarImagensDestino(this.recomendacoes.topPick);
+        
+      // Pré-carregar imagens para melhorar performance
+      if (this.recomendacoes.topPick.imagens && this.recomendacoes.topPick.imagens.length > 0) {
+        window.BENETRIP_IMAGES.preloadImages({topPick: this.recomendacoes.topPick});
       }
-      
-      // Destino surpresa
-      if (this.recomendacoes.surpresa) {
-        this.recomendacoes.surpresa.imagens = 
-          await this.buscarImagensDestino(this.recomendacoes.surpresa);
-      }
-      
-      // Alternativas
-      if (this.recomendacoes.alternativas && this.recomendacoes.alternativas.length > 0) {
-        for (let i = 0; i < this.recomendacoes.alternativas.length; i++) {
-          this.recomendacoes.alternativas[i].imagens = 
-            await this.buscarImagensDestino(this.recomendacoes.alternativas[i]);
-          
-          // Pequena pausa para não sobrecarregar a API
-          if (i < this.recomendacoes.alternativas.length - 1) {
-            await new Promise(resolve => setTimeout(resolve, 300));
-          }
+    }
+    
+    // Destino surpresa (carregar com prioridade mais baixa)
+    if (this.recomendacoes.surpresa) {
+      this.recomendacoes.surpresa.imagens = 
+        await this.buscarImagensDestino(this.recomendacoes.surpresa);
+    }
+    
+    // Alternativas (com pequenas pausas entre requisições)
+    if (this.recomendacoes.alternativas && this.recomendacoes.alternativas.length > 0) {
+      for (let i = 0; i < this.recomendacoes.alternativas.length; i++) {
+        this.recomendacoes.alternativas[i].imagens = 
+          await this.buscarImagensDestino(this.recomendacoes.alternativas[i]);
+        
+        // Pequena pausa para não sobrecarregar a API
+        if (i < this.recomendacoes.alternativas.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 300));
         }
       }
-      
-      console.log('Destinos enriquecidos com imagens com sucesso');
-      return true;
-    } catch (erro) {
-      console.error('Erro ao enriquecer destinos com imagens:', erro);
-      return false;
     }
-  },
+    
+    // Validar a qualidade das imagens
+    if (window.BENETRIP_IMAGES) {
+      window.BENETRIP_IMAGES.testImageQuality(this.recomendacoes);
+    }
+    
+    console.log('Destinos enriquecidos com imagens com sucesso');
+    return true;
+  } catch (erro) {
+    console.error('Erro ao enriquecer destinos com imagens:', erro);
+    return false;
+  }
+},
   
   // Carregar dados do usuário do localStorage
   carregarDadosUsuario() {
@@ -359,6 +380,7 @@ const BENETRIP_DESTINOS = {
       this.renderizarDestinoDestaque(this.recomendacoes.topPick);
       this.renderizarDestinosAlternativos(this.recomendacoes.alternativas);
       this.renderizarOpcaoSurpresa();
+      this.verificarImagensAposRenderizacao();
       
     } catch (erro) {
       console.error('Erro ao renderizar interface:', erro);
@@ -473,48 +495,30 @@ const BENETRIP_DESTINOS = {
     `;
   },
   
-  // Método auxiliar para renderizar imagem com créditos - CORRIGIDO PARA MELHOR ACESSO AOS LINKS
-  renderizarImagemComCreditos(imagem, fallbackText, classes = '') {
-    if (!imagem) {
-      return `
-        <div class="bg-gray-200 ${classes}">
-          <img src="https://via.placeholder.com/400x224?text=${encodeURIComponent(fallbackText)}" alt="${fallbackText}" class="w-full h-full object-cover">
-        </div>
-      `;
-    }
-    
-    // Construir os créditos da imagem com link clicável garantido
-    const photographerLink = imagem.photographerUrl || '#';
-    const sourceLink = imagem.sourceUrl || '#';
-    const photographer = imagem.photographer || 'Desconhecido';
-
+  // Método auxiliar para renderizar imagem com créditos - USANDO BENETRIP_IMAGES
+renderizarImagemComCreditos(imagem, fallbackText, classes = '') {
+  if (!imagem) {
     return `
-      <div class="image-container loading bg-gray-200 ${classes} relative">
-        <img src="${imagem.url}" alt="${imagem.alt || fallbackText}" class="w-full h-full object-cover" 
-             onload="this.parentNode.classList.remove('loading')" 
-             onerror="this.onerror=null; this.src='https://via.placeholder.com/400x224?text=${encodeURIComponent(fallbackText)}'; this.parentNode.classList.remove('loading')">
-        
-        <!-- Icone de lupa com link para fonte original -->
-        <a href="${sourceLink}" target="_blank" rel="noopener noreferrer" 
-           class="absolute top-2 right-2 bg-white bg-opacity-80 p-1.5 rounded-full z-10 hover:bg-opacity-100 transition-all"
-           onclick="event.stopPropagation(); window.open('${sourceLink}', '_blank');">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="11" cy="11" r="8"></circle>
-            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-          </svg>
-        </a>
-        
-        <!-- Créditos do fotógrafo com melhor posicionamento e visibilidade -->
-        <div class="absolute bottom-0 left-0 right-0 p-1.5 bg-black bg-opacity-70 text-white text-xs z-10">
-          <a href="${photographerLink}" target="_blank" rel="noopener noreferrer" 
-             class="text-white hover:underline"
-             onclick="event.stopPropagation(); window.open('${photographerLink}', '_blank');">
-            Foto por ${photographer}
-          </a>
-        </div>
+      <div class="bg-gray-200 ${classes}">
+        <img src="https://via.placeholder.com/400x224?text=${encodeURIComponent(fallbackText)}" alt="${fallbackText}" class="w-full h-full object-cover">
       </div>
     `;
-  },
+  }
+  
+  // Criar um container temporário para renderizar a imagem
+  const tempContainer = document.createElement('div');
+  
+  // Usar o método do BENETRIP_IMAGES
+  window.BENETRIP_IMAGES.renderImageWithCredits(imagem, tempContainer, {
+    className: classes,
+    showCredits: true,
+    showPontoTuristico: true,
+    clickable: true
+  });
+  
+  // Retornar o HTML do container
+  return tempContainer.innerHTML;
+},
   
   // Renderizar destino destaque com sistema de abas
 renderizarDestinoDestaque(destino) {
@@ -619,10 +623,17 @@ renderizarDestinoDestaque(destino) {
                 ${this.gerarDescricaoAutomatica(ponto, destino.destino)}
               </p>
               ${idx === 0 && destino.imagens && destino.imagens.length > 1 ? `
-                <div class="mt-2 ml-11 rounded-lg overflow-hidden h-28">
-                  <img src="${destino.imagens[1].url}" alt="${ponto}" class="w-full h-full object-cover">
-                </div>
-              ` : ''}
+  <div class="mt-2 ml-11 rounded-lg overflow-hidden h-28 ponto-turistico-galeria" 
+       data-ponto="${ponto}" data-destino="${destino.destino}">
+    <div class="ponto-turistico-image-container">
+      ${this.renderizarImagemComCreditos(
+        destino.imagens.find(img => img.pontoTuristico === ponto) || destino.imagens[1],
+        ponto,
+        'h-full w-full'
+      )}
+    </div>
+  </div>
+` : ''}
             </div>
           `).join('') : 
           '<p class="text-center text-gray-500 my-6">Informações sobre pontos turísticos não disponíveis</p>'
@@ -845,8 +856,7 @@ renderizarDestinosAlternativos(destinos) {
     `;
   },
   
-  // Método para mostrar destino surpresa - COMPLETAMENTE CORRIGIDO
-  // Método para mostrar destino surpresa - COMPLETAMENTE CORRIGIDO
+  // Método para mostrar destino surpresa - VERSÃO OTIMIZADA
 mostrarDestinoSurpresa() {
   if (!this.recomendacoes || !this.recomendacoes.surpresa) {
     console.error('Destino surpresa não disponível');
@@ -944,14 +954,14 @@ mostrarDestinoSurpresa() {
             <span class="text-lg mr-2">🎁</span>
             <div>
               <h4 class="font-medium mb-1">Por que visitar:</h4>
-              <p class="text-gray-800 text-sm">${destino.porque || 'Ponta Negra e suas dunas.'}</p>
+              <p class="text-gray-800 text-sm">${destino.porque || 'Um destino fascinante com muitas atrações.'}</p>
             </div>
           </div>
         </div>
         
         <div class="mt-4">
           <h4 class="font-medium mb-2">Destaque da experiência:</h4>
-          <p class="text-gray-800">${destino.destaque || 'Passeio de buggy pelas dunas.'}</p>
+          <p class="text-gray-800">${destino.destaque || 'Experiências únicas que você lembrará para sempre.'}</p>
         </div>
         
         ${this.prepararInformacaoAeroporto(destino)}
@@ -972,8 +982,15 @@ mostrarDestinoSurpresa() {
                 ${this.gerarDescricaoAutomatica(ponto, destino.destino)}
               </p>
               ${idx === 0 && destino.imagens && destino.imagens.length > 1 ? `
-                <div class="mt-2 ml-11 rounded-lg overflow-hidden h-28">
-                  <img src="${destino.imagens[1].url}" alt="${ponto}" class="w-full h-full object-cover">
+                <div class="mt-2 ml-11 rounded-lg overflow-hidden h-28 ponto-turistico-galeria"
+                     data-ponto="${ponto}" data-destino="${destino.destino}">
+                  <div class="ponto-turistico-image-container">
+                    ${this.renderizarImagemComCreditos(
+                      destino.imagens.find(img => img.pontoTuristico === ponto) || destino.imagens[1],
+                      ponto,
+                      'h-full w-full'
+                    )}
+                  </div>
                 </div>
               ` : ''}
             </div>
@@ -1014,7 +1031,7 @@ mostrarDestinoSurpresa() {
             </div>
             <div>
               <p class="font-medium text-sm mb-1">Minha experiência em ${destino.destino}:</p>
-              <p class="italic">"${destino.comentario || `Foi incrível visitar a Praia de Ponta Negra e explorar as dunas de Natal! É um lugar especial que merece ser descoberto, com paisagens incríveis e muitas aventuras. 🐾`}"</p>
+              <p class="italic">"${destino.comentario || `Foi incrível explorar ${destino.destino}! ${destino.pontosTuristicos && destino.pontosTuristicos.length > 0 ? 'Especialmente ' + destino.pontosTuristicos[0] + '!' : 'O lugar é maravilhoso!'} 🐾`}"</p>
             </div>
           </div>
         </div>
@@ -1022,7 +1039,7 @@ mostrarDestinoSurpresa() {
         <div class="mt-4 bg-gray-50 p-4 rounded-lg">
           <h4 class="font-medium mb-2">Dicas de outros viajantes:</h4>
           <div class="border-l-2 border-gray-300 pl-3 py-1">
-            <p class="italic text-sm">"Adorei ${destino.destino}! As dunas são impressionantes e o passeio de buggy é uma aventura incrível. Não deixe de experimentar a culinária local."</p>
+            <p class="italic text-sm">"Adorei ${destino.destino}! A experiência é incrível e o clima é perfeito na ${estacaoAno}."</p>
             <p class="text-xs text-gray-500 mt-1">- Ana S., viajou em 2024</p>
           </div>
         </div>
@@ -1062,6 +1079,30 @@ mostrarDestinoSurpresa() {
       BENETRIP_DESTINOS.destinoSelecionado = null;
     }
   });
+  
+  // MELHORIA: Aprimorar qualidade das imagens após renderização do modal
+  setTimeout(() => {
+    // Melhorar qualidade das imagens no modal surpresa
+    if (destino.imagens && destino.imagens.length > 0) {
+      const imgContainer = document.querySelector('.modal-surpresa-content .image-container');
+      if (imgContainer) {
+        const imgElement = imgContainer.querySelector('img');
+        if (imgElement) {
+          window.BENETRIP_IMAGES.enhanceExistingImage(imgElement, destino.imagens[0]);
+        }
+      }
+      
+      // Melhorar imagens de pontos turísticos
+      const pontosTuristicosImgs = document.querySelectorAll('.ponto-turistico-galeria img');
+      pontosTuristicosImgs.forEach(img => {
+        const pontoTuristico = img.closest('.ponto-turistico-galeria').dataset.ponto;
+        const imagemPonto = destino.imagens.find(img => img.pontoTuristico === pontoTuristico);
+        if (imagemPonto) {
+          window.BENETRIP_IMAGES.enhanceExistingImage(img, imagemPonto);
+        }
+      });
+    }
+  }, 300);
 },
   
   // Método para selecionar um destino - VERSÃO CORRIGIDA E MELHORADA
@@ -1425,6 +1466,29 @@ mostrarConfirmacaoSelecao(destino) {
     
     return descricoes[index];
   },
+
+// Método para verificar e corrigir imagens problemáticas após renderização
+verificarImagensAposRenderizacao() {
+  // Selecionar todas as imagens de destinos
+  const imagens = document.querySelectorAll('.image-container img');
+  
+  imagens.forEach(img => {
+    // Verificar se a imagem já carregou corretamente
+    if (img.complete && img.naturalWidth === 0) {
+      // Imagem com erro de carregamento
+      const pontoTuristico = img.dataset.pontoTuristico;
+      const alt = img.alt || 'imagem de destino';
+      
+      // Usar o handler de erro do BENETRIP_IMAGES
+      window.BENETRIP_IMAGES.handleImageError(img);
+    }
+    
+    // Adicionar handler para imagens que ainda estão carregando
+    img.addEventListener('error', function() {
+      window.BENETRIP_IMAGES.handleImageError(this);
+    });
+  });
+},
   
   // Método para aplicar estilos modernos - ADICIONADA ANIMAÇÃO DE LOADING
   aplicarEstilosModernos() {
@@ -1546,5 +1610,13 @@ mostrarConfirmacaoSelecao(destino) {
 
 // Inicializar o módulo quando o DOM estiver pronto
 document.addEventListener('DOMContentLoaded', () => {
+  // Certificar que os serviços dependentes estão inicializados
+  if (!window.BENETRIP_IMAGES || !window.BENETRIP_IMAGES.isInitialized()) {
+    console.log('Inicializando serviço de imagens');
+    window.BENETRIP_IMAGES = window.BENETRIP_IMAGES || {};
+    window.BENETRIP_IMAGES.init();
+  }
+  
+  // Inicializar o módulo de destinos
   BENETRIP_DESTINOS.init();
 });
