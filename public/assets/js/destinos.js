@@ -128,6 +128,44 @@ const BENETRIP_DESTINOS = {
       botaoAba.classList.add('aba-ativa');
     }
   },
+
+// Buscar imagens para todos os destinos
+async enriquecerComImagens() {
+  try {
+    console.log('Enriquecendo destinos com imagens...');
+    
+    // Destino principal
+    if (this.recomendacoes.topPick) {
+      this.recomendacoes.topPick.imagens = 
+        await this.buscarImagensDestino(this.recomendacoes.topPick);
+    }
+    
+    // Destino surpresa
+    if (this.recomendacoes.surpresa) {
+      this.recomendacoes.surpresa.imagens = 
+        await this.buscarImagensDestino(this.recomendacoes.surpresa);
+    }
+    
+    // Alternativas
+    if (this.recomendacoes.alternativas && this.recomendacoes.alternativas.length > 0) {
+      for (let i = 0; i < this.recomendacoes.alternativas.length; i++) {
+        this.recomendacoes.alternativas[i].imagens = 
+          await this.buscarImagensDestino(this.recomendacoes.alternativas[i]);
+        
+        // Pequena pausa para não sobrecarregar a API
+        if (i < this.recomendacoes.alternativas.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 300));
+        }
+      }
+    }
+    
+    console.log('Destinos enriquecidos com imagens com sucesso');
+    return true;
+  } catch (erro) {
+    console.error('Erro ao enriquecer destinos com imagens:', erro);
+    return false;
+  }
+},
   
   // Carregar dados do usuário e recomendações
   async carregarDados() {
