@@ -1,6 +1,16 @@
 // api/image-search.js - Endpoint Vercel para busca de imagens
 const axios = require('axios');
 
+// Chaves de API do Google
+const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
+const GOOGLE_SEARCH_ENGINE_ID = process.env.GOOGLE_SEARCH_ENGINE_ID;
+const GOOGLE_PLACES_API_KEY = process.env.GOOGLE_PLACES_API_KEY || process.env.GOOGLE_API_KEY;
+
+// Cache temporário para pontos turísticos obtidos via Google Places
+const pontosTuristicosCache = new Map();
+// Tempo de expiração do cache (24 horas)
+const CACHE_EXPIRATION = 24 * 60 * 60 * 1000;
+
 // Função de logging estruturado
 function logEvent(type, message, data = {}) {
   const log = {
@@ -31,25 +41,159 @@ const CATEGORIAS_DESTINO = {
   // (Mantido igual ao original)
 };
 
-// Função simplificada para extrair pontos turísticos
-function classificarDestino(query, descricao = '', pontosTuristicos = []) {
+// Função para obter pontos turísticos de um destino via Google Places API
+async function fetchTouristAttractions(destination) {
+  // Verificar se já temos no cache
+  const cacheKey = destination.toLowerCase();
+  if (pontosTuristicosCache.has(cacheKey)) {
+    const cached = pontosTuristicosCache.get(cacheKey);
+    if (Date.now() - cached.timestamp < CACHE_EXPIRATION) {
+      return cached.data;
+    }
+    // Se expirou, remove do cache
+    pontosTuristicosCache.delete(cacheKey);
+  }
+
+  try {
+    logEvent('info', `Buscando pontos turísticos para ${destination}`, { destination });
+    
+    const response = await axios.get(
+      'https://maps.googleapis.com/maps/api/place/textsearch/json',
+      {
+        params: {
+          query: `top tourist attractions in ${destination}`,
+          key: GOOGLE_PLACES_API_KEY,
+          language: 'pt' // Pode usar 'en' para resultados em inglês
+        }
+      }
+    );
+    
+    if (response.data.results && response.data.results.length > 0) {
+      // Extrair os nomes dos pontos turísticos
+      const attractions = response.data.results
+        .slice(0, 5) // Limitar aos 5 principais resultados
+        .map(place => place.name);
+      
+      // Salvar no cache
+      pontosTuristicosCache.set(cacheKey, {
+        data: attractions,
+        timestamp: Date.now()
+      });
+      
+      logEvent('success', `Pontos turísticos encontrados para ${destination}`, { 
+        count: attractions.length,
+        attractions
+      });
+      
+      return attractions;
+    }
+    
+    return [];
+  } catch (error) {
+    logEvent('error', `Erro ao buscar pontos turísticos para ${destination}`, {
+      error: error.message,
+      destination
+    });
+    return [];
+  }
+}
+
+// Função para buscar imagens via Google Custom Search API
+async function fetchGoogleImages(query, options = {}) {
+  const { 
+    perPage = 2, 
+    orientation = "landscape",
+    destination = '',
+    country = '',
+    pontosTuristicos = []
+  } = options;
+  
+  // Construir uma query otimizada
+  let searchQuery = query;
+  if (pontosTuristicos && pontosTuristicos.length > 0) {
+    // Usar o primeiro ponto turístico na query principal
+    const pontoDestaque = pontosTuristicos[0];
+    searchQuery = `${pontoDestaque} ${destination} ${country}`;
+  }
+  
+  try {
+    logEvent('info', 'Buscando no Google Custom Search', { 
+      query: searchQuery,
+      destination,
+      pontosTuristicos: pontosTuristicos.join(', ')
+    });
+    
+    const response = await axios.get(
+      'https://www.googleapis.com/customsearch/v1',
+      {
+        params: {
+          q: searchQuery,
+          cx: GOOGLE_SEARCH_ENGINE_ID,
+          key: GOOGLE_API_KEY,
+          searchType: 'image',
+          num: perPage,
+          imgSize: 'large',
+          imgType: 'photo',
+          safe: 'active',
+          // Adicionar parâmetros para melhorar relevância
+          rights: 'cc_publicdomain,cc_attribute,cc_sharealike',
+          // Tentar limitar a sites de turismo confiáveis
+          siteSearch: 'tripadvisor.com,lonelyplanet.com,booking.com,expedia.com',
+          siteSearchFilter: 'i' // Incluir apenas estes sites
+        }
+      }
+    );
+    
+    if (response.data.items && response.data.items.length > 0) {
+      // Extrair dados das imagens
+      const pontoTuristico = pontosTuristicos && pontosTuristicos.length > 0 ? pontosTuristicos[0] : null;
+      const altText = pontoTuristico 
+        ? `${pontoTuristico} em ${destination}` + (country ? `, ${country}` : '')
+        : `${destination}` + (country ? `, ${country}` : '');
+      
+      return {
+        success: true,
+        images: response.data.items.map(item => ({
+          url: item.link,
+          source: "google",
+          photographer: item.displayLink || 'Google Images',
+          photographerId: item.displayLink || 'google',
+          photographerUrl: item.image.contextLink || '#',
+          sourceUrl: item.image.contextLink || item.link,
+          downloadUrl: item.link,
+          alt: item.title || altText,
+          pontoTuristico: pontoTuristico
+        }))
+      };
+    }
+    
+    return { success: false, images: [] };
+  } catch (error) {
+    logEvent('error', 'Erro ao buscar no Google Custom Search', { 
+      query: searchQuery, 
+      error: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
+    return { success: false, images: [], error };
+  }
+}
+
+// Função melhorada para classificar destino e obter pontos turísticos
+async function classificarDestino(query, descricao = '', pontosTuristicos = []) {
   let cidade = query;
   let pais = '';
 
-  // Tentar separar cidade e país se houver vírgula
+  // Separar cidade e país se houver vírgula
   if (query.includes(',')) {
     const partes = query.split(',').map(parte => parte.trim());
     cidade = partes[0];
     pais = partes[1] || '';
   }
 
-  // Normalizar nome da cidade para busca no banco de dados
+  // Normalizar nome da cidade para busca
   const cidadeNormalizada = normalizarNomeDestino(cidade);
-
-  // Verificar pontos turísticos conhecidos para este destino
-  const pontosTuristicosConhecidos = PONTOS_TURISTICOS_POPULARES[cidadeNormalizada] || [];
-
-  // Se temos pontos turísticos específicos fornecidos (ex: sugerido pela IA), usar esse array
+  
+  // 1. Verificar se temos pontos turísticos específicos fornecidos
   if (pontosTuristicos && pontosTuristicos.length > 0) {
     const pontoAleatorio = pontosTuristicos[Math.floor(Math.random() * pontosTuristicos.length)];
     return {
@@ -59,8 +203,10 @@ function classificarDestino(query, descricao = '', pontosTuristicos = []) {
       pais
     };
   }
-
-  // Se há pontos turísticos conhecidos na base interna, usa um deles
+  
+  // 2. Verificar pontos turísticos conhecidos na base interna
+  const pontosTuristicosConhecidos = PONTOS_TURISTICOS_POPULARES[cidadeNormalizada] || [];
+  
   if (pontosTuristicosConhecidos.length > 0) {
     const pontoAleatorio = pontosTuristicosConhecidos[Math.floor(Math.random() * pontosTuristicosConhecidos.length)];
     return {
@@ -70,8 +216,23 @@ function classificarDestino(query, descricao = '', pontosTuristicos = []) {
       pais
     };
   }
+  
+  // 3. Buscar pontos turísticos no Google Places
+  const queryDestino = pais ? `${cidade}, ${pais}` : cidade;
+  const googlePlacesAttractions = await fetchTouristAttractions(queryDestino);
+  
+  if (googlePlacesAttractions && googlePlacesAttractions.length > 0) {
+    const pontoAleatorio = googlePlacesAttractions[Math.floor(Math.random() * googlePlacesAttractions.length)];
+    return {
+      tipo: 'ponto_turistico_google',
+      termo: pontoAleatorio,
+      cidade,
+      pais,
+      pontosTuristicos: googlePlacesAttractions // Guardar todos os pontos
+    };
+  }
 
-  // Fallback: usar um termo padrão mais significativo
+  // Fallback: usar um termo padrão genérico
   return {
     tipo: 'landmark',
     termo: 'Ponto Turístico',
@@ -124,7 +285,7 @@ async function fetchPexelsImages(query, options = {}) {
     pontosTuristicos = []
   } = options;
   
-  const classificacao = classificarDestino(query, descricao, pontosTuristicos);
+  const classificacao = await classificarDestino(query, descricao, pontosTuristicos);
 
   // Monta a query sempre como: [termo] [cidade] [país]
   let searchQuery = `${classificacao.termo} ${classificacao.cidade}`;
@@ -177,7 +338,8 @@ async function fetchPexelsImages(query, options = {}) {
           downloadUrl: img.src.original,
           alt: altText,
           pontoTuristico: (classificacao.tipo === 'ponto_turistico_especifico' ||
-                           classificacao.tipo === 'ponto_turistico_conhecido')
+                           classificacao.tipo === 'ponto_turistico_conhecido' ||
+                           classificacao.tipo === 'ponto_turistico_google')
                            ? classificacao.termo : null
         }))
       };
@@ -203,7 +365,7 @@ async function fetchUnsplashImages(query, options = {}) {
     pontosTuristicos = []
   } = options;
   
-  const classificacao = classificarDestino(query, descricao, pontosTuristicos);
+  const classificacao = await classificarDestino(query, descricao, pontosTuristicos);
   
   let searchQuery = `${classificacao.termo} ${classificacao.cidade}`;
   if (classificacao.pais) {
@@ -247,7 +409,8 @@ async function fetchUnsplashImages(query, options = {}) {
           downloadUrl: img.links.download,
           alt: img.alt_description || altText,
           pontoTuristico: (classificacao.tipo === 'ponto_turistico_especifico' ||
-                           classificacao.tipo === 'ponto_turistico_conhecido')
+                           classificacao.tipo === 'ponto_turistico_conhecido' ||
+                           classificacao.tipo === 'ponto_turistico_google')
                            ? classificacao.termo : null
         }))
       };
@@ -286,7 +449,8 @@ function getPlaceholderImages(query, options = {}) {
         downloadUrl: `https://via.placeholder.com/${width}x${height}.png?text=${encodeURIComponent(placeholderText)}`,
         alt: placeholderText,
         pontoTuristico: (classificacao.tipo === 'ponto_turistico_especifico' ||
-                         classificacao.tipo === 'ponto_turistico_conhecido')
+                         classificacao.tipo === 'ponto_turistico_conhecido' ||
+                         classificacao.tipo === 'ponto_turistico_google')
                          ? classificacao.termo : null
       },
       {
@@ -299,7 +463,8 @@ function getPlaceholderImages(query, options = {}) {
         downloadUrl: `https://via.placeholder.com/${width}x${height}.png?text=${encodeURIComponent(placeholderText)}`,
         alt: `${placeholderText} - Vista alternativa`,
         pontoTuristico: (classificacao.tipo === 'ponto_turistico_especifico' ||
-                         classificacao.tipo === 'ponto_turistico_conhecido')
+                         classificacao.tipo === 'ponto_turistico_conhecido' ||
+                         classificacao.tipo === 'ponto_turistico_google')
                          ? classificacao.termo : null
       }
     ]
@@ -359,40 +524,67 @@ module.exports = async function handler(req, res) {
       pontosTuristicosArray
     });
     
+    // Nova cascata de APIs com prioridade: Google > Pexels > Unsplash > Placeholder
     let images = [];
+    let googleResult = { success: false, images: [] };
     let pexelsResult = { success: false, images: [] };
     let unsplashResult = { success: false, images: [] };
     
-    if (source === "pexels" || !source) {
-      pexelsResult = await fetchPexelsImages(query, {
+    // 1. Tentar buscar pontos turísticos via Google Places
+    const classificacao = await classificarDestino(query, descricao, pontosTuristicosArray);
+    
+    // 2. Tentar Google Custom Search primeiro
+    if (!source || source === "google") {
+      googleResult = await fetchGoogleImages(query, {
         perPage: parseInt(perPage),
+        orientation,
+        destination: classificacao.cidade,
+        country: classificacao.pais,
+        pontosTuristicos: classificacao.pontosTuristicos || pontosTuristicosArray
+      });
+      
+      if (googleResult.success && googleResult.images.length > 0) {
+        images = googleResult.images;
+        logEvent('success', 'Imagens do Google obtidas com sucesso', { 
+          count: images.length,
+          query,
+          classification: classificacao
+        });
+      }
+    }
+    
+    // 3. Tentar Pexels como segunda opção
+    if ((!googleResult.success || images.length < perPage) && (source === "pexels" || !source)) {
+      pexelsResult = await fetchPexelsImages(query, {
+        perPage: parseInt(perPage) - images.length,
         orientation,
         quality,
         descricao,
-        pontosTuristicos: pontosTuristicosArray
+        pontosTuristicos: classificacao.pontosTuristicos || pontosTuristicosArray
       });
       
       if (pexelsResult.success) {
-        images = pexelsResult.images;
+        images = [...images, ...pexelsResult.images].slice(0, parseInt(perPage));
         logEvent('success', 'Imagens do Pexels obtidas com sucesso', { 
-          count: images.length,
+          count: pexelsResult.images.length,
           query,
           pontosTuristicos: pontosTuristicosArray.join(', ')
         });
       }
     }
     
-    if ((!pexelsResult.success && source !== "pexels") || source === "unsplash") {
+    // 4. Tentar Unsplash como terceira opção
+    if (images.length < perPage && (source === "unsplash" || !source)) {
       unsplashResult = await fetchUnsplashImages(query, {
-        perPage: parseInt(perPage),
+        perPage: parseInt(perPage) - images.length,
         orientation,
         quality,
         descricao,
-        pontosTuristicos: pontosTuristicosArray
+        pontosTuristicos: classificacao.pontosTuristicos || pontosTuristicosArray
       });
       
       if (unsplashResult.success) {
-        images = [...images, ...unsplashResult.images];
+        images = [...images, ...unsplashResult.images].slice(0, parseInt(perPage));
         logEvent('success', 'Imagens do Unsplash obtidas com sucesso', { 
           count: unsplashResult.images.length,
           query,
@@ -401,27 +593,32 @@ module.exports = async function handler(req, res) {
       }
     }
     
-    if (!pexelsResult.success && !unsplashResult.success) {
+    // 5. Se ainda não temos imagens suficientes, usar placeholder
+    if (images.length < perPage) {
       const placeholderResult = getPlaceholderImages(query, {
         width: parseInt(width),
         height: parseInt(height),
         descricao,
-        pontosTuristicos: pontosTuristicosArray
+        pontosTuristicos: classificacao.pontosTuristicos || pontosTuristicosArray
       });
       
-      images = placeholderResult.images;
-      logEvent('info', 'Utilizando imagens de placeholder', { 
-        count: images.length,
+      images = [...images, ...placeholderResult.images].slice(0, parseInt(perPage));
+      logEvent('info', 'Utilizando imagens de placeholder para complementar', { 
+        count: placeholderResult.images.length,
         query,
         pontosTuristicos: pontosTuristicosArray.join(', ')
       });
     }
     
+    // Adicionar pontos turísticos obtidos para uso futuro
+    const pontosTuristicosResultado = classificacao.pontosTuristicos || pontosTuristicosArray;
+    
     return res.status(200).json({ 
       images,
       cache: true,
       timestamp: new Date().toISOString(),
-      pontosTuristicos: pontosTuristicosArray.length > 0 ? pontosTuristicosArray : undefined
+      pontosTuristicos: pontosTuristicosResultado.length > 0 ? pontosTuristicosResultado : undefined,
+      source: googleResult.success ? 'google' : (pexelsResult.success ? 'pexels' : (unsplashResult.success ? 'unsplash' : 'placeholder'))
     });
     
   } catch (error) {
