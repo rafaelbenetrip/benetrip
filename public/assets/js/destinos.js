@@ -673,13 +673,27 @@ renderizarDestinoDestaque(destino) {
                 ${this.gerarDescricaoAutomatica(ponto, destino.destino)}
               </p>
               ${idx === 0 && destino.imagens && destino.imagens.length > 1 ? `
-  <div class="mt-2 ml-11 rounded-lg overflow-hidden h-28 ponto-turistico-galeria" 
+  <div class="mt-2 ml-11 rounded-lg overflow-hidden h-28 ponto-turistico-galeria"
        data-ponto="${ponto}" data-destino="${destino.destino}">
     <div class="ponto-turistico-image-container">
       ${this.renderizarImagemComCreditos(
         destino.imagens.find(img => img.pontoTuristico === ponto) || destino.imagens[1],
         ponto,
-        'h-full w-full'
+        'h-full w-full',
+        { showPontoTuristico: false } // Isso remove o rótulo
+      )}
+    </div>
+  </div>
+` : ''}
+${idx === 1 && destino.imagens && destino.imagens.length > 0 ? `
+  <div class="mt-2 ml-11 rounded-lg overflow-hidden h-28 ponto-turistico-galeria"
+       data-ponto="${ponto}" data-destino="${destino.destino}">
+    <div class="ponto-turistico-image-container">
+      ${this.renderizarImagemComCreditos(
+        destino.imagens.find(img => img.pontoTuristico === ponto),
+        ponto,
+        'h-full w-full',
+        { showPontoTuristico: false } // Isso remove o rótulo
       )}
     </div>
   </div>
@@ -1029,17 +1043,31 @@ mostrarDestinoSurpresa() {
                 ${this.gerarDescricaoAutomatica(ponto, destino.destino)}
               </p>
               ${idx === 0 && destino.imagens && destino.imagens.length > 1 ? `
-                <div class="mt-2 ml-11 rounded-lg overflow-hidden h-28 ponto-turistico-galeria"
-                     data-ponto="${ponto}" data-destino="${destino.destino}">
-                  <div class="ponto-turistico-image-container">
-                    ${this.renderizarImagemComCreditos(
-                      destino.imagens.find(img => img.pontoTuristico === ponto) || destino.imagens[1],
-                      ponto,
-                      'h-full w-full'
-                    )}
-                  </div>
-                </div>
-              ` : ''}
+  <div class="mt-2 ml-11 rounded-lg overflow-hidden h-28 ponto-turistico-galeria"
+       data-ponto="${ponto}" data-destino="${destino.destino}">
+    <div class="ponto-turistico-image-container">
+      ${this.renderizarImagemComCreditos(
+        destino.imagens.find(img => img.pontoTuristico === ponto) || destino.imagens[1],
+        ponto,
+        'h-full w-full',
+        { showPontoTuristico: false } // Isso remove o rótulo
+      )}
+    </div>
+  </div>
+` : ''}
+${idx === 1 && destino.imagens && destino.imagens.length > 0 ? `
+  <div class="mt-2 ml-11 rounded-lg overflow-hidden h-28 ponto-turistico-galeria"
+       data-ponto="${ponto}" data-destino="${destino.destino}">
+    <div class="ponto-turistico-image-container">
+      ${this.renderizarImagemComCreditos(
+        destino.imagens.find(img => img.pontoTuristico === ponto),
+        ponto,
+        'h-full w-full',
+        { showPontoTuristico: false } // Isso remove o rótulo
+      )}
+    </div>
+  </div>
+` : ''}
             </div>
           `).join('') : 
           '<p class="text-center text-gray-500 my-6">Informações sobre pontos turísticos não disponíveis</p>'
