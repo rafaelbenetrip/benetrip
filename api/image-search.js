@@ -115,17 +115,29 @@ async function fetchGoogleImages(query, options = {}) {
     pontosTuristicos = []
   } = options;
   
-  // Construir uma query otimizada
-  let searchQuery = query;
+  // Construir queries específicas para cada ponto turístico
+  let searchQueries = [];
+  
   if (pontosTuristicos && pontosTuristicos.length > 0) {
-    // Usar o primeiro ponto turístico na query principal
-    const pontoDestaque = pontosTuristicos[0];
-    searchQuery = `${pontoDestaque} ${destination} ${country}`;
+    // Criar uma query para cada ponto turístico, limitado a 'perPage'
+    const pontosMax = Math.min(pontosTuristicos.length, perPage);
+    for (let i = 0; i < pontosMax; i++) {
+      searchQueries.push({
+        query: `${pontosTuristicos[i]} ${destination} ${country}`,
+        pontoTuristico: pontosTuristicos[i]
+      });
+    }
+  } else {
+    // Query padrão se não houver pontos turísticos
+    searchQueries.push({
+      query: `${query} ${destination} ${country}`,
+      pontoTuristico: null
+    });
   }
   
   try {
     logEvent('info', 'Buscando no Google Custom Search', { 
-      query: searchQuery,
+      searchQueries,
       destination,
       pontosTuristicos: pontosTuristicos.join(', ')
     });
@@ -136,12 +148,69 @@ async function fetchGoogleImages(query, options = {}) {
       return { success: false, images: [], error: { message: 'Credenciais não configuradas' } };
     }
     
-    // Simplificando a requisição para reduzir problemas
+    // Array para armazenar todas as imagens encontradas
+    let allImages = [];
+    
+    // Fazer uma busca para cada ponto turístico
+    for (const searchData of searchQueries) {
+      try {
+        const response = await axios.get(
+          'https://www.googleapis.com/customsearch/v1',
+          {
+            params: {
+              q: searchData.query,
+              cx: GOOGLE_SEARCH_ENGINE_ID,
+              key: GOOGLE_API_KEY,
+              searchType: 'image',
+              num: 1  // Apenas uma imagem por ponto turístico
+            }
+          }
+        );
+        
+        // Verificar se a resposta contém itens
+        if (response.data && response.data.items && response.data.items.length > 0) {
+          // Extrair dados das imagens
+          const pontoTuristico = searchData.pontoTuristico;
+          const altText = pontoTuristico 
+            ? `${pontoTuristico} em ${destination}` + (country ? `, ${country}` : '')
+            : `${destination}` + (country ? `, ${country}` : '');
+          
+          const images = response.data.items.map(item => ({
+            url: item.link,
+            source: "google",
+            photographer: item.displayLink || 'Google Images',
+            photographerId: item.displayLink || 'google',
+            photographerUrl: item.image.contextLink || '#',
+            sourceUrl: item.image.contextLink || item.link,
+            downloadUrl: item.link,
+            alt: item.title || altText,
+            pontoTuristico: pontoTuristico
+          }));
+          
+          allImages = [...allImages, ...images];
+        }
+      } catch (innerError) {
+        // Registrar erro, mas continuar para próxima query
+        logEvent('warn', `Erro na busca para ${searchData.pontoTuristico}`, {
+          error: innerError.message
+        });
+      }
+    }
+    
+    // Se conseguimos algumas imagens, retornar sucesso
+    if (allImages.length > 0) {
+      return {
+        success: true,
+        images: allImages
+      };
+    }
+    
+    // Caso não tenhamos encontrado nenhuma imagem, tentar uma busca genérica
     const response = await axios.get(
       'https://www.googleapis.com/customsearch/v1',
       {
         params: {
-          q: searchQuery,
+          q: query,
           cx: GOOGLE_SEARCH_ENGINE_ID,
           key: GOOGLE_API_KEY,
           searchType: 'image',
@@ -150,43 +219,43 @@ async function fetchGoogleImages(query, options = {}) {
       }
     );
     
-    // Verificar se a resposta contém itens
     if (response.data && response.data.items && response.data.items.length > 0) {
       // Log de sucesso explícito
-      logEvent('success', `Imagens do Google obtidas com sucesso`, { 
+      logEvent('success', `Imagens do Google obtidas com sucesso (busca genérica)`, { 
         count: response.data.items.length,
-        query: searchQuery
+        query
       });
       
-      // Extrair dados das imagens
-      const pontoTuristico = pontosTuristicos && pontosTuristicos.length > 0 ? pontosTuristicos[0] : null;
-      const altText = pontoTuristico 
-        ? `${pontoTuristico} em ${destination}` + (country ? `, ${country}` : '')
-        : `${destination}` + (country ? `, ${country}` : '');
-      
+      // Distribuir os pontos turísticos entre as imagens de forma circular
       return {
         success: true,
-        images: response.data.items.map(item => ({
-          url: item.link,
-          source: "google",
-          photographer: item.displayLink || 'Google Images',
-          photographerId: item.displayLink || 'google',
-          photographerUrl: item.image.contextLink || '#',
-          sourceUrl: item.image.contextLink || item.link,
-          downloadUrl: item.link,
-          alt: item.title || altText,
-          pontoTuristico: pontoTuristico
-        }))
+        images: response.data.items.map((item, idx) => {
+          const pontoTuristico = pontosTuristicos && pontosTuristicos.length > 0 
+            ? pontosTuristicos[idx % pontosTuristicos.length] 
+            : null;
+            
+          const altText = pontoTuristico 
+            ? `${pontoTuristico} em ${destination}` + (country ? `, ${country}` : '')
+            : `${destination}` + (country ? `, ${country}` : '');
+            
+          return {
+            url: item.link,
+            source: "google",
+            photographer: item.displayLink || 'Google Images',
+            photographerId: item.displayLink || 'google',
+            photographerUrl: item.image.contextLink || '#',
+            sourceUrl: item.image.contextLink || item.link,
+            downloadUrl: item.link,
+            alt: item.title || altText,
+            pontoTuristico: pontoTuristico
+          };
+        })
       };
-    } else {
-      // Log para resposta vazia
-      logEvent('info', 'Google Custom Search não retornou resultados', {
-        query: searchQuery
-      });
-      return { success: false, images: [], error: { message: 'Nenhum resultado encontrado' } };
     }
+    
+    return { success: false, images: [], error: { message: 'Nenhum resultado encontrado' } };
   } catch (error) {
-    // Melhor tratamento de erro com detalhes da resposta
+    // Tratamento de erro
     const errorDetails = error.response ? {
       status: error.response.status,
       statusText: error.response.statusText,
@@ -194,13 +263,10 @@ async function fetchGoogleImages(query, options = {}) {
     } : { message: error.message };
     
     logEvent('error', 'Erro ao buscar no Google Custom Search', { 
-      query: searchQuery, 
+      query, 
       error: error.message,
       details: errorDetails
     });
-    
-    // Log detalhado para depuração
-    console.error('Erro detalhado do Google Search:', JSON.stringify(errorDetails, null, 2));
     
     return { success: false, images: [], error };
   }
