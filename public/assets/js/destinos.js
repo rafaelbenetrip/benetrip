@@ -1015,51 +1015,32 @@ mostrarDestinoSurpresa() {
         ${this.prepararInformacaoAeroporto(destino)}
       </div>
       
-      // Conteúdo da aba Pontos Turísticos - VERSÃO MELHORADA
-<div id="conteudo-surpresa-pontos" class="conteudo-aba-surpresa p-4 overflow-y-auto hidden" style="max-height: calc(90vh - 280px);">
-  <p class="text-sm text-gray-600 mb-3">Atrações imperdíveis em ${destino.destino}:</p>
-  
-  ${destino.pontosTuristicos && destino.pontosTuristicos.length > 0 ? 
-    destino.pontosTuristicos.map((ponto, idx) => `
-      <div class="bg-white border border-gray-200 rounded-lg p-3 mb-3 shadow-sm hover:shadow-md transition-all">
-        <div class="flex items-center">
-          <span class="flex items-center justify-center w-8 h-8 rounded-full mr-3 text-white font-bold" style="background-color: #00A3E0;">${idx + 1}</span>
-          <h5 class="font-medium">${ponto}</h5>
-        </div>
-        <p class="text-sm text-gray-600 mt-2 ml-11">
-          ${this.gerarDescricaoAutomatica(ponto, destino.destino)}
-        </p>
+      <!-- Conteúdo da aba Pontos Turísticos - VERSÃO MELHORADA COM TODAS AS IMAGENS -->
+      <div id="conteudo-surpresa-pontos" class="conteudo-aba-surpresa p-4 overflow-y-auto hidden" style="max-height: calc(90vh - 280px);">
+        <p class="text-sm text-gray-600 mb-3">Atrações imperdíveis em ${destino.destino}:</p>
         
-        <div class="mt-2 ml-11 rounded-lg overflow-hidden h-28 ponto-turistico-galeria"
-             data-ponto="${ponto}" data-destino="${destino.destino}">
-          <div class="ponto-turistico-image-container">
-            ${this.renderizarImagemComCreditos(
-              this.encontrarMelhorImagemParaPontoTuristico(destino.imagens, ponto, idx),
-              ponto,
-              'h-full w-full',
-              { showPontoTuristico: false }
-            )}
-          </div>
-        </div>
-      </div>
-    `).join('') : 
-    '<p class="text-center text-gray-500 my-6">Informações sobre pontos turísticos não disponíveis</p>'
-  }
-</div>
-` : ''}
-${idx === 1 && destino.imagens && destino.imagens.length > 0 ? `
-  <div class="mt-2 ml-11 rounded-lg overflow-hidden h-28 ponto-turistico-galeria"
-       data-ponto="${ponto}" data-destino="${destino.destino}">
-    <div class="ponto-turistico-image-container">
-      ${this.renderizarImagemComCreditos(
-        destino.imagens.find(img => img.pontoTuristico === ponto),
-        ponto,
-        'h-full w-full',
-        { showPontoTuristico: false } // Isso remove o rótulo
-      )}
-    </div>
-  </div>
-` : ''}
+        ${destino.pontosTuristicos && destino.pontosTuristicos.length > 0 ? 
+          destino.pontosTuristicos.map((ponto, idx) => `
+            <div class="bg-white border border-gray-200 rounded-lg p-3 mb-3 shadow-sm hover:shadow-md transition-all">
+              <div class="flex items-center">
+                <span class="flex items-center justify-center w-8 h-8 rounded-full mr-3 text-white font-bold" style="background-color: #00A3E0;">${idx + 1}</span>
+                <h5 class="font-medium">${ponto}</h5>
+              </div>
+              <p class="text-sm text-gray-600 mt-2 ml-11">
+                ${this.gerarDescricaoAutomatica(ponto, destino.destino)}
+              </p>
+              
+              <div class="mt-2 ml-11 rounded-lg overflow-hidden h-28 ponto-turistico-galeria"
+                   data-ponto="${ponto}" data-destino="${destino.destino}">
+                <div class="ponto-turistico-image-container">
+                  ${this.renderizarImagemComCreditos(
+                    this.encontrarMelhorImagemParaPontoTuristico(destino.imagens, ponto, idx),
+                    ponto,
+                    'h-full w-full',
+                    { showPontoTuristico: false }
+                  )}
+                </div>
+              </div>
             </div>
           `).join('') : 
           '<p class="text-center text-gray-500 my-6">Informações sobre pontos turísticos não disponíveis</p>'
