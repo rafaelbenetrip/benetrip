@@ -136,6 +136,7 @@ async function fetchGoogleImages(query, options = {}) {
       return { success: false, images: [], error: { message: 'Credenciais não configuradas' } };
     }
     
+    // Simplificando a requisição para reduzir problemas
     const response = await axios.get(
       'https://www.googleapis.com/customsearch/v1',
       {
@@ -144,20 +145,19 @@ async function fetchGoogleImages(query, options = {}) {
           cx: GOOGLE_SEARCH_ENGINE_ID,
           key: GOOGLE_API_KEY,
           searchType: 'image',
-          num: perPage,
-          imgSize: 'large',
-          imgType: 'photo',
-          safe: 'active',
-          // Adicionar parâmetros para melhorar relevância
-          rights: 'cc_publicdomain,cc_attribute,cc_sharealike',
-          // Tentar limitar a sites de turismo confiáveis
-          siteSearch: 'tripadvisor.com,lonelyplanet.com,booking.com,expedia.com',
-          siteSearchFilter: 'i' // Incluir apenas estes sites
+          num: perPage
         }
       }
     );
     
-    if (response.data.items && response.data.items.length > 0) {
+    // Verificar se a resposta contém itens
+    if (response.data && response.data.items && response.data.items.length > 0) {
+      // Log de sucesso explícito
+      logEvent('success', `Imagens do Google obtidas com sucesso`, { 
+        count: response.data.items.length,
+        query: searchQuery
+      });
+      
       // Extrair dados das imagens
       const pontoTuristico = pontosTuristicos && pontosTuristicos.length > 0 ? pontosTuristicos[0] : null;
       const altText = pontoTuristico 
@@ -178,10 +178,14 @@ async function fetchGoogleImages(query, options = {}) {
           pontoTuristico: pontoTuristico
         }))
       };
+    } else {
+      // Log para resposta vazia
+      logEvent('info', 'Google Custom Search não retornou resultados', {
+        query: searchQuery
+      });
+      return { success: false, images: [], error: { message: 'Nenhum resultado encontrado' } };
     }
-    
-    return { success: false, images: [] };
-   } catch (error) {
+  } catch (error) {
     // Melhor tratamento de erro com detalhes da resposta
     const errorDetails = error.response ? {
       status: error.response.status,
@@ -194,6 +198,9 @@ async function fetchGoogleImages(query, options = {}) {
       error: error.message,
       details: errorDetails
     });
+    
+    // Log detalhado para depuração
+    console.error('Erro detalhado do Google Search:', JSON.stringify(errorDetails, null, 2));
     
     return { success: false, images: [], error };
   }
@@ -571,6 +578,11 @@ module.exports = async function handler(req, res) {
           query,
           classification: classificacao
         });
+      } else {
+        logEvent('info', 'Não foi possível obter imagens do Google, tentando Pexels', {
+          query,
+          reason: googleResult.error?.message || 'Resposta vazia'
+        });
       }
     }
     
@@ -585,6 +597,12 @@ module.exports = async function handler(req, res) {
       });
       
       if (pexelsResult.success) {
+        // Log detalhado para compreender a combinação
+        logEvent('info', `Complementando com ${pexelsResult.images.length} imagens do Pexels após ${images.length} do Google`, { 
+          googleImages: images.length,
+          pexelsImages: pexelsResult.images.length
+        });
+        
         images = [...images, ...pexelsResult.images].slice(0, parseInt(perPage));
         logEvent('success', 'Imagens do Pexels obtidas com sucesso', { 
           count: pexelsResult.images.length,
