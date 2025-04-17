@@ -663,45 +663,49 @@ renderizarDestinoDestaque(destino) {
       <div id="conteudo-pontos-turisticos" class="conteudo-aba p-4 hidden">
         <p class="text-sm text-gray-600 mb-3">Atrações imperdíveis em ${destino.destino}:</p>
         ${destino.pontosTuristicos && destino.pontosTuristicos.length > 0 ? 
-          destino.pontosTuristicos.map((ponto, idx) => `
-            <div class="bg-white border border-gray-200 rounded-lg p-3 mb-3 shadow-sm hover:shadow-md transition-all">
-              <div class="flex items-center">
-                <span class="flex items-center justify-center w-8 h-8 rounded-full mr-3 text-white font-bold" style="background-color: #00A3E0;">${idx + 1}</span>
-                <h5 class="font-medium">${ponto}</h5>
-              </div>
-              <p class="text-sm text-gray-600 mt-2 ml-11">
-                ${this.gerarDescricaoAutomatica(ponto, destino.destino)}
-              </p>
-              ${idx === 0 && destino.imagens && destino.imagens.length > 1 ? `
-  <div class="mt-2 ml-11 rounded-lg overflow-hidden h-28 ponto-turistico-galeria"
-       data-ponto="${ponto}" data-destino="${destino.destino}">
-    <div class="ponto-turistico-image-container">
-      ${this.renderizarImagemComCreditos(
-        destino.imagens.find(img => img.pontoTuristico === ponto) || destino.imagens[1],
-        ponto,
-        'h-full w-full',
-        { showPontoTuristico: false } // Isso remove o rótulo
-      )}
+  destino.pontosTuristicos.map((ponto, idx) => `
+    <div class="bg-white border border-gray-200 rounded-lg p-3 mb-3 shadow-sm hover:shadow-md transition-all">
+      <div class="flex items-center">
+        <span class="flex items-center justify-center w-8 h-8 rounded-full mr-3 text-white font-bold" style="background-color: #00A3E0;">${idx + 1}</span>
+        <h5 class="font-medium">${ponto}</h5>
+      </div>
+      <p class="text-sm text-gray-600 mt-2 ml-11">
+        ${this.gerarDescricaoAutomatica(ponto, destino.destino)}
+      </p>
+      
+      <!-- Foto para o primeiro ponto turístico - SEM RÓTULO -->
+      ${idx === 0 && destino.imagens && destino.imagens.some(img => img.pontoTuristico === ponto || idx === 0) ? `
+        <div class="mt-2 ml-11 rounded-lg overflow-hidden h-28 ponto-turistico-galeria"
+             data-ponto="${ponto}" data-destino="${destino.destino}">
+          <div class="ponto-turistico-image-container">
+            ${this.renderizarImagemComCreditos(
+              destino.imagens.find(img => img.pontoTuristico === ponto) || destino.imagens[1] || destino.imagens[0],
+              ponto,
+              'h-full w-full',
+              { showPontoTuristico: false } // Isso remove o rótulo
+            )}
+          </div>
+        </div>
+      ` : ''}
+      
+      <!-- Foto para o segundo ponto turístico - SEM RÓTULO -->
+      ${idx === 1 && destino.imagens && destino.imagens.some(img => img.pontoTuristico === ponto) ? `
+        <div class="mt-2 ml-11 rounded-lg overflow-hidden h-28 ponto-turistico-galeria"
+             data-ponto="${ponto}" data-destino="${destino.destino}">
+          <div class="ponto-turistico-image-container">
+            ${this.renderizarImagemComCreditos(
+              destino.imagens.find(img => img.pontoTuristico === ponto),
+              ponto,
+              'h-full w-full',
+              { showPontoTuristico: false } // Isso remove o rótulo
+            )}
+          </div>
+        </div>
+      ` : ''}
     </div>
-  </div>
-` : ''}
-${idx === 1 && destino.imagens && destino.imagens.length > 0 ? `
-  <div class="mt-2 ml-11 rounded-lg overflow-hidden h-28 ponto-turistico-galeria"
-       data-ponto="${ponto}" data-destino="${destino.destino}">
-    <div class="ponto-turistico-image-container">
-      ${this.renderizarImagemComCreditos(
-        destino.imagens.find(img => img.pontoTuristico === ponto),
-        ponto,
-        'h-full w-full',
-        { showPontoTuristico: false } // Isso remove o rótulo
-      )}
-    </div>
-  </div>
-` : ''}
-            </div>
-          `).join('') : 
-          '<p class="text-center text-gray-500 my-6">Informações sobre pontos turísticos não disponíveis</p>'
-        }
+  `).join('') : 
+  '<p class="text-center text-gray-500 my-6">Informações sobre pontos turísticos não disponíveis</p>'
+}
       </div>
     `;
     
@@ -1033,45 +1037,49 @@ mostrarDestinoSurpresa() {
         <p class="text-sm text-gray-600 mb-3">Atrações imperdíveis em ${destino.destino}:</p>
         
         ${destino.pontosTuristicos && destino.pontosTuristicos.length > 0 ? 
-          destino.pontosTuristicos.map((ponto, idx) => `
-            <div class="bg-white border border-gray-200 rounded-lg p-3 mb-3 shadow-sm hover:shadow-md transition-all">
-              <div class="flex items-center">
-                <span class="flex items-center justify-center w-8 h-8 rounded-full mr-3 text-white font-bold" style="background-color: #00A3E0;">${idx + 1}</span>
-                <h5 class="font-medium">${ponto}</h5>
-              </div>
-              <p class="text-sm text-gray-600 mt-2 ml-11">
-                ${this.gerarDescricaoAutomatica(ponto, destino.destino)}
-              </p>
-              ${idx === 0 && destino.imagens && destino.imagens.length > 1 ? `
-  <div class="mt-2 ml-11 rounded-lg overflow-hidden h-28 ponto-turistico-galeria"
-       data-ponto="${ponto}" data-destino="${destino.destino}">
-    <div class="ponto-turistico-image-container">
-      ${this.renderizarImagemComCreditos(
-        destino.imagens.find(img => img.pontoTuristico === ponto) || destino.imagens[1],
-        ponto,
-        'h-full w-full',
-        { showPontoTuristico: false } // Isso remove o rótulo
-      )}
+  destino.pontosTuristicos.map((ponto, idx) => `
+    <div class="bg-white border border-gray-200 rounded-lg p-3 mb-3 shadow-sm hover:shadow-md transition-all">
+      <div class="flex items-center">
+        <span class="flex items-center justify-center w-8 h-8 rounded-full mr-3 text-white font-bold" style="background-color: #00A3E0;">${idx + 1}</span>
+        <h5 class="font-medium">${ponto}</h5>
+      </div>
+      <p class="text-sm text-gray-600 mt-2 ml-11">
+        ${this.gerarDescricaoAutomatica(ponto, destino.destino)}
+      </p>
+      
+      <!-- Foto para o primeiro ponto turístico - SEM RÓTULO -->
+      ${idx === 0 && destino.imagens && destino.imagens.some(img => img.pontoTuristico === ponto || idx === 0) ? `
+        <div class="mt-2 ml-11 rounded-lg overflow-hidden h-28 ponto-turistico-galeria"
+             data-ponto="${ponto}" data-destino="${destino.destino}">
+          <div class="ponto-turistico-image-container">
+            ${this.renderizarImagemComCreditos(
+              destino.imagens.find(img => img.pontoTuristico === ponto) || destino.imagens[1] || destino.imagens[0],
+              ponto,
+              'h-full w-full',
+              { showPontoTuristico: false } // Isso remove o rótulo
+            )}
+          </div>
+        </div>
+      ` : ''}
+      
+      <!-- Foto para o segundo ponto turístico - SEM RÓTULO -->
+      ${idx === 1 && destino.imagens && destino.imagens.some(img => img.pontoTuristico === ponto) ? `
+        <div class="mt-2 ml-11 rounded-lg overflow-hidden h-28 ponto-turistico-galeria"
+             data-ponto="${ponto}" data-destino="${destino.destino}">
+          <div class="ponto-turistico-image-container">
+            ${this.renderizarImagemComCreditos(
+              destino.imagens.find(img => img.pontoTuristico === ponto),
+              ponto,
+              'h-full w-full',
+              { showPontoTuristico: false } // Isso remove o rótulo
+            )}
+          </div>
+        </div>
+      ` : ''}
     </div>
-  </div>
-` : ''}
-${idx === 1 && destino.imagens && destino.imagens.length > 0 ? `
-  <div class="mt-2 ml-11 rounded-lg overflow-hidden h-28 ponto-turistico-galeria"
-       data-ponto="${ponto}" data-destino="${destino.destino}">
-    <div class="ponto-turistico-image-container">
-      ${this.renderizarImagemComCreditos(
-        destino.imagens.find(img => img.pontoTuristico === ponto),
-        ponto,
-        'h-full w-full',
-        { showPontoTuristico: false } // Isso remove o rótulo
-      )}
-    </div>
-  </div>
-` : ''}
-            </div>
-          `).join('') : 
-          '<p class="text-center text-gray-500 my-6">Informações sobre pontos turísticos não disponíveis</p>'
-        }
+  `).join('') : 
+  '<p class="text-center text-gray-500 my-6">Informações sobre pontos turísticos não disponíveis</p>'
+}
       </div>
       
       <!-- Conteúdo da aba Clima -->
