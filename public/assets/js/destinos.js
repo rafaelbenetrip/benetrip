@@ -573,6 +573,7 @@ renderizarImagemComCreditos(imagem, fallbackText, classes = '', options = {}) {
 },
   
   // Renderizar destino destaque com sistema de abas
+// Método para renderizar destino destaque com sistema de abas
 renderizarDestinoDestaque(destino) {
     const container = document.getElementById('destino-destaque');
     if (!container) return;
@@ -658,7 +659,7 @@ renderizarDestinoDestaque(destino) {
       </div>
     `;
     
-    // Conteúdo da aba Pontos Turísticos
+    // Conteúdo da aba Pontos Turísticos - VERSÃO MELHORADA COM TODAS AS IMAGENS
     let pontosTuristicosHtml = `
       <div id="conteudo-pontos-turisticos" class="conteudo-aba p-4 hidden">
         <p class="text-sm text-gray-600 mb-3">Atrações imperdíveis em ${destino.destino}:</p>
@@ -672,32 +673,18 @@ renderizarDestinoDestaque(destino) {
               <p class="text-sm text-gray-600 mt-2 ml-11">
                 ${this.gerarDescricaoAutomatica(ponto, destino.destino)}
               </p>
-              ${idx === 0 && destino.imagens && destino.imagens.length > 1 ? `
-  <div class="mt-2 ml-11 rounded-lg overflow-hidden h-28 ponto-turistico-galeria"
-       data-ponto="${ponto}" data-destino="${destino.destino}">
-    <div class="ponto-turistico-image-container">
-      ${this.renderizarImagemComCreditos(
-        destino.imagens.find(img => img.pontoTuristico === ponto) || destino.imagens[1],
-        ponto,
-        'h-full w-full',
-        { showPontoTuristico: false } // Isso remove o rótulo
-      )}
-    </div>
-  </div>
-` : ''}
-${idx === 1 && destino.imagens && destino.imagens.length > 0 ? `
-  <div class="mt-2 ml-11 rounded-lg overflow-hidden h-28 ponto-turistico-galeria"
-       data-ponto="${ponto}" data-destino="${destino.destino}">
-    <div class="ponto-turistico-image-container">
-      ${this.renderizarImagemComCreditos(
-        destino.imagens.find(img => img.pontoTuristico === ponto),
-        ponto,
-        'h-full w-full',
-        { showPontoTuristico: false } // Isso remove o rótulo
-      )}
-    </div>
-  </div>
-` : ''}
+              
+              <div class="mt-2 ml-11 rounded-lg overflow-hidden h-28 ponto-turistico-galeria"
+                   data-ponto="${ponto}" data-destino="${destino.destino}">
+                <div class="ponto-turistico-image-container">
+                  ${this.renderizarImagemComCreditos(
+                    this.encontrarMelhorImagemParaPontoTuristico(destino.imagens, ponto, idx),
+                    ponto,
+                    'h-full w-full',
+                    { showPontoTuristico: false }
+                  )}
+                </div>
+              </div>
             </div>
           `).join('') : 
           '<p class="text-center text-gray-500 my-6">Informações sobre pontos turísticos não disponíveis</p>'
@@ -1028,32 +1015,37 @@ mostrarDestinoSurpresa() {
         ${this.prepararInformacaoAeroporto(destino)}
       </div>
       
-      <!-- Conteúdo da aba Pontos Turísticos -->
-      <div id="conteudo-surpresa-pontos" class="conteudo-aba-surpresa p-4 overflow-y-auto hidden" style="max-height: calc(90vh - 280px);">
-        <p class="text-sm text-gray-600 mb-3">Atrações imperdíveis em ${destino.destino}:</p>
+      // Conteúdo da aba Pontos Turísticos - VERSÃO MELHORADA
+<div id="conteudo-surpresa-pontos" class="conteudo-aba-surpresa p-4 overflow-y-auto hidden" style="max-height: calc(90vh - 280px);">
+  <p class="text-sm text-gray-600 mb-3">Atrações imperdíveis em ${destino.destino}:</p>
+  
+  ${destino.pontosTuristicos && destino.pontosTuristicos.length > 0 ? 
+    destino.pontosTuristicos.map((ponto, idx) => `
+      <div class="bg-white border border-gray-200 rounded-lg p-3 mb-3 shadow-sm hover:shadow-md transition-all">
+        <div class="flex items-center">
+          <span class="flex items-center justify-center w-8 h-8 rounded-full mr-3 text-white font-bold" style="background-color: #00A3E0;">${idx + 1}</span>
+          <h5 class="font-medium">${ponto}</h5>
+        </div>
+        <p class="text-sm text-gray-600 mt-2 ml-11">
+          ${this.gerarDescricaoAutomatica(ponto, destino.destino)}
+        </p>
         
-        ${destino.pontosTuristicos && destino.pontosTuristicos.length > 0 ? 
-          destino.pontosTuristicos.map((ponto, idx) => `
-            <div class="bg-white border border-gray-200 rounded-lg p-3 mb-3 shadow-sm hover:shadow-md transition-all">
-              <div class="flex items-center">
-                <span class="flex items-center justify-center w-8 h-8 rounded-full mr-3 text-white font-bold" style="background-color: #00A3E0;">${idx + 1}</span>
-                <h5 class="font-medium">${ponto}</h5>
-              </div>
-              <p class="text-sm text-gray-600 mt-2 ml-11">
-                ${this.gerarDescricaoAutomatica(ponto, destino.destino)}
-              </p>
-              ${idx === 0 && destino.imagens && destino.imagens.length > 1 ? `
-  <div class="mt-2 ml-11 rounded-lg overflow-hidden h-28 ponto-turistico-galeria"
-       data-ponto="${ponto}" data-destino="${destino.destino}">
-    <div class="ponto-turistico-image-container">
-      ${this.renderizarImagemComCreditos(
-        destino.imagens.find(img => img.pontoTuristico === ponto) || destino.imagens[1],
-        ponto,
-        'h-full w-full',
-        { showPontoTuristico: false } // Isso remove o rótulo
-      )}
-    </div>
-  </div>
+        <div class="mt-2 ml-11 rounded-lg overflow-hidden h-28 ponto-turistico-galeria"
+             data-ponto="${ponto}" data-destino="${destino.destino}">
+          <div class="ponto-turistico-image-container">
+            ${this.renderizarImagemComCreditos(
+              this.encontrarMelhorImagemParaPontoTuristico(destino.imagens, ponto, idx),
+              ponto,
+              'h-full w-full',
+              { showPontoTuristico: false }
+            )}
+          </div>
+        </div>
+      </div>
+    `).join('') : 
+    '<p class="text-center text-gray-500 my-6">Informações sobre pontos turísticos não disponíveis</p>'
+  }
+</div>
 ` : ''}
 ${idx === 1 && destino.imagens && destino.imagens.length > 0 ? `
   <div class="mt-2 ml-11 rounded-lg overflow-hidden h-28 ponto-turistico-galeria"
@@ -1232,6 +1224,48 @@ ${idx === 1 && destino.imagens && destino.imagens.length > 0 ? `
     
     this.mostrarConfirmacaoSelecao(destinoPadronizado);
   },
+
+// Método para encontrar a melhor imagem para um ponto turístico específico
+encontrarMelhorImagemParaPontoTuristico(imagens, pontoTuristico, indice = 0) {
+  if (!imagens || imagens.length === 0) return null;
+  
+  // Estratégia de busca para encontrar a melhor imagem:
+  
+  // 1. Tentar achar uma imagem que tenha exatamente o mesmo pontoTuristico
+  const imagemExata = imagens.find(img => 
+    img.pontoTuristico && 
+    img.pontoTuristico.toLowerCase() === pontoTuristico.toLowerCase()
+  );
+  if (imagemExata) return imagemExata;
+  
+  // 2. Tentar achar uma imagem que contenha o nome do ponto turístico
+  const imagemComNome = imagens.find(img => 
+    img.pontoTuristico && 
+    img.pontoTuristico.toLowerCase().includes(pontoTuristico.toLowerCase())
+  );
+  if (imagemComNome) return imagemComNome;
+  
+  // 3. Tentar achar uma imagem cujo alt contenha o nome do ponto turístico
+  const imagemAltComNome = imagens.find(img => 
+    img.alt && 
+    img.alt.toLowerCase().includes(pontoTuristico.toLowerCase())
+  );
+  if (imagemAltComNome) return imagemAltComNome;
+  
+  // 4. Usar uma imagem específica com base no índice do ponto turístico
+  // Distribui as imagens disponíveis entre os pontos turísticos de forma circular
+  const indiceImagem = indice % imagens.length;
+  
+  // Para evitar sempre usar a mesma imagem de capa para outros pontos turísticos
+  // usamos um offset para começar a partir da segunda imagem
+  const offsetIndice = (indice === 0) ? 0 : indiceImagem + 1;
+  const indiceAjustado = offsetIndice % imagens.length;
+  
+  return {
+    ...imagens[indiceAjustado],
+    pontoTuristico: pontoTuristico  // Atribuir o nome correto do ponto turístico
+  };
+},
   
   // Método auxiliar para tentar obter código IATA
   obterCodigoIATADestino(destino) {
