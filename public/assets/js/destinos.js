@@ -495,14 +495,14 @@ async enriquecerComImagens() {
     `;
   },
   
-  // Método auxiliar para renderizar imagem com créditos - AJUSTADO PARA CRÉDITOS DISCRETOS
+  // Método auxiliar para renderizar imagem com créditos - VERSÃO CORRIGIDA COMPLETA
+// Método auxiliar para renderizar imagem com créditos - COM ÍCONE DE LUPA
 renderizarImagemComCreditos(imagem, fallbackText, classes = '', options = {}) {
   // Options para controlar comportamento
   const { 
     isTopChoice = false, 
     isSurpriseDestination = false,
-    showPontoTuristico = true,
-    showCredits = true
+    showPontoTuristico = true
   } = options || {};
   
   if (!imagem) {
@@ -545,25 +545,9 @@ renderizarImagemComCreditos(imagem, fallbackText, classes = '', options = {}) {
   // Garantir que temos URLs e textos alternativos
   const imageUrl = imagem.url || `https://via.placeholder.com/400x224?text=${encodeURIComponent(fallbackText)}`;
   const imageAlt = imagem.alt || fallbackText;
-  const photographer = imagem.photographer || 'Benetrip';
   const sourceUrl = imagem.sourceUrl || '#';
   
-  // HTML para créditos de forma abreviada no canto inferior direito
-  let creditsTag = '';
-  if (showCredits) {
-    creditsTag = `
-      <a href="${sourceUrl}" target="_blank" rel="noopener noreferrer" 
-         class="absolute bottom-1 right-1 bg-black bg-opacity-50 rounded-sm px-1.5 py-0.5 text-white text-xs flex items-center hover:bg-opacity-70 z-5"
-         title="Foto por ${photographer}">
-        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-0.5">
-          <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7l-5-5z"></path>
-          <polyline points="14 2 14 8 20 8"></polyline>
-        </svg>
-      </a>
-    `;
-  }
-  
-  // Montar HTML final
+  // Montar HTML final com ícone de lupa em vez de texto completo
   return `
     <div class="relative ${classes}">
       <img 
@@ -576,7 +560,14 @@ renderizarImagemComCreditos(imagem, fallbackText, classes = '', options = {}) {
       ${topChoiceTag}
       ${surpriseTag}
       ${pontoTuristicoTag}
-      ${creditsTag}
+      
+      <!-- Ícone de lupa para créditos -->
+      <a href="${sourceUrl}" target="_blank" rel="noopener noreferrer" class="absolute bottom-2 right-2 bg-white bg-opacity-80 p-1.5 rounded-full z-10 hover:bg-opacity-100 transition-all">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="8"></circle>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
+      </a>
     </div>
   `;
 },
@@ -838,10 +829,11 @@ renderizarDestinosAlternativos(destinos) {
     elementoDestino.innerHTML = `
       <div class="relative">
         ${this.renderizarImagemComCreditos(
-          destino.imagens && destino.imagens.length > 0 ? destino.imagens[0] : null,
-          destino.destino,
-          'h-32'
-        )}
+  destino.imagens && destino.imagens.length > 0 ? destino.imagens[0] : null,
+  destino.destino,
+  'h-32',
+  { showCredits: false }  // Ocultar créditos nos cards pequenos
+)}
         <div class="absolute top-2 right-2 bg-white bg-opacity-90 rounded-full p-1 shadow-sm">
           <span class="text-lg">${iconeTipo}</span>
         </div>
