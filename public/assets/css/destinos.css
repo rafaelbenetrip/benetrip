@@ -804,11 +804,17 @@ h3 {
   z-index: 10 !important; /* Garantir que fique acima de outros elementos */
 }
 
-/* Ajustar posicionamento do ícone de créditos */
-.image-container a[title] {
-  transition: all 0.2s ease;
+/* Estilo para o ícone de lupa */
+.image-container a.absolute {
+  opacity: 0.7;
+  transition: opacity 0.2s ease;
 }
 
-.image-container a[title]:hover {
-  transform: scale(1.1);
+.image-container a.absolute:hover {
+  opacity: 1;
+}
+
+/* Garantir que o ícone fique visível em imagens claras */
+.image-container a.absolute svg {
+  color: #333;
 }
