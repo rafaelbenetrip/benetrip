@@ -485,14 +485,14 @@ async function callAIAPI(provider, prompt, requestData) {
       max_tokens: 2000
     },
     openai: {
-  url: 'https://api.openai.com/v1/chat/completions',
-  header: 'Authorization',
-  prefix: 'Bearer',
-  model: 'o4-mini',
-  systemMessage: 'Você é um especialista em viagens...',
-  max_completion_tokens: 2000,   // ✅ novo campo
-  useCompletionTokens: true      // flag opcional para seu builder
-},
+      url: 'https://api.openai.com/v1/chat/completions',
+      header: 'Authorization',
+      prefix: 'Bearer',
+      model: 'o3-2025-04-16',
+      systemMessage: 'Você é um especialista em viagens. Retorne apenas JSON com 4 destinos alternativos, respeitando o orçamento para voos.',
+      temperature: 0.7,
+      max_tokens: 2000
+    },
     claude: {
       url: 'https://api.anthropic.com/v1/messages',
       header: 'anthropic-api-key',
@@ -554,9 +554,7 @@ IMPORTANTE:
             content: finalPrompt
           }
         ],
-        ...(config.temperature !== undefined
-      ? { temperature: config.temperature }
-      : {}),
+        temperature: config.temperature || 0.7
       };
     } else {
       requestData = {
@@ -571,9 +569,8 @@ IMPORTANTE:
             content: finalPrompt
           }
         ],
-...(config.max_completion_tokens             // se existir no apiConfig
-    ? { max_completion_tokens: config.max_completion_tokens }
-    : { max_tokens: config.max_tokens })     // mantém compatibilidade
+        temperature: config.temperature || 0.7,
+        max_tokens: config.max_tokens || 2000
       };
       
       if (config.additionalParams) {
