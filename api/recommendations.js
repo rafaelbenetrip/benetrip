@@ -490,7 +490,6 @@ async function callAIAPI(provider, prompt, requestData) {
   prefix: 'Bearer',
   model: 'o4-mini',
   systemMessage: 'Você é um especialista em viagens...',
-  temperature: 0.7,
   max_completion_tokens: 2000,   // ✅ novo campo
   useCompletionTokens: true      // flag opcional para seu builder
 },
@@ -555,7 +554,9 @@ IMPORTANTE:
             content: finalPrompt
           }
         ],
-        temperature: config.temperature || 0.7
+        ...(config.temperature !== undefined
+      ? { temperature: config.temperature }
+      : {}),
       };
     } else {
       requestData = {
@@ -570,7 +571,6 @@ IMPORTANTE:
             content: finalPrompt
           }
         ],
-        temperature: config.temperature || 0.7,
 ...(config.max_completion_tokens             // se existir no apiConfig
     ? { max_completion_tokens: config.max_completion_tokens }
     : { max_tokens: config.max_tokens })     // mantém compatibilidade
