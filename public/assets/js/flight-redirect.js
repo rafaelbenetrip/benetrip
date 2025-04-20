@@ -717,4 +717,3 @@ console.log('BENETRIP_REDIRECT carregado - Versão 2.2 (Suporte aprimorado para 
 
 // Muito importante: tornar a função disponível globalmente
 console.log('Garantindo acesso global a BENETRIP_REDIRECT:', typeof window.BENETRIP_REDIRECT);
-
