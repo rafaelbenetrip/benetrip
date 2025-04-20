@@ -743,3 +743,89 @@ module.exports = async function handler(req, res) {
     });
   }
 };
+// Adicionar ao final do arquivo (mantendo todo o código existente)
+
+// Modificar para exportar funções que serão usadas pelo itinerary-generator
+module.exports = {
+  // Manter a função de handler para a API
+  handler,
+  
+  // Adicionar função específica para busca de imagens de atrações
+  searchAttractionImage: async function(attraction, destination, country = '') {
+    try {
+      // Usar a classificação de destino existente
+      const classificacao = await classificarDestino(
+        destination, 
+        '', 
+        [attraction]
+      );
+      
+      // Tentar cada fonte em cascata
+      let result = await fetchGoogleImages(destination, {
+        perPage: 1,
+        destination: classificacao.cidade,
+        country: country,
+        pontosTuristicos: [attraction]
+      });
+      
+      if (result.success && result.images.length > 0) {
+        return result.images[0].url;
+      }
+      
+      result = await fetchPexelsImages(destination, {
+        perPage: 1,
+        pontosTuristicos: [attraction]
+      });
+      
+      if (result.success && result.images.length > 0) {
+        return result.images[0].url;
+      }
+      
+      result = await fetchUnsplashImages(destination, {
+        perPage: 1,
+        pontosTuristicos: [attraction]
+      });
+      
+      if (result.success && result.images.length > 0) {
+        return result.images[0].url;
+      }
+      
+      // Fallback para placeholder
+      return `https://via.placeholder.com/800x600.png?text=${encodeURIComponent(attraction + ' em ' + destination)}`;
+    } catch (error) {
+      logEvent('error', 'Erro ao buscar imagem para atração', {
+        attraction,
+        destination,
+        error: error.message
+      });
+      return `https://via.placeholder.com/800x600.png?text=${encodeURIComponent(attraction + ' em ' + destination)}`;
+    }
+  },
+  
+  // Função para buscar pontos turísticos
+  getTouristAttractions: async function(destination) {
+    try {
+      // Verificar primeiro na base interna
+      const cidadeNormalizada = normalizarNomeDestino(destination);
+      const pontosTuristicosConhecidos = PONTOS_TURISTICOS_POPULARES[cidadeNormalizada] || [];
+      
+      if (pontosTuristicosConhecidos.length > 0) {
+        return pontosTuristicosConhecidos;
+      }
+      
+      // Se não encontrar, buscar via Google Places
+      return await fetchTouristAttractions(destination);
+    } catch (error) {
+      logEvent('error', 'Erro ao buscar pontos turísticos', {
+        destination,
+        error: error.message
+      });
+      return [];
+    }
+  }
+};
+
+// Se estiver sendo executado como uma API, exportar o handler
+if (typeof handler === 'function') {
+  module.exports.default = handler;
+}
