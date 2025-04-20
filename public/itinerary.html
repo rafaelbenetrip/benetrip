@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Seu Roteiro de Viagem | Benetrip</title>
+    <link rel="stylesheet" href="public/assets/css/main.css">
+    <link rel="stylesheet" href="public/assets/css/itinerary.css">
+</head>
+<body>
+    <div class="benetrip-container">
+        <!-- Cabeçalho com mascote -->
+        <header class="header">
+            <div class="mascot-container">
+                <img src="public/assets/images/tripinha-icon.png" alt="Tripinha" class="mascot-image">
+            </div>
+            <h1 class="header-title" id="destination-title">Seu Roteiro</h1>
+        </header>
+
+        <!-- Resumo da Viagem -->
+        <section class="trip-summary" id="trip-summary">
+            <!-- Será preenchido dinamicamente pelo JavaScript -->
+        </section>
+
+        <!-- Container para os dias do roteiro -->
+        <section class="itinerary-days" id="itinerary-days">
+            <!-- Será preenchido dinamicamente pelo JavaScript -->
+        </section>
+
+        <!-- Rodapé com botões de ação -->
+        <footer class="footer-actions">
+            <button class="btn btn-secondary" id="btn-edit-flights">
+                <i class="icon-edit"></i> Simular voo novamente
+            </button>
+            <button class="btn btn-primary" id="btn-share">
+                <i class="icon-share"></i> Compartilhar roteiro
+            </button>
+        </footer>
+    </div>
+
+    <!-- Templates -->
+    <template id="trip-summary-template">
+        <div class="summary-card">
+            <h2 class="summary-title">📋 Resumo da Viagem</h2>
+            <div class="summary-details">
+                <div class="summary-item">
+                    <span class="summary-icon">🎯</span>
+                    <div class="summary-info">
+                        <span class="summary-label">Destino:</span>
+                        <p class="summary-value">{{destination}}</p>
+                    </div>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-icon">📅</span>
+                    <div class="summary-info">
+                        <span class="summary-label">Datas:</span>
+                        <p class="summary-value">{{dates}}</p>
+                    </div>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-icon">✈️</span>
+                    <div class="summary-info">
+                        <span class="summary-label">Horários dos voos:</span>
+                        <p class="summary-value">{{flightTimes}}</p>
+                    </div>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-icon">👨‍👩‍👧‍👦</span>
+                    <div class="summary-info">
+                        <span class="summary-label">Grupo:</span>
+                        <p class="summary-value">{{group}}</p>
+                    </div>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-icon">🏛️</span>
+                    <div class="summary-info">
+                        <span class="summary-label">Preferência:</span>
+                        <p class="summary-value">{{preference}}</p>
+                    </div>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-icon">🛫</span>
+                    <div class="summary-info">
+                        <span class="summary-label">Cidade de partida:</span>
+                        <p class="summary-value">{{originCity}}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <template id="day-template">
+        <div class="day-card" data-day="{{dayNumber}}">
+            <div class="day-header">
+                <div class="day-number">{{dayNumber}}</div>
+                <span class="day-title">Dia {{dayNumber}} — {{dayDate}}</span>
+            </div>
+            <div class="day-content">
+                <p class="day-description">{{dayDescription}}</p>
+                
+                <div class="weather-forecast">
+                    <span class="weather-icon">{{weatherIcon}}</span>
+                    <span class="weather-details">Previsão: {{temperature}}°C, {{weatherCondition}}</span>
+                </div>
+                
+                <div class="day-periods">
+                    <button class="period-tab period-active" data-period="morning">
+                        <span>🌅</span> Manhã
+                    </button>
+                    <button class="period-tab" data-period="afternoon">
+                        <span>☀️</span> Tarde
+                    </button>
+                    <button class="period-tab" data-period="evening">
+                        <span>🌙</span> Noite
+                    </button>
+                </div>
+                
+                <div class="period-content" id="{{dayId}}-morning">
+                    <div class="activity-item">
+                        <span class="activity-icon">🕒</span>
+                        <div class="activity-info">
+                            <span class="activity-time">{{activityTime}}</span>
+                        </div>
+                    </div>
+                    
+                    <div class="activity-item">
+                        <span class="activity-icon">📍</span>
+                        <div class="activity-info">
+                            <span class="activity-location">{{activityLocation}}</span>
+                            <div class="activity-badges">
+                                {{activityBadges}}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <button class="map-button">
+                        <i class="icon-map"></i> Ver no mapa
+                    </button>
+                    
+                    <div class="tripinha-tip">
+                        <div class="tripinha-avatar">
+                            <img src="public/assets/images/tripinha-icon.png" alt="Tripinha">
+                        </div>
+                        <div class="tip-content">
+                            <p><strong>Dica da Tripinha:</strong> {{tripinhaTip}}</p>
+                        </div>
+                    </div>
+                    
+                    <div class="activity-image">
+                        <img src="{{activityImage}}" alt="{{activityImageAlt}}">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <template id="badge-template">
+        <span class="badge badge-{{badgeType}}">{{badgeText}}</span>
+    </template>
+
+    <script src="public/assets/js/modules/event-emitter.js"></script>
+    <script src="public/assets/js/modules/storage-manager.js"></script>
+    <script src="public/assets/js/modules/itinerary-builder.js"></script>
+    <script src="public/assets/js/modules/weather-api.js"></script>
+    <script src="public/assets/js/modules/ai-suggestions.js"></script>
+    <script src="public/assets/js/itinerary.js"></script>
+</body>
+</html>
