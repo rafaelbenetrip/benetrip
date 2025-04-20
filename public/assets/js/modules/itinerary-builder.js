@@ -1,106 +1,121 @@
 /**
- * Módulo de construção do roteiro
- * Responsável por formatar dados do roteiro para exibição
+ * Módulo responsável por construir o roteiro personalizado
+ * baseado nas preferências do usuário e dados do destino
  */
 (function() {
     'use strict';
 
-    // Namespace global
+    // Definição do namespace global se não existir
     window.BenetripApp = window.BenetripApp || {};
 
+    // Objeto do módulo
     const ItineraryBuilder = {
         /**
-         * Constrói o roteiro completo
-         * @param {Object} destination - Dados do destino
+         * Constrói a estrutura de dados do roteiro completo
+         * @param {Object} destination - Informações do destino
          * @param {Object} preferences - Preferências do usuário
          * @param {Object} flight - Dados do voo selecionado
-         * @param {Object} aiSuggestions - Sugestões da IA
-         * @param {Object} weather - Dados de clima
-         * @returns {Object} Objeto com o roteiro completo
+         * @param {Object} aiSuggestions - Sugestões da IA (opcional)
+         * @param {Object} weather - Dados de previsão do tempo (opcional)
+         * @returns {Object} Roteiro completo
          */
-        buildItinerary: function(destination, preferences, flight, aiSuggestions, weather) {
-            // Datas da viagem
-            const departureDate = new Date(flight.departureDate);
-            const returnDate = new Date(flight.returnDate);
-            
-            // Número de dias
-            const totalDays = this.getDaysBetweenDates(departureDate, returnDate) + 1;
-            
-            // Cria estrutura básica do roteiro
-            const itinerary = {
-                destination: destination,
-                totalDays: totalDays,
-                days: []
-            };
-            
-            // Gera cada dia do roteiro
-            for (let i = 0; i < totalDays; i++) {
-                const currentDate = new Date(departureDate);
-                currentDate.setDate(departureDate.getDate() + i);
+        buildItinerary: function(destination, preferences, flight, aiSuggestions = null, weather = null) {
+            try {
+                // Extrair datas
+                const departureDate = new Date(flight.departureDate);
+                const returnDate = new Date(flight.returnDate);
                 
-                // Obtém sugestões da IA para este dia
-                const daySuggestions = aiSuggestions.days && aiSuggestions.days[i] ? 
-                    aiSuggestions.days[i] : this.getDefaultDaySuggestions(i, totalDays);
+                // Calcular número de dias
+                const totalDays = this.getDaysBetweenDates(departureDate, returnDate) + 1;
                 
-                // Obtém dados climáticos para o dia
-                const dayWeather = weather[i] || null;
+                // Estrutura base do roteiro
+                const itinerary = {
+                    destination: destination,
+                    preferences: preferences,
+                    flight: flight,
+                    totalDays: totalDays,
+                    days: []
+                };
                 
-                // Cria objeto do dia
-                const day = this.buildDay(
-                    i + 1,
-                    currentDate,
-                    daySuggestions,
-                    dayWeather,
-                    preferences,
-                    i === 0 ? flight.arrivalTime : null,
-                    i === totalDays - 1 ? flight.departureTime : null
-                );
+                // Gerar dados para cada dia
+                for (let i = 0; i < totalDays; i++) {
+                    const currentDate = new Date(departureDate);
+                    currentDate.setDate(departureDate.getDate() + i);
+                    
+                    // Obter sugestões da IA para o dia, se disponíveis
+                    const daySuggestions = aiSuggestions && aiSuggestions.days && aiSuggestions.days[i] 
+                        ? aiSuggestions.days[i] 
+                        : this.getDefaultDaySuggestions(i, totalDays, preferences);
+                    
+                    // Obter dados de clima para o dia, se disponíveis
+                    const dayWeather = weather && weather[i] ? weather[i] : null;
+                    
+                    // Construir objeto para o dia
+                    const day = this.buildDay(
+                        i + 1,
+                        currentDate,
+                        destination,
+                        preferences,
+                        daySuggestions,
+                        dayWeather,
+                        i === 0 ? flight.arrivalTime : null,
+                        i === totalDays - 1 ? flight.departureTime : null
+                    );
+                    
+                    itinerary.days.push(day);
+                }
                 
-                itinerary.days.push(day);
+                return itinerary;
+            } catch (error) {
+                console.error('Erro ao construir roteiro:', error);
+                return this.buildFallbackItinerary(destination, preferences, flight);
             }
-            
-            return itinerary;
         },
         
         /**
-         * Constrói os dados de um dia específico
+         * Constrói os dados para um dia específico
          */
-        buildDay: function(dayNumber, date, suggestions, weather, preferences, arrivalTime, departureTime) {
-            // Formata data para string ISO
-            const dateString = date.toISOString().split('T')[0];
-            
-            // Determina os badges apropriados com base nas preferências
+        buildDay: function(dayNumber, date, destination, preferences, suggestions, weather, arrivalTime, departureTime) {
+            // Badges para a atividade principal
             const badges = this.getBadgesForPreferences(preferences);
             
-            // Cria objeto do dia
+            // Estrutura base para o dia
             const day = {
                 number: dayNumber,
-                date: dateString,
-                description: suggestions.description || 'Aproveite seu dia!',
-                tip: suggestions.tip || 'Dica da Tripinha: Aproveite cada momento!',
-                weather: weather,
+                date: date.toISOString().split('T')[0],
+                weekday: this.getWeekdayName(date.getDay()),
+                formattedDate: this.formatDate(date),
+                description: suggestions.description || `Dia ${dayNumber} em ${destination.city}`,
+                tip: suggestions.tip || 'Aproveite seu dia!',
+                weather: weather ? {
+                    icon: weather.icon || '🌤️',
+                    temperature: weather.temperature || '25',
+                    condition: weather.condition || 'Parcialmente nublado'
+                } : null,
                 activities: []
             };
             
-            // Adiciona atividades do dia
+            // Adicionar atividade principal
             if (suggestions.activities && suggestions.activities.length > 0) {
-                suggestions.activities.forEach(activity => {
-                    day.activities.push({
-                        time: activity.time || (arrivalTime ? `Chegada às ${arrivalTime}` : ''),
-                        location: activity.location || '',
-                        description: activity.description || '',
-                        image: activity.image || '',
-                        imageAlt: activity.imageAlt || `Imagem de ${activity.location}`,
-                        badges: badges
-                    });
+                const mainActivity = suggestions.activities[0];
+                const activityTime = mainActivity.time || (arrivalTime ? `Chegada às ${arrivalTime}` : (departureTime ? `Partida às ${departureTime}` : ''));
+                
+                day.activities.push({
+                    time: activityTime,
+                    location: mainActivity.location || 'Local a ser definido',
+                    description: mainActivity.description || 'Atividade recomendada',
+                    image: mainActivity.image || '',
+                    imageAlt: mainActivity.imageAlt || `Imagem de ${mainActivity.location} em ${destination.city}`,
+                    badges: badges
                 });
             } else {
-                // Atividade padrão se não houver sugestões
+                // Atividade genérica se não houver sugestões
                 day.activities.push({
                     time: arrivalTime ? `Chegada às ${arrivalTime}` : (departureTime ? `Partida às ${departureTime}` : ''),
-                    location: 'Explore a cidade',
-                    description: 'Aproveite este dia para conhecer a cidade.',
+                    location: 'Explorar a cidade',
+                    description: 'Aproveite este dia para conhecer a cidade',
                     image: '',
+                    imageAlt: `Imagem de ${destination.city}`,
                     badges: badges
                 });
             }
@@ -109,18 +124,18 @@
         },
         
         /**
-         * Cria badges apropriados baseados nas preferências
+         * Gera badges baseados nas preferências do usuário
          */
         getBadgesForPreferences: function(preferences) {
             const badges = [];
             
-            // Badge "Imperdível" é padrão para atividades principais
+            // Badge padrão
             badges.push({
                 type: 'primary',
                 text: 'Imperdível'
             });
             
-            // Badge baseado no tipo de grupo
+            // Badge baseado no tipo de companhia
             if (preferences.companhia === 2) { // Família
                 badges.push({
                     type: 'success',
@@ -138,7 +153,7 @@
                 });
             }
             
-            // Badge baseado nas preferências de viagem
+            // Badge baseado na preferência de viagem
             if (preferences.preferencia_viagem === 0) { // Relaxar
                 badges.push({
                     type: 'info',
@@ -165,7 +180,121 @@
         },
         
         /**
-         * Determina número de dias entre duas datas
+         * Gera sugestões padrão para um dia caso não haja sugestões da IA
+         */
+        getDefaultDaySuggestions: function(dayIndex, totalDays, preferences) {
+            // Mapeia o tipo de companhia para personalizar mensagens
+            let companhia = 'você';
+            if (preferences.companhia === 1) companhia = 'vocês dois';
+            if (preferences.companhia === 2) companhia = 'toda a família';
+            if (preferences.companhia === 3) companhia = 'seu grupo';
+            
+            // Mapeia a preferência para personalizar atividades
+            let tipoAtividade = 'relaxante';
+            let localTipo = 'áreas de descanso';
+            
+            if (preferences.preferencia_viagem === 1) { // Aventura
+                tipoAtividade = 'aventureira';
+                localTipo = 'pontos de aventura';
+            } else if (preferences.preferencia_viagem === 2) { // Cultura
+                tipoAtividade = 'cultural';
+                localTipo = 'atrações culturais';
+            } else if (preferences.preferencia_viagem === 3) { // Urbano
+                tipoAtividade = 'urbana';
+                localTipo = 'atrações urbanas';
+            }
+            
+            // Primeiro dia (chegada)
+            if (dayIndex === 0) {
+                return {
+                    description: `Depois de pousar, hora de sentir o clima da cidade! Um passeio leve para ${companhia} se ambientar e descansar da viagem.`,
+                    tip: `Experimente a culinária local logo no primeiro dia! É a melhor forma de ${companhia} começar a viajar de verdade!`,
+                    activities: [{
+                        time: 'Chegada',
+                        location: 'Centro da cidade',
+                        description: 'Passeio de reconhecimento'
+                    }]
+                };
+            }
+            // Último dia (partida)
+            else if (dayIndex === totalDays - 1) {
+                return {
+                    description: `Último dia! Aproveite para fazer compras de lembrancinhas e relaxar antes do voo de volta.`,
+                    tip: `Organize as malas com antecedência para ${companhia} aproveitar ao máximo as últimas horas!`,
+                    activities: [{
+                        time: 'Manhã',
+                        location: 'Mercado local',
+                        description: 'Compras de lembranças'
+                    }]
+                };
+            }
+            // Dias intermediários
+            else {
+                return {
+                    description: `Dia perfeito para uma experiência ${tipoAtividade}! Explore as melhores atrações da cidade.`,
+                    tip: `Pesquise com antecedência sobre ingressos online para as ${localTipo}. Assim ${companhia} evita filas!`,
+                    activities: [{
+                        time: 'Dia inteiro',
+                        location: 'Principais atrações',
+                        description: `Explore as melhores ${localTipo} da cidade`
+                    }]
+                };
+            }
+        },
+        
+        /**
+         * Constrói um roteiro básico caso ocorra algum erro
+         */
+        buildFallbackItinerary: function(destination, preferences, flight) {
+            const departureDate = new Date(flight.departureDate);
+            const returnDate = new Date(flight.returnDate);
+            const totalDays = this.getDaysBetweenDates(departureDate, returnDate) + 1;
+            
+            const itinerary = {
+                destination: destination,
+                preferences: preferences,
+                flight: flight,
+                totalDays: totalDays,
+                days: []
+            };
+            
+            for (let i = 0; i < totalDays; i++) {
+                const currentDate = new Date(departureDate);
+                currentDate.setDate(departureDate.getDate() + i);
+                
+                const defaultSuggestions = this.getDefaultDaySuggestions(i, totalDays, preferences);
+                
+                const day = {
+                    number: i + 1,
+                    date: currentDate.toISOString().split('T')[0],
+                    weekday: this.getWeekdayName(currentDate.getDay()),
+                    formattedDate: this.formatDate(currentDate),
+                    description: defaultSuggestions.description,
+                    tip: defaultSuggestions.tip,
+                    weather: {
+                        icon: '🌤️',
+                        temperature: '25',
+                        condition: 'Parcialmente nublado'
+                    },
+                    activities: [{
+                        time: i === 0 ? `Chegada às ${flight.arrivalTime || '15:00'}` : 
+                              (i === totalDays - 1 ? `Partida às ${flight.departureTime || '18:00'}` : ''),
+                        location: defaultSuggestions.activities[0].location,
+                        description: defaultSuggestions.activities[0].description,
+                        image: '',
+                        imageAlt: `Imagem de ${destination.city}`,
+                        badges: this.getBadgesForPreferences(preferences)
+                    }]
+                };
+                
+                itinerary.days.push(day);
+            }
+            
+            return itinerary;
+        },
+        
+        /**
+         * Calcula número de dias entre duas datas
          */
         getDaysBetweenDates: function(startDate, endDate) {
             const difference = endDate.getTime() - startDate.getTime();
@@ -173,54 +302,21 @@
         },
         
         /**
-         * Gera sugestões padrão para um dia
+         * Formata uma data para exibição
          */
-        getDefaultDaySuggestions: function(dayIndex, totalDays) {
-            // Primeiro dia
-            if (dayIndex === 0) {
-                return {
-                    description: "Depois de pousar, hora sentir o clima da cidade com calma: faça um passeio pela região central, experimente a culinária local e descanse para os próximos dias.",
-                    tip: "Procure restaurantes autênticos onde os moradores locais comem para ter uma experiência gastronômica genuína!",
-                    activities: [
-                        {
-                            time: "Tarde",
-                            location: "Centro da cidade",
-                            description: "Passeio pelo centro histórico"
-                        }
-                    ]
-                };
-            }
-            // Último dia
-            else if (dayIndex === totalDays - 1) {
-                return {
-                    description: "Último dia de viagem! Aproveite para fazer compras de últimos souvenirs e relaxar antes do voo de volta.",
-                    tip: "Reserve tempo suficiente para o check-in no aeroporto e organize suas malas com antecedência!",
-                    activities: [
-                        {
-                            time: "Manhã",
-                            location: "Mercado local",
-                            description: "Compras de lembranças"
-                        }
-                    ]
-                };
-            }
-            // Dias intermediários
-            else {
-                return {
-                    description: "Explore as principais atrações da cidade.",
-                    tip: "Pesquise sobre passes de transporte público para economizar durante seus deslocamentos!",
-                    activities: [
-                        {
-                            time: "Dia inteiro",
-                            location: "Atrações turísticas",
-                            description: "Visita aos pontos turísticos"
-                        }
-                    ]
-                };
-            }
+        formatDate: function(date) {
+            return `${date.getDate().toString().padStart(2, '0')}/${(date.getMonth() + 1).toString().padStart(2, '0')}`;
+        },
+        
+        /**
+         * Retorna o nome do dia da semana
+         */
+        getWeekdayName: function(weekdayIndex) {
+            const weekdays = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
+            return weekdays[weekdayIndex];
         }
     };
-
+    
     // Expõe o módulo globalmente
     window.BenetripApp.ItineraryBuilder = ItineraryBuilder;
 })();
