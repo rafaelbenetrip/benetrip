@@ -571,7 +571,9 @@ IMPORTANTE:
           }
         ],
         temperature: config.temperature || 0.7,
-        max_tokens: config.max_tokens || 2000
+...(config.max_completion_tokens             // se existir no apiConfig
+    ? { max_completion_tokens: config.max_completion_tokens }
+    : { max_tokens: config.max_tokens })     // mantém compatibilidade
       };
       
       if (config.additionalParams) {
