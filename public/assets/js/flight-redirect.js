@@ -74,7 +74,7 @@ window.BENETRIP_REDIRECT = {
                         this.processarConfirmacao(voo.sign || 'voo-0');
                     } else {
                         // Último recurso: ir direto para hotéis
-                        window.location.href = 'hotels.html';
+                        window.location.href = 'itinerary.html';
                     }
                 }
             }
@@ -103,7 +103,7 @@ window.BENETRIP_REDIRECT = {
         if (!window.BENETRIP_VOOS) {
             console.error('Módulo BENETRIP_VOOS não disponível');
             // Fallback: ir direto para hotéis
-            window.location.href = 'hotels.html';
+            window.location.href = 'itinerary.html';
             return;
         }
         
@@ -207,7 +207,7 @@ window.BENETRIP_REDIRECT = {
                     
                     if (redirectData && redirectData.url) {
                         // Salvar dados na localStorage antes de redirecionar
-                        localStorage.setItem('benetrip_redirect_destination', 'hotels.html');
+                        localStorage.setItem('benetrip_redirect_destination', 'itinerary.html');
                         localStorage.setItem('benetrip_parceiro_aberto', 'true');
                         
                         // Configurar pixel de tracking se disponível
@@ -234,7 +234,7 @@ window.BENETRIP_REDIRECT = {
                         this._redirectInProgress = false;
                         
                         // Redirecionar para hotéis como fallback
-                        window.location.href = 'hotels.html';
+                        window.location.href = 'itinerary.html';
                     }
                 })
                 .catch(error => {
@@ -250,7 +250,7 @@ window.BENETRIP_REDIRECT = {
                     this._redirectInProgress = false;
                     
                     // Redireciona para a página de hotéis em caso de erro
-                    window.location.href = 'hotels.html';
+                    window.location.href = 'itinerary.html';
                 });
         } else {
             // Abordagem desktop (original)
@@ -270,7 +270,7 @@ window.BENETRIP_REDIRECT = {
                 
                 // Redirecionar para hotéis como fallback
                 setTimeout(() => {
-                    window.location.href = 'hotels.html';
+                    window.location.href = 'itinerary.html';
                 }, 1000);
                 return;
             }
@@ -392,7 +392,7 @@ window.BENETRIP_REDIRECT = {
                     
                     // Redireciona para a página de hotéis após um delay
                     setTimeout(() => {
-                        window.location.href = 'hotels.html';
+                        window.location.href = 'itinerary.html';
                     }, 2000);
                 })
                 .catch(error => {
@@ -440,7 +440,7 @@ window.BENETRIP_REDIRECT = {
                     
                     // Redireciona para a página de hotéis mesmo em caso de erro
                     setTimeout(() => {
-                        window.location.href = 'hotels.html';
+                        window.location.href = 'itinerary.html';
                     }, 1000);
                 });
         }
