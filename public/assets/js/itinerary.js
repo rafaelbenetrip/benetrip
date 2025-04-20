@@ -1,33 +1,32 @@
 /**
- * Arquivo principal para a página de roteiro
- * Responsável pela inicialização e coordenação dos módulos
+ * Script principal para a página de roteiro de viagem
+ * Coordena a renderização e interação do usuário com o roteiro
  */
 (function() {
     'use strict';
-
-    // Módulos
+    
+    // Módulos e utilitários
     const StorageManager = window.BenetripApp.StorageManager;
     const EventEmitter = window.BenetripApp.EventEmitter;
     const ItineraryBuilder = window.BenetripApp.ItineraryBuilder;
-    const WeatherAPI = window.BenetripApp.WeatherAPI;
-    const AISuggestions = window.BenetripApp.AISuggestions;
-
-    // Elementos DOM
+    
+    // Elementos do DOM
     const elements = {
         destinationTitle: document.getElementById('destination-title'),
         tripSummary: document.getElementById('trip-summary'),
         itineraryDays: document.getElementById('itinerary-days'),
+        itineraryLoader: document.getElementById('itinerary-loader'),
         btnEditFlights: document.getElementById('btn-edit-flights'),
         btnShare: document.getElementById('btn-share')
     };
-
+    
     // Templates
     const templates = {
-        tripSummary: document.getElementById('trip-summary-template'),
-        day: document.getElementById('day-template'),
-        badge: document.getElementById('badge-template')
+        tripSummary: document.getElementById('trip-summary-template').innerHTML,
+        day: document.getElementById('day-template').innerHTML,
+        badge: document.getElementById('badge-template').innerHTML
     };
-
+    
     // Estado da aplicação
     let appState = {
         userPreferences: null,
@@ -36,41 +35,53 @@
         itinerary: null,
         weather: {}
     };
-
+    
     /**
      * Inicializa a página
      */
     function init() {
-        // Carrega dados da sessão anterior
+        // Carregar dados armazenados
         loadStoredData();
         
-        // Se não houver dados suficientes, redireciona para página inicial
+        // Validar se há dados suficientes
         if (!validateData()) {
-            window.location.href = 'index.html';
+            showError('Dados insuficientes para gerar o roteiro. Volte e selecione um voo.');
+            setTimeout(() => {
+                window.location.href = 'index.html';
+            }, 3000);
             return;
         }
-
-        // Atualiza título com o destino
+        
+        // Atualizar título com destino
         updateDestinationTitle();
         
-        // Gera o roteiro
+        // Configurar eventos
+        setupEventListeners();
+        
+        // Gerar roteiro
         generateItinerary();
         
-        // Configura eventos dos botões
-        setupEventListeners();
+        // Emitir evento de página carregada
+        EventEmitter.emit('itinerary:loaded');
     }
-
+    
     /**
-     * Carrega dados armazenados no localStorage
+     * Carrega dados do localStorage
      */
     function loadStoredData() {
         appState.userPreferences = StorageManager.get('userPreferences');
         appState.selectedFlight = StorageManager.get('selectedFlight');
         appState.destination = StorageManager.get('destination');
+        
+        console.log('Dados carregados:', {
+            userPreferences: appState.userPreferences,
+            selectedFlight: appState.selectedFlight,
+            destination: appState.destination
+        });
     }
-
+    
     /**
-     * Valida se temos dados suficientes para gerar o roteiro
+     * Valida se há dados suficientes para gerar o roteiro
      */
     function validateData() {
         return (
@@ -79,39 +90,89 @@
             appState.destination
         );
     }
-
+    
     /**
-     * Atualiza título com o nome do destino
+     * Atualiza o título com o nome do destino
      */
     function updateDestinationTitle() {
-        elements.destinationTitle.textContent = `Seu Roteiro para ${appState.destination.city}`;
+        if (elements.destinationTitle && appState.destination) {
+            elements.destinationTitle.textContent = `Seu Roteiro para ${appState.destination.city}`;
+        }
     }
-
+    
+    /**
+     * Configura eventos dos elementos interativos
+     */
+    function setupEventListeners() {
+        // Botão para editar voos
+        if (elements.btnEditFlights) {
+            elements.btnEditFlights.addEventListener('click', function() {
+                window.location.href = 'flights.html';
+            });
+        }
+        
+        // Botão para compartilhar
+        if (elements.btnShare) {
+            elements.btnShare.addEventListener('click', shareItinerary);
+        }
+        
+        // Evento global para cliques em botões de mapa
+        document.addEventListener('click', function(e) {
+            // Verificar se o clique foi em um botão de mapa
+            if (e.target.matches('.map-button') || e.target.closest('.map-button')) {
+                const button = e.target.matches('.map-button') ? e.target : e.target.closest('.map-button');
+                const location = button.dataset.location;
+                
+                if (location) {
+                    openInMaps(`${location}, ${appState.destination.city}, ${appState.destination.country}`);
+                }
+            }
+            
+            // Verificar se o clique foi em uma aba de período
+            if (e.target.matches('.period-tab') || e.target.closest('.period-tab')) {
+                const tab = e.target.matches('.period-tab') ? e.target : e.target.closest('.period-tab');
+                const dayCard = tab.closest('.day-card');
+                
+                if (dayCard) {
+                    // Remover classe ativa de todas as abas no mesmo dia
+                    const tabs = dayCard.querySelectorAll('.period-tab');
+                    tabs.forEach(t => t.classList.remove('period-active'));
+                    
+                    // Adicionar classe ativa na aba clicada
+                    tab.classList.add('period-active');
+                    
+                    // Mudar conteúdo para o período selecionado (implementação futura)
+                    // Por enquanto, apenas um feedback visual
+                    console.log('Período selecionado:', tab.dataset.period);
+                }
+            }
+        });
+    }
+    
     /**
      * Gera o roteiro de viagem
      */
     async function generateItinerary() {
         try {
-            // Exibe loader
             showLoader();
             
-            // Obtém sugestões de IA para o roteiro
-            const aiSuggestions = await AISuggestions.getItinerarySuggestions(
-                appState.destination, 
-                appState.userPreferences,
-                appState.selectedFlight
-            );
-            
-            // Busca previsão do tempo
-            const weatherData = await WeatherAPI.getWeatherForecast(
+            // 1. Buscar previsão do tempo
+            const weatherData = await fetchWeatherForecast(
                 appState.destination.city,
-                formatDateForWeatherAPI(appState.selectedFlight.departureDate),
-                formatDateForWeatherAPI(appState.selectedFlight.returnDate)
+                appState.selectedFlight.departureDate,
+                appState.selectedFlight.returnDate
             );
             
             appState.weather = weatherData;
             
-            // Constrói o roteiro completo
+            // 2. Obter sugestões da IA
+            const aiSuggestions = await fetchItinerarySuggestions(
+                appState.destination,
+                appState.userPreferences,
+                appState.selectedFlight
+            );
+            
+            // 3. Construir o roteiro completo
             appState.itinerary = ItineraryBuilder.buildItinerary(
                 appState.destination,
                 appState.userPreferences,
@@ -120,47 +181,167 @@
                 appState.weather
             );
             
-            // Armazena o roteiro no localStorage
+            // 4. Salvar no localStorage para persistência
             StorageManager.save('itinerary', appState.itinerary);
             
-            // Renderiza o resumo da viagem
+            // 5. Renderizar na tela
             renderTripSummary();
-            
-            // Renderiza os dias do roteiro
             renderItineraryDays();
             
-            // Esconde loader
-            hideLoader();
+            // 6. Buscar imagens para cada dia
+            fetchImagesForDays();
             
+            hideLoader();
         } catch (error) {
             console.error('Erro ao gerar roteiro:', error);
             hideLoader();
-            showErrorMessage('Não foi possível gerar seu roteiro. Tente novamente mais tarde.');
+            showError('Não foi possível gerar seu roteiro. Tente novamente mais tarde.');
         }
     }
-
+    
+    /**
+     * Busca a previsão do tempo para o destino
+     */
+    async function fetchWeatherForecast(city, startDate, endDate) {
+        try {
+            // Formatar datas para YYYY-MM-DD
+            const start = new Date(startDate).toISOString().split('T')[0];
+            const end = new Date(endDate).toISOString().split('T')[0];
+            
+            const response = await fetch(`/api/weather?city=${encodeURIComponent(city)}&start=${start}&end=${end}`);
+            
+            if (!response.ok) {
+                throw new Error('Falha ao obter previsão do tempo');
+            }
+            
+            return await response.json();
+        } catch (error) {
+            console.error('Erro ao buscar previsão do tempo:', error);
+            return {}; // Retorna objeto vazio em caso de erro
+        }
+    }
+    
+    /**
+     * Busca sugestões de roteiro da IA
+     */
+    async function fetchItinerarySuggestions(destination, preferences, flight) {
+        try {
+            const requestData = {
+                destination: destination,
+                preferences: preferences,
+                flight: flight
+            };
+            
+            const response = await fetch('/api/itinerary-generator', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(requestData)
+            });
+            
+            if (!response.ok) {
+                throw new Error('Falha ao obter sugestões de roteiro');
+            }
+            
+            return await response.json();
+        } catch (error) {
+            console.error('Erro ao buscar sugestões de roteiro:', error);
+            return { days: [] }; // Retorna objeto com array vazio em caso de erro
+        }
+    }
+    
+    /**
+     * Busca imagens para cada dia do roteiro
+     */
+    async function fetchImagesForDays() {
+        if (!appState.itinerary || !appState.itinerary.days) return;
+        
+        for (let i = 0; i < appState.itinerary.days.length; i++) {
+            const day = appState.itinerary.days[i];
+            
+            if (day.activities && day.activities.length > 0) {
+                for (let j = 0; j < day.activities.length; j++) {
+                    const activity = day.activities[j];
+                    
+                    // Se a atividade já tem imagem, pular
+                    if (activity.image && activity.image.length > 0) continue;
+                    
+                    try {
+                        // Buscar imagem para a atividade
+                        const query = `${activity.location} ${appState.destination.city} ${appState.destination.country}`;
+                        const imageUrl = await fetchImage(query);
+                        
+                        if (imageUrl) {
+                            // Atualizar a imagem na atividade
+                            activity.image = imageUrl;
+                            activity.imageAlt = `Imagem de ${activity.location} em ${appState.destination.city}`;
+                            
+                            // Atualizar a imagem no DOM
+                            const activityImageEl = document.querySelector(`.day-card[data-day="${day.number}"] .activity-image img`);
+                            if (activityImageEl) {
+                                activityImageEl.src = imageUrl;
+                                activityImageEl.alt = activity.imageAlt;
+                            }
+                        }
+                    } catch (error) {
+                        console.error(`Erro ao buscar imagem para o dia ${day.number}:`, error);
+                    }
+                }
+            }
+        }
+    }
+    
+    /**
+     * Busca uma imagem para um local específico
+     */
+    async function fetchImage(query) {
+        try {
+            const response = await fetch(`/api/image-search?query=${encodeURIComponent(query)}&perPage=1`);
+            
+            if (!response.ok) {
+                throw new Error('Falha ao buscar imagem');
+            }
+            
+            const data = await response.json();
+            
+            if (data.images && data.images.length > 0) {
+                return data.images[0].url;
+            }
+            
+            return null;
+        } catch (error) {
+            console.error('Erro ao buscar imagem:', error);
+            return null;
+        }
+    }
+    
     /**
      * Renderiza o resumo da viagem
      */
     function renderTripSummary() {
-        const template = templates.tripSummary.innerHTML;
+        if (!appState.itinerary || !elements.tripSummary) return;
+        
+        const destination = appState.destination;
         const flight = appState.selectedFlight;
         const preferences = appState.userPreferences;
         
-        // Formata datas para exibição
-        const formattedDates = formatDateRange(flight.departureDate, flight.returnDate);
+        // Formatar datas
+        const departureDate = new Date(flight.departureDate);
+        const returnDate = new Date(flight.returnDate);
+        const formattedDates = formatDateRange(departureDate, returnDate);
         
-        // Determina o tipo de grupo
+        // Determinar tipo de companhia
         let groupText = 'Sozinho(a)';
         if (preferences.companhia === 1) {
             groupText = 'Romântico (2 pessoas)';
         } else if (preferences.companhia === 2) {
-            groupText = `Família (${preferences.quantidade_familia} pessoas)`;
+            groupText = `Família (${preferences.quantidade_familia || 'múltiplas'} pessoas)`;
         } else if (preferences.companhia === 3) {
-            groupText = `Amigos (${preferences.quantidade_amigos} pessoas)`;
+            groupText = `Amigos (${preferences.quantidade_amigos || 'múltiplas'} pessoas)`;
         }
         
-        // Determina a preferência de viagem
+        // Determinar preferência de viagem
         let preferenceText = 'Relaxar';
         if (preferences.preferencia_viagem === 1) {
             preferenceText = 'Aventura';
@@ -170,135 +351,75 @@
             preferenceText = 'Urbano';
         }
         
-        // Preenche o template
-        const html = template
-            .replace('{{destination}}', `${appState.destination.city}, ${appState.destination.country}`)
+        // Preencher o template
+        let html = templates.tripSummary
+            .replace('{{destination}}', `${destination.city}, ${destination.country}`)
             .replace('{{dates}}', formattedDates)
             .replace('{{flightTimes}}', `Chegada ${formatTime(flight.arrivalTime)} - Saída ${formatTime(flight.departureTime)}`)
             .replace('{{group}}', groupText)
             .replace('{{preference}}', preferenceText)
-            .replace('{{originCity}}', preferences.cidade_partida);
+            .replace('{{originCity}}', preferences.cidade_partida || '');
         
         elements.tripSummary.innerHTML = html;
     }
-
+    
     /**
      * Renderiza os dias do roteiro
      */
     function renderItineraryDays() {
-        if (!appState.itinerary || !appState.itinerary.days || !appState.itinerary.days.length) {
-            return;
-        }
+        if (!appState.itinerary || !appState.itinerary.days || !elements.itineraryDays) return;
         
         let daysHtml = '';
         
-        // Para cada dia do roteiro
-        appState.itinerary.days.forEach((day, index) => {
-            const dayNumber = index + 1;
-            const dayId = `day-${dayNumber}`;
-            
-            // Cria os badges para atividades
+        appState.itinerary.days.forEach(day => {
+            // Criar badges para a atividade principal
             let badgesHtml = '';
-            if (day.activities && day.activities.length > 0) {
-                const activity = day.activities[0]; // Pega primeira atividade do dia
-                
-                if (activity.badges && activity.badges.length > 0) {
-                    activity.badges.forEach(badge => {
-                        const badgeHtml = templates.badge.innerHTML
-                            .replace('{{badgeType}}', badge.type)
-                            .replace('{{badgeText}}', badge.text);
-                        badgesHtml += badgeHtml;
-                    });
-                }
+            if (day.activities && day.activities.length > 0 && day.activities[0].badges) {
+                day.activities[0].badges.forEach(badge => {
+                    const badgeHtml = templates.badge
+                        .replace('{{badgeType}}', badge.type)
+                        .replace('{{badgeText}}', badge.text);
+                    badgesHtml += badgeHtml;
+                });
             }
             
-            // Obtém previsão do tempo para o dia
-            const weather = appState.weather[index] || {
+            // Informações de clima
+            const weather = day.weather || {
                 icon: '🌤️',
-                temperature: '--',
-                condition: 'Informação indisponível'
+                temperature: '25',
+                condition: 'Parcialmente nublado'
             };
             
-            // Formata a data do dia
-            const dayDate = formatDayDate(day.date);
+            // Informações da atividade principal
+            const activity = day.activities && day.activities.length > 0 ? day.activities[0] : {
+                time: '',
+                location: 'Local a definir',
+                image: '',
+                imageAlt: `Imagem de ${appState.destination.city}`
+            };
             
-            // Preenche o template do dia
-            const template = templates.day.innerHTML;
-            const dayHtml = template
-                .replace(/{{dayNumber}}/g, dayNumber)
-                .replace('{{dayDate}}', dayDate)
+            // Preencher o template do dia
+            const dayHtml = templates.day
+                .replace(/{{dayNumber}}/g, day.number)
+                .replace('{{dayDate}}', `${day.weekday}, ${day.formattedDate}`)
                 .replace('{{dayDescription}}', day.description)
                 .replace('{{weatherIcon}}', weather.icon)
                 .replace('{{temperature}}', weather.temperature)
                 .replace('{{weatherCondition}}', weather.condition)
-                .replace('{{dayId}}', dayId)
-                .replace('{{activityTime}}', day.activities[0]?.time || '')
-                .replace('{{activityLocation}}', day.activities[0]?.location || '')
+                .replace('{{dayId}}', `day-${day.number}`)
+                .replace('{{activityTime}}', activity.time)
+                .replace('{{activityLocation}}', activity.location)
                 .replace('{{activityBadges}}', badgesHtml)
-                .replace('{{tripinhaTip}}', day.tip || 'Aproveite seu dia!')
-                .replace('{{activityImage}}', day.activities[0]?.image || 'public/assets/images/default-location.jpg')
-                .replace('{{activityImageAlt}}', day.activities[0]?.imageAlt || 'Imagem do local');
+                .replace('{{tripinhaTip}}', day.tip)
+                .replace('{{activityImage}}', activity.image)
+                .replace('{{activityImageAlt}}', activity.imageAlt);
             
             daysHtml += dayHtml;
         });
         
         elements.itineraryDays.innerHTML = daysHtml;
-        
-        // Configura os eventos das abas de período
-        setupPeriodTabs();
     }
-
-    /**
-     * Configura os eventos das abas de período (manhã, tarde, noite)
-     */
-    function setupPeriodTabs() {
-        const periodTabs = document.querySelectorAll('.period-tab');
-        
-        periodTabs.forEach(tab => {
-            tab.addEventListener('click', function() {
-                // Remove classe ativa de todas as abas do mesmo dia
-                const dayCard = this.closest('.day-card');
-                const tabs = dayCard.querySelectorAll('.period-tab');
-                tabs.forEach(t => t.classList.remove('period-active'));
-                
-                // Adiciona classe ativa na aba clicada
-                this.classList.add('period-active');
-                
-                // TODO: Implementar troca de conteúdo por período
-                // Esta funcionalidade será implementada em versão futura
-            });
-        });
-    }
-
-    /**
-     * Configura listeners de eventos
-     */
-    function setupEventListeners() {
-        // Botão de editar voos
-        elements.btnEditFlights.addEventListener('click', function() {
-            window.location.href = 'flights.html';
-        });
-        
-        // Botão de compartilhar
-        elements.btnShare.addEventListener('click', function() {
-            shareItinerary();
-        });
-        
-        // Botões de ver no mapa
-        document.addEventListener('click', function(e) {
-            if (e.target.matches('.map-button') || e.target.closest('.map-button')) {
-                const dayCard = e.target.closest('.day-card');
-                const dayNumber = dayCard.dataset.day;
-                const day = appState.itinerary.days[dayNumber - 1];
-                
-                if (day && day.activities && day.activities.length > 0) {
-                    const activity = day.activities[0];
-                    openMap(activity.location, appState.destination.city);
-                }
-            }
-        });
-    }
-
+    
     /**
      * Compartilha o roteiro
      */
@@ -324,90 +445,73 @@
             alert('Link copiado para a área de transferência!');
         }
     }
-
+    
     /**
-     * Abre mapa com a localização
+     * Abre um local no Google Maps
      */
-    function openMap(place, city) {
-        const query = encodeURIComponent(`${place}, ${city}`);
+    function openInMaps(location) {
+        if (!location) return;
+        
+        const query = encodeURIComponent(location);
         window.open(`https://www.google.com/maps/search/?api=1&query=${query}`, '_blank');
     }
-
+    
     /**
-     * Funções auxiliares para formatação
+     * Funções auxiliares para formatação de datas e horas
      */
     function formatDateRange(startDate, endDate) {
-        const start = new Date(startDate);
-        const end = new Date(endDate);
-        
-        const options = { day: 'numeric', month: 'numeric' };
-        const startFormatted = start.toLocaleDateString('pt-BR', options);
-        const endFormatted = end.toLocaleDateString('pt-BR', options);
-        
-        // Determina os dias da semana
+        // Formatar data para DD/MM (dia da semana a dia da semana)
         const weekdays = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado'];
-        const startDay = weekdays[start.getDay()];
-        const endDay = weekdays[end.getDay()];
         
-        return `${startFormatted} a ${endFormatted} (${startDay} a ${endDay})`;
-    }
-
-    function formatDayDate(dateString) {
-        const date = new Date(dateString);
-        const weekdays = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
-        const day = date.getDate();
-        const month = date.getMonth() + 1;
+        const startFormatted = `${startDate.getDate().toString().padStart(2, '0')}/${(startDate.getMonth() + 1).toString().padStart(2, '0')}`;
+        const endFormatted = `${endDate.getDate().toString().padStart(2, '0')}/${(endDate.getMonth() + 1).toString().padStart(2, '0')}`;
         
-        return `${weekdays[date.getDay()]}, ${day}/${month}`;
+        const startWeekday = weekdays[startDate.getDay()];
+        const endWeekday = weekdays[endDate.getDay()];
+        
+        return `${startFormatted} a ${endFormatted} (${startWeekday} a ${endWeekday})`;
     }
-
+    
     function formatTime(timeString) {
-        if (!timeString) return '--:--';
+        if (!timeString) return '00:00';
         
-        // Converte horário para formato HH:MM
-        const [hours, minutes] = timeString.split(':');
-        return `${hours}:${minutes}`;
+        return timeString;
     }
-
-    function formatDateForWeatherAPI(dateString) {
-        return dateString.split('T')[0];
-    }
-
+    
     /**
-     * Exibe loader
+     * Funções de gerenciamento de UI
      */
     function showLoader() {
-        // Implemente conforme o padrão do projeto
-        const loader = document.createElement('div');
-        loader.id = 'loader';
-        loader.className = 'loader';
-        loader.innerHTML = '<div class="loader-spinner"></div><p>Preparando seu roteiro personalizado...</p>';
-        document.body.appendChild(loader);
-    }
-
-    /**
-     * Esconde loader
-     */
-    function hideLoader() {
-        const loader = document.getElementById('loader');
-        if (loader) {
-            loader.remove();
+        if (elements.itineraryLoader) {
+            elements.itineraryLoader.style.display = 'flex';
         }
     }
-
-    /**
-     * Exibe mensagem de erro
-     */
-    function showErrorMessage(message) {
+    
+    function hideLoader() {
+        if (elements.itineraryLoader) {
+            elements.itineraryLoader.style.display = 'none';
+        }
+    }
+    
+    function showError(message) {
+        // Remover erro existente, se houver
+        const existingError = document.querySelector('.error-message');
+        if (existingError) {
+            existingError.remove();
+        }
+        
+        // Criar mensagem de erro
         const errorDiv = document.createElement('div');
         errorDiv.className = 'error-message';
         errorDiv.textContent = message;
         
-        // Adiciona botão para tentar novamente
+        // Adicionar botão para tentar novamente
         const retryButton = document.createElement('button');
         retryButton.textContent = 'Tentar novamente';
         retryButton.className = 'btn btn-primary';
         retryButton.style.marginTop = '16px';
+        retryButton.style.width = '100%';
+        
         retryButton.addEventListener('click', function() {
             errorDiv.remove();
             generateItinerary();
@@ -416,9 +520,15 @@
         errorDiv.appendChild(document.createElement('br'));
         errorDiv.appendChild(retryButton);
         
-        document.body.appendChild(errorDiv);
+        // Adicionar no DOM
+        if (elements.itineraryDays) {
+            elements.itineraryDays.innerHTML = '';
+            elements.itineraryDays.appendChild(errorDiv);
+        } else {
+            document.body.appendChild(errorDiv);
+        }
     }
-
-    // Inicializa quando o DOM estiver pronto
+    
+    // Inicializar quando o DOM estiver carregado
     document.addEventListener('DOMContentLoaded', init);
 })();
