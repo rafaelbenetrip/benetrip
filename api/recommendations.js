@@ -17,7 +17,7 @@ const CONFIG = {
     enabled: true,
     maxLength: 500
   },
-  providerOrder: ['perplexity', 'openai', 'claude', 'deepseek']
+  providerOrder: ['openai', 'perplexity', 'claude', 'deepseek']
 };
 
 // =======================
@@ -488,8 +488,8 @@ async function callAIAPI(provider, prompt, requestData) {
       url: 'https://api.openai.com/v1/chat/completions',
       header: 'Authorization',
       prefix: 'Bearer',
-      model: 'gpt-3.5-turbo',
-      systemMessage: 'Você é um especialista em viagens. Retorne apenas JSON com 4 destinos alternativos, respeitando o orçamento para voos.',
+      model: 'o4-mini-2025-04-16',
+      systemMessage: 'Você é um especialista em viagens com experiência em destinos globais. Retorne apenas JSON com destinos detalhados, respeitando o orçamento para voos.',
       temperature: 0.7,
       max_tokens: 2000
     },
