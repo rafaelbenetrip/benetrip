@@ -135,6 +135,47 @@ const BENETRIP_ROTEIRO = {
 async gerarRoteiro() {
   try {
     console.log('Estrutura real dos dadosVoo:', JSON.stringify(this.dadosVoo));
+    console.log('Dados do usuário completos:', JSON.stringify(this.dadosUsuario));
+    
+    // Primeiro, verificar se temos as datas do usuário diretamente das respostas do questionário
+    let datasDoUsuario = this.dadosUsuario?.respostas?.datas;
+    if (datasDoUsuario) {
+      console.log('Datas encontradas nas respostas do usuário:', datasDoUsuario);
+      
+      // Formatar as datas conforme necessário
+      let dataIda, dataVolta;
+      
+      // Se datasDoUsuario for um objeto com dataIda e dataVolta
+      if (typeof datasDoUsuario === 'object' && datasDoUsuario.dataIda) {
+        dataIda = datasDoUsuario.dataIda;
+        dataVolta = datasDoUsuario.dataVolta;
+      } 
+      // Se for um array com duas datas
+      else if (Array.isArray(datasDoUsuario) && datasDoUsuario.length >= 2) {
+        dataIda = datasDoUsuario[0];
+        dataVolta = datasDoUsuario[1];
+      }
+      // Se for uma string no formato "dataIda,dataVolta"
+      else if (typeof datasDoUsuario === 'string' && datasDoUsuario.includes(',')) {
+        [dataIda, dataVolta] = datasDoUsuario.split(',');
+      }
+      
+      // Se conseguimos extrair as datas, sobrescrevemos no dadosVoo
+      if (dataIda) {
+        console.log(`Usando datas do usuário: Ida=${dataIda}, Volta=${dataVolta}`);
+        
+        // Criar ou atualizar estrutura de dadosVoo
+        if (!this.dadosVoo) this.dadosVoo = {};
+        if (!this.dadosVoo.ida) this.dadosVoo.ida = {};
+        
+        this.dadosVoo.ida.dataPartida = dataIda;
+        
+        if (dataVolta) {
+          if (!this.dadosVoo.volta) this.dadosVoo.volta = {};
+          this.dadosVoo.volta.dataPartida = dataVolta;
+        }
+      }
+    }
     
     // Verificar e adaptar dados em diferentes formatos possíveis
     if (this.dadosVoo) {
@@ -166,36 +207,75 @@ async gerarRoteiro() {
                            (this.dadosVoo?.data);
     
     if (!this.dadosVoo || !temDataPartida) {
-      // Tentar extrair informações do destino se o voo não tiver dados suficientes
-      if (this.dadosDestino) {
-        console.log('Criando dados de voo a partir do destino...');
+      // Tentar extrair do objeto de datas do usuário
+      if (this.dadosUsuario?.respostas?.datas) {
+        const datas = this.dadosUsuario.respostas.datas;
+        console.log('Tentando extrair datas do objeto:', datas);
         
-        // Criar um objeto de voo mínimo para prosseguir
-        const hoje = new Date();
-        const dataIda = new Date(hoje);
-        dataIda.setDate(hoje.getDate() + 30); // 30 dias no futuro
+        let dataIda, dataVolta;
         
-        const dataVolta = new Date(dataIda);
-        dataVolta.setDate(dataIda.getDate() + 5); // 5 dias após ida
+        // Tentar diferentes formatos possíveis
+        if (typeof datas === 'object') {
+          dataIda = datas.dataIda || datas.ida;
+          dataVolta = datas.dataVolta || datas.volta;
+        } else if (typeof datas === 'string') {
+          const partes = datas.split(',');
+          dataIda = partes[0];
+          dataVolta = partes[1];
+        }
         
-        this.dadosVoo = {
-          ida: {
-            dataPartida: dataIda.toISOString(),
-            horaChegada: '12:00',
-            destino: this.dadosDestino.codigo_iata || 'CWB',
-            origem: 'GRU'
-          },
-          volta: {
-            dataPartida: dataVolta.toISOString(),
-            horaPartida: '14:00',
-            destino: 'GRU',
-            origem: this.dadosDestino.codigo_iata || 'CWB'
+        if (dataIda) {
+          this.dadosVoo = {
+            ida: {
+              dataPartida: dataIda,
+              horaChegada: '12:00',
+              destino: this.dadosDestino?.codigo_iata || 'CWB'
+            }
+          };
+          
+          if (dataVolta) {
+            this.dadosVoo.volta = {
+              dataPartida: dataVolta,
+              horaPartida: '14:00'
+            };
           }
-        };
-        
-        console.log('Dados de voo gerados:', this.dadosVoo);
-      } else {
-        throw new Error('Dados insuficientes para gerar o roteiro.');
+          
+          console.log('Dados de voo criados a partir de datas do usuário:', this.dadosVoo);
+        }
+      }
+      
+      // Se ainda não tiver dados suficientes, tentar a partir do destino
+      if (!this.dadosVoo || !this.dadosVoo.ida || !this.dadosVoo.ida.dataPartida) {
+        if (this.dadosDestino) {
+          console.log('Criando dados de voo a partir do destino...');
+          
+          // Criar um objeto de voo mínimo para prosseguir
+          const hoje = new Date();
+          const dataIda = new Date(hoje);
+          dataIda.setDate(hoje.getDate() + 30); // 30 dias no futuro
+          
+          const dataVolta = new Date(dataIda);
+          dataVolta.setDate(dataIda.getDate() + 5); // 5 dias após ida
+          
+          this.dadosVoo = {
+            ida: {
+              dataPartida: dataIda.toISOString(),
+              horaChegada: '12:00',
+              destino: this.dadosDestino.codigo_iata || 'CWB',
+              origem: 'GRU'
+            },
+            volta: {
+              dataPartida: dataVolta.toISOString(),
+              horaPartida: '14:00',
+              destino: 'GRU',
+              origem: this.dadosDestino.codigo_iata || 'CWB'
+            }
+          };
+          
+          console.log('Dados de voo gerados como último recurso:', this.dadosVoo);
+        } else {
+          throw new Error('Dados insuficientes para gerar o roteiro.');
+        }
       }
     }
     
@@ -220,6 +300,20 @@ async gerarRoteiro() {
     if (location.hostname === 'localhost' || location.hostname === '127.0.0.1' || location.hostname === '') {
       await this.simularDelayDev(3000);
       this.roteiroPronto = this.obterRoteiroDummy();
+      
+      // Ajusta as datas do roteiro dummy para usar as datas reais escolhidas pelo usuário
+      if (this.roteiroPronto && this.roteiroPronto.dias && this.roteiroPronto.dias.length > 0) {
+        const dataInicio = new Date(this.dadosVoo.ida.dataPartida);
+        
+        // Atualiza as datas em cada dia do roteiro
+        this.roteiroPronto.dias.forEach((dia, index) => {
+          const dataDia = new Date(dataInicio);
+          dataDia.setDate(dataInicio.getDate() + index);
+          dia.data = dataDia.toISOString().split('T')[0];
+        });
+        
+        console.log('Roteiro dummy ajustado com datas reais do usuário:', this.roteiroPronto);
+      }
     } else {
       const response = await fetch('/api/itinerary-generator', {
         method: 'POST',
