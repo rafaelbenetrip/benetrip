@@ -1,0 +1,371 @@
+/* Cores da identidade visual da Benetrip */
+:root {
+  --primary: #E87722;       /* Laranja Vibrante */
+  --secondary: #00A3E0;     /* Azul Sereno */
+  --white: #FFFFFF;         /* Branco Neutro */
+  --dark: #21272A;          /* Cinza Escuro */
+  --light-gray: #F5F5F5;    /* Cinza Claro */
+  --medium-gray: #E0E0E0;   /* Cinza Médio */
+}
+
+/* Estilos específicos para a página de roteiro */
+.roteiro-content {
+  padding: 16px 16px 100px 16px;
+}
+
+/* Resumo da viagem */
+.resumo-viagem {
+  background-color: var(--white);
+  border: 1px solid var(--medium-gray);
+  border-radius: 12px;
+  margin-bottom: 20px;
+  overflow: hidden;
+}
+
+.resumo-viagem-header {
+  background-color: var(--secondary);
+  color: var(--white);
+  padding: 12px 16px;
+  font-weight: bold;
+  font-size: 16px;
+}
+
+.resumo-viagem-content {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.resumo-item {
+  display: flex;
+  align-items: flex-start;
+}
+
+.resumo-item .icone {
+  width: 24px;
+  text-align: center;
+  flex-shrink: 0;
+  margin-right: 8px;
+}
+
+.resumo-item .texto {
+  flex: 1;
+}
+
+.resumo-item .texto .label {
+  font-size: 12px;
+  color: #888;
+}
+
+.resumo-item .texto .valor {
+  font-weight: 500;
+}
+
+/* Dia do roteiro */
+.dia-roteiro {
+  margin-bottom: 20px;
+}
+
+.dia-header {
+  display: flex;
+  align-items: center;
+  background-color: var(--primary);
+  color: var(--white);
+  padding: 12px;
+  border-radius: 8px 8px 0 0;
+  font-weight: bold;
+}
+
+.dia-numero {
+  background-color: var(--white);
+  color: var(--primary);
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 10px;
+  font-weight: bold;
+}
+
+.dia-content {
+  border: 1px solid var(--medium-gray);
+  border-top: none;
+  border-radius: 0 0 8px 8px;
+  padding: 16px;
+}
+
+.dia-descricao {
+  color: #666;
+  font-size: 14px;
+  line-height: 1.4;
+  margin-bottom: 12px;
+}
+
+/* Previsão do tempo */
+.previsao-tempo {
+  display: flex;
+  align-items: center;
+  background-color: var(--light-gray);
+  padding: 8px 12px;
+  border-radius: 8px;
+  margin-bottom: 16px;
+  font-size: 12px;
+}
+
+.previsao-tempo .icone {
+  margin-right: 8px;
+}
+
+/* Divisão por período */
+.periodos-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--medium-gray);
+  margin-bottom: 16px;
+}
+
+.periodo-tab {
+  flex: 1;
+  text-align: center;
+  font-size: 14px;
+  padding: 10px 0;
+  color: #888;
+  cursor: pointer;
+}
+
+.periodo-tab.active {
+  color: var(--primary);
+  border-bottom: 2px solid var(--primary);
+  font-weight: 500;
+}
+
+/* Atividades */
+.atividade {
+  margin-bottom: 16px;
+}
+
+.atividade-horario {
+  display: flex;
+  align-items: center;
+  color: var(--secondary);
+  font-size: 14px;
+  font-weight: 500;
+  margin-bottom: 6px;
+}
+
+.atividade-horario .icone {
+  margin-right: 6px;
+}
+
+.atividade-local {
+  display: flex;
+  margin-bottom: 8px;
+}
+
+.atividade-local .icone {
+  margin-right: 8px;
+}
+
+.atividade-local .nome {
+  font-weight: 500;
+  font-size: 14px;
+}
+
+.atividade-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.badge {
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 12px;
+  background-color: var(--primary);
+  color: var(--white);
+  white-space: nowrap;
+}
+
+.badge.badge-green {
+  background-color: #4CAF50;
+}
+
+.badge.badge-blue {
+  background-color: var(--secondary);
+}
+
+.badge.badge-purple {
+  background-color: #9C27B0;
+}
+
+.btn-ver-mapa {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  border-radius: 4px;
+  border: 1px solid var(--secondary);
+  color: var(--secondary);
+  background-color: transparent;
+  font-size: 12px;
+  margin-top: 8px;
+  cursor: pointer;
+}
+
+.btn-ver-mapa svg {
+  margin-right: 6px;
+}
+
+/* Dica da Tripinha */
+.tripinha-dica {
+  background-color: #FFF8F3;
+  border-radius: 8px;
+  padding: 12px;
+  margin: 16px 0;
+}
+
+.tripinha-dica-conteudo {
+  display: flex;
+}
+
+.tripinha-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  overflow: hidden;
+  margin-right: 10px;
+  flex-shrink: 0;
+}
+
+.tripinha-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.tripinha-texto {
+  background-color: rgba(232, 119, 34, 0.15);
+  padding: 8px 12px;
+  border-radius: 8px;
+  color: var(--dark);
+  font-size: 13px;
+}
+
+.tripinha-texto strong {
+  font-weight: 600;
+}
+
+/* Imagem do local */
+.imagem-local {
+  margin-top: 16px;
+  border-radius: 8px;
+  overflow: hidden;
+  height: 120px;
+}
+
+.imagem-local img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Botões de ação fixos */
+.botao-acoes-fixo {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background-color: var(--white);
+  display: flex;
+  padding: 12px 16px;
+  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
+  z-index: 100;
+  max-width: 480px;
+  margin: 0 auto;
+}
+
+.btn-secundario, .btn-principal {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  border-radius: 6px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-secundario {
+  border: 1px solid var(--secondary);
+  color: var(--secondary);
+  background-color: transparent;
+  margin-right: 8px;
+}
+
+.btn-principal {
+  background-color: var(--primary);
+  color: var(--white);
+  border: none;
+}
+
+.btn-secundario svg, .btn-principal svg {
+  margin-right: 8px;
+}
+
+/* Loading */
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  text-align: center;
+}
+
+.loading-avatar {
+  width: 80px;
+  height: 80px;
+  margin-bottom: 20px;
+  animation: bounce 2s infinite;
+}
+
+.loading-text {
+  font-size: 16px;
+  margin-bottom: 20px;
+  color: var(--dark);
+}
+
+.progress-bar-container {
+  width: 100%;
+  background-color: #f0f0f0;
+  border-radius: 10px;
+  overflow: hidden;
+  height: 8px;
+}
+
+.progress-bar {
+  height: 100%;
+  background-color: var(--primary);
+  width: 0;
+  transition: width 0.5s ease;
+}
+
+@keyframes bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+/* Responsividade */
+@media (min-width: 480px) {
+  .app-container {
+    max-width: 480px;
+    margin: 0 auto;
+    border-left: 1px solid #eee;
+    border-right: 1px solid #eee;
+  }
+}
