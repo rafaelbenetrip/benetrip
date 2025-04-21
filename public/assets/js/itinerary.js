@@ -1409,7 +1409,7 @@ gerarAtividadesPeriodo(periodo, diaSemana, numeroDia) {
       tags: ["Ar Livre", "Relaxante"]
     }
   ];
-
+  
   const atividadesTarde = [
     {
       horario: "14:00",
@@ -1430,7 +1430,7 @@ gerarAtividadesPeriodo(periodo, diaSemana, numeroDia) {
       tags: ["Ar Livre", "Relaxante"]
     }
   ];
-
+  
   const atividadesNoite = [
     {
       horario: "19:00",
@@ -1451,7 +1451,7 @@ gerarAtividadesPeriodo(periodo, diaSemana, numeroDia) {
       tags: ["Imperdível", "Gastronômico"]
     }
   ];
-
+  
   // Escolher atividades com base no dia e período
   let atividades = [];
   if (periodo === 'manha') {
@@ -1461,9 +1461,9 @@ gerarAtividadesPeriodo(periodo, diaSemana, numeroDia) {
   } else {
     atividades = [atividadesNoite[(numeroDia + diaSemana) % atividadesNoite.length]];
   }
-
+  
   return { atividades };
-};  // <— Fecha o objeto BENETRIP_ROTEIRO
+},
 
 // Inicializar quando o DOM estiver pronto
 document.addEventListener('DOMContentLoaded', () => {
@@ -1475,3 +1475,4 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Exporta o módulo para acesso global
 window.BENETRIP_ROTEIRO = BENETRIP_ROTEIRO;
+
