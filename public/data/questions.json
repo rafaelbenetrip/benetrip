@@ -1,13 +1,13 @@
 [
     {
-  "question": "1️⃣ Você já tem um destino em mente ou quer que eu te surpreenda?",
-  "description": "Escolha se já sabe pra onde quer ir ou se prefere descobrir novos lugares com a minha ajuda!",
-  "options": [
-    "✅ Sim, já tenho um lugar em mente!",
-    "🎁 Não, quero que você me ajude a encontrar o destino perfeito!"
-  ],
-  "key": "conhece_destino"
-},
+        "question": "1️⃣ Você já tem um destino em mente ou quer que eu te surpreenda?",
+        "description": "Escolha se já sabe pra onde quer ir ou se prefere descobrir novos lugares com a minha ajuda!",
+        "options": [
+            "✅ Sim, já tenho um lugar em mente!",
+            "🎁 Não, quero que você me ajude a encontrar o destino perfeito!"
+        ],
+        "key": "conhece_destino"
+    },
     
     {
         "question": "2️⃣ Qual é o seu destino desejado?",
@@ -19,6 +19,22 @@
             "show_if_value": 0
         },
         "key": "destino_conhecido"
+    },
+    
+    {
+        "question": "3️⃣ Qual é o seu estilo de viagem para este destino?",
+        "description": "Isso me ajudará a personalizar seu roteiro de viagem.",
+        "options": [
+            "🌊 Relaxar – Quero descansar e curtir sem pressa.",
+            "🏔️ Aventura – Quero experiências excitantes e adrenalina.",
+            "🏛️ Cultura – Quero conhecer história, arte e gastronomia.",
+            "🛍️ Urbano – Quero agito, compras e vida noturna."
+        ],
+        "conditional": {
+            "depends_on": "conhece_destino",
+            "show_if_value": 0
+        },
+        "key": "estilo_viagem_destino"
     },
     
     {
