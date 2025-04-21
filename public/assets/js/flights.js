@@ -2312,71 +2312,81 @@ obterPrecoVoo(voo) {
     return `${h}h ${m > 0 ? m + 'm' : ''}`.trim();
   },
 
- /**
- * Redireciona o usuário para o site parceiro de compra do voo e depois para a página de roteiro
- * @param {Object} voo - Dados do voo a ser comprado
+/**
+ * Redireciona o usuário para o site parceiro de compra do voo via página intermediária.
+ * Esta versão salva os dados básicos do voo e redireciona para a página redirect.html,
+ * passando os identificadores da busca e do termo na URL.
+ *
+ * @param {Object} voo - Dados do voo a ser comprado (proposta completa)
  */
 redirecionarParaSiteCompra(voo) {
-  if (!voo || !voo.terms) {
-    this.exibirToast('Não foi possível obter informações do voo para compra.', 'error');
-    return;
-  }
-  
-  try {
-    // Obtém a chave do voo para redirecionamento
-    const k = Object.keys(voo.terms)[0];
-    if (!k) {
-      this.exibirToast('Informações de compra indisponíveis.', 'error');
-      return;
+    console.log('Iniciando redirecionamento via página intermediária...');
+
+    if (!voo || !voo.terms) {
+        this.exibirToast('Não foi possível obter informações do voo para compra.', 'error');
+        console.error('Dados do voo ou termos ausentes para redirecionamento.');
+        return;
     }
-    
-    // Obtém o URL para redirecionamento
-    const termUrl = voo.terms[k]?.url;
-    if (!termUrl) {
-      this.exibirToast('Link de redirecionamento não encontrado.', 'error');
-      return;
-    }
-    
-    // Salva os dados do voo selecionado no localStorage para uso na página de roteiro
-    this.salvarVooSelecionado(voo);
-    
-    // Obtém a moeda selecionada pelo usuário
-    const moedaUsuario = this.obterMoedaAtual();
-    
-    // Exibe mensagem de loading
-    this.exibirToast('Redirecionando para o site de compra...', 'info');
-    
-    // Constrói a URL da API de redirecionamento com o parâmetro de moeda
-    const redirectUrl = `/api/flight-redirect?search_id=${this.searchId}&term_url=${termUrl}&marker=${process.env.AVIASALES_MARKER || '604241'}&currency=${moedaUsuario}`;
-    
-    console.log(`Redirecionando para compra com moeda ${moedaUsuario}:`, redirectUrl);
-    
-    // Faz a requisição para obter a URL final
-    fetch(redirectUrl)
-      .then(response => response.json())
-      .then(data => {
-        if (!data.url) {
-          throw new Error('URL de redirecionamento não encontrada na resposta');
+
+    try {
+        // Obter o searchId da busca atual
+        const searchId = this.searchId;
+        if (!searchId) {
+             console.error('Search ID não disponível.');
+             this.exibirToast('Dados da busca incompletos. Tente novamente.', 'error');
+             return;
         }
-        
-        console.log('URL de redirecionamento recebida:', data.url.substring(0, 50) + '...');
-        
-        // Redireciona para o site parceiro em uma nova aba
-        window.open(data.url, '_blank');
-        
-        // NOVA FUNCIONALIDADE: Redireciona a aba atual para a página de roteiro
+        console.log('Search ID:', searchId);
+
+        // Obter o URL específico do termo (parceiro/tarifa) do voo selecionado
+        const termKey = Object.keys(voo.terms)[0]; // Assume que há pelo menos um termo
+        const termUrl = voo.terms[termKey]?.url;
+
+        if (!termUrl) {
+            console.error('URL do termo do voo não encontrada:', voo.terms);
+            this.exibirToast('Link de redirecionamento do parceiro não disponível.', 'error');
+            return;
+        }
+        console.log('URL do termo:', termUrl.substring(0, 50) + '...'); // Log parcial para não expor URL completa
+
+        // 1. Salvar os dados do voo selecionado no localStorage para uso na página de roteiro
+        // Sua função salvarVooSelecionado já faz isso com os dados simplificados para itinerary.html.
+        // NÃO vamos salvar searchId ou termUrl aqui, pois redirect.html lerá da URL.
+        this.salvarVooSelecionado(voo); // Mantém a chamada para salvar os dados para itinerary.html
+        console.log('Dados simplificados do voo salvos para itinerary.html.');
+
+
+        // 2. Preparar os parâmetros para a página redirect.html
+        // A página redirect.html precisará do searchId e termUrl para ela mesma chamar a API de backend.
+        const redirectParams = new URLSearchParams();
+        redirectParams.append('search_id', searchId);
+        redirectParams.append('term_url', termUrl);
+        // O redirect.html precisará chamar /api/flight-redirect com search_id e term_url
+        // Ele obterá o URL final, method, params, click_id e gate_id dessa chamada.
+        // Portanto, apenas search_id e term_url precisam ser passados AQUI para redirect.html.
+
+
+        // 3. Redirecionar a aba atual para a página intermediária (redirect.html)
+        const redirectPageUrl = `redirect.html?${redirectParams.toString()}`;
+        console.log('Redirecionando para página intermediária com URL:', redirectPageUrl);
+
+        // Exibir mensagem rápida antes de sair
+        this.exibirToast('Redirecionando para o site do parceiro...', 'info');
+
+        // Pequeno delay antes de redirecionar para garantir que a mensagem seja vista
         setTimeout(() => {
-          window.location.href = 'roteiro.html';
-        }, 500); // Pequeno delay para garantir que a nova aba seja aberta primeiro
-      })
-      .catch(error => {
-        console.error('Erro ao obter URL de redirecionamento:', error);
-        this.exibirToast('Erro ao redirecionar para o site de compra. Tente novamente.', 'error');
-      });
-  } catch (error) {
-    console.error('Erro ao redirecionar para site de compra:', error);
-    this.exibirToast('Ocorreu um erro ao processar sua solicitação.', 'error');
-  }
+             window.location.href = redirectPageUrl; // Usa href para simples navegação
+        }, 300); // Delay curto
+
+        // A LÓGICA ANTIGA de fetch e window.open/location.href ESTÁ REMOVIDA DAQUI.
+        // Agora, redirect.html cuidará disso.
+
+    } catch (error) {
+        console.error('Erro inesperado ao preparar redirecionamento:', error);
+        this.exibirToast('Ocorreu um erro interno. Tente selecionar o voo novamente.', 'error');
+        // Como fallback, pode-se considerar redirecionar para a página de erro ou busca novamente
+        // setTimeout(() => { window.location.href = 'flights.html'; }, 3000);
+    }
 },
 
   /**
