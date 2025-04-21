@@ -1,99 +1,368 @@
-/**
- * API para geração de roteiro personalizado
- * Usa IA para sugerir atividades com base nas preferências do usuário
- */
-const express = require('express');
-const router = express.Router();
+// api/itinerary-generator.js - Endpoint para geração de roteiro personalizado
 const axios = require('axios');
-const imageSearch = require('./image-search');
 
-// Chave da API para IA
-const AI_API_KEY = process.env.AI_API_KEY || '';
+// Chaves de API
+const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY;
+const CLAUDE_API_KEY = process.env.CLAUDE_API_KEY;
 
-/**
- * Endpoint para geração de roteiro
- * POST /api/itinerary-generator
- */
-router.post('/', async (req, res) => {
-    try {
-        // Extrai dados da requisição
-        const { destination, preferences, flight, dates } = req.body;
-        
-        if (!destination || !preferences || !flight) {
-            return res.status(400).json({ error: 'Dados incompletos' });
-        }
-        
-        // Gera roteiro com IA
-        const itinerary = await generateItineraryWithAI(destination, preferences, flight, dates);
-        
-        // Adiciona imagens às atividades
-        const itineraryWithImages = await addImagesToActivities(itinerary, destination);
-        
-        res.json(itineraryWithImages);
-        
-    } catch (error) {
-        console.error('Erro ao gerar roteiro:', error);
-        res.status(500).json({ error: 'Falha ao gerar roteiro' });
-    }
-});
+// Modelo padrão a ser usado (DeepSeek Coder)
+const DEFAULT_MODEL = 'deepseek-chat';
 
-/**
- * Gera roteiro usando IA
- */
-async function generateItineraryWithAI(destination, preferences, flight, dates) {
-    // Implementação conforme já descrita no guia...
-    // Código anterior mantido
+// Função auxiliar para logging estruturado
+function logEvent(type, message, data = {}) {
+  const log = {
+    timestamp: new Date().toISOString(),
+    type,
+    message,
+    ...data
+  };
+  console.log(JSON.stringify(log));
 }
 
 /**
- * Adiciona imagens às atividades do roteiro
- * Utiliza o módulo de busca de imagens existente
+ * Gera um roteiro personalizado através da API Deepseek ou Claude
  */
-async function addImagesToActivities(itinerary, destination) {
-    if (!itinerary || !itinerary.days) {
-        return itinerary;
+module.exports = async (req, res) => {
+  // Configurar cabeçalhos CORS
+  res.setHeader('Access-Control-Allow-Credentials', true);
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  
+  // Responder a preflight requests
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+  
+  // Verificar método
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Método não permitido. Use POST.' });
+  }
+  
+  try {
+    // Obter parâmetros do corpo da requisição
+    const {
+      destino,
+      pais,
+      dataInicio,
+      dataFim,
+      horaChegada,
+      horaSaida,
+      tipoViagem,
+      tipoCompanhia,
+      preferencias,
+      modeloIA
+    } = req.body;
+    
+    // Validar parâmetros obrigatórios
+    if (!destino || !dataInicio) {
+      return res.status(400).json({ error: 'Parâmetros obrigatórios: destino, dataInicio' });
     }
     
-    // Buscar todos os pontos turísticos primeiro para melhorar resultado
-    let touristAttractions = [];
-    try {
-        touristAttractions = await imageSearch.getTouristAttractions(destination.city);
-    } catch (error) {
-        console.warn('Erro ao buscar pontos turísticos:', error);
+    // Calcular número de dias
+    const diasViagem = calcularDiasViagem(dataInicio, dataFim);
+    
+    // Log dos parâmetros recebidos
+    logEvent('info', 'Gerando roteiro personalizado', {
+      destino,
+      pais,
+      diasViagem,
+      tipoViagem,
+      tipoCompanhia
+    });
+    
+    // Gerar o prompt para a IA
+    const prompt = gerarPromptRoteiro({
+      destino,
+      pais,
+      dataInicio,
+      dataFim,
+      horaChegada,
+      horaSaida,
+      diasViagem,
+      tipoViagem,
+      tipoCompanhia,
+      preferencias
+    });
+    
+    // Selecionar o modelo de IA a ser usado
+    const modelo = modeloIA || DEFAULT_MODEL;
+    
+    // Gerar o roteiro usando a API correspondente
+    let roteiro;
+    
+    if (modelo === 'claude') {
+      roteiro = await gerarRoteiroComClaude(prompt);
+    } else {
+      roteiro = await gerarRoteiroComDeepseek(prompt);
     }
     
-    // Para cada dia do roteiro
-    for (let i = 0; i < itinerary.days.length; i++) {
-        const day = itinerary.days[i];
-        
-        // Para cada atividade do dia
-        if (day.activities && day.activities.length > 0) {
-            for (let j = 0; j < day.activities.length; j++) {
-                const activity = day.activities[j];
-                
-                try {
-                    // Busca imagem para a atividade usando o módulo existente
-                    const imageUrl = await imageSearch.searchAttractionImage(
-                        activity.location,
-                        destination.city,
-                        destination.country
-                    );
-                    
-                    // Adiciona URL da imagem à atividade
-                    activity.image = imageUrl;
-                    activity.imageAlt = `Imagem de ${activity.location} em ${destination.city}`;
-                    
-                } catch (error) {
-                    console.warn('Erro ao buscar imagem para atividade:', error);
-                    // Usa imagem padrão em caso de erro
-                    activity.image = '/public/assets/images/default-location.jpg';
-                    activity.imageAlt = `Imagem de ${destination.city}`;
-                }
-            }
-        }
+    // Verificar se o roteiro foi gerado com sucesso
+    if (!roteiro) {
+      throw new Error('Falha ao gerar roteiro');
     }
     
-    return itinerary;
+    // Retornar o roteiro gerado
+    return res.status(200).json(roteiro);
+    
+  } catch (erro) {
+    // Log do erro
+    logEvent('error', 'Erro ao gerar roteiro', {
+      message: erro.message,
+      stack: erro.stack
+    });
+    
+    // Retornar erro
+    return res.status(500).json({
+      error: 'Erro ao gerar roteiro personalizado',
+      details: erro.message
+    });
+  }
+};
+
+/**
+ * Calcula o número de dias entre duas datas
+ * @param {string} dataInicio - Data de início no formato YYYY-MM-DD
+ * @param {string} dataFim - Data de fim no formato YYYY-MM-DD
+ * @returns {number} Número de dias
+ */
+function calcularDiasViagem(dataInicio, dataFim) {
+  if (!dataInicio) return 1;
+  
+  const inicio = new Date(dataInicio);
+  
+  // Se não tiver data fim, assume 1 dia
+  if (!dataFim) return 1;
+  
+  const fim = new Date(dataFim);
+  
+  // Calcular diferença em dias
+  const diffTempo = Math.abs(fim - inicio);
+  const diffDias = Math.ceil(diffTempo / (1000 * 60 * 60 * 24)) + 1;  // +1 para incluir o dia de chegada
+  
+  return diffDias;
 }
 
-module.exports = router;
+/**
+ * Gera o prompt para a IA baseado nos parâmetros
+ * @param {Object} params - Parâmetros para o prompt
+ * @returns {string} Prompt formatado
+ */
+function gerarPromptRoteiro(params) {
+  const {
+    destino,
+    pais,
+    dataInicio,
+    dataFim,
+    horaChegada,
+    horaSaida,
+    diasViagem,
+    tipoViagem,
+    tipoCompanhia,
+    preferencias
+  } = params;
+  
+  // Mapear o tipo de viagem para descrição
+  const descricaoTipoViagem = {
+    'relaxar': 'relaxamento e descanso',
+    'aventura': 'aventura e adrenalina',
+    'cultura': 'cultura, história e gastronomia',
+    'urbano': 'urbanismo, compras e vida noturna'
+  }[tipoViagem] || 'cultura e experiências variadas';
+  
+  // Mapear o tipo de companhia para descrição
+  const descricaoTipoCompanhia = {
+    'sozinho': 'uma pessoa viajando sozinha',
+    'casal': 'um casal em viagem romântica',
+    'familia': 'uma família com crianças',
+    'amigos': 'um grupo de amigos'
+  }[tipoCompanhia] || 'um viajante';
+  
+  // Montar o prompt
+  return `
+Você é um especialista em planejamento de viagens da Benetrip, uma plataforma de viagens personalizada. 
+Crie um roteiro detalhado para uma viagem com as seguintes características:
+
+- Destino: ${destino}, ${pais}
+- Data de início: ${dataInicio}${dataFim ? `\n- Data de término: ${dataFim}` : ''}
+- Duração: ${diasViagem} dias
+- Horário de chegada no primeiro dia: ${horaChegada || 'Não informado'}
+- Horário de partida no último dia: ${horaSaida || 'Não informado'}
+- Tipo de viagem: Foco em ${descricaoTipoViagem}
+- Viajantes: ${descricaoTipoCompanhia}
+
+INSTRUÇÕES:
+1. Organize o roteiro por dias, considerando o dia da semana real e se é fim de semana ou dia útil.
+2. Para cada dia, divida o roteiro em períodos: manhã, tarde e noite.
+3. Cada período deve ter 1-2 atividades relevantes, com locais reais (pontos turísticos, restaurantes, etc).
+4. Para cada atividade, inclua:
+   - Horário sugerido
+   - Nome do local
+   - 1-2 tags relevantes (ex: Imperdível, Cultural, Família)
+   - Uma dica personalizada da Tripinha (mascote da Benetrip)
+5. No primeiro dia, considere o horário de chegada (${horaChegada || 'não informado'}).
+6. No último dia, considere o horário de partida (${horaSaida || 'não informado'}).
+7. Inclua uma breve descrição para cada dia.
+
+Retorne o roteiro em formato JSON com a seguinte estrutura:
+{
+  "destino": "Nome do destino",
+  "dias": [
+    {
+      "data": "YYYY-MM-DD",
+      "descricao": "Breve descrição sobre o dia",
+      "manha": {
+        "horarioEspecial": "Chegada às XX:XX" (opcional, apenas se for chegada/partida),
+        "atividades": [
+          {
+            "horario": "HH:MM",
+            "local": "Nome do local",
+            "tags": ["tag1", "tag2"],
+            "dica": "Dica da Tripinha sobre o local"
+          }
+        ]
+      },
+      "tarde": { ... mesmo formato da manhã ... },
+      "noite": { ... mesmo formato da manhã ... }
+    }
+  ]
+}
+
+Observações importantes:
+- Para ${descricaoTipoCompanhia}, dê prioridade a atividades compatíveis.
+- Como o foco é ${descricaoTipoViagem}, sugira mais atividades relacionadas a esse tema.
+- Considere atividades para dias úteis e atividades específicas para fins de semana.
+- Inclua uma mistura de atrações turísticas populares e experiências locais.
+`;
+}
+
+/**
+ * Gera roteiro utilizando a API DeepSeek
+ * @param {string} prompt - Prompt para a IA
+ * @returns {Object} Roteiro gerado
+ */
+async function gerarRoteiroComDeepseek(prompt) {
+  try {
+    // Verificar se a chave da API está configurada
+    if (!DEEPSEEK_API_KEY) {
+      throw new Error('Chave da API DeepSeek não configurada');
+    }
+    
+    // Realizar chamada à API DeepSeek
+    const response = await axios.post(
+      'https://api.deepseek.com/v1/chat/completions',
+      {
+        model: 'deepseek-chat',
+        messages: [
+          {
+            role: 'user',
+            content: prompt
+          }
+        ],
+        temperature: 0.7,
+        response_format: { type: 'json_object' }
+      },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${DEEPSEEK_API_KEY}`
+        }
+      }
+    );
+    
+    // Extrair resposta
+    const respostaText = response.data.choices[0].message.content;
+    
+    // Processar a resposta JSON
+    try {
+      // Limpar qualquer markdown ou texto antes/depois do JSON
+      const jsonMatch = respostaText.match(/\{[\s\S]*\}/);
+      const jsonText = jsonMatch ? jsonMatch[0] : respostaText;
+      
+      // Parsear para objeto
+      const roteiro = JSON.parse(jsonText);
+      return roteiro;
+    } catch (parseError) {
+      logEvent('error', 'Erro ao processar resposta JSON da DeepSeek', {
+        error: parseError.message,
+        response: respostaText
+      });
+      
+      throw new Error('Resposta da DeepSeek não é um JSON válido');
+    }
+    
+  } catch (erro) {
+    logEvent('error', 'Erro na chamada à API DeepSeek', {
+      error: erro.message,
+      response: erro.response?.data
+    });
+    
+    throw erro;
+  }
+}
+
+/**
+ * Gera roteiro utilizando a API Claude (Anthropic)
+ * @param {string} prompt - Prompt para a IA
+ * @returns {Object} Roteiro gerado
+ */
+async function gerarRoteiroComClaude(prompt) {
+  try {
+    // Verificar se a chave da API está configurada
+    if (!CLAUDE_API_KEY) {
+      throw new Error('Chave da API Claude não configurada');
+    }
+    
+    // Realizar chamada à API Claude (Anthropic)
+    const response = await axios.post(
+      'https://api.anthropic.com/v1/messages',
+      {
+        model: 'claude-3-haiku-20240307',
+        max_tokens: 4000,
+        messages: [
+          {
+            role: 'user',
+            content: prompt
+          }
+        ],
+        response_format: { type: 'json_object' }
+      },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': CLAUDE_API_KEY,
+          'anthropic-version': '2023-06-01'
+        }
+      }
+    );
+    
+    // Extrair resposta
+    const respostaText = response.data.content[0].text;
+    
+    // Processar a resposta JSON
+    try {
+      // Limpar qualquer markdown ou texto antes/depois do JSON
+      const jsonMatch = respostaText.match(/\{[\s\S]*\}/);
+      const jsonText = jsonMatch ? jsonMatch[0] : respostaText;
+      
+      // Parsear para objeto
+      const roteiro = JSON.parse(jsonText);
+      return roteiro;
+    } catch (parseError) {
+      logEvent('error', 'Erro ao processar resposta JSON da Claude', {
+        error: parseError.message,
+        response: respostaText
+      });
+      
+      throw new Error('Resposta da Claude não é um JSON válido');
+    }
+    
+  } catch (erro) {
+    logEvent('error', 'Erro na chamada à API Claude', {
+      error: erro.message,
+      response: erro.response?.data
+    });
+    
+    throw erro;
+  }
+}
