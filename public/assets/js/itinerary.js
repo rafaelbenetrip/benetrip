@@ -130,83 +130,175 @@ const BENETRIP_ROTEIRO = {
   },
   
   /**
-   * Gera o roteiro personalizado via API
-   */
-  async gerarRoteiro() {
-    try {
-      // Verificar se temos os dados necessários
-      if (!this.dadosVoo || !this.dadosVoo.ida || !this.dadosVoo.ida.dataPartida) {
+ * Gera o roteiro personalizado via API
+ */
+async gerarRoteiro() {
+  try {
+    console.log('Estrutura real dos dadosVoo:', JSON.stringify(this.dadosVoo));
+    
+    // Verificar e adaptar dados em diferentes formatos possíveis
+    if (this.dadosVoo) {
+      // Se os dados estiverem em um formato diferente, adapte-os para o formato esperado
+      if (!this.dadosVoo.ida && this.dadosVoo.voo) {
+        console.log('Adaptando formato dos dados de voo...');
+        this.dadosVoo.ida = {
+          dataPartida: this.dadosVoo.voo.dataIda || this.dadosVoo.dataIda || this.dadosVoo.voo.data,
+          horaChegada: this.dadosVoo.voo.horaChegada || '12:00',
+          destino: this.dadosVoo.voo.destino || this.dadosDestino?.codigo_iata
+        };
+        
+        // Se tiver data de volta, cria objeto volta também
+        if (this.dadosVoo.voo.dataVolta || this.dadosVoo.dataVolta) {
+          this.dadosVoo.volta = {
+            dataPartida: this.dadosVoo.voo.dataVolta || this.dadosVoo.dataVolta,
+            horaPartida: this.dadosVoo.voo.horaPartida || '14:00'
+          };
+        }
+        
+        console.log('Dados adaptados:', this.dadosVoo);
+      }
+    }
+    
+    // Verificação mais flexível
+    const temDataPartida = (this.dadosVoo?.ida?.dataPartida) || 
+                           (this.dadosVoo?.voo?.dataIda) || 
+                           (this.dadosVoo?.dataIda) ||
+                           (this.dadosVoo?.data);
+    
+    if (!this.dadosVoo || !temDataPartida) {
+      // Tentar extrair informações do destino se o voo não tiver dados suficientes
+      if (this.dadosDestino) {
+        console.log('Criando dados de voo a partir do destino...');
+        
+        // Criar um objeto de voo mínimo para prosseguir
+        const hoje = new Date();
+        const dataIda = new Date(hoje);
+        dataIda.setDate(hoje.getDate() + 30); // 30 dias no futuro
+        
+        const dataVolta = new Date(dataIda);
+        dataVolta.setDate(dataIda.getDate() + 5); // 5 dias após ida
+        
+        this.dadosVoo = {
+          ida: {
+            dataPartida: dataIda.toISOString(),
+            horaChegada: '12:00',
+            destino: this.dadosDestino.codigo_iata || 'CWB',
+            origem: 'GRU'
+          },
+          volta: {
+            dataPartida: dataVolta.toISOString(),
+            horaPartida: '14:00',
+            destino: 'GRU',
+            origem: this.dadosDestino.codigo_iata || 'CWB'
+          }
+        };
+        
+        console.log('Dados de voo gerados:', this.dadosVoo);
+      } else {
         throw new Error('Dados insuficientes para gerar o roteiro.');
       }
+    }
+    
+    // Preparar os parâmetros para a API
+    const params = {
+      destino: this.dadosDestino?.destino || this.extrairNomeDestino(this.dadosVoo.ida?.destino),
+      pais: this.dadosDestino?.pais || 'Desconhecido',
+      dataInicio: this.extrairDataFormatada(this.dadosVoo.ida?.dataPartida || this.dadosVoo.dataIda),
+      dataFim: this.extrairDataFormatada(this.dadosVoo.volta?.dataPartida || this.dadosVoo.dataVolta),
+      horaChegada: this.dadosVoo.ida?.horaChegada || '12:00',
+      horaSaida: this.dadosVoo.volta?.horaPartida || '14:00',
+      tipoViagem: this.obterTipoViagem(),
+      tipoCompanhia: this.obterTipoCompanhia(),
+      preferencias: this.obterPreferencias(),
+      modeloIA: "deepseekai" // ou outra IA conforme recomendação
+    };
+    
+    console.log('Parâmetros para geração de roteiro:', params);
+    
+    // Chamar a API
+    // Simular delay para desenvolvimento
+    if (location.hostname === 'localhost' || location.hostname === '127.0.0.1' || location.hostname === '') {
+      await this.simularDelayDev(3000);
+      this.roteiroPronto = this.obterRoteiroDummy();
+    } else {
+      const response = await fetch('/api/itinerary-generator', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(params)
+      });
       
-      // Preparar os parâmetros para a API
-      const params = {
-        destino: this.dadosDestino?.destino || this.extrairNomeDestino(this.dadosVoo.ida.destino),
-        pais: this.dadosDestino?.pais || 'Desconhecido',
-        dataInicio: this.dadosVoo.ida.dataPartida.split('T')[0],
-        dataFim: this.dadosVoo.volta ? this.dadosVoo.volta.dataPartida.split('T')[0] : null,
-        horaChegada: this.dadosVoo.ida.horaChegada,
-        horaSaida: this.dadosVoo.volta ? this.dadosVoo.volta.horaPartida : null,
-        tipoViagem: this.obterTipoViagem(),
-        tipoCompanhia: this.obterTipoCompanhia(),
-        preferencias: this.obterPreferencias(),
-        modeloIA: "deepseekai" // ou outra IA conforme recomendação
-      };
-      
-      console.log('Parâmetros para geração de roteiro:', params);
-      
-      // Chamar a API
-      // Simular delay para desenvolvimento
-      if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
-        await this.simularDelayDev(3000);
-        this.roteiroPronto = this.obterRoteiroDummy();
-      } else {
-        const response = await fetch('/api/itinerary-generator', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(params)
-        });
-        
-        if (!response.ok) {
-          throw new Error(`Erro ${response.status} ao gerar roteiro: ${await response.text()}`);
-        }
-        
-        this.roteiroPronto = await response.json();
+      if (!response.ok) {
+        throw new Error(`Erro ${response.status} ao gerar roteiro: ${await response.text()}`);
       }
       
-      console.log('Roteiro gerado:', this.roteiroPronto);
-      
-      // Buscar previsão do tempo para os dias do roteiro
-      await this.buscarPrevisaoTempo();
-      
-      // Buscar imagens para os pontos turísticos
-      await this.buscarImagensLocais();
-      
-      // Atualizar UI
-      this.atualizarUIComRoteiro();
-      
-    } catch (erro) {
-      console.error('Erro ao gerar roteiro:', erro);
-      this.mostrarErro('Não foi possível gerar seu roteiro personalizado. Tente novamente.');
-    } finally {
-      // Parar animação de progresso
-      clearInterval(this.intervalId);
-      this.estaCarregando = false;
-      
-      // Completar a barra de progresso
-      this.atualizarBarraProgresso(100, 'Roteiro pronto!');
-      
-      // Remover container de carregamento
-      setTimeout(() => {
-        const loadingContainer = document.querySelector('.loading-container');
-        if (loadingContainer) {
-          loadingContainer.style.display = 'none';
-        }
-      }, 500);
+      this.roteiroPronto = await response.json();
     }
-  },
+    
+    console.log('Roteiro gerado:', this.roteiroPronto);
+    
+    // Buscar previsão do tempo para os dias do roteiro
+    await this.buscarPrevisaoTempo();
+    
+    // Buscar imagens para os pontos turísticos
+    await this.buscarImagensLocais();
+    
+    // Atualizar UI
+    this.atualizarUIComRoteiro();
+    
+  } catch (erro) {
+    console.error('Erro ao gerar roteiro:', erro);
+    this.mostrarErro('Não foi possível gerar seu roteiro personalizado. Tente novamente.');
+  } finally {
+    // Parar animação de progresso
+    clearInterval(this.intervalId);
+    this.estaCarregando = false;
+    
+    // Completar a barra de progresso
+    this.atualizarBarraProgresso(100, 'Roteiro pronto!');
+    
+    // Remover container de carregamento
+    setTimeout(() => {
+      const loadingContainer = document.querySelector('.loading-container');
+      if (loadingContainer) {
+        loadingContainer.style.display = 'none';
+      }
+    }, 500);
+  }
+},
+
+/**
+ * Extrai a data formatada de uma string ISO ou outros formatos possíveis
+ * @param {string} dataString - String de data
+ * @returns {string} Data formatada como YYYY-MM-DD
+ */
+extrairDataFormatada(dataString) {
+  if (!dataString) return null;
+  
+  try {
+    // Se já for um formato YYYY-MM-DD
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dataString)) {
+      return dataString;
+    }
+    
+    // Se for uma data ISO completa
+    if (dataString.includes('T')) {
+      return dataString.split('T')[0];
+    }
+    
+    // Se for outro formato de data
+    const data = new Date(dataString);
+    if (!isNaN(data.getTime())) {
+      return data.toISOString().split('T')[0];
+    }
+    
+    return null;
+  } catch (e) {
+    console.warn('Erro ao extrair data formatada:', e);
+    return null;
+  }
+},
   
   /**
    * Busca previsão do tempo para os dias do roteiro
