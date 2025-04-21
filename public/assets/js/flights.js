@@ -2312,8 +2312,8 @@ obterPrecoVoo(voo) {
     return `${h}h ${m > 0 ? m + 'm' : ''}`.trim();
   },
 
-  /**
- * Redireciona o usuário para o site parceiro de compra do voo
+ /**
+ * Redireciona o usuário para o site parceiro de compra do voo e depois para a página de roteiro
  * @param {Object} voo - Dados do voo a ser comprado
  */
 redirecionarParaSiteCompra(voo) {
@@ -2336,6 +2336,9 @@ redirecionarParaSiteCompra(voo) {
       this.exibirToast('Link de redirecionamento não encontrado.', 'error');
       return;
     }
+    
+    // Salva os dados do voo selecionado no localStorage para uso na página de roteiro
+    this.salvarVooSelecionado(voo);
     
     // Obtém a moeda selecionada pelo usuário
     const moedaUsuario = this.obterMoedaAtual();
@@ -2360,6 +2363,11 @@ redirecionarParaSiteCompra(voo) {
         
         // Redireciona para o site parceiro em uma nova aba
         window.open(data.url, '_blank');
+        
+        // NOVA FUNCIONALIDADE: Redireciona a aba atual para a página de roteiro
+        setTimeout(() => {
+          window.location.href = 'roteiro.html';
+        }, 500); // Pequeno delay para garantir que a nova aba seja aberta primeiro
       })
       .catch(error => {
         console.error('Erro ao obter URL de redirecionamento:', error);
@@ -2368,6 +2376,60 @@ redirecionarParaSiteCompra(voo) {
   } catch (error) {
     console.error('Erro ao redirecionar para site de compra:', error);
     this.exibirToast('Ocorreu um erro ao processar sua solicitação.', 'error');
+  }
+},
+
+  /**
+ * Salva os dados do voo selecionado no localStorage para uso na página de roteiro
+ * @param {Object} voo - Dados do voo selecionado
+ */
+salvarVooSelecionado(voo) {
+  try {
+    // Extrair informações importantes do voo
+    const infoIda = this.obterInfoSegmento(voo.segment?.[0]);
+    const infoVolta = voo.segment?.length > 1 ? this.obterInfoSegmento(voo.segment[1]) : null;
+    const preco = this.obterPrecoVoo(voo);
+    const moeda = this.obterMoedaAtual();
+    
+    // Criar objeto simplificado com dados relevantes para a página de roteiro
+    const vooSimplificado = {
+      id: voo.sign || `voo-${Date.now()}`,
+      companhiaAerea: voo.carriers?.[0] || 'N/A',
+      companhiaNome: this.obterNomeCompanhiaAerea(voo.carriers?.[0]),
+      preco: preco,
+      precoFormatado: this.formatarPreco(preco, moeda),
+      moeda: moeda,
+      ida: {
+        origem: infoIda?.aeroportoPartida || 'N/A',
+        destino: infoIda?.aeroportoChegada || 'N/A',
+        dataPartida: infoIda?.dataPartida ? infoIda.dataPartida.toISOString() : null,
+        dataChegada: infoIda?.dataChegada ? infoIda.dataChegada.toISOString() : null,
+        horaPartida: infoIda?.horaPartida || 'N/A',
+        horaChegada: infoIda?.horaChegada || 'N/A',
+        duracao: infoIda?.duracao || 0,
+        paradas: infoIda?.paradas || 0
+      }
+    };
+    
+    // Adiciona informações de volta se disponíveis
+    if (infoVolta) {
+      vooSimplificado.volta = {
+        origem: infoVolta.aeroportoPartida || 'N/A',
+        destino: infoVolta.aeroportoChegada || 'N/A',
+        dataPartida: infoVolta.dataPartida ? infoVolta.dataPartida.toISOString() : null,
+        dataChegada: infoVolta.dataChegada ? infoVolta.dataChegada.toISOString() : null,
+        horaPartida: infoVolta.horaPartida || 'N/A',
+        horaChegada: infoVolta.horaChegada || 'N/A',
+        duracao: infoVolta.duracao || 0,
+        paradas: infoVolta.paradas || 0
+      };
+    }
+    
+    // Salva no localStorage
+    localStorage.setItem('benetrip_voo_selecionado', JSON.stringify(vooSimplificado));
+    console.log('Dados do voo salvos para a página de roteiro:', vooSimplificado);
+  } catch (erro) {
+    console.error('Erro ao salvar dados do voo:', erro);
   }
 }
 
