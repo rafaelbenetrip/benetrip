@@ -1463,7 +1463,8 @@ gerarAtividadesPeriodo(periodo, diaSemana, numeroDia) {
   }
   
   return { atividades };
-},
+}
+};
 
 // Inicializar quando o DOM estiver pronto
 document.addEventListener('DOMContentLoaded', () => {
