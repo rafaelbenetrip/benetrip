@@ -1153,3 +1153,4 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Exporta o módulo para acesso global
 window.BENETRIP_ROTEIRO = BENETRIP_ROTEIRO;
+
