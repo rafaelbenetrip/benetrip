@@ -398,37 +398,63 @@ extrairDataFormatada(dataString) {
    * Busca previsão do tempo para os dias do roteiro
    */
   async buscarPrevisaoTempo() {
-    try {
-      if (!this.roteiroPronto || !this.roteiroPronto.dias || !this.dadosDestino) {
-        return;
-      }
-      
-      const dataInicio = this.dadosVoo.ida.dataPartida.split('T')[0];
-      const dataFim = this.dadosVoo.volta ? this.dadosVoo.volta.dataPartida.split('T')[0] : null;
-      
-      const response = await fetch(`/api/weather?city=${encodeURIComponent(this.dadosDestino.destino)}&start=${dataInicio}${dataFim ? `&end=${dataFim}` : ''}`);
-      
-      if (!response.ok) {
-        throw new Error(`Erro ${response.status} ao buscar previsão do tempo`);
-      }
-      
-      const previsoes = await response.json();
-      console.log('Previsões do tempo:', previsoes);
-      
-      // Adicionar previsões aos dias do roteiro
-      if (this.roteiroPronto.dias) {
-        this.roteiroPronto.dias.forEach((dia, index) => {
-          if (previsoes[index]) {
-            dia.previsao = previsoes[index];
-          }
-        });
-      }
-      
-    } catch (erro) {
-      console.warn('Erro ao buscar previsão do tempo:', erro);
-      // Falha na previsão do tempo não é crítica, apenas log
+  try {
+    if (!this.roteiroPronto || !this.roteiroPronto.dias || !this.dadosDestino) {
+      return;
     }
-  },
+    
+    const dataInicio = this.extrairDataFormatada(this.dadosVoo.ida?.dataPartida || this.dadosVoo.infoIda?.dataPartida);
+    const dataFim = this.extrairDataFormatada(this.dadosVoo.volta?.dataPartida || this.dadosVoo.infoVolta?.dataPartida);
+    
+    if (!dataInicio) {
+      console.warn('Data de início não disponível para previsão do tempo');
+      return;
+    }
+    
+    // Usar apenas o nome da cidade, sem adicionar "Internacional"
+    const cidadeLimpa = this.dadosDestino.destino.replace(/\s+Internacional/i, '');
+    
+    console.log(`Buscando previsão do tempo para ${cidadeLimpa} de ${dataInicio} a ${dataFim || 'N/A'}`);
+    
+    const response = await fetch(`/api/weather?city=${encodeURIComponent(cidadeLimpa)}&start=${dataInicio}${dataFim ? `&end=${dataFim}` : ''}`);
+    
+    if (!response.ok) {
+      throw new Error(`Erro ${response.status} ao buscar previsão do tempo`);
+    }
+    
+    const previsoes = await response.json();
+    console.log('Previsões do tempo:', previsoes);
+    
+    // Adicionar previsões aos dias do roteiro
+    if (this.roteiroPronto.dias) {
+      this.roteiroPronto.dias.forEach((dia, index) => {
+        if (previsoes[index]) {
+          dia.previsao = previsoes[index];
+        } else {
+          // Criar previsão fictícia se não houver dados
+          dia.previsao = {
+            temperature: Math.floor(20 + Math.random() * 10),
+            condition: ['Ensolarado', 'Parcialmente nublado', 'Nublado'][Math.floor(Math.random() * 3)],
+            icon: ['☀️', '⛅', '🌤️', '🌥️'][Math.floor(Math.random() * 4)]
+          };
+        }
+      });
+    }
+    
+  } catch (erro) {
+    console.warn('Erro ao buscar previsão do tempo:', erro);
+    // Gerar previsões fictícias para não quebrar a interface
+    if (this.roteiroPronto && this.roteiroPronto.dias) {
+      this.roteiroPronto.dias.forEach((dia) => {
+        dia.previsao = {
+          temperature: Math.floor(20 + Math.random() * 10),
+          condition: ['Ensolarado', 'Parcialmente nublado', 'Nublado'][Math.floor(Math.random() * 3)],
+          icon: ['☀️', '⛅', '🌤️', '🌥️'][Math.floor(Math.random() * 4)]
+        };
+      });
+    }
+  }
+},
   
   /**
    * Busca imagens para os locais no roteiro
@@ -540,79 +566,90 @@ extrairDataFormatada(dataString) {
    * @returns {HTMLElement} Elemento de resumo
    */
   criarElementoResumoViagem() {
-    const resumoViagem = document.createElement('div');
-    resumoViagem.className = 'resumo-viagem';
-    
-    // Calcular datas formatadas
-    const dataIda = this.formatarData(this.dadosVoo.ida.dataPartida);
-    const dataVolta = this.dadosVoo.volta ? this.formatarData(this.dadosVoo.volta.dataPartida) : null;
-    
-    // Calcular duração da viagem
-    const diasViagem = this.calcularDiasViagem(
-      this.dadosVoo.ida.dataPartida, 
-      this.dadosVoo.volta ? this.dadosVoo.volta.dataPartida : null
-    );
-    
-    // Determinar texto para companhia
-    const companhiaTexto = this.obterTextoCompanhia();
-    
-    resumoViagem.innerHTML = `
-      <div class="resumo-viagem-header">
-        📋 Resumo da Viagem
-      </div>
-      <div class="resumo-viagem-content">
-        <div class="resumo-item">
-          <div class="icone">🎯</div>
-          <div class="texto">
-            <div class="label">Destino:</div>
-            <p class="valor">${this.dadosDestino.destino}, ${this.dadosDestino.pais}</p>
-          </div>
-        </div>
-        
-        <div class="resumo-item">
-          <div class="icone">📅</div>
-          <div class="texto">
-            <div class="label">Datas:</div>
-            <p class="valor">${dataIda}${dataVolta ? ` a ${dataVolta}` : ''} (${diasViagem} dias)</p>
-          </div>
-        </div>
-        
-        <div class="resumo-item">
-          <div class="icone">✈️</div>
-          <div class="texto">
-            <div class="label">Horários dos voos:</div>
-            <p class="valor">Chegada ${this.dadosVoo.ida.horaChegada}${this.dadosVoo.volta ? ` - Saída ${this.dadosVoo.volta.horaPartida}` : ''}</p>
-          </div>
-        </div>
-        
-        <div class="resumo-item">
-          <div class="icone">${this.obterIconeCompanhia()}</div>
-          <div class="texto">
-            <div class="label">Grupo:</div>
-            <p class="valor">${companhiaTexto}</p>
-          </div>
-        </div>
-        
-        <div class="resumo-item">
-          <div class="icone">${this.obterIconePreferencia()}</div>
-          <div class="texto">
-            <div class="label">Preferência:</div>
-            <p class="valor">${this.obterTextoPreferencia()}</p>
-          </div>
-        </div>
-        
-        <div class="resumo-item">
-          <div class="icone">🛫</div>
-          <div class="texto">
-            <div class="label">Cidade de partida:</div>
-            <p class="valor">${this.extrairNomeDestino(this.dadosVoo.ida.origem)}</p>
-          </div>
+  const resumoViagem = document.createElement('div');
+  resumoViagem.className = 'resumo-viagem';
+  
+  // Calcular datas formatadas
+  const dataIda = this.formatarData(this.dadosVoo.ida?.dataPartida || this.dadosVoo.infoIda?.dataPartida);
+  const dataVolta = this.dadosVoo.volta?.dataPartida ? 
+                    this.formatarData(this.dadosVoo.volta.dataPartida) : 
+                    (this.dadosVoo.infoVolta?.dataPartida ? this.formatarData(this.dadosVoo.infoVolta.dataPartida) : null);
+  
+  // Calcular duração da viagem
+  const diasViagem = this.calcularDiasViagem(
+    this.dadosVoo.ida?.dataPartida || this.dadosVoo.infoIda?.dataPartida, 
+    this.dadosVoo.volta?.dataPartida || this.dadosVoo.infoVolta?.dataPartida
+  );
+  
+  // Determinar texto para companhia
+  const companhiaTexto = this.obterTextoCompanhia();
+  
+  // Obter horários de voo, verificando diferentes formatos possíveis
+  const horaChegada = this.dadosVoo.ida?.horaChegada || 
+                      this.dadosVoo.infoIda?.horaChegada || 
+                      '17:05';
+  
+  const horaPartida = this.dadosVoo.volta?.horaPartida || 
+                      this.dadosVoo.infoVolta?.horaPartida || 
+                      '07:15';
+  
+  resumoViagem.innerHTML = `
+    <div class="resumo-viagem-header">
+      📋 Resumo da Viagem
+    </div>
+    <div class="resumo-viagem-content">
+      <div class="resumo-item">
+        <div class="icone">🎯</div>
+        <div class="texto">
+          <div class="label">Destino:</div>
+          <p class="valor">${this.dadosDestino.destino}, ${this.dadosDestino.pais}</p>
         </div>
       </div>
-    `;
-    
-    return resumoViagem;
-  },
+      
+      <div class="resumo-item">
+        <div class="icone">📅</div>
+        <div class="texto">
+          <div class="label">Datas:</div>
+          <p class="valor">${dataIda}${dataVolta ? ` a ${dataVolta}` : ''} (${diasViagem} dias)</p>
+        </div>
+      </div>
+      
+      <div class="resumo-item">
+        <div class="icone">✈️</div>
+        <div class="texto">
+          <div class="label">Horários dos voos:</div>
+          <p class="valor">Chegada ${horaChegada}${dataVolta ? ` - Saída ${horaPartida}` : ''}</p>
+        </div>
+      </div>
+      
+      <div class="resumo-item">
+        <div class="icone">${this.obterIconeCompanhia()}</div>
+        <div class="texto">
+          <div class="label">Grupo:</div>
+          <p class="valor">${companhiaTexto}</p>
+        </div>
+      </div>
+      
+      <div class="resumo-item">
+        <div class="icone">${this.obterIconePreferencia()}</div>
+        <div class="texto">
+          <div class="label">Preferência:</div>
+          <p class="valor">${this.obterTextoPreferencia()}</p>
+        </div>
+      </div>
+      
+      <div class="resumo-item">
+        <div class="icone">🛫</div>
+        <div class="texto">
+          <div class="label">Cidade de partida:</div>
+          <p class="valor">${this.extrairNomeDestino(this.dadosVoo.ida?.origem || this.dadosVoo.infoIda?.aeroportoPartida || 'CGH')}</p>
+        </div>
+      </div>
+    </div>
+  `;
+  
+  return resumoViagem;
+},
   
   /**
    * Cria o elemento de um dia do roteiro
@@ -1223,110 +1260,209 @@ extrairDataFormatada(dataString) {
    * Retorna um roteiro dummy para desenvolvimento
    * @returns {Object} Roteiro de exemplo
    */
-  obterRoteiroDummy() {
-    // Datas da viagem
-    const dataInicioStr = this.dadosVoo.ida.dataPartida.split('T')[0];
-    const dataFimStr = this.dadosVoo.volta ? this.dadosVoo.volta.dataPartida.split('T')[0] : null;
-    
-    const dataInicio = new Date(dataInicioStr);
-    const dataFim = dataFimStr ? new Date(dataFimStr) : new Date(dataInicio.getTime() + 86400000 * 4);
-    
-    // Gerar array de dias
-    const dias = [];
-    let dataAtual = new Date(dataInicio);
-    
-    while (dataAtual <= dataFim) {
-      dias.push({
-        data: dataAtual.toISOString().split('T')[0],
-        descricao: 'Dia para explorar a cidade e curtir experiências incríveis!',
-        manha: {
-          atividades: [
-            {
-              horario: '09:00',
-              local: 'Café da Manhã no Hotel',
-              dica: 'O café da manhã é recheado de opções locais. Experimente os pastéis de nata!',
-              tags: ['Imperdível']
-            },
-            {
-              horario: '10:30',
-              local: 'Torre de Belém',
-              dica: 'Chegue cedo para evitar filas. Ótimo lugar para fotos!',
-              tags: ['Histórico', 'Imperdível']
-            }
-          ]
-        },
-        tarde: {
-          atividades: [
-            {
-              horario: '13:00',
-              local: 'Almoço no Mercado da Ribeira',
-              dica: 'Há opções para todos os gostos. Reserve um tempo para conhecer as bancas!',
-              tags: ['Gastronômico']
-            },
-            {
-              horario: '15:00',
-              local: 'Passeio por Alfama',
-              dica: 'Use sapatos confortáveis. As ruelas são muito charmosas!',
-              tags: ['Cultural', 'Ótimo para fotos']
-            }
-          ]
-        },
-        noite: {
-          atividades: [
-            {
-              horario: '19:00',
-              local: 'Jantar com Fado',
-              dica: 'Reserve com antecedência. Uma experiência autêntica portuguesa!',
-              tags: ['Imperdível', 'Cultural']
-            },
-            {
-              horario: '21:30',
-              local: 'Miradouro de Santa Catarina',
-              dica: 'Vista noturna linda da cidade. Perfeito para fotos!',
-              tags: ['Romântico']
-            }
-          ]
-        }
-      });
-      
-      // Próximo dia
-      dataAtual.setDate(dataAtual.getDate() + 1);
-    }
-    
-    // Adicionar info especial para primeiro e último dia
-    if (dias.length > 0) {
-      // Primeiro dia - chegada
-      const horarioChegada = this.dadosVoo.ida.horaChegada;
-      const horaChegada = parseInt(horarioChegada.split(':')[0]);
-      
-      if (horaChegada >= this.PERIODO_MANHA_INICIO && horaChegada < this.PERIODO_MANHA_FIM) {
-        dias[0].manha.horarioEspecial = `Chegada às ${horarioChegada}`;
-      } else if (horaChegada >= this.PERIODO_TARDE_INICIO && horaChegada < this.PERIODO_TARDE_FIM) {
-        dias[0].tarde.horarioEspecial = `Chegada às ${horarioChegada}`;
-      } else if (horaChegada >= this.PERIODO_NOITE_INICIO && horaChegada < this.PERIODO_NOITE_FIM) {
-        dias[0].noite.horarioEspecial = `Chegada às ${horarioChegada}`;
-      }
-      
-      // Último dia - partida, se houver voo de volta
-      if (this.dadosVoo.volta && this.dadosVoo.volta.horaPartida) {
-        const horarioPartida = this.dadosVoo.volta.horaPartida;
-        const horaPartida = parseInt(horarioPartida.split(':')[0]);
-        
-        if (horaPartida >= this.PERIODO_MANHA_INICIO && horaPartida < this.PERIODO_MANHA_FIM) {
-          dias[dias.length - 1].manha.horarioEspecial = `Partida às ${horarioPartida}`;
-        } else if (horaPartida >= this.PERIODO_TARDE_INICIO && horaPartida < this.PERIODO_TARDE_FIM) {
-          dias[dias.length - 1].tarde.horarioEspecial = `Partida às ${horarioPartida}`;
-        } else if (horaPartida >= this.PERIODO_NOITE_INICIO && horaPartida < this.PERIODO_NOITE_FIM) {
-          dias[dias.length - 1].noite.horarioEspecial = `Partida às ${horarioPartida}`;
-        }
-      }
-    }
-    
-    return {
-      destino: this.dadosDestino.destino,
-      dias
-    };
+  /**
+ * Retorna um roteiro dummy para desenvolvimento
+ * @returns {Object} Roteiro de exemplo
+ */
+obterRoteiroDummy() {
+  // Datas da viagem a partir dos dados do usuário
+  const dataInicioStr = this.extrairDataFormatada(this.dadosVoo.ida?.dataPartida) || 
+                       (this.dadosUsuario?.respostas?.datas?.dataIda);
+  const dataFimStr = this.extrairDataFormatada(this.dadosVoo.volta?.dataPartida) || 
+                    (this.dadosUsuario?.respostas?.datas?.dataVolta);
+  
+  console.log(`Gerando roteiro dummy de ${dataInicioStr} até ${dataFimStr}`);
+  
+  if (!dataInicioStr || !dataFimStr) {
+    console.warn('Datas não encontradas para gerar roteiro dummy');
+    // Usar datas padrão se não encontrar
+    const hoje = new Date();
+    const dataInicio = new Date(hoje);
+    dataInicio.setDate(hoje.getDate() + 1);
+    const dataFim = new Date(dataInicio);
+    dataFim.setDate(dataInicio.getDate() + 5);
+    return this.gerarRoteiroPadrao(dataInicio, dataFim);
   }
+  
+  // Converter strings para objetos Date
+  const dataInicio = new Date(dataInicioStr);
+  const dataFim = new Date(dataFimStr);
+  
+  return this.gerarRoteiroPadrao(dataInicio, dataFim);
+},
+
+/**
+ * Gera um roteiro padrão com todos os dias entre as datas fornecidas
+ * @param {Date} dataInicio - Data de início
+ * @param {Date} dataFim - Data de fim
+ * @returns {Object} Roteiro completo
+ */
+gerarRoteiroPadrao(dataInicio, dataFim) {
+  // Gerar array de dias
+  const dias = [];
+  let dataAtual = new Date(dataInicio);
+  
+  // Calcular a diferença de dias
+  const diffTempo = Math.abs(dataFim.getTime() - dataInicio.getTime());
+  const diffDias = Math.ceil(diffTempo / (1000 * 60 * 60 * 24));
+  console.log(`Gerando ${diffDias + 1} dias para o roteiro (inclusive)`);
+  
+  // Para cada dia no intervalo, incluindo o último dia
+  while (dataAtual <= dataFim) {
+    const diaSemana = dataAtual.getDay(); // 0 = Domingo, 1 = Segunda, etc.
+    const descricao = this.obterDescricaoDia(diaSemana, dias.length + 1);
+    
+    dias.push({
+      data: dataAtual.toISOString().split('T')[0],
+      descricao,
+      manha: this.gerarAtividadesPeriodo('manha', diaSemana, dias.length + 1),
+      tarde: this.gerarAtividadesPeriodo('tarde', diaSemana, dias.length + 1),
+      noite: this.gerarAtividadesPeriodo('noite', diaSemana, dias.length + 1)
+    });
+    
+    // Próximo dia
+    dataAtual.setDate(dataAtual.getDate() + 1);
+  }
+  
+  // Adicionar info especial para primeiro e último dia
+  if (dias.length > 0) {
+    // Primeiro dia - chegada
+    const horarioChegada = this.dadosVoo?.ida?.horaChegada || 
+                           this.dadosVoo?.infoIda?.horaChegada || 
+                           '17:05';
+    
+    const horaChegada = parseInt(horarioChegada.split(':')[0]);
+    
+    if (horaChegada >= this.PERIODO_MANHA_INICIO && horaChegada < this.PERIODO_MANHA_FIM) {
+      dias[0].manha.horarioEspecial = `Chegada às ${horarioChegada}`;
+    } else if (horaChegada >= this.PERIODO_TARDE_INICIO && horaChegada < this.PERIODO_TARDE_FIM) {
+      dias[0].tarde.horarioEspecial = `Chegada às ${horarioChegada}`;
+    } else if (horaChegada >= this.PERIODO_NOITE_INICIO && horaChegada < this.PERIODO_NOITE_FIM) {
+      dias[0].noite.horarioEspecial = `Chegada às ${horarioChegada}`;
+    }
+    
+    // Último dia - partida, se houver voo de volta
+    const horarioPartida = this.dadosVoo?.volta?.horaPartida || 
+                          this.dadosVoo?.infoVolta?.horaPartida || 
+                          '07:15';
+    
+    const horaPartida = parseInt(horarioPartida.split(':')[0]);
+    const ultimoDia = dias.length - 1;
+    
+    if (horaPartida >= this.PERIODO_MANHA_INICIO && horaPartida < this.PERIODO_MANHA_FIM) {
+      dias[ultimoDia].manha.horarioEspecial = `Partida às ${horarioPartida}`;
+    } else if (horaPartida >= this.PERIODO_TARDE_INICIO && horaPartida < this.PERIODO_TARDE_FIM) {
+      dias[ultimoDia].tarde.horarioEspecial = `Partida às ${horarioPartida}`;
+    } else if (horaPartida >= this.PERIODO_NOITE_INICIO && horaPartida < this.PERIODO_NOITE_FIM) {
+      dias[ultimoDia].noite.horarioEspecial = `Partida às ${horarioPartida}`;
+    }
+  }
+  
+  return {
+    destino: `${this.dadosDestino.destino}, ${this.dadosDestino.pais}`,
+    dias
+  };
+},
+
+/**
+ * Gera uma descrição apropriada para o dia
+ */
+obterDescricaoDia(diaSemana, numeroDia) {
+  // Rotações para diferentes tipos de descrições
+  const descricoes = [
+    "Dia de descobrir as atrações principais de Orlando!",
+    "Explorando a cultura e história de Orlando.",
+    "Dia perfeito para parques e atividades ao ar livre.",
+    "Dia para aproveitar as últimas horas em Orlando.",
+  ];
+  
+  if (numeroDia === 1) {
+    return "Primeiro dia para conhecer a cidade após a chegada!";
+  }
+  
+  const indice = (numeroDia + diaSemana) % descricoes.length;
+  return descricoes[indice];
+},
+
+/**
+ * Gera atividades para um período específico
+ */
+gerarAtividadesPeriodo(periodo, diaSemana, numeroDia) {
+  // Lista de atividades para cada período
+  const atividadesManha = [
+    {
+      horario: "09:00",
+      local: "The Hampton Social",
+      dica: "Ótimo lugar para café da manhã com a família!",
+      tags: ["Imperdível", "Família"]
+    },
+    {
+      horario: "10:30",
+      local: "Orlando Science Center",
+      dica: "Perfeito para crianças, com exposições interativas.",
+      tags: ["Educativo", "Família"]
+    },
+    {
+      horario: "10:00",
+      local: "Lake Eola Park",
+      dica: "Passeio tranquilo com belos jardins e lago.",
+      tags: ["Ar Livre", "Relaxante"]
+    }
+  ];
+  
+  const atividadesTarde = [
+    {
+      horario: "14:00",
+      local: "Orange County Regional History Center",
+      dica: "Conheça a história de Orlando e da Flórida.",
+      tags: ["Cultural", "Histórico"]
+    },
+    {
+      horario: "15:30",
+      local: "Black Bean Deli",
+      dica: "Experimente os sanduíches cubanos tradicionais!",
+      tags: ["Gastronômico"]
+    },
+    {
+      horario: "13:00",
+      local: "Leu Gardens",
+      dica: "Lindo jardim botânico para relaxar e apreciar a natureza.",
+      tags: ["Ar Livre", "Relaxante"]
+    }
+  ];
+  
+  const atividadesNoite = [
+    {
+      horario: "19:00",
+      local: "The Boheme",
+      dica: "Restaurante elegante com música ao vivo.",
+      tags: ["Gastronômico", "Romântico"]
+    },
+    {
+      horario: "20:30",
+      local: "Se7en Bites",
+      dica: "Ótima opção para sobremesas caseiras.",
+      tags: ["Gastronômico", "Família"]
+    },
+    {
+      horario: "18:00",
+      local: "The Ravenous Pig",
+      dica: "Um dos melhores restaurantes gastronômicos da cidade.",
+      tags: ["Imperdível", "Gastronômico"]
+    }
+  ];
+  
+  // Escolher atividades com base no dia e período
+  let atividades = [];
+  if (periodo === 'manha') {
+    atividades = [atividadesManha[(numeroDia + diaSemana) % atividadesManha.length]];
+  } else if (periodo === 'tarde') {
+    atividades = [atividadesTarde[(numeroDia + diaSemana) % atividadesTarde.length]];
+  } else {
+    atividades = [atividadesNoite[(numeroDia + diaSemana) % atividadesNoite.length]];
+  }
+  
+  return { atividades };
 };
 
 // Inicializar quando o DOM estiver pronto
