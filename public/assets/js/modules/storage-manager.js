@@ -74,3 +74,4 @@
     // Expõe o módulo globalmente
     window.BenetripApp.StorageManager = StorageManager;
 })();
+
