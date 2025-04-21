@@ -14,35 +14,58 @@
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            height: 100vh;
+            min-height: 100vh; /* Usar min-height para telas menores */
             background-color: #f8f8f8;
+            color: #333;
+            padding: 20px;
+            box-sizing: border-box; /* Inclui padding na altura */
         }
         .logo {
-            max-width: 200px;
+            max-width: 150px; /* Ajustar tamanho do logo */
             margin-bottom: 20px;
         }
         .container {
             max-width: 600px;
+            width: 100%; /* Garante que o container use a largura disponível */
             padding: 20px;
             border-radius: 8px;
             background-color: white;
             box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            box-sizing: border-box; /* Inclui padding na largura */
+        }
+        h1 {
+            font-size: 1.5em; /* Ajustar tamanho do título para mobile */
+            margin-bottom: 10px;
+        }
+        p {
+            font-size: 1em;
+            margin: 5px 0;
+            line-height: 1.4;
         }
         .progress {
             width: 100%;
             height: 10px;
             background-color: #eee;
             border-radius: 10px;
-            margin: 20px 0;
+            margin: 20px auto; /* Centraliza a barra */
             overflow: hidden;
         }
         .progress-bar {
             height: 100%;
+            width: 0; /* Começa em 0% */
             background-color: #E87722;
-            animation: progress 1s linear forwards;
+            animation: progress-fill 5s linear forwards; /* Animação mais longa */
+        }
+         @keyframes progress-fill {
+             from { width: 0; }
+             to { width: 100%; }
+         }
+        #status {
+            min-height: 1.2em; /* Garante espaço mesmo vazio */
+            margin-bottom: 15px;
         }
         .manual-btn {
-            display: none;
+            display: none; /* Escondido por padrão */
             margin-top: 20px;
             padding: 10px 20px;
             background-color: #E87722;
@@ -51,139 +74,270 @@
             border-radius: 4px;
             cursor: pointer;
             font-weight: bold;
+            font-size: 1em;
+            text-decoration: none; /* Para ser usado como link */
+            text-align: center;
         }
         .manual-btn:hover {
             background-color: #d26a1e;
         }
-        @keyframes progress {
-            from { width: 0; }
-            to { width: 100%; }
-        }
+
+        /* Estilo para o spinner (opcional, se quiser adicionar um) */
+         .spinner {
+             display: none; /* Escondido por padrão */
+             border: 4px solid rgba(0, 0, 0, 0.1);
+             border-left-color: #E87722;
+             border-radius: 50%;
+             width: 30px;
+             height: 30px;
+             animation: spin 1s linear infinite;
+             margin: 20px auto;
+         }
+         @keyframes spin {
+             0% { transform: rotate(0deg); }
+             100% { transform: rotate(360deg); }
+         }
+
     </style>
 </head>
 <body>
     <img src="assets/images/logo.png" alt="Benetrip" class="logo" onerror="this.src='https://benetrip.com.br/assets/images/logo.png'">
-    
+
     <div class="container">
         <h1>Redirecionando para parceiro Benetrip</h1>
-        <p>Você está sendo redirecionado para o site do parceiro para finalizar sua reserva de voo.</p>
-        <p><strong>Por favor, não feche esta janela até ser redirecionado.</strong></p>
-        
+        <p>Estamos te enviando para o site do parceiro para finalizar a reserva do seu voo.</p>
+        <p>Uma nova janela ou aba será aberta.</p>
+
         <div class="progress">
             <div class="progress-bar"></div>
         </div>
-        
-        <p id="status">Redirecionando...</p>
-        
-        <button id="manual-redirect" class="manual-btn">Clique aqui para continuar manualmente</button>
+
+        <p id="status">Iniciando redirecionamento...</p>
+
+        <a href="#" id="manual-redirect" class="manual-btn">Clique aqui para continuar manualmente</a>
     </div>
-    
-    <!-- Pixel de rastreamento (invisível) -->
+
     <img width="0" height="0" id="tracking-pixel" alt="" style="position:absolute;visibility:hidden">
-    
+
     <script>
         // Função simplificada para obter parâmetros da URL
         function getParam(name) {
             const urlParams = new URLSearchParams(window.location.search);
             return urlParams.get(name);
         }
-        
-        // Função para redirecionar de forma confiável
-        function redirectToPartner() {
-            const url = getParam('url');
-            const method = getParam('method') || 'GET';
-            
-            console.log('Redirecionando para:', url, 'via método:', method);
-            
-            if (!url) {
-                document.getElementById('status').textContent = 'Erro: URL de redirecionamento não encontrada';
-                return;
-            }
-            
-            // Para método GET, redirecionamento direto
-            if (method.toUpperCase() === 'GET') {
-                // Notificar usuário
-                document.getElementById('status').textContent = 'Redirecionando agora...';
-                
-                // SOLUÇÃO ROBUSTA: Usar location.replace para redirecionamento direto
-                window.location.replace(url);
-                
-                // Mostrar botão manual após 3 segundos (caso o redirecionamento automático falhe)
-                setTimeout(() => {
-                    document.getElementById('manual-redirect').style.display = 'inline-block';
-                    document.getElementById('status').textContent = 'Aguardando redirecionamento...';
-                }, 3000);
-            } 
-            // Para método POST, criamos um formulário
-            else if (method.toUpperCase() === 'POST') {
-                try {
-                    const paramsStr = getParam('params');
-                    const params = paramsStr ? JSON.parse(paramsStr) : {};
-                    
-                    document.getElementById('status').textContent = 'Enviando requisição para o parceiro...';
-                    
-                    // Criar e submeter formulário
+
+        // Função para tentar abrir o site do parceiro em uma nova aba/janela
+        function attemptPartnerOpen(url, method, params) {
+            console.log('Attempting to open partner link:', url, 'via método:', method);
+            let partnerWindow = null;
+
+            try {
+                if (method && method.toUpperCase() === 'POST') {
+                    // Para método POST, criamos um formulário e o submetemos para _blank
                     const form = document.createElement('form');
                     form.method = 'POST';
                     form.action = url;
-                    
-                    // Adicionar os campos
-                    Object.entries(params).forEach(([key, value]) => {
-                        const input = document.createElement('input');
-                        input.type = 'hidden';
-                        input.name = key;
-                        input.value = value;
-                        form.appendChild(input);
-                    });
-                    
+                    form.target = '_blank'; // <--- AQUI está a chave para abrir em nova aba/janela
+                    form.style.display = 'none'; // Esconde o formulário
+
+                    if (params) {
+                        // Adicionar os campos do POST
+                        Object.entries(params).forEach(([key, value]) => {
+                            const input = document.createElement('input');
+                            input.type = 'hidden';
+                            input.name = key;
+                            input.value = value;
+                            form.appendChild(input);
+                        });
+                    }
+
                     // Adicionar ao documento e submeter
                     document.body.appendChild(form);
                     form.submit();
-                } catch (error) {
-                    console.error('Erro ao processar redirecionamento POST:', error);
-                    document.getElementById('status').textContent = 'Erro ao processar redirecionamento';
-                    document.getElementById('manual-redirect').style.display = 'inline-block';
+                    // Após submeter, removemos o formulário (pode ser necessário um pequeno delay em alguns casos, mas vamos tentar direto)
+                     setTimeout(() => {
+                         try {
+                              if(document.body.contains(form)) {
+                                 document.body.removeChild(form);
+                              }
+                         } catch(e) { console.warn("Erro ao remover formulário:", e); }
+                     }, 100);
+
+                    // Em muitos browsers, especialmente mobile, form.submit() para _blank
+                    // pode não retornar uma referência de janela útil ou ser bloqueado.
+                    // Assumimos que a tentativa foi feita. Não podemos ter certeza do sucesso aqui.
+                    partnerWindow = true; // Indica que a tentativa foi feita (ou iniciada)
+                    console.log('Formulário POST submetido para nova aba.');
+
+                } else { // Default é GET
+                    // Para método GET, redirecionamento direto em uma nova aba
+                    partnerWindow = window.open(url, '_blank');
+                    console.log('window.open chamado para URL:', url);
                 }
+
+            } catch (error) {
+                 console.error('Erro durante window.open ou submissão do formulário:', error);
+                 // O erro aqui pode ser um bloqueio de popup, etc.
+                 partnerWindow = false; // Indica que falhou ou foi bloqueado
             }
+
+            // Verifica se a janela foi bloqueada ou falhou.
+            // Nota: Esta verificação não é 100% confiável em todos os browsers/mobile.
+             const blocked = (partnerWindow === false || (partnerWindow && (partnerWindow.closed || typeof partnerWindow.closed === 'undefined')));
+
+            if (blocked) {
+                console.warn('Janela do parceiro provavelmente bloqueada ou não abriu.');
+                // Mostrar botão manual como um fallback
+                document.getElementById('manual-redirect').style.display = 'inline-block';
+                document.getElementById('status').textContent = 'Redirecionamento automático falhou. Por favor, clique no botão abaixo:';
+                 return false; // Indica falha detectada
+            }
+
+            console.log('Tentativa de abrir parceiro realizada com sucesso aparente.');
+            return true; // Indica sucesso aparente
         }
-        
-        // Configurar pixel de rastreamento
+
+        // Função para navegar a aba atual para a página de roteiro
+        function navigateToItinerary() {
+            console.log('Navegando aba atual para itinerary.html');
+            // Usar location.replace para que a página de redirecionamento não fique no histórico
+            window.location.replace('itinerary.html');
+        }
+
+        // Função principal que coordena o redirecionamento
+        function handleRedirectionProcess() {
+            document.getElementById('status').textContent = 'Obtendo link do parceiro...';
+             // O pixel de rastreamento já deve ter sido configurado em DOMContentLoaded
+
+            const url = getParam('url');
+            const method = getParam('method') || 'GET';
+            const paramsStr = getParam('params');
+            let params = null;
+
+            try {
+                if (paramsStr) {
+                    // DecodeURIComponent para tratar parâmetros codificados na URL
+                    params = JSON.parse(decodeURIComponent(paramsStr));
+                }
+            } catch(e) {
+                console.error('Erro ao parsear parâmetros:', e);
+                document.getElementById('status').textContent = 'Erro ao processar parâmetros de redirecionamento.';
+                 // Mesmo com erro, tentamos ir para o roteiro eventualmente
+                 setTimeout(navigateToItinerary, 3000);
+                 return; // Sai da função
+            }
+
+            if (!url) {
+                document.getElementById('status').textContent = 'Erro: URL do parceiro não encontrada.';
+                console.error('URL do parceiro ausente nos parâmetros.');
+                 // Mesmo com erro, tentamos ir para o roteiro eventualmente
+                 setTimeout(navigateToItinerary, 3000);
+                 return; // Sai da função
+            }
+
+            // 1. Tentar abrir o site do parceiro em nova aba
+            document.getElementById('status').textContent = 'Abrindo site do parceiro...';
+            const attemptSuccessful = attemptPartnerOpen(url, method, params);
+
+            // 2. Navegar a aba atual para a página de roteiro
+            // Fazemos isso logo em seguida, independentemente do sucesso da abertura da nova aba.
+            // Isso garante que a aba original (que virou redirect.html) vá para itinerary.html.
+            // Adicione um pequeno delay para dar tempo ao navegador de lidar com o window.open
+            // Se attemptSuccessful for false, a mensagem de status já foi atualizada por attemptPartnerOpen
+             if(attemptSuccessful) {
+                  document.getElementById('status').textContent = 'Redirecionando de volta para Benetrip...';
+             }
+
+
+            setTimeout(navigateToItinerary, attemptSuccessful ? 800 : 3000); // Delay menor se abriu, maior se falhou para o usuário ler
+
+        }
+
+
+        // Configurar pixel de rastreamento (antes de qualquer redirecionamento visual)
         function setupTrackingPixel() {
             const clickId = getParam('click_id');
             const gateId = getParam('gate_id');
-            
+
             if (clickId && gateId) {
                 const pixel = document.getElementById('tracking-pixel');
-                pixel.src = `//yasen.aviasales.com/adaptors/pixel_click.png?click_id=${clickId}&gate_id=${gateId}`;
-                console.log('Configurando pixel de rastreamento');
+                // Verifica se a URL do pixel é segura (HTTPS)
+                const pixelUrl = `https://yasen.aviasales.com/adaptors/pixel_click.png?click_id=${clickId}&gate_id=${gateId}`;
+                pixel.src = pixelUrl;
+                console.log('Configurando pixel de rastreamento com URL:', pixelUrl);
+                 // Adicionar tratamento de erro para o pixel, caso a imagem não carregue
+                 pixel.onerror = () => { console.warn('Falha ao carregar pixel de rastreamento.'); };
+            } else {
+                console.log('click_id ou gate_id ausente, pixel de rastreamento não configurado.');
             }
         }
-        
+
+
         // Inicializar quando o documento estiver pronto
         document.addEventListener('DOMContentLoaded', function() {
-            // Configurar pixel de rastreamento
+            console.log('redirect.html: DOMContentLoaded');
+            // Configurar pixel de rastreamento (deve ser feito assim que a página carrega)
             setupTrackingPixel();
-            
-            // Configurar botão manual
-            document.getElementById('manual-redirect').addEventListener('click', function() {
+
+            // Configurar o botão manual caso o redirecionamento automático falhe
+            const manualButton = document.getElementById('manual-redirect');
+            manualButton.addEventListener('click', function(event) {
+                event.preventDefault(); // Previne o comportamento padrão do link
                 const url = getParam('url');
                 if (url) {
+                    console.log('redirect.html: Botão manual clicado. Redirecionando na ABA ATUAL para:', url);
+                    document.getElementById('status').textContent = 'Redirecionando manualmente...';
+                    manualButton.style.display = 'none'; // Esconde o botão após o clique
+
+                    // Usa window.location.href para redirecionar a aba atual diretamente para o parceiro
+                    // Neste caso, a aba atual irá para o parceiro, não para itinerary.html
+                    // O usuário terá que usar o botão de voltar do navegador se quiser retornar
                     window.location.href = url;
+
+                } else {
+                    document.getElementById('status').textContent = 'Erro: URL do parceiro não disponível.';
+                     console.error('redirect.html: URL do parceiro ausente para botão manual.');
                 }
             });
-            
-            // Redirecionar após um pequeno atraso (1 segundo)
-            setTimeout(redirectToPartner, 1000);
+
+            // Iniciar o processo de redirecionamento automático após um pequeno atraso
+            // O atraso permite que a página de carregamento seja exibida primeiro
+            console.log('redirect.html: Iniciando processo de redirecionamento automático com delay.');
+            setTimeout(handleRedirectionProcess, 1000); // Atraso de 1 segundo antes de tentar abrir o parceiro
+
+             // Opcional: Timer final para garantir que a página não fique travada indefinidamente,
+             // redirecionando para a página de roteiro após um tempo maior caso algo falhe completamente.
+             setTimeout(() => {
+                 console.log('redirect.html: Timer de fallback atingido. Verificando se ainda está na página de redirecionamento.');
+                 // Se a URL atual ainda for redirect.html (ou similar), forçar navegação para itinerary
+                 if(window.location.pathname.includes('redirect.html')) { // Ajuste 'redirect.html' conforme o nome do arquivo
+                      console.log('redirect.html: Ainda na página de redirecionamento. Forçando navegação para itinerary.html.');
+                     // Limpar dados do localStorage antes de redirecionar como último recurso
+                      localStorage.removeItem('benetrip_voo_selecionado');
+                      localStorage.removeItem('benetrip_redirect_destination');
+                      localStorage.removeItem('benetrip_parceiro_aberto'); // Limpa qualquer flag pendente
+                     window.location.replace(navigateToItinerary); // Usa replace
+                 } else {
+                     console.log('redirect.html: Já navegou para outra página.');
+                 }
+             }, 20000); // Exemplo: 20 segundos
         });
-        
-        // Garantia adicional - tentar redirecionamento depois de 2 segundos se a página ainda estiver aberta
-        setTimeout(function() {
-            const url = getParam('url');
-            if (url) {
-                console.log('Tentativa adicional de redirecionamento após 2s');
-                window.location.href = url;
-            }
-        }, 2000);
+
+        // Limpando os dados temporários do localStorage *após* a página de destino (itinerary.html) ter carregado.
+        // Isso geralmente é melhor feito na página itinerary.html quando ela lê os dados.
+        // Mas como fallback, podemos tentar limpar aqui com um atraso maior, na esperança
+        // de que itinerary.html já tenha lido. CUIDADO: pode apagar dados antes que itinerary.html leia.
+        // É mais seguro limpar em itinerary.html.
+
+         // Limpando flags de retorno do parceiro que podem ter ficado penduradas
+         // Isso é feito na inicialização da página itinerary.html no seu código original (verificar)
+         // Podemos adicionar uma limpeza preventiva aqui também com atraso.
+         setTimeout(() => {
+              localStorage.removeItem('benetrip_redirect_destination');
+              localStorage.removeItem('benetrip_parceiro_aberto');
+              console.log('redirect.html: Flags de retorno do parceiro removidas do localStorage (preventivo).');
+         }, 5000); // 5 segundos após carregar a página redirect.html
+
     </script>
 </body>
 </html>
