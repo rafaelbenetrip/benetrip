@@ -1053,19 +1053,25 @@ const BENETRIP = {
      * Verifica se atingimos o limite de perguntas para este fluxo
      */
     verificarLimitePerguntas() {
-        // Garantir que o questionário termine se todas as perguntas obrigatórias foram respondidas
-        if (this.estado.fluxo === 'destino_conhecido') {
-            const perguntasObrigatorias = ['conhece_destino', 'destino_conhecido', 'cidade_partida', 'datas'];
-            const todasRespondidas = perguntasObrigatorias.every(key => this.estado.respostas[key] !== undefined);
-            
-            if (todasRespondidas && this.estado.perguntaAtual >= 3) {
-                console.log("Todas perguntas obrigatórias respondidas, finalizando questionário");
-                return true;
-            }
-        }
+    // Garantir que o questionário termine se todas as perguntas obrigatórias foram respondidas
+    if (this.estado.fluxo === 'destino_conhecido') {
+        const perguntasObrigatorias = [
+            'conhece_destino', 
+            'destino_conhecido', 
+            'estilo_viagem_destino', // Nova pergunta adicionada
+            'cidade_partida', 
+            'datas'
+        ];
+        const todasRespondidas = perguntasObrigatorias.every(key => this.estado.respostas[key] !== undefined);
         
-        return false; // Mantém comportamento padrão para outros casos
-    },
+        if (todasRespondidas && this.estado.perguntaAtual >= 4) { // Aumentamos de 3 para 4
+            console.log("Todas perguntas obrigatórias respondidas, finalizando questionário");
+            return true;
+        }
+    }
+    
+    return false; // Mantém comportamento padrão para outros casos
+},
 
     /**
      * Mostra a resposta do usuário no chat
