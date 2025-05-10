@@ -1324,28 +1324,38 @@ gerarRoteiroPadrao(dataInicio, dataFim, numeroEspecificoDeDias = null) {
   
   // Usar número específico de dias se fornecido, senão calcular
   let totalDias;
-  if (numeroEspecificoDeDias) {
+  if (numeroEspecificoDeDias && numeroEspecificoDeDias > 0) {
     totalDias = numeroEspecificoDeDias;
-    console.log(`Gerando roteiro com ${totalDias} dias específicos`);
+    console.log(`FORÇANDO roteiro com ${totalDias} dias específicos como solicitado`);
   } else {
     // Calcular a diferença de dias
     const diffTempo = Math.abs(dataFim.getTime() - dataInicio.getTime());
     totalDias = Math.ceil(diffTempo / (1000 * 60 * 60 * 24)) + 1;
-    console.log(`Gerando roteiro calculado: ${totalDias} dias`);
+    console.log(`Calculando roteiro: ${totalDias} dias entre ${dataInicio} e ${dataFim}`);
   }
   
-  // Gerar todos os dias até a data fim
+  // IMPORTANTE: Garantir que geramos TODOS os dias
+  console.log(`*** GERANDO ROTEIRO COM ${totalDias} DIAS ***`);
+  
+  // Gerar todos os dias até totalDias
   for (let i = 0; i < totalDias; i++) {
     const diaSemana = dataAtual.getDay(); // 0 = Domingo, 1 = Segunda, etc.
-    const descricao = this.obterDescricaoDia(diaSemana, dias.length + 1);
+    const descricao = this.obterDescricaoDia(diaSemana, dias.length + 1, this.dadosDestino.destino);
     
-    dias.push({
+    const diaRoteiro = {
       data: dataAtual.toISOString().split('T')[0],
       descricao,
-      manha: this.gerarAtividadesPeriodo('manha', diaSemana, dias.length + 1),
-      tarde: this.gerarAtividadesPeriodo('tarde', diaSemana, dias.length + 1),
-      noite: this.gerarAtividadesPeriodo('noite', diaSemana, dias.length + 1)
-    });
+      manha: this.gerarAtividadesPeriodo('manha', diaSemana, dias.length + 1, this.dadosDestino.destino),
+      tarde: this.gerarAtividadesPeriodo('tarde', diaSemana, dias.length + 1, this.dadosDestino.destino),
+      noite: this.gerarAtividadesPeriodo('noite', diaSemana, dias.length + 1, this.dadosDestino.destino)
+    };
+    
+    dias.push(diaRoteiro);
+    
+    // Log para debug
+    if (i < 5 || i === totalDias - 1) {
+      console.log(`Dia ${i + 1}/${totalDias} gerado: ${diaRoteiro.data}`);
+    }
     
     // Próximo dia
     dataAtual.setDate(dataAtual.getDate() + 1);
@@ -1385,7 +1395,7 @@ gerarRoteiroPadrao(dataInicio, dataFim, numeroEspecificoDeDias = null) {
     }
   }
   
-  console.log(`Roteiro final gerado com ${dias.length} dias`);
+  console.log(`*** ROTEIRO FINAL COM ${dias.length} DIAS GERADO ***`);
   
   return {
     destino: `${this.dadosDestino.destino}, ${this.dadosDestino.pais}`,
@@ -1396,99 +1406,98 @@ gerarRoteiroPadrao(dataInicio, dataFim, numeroEspecificoDeDias = null) {
 /**
  * Gera uma descrição apropriada para o dia
  */
-obterDescricaoDia(diaSemana, numeroDia) {
-  // Rotações para diferentes tipos de descrições
+obterDescricaoDia(diaSemana, numeroDia, destino = "Orlando") {
+  // Manter descrições genéricas para usar em qualquer destino
   const descricoes = [
-    "Dia de descobrir as atrações principais de Orlando!",
-    "Explorando a cultura e história de Orlando.",
-    "Dia perfeito para parques e atividades ao ar livre.",
-    "Dia para aproveitar as últimas horas em Orlando.",
+    `Início perfeito em ${destino}! Primeiro dia para conhecer a cidade.`,
+    `Explorando a cultura e história de ${destino}.`,
+    `Dia perfeito para atividades ao ar livre em ${destino}.`,
+    `Mergulhando na gastronomia local de ${destino}.`,
+    `Descobrindo os pontos turísticos principais de ${destino}.`,
+    `Dia para relaxar e curtir os encantos de ${destino}.`,
+    `Explorando os bairros e a vida local de ${destino}.`,
+    `Aventuras e experiências únicas em ${destino}.`,
+    `Momentos especiais e memórias inesquecíveis em ${destino}.`,
+    `Aproveitando os últimos momentos em ${destino}.`
   ];
   
   if (numeroDia === 1) {
-    return "Primeiro dia para conhecer a cidade após a chegada!";
+    return `Primeiro dia para conhecer ${destino} após a chegada!`;
   }
   
-  const indice = (numeroDia + diaSemana) % descricoes.length;
+  // Usar modulo para rotacionar as descrições
+  const indice = (numeroDia - 2) % descricoes.length;
+  
+  // Se for o último dia (quando maior que 10), usar descrição específica
+  if (numeroDia > 10) {
+    return descricoes[descricoes.length - 1];
+  }
+  
   return descricoes[indice];
 },
 
 /**
  * Gera atividades para um período específico
  */
-gerarAtividadesPeriodo(periodo, diaSemana, numeroDia) {
-  // Lista de atividades para cada período
-  const atividadesManha = [
-    {
-      horario: "09:00",
-      local: "The Hampton Social",
-      dica: "Ótimo lugar para café da manhã com a família!",
-      tags: ["Imperdível", "Família"]
-    },
-    {
-      horario: "10:30",
-      local: "Orlando Science Center",
-      dica: "Perfeito para crianças, com exposições interativas.",
-      tags: ["Educativo", "Família"]
-    },
-    {
-      horario: "10:00",
-      local: "Lake Eola Park",
-      dica: "Passeio tranquilo com belos jardins e lago.",
-      tags: ["Ar Livre", "Relaxante"]
-    }
-  ];
+gerarAtividadesPeriodo(periodo, diaSemana, numeroDia, destino = "Orlando") {
+  // Atividades genéricas que podem ser adaptadas a qualquer cidade
+  const atividadesGenericas = {
+    manha: [
+      { horario: "09:00", local: "Centro da Cidade", dica: "Comece o dia explorando o centro histórico!" },
+      { horario: "10:00", local: "Museu Principal", dica: "Ótima oportunidade para conhecer a história local!" },
+      { horario: "09:30", local: "Mercado Local", dica: "Experimente os produtos frescos da região!" },
+      { horario: "10:30", local: "Igreja/Catedral Principal", dica: "Arquitetura impressionante e história fascinante!" },
+      { horario: "09:00", local: "Parque Central", dica: "Perfeito para uma caminhada matinal relaxante!" },
+      { horario: "10:00", local: "Centro Cultural", dica: "Exposições interessantes sobre a cultura local!" },
+      { horario: "09:30", local: "Bairro Histórico", dica: "Ruas cheias de charme e história!" },
+      { horario: "10:30", local: "Praça Principal", dica: "Coração da cidade, sempre vibrante!" }
+    ],
+    tarde: [
+      { horario: "14:00", local: "Pontos Turísticos Principais", dica: "As atrações mais famosas esperam por você!" },
+      { horario: "15:00", local: "Bairro Artístico", dica: "Galerias de arte e lojas interessantes!" },
+      { horario: "14:30", local: "Jardim Botânico", dica: "Natureza exuberante no centro da cidade!" },
+      { horario: "15:30", local: "Centro de Compras", dica: "Ótimo lugar para souvenirs e compras!" },
+      { horario: "14:00", local: "Área Gastronômica", dica: "Prove a culinária local autêntica!" },
+      { horario: "15:00", local: "Vista Panorâmica", dica: "As melhores vistas da cidade!" },
+      { horario: "14:30", local: "Bairro Moderno", dica: "Arquitetura contemporânea e lifestyle urbano!" },
+      { horario: "15:30", local: "Área de Lazer", dica: "Relaxe e aproveite o ambiente local!" }
+    ],
+    noite: [
+      { horario: "19:00", local: "Restaurante Típico", dica: "Jantar com os sabores autênticos da região!" },
+      { horario: "20:00", local: "Vida Noturna Local", dica: "Experiência noturna autêntica!" },
+      { horario: "19:30", local: "Teatro/Casa de Shows", dica: "Cultura e entretenimento noturno!" },
+      { horario: "20:30", local: "Bar com Vista", dica: "Perfeito para relaxar com vistas incríveis!" },
+      { horario: "19:00", local: "Food Street", dica: "Variedade gastronômica em ambiente animado!" },
+      { horario: "20:00", local: "Passeio Noturno", dica: "A cidade tem um charme especial à noite!" },
+      { horario: "19:30", local: "Rooftop Bar", dica: "Vista privilegiada e drinks especiais!" },
+      { horario: "20:30", local: "Área Cultural", dica: "Eventos culturais e artisticos noturnos!" }
+    ]
+  };
   
-  const atividadesTarde = [
-    {
-      horario: "14:00",
-      local: "Orange County Regional History Center",
-      dica: "Conheça a história de Orlando e da Flórida.",
-      tags: ["Cultural", "Histórico"]
-    },
-    {
-      horario: "15:30",
-      local: "Black Bean Deli",
-      dica: "Experimente os sanduíches cubanos tradicionais!",
-      tags: ["Gastronômico"]
-    },
-    {
-      horario: "13:00",
-      local: "Leu Gardens",
-      dica: "Lindo jardim botânico para relaxar e apreciar a natureza.",
-      tags: ["Ar Livre", "Relaxante"]
-    }
-  ];
+  // Personalize os locais para o destino específico
+  const atividadesPersonalizadas = atividadesGenericas[periodo].map(ativ => ({
+    horario: ativ.horario,
+    local: ativ.local.replace(/Centro da Cidade|Museu Principal|Igreja\/Catedral Principal/g, (match) => {
+      if (destino.toLowerCase().includes('paulo')) {
+        if (match === "Centro da Cidade") return "Centro Histórico de SP";
+        if (match === "Museu Principal") return "MASP";
+        if (match === "Igreja/Catedral Principal") return "Catedral da Sé";
+      }
+      return match + ` de ${destino}`;
+    }),
+    dica: ativ.dica,
+    tags: ["Local", "Recomendado"]
+  }));
   
-  const atividadesNoite = [
-    {
-      horario: "19:00",
-      local: "The Boheme",
-      dica: "Restaurante elegante com música ao vivo.",
-      tags: ["Gastronômico", "Romântico"]
-    },
-    {
-      horario: "20:30",
-      local: "Se7en Bites",
-      dica: "Ótima opção para sobremesas caseiras.",
-      tags: ["Gastronômico", "Família"]
-    },
-    {
-      horario: "18:00",
-      local: "The Ravenous Pig",
-      dica: "Um dos melhores restaurantes gastronômicos da cidade.",
-      tags: ["Imperdível", "Gastronômico"]
-    }
-  ];
-  
-  // Escolher atividades com base no dia e período
+  // Escolher atividades baseado no dia e período
   let atividades = [];
-  if (periodo === 'manha') {
-    atividades = [atividadesManha[(numeroDia + diaSemana) % atividadesManha.length]];
-  } else if (periodo === 'tarde') {
-    atividades = [atividadesTarde[(numeroDia + diaSemana) % atividadesTarde.length]];
-  } else {
-    atividades = [atividadesNoite[(numeroDia + diaSemana) % atividadesNoite.length]];
+  const indice = (numeroDia + diaSemana) % atividadesPersonalizadas.length;
+  atividades = [atividadesPersonalizadas[indice]];
+  
+  // Adicionar mais atividades se for um dia normal (não primeiro ou último)
+  if (numeroDia > 1 && numeroDia % 3 === 0) {
+    const segundoIndice = (indice + 1) % atividadesPersonalizadas.length;
+    atividades.push(atividadesPersonalizadas[segundoIndice]);
   }
   
   return { atividades };
