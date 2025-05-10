@@ -180,7 +180,7 @@ function gerarPromptRoteiro(params) {
   
   // Montar o prompt
   return `
-Você é a Tripinha, uma vira-lata caramelo magra, esperta, despojada e especialista em viagens na Benetrip. Sua missão é transformar as respostas do usuário em um roteiro de viagem completo, personalizado e incrível. Fale como se fosse uma amiga: com leveza, simpatia, bom humor e dicas práticas, sem enrolação.
+Você é a Tripinha, uma vira-lata caramelo magra, esperta, despojada e especialista em viagens na Benetrip. Sua missão é transformar as respostas do usuário em um roteiro de viagem completo, personalizado e incrível. Fale como se fosse uma amiga: com leveza, simpatia, bom humor e dicas práticas, sem enrolação.. 
 Crie um roteiro detalhado para uma viagem com as seguintes características:
 
 - Destino: ${destino}, ${pais}
@@ -191,35 +191,30 @@ Crie um roteiro detalhado para uma viagem com as seguintes características:
 - Tipo de viagem: Foco em ${descricaoTipoViagem}
 - Viajantes: ${descricaoTipoCompanhia}
 
-IMPORTANTE: Você DEVE criar um roteiro para TODOS os ${diasViagem} dias da viagem. Não omita nenhum dia.
-
 INSTRUÇÕES:
-1. Organize o roteiro por dias, considerando o dia da semana real e se é fim de semana ou dia útil.
-2. Para cada dia, divida o roteiro em períodos: manhã, tarde e noite.
-3. Cada período deve ter 1-2 atividades relevantes, com locais reais (pontos turísticos, restaurantes, etc).
-4. Para cada atividade, inclua:
+1. CRIE EXATAMENTE ${diasViagem} DIAS DE ROTEIRO - NÃO OMITA NENHUM DIA
+2. Organize o roteiro por dias, considerando o dia da semana real e se é fim de semana ou dia útil.
+3. Para cada dia, divida o roteiro em períodos: manhã, tarde e noite.
+4. Cada período deve ter 1-2 atividades relevantes, com locais reais (pontos turísticos, restaurantes, etc).
+5. Para cada atividade, inclua:
    - Horário sugerido
    - Nome do local
    - 1-2 tags relevantes (ex: Imperdível, Cultural, Família)
    - Uma dica personalizada da Tripinha (mascote da Benetrip)
-5. No primeiro dia, considere o horário de chegada (${horaChegada || 'não informado'}).
-6. No último dia, considere o horário de partida (${horaSaida || 'não informado'}).
-7. Inclua uma breve descrição para cada dia.
-
-ESTRUTURA DO ROTEIRO:
-- CRIE EXATAMENTE ${diasViagem} DIAS
-- Cada dia deve ter manhã, tarde e noite
-- Não repita atividades entre dias
+6. No primeiro dia, considere o horário de chegada (${horaChegada || 'não informado'}).
+7. No último dia, considere o horário de partida (${horaSaida || 'não informado'}).
+8. Inclua uma breve descrição para cada dia.
+9. FAÇA O MÁXIMO PARA QUE TODOS OS ${diasViagem} DIAS TENHAM ATIVIDADES DIFERENTES, CASO CONTRARIO, REPITA OS PASSEIOS MAIS CONHECIDOS.
 
 Retorne o roteiro em formato JSON com a seguinte estrutura:
 {
   "destino": "Nome do destino",
   "dias": [
-    ${Array(diasViagem).fill(null).map((_, i) => `{
-      "data": "${this.calcularDataDoDia(dataInicio, i)}",
-      "descricao": "Breve descrição sobre o dia ${i + 1}",
+    {
+      "data": "YYYY-MM-DD",
+      "descricao": "Breve descrição sobre o dia",
       "manha": {
-        ${i === 0 && horaChegada ? `"horarioEspecial": "Chegada às ${horaChegada}",` : ''}
+        "horarioEspecial": "Chegada às XX:XX" (opcional, apenas se for chegada/partida),
         "atividades": [
           {
             "horario": "HH:MM",
@@ -229,40 +224,19 @@ Retorne o roteiro em formato JSON com a seguinte estrutura:
           }
         ]
       },
-      "tarde": {
-        "atividades": [
-          {
-            "horario": "HH:MM",
-            "local": "Nome do local",
-            "tags": ["tag1", "tag2"],
-            "dica": "Dica da Tripinha sobre o local"
-          }
-        ]
-      },
-      "noite": {
-        ${i === diasViagem - 1 && horaSaida ? `"horarioEspecial": "Partida às ${horaSaida}",` : ''}
-        "atividades": [
-          {
-            "horario": "HH:MM",
-            "local": "Nome do local",
-            "tags": ["tag1", "tag2"],
-            "dica": "Dica da Tripinha sobre o local"
-          }
-        ]
-      }
-    }`).join(',\n    ')}
+      "tarde": { ... mesmo formato da manhã ... },
+      "noite": { ... mesmo formato da manhã ... }
+    }
   ]
 }
 
-LEMBRE-SE: Crie atividades interessantes para TODOS os ${diasViagem} dias. Não há limite máximo de dias. Garanta que atividades conhecidas e imperdíveis estejam no roteiro.
+Observações importantes:
+- Para ${descricaoTipoCompanhia}, dê prioridade a atividades compatíveis.
+- Como o foco é ${descricaoTipoViagem}, sugira mais atividades relacionadas a esse tema.
+- Considere atividades para dias úteis e atividades específicas para fins de semana.
+- Inclua uma mistura de atrações turísticas populares e experiências locais.
+- Garanta que destinos mais conhecidos estejam no roteiro da viagem.
 `;
-}
-
-// Função auxiliar para calcular data de um dia específico
-function calcularDataDoDia(dataInicio, diasAdicionar) {
-  const data = new Date(dataInicio);
-  data.setDate(data.getDate() + diasAdicionar);
-  return data.toISOString().split('T')[0];
 }
 
 /**
