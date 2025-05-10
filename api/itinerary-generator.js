@@ -205,6 +205,7 @@ INSTRUÇÕES:
 7. No último dia, considere o horário de partida (${horaSaida || 'não informado'}).
 8. Inclua uma breve descrição para cada dia.
 9. FAÇA O MÁXIMO PARA QUE TODOS OS ${diasViagem} DIAS TENHAM ATIVIDADES DIFERENTES, CASO CONTRARIO, REPITA OS PASSEIOS MAIS CONHECIDOS.
+10. CRITICAL: Você DEVE criar atividades para TODOS os ${diasViagem} dias sem exceções. Se ${diasViagem} é 29, você DEVE criar 29 dias de roteiro completo.
 
 Retorne o roteiro em formato JSON com a seguinte estrutura:
 {
