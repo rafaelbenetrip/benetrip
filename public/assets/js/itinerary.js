@@ -5,13 +5,15 @@
 
 // Inicialização do módulo de roteiro
 const BENETRIP_ROTEIRO = {
-  // --- Constantes ---
-  PERIODO_MANHA_INICIO: 6,
-  PERIODO_MANHA_FIM: 12,
-  PERIODO_TARDE_INICIO: 12,
-  PERIODO_TARDE_FIM: 18,
-  PERIODO_NOITE_INICIO: 18,
-  PERIODO_NOITE_FIM: 23,
+// --- Constantes ---
+PERIODO_MANHA_INICIO: 6,
+PERIODO_MANHA_FIM: 12,
+PERIODO_TARDE_INICIO: 12,
+PERIODO_TARDE_FIM: 18,
+PERIODO_NOITE_INICIO: 18,
+PERIODO_NOITE_FIM: 23,
+MAX_DIAS_VIAGEM: 30, // Aumentado para suportar viagens mais longas
+DIAS_SIMULACAO_DEV: 30, // Máximo de dias para roteiro dummy em desenvolvimento
   
   // --- Estado ---
   dadosVoo: null,
@@ -339,6 +341,8 @@ async gerarRoteiro() {
     await this.buscarImagensLocais();
     
     // Atualizar UI
+    console.log(`Roteiro gerado com ${this.roteiroPronto.dias?.length || 0} dias`);
+console.log('Dias do roteiro:', this.roteiroPronto.dias?.map(dia => dia.data) || []);
     this.atualizarUIComRoteiro();
     
   } catch (erro) {
@@ -1223,22 +1227,32 @@ extrairDataFormatada(dataString) {
    * @returns {number} Número de dias
    */
   calcularDiasViagem(dataInicio, dataFim) {
-    try {
-      const inicio = new Date(dataInicio);
-      
-      // Se não tiver data fim, assume 1 dia
-      if (!dataFim) return 1;
-      
-      const fim = new Date(dataFim);
-      const diffTempo = Math.abs(fim - inicio);
-      const diffDias = Math.ceil(diffTempo / (1000 * 60 * 60 * 24));
-      
-      return diffDias;
-    } catch (e) {
-      console.warn('Erro ao calcular dias de viagem:', e);
+  try {
+    if (!dataInicio) {
+      console.warn('Data de início não fornecida');
       return 1;
     }
-  },
+    
+    const inicio = new Date(dataInicio);
+    
+    // Se não tiver data fim, assume 1 dia
+    if (!dataFim) {
+      console.warn('Data de fim não fornecida, assumindo 1 dia');
+      return 1;
+    }
+    
+    const fim = new Date(dataFim);
+    const diffTempo = Math.abs(fim.getTime() - inicio.getTime());
+    const diffDias = Math.ceil(diffTempo / (1000 * 60 * 60 * 24)) + 1; // +1 para incluir o dia de chegada
+    
+    console.log(`Calculando dias: de ${dataInicio} até ${dataFim} = ${diffDias} dias`);
+    
+    return diffDias;
+  } catch (e) {
+    console.error('Erro ao calcular dias de viagem:', e);
+    return 1;
+  }
+},
   
   /**
    * Obtém a classe CSS para uma badge
@@ -1288,7 +1302,13 @@ obterRoteiroDummy() {
   const dataInicio = new Date(dataInicioStr);
   const dataFim = new Date(dataFimStr);
   
-  return this.gerarRoteiroPadrao(dataInicio, dataFim);
+  // Calcular número real de dias
+  const diffTempo = Math.abs(dataFim.getTime() - dataInicio.getTime());
+  const numeroRealDeDias = Math.ceil(diffTempo / (1000 * 60 * 60 * 24)) + 1;
+  
+  console.log(`Gerando roteiro dummy para ${numeroRealDeDias} dias reais`);
+  
+  return this.gerarRoteiroPadrao(dataInicio, dataFim, numeroRealDeDias);
 },
 
 /**
@@ -1297,18 +1317,25 @@ obterRoteiroDummy() {
  * @param {Date} dataFim - Data de fim
  * @returns {Object} Roteiro completo
  */
-gerarRoteiroPadrao(dataInicio, dataFim) {
+gerarRoteiroPadrao(dataInicio, dataFim, numeroEspecificoDeDias = null) {
   // Gerar array de dias
   const dias = [];
   let dataAtual = new Date(dataInicio);
   
-  // Calcular a diferença de dias
-  const diffTempo = Math.abs(dataFim.getTime() - dataInicio.getTime());
-  const diffDias = Math.ceil(diffTempo / (1000 * 60 * 60 * 24));
-  console.log(`Gerando ${diffDias + 1} dias para o roteiro (inclusive)`);
+  // Usar número específico de dias se fornecido, senão calcular
+  let totalDias;
+  if (numeroEspecificoDeDias) {
+    totalDias = numeroEspecificoDeDias;
+    console.log(`Gerando roteiro com ${totalDias} dias específicos`);
+  } else {
+    // Calcular a diferença de dias
+    const diffTempo = Math.abs(dataFim.getTime() - dataInicio.getTime());
+    totalDias = Math.ceil(diffTempo / (1000 * 60 * 60 * 24)) + 1;
+    console.log(`Gerando roteiro calculado: ${totalDias} dias`);
+  }
   
-  // Para cada dia no intervalo, incluindo o último dia
-  while (dataAtual <= dataFim) {
+  // Gerar todos os dias até a data fim
+  for (let i = 0; i < totalDias; i++) {
     const diaSemana = dataAtual.getDay(); // 0 = Domingo, 1 = Segunda, etc.
     const descricao = this.obterDescricaoDia(diaSemana, dias.length + 1);
     
@@ -1357,6 +1384,8 @@ gerarRoteiroPadrao(dataInicio, dataFim) {
       dias[ultimoDia].noite.horarioEspecial = `Partida às ${horarioPartida}`;
     }
   }
+  
+  console.log(`Roteiro final gerado com ${dias.length} dias`);
   
   return {
     destino: `${this.dadosDestino.destino}, ${this.dadosDestino.pais}`,
