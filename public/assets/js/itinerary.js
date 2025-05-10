@@ -1285,7 +1285,9 @@ obterRoteiroDummy() {
   const dataFimStr = this.extrairDataFormatada(this.dadosVoo.volta?.dataPartida) || 
                     (this.dadosUsuario?.respostas?.datas?.dataVolta);
   
-  console.log(`Gerando roteiro dummy de ${dataInicioStr} até ${dataFimStr}`);
+  console.log(`=== INÍCIO obterRoteiroDummy ===`);
+  console.log(`Data início String: ${dataInicioStr}`);
+  console.log(`Data fim String: ${dataFimStr}`);
   
   if (!dataInicioStr || !dataFimStr) {
     console.warn('Datas não encontradas para gerar roteiro dummy');
@@ -1306,9 +1308,21 @@ obterRoteiroDummy() {
   const diffTempo = Math.abs(dataFim.getTime() - dataInicio.getTime());
   const numeroRealDeDias = Math.ceil(diffTempo / (1000 * 60 * 60 * 24)) + 1;
   
-  console.log(`Gerando roteiro dummy para ${numeroRealDeDias} dias reais`);
+  console.log(`=== CÁLCULO DE DIAS ===`);
+  console.log(`Data início: ${dataInicio}`);
+  console.log(`Data fim: ${dataFim}`);
+  console.log(`Diferença em milissegundos: ${diffTempo}`);
+  console.log(`Número real de dias calculado: ${numeroRealDeDias}`);
+  console.log(`=== FIM CÁLCULO ===`);
   
-  return this.gerarRoteiroPadrao(dataInicio, dataFim, numeroRealDeDias);
+  // FORÇAR o número correto de dias
+  const roteiro = this.gerarRoteiroPadrao(dataInicio, dataFim, numeroRealDeDias);
+  
+  console.log(`=== RESULTADO obterRoteiroDummy ===`);
+  console.log(`Dias no roteiro gerado: ${roteiro.dias?.length || 0}`);
+  console.log(`=== FIM obterRoteiroDummy ===`);
+  
+  return roteiro;
 },
 
 /**
@@ -1318,87 +1332,90 @@ obterRoteiroDummy() {
  * @returns {Object} Roteiro completo
  */
 gerarRoteiroPadrao(dataInicio, dataFim, numeroEspecificoDeDias = null) {
+  console.log(`=== INÍCIO gerarRoteiroPadrao ===`);
+  console.log(`Parâmetros recebidos:`);
+  console.log(`- dataInicio: ${dataInicio}`);
+  console.log(`- dataFim: ${dataFim}`);
+  console.log(`- numeroEspecificoDeDias: ${numeroEspecificoDeDias}`);
+  
   // Gerar array de dias
   const dias = [];
   let dataAtual = new Date(dataInicio);
   
-  // Usar número específico de dias se fornecido, senão calcular
+  // SEMPRE usar o número específico de dias se fornecido
   let totalDias;
   if (numeroEspecificoDeDias && numeroEspecificoDeDias > 0) {
     totalDias = numeroEspecificoDeDias;
-    console.log(`FORÇANDO roteiro com ${totalDias} dias específicos como solicitado`);
+    console.log(`*** USANDO número específico: ${totalDias} dias ***`);
   } else {
-    // Calcular a diferença de dias
+    // Calcular a diferença de dias apenas se não tiver número específico
     const diffTempo = Math.abs(dataFim.getTime() - dataInicio.getTime());
     totalDias = Math.ceil(diffTempo / (1000 * 60 * 60 * 24)) + 1;
-    console.log(`Calculando roteiro: ${totalDias} dias entre ${dataInicio} e ${dataFim}`);
+    console.log(`*** CALCULANDO: ${totalDias} dias ***`);
   }
   
-  // IMPORTANTE: Garantir que geramos TODOS os dias
-  console.log(`*** GERANDO ROTEIRO COM ${totalDias} DIAS ***`);
+  console.log(`*** GERANDO EXATAMENTE ${totalDias} DIAS ***`);
   
-  // Gerar todos os dias até totalDias
+  // Loop para criar TODOS os dias
   for (let i = 0; i < totalDias; i++) {
-    const diaSemana = dataAtual.getDay(); // 0 = Domingo, 1 = Segunda, etc.
-    const descricao = this.obterDescricaoDia(diaSemana, dias.length + 1, this.dadosDestino.destino);
+    const diaSemana = dataAtual.getDay();
+    const descricao = this.obterDescricaoDia(diaSemana, i + 1, this.dadosDestino?.destino || 'Orlando');
     
     const diaRoteiro = {
       data: dataAtual.toISOString().split('T')[0],
       descricao,
-      manha: this.gerarAtividadesPeriodo('manha', diaSemana, dias.length + 1, this.dadosDestino.destino),
-      tarde: this.gerarAtividadesPeriodo('tarde', diaSemana, dias.length + 1, this.dadosDestino.destino),
-      noite: this.gerarAtividadesPeriodo('noite', diaSemana, dias.length + 1, this.dadosDestino.destino)
+      manha: this.gerarAtividadesPeriodo('manha', diaSemana, i + 1, this.dadosDestino?.destino || 'Orlando'),
+      tarde: this.gerarAtividadesPeriodo('tarde', diaSemana, i + 1, this.dadosDestino?.destino || 'Orlando'),
+      noite: this.gerarAtividadesPeriodo('noite', diaSemana, i + 1, this.dadosDestino?.destino || 'Orlando')
     };
     
     dias.push(diaRoteiro);
     
-    // Log para debug
-    if (i < 5 || i === totalDias - 1) {
-      console.log(`Dia ${i + 1}/${totalDias} gerado: ${diaRoteiro.data}`);
+    // Log para os primeiros 3 dias, alguns intermediários e último
+    if (i < 3 || i === Math.floor(totalDias/2) || i === totalDias - 1) {
+      console.log(`Dia ${i + 1}/${totalDias} criado: ${diaRoteiro.data} - ${descricao}`);
     }
     
-    // Próximo dia
+    // Avançar para o próximo dia
     dataAtual.setDate(dataAtual.getDate() + 1);
   }
   
-  // Adicionar info especial para primeiro e último dia
+  // Adicionar informações especiais de chegada e partida
   if (dias.length > 0) {
     // Primeiro dia - chegada
-    const horarioChegada = this.dadosVoo?.ida?.horaChegada || 
-                           this.dadosVoo?.infoIda?.horaChegada || 
-                           '17:05';
-    
+    const horarioChegada = this.dadosVoo?.ida?.horaChegada || '17:05';
     const horaChegada = parseInt(horarioChegada.split(':')[0]);
     
-    if (horaChegada >= this.PERIODO_MANHA_INICIO && horaChegada < this.PERIODO_MANHA_FIM) {
+    if (horaChegada >= 6 && horaChegada < 12) {
       dias[0].manha.horarioEspecial = `Chegada às ${horarioChegada}`;
-    } else if (horaChegada >= this.PERIODO_TARDE_INICIO && horaChegada < this.PERIODO_TARDE_FIM) {
+    } else if (horaChegada >= 12 && horaChegada < 18) {
       dias[0].tarde.horarioEspecial = `Chegada às ${horarioChegada}`;
-    } else if (horaChegada >= this.PERIODO_NOITE_INICIO && horaChegada < this.PERIODO_NOITE_FIM) {
+    } else {
       dias[0].noite.horarioEspecial = `Chegada às ${horarioChegada}`;
     }
     
-    // Último dia - partida, se houver voo de volta
-    const horarioPartida = this.dadosVoo?.volta?.horaPartida || 
-                          this.dadosVoo?.infoVolta?.horaPartida || 
-                          '07:15';
-    
+    // Último dia - partida
+    const horarioPartida = this.dadosVoo?.volta?.horaPartida || '07:15';
     const horaPartida = parseInt(horarioPartida.split(':')[0]);
     const ultimoDia = dias.length - 1;
     
-    if (horaPartida >= this.PERIODO_MANHA_INICIO && horaPartida < this.PERIODO_MANHA_FIM) {
+    if (horaPartida >= 6 && horaPartida < 12) {
       dias[ultimoDia].manha.horarioEspecial = `Partida às ${horarioPartida}`;
-    } else if (horaPartida >= this.PERIODO_TARDE_INICIO && horaPartida < this.PERIODO_TARDE_FIM) {
+    } else if (horaPartida >= 12 && horaPartida < 18) {
       dias[ultimoDia].tarde.horarioEspecial = `Partida às ${horarioPartida}`;
-    } else if (horaPartida >= this.PERIODO_NOITE_INICIO && horaPartida < this.PERIODO_NOITE_FIM) {
+    } else {
       dias[ultimoDia].noite.horarioEspecial = `Partida às ${horarioPartida}`;
     }
   }
   
-  console.log(`*** ROTEIRO FINAL COM ${dias.length} DIAS GERADO ***`);
+  console.log(`=== RESULTADO gerarRoteiroPadrao ===`);
+  console.log(`Total de dias criados: ${dias.length}`);
+  console.log(`Primeiro dia: ${dias[0]?.data}`);
+  console.log(`Último dia: ${dias[dias.length - 1]?.data}`);
+  console.log(`=== FIM gerarRoteiroPadrao ===`);
   
   return {
-    destino: `${this.dadosDestino.destino}, ${this.dadosDestino.pais}`,
+    destino: `${this.dadosDestino?.destino || 'Orlando'}, ${this.dadosDestino?.pais || 'EUA'}`,
     dias
   };
 },
