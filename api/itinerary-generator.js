@@ -180,7 +180,7 @@ function gerarPromptRoteiro(params) {
   
   // Montar o prompt
   return `
-Você é um especialista em planejamento de viagens da Benetrip, uma plataforma de viagens personalizada. 
+Você é a Tripinha, uma vira-lata caramelo magra, esperta, despojada e especialista em viagens na Benetrip. Sua missão é transformar as respostas do usuário em um roteiro de viagem completo, personalizado e incrível. Fale como se fosse uma amiga: com leveza, simpatia, bom humor e dicas práticas, sem enrolação.
 Crie um roteiro detalhado para uma viagem com as seguintes características:
 
 - Destino: ${destino}, ${pais}
@@ -190,6 +190,8 @@ Crie um roteiro detalhado para uma viagem com as seguintes características:
 - Horário de partida no último dia: ${horaSaida || 'Não informado'}
 - Tipo de viagem: Foco em ${descricaoTipoViagem}
 - Viajantes: ${descricaoTipoCompanhia}
+
+IMPORTANTE: Você DEVE criar um roteiro para TODOS os ${diasViagem} dias da viagem. Não omita nenhum dia.
 
 INSTRUÇÕES:
 1. Organize o roteiro por dias, considerando o dia da semana real e se é fim de semana ou dia útil.
@@ -204,15 +206,20 @@ INSTRUÇÕES:
 6. No último dia, considere o horário de partida (${horaSaida || 'não informado'}).
 7. Inclua uma breve descrição para cada dia.
 
+ESTRUTURA DO ROTEIRO:
+- CRIE EXATAMENTE ${diasViagem} DIAS
+- Cada dia deve ter manhã, tarde e noite
+- Não repita atividades entre dias
+
 Retorne o roteiro em formato JSON com a seguinte estrutura:
 {
   "destino": "Nome do destino",
   "dias": [
-    {
-      "data": "YYYY-MM-DD",
-      "descricao": "Breve descrição sobre o dia",
+    ${Array(diasViagem).fill(null).map((_, i) => `{
+      "data": "${this.calcularDataDoDia(dataInicio, i)}",
+      "descricao": "Breve descrição sobre o dia ${i + 1}",
       "manha": {
-        "horarioEspecial": "Chegada às XX:XX" (opcional, apenas se for chegada/partida),
+        ${i === 0 && horaChegada ? `"horarioEspecial": "Chegada às ${horaChegada}",` : ''}
         "atividades": [
           {
             "horario": "HH:MM",
@@ -222,18 +229,40 @@ Retorne o roteiro em formato JSON com a seguinte estrutura:
           }
         ]
       },
-      "tarde": { ... mesmo formato da manhã ... },
-      "noite": { ... mesmo formato da manhã ... }
-    }
+      "tarde": {
+        "atividades": [
+          {
+            "horario": "HH:MM",
+            "local": "Nome do local",
+            "tags": ["tag1", "tag2"],
+            "dica": "Dica da Tripinha sobre o local"
+          }
+        ]
+      },
+      "noite": {
+        ${i === diasViagem - 1 && horaSaida ? `"horarioEspecial": "Partida às ${horaSaida}",` : ''}
+        "atividades": [
+          {
+            "horario": "HH:MM",
+            "local": "Nome do local",
+            "tags": ["tag1", "tag2"],
+            "dica": "Dica da Tripinha sobre o local"
+          }
+        ]
+      }
+    }`).join(',\n    ')}
   ]
 }
 
-Observações importantes:
-- Para ${descricaoTipoCompanhia}, dê prioridade a atividades compatíveis.
-- Como o foco é ${descricaoTipoViagem}, sugira mais atividades relacionadas a esse tema.
-- Considere atividades para dias úteis e atividades específicas para fins de semana.
-- Inclua uma mistura de atrações turísticas populares e experiências locais.
+LEMBRE-SE: Crie atividades interessantes para TODOS os ${diasViagem} dias. Não há limite máximo de dias. Garanta que atividades conhecidas e imperdíveis estejam no roteiro.
 `;
+}
+
+// Função auxiliar para calcular data de um dia específico
+function calcularDataDoDia(dataInicio, diasAdicionar) {
+  const data = new Date(dataInicio);
+  data.setDate(data.getDate() + diasAdicionar);
+  return data.toISOString().split('T')[0];
 }
 
 /**
