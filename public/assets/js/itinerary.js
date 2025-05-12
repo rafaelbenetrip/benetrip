@@ -315,6 +315,13 @@ async gerarRoteiro() {
         });
         
         console.log('Roteiro dummy ajustado com datas reais do usuário:', this.roteiroPronto);
+// Verificação final após ajustes
+console.log(`=== VERIFICAÇÃO FINAL ===`);
+console.log(`Total de dias no roteiro final: ${this.roteiroPronto.dias.length}`);
+console.log(`Primeira data: ${this.roteiroPronto.dias[0]?.data}`);
+console.log(`Última data: ${this.roteiroPronto.dias[this.roteiroPronto.dias.length - 1]?.data}`);
+console.log(`=== FIM VERIFICAÇÃO ===`);
+        
       }
     } else {
       const response = await fetch('/api/itinerary-generator', {
