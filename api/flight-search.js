@@ -1,5 +1,5 @@
 // api/flight-search.js - INICIA a busca de voos e retorna search_id
-// Versão com assinatura CORRIGIDA para ordenação aninhada (documentação)
+// Versão com assinatura CORRIGIDA e inclusão de moeda na requisição inicial
 const axios = require('axios');
 const crypto = require('crypto');
 
@@ -16,11 +16,10 @@ function isValidIATA(code) {
 // Segue a lógica da documentação: ordena nomes de nível superior + 'passengers' + 'segments',
 // e insere os valores aninhados na ordem correta.
 function generateSignature(data, token) {
-  console.log("--- Iniciando Geração de Assinatura (Ordenação Aninhada Correta) ---");
+  console.log("[Flight Search] Iniciando Geração de Assinatura (Ordenação Aninhada Correta)");
 
-  // 1. Identificar chaves de nível superior e nomes das estruturas aninhadas
   const topLevelParamNames = [];
-  const nestedStructureNames = ['passengers', 'segments']; // Estruturas aninhadas conhecidas
+  const nestedStructureNames = ['passengers', 'segments'];
 
   // Adiciona chaves de nível superior presentes em 'data'
   if (data.host !== undefined) topLevelParamNames.push('host');
@@ -28,53 +27,38 @@ function generateSignature(data, token) {
   if (data.marker !== undefined) topLevelParamNames.push('marker');
   if (data.trip_class !== undefined) topLevelParamNames.push('trip_class');
   if (data.user_ip !== undefined) topLevelParamNames.push('user_ip');
-  // Adiciona opcionais de nível superior se presentes
-  if (data.currency !== undefined) topLevelParamNames.push('currency');
+  if (data.currency !== undefined) topLevelParamNames.push('currency'); // Adicionado currency aqui
   if (data.know_english !== undefined) topLevelParamNames.push('know_english');
   if (data.only_direct !== undefined) topLevelParamNames.push('only_direct');
-  // Adicione outros opcionais de nível superior aqui
 
-  // Lista combinada de nomes para ordenação
   const namesToSort = [...topLevelParamNames, ...nestedStructureNames];
-
-  // 2. Ordenar a lista de nomes alfabeticamente
   namesToSort.sort((a, b) => a.localeCompare(b));
-  console.log("Ordem dos nomes (nível superior + aninhados) para processamento:", namesToSort);
+  console.log("[Flight Search] Ordem dos nomes para assinatura:", namesToSort);
 
-  // 3. Construir a lista final de VALORES na ordem definida
   const finalValues = [];
   namesToSort.forEach(name => {
     if (name === 'passengers') {
-      // Insere valores de passengers na ordem: adults, children, infants
       finalValues.push(String(data.passengers.adults));
       finalValues.push(String(data.passengers.children));
       finalValues.push(String(data.passengers.infants));
     } else if (name === 'segments') {
-      // Insere valores de cada segmento na ordem: date, destination, origin
       data.segments.forEach(segment => {
         finalValues.push(String(segment.date));
         finalValues.push(String(segment.destination));
         finalValues.push(String(segment.origin));
       });
     } else {
-      // É um parâmetro de nível superior (simples ou opcional)
-      // Adiciona o valor correspondente SE ele existir em 'data'
       if (data[name] !== undefined) {
          finalValues.push(String(data[name]));
       }
     }
   });
 
-  console.log("Valores finais coletados na ordem correta:", finalValues);
-
-  // 4. Concatenar token e valores finais com ':'
+  console.log("[Flight Search] Valores finais para assinatura:", finalValues);
   const signatureString = token + ':' + finalValues.join(':');
-  console.log("String completa para assinatura:", signatureString);
-
-  // 5. Gerar hash MD5
+  console.log("[Flight Search] String completa para assinatura:", signatureString.substring(0, 50) + "..."); // Log parcial por segurança
   const signatureHash = crypto.createHash('md5').update(signatureString).digest('hex');
-  console.log("Hash MD5 gerado (Signature - Ordenação Aninhada Correta):", signatureHash);
-
+  console.log("[Flight Search] Hash MD5 gerado (Assinatura):", signatureHash);
   return signatureHash;
 }
 // --- Fim Funções Auxiliares ---
@@ -96,12 +80,17 @@ module.exports = async function handler(req, res) {
   }
 
   try {
-    console.log("Iniciando busca de voos (Endpoint: /api/flight-search)...");
-    const params = req.body;
+    console.log("[Flight Search] Iniciando busca de voos...");
+    const params = req.body; // Parâmetros recebidos do frontend
 
     // --- Validações ---
-    if (!params.origem || !params.destino || !params.dataIda || !isValidIATA(params.origem.toUpperCase()) || !isValidIATA(params.destino.toUpperCase()) || !isValidDate(params.dataIda) || (params.dataVolta && !isValidDate(params.dataVolta))) {
-        return res.status(400).json({ error: "Parâmetros inválidos ou ausentes." });
+    if (!params.origem || !params.destino || !params.dataIda ||
+        !isValidIATA(params.origem.toUpperCase()) ||
+        !isValidIATA(params.destino.toUpperCase()) ||
+        !isValidDate(params.dataIda) ||
+        (params.dataVolta && !isValidDate(params.dataVolta))) {
+      console.warn("[Flight Search] Parâmetros inválidos ou ausentes:", params);
+      return res.status(400).json({ error: "Parâmetros inválidos ou ausentes." });
     }
     const origem = params.origem.toUpperCase();
     const destino = params.destino.toUpperCase();
@@ -110,26 +99,29 @@ module.exports = async function handler(req, res) {
     // --- Obter variáveis de ambiente ---
     const token = process.env.AVIASALES_TOKEN;
     const marker = process.env.AVIASALES_MARKER;
-    const hostEnv = process.env.HOST || "www.benetrip.com.br";
+    const hostEnv = process.env.HOST || "www.benetrip.com.br"; // Use um host real ou configurável
 
     if (!token || !marker) {
-      console.error("!!! ERRO CRÍTICO: Credenciais da API não configuradas no servidor.");
+      console.error("[Flight Search] ERRO CRÍTICO: Credenciais da API (AVIASALES_TOKEN/AVIASALES_MARKER) não configuradas no servidor.");
       return res.status(500).json({ error: "Configuração interna da API incompleta." });
     }
 
-    const userIp = req.headers['x-forwarded-for']?.split(',')[0].trim() || req.headers['client-ip'] || req.connection?.remoteAddress || req.socket?.remoteAddress || "127.0.0.1";
+    const userIp = req.headers['x-forwarded-for']?.split(',')[0].trim() ||
+                   req.headers['client-ip'] ||
+                   req.connection?.remoteAddress ||
+                   req.socket?.remoteAddress ||
+                   "127.0.0.1"; // IP do usuário
     // --- Fim Obter variáveis ---
 
 
-    // --- Montar objeto da requisição ---
+    // --- Montar objeto da requisição para Travelpayouts ---
     const supportedLocales = ['en', 'ru', 'de', 'fr', 'it', 'pl', 'th', 'zh-Hans', 'ko', 'ja', 'vi', 'pt', 'pt-BR', 'uk', 'es', 'id', 'ms', 'zh-Hant', 'tr'];
-    // MODIFICADO: Garante locale padrão "pt-BR" otimizado para parceiros
-    const localeParam = params.locale && supportedLocales.includes(params.locale) ? params.locale : "pt-BR";
+    const localeParam = params.locale && supportedLocales.includes(params.locale) ? params.locale : "pt-BR"; // Prioriza pt-BR
+
     const requestData = {
       marker: marker,
       host: hostEnv,
       user_ip: userIp,
-      // MODIFICADO: locale padrão pt-BR
       locale: localeParam,
       trip_class: params.classe ? params.classe.toUpperCase() : "Y",
       passengers: {
@@ -138,25 +130,26 @@ module.exports = async function handler(req, res) {
         infants: parseInt(params.bebes || 0, 10)
       },
       segments: []
-      // Opcionais serão adicionados abaixo se vierem dos params
     };
 
-    // NOVO: Adiciona preferência para parceiros que suportam português
+    // Adiciona preferência para parceiros que suportam português se o locale for pt ou pt-BR
     if (requestData.locale && requestData.locale.toLowerCase().startsWith("pt")) {
-      requestData.know_english = false;
+      requestData.know_english = false; // Informa à API que o usuário pode não saber inglês
     }
 
-    // Adiciona opcionais se vierem do frontend
-    if (params.know_english !== undefined) {
-        requestData.know_english = (String(params.know_english).toLowerCase() === 'true');
+    // Adiciona currency SE FOR ENVIADO PELO FRONTEND
+    // Esta é a principal modificação desta seção
+    if (params.currency && typeof params.currency === 'string' && params.currency.length === 3) {
+      requestData.currency = params.currency.toUpperCase();
+      console.log(`[Flight Search] Moeda definida na requisição inicial: ${requestData.currency}`);
+    } else {
+      console.log("[Flight Search] Moeda não especificada pelo frontend para a requisição inicial.");
     }
-    if (params.currency) {
-        requestData.currency = String(params.currency).toUpperCase().substring(0, 3);
-    }
+
     if (params.only_direct !== undefined) {
         requestData.only_direct = (String(params.only_direct).toLowerCase() === 'true');
     }
-    // Adicione outros opcionais aqui se necessário
+    // Adicione outros opcionais aqui se necessário (ex: params.know_english)
 
     requestData.segments.push({ origin: origem, destination: destino, date: params.dataIda });
     if (params.dataVolta) {
@@ -164,15 +157,15 @@ module.exports = async function handler(req, res) {
     }
     // --- Fim Montar objeto ---
 
-    // --- Gerar Assinatura (usando a nova função corrigida) ---
+    // --- Gerar Assinatura ---
     const signature = generateSignature(requestData, token);
     requestData.signature = signature;
     // --- Fim Gerar Assinatura ---
 
-    console.log("Enviando requisição INICIAL para Travelpayouts...");
-    const logData = { ...requestData };
-    delete logData.signature;
-    console.log("Payload (sem assinatura):", JSON.stringify(logData, null, 2));
+    console.log("[Flight Search] Enviando requisição INICIAL para Travelpayouts...");
+    const logDataForPayload = { ...requestData };
+    delete logDataForPayload.signature; // Não logar a assinatura completa por segurança
+    console.log("[Flight Search] Payload (sem assinatura):", JSON.stringify(logDataForPayload, null, 2));
 
 
     // --- Enviar requisição INICIAL ---
@@ -180,61 +173,58 @@ module.exports = async function handler(req, res) {
       "https://api.travelpayouts.com/v1/flight_search",
       requestData,
       {
-        headers: { "Content-Type": "application/json" },
-        timeout: 15000
+        headers: { "Content-Type": "application/json", 'Accept-Encoding': 'gzip, deflate, br' },
+        timeout: 20000 // Aumentado timeout para 20s
       }
     );
     // --- Fim Enviar requisição ---
 
-    console.log("Resposta inicial da Travelpayouts (Status):", apiResponse.status);
-    
-    // Registra a resposta completa para debug
-    console.log("Resposta completa da API Travelpayouts:", JSON.stringify(apiResponse.data, null, 2));
+    console.log("[Flight Search] Resposta inicial da Travelpayouts (Status):", apiResponse.status);
+    console.log("[Flight Search] Resposta completa da API Travelpayouts:", JSON.stringify(apiResponse.data, null, 2).substring(0, 500) + "..."); // Log parcial
 
     const searchId = apiResponse.data?.search_id;
-    
-    // CORREÇÃO: Preservar o formato original das taxas de câmbio exatamente como recebido
-    const currencyRates = apiResponse.data?.currency_rates;
-    
+    const currencyRates = apiResponse.data?.currency_rates; // Preservar formato original
+
     if (currencyRates) {
-      console.log("Taxas de câmbio recebidas da API:", JSON.stringify(currencyRates, null, 2));
+      console.log("[Flight Search] Taxas de câmbio recebidas da API:", JSON.stringify(currencyRates, null, 2));
     } else {
-      console.warn("ATENÇÃO: API não retornou taxas de câmbio!");
+      console.warn("[Flight Search] ATENÇÃO: API não retornou taxas de câmbio (currency_rates)!");
     }
 
     // Tratar status 200 ou 202 como sucesso se tiver search_id
     if (searchId && (apiResponse.status === 200 || apiResponse.status === 202)) {
-      console.log("Busca iniciada com sucesso. Search ID:", searchId);
-      
-      // IMPORTANTE: Retorna os dados exatamente como recebidos da API
+      console.log("[Flight Search] Busca iniciada com sucesso. Search ID:", searchId);
       return res.status(202).json({
         search_id: searchId,
         currency_rates: currencyRates, // Manter as taxas no formato original da API
-        raw_response: apiResponse.data, // Incluir resposta completa para diagnóstico
+        // raw_response: apiResponse.data, // Opcional: incluir resposta completa para diagnóstico no frontend
         message: "Busca de voos iniciada. Use o search_id para verificar os resultados."
       });
     } else {
-      console.error(`!!! ERRO: A API Travelpayouts retornou status ${apiResponse.status} mas sem search_id ou status inesperado. Resposta:`, apiResponse.data);
-      return res.status(500).json({ error: "Falha ao iniciar a busca. Resposta inesperada da API externa.", apiResponse: apiResponse.data });
+      console.error(`[Flight Search] ERRO: A API Travelpayouts retornou status ${apiResponse.status} mas sem search_id ou status inesperado. Resposta:`, apiResponse.data);
+      return res.status(apiResponse.status || 500).json({
+        error: "Falha ao iniciar a busca. Resposta inesperada da API externa.",
+        details: apiResponse.data
+      });
     }
 
   } catch (error) {
     // --- Tratamento de Erro ---
-    console.error("!!! ERRO GERAL NO HANDLER /api/flight-search !!!");
+    console.error("!!! [Flight Search] ERRO GERAL NO HANDLER /api/flight-search !!!");
     if (error.response) {
-        console.error("Erro Axios (Initial Search): Status:", error.response.status, "Data:", error.response.data);
+        console.error("[Flight Search] Erro Axios (Initial Search): Status:", error.response.status, "Data:", JSON.stringify(error.response.data).substring(0, 500) + "...");
         if (error.response.status === 401 || error.response.status === 403) {
-             console.error("!!! ATENÇÃO: Erro 401/403. Verifique se a nova lógica de assinatura está 100% correta ou se as credenciais (Token/Marker) estão válidas.");
+             console.error("[Flight Search] !!! ATENÇÃO: Erro 401/403. Verifique a assinatura e as credenciais (Token/Marker).");
         }
-        return res.status(error.response.status).json({
-            error: `Erro ${error.response.status} ao iniciar busca com a API externa.`,
+        return res.status(error.response.status || 502).json({
+            error: `Erro ${error.response.status || 'desconhecido'} ao iniciar busca com a API externa.`,
             details: error.response.data
         });
     } else if (error.request) {
-        console.error("Erro Axios (Initial Search): Nenhuma resposta recebida:", error.message);
+        console.error("[Flight Search] Erro Axios (Initial Search): Nenhuma resposta recebida:", error.message);
         return res.status(504).json({ error: "Nenhuma resposta da API externa ao iniciar busca (Gateway Timeout)." });
     } else {
-        console.error("Erro interno (Initial Search):", error.message);
+        console.error("[Flight Search] Erro interno (Initial Search):", error.message, error.stack);
         return res.status(500).json({ error: "Erro interno no servidor ao iniciar busca.", details: error.message });
     }
     // --- Fim Tratamento de Erro ---
