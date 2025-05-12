@@ -1,312 +1,346 @@
 // api/flight-redirect.js
 const axios = require('axios');
 
+// Mapeamento de regras de parceiros para internacionalização (i18n) e localização (l10n)
+// Este objeto pode ser expandido e até mesmo movido para um arquivo de configuração separado.
+const partnerRules = {
+  // Exemplo para ubfly.br.com (já existente no código original, agora formalizado)
+  'ubfly.br.com': {
+    currencyParam: 'Currency', // Nome do parâmetro de moeda
+    languageParam: 'Locale',   // Nome do parâmetro de idioma
+    languageValueFormat: (lang) => lang.toLowerCase().startsWith('pt') ? 'PT' : 'EN', // Formato específico: PT ou EN
+    currencyValueFormat: (curr) => curr.toUpperCase(), // Ex: BRL
+    // Regra específica: se a URL já tiver Currency=USD e o usuário quer BRL, substitui.
+    // Se tiver Locale=EN e o usuário quer PT, substitui.
+    specificLogic: (url, currency, language) => {
+      let modifiedUrl = url;
+      let modified = false;
+      if (currency === 'BRL' && modifiedUrl.includes('Currency=USD')) {
+        modifiedUrl = modifiedUrl.replace('Currency=USD', 'Currency=BRL');
+        modified = true;
+      }
+      if (language && language.toLowerCase().startsWith('pt') && modifiedUrl.includes('Locale=EN')) {
+        modifiedUrl = modifiedUrl.replace('Locale=EN', 'Locale=PT');
+        modified = true;
+      }
+      return { url: modifiedUrl, modified };
+    }
+  },
+  'exemplo-parceiro-a.com': {
+    currencyParam: 'displayCurrency',
+    languageParam: 'market', // Ex: 'pt-br', 'en-us'
+    languageValueFormat: (lang) => lang.toLowerCase().startsWith('pt') ? 'pt-br' : (lang.toLowerCase().startsWith('en') ? 'en-us' : lang.toLowerCase()),
+    currencyValueFormat: (curr) => curr.toUpperCase(),
+  },
+  'exemplo-parceiro-b.net': {
+    currencyParam: 'cur',
+    languageParam: 'lang', // Ex: 'pt', 'en'
+    languageValueFormat: (lang) => lang.toLowerCase().split('-')[0], // Pega 'pt' de 'pt-BR'
+    currencyValueFormat: (curr) => curr.toLowerCase(), // Ex: brl
+  },
+  // Adicione mais parceiros e suas regras específicas aqui
+  // 'nomedoparceiro.com': { ... regras ... },
+};
+
+
 /**
- * Aplica modificações à URL do parceiro de forma automática (case-sensitive e regras de domínios)
- * @param {string} url - URL original
- * @param {string} currency - Moeda desejada
- * @param {string} language - Idioma desejado (pt-BR)
- * @returns {Object} - URL modificada e informações
+ * Aplica modificações à URL do parceiro de forma inteligente para moeda e idioma.
+ * @param {string} originalUrl - URL original do parceiro.
+ * @param {string} targetCurrency - Moeda desejada (ex: "BRL").
+ * @param {string} targetLanguage - Idioma desejado (ex: "pt-BR").
+ * @returns {Object} - { url: string (modificada ou original), modified: boolean, domain: string, ruleApplied: string|null }
  */
-function applySmartParameterChanges(url, currency, language) {
-  if (!url) return { url, modified: false };
-  
-  let modifiedUrl = url;
+function applySmartParameterChanges(originalUrl, targetCurrency, targetLanguage) {
+  if (!originalUrl) return { url: originalUrl, modified: false, domain: 'unknown', ruleApplied: null };
+
+  let currentUrl = originalUrl;
   let modified = false;
+  let ruleApplied = null;
 
-  // 1. EXTRAIR DOMÍNIO PARA DIAGNÓSTICO
-  const domainMatch = url.match(/https?:\/\/(?:www\.)?([^\/]+)/i);
-  const domain = domainMatch ? domainMatch[1] : 'unknown';
+  console.log(`[Redirect Smarter] Iniciando modificação para URL: ${originalUrl.substring(0,100)}...`);
+  console.log(`[Redirect Smarter] Moeda Alvo: ${targetCurrency}, Idioma Alvo: ${targetLanguage}`);
 
-  // 2. Verificações específicas para domínios conhecidos
-  if (domain.includes('ubfly.br.com')) {
-    console.log('[Proxy Redirect] Detectado ubfly.br.com, aplicando regras específicas');
-    // Se a URL já contém Currency=USD, substituir por BRL
-    if (modifiedUrl.includes('Currency=USD') && currency === 'BRL') {
-      modifiedUrl = modifiedUrl.replace('Currency=USD', 'Currency=BRL');
-      modified = true;
+  const domainMatch = originalUrl.match(/https?:\/\/(?:www\.)?([^\/]+)/i);
+  const domain = domainMatch ? domainMatch[1].toLowerCase() : 'unknown';
+  console.log(`[Redirect Smarter] Domínio detectado: ${domain}`);
+
+  const specificRule = partnerRules[domain];
+
+  if (specificRule && specificRule.specificLogic) {
+    console.log(`[Redirect Smarter] Aplicando lógica específica para o domínio: ${domain}`);
+    const result = specificRule.specificLogic(currentUrl, targetCurrency, targetLanguage);
+    currentUrl = result.url;
+    if (result.modified) {
+        modified = true;
+        ruleApplied = `specificLogic for ${domain}`;
     }
-    // Se a URL contém Locale=EN, substituir por PT
-    if (modifiedUrl.includes('Locale=EN') && language && language.toLowerCase().startsWith('pt')) {
-      modifiedUrl = modifiedUrl.replace('Locale=EN', 'Locale=PT');
-      modified = true;
-    }
-    if (modified) {
-      return {
-        url: modifiedUrl,
-        modified: true,
-        domain,
-        specificRulesApplied: true
-      };
-    }
+    console.log(`[Redirect Smarter] Após lógica específica: ${currentUrl.substring(0,100)}... (Modificado: ${modified})`);
   }
 
-  // 2b. Detectar se já há querystring
-  const hasQueryString = url.includes('?');
-  
-  // 3. APLICAR MODIFICAÇÕES BASEADAS EM PADRÕES DETECTADOS
-  // A. Modificar moeda se necessária (considerar case-sensitivity)
-  if (currency) {
-    // Padrões para parâmetros de moeda (com case insensitive + modos uppercase)
+  // Tentar aplicar regras genéricas ou baseadas em partnerRules (se não houver specificLogic ou ela não modificou)
+  const currencyParamName = specificRule?.currencyParam;
+  const languageParamName = specificRule?.languageParam;
+  const formatLangValue = specificRule?.languageValueFormat || ((lang) => lang.toLowerCase().startsWith('pt') ? 'pt-BR' : lang); // Default: pt-BR ou original
+  const formatCurrValue = specificRule?.currencyValueFormat || ((curr) => curr.toUpperCase()); // Default: BRL
+
+  // 1. Modificar/Adicionar Moeda
+  if (targetCurrency) {
+    const formattedTargetCurrency = formatCurrValue(targetCurrency);
+    let currencyModifiedThisPass = false;
+    // Padrões comuns para parâmetros de moeda (case insensitive)
     const currencyPatterns = [
-      /([?&]currency=)([A-Z]{3})/gi,
-      /([?&]curr=)([A-Z]{3})/gi,
-      /([?&]cur=)([A-Z]{3})/gi,
-      /([?&]Currency=)([A-Z]{3})/g,
-      /([?&]Curr=)([A-Z]{3})/g,
-      /currency%3A([A-Z]{3})/gi,
-      /([?&]moeda=)([A-Z]{3})/gi
+      new RegExp(`([?&]${currencyParamName || 'currency'}=)([A-Z]{3})`, 'i'),
+      new RegExp(`([?&]${currencyParamName || 'curr'}=)([A-Z]{3})`, 'i'),
+      new RegExp(`([?&]${currencyParamName || 'cur'}=)([A-Z]{3})`, 'i'),
+      new RegExp(`([?&]${currencyParamName || 'pricecurrency'}=)([A-Z]{3})`, 'i'),
+      new RegExp(`([?&]${currencyParamName || 'displayCurrency'}=)([A-Z]{3})`, 'i'),
+      new RegExp(`([?&]${currencyParamName || 'moeda'}=)([A-Z]{3})`, 'i'),
+      // Adicione outros padrões comuns se necessário
     ];
-    
-    let currencyModified = false;
-    currencyPatterns.forEach(pattern => {
-      if (modifiedUrl.match(pattern)) {
-        modifiedUrl = modifiedUrl.replace(pattern, function(match, p1) {
-          currencyModified = true;
-          return p1 + currency;
-        });
-      }
-    });
 
-    // Se nenhum padrão foi encontrado, adicionar o parâmetro no formato predominante
-    if (!currencyModified) {
-      const separator = hasQueryString ? '&' : '?';
-      if (modifiedUrl.includes('Currency=')) {
-        modifiedUrl = `${modifiedUrl}${separator}Currency=${currency}`;
-      } else {
-        modifiedUrl = `${modifiedUrl}${separator}currency=${currency}`;
+    for (const pattern of currencyPatterns) {
+      if (currentUrl.match(pattern)) {
+        const existingCurrency = currentUrl.match(pattern)[2];
+        if (existingCurrency.toUpperCase() !== formattedTargetCurrency) {
+          currentUrl = currentUrl.replace(pattern, `$1${formattedTargetCurrency}`);
+          modified = true;
+          currencyModifiedThisPass = true;
+          ruleApplied = ruleApplied || `currencyPattern ${pattern.source}`;
+          console.log(`[Redirect Smarter] Moeda MODIFICADA via padrão ${pattern.source} para ${formattedTargetCurrency}`);
+        } else {
+          currencyModifiedThisPass = true; // Já está correto
+          console.log(`[Redirect Smarter] Moeda JÁ CORRETA via padrão ${pattern.source} (${formattedTargetCurrency})`);
+        }
+        break;
       }
+    }
+
+    if (!currencyModifiedThisPass) {
+      const separator = currentUrl.includes('?') ? '&' : '?';
+      const paramNameToAdd = currencyParamName || (currentUrl.toLowerCase().includes('currency=') ? 'Currency' : 'currency');
+      currentUrl = `${currentUrl}${separator}${paramNameToAdd}=${formattedTargetCurrency}`;
       modified = true;
-    } else {
-      modified = true;
+      ruleApplied = ruleApplied || `currencyAdded ${paramNameToAdd}`;
+      console.log(`[Redirect Smarter] Moeda ADICIONADA: ${paramNameToAdd}=${formattedTargetCurrency}`);
     }
   }
-  
-  // B. Modificar idioma (considerar case-sensitivity)
-  if (language) {
-    const langCode = language.startsWith('pt') ? 'pt-BR' : language;
-    const shortLangCode = langCode.split('-')[0];
+
+  // 2. Modificar/Adicionar Idioma
+  if (targetLanguage) {
+    const formattedTargetLanguage = formatLangValue(targetLanguage);
+    let languageModifiedThisPass = false;
+    // Padrões comuns para parâmetros de idioma (case insensitive)
+    // Formatos comuns: xx, xx-XX, xx_XX
     const languagePatterns = [
-      /([?&]locale=)([a-z]{2}(-[A-Z]{2})?)/gi,
-      /([?&]lang(uage)?=)([a-z]{2}(-[A-Z]{2})?)/gi, 
-      /([?&]idioma=)([a-z]{2}(-[A-Z]{2})?)/gi,
-      /([?&]Locale=)([a-z]{2}(-[A-Z]{2})?)/g,
-      /([?&]Lang(uage)?=)([a-z]{2}(-[A-Z]{2})?)/g,
-      /locale%3A([a-z]{2}(-[A-Z]{2})?)/gi
+      new RegExp(`([?&]${languageParamName || 'locale'}=)([a-zA-Z]{2}(?:[-_][a-zA-Z]{2})?)`, 'i'),
+      new RegExp(`([?&]${languageParamName || 'lang'}=)([a-zA-Z]{2}(?:[-_][a-zA-Z]{2})?)`, 'i'),
+      new RegExp(`([?&]${languageParamName || 'language'}=)([a-zA-Z]{2}(?:[-_][a-zA-Z]{2})?)`, 'i'),
+      new RegExp(`([?&]${languageParamName || 'lc'}=)([a-zA-Z]{2}(?:[-_][a-zA-Z]{2})?)`, 'i'),
+      new RegExp(`([?&]${languageParamName || 'hl'}=)([a-zA-Z]{2}(?:[-_][a-zA-Z]{2})?)`, 'i'),
+      new RegExp(`([?&]${languageParamName || 'market'}=)([a-zA-Z]{2}(?:[-_][a-zA-Z]{2})?)`, 'i'),
+      new RegExp(`([?&]${languageParamName || 'CountryCode'}=)([a-zA-Z]{2})`, 'i'), // Para casos como CountryCode=BR
+      new RegExp(`([?&]${languageParamName || 'idioma'}=)([a-zA-Z]{2}(?:[-_][a-zA-Z]{2})?)`, 'i'),
     ];
-    
-    let langModified = false;
-    languagePatterns.forEach(pattern => {
-      if (modifiedUrl.match(pattern)) {
-        // Inferir formato curto ou completo
-        const isShortFormat = pattern.toString().includes('([a-z]{2})');
-        const langValue = isShortFormat ? shortLangCode : langCode;
-        modifiedUrl = modifiedUrl.replace(pattern, function(match, p1) {
-          langModified = true;
-          return p1 + langValue;
-        });
-      }
-    });
 
-    // CASO ESPECIAL: ubfly.br.com usa Locale=EN → Locale=PT
-    if (domain.includes('ubfly.br.com') && modifiedUrl.includes('Locale=EN')) {
-      modifiedUrl = modifiedUrl.replace('Locale=EN', 'Locale=PT');
-      langModified = true;
+    for (const pattern of languagePatterns) {
+      if (currentUrl.match(pattern)) {
+        const existingLanguage = currentUrl.match(pattern)[2];
+        // Normalizar para comparação (ex: pt-br vs pt_BR vs pt)
+        const normalize = (lang) => lang.toLowerCase().replace('_', '-').split('-')[0];
+        if (normalize(existingLanguage) !== normalize(formattedTargetLanguage)) {
+          currentUrl = currentUrl.replace(pattern, `$1${formattedTargetLanguage}`);
+          modified = true;
+          languageModifiedThisPass = true;
+          ruleApplied = ruleApplied || `languagePattern ${pattern.source}`;
+          console.log(`[Redirect Smarter] Idioma MODIFICADO via padrão ${pattern.source} para ${formattedTargetLanguage}`);
+        } else {
+          languageModifiedThisPass = true; // Já está correto ou equivalente
+           console.log(`[Redirect Smarter] Idioma JÁ CORRETO/EQUIVALENTE via padrão ${pattern.source} (${formattedTargetLanguage})`);
+        }
+        break;
+      }
     }
 
-    if (!langModified && language.startsWith('pt')) {
-      const separator = hasQueryString ? '&' : '?';
-      if (modifiedUrl.includes('Locale=') || modifiedUrl.includes('Language=')) {
-        modifiedUrl = `${modifiedUrl}${separator}Locale=PT`;
-      } else {
-        modifiedUrl = `${modifiedUrl}${separator}locale=pt-BR`;
-      }
+    if (!languageModifiedThisPass) {
+      const separator = currentUrl.includes('?') ? '&' : '?';
+      const paramNameToAdd = languageParamName || (currentUrl.toLowerCase().includes('locale=') ? 'Locale' : 'locale');
+      currentUrl = `${currentUrl}${separator}${paramNameToAdd}=${formattedTargetLanguage}`;
       modified = true;
-    } else if (langModified) {
-      modified = true;
+      ruleApplied = ruleApplied || `languageAdded ${paramNameToAdd}`;
+      console.log(`[Redirect Smarter] Idioma ADICIONADO: ${paramNameToAdd}=${formattedTargetLanguage}`);
     }
   }
-  
-  return {
-    url: modifiedUrl,
-    modified,
-    domain
-  };
+
+  console.log(`[Redirect Smarter] URL Final: ${currentUrl.substring(0,100)}... (Modificado: ${modified}, Regra: ${ruleApplied || 'Nenhuma'})`);
+  return { url: currentUrl, modified, domain, ruleApplied };
 }
+
 
 // --- Início do handler principal ---
 module.exports = async function handler(req, res) {
   // CORS Headers
   res.setHeader('Access-Control-Allow-Credentials', true);
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Origin', '*'); // Restrinja em produção
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
-  
+
   if (req.method !== 'GET') {
-    return res.status(405).json({ 
-      error: "Método não permitido", 
+    return res.status(405).json({
+      error: "Método não permitido",
       message: "Esta API aceita apenas requisições GET"
     });
   }
 
   const { search_id, term_url, marker } = req.query;
-  const currency = req.query.currency;
-  const preferredLanguage = req.query.language || req.headers['accept-language']?.split(',')[0] || 'pt-BR';
-  const wantsPtBr = preferredLanguage.toLowerCase().startsWith('pt-br') || preferredLanguage.toLowerCase().startsWith('pt');
+  // Moeda e idioma desejados pelo usuário, passados pelo frontend
+  const userCurrency = req.query.currency; // Ex: "BRL"
+  const userLanguage = req.query.language || req.headers['accept-language']?.split(',')[0] || 'pt-BR'; // Ex: "pt-BR"
 
   if (!search_id || !term_url || !marker) {
-    return res.status(400).json({ 
-      error: "Parâmetros obrigatórios ausentes", 
+    console.warn("[Proxy Redirect] Parâmetros obrigatórios ausentes:", req.query);
+    return res.status(400).json({
+      error: "Parâmetros obrigatórios ausentes",
       required: ["search_id", "term_url", "marker"],
       provided: { search_id: !!search_id, term_url: !!term_url, marker: !!marker }
     });
   }
 
-  console.log(`[Proxy Redirect] Buscando link para search_id: ${search_id}, term_url: ${term_url}, marker: ${marker}${currency ? `, currency: ${currency}` : ''}${preferredLanguage ? `, language: ${preferredLanguage}` : ''}`);
-  
-  let redirectUrl = `https://api.travelpayouts.com/v1/flight_searches/${encodeURIComponent(search_id)}/clicks/${encodeURIComponent(term_url)}.json?marker=${encodeURIComponent(marker)}`;
-  if (currency) redirectUrl += `&currency=${encodeURIComponent(currency)}`;
-  redirectUrl += `&locale=${encodeURIComponent(wantsPtBr ? 'pt-BR' : 'en-US')}`;
-  console.log(`[Proxy Redirect] URL construída: ${redirectUrl}`);
+  console.log(`[Proxy Redirect] Buscando link para search_id: ${search_id}, term_url: ${term_url.substring(0,30)}..., marker: ${marker}`);
+  if (userCurrency) console.log(`[Proxy Redirect] Moeda do usuário: ${userCurrency}`);
+  if (userLanguage) console.log(`[Proxy Redirect] Idioma do usuário: ${userLanguage}`);
+
+  // O locale na API da Travelpayouts para /clicks afeta a página de "estamos te redirecionando" deles,
+  // não necessariamente a página final do parceiro.
+  const travelpayoutsApiLocale = userLanguage.toLowerCase().startsWith('pt') ? 'pt-BR' : 'en-US';
+
+  let redirectApiUrl = `https://api.travelpayouts.com/v1/flight_searches/${encodeURIComponent(search_id)}/clicks/${encodeURIComponent(term_url)}.json?marker=${encodeURIComponent(marker)}`;
+  // A API de clicks da Travelpayouts também aceita `currency`, que pode influenciar o link gerado.
+  if (userCurrency) redirectApiUrl += `&currency=${encodeURIComponent(userCurrency.toUpperCase())}`;
+  redirectApiUrl += `&locale=${encodeURIComponent(travelpayoutsApiLocale)}`;
+
+  console.log(`[Proxy Redirect] URL da API de cliques construída: ${redirectApiUrl}`);
 
   try {
-    const redirectResponse = await axios.get(redirectUrl, {
+    const redirectResponseFromApi = await axios.get(redirectApiUrl, {
       headers: {
         'Accept': 'application/json',
-        'User-Agent': 'Benetrip/1.0'
+        'User-Agent': 'BenetripFlights/1.1', // Seja específico no User-Agent
+        'Accept-Encoding': 'gzip, deflate, br'
       },
-      timeout: 10000,
+      timeout: 15000, // Timeout aumentado
       validateStatus: function (status) {
-        return true; // aceitamos qualquer status HTTP
+        return status >= 200 && status < 500; // Aceitar 4xx para ver o erro
       }
     });
 
-    console.log(`[Proxy Redirect] Resposta recebida com status ${redirectResponse.status}`);
+    console.log(`[Proxy Redirect] Resposta da API de cliques recebida com status ${redirectResponseFromApi.status}`);
 
-    if (redirectResponse.status !== 200) {
-      console.error(`[Proxy Redirect] API retornou status ${redirectResponse.status}:`, 
-        typeof redirectResponse.data === 'object' ? JSON.stringify(redirectResponse.data) : redirectResponse.data);
-      return res.status(redirectResponse.status).json({
-        error: `API externa retornou status ${redirectResponse.status}`,
-        details: redirectResponse.data,
+    if (redirectResponseFromApi.status !== 200) {
+      console.error(`[Proxy Redirect] API de cliques retornou status ${redirectResponseFromApi.status}:`,
+        typeof redirectResponseFromApi.data === 'object' ? JSON.stringify(redirectResponseFromApi.data) : redirectResponseFromApi.data);
+      return res.status(redirectResponseFromApi.status).json({
+        error: `API externa (cliques) retornou status ${redirectResponseFromApi.status}`,
+        details: redirectResponseFromApi.data,
         timestamp: new Date().toISOString()
       });
     }
 
-    if (!redirectResponse.data || !redirectResponse.data.url) {
-      console.error('[Proxy Redirect] Resposta inválida da API:', 
-        typeof redirectResponse.data === 'object' ? JSON.stringify(redirectResponse.data) : redirectResponse.data);
+    if (!redirectResponseFromApi.data || !redirectResponseFromApi.data.url) {
+      console.error('[Proxy Redirect] Resposta inválida da API de cliques (sem URL):',
+        typeof redirectResponseFromApi.data === 'object' ? JSON.stringify(redirectResponseFromApi.data) : redirectResponseFromApi.data);
       return res.status(502).json({
-        error: "Resposta inválida da API externa",
+        error: "Resposta inválida da API externa (cliques)",
         message: "A resposta não contém o campo 'url' obrigatório",
-        data: redirectResponse.data,
+        data: redirectResponseFromApi.data,
         timestamp: new Date().toISOString()
       });
     }
 
-    let urlModified = false;
-    let partnerDomain = 'unknown';
+    let partnerUrlFromApi = redirectResponseFromApi.data.url;
+    const gateName = redirectResponseFromApi.data.gate_name || '';
+    const gateId = redirectResponseFromApi.data.gate_id || '';
+    let urlModificationDetails = { modified: false, domain: 'unknown', ruleApplied: null };
 
-    const partnerUrl = redirectResponse.data.url;
-    const gateName = redirectResponse.data.gate_name || '';
-    const gateId = redirectResponse.data.gate_id || '';
+    console.log(`[Proxy Redirect] URL do parceiro recebida da API: ${partnerUrlFromApi.substring(0, 100)}...`);
+    console.log(`[Proxy Redirect] Gate: ${gateName} (ID: ${gateId})`);
 
-    // --- Registro detalhado para diagnóstico ---
-    if (partnerUrl) {
-      // Extrai domínio
-      const matchDomain = partnerUrl.match(/https?:\/\/(?:www\.)?([^\/]+)/i);
-      partnerDomain = matchDomain ? matchDomain[1] : 'unknown';
-      console.log(`[Proxy Redirect] URL recebida: ${partnerUrl.substring(0, 100)}...`);
-      console.log(`[Proxy Redirect] Domínio detectado: ${partnerDomain}`);
-      console.log(`[Proxy Redirect] Parâmetros importantes detectados:`);
-      console.log(
-        `  - Currency/Moeda: ${
-          partnerUrl.match(/[?&](([cC]urr(ency)?|[mM]oeda)=)([A-Z]{3})/i) ? 'Sim' : 'Não'
-        }`
-      );
-      console.log(
-        `  - Locale/Idioma: ${
-          partnerUrl.match(/[?&](([lL]ocale|[lL]ang(uage)?)=)([a-zA-Z-]{2,7})/i) ? 'Sim' : 'Não'
-        }`
-      );
-    }
-
-    // NOVO: Modificação automática de URL
-    if (partnerUrl) {
-      const languageToUse = wantsPtBr ? 'pt-BR' : preferredLanguage || 'en-US';
-      console.log(`[Proxy Redirect] Aplicando modificações automáticas para idioma ${languageToUse} e moeda ${currency || 'N/A'}`);
-
-      const { url: modifiedUrl, modified, domain } =
-        applySmartParameterChanges(partnerUrl, currency, languageToUse);
-
-      if (modified) {
-        redirectResponse.data.url = modifiedUrl;
-        console.log(`[Proxy Redirect] URL modificada automaticamente. Domínio: ${domain}`);
-        urlModified = true;
-        partnerDomain = domain;
-      }
+    // Aplicar modificações de moeda e idioma na URL do parceiro
+    if (partnerUrlFromApi && (userCurrency || userLanguage)) {
+      console.log(`[Proxy Redirect] Tentando aplicar modificações inteligentes para Moeda: ${userCurrency || 'N/A'}, Idioma: ${userLanguage || 'N/A'}`);
+      const modificationResult = applySmartParameterChanges(partnerUrlFromApi, userCurrency, userLanguage);
+      partnerUrlFromApi = modificationResult.url;
+      urlModificationDetails = modificationResult;
     }
 
     res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
     res.setHeader('Pragma', 'no-cache');
     res.setHeader('Expires', '0');
 
-    const finalJson = {
-      ...redirectResponse.data,
+    const finalJsonResponse = {
+      ...redirectResponseFromApi.data, // Inclui todos os dados da resposta da API (url, method, params, etc.)
+      url: partnerUrlFromApi, // Sobrescreve com a URL possivelmente modificada
       _benetrip_info: {
-        expires_in: 15 * 60, // 15 minutos
         timestamp: Date.now(),
-        currency: currency || 'default'
-      },
-      _benetrip_meta: {
-        language_requested: wantsPtBr ? 'pt-BR' : preferredLanguage,
-        currency_requested: currency || 'default',
-        url_modified: urlModified,
+        currency_requested_to_partner: userCurrency || 'default',
+        language_requested_to_partner: userLanguage || 'default',
+        url_modification_details: {
+            original_url_length: redirectResponseFromApi.data.url.length,
+            modified_url_length: partnerUrlFromApi.length,
+            was_modified: urlModificationDetails.modified,
+            partner_domain: urlModificationDetails.domain,
+            rule_applied: urlModificationDetails.ruleApplied
+        },
         gate_id: gateId,
         gate_name: gateName,
-        partner_domain: partnerDomain
       }
     };
 
-    const urlParcial = redirectResponse.data.url.substring(0, 50) + '...';
-    console.log(`[Proxy Redirect] Link final: ${urlParcial}`);
-    console.log(`[Proxy Redirect] Método: ${redirectResponse.data.method || 'GET'}`);
+    console.log(`[Proxy Redirect] Link final para o cliente: ${finalJsonResponse.url.substring(0, 50)}...`);
+    console.log(`[Proxy Redirect] Método para o cliente: ${finalJsonResponse.method || 'GET'}`);
+    if(finalJsonResponse.params) console.log(`[Proxy Redirect] Parâmetros POST para o cliente:`, finalJsonResponse.params);
 
-    return res.status(200).json(finalJson);
+
+    return res.status(200).json(finalJsonResponse);
 
   } catch (error) {
-    console.error(`[Proxy Redirect] ERRO AO BUSCAR LINK:`, error.message);
-    if (error.code === 'ECONNABORTED') {
+    console.error(`[Proxy Redirect] ERRO CRÍTICO AO BUSCAR LINK:`, error.message);
+    if (error.code === 'ECONNABORTED' || error.message?.toLowerCase().includes('timeout')) {
       return res.status(504).json({
-        error: "Tempo limite excedido ao conectar com a API externa",
+        error: "Tempo limite excedido ao conectar com a API externa de cliques",
         code: "TIMEOUT",
         message: error.message,
         timestamp: new Date().toISOString()
       });
     } else if (error.response) {
+      // Erro vindo da resposta da API (ex: 4xx, 5xx da Travelpayouts)
+      console.error("[Proxy Redirect] Erro na resposta da API externa:", error.response.status, error.response.data);
       return res.status(error.response.status || 502).json({
-        error: "Erro retornado pela API externa",
+        error: "Erro retornado pela API externa de cliques",
         status: error.response.status,
         data: error.response.data,
         message: error.message,
         timestamp: new Date().toISOString()
       });
     } else if (error.request) {
+      // Erro na requisição, sem resposta (ex: problema de rede)
+      console.error("[Proxy Redirect] Sem resposta da API externa:", error.request);
       return res.status(504).json({
-        error: "Sem resposta da API externa",
+        error: "Sem resposta da API externa de cliques",
         code: "NO_RESPONSE",
         message: error.message,
         timestamp: new Date().toISOString()
       });
     } else {
+      // Outro tipo de erro (configuração do axios, erro de lógica no try, etc.)
+      console.error("[Proxy Redirect] Erro interno na requisição:", error.stack);
       return res.status(500).json({
-        error: "Erro interno na requisição",
+        error: "Erro interno no servidor durante o redirecionamento",
         message: error.message,
-        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined,
+        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined, // Não exponha stack em produção
         timestamp: new Date().toISOString()
       });
     }
