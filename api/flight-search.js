@@ -1,5 +1,5 @@
 // api/flight-search.js - INICIA a busca de voos e retorna search_id
-// Versão com assinatura CORRIGIDA e inclusão de moeda na requisição inicial
+// Versão com assinatura CORRIGIDA e inclusão de moeda na requisição inicial_
 const axios = require('axios');
 const crypto = require('crypto');
 
