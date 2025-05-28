@@ -183,76 +183,82 @@ window.BENETRIP_REDIRECT = {
         
         // Abordagem diferente para dispositivos móveis
         if (isMobile) {
-            console.log('Usando abordagem de redirecionamento para mobile');
+    console.log('Usando abordagem de redirecionamento para mobile (CORRIGIDA)');
+    
+    // Mostrar indicador de carregamento para mobile
+    const loadingDiv = document.createElement('div');
+    loadingDiv.id = 'mobile-redirect-loading';
+    loadingDiv.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(255,255,255,0.9);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;';
+    loadingDiv.innerHTML = `
+        <img src="${window.location.origin}/assets/images/logo.png" alt="Benetrip" style="max-width:200px;margin-bottom:20px;">
+        <h2 style="margin:10px 0;color:#333;font-family:Arial;">Abrindo site do parceiro</h2>
+        <p style="margin:5px 0;text-align:center;padding:0 20px;">Uma nova aba será aberta com o site do parceiro...</p>
+        <div style="width:80%;height:10px;background:#eee;border-radius:5px;margin:20px 0;overflow:hidden;">
+            <div style="height:100%;width:0;background:#E87722;animation:fillBar 3s linear forwards;"></div>
+        </div>
+        <style>@keyframes fillBar { to { width: 100%; } }</style>
+    `;
+    document.body.appendChild(loadingDiv);
+    
+    // Obter link diretamente
+    this.obterLinkRedirecionamento(voo)
+        .then(redirectData => {
+            console.log('Dados de redirecionamento recebidos para mobile:', redirectData);
             
-            // Mostrar indicador de carregamento para mobile
-            const loadingDiv = document.createElement('div');
-            loadingDiv.id = 'mobile-redirect-loading';
-            loadingDiv.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(255,255,255,0.9);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;';
-            loadingDiv.innerHTML = `
-                <img src="${window.location.origin}/assets/images/logo.png" alt="Benetrip" style="max-width:200px;margin-bottom:20px;">
-                <h2 style="margin:10px 0;color:#333;font-family:Arial;">Redirecionando para parceiro</h2>
-                <p style="margin:5px 0;text-align:center;padding:0 20px;">Aguarde enquanto preparamos seu redirecionamento...</p>
-                <div style="width:80%;height:10px;background:#eee;border-radius:5px;margin:20px 0;overflow:hidden;">
-                    <div style="height:100%;width:0;background:#E87722;animation:fillBar 2s linear forwards;"></div>
-                </div>
-                <style>@keyframes fillBar { to { width: 100%; } }</style>
-            `;
-            document.body.appendChild(loadingDiv);
-            
-            // Obter link diretamente e redirecionar na mesma janela para mobile
-            this.obterLinkRedirecionamento(voo)
-                .then(redirectData => {
-                    console.log('Dados de redirecionamento recebidos para mobile:', redirectData);
+            if (redirectData && redirectData.url) {
+                // MUDANÇA PRINCIPAL: Tentar abrir nova aba mesmo em mobile
+                try {
+                    const partnerWindow = window.open(redirectData.url, '_blank');
                     
-                    if (redirectData && redirectData.url) {
-                        // Salvar dados na localStorage antes de redirecionar
-                        localStorage.setItem('benetrip_redirect_destination', 'itinerary.html');
-                        localStorage.setItem('benetrip_parceiro_aberto', 'true');
-                        
-                        // Configurar pixel de tracking se disponível
-                        if (redirectData.click_id && redirectData.gate_id) {
-                            const img = document.createElement('img');
-                            img.width = 0;
-                            img.height = 0;
-                            img.src = `//yasen.aviasales.com/adaptors/pixel_click.png?click_id=${redirectData.click_id}&gate_id=${redirectData.gate_id}`;
-                            document.body.appendChild(img);
-                        }
-                        
-                        // Redirecionar na mesma janela para mobile
-                        console.log('Redirecionando para parceiro em dispositivo mobile:', redirectData.url);
-                        setTimeout(() => {
-                            // Usar window.location.replace para forçar redirecionamento
-                            window.location.replace(redirectData.url);
-                        }, 1500);
-                    } else {
-                        // Limpar loading e mostrar erro
+                    // Verificar se a janela foi bloqueada
+                    if (!partnerWindow || partnerWindow.closed) {
+                        console.warn('Nova aba bloqueada em mobile, usando fallback');
+                        // Fallback: usar redirect.html para mobile também
+                        this.redirecionarViaRedirectHtml(voo);
+                        return;
+                    }
+                    
+                    console.log('Nova aba aberta com sucesso em mobile');
+                    
+                    // Configurar pixel de tracking se disponível
+                    if (redirectData.click_id && redirectData.gate_id) {
+                        const img = document.createElement('img');
+                        img.width = 0;
+                        img.height = 0;
+                        img.src = `//yasen.aviasales.com/adaptors/pixel_click.png?click_id=${redirectData.click_id}&gate_id=${redirectData.gate_id}`;
+                        document.body.appendChild(img);
+                    }
+                    
+                    // MUDANÇA: Redirecionar para itinerários ao invés do parceiro
+                    setTimeout(() => {
                         document.getElementById('mobile-redirect-loading').remove();
-                        alert('Erro ao obter link do parceiro. Você será redirecionado para selecionar seu hotel.');
-                        
-                        // Reseta flag de redirecionamento
-                        this._redirectInProgress = false;
-                        
-                        // Redirecionar para hotéis como fallback
+                        console.log('Redirecionando para itinerary.html após abrir parceiro');
                         window.location.href = 'itinerary.html';
-                    }
-                })
-                .catch(error => {
-                    // Limpar loading e mostrar erro
-                    if (document.getElementById('mobile-redirect-loading')) {
-                        document.getElementById('mobile-redirect-loading').remove();
-                    }
+                    }, 2000);
                     
-                    console.error('Erro ao obter link de redirecionamento em mobile:', error);
-                    alert('Erro ao conectar com o parceiro. Redirecionando para hotéis.');
-                    
-                    // Reseta flag de redirecionamento
-                    this._redirectInProgress = false;
-                    
-                    // Redireciona para a página de hotéis em caso de erro
-                    window.location.href = 'itinerary.html';
-                });
-        } else {
+                } catch (error) {
+                    console.error('Erro ao abrir nova aba em mobile:', error);
+                    // Usar redirect.html como fallback
+                    this.redirecionarViaRedirectHtml(voo);
+                }
+            } else {
+                // Limpar loading e mostrar erro
+                document.getElementById('mobile-redirect-loading').remove();
+                alert('Erro ao obter link do parceiro. Você será redirecionado para selecionar seu hotel.');
+                
+                // Reseta flag de redirecionamento
+                this._redirectInProgress = false;
+                
+                // Redirecionar para hotéis como fallback
+                window.location.href = 'itinerary.html';
+            }
+        })
+        .catch(error => {
+            console.error('Erro ao obter link de redirecionamento em mobile:', error);
+            // Usar redirect.html como fallback
+            this.redirecionarViaRedirectHtml(voo);
+        });
+} else {
             // Abordagem desktop (original)
             console.log('Usando abordagem de redirecionamento para desktop');
             
@@ -565,6 +571,72 @@ window.BENETRIP_REDIRECT = {
         // Implementa fetch com timeout e retry para maior confiabilidade
         return this.fetchWithRetry(apiUrl, 2, 1000);
     },
+
+    /**
+ * Redireciona via redirect.html como fallback (adicionar ao objeto BENETRIP_REDIRECT)
+ * @param {Object} voo - Dados do voo
+ */
+redirecionarViaRedirectHtml: function(voo) {
+    console.log('Usando redirect.html como fallback...');
+    
+    // Limpar qualquer loading existente
+    const existingLoading = document.getElementById('mobile-redirect-loading');
+    if (existingLoading) {
+        existingLoading.remove();
+    }
+    
+    try {
+        // Obter o search_id e o URL do termo dos dados do voo
+        const searchId = window.BENETRIP_VOOS?.searchId;
+        
+        // Encontrar o termo (url) do voo selecionado
+        let termUrl = null;
+        if (voo.terms) {
+            const termsKey = Object.keys(voo.terms)[0];
+            termUrl = voo.terms[termsKey].url;
+        }
+        
+        // Validação básica dos dados necessários
+        if (!searchId || !termUrl) {
+            console.error('Dados insuficientes para redirecionamento via redirect.html');
+            // Ir direto para itinerários
+            window.location.href = 'itinerary.html';
+            return;
+        }
+        
+        // Salvar dados do voo
+        if (window.BENETRIP_VOOS) {
+            window.BENETRIP_VOOS.salvarVooSelecionado(voo);
+        }
+        
+        // Preparar parâmetros para redirect.html
+        const redirectParams = new URLSearchParams();
+        redirectParams.append('search_id', searchId);
+        redirectParams.append('term_url', termUrl);
+        
+        // Redirecionar para redirect.html
+        const redirectPageUrl = `redirect.html?${redirectParams.toString()}`;
+        console.log('Redirecionando para redirect.html:', redirectPageUrl);
+        
+        this.exibirToast('Redirecionando via página intermediária...', 'info');
+        
+        setTimeout(() => {
+            window.location.href = redirectPageUrl;
+        }, 300);
+        
+    } catch (error) {
+        console.error('Erro no fallback para redirect.html:', error);
+        
+        // Último recurso: ir direto para itinerários
+        this.exibirToast('Erro no redirecionamento. Indo para página de roteiro.', 'warning');
+        setTimeout(() => {
+            window.location.href = 'itinerary.html';
+        }, 1000);
+    } finally {
+        // Reseta flag de redirecionamento
+        this._redirectInProgress = false;
+    }
+},
     
     /**
      * Implementação de fetch com retry para maior confiabilidade
