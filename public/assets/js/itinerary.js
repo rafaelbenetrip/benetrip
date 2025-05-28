@@ -411,6 +411,7 @@ extrairDataFormatada(dataString) {
   async buscarPrevisaoTempo() {
   try {
     if (!this.roteiroPronto || !this.roteiroPronto.dias || !this.dadosDestino) {
+      console.warn('Dados insuficientes para buscar previsão do tempo');
       return;
     }
     
@@ -419,51 +420,90 @@ extrairDataFormatada(dataString) {
     
     if (!dataInicio) {
       console.warn('Data de início não disponível para previsão do tempo');
+      this.adicionarPrevisoesFictícias();
       return;
     }
     
     // Usar apenas o nome da cidade, sem adicionar "Internacional"
-    const cidadeLimpa = this.dadosDestino.destino.replace(/\s+Internacional/i, '');
+    const cidadeLimpa = this.dadosDestino.destino
+      .replace(/\s+Internacional/i, '')
+      .replace(/\s*,.*$/, '') // Remove país se estiver junto
+      .trim();
     
     console.log(`Buscando previsão do tempo para ${cidadeLimpa} de ${dataInicio} a ${dataFim || 'N/A'}`);
     
-    const response = await fetch(`/api/weather?city=${encodeURIComponent(cidadeLimpa)}&start=${dataInicio}${dataFim ? `&end=${dataFim}` : ''}`);
+    // Construir URL da API
+    const apiUrl = `/api/weather?city=${encodeURIComponent(cidadeLimpa)}&start=${dataInicio}${dataFim ? `&end=${dataFim}` : ''}`;
+    console.log('URL da API de clima:', apiUrl);
+    
+    // Fazer requisição com timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 segundos
+    
+    const response = await fetch(apiUrl, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      signal: controller.signal
+    });
+    
+    clearTimeout(timeoutId);
+    
+    console.log(`Resposta da API de clima: ${response.status} ${response.statusText}`);
     
     if (!response.ok) {
-      throw new Error(`Erro ${response.status} ao buscar previsão do tempo`);
+      const errorText = await response.text();
+      console.error(`Erro ${response.status} na API de clima:`, errorText);
+      
+      // Em caso de erro, usar dados fictícios
+      this.adicionarPrevisoesFictícias();
+      return;
     }
     
     const previsoes = await response.json();
-    console.log('Previsões do tempo:', previsoes);
+    console.log('Previsões do tempo recebidas:', previsoes);
+    
+    // Verificar se recebemos dados válidos
+    if (!previsoes || typeof previsoes !== 'object') {
+      console.warn('Formato inválido de previsões do tempo');
+      this.adicionarPrevisoesFictícias();
+      return;
+    }
     
     // Adicionar previsões aos dias do roteiro
+    let previsoesAdicionadas = 0;
+    
     if (this.roteiroPronto.dias) {
       this.roteiroPronto.dias.forEach((dia, index) => {
         if (previsoes[index]) {
-          dia.previsao = previsoes[index];
-        } else {
-          // Criar previsão fictícia se não houver dados
           dia.previsao = {
-            temperature: Math.floor(20 + Math.random() * 10),
-            condition: ['Ensolarado', 'Parcialmente nublado', 'Nublado'][Math.floor(Math.random() * 3)],
-            icon: ['☀️', '⛅', '🌤️', '🌥️'][Math.floor(Math.random() * 4)]
+            temperature: previsoes[index].temperature || 22,
+            condition: previsoes[index].condition || 'Parcialmente nublado',
+            icon: previsoes[index].icon || '🌤️',
+            date: previsoes[index].date || dia.data
           };
+          previsoesAdicionadas++;
+        } else {
+          // Criar previsão fictícia se não houver dados para esse dia
+          dia.previsao = this.gerarPrevisaoFicticia(index);
         }
       });
     }
     
+    console.log(`Previsões adicionadas: ${previsoesAdicionadas}/${this.roteiroPronto.dias.length} dias`);
+    
   } catch (erro) {
     console.warn('Erro ao buscar previsão do tempo:', erro);
-    // Gerar previsões fictícias para não quebrar a interface
-    if (this.roteiroPronto && this.roteiroPronto.dias) {
-      this.roteiroPronto.dias.forEach((dia) => {
-        dia.previsao = {
-          temperature: Math.floor(20 + Math.random() * 10),
-          condition: ['Ensolarado', 'Parcialmente nublado', 'Nublado'][Math.floor(Math.random() * 3)],
-          icon: ['☀️', '⛅', '🌤️', '🌥️'][Math.floor(Math.random() * 4)]
-        };
-      });
+    
+    // Se der qualquer erro, incluindo timeout ou abort
+    if (erro.name === 'AbortError') {
+      console.warn('Timeout na requisição de previsão do tempo');
     }
+    
+    // Sempre adicionar previsões fictícias como fallback
+    this.adicionarPrevisoesFictícias();
   }
 },
   
