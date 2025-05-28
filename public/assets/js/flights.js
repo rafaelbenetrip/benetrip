@@ -2320,7 +2320,7 @@ obterPrecoVoo(voo) {
  * @param {Object} voo - Dados do voo a ser comprado (proposta completa)
  */
 redirecionarParaSiteCompra(voo) {
-    console.log('Iniciando redirecionamento via página intermediária...');
+    console.log('Iniciando redirecionamento via redirect.html...');
 
     if (!voo || !voo.terms) {
         this.exibirToast('Não foi possível obter informações do voo para compra.', 'error');
@@ -2336,10 +2336,9 @@ redirecionarParaSiteCompra(voo) {
              this.exibirToast('Dados da busca incompletos. Tente novamente.', 'error');
              return;
         }
-        console.log('Search ID:', searchId);
 
         // Obter o URL específico do termo (parceiro/tarifa) do voo selecionado
-        const termKey = Object.keys(voo.terms)[0]; // Assume que há pelo menos um termo
+        const termKey = Object.keys(voo.terms)[0];
         const termUrl = voo.terms[termKey]?.url;
 
         if (!termUrl) {
@@ -2347,45 +2346,31 @@ redirecionarParaSiteCompra(voo) {
             this.exibirToast('Link de redirecionamento do parceiro não disponível.', 'error');
             return;
         }
-        console.log('URL do termo:', termUrl.substring(0, 50) + '...'); // Log parcial para não expor URL completa
 
-        // 1. Salvar os dados do voo selecionado no localStorage para uso na página de roteiro
-        // Sua função salvarVooSelecionado já faz isso com os dados simplificados para itinerary.html.
-        // NÃO vamos salvar searchId ou termUrl aqui, pois redirect.html lerá da URL.
-        this.salvarVooSelecionado(voo); // Mantém a chamada para salvar os dados para itinerary.html
-        console.log('Dados simplificados do voo salvos para itinerary.html.');
+        // Salvar os dados do voo selecionado no localStorage
+        this.salvarVooSelecionado(voo);
+        console.log('Dados do voo salvos para itinerary.html.');
 
-
-        // 2. Preparar os parâmetros para a página redirect.html
-        // A página redirect.html precisará do searchId e termUrl para ela mesma chamar a API de backend.
+        // Preparar os parâmetros para redirect.html
         const redirectParams = new URLSearchParams();
         redirectParams.append('search_id', searchId);
         redirectParams.append('term_url', termUrl);
-        // O redirect.html precisará chamar /api/flight-redirect com search_id e term_url
-        // Ele obterá o URL final, method, params, click_id e gate_id dessa chamada.
-        // Portanto, apenas search_id e term_url precisam ser passados AQUI para redirect.html.
 
-
-        // 3. Redirecionar a aba atual para a página intermediária (redirect.html)
+        // Redirecionar SEMPRE para redirect.html (funciona bem em mobile e desktop)
         const redirectPageUrl = `redirect.html?${redirectParams.toString()}`;
-        console.log('Redirecionando para página intermediária com URL:', redirectPageUrl);
+        console.log('Redirecionando para redirect.html:', redirectPageUrl);
 
-        // Exibir mensagem rápida antes de sair
-        this.exibirToast('Redirecionando para o site do parceiro...', 'info');
+        // Exibir mensagem rápida
+        this.exibirToast('Abrindo site do parceiro...', 'info');
 
-        // Pequeno delay antes de redirecionar para garantir que a mensagem seja vista
+        // Redirecionar após pequeno delay
         setTimeout(() => {
-             window.location.href = redirectPageUrl; // Usa href para simples navegação
-        }, 300); // Delay curto
-
-        // A LÓGICA ANTIGA de fetch e window.open/location.href ESTÁ REMOVIDA DAQUI.
-        // Agora, redirect.html cuidará disso.
+             window.location.href = redirectPageUrl;
+        }, 500);
 
     } catch (error) {
-        console.error('Erro inesperado ao preparar redirecionamento:', error);
+        console.error('Erro ao preparar redirecionamento:', error);
         this.exibirToast('Ocorreu um erro interno. Tente selecionar o voo novamente.', 'error');
-        // Como fallback, pode-se considerar redirecionar para a página de erro ou busca novamente
-        // setTimeout(() => { window.location.href = 'flights.html'; }, 3000);
     }
 },
 
