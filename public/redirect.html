@@ -128,74 +128,91 @@
 
         // Função para tentar abrir o site do parceiro em uma nova aba/janela
         function attemptPartnerOpen(url, method, params) {
-            console.log('Attempting to open partner link:', url, 'via método:', method);
-            let partnerWindow = null;
+    console.log('Attempting to open partner link:', url, 'via método:', method);
+    let partnerWindow = null;
 
-            try {
-                if (method && method.toUpperCase() === 'POST') {
-                    // Para método POST, criamos um formulário e o submetemos para _blank
-                    const form = document.createElement('form');
-                    form.method = 'POST';
-                    form.action = url;
-                    form.target = '_blank'; // <--- AQUI está a chave para abrir em nova aba/janela
-                    form.style.display = 'none'; // Esconde o formulário
+    try {
+        if (method && method.toUpperCase() === 'POST') {
+            // Para método POST, criamos um formulário e o submetemos para _blank
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = url;
+            form.target = '_blank';
+            form.style.display = 'none';
 
-                    if (params) {
-                        // Adicionar os campos do POST
-                        Object.entries(params).forEach(([key, value]) => {
-                            const input = document.createElement('input');
-                            input.type = 'hidden';
-                            input.name = key;
-                            input.value = value;
-                            form.appendChild(input);
-                        });
+            if (params) {
+                Object.entries(params).forEach(([key, value]) => {
+                    const input = document.createElement('input');
+                    input.type = 'hidden';
+                    input.name = key;
+                    input.value = value;
+                    form.appendChild(input);
+                });
+            }
+
+            document.body.appendChild(form);
+            form.submit();
+            
+            setTimeout(() => {
+                try {
+                    if(document.body.contains(form)) {
+                        document.body.removeChild(form);
                     }
+                } catch(e) { console.warn("Erro ao remover formulário:", e); }
+            }, 100);
 
-                    // Adicionar ao documento e submeter
-                    document.body.appendChild(form);
-                    form.submit();
-                    // Após submeter, removemos o formulário (pode ser necessário um pequeno delay em alguns casos, mas vamos tentar direto)
-                     setTimeout(() => {
-                         try {
-                              if(document.body.contains(form)) {
-                                 document.body.removeChild(form);
-                              }
-                         } catch(e) { console.warn("Erro ao remover formulário:", e); }
-                     }, 100);
+            partnerWindow = true; // Indica que a tentativa foi feita
+            console.log('Formulário POST submetido para nova aba.');
 
-                    // Em muitos browsers, especialmente mobile, form.submit() para _blank
-                    // pode não retornar uma referência de janela útil ou ser bloqueado.
-                    // Assumimos que a tentativa foi feita. Não podemos ter certeza do sucesso aqui.
-                    partnerWindow = true; // Indica que a tentativa foi feita (ou iniciada)
-                    console.log('Formulário POST submetido para nova aba.');
-
-                } else { // Default é GET
-                    // Para método GET, redirecionamento direto em uma nova aba
-                    partnerWindow = window.open(url, '_blank');
-                    console.log('window.open chamado para URL:', url);
-                }
-
-            } catch (error) {
-                 console.error('Erro durante window.open ou submissão do formulário:', error);
-                 // O erro aqui pode ser um bloqueio de popup, etc.
-                 partnerWindow = false; // Indica que falhou ou foi bloqueado
+        } else { // Default é GET
+            // Para método GET, redirecionamento direto em uma nova aba
+            partnerWindow = window.open(url, '_blank');
+            console.log('window.open chamado para URL:', url);
+            
+            // MELHORIA MOBILE: Tentar detectar se window.open falhou
+            if (partnerWindow === null) {
+                console.warn('window.open retornou null - provável bloqueio');
+                partnerWindow = false;
             }
-
-            // Verifica se a janela foi bloqueada ou falhou.
-            // Nota: Esta verificação não é 100% confiável em todos os browsers/mobile.
-             const blocked = (partnerWindow === false || (partnerWindow && (partnerWindow.closed || typeof partnerWindow.closed === 'undefined')));
-
-            if (blocked) {
-                console.warn('Janela do parceiro provavelmente bloqueada ou não abriu.');
-                // Mostrar botão manual como um fallback
-                document.getElementById('manual-redirect').style.display = 'inline-block';
-                document.getElementById('status').textContent = 'Redirecionamento automático falhou. Por favor, clique no botão abaixo:';
-                 return false; // Indica falha detectada
-            }
-
-            console.log('Tentativa de abrir parceiro realizada com sucesso aparente.');
-            return true; // Indica sucesso aparente
         }
+
+    } catch (error) {
+        console.error('Erro durante window.open ou submissão do formulário:', error);
+        partnerWindow = false;
+    }
+
+    // Verificação melhorada para mobile
+    let blocked = false;
+    
+    if (partnerWindow === false) {
+        blocked = true;
+    } else if (partnerWindow && typeof partnerWindow === 'object') {
+        // Para window.open, verificar se foi bloqueado
+        try {
+            // Pequeno delay para permitir que o browser processe
+            setTimeout(() => {
+                if (partnerWindow.closed || typeof partnerWindow.closed === 'undefined') {
+                    console.warn('Janela fechada ou bloqueada detectada');
+                    // Se detectarmos bloqueio tarde, mostrar botão manual
+                    document.getElementById('manual-redirect').style.display = 'inline-block';
+                    document.getElementById('status').textContent = 'Popup bloqueado. Use o botão abaixo:';
+                }
+            }, 500);
+        } catch(e) {
+            console.warn('Não foi possível verificar status da janela:', e);
+        }
+    }
+
+    if (blocked) {
+        console.warn('Janela do parceiro provavelmente bloqueada ou não abriu.');
+        document.getElementById('manual-redirect').style.display = 'inline-block';
+        document.getElementById('status').textContent = 'Redirecionamento automático falhou. Por favor, clique no botão abaixo:';
+        return false;
+    }
+
+    console.log('Tentativa de abrir parceiro realizada com sucesso aparente.');
+    return true;
+}
 
         // Função para navegar a aba atual para a página de roteiro
         function navigateToItinerary() {
