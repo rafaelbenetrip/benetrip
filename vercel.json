@@ -51,17 +51,25 @@
       "continue": true
     },
     {
-      "src": "/api/(.*)",
+      "src": "/api/weather",
       "headers": {
         "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type, Authorization",
-        "Content-Type": "application/json",
-        "Connection": "keep-alive",
-        "Keep-Alive": "timeout=60",
-        "Cache-Control": "public, max-age=60, stale-while-revalidate=300"
+        "Access-Control-Allow-Methods": "GET, OPTIONS",
+        "Content-Type": "application/json; charset=utf-8",
+        "X-Content-Type-Options": "nosniff",
+        "Cache-Control": "public, max-age=300, stale-while-revalidate=86400"
       },
-      "continue": true
+      "dest": "/api/weather.js"
+    },
+    {
+      "src": "/api/itinerary-generator",
+      "headers": {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "POST, OPTIONS",
+        "Content-Type": "application/json; charset=utf-8",
+        "X-Content-Type-Options": "nosniff"
+      },
+      "dest": "/api/itinerary-generator.js"
     },
     {
       "src": "/api/flight-results",
@@ -72,6 +80,16 @@
         "X-Content-Type-Options": "nosniff"
       },
       "dest": "/api/flight-results.js"
+    },
+    {
+      "src": "/api/flight-redirect",
+      "headers": {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, OPTIONS",
+        "Content-Type": "application/json; charset=utf-8",
+        "X-Content-Type-Options": "nosniff"
+      },
+      "dest": "/api/flight-redirect.js"
     },
     {
       "src": "/api/recommendations",
@@ -86,8 +104,25 @@
       "dest": "/api/image-search.js"
     },
     {
+      "src": "/api/(.*)",
+      "headers": {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization",
+        "Content-Type": "application/json",
+        "Connection": "keep-alive",
+        "Keep-Alive": "timeout=60",
+        "Cache-Control": "public, max-age=60, stale-while-revalidate=300"
+      },
+      "continue": true
+    },
+    {
       "src": "/destinos",
       "dest": "/public/destinos.html"
+    },
+    {
+      "src": "/itinerary",
+      "dest": "/public/itinerary.html"
     },
     {
       "src": "/assets/(.*)",
@@ -108,41 +143,6 @@
     {
       "src": "/(.*)",
       "dest": "/public/$1"
-    },
-    {
-      "src": "/api/flight-redirect",
-      "headers": {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET, OPTIONS",
-        "Content-Type": "application/json; charset=utf-8",
-        "X-Content-Type-Options": "nosniff"
-      },
-      "dest": "/api/flight-redirect.js"
-    },
-    {
-      "src": "/api/itinerary-generator",
-      "headers": {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "POST, OPTIONS",
-        "Content-Type": "application/json; charset=utf-8",
-        "X-Content-Type-Options": "nosniff"
-      },
-      "dest": "/api/itinerary-generator.js"
-    },
-    {
-      "src": "/api/weather",
-      "headers": {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET, OPTIONS",
-        "Content-Type": "application/json; charset=utf-8",
-        "X-Content-Type-Options": "nosniff",
-        "Cache-Control": "public, max-age=300, stale-while-revalidate=86400"
-      },
-      "dest": "/api/weather.js"
-    },
-    {
-      "src": "/itinerary",
-      "dest": "/public/itinerary.html"
     }
   ]
 }
