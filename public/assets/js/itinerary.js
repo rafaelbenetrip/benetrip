@@ -657,9 +657,6 @@ const BENETRIP_ROTEIRO = {
     console.log('✅ Interface atualizada com sucesso');
   },
 
-  // Resto das funções permanecem iguais...
-  // [Continue with all other existing functions...]
-
   /**
    * Cria o elemento de resumo da viagem
    */
@@ -918,159 +915,232 @@ const BENETRIP_ROTEIRO = {
     return html;
   },
 
-  // Funções auxiliares permanecem iguais...
-  abrirMapa(local) {
-    const query = `${local}, ${this.dadosDestino.destino}, ${this.dadosDestino.pais}`;
-    const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
-    window.open(url, '_blank');
-  },
+  // ===========================================
+  // FUNÇÕES CORRIGIDAS PARA MAPEAMENTO DE PREFERÊNCIAS
+  // ===========================================
 
-  compartilharRoteiro() {
-    if (navigator.share) {
-      navigator.share({
-        title: `Roteiro Benetrip para ${this.dadosDestino.destino}`,
-        text: `Confira meu roteiro personalizado de viagem para ${this.dadosDestino.destino} gerado pela Benetrip!`,
-        url: window.location.href
-      })
-      .then(() => console.log('✅ Roteiro compartilhado com sucesso'))
-      .catch((error) => console.log('❌ Erro ao compartilhar:', error));
-    } else {
-      this.exibirToast('Para compartilhar, copie o link da página e envie para seus amigos!', 'info');
-      
-      try {
-        navigator.clipboard.writeText(window.location.href);
-        this.exibirToast('Link copiado para a área de transferência!', 'success');
-      } catch (e) {
-        console.warn('⚠️ Erro ao copiar para área de transferência:', e);
-      }
-    }
-  },
-
-  editarRoteiro() {
-    this.exibirToast('Função de personalização em desenvolvimento', 'info');
-  },
-
-  exibirToast(mensagem, tipo = 'info') {
-    const toastContainer = document.getElementById('toast-container');
-    if (!toastContainer) return;
-    
-    const toast = document.createElement('div');
-    toast.className = `toast toast-${tipo}`;
-    toast.textContent = mensagem;
-    
-    toastContainer.appendChild(toast);
-    
-    setTimeout(() => {
-      toast.classList.add('toast-visible');
-    }, 10);
-    
-    setTimeout(() => {
-      toast.classList.remove('toast-visible');
-      setTimeout(() => {
-        if (toast.parentNode) {
-          toast.parentNode.removeChild(toast);
-        }
-      }, 300);
-    }, 5000);
-  },
-
-  mostrarErro(mensagem) {
-    this.exibirToast(mensagem, 'error');
-    
-    clearInterval(this.intervalId);
-    
-    const container = document.querySelector('.roteiro-content');
-    if (container) {
-      container.innerHTML = `
-        <div class="erro-container">
-          <img src="assets/images/tripinha/avatar-triste.png" alt="Tripinha triste" class="tripinha-erro">
-          <h3 class="erro-titulo">${mensagem}</h3>
-          <p class="erro-descricao">Desculpe pelo inconveniente.</p>
-          <button class="btn-tentar-novamente">Tentar Novamente</button>
-        </div>
-      `;
-      
-      document.querySelector('.btn-tentar-novamente')?.addEventListener('click', () => {
-        location.reload();
-      });
-    }
-  },
-
-  // Funções auxiliares...
-  simularDelayDev(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
-  },
-
+  /**
+   * FUNÇÃO CORRIGIDA: Obtém os dados de tipo de viagem 
+   * @returns {string} Tipo de viagem
+   */
   obterTipoViagem() {
     if (!this.dadosUsuario || !this.dadosUsuario.respostas) {
-      return 'cultura';
+      console.warn('⚠️ Dados do usuário não encontrados, usando padrão: cultura');
+      return 'cultura';  // Default
     }
     
     const respostas = this.dadosUsuario.respostas;
+    console.log('🔍 Analisando respostas para tipo de viagem:', respostas);
     
+    // 1. VERIFICAR estilo_viagem_destino (campo específico do fluxo atual)
+    if (typeof respostas.estilo_viagem_destino === 'number') {
+      const mapeamento = ['relaxar', 'aventura', 'cultura', 'urbano'];
+      const tipoViagem = mapeamento[respostas.estilo_viagem_destino] || 'cultura';
+      console.log(`✅ Tipo de viagem via estilo_viagem_destino[${respostas.estilo_viagem_destino}]: ${tipoViagem}`);
+      return tipoViagem;
+    }
+    
+    // 2. VERIFICAR destino_imaginado (campo do questionário original)
+    if (typeof respostas.destino_imaginado === 'number') {
+      const mapeamento = ['praia', 'natureza', 'urbano', 'surpresa'];
+      const destino = mapeamento[respostas.destino_imaginado];
+      
+      if (destino === 'praia') return 'relaxar';
+      if (destino === 'natureza') return 'aventura';
+      if (destino === 'urbano') return 'urbano';
+      if (destino === 'surpresa') return 'cultura';
+      
+      console.log(`✅ Tipo de viagem via destino_imaginado[${respostas.destino_imaginado}]: ${destino} -> mapeado`);
+    }
+    
+    // 3. VERIFICAR tipo_viagem (campo genérico)
+    if (typeof respostas.tipo_viagem === 'number') {
+      const mapeamento = ['relaxar', 'aventura', 'cultura', 'urbano'];
+      const tipoViagem = mapeamento[respostas.tipo_viagem] || 'cultura';
+      console.log(`✅ Tipo de viagem via tipo_viagem[${respostas.tipo_viagem}]: ${tipoViagem}`);
+      return tipoViagem;
+    }
+    
+    // 4. VERIFICAR preferencia_viagem (campo alternativo)
     if (typeof respostas.preferencia_viagem === 'number') {
       const mapeamento = ['relaxar', 'aventura', 'cultura', 'urbano'];
-      return mapeamento[respostas.preferencia_viagem] || 'cultura';
+      const tipoViagem = mapeamento[respostas.preferencia_viagem] || 'cultura';
+      console.log(`✅ Tipo de viagem via preferencia_viagem[${respostas.preferencia_viagem}]: ${tipoViagem}`);
+      return tipoViagem;
     }
     
-    if (typeof respostas.tipo_viagem === 'number') {
-      const mapeamento = ['relaxar', 'aventura', 'cultural', 'urbano'];
-      return mapeamento[respostas.tipo_viagem] || 'cultural';
-    }
-    
+    // 5. BUSCAR em texto (fallback)
     const respostasTexto = JSON.stringify(respostas).toLowerCase();
-    if (respostasTexto.includes('relax')) return 'relaxar';
-    if (respostasTexto.includes('aventura')) return 'aventura';
-    if (respostasTexto.includes('cultura')) return 'cultura';
-    if (respostasTexto.includes('urbano')) return 'urbano';
+    if (respostasTexto.includes('urban') || respostasTexto.includes('urbano')) {
+      console.log('✅ Tipo de viagem via texto: urbano');
+      return 'urbano';
+    }
+    if (respostasTexto.includes('relax')) {
+      console.log('✅ Tipo de viagem via texto: relaxar');
+      return 'relaxar';
+    }
+    if (respostasTexto.includes('aventura')) {
+      console.log('✅ Tipo de viagem via texto: aventura');
+      return 'aventura';
+    }
+    if (respostasTexto.includes('cultura')) {
+      console.log('✅ Tipo de viagem via texto: cultura');
+      return 'cultura';
+    }
     
-    return 'cultura';
+    console.warn('⚠️ Nenhum tipo de viagem encontrado, usando padrão: cultura');
+    return 'cultura';  // Default final
   },
 
+  /**
+   * FUNÇÃO CORRIGIDA: Obtém o texto do tipo de preferência 
+   * @returns {string} Texto de preferência
+   */
   obterTextoPreferencia() {
     const tipo = this.obterTipoViagem();
     const mapeamento = {
-      'relaxar': 'Relaxamento',
-      'aventura': 'Aventura',
-      'cultura': 'Cultura',
-      'urbano': 'Urbano'
+      'relaxar': 'Relaxamento e Praia',
+      'aventura': 'Aventura e Natureza',
+      'cultura': 'Cultura e História',
+      'urbano': 'Urbano e Vida Noturna'  // ← CORRIGIDO
     };
     
-    return mapeamento[tipo] || 'Cultura';
+    const texto = mapeamento[tipo] || 'Cultura e História';
+    console.log(`🏷️ Texto de preferência: ${tipo} -> ${texto}`);
+    return texto;
   },
 
+  /**
+   * FUNÇÃO CORRIGIDA: Obtém o ícone para o tipo de preferência 
+   * @returns {string} Emoji de ícone
+   */
   obterIconePreferencia() {
     const tipo = this.obterTipoViagem();
     const mapeamento = {
       'relaxar': '🏖️',
       'aventura': '🏔️',
       'cultura': '🏛️',
-      'urbano': '🛍️'
+      'urbano': '🏙️'  // ← CORRIGIDO
     };
     
-    return mapeamento[tipo] || '🏛️';
+    const icone = mapeamento[tipo] || '🏛️';
+    console.log(`🎯 Ícone de preferência: ${tipo} -> ${icone}`);
+    return icone;
   },
 
+  /**
+   * FUNÇÃO CORRIGIDA: Obtém o tipo de companhia 
+   * @returns {string} Tipo de companhia
+   */
   obterTipoCompanhia() {
     if (!this.dadosUsuario || !this.dadosUsuario.respostas) {
-      return 'sozinho';
+      console.warn('⚠️ Dados do usuário não encontrados, usando padrão: sozinho');
+      return 'sozinho';  // Default
     }
     
     const respostas = this.dadosUsuario.respostas;
+    console.log('🔍 Analisando respostas para tipo de companhia:', respostas);
     
+    // 1. VERIFICAR companhia (campo principal)
     if (typeof respostas.companhia === 'number') {
       const mapeamento = ['sozinho', 'casal', 'familia', 'amigos'];
-      return mapeamento[respostas.companhia] || 'sozinho';
+      const tipoCompanhia = mapeamento[respostas.companhia] || 'sozinho';
+      console.log(`✅ Tipo de companhia via companhia[${respostas.companhia}]: ${tipoCompanhia}`);
+      return tipoCompanhia;
     }
     
+    // 2. BUSCAR em texto (fallback)
     const respostasTexto = JSON.stringify(respostas).toLowerCase();
-    if (respostasTexto.includes('sozinho')) return 'sozinho';
-    if (respostasTexto.includes('romantic') || respostasTexto.includes('casal')) return 'casal';
-    if (respostasTexto.includes('famil')) return 'familia';
-    if (respostasTexto.includes('amigos')) return 'amigos';
+    if (respostasTexto.includes('sozinho') || respostasTexto.includes('alone')) {
+      console.log('✅ Tipo de companhia via texto: sozinho');
+      return 'sozinho';
+    }
+    if (respostasTexto.includes('romantic') || respostasTexto.includes('casal') || respostasTexto.includes('couple')) {
+      console.log('✅ Tipo de companhia via texto: casal');
+      return 'casal';
+    }
+    if (respostasTexto.includes('famil') || respostasTexto.includes('family')) {
+      console.log('✅ Tipo de companhia via texto: familia');
+      return 'familia';
+    }
+    if (respostasTexto.includes('amigos') || respostasTexto.includes('friends')) {
+      console.log('✅ Tipo de companhia via texto: amigos');
+      return 'amigos';
+    }
     
-    return 'sozinho';
+    console.warn('⚠️ Nenhum tipo de companhia encontrado, usando padrão: sozinho');
+    return 'sozinho';  // Default final
   },
+
+  /**
+   * FUNÇÃO CORRIGIDA: Obtém as preferências do usuário 
+   * @returns {Object} Objeto com preferências detalhadas
+   */
+  obterPreferencias() {
+    const tipoViagem = this.obterTipoViagem();
+    const tipoCompanhia = this.obterTipoCompanhia();
+    
+    console.log('📋 Preferências finais:', { tipoViagem, tipoCompanhia });
+    
+    // Criar objeto de preferências baseado nos dados disponíveis
+    return {
+      tipoViagem: tipoViagem,
+      tipoCompanhia: tipoCompanhia,
+      descricaoViagem: this.obterTextoPreferencia(),
+      iconeViagem: this.obterIconePreferencia(),
+      iconeCompanhia: this.obterIconeCompanhia(),
+      // Adicionar detalhes específicos para orientar a IA
+      focoPrincipal: this.obterFocoPrincipal(tipoViagem),
+      atividadesPreferidas: this.obterAtividadesPreferidas(tipoViagem, tipoCompanhia)
+    };
+  },
+
+  /**
+   * NOVA FUNÇÃO: Obtém o foco principal baseado no tipo de viagem
+   * @param {string} tipoViagem - Tipo de viagem
+   * @returns {string} Foco principal
+   */
+  obterFocoPrincipal(tipoViagem) {
+    const focos = {
+      'relaxar': 'praias, spas, descanso e tranquilidade',
+      'aventura': 'trilhas, esportes radicais, natureza e adrenalina',
+      'cultura': 'museus, história, arte e patrimônio cultural',
+      'urbano': 'vida noturna, compras, restaurantes modernos e experiências urbanas'
+    };
+    
+    return focos[tipoViagem] || focos['cultura'];
+  },
+
+  /**
+   * NOVA FUNÇÃO: Obtém atividades preferidas baseadas no perfil
+   * @param {string} tipoViagem - Tipo de viagem
+   * @param {string} tipoCompanhia - Tipo de companhia
+   * @returns {Array} Lista de atividades preferidas
+   */
+  obterAtividadesPreferidas(tipoViagem, tipoCompanhia) {
+    const atividadesPorTipo = {
+      'relaxar': ['spas', 'praia', 'parques tranquilos', 'cafeterias aconchegantes'],
+      'aventura': ['trilhas', 'esportes radicais', 'parques nacionais', 'atividades ao ar livre'],
+      'cultura': ['museus', 'monumentos históricos', 'teatros', 'centros culturais'],
+      'urbano': ['rooftops', 'vida noturna', 'compras', 'restaurantes modernos', 'bares', 'clubes']
+    };
+    
+    const atividadesPorCompanhia = {
+      'sozinho': ['cafés', 'museus', 'caminhadas urbanas', 'observação da cidade'],
+      'casal': ['restaurantes românticos', 'vistas panorâmicas', 'passeios noturnos'],
+      'familia': ['parques', 'atividades educativas', 'entretenimento familiar'],
+      'amigos': ['bares', 'vida noturna', 'atividades em grupo', 'experiências divertidas']
+    };
+    
+    return [
+      ...(atividadesPorTipo[tipoViagem] || []),
+      ...(atividadesPorCompanhia[tipoCompanhia] || [])
+    ];
+  },
+
+  // ===========================================
+  // FUNÇÕES AUXILIARES MANTIDAS
+  // ===========================================
 
   obterTextoCompanhia() {
     const tipo = this.obterTipoCompanhia();
@@ -1104,13 +1174,6 @@ const BENETRIP_ROTEIRO = {
     };
     
     return mapeamento[tipo] || '🧳';
-  },
-
-  obterPreferencias() {
-    return {
-      tipoViagem: this.obterTipoViagem(),
-      tipoCompanhia: this.obterTipoCompanhia(),
-    };
   },
 
   extrairNomeDestino(codigoIATA) {
@@ -1203,6 +1266,88 @@ const BENETRIP_ROTEIRO = {
     if (tag.includes('compra') || tag.includes('loja')) return 'badge-purple';
     
     return '';
+  },
+
+  abrirMapa(local) {
+    const query = `${local}, ${this.dadosDestino.destino}, ${this.dadosDestino.pais}`;
+    const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
+    window.open(url, '_blank');
+  },
+
+  compartilharRoteiro() {
+    if (navigator.share) {
+      navigator.share({
+        title: `Roteiro Benetrip para ${this.dadosDestino.destino}`,
+        text: `Confira meu roteiro personalizado de viagem para ${this.dadosDestino.destino} gerado pela Benetrip!`,
+        url: window.location.href
+      })
+      .then(() => console.log('✅ Roteiro compartilhado com sucesso'))
+      .catch((error) => console.log('❌ Erro ao compartilhar:', error));
+    } else {
+      this.exibirToast('Para compartilhar, copie o link da página e envie para seus amigos!', 'info');
+      
+      try {
+        navigator.clipboard.writeText(window.location.href);
+        this.exibirToast('Link copiado para a área de transferência!', 'success');
+      } catch (e) {
+        console.warn('⚠️ Erro ao copiar para área de transferência:', e);
+      }
+    }
+  },
+
+  editarRoteiro() {
+    this.exibirToast('Função de personalização em desenvolvimento', 'info');
+  },
+
+  exibirToast(mensagem, tipo = 'info') {
+    const toastContainer = document.getElementById('toast-container');
+    if (!toastContainer) return;
+    
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${tipo}`;
+    toast.textContent = mensagem;
+    
+    toastContainer.appendChild(toast);
+    
+    setTimeout(() => {
+      toast.classList.add('toast-visible');
+    }, 10);
+    
+    setTimeout(() => {
+      toast.classList.remove('toast-visible');
+      setTimeout(() => {
+        if (toast.parentNode) {
+          toast.parentNode.removeChild(toast);
+        }
+      }, 300);
+    }, 5000);
+  },
+
+  mostrarErro(mensagem) {
+    this.exibirToast(mensagem, 'error');
+    
+    clearInterval(this.intervalId);
+    
+    const container = document.querySelector('.roteiro-content');
+    if (container) {
+      container.innerHTML = `
+        <div class="erro-container">
+          <img src="assets/images/tripinha/avatar-triste.png" alt="Tripinha triste" class="tripinha-erro">
+          <h3 class="erro-titulo">${mensagem}</h3>
+          <p class="erro-descricao">Desculpe pelo inconveniente.</p>
+          <button class="btn-tentar-novamente">Tentar Novamente</button>
+        </div>
+      `;
+      
+      document.querySelector('.btn-tentar-novamente')?.addEventListener('click', () => {
+        location.reload();
+      });
+    }
+  },
+
+  // Funções auxiliares...
+  simularDelayDev(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
   },
 
   obterRoteiroDummy() {
