@@ -22,20 +22,20 @@ module.exports = async (req, res) => {
   
   // Responder a preflight requests
   if (req.method === 'OPTIONS') {
-    console.log('[Weather API] Preflight request recebido');
+    console.log('[Weather API] ✅ Preflight request processado');
     return res.status(200).end();
   }
   
   // Verificar método
   if (req.method !== 'GET') {
-    console.log(`[Weather API] Método não permitido: ${req.method}`);
+    console.log(`[Weather API] ❌ Método não permitido: ${req.method}`);
     return res.status(405).json({ 
       error: 'Método não permitido. Use GET.',
       method_received: req.method
     });
   }
   
-  console.log('[Weather API] Requisição recebida:', {
+  console.log('[Weather API] 📡 Requisição recebida:', {
     query: req.query,
     url: req.url,
     method: req.method
@@ -46,7 +46,7 @@ module.exports = async (req, res) => {
   
   // Validar cidade
   if (!city) {
-    console.log('[Weather API] Erro: Parâmetro city não fornecido');
+    console.log('[Weather API] ❌ Erro: Parâmetro city não fornecido');
     return res.status(400).json({ 
       error: 'Parâmetro "city" é obrigatório',
       received_params: req.query
@@ -54,11 +54,11 @@ module.exports = async (req, res) => {
   }
   
   try {
-    console.log(`[Weather API] Buscando previsão para: ${city}`);
+    console.log(`[Weather API] 🌤️ Buscando previsão para: ${city}`);
     
     // Calcular número de dias baseado nas datas fornecidas
     const days = calculateDays(start, end);
-    console.log(`[Weather API] Dias calculados: ${days}`);
+    console.log(`[Weather API] 📊 Dias calculados: ${days}`);
     
     // Gerar chave de cache
     const cacheKey = `${city.toLowerCase()}_${start || 'nostart'}_${end || 'noend'}_${days}`;
@@ -68,18 +68,18 @@ module.exports = async (req, res) => {
       const cached = weatherCache.get(cacheKey);
       // Verificar se o cache ainda é válido
       if (Date.now() - cached.timestamp < CACHE_EXPIRATION) {
-        console.log('[Weather API] Usando previsão do tempo em cache');
+        console.log('[Weather API] 🗄️ Usando previsão do tempo em cache');
         return res.status(200).json(cached.data);
       }
       // Se expirou, remover do cache
       weatherCache.delete(cacheKey);
     }
     
-    console.log('[Weather API] Buscando nova previsão do tempo');
+    console.log('[Weather API] 🔄 Buscando nova previsão do tempo');
     
     // Verificar se a chave da API está configurada
     if (!WEATHER_API_KEY) {
-      console.warn('[Weather API] WEATHERAPI_KEY não configurada, usando dados mockados');
+      console.warn('[Weather API] ⚠️ WEATHERAPI_KEY não configurada, usando dados mockados');
       const mockData = getMockWeatherData(days, city);
       
       // Salvar no cache
@@ -88,15 +88,31 @@ module.exports = async (req, res) => {
         timestamp: Date.now()
       });
       
-      console.log('[Weather API] Retornando dados mockados:', mockData);
+      console.log('[Weather API] 🎲 Retornando dados mockados:', mockData);
       return res.status(200).json(mockData);
     }
     
     // Chamar a API WeatherAPI.com
+    console.log('[Weather API] 🌐 Chamando API externa...');
     const weatherData = await getWeatherForecast(city, days);
     
     // Formatar dados para o formato esperado pelo frontend
     const formattedData = formatWeatherData(weatherData);
+    
+    // VALIDAR se temos dados válidos antes de retornar
+    if (!formattedData || Object.keys(formattedData).length === 0) {
+      console.warn('[Weather API] ⚠️ Dados formatados estão vazios, usando mock');
+      const mockData = getMockWeatherData(days, city);
+      
+      // Salvar no cache
+      weatherCache.set(cacheKey, {
+        data: mockData,
+        timestamp: Date.now()
+      });
+      
+      console.log('[Weather API] 🎲 Retornando dados mockados (dados vazios):', mockData);
+      return res.status(200).json(mockData);
+    }
     
     // Salvar no cache
     weatherCache.set(cacheKey, {
@@ -104,15 +120,23 @@ module.exports = async (req, res) => {
       timestamp: Date.now()
     });
     
-    console.log('[Weather API] Dados formatados retornados:', formattedData);
+    console.log('[Weather API] ✅ Dados formatados retornados com sucesso:', formattedData);
     return res.status(200).json(formattedData);
     
   } catch (error) {
-    console.error('[Weather API] Erro ao obter previsão do tempo:', error);
+    console.error('[Weather API] ❌ Erro ao obter previsão do tempo:', error);
     
-    // Retornar dados mockados em caso de erro
+    // SEMPRE retornar dados mockados em caso de erro, mas com status 200
     const mockData = getMockWeatherData(calculateDays(start, end), city);
-    console.log('[Weather API] Retornando dados mockados por erro:', mockData);
+    console.log('[Weather API] 🛡️ Retornando dados mockados por erro:', mockData);
+    
+    // Cache os dados mockados também
+    const cacheKey = `${city.toLowerCase()}_${start || 'nostart'}_${end || 'noend'}_error`;
+    weatherCache.set(cacheKey, {
+      data: mockData,
+      timestamp: Date.now()
+    });
+    
     return res.status(200).json(mockData);
   }
 };
@@ -122,7 +146,7 @@ module.exports = async (req, res) => {
  */
 async function getWeatherForecast(city, days) {
   try {
-    console.log(`[Weather API] Chamando WeatherAPI para ${city}, ${days} dias`);
+    console.log(`[Weather API] 🌐 Chamando WeatherAPI para ${city}, ${days} dias`);
     
     const response = await axios.get('https://api.weatherapi.com/v1/forecast.json', {
       params: {
@@ -135,10 +159,10 @@ async function getWeatherForecast(city, days) {
       timeout: 10000 // 10 segundos de timeout
     });
     
-    console.log('[Weather API] Resposta da WeatherAPI recebida');
+    console.log('[Weather API] ✅ Resposta da WeatherAPI recebida');
     return response.data;
   } catch (error) {
-    console.error('[Weather API] Erro na API de previsão do tempo:', {
+    console.error('[Weather API] ❌ Erro na API de previsão do tempo:', {
       message: error.message,
       response: error.response?.data,
       status: error.response?.status
@@ -165,6 +189,10 @@ function formatWeatherData(weatherData) {
         date: day.date
       };
     });
+    
+    console.log(`[Weather API] 📊 Dados formatados: ${Object.keys(formattedData).length} dias`);
+  } else {
+    console.warn('[Weather API] ⚠️ Estrutura de dados da WeatherAPI inválida');
   }
   
   return formattedData;
@@ -176,7 +204,7 @@ function formatWeatherData(weatherData) {
 function calculateDays(startDate, endDate) {
   // Valor padrão se não houver datas
   if (!startDate || !endDate) {
-    console.log('[Weather API] Datas não fornecidas, usando 7 dias');
+    console.log('[Weather API] 📅 Datas não fornecidas, usando 7 dias');
     return 7;
   }
   
@@ -185,7 +213,7 @@ function calculateDays(startDate, endDate) {
   
   // Verificar se as datas são válidas
   if (isNaN(start.getTime()) || isNaN(end.getTime())) {
-    console.log('[Weather API] Datas inválidas, usando 7 dias');
+    console.log('[Weather API] ⚠️ Datas inválidas, usando 7 dias');
     return 7;
   }
   
@@ -195,7 +223,7 @@ function calculateDays(startDate, endDate) {
   
   // WeatherAPI permite no máximo 14 dias
   const finalDays = Math.min(differenceDays, 14);
-  console.log(`[Weather API] Dias calculados: ${finalDays} (de ${startDate} até ${endDate})`);
+  console.log(`[Weather API] 🧮 Dias calculados: ${finalDays} (de ${startDate} até ${endDate})`);
   
   return finalDays;
 }
@@ -266,7 +294,7 @@ function getWeatherEmoji(conditionCode) {
  * Gera dados mockados de previsão do tempo
  */
 function getMockWeatherData(days, city = 'Cidade') {
-  console.log(`[Weather API] Gerando ${days} dias de dados mockados para ${city}`);
+  console.log(`[Weather API] 🎲 Gerando ${days} dias de dados mockados para ${city}`);
   
   const mockData = {};
   
@@ -306,7 +334,7 @@ function getMockWeatherData(days, city = 'Cidade') {
     };
   }
   
-  console.log(`[Weather API] Dados mockados gerados:`, mockData);
+  console.log(`[Weather API] 🎲 Dados mockados gerados para ${days} dias:`, mockData);
   return mockData;
 }
 
