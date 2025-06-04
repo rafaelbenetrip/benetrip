@@ -287,7 +287,7 @@ window.BENETRIP_REDIRECT = {
                     <!DOCTYPE html>
                     <html>
                     <head>
-                        <title>Redirecionando para parceiro - Benetrip</title>
+                        <title>Redirecionando para um parceiro da Benetrip</title>
                         <style>
                             body { font-family: Arial, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; flex-direction: column; }
                             .progress { width: 80%; height: 20px; background-color: #f3f3f3; border-radius: 10px; margin: 20px 0; overflow: hidden; }
@@ -300,8 +300,9 @@ window.BENETRIP_REDIRECT = {
                     <body>
                         <img src="${window.location.origin}/assets/images/logo.png" alt="Benetrip" class="logo" onerror="this.src='https://benetrip.com.br/assets/images/logo.png'">
                         <div class="message">
-                            <h2>Redirecionando para parceiro Benetrip</h2>
-                            <p>Você está sendo redirecionado para o site do parceiro para finalizar sua reserva de voo.</p>
+                            <h2>Redirecionando para um parceiro da Benetrip</h2>
+                            <p>Você está sendo redirecionado para o site do parceiro para finalizar sua reserva de voo.</p>                            
+                            <p>A Tripinha está fazendo um roteiro perfeito para sua viagem na outra aba.</p>
                             <p>Por favor, <strong>não feche</strong> esta janela até ser redirecionado.</p>
                         </div>
                         <div class="progress">
