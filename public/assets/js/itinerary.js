@@ -1,6 +1,7 @@
 /**
- * Benetrip - Sistema de Roteiro Personalizado (CORRIGIDO)
+ * Benetrip - Sistema de Roteiro Personalizado (VERSÃO CORRIGIDA E OTIMIZADA)
  * Responsável por gerar e exibir roteiros personalizados de viagem
+ * Versão: 2.0 - Com correções de datas e remoção de código obsoleto
  */
 
 // Inicialização do módulo de roteiro
@@ -13,7 +14,6 @@ const BENETRIP_ROTEIRO = {
   PERIODO_NOITE_INICIO: 18,
   PERIODO_NOITE_FIM: 23,
   MAX_DIAS_VIAGEM: 30,
-  DIAS_SIMULACAO_DEV: 30,
   
   // --- Estado ---
   dadosVoo: null,
@@ -46,19 +46,22 @@ const BENETRIP_ROTEIRO = {
   },
   
   /**
-   * Carrega os dados necessários para o roteiro
+   * ✅ FUNÇÃO CORRIGIDA: Carrega os dados necessários para o roteiro
    */
   async carregarDados() {
     try {
-      // Carregar dados do voo selecionado
+      console.log('🔄 Carregando dados para roteiro...');
+      
+      // 1. PRIORIDADE: Carregar dados do voo selecionado
       const vooString = localStorage.getItem('benetrip_voo_selecionado');
       if (!vooString) {
         throw new Error('Nenhum voo selecionado. Selecione um voo primeiro.');
       }
+      
       this.dadosVoo = JSON.parse(vooString);
       console.log('✅ Dados do voo carregados:', this.dadosVoo);
       
-      // Carregar dados do usuário
+      // 2. Carregar dados do usuário
       const usuarioString = localStorage.getItem('benetrip_user_data');
       if (usuarioString) {
         this.dadosUsuario = JSON.parse(usuarioString);
@@ -68,24 +71,125 @@ const BENETRIP_ROTEIRO = {
         this.dadosUsuario = {};
       }
       
-      // Carregar dados do destino
+      // 3. Carregar dados do destino
       const destinoString = localStorage.getItem('benetrip_destino_selecionado');
       if (destinoString) {
         this.dadosDestino = JSON.parse(destinoString);
-        console.log('✅ Dados do destino carregados:', this.dadosDestino);
       } else {
+        // Extrair do voo como fallback
         this.dadosDestino = {
           destino: this.extrairNomeDestino(this.dadosVoo?.ida?.destino),
           codigo_iata: this.dadosVoo?.ida?.destino,
           pais: 'Desconhecido'
         };
-        console.log('✅ Dados do destino extraídos do voo:', this.dadosDestino);
       }
+      
+      console.log('✅ Dados do destino carregados:', this.dadosDestino);
+      
+      // 4. NOVA LÓGICA: Validar e normalizar datas dos voos
+      this.normalizarDatasVoo();
       
       return true;
     } catch (erro) {
       console.error('❌ Erro ao carregar dados:', erro);
       throw erro;
+    }
+  },
+
+  /**
+   * ✅ NOVA FUNÇÃO: Normaliza as datas do voo para formato consistente
+   */
+  normalizarDatasVoo() {
+    console.log('🔄 Normalizando datas do voo...');
+    console.log('📊 Dados originais do voo:', JSON.stringify(this.dadosVoo, null, 2));
+    
+    // Se dados do voo estão corretos, usar como estão
+    if (this.dadosVoo?.ida?.dataPartida && this.isValidDate(this.dadosVoo.ida.dataPartida)) {
+      console.log('✅ Datas do voo já estão corretas');
+      return;
+    }
+    
+    // Tentar extrair datas dos dados do usuário como BACKUP (não prioridade)
+    const datasUsuario = this.dadosUsuario?.respostas?.datas;
+    if (datasUsuario && !this.dadosVoo?.ida?.dataPartida) {
+      console.log('⚠️ Usando datas do usuário como backup:', datasUsuario);
+      
+      let dataIda, dataVolta;
+      
+      // Diferentes formatos possíveis
+      if (typeof datasUsuario === 'object' && datasUsuario.dataIda) {
+        dataIda = datasUsuario.dataIda;
+        dataVolta = datasUsuario.dataVolta;
+      } else if (Array.isArray(datasUsuario) && datasUsuario.length >= 2) {
+        dataIda = datasUsuario[0];
+        dataVolta = datasUsuario[1];
+      } else if (typeof datasUsuario === 'string') {
+        if (datasUsuario.includes(',')) {
+          [dataIda, dataVolta] = datasUsuario.split(',').map(d => d.trim());
+        } else {
+          dataIda = datasUsuario;
+        }
+      }
+      
+      // Atualizar dados do voo com datas normalizadas
+      if (dataIda) {
+        this.dadosVoo = this.dadosVoo || {};
+        this.dadosVoo.ida = this.dadosVoo.ida || {};
+        this.dadosVoo.ida.dataPartida = this.formatarDataISO(dataIda);
+        this.dadosVoo.ida.horaChegada = this.dadosVoo.ida.horaChegada || '15:30';
+        
+        if (dataVolta) {
+          this.dadosVoo.volta = this.dadosVoo.volta || {};
+          this.dadosVoo.volta.dataPartida = this.formatarDataISO(dataVolta);
+          this.dadosVoo.volta.horaPartida = this.dadosVoo.volta.horaPartida || '21:00';
+        }
+      }
+    }
+    
+    // Verificação final
+    if (!this.dadosVoo?.ida?.dataPartida) {
+      console.error('❌ Não foi possível normalizar datas do voo');
+      throw new Error('Datas de viagem não disponíveis');
+    }
+    
+    console.log('✅ Datas normalizadas:', {
+      ida: this.dadosVoo.ida.dataPartida,
+      volta: this.dadosVoo.volta?.dataPartida
+    });
+  },
+
+  /**
+   * ✅ NOVA FUNÇÃO: Valida se uma data é válida
+   */
+  isValidDate(dateString) {
+    if (!dateString) return false;
+    const date = new Date(dateString);
+    return !isNaN(date.getTime()) && date.getFullYear() > 2020;
+  },
+
+  /**
+   * ✅ FUNÇÃO CONSOLIDADA: Formata data para ISO (substituiu extrairDataFormatada + normalizarData)
+   */
+  formatarDataISO(dataInput) {
+    if (!dataInput) return null;
+    
+    try {
+      // Se já está no formato ISO correto
+      if (typeof dataInput === 'string' && /^\d{4}-\d{2}-\d{2}/.test(dataInput)) {
+        return dataInput.includes('T') ? dataInput.split('T')[0] : dataInput;
+      }
+      
+      // Converter para Date e extrair apenas YYYY-MM-DD
+      const data = new Date(dataInput);
+      if (isNaN(data.getTime())) {
+        console.warn('⚠️ Data inválida:', dataInput);
+        return null;
+      }
+      
+      return data.toISOString().split('T')[0];
+    } catch (e) {
+      console.warn('⚠️ Erro ao formatar data:', e);
+      return null;
     }
   },
   
@@ -131,146 +235,38 @@ const BENETRIP_ROTEIRO = {
   },
   
   /**
-   * Gera o roteiro personalizado via API
+   * ✅ FUNÇÃO CORRIGIDA: Gera o roteiro personalizado via API
    */
   async gerarRoteiro() {
     try {
-      console.log('🎯 Estrutura real dos dadosVoo:', JSON.stringify(this.dadosVoo));
-      console.log('👤 Dados do usuário completos:', JSON.stringify(this.dadosUsuario));
+      console.log('🎯 Gerando roteiro com dados validados...');
+      console.log('📅 Dados finais do voo:', {
+        ida: this.dadosVoo.ida,
+        volta: this.dadosVoo.volta
+      });
       
-      // Verificar e adaptar dados de datas
-      let datasDoUsuario = this.dadosUsuario?.respostas?.datas;
-      if (datasDoUsuario) {
-        console.log('📅 Datas encontradas nas respostas do usuário:', datasDoUsuario);
-        
-        let dataIda, dataVolta;
-        
-        if (typeof datasDoUsuario === 'object' && datasDoUsuario.dataIda) {
-          dataIda = datasDoUsuario.dataIda;
-          dataVolta = datasDoUsuario.dataVolta;
-        } else if (Array.isArray(datasDoUsuario) && datasDoUsuario.length >= 2) {
-          dataIda = datasDoUsuario[0];
-          dataVolta = datasDoUsuario[1];
-        } else if (typeof datasDoUsuario === 'string' && datasDoUsuario.includes(',')) {
-          [dataIda, dataVolta] = datasDoUsuario.split(',');
-        }
-        
-        if (dataIda) {
-          console.log(`📊 Usando datas do usuário: Ida=${dataIda}, Volta=${dataVolta}`);
-          
-          if (!this.dadosVoo) this.dadosVoo = {};
-          if (!this.dadosVoo.ida) this.dadosVoo.ida = {};
-          
-          this.dadosVoo.ida.dataPartida = dataIda;
-          
-          if (dataVolta) {
-            if (!this.dadosVoo.volta) this.dadosVoo.volta = {};
-            this.dadosVoo.volta.dataPartida = dataVolta;
-          }
-        }
+      // Extrair datas já normalizadas
+      const dataIda = this.formatarDataISO(this.dadosVoo.ida.dataPartida);
+      const dataVolta = this.dadosVoo.volta?.dataPartida ? 
+        this.formatarDataISO(this.dadosVoo.volta.dataPartida) : null;
+      
+      if (!dataIda) {
+        throw new Error('Data de ida não disponível');
       }
       
-      // Verificar e adaptar formato dos dados
-      if (this.dadosVoo && !this.dadosVoo.ida && this.dadosVoo.voo) {
-        console.log('🔄 Adaptando formato dos dados de voo...');
-        this.dadosVoo.ida = {
-          dataPartida: this.dadosVoo.voo.dataIda || this.dadosVoo.dataIda || this.dadosVoo.voo.data,
-          horaChegada: this.dadosVoo.voo.horaChegada || '12:00',
-          destino: this.dadosVoo.voo.destino || this.dadosDestino?.codigo_iata
-        };
-        
-        if (this.dadosVoo.voo.dataVolta || this.dadosVoo.dataVolta) {
-          this.dadosVoo.volta = {
-            dataPartida: this.dadosVoo.voo.dataVolta || this.dadosVoo.dataVolta,
-            horaPartida: this.dadosVoo.voo.horaPartida || '14:00'
-          };
-        }
-        
-        console.log('✅ Dados adaptados:', this.dadosVoo);
-      }
+      console.log('📊 Datas extraídas:', { dataIda, dataVolta });
       
-      // Verificação final dos dados
-      const temDataPartida = (this.dadosVoo?.ida?.dataPartida) || 
-                             (this.dadosVoo?.voo?.dataIda) || 
-                             (this.dadosVoo?.dataIda) ||
-                             (this.dadosVoo?.data);
-      
-      if (!this.dadosVoo || !temDataPartida) {
-        if (this.dadosUsuario?.respostas?.datas) {
-          const datas = this.dadosUsuario.respostas.datas;
-          console.log('🔍 Tentando extrair datas do objeto:', datas);
-          
-          let dataIda, dataVolta;
-          
-          if (typeof datas === 'object') {
-            dataIda = datas.dataIda || datas.ida;
-            dataVolta = datas.dataVolta || datas.volta;
-          } else if (typeof datas === 'string') {
-            const partes = datas.split(',');
-            dataIda = partes[0];
-            dataVolta = partes[1];
-          }
-          
-          if (dataIda) {
-            this.dadosVoo = {
-              ida: {
-                dataPartida: dataIda,
-                horaChegada: '12:00',
-                destino: this.dadosDestino?.codigo_iata || 'CWB'
-              }
-            };
-            
-            if (dataVolta) {
-              this.dadosVoo.volta = {
-                dataPartida: dataVolta,
-                horaPartida: '14:00'
-              };
-            }
-            
-            console.log('🆕 Dados de voo criados a partir de datas do usuário:', this.dadosVoo);
-          }
-        }
-        
-        // Último recurso - criar dados mínimos
-        if (!this.dadosVoo || !this.dadosVoo.ida || !this.dadosVoo.ida.dataPartida) {
-          if (this.dadosDestino) {
-            console.log('⚠️ Criando dados de voo como último recurso...');
-            
-            const hoje = new Date();
-            const dataIda = new Date(hoje);
-            dataIda.setDate(hoje.getDate() + 30);
-            
-            const dataVolta = new Date(dataIda);
-            dataVolta.setDate(dataIda.getDate() + 5);
-            
-            this.dadosVoo = {
-              ida: {
-                dataPartida: dataIda.toISOString(),
-                horaChegada: '12:00',
-                destino: this.dadosDestino.codigo_iata || 'CWB',
-                origem: 'GRU'
-              },
-              volta: {
-                dataPartida: dataVolta.toISOString(),
-                horaPartida: '14:00',
-                destino: 'GRU',
-                origem: this.dadosDestino.codigo_iata || 'CWB'
-              }
-            };
-            
-            console.log('🆘 Dados de voo gerados como último recurso:', this.dadosVoo);
-          } else {
-            throw new Error('Dados insuficientes para gerar o roteiro.');
-          }
-        }
-      }
+      // Calcular número real de dias da viagem
+      const diasReais = this.calcularDiasViagemCorreto(dataIda, dataVolta);
+      console.log(`🗓️ Dias reais de viagem: ${diasReais}`);
       
       // Preparar parâmetros para a API
       const params = {
         destino: this.dadosDestino?.destino || this.extrairNomeDestino(this.dadosVoo.ida?.destino),
         pais: this.dadosDestino?.pais || 'Desconhecido',
-        dataInicio: this.extrairDataFormatada(this.dadosVoo.ida?.dataPartida || this.dadosVoo.dataIda),
-        dataFim: this.extrairDataFormatada(this.dadosVoo.volta?.dataPartida || this.dadosVoo.dataVolta),
+        dataInicio: dataIda,
+        dataFim: dataVolta,
+        diasViagem: diasReais, // ← NOVO: passar número exato de dias
         horaChegada: this.dadosVoo.ida?.horaChegada || '12:00',
         horaSaida: this.dadosVoo.volta?.horaPartida || '14:00',
         tipoViagem: this.obterTipoViagem(),
@@ -279,26 +275,13 @@ const BENETRIP_ROTEIRO = {
         modeloIA: "deepseekai"
       };
       
-      console.log('📋 Parâmetros para geração de roteiro:', params);
+      console.log('📋 Parâmetros finais para geração de roteiro:', params);
       
       // Chamar a API ou usar dados dummy em desenvolvimento
       if (location.hostname === 'localhost' || location.hostname === '127.0.0.1' || location.hostname === '') {
-        console.log('🔧 Modo desenvolvimento - usando roteiro dummy');
+        console.log('🔧 Modo desenvolvimento - usando roteiro dummy com datas corretas');
         await this.simularDelayDev(3000);
-        this.roteiroPronto = this.obterRoteiroDummy();
-        
-        // Ajustar datas do roteiro dummy
-        if (this.roteiroPronto && this.roteiroPronto.dias && this.roteiroPronto.dias.length > 0) {
-          const dataInicio = new Date(this.dadosVoo.ida.dataPartida);
-          
-          this.roteiroPronto.dias.forEach((dia, index) => {
-            const dataDia = new Date(dataInicio);
-            dataDia.setDate(dataInicio.getDate() + index);
-            dia.data = dataDia.toISOString().split('T')[0];
-          });
-          
-          console.log('✅ Roteiro dummy ajustado com datas reais:', this.roteiroPronto);
-        }
+        this.roteiroPronto = this.obterRoteiroDummyCorreto(dataIda, dataVolta, diasReais);
       } else {
         console.log('🌐 Modo produção - chamando API real');
         const response = await fetch('/api/itinerary-generator', {
@@ -314,33 +297,28 @@ const BENETRIP_ROTEIRO = {
         }
         
         this.roteiroPronto = await response.json();
+        
+        // Garantir que as datas do roteiro correspondem às datas reais
+        this.ajustarDatasRoteiro(dataIda, diasReais);
       }
       
-      console.log('🎉 Roteiro gerado:', this.roteiroPronto);
+      console.log('🎉 Roteiro gerado com datas corretas:', this.roteiroPronto);
       
       // Buscar previsão do tempo e imagens
-      console.log('🌤️ Buscando previsão do tempo...');
       await this.buscarPrevisaoTempo();
-      
-      console.log('🖼️ Buscando imagens para locais...');
       await this.buscarImagensLocais();
       
       // Atualizar UI
-      console.log(`✨ Finalizando roteiro com ${this.roteiroPronto.dias?.length || 0} dias`);
       this.atualizarUIComRoteiro();
       
     } catch (erro) {
       console.error('❌ Erro ao gerar roteiro:', erro);
       this.mostrarErro('Não foi possível gerar seu roteiro personalizado. Tente novamente.');
     } finally {
-      // Parar animação de progresso
       clearInterval(this.intervalId);
       this.estaCarregando = false;
-      
-      // Completar a barra de progresso
       this.atualizarBarraProgresso(100, 'Roteiro pronto!');
       
-      // Remover container de carregamento
       setTimeout(() => {
         const loadingContainer = document.querySelector('.loading-container');
         if (loadingContainer) {
@@ -351,22 +329,178 @@ const BENETRIP_ROTEIRO = {
   },
 
   /**
-   * FUNÇÃO CORRIGIDA: Busca previsão do tempo para os dias do roteiro
+   * ✅ NOVA FUNÇÃO: Calcula corretamente os dias de viagem
+   */
+  calcularDiasViagemCorreto(dataIda, dataVolta) {
+    try {
+      if (!dataIda) {
+        console.warn('⚠️ Data de ida não fornecida');
+        return 1;
+      }
+      
+      const inicio = new Date(dataIda);
+      
+      if (!dataVolta) {
+        console.log('📅 Viagem só de ida - 1 dia');
+        return 1;
+      }
+      
+      const fim = new Date(dataVolta);
+      
+      // Calcular diferença em dias (incluindo dia de chegada e saída)
+      const diffTempo = fim.getTime() - inicio.getTime();
+      const diffDias = Math.floor(diffTempo / (1000 * 60 * 60 * 24)) + 1;
+      
+      // Garantir que seja pelo menos 1 dia
+      const diasFinais = Math.max(1, diffDias);
+      
+      console.log(`📊 Cálculo de dias: ${dataIda} até ${dataVolta} = ${diasFinais} dias`);
+      
+      return diasFinais;
+    } catch (e) {
+      console.error('❌ Erro ao calcular dias de viagem:', e);
+      return 1;
+    }
+  },
+
+  /**
+   * ✅ NOVA FUNÇÃO: Gera roteiro dummy com datas corretas
+   */
+  obterRoteiroDummyCorreto(dataIda, dataVolta, diasReais) {
+    console.log(`🏗️ Gerando roteiro dummy para ${diasReais} dias`);
+    console.log(`📅 De ${dataIda} até ${dataVolta || 'N/A'}`);
+    
+    const dias = [];
+    const dataInicio = new Date(dataIda);
+    
+    // Gerar exatamente o número de dias calculado
+    for (let i = 0; i < diasReais; i++) {
+      const dataAtual = new Date(dataInicio);
+      dataAtual.setDate(dataInicio.getDate() + i);
+      
+      const dataFormatada = dataAtual.toISOString().split('T')[0];
+      const diaSemana = dataAtual.getDay();
+      
+      const diaRoteiro = {
+        data: dataFormatada,
+        descricao: this.obterDescricaoDia(diaSemana, i + 1, this.dadosDestino?.destino || 'seu destino'),
+        manha: this.gerarAtividadesPeriodo('manha', diaSemana, i + 1, this.dadosDestino?.destino || 'seu destino'),
+        tarde: this.gerarAtividadesPeriodo('tarde', diaSemana, i + 1, this.dadosDestino?.destino || 'seu destino'),
+        noite: this.gerarAtividadesPeriodo('noite', diaSemana, i + 1, this.dadosDestino?.destino || 'seu destino')
+      };
+      
+      dias.push(diaRoteiro);
+      
+      console.log(`📅 Dia ${i + 1}/${diasReais}: ${dataFormatada}`);
+    }
+    
+    // Adicionar informações de voo ao primeiro e último dia
+    this.adicionarInformacoesVoo(dias);
+    
+    console.log(`✅ Roteiro dummy criado com ${dias.length} dias corretos`);
+    
+    return {
+      destino: `${this.dadosDestino?.destino || 'Seu Destino'}, ${this.dadosDestino?.pais || 'Mundo'}`,
+      dias
+    };
+  },
+
+  /**
+   * ✅ NOVA FUNÇÃO: Adiciona informações de voo ao roteiro
+   */
+  adicionarInformacoesVoo(dias) {
+    if (!dias || dias.length === 0) return;
+    
+    // Informações de chegada no primeiro dia
+    const horarioChegada = this.dadosVoo?.ida?.horaChegada || '15:30';
+    const horaChegada = parseInt(horarioChegada.split(':')[0]);
+    
+    if (horaChegada >= 6 && horaChegada < 12) {
+      dias[0].manha.horarioEspecial = `Chegada às ${horarioChegada}`;
+    } else if (horaChegada >= 12 && horaChegada < 18) {
+      dias[0].tarde.horarioEspecial = `Chegada às ${horarioChegada}`;
+    } else {
+      dias[0].noite.horarioEspecial = `Chegada às ${horarioChegada}`;
+    }
+    
+    // Informações de partida no último dia (se houver voo de volta)
+    if (this.dadosVoo?.volta && dias.length > 1) {
+      const horarioPartida = this.dadosVoo.volta.horaPartida || '21:00';
+      const horaPartida = parseInt(horarioPartida.split(':')[0]);
+      const ultimoDia = dias.length - 1;
+      
+      if (horaPartida >= 6 && horaPartida < 12) {
+        dias[ultimoDia].manha.horarioEspecial = `Partida às ${horarioPartida}`;
+      } else if (horaPartida >= 12 && horaPartida < 18) {
+        dias[ultimoDia].tarde.horarioEspecial = `Partida às ${horarioPartida}`;
+      } else {
+        dias[ultimoDia].noite.horarioEspecial = `Partida às ${horarioPartida}`;
+      }
+    }
+    
+    console.log('✅ Informações de voo adicionadas ao roteiro');
+  },
+
+  /**
+   * ✅ NOVA FUNÇÃO: Ajusta datas do roteiro para corresponder às datas reais
+   */
+  ajustarDatasRoteiro(dataIda, diasReais) {
+    if (!this.roteiroPronto || !this.roteiroPronto.dias) return;
+    
+    console.log('🔄 Ajustando datas do roteiro para corresponder às datas reais...');
+    
+    const dataInicio = new Date(dataIda);
+    
+    // Garantir que temos exatamente o número correto de dias
+    if (this.roteiroPronto.dias.length !== diasReais) {
+      console.log(`⚠️ Ajustando número de dias de ${this.roteiroPronto.dias.length} para ${diasReais}`);
+      
+      if (this.roteiroPronto.dias.length > diasReais) {
+        // Remover dias extras
+        this.roteiroPronto.dias = this.roteiroPronto.dias.slice(0, diasReais);
+      } else {
+        // Adicionar dias faltantes (duplicar último dia como template)
+        const ultimoDia = this.roteiroPronto.dias[this.roteiroPronto.dias.length - 1];
+        while (this.roteiroPronto.dias.length < diasReais) {
+          const novoDay = JSON.parse(JSON.stringify(ultimoDia));
+          novoDay.descricao = `Aproveite mais um dia explorando!`;
+          this.roteiroPronto.dias.push(novoDay);
+        }
+      }
+    }
+    
+    // Ajustar datas de cada dia
+    this.roteiroPronto.dias.forEach((dia, index) => {
+      const dataDia = new Date(dataInicio);
+      dataDia.setDate(dataInicio.getDate() + index);
+      dia.data = dataDia.toISOString().split('T')[0];
+      
+      console.log(`📅 Dia ${index + 1} ajustado para: ${dia.data}`);
+    });
+    
+    // Adicionar informações de voo
+    this.adicionarInformacoesVoo(this.roteiroPronto.dias);
+    
+    console.log('✅ Datas do roteiro ajustadas com sucesso');
+  },
+
+  /**
+   * ✅ FUNÇÃO SIMPLIFICADA: Busca previsão do tempo para os dias do roteiro
    */
   async buscarPrevisaoTempo() {
     try {
       if (!this.roteiroPronto || !this.roteiroPronto.dias || !this.dadosDestino) {
         console.warn('⚠️ Dados insuficientes para buscar previsão do tempo');
-        this.adicionarPrevisoesFictícias();
+        this.garantirPrevisoesTodosDias();
         return;
       }
       
-      const dataInicio = this.extrairDataFormatada(this.dadosVoo.ida?.dataPartida);
-      const dataFim = this.extrairDataFormatada(this.dadosVoo.volta?.dataPartida);
+      const dataInicio = this.formatarDataISO(this.dadosVoo.ida?.dataPartida);
+      const dataFim = this.formatarDataISO(this.dadosVoo.volta?.dataPartida);
       
       if (!dataInicio) {
         console.warn('⚠️ Data de início não disponível para previsão do tempo');
-        this.adicionarPrevisoesFictícias();
+        this.garantirPrevisoesTodosDias();
         return;
       }
       
@@ -402,7 +536,7 @@ const BENETRIP_ROTEIRO = {
       if (!response.ok) {
         const errorText = await response.text();
         console.error(`❌ Erro ${response.status} na API de clima:`, errorText);
-        this.adicionarPrevisoesFictícias();
+        this.garantirPrevisoesTodosDias();
         return;
       }
       
@@ -412,11 +546,11 @@ const BENETRIP_ROTEIRO = {
       // Verificar se recebemos dados válidos
       if (!previsoes || typeof previsoes !== 'object') {
         console.warn('⚠️ Formato inválido de previsões do tempo');
-        this.adicionarPrevisoesFictícias();
+        this.garantirPrevisoesTodosDias();
         return;
       }
       
-      // CORREÇÃO: Adicionar previsões aos dias do roteiro
+      // Adicionar previsões aos dias do roteiro
       let previsoesAdicionadas = 0;
       
       if (this.roteiroPronto.dias) {
@@ -446,22 +580,17 @@ const BENETRIP_ROTEIRO = {
       if (erro.name === 'AbortError') {
         console.warn('⏱️ Timeout na requisição de previsão do tempo');
       }
-      
-      // Sempre adicionar previsões fictícias como fallback
-      this.adicionarPrevisoesFictícias();
+    } finally {
+      // SEMPRE garantir que todos os dias tenham previsão
+      this.garantirPrevisoesTodosDias();
     }
   },
 
   /**
-   * NOVA FUNÇÃO: Adiciona previsões fictícias a todos os dias
+   * ✅ FUNÇÃO SIMPLIFICADA: Garante que todos os dias tenham previsão
    */
-  adicionarPrevisoesFictícias() {
-    console.log('🎲 Adicionando previsões fictícias...');
-    
-    if (!this.roteiroPronto || !this.roteiroPronto.dias) {
-      console.warn('⚠️ Não há dias no roteiro para adicionar previsões');
-      return;
-    }
+  garantirPrevisoesTodosDias() {
+    if (!this.roteiroPronto?.dias) return;
     
     this.roteiroPronto.dias.forEach((dia, index) => {
       if (!dia.previsao) {
@@ -469,13 +598,11 @@ const BENETRIP_ROTEIRO = {
       }
     });
     
-    console.log(`✅ Previsões fictícias adicionadas a ${this.roteiroPronto.dias.length} dias`);
+    console.log(`✅ Previsões garantidas para todos os ${this.roteiroPronto.dias.length} dias`);
   },
 
   /**
-   * NOVA FUNÇÃO: Gera uma previsão fictícia para um dia
-   * @param {number} index - Índice do dia
-   * @returns {Object} Objeto de previsão
+   * Gera uma previsão fictícia para um dia
    */
   gerarPrevisaoFicticia(index) {
     const condicoes = [
@@ -514,35 +641,6 @@ const BENETRIP_ROTEIRO = {
       condition: condition.condition,
       date: dataDia.toISOString().split('T')[0]
     };
-  },
-
-  /**
-   * Extrai a data formatada de uma string ISO ou outros formatos possíveis
-   * @param {string} dataString - String de data
-   * @returns {string} Data formatada como YYYY-MM-DD
-   */
-  extrairDataFormatada(dataString) {
-    if (!dataString) return null;
-    
-    try {
-      if (/^\d{4}-\d{2}-\d{2}$/.test(dataString)) {
-        return dataString;
-      }
-      
-      if (dataString.includes('T')) {
-        return dataString.split('T')[0];
-      }
-      
-      const data = new Date(dataString);
-      if (!isNaN(data.getTime())) {
-        return data.toISOString().split('T')[0];
-      }
-      
-      return null;
-    } catch (e) {
-      console.warn('⚠️ Erro ao extrair data formatada:', e);
-      return null;
-    }
   },
 
   /**
@@ -667,9 +765,9 @@ const BENETRIP_ROTEIRO = {
     const dataIda = this.formatarData(this.dadosVoo.ida?.dataPartida);
     const dataVolta = this.dadosVoo.volta?.dataPartida ? this.formatarData(this.dadosVoo.volta.dataPartida) : null;
     
-    const diasViagem = this.calcularDiasViagem(
-      this.dadosVoo.ida?.dataPartida, 
-      this.dadosVoo.volta?.dataPartida
+    const diasViagem = this.calcularDiasViagemCorreto(
+      this.formatarDataISO(this.dadosVoo.ida?.dataPartida), 
+      this.formatarDataISO(this.dadosVoo.volta?.dataPartida)
     );
     
     const companhiaTexto = this.obterTextoCompanhia();
@@ -916,12 +1014,11 @@ const BENETRIP_ROTEIRO = {
   },
 
   // ===========================================
-  // FUNÇÕES CORRIGIDAS PARA MAPEAMENTO DE PREFERÊNCIAS
+  // FUNÇÕES DE MAPEAMENTO DE PREFERÊNCIAS (CORRIGIDAS)
   // ===========================================
 
   /**
-   * FUNÇÃO CORRIGIDA: Obtém os dados de tipo de viagem 
-   * @returns {string} Tipo de viagem
+   * ✅ FUNÇÃO CORRIGIDA: Obtém os dados de tipo de viagem 
    */
   obterTipoViagem() {
     if (!this.dadosUsuario || !this.dadosUsuario.respostas) {
@@ -940,7 +1037,15 @@ const BENETRIP_ROTEIRO = {
       return tipoViagem;
     }
     
-    // 2. VERIFICAR destino_imaginado (campo do questionário original)
+    // 2. VERIFICAR preferencia_viagem (campo alternativo)
+    if (typeof respostas.preferencia_viagem === 'number') {
+      const mapeamento = ['relaxar', 'aventura', 'cultura', 'urbano'];
+      const tipoViagem = mapeamento[respostas.preferencia_viagem] || 'cultura';
+      console.log(`✅ Tipo de viagem via preferencia_viagem[${respostas.preferencia_viagem}]: ${tipoViagem}`);
+      return tipoViagem;
+    }
+    
+    // 3. VERIFICAR destino_imaginado (campo do questionário original)
     if (typeof respostas.destino_imaginado === 'number') {
       const mapeamento = ['praia', 'natureza', 'urbano', 'surpresa'];
       const destino = mapeamento[respostas.destino_imaginado];
@@ -953,23 +1058,7 @@ const BENETRIP_ROTEIRO = {
       console.log(`✅ Tipo de viagem via destino_imaginado[${respostas.destino_imaginado}]: ${destino} -> mapeado`);
     }
     
-    // 3. VERIFICAR tipo_viagem (campo genérico)
-    if (typeof respostas.tipo_viagem === 'number') {
-      const mapeamento = ['relaxar', 'aventura', 'cultura', 'urbano'];
-      const tipoViagem = mapeamento[respostas.tipo_viagem] || 'cultura';
-      console.log(`✅ Tipo de viagem via tipo_viagem[${respostas.tipo_viagem}]: ${tipoViagem}`);
-      return tipoViagem;
-    }
-    
-    // 4. VERIFICAR preferencia_viagem (campo alternativo)
-    if (typeof respostas.preferencia_viagem === 'number') {
-      const mapeamento = ['relaxar', 'aventura', 'cultura', 'urbano'];
-      const tipoViagem = mapeamento[respostas.preferencia_viagem] || 'cultura';
-      console.log(`✅ Tipo de viagem via preferencia_viagem[${respostas.preferencia_viagem}]: ${tipoViagem}`);
-      return tipoViagem;
-    }
-    
-    // 5. BUSCAR em texto (fallback)
+    // 4. BUSCAR em texto (fallback)
     const respostasTexto = JSON.stringify(respostas).toLowerCase();
     if (respostasTexto.includes('urban') || respostasTexto.includes('urbano')) {
       console.log('✅ Tipo de viagem via texto: urbano');
@@ -993,8 +1082,7 @@ const BENETRIP_ROTEIRO = {
   },
 
   /**
-   * FUNÇÃO CORRIGIDA: Obtém o texto do tipo de preferência 
-   * @returns {string} Texto de preferência
+   * ✅ FUNÇÃO CORRIGIDA: Obtém o texto do tipo de preferência 
    */
   obterTextoPreferencia() {
     const tipo = this.obterTipoViagem();
@@ -1002,7 +1090,7 @@ const BENETRIP_ROTEIRO = {
       'relaxar': 'Relaxamento e Praia',
       'aventura': 'Aventura e Natureza',
       'cultura': 'Cultura e História',
-      'urbano': 'Urbano e Vida Noturna'  // ← CORRIGIDO
+      'urbano': 'Urbano e Vida Noturna'
     };
     
     const texto = mapeamento[tipo] || 'Cultura e História';
@@ -1011,8 +1099,7 @@ const BENETRIP_ROTEIRO = {
   },
 
   /**
-   * FUNÇÃO CORRIGIDA: Obtém o ícone para o tipo de preferência 
-   * @returns {string} Emoji de ícone
+   * ✅ FUNÇÃO CORRIGIDA: Obtém o ícone para o tipo de preferência 
    */
   obterIconePreferencia() {
     const tipo = this.obterTipoViagem();
@@ -1020,7 +1107,7 @@ const BENETRIP_ROTEIRO = {
       'relaxar': '🏖️',
       'aventura': '🏔️',
       'cultura': '🏛️',
-      'urbano': '🏙️'  // ← CORRIGIDO
+      'urbano': '🏙️'
     };
     
     const icone = mapeamento[tipo] || '🏛️';
@@ -1029,8 +1116,7 @@ const BENETRIP_ROTEIRO = {
   },
 
   /**
-   * FUNÇÃO CORRIGIDA: Obtém o tipo de companhia 
-   * @returns {string} Tipo de companhia
+   * ✅ FUNÇÃO CORRIGIDA: Obtém o tipo de companhia 
    */
   obterTipoCompanhia() {
     if (!this.dadosUsuario || !this.dadosUsuario.respostas) {
@@ -1073,8 +1159,7 @@ const BENETRIP_ROTEIRO = {
   },
 
   /**
-   * FUNÇÃO CORRIGIDA: Obtém as preferências do usuário 
-   * @returns {Object} Objeto com preferências detalhadas
+   * ✅ FUNÇÃO CORRIGIDA: Obtém as preferências do usuário 
    */
   obterPreferencias() {
     const tipoViagem = this.obterTipoViagem();
@@ -1096,9 +1181,7 @@ const BENETRIP_ROTEIRO = {
   },
 
   /**
-   * NOVA FUNÇÃO: Obtém o foco principal baseado no tipo de viagem
-   * @param {string} tipoViagem - Tipo de viagem
-   * @returns {string} Foco principal
+   * ✅ NOVA FUNÇÃO: Obtém o foco principal baseado no tipo de viagem
    */
   obterFocoPrincipal(tipoViagem) {
     const focos = {
@@ -1112,10 +1195,7 @@ const BENETRIP_ROTEIRO = {
   },
 
   /**
-   * NOVA FUNÇÃO: Obtém atividades preferidas baseadas no perfil
-   * @param {string} tipoViagem - Tipo de viagem
-   * @param {string} tipoCompanhia - Tipo de companhia
-   * @returns {Array} Lista de atividades preferidas
+   * ✅ NOVA FUNÇÃO: Obtém atividades preferidas baseadas no perfil
    */
   obterAtividadesPreferidas(tipoViagem, tipoCompanhia) {
     const atividadesPorTipo = {
@@ -1196,7 +1276,8 @@ const BENETRIP_ROTEIRO = {
       'BCN': 'Barcelona',
       'FCO': 'Roma',
       'MXP': 'Milão',
-      'MDE': 'Medellín'
+      'MDE': 'Medellín',
+      'CWB': 'Curitiba'
     };
     
     return mapeamento[codigoIATA] || codigoIATA;
@@ -1227,33 +1308,6 @@ const BENETRIP_ROTEIRO = {
     } catch (e) {
       console.warn('⚠️ Erro ao formatar data completa:', e);
       return dataString;
-    }
-  },
-
-  calcularDiasViagem(dataInicio, dataFim) {
-    try {
-      if (!dataInicio) {
-        console.warn('⚠️ Data de início não fornecida');
-        return 1;
-      }
-      
-      const inicio = new Date(dataInicio);
-      
-      if (!dataFim) {
-        console.warn('⚠️ Data de fim não fornecida, assumindo 1 dia');
-        return 1;
-      }
-      
-      const fim = new Date(dataFim);
-      const diffTempo = Math.abs(fim.getTime() - inicio.getTime());
-      const diffDias = Math.ceil(diffTempo / (1000 * 60 * 60 * 24)) + 1;
-      
-      console.log(`📊 Calculando dias: de ${dataInicio} até ${dataFim} = ${diffDias} dias`);
-      
-      return diffDias;
-    } catch (e) {
-      console.error('❌ Erro ao calcular dias de viagem:', e);
-      return 1;
     }
   },
 
@@ -1348,112 +1402,6 @@ const BENETRIP_ROTEIRO = {
   // Funções auxiliares...
   simularDelayDev(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
-  },
-
-  obterRoteiroDummy() {
-    const dataInicioStr = this.extrairDataFormatada(this.dadosVoo.ida?.dataPartida) || 
-                         (this.dadosUsuario?.respostas?.datas?.dataIda);
-    const dataFimStr = this.extrairDataFormatada(this.dadosVoo.volta?.dataPartida) || 
-                      (this.dadosUsuario?.respostas?.datas?.dataVolta);
-    
-    console.log(`📊 Gerando roteiro dummy: ${dataInicioStr} até ${dataFimStr}`);
-    
-    if (!dataInicioStr || !dataFimStr) {
-      console.warn('⚠️ Datas não encontradas para gerar roteiro dummy');
-      const hoje = new Date();
-      const dataInicio = new Date(hoje);
-      dataInicio.setDate(hoje.getDate() + 1);
-      const dataFim = new Date(dataInicio);
-      dataFim.setDate(dataInicio.getDate() + 5);
-      return this.gerarRoteiroPadrao(dataInicio, dataFim);
-    }
-    
-    const dataInicio = new Date(dataInicioStr);
-    const dataFim = new Date(dataFimStr);
-    
-    const diffTempo = Math.abs(dataFim.getTime() - dataInicio.getTime());
-    const numeroRealDeDias = Math.ceil(diffTempo / (1000 * 60 * 60 * 24)) + 1;
-    
-    console.log(`📅 Número real de dias calculado: ${numeroRealDeDias}`);
-    
-    const roteiro = this.gerarRoteiroPadrao(dataInicio, dataFim, numeroRealDeDias);
-    
-    console.log(`✅ Roteiro dummy gerado com ${roteiro.dias?.length || 0} dias`);
-    
-    return roteiro;
-  },
-
-  gerarRoteiroPadrao(dataInicio, dataFim, numeroEspecificoDeDias = null) {
-    console.log(`🏗️ Gerando roteiro padrão...`);
-    
-    const dias = [];
-    let dataAtual = new Date(dataInicio);
-    
-    let totalDias;
-    if (numeroEspecificoDeDias && numeroEspecificoDeDias > 0) {
-      totalDias = numeroEspecificoDeDias;
-      console.log(`🎯 Usando número específico: ${totalDias} dias`);
-    } else {
-      const diffTempo = Math.abs(dataFim.getTime() - dataInicio.getTime());
-      totalDias = Math.ceil(diffTempo / (1000 * 60 * 60 * 24)) + 1;
-      console.log(`🧮 Calculando: ${totalDias} dias`);
-    }
-    
-    console.log(`🏗️ Gerando exatamente ${totalDias} dias`);
-    
-    for (let i = 0; i < totalDias; i++) {
-      const diaSemana = dataAtual.getDay();
-      const descricao = this.obterDescricaoDia(diaSemana, i + 1, this.dadosDestino?.destino || 'Orlando');
-      
-      const diaRoteiro = {
-        data: dataAtual.toISOString().split('T')[0],
-        descricao,
-        manha: this.gerarAtividadesPeriodo('manha', diaSemana, i + 1, this.dadosDestino?.destino || 'Orlando'),
-        tarde: this.gerarAtividadesPeriodo('tarde', diaSemana, i + 1, this.dadosDestino?.destino || 'Orlando'),
-        noite: this.gerarAtividadesPeriodo('noite', diaSemana, i + 1, this.dadosDestino?.destino || 'Orlando')
-      };
-      
-      dias.push(diaRoteiro);
-      
-      if (i < 3 || i === Math.floor(totalDias/2) || i === totalDias - 1) {
-        console.log(`📅 Dia ${i + 1}/${totalDias} criado: ${diaRoteiro.data}`);
-      }
-      
-      dataAtual.setDate(dataAtual.getDate() + 1);
-    }
-    
-    // Adicionar informações de chegada e partida
-    if (dias.length > 0) {
-      const horarioChegada = this.dadosVoo?.ida?.horaChegada || '17:05';
-      const horaChegada = parseInt(horarioChegada.split(':')[0]);
-      
-      if (horaChegada >= 6 && horaChegada < 12) {
-        dias[0].manha.horarioEspecial = `Chegada às ${horarioChegada}`;
-      } else if (horaChegada >= 12 && horaChegada < 18) {
-        dias[0].tarde.horarioEspecial = `Chegada às ${horarioChegada}`;
-      } else {
-        dias[0].noite.horarioEspecial = `Chegada às ${horarioChegada}`;
-      }
-      
-      const horarioPartida = this.dadosVoo?.volta?.horaPartida || '07:15';
-      const horaPartida = parseInt(horarioPartida.split(':')[0]);
-      const ultimoDia = dias.length - 1;
-      
-      if (horaPartida >= 6 && horaPartida < 12) {
-        dias[ultimoDia].manha.horarioEspecial = `Partida às ${horarioPartida}`;
-      } else if (horaPartida >= 12 && horaPartida < 18) {
-        dias[ultimoDia].tarde.horarioEspecial = `Partida às ${horarioPartida}`;
-      } else {
-        dias[ultimoDia].noite.horarioEspecial = `Partida às ${horarioPartida}`;
-      }
-    }
-    
-    console.log(`✅ Roteiro padrão criado com ${dias.length} dias`);
-    
-    return {
-      destino: `${this.dadosDestino?.destino || 'Orlando'}, ${this.dadosDestino?.pais || 'EUA'}`,
-      dias
-    };
   },
 
   obterDescricaoDia(diaSemana, numeroDia, destino = "Orlando") {
