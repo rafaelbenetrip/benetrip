@@ -2380,11 +2380,51 @@ redirecionarParaSiteCompra(voo) {
  */
 salvarVooSelecionado(voo) {
   try {
+    console.log('💾 Salvando dados do voo selecionado...');
+    console.log('📊 Voo original:', voo);
+    
     // Extrair informações importantes do voo
     const infoIda = this.obterInfoSegmento(voo.segment?.[0]);
     const infoVolta = voo.segment?.length > 1 ? this.obterInfoSegmento(voo.segment[1]) : null;
     const preco = this.obterPrecoVoo(voo);
     const moeda = this.obterMoedaAtual();
+    
+    // NOVA LÓGICA: Extrair datas dos dados do usuário para garantir consistência
+    const dadosUsuario = this.carregarDadosUsuario();
+    const datasUsuario = dadosUsuario?.respostas?.datas;
+    
+    console.log('📅 Datas do usuário:', datasUsuario);
+    console.log('📅 Info ida do voo:', infoIda);
+    console.log('📅 Info volta do voo:', infoVolta);
+    
+    // Função para extrair data correta (priorizando dados do usuário)
+    const extrairDataCorreta = (tipoData) => {
+      if (!datasUsuario) return null;
+      
+      try {
+        if (typeof datasUsuario === 'object' && !Array.isArray(datasUsuario)) {
+          // Formato: { dataIda: "2025-08-05", dataVolta: "2025-08-15" }
+          return tipoData === 'ida' ? datasUsuario.dataIda : datasUsuario.dataVolta;
+        } else if (Array.isArray(datasUsuario) && datasUsuario.length >= 2) {
+          // Formato: ["2025-08-05", "2025-08-15"]
+          return tipoData === 'ida' ? datasUsuario[0] : datasUsuario[1];
+        } else if (typeof datasUsuario === 'string' && datasUsuario.includes(',')) {
+          // Formato: "2025-08-05,2025-08-15"
+          const datas = datasUsuario.split(',').map(d => d.trim());
+          return tipoData === 'ida' ? datas[0] : datas[1];
+        }
+      } catch (e) {
+        console.warn('⚠️ Erro ao extrair data do usuário:', e);
+      }
+      
+      return null;
+    };
+    
+    // Obter datas corretas
+    const dataIdaUsuario = extrairDataCorreta('ida');
+    const dataVoltaUsuario = extrairDataCorreta('volta');
+    
+    console.log('🎯 Datas extraídas do usuário:', { dataIdaUsuario, dataVoltaUsuario });
     
     // Criar objeto simplificado com dados relevantes para a página de roteiro
     const vooSimplificado = {
@@ -2394,40 +2434,70 @@ salvarVooSelecionado(voo) {
       preco: preco,
       precoFormatado: this.formatarPreco(preco, moeda),
       moeda: moeda,
+      
+      // DADOS DE IDA (priorizando dados do usuário)
       ida: {
-        origem: infoIda?.aeroportoPartida || 'N/A',
-        destino: infoIda?.aeroportoChegada || 'N/A',
-        dataPartida: infoIda?.dataPartida ? infoIda.dataPartida.toISOString() : null,
-        dataChegada: infoIda?.dataChegada ? infoIda.dataChegada.toISOString() : null,
-        horaPartida: infoIda?.horaPartida || 'N/A',
-        horaChegada: infoIda?.horaChegada || 'N/A',
+        origem: infoIda?.aeroportoPartida || this.obterCodigoIATAOrigem(dadosUsuario) || 'GRU',
+        destino: infoIda?.aeroportoChegada || this.destino?.codigo_iata || 'N/A',
+        
+        // ✅ CORRIGIDO: Usar datas do usuário como prioridade
+        dataPartida: dataIdaUsuario || 
+                     (infoIda?.dataPartida ? infoIda.dataPartida.toISOString() : null) ||
+                     this.gerarDataDefault('ida'),
+        
+        dataChegada: dataIdaUsuario || 
+                     (infoIda?.dataChegada ? infoIda.dataChegada.toISOString() : null) ||
+                     this.gerarDataDefault('ida'),
+        
+        horaPartida: infoIda?.horaPartida || '08:00',
+        horaChegada: infoIda?.horaChegada || '15:30',
         duracao: infoIda?.duracao || 0,
         paradas: infoIda?.paradas || 0
       }
     };
     
-    // Adiciona informações de volta se disponíveis
-    if (infoVolta) {
+    // Adicionar informações de volta se disponíveis
+    if (infoVolta || dataVoltaUsuario) {
       vooSimplificado.volta = {
-        origem: infoVolta.aeroportoPartida || 'N/A',
-        destino: infoVolta.aeroportoChegada || 'N/A',
-        dataPartida: infoVolta.dataPartida ? infoVolta.dataPartida.toISOString() : null,
-        dataChegada: infoVolta.dataChegada ? infoVolta.dataChegada.toISOString() : null,
-        horaPartida: infoVolta.horaPartida || 'N/A',
-        horaChegada: infoVolta.horaChegada || 'N/A',
-        duracao: infoVolta.duracao || 0,
-        paradas: infoVolta.paradas || 0
+        origem: infoVolta?.aeroportoPartida || vooSimplificado.ida.destino,
+        destino: infoVolta?.aeroportoChegada || vooSimplificado.ida.origem,
+        
+        // ✅ CORRIGIDO: Usar datas do usuário como prioridade
+        dataPartida: dataVoltaUsuario || 
+                     (infoVolta?.dataPartida ? infoVolta.dataPartida.toISOString() : null) ||
+                     this.gerarDataDefault('volta', dataIdaUsuario),
+        
+        dataChegada: dataVoltaUsuario || 
+                     (infoVolta?.dataChegada ? infoVolta.dataChegada.toISOString() : null) ||
+                     this.gerarDataDefault('volta', dataIdaUsuario),
+        
+        horaPartida: infoVolta?.horaPartida || '21:00',
+        horaChegada: infoVolta?.horaChegada || '07:15',
+        duracao: infoVolta?.duracao || 0,
+        paradas: infoVolta?.paradas || 0
       };
     }
     
-    // Salva no localStorage
+    console.log('💾 Dados finais para salvamento:', vooSimplificado);
+    
+    // Salvar no localStorage
     localStorage.setItem('benetrip_voo_selecionado', JSON.stringify(vooSimplificado));
-    console.log('Dados do voo salvos para a página de roteiro:', vooSimplificado);
+    
+    // NOVO: Também salvar uma cópia dos dados originais para debug
+    localStorage.setItem('benetrip_voo_original', JSON.stringify({
+      vooOriginal: voo,
+      dadosUsuario: dadosUsuario,
+      timestamp: new Date().toISOString()
+    }));
+    
+    console.log('✅ Dados do voo salvos com sucesso para roteiro');
+    
+    return vooSimplificado;
   } catch (erro) {
-    console.error('Erro ao salvar dados do voo:', erro);
+    console.error('❌ Erro ao salvar dados do voo:', erro);
+    throw erro;
   }
 }
-
 }; // Fim do objeto BENETRIP_VOOS
 
 // Inicializar quando o DOM estiver pronto
