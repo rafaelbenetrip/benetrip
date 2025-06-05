@@ -1,7 +1,7 @@
 /**
- * Benetrip - Sistema de Roteiro Personalizado (VERSÃO COMPLETA CORRIGIDA)
+ * Benetrip - Sistema de Roteiro Personalizado (VERSÃO COMPLETA COM HORÁRIOS INTELIGENTES)
  * Responsável por gerar e exibir roteiros personalizados de viagem
- * Versão: 3.0 - Com correções completas de datas e timezone
+ * Versão: 4.0 - Com correções de datas + horários inteligentes de voo
  */
 
 // Inicialização do módulo de roteiro
@@ -88,6 +88,9 @@ const BENETRIP_ROTEIRO = {
       
       // 4. NOVA LÓGICA: Validar e normalizar datas dos voos
       this.normalizarDatasVoo();
+      
+      // 5. ✅ NOVO: Validar horários dos voos
+      this.validarHorariosVoo();
       
       return true;
     } catch (erro) {
@@ -452,8 +455,8 @@ const BENETRIP_ROTEIRO = {
       console.log(`📅 Dia ${i + 1}/${diasReais}: ${dataFormatada} (${dataAtual.toDateString()})`);
     }
     
-    // Adicionar informações de voo ao primeiro e último dia
-    this.adicionarInformacoesVoo(dias);
+    // ✅ ATUALIZADO: Usar função melhorada para adicionar informações de voo
+    this.adicionarInformacoesVooMelhorada(dias);
     
     console.log(`✅ Roteiro dummy criado com ${dias.length} dias corretos`);
     
@@ -463,40 +466,263 @@ const BENETRIP_ROTEIRO = {
     };
   },
 
+  // ===========================================
+  // ✅ NOVAS FUNÇÕES DE HORÁRIOS INTELIGENTES
+  // ===========================================
+
   /**
-   * ✅ NOVA FUNÇÃO: Adiciona informações de voo ao roteiro
+   * ✅ NOVA FUNÇÃO: Analisa e ajusta atividades baseado nos horários de voo
    */
-  adicionarInformacoesVoo(dias) {
+  ajustarAtividadesPorHorarios(dias) {
     if (!dias || dias.length === 0) return;
     
-    // Informações de chegada no primeiro dia
+    // Analisar horário de chegada no primeiro dia
     const horarioChegada = this.dadosVoo?.ida?.horaChegada || '15:30';
     const horaChegada = parseInt(horarioChegada.split(':')[0]);
+    const minutoChegada = parseInt(horarioChegada.split(':')[1]);
     
-    if (horaChegada >= 6 && horaChegada < 12) {
-      dias[0].manha.horarioEspecial = `Chegada às ${horarioChegada}`;
-    } else if (horaChegada >= 12 && horaChegada < 18) {
-      dias[0].tarde.horarioEspecial = `Chegada às ${horarioChegada}`;
+    console.log(`🛬 Analisando chegada às ${horarioChegada} (${horaChegada}:${minutoChegada})`);
+    
+    // Ajustar primeiro dia baseado no horário de chegada
+    if (horaChegada < 10) {
+      // Chegada muito cedo - dia completo disponível
+      dias[0].observacao = "Chegada cedo - dia completo para explorar!";
+      this.adicionarAtividadeEspecial(dias[0].manha, "Check-in no hotel", horarioChegada);
+    } else if (horaChegada >= 10 && horaChegada < 14) {
+      // Chegada meio do dia - tarde/noite disponível
+      dias[0].observacao = "Chegada no meio do dia - aproveite a tarde!";
+      this.adicionarAtividadeEspecial(dias[0].tarde, "Check-in e instalação", horarioChegada);
+    } else if (horaChegada >= 14 && horaChegada < 18) {
+      // Chegada à tarde - noite disponível
+      dias[0].observacao = "Chegada à tarde - explore a vida noturna!";
+      this.adicionarAtividadeEspecial(dias[0].tarde, "Check-in e descanso", horarioChegada);
     } else {
-      dias[0].noite.horarioEspecial = `Chegada às ${horarioChegada}`;
+      // Chegada muito tarde - só descanso
+      dias[0].observacao = "Chegada noturna - descanse para começar bem amanhã!";
+      dias[0].noite.atividades = [{
+        horario: horarioChegada,
+        local: "Hotel",
+        dica: "Chegada noturna - foque no descanso para aproveitar os próximos dias!",
+        tags: ["Descanso", "Chegada"]
+      }];
     }
     
-    // Informações de partida no último dia (se houver voo de volta)
+    // Analisar horário de partida no último dia (se houver)
     if (this.dadosVoo?.volta && dias.length > 1) {
       const horarioPartida = this.dadosVoo.volta.horaPartida || '21:00';
       const horaPartida = parseInt(horarioPartida.split(':')[0]);
       const ultimoDia = dias.length - 1;
       
-      if (horaPartida >= 6 && horaPartida < 12) {
-        dias[ultimoDia].manha.horarioEspecial = `Partida às ${horarioPartida}`;
-      } else if (horaPartida >= 12 && horaPartida < 18) {
-        dias[ultimoDia].tarde.horarioEspecial = `Partida às ${horarioPartida}`;
+      console.log(`🛫 Analisando partida às ${horarioPartida} (${horaPartida}:00)`);
+      
+      if (horaPartida < 8) {
+        // Partida muito cedo - último dia limitado
+        dias[ultimoDia].observacao = "Partida cedo - programe atividades leves!";
+        dias[ultimoDia].manha.atividades = [{
+          horario: "06:00",
+          local: "Hotel",
+          dica: "Check-out cedo e transfer para o aeroporto. Prepare-se na noite anterior!",
+          tags: ["Check-out", "Transfer"]
+        }];
+      } else if (horaPartida >= 8 && horaPartida < 14) {
+        // Partida manhã/meio-dia - manhã limitada
+        dias[ultimoDia].observacao = "Partida pela manhã - aproveite para últimas compras!";
+        this.adicionarAtividadeEspecial(dias[ultimoDia].manha, "Check-out e últimas atividades", 
+          this.calcularHorarioCheckout(horarioPartida));
+      } else if (horaPartida >= 14 && horaPartida < 20) {
+        // Partida à tarde - manhã completa disponível
+        dias[ultimoDia].observacao = "Partida à tarde - manhã completa para aproveitar!";
+        this.adicionarAtividadeEspecial(dias[ultimoDia].tarde, "Check-out e transfer", 
+          this.calcularHorarioCheckout(horarioPartida));
       } else {
-        dias[ultimoDia].noite.horarioEspecial = `Partida às ${horarioPartida}`;
+        // Partida noturna - dia quase completo
+        dias[ultimoDia].observacao = "Partida noturna - dia quase completo disponível!";
+        this.adicionarAtividadeEspecial(dias[ultimoDia].noite, "Transfer para aeroporto", 
+          this.calcularHorarioCheckout(horarioPartida));
       }
     }
     
-    console.log('✅ Informações de voo adicionadas ao roteiro');
+    console.log('✅ Atividades ajustadas baseadas nos horários de voo');
+  },
+
+  /**
+   * ✅ NOVA FUNÇÃO: Adiciona atividade especial relacionada ao voo
+   */
+  adicionarAtividadeEspecial(periodo, descricao, horario) {
+    if (!periodo.atividades) {
+      periodo.atividades = [];
+    }
+    
+    // Adicionar no início da lista
+    periodo.atividades.unshift({
+      horario: horario,
+      local: descricao,
+      dica: "Atividade relacionada ao seu voo - importante não perder!",
+      tags: ["Voo", "Importante"],
+      isEspecial: true
+    });
+  },
+
+  /**
+   * ✅ NOVA FUNÇÃO: Calcula horário ideal para check-out baseado na partida
+   */
+  calcularHorarioCheckout(horarioPartida) {
+    const horaPartida = parseInt(horarioPartida.split(':')[0]);
+    const minutoPartida = parseInt(horarioPartida.split(':')[1]);
+    
+    // Calcular 3 horas antes da partida para check-out
+    let horaCheckout = horaPartida - 3;
+    let minutoCheckout = minutoPartida;
+    
+    // Ajustar se ficar negativo
+    if (horaCheckout < 0) {
+      horaCheckout = 6; // Mínimo 6h da manhã
+      minutoCheckout = 0;
+    }
+    
+    return `${String(horaCheckout).padStart(2, '0')}:${String(minutoCheckout).padStart(2, '0')}`;
+  },
+
+  /**
+   * ✅ NOVA FUNÇÃO: Analisa compatibilidade de horários com atividades
+   */
+  analisarCompatibilidadeHorarios() {
+    const horarioChegada = this.dadosVoo?.ida?.horaChegada || '15:30';
+    const horarioPartida = this.dadosVoo?.volta?.horaPartida || '21:00';
+    
+    const horaChegada = parseInt(horarioChegada.split(':')[0]);
+    const horaPartida = parseInt(horarioPartida.split(':')[0]);
+    
+    const alertas = [];
+    
+    // Verificar chegada muito tarde
+    if (horaChegada >= 22) {
+      alertas.push({
+        tipo: 'warning',
+        icone: '🌙',
+        titulo: 'Chegada Noturna',
+        mensagem: 'Sua chegada é muito tarde. O primeiro dia será focado no descanso.'
+      });
+    }
+    
+    // Verificar partida muito cedo
+    if (horaPartida <= 6) {
+      alertas.push({
+        tipo: 'warning',
+        icone: '🌅',
+        titulo: 'Partida Madrugada',
+        mensagem: 'Sua partida é muito cedo. Prepare-se na noite anterior!'
+      });
+    }
+    
+    // Verificar se há tempo suficiente
+    const diasViagem = this.calcularDiasViagemCorreto(
+      this.formatarDataISO(this.dadosVoo.ida?.dataPartida),
+      this.formatarDataISO(this.dadosVoo.volta?.dataPartida)
+    );
+    
+    if (diasViagem === 1 && (horaChegada >= 18 || horaPartida <= 10)) {
+      alertas.push({
+        tipo: 'info',
+        icone: '⏰',
+        titulo: 'Viagem Rápida',
+        mensagem: 'Com apenas 1 dia e horários apertados, foque em atividades próximas!'
+      });
+    }
+    
+    // Sugestões baseadas nos horários
+    if (horaChegada <= 10 && horaPartida >= 20) {
+      alertas.push({
+        tipo: 'success',
+        icone: '🎉',
+        titulo: 'Horários Ideais',
+        mensagem: 'Seus horários permitem aproveitar o dia completo!'
+      });
+    }
+    
+    return alertas;
+  },
+
+  /**
+   * ✅ NOVA FUNÇÃO: Cria elemento visual para alertas de horário
+   */
+  criarElementoAlertasHorario(alertas) {
+    if (!alertas || alertas.length === 0) return '';
+    
+    return alertas.map(alerta => `
+      <div class="alerta-horario alerta-${alerta.tipo}">
+        <div class="alerta-icone">${alerta.icone}</div>
+        <div class="alerta-conteudo">
+          <div class="alerta-titulo">${alerta.titulo}</div>
+          <div class="alerta-mensagem">${alerta.mensagem}</div>
+        </div>
+      </div>
+    `).join('');
+  },
+
+  /**
+   * ✅ FUNÇÃO ATUALIZADA: Adicionar informações de voo com mais detalhes
+   */
+  adicionarInformacoesVooMelhorada(dias) {
+    if (!dias || dias.length === 0) return;
+    
+    // Primeiro, aplicar ajustes baseados nos horários
+    this.ajustarAtividadesPorHorarios(dias);
+    
+    // Analisar compatibilidade e gerar alertas
+    const alertas = this.analisarCompatibilidadeHorarios();
+    
+    // Adicionar alertas ao primeiro dia se houver
+    if (alertas.length > 0) {
+      dias[0].alertasHorario = alertas;
+    }
+    
+    console.log('✅ Informações detalhadas de voo adicionadas ao roteiro');
+  },
+
+  /**
+   * ✅ FUNÇÃO ATUALIZADA: Validar horários dos voos
+   */
+  validarHorariosVoo() {
+    console.log('🔍 Validando horários dos voos...');
+    
+    const horarioChegada = this.dadosVoo?.ida?.horaChegada;
+    const horarioPartida = this.dadosVoo?.volta?.horaPartida;
+    
+    console.log(`🛬 Horário de chegada: ${horarioChegada || 'Não definido'}`);
+    console.log(`🛫 Horário de partida: ${horarioPartida || 'Não definido'}`);
+    
+    // Validar formato dos horários
+    const formatoHorario = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/;
+    
+    if (horarioChegada && !formatoHorario.test(horarioChegada)) {
+      console.warn(`⚠️ Formato inválido para horário de chegada: ${horarioChegada}`);
+    }
+    
+    if (horarioPartida && !formatoHorario.test(horarioPartida)) {
+      console.warn(`⚠️ Formato inválido para horário de partida: ${horarioPartida}`);
+    }
+    
+    // Verificar se os horários fazem sentido
+    if (horarioChegada && horarioPartida) {
+      const [horaC, minC] = horarioChegada.split(':').map(Number);
+      const [horaP, minP] = horarioPartida.split(':').map(Number);
+      
+      const minutosChegada = horaC * 60 + minC;
+      const minutosPartida = horaP * 60 + minP;
+      
+      // Para viagens de 1 dia, verificar se há tempo suficiente
+      const diasViagem = this.calcularDiasViagemCorreto(
+        this.formatarDataISO(this.dadosVoo.ida?.dataPartida),
+        this.formatarDataISO(this.dadosVoo.volta?.dataPartida)
+      );
+      
+      if (diasViagem === 1 && minutosPartida <= minutosChegada + 120) {
+        console.warn('⚠️ Tempo muito curto entre chegada e partida (menos de 2 horas)');
+      }
+    }
+    
+    console.log('✅ Validação de horários concluída');
   },
 
   /**
@@ -548,8 +774,8 @@ const BENETRIP_ROTEIRO = {
       console.log(`📅 Dia ${index + 1} ajustado para: ${dia.data} (${dataDia.toDateString()})`);
     });
     
-    // Adicionar informações de voo
-    this.adicionarInformacoesVoo(this.roteiroPronto.dias);
+    // ✅ ATUALIZADO: Usar função melhorada para adicionar informações de voo
+    this.adicionarInformacoesVooMelhorada(this.roteiroPronto.dias);
     
     console.log('✅ Datas do roteiro ajustadas com sucesso');
   },
@@ -903,13 +1129,24 @@ const BENETRIP_ROTEIRO = {
   },
 
   /**
-   * Cria o elemento de um dia do roteiro
+   * ✅ FUNÇÃO ATUALIZADA: Cria o elemento de um dia do roteiro com alertas de horário
    */
   criarElementoDiaRoteiro(dia, numeroDia) {
     const diaRoteiro = document.createElement('div');
     diaRoteiro.className = 'dia-roteiro';
     
     const dataFormatada = this.formatarDataCompleta(dia.data);
+    
+    // Criar alertas de horário se existirem
+    const alertasHTML = dia.alertasHorario ? 
+      this.criarElementoAlertasHorario(dia.alertasHorario) : '';
+    
+    // Criar observação se existir
+    const observacaoHTML = dia.observacao ? 
+      `<div class="dia-observacao">
+         <span class="icone">💡</span>
+         <span>${dia.observacao}</span>
+       </div>` : '';
     
     diaRoteiro.innerHTML = `
       <div class="dia-header">
@@ -922,6 +1159,8 @@ const BENETRIP_ROTEIRO = {
           "${dia.descricao || 'Explore e aproveite seu dia!'}"
         </p>
         
+        ${observacaoHTML}
+        ${alertasHTML}
         ${this.criarElementoPrevisaoTempo(dia.previsao)}
         
         <div class="periodos-tabs">
@@ -1004,7 +1243,7 @@ const BENETRIP_ROTEIRO = {
   },
 
   /**
-   * Cria o elemento HTML para um período do dia
+   * ✅ FUNÇÃO ATUALIZADA: Cria o elemento HTML para um período do dia
    */
   criarElementoPeriodo(periodo, nomePeriodo) {
     if (!periodo || !periodo.atividades || periodo.atividades.length === 0) {
@@ -1027,8 +1266,11 @@ const BENETRIP_ROTEIRO = {
     }
     
     periodo.atividades.forEach(atividade => {
+      // ✅ NOVO: Classe especial para atividades de voo
+      const classeEspecial = atividade.isEspecial ? ' atividade-especial' : '';
+      
       html += `
-        <div class="atividade">
+        <div class="atividade${classeEspecial}">
           ${atividade.horario ? `
             <div class="atividade-horario">
               <span class="icone">🕒</span>
@@ -1070,12 +1312,14 @@ const BENETRIP_ROTEIRO = {
             </div>
           ` : ''}
           
-          <button class="btn-ver-mapa" data-local="${atividade.local}">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-              <path d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"></path>
-            </svg>
-            Ver no mapa
-          </button>
+          ${!atividade.isEspecial ? `
+            <button class="btn-ver-mapa" data-local="${atividade.local}">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"></path>
+              </svg>
+              Ver no mapa
+            </button>
+          ` : ''}
         </div>
       `;
     });
@@ -1481,6 +1725,7 @@ const BENETRIP_ROTEIRO = {
     if (tag.includes('famil') || tag.includes('criança')) return 'badge-green';
     if (tag.includes('histór') || tag.includes('cultur')) return 'badge-blue';
     if (tag.includes('compra') || tag.includes('loja')) return 'badge-purple';
+    if (tag.includes('voo') || tag.includes('importante')) return 'badge-red';
     
     return '';
   },
