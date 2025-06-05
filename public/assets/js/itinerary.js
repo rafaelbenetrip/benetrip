@@ -1,7 +1,7 @@
 /**
- * Benetrip - Sistema de Roteiro Personalizado (VERSÃO CORRIGIDA E OTIMIZADA)
+ * Benetrip - Sistema de Roteiro Personalizado (VERSÃO COMPLETA CORRIGIDA)
  * Responsável por gerar e exibir roteiros personalizados de viagem
- * Versão: 2.0 - Com correções de datas e remoção de código obsoleto
+ * Versão: 3.0 - Com correções completas de datas e timezone
  */
 
 // Inicialização do módulo de roteiro
@@ -168,25 +168,61 @@ const BENETRIP_ROTEIRO = {
   },
 
   /**
-   * ✅ FUNÇÃO CONSOLIDADA: Formata data para ISO (substituiu extrairDataFormatada + normalizarData)
+   * ✅ NOVA FUNÇÃO: Cria uma data local segura sem problemas de timezone
+   */
+  criarDataLocal(dataString) {
+    if (!dataString) return null;
+    
+    try {
+      const partes = dataString.split('-');
+      if (partes.length !== 3) return null;
+      
+      // Criar data no horário local (meio-dia para evitar problemas de timezone)
+      return new Date(
+        parseInt(partes[0]), // ano
+        parseInt(partes[1]) - 1, // mês (0-indexed)
+        parseInt(partes[2]), // dia
+        12, 0, 0, 0 // meio-dia
+      );
+    } catch (e) {
+      console.warn('⚠️ Erro ao criar data local:', e);
+      return null;
+    }
+  },
+
+  /**
+   * ✅ FUNÇÃO CORRIGIDA: Formata data para ISO sem problemas de timezone
    */
   formatarDataISO(dataInput) {
     if (!dataInput) return null;
     
     try {
       // Se já está no formato ISO correto
-      if (typeof dataInput === 'string' && /^\d{4}-\d{2}-\d{2}/.test(dataInput)) {
-        return dataInput.includes('T') ? dataInput.split('T')[0] : dataInput;
+      if (typeof dataInput === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dataInput)) {
+        return dataInput;
       }
       
-      // Converter para Date e extrair apenas YYYY-MM-DD
+      // Se contém 'T' (formato ISO completo), extrair apenas a data
+      if (typeof dataInput === 'string' && dataInput.includes('T')) {
+        return dataInput.split('T')[0];
+      }
+      
+      // Converter para Date
       const data = new Date(dataInput);
       if (isNaN(data.getTime())) {
         console.warn('⚠️ Data inválida:', dataInput);
         return null;
       }
       
-      return data.toISOString().split('T')[0];
+      // ✅ CORREÇÃO: Usar dados locais em vez de UTC
+      const ano = data.getFullYear();
+      const mes = String(data.getMonth() + 1).padStart(2, '0');
+      const dia = String(data.getDate()).padStart(2, '0');
+      
+      const dataFormatada = `${ano}-${mes}-${dia}`;
+      console.log(`📅 Data formatada (local): ${dataInput} -> ${dataFormatada}`);
+      
+      return dataFormatada;
     } catch (e) {
       console.warn('⚠️ Erro ao formatar data:', e);
       return null;
@@ -235,15 +271,14 @@ const BENETRIP_ROTEIRO = {
   },
   
   /**
-   * ✅ FUNÇÃO CORRIGIDA: Gera o roteiro personalizado via API
+   * ✅ FUNÇÃO CORRIGIDA: Gera o roteiro personalizado com validação completa
    */
   async gerarRoteiro() {
     try {
       console.log('🎯 Gerando roteiro com dados validados...');
-      console.log('📅 Dados finais do voo:', {
-        ida: this.dadosVoo.ida,
-        volta: this.dadosVoo.volta
-      });
+      
+      // Debug inicial
+      this.debugDatas();
       
       // Extrair datas já normalizadas
       const dataIda = this.formatarDataISO(this.dadosVoo.ida.dataPartida);
@@ -254,11 +289,13 @@ const BENETRIP_ROTEIRO = {
         throw new Error('Data de ida não disponível');
       }
       
-      console.log('📊 Datas extraídas:', { dataIda, dataVolta });
+      console.log('📊 Datas extraídas e formatadas:');
+      console.log(`   Data ida: ${dataIda}`);
+      console.log(`   Data volta: ${dataVolta || 'N/A'}`);
       
       // Calcular número real de dias da viagem
       const diasReais = this.calcularDiasViagemCorreto(dataIda, dataVolta);
-      console.log(`🗓️ Dias reais de viagem: ${diasReais}`);
+      console.log(`🗓️ Dias reais de viagem calculados: ${diasReais}`);
       
       // Preparar parâmetros para a API
       const params = {
@@ -266,7 +303,7 @@ const BENETRIP_ROTEIRO = {
         pais: this.dadosDestino?.pais || 'Desconhecido',
         dataInicio: dataIda,
         dataFim: dataVolta,
-        diasViagem: diasReais, // ← NOVO: passar número exato de dias
+        diasViagem: diasReais,
         horaChegada: this.dadosVoo.ida?.horaChegada || '12:00',
         horaSaida: this.dadosVoo.volta?.horaPartida || '14:00',
         tipoViagem: this.obterTipoViagem(),
@@ -302,7 +339,13 @@ const BENETRIP_ROTEIRO = {
         this.ajustarDatasRoteiro(dataIda, diasReais);
       }
       
-      console.log('🎉 Roteiro gerado com datas corretas:', this.roteiroPronto);
+      console.log('🎉 Roteiro gerado, validando consistência...');
+      
+      // Validar consistência de datas
+      this.validarConsistenciaDatas();
+      
+      // Debug final
+      this.debugDatas();
       
       // Buscar previsão do tempo e imagens
       await this.buscarPrevisaoTempo();
@@ -338,14 +381,14 @@ const BENETRIP_ROTEIRO = {
         return 1;
       }
       
-      const inicio = new Date(dataIda);
+      const inicio = this.criarDataLocal(dataIda);
       
       if (!dataVolta) {
         console.log('📅 Viagem só de ida - 1 dia');
         return 1;
       }
       
-      const fim = new Date(dataVolta);
+      const fim = this.criarDataLocal(dataVolta);
       
       // Calcular diferença em dias (incluindo dia de chegada e saída)
       const diffTempo = fim.getTime() - inicio.getTime();
@@ -364,21 +407,36 @@ const BENETRIP_ROTEIRO = {
   },
 
   /**
-   * ✅ NOVA FUNÇÃO: Gera roteiro dummy com datas corretas
+   * ✅ FUNÇÃO CORRIGIDA: Gera roteiro dummy com datas corretas
    */
   obterRoteiroDummyCorreto(dataIda, dataVolta, diasReais) {
     console.log(`🏗️ Gerando roteiro dummy para ${diasReais} dias`);
     console.log(`📅 De ${dataIda} até ${dataVolta || 'N/A'}`);
     
     const dias = [];
-    const dataInicio = new Date(dataIda);
+    
+    // ✅ CORREÇÃO: Criar data com components locais para evitar timezone
+    const partesDataIda = dataIda.split('-');
+    const dataInicio = new Date(
+      parseInt(partesDataIda[0]), // ano
+      parseInt(partesDataIda[1]) - 1, // mês (0-indexed)
+      parseInt(partesDataIda[2]), // dia
+      12, 0, 0 // meio-dia para evitar problemas de timezone
+    );
+    
+    console.log(`📅 Data de início normalizada: ${dataInicio.toDateString()}`);
     
     // Gerar exatamente o número de dias calculado
     for (let i = 0; i < diasReais; i++) {
       const dataAtual = new Date(dataInicio);
       dataAtual.setDate(dataInicio.getDate() + i);
       
-      const dataFormatada = dataAtual.toISOString().split('T')[0];
+      // ✅ CORREÇÃO: Usar componentes locais em vez de toISOString
+      const ano = dataAtual.getFullYear();
+      const mes = String(dataAtual.getMonth() + 1).padStart(2, '0');
+      const dia = String(dataAtual.getDate()).padStart(2, '0');
+      const dataFormatada = `${ano}-${mes}-${dia}`;
+      
       const diaSemana = dataAtual.getDay();
       
       const diaRoteiro = {
@@ -391,7 +449,7 @@ const BENETRIP_ROTEIRO = {
       
       dias.push(diaRoteiro);
       
-      console.log(`📅 Dia ${i + 1}/${diasReais}: ${dataFormatada}`);
+      console.log(`📅 Dia ${i + 1}/${diasReais}: ${dataFormatada} (${dataAtual.toDateString()})`);
     }
     
     // Adicionar informações de voo ao primeiro e último dia
@@ -442,14 +500,21 @@ const BENETRIP_ROTEIRO = {
   },
 
   /**
-   * ✅ NOVA FUNÇÃO: Ajusta datas do roteiro para corresponder às datas reais
+   * ✅ FUNÇÃO CORRIGIDA: Ajusta datas do roteiro para corresponder às datas reais
    */
   ajustarDatasRoteiro(dataIda, diasReais) {
     if (!this.roteiroPronto || !this.roteiroPronto.dias) return;
     
     console.log('🔄 Ajustando datas do roteiro para corresponder às datas reais...');
     
-    const dataInicio = new Date(dataIda);
+    // ✅ CORREÇÃO: Criar data com components locais
+    const partesDataIda = dataIda.split('-');
+    const dataInicio = new Date(
+      parseInt(partesDataIda[0]), // ano
+      parseInt(partesDataIda[1]) - 1, // mês (0-indexed)
+      parseInt(partesDataIda[2]), // dia
+      12, 0, 0 // meio-dia para evitar problemas de timezone
+    );
     
     // Garantir que temos exatamente o número correto de dias
     if (this.roteiroPronto.dias.length !== diasReais) {
@@ -473,9 +538,14 @@ const BENETRIP_ROTEIRO = {
     this.roteiroPronto.dias.forEach((dia, index) => {
       const dataDia = new Date(dataInicio);
       dataDia.setDate(dataInicio.getDate() + index);
-      dia.data = dataDia.toISOString().split('T')[0];
       
-      console.log(`📅 Dia ${index + 1} ajustado para: ${dia.data}`);
+      // ✅ CORREÇÃO: Usar componentes locais em vez de toISOString
+      const ano = dataDia.getFullYear();
+      const mes = String(dataDia.getMonth() + 1).padStart(2, '0');
+      const diaNum = String(dataDia.getDate()).padStart(2, '0');
+      dia.data = `${ano}-${mes}-${diaNum}`;
+      
+      console.log(`📅 Dia ${index + 1} ajustado para: ${dia.data} (${dataDia.toDateString()})`);
     });
     
     // Adicionar informações de voo
@@ -1014,6 +1084,89 @@ const BENETRIP_ROTEIRO = {
   },
 
   // ===========================================
+  // FUNÇÕES DE DEBUG E VALIDAÇÃO
+  // ===========================================
+
+  /**
+   * ✅ NOVA FUNÇÃO: Debug para verificar processamento de datas
+   */
+  debugDatas() {
+    console.log('🔍 DEBUG - Verificação de datas:');
+    console.log('📊 Dados do voo:', {
+      ida: this.dadosVoo?.ida,
+      volta: this.dadosVoo?.volta
+    });
+    
+    console.log('📊 Dados do usuário (datas):', this.dadosUsuario?.respostas?.datas);
+    
+    if (this.roteiroPronto?.dias) {
+      console.log('📊 Datas no roteiro gerado:');
+      this.roteiroPronto.dias.forEach((dia, index) => {
+        console.log(`  Dia ${index + 1}: ${dia.data}`);
+      });
+    }
+  },
+
+  /**
+   * ✅ NOVA FUNÇÃO: Validar consistência de datas entre voo e roteiro
+   */
+  validarConsistenciaDatas() {
+    const dataIdaVoo = this.formatarDataISO(this.dadosVoo?.ida?.dataPartida);
+    const dataVoltaVoo = this.formatarDataISO(this.dadosVoo?.volta?.dataPartida);
+    
+    console.log('🔍 Validação de consistência:');
+    console.log(`📅 Data ida do voo: ${dataIdaVoo}`);
+    console.log(`📅 Data volta do voo: ${dataVoltaVoo}`);
+    
+    if (this.roteiroPronto?.dias?.length > 0) {
+      const primeiroDiaRoteiro = this.roteiroPronto.dias[0].data;
+      const ultimoDiaRoteiro = this.roteiroPronto.dias[this.roteiroPronto.dias.length - 1].data;
+      
+      console.log(`📅 Primeiro dia do roteiro: ${primeiroDiaRoteiro}`);
+      console.log(`📅 Último dia do roteiro: ${ultimoDiaRoteiro}`);
+      
+      // Verificar se as datas coincidem
+      if (dataIdaVoo !== primeiroDiaRoteiro) {
+        console.error('❌ INCONSISTÊNCIA: Data de ida do voo não coincide com primeiro dia do roteiro!');
+        console.error(`   Voo: ${dataIdaVoo} vs Roteiro: ${primeiroDiaRoteiro}`);
+        return false;
+      }
+      
+      if (dataVoltaVoo && dataVoltaVoo !== ultimoDiaRoteiro) {
+        console.warn('⚠️ AVISO: Data de volta do voo não coincide com último dia do roteiro');
+        console.warn(`   Voo: ${dataVoltaVoo} vs Roteiro: ${ultimoDiaRoteiro}`);
+      }
+      
+      console.log('✅ Datas do voo e roteiro estão consistentes');
+      return true;
+    }
+    
+    return false;
+  },
+
+  /**
+   * ✅ NOVA FUNÇÃO: Teste de datas para desenvolvimento
+   */
+  testarDatas() {
+    console.log('🧪 TESTE DE DATAS:');
+    
+    // Testar diferentes formatos de data
+    const testeDataInput = '2025-03-15';
+    const dataFormatada = this.formatarDataISO(testeDataInput);
+    const dataLocal = this.criarDataLocal(testeDataInput);
+    
+    console.log(`   Input: ${testeDataInput}`);
+    console.log(`   Formatada: ${dataFormatada}`);
+    console.log(`   Data local: ${dataLocal?.toDateString()}`);
+    console.log(`   ISO nativo: ${dataLocal?.toISOString().split('T')[0]}`);
+    
+    // Testar timezone
+    const agora = new Date();
+    console.log(`   Timezone offset: ${agora.getTimezoneOffset()} minutos`);
+    console.log(`   Fuso horário: ${Intl.DateTimeFormat().resolvedOptions().timeZone}`);
+  },
+
+  // ===========================================
   // FUNÇÕES DE MAPEAMENTO DE PREFERÊNCIAS (CORRIGIDAS)
   // ===========================================
 
@@ -1283,10 +1436,15 @@ const BENETRIP_ROTEIRO = {
     return mapeamento[codigoIATA] || codigoIATA;
   },
 
+  /**
+   * ✅ FUNÇÃO ATUALIZADA: Formatar data para exibição usando data local
+   */
   formatarData(dataString) {
     try {
-      const data = new Date(dataString);
-      return data.toLocaleDateString('pt-BR', {
+      const dataLocal = this.criarDataLocal(dataString);
+      if (!dataLocal) return dataString;
+      
+      return dataLocal.toLocaleDateString('pt-BR', {
         day: 'numeric',
         month: 'long'
       });
@@ -1296,10 +1454,15 @@ const BENETRIP_ROTEIRO = {
     }
   },
 
+  /**
+   * ✅ FUNÇÃO ATUALIZADA: Formatar data completa usando data local
+   */
   formatarDataCompleta(dataString) {
     try {
-      const data = new Date(dataString);
-      return data.toLocaleDateString('pt-BR', {
+      const dataLocal = this.criarDataLocal(dataString);
+      if (!dataLocal) return dataString;
+      
+      return dataLocal.toLocaleDateString('pt-BR', {
         weekday: 'long',
         day: 'numeric',
         month: 'numeric',
