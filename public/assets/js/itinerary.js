@@ -500,53 +500,234 @@ const BENETRIP_ROTEIRO = {
    * Busca imagens para os locais
    */
   async buscarImagensLocais() {
-    try {
-      if (!this.roteiroPronto?.dias) return;
+  try {
+    console.log('🖼️ Iniciando busca de imagens para locais...');
+    
+    if (!this.roteiroPronto?.dias) {
+      console.warn('⚠️ Não há roteiro para buscar imagens');
+      return;
+    }
+    
+    // Coletar todos os pontos turísticos únicos
+    const pontosTuristicos = new Set();
+    let totalAtividades = 0;
+    
+    this.roteiroPronto.dias.forEach((dia, diaIndex) => {
+      console.log(`📅 Processando dia ${diaIndex + 1}:`, dia.data);
       
-      const pontos = new Set();
-      this.roteiroPronto.dias.forEach(dia => {
-        ['manha', 'tarde', 'noite'].forEach(periodo => {
-          if (dia[periodo]?.atividades) {
-            dia[periodo].atividades.forEach(ativ => {
-              if (ativ.local) pontos.add(ativ.local);
-            });
-          }
-        });
-      });
-      
-      const imagensPromises = [...pontos].slice(0, 10).map(async (local) => {
-        try {
-          const response = await fetch(`/api/image-search?query=${encodeURIComponent(local)}&perPage=1`);
-          if (response.ok) {
-            const dados = await response.json();
-            return { local, imagem: dados.images[0]?.url };
-          }
-        } catch (e) {
-          return { local, imagem: null };
+      ['manha', 'tarde', 'noite'].forEach(periodo => {
+        if (dia[periodo]?.atividades?.length) {
+          console.log(`  🕐 ${periodo}: ${dia[periodo].atividades.length} atividades`);
+          
+          dia[periodo].atividades.forEach((atividade, ativIndex) => {
+            if (atividade.local && !atividade.isEspecial) {
+              pontosTuristicos.add(atividade.local);
+              totalAtividades++;
+              console.log(`    📍 ${ativIndex + 1}. ${atividade.local}`);
+            } else if (atividade.isEspecial) {
+              console.log(`    ✈️ ${ativIndex + 1}. ${atividade.local} (especial - sem imagem)`);
+            }
+          });
+        } else {
+          console.log(`  🕐 ${periodo}: nenhuma atividade`);
         }
       });
-      
-      const resultados = await Promise.all(imagensPromises);
-      const mapaImagens = {};
-      resultados.forEach(r => {
-        if (r.imagem) mapaImagens[r.local] = r.imagem;
+    });
+    
+    const pontosArray = [...pontosTuristicos];
+    console.log(`🎯 Total de atividades: ${totalAtividades}`);
+    console.log(`🖼️ Pontos únicos para buscar imagens (${pontosArray.length}):`, pontosArray);
+    
+    if (pontosArray.length === 0) {
+      console.warn('⚠️ Nenhum ponto turístico encontrado para buscar imagens');
+      return;
+    }
+    
+    // Buscar imagens para cada ponto (sem limite de 10)
+    console.log('🔍 Iniciando busca de imagens via API...');
+    
+    const imagensPromises = pontosArray.map(async (local, index) => {
+      try {
+        console.log(`🔍 ${index + 1}/${pontosArray.length} Buscando imagem para: ${local}`);
+        
+        // Construir query melhorada incluindo destino
+        const query = `${local} ${this.dadosDestino?.destino || ''}`.trim();
+        const url = `/api/image-search?query=${encodeURIComponent(query)}&perPage=1&descricao=${encodeURIComponent(this.dadosDestino?.destino || '')}`;
+        
+        console.log(`🔗 URL da busca: ${url}`);
+        
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 8000); // 8s timeout
+        
+        const response = await fetch(url, {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+          },
+          signal: controller.signal
+        });
+        
+        clearTimeout(timeoutId);
+        
+        console.log(`📡 ${local} - Status: ${response.status}`);
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.warn(`⚠️ Erro ${response.status} para ${local}:`, errorText);
+          return { local, imagem: null, erro: `HTTP ${response.status}` };
+        }
+        
+        const dados = await response.json();
+        console.log(`📊 ${local} - Resposta:`, dados);
+        
+        if (dados && dados.images && Array.isArray(dados.images) && dados.images.length > 0) {
+          const imagemUrl = dados.images[0].url || dados.images[0].webformatURL || dados.images[0].src?.medium;
+          console.log(`✅ ${local} - Imagem encontrada: ${imagemUrl}`);
+          return { local, imagem: imagemUrl };
+        } else {
+          console.warn(`⚠️ ${local} - Nenhuma imagem na resposta:`, dados);
+          return { local, imagem: null, erro: 'Sem imagens na resposta' };
+        }
+        
+      } catch (erro) {
+        if (erro.name === 'AbortError') {
+          console.warn(`⏱️ Timeout para ${local}`);
+          return { local, imagem: null, erro: 'Timeout' };
+        } else {
+          console.warn(`❌ Erro ao buscar imagem para ${local}:`, erro);
+          return { local, imagem: null, erro: erro.message };
+        }
+      }
+    });
+    
+    // Aguardar todas as buscas
+    console.log('⏳ Aguardando todas as buscas de imagens...');
+    const resultadosImagens = await Promise.all(imagensPromises);
+    
+    // Processar resultados
+    const imagensEncontradas = resultadosImagens.filter(r => r.imagem);
+    const imagensFalharam = resultadosImagens.filter(r => !r.imagem);
+    
+    console.log(`✅ Imagens encontradas: ${imagensEncontradas.length}/${resultadosImagens.length}`);
+    console.log(`❌ Imagens falharam: ${imagensFalharam.length}`);
+    
+    if (imagensFalharam.length > 0) {
+      console.warn('❌ Locais sem imagem:', imagensFalharam.map(r => `${r.local} (${r.erro})`));
+    }
+    
+    // Criar mapa de local -> URL da imagem
+    const mapaImagens = {};
+    imagensEncontradas.forEach(resultado => {
+      mapaImagens[resultado.local] = resultado.imagem;
+      console.log(`🗺️ Mapeando: ${resultado.local} -> ${resultado.imagem}`);
+    });
+    
+    // Aplicar imagens às atividades no roteiro
+    let imagensAplicadas = 0;
+    
+    this.roteiroPronto.dias.forEach((dia, diaIndex) => {
+      ['manha', 'tarde', 'noite'].forEach(periodo => {
+        if (dia[periodo]?.atividades?.length) {
+          dia[periodo].atividades.forEach((atividade, ativIndex) => {
+            if (atividade.local && mapaImagens[atividade.local] && !atividade.isEspecial) {
+              atividade.imagemUrl = mapaImagens[atividade.local];
+              imagensAplicadas++;
+              console.log(`🖼️ Imagem aplicada - Dia ${diaIndex + 1}, ${periodo}, ${atividade.local}`);
+            }
+          });
+        }
       });
-      
-      this.roteiroPronto.dias.forEach(dia => {
-        ['manha', 'tarde', 'noite'].forEach(periodo => {
-          if (dia[periodo]?.atividades) {
-            dia[periodo].atividades.forEach(ativ => {
-              if (ativ.local && mapaImagens[ativ.local]) {
-                ativ.imagemUrl = mapaImagens[ativ.local];
-              }
-            });
+    });
+    
+    console.log(`🎨 Total de imagens aplicadas ao roteiro: ${imagensAplicadas}`);
+    
+    // ✅ NOVO: Adicionar imagens de fallback para locais sem imagem
+    if (imagensAplicadas < totalAtividades / 2) { // Se menos de 50% têm imagem
+      console.log('🔄 Adicionando imagens de fallback...');
+      this.adicionarImagensFallback();
+    }
+    
+    console.log('✅ Busca de imagens concluída');
+    
+  } catch (erro) {
+    console.error('❌ Erro geral ao buscar imagens:', erro);
+    // Em caso de erro total, adicionar imagens de fallback
+    this.adicionarImagensFallback();
+  }
+},
+
+/**
+ * ✅ NOVA FUNÇÃO: Adiciona imagens de fallback para atividades sem imagem
+ */
+adicionarImagensFallback() {
+  console.log('🔄 Adicionando imagens de fallback...');
+  
+  // URLs de imagens genéricas relacionadas a viagem
+  const imagensFallback = [
+    'https://images.unsplash.com/photo-1488646953014-85cb44e25828?w=400&h=250&fit=crop',  // Viagem
+    'https://images.unsplash.com/photo-1539650116574-75c0c6d73f6e?w=400&h=250&fit=crop',  // Cidade
+    'https://images.unsplash.com/photo-1571896349842-33c89424de2d?w=400&h=250&fit=crop',  // Hotel
+    'https://images.unsplash.com/photo-1555217851-6141535bd771?w=400&h=250&fit=crop',  // Restaurante
+    'https://images.unsplash.com/photo-1513475382585-d06e58bcb0e0?w=400&h=250&fit=crop',  // Museu
+    'https://images.unsplash.com/photo-1449824913935-59a10b8d2000?w=400&h=250&fit=crop',  // Parque
+    'https://images.unsplash.com/photo-1551218808-94e220e084d2?w=400&h=250&fit=crop',  // Shopping
+    'https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=400&h=250&fit=crop'   // Vida noturna
+  ];
+  
+  let fallbackIndex = 0;
+  let fallbacksAdicionados = 0;
+  
+  this.roteiroPronto.dias.forEach((dia, diaIndex) => {
+    ['manha', 'tarde', 'noite'].forEach(periodo => {
+      if (dia[periodo]?.atividades?.length) {
+        dia[periodo].atividades.forEach((atividade, ativIndex) => {
+          if (atividade.local && !atividade.imagemUrl && !atividade.isEspecial) {
+            atividade.imagemUrl = imagensFallback[fallbackIndex % imagensFallback.length];
+            fallbackIndex++;
+            fallbacksAdicionados++;
+            console.log(`🖼️ Fallback aplicado - Dia ${diaIndex + 1}, ${periodo}, ${atividade.local}`);
           }
         });
-      });
-    } catch (e) {
-      console.warn('⚠️ Erro ao buscar imagens:', e);
+      }
+    });
+  });
+  
+  console.log(`🎨 Total de imagens de fallback adicionadas: ${fallbacksAdicionados}`);
+},
+
+/**
+ * ✅ FUNÇÃO MELHORADA: Testa a API de imagens
+ */
+async testarAPIImagens() {
+  console.log('🧪 Testando API de imagens...');
+  
+  try {
+    const testeLocal = 'Centro da Cidade';
+    const url = `/api/image-search?query=${encodeURIComponent(testeLocal)}&perPage=1`;
+    
+    console.log(`🔗 URL de teste: ${url}`);
+    
+    const response = await fetch(url);
+    console.log(`📡 Status da resposta: ${response.status}`);
+    
+    if (response.ok) {
+      const dados = await response.json();
+      console.log('📊 Estrutura da resposta:', JSON.stringify(dados, null, 2));
+      
+      if (dados.images && dados.images.length > 0) {
+        console.log('✅ API funcionando - imagem de teste:', dados.images[0]);
+      } else {
+        console.warn('⚠️ API retornou dados mas sem imagens');
+      }
+    } else {
+      const errorText = await response.text();
+      console.error(`❌ API falhou: ${response.status} - ${errorText}`);
     }
-  },
+  } catch (erro) {
+    console.error('❌ Erro ao testar API:', erro);
+  }
+},
 
   /**
    * ✅ FUNÇÃO OTIMIZADA: Atualiza a interface
