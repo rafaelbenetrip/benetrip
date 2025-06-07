@@ -1,7 +1,7 @@
 /**
- * Benetrip - Sistema de Roteiro Personalizado (VERSÃO OTIMIZADA)
+ * Benetrip - Sistema de Roteiro Personalizado (VERSÃO OTIMIZADA E CORRIGIDA)
  * Responsável por gerar e exibir roteiros personalizados de viagem
- * Versão: 5.0 - Otimizada com correções de horários
+ * Versão: 6.0 - Otimizada com correções de imagens e horários
  */
 
 const BENETRIP_ROTEIRO = {
@@ -181,6 +181,13 @@ const BENETRIP_ROTEIRO = {
   },
 
   /**
+   * ✅ NOVA FUNÇÃO: Função delay para controle de timing
+   */
+  delay(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  },
+
+  /**
    * Animação de progresso
    */
   iniciarAnimacaoProgresso() {
@@ -272,10 +279,6 @@ const BENETRIP_ROTEIRO = {
 
   isDesenvolvimento() {
     return ['localhost', '127.0.0.1', ''].includes(location.hostname);
-  },
-
-  delay(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
   },
 
   finalizarCarregamento() {
@@ -497,67 +500,88 @@ const BENETRIP_ROTEIRO = {
   },
 
   /**
-   * Busca imagens para os locais
+   * ✅ FUNÇÃO CORRIGIDA: Busca imagens com configurações otimizadas
    */
   async buscarImagensLocais() {
-  try {
-    console.log('🖼️ Iniciando busca de imagens para locais...');
-    
-    if (!this.roteiroPronto?.dias) {
-      console.warn('⚠️ Não há roteiro para buscar imagens');
-      return;
-    }
-    
-    // Coletar todos os pontos turísticos únicos
-    const pontosTuristicos = new Set();
-    let totalAtividades = 0;
-    
-    this.roteiroPronto.dias.forEach((dia, diaIndex) => {
-      console.log(`📅 Processando dia ${diaIndex + 1}:`, dia.data);
+    try {
+      console.log('🖼️ Iniciando busca de imagens para locais...');
       
-      ['manha', 'tarde', 'noite'].forEach(periodo => {
-        if (dia[periodo]?.atividades?.length) {
-          console.log(`  🕐 ${periodo}: ${dia[periodo].atividades.length} atividades`);
-          
-          dia[periodo].atividades.forEach((atividade, ativIndex) => {
-            if (atividade.local && !atividade.isEspecial) {
-              pontosTuristicos.add(atividade.local);
-              totalAtividades++;
-              console.log(`    📍 ${ativIndex + 1}. ${atividade.local}`);
-            } else if (atividade.isEspecial) {
-              console.log(`    ✈️ ${ativIndex + 1}. ${atividade.local} (especial - sem imagem)`);
-            }
-          });
-        } else {
-          console.log(`  🕐 ${periodo}: nenhuma atividade`);
-        }
+      if (!this.roteiroPronto?.dias) {
+        console.warn('⚠️ Não há roteiro para buscar imagens');
+        return;
+      }
+      
+      // ✅ MELHORIA: Coletar pontos turísticos com limite inteligente
+      const pontosTuristicos = new Set();
+      let totalAtividades = 0;
+      
+      this.roteiroPronto.dias.forEach((dia, diaIndex) => {
+        ['manha', 'tarde', 'noite'].forEach(periodo => {
+          if (dia[periodo]?.atividades?.length) {
+            dia[periodo].atividades.forEach((atividade, ativIndex) => {
+              if (atividade.local && !atividade.isEspecial) {
+                pontosTuristicos.add(atividade.local);
+                totalAtividades++;
+              }
+            });
+          }
+        });
       });
-    });
-    
-    const pontosArray = [...pontosTuristicos];
-    console.log(`🎯 Total de atividades: ${totalAtividades}`);
-    console.log(`🖼️ Pontos únicos para buscar imagens (${pontosArray.length}):`, pontosArray);
-    
-    if (pontosArray.length === 0) {
-      console.warn('⚠️ Nenhum ponto turístico encontrado para buscar imagens');
-      return;
-    }
-    
-    // Buscar imagens para cada ponto (sem limite de 10)
-    console.log('🔍 Iniciando busca de imagens via API...');
-    
-    const imagensPromises = pontosArray.map(async (local, index) => {
-      try {
-        console.log(`🔍 ${index + 1}/${pontosArray.length} Buscando imagem para: ${local}`);
+      
+      const pontosArray = [...pontosTuristicos];
+      console.log(`🎯 Total de atividades: ${totalAtividades}`);
+      console.log(`🖼️ Pontos únicos para buscar imagens (${pontosArray.length}):`, pontosArray);
+      
+      if (pontosArray.length === 0) {
+        console.warn('⚠️ Nenhum ponto turístico encontrado - aplicando fallbacks');
+        this.adicionarImagensFallback();
+        return;
+      }
+      
+      // ✅ LIMITE INTELIGENTE: Máximo 8 buscas para não sobrecarregar
+      const pontosLimitados = pontosArray.slice(0, 8);
+      console.log(`🎯 Limitando busca a ${pontosLimitados.length} pontos principais`);
+      
+      // ✅ CONFIGURAÇÕES OTIMIZADAS
+      const configBusca = {
+        timeout: 15000,  // ✅ Aumentado para 15 segundos
+        maxTentativas: 2, // ✅ Máximo 2 tentativas por imagem
+        delayEntreBuscas: 500 // ✅ 500ms entre buscas para evitar rate limit
+      };
+      
+      // ✅ Buscar imagens com configurações otimizadas
+      const imagensPromises = pontosLimitados.map(async (local, index) => {
+        // ✅ Delay escalonado para evitar muitas requisições simultâneas
+        await this.delay(index * configBusca.delayEntreBuscas);
         
-        // Construir query melhorada incluindo destino
+        return this.buscarImagemComFallback(local, configBusca, index + 1, pontosLimitados.length);
+      });
+      
+      console.log('⏳ Aguardando todas as buscas de imagens...');
+      const resultadosImagens = await Promise.all(imagensPromises);
+      
+      // ✅ Processar e aplicar resultados
+      this.processarResultadosImagens(resultadosImagens, totalAtividades);
+      
+    } catch (erro) {
+      console.error('❌ Erro geral ao buscar imagens:', erro);
+      this.adicionarImagensFallback();
+    }
+  },
+
+  /**
+   * ✅ NOVA FUNÇÃO: Buscar imagem individual com fallback
+   */
+  async buscarImagemComFallback(local, config, numeroAtual, total) {
+    for (let tentativa = 1; tentativa <= config.maxTentativas; tentativa++) {
+      try {
+        console.log(`🔍 ${numeroAtual}/${total} (tentativa ${tentativa}) Buscando: ${local}`);
+        
         const query = `${local} ${this.dadosDestino?.destino || ''}`.trim();
         const url = `/api/image-search?query=${encodeURIComponent(query)}&perPage=1&descricao=${encodeURIComponent(this.dadosDestino?.destino || '')}`;
         
-        console.log(`🔗 URL da busca: ${url}`);
-        
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 8000); // 8s timeout
+        const timeoutId = setTimeout(() => controller.abort(), config.timeout);
         
         const response = await fetch(url, {
           method: 'GET',
@@ -570,60 +594,50 @@ const BENETRIP_ROTEIRO = {
         
         clearTimeout(timeoutId);
         
-        console.log(`📡 ${local} - Status: ${response.status}`);
-        
         if (!response.ok) {
-          const errorText = await response.text();
-          console.warn(`⚠️ Erro ${response.status} para ${local}:`, errorText);
-          return { local, imagem: null, erro: `HTTP ${response.status}` };
+          throw new Error(`HTTP ${response.status}`);
         }
         
         const dados = await response.json();
-        console.log(`📊 ${local} - Resposta:`, dados);
         
-        if (dados && dados.images && Array.isArray(dados.images) && dados.images.length > 0) {
-          const imagemUrl = dados.images[0].url || dados.images[0].webformatURL || dados.images[0].src?.medium;
-          console.log(`✅ ${local} - Imagem encontrada: ${imagemUrl}`);
-          return { local, imagem: imagemUrl };
-        } else {
-          console.warn(`⚠️ ${local} - Nenhuma imagem na resposta:`, dados);
-          return { local, imagem: null, erro: 'Sem imagens na resposta' };
+        if (dados?.images?.length > 0) {
+          const imagemUrl = dados.images[0].url || dados.images[0].src?.medium;
+          console.log(`✅ ${local} - Imagem encontrada (tentativa ${tentativa})`);
+          return { local, imagem: imagemUrl, tentativa };
         }
+        
+        throw new Error('Sem imagens na resposta');
         
       } catch (erro) {
-        if (erro.name === 'AbortError') {
-          console.warn(`⏱️ Timeout para ${local}`);
-          return { local, imagem: null, erro: 'Timeout' };
-        } else {
-          console.warn(`❌ Erro ao buscar imagem para ${local}:`, erro);
+        console.warn(`⚠️ ${local} - Tentativa ${tentativa} falhou:`, erro.message);
+        
+        if (tentativa === config.maxTentativas) {
           return { local, imagem: null, erro: erro.message };
         }
+        
+        // ✅ Delay antes de tentar novamente
+        await this.delay(1000);
       }
-    });
+    }
+  },
+
+  /**
+   * ✅ NOVA FUNÇÃO: Processar resultados e aplicar imagens
+   */
+  processarResultadosImagens(resultados, totalAtividades) {
+    const imagensEncontradas = resultados.filter(r => r.imagem);
+    const imagensFalharam = resultados.filter(r => !r.imagem);
     
-    // Aguardar todas as buscas
-    console.log('⏳ Aguardando todas as buscas de imagens...');
-    const resultadosImagens = await Promise.all(imagensPromises);
-    
-    // Processar resultados
-    const imagensEncontradas = resultadosImagens.filter(r => r.imagem);
-    const imagensFalharam = resultadosImagens.filter(r => !r.imagem);
-    
-    console.log(`✅ Imagens encontradas: ${imagensEncontradas.length}/${resultadosImagens.length}`);
+    console.log(`✅ Imagens encontradas: ${imagensEncontradas.length}/${resultados.length}`);
     console.log(`❌ Imagens falharam: ${imagensFalharam.length}`);
     
-    if (imagensFalharam.length > 0) {
-      console.warn('❌ Locais sem imagem:', imagensFalharam.map(r => `${r.local} (${r.erro})`));
-    }
-    
-    // Criar mapa de local -> URL da imagem
+    // Criar mapa de local -> URL
     const mapaImagens = {};
     imagensEncontradas.forEach(resultado => {
       mapaImagens[resultado.local] = resultado.imagem;
-      console.log(`🗺️ Mapeando: ${resultado.local} -> ${resultado.imagem}`);
     });
     
-    // Aplicar imagens às atividades no roteiro
+    // Aplicar imagens às atividades
     let imagensAplicadas = 0;
     
     this.roteiroPronto.dias.forEach((dia, diaIndex) => {
@@ -633,101 +647,74 @@ const BENETRIP_ROTEIRO = {
             if (atividade.local && mapaImagens[atividade.local] && !atividade.isEspecial) {
               atividade.imagemUrl = mapaImagens[atividade.local];
               imagensAplicadas++;
-              console.log(`🖼️ Imagem aplicada - Dia ${diaIndex + 1}, ${periodo}, ${atividade.local}`);
             }
           });
         }
       });
     });
     
-    console.log(`🎨 Total de imagens aplicadas ao roteiro: ${imagensAplicadas}`);
+    console.log(`🎨 Total de imagens aplicadas: ${imagensAplicadas}`);
     
-    // ✅ NOVO: Adicionar imagens de fallback para locais sem imagem
-    if (imagensAplicadas < totalAtividades / 2) { // Se menos de 50% têm imagem
-      console.log('🔄 Adicionando imagens de fallback...');
+    // ✅ Aplicar fallbacks se necessário
+    if (imagensAplicadas < totalAtividades * 0.3) { // Se menos de 30% têm imagem
+      console.log('🔄 Poucas imagens encontradas - aplicando fallbacks...');
       this.adicionarImagensFallback();
     }
-    
-    console.log('✅ Busca de imagens concluída');
-    
-  } catch (erro) {
-    console.error('❌ Erro geral ao buscar imagens:', erro);
-    // Em caso de erro total, adicionar imagens de fallback
-    this.adicionarImagensFallback();
-  }
-},
+  },
 
-/**
- * ✅ NOVA FUNÇÃO: Adiciona imagens de fallback para atividades sem imagem
- */
-adicionarImagensFallback() {
-  console.log('🔄 Adicionando imagens de fallback...');
-  
-  // URLs de imagens genéricas relacionadas a viagem
-  const imagensFallback = [
-    'https://images.unsplash.com/photo-1488646953014-85cb44e25828?w=400&h=250&fit=crop',  // Viagem
-    'https://images.unsplash.com/photo-1539650116574-75c0c6d73f6e?w=400&h=250&fit=crop',  // Cidade
-    'https://images.unsplash.com/photo-1571896349842-33c89424de2d?w=400&h=250&fit=crop',  // Hotel
-    'https://images.unsplash.com/photo-1555217851-6141535bd771?w=400&h=250&fit=crop',  // Restaurante
-    'https://images.unsplash.com/photo-1513475382585-d06e58bcb0e0?w=400&h=250&fit=crop',  // Museu
-    'https://images.unsplash.com/photo-1449824913935-59a10b8d2000?w=400&h=250&fit=crop',  // Parque
-    'https://images.unsplash.com/photo-1551218808-94e220e084d2?w=400&h=250&fit=crop',  // Shopping
-    'https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=400&h=250&fit=crop'   // Vida noturna
-  ];
-  
-  let fallbackIndex = 0;
-  let fallbacksAdicionados = 0;
-  
-  this.roteiroPronto.dias.forEach((dia, diaIndex) => {
-    ['manha', 'tarde', 'noite'].forEach(periodo => {
-      if (dia[periodo]?.atividades?.length) {
-        dia[periodo].atividades.forEach((atividade, ativIndex) => {
-          if (atividade.local && !atividade.imagemUrl && !atividade.isEspecial) {
-            atividade.imagemUrl = imagensFallback[fallbackIndex % imagensFallback.length];
-            fallbackIndex++;
-            fallbacksAdicionados++;
-            console.log(`🖼️ Fallback aplicado - Dia ${diaIndex + 1}, ${periodo}, ${atividade.local}`);
-          }
-        });
-      }
-    });
-  });
-  
-  console.log(`🎨 Total de imagens de fallback adicionadas: ${fallbacksAdicionados}`);
-},
-
-/**
- * ✅ FUNÇÃO MELHORADA: Testa a API de imagens
- */
-async testarAPIImagens() {
-  console.log('🧪 Testando API de imagens...');
-  
-  try {
-    const testeLocal = 'Centro da Cidade';
-    const url = `/api/image-search?query=${encodeURIComponent(testeLocal)}&perPage=1`;
+  /**
+   * ✅ FUNÇÃO CORRIGIDA: Adiciona imagens de fallback confiáveis
+   */
+  adicionarImagensFallback() {
+    console.log('🔄 Adicionando imagens de fallback...');
     
-    console.log(`🔗 URL de teste: ${url}`);
-    
-    const response = await fetch(url);
-    console.log(`📡 Status da resposta: ${response.status}`);
-    
-    if (response.ok) {
-      const dados = await response.json();
-      console.log('📊 Estrutura da resposta:', JSON.stringify(dados, null, 2));
+    // ✅ URLs CORRIGIDAS - usando serviços mais confiáveis
+    const imagensFallback = [
+      // Imagens de placeholder com temas de viagem
+      'https://picsum.photos/400/250?random=1',  // Paisagem aleatória
+      'https://picsum.photos/400/250?random=2',  // Cidade aleatória
+      'https://picsum.photos/400/250?random=3',  // Arquitetura aleatória
+      'https://picsum.photos/400/250?random=4',  // Natureza aleatória
+      'https://picsum.photos/400/250?random=5',  // Urbano aleatório
+      'https://picsum.photos/400/250?random=6',  // Cultura aleatória
+      'https://picsum.photos/400/250?random=7',  // História aleatória
+      'https://picsum.photos/400/250?random=8',  // Vida noturna aleatória
       
-      if (dados.images && dados.images.length > 0) {
-        console.log('✅ API funcionando - imagem de teste:', dados.images[0]);
-      } else {
-        console.warn('⚠️ API retornou dados mas sem imagens');
-      }
-    } else {
-      const errorText = await response.text();
-      console.error(`❌ API falhou: ${response.status} - ${errorText}`);
-    }
-  } catch (erro) {
-    console.error('❌ Erro ao testar API:', erro);
-  }
-},
+      // ✅ NOVA OPÇÃO: Imagens locais como backup
+      'assets/images/fallback/viagem-generica-1.jpg',
+      'assets/images/fallback/viagem-generica-2.jpg',
+      'assets/images/fallback/viagem-generica-3.jpg',
+      'assets/images/fallback/viagem-generica-4.jpg'
+    ];
+    
+    let fallbackIndex = 0;
+    let fallbacksAdicionados = 0;
+    
+    this.roteiroPronto.dias.forEach((dia, diaIndex) => {
+      ['manha', 'tarde', 'noite'].forEach(periodo => {
+        if (dia[periodo]?.atividades?.length) {
+          dia[periodo].atividades.forEach((atividade, ativIndex) => {
+            if (atividade.local && !atividade.imagemUrl && !atividade.isEspecial) {
+              
+              // ✅ MELHORIA: Tentar multiple fallbacks
+              const urlFallback = imagensFallback[fallbackIndex % imagensFallback.length];
+              
+              // ✅ VERIFICAÇÃO: Se a URL falhar, usar placeholder simples
+              atividade.imagemUrl = urlFallback;
+              atividade.imagemFallback = `https://via.placeholder.com/400x250/E87722/FFFFFF?text=${encodeURIComponent(atividade.local)}`;
+              
+              fallbackIndex++;
+              fallbacksAdicionados++;
+              
+              console.log(`🖼️ Fallback aplicado - Dia ${diaIndex + 1}, ${periodo}, ${atividade.local}`);
+            }
+          });
+        }
+      });
+    });
+    
+    console.log(`🎨 Total de imagens de fallback adicionadas: ${fallbacksAdicionados}`);
+  },
 
   /**
    * ✅ FUNÇÃO OTIMIZADA: Atualiza a interface
@@ -903,6 +890,9 @@ async testarAPIImagens() {
     `;
   },
 
+  /**
+   * ✅ FUNÇÃO CORRIGIDA: Cria conteúdo do período com imagens da Tripinha corrigidas
+   */
   criarConteudoPeriodo(periodo) {
     if (!periodo?.atividades?.length) {
       return '<div class="periodo-vazio"><p>Nenhuma atividade planejada.</p></div>';
@@ -932,7 +922,7 @@ async testarAPIImagens() {
           <div class="tripinha-dica">
             <div class="tripinha-dica-conteudo">
               <div class="tripinha-avatar">
-                <img src="assets/images/tripinha/avatar-normal.png" alt="Tripinha">
+                ${this.obterImagemTripinha()}
               </div>
               <div class="tripinha-texto">
                 <strong>Dica da Tripinha:</strong> ${ativ.dica}
@@ -943,7 +933,12 @@ async testarAPIImagens() {
         
         ${ativ.imagemUrl ? `
           <div class="imagem-local">
-            <img src="${ativ.imagemUrl}" alt="${ativ.local}" loading="lazy">
+            <img 
+              src="${ativ.imagemUrl}" 
+              alt="${ativ.local}" 
+              loading="lazy"
+              onerror="this.onerror=null; this.src='${ativ.imagemFallback || 'https://via.placeholder.com/400x250/E87722/FFFFFF?text=' + encodeURIComponent(ativ.local)}';"
+            >
           </div>
         ` : ''}
         
@@ -957,6 +952,37 @@ async testarAPIImagens() {
         ` : ''}
       </div>
     `).join('');
+  },
+
+  /**
+   * ✅ NOVA FUNÇÃO: Gerenciar imagens da Tripinha com fallback
+   */
+  obterImagemTripinha(tipo = 'normal') {
+    // ✅ Múltiplas opções de caminho para a Tripinha
+    const caminhosPossiveis = [
+      `assets/images/tripinha/avatar-${tipo}.png`,
+      `assets/images/tripinha-${tipo}.png`,
+      `images/tripinha/avatar-${tipo}.png`,
+      `assets/tripinha-${tipo}.png`,
+      // Fallback: emoji se nenhuma imagem funcionar
+      null
+    ];
+    
+    // ✅ HTML com fallback automático
+    const htmlFallbacks = caminhosPossiveis
+      .filter(caminho => caminho !== null)
+      .map(caminho => `this.src='${caminho}';`)
+      .join(' ') + ' this.style.display="none"; this.nextElementSibling.style.display="inline";';
+    
+    return `
+      <img 
+        src="${caminhosPossiveis[0]}" 
+        alt="Tripinha" 
+        style="width: 32px; height: 32px; border-radius: 50%;"
+        onerror="${htmlFallbacks}"
+      >
+      <span style="display: none; font-size: 24px;">🐕</span>
+    `;
   },
 
   // ===========================================
@@ -1187,7 +1213,8 @@ async testarAPIImagens() {
     if (container) {
       container.innerHTML = `
         <div class="erro-container">
-          <img src="assets/images/tripinha/avatar-triste.png" alt="Tripinha triste" class="tripinha-erro">
+          <img src="assets/images/tripinha/avatar-triste.png" alt="Tripinha triste" class="tripinha-erro" onerror="this.style.display='none'; this.nextElementSibling.style.display='inline';">
+          <span style="display: none; font-size: 48px;">😢</span>
           <h3 class="erro-titulo">${mensagem}</h3>
           <p class="erro-descricao">Desculpe pelo inconveniente.</p>
           <button class="btn-tentar-novamente" onclick="location.reload()">Tentar Novamente</button>
