@@ -143,29 +143,38 @@ async function fetchGoogleImages(query, options = {}) {
     });
 
     // Verificar se as credenciais estão configuradas
-    if (!GOOGLE_API_KEY || !GOOGLE_SEARCH_ENGINE_ID) {
-      logEvent('error', 'Credenciais Google não configuradas corretamente');
-      return { success: false, images: [], error: { message: 'Credenciais não configuradas' } };
-    }
+if (!GOOGLE_API_KEY || !GOOGLE_SEARCH_ENGINE_ID) {
+  logEvent('warn', 'Credenciais Google não configuradas, pulando para próxima API');
+  return { success: false, images: [], error: { message: 'Credenciais não configuradas' } };
+}
     
     // Array para armazenar todas as imagens encontradas
     let allImages = [];
     
-    // Fazer uma busca para cada ponto turístico
-    for (const searchData of searchQueries) {
-      try {
-        const response = await axios.get(
-          'https://www.googleapis.com/customsearch/v1',
-          {
-            params: {
-              q: searchData.query,
-              cx: GOOGLE_SEARCH_ENGINE_ID,
-              key: GOOGLE_API_KEY,
-              searchType: 'image',
-              num: 1  // Apenas uma imagem por ponto turístico
-            }
-          }
-        );
+    // Fazer uma busca para cada ponto turístico com delay
+for (let i = 0; i < searchQueries.length; i++) {
+  const searchData = searchQueries[i];
+  
+  // Adicionar pequeno delay entre requisições para evitar rate limit
+  if (i > 0) {
+    await new Promise(resolve => setTimeout(resolve, 200));
+  }
+  
+  try {
+    const response = await axios.get(
+      'https://www.googleapis.com/customsearch/v1',
+      {
+        params: {
+          q: searchData.query,
+          cx: GOOGLE_SEARCH_ENGINE_ID,
+          key: GOOGLE_API_KEY,
+          searchType: 'image',
+          num: 2,  // Buscar 2 imagens para ter opções
+          imgSize: 'large',  // Priorizar imagens grandes
+          safe: 'active'  // Filtro de conteúdo seguro
+        }
+      }
+    );
         
         // Verificar se a resposta contém itens
         if (response.data && response.data.items && response.data.items.length > 0) {
@@ -627,15 +636,15 @@ module.exports = async function handler(req, res) {
     // 1. Tentar buscar pontos turísticos via Google Places
     const classificacao = await classificarDestino(query, descricao, pontosTuristicosArray);
     
-    // 2. Tentar Google Custom Search primeiro
-    if (!source || source === "google") {
-      googleResult = await fetchGoogleImages(query, {
-        perPage: parseInt(perPage),
-        orientation,
-        destination: classificacao.cidade,
-        country: classificacao.pais,
-        pontosTuristicos: classificacao.pontosTuristicos || pontosTuristicosArray
-      });
+    // 2. Tentar Google Custom Search primeiro (se configurado)
+if ((!source || source === "google") && GOOGLE_API_KEY && GOOGLE_SEARCH_ENGINE_ID) {
+  googleResult = await fetchGoogleImages(query, {
+    perPage: parseInt(perPage),
+    orientation,
+    destination: classificacao.cidade,
+    country: classificacao.pais,
+    pontosTuristicos: classificacao.pontosTuristicos || pontosTuristicosArray
+  });
       
       if (googleResult.success && googleResult.images.length > 0) {
         images = googleResult.images;
