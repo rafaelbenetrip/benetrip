@@ -1,11 +1,11 @@
 /**
- * Benetrip - Sistema de Roteiro Personalizado (VERSÃO OTIMIZADA E CORRIGIDA)
- * Responsável por gerar e exibir roteiros personalizados de viagem
- * Versão: 6.0 - Otimizada com correções de imagens e horários
+ * Benetrip - Sistema de Roteiro Personalizado (VERSÃO 7.0 - OTIMIZADA)
+ * Corrige: datas inválidas, imagens limitadas e previsão do tempo
+ * Data: 2025
  */
 
 const BENETRIP_ROTEIRO = {
-  // Estado
+  // Estado global
   dadosVoo: null,
   dadosUsuario: null,
   dadosDestino: null,
@@ -13,17 +13,19 @@ const BENETRIP_ROTEIRO = {
   estaCarregando: true,
   progressoAtual: 10,
   intervalId: null,
+  imagensCache: new Map(), // Cache de imagens para evitar requisições duplicadas
 
   /**
    * Inicializa o sistema de roteiro
    */
   init() {
-    console.log('🚀 Inicializando sistema de roteiro...');
+    console.log('🚀 Benetrip Roteiro v7.0 - Inicializando...');
+    
     this.carregarDados()
       .then(() => this.gerarRoteiro())
       .catch(erro => {
-        console.error('❌ Erro ao inicializar roteiro:', erro);
-        this.mostrarErro('Erro ao carregar dados. Tente novamente mais tarde.');
+        console.error('❌ Erro fatal:', erro);
+        this.mostrarErro('Erro ao carregar dados. Por favor, tente novamente.');
       });
     
     this.configurarEventos();
@@ -34,157 +36,373 @@ const BENETRIP_ROTEIRO = {
    * Configura eventos dos botões
    */
   configurarEventos() {
+    // Botões principais
     document.getElementById('btn-compartilhar-roteiro')?.addEventListener('click', () => this.compartilharRoteiro());
     document.getElementById('btn-editar-roteiro')?.addEventListener('click', () => this.editarRoteiro());
     document.querySelector('.btn-voltar')?.addEventListener('click', () => history.back());
+    
+    // Prevenir erros de imagem no console
+    document.addEventListener('error', (e) => {
+      if (e.target.tagName === 'IMG') {
+        console.warn('⚠️ Imagem falhou:', e.target.src);
+      }
+    }, true);
   },
 
   /**
-   * ✅ FUNÇÃO CORRIGIDA: Carrega os dados necessários para o roteiro
+   * ✅ CORRIGIDO: Carrega e valida dados do localStorage
    */
   async carregarDados() {
     try {
-      console.log('🔄 Carregando dados para roteiro...');
+      console.log('📂 Carregando dados salvos...');
       
-      // Carregar dados do voo selecionado
+      // 1. Carregar voo selecionado
       const vooString = localStorage.getItem('benetrip_voo_selecionado');
-      if (!vooString) throw new Error('Nenhum voo selecionado');
-      this.dadosVoo = JSON.parse(vooString);
+      if (!vooString) {
+        throw new Error('Nenhum voo foi selecionado. Redirecionando...');
+      }
       
-      // Carregar dados do usuário
+      this.dadosVoo = JSON.parse(vooString);
+      console.log('✈️ Dados do voo carregados:', this.dadosVoo);
+      
+      // 2. Carregar dados do usuário
       const usuarioString = localStorage.getItem('benetrip_user_data');
       this.dadosUsuario = usuarioString ? JSON.parse(usuarioString) : {};
+      console.log('👤 Dados do usuário carregados:', this.dadosUsuario);
       
-      // Carregar dados do destino
+      // 3. Carregar destino
       const destinoString = localStorage.getItem('benetrip_destino_selecionado');
-      this.dadosDestino = destinoString ? JSON.parse(destinoString) : {
-        destino: this.extrairNomeDestino(this.getDestinoCode()),
-        codigo_iata: this.getDestinoCode(),
-        pais: 'Desconhecido'
-      };
+      if (destinoString) {
+        this.dadosDestino = JSON.parse(destinoString);
+      } else {
+        // Fallback: criar destino baseado no voo
+        const codigoDestino = this.extrairCodigoDestino();
+        this.dadosDestino = {
+          destino: this.obterNomeDestinoPorCodigo(codigoDestino),
+          codigo_iata: codigoDestino,
+          pais: this.obterPaisPorCodigo(codigoDestino)
+        };
+      }
+      console.log('📍 Destino definido:', this.dadosDestino);
       
-      this.normalizarDatasVoo();
-      this.validarHorariosVoo();
+      // 4. Normalizar e validar datas
+      await this.normalizarEValidarDatas();
       
       return true;
+      
     } catch (erro) {
       console.error('❌ Erro ao carregar dados:', erro);
+      
+      // Se não houver dados essenciais, redirecionar
+      if (erro.message.includes('voo')) {
+        setTimeout(() => {
+          window.location.href = '/flights.html';
+        }, 2000);
+      }
+      
       throw erro;
     }
   },
 
   /**
-   * ✅ NOVA FUNÇÃO: Extrai código do destino de forma inteligente
+   * ✅ NOVO: Extrai código do destino de múltiplas fontes possíveis
    */
-  getDestinoCode() {
-    return this.dadosVoo?.infoIda?.aeroportoChegada || 
-           this.dadosVoo?.ida?.destino || 
-           this.dadosVoo?.voo?.segment?.[0]?.flight?.[0]?.arrival ||
-           'Unknown';
-  },
-
-  /**
-   * ✅ NOVA FUNÇÃO: Extrai horário de chegada de forma inteligente
-   */
-  extrairHorarioChegada() {
-    return this.dadosVoo?.infoIda?.horaChegada ||
-           this.dadosVoo?.ida?.horaChegada ||
-           this.dadosVoo?.voo?.segment?.[0]?.flight?.[0]?.arrival_time ||
-           this.dadosVoo?.segment?.[0]?.flight?.[0]?.arrival_time ||
-           '15:30';
-  },
-
-  /**
-   * ✅ NOVA FUNÇÃO: Extrai horário de partida de forma inteligente
-   */
-  extrairHorarioPartida() {
-    return this.dadosVoo?.infoVolta?.horaPartida ||
-           this.dadosVoo?.volta?.horaPartida ||
-           this.dadosVoo?.voo?.segment?.[1]?.flight?.[0]?.departure_time ||
-           this.dadosVoo?.segment?.[1]?.flight?.[0]?.departure_time ||
-           '21:00';
-  },
-
-  /**
-   * ✅ FUNÇÃO OTIMIZADA: Normaliza as datas do voo
-   */
-  normalizarDatasVoo() {
-    console.log('🔄 Normalizando datas do voo...');
+  extrairCodigoDestino() {
+    // Tentar múltiplas fontes de dados
+    const possiveis = [
+      this.dadosVoo?.infoIda?.aeroportoChegada,
+      this.dadosVoo?.ida?.destino,
+      this.dadosVoo?.voo?.segment?.[0]?.flight?.[0]?.arrival,
+      this.dadosVoo?.segment?.[0]?.flight?.[0]?.arrival,
+      this.dadosVoo?.destination,
+      this.dadosVoo?.arrival_airport
+    ];
     
-    const dataIda = this.dadosVoo?.infoIda?.dataPartida || this.dadosVoo?.ida?.dataPartida;
-    const dataVolta = this.dadosVoo?.infoVolta?.dataPartida || this.dadosVoo?.volta?.dataPartida;
-    
-    if (!dataIda && this.dadosUsuario?.respostas?.datas) {
-      const datasUsuario = this.dadosUsuario.respostas.datas;
-      let ida, volta;
-      
-      if (typeof datasUsuario === 'object' && datasUsuario.dataIda) {
-        ida = datasUsuario.dataIda;
-        volta = datasUsuario.dataVolta;
-      } else if (Array.isArray(datasUsuario)) {
-        [ida, volta] = datasUsuario;
-      } else if (typeof datasUsuario === 'string') {
-        [ida, volta] = datasUsuario.split(',').map(d => d.trim());
+    for (const codigo of possiveis) {
+      if (codigo && codigo.length === 3) {
+        return codigo.toUpperCase();
       }
+    }
+    
+    console.warn('⚠️ Código de destino não encontrado, usando padrão');
+    return 'GRU'; // São Paulo como padrão
+  },
+
+  /**
+   * ✅ CORRIGIDO: Normaliza e valida datas com múltiplos formatos
+   */
+  async normalizarEValidarDatas() {
+    console.log('📅 Normalizando datas...');
+    
+    try {
+      // 1. Tentar extrair datas do voo
+      let dataIda = this.extrairDataIda();
+      let dataVolta = this.extrairDataVolta();
       
-      if (ida) {
-        this.dadosVoo = this.dadosVoo || {};
-        this.dadosVoo.infoIda = { ...this.dadosVoo.infoIda, dataPartida: this.formatarDataISO(ida) };
-        if (volta) {
-          this.dadosVoo.infoVolta = { ...this.dadosVoo.infoVolta, dataPartida: this.formatarDataISO(volta) };
+      // 2. Se não houver no voo, tentar das respostas do usuário
+      if (!dataIda && this.dadosUsuario?.respostas?.datas) {
+        const datasRespostas = this.extrairDatasRespostas();
+        if (datasRespostas) {
+          dataIda = datasRespostas.ida;
+          dataVolta = datasRespostas.volta;
         }
       }
-    }
-    
-    if (!this.getDataIda()) {
-      throw new Error('Datas de viagem não disponíveis');
+      
+      // 3. Validar e formatar datas
+      if (!dataIda) {
+        throw new Error('Data de ida não encontrada');
+      }
+      
+      // Garantir formato ISO correto
+      dataIda = this.garantirFormatoISO(dataIda);
+      if (dataVolta) {
+        dataVolta = this.garantirFormatoISO(dataVolta);
+      }
+      
+      // 4. Validar se as datas são válidas
+      const dataIdaObj = new Date(dataIda + 'T12:00:00');
+      const dataVoltaObj = dataVolta ? new Date(dataVolta + 'T12:00:00') : null;
+      
+      if (isNaN(dataIdaObj.getTime())) {
+        throw new Error('Data de ida inválida: ' + dataIda);
+      }
+      
+      if (dataVoltaObj && isNaN(dataVoltaObj.getTime())) {
+        throw new Error('Data de volta inválida: ' + dataVolta);
+      }
+      
+      // 5. Validar lógica das datas
+      if (dataVoltaObj && dataVoltaObj <= dataIdaObj) {
+        console.warn('⚠️ Data de volta anterior à ida, ajustando...');
+        dataVoltaObj.setDate(dataIdaObj.getDate() + 3);
+        dataVolta = this.formatarDataISO(dataVoltaObj);
+      }
+      
+      // 6. Salvar datas normalizadas
+      if (!this.dadosVoo.infoIda) this.dadosVoo.infoIda = {};
+      if (!this.dadosVoo.infoVolta) this.dadosVoo.infoVolta = {};
+      
+      this.dadosVoo.infoIda.dataPartida = dataIda;
+      if (dataVolta) {
+        this.dadosVoo.infoVolta.dataPartida = dataVolta;
+      }
+      
+      console.log('✅ Datas normalizadas:', {
+        ida: dataIda,
+        volta: dataVolta,
+        diasViagem: this.calcularDiasViagem(dataIda, dataVolta)
+      });
+      
+    } catch (erro) {
+      console.error('❌ Erro ao normalizar datas:', erro);
+      
+      // Fallback: usar datas padrão
+      const hoje = new Date();
+      hoje.setDate(hoje.getDate() + 30); // 30 dias no futuro
+      
+      const ida = this.formatarDataISO(hoje);
+      const volta = new Date(hoje);
+      volta.setDate(hoje.getDate() + 5);
+      
+      this.dadosVoo.infoIda = { dataPartida: ida };
+      this.dadosVoo.infoVolta = { dataPartida: this.formatarDataISO(volta) };
+      
+      console.warn('⚠️ Usando datas padrão:', this.dadosVoo.infoIda, this.dadosVoo.infoVolta);
     }
   },
 
   /**
-   * Helpers para datas
+   * ✅ NOVO: Extrai datas de múltiplas fontes
+   */
+  extrairDataIda() {
+    const possiveis = [
+      this.dadosVoo?.infoIda?.dataPartida,
+      this.dadosVoo?.ida?.dataPartida,
+      this.dadosVoo?.ida?.data,
+      this.dadosVoo?.departure_date,
+      this.dadosVoo?.departureDate,
+      this.dadosVoo?.segments?.[0]?.date
+    ];
+    
+    for (const data of possiveis) {
+      if (data && this.isDataValida(data)) {
+        return data;
+      }
+    }
+    
+    return null;
+  },
+
+  /**
+   * ✅ NOVO: Extrai data de volta
+   */
+  extrairDataVolta() {
+    const possiveis = [
+      this.dadosVoo?.infoVolta?.dataPartida,
+      this.dadosVoo?.volta?.dataPartida,
+      this.dadosVoo?.volta?.data,
+      this.dadosVoo?.return_date,
+      this.dadosVoo?.returnDate,
+      this.dadosVoo?.segments?.[1]?.date
+    ];
+    
+    for (const data of possiveis) {
+      if (data && this.isDataValida(data)) {
+        return data;
+      }
+    }
+    
+    return null;
+  },
+
+  /**
+   * ✅ NOVO: Extrai datas das respostas do usuário
+   */
+  extrairDatasRespostas() {
+    const datas = this.dadosUsuario?.respostas?.datas;
+    if (!datas) return null;
+    
+    // Caso 1: Objeto com dataIda e dataVolta
+    if (typeof datas === 'object' && datas.dataIda) {
+      return {
+        ida: datas.dataIda,
+        volta: datas.dataVolta
+      };
+    }
+    
+    // Caso 2: Array [ida, volta]
+    if (Array.isArray(datas) && datas.length >= 1) {
+      return {
+        ida: datas[0],
+        volta: datas[1] || null
+      };
+    }
+    
+    // Caso 3: String "ida,volta"
+    if (typeof datas === 'string' && datas.includes(',')) {
+      const [ida, volta] = datas.split(',').map(d => d.trim());
+      return { ida, volta };
+    }
+    
+    // Caso 4: String única (só ida)
+    if (typeof datas === 'string') {
+      return {
+        ida: datas,
+        volta: null
+      };
+    }
+    
+    return null;
+  },
+
+  /**
+   * ✅ NOVO: Valida se uma data é válida
+   */
+  isDataValida(data) {
+    if (!data) return false;
+    
+    // Aceitar diferentes formatos
+    const formatos = [
+      /^\d{4}-\d{2}-\d{2}$/,           // YYYY-MM-DD
+      /^\d{2}\/\d{2}\/\d{4}$/,         // DD/MM/YYYY
+      /^\d{2}-\d{2}-\d{4}$/,           // DD-MM-YYYY
+      /^\d{4}\/\d{2}\/\d{2}$/          // YYYY/MM/DD
+    ];
+    
+    const dataStr = String(data);
+    return formatos.some(formato => formato.test(dataStr));
+  },
+
+  /**
+   * ✅ CORRIGIDO: Garante formato ISO YYYY-MM-DD
+   */
+  garantirFormatoISO(dataInput) {
+    if (!dataInput) return null;
+    
+    const dataStr = String(dataInput);
+    
+    // Já está em ISO?
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dataStr)) {
+      return dataStr;
+    }
+    
+    // DD/MM/YYYY ou DD-MM-YYYY
+    if (/^\d{2}[\/\-]\d{2}[\/\-]\d{4}$/.test(dataStr)) {
+      const [dia, mes, ano] = dataStr.split(/[\/\-]/);
+      return `${ano}-${mes.padStart(2, '0')}-${dia.padStart(2, '0')}`;
+    }
+    
+    // YYYY/MM/DD
+    if (/^\d{4}\/\d{2}\/\d{2}$/.test(dataStr)) {
+      return dataStr.replace(/\//g, '-');
+    }
+    
+    // Tentar criar Date
+    try {
+      const data = new Date(dataStr);
+      if (!isNaN(data.getTime())) {
+        return this.formatarDataISO(data);
+      }
+    } catch (e) {
+      console.warn('⚠️ Não foi possível converter data:', dataStr);
+    }
+    
+    return null;
+  },
+
+  /**
+   * ✅ MELHORADO: Formata Date para ISO
+   */
+  formatarDataISO(data) {
+    if (!data) return null;
+    
+    const d = data instanceof Date ? data : new Date(data);
+    if (isNaN(d.getTime())) return null;
+    
+    const ano = d.getFullYear();
+    const mes = String(d.getMonth() + 1).padStart(2, '0');
+    const dia = String(d.getDate()).padStart(2, '0');
+    
+    return `${ano}-${mes}-${dia}`;
+  },
+
+  /**
+   * Helpers para acessar datas
    */
   getDataIda() {
-    return this.dadosVoo?.infoIda?.dataPartida || this.dadosVoo?.ida?.dataPartida;
+    return this.dadosVoo?.infoIda?.dataPartida;
   },
 
   getDataVolta() {
-    return this.dadosVoo?.infoVolta?.dataPartida || this.dadosVoo?.volta?.dataPartida;
+    return this.dadosVoo?.infoVolta?.dataPartida;
   },
 
   /**
-   * ✅ FUNÇÃO OTIMIZADA: Formata data para ISO
+   * ✅ MELHORADO: Calcula dias de viagem com validação
    */
-  formatarDataISO(dataInput) {
-    if (!dataInput) return null;
-    
-    if (typeof dataInput === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dataInput)) {
-      return dataInput;
-    }
-    
-    if (typeof dataInput === 'string' && dataInput.includes('T')) {
-      return dataInput.split('T')[0];
-    }
+  calcularDiasViagem(dataIda, dataVolta) {
+    if (!dataIda) return 1;
     
     try {
-      const data = new Date(dataInput);
-      if (isNaN(data.getTime())) return null;
+      const inicio = new Date(dataIda + 'T12:00:00');
+      const fim = dataVolta ? new Date(dataVolta + 'T12:00:00') : inicio;
       
-      const ano = data.getFullYear();
-      const mes = String(data.getMonth() + 1).padStart(2, '0');
-      const dia = String(data.getDate()).padStart(2, '0');
+      const diffMs = fim - inicio;
+      const diffDias = Math.floor(diffMs / (1000 * 60 * 60 * 24)) + 1;
       
-      return `${ano}-${mes}-${dia}`;
+      // Validações
+      if (diffDias < 1) return 1;
+      if (diffDias > 30) {
+        console.warn('⚠️ Viagem muito longa, limitando a 30 dias');
+        return 30;
+      }
+      
+      return diffDias;
+      
     } catch (e) {
-      return null;
+      console.error('❌ Erro ao calcular dias:', e);
+      return 1;
     }
-  },
-
-  /**
-   * ✅ NOVA FUNÇÃO: Função delay para controle de timing
-   */
-  delay(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
   },
 
   /**
@@ -192,23 +410,24 @@ const BENETRIP_ROTEIRO = {
    */
   iniciarAnimacaoProgresso() {
     const mensagens = [
-      'Preparando seu roteiro personalizado...',
-      'Analisando seu perfil de viagem...',
-      'Buscando pontos turísticos...',
-      'Organizando atividades por dias...',
-      'Checando previsão do tempo...'
+      '🔍 Analisando seu perfil de viagem...',
+      '🗺️ Mapeando pontos turísticos...',
+      '📸 Buscando imagens dos locais...',
+      '🌤️ Checando previsão do tempo...',
+      '📝 Organizando seu roteiro perfeito...'
     ];
     
     let indice = 0;
+    
     this.intervalId = setInterval(() => {
-      this.progressoAtual += 15;
-      if (this.progressoAtual >= 95) {
-        clearInterval(this.intervalId);
-        return;
-      }
+      this.progressoAtual = Math.min(this.progressoAtual + 12, 90);
       this.atualizarBarraProgresso(this.progressoAtual, mensagens[indice % mensagens.length]);
       indice++;
-    }, 800);
+      
+      if (this.progressoAtual >= 90) {
+        clearInterval(this.intervalId);
+      }
+    }, 1000);
   },
 
   atualizarBarraProgresso(porcentagem, mensagem) {
@@ -219,308 +438,457 @@ const BENETRIP_ROTEIRO = {
       barra.style.width = `${porcentagem}%`;
       barra.setAttribute('aria-valuenow', porcentagem);
     }
-    if (texto) texto.textContent = mensagem;
+    
+    if (texto) {
+      texto.textContent = mensagem;
+    }
   },
 
   /**
-   * ✅ FUNÇÃO PRINCIPAL: Gera o roteiro personalizado
+   * ✅ OTIMIZADO: Gera o roteiro com validações melhoradas
    */
   async gerarRoteiro() {
     try {
-      console.log('🎯 Gerando roteiro...');
+      console.log('🎯 Iniciando geração do roteiro...');
       
-      const dataIda = this.formatarDataISO(this.getDataIda());
-      const dataVolta = this.formatarDataISO(this.getDataVolta());
-      const diasReais = this.calcularDiasViagem(dataIda, dataVolta);
+      const dataIda = this.getDataIda();
+      const dataVolta = this.getDataVolta();
+      const diasViagem = this.calcularDiasViagem(dataIda, dataVolta);
       
-      const params = {
-        destino: this.dadosDestino?.destino || this.extrairNomeDestino(this.getDestinoCode()),
-        pais: this.dadosDestino?.pais || 'Desconhecido',
-        dataInicio: dataIda,
-        dataFim: dataVolta,
-        diasViagem: diasReais,
-        horaChegada: this.extrairHorarioChegada(),
-        horaSaida: this.extrairHorarioPartida(),
-        tipoViagem: this.obterTipoViagem(),
-        tipoCompanhia: this.obterTipoCompanhia(),
+      console.log('📊 Parâmetros do roteiro:', {
+        destino: this.dadosDestino,
+        dataIda,
+        dataVolta,
+        diasViagem,
         preferencias: this.obterPreferencias()
-      };
+      });
       
-      // Usar dados dummy ou API real
+      // Simular delay para UX
+      await this.delay(1500);
+      
+      // Gerar roteiro (usando dados dummy em desenvolvimento)
       if (this.isDesenvolvimento()) {
-        await this.delay(2000);
-        this.roteiroPronto = this.gerarRoteiroDummy(dataIda, dataVolta, diasReais);
+        this.roteiroPronto = await this.gerarRoteiroDummy(dataIda, dataVolta, diasViagem);
       } else {
-        const response = await fetch('/api/itinerary-generator', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(params)
+        this.roteiroPronto = await this.chamarAPIRoteiro({
+          destino: this.dadosDestino.destino,
+          pais: this.dadosDestino.pais,
+          dataInicio: dataIda,
+          dataFim: dataVolta,
+          diasViagem,
+          horaChegada: this.extrairHorarioChegada(),
+          horaSaida: this.extrairHorarioPartida(),
+          preferencias: this.obterPreferencias()
         });
-        
-        if (!response.ok) throw new Error(`Erro ${response.status}`);
-        this.roteiroPronto = await response.json();
-        this.ajustarDatasRoteiro(dataIda, diasReais);
       }
       
+      // Executar tarefas em paralelo
       await Promise.all([
         this.buscarPrevisaoTempo(),
-        this.buscarImagensLocais()
+        this.buscarTodasImagensOtimizado()
       ]);
       
+      // Atualizar UI
       this.atualizarUIComRoteiro();
+      
+      console.log('✅ Roteiro gerado com sucesso!');
       
     } catch (erro) {
       console.error('❌ Erro ao gerar roteiro:', erro);
-      this.mostrarErro('Não foi possível gerar seu roteiro. Tente novamente.');
+      this.mostrarErro('Não foi possível gerar seu roteiro. Por favor, tente novamente.');
+      throw erro;
     } finally {
       this.finalizarCarregamento();
     }
   },
 
+  /**
+   * Verificar se está em desenvolvimento
+   */
   isDesenvolvimento() {
-    return ['localhost', '127.0.0.1', ''].includes(location.hostname);
+    return ['localhost', '127.0.0.1', ''].includes(location.hostname) || 
+           location.hostname.startsWith('192.168.');
   },
 
+  /**
+   * Delay auxiliar
+   */
+  delay(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  },
+
+  /**
+   * Finalizar carregamento
+   */
   finalizarCarregamento() {
     clearInterval(this.intervalId);
     this.estaCarregando = false;
-    this.atualizarBarraProgresso(100, 'Roteiro pronto!');
+    
+    this.atualizarBarraProgresso(100, '✨ Roteiro pronto!');
     
     setTimeout(() => {
       const loading = document.querySelector('.loading-container');
-      if (loading) loading.style.display = 'none';
+      if (loading) {
+        loading.classList.add('fade-out');
+        setTimeout(() => loading.style.display = 'none', 300);
+      }
     }, 500);
   },
 
   /**
-   * ✅ FUNÇÃO OTIMIZADA: Calcula dias de viagem
+   * ✅ MELHORADO: Gera roteiro dummy com dados realistas
    */
-  calcularDiasViagem(dataIda, dataVolta) {
-    if (!dataIda) return 1;
-    if (!dataVolta) return 1;
+  async gerarRoteiroDummy(dataIda, dataVolta, diasViagem) {
+    console.log('🏗️ Gerando roteiro dummy...');
     
-    try {
-      const inicio = new Date(dataIda + 'T12:00:00');
-      const fim = new Date(dataVolta + 'T12:00:00');
-      const diffDias = Math.floor((fim - inicio) / (1000 * 60 * 60 * 24)) + 1;
-      return Math.max(1, diffDias);
-    } catch (e) {
-      return 1;
-    }
-  },
-
-  /**
-   * ✅ FUNÇÃO CORRIGIDA: Validar horários dos voos
-   */
-  validarHorariosVoo() {
-    const horarioChegada = this.extrairHorarioChegada();
-    const horarioPartida = this.extrairHorarioPartida();
-    
-    console.log(`🛬 Horário de chegada: ${horarioChegada}`);
-    console.log(`🛫 Horário de partida: ${horarioPartida}`);
-    
-    // Validar formato básico
-    const formatoHorario = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/;
-    if (!formatoHorario.test(horarioChegada)) {
-      console.warn(`⚠️ Formato inválido - chegada: ${horarioChegada}`);
-    }
-    if (horarioPartida && !formatoHorario.test(horarioPartida)) {
-      console.warn(`⚠️ Formato inválido - partida: ${horarioPartida}`);
-    }
-  },
-
-  /**
-   * ✅ FUNÇÃO OTIMIZADA: Gera roteiro dummy com horários corretos
-   */
-  gerarRoteiroDummy(dataIda, dataVolta, diasReais) {
+    const destino = this.dadosDestino.destino;
     const dias = [];
     const dataInicio = new Date(dataIda + 'T12:00:00');
     
-    for (let i = 0; i < diasReais; i++) {
+    // Base de atividades por tipo de destino
+    const atividadesBase = this.obterAtividadesBase(destino);
+    
+    for (let i = 0; i < diasViagem; i++) {
       const dataAtual = new Date(dataInicio);
       dataAtual.setDate(dataInicio.getDate() + i);
       
-      const dataFormatada = dataAtual.toISOString().split('T')[0];
-      const diaSemana = dataAtual.getDay();
+      const dia = {
+        data: this.formatarDataISO(dataAtual),
+        descricao: this.obterDescricaoDia(i + 1, destino, diasViagem),
+        manha: this.gerarPeriodoCompleto('manha', i, atividadesBase),
+        tarde: this.gerarPeriodoCompleto('tarde', i, atividadesBase),
+        noite: this.gerarPeriodoCompleto('noite', i, atividadesBase)
+      };
       
-      dias.push({
-        data: dataFormatada,
-        descricao: this.obterDescricaoDia(i + 1, this.dadosDestino?.destino || 'seu destino'),
-        manha: this.gerarAtividadesPeriodo('manha', i + 1),
-        tarde: this.gerarAtividadesPeriodo('tarde', i + 1),
-        noite: this.gerarAtividadesPeriodo('noite', i + 1)
-      });
+      // Adicionar observação especial para primeiro e último dia
+      if (i === 0) {
+        dia.observacao = this.obterObservacaoPrimeiroDia();
+      } else if (i === diasViagem - 1) {
+        dia.observacao = this.obterObservacaoUltimoDia();
+      }
+      
+      dias.push(dia);
     }
     
+    // Ajustar atividades baseado nos horários dos voos
     this.ajustarAtividadesPorHorarios(dias);
     
     return {
-      destino: `${this.dadosDestino?.destino || 'Seu Destino'}, ${this.dadosDestino?.pais || 'Mundo'}`,
+      destino: `${destino}, ${this.dadosDestino.pais}`,
       dias
     };
   },
 
   /**
-   * ✅ FUNÇÃO OTIMIZADA: Ajusta atividades baseado nos horários do voo
+   * ✅ NOVO: Obtém atividades base por destino
    */
-  ajustarAtividadesPorHorarios(dias) {
-    if (!dias.length) return;
+  obterAtividadesBase(destino) {
+    // Atividades genéricas que funcionam para qualquer destino
+    const generico = {
+      manha: [
+        { local: "Centro Histórico", dica: "Comece cedo para evitar multidões!" },
+        { local: "Museu Nacional", dica: "Não perca a exposição principal!" },
+        { local: "Mercado Central", dica: "Prove as especialidades locais!" },
+        { local: "Catedral Principal", dica: "Arquitetura impressionante!" },
+        { local: "Parque Municipal", dica: "Ótimo para caminhadas matinais!" }
+      ],
+      tarde: [
+        { local: "Bairro Artístico", dica: "Galerias e street art incríveis!" },
+        { local: "Mirante da Cidade", dica: "Vista panorâmica espetacular!" },
+        { local: "Passeio de Barco", dica: "Perspectiva única da cidade!" },
+        { local: "Shopping Local", dica: "Artesanato e lembranças!" },
+        { local: "Tour Gastronômico", dica: "Sabores autênticos da região!" }
+      ],
+      noite: [
+        { local: "Restaurante Típico", dica: "Peça o prato da casa!" },
+        { local: "Show Cultural", dica: "Música e dança tradicional!" },
+        { local: "Bar com Vista", dica: "Drinks especiais ao pôr do sol!" },
+        { local: "Teatro Municipal", dica: "Verifique a programação!" },
+        { local: "Rua Gastronômica", dica: "Vida noturna animada!" }
+      ]
+    };
     
-    const horarioChegada = this.extrairHorarioChegada();
-    const horarioPartida = this.extrairHorarioPartida();
-    
-    const horaChegada = parseInt(horarioChegada.split(':')[0]);
-    const horaPartida = horarioPartida ? parseInt(horarioPartida.split(':')[0]) : null;
-    
-    // Ajustar primeiro dia
-    if (horaChegada < 8) {
-      dias[0].observacao = "Chegada madrugada - dia completo disponível!";
-      this.adicionarAtividadeEspecial(dias[0].manha, "Check-in hotel", horarioChegada);
-    } else if (horaChegada < 12) {
-      dias[0].observacao = "Chegada manhã - aproveite o dia!";
-      this.adicionarAtividadeEspecial(dias[0].manha, "Check-in e exploração", horarioChegada);
-    } else if (horaChegada < 16) {
-      dias[0].observacao = "Chegada meio-dia - tarde livre!";
-      this.adicionarAtividadeEspecial(dias[0].tarde, "Check-in e descanso", horarioChegada);
-    } else if (horaChegada < 20) {
-      dias[0].observacao = "Chegada tarde - explore a noite!";
-      this.adicionarAtividadeEspecial(dias[0].tarde, "Check-in", horarioChegada);
-    } else {
-      dias[0].observacao = "Chegada noturna - descanse!";
-      dias[0].noite.atividades = [{
-        horario: horarioChegada,
-        local: "Hotel",
-        dica: "Chegada noturna - foque no descanso!",
-        tags: ["Descanso"],
-        isEspecial: true
-      }];
-    }
-    
-    // Ajustar último dia se houver volta
-    if (horaPartida && dias.length > 1) {
-      const ultimoDia = dias.length - 1;
-      
-      if (horaPartida < 8) {
-        dias[ultimoDia].observacao = "Partida muito cedo - prepare-se!";
-        dias[ultimoDia].noite.atividades = [{
-          horario: "22:00",
-          local: "Hotel",
-          dica: "Prepare bagagens e descanse - voo cedo!",
-          tags: ["Preparação"],
-          isEspecial: true
-        }];
-      } else if (horaPartida < 14) {
-        dias[ultimoDia].observacao = "Partida manhã - tempo limitado!";
-        this.adicionarAtividadeEspecial(dias[ultimoDia].manha, "Check-out e transfer", 
-          this.calcularHorarioCheckout(horarioPartida));
-      } else if (horaPartida < 20) {
-        dias[ultimoDia].observacao = "Partida tarde - manhã livre!";
-        this.adicionarAtividadeEspecial(dias[ultimoDia].tarde, "Transfer aeroporto", 
-          this.calcularHorarioCheckout(horarioPartida));
-      } else {
-        dias[ultimoDia].observacao = "Partida noturna - dia completo!";
-        this.adicionarAtividadeEspecial(dias[ultimoDia].noite, "Transfer aeroporto", 
-          this.calcularHorarioCheckout(horarioPartida));
+    // Personalizar por destino conhecido
+    const especificos = {
+      'Lisboa': {
+        manha: [
+          { local: "Torre de Belém", dica: "Chegue antes das 10h para evitar filas!" },
+          { local: "Mosteiro dos Jerónimos", dica: "Arquitetura manuelina impressionante!" },
+          { local: "Castelo de São Jorge", dica: "Vista incrível da cidade!" }
+        ],
+        tarde: [
+          { local: "Bairro de Alfama", dica: "Perca-se nas ruelas históricas!" },
+          { local: "Elevador de Santa Justa", dica: "Vista 360° de Lisboa!" },
+          { local: "LX Factory", dica: "Arte, lojas e cafés descolados!" }
+        ],
+        noite: [
+          { local: "Casa de Fado", dica: "Experiência musical única!" },
+          { local: "Time Out Market", dica: "O melhor da gastronomia local!" },
+          { local: "Bairro Alto", dica: "Vida noturna vibrante!" }
+        ]
+      },
+      'Paris': {
+        manha: [
+          { local: "Torre Eiffel", dica: "Compre ingressos online!" },
+          { local: "Museu do Louvre", dica: "Reserve meio dia inteiro!" },
+          { local: "Notre-Dame", dica: "Em restauração, mas vale a visita externa!" }
+        ]
       }
-    }
-  },
-
-  adicionarAtividadeEspecial(periodo, descricao, horario) {
-    if (!periodo.atividades) periodo.atividades = [];
-    periodo.atividades.unshift({
-      horario,
-      local: descricao,
-      dica: "Atividade relacionada ao seu voo!",
-      tags: ["Voo"],
-      isEspecial: true
-    });
-  },
-
-  calcularHorarioCheckout(horarioPartida) {
-    const hora = parseInt(horarioPartida.split(':')[0]) - 3;
-    return `${String(Math.max(6, hora)).padStart(2, '0')}:00`;
+      // Adicionar mais destinos conforme necessário
+    };
+    
+    // Retornar específico se existir, senão genérico
+    return especificos[destino] || generico;
   },
 
   /**
-   * ✅ FUNÇÃO OTIMIZADA: Busca previsão do tempo
+   * ✅ NOVO: Gera período completo com múltiplas atividades
    */
-  async buscarPrevisaoTempo() {
-    try {
-      if (!this.roteiroPronto?.dias) return;
+  gerarPeriodoCompleto(periodo, diaIndex, atividadesBase) {
+    const atividades = [];
+    const listaBase = atividadesBase[periodo] || [];
+    
+    // Horários padrão por período
+    const horarios = {
+      manha: ['09:00', '10:30', '11:30'],
+      tarde: ['14:00', '15:30', '17:00'],
+      noite: ['19:00', '20:30', '22:00']
+    };
+    
+    // Número de atividades por período (varia por dia)
+    const numAtividades = (diaIndex % 2 === 0) ? 2 : 3;
+    
+    for (let i = 0; i < numAtividades && i < listaBase.length; i++) {
+      const atividadeIndex = (diaIndex * 3 + i) % listaBase.length;
+      const atividade = { ...listaBase[atividadeIndex] };
       
-      const cidade = this.dadosDestino.destino.replace(/\s+Internacional/i, '').replace(/\s*,.*$/, '');
-      const dataInicio = this.formatarDataISO(this.getDataIda());
-      const dataFim = this.formatarDataISO(this.getDataVolta());
+      atividade.horario = horarios[periodo][i];
+      atividade.tags = this.gerarTagsAtividade(atividade.local, periodo);
       
-      const url = `/api/weather?city=${encodeURIComponent(cidade)}&start=${dataInicio}${dataFim ? `&end=${dataFim}` : ''}`;
-      
-      const controller = new AbortController();
-      setTimeout(() => controller.abort(), 10000);
-      
-      const response = await fetch(url, { signal: controller.signal });
-      
-      if (response.ok) {
-        const previsoes = await response.json();
-        this.roteiroPronto.dias.forEach((dia, index) => {
-          dia.previsao = previsoes[index] || this.gerarPrevisaoFicticia(index);
-        });
+      atividades.push(atividade);
+    }
+    
+    return { atividades };
+  },
+
+  /**
+   * ✅ NOVO: Gera tags relevantes para atividade
+   */
+  gerarTagsAtividade(local, periodo) {
+    const tags = [];
+    
+    // Tags por palavra-chave no local
+    if (local.includes('Museu')) tags.push('Cultural');
+    if (local.includes('Restaurante') || local.includes('Gastronôm')) tags.push('Gastronomia');
+    if (local.includes('Parque') || local.includes('Jardim')) tags.push('Natureza');
+    if (local.includes('Shopping') || local.includes('Mercado')) tags.push('Compras');
+    if (local.includes('Igreja') || local.includes('Catedral')) tags.push('Religioso');
+    if (local.includes('Bar') || local.includes('Noturna')) tags.push('Vida Noturna');
+    if (local.includes('Mirante') || local.includes('Vista')) tags.push('Vista Panorâmica');
+    
+    // Tag por período
+    if (periodo === 'manha') tags.push('Matinal');
+    if (periodo === 'noite') tags.push('Noturno');
+    
+    // Sempre adicionar pelo menos uma tag
+    if (tags.length === 0) tags.push('Recomendado');
+    
+    // Adicionar "Imperdível" aleatoriamente (30% de chance)
+    if (Math.random() < 0.3) tags.unshift('Imperdível');
+    
+    return tags.slice(0, 3); // Máximo 3 tags
+  },
+
+  /**
+   * ✅ MELHORADO: Ajusta atividades do primeiro e último dia
+   */
+  ajustarAtividadesPorHorarios(dias) {
+    if (!dias || dias.length === 0) return;
+    
+    const horaChegada = this.extrairHorarioChegada();
+    const horaPartida = this.extrairHorarioPartida();
+    
+    // Ajustar primeiro dia baseado no horário de chegada
+    const primeiroDia = dias[0];
+    const horaChegadaNum = parseInt(horaChegada.split(':')[0]);
+    
+    if (horaChegadaNum >= 20) {
+      // Chegada muito tarde - só jantar/descanso
+      primeiroDia.manha.atividades = [];
+      primeiroDia.tarde.atividades = [];
+      primeiroDia.noite.atividades = [{
+        horario: '21:00',
+        local: 'Check-in e Jantar no Hotel',
+        dica: 'Descanse para começar bem amanhã!',
+        tags: ['Chegada', 'Descanso'],
+        isEspecial: true
+      }];
+    } else if (horaChegadaNum >= 16) {
+      // Chegada à tarde - sem manhã
+      primeiroDia.manha.atividades = [];
+      primeiroDia.tarde.atividades = [{
+        horario: horaChegada,
+        local: 'Check-in no Hotel',
+        dica: 'Deixe as malas e saia para explorar!',
+        tags: ['Chegada'],
+        isEspecial: true
+      }];
+    } else if (horaChegadaNum >= 12) {
+      // Chegada meio-dia
+      primeiroDia.manha.atividades = [];
+      if (primeiroDia.tarde.atividades.length > 0) {
+        primeiroDia.tarde.atividades[0] = {
+          horario: `${horaChegadaNum + 1}:00`,
+          local: 'Check-in e Almoço',
+          dica: 'Experimente a culinária local!',
+          tags: ['Chegada', 'Gastronomia'],
+          isEspecial: true
+        };
       }
-    } catch (e) {
-      console.warn('⚠️ Erro ao buscar previsão:', e);
-    } finally {
-      this.garantirPrevisoesTodosDias();
+    }
+    
+    // Ajustar último dia se houver partida
+    if (horaPartida && dias.length > 1) {
+      const ultimoDia = dias[dias.length - 1];
+      const horaPartidaNum = parseInt(horaPartida.split(':')[0]);
+      
+      if (horaPartidaNum < 12) {
+        // Partida de manhã
+        ultimoDia.tarde.atividades = [];
+        ultimoDia.noite.atividades = [];
+        ultimoDia.manha.atividades = [{
+          horario: '08:00',
+          local: 'Check-out e Transfer para Aeroporto',
+          dica: 'Chegue ao aeroporto com 2h de antecedência!',
+          tags: ['Partida'],
+          isEspecial: true
+        }];
+      } else if (horaPartidaNum < 18) {
+        // Partida à tarde
+        ultimoDia.noite.atividades = [];
+        if (ultimoDia.tarde.atividades.length > 0) {
+          ultimoDia.tarde.atividades[ultimoDia.tarde.atividades.length - 1] = {
+            horario: `${horaPartidaNum - 3}:00`,
+            local: 'Transfer para Aeroporto',
+            dica: 'Hora de se despedir! Até a próxima!',
+            tags: ['Partida'],
+            isEspecial: true
+          };
+        }
+      }
     }
   },
 
-  garantirPrevisoesTodosDias() {
-    if (!this.roteiroPronto?.dias) return;
-    this.roteiroPronto.dias.forEach((dia, index) => {
-      if (!dia.previsao) {
-        dia.previsao = this.gerarPrevisaoFicticia(index);
+  /**
+   * ✅ CORRIGIDO: Busca previsão do tempo apenas para os 3 primeiros dias
+   */
+  async buscarPrevisaoTempo() {
+    try {
+      console.log('🌤️ Buscando previsão do tempo (limitada a 3 dias)...');
+      
+      if (!this.roteiroPronto?.dias || this.roteiroPronto.dias.length === 0) {
+        console.warn('⚠️ Sem dias no roteiro para buscar previsão');
+        return;
       }
-    });
+      
+      // IMPORTANTE: Limitar a 3 dias
+      const diasComPrevisao = Math.min(3, this.roteiroPronto.dias.length);
+      const cidade = this.dadosDestino.destino.replace(/\s+Internacional/i, '').trim();
+      
+      // Tentar buscar previsão real
+      try {
+        const url = `/api/weather?city=${encodeURIComponent(cidade)}&days=${diasComPrevisao}`;
+        
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000);
+        
+        const response = await fetch(url, { signal: controller.signal });
+        clearTimeout(timeoutId);
+        
+        if (response.ok) {
+          const previsoes = await response.json();
+          
+          // Aplicar previsões apenas aos primeiros 3 dias
+          for (let i = 0; i < diasComPrevisao; i++) {
+            if (previsoes[i]) {
+              this.roteiroPronto.dias[i].previsao = previsoes[i];
+            } else {
+              this.roteiroPronto.dias[i].previsao = this.gerarPrevisaoAleatoria(i);
+            }
+          }
+          
+          console.log(`✅ Previsão aplicada aos primeiros ${diasComPrevisao} dias`);
+        } else {
+          throw new Error(`HTTP ${response.status}`);
+        }
+        
+      } catch (erro) {
+        console.warn('⚠️ Erro ao buscar previsão real:', erro.message);
+        
+        // Fallback: previsões aleatórias para os 3 primeiros dias
+        for (let i = 0; i < diasComPrevisao; i++) {
+          this.roteiroPronto.dias[i].previsao = this.gerarPrevisaoAleatoria(i);
+        }
+      }
+      
+      // IMPORTANTE: Garantir que dias > 3 não tenham previsão
+      for (let i = 3; i < this.roteiroPronto.dias.length; i++) {
+        delete this.roteiroPronto.dias[i].previsao;
+      }
+      
+    } catch (erro) {
+      console.error('❌ Erro geral na previsão:', erro);
+    }
   },
 
-  gerarPrevisaoFicticia(index) {
+  /**
+   * ✅ NOVO: Gera previsão aleatória realista
+   */
+  gerarPrevisaoAleatoria(diaIndex) {
     const condicoes = [
-      { icon: '☀️', condition: 'Ensolarado', temp: 28 },
-      { icon: '🌤️', condition: 'Parcialmente nublado', temp: 25 },
-      { icon: '☁️', condition: 'Nublado', temp: 22 }
+      { icon: '☀️', condition: 'Ensolarado', tempBase: 28 },
+      { icon: '🌤️', condition: 'Parcialmente nublado', tempBase: 25 },
+      { icon: '☁️', condition: 'Nublado', tempBase: 22 },
+      { icon: '🌦️', condition: 'Chuvas esparsas', tempBase: 20 }
     ];
     
-    const condicao = condicoes[index % condicoes.length];
-    const tempVariacao = Math.floor(Math.random() * 6) - 3;
+    const condicao = condicoes[diaIndex % condicoes.length];
+    const variacaoTemp = Math.floor(Math.random() * 6) - 3;
     
     return {
       icon: condicao.icon,
-      temperature: Math.max(15, condicao.temp + tempVariacao),
+      temperature: Math.max(15, Math.min(35, condicao.tempBase + variacaoTemp)),
       condition: condicao.condition,
-      date: new Date().toISOString().split('T')[0]
+      date: this.roteiroPronto.dias[diaIndex].data
     };
   },
 
   /**
-   * ✅ FUNÇÃO CORRIGIDA: Busca imagens com configurações otimizadas
+   * ✅ CORRIGIDO: Busca imagens para TODOS os dias com otimização
    */
-  async buscarImagensLocais() {
+  async buscarTodasImagensOtimizado() {
     try {
-      console.log('🖼️ Iniciando busca de imagens para locais...');
+      console.log('🖼️ Iniciando busca otimizada de imagens...');
       
-      if (!this.roteiroPronto?.dias) {
-        console.warn('⚠️ Não há roteiro para buscar imagens');
+      if (!this.roteiroPronto?.dias || this.roteiroPronto.dias.length === 0) {
+        console.warn('⚠️ Sem roteiro para buscar imagens');
         return;
       }
       
-      // ✅ MELHORIA: Coletar pontos turísticos com limite inteligente
-      const pontosTuristicos = new Set();
+      // 1. Coletar TODOS os locais únicos
+      const locaisUnicos = new Map();
       let totalAtividades = 0;
       
       this.roteiroPronto.dias.forEach((dia, diaIndex) => {
         ['manha', 'tarde', 'noite'].forEach(periodo => {
           if (dia[periodo]?.atividades?.length) {
-            dia[periodo].atividades.forEach((atividade, ativIndex) => {
+            dia[periodo].atividades.forEach(atividade => {
               if (atividade.local && !atividade.isEspecial) {
-                pontosTuristicos.add(atividade.local);
+                // Usar Map para evitar duplicatas
+                locaisUnicos.set(atividade.local, {
+                  local: atividade.local,
+                  primeiraOcorrencia: { dia: diaIndex, periodo }
+                });
                 totalAtividades++;
               }
             });
@@ -528,217 +896,246 @@ const BENETRIP_ROTEIRO = {
         });
       });
       
-      const pontosArray = [...pontosTuristicos];
-      console.log(`🎯 Total de atividades: ${totalAtividades}`);
-      console.log(`🖼️ Pontos únicos para buscar imagens (${pontosArray.length}):`, pontosArray);
+      console.log(`📊 Estatísticas de busca:
+        - Total de atividades: ${totalAtividades}
+        - Locais únicos: ${locaisUnicos.size}
+        - Dias no roteiro: ${this.roteiroPronto.dias.length}`);
       
-      if (pontosArray.length === 0) {
-        console.warn('⚠️ Nenhum ponto turístico encontrado - aplicando fallbacks');
-        this.adicionarImagensFallback();
-        return;
+      // 2. Estratégia de busca inteligente
+      const locaisArray = Array.from(locaisUnicos.values());
+      const maxBuscasSimultaneas = 3; // Limitar requisições simultâneas
+      const maxTotalBuscas = Math.min(locaisArray.length, 20); // Limite máximo de 20 buscas
+      
+      // 3. Dividir em lotes para não sobrecarregar
+      const lotes = [];
+      for (let i = 0; i < maxTotalBuscas; i += maxBuscasSimultaneas) {
+        lotes.push(locaisArray.slice(i, i + maxBuscasSimultaneas));
       }
       
-      // ✅ LIMITE INTELIGENTE: Máximo 8 buscas para não sobrecarregar
-      const pontosLimitados = pontosArray.slice(0, 8);
-      console.log(`🎯 Limitando busca a ${pontosLimitados.length} pontos principais`);
+      console.log(`🔄 Processando ${lotes.length} lotes de imagens...`);
       
-      // ✅ CONFIGURAÇÕES OTIMIZADAS
-      const configBusca = {
-        timeout: 15000,  // ✅ Aumentado para 15 segundos
-        maxTentativas: 2, // ✅ Máximo 2 tentativas por imagem
-        delayEntreBuscas: 500 // ✅ 500ms entre buscas para evitar rate limit
-      };
+      // 4. Processar lotes sequencialmente
+      const todasImagens = new Map();
       
-      // ✅ Buscar imagens com configurações otimizadas
-      const imagensPromises = pontosLimitados.map(async (local, index) => {
-        // ✅ Delay escalonado para evitar muitas requisições simultâneas
-        await this.delay(index * configBusca.delayEntreBuscas);
+      for (let i = 0; i < lotes.length; i++) {
+        console.log(`📦 Processando lote ${i + 1}/${lotes.length}...`);
         
-        return this.buscarImagemComFallback(local, configBusca, index + 1, pontosLimitados.length);
-      });
-      
-      console.log('⏳ Aguardando todas as buscas de imagens...');
-      const resultadosImagens = await Promise.all(imagensPromises);
-      
-      // ✅ Processar e aplicar resultados
-      this.processarResultadosImagens(resultadosImagens, totalAtividades);
-      
-    } catch (erro) {
-      console.error('❌ Erro geral ao buscar imagens:', erro);
-      this.adicionarImagensFallback();
-    }
-  },
-
-  /**
-   * ✅ NOVA FUNÇÃO: Buscar imagem individual com fallback
-   */
-  async buscarImagemComFallback(local, config, numeroAtual, total) {
-    for (let tentativa = 1; tentativa <= config.maxTentativas; tentativa++) {
-      try {
-        console.log(`🔍 ${numeroAtual}/${total} (tentativa ${tentativa}) Buscando: ${local}`);
+        const promises = lotes[i].map(item => 
+          this.buscarImagemComCache(item.local)
+        );
         
-        const query = `${local} ${this.dadosDestino?.destino || ''}`.trim();
-        const url = `/api/image-search?query=${encodeURIComponent(query)}&perPage=1&descricao=${encodeURIComponent(this.dadosDestino?.destino || '')}`;
+        const resultados = await Promise.all(promises);
         
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), config.timeout);
-        
-        const response = await fetch(url, {
-          method: 'GET',
-          headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json'
-          },
-          signal: controller.signal
+        // Armazenar resultados
+        resultados.forEach((resultado, index) => {
+          const local = lotes[i][index].local;
+          if (resultado.sucesso) {
+            todasImagens.set(local, resultado.url);
+            console.log(`✅ Imagem encontrada: ${local}`);
+          } else {
+            console.warn(`⚠️ Sem imagem: ${local}`);
+          }
         });
         
-        clearTimeout(timeoutId);
-        
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}`);
+        // Delay entre lotes para evitar rate limit
+        if (i < lotes.length - 1) {
+          await this.delay(500);
         }
-        
-        const dados = await response.json();
-        
-        if (dados?.images?.length > 0) {
-          const imagemUrl = dados.images[0].url || dados.images[0].src?.medium;
-          console.log(`✅ ${local} - Imagem encontrada (tentativa ${tentativa})`);
-          return { local, imagem: imagemUrl, tentativa };
-        }
-        
-        throw new Error('Sem imagens na resposta');
-        
-      } catch (erro) {
-        console.warn(`⚠️ ${local} - Tentativa ${tentativa} falhou:`, erro.message);
-        
-        if (tentativa === config.maxTentativas) {
-          return { local, imagem: null, erro: erro.message };
-        }
-        
-        // ✅ Delay antes de tentar novamente
-        await this.delay(1000);
       }
+      
+      console.log(`📸 Total de imagens encontradas: ${todasImagens.size}`);
+      
+      // 5. Aplicar imagens a TODAS as atividades
+      let imagensAplicadas = 0;
+      
+      this.roteiroPronto.dias.forEach((dia, diaIndex) => {
+        ['manha', 'tarde', 'noite'].forEach(periodo => {
+          if (dia[periodo]?.atividades?.length) {
+            dia[periodo].atividades.forEach((atividade, ativIndex) => {
+              if (atividade.local && !atividade.isEspecial) {
+                const imagemUrl = todasImagens.get(atividade.local);
+                
+                if (imagemUrl) {
+                  atividade.imagemUrl = imagemUrl;
+                  imagensAplicadas++;
+                } else {
+                  // Aplicar fallback
+                  atividade.imagemUrl = this.gerarImagemFallback(atividade.local, diaIndex, ativIndex);
+                  atividade.isFallback = true;
+                }
+              }
+            });
+          }
+        });
+      });
+      
+      console.log(`✅ Imagens aplicadas: ${imagensAplicadas}/${totalAtividades}`);
+      
+      // 6. Se muitas falhas, aplicar fallbacks adicionais
+      const taxaSucesso = imagensAplicadas / totalAtividades;
+      if (taxaSucesso < 0.5) {
+        console.log('🔄 Taxa de sucesso baixa, melhorando fallbacks...');
+        this.melhorarFallbacks();
+      }
+      
+    } catch (erro) {
+      console.error('❌ Erro ao buscar imagens:', erro);
+      this.aplicarFallbacksGlobal();
     }
   },
 
   /**
-   * ✅ NOVA FUNÇÃO: Processar resultados e aplicar imagens
+   * ✅ NOVO: Busca imagem com cache
    */
-  processarResultadosImagens(resultados, totalAtividades) {
-    const imagensEncontradas = resultados.filter(r => r.imagem);
-    const imagensFalharam = resultados.filter(r => !r.imagem);
+  async buscarImagemComCache(local) {
+    // Verificar cache primeiro
+    if (this.imagensCache.has(local)) {
+      return this.imagensCache.get(local);
+    }
     
-    console.log(`✅ Imagens encontradas: ${imagensEncontradas.length}/${resultados.length}`);
-    console.log(`❌ Imagens falharam: ${imagensFalharam.length}`);
-    
-    // Criar mapa de local -> URL
-    const mapaImagens = {};
-    imagensEncontradas.forEach(resultado => {
-      mapaImagens[resultado.local] = resultado.imagem;
-    });
-    
-    // Aplicar imagens às atividades
-    let imagensAplicadas = 0;
-    
-    this.roteiroPronto.dias.forEach((dia, diaIndex) => {
-      ['manha', 'tarde', 'noite'].forEach(periodo => {
-        if (dia[periodo]?.atividades?.length) {
-          dia[periodo].atividades.forEach((atividade, ativIndex) => {
-            if (atividade.local && mapaImagens[atividade.local] && !atividade.isEspecial) {
-              atividade.imagemUrl = mapaImagens[atividade.local];
-              imagensAplicadas++;
-            }
-          });
+    try {
+      const query = `${local} ${this.dadosDestino.destino}`.trim();
+      const url = `/api/image-search?query=${encodeURIComponent(query)}&perPage=1`;
+      
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
+      
+      const response = await fetch(url, {
+        signal: controller.signal,
+        headers: {
+          'Accept': 'application/json',
+          'Cache-Control': 'max-age=3600'
         }
       });
-    });
-    
-    console.log(`🎨 Total de imagens aplicadas: ${imagensAplicadas}`);
-    
-    // ✅ Aplicar fallbacks se necessário
-    if (imagensAplicadas < totalAtividades * 0.3) { // Se menos de 30% têm imagem
-      console.log('🔄 Poucas imagens encontradas - aplicando fallbacks...');
-      this.adicionarImagensFallback();
+      
+      clearTimeout(timeoutId);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      
+      const dados = await response.json();
+      
+      if (dados?.images?.[0]) {
+        const imagemUrl = dados.images[0].url || dados.images[0].src?.medium;
+        const resultado = { sucesso: true, url: imagemUrl };
+        
+        // Salvar no cache
+        this.imagensCache.set(local, resultado);
+        
+        return resultado;
+      }
+      
+      throw new Error('Sem imagens na resposta');
+      
+    } catch (erro) {
+      const resultado = { sucesso: false, erro: erro.message };
+      this.imagensCache.set(local, resultado);
+      return resultado;
     }
   },
 
   /**
-   * ✅ FUNÇÃO CORRIGIDA: Adiciona imagens de fallback confiáveis
+   * ✅ NOVO: Gera imagem de fallback melhorada
    */
-  adicionarImagensFallback() {
-    console.log('🔄 Adicionando imagens de fallback...');
-    
-    // ✅ URLs CORRIGIDAS - usando serviços mais confiáveis
-    const imagensFallback = [
-      // Imagens de placeholder com temas de viagem
-      'https://picsum.photos/400/250?random=1',  // Paisagem aleatória
-      'https://picsum.photos/400/250?random=2',  // Cidade aleatória
-      'https://picsum.photos/400/250?random=3',  // Arquitetura aleatória
-      'https://picsum.photos/400/250?random=4',  // Natureza aleatória
-      'https://picsum.photos/400/250?random=5',  // Urbano aleatório
-      'https://picsum.photos/400/250?random=6',  // Cultura aleatória
-      'https://picsum.photos/400/250?random=7',  // História aleatória
-      'https://picsum.photos/400/250?random=8',  // Vida noturna aleatória
-      
-      // ✅ NOVA OPÇÃO: Imagens locais como backup
-      'assets/images/fallback/viagem-generica-1.jpg',
-      'assets/images/fallback/viagem-generica-2.jpg',
-      'assets/images/fallback/viagem-generica-3.jpg',
-      'assets/images/fallback/viagem-generica-4.jpg'
+  gerarImagemFallback(local, diaIndex, ativIndex) {
+    // Lista expandida de imagens de fallback
+    const fallbacks = [
+      `https://picsum.photos/400/250?random=${diaIndex}${ativIndex}`,
+      `https://source.unsplash.com/400x250/?${encodeURIComponent(local)},travel`,
+      `https://loremflickr.com/400/250/${encodeURIComponent(local)}`,
+      `https://placeimg.com/400/250/arch?t=${Date.now()}`,
+      `https://via.placeholder.com/400x250/E87722/FFFFFF?text=${encodeURIComponent(local)}`
     ];
     
+    // Selecionar fallback baseado no índice
+    const indice = (diaIndex * 10 + ativIndex) % fallbacks.length;
+    
+    return fallbacks[indice];
+  },
+
+  /**
+   * ✅ NOVO: Melhora fallbacks existentes
+   */
+  melhorarFallbacks() {
+    const palavrasChave = ['travel', 'tourism', 'destination', 'vacation', 'explore', 'adventure'];
     let fallbackIndex = 0;
-    let fallbacksAdicionados = 0;
     
     this.roteiroPronto.dias.forEach((dia, diaIndex) => {
       ['manha', 'tarde', 'noite'].forEach(periodo => {
         if (dia[periodo]?.atividades?.length) {
           dia[periodo].atividades.forEach((atividade, ativIndex) => {
-            if (atividade.local && !atividade.imagemUrl && !atividade.isEspecial) {
-              
-              // ✅ MELHORIA: Tentar multiple fallbacks
-              const urlFallback = imagensFallback[fallbackIndex % imagensFallback.length];
-              
-              // ✅ VERIFICAÇÃO: Se a URL falhar, usar placeholder simples
-              atividade.imagemUrl = urlFallback;
-              atividade.imagemFallback = `https://via.placeholder.com/400x250/E87722/FFFFFF?text=${encodeURIComponent(atividade.local)}`;
-              
+            if (atividade.isFallback && atividade.local) {
+              const palavra = palavrasChave[fallbackIndex % palavrasChave.length];
+              atividade.imagemUrl = `https://source.unsplash.com/400x250/?${palavra},${encodeURIComponent(this.dadosDestino.destino)}`;
               fallbackIndex++;
-              fallbacksAdicionados++;
-              
-              console.log(`🖼️ Fallback aplicado - Dia ${diaIndex + 1}, ${periodo}, ${atividade.local}`);
             }
           });
         }
       });
     });
-    
-    console.log(`🎨 Total de imagens de fallback adicionadas: ${fallbacksAdicionados}`);
   },
 
   /**
-   * ✅ FUNÇÃO OTIMIZADA: Atualiza a interface
+   * ✅ NOVO: Aplica fallbacks global em caso de erro total
+   */
+  aplicarFallbacksGlobal() {
+    console.log('🔄 Aplicando fallbacks globais...');
+    
+    let index = 0;
+    this.roteiroPronto.dias.forEach((dia, diaIndex) => {
+      ['manha', 'tarde', 'noite'].forEach(periodo => {
+        if (dia[periodo]?.atividades?.length) {
+          dia[periodo].atividades.forEach((atividade) => {
+            if (atividade.local && !atividade.isEspecial && !atividade.imagemUrl) {
+              atividade.imagemUrl = `https://picsum.photos/400/250?random=${index++}`;
+              atividade.isFallback = true;
+            }
+          });
+        }
+      });
+    });
+  },
+
+  /**
+   * ✅ MELHORADO: Atualiza UI com o roteiro
    */
   atualizarUIComRoteiro() {
-    const container = document.querySelector('.roteiro-content');
-    if (!container) return;
+    console.log('🎨 Atualizando interface...');
     
+    const container = document.querySelector('.roteiro-content');
+    if (!container) {
+      console.error('❌ Container do roteiro não encontrado');
+      return;
+    }
+    
+    // Limpar conteúdo
     container.innerHTML = '';
     
+    // Atualizar título
     const header = document.querySelector('.app-header h1');
     if (header) {
       header.textContent = `Seu Roteiro para ${this.dadosDestino.destino}`;
     }
     
+    // Adicionar resumo
     container.appendChild(this.criarResumoViagem());
     
+    // Adicionar dias
     this.roteiroPronto.dias.forEach((dia, index) => {
       container.appendChild(this.criarElementoDia(dia, index + 1));
     });
+    
+    // Adicionar espaço no final para os botões fixos
+    const spacer = document.createElement('div');
+    spacer.style.height = '100px';
+    container.appendChild(spacer);
+    
+    console.log('✅ Interface atualizada');
   },
 
   /**
-   * ✅ FUNÇÃO CORRIGIDA: Cria resumo da viagem com horários corretos
+   * ✅ MELHORADO: Cria elemento do resumo da viagem
    */
   criarResumoViagem() {
     const resumo = document.createElement('div');
@@ -746,16 +1143,13 @@ const BENETRIP_ROTEIRO = {
     
     const dataIda = this.formatarData(this.getDataIda());
     const dataVolta = this.getDataVolta() ? this.formatarData(this.getDataVolta()) : null;
-    const diasViagem = this.calcularDiasViagem(
-      this.formatarDataISO(this.getDataIda()), 
-      this.formatarDataISO(this.getDataVolta())
-    );
-    
-    const horaChegada = this.extrairHorarioChegada();
-    const horaPartida = this.extrairHorarioPartida();
+    const diasViagem = this.calcularDiasViagem(this.getDataIda(), this.getDataVolta());
     
     resumo.innerHTML = `
-      <div class="resumo-viagem-header">📋 Resumo da Viagem</div>
+      <div class="resumo-viagem-header">
+        <span class="icone-header">📋</span>
+        <span>Resumo da Viagem</span>
+      </div>
       <div class="resumo-viagem-content">
         <div class="resumo-item">
           <div class="icone">🎯</div>
@@ -768,23 +1162,25 @@ const BENETRIP_ROTEIRO = {
         <div class="resumo-item">
           <div class="icone">📅</div>
           <div class="texto">
-            <div class="label">Datas:</div>
-            <p class="valor">${dataIda}${dataVolta ? ` a ${dataVolta}` : ''} (${diasViagem} dias)</p>
+            <div class="label">Período:</div>
+            <p class="valor">${dataIda}${dataVolta ? ` até ${dataVolta}` : ''}</p>
+            <p class="valor-secundario">${diasViagem} ${diasViagem === 1 ? 'dia' : 'dias'} de viagem</p>
           </div>
         </div>
         
         <div class="resumo-item">
           <div class="icone">✈️</div>
           <div class="texto">
-            <div class="label">Horários dos voos:</div>
-            <p class="valor">Chegada ${horaChegada}${horaPartida !== '21:00' ? ` - Saída ${horaPartida}` : ''}</p>
+            <div class="label">Voos:</div>
+            <p class="valor">Chegada: ${this.extrairHorarioChegada()}</p>
+            ${this.getDataVolta() ? `<p class="valor">Partida: ${this.extrairHorarioPartida()}</p>` : ''}
           </div>
         </div>
         
         <div class="resumo-item">
           <div class="icone">${this.obterIconeCompanhia()}</div>
           <div class="texto">
-            <div class="label">Grupo:</div>
+            <div class="label">Viajando:</div>
             <p class="valor">${this.obterTextoCompanhia()}</p>
           </div>
         </div>
@@ -792,7 +1188,7 @@ const BENETRIP_ROTEIRO = {
         <div class="resumo-item">
           <div class="icone">${this.obterIconePreferencia()}</div>
           <div class="texto">
-            <div class="label">Preferência:</div>
+            <div class="label">Estilo:</div>
             <p class="valor">${this.obterTextoPreferencia()}</p>
           </div>
         </div>
@@ -803,15 +1199,15 @@ const BENETRIP_ROTEIRO = {
   },
 
   /**
-   * ✅ FUNÇÃO OTIMIZADA: Cria elemento de um dia do roteiro
+   * ✅ MELHORADO: Cria elemento de um dia com validações
    */
   criarElementoDia(dia, numeroDia) {
     const elemento = document.createElement('div');
     elemento.className = 'dia-roteiro';
+    elemento.setAttribute('data-dia', numeroDia);
     
     const dataFormatada = this.formatarDataCompleta(dia.data);
-    const observacao = dia.observacao ? 
-      `<div class="dia-observacao"><span>💡</span> ${dia.observacao}</div>` : '';
+    const temPrevisao = dia.previsao && numeroDia <= 3; // Previsão só para 3 primeiros dias
     
     elemento.innerHTML = `
       <div class="dia-header">
@@ -821,98 +1217,99 @@ const BENETRIP_ROTEIRO = {
       
       <div class="dia-content">
         <p class="dia-descricao">"${dia.descricao}"</p>
-        ${observacao}
-        ${this.criarPrevisaoTempo(dia.previsao)}
+        
+        ${dia.observacao ? `
+          <div class="dia-observacao">
+            <span class="icone-obs">💡</span>
+            <span>${dia.observacao}</span>
+          </div>
+        ` : ''}
+        
+        ${temPrevisao ? this.criarPrevisaoTempo(dia.previsao) : ''}
         
         <div class="periodos-tabs">
-          <div class="periodo-tab active" data-periodo="manha" data-dia="${numeroDia}">
-            <span>🌅</span> Manhã
-          </div>
-          <div class="periodo-tab" data-periodo="tarde" data-dia="${numeroDia}">
-            <span>☀️</span> Tarde
-          </div>
-          <div class="periodo-tab" data-periodo="noite" data-dia="${numeroDia}">
-            <span>🌙</span> Noite
-          </div>
+          <button class="periodo-tab active" data-periodo="manha" data-dia="${numeroDia}">
+            <span class="tab-icon">🌅</span>
+            <span class="tab-text">Manhã</span>
+          </button>
+          <button class="periodo-tab" data-periodo="tarde" data-dia="${numeroDia}">
+            <span class="tab-icon">☀️</span>
+            <span class="tab-text">Tarde</span>
+          </button>
+          <button class="periodo-tab" data-periodo="noite" data-dia="${numeroDia}">
+            <span class="tab-icon">🌙</span>
+            <span class="tab-text">Noite</span>
+          </button>
         </div>
         
-        <div class="periodo-conteudo" id="dia-${numeroDia}-manha">
-          ${this.criarConteudoPeriodo(dia.manha)}
-        </div>
-        
-        <div class="periodo-conteudo" id="dia-${numeroDia}-tarde" style="display: none;">
-          ${this.criarConteudoPeriodo(dia.tarde)}
-        </div>
-        
-        <div class="periodo-conteudo" id="dia-${numeroDia}-noite" style="display: none;">
-          ${this.criarConteudoPeriodo(dia.noite)}
+        <div class="periodos-container">
+          <div class="periodo-conteudo active" id="dia-${numeroDia}-manha">
+            ${this.criarConteudoPeriodo(dia.manha, 'manha')}
+          </div>
+          
+          <div class="periodo-conteudo" id="dia-${numeroDia}-tarde">
+            ${this.criarConteudoPeriodo(dia.tarde, 'tarde')}
+          </div>
+          
+          <div class="periodo-conteudo" id="dia-${numeroDia}-noite">
+            ${this.criarConteudoPeriodo(dia.noite, 'noite')}
+          </div>
         </div>
       </div>
     `;
     
-    setTimeout(() => this.configurarEventosDia(elemento, numeroDia), 100);
+    // Configurar eventos após inserir no DOM
+    setTimeout(() => this.configurarEventosDia(elemento, numeroDia), 0);
     
     return elemento;
   },
 
-  configurarEventosDia(elemento, numeroDia) {
-    const tabs = elemento.querySelectorAll('.periodo-tab');
-    tabs.forEach(tab => {
-      tab.addEventListener('click', () => {
-        tabs.forEach(t => t.classList.remove('active'));
-        tab.classList.add('active');
-        
-        const conteudos = elemento.querySelectorAll('.periodo-conteudo');
-        conteudos.forEach(c => c.style.display = 'none');
-        
-        const periodo = tab.getAttribute('data-periodo');
-        const conteudo = document.getElementById(`dia-${numeroDia}-${periodo}`);
-        if (conteudo) conteudo.style.display = 'block';
-      });
-    });
-    
-    const botoesMapa = elemento.querySelectorAll('.btn-ver-mapa');
-    botoesMapa.forEach(botao => {
-      botao.addEventListener('click', () => {
-        const local = botao.getAttribute('data-local');
-        if (local) this.abrirMapa(local);
-      });
-    });
-  },
-
+  /**
+   * Cria elemento de previsão do tempo
+   */
   criarPrevisaoTempo(previsao) {
     if (!previsao) return '';
+    
     return `
       <div class="previsao-tempo">
-        <span>${previsao.icon || '🌤️'}</span>
-        <span class="font-medium">Previsão: ${previsao.temperature || '--'}°C, ${previsao.condition || 'Parcialmente nublado'}</span>
+        <span class="previsao-icon">${previsao.icon || '🌤️'}</span>
+        <span class="previsao-texto">
+          <strong>Previsão:</strong> ${previsao.temperature || '--'}°C, ${previsao.condition || 'Indefinido'}
+        </span>
       </div>
     `;
   },
 
   /**
-   * ✅ FUNÇÃO CORRIGIDA: Cria conteúdo do período com imagens da Tripinha corrigidas
+   * ✅ MELHORADO: Cria conteúdo do período com melhor tratamento de imagens
    */
-  criarConteudoPeriodo(periodo) {
+  criarConteudoPeriodo(periodo, nomePeriodo) {
     if (!periodo?.atividades?.length) {
-      return '<div class="periodo-vazio"><p>Nenhuma atividade planejada.</p></div>';
+      return `
+        <div class="periodo-vazio">
+          <p>Período livre para descanso ou atividades opcionais.</p>
+        </div>
+      `;
     }
     
-    return periodo.atividades.map(ativ => `
-      <div class="atividade${ativ.isEspecial ? ' atividade-especial' : ''}">
+    return periodo.atividades.map((ativ, index) => `
+      <div class="atividade ${ativ.isEspecial ? 'atividade-especial' : ''}">
         ${ativ.horario ? `
           <div class="atividade-horario">
-            <span>🕒</span> <span>${ativ.horario}</span>
+            <span class="horario-icon">🕒</span>
+            <span class="horario-texto">${ativ.horario}</span>
           </div>
         ` : ''}
         
         <div class="atividade-local">
-          <span>📍</span>
-          <div>
-            <span class="nome">${ativ.local}</span>
+          <span class="local-icon">📍</span>
+          <div class="local-info">
+            <span class="local-nome">${ativ.local}</span>
             ${ativ.tags?.length ? `
               <div class="atividade-badges">
-                ${ativ.tags.map(tag => `<span class="badge">${tag}</span>`).join('')}
+                ${ativ.tags.map(tag => `
+                  <span class="badge ${this.getClasseBadge(tag)}">${tag}</span>
+                `).join('')}
               </div>
             ` : ''}
           </div>
@@ -920,34 +1317,42 @@ const BENETRIP_ROTEIRO = {
         
         ${ativ.dica ? `
           <div class="tripinha-dica">
-            <div class="tripinha-dica-conteudo">
-              <div class="tripinha-avatar">
-                ${this.obterImagemTripinha()}
-              </div>
-              <div class="tripinha-texto">
-                <strong>Dica da Tripinha:</strong> ${ativ.dica}
-              </div>
+            <div class="tripinha-avatar-container">
+              <img 
+                src="assets/images/tripinha-avatar.png" 
+                alt="Tripinha" 
+                class="tripinha-avatar"
+                onerror="this.style.display='none'; this.nextElementSibling.style.display='block';"
+              >
+              <div class="tripinha-emoji" style="display:none;">🐕</div>
+            </div>
+            <div class="dica-conteudo">
+              <p><strong>Dica da Tripinha:</strong> ${ativ.dica}</p>
             </div>
           </div>
         ` : ''}
         
-        ${ativ.imagemUrl ? `
-          <div class="imagem-local">
+        ${ativ.imagemUrl && !ativ.isEspecial ? `
+          <div class="atividade-imagem">
             <img 
               src="${ativ.imagemUrl}" 
-              alt="${ativ.local}" 
+              alt="${ativ.local}"
               loading="lazy"
-              onerror="this.onerror=null; this.src='${ativ.imagemFallback || 'https://via.placeholder.com/400x250/E87722/FFFFFF?text=' + encodeURIComponent(ativ.local)}';"
+              onerror="this.onerror=null; this.src='https://via.placeholder.com/400x250/E87722/FFFFFF?text=${encodeURIComponent(ativ.local)}';"
             >
           </div>
         ` : ''}
         
         ${!ativ.isEspecial ? `
-          <button class="btn-ver-mapa" data-local="${ativ.local}">
-            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <button 
+            class="btn-ver-mapa" 
+            data-local="${ativ.local}"
+            aria-label="Ver ${ativ.local} no mapa"
+          >
+            <svg class="mapa-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
               <path d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"></path>
             </svg>
-            Ver no mapa
+            <span>Ver no mapa</span>
           </button>
         ` : ''}
       </div>
@@ -955,48 +1360,185 @@ const BENETRIP_ROTEIRO = {
   },
 
   /**
-   * ✅ NOVA FUNÇÃO: Gerenciar imagens da Tripinha com fallback
+   * ✅ NOVO: Retorna classe CSS apropriada para badge
    */
-  obterImagemTripinha(tipo = 'normal') {
-    // ✅ Múltiplas opções de caminho para a Tripinha
-    const caminhosPossiveis = [
-      `assets/images/tripinha/avatar-${tipo}.png`,
-      `assets/images/tripinha-${tipo}.png`,
-      `images/tripinha/avatar-${tipo}.png`,
-      `assets/tripinha-${tipo}.png`,
-      // Fallback: emoji se nenhuma imagem funcionar
-      null
-    ];
+  getClasseBadge(tag) {
+    const classes = {
+      'Imperdível': 'badge-destaque',
+      'Voo': 'badge-voo',
+      'Chegada': 'badge-voo',
+      'Partida': 'badge-voo',
+      'Cultural': 'badge-cultura',
+      'Gastronomia': 'badge-gastronomia',
+      'Natureza': 'badge-natureza',
+      'Compras': 'badge-compras',
+      'Vida Noturna': 'badge-noturno',
+      'Vista Panorâmica': 'badge-vista'
+    };
     
-    // ✅ HTML com fallback automático
-    const htmlFallbacks = caminhosPossiveis
-      .filter(caminho => caminho !== null)
-      .map(caminho => `this.src='${caminho}';`)
-      .join(' ') + ' this.style.display="none"; this.nextElementSibling.style.display="inline";';
+    return classes[tag] || 'badge-padrao';
+  },
+
+  /**
+   * ✅ MELHORADO: Configura eventos do dia com melhor performance
+   */
+  configurarEventosDia(elemento, numeroDia) {
+    // Tabs de período
+    const tabs = elemento.querySelectorAll('.periodo-tab');
+    const conteudos = elemento.querySelectorAll('.periodo-conteudo');
     
-    return `
-      <img 
-        src="${caminhosPossiveis[0]}" 
-        alt="Tripinha" 
-        style="width: 32px; height: 32px; border-radius: 50%;"
-        onerror="${htmlFallbacks}"
-      >
-      <span style="display: none; font-size: 24px;">🐕</span>
-    `;
+    tabs.forEach(tab => {
+      tab.addEventListener('click', (e) => {
+        e.preventDefault();
+        
+        // Remover active de todos
+        tabs.forEach(t => t.classList.remove('active'));
+        conteudos.forEach(c => c.classList.remove('active'));
+        
+        // Adicionar active ao clicado
+        tab.classList.add('active');
+        const periodo = tab.getAttribute('data-periodo');
+        const conteudo = elemento.querySelector(`#dia-${numeroDia}-${periodo}`);
+        if (conteudo) {
+          conteudo.classList.add('active');
+        }
+      });
+    });
+    
+    // Botões de mapa
+    const botoesMapa = elemento.querySelectorAll('.btn-ver-mapa');
+    botoesMapa.forEach(botao => {
+      botao.addEventListener('click', (e) => {
+        e.preventDefault();
+        const local = botao.getAttribute('data-local');
+        if (local) {
+          this.abrirMapa(local);
+        }
+      });
+    });
   },
 
   // ===========================================
-  // FUNÇÕES DE MAPEAMENTO E HELPERS
+  // HELPERS E UTILIDADES
   // ===========================================
+
+  /**
+   * ✅ MELHORADO: Extrai horários com mais fallbacks
+   */
+  extrairHorarioChegada() {
+    const possiveis = [
+      this.dadosVoo?.infoIda?.horaChegada,
+      this.dadosVoo?.ida?.horaChegada,
+      this.dadosVoo?.ida?.horario,
+      this.dadosVoo?.voo?.segment?.[0]?.flight?.[0]?.arrival_time,
+      this.dadosVoo?.segment?.[0]?.flight?.[0]?.arrival_time,
+      this.dadosVoo?.arrival_time
+    ];
+    
+    for (const horario of possiveis) {
+      if (horario && /\d{1,2}:\d{2}/.test(horario)) {
+        return this.formatarHorario(horario);
+      }
+    }
+    
+    return '15:30'; // Padrão
+  },
+
+  extrairHorarioPartida() {
+    const possiveis = [
+      this.dadosVoo?.infoVolta?.horaPartida,
+      this.dadosVoo?.volta?.horaPartida,
+      this.dadosVoo?.volta?.horario,
+      this.dadosVoo?.voo?.segment?.[1]?.flight?.[0]?.departure_time,
+      this.dadosVoo?.segment?.[1]?.flight?.[0]?.departure_time,
+      this.dadosVoo?.departure_time
+    ];
+    
+    for (const horario of possiveis) {
+      if (horario && /\d{1,2}:\d{2}/.test(horario)) {
+        return this.formatarHorario(horario);
+      }
+    }
+    
+    return '21:00'; // Padrão
+  },
+
+  /**
+   * ✅ NOVO: Formata horário para padrão HH:MM
+   */
+  formatarHorario(horario) {
+    const match = horario.match(/(\d{1,2}):(\d{2})/);
+    if (match) {
+      const hora = match[1].padStart(2, '0');
+      const minuto = match[2];
+      return `${hora}:${minuto}`;
+    }
+    return horario;
+  },
+
+  /**
+   * Obtém descrição personalizada do dia
+   */
+  obterDescricaoDia(numeroDia, destino, totalDias) {
+    if (numeroDia === 1) {
+      return `Chegada e primeiras impressões de ${destino}!`;
+    } else if (numeroDia === totalDias) {
+      return `Últimos momentos para aproveitar ${destino} antes da partida.`;
+    }
+    
+    const descricoes = [
+      `Explorando os tesouros escondidos de ${destino}.`,
+      `Dia de imersão cultural em ${destino}.`,
+      `Descobrindo a gastronomia e vida local de ${destino}.`,
+      `Aventuras inesquecíveis em ${destino}.`,
+      `Vivenciando o melhor que ${destino} tem a oferecer.`
+    ];
+    
+    return descricoes[(numeroDia - 2) % descricoes.length];
+  },
+
+  /**
+   * Observações especiais
+   */
+  obterObservacaoPrimeiroDia() {
+    const hora = parseInt(this.extrairHorarioChegada().split(':')[0]);
+    
+    if (hora < 8) return "Chegada cedo - aproveite o dia completo!";
+    if (hora < 12) return "Chegada pela manhã - tempo de sobra para explorar!";
+    if (hora < 16) return "Chegada à tarde - relaxe e prepare-se para amanhã!";
+    if (hora < 20) return "Chegada no fim da tarde - conheça a vida noturna!";
+    return "Chegada à noite - descanse bem para aproveitar amanhã!";
+  },
+
+  obterObservacaoUltimoDia() {
+    const hora = parseInt(this.extrairHorarioPartida().split(':')[0]);
+    
+    if (hora < 12) return "Voo pela manhã - aproveite a noite anterior!";
+    if (hora < 18) return "Voo à tarde - manhã livre para últimas compras!";
+    return "Voo à noite - dia completo para aproveitar!";
+  },
+
+  /**
+   * Mapeamentos de preferências
+   */
+  obterPreferencias() {
+    return {
+      tipoViagem: this.obterTipoViagem(),
+      tipoCompanhia: this.obterTipoCompanhia(),
+      orcamento: this.obterNivelOrcamento()
+    };
+  },
 
   obterTipoViagem() {
     const respostas = this.dadosUsuario?.respostas || {};
     
-    if (typeof respostas.estilo_viagem_destino === 'number') {
-      return ['relaxar', 'aventura', 'cultura', 'urbano'][respostas.estilo_viagem_destino] || 'cultura';
+    // Mapear diferentes formatos de resposta
+    if (respostas.tipo_viagem !== undefined) {
+      const tipos = ['relaxar', 'aventura', 'cultura', 'urbano'];
+      return tipos[respostas.tipo_viagem] || 'cultura';
     }
     
-    if (typeof respostas.destino_imaginado === 'number') {
+    if (respostas.destino_imaginado !== undefined) {
       const mapa = { 0: 'relaxar', 1: 'aventura', 2: 'urbano', 3: 'cultura' };
       return mapa[respostas.destino_imaginado] || 'cultura';
     }
@@ -1007,48 +1549,62 @@ const BENETRIP_ROTEIRO = {
   obterTipoCompanhia() {
     const respostas = this.dadosUsuario?.respostas || {};
     
-    if (typeof respostas.companhia === 'number') {
-      return ['sozinho', 'casal', 'familia', 'amigos'][respostas.companhia] || 'sozinho';
+    if (respostas.companhia !== undefined) {
+      const tipos = ['sozinho', 'casal', 'familia', 'amigos'];
+      return tipos[respostas.companhia] || 'sozinho';
     }
     
     return 'sozinho';
   },
 
-  obterPreferencias() {
-    return {
-      tipoViagem: this.obterTipoViagem(),
-      tipoCompanhia: this.obterTipoCompanhia()
-    };
+  obterNivelOrcamento() {
+    const orcamento = this.dadosUsuario?.respostas?.orcamento_valor;
+    if (!orcamento) return 'medio';
+    
+    const valor = parseInt(orcamento);
+    if (valor < 1000) return 'economico';
+    if (valor < 3000) return 'medio';
+    return 'luxo';
   },
 
   obterTextoPreferencia() {
     const mapa = {
-      'relaxar': 'Relaxamento e Praia',
-      'aventura': 'Aventura e Natureza', 
+      'relaxar': 'Relaxamento e Descanso',
+      'aventura': 'Aventura e Natureza',
       'cultura': 'Cultura e História',
-      'urbano': 'Urbano e Vida Noturna'
+      'urbano': 'Urbano e Moderno'
     };
-    return mapa[this.obterTipoViagem()] || 'Cultura e História';
+    return mapa[this.obterTipoViagem()] || 'Experiências Variadas';
   },
 
   obterIconePreferencia() {
     const mapa = {
       'relaxar': '🏖️',
       'aventura': '🏔️',
-      'cultura': '🏛️', 
+      'cultura': '🏛️',
       'urbano': '🏙️'
     };
-    return mapa[this.obterTipoViagem()] || '🏛️';
+    return mapa[this.obterTipoViagem()] || '✨';
   },
 
   obterTextoCompanhia() {
-    const mapa = {
-      'sozinho': 'Sozinho(a)',
+    const quantidade = this.obterQuantidadePessoas();
+    const tipo = this.obterTipoCompanhia();
+    
+    const textos = {
+      'sozinho': 'Viagem Solo',
       'casal': 'Casal',
-      'familia': 'Família',
-      'amigos': 'Amigos'
+      'familia': `Família (${quantidade} pessoas)`,
+      'amigos': `Grupo de Amigos (${quantidade} pessoas)`
     };
-    return mapa[this.obterTipoCompanhia()] || 'Sozinho(a)';
+    
+    return textos[tipo] || 'Viagem Individual';
+  },
+
+  obterQuantidadePessoas() {
+    const respostas = this.dadosUsuario?.respostas || {};
+    return respostas.quantidade_familia || respostas.quantidade_amigos || 
+           respostas.adults || 1;
   },
 
   obterIconeCompanhia() {
@@ -1058,179 +1614,373 @@ const BENETRIP_ROTEIRO = {
       'familia': '👨‍👩‍👧‍👦',
       'amigos': '🎉'
     };
-    return mapa[this.obterTipoCompanhia()] || '🧳';
+    return mapa[this.obterTipoCompanhia()] || '👤';
   },
 
-  extrairNomeDestino(codigo) {
-    const mapa = {
-      'GRU': 'São Paulo', 'CGH': 'São Paulo',
-      'SDU': 'Rio de Janeiro', 'GIG': 'Rio de Janeiro',
-      'BSB': 'Brasília', 'LIS': 'Lisboa',
-      'LON': 'Londres', 'LHR': 'Londres',
-      'CDG': 'Paris', 'JFK': 'Nova York',
-      'LAX': 'Los Angeles', 'MIA': 'Miami',
+  /**
+   * ✅ MELHORADO: Mapeamento de destinos expandido
+   */
+  obterNomeDestinoPorCodigo(codigo) {
+    const mapeamento = {
+      // Brasil
+      'GRU': 'São Paulo', 'CGH': 'São Paulo', 'VCP': 'Campinas',
+      'GIG': 'Rio de Janeiro', 'SDU': 'Rio de Janeiro',
+      'BSB': 'Brasília', 'CNF': 'Belo Horizonte', 'PLU': 'Belo Horizonte',
+      'CWB': 'Curitiba', 'POA': 'Porto Alegre', 'FLN': 'Florianópolis',
+      'SSA': 'Salvador', 'REC': 'Recife', 'FOR': 'Fortaleza',
+      'MAO': 'Manaus', 'BEL': 'Belém', 'GYN': 'Goiânia',
+      
+      // América do Sul
+      'EZE': 'Buenos Aires', 'AEP': 'Buenos Aires',
+      'SCL': 'Santiago', 'LIM': 'Lima', 'BOG': 'Bogotá',
+      'MDE': 'Medellín', 'CTG': 'Cartagena',
+      'CCS': 'Caracas', 'UIO': 'Quito', 'LPB': 'La Paz',
+      'MVD': 'Montevidéu', 'ASU': 'Assunção',
+      
+      // América do Norte
+      'JFK': 'Nova York', 'EWR': 'Nova York', 'LGA': 'Nova York',
+      'LAX': 'Los Angeles', 'SFO': 'São Francisco',
+      'ORD': 'Chicago', 'MIA': 'Miami', 'MCO': 'Orlando',
+      'LAS': 'Las Vegas', 'SEA': 'Seattle', 'BOS': 'Boston',
+      'ATL': 'Atlanta', 'DFW': 'Dallas', 'IAH': 'Houston',
+      'YYZ': 'Toronto', 'YVR': 'Vancouver', 'YUL': 'Montreal',
+      'MEX': 'Cidade do México', 'CUN': 'Cancún',
+      
+      // Europa
+      'LHR': 'Londres', 'LGW': 'Londres', 'LCY': 'Londres',
+      'CDG': 'Paris', 'ORY': 'Paris',
       'MAD': 'Madri', 'BCN': 'Barcelona',
-      'FCO': 'Roma', 'MXP': 'Milão',
-      'MDE': 'Medellín', 'CWB': 'Curitiba',
-      'AEP': 'Buenos Aires'
+      'FCO': 'Roma', 'MXP': 'Milão', 'VCE': 'Veneza',
+      'FRA': 'Frankfurt', 'MUC': 'Munique', 'BER': 'Berlim',
+      'AMS': 'Amsterdã', 'BRU': 'Bruxelas',
+      'LIS': 'Lisboa', 'OPO': 'Porto',
+      'ATH': 'Atenas', 'IST': 'Istambul',
+      'CPH': 'Copenhague', 'ARN': 'Estocolmo',
+      'OSL': 'Oslo', 'HEL': 'Helsinque',
+      'VIE': 'Viena', 'PRG': 'Praga',
+      'BUD': 'Budapeste', 'WAW': 'Varsóvia',
+      
+      // Ásia
+      'NRT': 'Tóquio', 'HND': 'Tóquio',
+      'ICN': 'Seul', 'PEK': 'Pequim', 'PVG': 'Xangai',
+      'HKG': 'Hong Kong', 'SIN': 'Singapura',
+      'BKK': 'Bangkok', 'KUL': 'Kuala Lumpur',
+      'DXB': 'Dubai', 'DOH': 'Doha',
+      'DEL': 'Nova Délhi', 'BOM': 'Mumbai',
+      
+      // Oceania
+      'SYD': 'Sydney', 'MEL': 'Melbourne',
+      'AKL': 'Auckland', 'CHC': 'Christchurch',
+      
+      // África
+      'JNB': 'Joanesburgo', 'CPT': 'Cidade do Cabo',
+      'CAI': 'Cairo', 'CMN': 'Casablanca',
+      'NBO': 'Nairóbi', 'ADD': 'Adis Abeba'
     };
-    return mapa[codigo] || codigo;
+    
+    return mapeamento[codigo] || codigo;
   },
 
+  /**
+   * ✅ NOVO: Obtém país por código IATA
+   */
+  obterPaisPorCodigo(codigo) {
+    const paises = {
+      // Brasil
+      'GRU': 'Brasil', 'CGH': 'Brasil', 'GIG': 'Brasil', 'SDU': 'Brasil',
+      'BSB': 'Brasil', 'CNF': 'Brasil', 'CWB': 'Brasil', 'POA': 'Brasil',
+      
+      // América do Sul
+      'EZE': 'Argentina', 'AEP': 'Argentina',
+      'SCL': 'Chile', 'LIM': 'Peru', 'BOG': 'Colômbia',
+      'MDE': 'Colômbia', 'UIO': 'Equador', 'CCS': 'Venezuela',
+      'MVD': 'Uruguai', 'ASU': 'Paraguai', 'LPB': 'Bolívia',
+      
+      // América do Norte
+      'JFK': 'Estados Unidos', 'LAX': 'Estados Unidos', 'MIA': 'Estados Unidos',
+      'YYZ': 'Canadá', 'YVR': 'Canadá',
+      'MEX': 'México', 'CUN': 'México',
+      
+      // Europa
+      'LHR': 'Reino Unido', 'CDG': 'França', 'MAD': 'Espanha',
+      'FCO': 'Itália', 'FRA': 'Alemanha', 'AMS': 'Holanda',
+      'LIS': 'Portugal', 'BRU': 'Bélgica', 'VIE': 'Áustria',
+      
+      // Ásia
+      'NRT': 'Japão', 'ICN': 'Coreia do Sul', 'PEK': 'China',
+      'HKG': 'Hong Kong', 'SIN': 'Singapura', 'BKK': 'Tailândia',
+      'DXB': 'Emirados Árabes', 'DEL': 'Índia',
+      
+      // Oceania
+      'SYD': 'Austrália', 'AKL': 'Nova Zelândia',
+      
+      // África
+      'JNB': 'África do Sul', 'CAI': 'Egito', 'CMN': 'Marrocos'
+    };
+    
+    return paises[codigo] || 'Internacional';
+  },
+
+  /**
+   * ✅ MELHORADO: Formata data com validação
+   */
   formatarData(dataString) {
+    if (!dataString) return 'Data indefinida';
+    
     try {
       const data = new Date(dataString + 'T12:00:00');
-      return data.toLocaleDateString('pt-BR', { day: 'numeric', month: 'long' });
+      if (isNaN(data.getTime())) {
+        return dataString; // Retornar como está se não conseguir formatar
+      }
+      
+      const options = { 
+        day: 'numeric', 
+        month: 'long',
+        year: 'numeric'
+      };
+      
+      return data.toLocaleDateString('pt-BR', options);
     } catch (e) {
       return dataString;
     }
   },
 
   formatarDataCompleta(dataString) {
+    if (!dataString) return 'Data indefinida';
+    
     try {
       const data = new Date(dataString + 'T12:00:00');
-      return data.toLocaleDateString('pt-BR', {
+      if (isNaN(data.getTime())) {
+        return dataString;
+      }
+      
+      const options = {
         weekday: 'long',
-        day: 'numeric', 
+        day: 'numeric',
         month: 'numeric',
         year: 'numeric'
-      });
+      };
+      
+      const formatada = data.toLocaleDateString('pt-BR', options);
+      // Capitalizar primeira letra
+      return formatada.charAt(0).toUpperCase() + formatada.slice(1);
     } catch (e) {
       return dataString;
     }
   },
 
-  obterDescricaoDia(numeroDia, destino) {
-    const descricoes = [
-      `Primeiro dia para conhecer ${destino} após a chegada!`,
-      `Explorando a cultura e história de ${destino}.`,
-      `Dia perfeito para atividades ao ar livre em ${destino}.`,
-      `Mergulhando na gastronomia local de ${destino}.`,
-      `Descobrindo os pontos turísticos principais de ${destino}.`,
-      `Aproveitando os últimos momentos em ${destino}.`
-    ];
-    
-    return descricoes[Math.min(numeroDia - 1, descricoes.length - 1)];
-  },
-
-  gerarAtividadesPeriodo(periodo, numeroDia) {
-    const atividades = {
-      manha: [
-        { horario: "09:00", local: "Centro da Cidade", dica: "Comece explorando o centro histórico!" },
-        { horario: "10:00", local: "Museu Principal", dica: "História local fascinante!" },
-        { horario: "09:30", local: "Mercado Local", dica: "Produtos frescos da região!" }
-      ],
-      tarde: [
-        { horario: "14:00", local: "Pontos Turísticos", dica: "Atrações mais famosas!" },
-        { horario: "15:00", local: "Bairro Artístico", dica: "Galerias e lojas interessantes!" },
-        { horario: "14:30", local: "Jardim Botânico", dica: "Natureza no centro da cidade!" }
-      ],
-      noite: [
-        { horario: "19:00", local: "Restaurante Típico", dica: "Sabores autênticos da região!" },
-        { horario: "20:00", local: "Vida Noturna Local", dica: "Experiência noturna autêntica!" },
-        { horario: "19:30", local: "Teatro Local", dica: "Cultura e entretenimento!" }
-      ]
-    };
-    
-    const lista = atividades[periodo] || [];
-    const indice = (numeroDia - 1) % lista.length;
-    
-    return {
-      atividades: [{ 
-        ...lista[indice], 
-        tags: ["Local", "Recomendado"] 
-      }]
-    };
-  },
-
-  ajustarDatasRoteiro(dataIda, diasReais) {
-    if (!this.roteiroPronto?.dias) return;
-    
-    const dataInicio = new Date(dataIda + 'T12:00:00');
-    
-    this.roteiroPronto.dias.forEach((dia, index) => {
-      const dataDia = new Date(dataInicio);
-      dataDia.setDate(dataInicio.getDate() + index);
-      dia.data = dataDia.toISOString().split('T')[0];
-    });
-    
-    this.ajustarAtividadesPorHorarios(this.roteiroPronto.dias);
-  },
-
   // ===========================================
-  // FUNÇÕES DE INTERAÇÃO
+  // AÇÕES E INTERAÇÕES
   // ===========================================
 
+  /**
+   * Abre local no Google Maps
+   */
   abrirMapa(local) {
-    const query = `${local}, ${this.dadosDestino.destino}`;
+    const destino = `${this.dadosDestino.destino}, ${this.dadosDestino.pais}`;
+    const query = `${local}, ${destino}`;
     const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
-    window.open(url, '_blank');
+    
+    window.open(url, '_blank', 'noopener,noreferrer');
   },
 
-  compartilharRoteiro() {
-    if (navigator.share) {
-      navigator.share({
-        title: `Roteiro Benetrip para ${this.dadosDestino.destino}`,
-        text: `Confira meu roteiro personalizado para ${this.dadosDestino.destino}!`,
-        url: window.location.href
-      }).catch(e => console.log('Erro ao compartilhar:', e));
-    } else {
+  /**
+   * Compartilha roteiro
+   */
+  async compartilharRoteiro() {
+    const titulo = `Roteiro Benetrip - ${this.dadosDestino.destino}`;
+    const texto = `Confira meu roteiro personalizado para ${this.dadosDestino.destino}! 🐕✈️`;
+    const url = window.location.href;
+    
+    // Tentar Web Share API
+    if (navigator.share && /mobile|android|iphone/i.test(navigator.userAgent)) {
       try {
-        navigator.clipboard.writeText(window.location.href);
-        this.exibirToast('Link copiado!', 'success');
+        await navigator.share({ title: titulo, text: texto, url });
+        this.exibirToast('Roteiro compartilhado!', 'success');
+        return;
       } catch (e) {
-        this.exibirToast('Para compartilhar, copie o link da página!', 'info');
+        console.log('Share cancelado ou não suportado');
       }
+    }
+    
+    // Fallback: copiar link
+    try {
+      await navigator.clipboard.writeText(url);
+      this.exibirToast('Link copiado! Cole onde quiser compartilhar.', 'success');
+    } catch (e) {
+      // Fallback do fallback
+      const input = document.createElement('input');
+      input.value = url;
+      document.body.appendChild(input);
+      input.select();
+      document.execCommand('copy');
+      document.body.removeChild(input);
+      this.exibirToast('Link copiado!', 'success');
     }
   },
 
+  /**
+   * Editar roteiro (futuro)
+   */
   editarRoteiro() {
-    this.exibirToast('Função em desenvolvimento', 'info');
+    this.exibirToast('Em breve você poderá personalizar ainda mais seu roteiro! 🚀', 'info');
   },
 
+  /**
+   * ✅ MELHORADO: Sistema de toast notifications
+   */
   exibirToast(mensagem, tipo = 'info') {
-    const container = document.getElementById('toast-container');
-    if (!container) return;
+    // Criar container se não existir
+    let container = document.getElementById('toast-container');
+    if (!container) {
+      container = document.createElement('div');
+      container.id = 'toast-container';
+      container.className = 'toast-container';
+      document.body.appendChild(container);
+    }
     
+    // Criar toast
     const toast = document.createElement('div');
     toast.className = `toast toast-${tipo}`;
-    toast.textContent = mensagem;
+    
+    // Ícone por tipo
+    const icones = {
+      success: '✅',
+      error: '❌',
+      info: 'ℹ️',
+      warning: '⚠️'
+    };
+    
+    toast.innerHTML = `
+      <span class="toast-icon">${icones[tipo] || icones.info}</span>
+      <span class="toast-message">${mensagem}</span>
+    `;
     
     container.appendChild(toast);
-    setTimeout(() => toast.classList.add('toast-visible'), 10);
     
+    // Animar entrada
+    requestAnimationFrame(() => {
+      toast.classList.add('toast-visible');
+    });
+    
+    // Remover após 4 segundos
     setTimeout(() => {
       toast.classList.remove('toast-visible');
       setTimeout(() => toast.remove(), 300);
-    }, 3000);
+    }, 4000);
   },
 
+  /**
+   * ✅ MELHORADO: Mostra erro com opções
+   */
   mostrarErro(mensagem) {
-    this.exibirToast(mensagem, 'error');
+    console.error('❌ Erro exibido ao usuário:', mensagem);
+    
     clearInterval(this.intervalId);
+    this.estaCarregando = false;
     
     const container = document.querySelector('.roteiro-content');
-    if (container) {
-      container.innerHTML = `
-        <div class="erro-container">
-          <img src="assets/images/tripinha/avatar-triste.png" alt="Tripinha triste" class="tripinha-erro" onerror="this.style.display='none'; this.nextElementSibling.style.display='inline';">
-          <span style="display: none; font-size: 48px;">😢</span>
-          <h3 class="erro-titulo">${mensagem}</h3>
-          <p class="erro-descricao">Desculpe pelo inconveniente.</p>
-          <button class="btn-tentar-novamente" onclick="location.reload()">Tentar Novamente</button>
+    if (!container) return;
+    
+    container.innerHTML = `
+      <div class="erro-container">
+        <div class="erro-icon">
+          <img 
+            src="assets/images/tripinha-triste.png" 
+            alt="Tripinha triste"
+            onerror="this.style.display='none'; this.nextElementSibling.style.display='block';"
+          >
+          <div style="display:none; font-size: 72px;">😢</div>
         </div>
-      `;
+        
+        <h2 class="erro-titulo">Ops! Algo deu errado...</h2>
+        <p class="erro-mensagem">${mensagem}</p>
+        
+        <div class="erro-acoes">
+          <button class="btn btn-primary" onclick="location.reload()">
+            🔄 Tentar Novamente
+          </button>
+          <button class="btn btn-secondary" onclick="history.back()">
+            ⬅️ Voltar
+          </button>
+        </div>
+        
+        <p class="erro-dica">
+          <strong>Dica:</strong> Se o problema persistir, tente limpar o cache do navegador ou usar outro navegador.
+        </p>
+      </div>
+    `;
+    
+    // Ocultar loading se ainda estiver visível
+    const loading = document.querySelector('.loading-container');
+    if (loading) loading.style.display = 'none';
+  },
+
+  /**
+   * ✅ NOVO: Chama API real de roteiro (para produção)
+   */
+  async chamarAPIRoteiro(params) {
+    try {
+      const response = await fetch('/api/itinerary-generator', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify(params)
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Erro na API: ${response.status}`);
+      }
+      
+      const roteiro = await response.json();
+      
+      // Validar resposta
+      if (!roteiro.dias || !Array.isArray(roteiro.dias)) {
+        throw new Error('Formato de resposta inválido');
+      }
+      
+      return roteiro;
+      
+    } catch (erro) {
+      console.error('❌ Erro ao chamar API:', erro);
+      
+      // Fallback para dados dummy
+      return this.gerarRoteiroDummy(
+        params.dataInicio,
+        params.dataFim,
+        params.diasViagem
+      );
     }
   }
 };
 
-// Inicializar quando DOM estiver pronto
+// ===========================================
+// INICIALIZAÇÃO
+// ===========================================
+
 document.addEventListener('DOMContentLoaded', () => {
-  if (document.getElementById('roteiro-container')) {
-    console.log('🚀 Inicializando módulo de roteiro Benetrip...');
+  // Verificar se estamos na página correta
+  if (document.getElementById('roteiro-container') || 
+      document.querySelector('.roteiro-content')) {
+    
+    console.log('📄 Página de roteiro detectada');
+    
+    // Adicionar classe ao body para estilos específicos
+    document.body.classList.add('pagina-roteiro');
+    
+    // Inicializar sistema
     BENETRIP_ROTEIRO.init();
   }
 });
 
-// Exportar para acesso global
+// Exportar para acesso global se necessário
 window.BENETRIP_ROTEIRO = BENETRIP_ROTEIRO;
+
+// Prevenir erros se o módulo for carregado múltiplas vezes
+if (window.BENETRIP_ROTEIRO_LOADED) {
+  console.warn('⚠️ Módulo de roteiro já foi carregado');
+} else {
+  window.BENETRIP_ROTEIRO_LOADED = true;
+}
