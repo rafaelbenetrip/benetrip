@@ -178,11 +178,13 @@ async buscarImagensDestino(destino) {
     let url = `/api/image-search?query=${encodeURIComponent(queryCompleta)}`;
     
     // Adicionar pontos turísticos específicos à query
-    if (destino.pontosTuristicos && destino.pontosTuristicos.length > 0) {
-      url += `&pontosTuristicos=${encodeURIComponent(JSON.stringify(destino.pontosTuristicos))}`;
-    } else if (destino.pontoTuristico) {
-      url += `&pontosTuristicos=${encodeURIComponent(JSON.stringify([destino.pontoTuristico]))}`;
-    }
+if (destino.pontosTuristicos && destino.pontosTuristicos.length > 0) {
+  url += `&pontosTuristicos=${encodeURIComponent(JSON.stringify(destino.pontosTuristicos))}`;
+  url += `&perPage=${destino.pontosTuristicos.length}`; // Buscar uma imagem para cada ponto
+} else if (destino.pontoTuristico) {
+  url += `&pontosTuristicos=${encodeURIComponent(JSON.stringify([destino.pontoTuristico]))}`;
+  url += `&perPage=2`;
+}
     
     console.log(`Buscando imagens para ${destino.destino} com pontos turísticos`, 
       destino.pontosTuristicos || destino.pontoTuristico);
@@ -1233,20 +1235,31 @@ encontrarMelhorImagemParaPontoTuristico(imagens, pontoTuristico, indice = 0) {
   );
   if (imagemAltComNome) return imagemAltComNome;
   
-  // 4. Usar uma imagem específica com base no índice do ponto turístico
-  // Distribui as imagens disponíveis entre os pontos turísticos de forma circular
+  // 4. Se não encontrou imagem específica, tentar buscar nova imagem
+// Primeiro verifica se já tentamos buscar esta imagem específica
+const cacheKey = `fallback_${pontoTuristico}_${destino.destino}`;
+if (this.fallbackCache && this.fallbackCache[cacheKey]) {
+  // Já tentamos e não conseguimos, usar imagem genérica
   const indiceImagem = indice % imagens.length;
-  
-  // Para evitar sempre usar a mesma imagem de capa para outros pontos turísticos
-  // usamos um offset para começar a partir da segunda imagem
-  const offsetIndice = (indice === 0) ? 0 : indiceImagem + 1;
-  const indiceAjustado = offsetIndice % imagens.length;
-  
   return {
-    ...imagens[indiceAjustado],
-    pontoTuristico: pontoTuristico  // Atribuir o nome correto do ponto turístico
+    ...imagens[indiceImagem],
+    pontoTuristico: pontoTuristico,
+    isFallback: true
   };
-},
+}
+
+// Marcar que tentamos buscar esta imagem
+if (!this.fallbackCache) this.fallbackCache = {};
+this.fallbackCache[cacheKey] = true;
+
+// Usar imagem genérica mas com marcação especial
+const imagemGenerica = imagens[0]; // Sempre usar a primeira como genérica
+return {
+  ...imagemGenerica,
+  pontoTuristico: pontoTuristico,
+  alt: `Vista geral de ${destino.destino}`,
+  isFallback: true
+};
   
   // Método auxiliar para tentar obter código IATA
   obterCodigoIATADestino(destino) {
