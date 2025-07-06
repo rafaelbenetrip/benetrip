@@ -1,6 +1,6 @@
 /**
- * Benetrip - Sistema de Roteiro Contínuo Otimizado (VERSÃO 8.0 - PRODUÇÃO)
- * Características: Roteiro contínuo, 100% mobile, imagens responsivas, performance otimizada
+ * Benetrip - Sistema de Roteiro Contínuo Otimizado (VERSÃO 8.1 - CORREÇÕES CRÍTICAS)
+ * Correções: Locais específicos restaurados, Event listeners corrigidos, Todos os dias funcionando
  * Data: 2025 - Código Pronto para Produção
  */
 
@@ -20,7 +20,7 @@ const BENETRIP_ROTEIRO = {
    * ✅ OTIMIZADO: Inicialização com error handling melhorado
    */
   init() {
-    console.log('🚀 Benetrip Roteiro v8.0 - Inicializando Sistema Contínuo...');
+    console.log('🚀 Benetrip Roteiro v8.1 - Inicializando Sistema Contínuo...');
     
     try {
       this.carregarDados()
@@ -39,33 +39,85 @@ const BENETRIP_ROTEIRO = {
   },
 
   /**
-   * ✅ NOVO: Configura eventos otimizados para mobile
+   * ✅ CORRIGIDO: Eventos com seletores corretos
    */
   configurarEventos() {
-    // Botões principais
-    const btnCompartilhar = document.getElementById('btn-compartilhar-roteiro');
-    const btnEditar = document.getElementById('btn-editar-roteiro');
-    const btnVoltar = document.querySelector('.btn-voltar');
+    // Usar addEventListener com verificação de existência
+    const configurarBotao = (seletor, callback) => {
+      const elemento = document.querySelector(seletor);
+      if (elemento) {
+        elemento.addEventListener('click', callback);
+        console.log(`✅ Evento configurado: ${seletor}`);
+      } else {
+        console.warn(`⚠️ Elemento não encontrado: ${seletor}`);
+      }
+    };
 
-    if (btnCompartilhar) {
-      btnCompartilhar.addEventListener('click', () => this.compartilharRoteiro());
-    }
-    if (btnEditar) {
-      btnEditar.addEventListener('click', () => this.editarRoteiro());
-    }
-    if (btnVoltar) {
-      btnVoltar.addEventListener('click', () => history.back());
-    }
+    // Botões principais - usando seletores mais específicos
+    configurarBotao('#btn-compartilhar-roteiro', () => this.compartilharRoteiro());
+    configurarBotao('#btn-editar-roteiro', () => this.editarRoteiro());
+    configurarBotao('.btn-voltar', () => history.back());
+    
+    // Botões alternativos (se os IDs não existirem)
+    configurarBotao('[data-action="compartilhar"]', () => this.compartilharRoteiro());
+    configurarBotao('[data-action="editar"]', () => this.editarRoteiro());
+    configurarBotao('button[onclick*="compartilhar"]', () => this.compartilharRoteiro());
+    configurarBotao('button[onclick*="editar"]', () => this.editarRoteiro());
     
     // Configurar lazy loading avançado
     this.configurarLazyLoadingAvancado();
     
     // Otimização touch para mobile
     this.configurarEventosTouch();
+
+    // Configurar eventos globais de documento
+    this.configurarEventosGlobais();
   },
 
   /**
-   * ✅ NOVO: Lazy loading avançado com IntersectionObserver
+   * ✅ NOVO: Eventos globais para capturar cliques dinamicamente
+   */
+  configurarEventosGlobais() {
+    // Delegação de eventos para botões criados dinamicamente
+    document.addEventListener('click', (e) => {
+      // Botões de compartilhar
+      if (e.target.id === 'btn-compartilhar-roteiro' || 
+          e.target.closest('#btn-compartilhar-roteiro')) {
+        e.preventDefault();
+        this.compartilharRoteiro();
+      }
+      
+      // Botões de editar
+      if (e.target.id === 'btn-editar-roteiro' || 
+          e.target.closest('#btn-editar-roteiro')) {
+        e.preventDefault();
+        this.editarRoteiro();
+      }
+      
+      // Botões de mapa
+      if (e.target.classList.contains('btn-ver-mapa') || 
+          e.target.closest('.btn-ver-mapa')) {
+        e.preventDefault();
+        const btnMapa = e.target.closest('.btn-ver-mapa') || e.target;
+        const local = btnMapa.getAttribute('data-local');
+        if (local) {
+          this.abrirMapa(local);
+        }
+      }
+
+      // Botões de voltar
+      if (e.target.classList.contains('btn-voltar') || 
+          e.target.closest('.btn-voltar')) {
+        e.preventDefault();
+        history.back();
+      }
+    });
+
+    console.log('✅ Eventos globais configurados');
+  },
+
+  /**
+   * ✅ MANTIDO: Lazy loading avançado
    */
   configurarLazyLoadingAvancado() {
     if ('IntersectionObserver' in window) {
@@ -87,10 +139,9 @@ const BENETRIP_ROTEIRO = {
   },
 
   /**
-   * ✅ NOVO: Eventos touch otimizados para mobile
+   * ✅ MANTIDO: Eventos touch otimizados
    */
   configurarEventosTouch() {
-    // Prevenir zoom duplo toque em botões
     document.addEventListener('touchstart', (e) => {
       if (e.target.matches('button, .btn, .btn-ver-mapa')) {
         e.target.style.WebkitTouchCallout = 'none';
@@ -98,7 +149,6 @@ const BENETRIP_ROTEIRO = {
       }
     });
 
-    // Melhorar scroll performance
     document.addEventListener('touchmove', (e) => {
       // Permitir scroll normal
     }, { passive: true });
@@ -111,7 +161,6 @@ const BENETRIP_ROTEIRO = {
     try {
       console.log('📂 Carregando dados salvos...');
       
-      // 1. Carregar voo selecionado (obrigatório)
       const vooString = localStorage.getItem('benetrip_voo_selecionado');
       if (!vooString) {
         throw new Error('Nenhum voo foi selecionado. Redirecionando...');
@@ -120,12 +169,10 @@ const BENETRIP_ROTEIRO = {
       this.dadosVoo = JSON.parse(vooString);
       console.log('✈️ Dados do voo carregados:', this.dadosVoo);
       
-      // 2. Carregar dados do usuário
       const usuarioString = localStorage.getItem('benetrip_user_data');
       this.dadosUsuario = usuarioString ? JSON.parse(usuarioString) : {};
       console.log('👤 Dados do usuário carregados:', this.dadosUsuario);
       
-      // 3. Carregar ou criar destino
       const destinoString = localStorage.getItem('benetrip_destino_selecionado');
       if (destinoString) {
         this.dadosDestino = JSON.parse(destinoString);
@@ -139,7 +186,6 @@ const BENETRIP_ROTEIRO = {
       }
       console.log('📍 Destino definido:', this.dadosDestino);
       
-      // 4. Normalizar datas (crucial para funcionalidade)
       await this.normalizarEValidarDatas();
       
       return true;
@@ -181,7 +227,7 @@ const BENETRIP_ROTEIRO = {
   },
 
   /**
-   * ✅ MANTIDO: Normalização de datas (compatibilidade total)
+   * ✅ MANTIDO: Normalização de datas
    */
   async normalizarEValidarDatas() {
     console.log('📅 Normalizando datas...');
@@ -274,18 +320,16 @@ const BENETRIP_ROTEIRO = {
         preferencias: this.obterPreferencias()
       });
       
-      await this.delay(1200); // UX otimizado
+      await this.delay(1200);
       
-      // Gerar roteiro contínuo
+      // Gerar roteiro contínuo para TODOS os dias
       this.roteiroPronto = await this.gerarRoteiroContiguoDummy(dataIda, dataVolta, diasViagem);
       
-      // Executar tarefas em paralelo (performance)
       await Promise.all([
         this.buscarPrevisaoTempoOtimizada(),
         this.buscarTodasImagensOtimizado()
       ]);
       
-      // Atualizar UI
       this.atualizarUIComRoteiroContinuo();
       
       console.log('✅ Roteiro contínuo gerado com sucesso!');
@@ -300,18 +344,19 @@ const BENETRIP_ROTEIRO = {
   },
 
   /**
-   * ✅ OTIMIZADO: Gera roteiro contínuo sem divisões
+   * ✅ CORRIGIDO: Gera roteiro para TODOS os dias com locais específicos
    */
   async gerarRoteiroContiguoDummy(dataIda, dataVolta, diasViagem) {
-    console.log('🏗️ Gerando roteiro contínuo sem divisões...');
+    console.log(`🏗️ Gerando roteiro contínuo para ${diasViagem} dias...`);
     
     const destino = this.dadosDestino.destino;
     const dias = [];
     const dataInicio = new Date(dataIda + 'T12:00:00');
     
-    // Base de atividades contínuas por destino
-    const atividadesBase = this.obterAtividadesContinuas(destino);
+    // Obter atividades específicas por destino
+    const atividadesEspecificas = this.obterAtividadesEspecificasPorDestino(destino);
     
+    // ✅ CORRIGIDO: Gerar para TODOS os dias da viagem
     for (let i = 0; i < diasViagem; i++) {
       const dataAtual = new Date(dataInicio);
       dataAtual.setDate(dataInicio.getDate() + i);
@@ -319,10 +364,9 @@ const BENETRIP_ROTEIRO = {
       const dia = {
         data: this.formatarDataISO(dataAtual),
         descricao: this.obterDescricaoDia(i + 1, destino, diasViagem),
-        atividades: this.gerarAtividadesDoDiaContinuo(i, destino, atividadesBase, diasViagem)
+        atividades: this.gerarAtividadesDoDiaCompleto(i, destino, atividadesEspecificas, diasViagem)
       };
       
-      // Observações especiais
       if (i === 0) {
         dia.observacao = this.obterObservacaoPrimeiroDia();
       } else if (i === diasViagem - 1) {
@@ -335,6 +379,8 @@ const BENETRIP_ROTEIRO = {
     // Ajustar baseado nos horários dos voos
     this.ajustarAtividadesPorHorariosContinuo(dias);
     
+    console.log(`✅ Roteiro gerado para ${dias.length} dias completos`);
+    
     return {
       destino: `${destino}, ${this.dadosDestino.pais}`,
       dias
@@ -342,30 +388,115 @@ const BENETRIP_ROTEIRO = {
   },
 
   /**
-   * ✅ NOVO: Obtém atividades contínuas por destino
+   * ✅ CORRIGIDO: Atividades específicas restauradas do código original
    */
-  obterAtividadesContinuas(destino) {
+  obterAtividadesEspecificasPorDestino(destino) {
+    // Base específica expandida por destino
+    const destinosEspecificos = {
+      'Lisboa': [
+        // Dia 1
+        { local: "Torre de Belém", dica: "Chegue antes das 10h para evitar filas!", horario: "09:00" },
+        { local: "Mosteiro dos Jerónimos", dica: "Arquitetura manuelina impressionante!", horario: "10:30" },
+        { local: "Pastéis de Belém", dica: "Prove os originais ainda quentinhos!", horario: "12:00" },
+        { local: "Time Out Market", dica: "Variedade incrível de sabores!", horario: "13:30" },
+        { local: "Elevador de Santa Justa", dica: "Vista 360° de Lisboa!", horario: "15:00" },
+        { local: "Bairro de Alfama", dica: "Perca-se nas ruelas históricas!", horario: "16:30" },
+        { local: "Miradouro da Senhora do Monte", dica: "Pôr do sol espetacular!", horario: "18:00" },
+        { local: "Casa de Fado", dica: "Experiência musical única!", horario: "20:00" },
+        
+        // Dia 2
+        { local: "Castelo de São Jorge", dica: "Vista incrível e história fascinante!", horario: "09:30" },
+        { local: "LX Factory", dica: "Arte, lojas e cafés descolados!", horario: "11:00" },
+        { local: "Almoço na Rua Rosa", dica: "Charme e boa gastronomia!", horario: "13:00" },
+        { local: "Tram 28", dica: "Tour panorâmico pela cidade!", horario: "15:00" },
+        { local: "Cais do Sodré", dica: "Modernidade e tradição juntas!", horario: "17:00" },
+        { local: "Jantar no Chiado", dica: "Elegância e sabor português!", horario: "19:30" },
+        
+        // Dia 3
+        { local: "Quinta da Regaleira (Sintra)", dica: "Palácio mágico com jardins misteriosos!", horario: "09:00" },
+        { local: "Palácio da Pena", dica: "Cores vibrantes e vista incrível!", horario: "11:30" },
+        { local: "Centro Histórico de Sintra", dica: "Doces conventuais deliciosos!", horario: "14:00" },
+        { local: "Cabo da Roca", dica: "O ponto mais ocidental da Europa!", horario: "16:00" },
+        { local: "Cascais", dica: "Charme costeiro e praia linda!", horario: "17:30" },
+        { local: "Jantar em Cascais", dica: "Frutos do mar fresquinhos!", horario: "19:30" },
+        
+        // Dias adicionais
+        { local: "Museu Nacional de Arte Antiga", dica: "Obras-primas da arte portuguesa!", horario: "10:00" },
+        { local: "Bairro Alto", dica: "Vida noturna vibrante!", horario: "22:00" },
+        { local: "Parque das Nações", dica: "Arquitetura moderna e Oceanário!", horario: "14:00" },
+        { local: "Oceanário de Lisboa", dica: "Um dos maiores aquários da Europa!", horario: "15:30" },
+        { local: "Ponte 25 de Abril", dica: "Vista panorâmica da ponte!", horario: "17:00" },
+        { local: "Docas de Santo Amaro", dica: "Restaurantes com vista para o Tejo!", horario: "19:00" }
+      ],
+      
+      'Paris': [
+        // Dia 1
+        { local: "Torre Eiffel", dica: "Compre ingressos online com antecedência!", horario: "09:00" },
+        { local: "Champs-Élysées", dica: "Caminhada icônica até o Arco do Triunfo!", horario: "11:00" },
+        { local: "Arco do Triunfo", dica: "Vista panorâmica de Paris!", horario: "12:00" },
+        { local: "Almoço em Café Tradicional", dica: "Experiência parisiense autêntica!", horario: "13:00" },
+        { local: "Museu do Louvre", dica: "Reserve meio dia para as principais obras!", horario: "14:30" },
+        { local: "Passeio pelo Sena", dica: "Paris vista do rio é mágica!", horario: "17:00" },
+        { local: "Jantar em Bistrô", dica: "Gastronomia francesa tradicional!", horario: "19:30" },
+        
+        // Dia 2
+        { local: "Montmartre e Sacré-Cœur", dica: "Atmosfera boêmia e vista linda!", horario: "09:00" },
+        { local: "Place du Tertre", dica: "Artistas de rua e retratos!", horario: "10:30" },
+        { local: "Moulin Rouge", dica: "Ícone da vida noturna parisiense!", horario: "11:30" },
+        { local: "Marais", dica: "Bairro histórico e trendy!", horario: "14:00" },
+        { local: "Place des Vosges", dica: "A praça mais bonita de Paris!", horario: "15:30" },
+        { local: "Notre-Dame (externa)", dica: "Em restauração, mas ainda majestosa!", horario: "17:00" },
+        { local: "Île Saint-Louis", dica: "Sorvete Berthillon imperdível!", horario: "18:00" },
+        
+        // Dias adicionais
+        { local: "Versailles", dica: "Palácio e jardins espetaculares!", horario: "09:00" },
+        { local: "Museu d'Orsay", dica: "Maior coleção de arte impressionista!", horario: "14:00" },
+        { local: "Saint-Germain-des-Prés", dica: "Cafés históricos e livrarias!", horario: "16:00" },
+        { local: "Trocadéro", dica: "Melhor vista da Torre Eiffel!", horario: "18:00" }
+      ],
+      
+      'Roma': [
+        { local: "Coliseu", dica: "Reserve entrada prioritária!", horario: "09:00" },
+        { local: "Fórum Romano", dica: "Centro da vida na Roma Antiga!", horario: "11:00" },
+        { local: "Fontana di Trevi", dica: "Jogue uma moeda e faça um pedido!", horario: "14:00" },
+        { local: "Pantheon", dica: "Arquitetura romana preservada!", horario: "15:30" },
+        { local: "Piazza Navona", dica: "Bernini e atmosfera barroca!", horario: "17:00" },
+        { local: "Vaticano", dica: "Capela Sistina é imperdível!", horario: "09:00" },
+        { local: "Trastevere", dica: "Vida noturna autêntica romana!", horario: "20:00" }
+      ],
+
+      'Madrid': [
+        { local: "Museu do Prado", dica: "Velázquez e Goya te esperam!", horario: "10:00" },
+        { local: "Parque del Retiro", dica: "Palácio de Cristal é mágico!", horario: "12:00" },
+        { local: "Puerta del Sol", dica: "Quilômetro zero da Espanha!", horario: "14:00" },
+        { local: "Plaza Mayor", dica: "Arquitetura habsburga perfeita!", horario: "15:00" },
+        { local: "Mercado San Miguel", dica: "Tapas gourmet deliciosas!", horario: "16:30" },
+        { local: "Palácio Real", dica: "Ostentação da realeza espanhola!", horario: "18:00" },
+        { local: "Malasaña", dica: "Vida noturna madrilenha!", horario: "21:00" }
+      ]
+    };
+
+    // Base genérica melhorada para outros destinos
     const baseGenerica = [
       { local: "Centro Histórico", dica: "Comece cedo para aproveitar melhor!", horario: "09:00" },
       { local: "Museu Nacional", dica: "Reserve pelo menos 2 horas para visitar!", horario: "10:30" },
       { local: "Mercado Central", dica: "Experimente as especialidades locais!", horario: "12:00" },
       { local: "Almoço em Restaurante Típico", dica: "Peça o prato mais tradicional!", horario: "13:30" },
       { local: "Catedral Principal", dica: "Arquitetura impressionante e história rica!", horario: "15:00" },
-      { local: "Passeio pela Cidade Velha", dica: "Caminhe devagar e observe os detalhes!", horario: "16:30" },
+      { local: "Bairro Artístico", dica: "Galerias e arte de rua incríveis!", horario: "16:30" },
       { local: "Mirante da Cidade", dica: "Melhor vista panorâmica ao entardecer!", horario: "18:00" },
-      { local: "Jantar com Vista", dica: "Reserve uma mesa com vista especial!", horario: "19:30" },
-      { local: "Caminhada Noturna", dica: "A cidade tem outro charme à noite!", horario: "21:00" },
+      { local: "Restaurante com Vista", dica: "Reserve uma mesa especial!", horario: "19:30" },
+      { local: "Passeio Noturno", dica: "A cidade tem outro charme à noite!", horario: "21:00" },
       
-      // Atividades do dia 2
-      { local: "Bairro Artístico", dica: "Galerias e street art incríveis!", horario: "09:30" },
+      // Segundo dia
+      { local: "Parque Municipal", dica: "Ótimo para relaxar e fazer fotos!", horario: "09:30" },
       { local: "Tour Gastronômico", dica: "Sabores autênticos da região!", horario: "11:00" },
-      { local: "Parque Municipal", dica: "Ótimo para relaxar e fazer fotos!", horario: "13:00" },
-      { local: "Shopping Local", dica: "Artesanato e lembranças especiais!", horario: "15:00" },
-      { local: "Passeio de Barco", dica: "Perspectiva única da cidade!", horario: "16:30" },
-      { local: "Bar com Vista", dica: "Drinks especiais ao pôr do sol!", horario: "18:30" },
+      { local: "Shopping Local", dica: "Artesanato e lembranças especiais!", horario: "13:00" },
+      { local: "Passeio de Barco", dica: "Perspectiva única da cidade!", horario: "15:00" },
+      { local: "Bar com Vista", dica: "Drinks especiais ao pôr do sol!", horario: "17:30" },
       { local: "Show Cultural", dica: "Música e dança tradicional!", horario: "20:00" },
       
-      // Atividades do dia 3+
+      // Terceiro dia e seguintes
       { local: "Excursão aos Arredores", dica: "Conheça as belezas próximas!", horario: "08:30" },
       { local: "Vila Histórica", dica: "Patrimônio preservado e autêntico!", horario: "10:00" },
       { local: "Degustação Local", dica: "Produtos típicos da região!", horario: "12:30" },
@@ -375,60 +506,31 @@ const BENETRIP_ROTEIRO = {
       { local: "Rua Gastronômica", dica: "Vida noturna animada e saborosa!", horario: "21:30" }
     ];
     
-    // Atividades específicas por destino conhecido
-    const especificos = {
-      'Lisboa': [
-        { local: "Torre de Belém", dica: "Chegue antes das 10h para evitar filas!", horario: "09:00" },
-        { local: "Mosteiro dos Jerónimos", dica: "Arquitetura manuelina impressionante!", horario: "10:30" },
-        { local: "Pastéis de Belém", dica: "Prove os originais ainda quentinhos!", horario: "12:00" },
-        { local: "Time Out Market", dica: "Variedade incrível de sabores!", horario: "13:30" },
-        { local: "Elevador de Santa Justa", dica: "Vista 360° de Lisboa!", horario: "15:00" },
-        { local: "Bairro de Alfama", dica: "Perca-se nas ruelas históricas!", horario: "16:30" },
-        { local: "Miradouro da Senhora do Monte", dica: "Pôr do sol espetacular!", horario: "18:00" },
-        { local: "Casa de Fado", dica: "Experiência musical única!", horario: "20:00" },
-        { local: "Bairro Alto", dica: "Vida noturna vibrante!", horario: "22:00" },
-        
-        { local: "Castelo de São Jorge", dica: "Vista incrível e história fascinante!", horario: "09:30" },
-        { local: "LX Factory", dica: "Arte, lojas e cafés descolados!", horario: "11:00" },
-        { local: "Almoço na Rua Rosa", dica: "Charme e boa gastronomia!", horario: "13:00" },
-        { local: "Tram 28", dica: "Tour panorâmico pela cidade!", horario: "15:00" },
-        { local: "Cais do Sodré", dica: "Modernidade e tradição juntas!", horario: "17:00" },
-        { local: "Jantar no Chiado", dica: "Elegância e sabor português!", horario: "19:30" }
-      ],
-      
-      'Paris': [
-        { local: "Torre Eiffel", dica: "Compre ingressos online com antecedência!", horario: "09:00" },
-        { local: "Champs-Élysées", dica: "Caminhada icônica até o Arco do Triunfo!", horario: "11:00" },
-        { local: "Almoço em Café Tradicional", dica: "Experiência parisiense autêntica!", horario: "13:00" },
-        { local: "Museu do Louvre", dica: "Reserve meio dia para as principais obras!", horario: "14:30" },
-        { local: "Passeio pelo Sena", dica: "Paris vista do rio é mágica!", horario: "17:00" },
-        { local: "Montmartre e Sacré-Cœur", dica: "Atmosfera boêmia e vista linda!", horario: "18:30" },
-        { local: "Jantar em Bistrô", dica: "Gastronomia francesa tradicional!", horario: "20:00" }
-      ]
-    };
-    
-    return especificos[destino] || baseGenerica;
+    return destinosEspecificos[destino] || baseGenerica;
   },
 
   /**
-   * ✅ NOVO: Gera atividades contínuas para o dia
+   * ✅ CORRIGIDO: Gera atividades completas para todos os dias
    */
-  gerarAtividadesDoDiaContinuo(diaIndex, destino, atividadesBase, totalDias) {
+  gerarAtividadesDoDiaCompleto(diaIndex, destino, atividadesEspecificas, diasViagem) {
     const atividades = [];
     
-    // Número variável de atividades por dia (4-7)
-    const numAtividades = 4 + (diaIndex % 4);
-    const inicioIndex = diaIndex * 6;
+    // ✅ CORRIGIDO: Número variável de atividades (5-8 por dia)
+    const numAtividades = 5 + (diaIndex % 4); // Entre 5 e 8 atividades
     
-    for (let i = 0; i < numAtividades && inicioIndex + i < atividadesBase.length; i++) {
-      const atividadeIndex = (inicioIndex + i) % atividadesBase.length;
-      const atividadeBase = { ...atividadesBase[atividadeIndex] };
+    // ✅ CORRIGIDO: Distribuir atividades por todos os dias
+    const inicioIndex = diaIndex * 7; // 7 atividades base por dia
+    
+    for (let i = 0; i < numAtividades; i++) {
+      // Usar módulo para reciclar atividades se necessário
+      const atividadeIndex = (inicioIndex + i) % atividadesEspecificas.length;
+      const atividadeBase = { ...atividadesEspecificas[atividadeIndex] };
       
-      // Personalização por atividade
+      // Personalização
       atividadeBase.tags = this.gerarTagsAtividade(atividadeBase.local);
       atividadeBase.duracao = this.estimarDuracaoAtividade(atividadeBase.local);
       
-      // Ajustar horário com variação
+      // Ajustar horário com variação pequena
       if (atividadeBase.horario) {
         atividadeBase.horario = this.ajustarHorarioComVariacao(atividadeBase.horario, i);
       }
@@ -436,30 +538,51 @@ const BENETRIP_ROTEIRO = {
       atividades.push(atividadeBase);
     }
     
+    // Se o destino tem poucas atividades específicas, complementar com genéricas
+    if (atividades.length < 4 && diaIndex < diasViagem - 1) {
+      const atividadesComplementares = this.gerarAtividadesComplementares(diaIndex, destino);
+      atividades.push(...atividadesComplementares.slice(0, 4 - atividades.length));
+    }
+    
     return atividades;
   },
 
   /**
-   * ✅ NOVO: Ajusta horário com pequenas variações
+   * ✅ NOVO: Gera atividades complementares
+   */
+  gerarAtividadesComplementares(diaIndex, destino) {
+    const complementares = [
+      { local: `Café Local em ${destino}`, dica: "Prove o café da região!", horario: "08:30" },
+      { local: `Livraria Histórica`, dica: "Descobertas literárias interessantes!", horario: "10:00" },
+      { local: `Galeria de Arte Local`, dica: "Arte contemporânea da região!", horario: "11:30" },
+      { local: `Loja de Artesanato`, dica: "Lembranças autênticas!", horario: "14:00" },
+      { local: `Jardim Botânico`, dica: "Natureza e tranquilidade!", horario: "15:30" },
+      { local: `Miradouro Secreto`, dica: "Vista que poucos conhecem!", horario: "17:00" }
+    ];
+    
+    return complementares.map(ativ => ({
+      ...ativ,
+      tags: this.gerarTagsAtividade(ativ.local),
+      duracao: this.estimarDuracaoAtividade(ativ.local)
+    }));
+  },
+
+  /**
+   * ✅ MANTIDO: Funções auxiliares
    */
   ajustarHorarioComVariacao(horarioBase, indice) {
     const [hora, minuto] = horarioBase.split(':').map(Number);
     
-    // Adicionar variação de 15-30 minutos
     const variacao = (indice * 15) % 60;
     let novaHora = hora + Math.floor(variacao / 60);
     let novoMinuto = (minuto + variacao) % 60;
     
-    // Validar limites
     if (novaHora > 23) novaHora = 23;
     if (novaHora < 0) novaHora = 0;
     
     return `${novaHora.toString().padStart(2, '0')}:${novoMinuto.toString().padStart(2, '0')}`;
   },
 
-  /**
-   * ✅ NOVO: Estima duração baseada no tipo de atividade
-   */
   estimarDuracaoAtividade(local) {
     const localLower = local.toLowerCase();
     
@@ -474,13 +597,9 @@ const BENETRIP_ROTEIRO = {
     return '1-2 horas';
   },
 
-  /**
-   * ✅ NOVO: Gera tags inteligentes para atividades
-   */
   gerarTagsAtividade(local) {
     const tags = [];
     
-    // Tags baseadas em palavras-chave
     if (local.includes('Museu')) tags.push('Cultural');
     if (local.includes('Restaurante') || local.includes('Almoço') || local.includes('Jantar')) tags.push('Gastronomia');
     if (local.includes('Parque') || local.includes('Jardim')) tags.push('Natureza');
@@ -490,17 +609,15 @@ const BENETRIP_ROTEIRO = {
     if (local.includes('Mirante') || local.includes('Vista') || local.includes('Torre')) tags.push('Vista Panorâmica');
     if (local.includes('Centro') || local.includes('Histórico')) tags.push('Histórico');
     
-    // Tag padrão se vazio
     if (tags.length === 0) tags.push('Recomendado');
     
-    // 30% de chance de ser "Imperdível"
     if (Math.random() < 0.3) tags.unshift('Imperdível');
     
-    return tags.slice(0, 3); // Máximo 3 tags
+    return tags.slice(0, 3);
   },
 
   /**
-   * ✅ OTIMIZADO: Ajusta atividades por horários de voo (versão contínua)
+   * ✅ MANTIDO: Ajustes por horários de voo
    */
   ajustarAtividadesPorHorariosContinuo(dias) {
     if (!dias || dias.length === 0) return;
@@ -513,7 +630,6 @@ const BENETRIP_ROTEIRO = {
     const horaChegadaNum = parseInt(horaChegada.split(':')[0]);
     
     if (horaChegadaNum >= 20) {
-      // Chegada muito tarde
       primeiroDia.atividades = [{
         horario: '21:00',
         local: 'Check-in e Jantar no Hotel',
@@ -523,7 +639,6 @@ const BENETRIP_ROTEIRO = {
         duracao: '1 hora'
       }];
     } else if (horaChegadaNum >= 16) {
-      // Chegada à tarde
       primeiroDia.atividades = [
         {
           horario: horaChegada,
@@ -539,7 +654,6 @@ const BENETRIP_ROTEIRO = {
         }))
       ];
     } else if (horaChegadaNum >= 12) {
-      // Chegada meio-dia
       if (primeiroDia.atividades.length > 0) {
         primeiroDia.atividades[0] = {
           horario: `${horaChegadaNum + 1}:00`,
@@ -558,7 +672,6 @@ const BENETRIP_ROTEIRO = {
       const horaPartidaNum = parseInt(horaPartida.split(':')[0]);
       
       if (horaPartidaNum < 12) {
-        // Partida de manhã
         ultimoDia.atividades = [{
           horario: '08:00',
           local: 'Check-out e Transfer para Aeroporto',
@@ -568,7 +681,6 @@ const BENETRIP_ROTEIRO = {
           duracao: '2 horas'
         }];
       } else if (horaPartidaNum < 18) {
-        // Partida à tarde
         ultimoDia.atividades = [
           ...ultimoDia.atividades.slice(0, 3),
           {
@@ -584,9 +696,6 @@ const BENETRIP_ROTEIRO = {
     }
   },
 
-  /**
-   * ✅ NOVO: Ajusta horário após check-in
-   */
   ajustarHorarioAposCheckIn(horarioOriginal, horaChegada) {
     const [hora] = horarioOriginal.split(':');
     const novaHora = Math.max(parseInt(hora), horaChegada + 2);
@@ -594,7 +703,7 @@ const BENETRIP_ROTEIRO = {
   },
 
   /**
-   * ✅ OTIMIZADO: Busca previsão do tempo (limitada a 3 dias)
+   * ✅ MANTIDO: Previsão do tempo otimizada
    */
   async buscarPrevisaoTempoOtimizada() {
     try {
@@ -605,7 +714,6 @@ const BENETRIP_ROTEIRO = {
         return;
       }
       
-      // Limitar a 3 dias para performance
       const diasComPrevisao = Math.min(3, this.roteiroPronto.dias.length);
       
       for (let i = 0; i < diasComPrevisao; i++) {
@@ -619,9 +727,6 @@ const BENETRIP_ROTEIRO = {
     }
   },
 
-  /**
-   * ✅ NOVO: Gera previsão aleatória realista
-   */
   gerarPrevisaoAleatoria(diaIndex) {
     const condicoes = [
       { icon: '☀️', condition: 'Ensolarado', tempBase: 28 },
@@ -641,7 +746,7 @@ const BENETRIP_ROTEIRO = {
   },
 
   /**
-   * ✅ OTIMIZADO: Busca imagens com estratégia inteligente
+   * ✅ MANTIDO: Sistema de imagens otimizado
    */
   async buscarTodasImagensOtimizado() {
     try {
@@ -652,7 +757,6 @@ const BENETRIP_ROTEIRO = {
         return;
       }
       
-      // 1. Coletar locais únicos
       const locaisUnicos = new Map();
       let totalAtividades = 0;
       
@@ -672,13 +776,11 @@ const BENETRIP_ROTEIRO = {
       
       console.log(`📊 Estatísticas: ${totalAtividades} atividades, ${locaisUnicos.size} locais únicos`);
       
-      // 2. Estratégia de busca inteligente
       const locaisArray = Array.from(locaisUnicos.values());
-      const maxBuscas = Math.min(locaisArray.length, 15); // Limite para performance
+      const maxBuscas = Math.min(locaisArray.length, 15);
       
       const todasImagens = new Map();
       
-      // 3. Busca sequencial com cache
       for (let i = 0; i < maxBuscas; i++) {
         const resultado = await this.buscarImagemComCache(locaisArray[i].local);
         
@@ -686,13 +788,11 @@ const BENETRIP_ROTEIRO = {
           todasImagens.set(locaisArray[i].local, resultado.url);
         }
         
-        // Delay entre requisições
         if (i < maxBuscas - 1) {
           await this.delay(300);
         }
       }
       
-      // 4. Aplicar imagens a todas as atividades
       let imagensAplicadas = 0;
       this.roteiroPronto.dias.forEach((dia) => {
         if (dia.atividades?.length) {
@@ -720,9 +820,6 @@ const BENETRIP_ROTEIRO = {
     }
   },
 
-  /**
-   * ✅ OTIMIZADO: Busca imagem com cache avançado
-   */
   async buscarImagemComCache(local) {
     if (this.imagensCache.has(local)) {
       return this.imagensCache.get(local);
@@ -764,9 +861,6 @@ const BENETRIP_ROTEIRO = {
     }
   },
 
-  /**
-   * ✅ NOVO: Gera fallback inteligente
-   */
   gerarImagemFallback(local, diaIndex, ativIndex) {
     const fallbacks = [
       `https://picsum.photos/400/250?random=${diaIndex}${ativIndex}`,
@@ -777,9 +871,6 @@ const BENETRIP_ROTEIRO = {
     return fallbacks[ativIndex % fallbacks.length];
   },
 
-  /**
-   * ✅ NOVO: Aplica fallbacks globais
-   */
   aplicarFallbacksGlobal() {
     console.log('🔄 Aplicando fallbacks globais...');
     
@@ -796,9 +887,6 @@ const BENETRIP_ROTEIRO = {
     });
   },
 
-  /**
-   * ✅ OTIMIZADO: Carrega imagem com fallback melhorado
-   */
   carregarImagemComFallback(img) {
     const fallbackUrls = [
       img.dataset.src,
@@ -829,7 +917,7 @@ const BENETRIP_ROTEIRO = {
   },
 
   /**
-   * ✅ ATUALIZADO: UI com roteiro contínuo mobile-optimized
+   * ✅ CORRIGIDO: UI com roteiro contínuo e eventos funcionais
    */
   atualizarUIComRoteiroContinuo() {
     console.log('🎨 Atualizando interface com roteiro contínuo...');
@@ -851,7 +939,7 @@ const BENETRIP_ROTEIRO = {
     // Adicionar resumo
     container.appendChild(this.criarResumoViagem());
     
-    // Adicionar dias com atividades contínuas
+    // Adicionar TODOS os dias
     this.roteiroPronto.dias.forEach((dia, index) => {
       container.appendChild(this.criarElementoDiaContinuo(dia, index + 1));
     });
@@ -861,12 +949,9 @@ const BENETRIP_ROTEIRO = {
     spacer.style.height = '100px';
     container.appendChild(spacer);
     
-    console.log('✅ Interface contínua atualizada');
+    console.log(`✅ Interface contínua atualizada com ${this.roteiroPronto.dias.length} dias`);
   },
 
-  /**
-   * ✅ NOVO: Cria elemento de dia com layout contínuo
-   */
   criarElementoDiaContinuo(dia, numeroDia) {
     const elemento = document.createElement('div');
     elemento.className = 'dia-roteiro';
@@ -899,15 +984,12 @@ const BENETRIP_ROTEIRO = {
       </div>
     `;
     
-    // Configurar eventos após inserir
+    // ✅ CORRIGIDO: Configurar eventos após inserir no DOM
     setTimeout(() => this.configurarEventosDiaContinuo(elemento), 0);
     
     return elemento;
   },
 
-  /**
-   * ✅ NOVO: Cria lista contínua de atividades
-   */
   criarListaAtividadesContinuas(atividades) {
     if (!atividades?.length) {
       return `
@@ -986,20 +1068,10 @@ const BENETRIP_ROTEIRO = {
   },
 
   /**
-   * ✅ NOVO: Configura eventos do dia contínuo
+   * ✅ CORRIGIDO: Configurar eventos do dia (sem necessidade de setTimeout)
    */
   configurarEventosDiaContinuo(elemento) {
-    // Botões de mapa
-    const botoesMapa = elemento.querySelectorAll('.btn-ver-mapa');
-    botoesMapa.forEach(botao => {
-      botao.addEventListener('click', (e) => {
-        e.preventDefault();
-        const local = botao.getAttribute('data-local');
-        if (local) {
-          this.abrirMapa(local);
-        }
-      });
-    });
+    // ✅ Eventos de mapa são tratados por delegação no configurarEventosGlobais()
     
     // Configurar lazy loading se disponível
     if (this.imageObserver) {
@@ -1012,9 +1084,7 @@ const BENETRIP_ROTEIRO = {
   // HELPERS E UTILIDADES (MANTIDOS)
   // ===========================================
 
-  /**
-   * ✅ MANTIDO: Helpers de data (compatibilidade total)
-   */
+  // ✅ MANTIDO: Todos os helpers de data
   extrairDataIda() {
     const possiveis = [
       this.dadosVoo?.infoIda?.dataPartida,
@@ -1163,9 +1233,7 @@ const BENETRIP_ROTEIRO = {
     }
   },
 
-  /**
-   * ✅ MANTIDO: Helpers de horário
-   */
+  // ✅ MANTIDO: Helpers de horário
   extrairHorarioChegada() {
     const possiveis = [
       this.dadosVoo?.infoIda?.horaChegada,
@@ -1209,9 +1277,7 @@ const BENETRIP_ROTEIRO = {
     return horario;
   },
 
-  /**
-   * ✅ MANTIDO: Helpers de UI
-   */
+  // ✅ MANTIDO: Helpers de UI
   criarPrevisaoTempo(previsao) {
     if (!previsao) return '';
     
@@ -1305,9 +1371,7 @@ const BENETRIP_ROTEIRO = {
     return resumo;
   },
 
-  /**
-   * ✅ MANTIDO: Helpers de dados do usuário
-   */
+  // ✅ MANTIDO: Helpers de dados do usuário
   obterPreferencias() {
     return {
       tipoViagem: this.obterTipoViagem(),
@@ -1403,9 +1467,7 @@ const BENETRIP_ROTEIRO = {
     return mapa[this.obterTipoCompanhia()] || '👤';
   },
 
-  /**
-   * ✅ MANTIDO: Mapeamento de destinos
-   */
+  // ✅ MANTIDO: Mapeamento de destinos
   obterNomeDestinoPorCodigo(codigo) {
     const mapeamento = {
       'GRU': 'São Paulo', 'CGH': 'São Paulo', 'VCP': 'Campinas',
@@ -1414,7 +1476,6 @@ const BENETRIP_ROTEIRO = {
       'LHR': 'Londres', 'CDG': 'Paris', 'MAD': 'Madrid',
       'FCO': 'Roma', 'FRA': 'Frankfurt', 'AMS': 'Amsterdam',
       'LIS': 'Lisboa', 'JFK': 'Nova York', 'LAX': 'Los Angeles'
-      // ... expandir conforme necessário
     };
     
     return mapeamento[codigo] || codigo;
@@ -1424,16 +1485,14 @@ const BENETRIP_ROTEIRO = {
     const paises = {
       'GRU': 'Brasil', 'GIG': 'Brasil', 'BSB': 'Brasil',
       'LHR': 'Reino Unido', 'CDG': 'França', 'MAD': 'Espanha',
-      'LIS': 'Portugal', 'JFK': 'Estados Unidos', 'LAX': 'Estados Unidos'
-      // ... expandir conforme necessário
+      'LIS': 'Portugal', 'JFK': 'Estados Unidos', 'LAX': 'Estados Unidos',
+      'FCO': 'Itália', 'FRA': 'Alemanha', 'AMS': 'Holanda'
     };
     
     return paises[codigo] || 'Internacional';
   },
 
-  /**
-   * ✅ MANTIDO: Formatação de datas
-   */
+  // ✅ MANTIDO: Formatação de datas
   formatarData(dataString) {
     if (!dataString) return 'Data indefinida';
     
@@ -1515,12 +1574,9 @@ const BENETRIP_ROTEIRO = {
   },
 
   // ===========================================
-  // AÇÕES E INTERAÇÕES
+  // AÇÕES E INTERAÇÕES (CORRIGIDAS)
   // ===========================================
 
-  /**
-   * ✅ MANTIDO: Ações do usuário
-   */
   abrirMapa(local) {
     const destino = `${this.dadosDestino.destino}, ${this.dadosDestino.pais}`;
     const query = `${local}, ${destino}`;
@@ -1556,9 +1612,6 @@ const BENETRIP_ROTEIRO = {
     this.exibirToast('Em breve você poderá personalizar ainda mais seu roteiro! 🚀', 'info');
   },
 
-  /**
-   * ✅ OTIMIZADO: Sistema de toast melhorado
-   */
   exibirToast(mensagem, tipo = 'info') {
     let container = document.getElementById('toast-container');
     if (!container) {
@@ -1641,9 +1694,6 @@ const BENETRIP_ROTEIRO = {
   // LOADING E PROGRESSO
   // ===========================================
 
-  /**
-   * ✅ OTIMIZADO: Animação de progresso
-   */
   iniciarAnimacaoProgresso() {
     const mensagens = [
       '🔍 Analisando seu perfil de viagem...',
@@ -1721,5 +1771,5 @@ window.BENETRIP_ROTEIRO = BENETRIP_ROTEIRO;
 // Controle de carregamento múltiplo
 if (!window.BENETRIP_ROTEIRO_LOADED) {
   window.BENETRIP_ROTEIRO_LOADED = true;
-  console.log('✅ Benetrip Roteiro v8.0 - Sistema Contínuo Carregado');
+  console.log('✅ Benetrip Roteiro v8.1 - CORREÇÕES CRÍTICAS Aplicadas');
 }
