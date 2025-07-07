@@ -1,372 +1,414 @@
-// api/itinerary-generator.js - Endpoint para geração de roteiro personalizado
-const axios = require('axios');
+// api/itinerary-generator.js - OTIMIZADO PARA VERCEL SERVERLESS
 
-// Chaves de API
-const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY;
+// ⚡ CHAVES DE AMBIENTE VERCEL
+const DEEPSEEK_API_KEY = process.env.AI_API_KEY || process.env.DEEPSEEK_API_KEY || process.env.OPENAI_API_KEY;
 const CLAUDE_API_KEY = process.env.CLAUDE_API_KEY;
 
-// Modelo padrão a ser usado (DeepSeek Coder)
-const DEFAULT_MODEL = 'deepseek-chat';
-
-// Função auxiliar para logging estruturado
-function logEvent(type, message, data = {}) {
-  const log = {
-    timestamp: new Date().toISOString(),
-    type,
-    message,
-    ...data
-  };
-  console.log(JSON.stringify(log));
+// 📊 LOG ESTRUTURADO PARA VERCEL
+function logVercel(type, message, data = {}) {
+  const timestamp = new Date().toISOString();
+  console.log(`[${timestamp}] ${type.toUpperCase()}: ${message}`, data);
 }
 
 /**
- * Gera um roteiro personalizado através da API Deepseek ou Claude
+ * 🚀 HANDLER PRINCIPAL VERCEL SERVERLESS
  */
-module.exports = async (req, res) => {
-  // Configurar cabeçalhos CORS
+export default async function handler(req, res) {
+  // ⏱️ Configurar timeout específico do Vercel
+  const startTime = Date.now();
+  
+  // 🌐 CORS para Vercel
   res.setHeader('Access-Control-Allow-Credentials', true);
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
   
-  // Responder a preflight requests
+  // Preflight OPTIONS
   if (req.method === 'OPTIONS') {
-    return res.status(200).end();
+    res.status(200).end();
+    return;
   }
-  
-  // Verificar método
+
+  // Apenas POST aceito
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Método não permitido. Use POST.' });
+    res.status(405).json({
+      error: 'Método não permitido',
+      allowed: ['POST'],
+      received: req.method
+    });
+    return;
   }
-  
+
   try {
-    // Obter parâmetros do corpo da requisição
+    logVercel('info', 'Iniciando geração de roteiro', {
+      method: req.method,
+      hasDeepseek: !!DEEPSEEK_API_KEY,
+      hasClaude: !!CLAUDE_API_KEY,
+      vercelRegion: process.env.VERCEL_REGION || 'unknown'
+    });
+
+    // 📋 EXTRAIR PARÂMETROS
     const {
       destino,
       pais,
       dataInicio,
       dataFim,
-      horaChegada,
-      horaSaida,
-      tipoViagem,
-      tipoCompanhia,
-      preferencias,
-      modeloIA
-    } = req.body;
-    
-    // Validar parâmetros obrigatórios
-    if (!destino || !dataInicio) {
-      return res.status(400).json({ error: 'Parâmetros obrigatórios: destino, dataInicio' });
+      horaChegada = '15:30',
+      horaSaida = '21:00',
+      tipoViagem = 'cultura',
+      tipoCompanhia = 'casal',
+      preferencias = {},
+      modeloIA = 'deepseek'
+    } = req.body || {};
+
+    // ✅ VALIDAÇÃO BÁSICA
+    if (!destino) {
+      res.status(400).json({
+        error: 'Parâmetro obrigatório: destino',
+        received: { destino, dataInicio },
+        exemplo: {
+          destino: 'Lisboa',
+          pais: 'Portugal',
+          dataInicio: '2025-08-01'
+        }
+      });
+      return;
     }
-    
-    // Calcular número de dias
+
+    // 📅 CALCULAR DIAS
     const diasViagem = calcularDiasViagem(dataInicio, dataFim);
     
-    // Log dos parâmetros recebidos
-    logEvent('info', 'Gerando roteiro personalizado', {
-      destino,
-      pais,
-      diasViagem,
-      tipoViagem,
-      tipoCompanhia
+    logVercel('info', 'Parâmetros processados', {
+      destino, pais, diasViagem, tipoViagem, tipoCompanhia
     });
-    
-    // Gerar o prompt para a IA
-    const prompt = gerarPromptRoteiro({
-      destino,
-      pais,
-      dataInicio,
-      dataFim,
-      horaChegada,
-      horaSaida,
-      diasViagem,
-      tipoViagem,
-      tipoCompanhia,
-      preferencias
-    });
-    
-    // Selecionar o modelo de IA a ser usado
-    const modelo = modeloIA || DEFAULT_MODEL;
-    
-    // Gerar o roteiro usando a API correspondente
-    let roteiro;
-    
-    if (modelo === 'claude') {
-      roteiro = await gerarRoteiroComClaude(prompt);
+
+    // 🤖 TENTAR GERAR VIA IA
+    let roteiro = null;
+    let fonteUsada = 'fallback';
+
+    // Verificar se temos pelo menos uma API key
+    if (!DEEPSEEK_API_KEY && !CLAUDE_API_KEY) {
+      logVercel('warn', 'Nenhuma API key encontrada - usando fallback');
     } else {
-      roteiro = await gerarRoteiroComDeepseek(prompt);
+      try {
+        const prompt = criarPromptOtimizado({
+          destino, pais, dataInicio, dataFim, horaChegada, horaSaida,
+          diasViagem, tipoViagem, tipoCompanhia, preferencias
+        });
+
+        if (modeloIA === 'claude' && CLAUDE_API_KEY) {
+          logVercel('info', 'Tentando Claude API');
+          roteiro = await chamarClaudeAPI(prompt);
+          fonteUsada = 'claude';
+        } else if (DEEPSEEK_API_KEY) {
+          logVercel('info', 'Tentando DeepSeek API');
+          roteiro = await chamarDeepseekAPI(prompt);
+          fonteUsada = 'deepseek';
+        }
+      } catch (apiError) {
+        logVercel('error', 'Erro na API de IA', {
+          error: apiError.message,
+          stack: apiError.stack?.substring(0, 500)
+        });
+      }
     }
-    
-    // Verificar se o roteiro foi gerado com sucesso
-    if (!roteiro) {
-      throw new Error('Falha ao gerar roteiro');
+
+    // 🆘 FALLBACK SE IA FALHOU
+    if (!roteiro || !roteiro.dias) {
+      logVercel('info', 'Usando roteiro de fallback');
+      roteiro = criarRoteiroFallback(destino, pais, dataInicio, dataFim, diasViagem);
+      fonteUsada = 'fallback';
     }
-    
-    // Retornar o roteiro gerado
-    return res.status(200).json(roteiro);
-    
-  } catch (erro) {
-    // Log do erro
-    logEvent('error', 'Erro ao gerar roteiro', {
-      message: erro.message,
-      stack: erro.stack
+
+    // 📊 ADICIONAR METADATA
+    roteiro.metadata = {
+      geradoEm: new Date().toISOString(),
+      fonte: fonteUsada,
+      versao: '8.5-vercel',
+      diasTotal: roteiro.dias?.length || 0,
+      tempoProcessamento: Date.now() - startTime,
+      vercelRegion: process.env.VERCEL_REGION || 'unknown'
+    };
+
+    logVercel('success', 'Roteiro gerado com sucesso', {
+      fonte: fonteUsada,
+      dias: roteiro.dias?.length,
+      tempo: Date.now() - startTime
     });
+
+    // ✅ RETORNAR SUCESSO
+    res.status(200).json(roteiro);
+
+  } catch (error) {
+    const tempoErro = Date.now() - startTime;
     
-    // Retornar erro
-    return res.status(500).json({
-      error: 'Erro ao gerar roteiro personalizado',
-      details: erro.message
+    logVercel('error', 'Erro fatal no handler', {
+      message: error.message,
+      stack: error.stack?.substring(0, 500),
+      tempo: tempoErro
+    });
+
+    res.status(500).json({
+      error: 'Erro interno do servidor',
+      message: error.message,
+      timestamp: new Date().toISOString(),
+      hasApiKeys: {
+        deepseek: !!DEEPSEEK_API_KEY,
+        claude: !!CLAUDE_API_KEY
+      },
+      tempoProcessamento: tempoErro
     });
   }
-};
-
-/**
- * Calcula o número de dias entre duas datas
- * @param {string} dataInicio - Data de início no formato YYYY-MM-DD
- * @param {string} dataFim - Data de fim no formato YYYY-MM-DD
- * @returns {number} Número de dias
- */
-function calcularDiasViagem(dataInicio, dataFim) {
-  if (!dataInicio) return 1;
-  
-  const inicio = new Date(dataInicio);
-  
-  // Se não tiver data fim, assume 1 dia
-  if (!dataFim) return 1;
-  
-  const fim = new Date(dataFim);
-  
-  // Calcular diferença em dias
-  const diffTempo = Math.abs(fim - inicio);
-  const diffDias = Math.ceil(diffTempo / (1000 * 60 * 60 * 24)) + 1;  // +1 para incluir o dia de chegada
-  
-  return diffDias;
 }
 
 /**
- * Gera o prompt para a IA baseado nos parâmetros
- * @param {Object} params - Parâmetros para o prompt
- * @returns {string} Prompt formatado
+ * 📅 CALCULAR DIAS DE VIAGEM
  */
-function gerarPromptRoteiro(params) {
-  const {
-    destino,
-    pais,
-    dataInicio,
-    dataFim,
-    horaChegada,
-    horaSaida,
-    diasViagem,
-    tipoViagem,
-    tipoCompanhia,
-    preferencias
-  } = params;
+function calcularDiasViagem(dataInicio, dataFim) {
+  if (!dataInicio) return 3; // Padrão
   
-  // Mapear o tipo de viagem para descrição
-  const descricaoTipoViagem = {
-    'relaxar': 'relaxamento e descanso',
-    'aventura': 'aventura e adrenalina',
-    'cultura': 'cultura, história e gastronomia',
-    'urbano': 'urbanismo, compras e vida noturna'
-  }[tipoViagem] || 'cultura e experiências variadas';
+  try {
+    const inicio = new Date(dataInicio);
+    const fim = dataFim ? new Date(dataFim) : inicio;
+    
+    const diffMs = Math.abs(fim - inicio);
+    const diffDias = Math.ceil(diffMs / (1000 * 60 * 60 * 24)) + 1;
+    
+    return Math.max(1, Math.min(10, diffDias)); // Entre 1 e 10 dias
+  } catch (e) {
+    return 3;
+  }
+}
+
+/**
+ * 📝 CRIAR PROMPT OTIMIZADO
+ */
+function criarPromptOtimizado(params) {
+  const { destino, pais, diasViagem, tipoViagem, tipoCompanhia } = params;
   
-  // Mapear o tipo de companhia para descrição
-  const descricaoTipoCompanhia = {
-    'sozinho': 'uma pessoa viajando sozinha',
-    'casal': 'um casal em viagem romântica',
-    'familia': 'uma família com crianças',
-    'amigos': 'um grupo de amigos'
-  }[tipoCompanhia] || 'um viajante';
-  
-  // Montar o prompt
-  return `
-Você é a Tripinha, uma vira-lata caramelo magra, esperta, despojada e especialista em viagens na Benetrip. Sua missão é transformar as respostas do usuário em um roteiro de viagem completo, personalizado e incrível. Fale como se fosse uma amiga: com leveza, simpatia, bom humor e dicas práticas, sem enrolação.. 
-Crie um roteiro detalhado para uma viagem com as seguintes características:
+  return `Crie um roteiro de viagem em formato JSON para:
 
-- Destino: ${destino}, ${pais}
-- Data de início: ${dataInicio}${dataFim ? `\n- Data de término: ${dataFim}` : ''}
-- Duração: ${diasViagem} dias
-- Horário de chegada no primeiro dia: ${horaChegada || 'Não informado'}
-- Horário de partida no último dia: ${horaSaida || 'Não informado'}
-- Tipo de viagem: Foco em ${descricaoTipoViagem}
-- Viajantes: ${descricaoTipoCompanhia}
+DESTINO: ${destino}, ${pais}
+DURAÇÃO: ${diasViagem} dias
+TIPO: ${tipoViagem} 
+VIAJANTES: ${tipoCompanhia}
 
-INSTRUÇÕES:
-1. CRIE EXATAMENTE ${diasViagem} DIAS DE ROTEIRO - NÃO OMITA NENHUM DIA
-2. Organize o roteiro por dias, considerando o dia da semana real e se é fim de semana ou dia útil.
-3. Para cada dia, divida o roteiro em períodos: manhã, tarde e noite.
-4. Cada período deve ter 1-2 atividades relevantes, com locais reais (pontos turísticos, restaurantes, etc).
-5. Para cada atividade, inclua:
-   - Horário sugerido
-   - Nome do local
-   - 1-2 tags relevantes (ex: Imperdível, Cultural, Família)
-   - Uma dica personalizada da Tripinha (mascote da Benetrip)
-6. No primeiro dia, considere o horário de chegada (${horaChegada || 'não informado'}).
-7. No último dia, considere o horário de partida (${horaSaida || 'não informado'}).
-8. Inclua uma breve descrição para cada dia.
-9. FAÇA O MÁXIMO PARA QUE TODOS OS ${diasViagem} DIAS TENHAM ATIVIDADES DIFERENTES, CASO CONTRARIO, REPITA OS PASSEIOS MAIS CONHECIDOS.
-10. CRITICAL: Você DEVE criar atividades para TODOS os ${diasViagem} dias sem exceções. Se ${diasViagem} é 29, você DEVE criar 29 dias de roteiro completo.
-
-Retorne o roteiro em formato JSON com a seguinte estrutura:
+Retorne APENAS o JSON no formato:
 {
-  "destino": "Nome do destino",
+  "destino": "${destino}, ${pais}",
   "dias": [
     {
-      "data": "YYYY-MM-DD",
-      "descricao": "Breve descrição sobre o dia",
+      "data": "2025-08-01",
+      "descricao": "Primeiro dia em ${destino}",
       "manha": {
-        "horarioEspecial": "Chegada às XX:XX" (opcional, apenas se for chegada/partida),
         "atividades": [
           {
-            "horario": "HH:MM",
-            "local": "Nome do local",
-            "tags": ["tag1", "tag2"],
-            "dica": "Dica da Tripinha sobre o local"
+            "horario": "09:00",
+            "local": "Centro Histórico",
+            "tags": ["Cultural", "Imperdível"],
+            "dica": "Chegue cedo para evitar multidões!"
           }
         ]
       },
-      "tarde": { ... mesmo formato da manhã ... },
-      "noite": { ... mesmo formato da manhã ... }
+      "tarde": {
+        "atividades": [
+          {
+            "horario": "14:00",
+            "local": "Museu Principal",
+            "tags": ["Cultural"],
+            "dica": "Reserve pelo menos 2 horas para a visita."
+          }
+        ]
+      },
+      "noite": {
+        "atividades": [
+          {
+            "horario": "19:00",
+            "local": "Restaurante Típico",
+            "tags": ["Gastronomia"],
+            "dica": "Experimente o prato tradicional!"
+          }
+        ]
+      }
     }
   ]
 }
 
-Observações importantes:
-- Para ${descricaoTipoCompanhia}, dê prioridade a atividades compatíveis.
-- Como o foco é ${descricaoTipoViagem}, sugira mais atividades relacionadas a esse tema.
-- Considere atividades para dias úteis e atividades específicas para fins de semana.
-- Inclua uma mistura de atrações turísticas populares e experiências locais.
-- Garanta que destinos mais conhecidos estejam no roteiro da viagem.
-`;
+IMPORTANTE: 
+- Crie EXATAMENTE ${diasViagem} dias
+- Use locais reais de ${destino}
+- Horários realistas
+- Tags: Cultural, Gastronomia, Natureza, Compras, Imperdível
+- RETORNE APENAS O JSON, sem texto adicional`;
 }
 
 /**
- * Gera roteiro utilizando a API DeepSeek
- * @param {string} prompt - Prompt para a IA
- * @returns {Object} Roteiro gerado
+ * 🤖 CHAMAR DEEPSEEK API (USANDO FETCH NATIVO)
  */
-async function gerarRoteiroComDeepseek(prompt) {
+async function chamarDeepseekAPI(prompt) {
+  if (!DEEPSEEK_API_KEY) {
+    throw new Error('DeepSeek API key não configurada');
+  }
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 40000); // 40s para Vercel
+
   try {
-    // Verificar se a chave da API está configurada
-    if (!DEEPSEEK_API_KEY) {
-      throw new Error('Chave da API DeepSeek não configurada');
-    }
-    
-    // Realizar chamada à API DeepSeek
-    const response = await axios.post(
-      'https://api.deepseek.com/v1/chat/completions',
-      {
+    const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${DEEPSEEK_API_KEY}`,
+        'User-Agent': 'Benetrip/1.0'
+      },
+      body: JSON.stringify({
         model: 'deepseek-chat',
-        messages: [
-          {
-            role: 'user',
-            content: prompt
-          }
-        ],
+        messages: [{ role: 'user', content: prompt }],
         temperature: 0.7,
-        response_format: { type: 'json_object' }
-      },
-      {
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${DEEPSEEK_API_KEY}`
-        }
-      }
-    );
+        max_tokens: 3000
+      }),
+      signal: controller.signal
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`DeepSeek API error ${response.status}: ${errorText}`);
+    }
+
+    const data = await response.json();
+    const content = data.choices?.[0]?.message?.content;
+
+    if (!content) {
+      throw new Error('Resposta vazia da DeepSeek API');
+    }
+
+    // Extrair JSON da resposta
+    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      throw new Error('JSON não encontrado na resposta da DeepSeek');
+    }
+
+    const roteiro = JSON.parse(jsonMatch[0]);
+    return roteiro;
+
+  } catch (error) {
+    clearTimeout(timeoutId);
     
-    // Extrair resposta
-    const respostaText = response.data.choices[0].message.content;
-    
-    // Processar a resposta JSON
-    try {
-      // Limpar qualquer markdown ou texto antes/depois do JSON
-      const jsonMatch = respostaText.match(/\{[\s\S]*\}/);
-      const jsonText = jsonMatch ? jsonMatch[0] : respostaText;
-      
-      // Parsear para objeto
-      const roteiro = JSON.parse(jsonText);
-      return roteiro;
-    } catch (parseError) {
-      logEvent('error', 'Erro ao processar resposta JSON da DeepSeek', {
-        error: parseError.message,
-        response: respostaText
-      });
-      
-      throw new Error('Resposta da DeepSeek não é um JSON válido');
+    if (error.name === 'AbortError') {
+      throw new Error('Timeout na DeepSeek API (>40s)');
     }
     
-  } catch (erro) {
-    logEvent('error', 'Erro na chamada à API DeepSeek', {
-      error: erro.message,
-      response: erro.response?.data
-    });
-    
-    throw erro;
+    throw error;
   }
 }
 
 /**
- * Gera roteiro utilizando a API Claude (Anthropic)
- * @param {string} prompt - Prompt para a IA
- * @returns {Object} Roteiro gerado
+ * 🤖 CHAMAR CLAUDE API (USANDO FETCH NATIVO)
  */
-async function gerarRoteiroComClaude(prompt) {
-  try {
-    // Verificar se a chave da API está configurada
-    if (!CLAUDE_API_KEY) {
-      throw new Error('Chave da API Claude não configurada');
-    }
-    
-    // Realizar chamada à API Claude (Anthropic)
-    const response = await axios.post(
-      'https://api.anthropic.com/v1/messages',
-      {
-        model: 'claude-3-haiku-20240307',
-        max_tokens: 4000,
-        messages: [
-          {
-            role: 'user',
-            content: prompt
-          }
-        ],
-        response_format: { type: 'json_object' }
-      },
-      {
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': CLAUDE_API_KEY,
-          'anthropic-version': '2023-06-01'
-        }
-      }
-    );
-    
-    // Extrair resposta
-    const respostaText = response.data.content[0].text;
-    
-    // Processar a resposta JSON
-    try {
-      // Limpar qualquer markdown ou texto antes/depois do JSON
-      const jsonMatch = respostaText.match(/\{[\s\S]*\}/);
-      const jsonText = jsonMatch ? jsonMatch[0] : respostaText;
-      
-      // Parsear para objeto
-      const roteiro = JSON.parse(jsonText);
-      return roteiro;
-    } catch (parseError) {
-      logEvent('error', 'Erro ao processar resposta JSON da Claude', {
-        error: parseError.message,
-        response: respostaText
-      });
-      
-      throw new Error('Resposta da Claude não é um JSON válido');
-    }
-    
-  } catch (erro) {
-    logEvent('error', 'Erro na chamada à API Claude', {
-      error: erro.message,
-      response: erro.response?.data
-    });
-    
-    throw erro;
+async function chamarClaudeAPI(prompt) {
+  if (!CLAUDE_API_KEY) {
+    throw new Error('Claude API key não configurada');
   }
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 40000);
+
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': CLAUDE_API_KEY,
+        'anthropic-version': '2023-06-01'
+      },
+      body: JSON.stringify({
+        model: 'claude-3-haiku-20240307',
+        max_tokens: 3000,
+        messages: [{ role: 'user', content: prompt }]
+      }),
+      signal: controller.signal
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Claude API error ${response.status}: ${errorText}`);
+    }
+
+    const data = await response.json();
+    const content = data.content?.[0]?.text;
+
+    if (!content) {
+      throw new Error('Resposta vazia da Claude API');
+    }
+
+    // Extrair JSON da resposta
+    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      throw new Error('JSON não encontrado na resposta da Claude');
+    }
+
+    const roteiro = JSON.parse(jsonMatch[0]);
+    return roteiro;
+
+  } catch (error) {
+    clearTimeout(timeoutId);
+    
+    if (error.name === 'AbortError') {
+      throw new Error('Timeout na Claude API (>40s)');
+    }
+    
+    throw error;
+  }
+}
+
+/**
+ * 🆘 ROTEIRO FALLBACK BÁSICO
+ */
+function criarRoteiroFallback(destino, pais, dataInicio, dataFim, diasViagem) {
+  const dias = [];
+  const dataBase = new Date(dataInicio || '2025-08-01');
+
+  for (let i = 0; i < diasViagem; i++) {
+    const dataAtual = new Date(dataBase);
+    dataAtual.setDate(dataBase.getDate() + i);
+    const dataISO = dataAtual.toISOString().split('T')[0];
+
+    dias.push({
+      data: dataISO,
+      descricao: `Dia ${i + 1} explorando ${destino}`,
+      manha: {
+        atividades: [{
+          horario: '09:00',
+          local: `Centro de ${destino}`,
+          tags: ['Exploração'],
+          dica: 'Comece explorando o centro da cidade!'
+        }]
+      },
+      tarde: {
+        atividades: [{
+          horario: '14:00',
+          local: `Principais Atrações de ${destino}`,
+          tags: ['Turístico'],
+          dica: 'Visite os pontos mais famosos!'
+        }]
+      },
+      noite: {
+        atividades: [{
+          horario: '19:00',
+          local: `Gastronomia Local`,
+          tags: ['Gastronomia'],
+          dica: 'Experimente os sabores locais!'
+        }]
+      }
+    });
+  }
+
+  return {
+    destino: `${destino}, ${pais || 'Destino'}`,
+    dias
+  };
 }
