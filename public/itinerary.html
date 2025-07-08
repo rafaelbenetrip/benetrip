@@ -6,133 +6,62 @@
     <meta name="theme-color" content="#E87722">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="default">
     
     <title>Benetrip - Seu Roteiro de Viagem</title>
     <meta name="description" content="Seu roteiro personalizado criado pela Tripinha - Descubra experiências únicas no seu destino!">
-    <meta name="keywords" content="roteiro viagem, planejamento viagem, destinos, turismo, Benetrip">
-    <meta name="author" content="Benetrip">
     
-    <!-- Open Graph para compartilhamento -->
-    <meta property="og:title" content="Benetrip - Seu Roteiro de Viagem">
-    <meta property="og:description" content="Roteiro personalizado criado pela Tripinha">
-    <meta property="og:type" content="website">
-    <meta property="og:url" content="https://benetrip.com.br/itinerary.html">
-    <meta property="og:image" content="https://benetrip.com.br/assets/images/og-image.jpg">
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Montserrat:wght@400;500&display=swap" rel="stylesheet">
     
-    <!-- Preload fonts para performance -->
-    <link rel="preload" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Montserrat:wght@400;500&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'">
-    <noscript>
-        <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Montserrat:wght@400;500&display=swap" rel="stylesheet">
-    </noscript>
-    
-    <!-- CSS otimizado -->
+    <!-- CSS -->
     <link rel="stylesheet" href="assets/css/styles.css">
     <link rel="stylesheet" href="assets/css/itinerary.css">
     
-    <!-- PWA e favicons com fallbacks -->
-    <link rel="apple-touch-icon" href="assets/images/icon-192.png" onerror="this.href='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTkyIiBoZWlnaHQ9IjE5MiIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjRTg3NzIyIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSI2NCIgZmlsbD0id2hpdGUiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGRvbWluYW50LWJhc2VsaW5lPSJtaWRkbGUiPkI8L3RleHQ+PC9zdmc+'">
-    <link rel="icon" type="image/png" sizes="192x192" href="assets/images/icon-192.png">
+    <!-- Favicons básicos -->
     <link rel="icon" type="image/png" sizes="32x32" href="assets/images/icon-32.png">
-    <link rel="icon" type="image/x-icon" href="assets/images/favicon.ico">
-    
-    <!-- Preconnect para melhor performance -->
-    <link rel="preconnect" href="https://picsum.photos">
-    <link rel="preconnect" href="https://source.unsplash.com">
-    <link rel="preconnect" href="https://api.pexels.com">
-    <link rel="dns-prefetch" href="https://fonts.googleapis.com">
-    <link rel="dns-prefetch" href="https://fonts.gstatic.com">
-    
-    <!-- Critical CSS inline para melhor performance -->
-    <style>
-        /* Critical CSS para evitar FOUC */
-        .benetrip-container { 
-            max-width: 480px; 
-            margin: 0 auto; 
-            background: #fff; 
-            min-height: 100vh; 
-            position: relative; 
-        }
-        .loading-container { 
-            display: flex; 
-            justify-content: center; 
-            align-items: center; 
-            min-height: 70vh; 
-            padding: 20px; 
-        }
-        .loading-content { 
-            text-align: center; 
-            max-width: 320px; 
-        }
-        .app-header { 
-            display: flex; 
-            align-items: center; 
-            padding: 15px 20px; 
-            background: #fff; 
-            border-bottom: 1px solid #E0E0E0; 
-            position: sticky; 
-            top: 0; 
-            z-index: 100; 
-        }
-        .btn-voltar { 
-            background: none; 
-            border: none; 
-            padding: 8px; 
-            margin-right: 15px; 
-            cursor: pointer; 
-        }
-    </style>
+    <link rel="apple-touch-icon" href="assets/images/icon-192.png">
 </head>
 <body class="mobile-optimized">
-    <!-- Container principal otimizado para mobile -->
-    <div id="roteiro-container" class="benetrip-container" role="main">
+    <!-- Container principal -->
+    <div id="roteiro-container" class="benetrip-container">
         
-        <!-- Header responsivo com skip link -->
-        <a href="#main-content" class="skip-link" aria-label="Pular para conteúdo principal">Pular para o conteúdo</a>
-        
-        <header class="app-header" role="banner">
-            <button 
-                class="btn-voltar" 
-                aria-label="Voltar à página anterior" 
-                type="button"
-                title="Voltar"
-            >
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <!-- Header simples -->
+        <header class="app-header">
+            <button class="btn-voltar" aria-label="Voltar">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M19 12H5M12 19l-7-7 7-7"></path>
                 </svg>
             </button>
-            <h1 id="page-title">Seu Roteiro</h1>
+            <h1>Seu Roteiro</h1>
         </header>
         
-        <!-- Conteúdo principal do roteiro -->
-        <main class="roteiro-content" role="main" id="main-content" aria-labelledby="page-title">
+        <!-- Conteúdo principal -->
+        <main class="roteiro-content">
             
-            <!-- Loading inicial com animações otimizadas -->
-            <div class="loading-container" id="loading-inicial" aria-live="polite" aria-label="Carregando roteiro">
+            <!-- Loading inicial -->
+            <div class="loading-container" id="loading-inicial">
                 <div class="loading-content">
-                    <div class="loading-avatar-container">
-                        <img 
-                            src="assets/images/tripinha/loading2.png" 
-                            alt="Tripinha preparando seu roteiro" 
-                            class="loading-avatar"
-                            onerror="this.style.display='none'; this.nextElementSibling.style.display='block';"
-                            loading="eager"
-                            width="120"
-                            height="120"
-                        >
-                        <div class="loading-emoji" style="display:none;" role="img" aria-label="Cachorro">🐕</div>
-                    </div>
+                    <img 
+                        src="assets/images/tripinha/loading2.png" 
+                        alt="Tripinha preparando seu roteiro" 
+                        class="loading-avatar"
+                        onerror="this.style.display='none'; this.nextElementSibling.style.display='block';"
+                    >
+                    <div class="loading-emoji" style="display:none;">🐕</div>
                     
-                    <div class="loading-text" id="loading-message" aria-live="polite">
+                    <div class="loading-text" id="loading-message">
                         Preparando seu roteiro personalizado...
                     </div>
                     
-                    <div class="progress-bar-container" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="10">
+                    <div class="progress-bar-container">
                         <div 
                             class="progress-bar" 
                             id="progress-bar"
+                            role="progressbar" 
                             style="width: 10%;" 
-                            aria-label="Progresso do carregamento"
+                            aria-valuenow="10" 
+                            aria-valuemin="0" 
+                            aria-valuemax="100"
                         ></div>
                     </div>
                     
@@ -142,20 +71,18 @@
                 </div>
             </div>
             
-            <!-- Conteúdo será inserido dinamicamente aqui -->
+            <!-- Conteúdo dinâmico será inserido aqui -->
             
         </main>
         
-        <!-- Barra de ações fixa otimizada -->
-        <div class="botao-acoes-fixo" role="toolbar" aria-label="Ações do roteiro">
+        <!-- Barra de ações fixa -->
+        <div class="botao-acoes-fixo">
             <button 
                 class="btn-secundario" 
-                id="btn-editar-roteiro" 
+                id="btn-editar-roteiro"
                 type="button"
-                aria-label="Personalizar seu roteiro de viagem"
-                title="Personalizar roteiro"
             >
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"></path>
                 </svg>
                 <span>Personalizar</span>
@@ -163,12 +90,10 @@
             
             <button 
                 class="btn-principal" 
-                id="btn-compartilhar-roteiro" 
+                id="btn-compartilhar-roteiro"
                 type="button"
-                aria-label="Compartilhar seu roteiro de viagem"
-                title="Compartilhar roteiro"
             >
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M15 8a3 3 0 10-2.977-2.63l-4.94 2.47a3 3 0 100 4.319l4.94 2.47a3 3 0 10.895-1.789l-4.94-2.47a3.027 3.027 0 000-.74l4.94-2.47C13.456 7.68 14.19 8 15 8z"></path>
                 </svg>
                 <span>Compartilhar</span>
@@ -176,46 +101,27 @@
         </div>
     </div>
 
-    <!-- Container para toast notifications -->
-    <div id="toast-container" class="toast-container" role="region" aria-live="polite" aria-label="Notificações"></div>
+    <!-- Containers auxiliares -->
+    <div id="toast-container" class="toast-container"></div>
+    <div id="modal-container" class="modal-container"></div>
 
-    <!-- Container para modais (futuro) -->
-    <div id="modal-container" class="modal-container" role="dialog" aria-hidden="true" aria-modal="true"></div>
-
-    <!-- Scripts otimizados -->
+    <!-- Configuração global simplificada -->
     <script>
-        // ✅ CONFIGURAÇÃO ATUALIZADA para compatibilidade com JS corrigido
+        // ✅ Configuração mínima e funcional
         window.BENETRIP_CONFIG = {
             apiBaseUrl: '/api',
-            imageQuality: 'medium', // low, medium, high
+            imageQuality: 'medium',
             enableLazyLoading: true,
             enableImageOptimization: true,
-            debugMode: false, // true em desenvolvimento
-            maxRetryAttempts: 3,
-            requestTimeout: 8000,
-            // ✅ Removido maxImagesPerDay já que agora busca TODAS as imagens
-            fallbackImageEnabled: true
+            debugMode: false
         };
         
-        // Detectar dispositivo mobile (melhorado)
+        // Detectar mobile
         window.isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-        window.isTablet = /iPad|Android(?!.*Mobile)/i.test(navigator.userAgent);
-        window.isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
         
-        // ✅ Service Worker com verificação de existência
-        if ('serviceWorker' in navigator && location.hostname !== 'localhost') {
-            fetch('/sw.js', { method: 'HEAD' })
-                .then(response => {
-                    if (response.ok) {
-                        navigator.serviceWorker.register('/sw.js')
-                            .then(reg => console.log('SW registrado:', reg.scope))
-                            .catch(err => console.log('SW falhou:', err));
-                    }
-                })
-                .catch(() => console.log('SW não disponível'));
-        }
+        // ✅ REMOVIDO Service Worker que estava causando erro 404
         
-        // ✅ Preloader com verificação de existência dos recursos
+        // Preloader básico
         function preloadCriticalResources() {
             const criticalImages = [
                 'assets/images/tripinha-avatar.png',
@@ -223,219 +129,61 @@
             ];
             
             criticalImages.forEach(src => {
-                fetch(src, { method: 'HEAD' })
-                    .then(response => {
-                        if (response.ok) {
-                            const img = new Image();
-                            img.src = src;
-                        }
-                    })
-                    .catch(() => console.log(`Recurso não encontrado: ${src}`));
+                const img = new Image();
+                img.src = src;
             });
         }
         
-        // Executar preload quando DOM estiver pronto
+        // Executar preload
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', preloadCriticalResources);
         } else {
             preloadCriticalResources();
         }
         
-        // ✅ Otimização de performance melhorada
-        window.addEventListener('load', () => {
-            // Remover loading screens desnecessários
-            setTimeout(() => {
-                const unnecessaryLoaders = document.querySelectorAll('.initial-loader, .page-loader');
-                unnecessaryLoaders.forEach(loader => {
-                    if (loader && loader !== document.getElementById('loading-inicial')) {
-                        loader.remove();
-                    }
-                });
-            }, 100);
-            
-            // Marcar como carregado
-            document.body.classList.add('loaded');
-        });
-        
-        // ✅ Prevenção de zoom acidental melhorada
-        let lastTouchEnd = 0;
+        // ✅ Prevenção de zoom básica (sem interferir nos cliques)
         document.addEventListener('touchstart', function(event) {
             if (event.touches.length > 1) {
                 event.preventDefault();
             }
         });
         
-        document.addEventListener('touchend', function(event) {
-            const now = (new Date()).getTime();
-            if (now - lastTouchEnd <= 300) {
-                event.preventDefault();
-            }
-            lastTouchEnd = now;
-        }, false);
-        
-        // ✅ Smooth scroll melhorado
-        document.addEventListener('click', function(e) {
-            const anchor = e.target.closest('a[href^="#"]');
-            if (anchor && anchor.getAttribute('href') !== '#') {
-                e.preventDefault();
-                const target = document.querySelector(anchor.getAttribute('href'));
-                if (target) {
-                    target.scrollIntoView({ 
-                        behavior: 'smooth', 
-                        block: 'start',
-                        inline: 'nearest'
-                    });
-                    
-                    // Foco para acessibilidade
-                    if (target.tabIndex < 0) {
-                        target.tabIndex = -1;
-                    }
-                    target.focus();
-                }
-            }
-        });
-        
-        // ✅ Gerenciamento de erro global
-        window.addEventListener('error', function(e) {
-            if (window.BENETRIP_CONFIG.debugMode) {
-                console.error('Erro global capturado:', e.error);
-            }
-        });
-        
-        window.addEventListener('unhandledrejection', function(e) {
-            if (window.BENETRIP_CONFIG.debugMode) {
-                console.error('Promise rejeitada:', e.reason);
-            }
-        });
-        
-        // ✅ Feedback tátil para dispositivos móveis
-        if (window.isTouchDevice) {
-            document.addEventListener('touchstart', function(e) {
-                const button = e.target.closest('button, .btn, [role="button"]');
-                if (button && navigator.vibrate) {
-                    navigator.vibrate(10); // Vibração sutil
-                }
-            });
-        }
-    </script>
-    
-    <!-- Scripts principais com fallbacks -->
-    <script src="assets/js/api.js" defer onerror="console.warn('api.js não carregou')"></script>
-    <script src="assets/js/modal-handler.js" defer onerror="console.warn('modal-handler.js não carregou')"></script>
-    <script src="assets/js/itinerary.js" defer onerror="console.error('itinerary.js CRÍTICO não carregou')"></script>
-    
-    <!-- ✅ Analytics otimizado -->
-    <script>
-        // Tracking de eventos melhorado
+        // ✅ Tracking básico
         function trackEvent(eventName, eventData = {}) {
-            // Google Analytics 4
-            if (typeof gtag !== 'undefined') {
-                gtag('event', eventName, {
-                    event_category: 'itinerary',
-                    event_label: eventData.label || '',
-                    value: eventData.value || 0,
-                    ...eventData
-                });
+            if (window.gtag) {
+                gtag('event', eventName, eventData);
             }
             
-            // Console para debug
-            if (window.BENETRIP_CONFIG?.debugMode) {
+            if (window.BENETRIP_CONFIG.debugMode) {
                 console.log('📊 Event tracked:', eventName, eventData);
             }
-            
-            // Opcional: enviar para API própria
-            if (eventData.critical) {
-                fetch('/api/analytics', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ event: eventName, data: eventData, timestamp: Date.now() })
-                }).catch(() => {}); // Silenciosamente falhar
-            }
         }
         
-        // Eventos automáticos melhorados
         window.addEventListener('load', () => {
-            trackEvent('page_load', { 
-                page: 'itinerary',
-                loadTime: performance.now(),
-                userAgent: navigator.userAgent,
-                isMobile: window.isMobile
-            });
+            trackEvent('page_load', { page: 'itinerary' });
         });
         
-        // Track saída da página
-        window.addEventListener('beforeunload', () => {
-            trackEvent('page_unload', { 
-                page: 'itinerary',
-                timeSpent: performance.now()
-            });
-        });
-        
-        // Track erros JavaScript
-        window.addEventListener('error', (e) => {
-            trackEvent('js_error', {
-                critical: true,
-                message: e.message,
-                filename: e.filename,
-                lineno: e.lineno
-            });
-        });
-        
-        // Disponibilizar globalmente
         window.trackEvent = trackEvent;
     </script>
     
-    <!-- ✅ Schema.org melhorado para SEO -->
+    <!-- Scripts principais SEM defer para garantir ordem -->
+    <script src="assets/js/api.js"></script>
+    <script src="assets/js/modal-handler.js"></script>
+    <script src="assets/js/itinerary.js"></script>
+    
+    <!-- SEO básico -->
     <script type="application/ld+json">
     {
         "@context": "https://schema.org",
-        "@type": "WebApplication",
-        "name": "Benetrip Travel Planner",
-        "description": "Planejador de viagens inteligente que cria roteiros personalizados com a ajuda da Tripinha",
-        "url": "https://benetrip.com.br",
-        "applicationCategory": "TravelApplication",
-        "operatingSystem": "Web Browser",
-        "offers": {
-            "@type": "Offer",
-            "price": "0",
-            "priceCurrency": "BRL"
-        },
+        "@type": "TravelAction",
+        "name": "Roteiro de Viagem Benetrip",
+        "description": "Roteiro personalizado criado pela Tripinha para sua viagem dos sonhos",
         "provider": {
             "@type": "Organization",
             "name": "Benetrip",
-            "url": "https://benetrip.com.br",
-            "logo": "https://benetrip.com.br/assets/images/logo.png"
-        },
-        "creator": {
-            "@type": "Organization",
-            "name": "Benetrip"
-        },
-        "featureList": [
-            "Roteiros personalizados",
-            "Busca de voos",
-            "Recomendações de destinos",
-            "Planejamento inteligente"
-        ]
-    }
-    </script>
-    
-    <!-- ✅ PWA Manifest -->
-    <link rel="manifest" href="/manifest.json">
-    
-    <!-- ✅ Preload de recursos críticos do CSS -->
-    <script>
-        // Carregar CSS não crítico de forma assíncrona
-        function loadCSS(href) {
-            const link = document.createElement('link');
-            link.rel = 'stylesheet';
-            link.href = href;
-            link.media = 'print';
-            link.onload = function() { this.media = 'all'; };
-            document.head.appendChild(link);
+            "url": "https://benetrip.com.br"
         }
-        
-        // Carregar fontes de ícones se necessário
-        // loadCSS('assets/css/icons.css');
+    }
     </script>
 </body>
 </html>
