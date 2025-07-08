@@ -1,12 +1,10 @@
 /**
- * Benetrip - Sistema de Roteiro Contínuo Otimizado (VERSÃO 8.1)
- * Características: 
- * - Roteiro contínuo sem divisões manhã/tarde/noite
- * - 100% mobile-responsive 
- * - Conectado com API real (/api/itinerary-generator)
- * - Imagens responsivas com lazy loading
- * - Performance otimizada
- * Data: 2025
+ * Benetrip - Sistema de Roteiro Contínuo Otimizado (VERSÃO 8.2 - CORRIGIDA)
+ * Correções aplicadas:
+ * - ✅ Imagens para TODOS os dias (removida limitação de 15)
+ * - ✅ Event listeners corrigidos (página totalmente clicável)
+ * - ✅ Fallbacks de imagem funcionais
+ * - ✅ Performance otimizada
  */
 
 const BENETRIP_ROTEIRO = {
@@ -25,7 +23,7 @@ const BENETRIP_ROTEIRO = {
    * ✅ INICIALIZAÇÃO OTIMIZADA
    */
   init() {
-    console.log('🚀 Benetrip Roteiro v8.1 - Roteiro Contínuo com API Real');
+    console.log('🚀 Benetrip Roteiro v8.2 - Versão Corrigida');
     
     this.carregarDados()
       .then(() => this.gerarRoteiroIA())
@@ -39,46 +37,130 @@ const BENETRIP_ROTEIRO = {
   },
 
   /**
-   * ✅ CONFIGURAÇÃO DE EVENTOS OTIMIZADA
+   * ✅ CONFIGURAÇÃO DE EVENTOS CORRIGIDA
    */
   configurarEventos() {
-    document.getElementById('btn-compartilhar-roteiro')?.addEventListener('click', () => this.compartilharRoteiro());
-    document.getElementById('btn-editar-roteiro')?.addEventListener('click', () => this.editarRoteiro());
-    document.querySelector('.btn-voltar')?.addEventListener('click', () => history.back());
+    // Event delegation para elementos dinâmicos
+    document.addEventListener('click', (e) => {
+      // Botão compartilhar
+      if (e.target.closest('#btn-compartilhar-roteiro')) {
+        e.preventDefault();
+        this.compartilharRoteiro();
+        return;
+      }
+      
+      // Botão editar
+      if (e.target.closest('#btn-editar-roteiro')) {
+        e.preventDefault();
+        this.editarRoteiro();
+        return;
+      }
+      
+      // Botão voltar
+      if (e.target.closest('.btn-voltar')) {
+        e.preventDefault();
+        history.back();
+        return;
+      }
+      
+      // Botões de mapa
+      if (e.target.closest('.btn-ver-mapa-mini')) {
+        e.preventDefault();
+        const botao = e.target.closest('.btn-ver-mapa-mini');
+        const local = botao.getAttribute('data-local');
+        if (local) {
+          this.abrirMapa(local);
+        }
+        return;
+      }
+    });
     
-    // Configurar Intersection Observer para lazy loading
-    this.configurarLazyLoading();
+    // Configurar Intersection Observer melhorado
+    this.configurarLazyLoadingMelhorado();
   },
 
   /**
-   * ✅ NOVO: Lazy Loading Avançado
+   * ✅ LAZY LOADING MELHORADO
    */
-  configurarLazyLoading() {
+  configurarLazyLoadingMelhorado() {
     if ('IntersectionObserver' in window) {
       this.imageObserver = new IntersectionObserver((entries) => {
         entries.forEach(entry => {
           if (entry.isIntersecting) {
             const img = entry.target;
             if (img.dataset.src) {
-              img.src = img.dataset.src;
-              img.onload = () => {
-                img.classList.add('loaded');
-                img.style.opacity = '1';
-              };
-              img.removeAttribute('data-src');
+              this.carregarImagemComFallback(img);
               this.imageObserver.unobserve(img);
             }
           }
         });
       }, {
-        rootMargin: '50px 0px',
-        threshold: 0.1
+        rootMargin: '100px 0px',
+        threshold: 0.01
       });
     }
   },
 
   /**
-   * ✅ CARREGAMENTO DE DADOS (mantido da v7.0)
+   * ✅ CARREGAMENTO DE IMAGEM COM FALLBACK ROBUSTO
+   */
+  carregarImagemComFallback(img) {
+    const originalSrc = img.dataset.src;
+    const local = img.alt || 'Local';
+    
+    // Fallbacks robustos (sem via.placeholder.com)
+    const fallbacks = [
+      originalSrc,
+      `https://picsum.photos/400/250?random=${Math.floor(Math.random() * 1000)}`,
+      `https://source.unsplash.com/400x250/?travel,${encodeURIComponent(this.dadosDestino.destino)}`,
+      this.criarImagemPlaceholderSVG(local)
+    ];
+    
+    let tentativaAtual = 0;
+    
+    const tentarCarregar = () => {
+      if (tentativaAtual >= fallbacks.length) {
+        console.warn('⚠️ Todos os fallbacks falharam para:', local);
+        img.style.display = 'none';
+        return;
+      }
+      
+      const src = fallbacks[tentativaAtual];
+      
+      img.onload = () => {
+        img.style.opacity = '1';
+        img.classList.add('loaded');
+      };
+      
+      img.onerror = () => {
+        tentativaAtual++;
+        console.warn(`⚠️ Falha na imagem ${tentativaAtual}/${fallbacks.length} para:`, local);
+        setTimeout(tentarCarregar, 100);
+      };
+      
+      img.src = src;
+    };
+    
+    tentarCarregar();
+  },
+
+  /**
+   * ✅ NOVO: Cria placeholder SVG como último fallback
+   */
+  criarImagemPlaceholderSVG(texto) {
+    const svg = `<svg width="400" height="250" xmlns="http://www.w3.org/2000/svg">
+      <rect width="100%" height="100%" fill="#E87722"/>
+      <text x="50%" y="50%" font-family="Arial, sans-serif" font-size="16" 
+            fill="white" text-anchor="middle" dominant-baseline="middle">
+        ${texto}
+      </text>
+    </svg>`;
+    
+    return 'data:image/svg+xml;base64,' + btoa(svg);
+  },
+
+  /**
+   * ✅ CARREGAMENTO DE DADOS (mantido)
    */
   async carregarDados() {
     try {
@@ -126,7 +208,7 @@ const BENETRIP_ROTEIRO = {
   },
 
   /**
-   * ✅ NORMALIZAÇÃO DE DATAS (mantido da v7.0)
+   * ✅ NORMALIZAÇÃO DE DATAS (mantido)
    */
   async normalizarEValidarDatas() {
     console.log('📅 Normalizando datas...');
@@ -201,7 +283,7 @@ const BENETRIP_ROTEIRO = {
   },
 
   /**
-   * ✅ GERAÇÃO DE ROTEIRO COM API REAL (nova funcionalidade principal)
+   * ✅ GERAÇÃO DE ROTEIRO COM API REAL
    */
   async gerarRoteiroIA() {
     try {
@@ -219,10 +301,8 @@ const BENETRIP_ROTEIRO = {
         preferencias: this.obterPreferenciasCompletas()
       });
       
-      // Simular delay para UX
       await this.delay(1500);
       
-      // Chamar API real de geração de roteiro
       const parametrosIA = {
         destino: this.dadosDestino.destino,
         pais: this.dadosDestino.pais,
@@ -233,7 +313,7 @@ const BENETRIP_ROTEIRO = {
         tipoViagem: this.obterTipoViagem(),
         tipoCompanhia: this.obterTipoCompanhia(),
         preferencias: this.obterPreferenciasCompletas(),
-        modeloIA: 'deepseek' // Usar DeepSeek como padrão
+        modeloIA: 'deepseek'
       };
       
       console.log('🚀 Chamando API de roteiro...', parametrosIA);
@@ -247,10 +327,10 @@ const BENETRIP_ROTEIRO = {
         this.roteiroPronto = await this.gerarRoteiroFallback(dataIda, dataVolta, diasViagem);
       }
       
-      // Executar tarefas em paralelo
+      // ✅ CORREÇÃO: Executar tarefas em paralelo
       await Promise.all([
         this.buscarPrevisaoTempo(),
-        this.buscarTodasImagensOtimizado()
+        this.buscarTodasImagensCorrigido() // <- MÉTODO CORRIGIDO
       ]);
       
       this.atualizarUIComRoteiroContino();
@@ -267,7 +347,118 @@ const BENETRIP_ROTEIRO = {
   },
 
   /**
-   * ✅ NOVO: Chama API real de roteiro
+   * ✅ CORREÇÃO PRINCIPAL: Busca imagens para TODOS os dias/atividades
+   */
+  async buscarTodasImagensCorrigido() {
+    try {
+      console.log('🖼️ Iniciando busca COMPLETA de imagens...');
+      
+      if (!this.roteiroPronto?.dias || this.roteiroPronto.dias.length === 0) {
+        console.warn('⚠️ Sem roteiro para buscar imagens');
+        return;
+      }
+      
+      // ✅ Coletar TODAS as atividades (sem limite)
+      const todasAtividades = [];
+      let totalAtividades = 0;
+      
+      this.roteiroPronto.dias.forEach((dia, diaIndex) => {
+        if (dia.atividades?.length) {
+          dia.atividades.forEach((atividade, ativIndex) => {
+            if (atividade.local && !atividade.isEspecial) {
+              todasAtividades.push({
+                local: atividade.local,
+                diaIndex,
+                ativIndex,
+                referencia: atividade
+              });
+              totalAtividades++;
+            }
+          });
+        }
+      });
+      
+      console.log(`📊 Estatísticas CORRIGIDAS: ${totalAtividades} atividades, ${todasAtividades.length} locais para buscar`);
+      
+      // ✅ REMOVIDA LIMITAÇÃO - buscar imagens para TODAS as atividades
+      const imagensMap = new Map();
+      let sucessos = 0;
+      
+      // Processar em lotes pequenos para não sobrecarregar
+      const tamanhoLote = 3;
+      for (let i = 0; i < todasAtividades.length; i += tamanhoLote) {
+        const lote = todasAtividades.slice(i, i + tamanhoLote);
+        
+        const promessas = lote.map(async (ativInfo) => {
+          try {
+            const resultado = await this.buscarImagemComCache(ativInfo.local);
+            
+            if (resultado.sucesso) {
+              imagensMap.set(ativInfo.local, resultado.url);
+              sucessos++;
+            }
+            
+            return resultado;
+          } catch (erro) {
+            console.warn(`⚠️ Erro na busca de imagem para ${ativInfo.local}:`, erro);
+            return { sucesso: false, erro: erro.message };
+          }
+        });
+        
+        await Promise.allSettled(promessas);
+        
+        // Pequena pausa entre lotes
+        if (i + tamanhoLote < todasAtividades.length) {
+          await this.delay(200);
+        }
+      }
+      
+      // ✅ Aplicar imagens OU fallbacks para TODAS as atividades
+      let imagensAplicadas = 0;
+      this.roteiroPronto.dias.forEach((dia, diaIndex) => {
+        if (dia.atividades?.length) {
+          dia.atividades.forEach((atividade, ativIndex) => {
+            if (atividade.local && !atividade.isEspecial) {
+              const imagemUrl = imagensMap.get(atividade.local);
+              
+              if (imagemUrl) {
+                atividade.imagemUrl = imagemUrl;
+              } else {
+                // ✅ Fallback melhorado para atividades sem imagem
+                atividade.imagemUrl = this.gerarImagemFallbackCorrigido(atividade.local, diaIndex, ativIndex);
+                atividade.isFallback = true;
+              }
+              
+              imagensAplicadas++;
+            }
+          });
+        }
+      });
+      
+      console.log(`✅ Imagens aplicadas: ${imagensAplicadas}/${totalAtividades} (${sucessos} da API, ${imagensAplicadas - sucessos} fallbacks)`);
+      
+    } catch (erro) {
+      console.error('❌ Erro ao buscar imagens:', erro);
+      this.aplicarFallbacksGlobal();
+    }
+  },
+
+  /**
+   * ✅ FALLBACK DE IMAGEM CORRIGIDO
+   */
+  gerarImagemFallbackCorrigido(local, diaIndex, ativIndex) {
+    // ✅ Fallbacks funcionais (sem via.placeholder.com)
+    const fallbacks = [
+      `https://picsum.photos/400/250?random=${diaIndex}${ativIndex}${Date.now()}`,
+      `https://source.unsplash.com/400x250/?travel,${encodeURIComponent(this.dadosDestino.destino)}`,
+      this.criarImagemPlaceholderSVG(local)
+    ];
+    
+    return fallbacks[ativIndex % fallbacks.length];
+  },
+
+  /**
+   * ✅ CHAMA API REAL DE ROTEIRO (mantido)
    */
   async chamarAPIRoteiroReal(parametros) {
     try {
@@ -286,7 +477,6 @@ const BENETRIP_ROTEIRO = {
       
       const roteiro = await response.json();
       
-      // Validar resposta
       if (!roteiro.dias || !Array.isArray(roteiro.dias)) {
         throw new Error('Formato de resposta inválido da API');
       }
@@ -301,7 +491,7 @@ const BENETRIP_ROTEIRO = {
   },
 
   /**
-   * ✅ NOVO: Converte roteiro da API (manhã/tarde/noite) para formato contínuo
+   * ✅ CONVERTE ROTEIRO PARA FORMATO CONTÍNUO (mantido)
    */
   converterRoteiroParaContinuo(roteiroAPI) {
     console.log('🔄 Convertendo roteiro para formato contínuo...');
@@ -319,18 +509,15 @@ const BENETRIP_ROTEIRO = {
         atividades: []
       };
       
-      // Adicionar observações especiais
       if (index === 0) {
         diaContino.observacao = this.obterObservacaoPrimeiroDia();
       } else if (index === roteiroAPI.dias.length - 1) {
         diaContino.observacao = this.obterObservacaoUltimoDia();
       }
       
-      // Consolidar atividades de manhã, tarde e noite em uma lista contínua
       ['manha', 'tarde', 'noite'].forEach(periodo => {
         if (dia[periodo]?.atividades?.length) {
           dia[periodo].atividades.forEach(atividade => {
-            // Adicionar período na atividade para contexto
             const atividadeContina = {
               ...atividade,
               periodo: periodo,
@@ -338,7 +525,6 @@ const BENETRIP_ROTEIRO = {
               tags: atividade.tags || this.gerarTagsAtividade(atividade.local, periodo)
             };
             
-            // Marcar atividades especiais
             if (atividade.local?.includes('Check-in') || 
                 atividade.local?.includes('Transfer') ||
                 atividade.local?.includes('Chegada') ||
@@ -351,7 +537,6 @@ const BENETRIP_ROTEIRO = {
         }
       });
       
-      // Se não há atividades, adicionar atividade de dia livre
       if (diaContino.atividades.length === 0) {
         diaContino.atividades.push({
           horario: '09:00',
@@ -372,179 +557,7 @@ const BENETRIP_ROTEIRO = {
   },
 
   /**
-   * ✅ FALLBACK: Gera roteiro básico se API falhar
-   */
-  async gerarRoteiroFallback(dataIda, dataVolta, diasViagem) {
-    console.log('🛡️ Gerando roteiro fallback...');
-    
-    const destino = this.dadosDestino.destino;
-    const dias = [];
-    const dataInicio = new Date(dataIda + 'T12:00:00');
-    
-    for (let i = 0; i < diasViagem; i++) {
-      const dataAtual = new Date(dataInicio);
-      dataAtual.setDate(dataInicio.getDate() + i);
-      
-      const dia = {
-        data: this.formatarDataISO(dataAtual),
-        descricao: this.obterDescricaoDia(i + 1, destino, diasViagem),
-        atividades: this.gerarAtividadesFallback(i, destino, diasViagem)
-      };
-      
-      if (i === 0) {
-        dia.observacao = this.obterObservacaoPrimeiroDia();
-      } else if (i === diasViagem - 1) {
-        dia.observacao = this.obterObservacaoUltimoDia();
-      }
-      
-      dias.push(dia);
-    }
-    
-    this.ajustarAtividadesPorHorariosContinuo(dias);
-    
-    return {
-      destino: `${destino}, ${this.dadosDestino.pais}`,
-      dias
-    };
-  },
-
-  /**
-   * ✅ NOVO: Gera atividades fallback
-   */
-  gerarAtividadesFallback(diaIndex, destino, totalDias) {
-    const atividadesBase = this.obterAtividadesBasePorDestino(destino);
-    const atividades = [];
-    
-    // Número de atividades por dia (3-5)
-    const numAtividades = 3 + (diaIndex % 3);
-    
-    for (let i = 0; i < numAtividades; i++) {
-      const index = (diaIndex * 4 + i) % atividadesBase.length;
-      const atividade = { ...atividadesBase[index] };
-      
-      atividade.horario = this.calcularHorarioAtividade(i);
-      atividade.tags = this.gerarTagsAtividade(atividade.local);
-      atividade.duracao = this.estimarDuracao(atividade.local);
-      
-      atividades.push(atividade);
-    }
-    
-    return atividades;
-  },
-
-  /**
-   * ✅ NOVO: Calcula horário da atividade
-   */
-  calcularHorarioAtividade(indice) {
-    const horariosBase = ['09:00', '11:30', '14:00', '16:30', '19:00'];
-    return horariosBase[indice % horariosBase.length];
-  },
-
-  /**
-   * ✅ PREVISÃO DO TEMPO (limitada a 3 dias)
-   */
-  async buscarPrevisaoTempo() {
-    try {
-      console.log('🌤️ Buscando previsão do tempo...');
-      
-      if (!this.roteiroPronto?.dias || this.roteiroPronto.dias.length === 0) {
-        console.warn('⚠️ Sem dias no roteiro para buscar previsão');
-        return;
-      }
-      
-      const diasComPrevisao = Math.min(3, this.roteiroPronto.dias.length);
-      
-      for (let i = 0; i < diasComPrevisao; i++) {
-        this.roteiroPronto.dias[i].previsao = this.gerarPrevisaoAleatoria(i);
-      }
-      
-      console.log(`✅ Previsão aplicada aos primeiros ${diasComPrevisao} dias`);
-      
-    } catch (erro) {
-      console.error('❌ Erro na previsão:', erro);
-    }
-  },
-
-  /**
-   * ✅ BUSCA DE IMAGENS OTIMIZADA
-   */
-  async buscarTodasImagensOtimizado() {
-    try {
-      console.log('🖼️ Iniciando busca otimizada de imagens...');
-      
-      if (!this.roteiroPronto?.dias || this.roteiroPronto.dias.length === 0) {
-        console.warn('⚠️ Sem roteiro para buscar imagens');
-        return;
-      }
-      
-      // Coletar todos os locais únicos
-      const locaisUnicos = new Map();
-      let totalAtividades = 0;
-      
-      this.roteiroPronto.dias.forEach((dia, diaIndex) => {
-        if (dia.atividades?.length) {
-          dia.atividades.forEach(atividade => {
-            if (atividade.local && !atividade.isEspecial) {
-              locaisUnicos.set(atividade.local, {
-                local: atividade.local,
-                primeiraOcorrencia: { dia: diaIndex }
-              });
-              totalAtividades++;
-            }
-          });
-        }
-      });
-      
-      console.log(`📊 Estatísticas: ${totalAtividades} atividades, ${locaisUnicos.size} locais únicos`);
-      
-      const locaisArray = Array.from(locaisUnicos.values());
-      const maxBuscas = Math.min(locaisArray.length, 15);
-      
-      const todasImagens = new Map();
-      
-      // Buscar imagens em lotes pequenos
-      for (let i = 0; i < maxBuscas; i++) {
-        const resultado = await this.buscarImagemComCache(locaisArray[i].local);
-        
-        if (resultado.sucesso) {
-          todasImagens.set(locaisArray[i].local, resultado.url);
-        }
-        
-        if (i < maxBuscas - 1) {
-          await this.delay(300);
-        }
-      }
-      
-      // Aplicar imagens
-      let imagensAplicadas = 0;
-      this.roteiroPronto.dias.forEach((dia, diaIndex) => {
-        if (dia.atividades?.length) {
-          dia.atividades.forEach((atividade, index) => {
-            if (atividade.local && !atividade.isEspecial) {
-              const imagemUrl = todasImagens.get(atividade.local);
-              
-              if (imagemUrl) {
-                atividade.imagemUrl = imagemUrl;
-                imagensAplicadas++;
-              } else {
-                atividade.imagemUrl = this.gerarImagemFallback(atividade.local, diaIndex, index);
-                atividade.isFallback = true;
-              }
-            }
-          });
-        }
-      });
-      
-      console.log(`✅ Imagens aplicadas: ${imagensAplicadas}/${totalAtividades}`);
-      
-    } catch (erro) {
-      console.error('❌ Erro ao buscar imagens:', erro);
-      this.aplicarFallbacksGlobal();
-    }
-  },
-
-  /**
-   * ✅ ATUALIZAÇÃO DA UI CONTÍNUA
+   * ✅ ATUALIZAÇÃO DA UI CORRIGIDA
    */
   atualizarUIComRoteiroContino() {
     console.log('🎨 Atualizando interface com roteiro contínuo...');
@@ -557,30 +570,43 @@ const BENETRIP_ROTEIRO = {
     
     container.innerHTML = '';
     
-    // Atualizar título
     const header = document.querySelector('.app-header h1');
     if (header) {
       header.textContent = `Seu Roteiro para ${this.dadosDestino.destino}`;
     }
     
-    // Adicionar resumo
     container.appendChild(this.criarResumoViagem());
     
-    // Adicionar dias com layout contínuo
     this.roteiroPronto.dias.forEach((dia, index) => {
       container.appendChild(this.criarElementoDiaContinuo(dia, index + 1));
     });
     
-    // Espaço para botões fixos
     const spacer = document.createElement('div');
     spacer.style.height = '100px';
     container.appendChild(spacer);
+    
+    // ✅ CORREÇÃO: Configurar lazy loading APÓS inserir elementos
+    this.configurarLazyLoadingParaElementos();
     
     console.log('✅ Interface contínua atualizada');
   },
 
   /**
-   * ✅ NOVO: Cria elemento de dia com layout contínuo
+   * ✅ NOVO: Configura lazy loading para elementos já existentes
+   */
+  configurarLazyLoadingParaElementos() {
+    if (this.imageObserver) {
+      const imagens = document.querySelectorAll('img[data-src]');
+      imagens.forEach(img => {
+        this.imageObserver.observe(img);
+      });
+      
+      console.log(`🖼️ Lazy loading configurado para ${imagens.length} imagens`);
+    }
+  },
+
+  /**
+   * ✅ CRIA ELEMENTO DE DIA CONTÍNUO (melhorado)
    */
   criarElementoDiaContinuo(dia, numeroDia) {
     const elemento = document.createElement('div');
@@ -614,14 +640,11 @@ const BENETRIP_ROTEIRO = {
       </div>
     `;
     
-    // Configurar eventos após inserir
-    setTimeout(() => this.configurarEventosDiaContinuo(elemento), 0);
-    
     return elemento;
   },
 
   /**
-   * ✅ NOVO: Cria lista contínua de atividades
+   * ✅ CRIA LISTA DE ATIVIDADES CONTÍNUAS (melhorado)
    */
   criarListaAtividadesContinuas(atividades) {
     if (!atividades?.length) {
@@ -633,7 +656,7 @@ const BENETRIP_ROTEIRO = {
     }
     
     return atividades.map((ativ, index) => `
-      <div class="atividade-continua ${ativ.isEspecial ? 'atividade-especial' : ''}">
+      <div class="atividade-continua ${ativ.isEspecial ? 'atividade-especial' : ''}" data-atividade="${index}">
         ${ativ.horario ? `
           <div class="atividade-horario">
             <span class="horario-icon">🕒</span>
@@ -683,7 +706,6 @@ const BENETRIP_ROTEIRO = {
               class="imagem-lazy"
               loading="lazy"
               style="opacity: 0; transition: opacity 0.3s ease;"
-              onerror="this.onerror=null; this.src='https://via.placeholder.com/400x250/E87722/FFFFFF?text=${encodeURIComponent(ativ.local)}';"
             >
           </div>
         ` : ''}
@@ -693,6 +715,7 @@ const BENETRIP_ROTEIRO = {
             class="btn-ver-mapa-mini" 
             data-local="${ativ.local}"
             aria-label="Ver ${ativ.local} no mapa"
+            type="button"
           >
             <svg class="icon-mapa" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"></path>
@@ -704,36 +727,222 @@ const BENETRIP_ROTEIRO = {
     `).join('');
   },
 
-  /**
-   * ✅ NOVO: Configura eventos do dia contínuo
-   */
-  configurarEventosDiaContinuo(elemento) {
-    // Botões de mapa
-    const botoesMapa = elemento.querySelectorAll('.btn-ver-mapa-mini');
-    botoesMapa.forEach(botao => {
-      botao.addEventListener('click', (e) => {
-        e.preventDefault();
-        const local = botao.getAttribute('data-local');
-        if (local) {
-          this.abrirMapa(local);
-        }
-      });
-    });
+  // ===========================================
+  // MÉTODOS AUXILIARES (mantidos com algumas melhorias)
+  // ===========================================
+
+  async gerarRoteiroFallback(dataIda, dataVolta, diasViagem) {
+    console.log('🛡️ Gerando roteiro fallback...');
     
-    // Configurar lazy loading se disponível
-    if (this.imageObserver) {
-      const imagens = elemento.querySelectorAll('img[data-src]');
-      imagens.forEach(img => this.imageObserver.observe(img));
+    const destino = this.dadosDestino.destino;
+    const dias = [];
+    const dataInicio = new Date(dataIda + 'T12:00:00');
+    
+    for (let i = 0; i < diasViagem; i++) {
+      const dataAtual = new Date(dataInicio);
+      dataAtual.setDate(dataInicio.getDate() + i);
+      
+      const dia = {
+        data: this.formatarDataISO(dataAtual),
+        descricao: this.obterDescricaoDia(i + 1, destino, diasViagem),
+        atividades: this.gerarAtividadesFallback(i, destino, diasViagem)
+      };
+      
+      if (i === 0) {
+        dia.observacao = this.obterObservacaoPrimeiroDia();
+      } else if (i === diasViagem - 1) {
+        dia.observacao = this.obterObservacaoUltimoDia();
+      }
+      
+      dias.push(dia);
+    }
+    
+    this.ajustarAtividadesPorHorariosContinuo(dias);
+    
+    return {
+      destino: `${destino}, ${this.dadosDestino.pais}`,
+      dias
+    };
+  },
+
+  gerarAtividadesFallback(diaIndex, destino, totalDias) {
+    const atividadesBase = this.obterAtividadesBasePorDestino(destino);
+    const atividades = [];
+    
+    const numAtividades = 3 + (diaIndex % 3);
+    
+    for (let i = 0; i < numAtividades; i++) {
+      const index = (diaIndex * 4 + i) % atividadesBase.length;
+      const atividade = { ...atividadesBase[index] };
+      
+      atividade.horario = this.calcularHorarioAtividade(i);
+      atividade.tags = this.gerarTagsAtividade(atividade.local);
+      atividade.duracao = this.estimarDuracao(atividade.local);
+      
+      atividades.push(atividade);
+    }
+    
+    return atividades;
+  },
+
+  calcularHorarioAtividade(indice) {
+    const horariosBase = ['09:00', '11:30', '14:00', '16:30', '19:00'];
+    return horariosBase[indice % horariosBase.length];
+  },
+
+  async buscarPrevisaoTempo() {
+    try {
+      console.log('🌤️ Buscando previsão do tempo...');
+      
+      if (!this.roteiroPronto?.dias || this.roteiroPronto.dias.length === 0) {
+        console.warn('⚠️ Sem dias no roteiro para buscar previsão');
+        return;
+      }
+      
+      const diasComPrevisao = Math.min(3, this.roteiroPronto.dias.length);
+      
+      for (let i = 0; i < diasComPrevisao; i++) {
+        this.roteiroPronto.dias[i].previsao = this.gerarPrevisaoAleatoria(i);
+      }
+      
+      console.log(`✅ Previsão aplicada aos primeiros ${diasComPrevisao} dias`);
+      
+    } catch (erro) {
+      console.error('❌ Erro na previsão:', erro);
     }
   },
 
-  // ===========================================
-  // MÉTODOS AUXILIARES E UTILITÁRIOS
-  // ===========================================
+  async buscarImagemComCache(local) {
+    if (this.imagensCache.has(local)) {
+      return this.imagensCache.get(local);
+    }
+    
+    try {
+      const query = `${local} ${this.dadosDestino.destino}`.trim();
+      const url = `/api/image-search?query=${encodeURIComponent(query)}&perPage=1`;
+      
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
+      
+      const response = await fetch(url, {
+        signal: controller.signal,
+        headers: { 'Accept': 'application/json' }
+      });
+      
+      clearTimeout(timeoutId);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      
+      const dados = await response.json();
+      
+      if (dados?.images?.[0]) {
+        const imagemUrl = dados.images[0].url || dados.images[0].src?.medium;
+        const resultado = { sucesso: true, url: imagemUrl };
+        this.imagensCache.set(local, resultado);
+        return resultado;
+      }
+      
+      throw new Error('Sem imagens na resposta');
+      
+    } catch (erro) {
+      const resultado = { sucesso: false, erro: erro.message };
+      this.imagensCache.set(local, resultado);
+      return resultado;
+    }
+  },
 
-  /**
-   * Obtém preferências completas do usuário
-   */
+  aplicarFallbacksGlobal() {
+    console.log('🔄 Aplicando fallbacks globais...');
+    
+    let index = 0;
+    this.roteiroPronto.dias.forEach((dia) => {
+      if (dia.atividades?.length) {
+        dia.atividades.forEach((atividade) => {
+          if (atividade.local && !atividade.isEspecial && !atividade.imagemUrl) {
+            atividade.imagemUrl = this.gerarImagemFallbackCorrigido(atividade.local, 0, index++);
+            atividade.isFallback = true;
+          }
+        });
+      }
+    });
+  },
+
+  abrirMapa(local) {
+    const destino = `${this.dadosDestino.destino}, ${this.dadosDestino.pais}`;
+    const query = `${local}, ${destino}`;
+    const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
+    window.open(url, '_blank', 'noopener,noreferrer');
+  },
+
+  async compartilharRoteiro() {
+    const titulo = `Roteiro Benetrip - ${this.dadosDestino.destino}`;
+    const texto = `Confira meu roteiro personalizado para ${this.dadosDestino.destino}! 🐕✈️`;
+    const url = window.location.href;
+    
+    if (navigator.share && /mobile|android|iphone/i.test(navigator.userAgent)) {
+      try {
+        await navigator.share({ title: titulo, text: texto, url });
+        this.exibirToast('Roteiro compartilhado!', 'success');
+        return;
+      } catch (e) {
+        console.log('Share cancelado');
+      }
+    }
+    
+    try {
+      await navigator.clipboard.writeText(url);
+      this.exibirToast('Link copiado! Cole onde quiser compartilhar.', 'success');
+    } catch (e) {
+      this.exibirToast('Link copiado!', 'success');
+    }
+  },
+
+  editarRoteiro() {
+    this.exibirToast('Em breve você poderá personalizar ainda mais seu roteiro! 🚀', 'info');
+  },
+
+  exibirToast(mensagem, tipo = 'info') {
+    let container = document.getElementById('toast-container');
+    if (!container) {
+      container = document.createElement('div');
+      container.id = 'toast-container';
+      container.className = 'toast-container';
+      document.body.appendChild(container);
+    }
+    
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${tipo}`;
+    
+    const icones = {
+      success: '✅',
+      error: '❌',
+      info: 'ℹ️',
+      warning: '⚠️'
+    };
+    
+    toast.innerHTML = `
+      <span class="toast-icon">${icones[tipo] || icones.info}</span>
+      <span class="toast-message">${mensagem}</span>
+    `;
+    
+    container.appendChild(toast);
+    
+    requestAnimationFrame(() => {
+      toast.classList.add('toast-visible');
+    });
+    
+    setTimeout(() => {
+      toast.classList.remove('toast-visible');
+      setTimeout(() => toast.remove(), 300);
+    }, 4000);
+  },
+
+  // =====================================
+  // MÉTODOS AUXILIARES ADICIONAIS
+  // =====================================
+
   obterPreferenciasCompletas() {
     const respostas = this.dadosUsuario?.respostas || {};
     
@@ -789,9 +998,6 @@ const BENETRIP_ROTEIRO = {
     return 'luxo';
   },
 
-  /**
-   * Extrair dados de múltiplas fontes
-   */
   extrairCodigoDestino() {
     const possiveis = [
       this.dadosVoo?.infoIda?.aeroportoChegada,
@@ -1055,7 +1261,6 @@ const BENETRIP_ROTEIRO = {
     const horaChegada = this.extrairHorarioChegada();
     const horaPartida = this.extrairHorarioPartida();
     
-    // Ajustar primeiro dia
     const primeiroDia = dias[0];
     const horaChegadaNum = parseInt(horaChegada.split(':')[0]);
     
@@ -1085,7 +1290,6 @@ const BENETRIP_ROTEIRO = {
       ];
     }
     
-    // Ajustar último dia
     if (horaPartida && dias.length > 1) {
       const ultimoDia = dias[dias.length - 1];
       const horaPartidaNum = parseInt(horaPartida.split(':')[0]);
@@ -1137,73 +1341,6 @@ const BENETRIP_ROTEIRO = {
       temperature: Math.max(15, Math.min(35, condicao.tempBase + variacaoTemp)),
       condition: condicao.condition
     };
-  },
-
-  async buscarImagemComCache(local) {
-    if (this.imagensCache.has(local)) {
-      return this.imagensCache.get(local);
-    }
-    
-    try {
-      const query = `${local} ${this.dadosDestino.destino}`.trim();
-      const url = `/api/image-search?query=${encodeURIComponent(query)}&perPage=1`;
-      
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 6000);
-      
-      const response = await fetch(url, {
-        signal: controller.signal,
-        headers: { 'Accept': 'application/json' }
-      });
-      
-      clearTimeout(timeoutId);
-      
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-      
-      const dados = await response.json();
-      
-      if (dados?.images?.[0]) {
-        const imagemUrl = dados.images[0].url || dados.images[0].src?.medium;
-        const resultado = { sucesso: true, url: imagemUrl };
-        this.imagensCache.set(local, resultado);
-        return resultado;
-      }
-      
-      throw new Error('Sem imagens na resposta');
-      
-    } catch (erro) {
-      const resultado = { sucesso: false, erro: erro.message };
-      this.imagensCache.set(local, resultado);
-      return resultado;
-    }
-  },
-
-  gerarImagemFallback(local, diaIndex, ativIndex) {
-    const fallbacks = [
-      `https://picsum.photos/400/250?random=${diaIndex}${ativIndex}`,
-      `https://source.unsplash.com/400x250/?travel,${encodeURIComponent(this.dadosDestino.destino)}`,
-      `https://via.placeholder.com/400x250/E87722/FFFFFF?text=${encodeURIComponent(local)}`
-    ];
-    
-    return fallbacks[ativIndex % fallbacks.length];
-  },
-
-  aplicarFallbacksGlobal() {
-    console.log('🔄 Aplicando fallbacks globais...');
-    
-    let index = 0;
-    this.roteiroPronto.dias.forEach((dia) => {
-      if (dia.atividades?.length) {
-        dia.atividades.forEach((atividade) => {
-          if (atividade.local && !atividade.isEspecial && !atividade.imagemUrl) {
-            atividade.imagemUrl = `https://picsum.photos/400/250?random=${index++}`;
-            atividade.isFallback = true;
-          }
-        });
-      }
-    });
   },
 
   getClasseBadge(tag) {
@@ -1531,80 +1668,6 @@ const BENETRIP_ROTEIRO = {
     };
     
     return especificos[destino] || generico;
-  },
-
-  // ===========================================
-  // AÇÕES E INTERAÇÕES
-  // ===========================================
-
-  abrirMapa(local) {
-    const destino = `${this.dadosDestino.destino}, ${this.dadosDestino.pais}`;
-    const query = `${local}, ${destino}`;
-    const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
-    window.open(url, '_blank', 'noopener,noreferrer');
-  },
-
-  async compartilharRoteiro() {
-    const titulo = `Roteiro Benetrip - ${this.dadosDestino.destino}`;
-    const texto = `Confira meu roteiro personalizado para ${this.dadosDestino.destino}! 🐕✈️`;
-    const url = window.location.href;
-    
-    if (navigator.share && /mobile|android|iphone/i.test(navigator.userAgent)) {
-      try {
-        await navigator.share({ title: titulo, text: texto, url });
-        this.exibirToast('Roteiro compartilhado!', 'success');
-        return;
-      } catch (e) {
-        console.log('Share cancelado');
-      }
-    }
-    
-    try {
-      await navigator.clipboard.writeText(url);
-      this.exibirToast('Link copiado! Cole onde quiser compartilhar.', 'success');
-    } catch (e) {
-      this.exibirToast('Link copiado!', 'success');
-    }
-  },
-
-  editarRoteiro() {
-    this.exibirToast('Em breve você poderá personalizar ainda mais seu roteiro! 🚀', 'info');
-  },
-
-  exibirToast(mensagem, tipo = 'info') {
-    let container = document.getElementById('toast-container');
-    if (!container) {
-      container = document.createElement('div');
-      container.id = 'toast-container';
-      container.className = 'toast-container';
-      document.body.appendChild(container);
-    }
-    
-    const toast = document.createElement('div');
-    toast.className = `toast toast-${tipo}`;
-    
-    const icones = {
-      success: '✅',
-      error: '❌',
-      info: 'ℹ️',
-      warning: '⚠️'
-    };
-    
-    toast.innerHTML = `
-      <span class="toast-icon">${icones[tipo] || icones.info}</span>
-      <span class="toast-message">${mensagem}</span>
-    `;
-    
-    container.appendChild(toast);
-    
-    requestAnimationFrame(() => {
-      toast.classList.add('toast-visible');
-    });
-    
-    setTimeout(() => {
-      toast.classList.remove('toast-visible');
-      setTimeout(() => toast.remove(), 300);
-    }, 4000);
   },
 
   mostrarErro(mensagem) {
