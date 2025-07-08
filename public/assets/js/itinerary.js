@@ -790,27 +790,160 @@ const BENETRIP_ROTEIRO = {
     return horariosBase[indice % horariosBase.length];
   },
 
-  async buscarPrevisaoTempo() {
-    try {
-      console.log('🌤️ Buscando previsão do tempo...');
-      
-      if (!this.roteiroPronto?.dias || this.roteiroPronto.dias.length === 0) {
-        console.warn('⚠️ Sem dias no roteiro para buscar previsão');
-        return;
-      }
-      
-      const diasComPrevisao = Math.min(3, this.roteiroPronto.dias.length);
-      
-      for (let i = 0; i < diasComPrevisao; i++) {
-        this.roteiroPronto.dias[i].previsao = this.gerarPrevisaoAleatoria(i);
-      }
-      
-      console.log(`✅ Previsão aplicada aos primeiros ${diasComPrevisao} dias`);
-      
-    } catch (erro) {
-      console.error('❌ Erro na previsão:', erro);
+  /**
+ * ✅ CORREÇÃO: Integração real com API de previsão do tempo
+ * Substitua o método buscarPrevisaoTempo() no arquivo itinerary.js
+ */
+
+async buscarPrevisaoTempo() {
+  try {
+    console.log('🌤️ Buscando previsão do tempo via API...');
+    
+    if (!this.roteiroPronto?.dias || this.roteiroPronto.dias.length === 0) {
+      console.warn('⚠️ Sem dias no roteiro para buscar previsão');
+      return;
     }
-  },
+    
+    // ✅ Preparar parâmetros para API
+    const cidade = this.dadosDestino.destino;
+    const dataInicio = this.getDataIda();
+    const dataFim = this.getDataVolta();
+    const diasComPrevisao = Math.min(3, this.roteiroPronto.dias.length);
+    
+    console.log(`📊 Buscando previsão para: ${cidade} (${diasComPrevisao} dias)`);
+    
+    try {
+      // ✅ CHAMADA REAL para API de tempo
+      const urlAPI = `/api/weather?city=${encodeURIComponent(cidade)}&start=${dataInicio}&end=${dataFim}`;
+      
+      const response = await fetch(urlAPI, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        },
+        // Timeout de 8 segundos
+        signal: AbortSignal.timeout(8000)
+      });
+      
+      if (!response.ok) {
+        throw new Error(`API de tempo falhou: ${response.status}`);
+      }
+      
+      const dadosTempo = await response.json();
+      console.log('✅ Dados de tempo recebidos:', dadosTempo);
+      
+      // ✅ Aplicar previsões reais aos primeiros dias
+      let aplicados = 0;
+      for (let i = 0; i < diasComPrevisao; i++) {
+        if (dadosTempo[i]) {
+          this.roteiroPronto.dias[i].previsao = {
+            icon: dadosTempo[i].icon || '🌤️',
+            temperature: dadosTempo[i].temperature || 25,
+            condition: dadosTempo[i].condition || 'Tempo agradável',
+            date: dadosTempo[i].date
+          };
+          aplicados++;
+        } else {
+          // Fallback se não tiver dados para este dia
+          this.roteiroPronto.dias[i].previsao = this.gerarPrevisaoFallback(i);
+        }
+      }
+      
+      console.log(`✅ Previsão REAL aplicada a ${aplicados}/${diasComPrevisao} dias`);
+      
+    } catch (erroAPI) {
+      console.warn('⚠️ Erro na API de tempo, usando fallback:', erroAPI.message);
+      
+      // ✅ Fallback: gerar previsões realistas se API falhar
+      for (let i = 0; i < diasComPrevisao; i++) {
+        this.roteiroPronto.dias[i].previsao = this.gerarPrevisaoFallback(i);
+      }
+      
+      console.log(`🛡️ Previsão FALLBACK aplicada aos primeiros ${diasComPrevisao} dias`);
+    }
+    
+  } catch (erro) {
+    console.error('❌ Erro geral na busca de previsão:', erro);
+    
+    // Garantir que pelo menos temos algo
+    const diasComPrevisao = Math.min(3, this.roteiroPronto.dias.length);
+    for (let i = 0; i < diasComPrevisao; i++) {
+      if (!this.roteiroPronto.dias[i].previsao) {
+        this.roteiroPronto.dias[i].previsao = this.gerarPrevisaoFallback(i);
+      }
+    }
+  }
+},
+
+/**
+ * ✅ NOVO: Gera previsão de fallback mais realista
+ */
+gerarPrevisaoFallback(diaIndex) {
+  // Condições mais realistas baseadas no destino
+  const cidade = this.dadosDestino.destino.toLowerCase();
+  
+  // Ajustar condições por região/clima
+  let condicoesPrincipais;
+  
+  if (cidade.includes('paris') || cidade.includes('londres') || cidade.includes('berlim')) {
+    // Clima temperado europeu
+    condicoesPrincipais = [
+      { icon: '🌤️', condition: 'Parcialmente nublado', tempBase: 18 },
+      { icon: '☁️', condition: 'Nublado', tempBase: 16 },
+      { icon: '🌦️', condition: 'Chuva leve', tempBase: 14 },
+      { icon: '☀️', condition: 'Ensolarado', tempBase: 22 }
+    ];
+  } else if (cidade.includes('miami') || cidade.includes('rio') || cidade.includes('salvador')) {
+    // Clima tropical
+    condicoesPrincipais = [
+      { icon: '☀️', condition: 'Ensolarado', tempBase: 28 },
+      { icon: '🌤️', condition: 'Parcialmente nublado', tempBase: 26 },
+      { icon: '⛈️', condition: 'Pancadas de chuva', tempBase: 24 },
+      { icon: '🌊', condition: 'Brisa marítima', tempBase: 25 }
+    ];
+  } else {
+    // Clima geral
+    condicoesPrincipais = [
+      { icon: '☀️', condition: 'Ensolarado', tempBase: 24 },
+      { icon: '🌤️', condition: 'Parcialmente nublado', tempBase: 22 },
+      { icon: '☁️', condition: 'Nublado', tempBase: 20 },
+      { icon: '🌦️', condition: 'Possibilidade de chuva', tempBase: 18 }
+    ];
+  }
+  
+  // Padrão mais realista: primeiros dias tendem a ter tempo melhor
+  let condicao;
+  if (diaIndex === 0) {
+    // Primeiro dia: 70% chance de tempo bom
+    condicao = Math.random() < 0.7 ? condicoesPrincipais[0] : condicoesPrincipais[1];
+  } else {
+    // Outros dias: distribuição normal
+    condicao = condicoesPrincipais[diaIndex % condicoesPrincipais.length];
+  }
+  
+  // Variação mais sutil de temperatura
+  const variacaoTemp = Math.floor(Math.random() * 5) - 2; // -2 a +2 graus
+  const temperaturaFinal = Math.max(10, Math.min(40, condicao.tempBase + variacaoTemp));
+  
+  return {
+    icon: condicao.icon,
+    temperature: temperaturaFinal,
+    condition: condicao.condition,
+    date: this.calcularDataDia(diaIndex)
+  };
+},
+
+/**
+ * ✅ NOVO: Calcula data para dia específico do roteiro
+ */
+calcularDataDia(diaIndex) {
+  const dataInicio = new Date(this.getDataIda() + 'T12:00:00');
+  const dataAlvo = new Date(dataInicio);
+  dataAlvo.setDate(dataInicio.getDate() + diaIndex);
+  
+  return this.formatarDataISO(dataAlvo);
+},
 
   async buscarImagemComCache(local) {
     if (this.imagensCache.has(local)) {
