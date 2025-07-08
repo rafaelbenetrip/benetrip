@@ -1077,33 +1077,55 @@ calcularDataDia(diaIndex) {
   // =====================================
 
   obterPreferenciasCompletas() {
-    const respostas = this.dadosUsuario?.respostas || {};
-    
-    return {
-      tipoViagem: this.obterTipoViagem(),
-      tipoCompanhia: this.obterTipoCompanhia(),
-      quantidade: this.obterQuantidadePessoas(),
-      orcamento: this.obterNivelOrcamento(),
-      destino_tipo: respostas.tipo_destino || 'ambos',
-      item_essencial: respostas.item_essencial || 'cultura'
-    };
-  },
+  const respostas = this.dadosUsuario?.respostas || {};
+  
+  return {
+    tipoViagem: this.obterTipoViagem(),
+    tipoCompanhia: this.obterTipoCompanhia(),
+    quantidade: this.obterQuantidadePessoas(),
+    orcamento: this.obterNivelOrcamento(),
+    destino_tipo: respostas.tipo_destino || 'ambos',
+    item_essencial: respostas.item_essencial || 'cultura',
+    // ✅ NOVO: Adicionar dados brutos para debug
+    raw_estilo_destino: respostas.estilo_viagem_destino,
+    raw_preferencia: respostas.preferencia_viagem,
+    conhece_destino: respostas.conhece_destino
+  };
+},
 
   obterTipoViagem() {
-    const respostas = this.dadosUsuario?.respostas || {};
-    
-    if (respostas.tipo_viagem !== undefined) {
-      const tipos = ['relaxar', 'aventura', 'cultura', 'urbano'];
-      return tipos[respostas.tipo_viagem] || 'cultura';
-    }
-    
-    if (respostas.destino_imaginado !== undefined) {
-      const mapa = { 0: 'relaxar', 1: 'aventura', 2: 'urbano', 3: 'cultura' };
-      return mapa[respostas.destino_imaginado] || 'cultura';
-    }
-    
-    return 'cultura';
-  },
+  const respostas = this.dadosUsuario?.respostas || {};
+  
+  // ✅ CORREÇÃO: Verificar as chaves corretas do questionário
+  let tipoViagem = null;
+  
+  // Caso 1: Usuário conhece o destino (usa estilo_viagem_destino)
+  if (respostas.estilo_viagem_destino !== undefined) {
+    tipoViagem = respostas.estilo_viagem_destino;
+  }
+  // Caso 2: Usuário não conhece destino (usa preferencia_viagem)  
+  else if (respostas.preferencia_viagem !== undefined) {
+    tipoViagem = respostas.preferencia_viagem;
+  }
+  // Caso 3: Fallback para campo antigo
+  else if (respostas.tipo_viagem !== undefined) {
+    tipoViagem = respostas.tipo_viagem;
+  }
+  
+  if (tipoViagem !== null) {
+    const tipos = ['relaxar', 'aventura', 'cultura', 'urbano'];
+    return tipos[tipoViagem] || 'cultura';
+  }
+  
+  // Fallback antigo baseado em destino_imaginado
+  if (respostas.destino_imaginado !== undefined) {
+    const mapa = { 0: 'relaxar', 1: 'aventura', 2: 'urbano', 3: 'cultura' };
+    return mapa[respostas.destino_imaginado] || 'cultura';
+  }
+  
+  console.warn('⚠️ Tipo de viagem não encontrado, usando padrão: cultura');
+  return 'cultura';
+},
 
   obterTipoCompanhia() {
     const respostas = this.dadosUsuario?.respostas || {};
