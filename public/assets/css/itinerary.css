@@ -474,93 +474,133 @@ body.mobile-optimized {
     word-wrap: break-word;
 }
 
-/* ✅ BADGES CORRIGIDAS - Layout e espaçamento */
+/* ✅ CORREÇÃO ESPECÍFICA PARA TAMANHO DAS BADGES */
+
 .atividade-badges {
     display: flex;
     flex-wrap: wrap;
-    gap: 6px;
-    margin-top: 4px;
+    gap: 8px;
+    margin-top: 6px;
     align-items: center;
 }
 
 .badge {
     display: inline-flex;
     align-items: center;
+    justify-content: center;
     font-size: 10px;
-    padding: 3px 8px;
-    border-radius: 12px;
+    padding: 6px 12px; /* ✅ AUMENTADO padding */
+    min-height: 24px; /* ✅ ALTURA MÍNIMA */
+    border-radius: 15px; /* ✅ BORDER RADIUS AJUSTADO */
     color: var(--white);
     font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: 0.3px;
+    letter-spacing: 0.5px;
     white-space: nowrap;
     line-height: 1;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    text-align: center;
+    min-width: fit-content; /* ✅ LARGURA AUTOMÁTICA */
 }
 
-/* ✅ CORES DOS BADGES CORRIGIDAS */
+/* ✅ BADGES ESPECÍFICAS COM TAMANHOS ADEQUADOS */
+.badge-cultura,
+.badge-turismo,
+.badge-destaque {
+    font-size: 9px; /* ✅ FONTE MENOR PARA TEXTOS LONGOS */
+    padding: 5px 10px;
+    min-height: 22px;
+    border-radius: 12px;
+}
+
+/* ✅ CORES CORRIGIDAS E CONTRASTADAS */
 .badge-destaque {
     background: linear-gradient(135deg, #E87722, #f39c42);
+    color: #FFFFFF;
 }
 
 .badge-voo {
     background: linear-gradient(135deg, #00A3E0, #42a5f5);
+    color: #FFFFFF;
 }
 
 .badge-cultura {
     background: linear-gradient(135deg, #9C27B0, #ba68c8);
+    color: #FFFFFF;
 }
 
 .badge-gastronomia {
     background: linear-gradient(135deg, #ff7043, #ff8a65);
+    color: #FFFFFF;
 }
 
 .badge-natureza {
     background: linear-gradient(135deg, #4CAF50, #66bb6a);
+    color: #FFFFFF;
 }
 
 .badge-compras {
     background: linear-gradient(135deg, #ffa726, #ffb74d);
+    color: #FFFFFF;
 }
 
 .badge-noturno {
     background: linear-gradient(135deg, #5c6bc0, #7986cb);
+    color: #FFFFFF;
 }
 
 .badge-vista {
     background: linear-gradient(135deg, #26a69a, #4db6ac);
+    color: #FFFFFF;
 }
 
 .badge-padrao {
     background: linear-gradient(135deg, #78909c, #90a4ae);
+    color: #FFFFFF;
 }
 
-/* ✅ RESPONSIVIDADE PARA BADGES */
+/* ✅ RESPONSIVIDADE MELHORADA */
 @media (max-width: 480px) {
     .badge {
         font-size: 9px;
-        padding: 2px 6px;
+        padding: 4px 8px;
+        min-height: 20px;
+        border-radius: 12px;
+    }
+    
+    .badge-cultura,
+    .badge-turismo,
+    .badge-destaque {
+        font-size: 8px;
+        padding: 3px 6px;
+        min-height: 18px;
         border-radius: 10px;
     }
     
     .atividade-badges {
-        gap: 4px;
-        margin-top: 6px;
-    }
-    
-    .local-nome {
-        font-size: 15px;
+        gap: 6px;
+        margin-top: 8px;
     }
 }
 
 @media (max-width: 360px) {
     .badge {
         font-size: 8px;
+        padding: 3px 6px;
+        min-height: 18px;
+    }
+    
+    .badge-cultura,
+    .badge-turismo,
+    .badge-destaque {
+        font-size: 7px;
         padding: 2px 5px;
+        min-height: 16px;
+        border-radius: 8px;
     }
     
     .atividade-badges {
-        gap: 3px;
+        gap: 4px;
     }
 }
 
