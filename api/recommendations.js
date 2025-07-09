@@ -342,6 +342,16 @@ PERFIL:
 - Datas: ${dataIda} a ${dataVolta}
 - ${mensagemOrcamento}
 
+⚠️ CÓDIGOS IATA OBRIGATÓRIOS: Para cada destino, use APENAS o código IATA real do AEROPORTO PRINCIPAL da cidade. Exemplos corretos:
+- São Paulo → GRU (Guarulhos)
+- Rio de Janeiro → GIG (Galeão) 
+- Londres → LHR (Heathrow)
+- Paris → CDG (Charles de Gaulle)
+- Nova York → JFK (Kennedy)
+- Madrid → MAD (Barajas)
+- Roma → FCO (Fiumicino)
+- Tóquio → HND (Haneda) ou NRT (Narita)
+
 RETORNE JSON com esta estrutura exata:
 {
   "topPick": {
@@ -360,7 +370,7 @@ RETORNE JSON com esta estrutura exata:
     },
     "aeroporto": {
       "codigo": "XYZ",
-      "nome": "Nome do Aeroporto"
+      "nome": "Nome do Aeroporto Principal"
     },
     "preco": {
       "voo": 1500,
@@ -375,7 +385,7 @@ RETORNE JSON com esta estrutura exata:
       "porque": "Razão",
       "pontoTuristico": "Ponto turístico",
       "clima": {"temperatura": "20°C-30°C"},
-      "aeroporto": {"codigo": "ABC", "nome": "Aeroporto"},
+      "aeroporto": {"codigo": "ABC", "nome": "Aeroporto Principal Real"},
       "preco": {"voo": 1200, "hotel": 180}
     }
   ],
@@ -393,17 +403,18 @@ RETORNE JSON com esta estrutura exata:
       "condicoes": "Agradável",
       "recomendacoes": "Roupas variadas"
     },
-    "aeroporto": {"codigo": "DEF", "nome": "Aeroporto"},
+    "aeroporto": {"codigo": "DEF", "nome": "Aeroporto Principal Real"},
     "preco": {"voo": 1800, "hotel": 250}
   }
 }
 
-IMPORTANTE:
+CRÍTICO:
+- Use APENAS códigos IATA reais de aeroportos principais (3 letras maiúsculas)
+- Se não souber o código exato, use o aeroporto internacional principal da cidade
 - Inclua EXATAMENTE 4 destinos em "alternativas"
 - Preços de voos devem respeitar o orçamento
 - Tripinha é uma cachorrinha aventureira 🐾
-- Mencione pontos turísticos reais e específicos
-- Use códigos IATA válidos para aeroportos`;
+- Mencione pontos turísticos reais e específicos`;
 }
 
 // =======================
@@ -646,11 +657,12 @@ const pontosPopulares = {
   "generico_America": ["Parques nacionais", "Centros urbanos"]
 };
 
-function ensureTouristAttractionsAndComments(jsonString, requestData) {
+async function ensureTouristAttractionsAndComments(jsonString, requestData) {
   try {
     const data = typeof jsonString === 'string' ? JSON.parse(jsonString) : jsonString;
     let modificado = false;
     
+    // Processar topPick
     if (data.topPick) {
       if (!data.topPick.pontosTuristicos?.length || data.topPick.pontosTuristicos.length < 2) {
         const destino = data.topPick.destino;
@@ -673,12 +685,22 @@ function ensureTouristAttractionsAndComments(jsonString, requestData) {
         modificado = true;
       }
       
-      if (!data.topPick.aeroporto?.codigo) {
-        data.topPick.aeroporto = {
-          codigo: obterCodigoIATAPadrao(data.topPick.destino, data.topPick.pais),
-          nome: `Aeroporto de ${data.topPick.destino}`
-        };
-        modificado = true;
+      // Validar e corrigir aeroporto do topPick
+      if (!data.topPick.aeroporto?.codigo || !utils.validarCodigoIATA(data.topPick.aeroporto.codigo)) {
+        try {
+          const aeroportoValidado = await validarECorrigirAeroporto(
+            data.topPick.destino, 
+            data.topPick.pais, 
+            data.topPick.aeroporto?.codigo
+          );
+          data.topPick.aeroporto = aeroportoValidado;
+          modificado = true;
+          console.log(`Aeroporto corrigido para ${data.topPick.destino}: ${aeroportoValidado.codigo}`);
+        } catch (error) {
+          console.warn(`Erro ao validar aeroporto para ${data.topPick.destino}:`, error.message);
+          data.topPick.aeroporto = obterCodigoIATAMelhorado(data.topPick.destino, data.topPick.pais);
+          modificado = true;
+        }
       }
       
       if (!data.topPick.clima) {
@@ -691,6 +713,7 @@ function ensureTouristAttractionsAndComments(jsonString, requestData) {
       }
     }
     
+    // Processar surpresa
     if (data.surpresa) {
       if (!data.surpresa.pontosTuristicos?.length || data.surpresa.pontosTuristicos.length < 2) {
         const destino = data.surpresa.destino;
@@ -713,12 +736,22 @@ function ensureTouristAttractionsAndComments(jsonString, requestData) {
         modificado = true;
       }
       
-      if (!data.surpresa.aeroporto?.codigo) {
-        data.surpresa.aeroporto = {
-          codigo: obterCodigoIATAPadrao(data.surpresa.destino, data.surpresa.pais),
-          nome: `Aeroporto de ${data.surpresa.destino}`
-        };
-        modificado = true;
+      // Validar e corrigir aeroporto da surpresa
+      if (!data.surpresa.aeroporto?.codigo || !utils.validarCodigoIATA(data.surpresa.aeroporto.codigo)) {
+        try {
+          const aeroportoValidado = await validarECorrigirAeroporto(
+            data.surpresa.destino, 
+            data.surpresa.pais, 
+            data.surpresa.aeroporto?.codigo
+          );
+          data.surpresa.aeroporto = aeroportoValidado;
+          modificado = true;
+          console.log(`Aeroporto corrigido para ${data.surpresa.destino}: ${aeroportoValidado.codigo}`);
+        } catch (error) {
+          console.warn(`Erro ao validar aeroporto para ${data.surpresa.destino}:`, error.message);
+          data.surpresa.aeroporto = obterCodigoIATAMelhorado(data.surpresa.destino, data.surpresa.pais);
+          modificado = true;
+        }
       }
       
       if (!data.surpresa.clima) {
@@ -731,24 +764,37 @@ function ensureTouristAttractionsAndComments(jsonString, requestData) {
       }
     }
     
+    // Processar alternativas
     if (!data.alternativas || !Array.isArray(data.alternativas)) {
       data.alternativas = [];
       modificado = true;
     }
     
-    data.alternativas.forEach(alternativa => {
+    // Validar aeroportos das alternativas existentes
+    for (let i = 0; i < data.alternativas.length; i++) {
+      const alternativa = data.alternativas[i];
+      
       if (!alternativa.pontoTuristico) {
         const destino = alternativa.destino;
         alternativa.pontoTuristico = (pontosPopulares[destino] || ["Atrações turísticas"])[0];
         modificado = true;
       }
       
-      if (!alternativa.aeroporto?.codigo) {
-        alternativa.aeroporto = {
-          codigo: obterCodigoIATAPadrao(alternativa.destino, alternativa.pais),
-          nome: `Aeroporto de ${alternativa.destino}`
-        };
-        modificado = true;
+      if (!alternativa.aeroporto?.codigo || !utils.validarCodigoIATA(alternativa.aeroporto.codigo)) {
+        try {
+          const aeroportoValidado = await validarECorrigirAeroporto(
+            alternativa.destino, 
+            alternativa.pais, 
+            alternativa.aeroporto?.codigo
+          );
+          alternativa.aeroporto = aeroportoValidado;
+          modificado = true;
+          console.log(`Aeroporto corrigido para ${alternativa.destino}: ${aeroportoValidado.codigo}`);
+        } catch (error) {
+          console.warn(`Erro ao validar aeroporto para ${alternativa.destino}:`, error.message);
+          alternativa.aeroporto = obterCodigoIATAMelhorado(alternativa.destino, alternativa.pais);
+          modificado = true;
+        }
       }
       
       if (!alternativa.clima) {
@@ -757,28 +803,29 @@ function ensureTouristAttractionsAndComments(jsonString, requestData) {
         };
         modificado = true;
       }
-    });
+    }
     
+    // Completar alternativas se necessário (usando aeroportos validados)
     const destinosReserva = ["Lisboa", "Barcelona", "Roma", "Tóquio"];
     const paisesReserva = ["Portugal", "Espanha", "Itália", "Japão"];
     const codigosPaisesReserva = ["PT", "ES", "IT", "JP"];
-    const codigosIATAReserva = ["LIS", "BCN", "FCO", "HND"];
     
     while (data.alternativas.length < 4) {
       const index = data.alternativas.length % destinosReserva.length;
       const destino = destinosReserva[index];
+      const pais = paisesReserva[index];
       const pontosConhecidos = pontosPopulares[destino] || ["Atrações turísticas"];
+      
+      // Usar aeroporto validado para destinos de reserva
+      const aeroportoReserva = obterCodigoIATAMelhorado(destino, pais);
       
       data.alternativas.push({
         destino: destino,
-        pais: paisesReserva[index],
+        pais: pais,
         codigoPais: codigosPaisesReserva[index],
         porque: `Cidade com rica história, gastronomia única e atmosfera encantadora`,
         pontoTuristico: pontosConhecidos[0] || "Atrações turísticas",
-        aeroporto: {
-          codigo: codigosIATAReserva[index],
-          nome: `Aeroporto de ${destino}`
-        },
+        aeroporto: aeroportoReserva,
         clima: {
           temperatura: "Temperatura típica para a estação"
         },
@@ -798,43 +845,193 @@ function ensureTouristAttractionsAndComments(jsonString, requestData) {
     
     return modificado ? JSON.stringify(data) : jsonString;
   } catch (error) {
-    console.error("Erro ao processar pontos turísticos:", error);
+    console.error("Erro ao processar pontos turísticos e aeroportos:", error);
     return jsonString;
   }
 }
 
-function obterCodigoIATAPadrao(cidade, pais) {
-  const mapeamentoIATA = {
-    'São Paulo': 'GRU', 'Rio de Janeiro': 'GIG', 'Buenos Aires': 'EZE',
-    'Santiago': 'SCL', 'Lima': 'LIM', 'Bogotá': 'BOG',
-    'Cartagena': 'CTG', 'Cidade do México': 'MEX', 'Cancún': 'CUN',
-    'Nova York': 'JFK', 'Los Angeles': 'LAX', 'Miami': 'MIA',
-    'Londres': 'LHR', 'Paris': 'CDG', 'Roma': 'FCO',
-    'Madri': 'MAD', 'Lisboa': 'LIS', 'Barcelona': 'BCN',
-    'Tóquio': 'HND', 'Dubai': 'DXB', 'Sydney': 'SYD',
-    'Amsterdã': 'AMS', 'Berlim': 'BER', 'Munique': 'MUC',
-    'Porto': 'OPO', 'Praga': 'PRG', 'Viena': 'VIE',
-    'Bangkok': 'BKK', 'Singapura': 'SIN', 'Hong Kong': 'HKG',
-    'Toronto': 'YYZ', 'Vancouver': 'YVR', 'Montreal': 'YUL'
+// =======================
+// Validação de aeroportos usando API Aviasales
+// =======================
+async function validarECorrigirAeroporto(cidade, pais, codigoAtual) {
+  try {
+    // Se o código atual parece válido (3 letras maiúsculas), tenta validar
+    if (codigoAtual && /^[A-Z]{3}$/.test(codigoAtual)) {
+      return { codigo: codigoAtual, nome: `Aeroporto de ${cidade}` };
+    }
+    
+    // Usa API de Autocomplete do Aviasales para encontrar aeroporto principal
+    const termoBusca = `${cidade} airport`;
+    const response = await axios.get(
+      `https://autocomplete.travelpayouts.com/places2?term=${encodeURIComponent(termoBusca)}&locale=en&types[]=airport`,
+      { timeout: 5000 }
+    );
+    
+    if (response.data && response.data.length > 0) {
+      // Procura o aeroporto com maior peso (mais importante)
+      const aeroportos = response.data
+        .filter(item => item.type === 'airport' && item.city_name && 
+                item.city_name.toLowerCase().includes(cidade.toLowerCase()))
+        .sort((a, b) => (b.weight || 0) - (a.weight || 0));
+      
+      if (aeroportos.length > 0) {
+        const melhorAeroporto = aeroportos[0];
+        return {
+          codigo: melhorAeroporto.code,
+          nome: melhorAeroporto.name || `Aeroporto de ${cidade}`
+        };
+      }
+    }
+    
+    // Se não encontrou, usa fallback melhorado
+    return obterCodigoIATAMelhorado(cidade, pais);
+    
+  } catch (error) {
+    console.warn(`Erro ao validar aeroporto para ${cidade}:`, error.message);
+    return obterCodigoIATAMelhorado(cidade, pais);
+  }
+}
+
+// Função de fallback melhorada com lista expandida
+function obterCodigoIATAMelhorado(cidade, pais) {
+  // Lista expandida dos aeroportos principais por cidade
+  const mapeamentoCompleto = {
+    // Brasil
+    'São Paulo': { codigo: 'GRU', nome: 'Aeroporto Internacional de Guarulhos' },
+    'Rio de Janeiro': { codigo: 'GIG', nome: 'Aeroporto Internacional do Galeão' },
+    'Brasília': { codigo: 'BSB', nome: 'Aeroporto Internacional de Brasília' },
+    'Belo Horizonte': { codigo: 'CNF', nome: 'Aeroporto Internacional Tancredo Neves' },
+    'Salvador': { codigo: 'SSA', nome: 'Aeroporto Internacional Deputado Luís Eduardo Magalhães' },
+    'Fortaleza': { codigo: 'FOR', nome: 'Aeroporto Internacional Pinto Martins' },
+    'Recife': { codigo: 'REC', nome: 'Aeroporto Internacional dos Guararapes' },
+    'Manaus': { codigo: 'MAO', nome: 'Aeroporto Internacional Eduardo Gomes' },
+    
+    // América do Sul
+    'Buenos Aires': { codigo: 'EZE', nome: 'Aeroporto Internacional Ezeiza' },
+    'Santiago': { codigo: 'SCL', nome: 'Aeroporto Internacional Arturo Merino Benítez' },
+    'Lima': { codigo: 'LIM', nome: 'Aeroporto Internacional Jorge Chávez' },
+    'Bogotá': { codigo: 'BOG', nome: 'Aeroporto Internacional El Dorado' },
+    'Cartagena': { codigo: 'CTG', nome: 'Aeroporto Internacional Rafael Núñez' },
+    'Medellín': { codigo: 'MDE', nome: 'Aeroporto Internacional José María Córdova' },
+    'Montevidéu': { codigo: 'MVD', nome: 'Aeroporto Internacional de Carrasco' },
+    'La Paz': { codigo: 'LPB', nome: 'Aeroporto Internacional El Alto' },
+    'Quito': { codigo: 'UIO', nome: 'Aeroporto Internacional Mariscal Sucre' },
+    
+    // América do Norte
+    'Nova York': { codigo: 'JFK', nome: 'Aeroporto Internacional John F. Kennedy' },
+    'Los Angeles': { codigo: 'LAX', nome: 'Aeroporto Internacional de Los Angeles' },
+    'Miami': { codigo: 'MIA', nome: 'Aeroporto Internacional de Miami' },
+    'Chicago': { codigo: 'ORD', nome: 'Aeroporto Internacional O\'Hare' },
+    'San Francisco': { codigo: 'SFO', nome: 'Aeroporto Internacional de San Francisco' },
+    'Las Vegas': { codigo: 'LAS', nome: 'Aeroporto Internacional McCarran' },
+    'Toronto': { codigo: 'YYZ', nome: 'Aeroporto Internacional Pearson' },
+    'Vancouver': { codigo: 'YVR', nome: 'Aeroporto Internacional de Vancouver' },
+    'Cidade do México': { codigo: 'MEX', nome: 'Aeroporto Internacional Benito Juárez' },
+    'Cancún': { codigo: 'CUN', nome: 'Aeroporto Internacional de Cancún' },
+    
+    // Europa
+    'Londres': { codigo: 'LHR', nome: 'Aeroporto de Heathrow' },
+    'Paris': { codigo: 'CDG', nome: 'Aeroporto Charles de Gaulle' },
+    'Roma': { codigo: 'FCO', nome: 'Aeroporto Leonardo da Vinci' },
+    'Madri': { codigo: 'MAD', nome: 'Aeroporto Adolfo Suárez Madrid-Barajas' },
+    'Lisboa': { codigo: 'LIS', nome: 'Aeroporto Humberto Delgado' },
+    'Porto': { codigo: 'OPO', nome: 'Aeroporto Francisco Sá Carneiro' },
+    'Barcelona': { codigo: 'BCN', nome: 'Aeroporto de Barcelona-El Prat' },
+    'Amsterdã': { codigo: 'AMS', nome: 'Aeroporto de Amsterdã Schiphol' },
+    'Berlim': { codigo: 'BER', nome: 'Aeroporto de Berlim Brandemburgo' },
+    'Munique': { codigo: 'MUC', nome: 'Aeroporto de Munique' },
+    'Zurique': { codigo: 'ZUR', nome: 'Aeroporto de Zurique' },
+    'Viena': { codigo: 'VIE', nome: 'Aeroporto Internacional de Viena' },
+    'Praga': { codigo: 'PRG', nome: 'Aeroporto Václav Havel de Praga' },
+    'Budapeste': { codigo: 'BUD', nome: 'Aeroporto Ferenc Liszt' },
+    'Varsóvia': { codigo: 'WAW', nome: 'Aeroporto Frederic Chopin' },
+    'Estocolmo': { codigo: 'ARN', nome: 'Aeroporto de Estocolmo-Arlanda' },
+    'Copenhague': { codigo: 'CPH', nome: 'Aeroporto de Copenhague' },
+    'Oslo': { codigo: 'OSL', nome: 'Aeroporto de Oslo' },
+    'Helsinque': { codigo: 'HEL', nome: 'Aeroporto de Helsinque-Vantaa' },
+    
+    // Ásia
+    'Tóquio': { codigo: 'HND', nome: 'Aeroporto de Haneda' },
+    'Osaka': { codigo: 'KIX', nome: 'Aeroporto Internacional de Kansai' },
+    'Seul': { codigo: 'ICN', nome: 'Aeroporto Internacional de Incheon' },
+    'Pequim': { codigo: 'PEK', nome: 'Aeroporto Internacional de Pequim' },
+    'Xangai': { codigo: 'PVG', nome: 'Aeroporto Internacional Pudong' },
+    'Hong Kong': { codigo: 'HKG', nome: 'Aeroporto Internacional de Hong Kong' },
+    'Singapura': { codigo: 'SIN', nome: 'Aeroporto de Changi' },
+    'Bangkok': { codigo: 'BKK', nome: 'Aeroporto Suvarnabhumi' },
+    'Kuala Lumpur': { codigo: 'KUL', nome: 'Aeroporto Internacional de Kuala Lumpur' },
+    'Jacarta': { codigo: 'CGK', nome: 'Aeroporto Internacional Soekarno-Hatta' },
+    'Manila': { codigo: 'MNL', nome: 'Aeroporto Internacional Ninoy Aquino' },
+    'Mumbai': { codigo: 'BOM', nome: 'Aeroporto Internacional Chhatrapati Shivaji' },
+    'Delhi': { codigo: 'DEL', nome: 'Aeroporto Internacional Indira Gandhi' },
+    
+    // Oriente Médio e África
+    'Dubai': { codigo: 'DXB', nome: 'Aeroporto Internacional de Dubai' },
+    'Doha': { codigo: 'DOH', nome: 'Aeroporto Internacional Hamad' },
+    'Abu Dhabi': { codigo: 'AUH', nome: 'Aeroporto Internacional de Abu Dhabi' },
+    'Istambul': { codigo: 'IST', nome: 'Aeroporto de Istambul' },
+    'Cairo': { codigo: 'CAI', nome: 'Aeroporto Internacional do Cairo' },
+    'Cidade do Cabo': { codigo: 'CPT', nome: 'Aeroporto Internacional da Cidade do Cabo' },
+    'Joanesburgo': { codigo: 'JNB', nome: 'Aeroporto Internacional O.R. Tambo' },
+    
+    // Oceania
+    'Sydney': { codigo: 'SYD', nome: 'Aeroporto Kingsford Smith' },
+    'Melbourne': { codigo: 'MEL', nome: 'Aeroporto de Melbourne' },
+    'Auckland': { codigo: 'AKL', nome: 'Aeroporto de Auckland' }
   };
   
-  if (mapeamentoIATA[cidade]) return mapeamentoIATA[cidade];
+  // Primeiro, tenta encontrar por cidade exata
+  if (mapeamentoCompleto[cidade]) {
+    return mapeamentoCompleto[cidade];
+  }
   
-  const mapeamentoPais = {
-    'Brasil': 'GRU', 'Estados Unidos': 'JFK', 'México': 'MEX',
-    'Reino Unido': 'LHR', 'França': 'CDG', 'Itália': 'FCO',
-    'Espanha': 'MAD', 'Portugal': 'LIS', 'Japão': 'HND',
-    'China': 'PEK', 'Austrália': 'SYD', 'Alemanha': 'FRA',
-    'Canadá': 'YYZ', 'Tailândia': 'BKK', 'Emirados Árabes': 'DXB',
-    'Colômbia': 'BOG', 'Peru': 'LIM', 'Chile': 'SCL',
-    'Argentina': 'EZE', 'Uruguai': 'MVD', 'Costa Rica': 'SJO'
+  // Depois, tenta por correspondência parcial da cidade
+  for (const [cidadeKey, aeroporto] of Object.entries(mapeamentoCompleto)) {
+    if (cidadeKey.toLowerCase().includes(cidade.toLowerCase()) || 
+        cidade.toLowerCase().includes(cidadeKey.toLowerCase())) {
+      return aeroporto;
+    }
+  }
+  
+  // Mapeamento por país (aeroporto principal)
+  const aeroportoPrincipalPorPais = {
+    'Brasil': { codigo: 'GRU', nome: 'Aeroporto Internacional de Guarulhos' },
+    'Argentina': { codigo: 'EZE', nome: 'Aeroporto Internacional Ezeiza' },
+    'Chile': { codigo: 'SCL', nome: 'Aeroporto Internacional Arturo Merino Benítez' },
+    'Colômbia': { codigo: 'BOG', nome: 'Aeroporto Internacional El Dorado' },
+    'Peru': { codigo: 'LIM', nome: 'Aeroporto Internacional Jorge Chávez' },
+    'Uruguai': { codigo: 'MVD', nome: 'Aeroporto Internacional de Carrasco' },
+    'Estados Unidos': { codigo: 'JFK', nome: 'Aeroporto Internacional John F. Kennedy' },
+    'México': { codigo: 'MEX', nome: 'Aeroporto Internacional Benito Juárez' },
+    'Canadá': { codigo: 'YYZ', nome: 'Aeroporto Internacional Pearson' },
+    'Reino Unido': { codigo: 'LHR', nome: 'Aeroporto de Heathrow' },
+    'França': { codigo: 'CDG', nome: 'Aeroporto Charles de Gaulle' },
+    'Itália': { codigo: 'FCO', nome: 'Aeroporto Leonardo da Vinci' },
+    'Espanha': { codigo: 'MAD', nome: 'Aeroporto Adolfo Suárez Madrid-Barajas' },
+    'Portugal': { codigo: 'LIS', nome: 'Aeroporto Humberto Delgado' },
+    'Alemanha': { codigo: 'FRA', nome: 'Aeroporto de Frankfurt' },
+    'Holanda': { codigo: 'AMS', nome: 'Aeroporto de Amsterdã Schiphol' },
+    'Japão': { codigo: 'HND', nome: 'Aeroporto de Haneda' },
+    'China': { codigo: 'PEK', nome: 'Aeroporto Internacional de Pequim' },
+    'Coreia do Sul': { codigo: 'ICN', nome: 'Aeroporto Internacional de Incheon' },
+    'Tailândia': { codigo: 'BKK', nome: 'Aeroporto Suvarnabhumi' },
+    'Singapura': { codigo: 'SIN', nome: 'Aeroporto de Changi' },
+    'Emirados Árabes Unidos': { codigo: 'DXB', nome: 'Aeroporto Internacional de Dubai' },
+    'Austrália': { codigo: 'SYD', nome: 'Aeroporto Kingsford Smith' }
   };
   
-  if (mapeamentoPais[pais]) return mapeamentoPais[pais];
+  if (aeroportoPrincipalPorPais[pais]) {
+    return aeroportoPrincipalPorPais[pais];
+  }
   
-  if (cidade?.length >= 3) return cidade.substring(0, 3).toUpperCase();
+  // Último recurso: gera um código genérico (não recomendado)
+  const codigoGenerico = cidade?.length >= 3 ? 
+    cidade.substring(0, 3).toUpperCase() : 'AAA';
   
-  return "AAA";
+  return {
+    codigo: codigoGenerico,
+    nome: `Aeroporto de ${cidade}`
+  };
 }
 
 // =======================
@@ -1300,7 +1497,7 @@ module.exports = async function handler(req, res) {
         
         let processedResponse = responseAI;
         if (responseAI && utils.isPartiallyValidJSON(responseAI)) {
-          processedResponse = ensureTouristAttractionsAndComments(responseAI, requestData);
+          processedResponse = await ensureTouristAttractionsAndComments(responseAI, requestData);
         }
         
         if (processedResponse && utils.isValidDestinationJSON(processedResponse, requestData)) {
