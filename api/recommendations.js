@@ -479,7 +479,7 @@ async function callAIAPI(provider, prompt, requestData) {
       url: 'https://api.deepseek.com/v1/chat/completions', 
       header: 'Authorization',
       prefix: 'Bearer',
-      model: 'deepseek-chat',
+      model: 'deepseek-r1',
       systemMessage: 'Você é um especialista em viagens. Seja conciso e retorne apenas JSON válido com destinos detalhados.',
       temperature: 0.5,  // Reduzir temperatura para mais eficiência
       max_tokens: 2500,  // Reduzir tokens para respostas mais rápidas
