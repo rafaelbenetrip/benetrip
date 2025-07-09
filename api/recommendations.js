@@ -342,7 +342,7 @@ PERFIL:
 - Datas: ${dataIda} a ${dataVolta}
 - ${mensagemOrcamento}
 
-⚠️ CÓDIGOS IATA OBRIGATÓRIOS: Para cada destino, use APENAS o código IATA real do AEROPORTO PRINCIPAL da cidade. Exemplos corretos:
+⚠️ CÓDIGOS IATA OBRIGATÓRIOS: Para cada destino, use APENAS o código IATA real do MAIOR E MAIS CONHECIDO AEROPORTO PRÓXIMO da cidade. Exemplos corretos:
 - São Paulo → GRU (Guarulhos)
 - Rio de Janeiro → GIG (Galeão) 
 - Londres → LHR (Heathrow)
@@ -370,7 +370,7 @@ RETORNE JSON com esta estrutura exata:
     },
     "aeroporto": {
       "codigo": "XYZ",
-      "nome": "Nome do Aeroporto Principal"
+      "nome": "Nome do Aeroporto Principal Próximo"
     },
     "preco": {
       "voo": 1500,
