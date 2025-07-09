@@ -17,7 +17,7 @@ const CONFIG = {
     enabled: true,
     maxLength: 500
   },
-  providerOrder: ['perplexity', 'openai', 'claude', 'deepseek']
+  providerOrder: ['deepseek', 'openai', 'claude', 'perplexity']
 };
 
 // =======================
@@ -464,17 +464,15 @@ ${adaptacoesPorTipo[infoViajante.companhia] || "Considere experiências versáte
 async function callAIAPI(provider, prompt, requestData) {
   const apiConfig = {
     deepseek: {
-      url: 'https://api.deepseek.com/v1/chat/completions', 
-      header: 'Authorization',
-      prefix: 'Bearer',
-      model: 'deepseek-reasoner',
-      systemMessage: 'Você é um especialista em viagens com experiência em destinos globais. Retorne apenas JSON com destinos detalhados, respeitando o orçamento para voos.',
-      temperature: 0.5,
-      max_tokens: 3000,
-      additionalParams: {
-        reasoner_enabled: true
-      }
-    },
+  url: 'https://api.deepseek.com/v1/chat/completions', 
+  header: 'Authorization',
+  prefix: 'Bearer',
+  model: 'deepseek-chat',  // ← Modelo padrão e estável
+  systemMessage: 'Você é um especialista em viagens com experiência em destinos globais. Retorne apenas JSON com destinos detalhados, respeitando o orçamento para voos.',
+  temperature: 0.7,  // Aumentar um pouco a criatividade
+  max_tokens: 2500   // Reduzir para ser mais eficiente
+  // Remover additionalParams
+},
     perplexity: {
       url: 'https://api.perplexity.ai/chat/completions',
       header: 'Authorization',
