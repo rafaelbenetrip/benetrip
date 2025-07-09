@@ -17,6 +17,7 @@ const CONFIG = {
     enabled: true,
     maxLength: 500
   },
+  // DeepSeek como primeiro provedor
   providerOrder: ['deepseek', 'openai', 'claude', 'perplexity']
 };
 
@@ -286,9 +287,9 @@ function obterDatasViagem(dadosUsuario) {
 }
 
 // =======================
-// Prompt Deepseek Reasoner aprimorado
+// Prompt Deepseek aprimorado
 // =======================
-function gerarPromptParaDeepseekReasoner(dados) {
+function gerarPromptParaDeepseek(dados) {
   const infoViajante = {
     companhia: getCompanhiaText(dados.companhia || 0),
     preferencia: getPreferenciaText(dados.preferencia_viagem || 0),
@@ -440,12 +441,49 @@ ${adaptacoesPorTipo[infoViajante.companhia] || "Considere experiências versáte
     }
   },
   "alternativas": [
-    // EXATAMENTE 4 destinos com estrutura similar à descrita acima
-    // Cada destino alternativo deve ser de uma região/continente diferente para maximizar a diversidade
+    {
+      "destino": "Nome da Cidade",
+      "pais": "Nome do País",
+      "codigoPais": "XX",
+      "porque": "Razão específica para visitar",
+      "pontoTuristico": "Nome de um Ponto Turístico",
+      "clima": {
+        "temperatura": "Faixa de temperatura média esperada"
+      },
+      "aeroporto": {
+        "codigo": "XYZ",
+        "nome": "Nome do Aeroporto Principal"
+      },
+      "preco": {
+        "voo": 1200,
+        "hotel": 180
+      }
+    }
+    // EXATAMENTE 4 destinos alternativos
   ],
   "surpresa": {
-    // Mesma estrutura do topPick
-    // Deve ser um destino menos óbvio, mas igualmente adequado
+    "destino": "Nome da Cidade",
+    "pais": "Nome do País",
+    "codigoPais": "XX",
+    "descricao": "Breve descrição de 1-2 frases sobre o destino",
+    "porque": "Razão para visitar, destacando o fator surpresa",
+    "destaque": "Uma experiência/atividade única neste destino",
+    "comentario": "Comentário entusiasmado da Tripinha mencionando um ponto turístico específico e aspectos sensoriais",
+    "pontosTuristicos": ["Nome do Primeiro Ponto", "Nome do Segundo Ponto"],
+    "eventos": ["Festival ou evento especial durante o período", "Outro evento relevante se houver"],
+    "clima": {
+      "temperatura": "Faixa de temperatura média esperada (ex: 15°C-25°C)",
+      "condicoes": "Descrição das condições típicas (ex: ensolarado com chuvas ocasionais)",
+      "recomendacoes": "Dicas relacionadas ao clima (o que levar/vestir)"
+    },
+    "aeroporto": {
+      "codigo": "XYZ",
+      "nome": "Nome do Aeroporto Principal"
+    },
+    "preco": {
+      "voo": 1800,
+      "hotel": 250
+    }
   },
   "estacaoViagem": "${estacaoViagem}"
 }
@@ -464,23 +502,14 @@ ${adaptacoesPorTipo[infoViajante.companhia] || "Considere experiências versáte
 async function callAIAPI(provider, prompt, requestData) {
   const apiConfig = {
     deepseek: {
-  url: 'https://api.deepseek.com/v1/chat/completions', 
-  header: 'Authorization',
-  prefix: 'Bearer',
-  model: 'deepseek-chat',  // ← Modelo padrão e estável
-  systemMessage: 'Você é um especialista em viagens com experiência em destinos globais. Retorne apenas JSON com destinos detalhados, respeitando o orçamento para voos.',
-  temperature: 0.7,  // Aumentar um pouco a criatividade
-  max_tokens: 2500   // Reduzir para ser mais eficiente
-  // Remover additionalParams
-},
-    perplexity: {
-      url: 'https://api.perplexity.ai/chat/completions',
+      url: 'https://api.deepseek.com/v1/chat/completions', 
       header: 'Authorization',
       prefix: 'Bearer',
-      model: 'sonar',
-      systemMessage: 'Você é um especialista em viagens. Sua prioridade é não exceder o orçamento para voos. Retorne apenas JSON puro com 4 destinos alternativos.',
-      temperature: 0.5,
-      max_tokens: 2000
+      model: 'deepseek-chat',
+      systemMessage: 'Você é um especialista em viagens com experiência em destinos globais. Retorne apenas JSON válido com destinos detalhados, respeitando rigorosamente o orçamento para voos.',
+      temperature: 0.7,
+      max_tokens: 3000,
+      response_format: { type: 'json_object' }
     },
     openai: {
       url: 'https://api.openai.com/v1/chat/completions',
@@ -493,11 +522,20 @@ async function callAIAPI(provider, prompt, requestData) {
     },
     claude: {
       url: 'https://api.anthropic.com/v1/messages',
-      header: 'anthropic-api-key',
+      header: 'x-api-key',
       prefix: '',
       model: 'claude-3-haiku-20240307',
       systemMessage: 'Você é um especialista em viagens. Retorne apenas JSON com 4 destinos alternativos, respeitando o orçamento para voos.',
       temperature: 0.7,
+      max_tokens: 2000
+    },
+    perplexity: {
+      url: 'https://api.perplexity.ai/chat/completions',
+      header: 'Authorization',
+      prefix: 'Bearer',
+      model: 'sonar',
+      systemMessage: 'Você é um especialista em viagens. Sua prioridade é não exceder o orçamento para voos. Retorne apenas JSON puro com 4 destinos alternativos.',
+      temperature: 0.5,
       max_tokens: 2000
     }
   };
@@ -513,22 +551,14 @@ async function callAIAPI(provider, prompt, requestData) {
     throw new Error(`Chave da API ${provider} não configurada`);
   }
 
-    // Configuração dos cabeçalhos
-  const headers = {
-    'Content-Type': 'application/json'
-  };
-  headers[config.header] = config.prefix ? `${config.prefix} ${apiKey}` : apiKey;
-
-  // Adicione um log para verificar os headers
-  console.log('Headers:', headers);
-  
+  // Usar prompt específico para DeepSeek ou prompt genérico para outros
   const finalPrompt = provider === 'deepseek' 
-    ? gerarPromptParaDeepseekReasoner(requestData)
+    ? gerarPromptParaDeepseek(requestData)
     : `${prompt}
   
 IMPORTANTE: 
 1. Cada voo DEVE respeitar o orçamento.
-2. Retorne apenas JSON.
+2. Retorne apenas JSON válido.
 3. Forneça 4 destinos alternativos.
 4. Inclua pontos turísticos específicos.
 5. Inclua o código IATA de cada aeroporto.`;
@@ -543,10 +573,6 @@ IMPORTANTE:
         model: config.model,
         max_tokens: config.max_tokens || 2000,
         messages: [
-          {
-            role: "system",
-            content: config.systemMessage
-          },
           {
             role: "user",
             content: finalPrompt
@@ -571,8 +597,9 @@ IMPORTANTE:
         max_tokens: config.max_tokens || 2000
       };
       
-      if (config.additionalParams) {
-        Object.assign(requestData, config.additionalParams);
+      // Adicionar response_format para DeepSeek
+      if (provider === 'deepseek' && config.response_format) {
+        requestData.response_format = config.response_format;
       }
       
       if (provider === 'perplexity') {
@@ -594,7 +621,7 @@ IMPORTANTE:
       url: config.url,
       headers,
       data: requestData,
-      timeout: config.timeout || CONFIG.timeout.request
+      timeout: CONFIG.timeout.request
     });
     
     let content;
@@ -832,7 +859,10 @@ function ensureTouristAttractionsAndComments(jsonString, requestData) {
         clima: {
           temperatura: "Temperatura típica para a estação"
         },
-
+        preco: {
+          voo: 1500,
+          hotel: 200
+        }
       });
       
       modificado = true;
@@ -1043,7 +1073,7 @@ function generateEmergencyData(dadosUsuario = {}) {
 }
 
 // =======================
-// Geração de prompt padrão
+// Geração de prompt padrão para outros provedores
 // =======================
 function gerarPromptParaDestinos(dados) {
   const infoViajante = {
