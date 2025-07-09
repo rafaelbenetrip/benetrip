@@ -8,17 +8,16 @@ const https = require('https');
 // =======================
 const CONFIG = {
   timeout: {
-    request: 120000,  // ← 2 minutos para R1 (é mais lento)
-    handler: 600000,  // ← 10 minutos total
-    retry: 3000       // ← 3 segundos entre tentativas
+    request: 50000,
+    handler: 300000,
+    retry: 1500
   },
-  retries: 1,         // ← Apenas 1 retry (R1 é mais confiável)
+  retries: 2,
   logging: {
     enabled: true,
     maxLength: 500
   },
-  // DeepSeek R1 como primeiro provedor
-  providerOrder: ['deepseek', 'openai', 'claude', 'perplexity']
+  providerOrder: ['perplexity', 'openai', 'claude', 'deepseek']
 };
 
 // =======================
@@ -287,177 +286,9 @@ function obterDatasViagem(dadosUsuario) {
 }
 
 // =======================
-// Prompt Deepseek R1 (reasoning model)
+// Prompt Deepseek Reasoner aprimorado
 // =======================
-function gerarPromptParaDeepseekR1(dados) {
-  const infoViajante = {
-    companhia: getCompanhiaText(dados.companhia || 0),
-    preferencia: getPreferenciaText(dados.preferencia_viagem || 0),
-    cidadeOrigem: dados.cidade_partida?.name || 'origem não especificada',
-    orcamento: dados.orcamento_valor || 'flexível',
-    moeda: dados.moeda_escolhida || 'BRL',
-    pessoas: dados.quantidade_familia || dados.quantidade_amigos || 1,
-    tipoDestino: dados.tipo_destino || 'qualquer',
-    famaDestino: dados.fama_destino || 'qualquer'
-  };
-  
-  let dataIda = 'não especificada';
-  let dataVolta = 'não especificada';
-  let duracaoViagem = 'não especificada';
-  
-  if (dados.datas) {
-    if (typeof dados.datas === 'string' && dados.datas.includes(',')) {
-      const partes = dados.datas.split(',');
-      dataIda = partes[0] || 'não especificada';
-      dataVolta = partes[1] || 'não especificada';
-    } else if (dados.datas.dataIda && dados.datas.dataVolta) {
-      dataIda = dados.datas.dataIda;
-      dataVolta = dados.datas.dataVolta;
-    }
-    
-    try {
-      if (dataIda !== 'não especificada' && dataVolta !== 'não especificada') {
-        const ida = new Date(dataIda);
-        const volta = new Date(dataVolta);
-        const diff = Math.abs(volta - ida);
-        duracaoViagem = `${Math.ceil(diff / (1000 * 60 * 60 * 24))} dias`;
-      }
-    } catch (error) {
-      console.error('Erro ao calcular duração da viagem:', error.message);
-    }
-  }
-  
-  let estacaoViagem = 'não determinada';
-  let hemisferio = infoViajante.cidadeOrigem.toLowerCase().includes('brasil') ? 'sul' : 'norte';
-  
-  try {
-    if (dataIda !== 'não especificada') {
-      const dataObj = new Date(dataIda);
-      const mes = dataObj.getMonth();
-      
-      if (mes >= 2 && mes <= 4) estacaoViagem = 'primavera';
-      else if (mes >= 5 && mes <= 7) estacaoViagem = 'verão';
-      else if (mes >= 8 && mes <= 10) estacaoViagem = 'outono';
-      else estacaoViagem = 'inverno';
-      
-      if (hemisferio === 'sul') {
-        const mapaEstacoes = {
-          'verão': 'inverno',
-          'inverno': 'verão',
-          'primavera': 'outono',
-          'outono': 'primavera'
-        };
-        estacaoViagem = mapaEstacoes[estacaoViagem] || estacaoViagem;
-      }
-    }
-  } catch (error) {
-    console.error('Erro ao determinar estação do ano:', error.message);
-  }
-  
-  const mensagemOrcamento = infoViajante.orcamento !== 'flexível' ?
-    `ORÇAMENTO MÁXIMO: ${infoViajante.orcamento} ${infoViajante.moeda}` : 
-    'Orçamento flexível';
-
-  return `Análise completa de recomendações de viagem. Raciocine passo a passo antes de fornecer a resposta final.
-
-## PERFIL DO VIAJANTE PARA ANÁLISE:
-- Origem: ${infoViajante.cidadeOrigem}
-- Composição: ${infoViajante.companhia}
-- Quantidade: ${infoViajante.pessoas} pessoa(s)
-- Interesses: ${infoViajante.preferencia}
-- Período: ${dataIda} a ${dataVolta} (${duracaoViagem})
-- Estação na viagem: ${estacaoViagem}
-- Tipo de destino preferido: ${getTipoDestinoText(infoViajante.tipoDestino)}
-- Popularidade desejada: ${getFamaDestinoText(infoViajante.famaDestino)}
-- ${mensagemOrcamento}
-
-## INSTRUÇÕES PARA RACIOCÍNIO:
-
-1. **ANÁLISE ORÇAMENTÁRIA**: Considere que os preços de voos devem ficar entre 80-105% do orçamento informado
-2. **ANÁLISE SAZONAL**: Verifique clima, eventos especiais e temporada turística para cada período
-3. **ADEQUAÇÃO AO PERFIL**: Garanta que destinos e atividades sejam adequados para ${infoViajante.companhia}
-4. **DIVERSIDADE GEOGRÁFICA**: Alternativas devem ser de regiões/continentes diferentes
-5. **PONTOS TURÍSTICOS**: Sempre inclua atrações específicas e conhecidas
-6. **COMENTÁRIOS DA TRIPINHA**: Devem mencionar pontos turísticos específicos e observações sensoriais
-
-## FORMATO DA RESPOSTA FINAL:
-
-Após completar seu raciocínio, forneça EXATAMENTE este JSON (sem markdown, sem explicações adicionais):
-
-{
-  "topPick": {
-    "destino": "Nome da Cidade",
-    "pais": "Nome do País",
-    "codigoPais": "XX",
-    "descricao": "Breve descrição de 1-2 frases sobre o destino",
-    "porque": "Razão específica para este viajante visitar este destino",
-    "destaque": "Uma experiência/atividade única neste destino",
-    "comentario": "Comentário entusiasmado da Tripinha mencionando um ponto turístico específico e aspectos sensoriais",
-    "pontosTuristicos": ["Nome do Primeiro Ponto", "Nome do Segundo Ponto"],
-    "eventos": ["Festival ou evento especial durante o período", "Outro evento relevante se houver"],
-    "clima": {
-      "temperatura": "Faixa de temperatura média esperada",
-      "condicoes": "Descrição das condições típicas",
-      "recomendacoes": "Dicas relacionadas ao clima"
-    },
-    "aeroporto": {
-      "codigo": "XYZ",
-      "nome": "Nome do Aeroporto Principal"
-    },
-    "preco": {
-      "voo": 1500,
-      "hotel": 200
-    }
-  },
-  "alternativas": [
-    {
-      "destino": "Nome da Cidade",
-      "pais": "Nome do País",
-      "codigoPais": "XX",
-      "porque": "Razão específica para visitar",
-      "pontoTuristico": "Nome de um Ponto Turístico",
-      "clima": {
-        "temperatura": "Faixa de temperatura média esperada"
-      },
-      "aeroporto": {
-        "codigo": "XYZ",
-        "nome": "Nome do Aeroporto Principal"
-      },
-      "preco": {
-        "voo": 1200,
-        "hotel": 180
-      }
-    }
-  ],
-  "surpresa": {
-    "destino": "Nome da Cidade",
-    "pais": "Nome do País",
-    "codigoPais": "XX",
-    "descricao": "Breve descrição de 1-2 frases sobre o destino",
-    "porque": "Razão para visitar, destacando o fator surpresa",
-    "destaque": "Uma experiência/atividade única neste destino",
-    "comentario": "Comentário entusiasmado da Tripinha mencionando um ponto turístico específico e aspectos sensoriais",
-    "pontosTuristicos": ["Nome do Primeiro Ponto", "Nome do Segundo Ponto"],
-    "eventos": ["Festival ou evento especial durante o período", "Outro evento relevante se houver"],
-    "clima": {
-      "temperatura": "Faixa de temperatura média esperada",
-      "condicoes": "Descrição das condições típicas",
-      "recomendacoes": "Dicas relacionadas ao clima"
-    },
-    "aeroporto": {
-      "codigo": "XYZ",
-      "nome": "Nome do Aeroporto Principal"
-    },
-    "preco": {
-      "voo": 1800,
-      "hotel": 250
-    }
-  },
-  "estacaoViagem": "${estacaoViagem}"
-}
-
-IMPORTANTE: Forneça EXATAMENTE 4 destinos alternativos e certifique-se de que todos os preços de voos respeitem o orçamento de ${infoViajante.orcamento} ${infoViajante.moeda}.`;
-}
+function gerarPromptParaDeepseekReasoner(dados) {
   const infoViajante = {
     companhia: getCompanhiaText(dados.companhia || 0),
     preferencia: getPreferenciaText(dados.preferencia_viagem || 0),
@@ -609,49 +440,12 @@ ${adaptacoesPorTipo[infoViajante.companhia] || "Considere experiências versáte
     }
   },
   "alternativas": [
-    {
-      "destino": "Nome da Cidade",
-      "pais": "Nome do País",
-      "codigoPais": "XX",
-      "porque": "Razão específica para visitar",
-      "pontoTuristico": "Nome de um Ponto Turístico",
-      "clima": {
-        "temperatura": "Faixa de temperatura média esperada"
-      },
-      "aeroporto": {
-        "codigo": "XYZ",
-        "nome": "Nome do Aeroporto Principal"
-      },
-      "preco": {
-        "voo": 1200,
-        "hotel": 180
-      }
-    }
-    // EXATAMENTE 4 destinos alternativos
+    // EXATAMENTE 4 destinos com estrutura similar à descrita acima
+    // Cada destino alternativo deve ser de uma região/continente diferente para maximizar a diversidade
   ],
   "surpresa": {
-    "destino": "Nome da Cidade",
-    "pais": "Nome do País",
-    "codigoPais": "XX",
-    "descricao": "Breve descrição de 1-2 frases sobre o destino",
-    "porque": "Razão para visitar, destacando o fator surpresa",
-    "destaque": "Uma experiência/atividade única neste destino",
-    "comentario": "Comentário entusiasmado da Tripinha mencionando um ponto turístico específico e aspectos sensoriais",
-    "pontosTuristicos": ["Nome do Primeiro Ponto", "Nome do Segundo Ponto"],
-    "eventos": ["Festival ou evento especial durante o período", "Outro evento relevante se houver"],
-    "clima": {
-      "temperatura": "Faixa de temperatura média esperada (ex: 15°C-25°C)",
-      "condicoes": "Descrição das condições típicas (ex: ensolarado com chuvas ocasionais)",
-      "recomendacoes": "Dicas relacionadas ao clima (o que levar/vestir)"
-    },
-    "aeroporto": {
-      "codigo": "XYZ",
-      "nome": "Nome do Aeroporto Principal"
-    },
-    "preco": {
-      "voo": 1800,
-      "hotel": 250
-    }
+    // Mesma estrutura do topPick
+    // Deve ser um destino menos óbvio, mas igualmente adequado
   },
   "estacaoViagem": "${estacaoViagem}"
 }
@@ -673,28 +467,13 @@ async function callAIAPI(provider, prompt, requestData) {
       url: 'https://api.deepseek.com/v1/chat/completions', 
       header: 'Authorization',
       prefix: 'Bearer',
-      model: 'deepseek-reasoner',  // ← Modelo correto para R1
-      systemMessage: 'Você é um especialista em viagens com experiência em destinos globais. Analise cuidadosamente o perfil do viajante e retorne JSON válido com destinos detalhados, respeitando rigorosamente o orçamento para voos.',
-      max_tokens: 8000  // ← Máximo suportado pelo R1
-      // ❌ R1 NÃO suporta: temperature, response_format, top_p, etc.
-    },
-    openai: {
-      url: 'https://api.openai.com/v1/chat/completions',
-      header: 'Authorization',
-      prefix: 'Bearer',
-      model: 'gpt-3.5-turbo',
-      systemMessage: 'Você é um especialista em viagens. Retorne apenas JSON com 4 destinos alternativos, respeitando o orçamento para voos.',
-      temperature: 0.2,
-      max_tokens: 2000
-    },
-    claude: {
-      url: 'https://api.anthropic.com/v1/messages',
-      header: 'x-api-key',
-      prefix: '',
-      model: 'claude-3-haiku-20240307',
-      systemMessage: 'Você é um especialista em viagens. Retorne apenas JSON com 4 destinos alternativos, respeitando o orçamento para voos.',
-      temperature: 0.7,
-      max_tokens: 2000
+      model: 'deepseek-reasoner',
+      systemMessage: 'Você é um especialista em viagens com experiência em destinos globais. Retorne apenas JSON com destinos detalhados, respeitando o orçamento para voos.',
+      temperature: 0.5,
+      max_tokens: 3000,
+      additionalParams: {
+        reasoner_enabled: true
+      }
     },
     perplexity: {
       url: 'https://api.perplexity.ai/chat/completions',
@@ -703,6 +482,24 @@ async function callAIAPI(provider, prompt, requestData) {
       model: 'sonar',
       systemMessage: 'Você é um especialista em viagens. Sua prioridade é não exceder o orçamento para voos. Retorne apenas JSON puro com 4 destinos alternativos.',
       temperature: 0.5,
+      max_tokens: 2000
+    },
+    openai: {
+      url: 'https://api.openai.com/v1/chat/completions',
+      header: 'Authorization',
+      prefix: 'Bearer',
+      model: 'gpt-3.5-turbo',
+      systemMessage: 'Você é um especialista em viagens. Retorne apenas JSON com 4 destinos alternativos, respeitando o orçamento para voos.',
+      temperature: 0.7,
+      max_tokens: 2000
+    },
+    claude: {
+      url: 'https://api.anthropic.com/v1/messages',
+      header: 'anthropic-api-key',
+      prefix: '',
+      model: 'claude-3-haiku-20240307',
+      systemMessage: 'Você é um especialista em viagens. Retorne apenas JSON com 4 destinos alternativos, respeitando o orçamento para voos.',
+      temperature: 0.7,
       max_tokens: 2000
     }
   };
@@ -718,14 +515,22 @@ async function callAIAPI(provider, prompt, requestData) {
     throw new Error(`Chave da API ${provider} não configurada`);
   }
 
-  // Usar prompt específico para R1 ou prompt genérico para outros
+    // Configuração dos cabeçalhos
+  const headers = {
+    'Content-Type': 'application/json'
+  };
+  headers[config.header] = config.prefix ? `${config.prefix} ${apiKey}` : apiKey;
+
+  // Adicione um log para verificar os headers
+  console.log('Headers:', headers);
+  
   const finalPrompt = provider === 'deepseek' 
-    ? gerarPromptParaDeepseekR1(requestData)  // ← Função específica para R1
+    ? gerarPromptParaDeepseekReasoner(requestData)
     : `${prompt}
   
 IMPORTANTE: 
 1. Cada voo DEVE respeitar o orçamento.
-2. Retorne apenas JSON válido.
+2. Retorne apenas JSON.
 3. Forneça 4 destinos alternativos.
 4. Inclua pontos turísticos específicos.
 5. Inclua o código IATA de cada aeroporto.`;
@@ -740,6 +545,10 @@ IMPORTANTE:
         model: config.model,
         max_tokens: config.max_tokens || 2000,
         messages: [
+          {
+            role: "system",
+            content: config.systemMessage
+          },
           {
             role: "user",
             content: finalPrompt
@@ -760,20 +569,16 @@ IMPORTANTE:
             content: finalPrompt
           }
         ],
-        max_tokens: config.max_tokens || 8000
+        temperature: config.temperature || 0.7,
+        max_tokens: config.max_tokens || 2000
       };
       
-      // ❌ R1 NÃO suporta estes parâmetros:
-      // - temperature, top_p, presence_penalty, frequency_penalty
-      // - response_format (JSON output)
-      // - logprobs, top_logprobs
+      if (config.additionalParams) {
+        Object.assign(requestData, config.additionalParams);
+      }
       
       if (provider === 'perplexity') {
         requestData.response_format = { type: "text" };
-        requestData.temperature = config.temperature || 0.5;
-      } else if (provider !== 'deepseek') {
-        // Adicionar temperature apenas para outros provedores
-        requestData.temperature = config.temperature || 0.7;
       }
     }
     
@@ -791,7 +596,7 @@ IMPORTANTE:
       url: config.url,
       headers,
       data: requestData,
-      timeout: CONFIG.timeout.request
+      timeout: config.timeout || CONFIG.timeout.request
     });
     
     let content;
@@ -801,22 +606,6 @@ IMPORTANTE:
         throw new Error(`Formato de resposta do ${provider} inválido`);
       }
       content = response.data.content[0].text;
-    } else if (provider === 'deepseek') {
-      // R1 tem estrutura especial com reasoning_content + content
-      if (!response.data?.choices?.[0]?.message?.content) {
-        throw new Error(`Formato de resposta do ${provider} inválido`);
-      }
-      
-      const reasoning = response.data.choices[0].message.reasoning_content || '';
-      const finalAnswer = response.data.choices[0].message.content || '';
-      
-      // Log do raciocínio (útil para debug)
-      if (reasoning) {
-        utils.log(`[R1 Reasoning] Primeiros 300 caracteres:`, reasoning.substring(0, 300));
-      }
-      
-      // Usar apenas a resposta final para processamento
-      content = finalAnswer;
     } else {
       if (!response.data?.choices?.[0]?.message?.content) {
         throw new Error(`Formato de resposta do ${provider} inválido`);
@@ -831,14 +620,14 @@ IMPORTANTE:
         const jsonConteudo = utils.extrairJSONDaResposta(content);
         if (jsonConteudo) {
           const dados = JSON.parse(jsonConteudo);
-          utils.log('DeepSeek R1 forneceu destinos válidos:', {
+          utils.log('Deepseek forneceu destinos válidos:', {
             topPick: dados.topPick?.destino,
             alternativas: dados.alternativas?.map(a => a.destino).join(', '),
             surpresa: dados.surpresa?.destino
           });
         }
       } catch (error) {
-        console.error('Erro ao analisar resposta do DeepSeek R1:', error.message);
+        console.error('Erro ao analisar resposta do Deepseek:', error.message);
       }
     }
     
@@ -1045,10 +834,7 @@ function ensureTouristAttractionsAndComments(jsonString, requestData) {
         clima: {
           temperatura: "Temperatura típica para a estação"
         },
-        preco: {
-          voo: 1500,
-          hotel: 200
-        }
+
       });
       
       modificado = true;
@@ -1259,7 +1045,7 @@ function generateEmergencyData(dadosUsuario = {}) {
 }
 
 // =======================
-// Geração de prompt padrão para outros provedores
+// Geração de prompt padrão
 // =======================
 function gerarPromptParaDestinos(dados) {
   const infoViajante = {
@@ -1541,11 +1327,11 @@ module.exports = async function handler(req, res) {
           if (provider === 'deepseek') {
             try {
               const parsedResponse = JSON.parse(processedResponse);
-              console.log(`[DeepSeek R1] TopPick: ${parsedResponse.topPick?.destino} (${parsedResponse.topPick?.pais})`);
-              console.log(`[DeepSeek R1] Alternativas: ${parsedResponse.alternativas?.map(a => a.destino).join(', ')}`);
-              console.log(`[DeepSeek R1] Surpresa: ${parsedResponse.surpresa?.destino} (${parsedResponse.surpresa?.pais})`);
+              console.log(`[Deepseek] TopPick: ${parsedResponse.topPick?.destino} (${parsedResponse.topPick?.pais})`);
+              console.log(`[Deepseek] Alternativas: ${parsedResponse.alternativas?.map(a => a.destino).join(', ')}`);
+              console.log(`[Deepseek] Surpresa: ${parsedResponse.surpresa?.destino} (${parsedResponse.surpresa?.pais})`);
             } catch (error) {
-              console.error('Erro ao analisar resposta DeepSeek R1 para log:', error.message);
+              console.error('Erro ao analisar resposta Deepseek para log:', error.message);
             }
           }
           
