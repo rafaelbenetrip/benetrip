@@ -8,9 +8,10 @@ const https = require('https');
 // =======================
 const CONFIG = {
   timeout: {
-    request: 80000,
+    request: 50000,
     handler: 300000,
-    retry: 1500
+    retry: 1500,
+    deepseek: 90000  // Timeout maior para DeepSeek (90 segundos)
   },
   retries: 2,
   logging: {
@@ -18,16 +19,31 @@ const CONFIG = {
     maxLength: 500
   },
   // DeepSeek como primeiro provedor
-  providerOrder: ['deepseek', 'perplexity', 'claude', 'openai']
+  providerOrder: ['deepseek', 'openai', 'claude', 'perplexity']
 };
 
 // =======================
-// Cliente HTTP configurado
+// Cliente HTTP configurado com configurações específicas
 // =======================
 const apiClient = axios.create({
   timeout: CONFIG.timeout.request,
   httpAgent: new http.Agent({ keepAlive: true }),
   httpsAgent: new https.Agent({ keepAlive: true })
+});
+
+// Cliente específico para DeepSeek com configurações otimizadas
+const deepseekClient = axios.create({
+  timeout: CONFIG.timeout.deepseek,
+  httpAgent: new http.Agent({ 
+    keepAlive: true,
+    timeout: CONFIG.timeout.deepseek,
+    maxSockets: 1
+  }),
+  httpsAgent: new https.Agent({ 
+    keepAlive: true,
+    timeout: CONFIG.timeout.deepseek,
+    maxSockets: 1
+  })
 });
 
 // =======================
@@ -287,7 +303,7 @@ function obterDatasViagem(dadosUsuario) {
 }
 
 // =======================
-// Prompt Deepseek aprimorado
+// Prompt Deepseek otimizado (mais conciso)
 // =======================
 function gerarPromptParaDeepseek(dados) {
   const infoViajante = {
@@ -296,14 +312,11 @@ function gerarPromptParaDeepseek(dados) {
     cidadeOrigem: dados.cidade_partida?.name || 'origem não especificada',
     orcamento: dados.orcamento_valor || 'flexível',
     moeda: dados.moeda_escolhida || 'BRL',
-    pessoas: dados.quantidade_familia || dados.quantidade_amigos || 1,
-    tipoDestino: dados.tipo_destino || 'qualquer',
-    famaDestino: dados.fama_destino || 'qualquer'
+    pessoas: dados.quantidade_familia || dados.quantidade_amigos || 1
   };
   
   let dataIda = 'não especificada';
   let dataVolta = 'não especificada';
-  let duracaoViagem = 'não especificada';
   
   if (dados.datas) {
     if (typeof dados.datas === 'string' && dados.datas.includes(',')) {
@@ -314,126 +327,40 @@ function gerarPromptParaDeepseek(dados) {
       dataIda = dados.datas.dataIda;
       dataVolta = dados.datas.dataVolta;
     }
-    
-    try {
-      if (dataIda !== 'não especificada' && dataVolta !== 'não especificada') {
-        const ida = new Date(dataIda);
-        const volta = new Date(dataVolta);
-        const diff = Math.abs(volta - ida);
-        duracaoViagem = `${Math.ceil(diff / (1000 * 60 * 60 * 24))} dias`;
-      }
-    } catch (error) {
-      console.error('Erro ao calcular duração da viagem:', error.message);
-    }
   }
-  
-  let estacaoViagem = 'não determinada';
-  let hemisferio = infoViajante.cidadeOrigem.toLowerCase().includes('brasil') ? 'sul' : 'norte';
-  
-  try {
-    if (dataIda !== 'não especificada') {
-      const dataObj = new Date(dataIda);
-      const mes = dataObj.getMonth();
-      
-      if (mes >= 2 && mes <= 4) estacaoViagem = 'primavera';
-      else if (mes >= 5 && mes <= 7) estacaoViagem = 'verão';
-      else if (mes >= 8 && mes <= 10) estacaoViagem = 'outono';
-      else estacaoViagem = 'inverno';
-      
-      if (hemisferio === 'sul') {
-        const mapaEstacoes = {
-          'verão': 'inverno',
-          'inverno': 'verão',
-          'primavera': 'outono',
-          'outono': 'primavera'
-        };
-        estacaoViagem = mapaEstacoes[estacaoViagem] || estacaoViagem;
-      }
-    }
-  } catch (error) {
-    console.error('Erro ao determinar estação do ano:', error.message);
-  }
-  
-  const adaptacoesPorTipo = {
-    "sozinho(a)": "Destinos seguros para viajantes solo, atividades para conhecer pessoas, bairros com boa vida noturna e transporte público eficiente",
-    "em casal (viagem romântica)": "Cenários românticos, jantares especiais, passeios a dois, hotéis boutique, praias privativas, mirantes com vistas panorâmicas e vinícolas",
-    "em família": "Atividades para todas as idades, opções kid-friendly, segurança, acomodações espaçosas, parques temáticos, atrações educativas e opções de transporte facilitado",
-    "com amigos": "Vida noturna, atividades em grupo, opções de compartilhamento, diversão coletiva, esportes de aventura, festivais locais e culinária diversificada"
-  };
   
   const mensagemOrcamento = infoViajante.orcamento !== 'flexível' ?
-    `ORÇAMENTO MÁXIMO: ${infoViajante.orcamento} ${infoViajante.moeda}` : 
+    `Orçamento máximo para voos: ${infoViajante.orcamento} ${infoViajante.moeda}` : 
     'Orçamento flexível';
 
-  return `# Tarefa: Recomendações Personalizadas de Destinos de Viagem
+  return `Crie recomendações de destinos de viagem em JSON:
 
-## Dados do Viajante
+PERFIL:
 - Origem: ${infoViajante.cidadeOrigem}
-- Composição: ${infoViajante.companhia}
-- Quantidade: ${infoViajante.pessoas} pessoa(s)
-- Interesses: ${infoViajante.preferencia}
-- Período: ${dataIda} a ${dataVolta} (${duracaoViagem})
-- Estação na viagem: ${estacaoViagem}
-- Tipo de destino preferido: ${getTipoDestinoText(infoViajante.tipoDestino)}
-- Nível de popularidade desejado: ${getFamaDestinoText(infoViajante.famaDestino)}
+- Viajantes: ${infoViajante.companhia} (${infoViajante.pessoas} pessoa(s))
+- Preferências: ${infoViajante.preferencia}
+- Datas: ${dataIda} a ${dataVolta}
+- ${mensagemOrcamento}
 
-## ASPECTOS SAZONAIS E CLIMÁTICOS CRÍTICOS
-- Para o período ${dataIda} a ${dataVolta}, verifique:
-  * Festivais, feriados e eventos especiais que agregam valor à viagem
-  * Condições climáticas adversas a evitar: monções, furacões, temperaturas extremas
-  * Temporada turística (alta/baixa) e impacto em preços, disponibilidade e experiência
-
-## ADAPTAÇÕES ESPECÍFICAS PARA: ${infoViajante.companhia.toUpperCase()}
-${adaptacoesPorTipo[infoViajante.companhia] || "Considere experiências versáteis para diferentes perfis"}
-
-## PERSONALIDADE DA TRIPINHA (MASCOTE)
-- A Tripinha é uma cachorrinha vira-lata caramelo, curiosa e aventureira e que conhece todos os lugares do mundo
-- Seus comentários devem ser:
-  * Autênticos e entusiasmados
-  * Mencionar PELO MENOS UM ponto turístico específico do destino
-  * Incluir uma observação sensorial que um cachorro notaria (cheiros, sons, texturas)
-  * Usar emoji 🐾 para dar personalidade
-  * Tom amigável e conversacional
-
-## Processo de Raciocínio Passo a Passo
-1) Identifique destinos adequados considerando:
-   - Clima apropriado para ${estacaoViagem}
-   - Eventos especiais/festivais no período
-   - Adaptação para viajantes ${infoViajante.companhia}
-   - Destinos que fiquem entre 80% e 105% orçamento estipulado para voos de ${infoViajante.orcamento} ${infoViajante.moeda}
-
-2) Para cada destino, determine:
-   - Preço realista de voo
-   - Pontos turísticos específicos e conhecidos
-   - Eventos sazonais ou especiais no período da viagem
-   - Comentário personalizado da Tripinha mencionando detalhes sensoriais
-   - Informações práticas de clima para o período
-
-3) Diversifique suas recomendações:
-   - topPick: Destino com máxima adequação ao perfil
-   - alternativas: 4 destinos diversos em geografia, custo e experiências
-   - surpresa: Destino incomum mas encantador (pode ser mais desafiador, desde que viável)
-
-## Formato de Retorno (JSON estrito)
+RETORNE JSON com esta estrutura exata:
 {
   "topPick": {
     "destino": "Nome da Cidade",
-    "pais": "Nome do País",
+    "pais": "Nome do País", 
     "codigoPais": "XX",
-    "descricao": "Breve descrição de 1-2 frases sobre o destino",
-    "porque": "Razão específica para este viajante visitar este destino",
-    "destaque": "Uma experiência/atividade única neste destino",
-    "comentario": "Comentário entusiasmado da Tripinha mencionando um ponto turístico específico e aspectos sensoriais",
-    "pontosTuristicos": ["Nome do Primeiro Ponto", "Nome do Segundo Ponto"],
-    "eventos": ["Festival ou evento especial durante o período", "Outro evento relevante se houver"],
+    "descricao": "Descrição breve",
+    "porque": "Razão para visitar",
+    "destaque": "Experiência única",
+    "comentario": "Comentário da Tripinha mencionando 1 ponto turístico específico",
+    "pontosTuristicos": ["Ponto 1", "Ponto 2"],
     "clima": {
-      "temperatura": "Faixa de temperatura média esperada (ex: 15°C-25°C)",
-      "condicoes": "Descrição das condições típicas (ex: ensolarado com chuvas ocasionais)",
-      "recomendacoes": "Dicas relacionadas ao clima (o que levar/vestir)"
+      "temperatura": "15°C-25°C",
+      "condicoes": "Ensolarado",
+      "recomendacoes": "Roupas leves"
     },
     "aeroporto": {
       "codigo": "XYZ",
-      "nome": "Nome do Aeroporto Principal"
+      "nome": "Nome do Aeroporto"
     },
     "preco": {
       "voo": 1500,
@@ -442,58 +369,41 @@ ${adaptacoesPorTipo[infoViajante.companhia] || "Considere experiências versáte
   },
   "alternativas": [
     {
-      "destino": "Nome da Cidade",
-      "pais": "Nome do País",
-      "codigoPais": "XX",
-      "porque": "Razão específica para visitar",
-      "pontoTuristico": "Nome de um Ponto Turístico",
-      "clima": {
-        "temperatura": "Faixa de temperatura média esperada"
-      },
-      "aeroporto": {
-        "codigo": "XYZ",
-        "nome": "Nome do Aeroporto Principal"
-      },
-      "preco": {
-        "voo": 1200,
-        "hotel": 180
-      }
+      "destino": "Cidade",
+      "pais": "País",
+      "codigoPais": "XX", 
+      "porque": "Razão",
+      "pontoTuristico": "Ponto turístico",
+      "clima": {"temperatura": "20°C-30°C"},
+      "aeroporto": {"codigo": "ABC", "nome": "Aeroporto"},
+      "preco": {"voo": 1200, "hotel": 180}
     }
-    // EXATAMENTE 4 destinos alternativos
   ],
   "surpresa": {
-    "destino": "Nome da Cidade",
-    "pais": "Nome do País",
+    "destino": "Cidade Surpresa",
+    "pais": "País",
     "codigoPais": "XX",
-    "descricao": "Breve descrição de 1-2 frases sobre o destino",
-    "porque": "Razão para visitar, destacando o fator surpresa",
-    "destaque": "Uma experiência/atividade única neste destino",
-    "comentario": "Comentário entusiasmado da Tripinha mencionando um ponto turístico específico e aspectos sensoriais",
-    "pontosTuristicos": ["Nome do Primeiro Ponto", "Nome do Segundo Ponto"],
-    "eventos": ["Festival ou evento especial durante o período", "Outro evento relevante se houver"],
+    "descricao": "Descrição",
+    "porque": "Razão surpresa",
+    "destaque": "Experiência única",
+    "comentario": "Comentário Tripinha com ponto turístico",
+    "pontosTuristicos": ["Ponto 1", "Ponto 2"],
     "clima": {
-      "temperatura": "Faixa de temperatura média esperada (ex: 15°C-25°C)",
-      "condicoes": "Descrição das condições típicas (ex: ensolarado com chuvas ocasionais)",
-      "recomendacoes": "Dicas relacionadas ao clima (o que levar/vestir)"
+      "temperatura": "18°C-28°C",
+      "condicoes": "Agradável",
+      "recomendacoes": "Roupas variadas"
     },
-    "aeroporto": {
-      "codigo": "XYZ",
-      "nome": "Nome do Aeroporto Principal"
-    },
-    "preco": {
-      "voo": 1800,
-      "hotel": 250
-    }
-  },
-  "estacaoViagem": "${estacaoViagem}"
+    "aeroporto": {"codigo": "DEF", "nome": "Aeroporto"},
+    "preco": {"voo": 1800, "hotel": 250}
+  }
 }
 
-## Verificação Final Obrigatória - CONFIRME QUE:
-- ✓ Considerou eventos sazonais, clima e atrações para CADA destino
-- ✓ Todos os comentários da Tripinha mencionam pontos turísticos específicos e incluem observações sensoriais
-- ✓ As recomendações estão adaptadas para viajantes ${infoViajante.companhia}
-- ✓ Todos os destinos incluem código IATA válido do aeroporto
-- ✓ Diversificou geograficamente as alternativas`;
+IMPORTANTE:
+- Inclua EXATAMENTE 4 destinos em "alternativas"
+- Preços de voos devem respeitar o orçamento
+- Tripinha é uma cachorrinha aventureira 🐾
+- Mencione pontos turísticos reais e específicos
+- Use códigos IATA válidos para aeroportos`;
 }
 
 // =======================
@@ -506,10 +416,11 @@ async function callAIAPI(provider, prompt, requestData) {
       header: 'Authorization',
       prefix: 'Bearer',
       model: 'deepseek-chat',
-      systemMessage: 'Você é um especialista em viagens com experiência em destinos globais. Retorne apenas JSON válido com destinos detalhados, respeitando rigorosamente o orçamento para voos.',
-      temperature: 0.7,
-      max_tokens: 3000,
-      response_format: { type: 'json_object' }
+      systemMessage: 'Você é um especialista em viagens. Seja conciso e retorne apenas JSON válido com destinos detalhados.',
+      temperature: 0.5,  // Reduzir temperatura para mais eficiência
+      max_tokens: 2500,  // Reduzir tokens para respostas mais rápidas
+      response_format: { type: 'json_object' },
+      timeout: CONFIG.timeout.deepseek  // Timeout específico para DeepSeek
     },
     openai: {
       url: 'https://api.openai.com/v1/chat/completions',
@@ -564,7 +475,7 @@ IMPORTANTE:
 5. Inclua o código IATA de cada aeroporto.`;
 
   try {
-    utils.log(`Enviando requisição para ${provider}...`, null);
+    utils.log(`Enviando requisição para ${provider} (timeout: ${config.timeout || CONFIG.timeout.request}ms)...`, null);
     
     let requestData;
     
@@ -616,12 +527,18 @@ IMPORTANTE:
       headers['anthropic-version'] = '2023-06-01';
     }
     
-    const response = await apiClient({
+    // Usar timeout específico para cada provedor
+    const timeoutValue = config.timeout || CONFIG.timeout.request;
+    
+    // Usar cliente específico para DeepSeek
+    const client = provider === 'deepseek' ? deepseekClient : apiClient;
+    
+    const response = await client({
       method: 'post',
       url: config.url,
       headers,
       data: requestData,
-      timeout: CONFIG.timeout.request
+      timeout: timeoutValue
     });
     
     let content;
@@ -659,6 +576,12 @@ IMPORTANTE:
     return utils.extrairJSONDaResposta(content);
   } catch (error) {
     console.error(`Erro na chamada à API ${provider}:`, error.message);
+    
+    // Log específico para timeout
+    if (error.code === 'ECONNABORTED' || error.message.includes('timeout') || error.message.includes('aborted')) {
+      console.error(`Timeout na API ${provider} após ${config.timeout || CONFIG.timeout.request}ms`);
+    }
+    
     if (error.response) {
       utils.log(`Resposta de erro (${provider}):`, error.response.data);
     }
@@ -1336,13 +1259,44 @@ module.exports = async function handler(req, res) {
     const orcamento = requestData.orcamento_valor ? parseFloat(requestData.orcamento_valor) : null;
     
     const providers = CONFIG.providerOrder.filter(
-      provider => process.env[`${provider.toUpperCase()}_API_KEY`]
+      provider => {
+        const apiKey = process.env[`${provider.toUpperCase()}_API_KEY`];
+        const hasKey = !!apiKey;
+        console.log(`Provedor ${provider}: ${hasKey ? 'Chave configurada' : 'Chave não encontrada'}`);
+        return hasKey;
+      }
     );
+    
+    console.log(`Provedores disponíveis: ${providers.join(', ')}`);
+    
+    if (providers.length === 0) {
+      console.error('Nenhuma chave de API configurada');
+      if (!isResponseSent) {
+        isResponseSent = true;
+        clearTimeout(serverTimeout);
+        return res.status(500).json({ 
+          tipo: "erro-config",
+          conteudo: JSON.stringify(generateEmergencyData(requestData)),
+          error: "Nenhuma chave de API configurada"
+        });
+      }
+    }
     
     for (const provider of providers) {
       try {
         console.log(`Tentando obter recomendações via ${provider}...`);
-        const responseAI = await callAIAPI(provider, prompt, requestData);
+        
+        // Retry específico para DeepSeek devido a timeouts frequentes
+        let responseAI;
+        if (provider === 'deepseek') {
+          responseAI = await retryAsync(
+            () => callAIAPI(provider, prompt, requestData),
+            3,  // 3 tentativas para DeepSeek
+            2000  // 2 segundos entre tentativas
+          );
+        } else {
+          responseAI = await callAIAPI(provider, prompt, requestData);
+        }
         
         let processedResponse = responseAI;
         if (responseAI && utils.isPartiallyValidJSON(responseAI)) {
@@ -1401,6 +1355,11 @@ module.exports = async function handler(req, res) {
         }
       } catch (error) {
         console.error(`Erro ao usar ${provider}:`, error.message);
+        
+        // Para DeepSeek, se der timeout, tenta o próximo provedor mais rápido
+        if (provider === 'deepseek' && (error.message.includes('timeout') || error.message.includes('aborted'))) {
+          console.log('DeepSeek com timeout - passando para próximo provedor...');
+        }
       }
     }
     
