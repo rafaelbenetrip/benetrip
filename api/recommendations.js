@@ -18,7 +18,7 @@ const CONFIG = {
     maxLength: 500
   },
   // DeepSeek como primeiro provedor
-  providerOrder: ['deepseek', 'openai', 'claude', 'perplexity']
+  providerOrder: ['deepseek', 'perplexity', 'claude', 'openai']
 };
 
 // =======================
