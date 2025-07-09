@@ -488,7 +488,7 @@ async function callAIAPI(provider, prompt, requestData) {
       prefix: 'Bearer',
       model: 'gpt-3.5-turbo',
       systemMessage: 'Você é um especialista em viagens. Retorne apenas JSON com 4 destinos alternativos, respeitando o orçamento para voos.',
-      temperature: 0.7,
+      temperature: 0.2,
       max_tokens: 2000
     },
     claude: {
