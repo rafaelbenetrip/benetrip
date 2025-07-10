@@ -1,4 +1,4 @@
-// api/recommendations.js - Endpoint da API Vercel para recomendações de destino
+// api/recommendations.js - Endpoint da API Vercel para recomendações de destino com DeepSeek R1
 const axios = require('axios');
 const http = require('http');
 const https = require('https');
@@ -8,25 +8,42 @@ const https = require('https');
 // =======================
 const CONFIG = {
   timeout: {
-    request: 80000,
+    request: 50000,
     handler: 300000,
-    retry: 1500
+    retry: 1500,
+    deepseek_r1: 120000  // Timeout maior para DeepSeek R1 (120 segundos) - ele precisa de mais tempo para "raciocinar"
   },
   retries: 2,
   logging: {
     enabled: true,
     maxLength: 500
   },
-  providerOrder: ['perplexity', 'openai', 'claude', 'deepseek']
+  // DeepSeek R1 como primeiro provedor
+  providerOrder: ['deepseek_r1', 'deepseek', 'openai', 'claude', 'perplexity']
 };
 
 // =======================
-// Cliente HTTP configurado
+// Cliente HTTP configurado com configurações específicas
 // =======================
 const apiClient = axios.create({
   timeout: CONFIG.timeout.request,
   httpAgent: new http.Agent({ keepAlive: true }),
   httpsAgent: new https.Agent({ keepAlive: true })
+});
+
+// Cliente específico para DeepSeek R1 com configurações otimizadas
+const deepseekR1Client = axios.create({
+  timeout: CONFIG.timeout.deepseek_r1,
+  httpAgent: new http.Agent({ 
+    keepAlive: true,
+    timeout: CONFIG.timeout.deepseek_r1,
+    maxSockets: 1
+  }),
+  httpsAgent: new https.Agent({ 
+    keepAlive: true,
+    timeout: CONFIG.timeout.deepseek_r1,
+    maxSockets: 1
+  })
 });
 
 // =======================
@@ -117,13 +134,53 @@ const utils = {
     try {
       const data = typeof jsonString === 'string' ? JSON.parse(jsonString) : jsonString;
       
+      // Validações básicas existentes
       if (!data.topPick?.destino || !data.alternativas || !data.surpresa?.destino) return false;
       if (!data.topPick.pontosTuristicos?.length || data.topPick.pontosTuristicos.length < 2) return false;
       if (!data.surpresa.pontosTuristicos?.length || data.surpresa.pontosTuristicos.length < 2) return false;
       if (!Array.isArray(data.alternativas) || data.alternativas.length !== 4) return false;
-      
       if (!data.alternativas.every(alt => alt.pontoTuristico)) return false;
       
+      // Nova validação: verificar aeroportos principais
+      const aeroportoTopPick = data.topPick.aeroporto?.codigo;
+      if (!aeroportoTopPick || aeroportosProibidos.has(aeroportoTopPick)) {
+        console.warn(`TopPick ${data.topPick.destino} tem aeroporto proibido: ${aeroportoTopPick}`);
+        return false;
+      }
+      
+      const aeroportoSurpresa = data.surpresa.aeroporto?.codigo;
+      if (!aeroportoSurpresa || aeroportosProibidos.has(aeroportoSurpresa)) {
+        console.warn(`Surpresa ${data.surpresa.destino} tem aeroporto proibido: ${aeroportoSurpresa}`);
+        return false;
+      }
+      
+      // Verificar aeroportos das alternativas
+      for (const alt of data.alternativas) {
+        const aeroportoAlt = alt.aeroporto?.codigo;
+        if (!aeroportoAlt || aeroportosProibidos.has(aeroportoAlt)) {
+          console.warn(`Alternativa ${alt.destino} tem aeroporto proibido: ${aeroportoAlt}`);
+          return false;
+        }
+      }
+      
+      // Nova validação: verificar distância mínima da origem
+      const cidadeOrigem = requestData?.cidade_partida?.name;
+      if (cidadeOrigem) {
+        const destinosParaVerificar = [
+          data.topPick.destino,
+          data.surpresa.destino,
+          ...data.alternativas.map(alt => alt.destino)
+        ];
+        
+        for (const destino of destinosParaVerificar) {
+          if (destinoMuitoProximo(cidadeOrigem, destino, 300)) {
+            console.warn(`Destino ${destino} está muito próximo de ${cidadeOrigem} (menos de 300km)`);
+            return false;
+          }
+        }
+      }
+      
+      // Validações de orçamento existentes
       if (!data.topPick.comentario || !data.topPick.pontosTuristicos.some(
         attraction => data.topPick.comentario.toLowerCase().includes(attraction.toLowerCase())
       )) return false;
@@ -286,23 +343,20 @@ function obterDatasViagem(dadosUsuario) {
 }
 
 // =======================
-// Prompt Deepseek Reasoner aprimorado
+// Prompt otimizado específico para DeepSeek R1
 // =======================
-function gerarPromptParaDeepseekReasoner(dados) {
+function gerarPromptParaDeepseekR1(dados) {
   const infoViajante = {
     companhia: getCompanhiaText(dados.companhia || 0),
     preferencia: getPreferenciaText(dados.preferencia_viagem || 0),
     cidadeOrigem: dados.cidade_partida?.name || 'origem não especificada',
     orcamento: dados.orcamento_valor || 'flexível',
     moeda: dados.moeda_escolhida || 'BRL',
-    pessoas: dados.quantidade_familia || dados.quantidade_amigos || 1,
-    tipoDestino: dados.tipo_destino || 'qualquer',
-    famaDestino: dados.fama_destino || 'qualquer'
+    pessoas: dados.quantidade_familia || dados.quantidade_amigos || 1
   };
   
   let dataIda = 'não especificada';
   let dataVolta = 'não especificada';
-  let duracaoViagem = 'não especificada';
   
   if (dados.datas) {
     if (typeof dados.datas === 'string' && dados.datas.includes(',')) {
@@ -313,122 +367,87 @@ function gerarPromptParaDeepseekReasoner(dados) {
       dataIda = dados.datas.dataIda;
       dataVolta = dados.datas.dataVolta;
     }
-    
-    try {
-      if (dataIda !== 'não especificada' && dataVolta !== 'não especificada') {
-        const ida = new Date(dataIda);
-        const volta = new Date(dataVolta);
-        const diff = Math.abs(volta - ida);
-        duracaoViagem = `${Math.ceil(diff / (1000 * 60 * 60 * 24))} dias`;
-      }
-    } catch (error) {
-      console.error('Erro ao calcular duração da viagem:', error.message);
-    }
   }
-  
-  let estacaoViagem = 'não determinada';
-  let hemisferio = infoViajante.cidadeOrigem.toLowerCase().includes('brasil') ? 'sul' : 'norte';
-  
-  try {
-    if (dataIda !== 'não especificada') {
-      const dataObj = new Date(dataIda);
-      const mes = dataObj.getMonth();
-      
-      if (mes >= 2 && mes <= 4) estacaoViagem = 'primavera';
-      else if (mes >= 5 && mes <= 7) estacaoViagem = 'verão';
-      else if (mes >= 8 && mes <= 10) estacaoViagem = 'outono';
-      else estacaoViagem = 'inverno';
-      
-      if (hemisferio === 'sul') {
-        const mapaEstacoes = {
-          'verão': 'inverno',
-          'inverno': 'verão',
-          'primavera': 'outono',
-          'outono': 'primavera'
-        };
-        estacaoViagem = mapaEstacoes[estacaoViagem] || estacaoViagem;
-      }
-    }
-  } catch (error) {
-    console.error('Erro ao determinar estação do ano:', error.message);
-  }
-  
-  const adaptacoesPorTipo = {
-    "sozinho(a)": "Destinos seguros para viajantes solo, atividades para conhecer pessoas, bairros com boa vida noturna e transporte público eficiente",
-    "em casal (viagem romântica)": "Cenários românticos, jantares especiais, passeios a dois, hotéis boutique, praias privativas, mirantes com vistas panorâmicas e vinícolas",
-    "em família": "Atividades para todas as idades, opções kid-friendly, segurança, acomodações espaçosas, parques temáticos, atrações educativas e opções de transporte facilitado",
-    "com amigos": "Vida noturna, atividades em grupo, opções de compartilhamento, diversão coletiva, esportes de aventura, festivais locais e culinária diversificada"
-  };
   
   const mensagemOrcamento = infoViajante.orcamento !== 'flexível' ?
-    `ORÇAMENTO MÁXIMO: ${infoViajante.orcamento} ${infoViajante.moeda}` : 
+    `Orçamento máximo para voos: ${infoViajante.orcamento} ${infoViajante.moeda}` : 
     'Orçamento flexível';
 
-  return `# Tarefa: Recomendações Personalizadas de Destinos de Viagem
+  return `<thinking>
+Preciso criar recomendações de destinos de viagem para este perfil:
 
-## Dados do Viajante
+ANÁLISE DO PERFIL:
 - Origem: ${infoViajante.cidadeOrigem}
-- Composição: ${infoViajante.companhia}
-- Quantidade: ${infoViajante.pessoas} pessoa(s)
-- Interesses: ${infoViajante.preferencia}
-- Período: ${dataIda} a ${dataVolta} (${duracaoViagem})
-- Estação na viagem: ${estacaoViagem}
-- Tipo de destino preferido: ${getTipoDestinoText(infoViajante.tipoDestino)}
-- Nível de popularidade desejado: ${getFamaDestinoText(infoViajante.famaDestino)}
+- Viajantes: ${infoViajante.companhia} (${infoViajante.pessoas} pessoa(s))
+- Preferências: ${infoViajante.preferencia}
+- Datas: ${dataIda} a ${dataVolta}
+- ${mensagemOrcamento}
 
-## ASPECTOS SAZONAIS E CLIMÁTICOS CRÍTICOS
-- Para o período ${dataIda} a ${dataVolta}, verifique:
-  * Festivais, feriados e eventos especiais que agregam valor à viagem
-  * Condições climáticas adversas a evitar: monções, furacões, temperaturas extremas
-  * Temporada turística (alta/baixa) e impacto em preços, disponibilidade e experiência
+RESTRIÇÕES CRÍTICAS QUE DEVO SEGUIR:
+1. APENAS cidades com aeroportos grandes próximos em até 150km
+2. Destinos devem estar a pelo menos 300km da origem
+3. Use APENAS códigos IATA de aeroportos principais mais próximos
+4. Os destinos devem respeitar o orçamento informado para voos de ida e volta
+5. Incluir EXATAMENTE 4 destinos em "alternativas"
+6. Mencionar pontos turísticos específicos nos comentários da Tripinha
 
-## ADAPTAÇÕES ESPECÍFICAS PARA: ${infoViajante.companhia.toUpperCase()}
-${adaptacoesPorTipo[infoViajante.companhia] || "Considere experiências versáteis para diferentes perfis"}
+CÓDIGOS IATA OBRIGATÓRIOS (apenas aeroportos principais):
+- São Paulo → GRU (Guarulhos)
+- Rio de Janeiro → GIG (Galeão) 
+- Buenos Aires → EZE (Ezeiza)
+- Santiago → SCL (Arturo Merino Benítez)
+- Lima → LIM (Jorge Chávez)
+- Londres → LHR (Heathrow)
+- Paris → CDG (Charles de Gaulle)
+- Nova York → JFK (Kennedy)
+- Tóquio → HND (Haneda)
 
-## PERSONALIDADE DA TRIPINHA (MASCOTE)
-- A Tripinha é uma cachorrinha vira-lata caramelo, curiosa e aventureira e que conhece todos os lugares do mundo
-- Seus comentários devem ser:
-  * Autênticos e entusiasmados
-  * Mencionar PELO MENOS UM ponto turístico específico do destino
-  * Incluir uma observação sensorial que um cachorro notaria (cheiros, sons, texturas)
-  * Usar emoji 🐾 para dar personalidade
-  * Tom amigável e conversacional
+Vou analisar as preferências e criar recomendações apropriadas...
 
-## Processo de Raciocínio Passo a Passo
-1) Identifique destinos adequados considerando:
-   - Clima apropriado para ${estacaoViagem}
-   - Eventos especiais/festivais no período
-   - Adaptação para viajantes ${infoViajante.companhia}
-   - Destinos que fiquem entre 80% e 105% orçamento estipulado para voos de ${infoViajante.orcamento} ${infoViajante.moeda}
+Baseado no perfil de viagem de ${infoViajante.companhia} com preferência por ${infoViajante.preferencia}, vou selecionar destinos que:
+1. Tenham aeroportos grandes próximos em até 150km
+2. Ofereçam experiências alinhadas com as preferências
+3. Respeitem o orçamento de ${infoViajante.orcamento} ${infoViajante.moeda} para voos de ida e volta
+4. Estejam a uma distância adequada de ${infoViajante.cidadeOrigem}
+</thinking>
 
-2) Para cada destino, determine:
-   - Preço realista de voo
-   - Pontos turísticos específicos e conhecidos
-   - Eventos sazonais ou especiais no período da viagem
-   - Comentário personalizado da Tripinha mencionando detalhes sensoriais
-   - Informações práticas de clima para o período
+Crie recomendações de destinos de viagem em JSON para este perfil:
 
-3) Diversifique suas recomendações:
-   - topPick: Destino com máxima adequação ao perfil
-   - alternativas: 4 destinos diversos, custo e experiências
-   - surpresa: Destino incomum mas encantador (pode ser mais desafiador, desde que viável)
+PERFIL DO VIAJANTE:
+- Origem: ${infoViajante.cidadeOrigem}
+- Viajantes: ${infoViajante.companhia} (${infoViajante.pessoas} pessoa(s))
+- Preferências: ${infoViajante.preferencia}
+- Datas: ${dataIda} a ${dataVolta}
+- ${mensagemOrcamento}
 
-## Formato de Retorno (JSON estrito)
+🚨 RESTRIÇÕES CRÍTICAS:
+- APENAS cidades aeroportos grandes próximos em até 150km
+
+✅ DESTINOS VÁLIDOS (exemplos):
+- BRASIL: São Paulo, Rio de Janeiro, Salvador, Recife, Fortaleza, Brasília, Belo Horizonte
+- INTERNACIONAL: Buenos Aires, Santiago, Lima, Bogotá, Cidade do México, Nova York, Paris, Londres, Roma, Tóquio
+
+⚠️ CÓDIGOS IATA OBRIGATÓRIOS: Use APENAS aeroportos principais:
+- São Paulo → GRU, Rio de Janeiro → GIG, Buenos Aires → EZE, Santiago → SCL, Lima → LIM
+- Londres → LHR, Paris → CDG, Nova York → JFK, Tóquio → HND
+
+🌍 CRITÉRIO DE DISTÂNCIA: Destinos devem estar a pelo menos 300km da origem
+
+RETORNE JSON com esta estrutura exata:
 {
   "topPick": {
-    "destino": "Nome da Cidade",
-    "pais": "Nome do País",
+    "destino": "Nome da METRÓPOLE",
+    "pais": "Nome do País", 
     "codigoPais": "XX",
-    "descricao": "Breve descrição de 1-2 frases sobre o destino",
-    "porque": "Razão específica para este viajante visitar este destino",
-    "destaque": "Uma experiência/atividade única neste destino",
-    "comentario": "Comentário entusiasmado da Tripinha mencionando um ponto turístico específico e aspectos sensoriais",
-    "pontosTuristicos": ["Nome do Primeiro Ponto", "Nome do Segundo Ponto"],
-    "eventos": ["Festival ou evento especial durante o período", "Outro evento relevante se houver"],
+    "descricao": "Descrição breve",
+    "porque": "Razão para visitar",
+    "destaque": "Experiência única",
+    "comentario": "Comentário da Tripinha mencionando 1 ponto turístico específico",
+    "pontosTuristicos": ["Ponto 1", "Ponto 2"],
     "clima": {
-      "temperatura": "Faixa de temperatura média esperada (ex: 15°C-25°C)",
-      "condicoes": "Descrição das condições típicas (ex: ensolarado com chuvas ocasionais)",
-      "recomendacoes": "Dicas relacionadas ao clima (o que levar/vestir)"
+      "temperatura": "15°C-25°C",
+      "condicoes": "Ensolarado",
+      "recomendacoes": "Roupas leves"
     },
     "aeroporto": {
       "codigo": "XYZ",
@@ -440,22 +459,164 @@ ${adaptacoesPorTipo[infoViajante.companhia] || "Considere experiências versáte
     }
   },
   "alternativas": [
-    // EXATAMENTE 4 destinos com estrutura similar à descrita acima
-    // Cada destino alternativo deve ser de uma região/continente diferente para maximizar a diversidade
+    {
+      "destino": "METRÓPOLE",
+      "pais": "País",
+      "codigoPais": "XX", 
+      "porque": "Razão",
+      "pontoTuristico": "Ponto turístico",
+      "clima": {"temperatura": "20°C-30°C"},
+      "aeroporto": {"codigo": "ABC", "nome": "Aeroporto Internacional Principal"},
+      "preco": {"voo": 1200, "hotel": 180}
+    }
   ],
   "surpresa": {
-    // Mesma estrutura do topPick
-    // Deve ser um destino menos óbvio, mas igualmente adequado
-  },
-  "estacaoViagem": "${estacaoViagem}"
+    "destino": "METRÓPOLE Surpresa",
+    "pais": "País",
+    "codigoPais": "XX",
+    "descricao": "Descrição",
+    "porque": "Razão surpresa",
+    "destaque": "Experiência única",
+    "comentario": "Comentário Tripinha com ponto turístico",
+    "pontosTuristicos": ["Ponto 1", "Ponto 2"],
+    "clima": {
+      "temperatura": "18°C-28°C",
+      "condicoes": "Agradável",
+      "recomendacoes": "Roupas variadas"
+    },
+    "aeroporto": {"codigo": "DEF", "nome": "Aeroporto Internacional Principal"},
+    "preco": {"voo": 1800, "hotel": 250}
+  }
 }
 
-## Verificação Final Obrigatória - CONFIRME QUE:
-- ✓ Considerou eventos sazonais, clima e atrações para CADA destino
-- ✓ Todos os comentários da Tripinha mencionam pontos turísticos específicos e incluem observações sensoriais
-- ✓ As recomendações estão adaptadas para viajantes ${infoViajante.companhia}
-- ✓ Todos os destinos incluem código IATA válido do aeroporto
-- ✓ Diversificou geograficamente as alternativas`;
+CRÍTICO:
+- Use APENAS códigos IATA de aeroportos principais
+- Inclua EXATAMENTE 4 destinos em "alternativas"
+- Os destinos devem respeitar o orçamento para voos de ida e volta
+- Tripinha é uma cachorrinha aventureira 🐾`;
+}
+
+// =======================
+// Prompt Deepseek padrão (mais conciso)
+// =======================
+function gerarPromptParaDeepseek(dados) {
+  const infoViajante = {
+    companhia: getCompanhiaText(dados.companhia || 0),
+    preferencia: getPreferenciaText(dados.preferencia_viagem || 0),
+    cidadeOrigem: dados.cidade_partida?.name || 'origem não especificada',
+    orcamento: dados.orcamento_valor || 'flexível',
+    moeda: dados.moeda_escolhida || 'BRL',
+    pessoas: dados.quantidade_familia || dados.quantidade_amigos || 1
+  };
+  
+  let dataIda = 'não especificada';
+  let dataVolta = 'não especificada';
+  
+  if (dados.datas) {
+    if (typeof dados.datas === 'string' && dados.datas.includes(',')) {
+      const partes = dados.datas.split(',');
+      dataIda = partes[0] || 'não especificada';
+      dataVolta = partes[1] || 'não especificada';
+    } else if (dados.datas.dataIda && dados.datas.dataVolta) {
+      dataIda = dados.datas.dataIda;
+      dataVolta = dados.datas.dataVolta;
+    }
+  }
+  
+  const mensagemOrcamento = infoViajante.orcamento !== 'flexível' ?
+    `Orçamento máximo para voos: ${infoViajante.orcamento} ${infoViajante.moeda}` : 
+    'Orçamento flexível';
+
+  return `Crie recomendações de destinos de viagem em JSON:
+
+PERFIL:
+- Origem: ${infoViajante.cidadeOrigem}
+- Viajantes: ${infoViajante.companhia} (${infoViajante.pessoas} pessoa(s))
+- Preferências: ${infoViajante.preferencia}
+- Datas: ${dataIda} a ${dataVolta}
+- ${mensagemOrcamento}
+
+🚨 RESTRIÇÕES CRÍTICAS:
+- APENAS cidades GRANDES com aeroportos grandes próximos em até 150km
+
+✅ DESTINOS VÁLIDOS (exemplos):
+- BRASIL: São Paulo, Rio de Janeiro, Salvador, Recife, Fortaleza, Brasília, Belo Horizonte
+- INTERNACIONAL: Buenos Aires, Santiago, Lima, Bogotá, Cidade do México, Nova York, Paris, Londres, Roma, Tóquio
+
+⚠️ CÓDIGOS IATA OBRIGATÓRIOS: Use APENAS aeroportos principais internacionais:
+- São Paulo → GRU (Guarulhos)
+- Rio de Janeiro → GIG (Galeão) 
+- Buenos Aires → EZE (Ezeiza)
+- Santiago → SCL (Arturo Merino Benítez)
+- Lima → LIM (Jorge Chávez)
+- Londres → LHR (Heathrow)
+- Paris → CDG (Charles de Gaulle)
+- Nova York → JFK (Kennedy)
+- Tóquio → HND (Haneda)
+
+🌍 CRITÉRIO DE DISTÂNCIA: Destinos devem estar a pelo menos 300km da origem
+
+RETORNE JSON com esta estrutura exata:
+{
+  "topPick": {
+    "destino": "Nome da METRÓPOLE",
+    "pais": "Nome do País", 
+    "codigoPais": "XX",
+    "descricao": "Descrição breve",
+    "porque": "Razão para visitar",
+    "destaque": "Experiência única",
+    "comentario": "Comentário da Tripinha mencionando 1 ponto turístico específico",
+    "pontosTuristicos": ["Ponto 1", "Ponto 2"],
+    "clima": {
+      "temperatura": "15°C-25°C",
+      "condicoes": "Ensolarado",
+      "recomendacoes": "Roupas leves"
+    },
+    "aeroporto": {
+      "codigo": "XYZ",
+      "nome": "Nome do Aeroporto Internacional Principal"
+    },
+    "preco": {
+      "voo": 1500,
+      "hotel": 200
+    }
+  },
+  "alternativas": [
+    {
+      "destino": "METRÓPOLE",
+      "pais": "País",
+      "codigoPais": "XX", 
+      "porque": "Razão",
+      "pontoTuristico": "Ponto turístico",
+      "clima": {"temperatura": "20°C-30°C"},
+      "aeroporto": {"codigo": "ABC", "nome": "Aeroporto Internacional Principal"},
+      "preco": {"voo": 1200, "hotel": 180}
+    }
+  ],
+  "surpresa": {
+    "destino": "METRÓPOLE Surpresa",
+    "pais": "País",
+    "codigoPais": "XX",
+    "descricao": "Descrição",
+    "porque": "Razão surpresa",
+    "destaque": "Experiência única",
+    "comentario": "Comentário Tripinha com ponto turístico",
+    "pontosTuristicos": ["Ponto 1", "Ponto 2"],
+    "clima": {
+      "temperatura": "18°C-28°C",
+      "condicoes": "Agradável",
+      "recomendacoes": "Roupas variadas"
+    },
+    "aeroporto": {"codigo": "DEF", "nome": "Aeroporto Internacional Principal"},
+    "preco": {"voo": 1800, "hotel": 250}
+  }
+}
+
+CRÍTICO:
+- Use APENAS códigos IATA de aeroportos INTERNACIONAIS principais
+- Inclua EXATAMENTE 4 destinos em "alternativas"
+- Destinos que respeitem o orçamento de voos de ida e volta
+- Tripinha é uma cachorrinha aventureira 🐾`;
 }
 
 // =======================
@@ -463,17 +624,44 @@ ${adaptacoesPorTipo[infoViajante.companhia] || "Considere experiências versáte
 // =======================
 async function callAIAPI(provider, prompt, requestData) {
   const apiConfig = {
+    deepseek_r1: {
+      url: 'https://api.deepseek.com/v1/chat/completions', 
+      header: 'Authorization',
+      prefix: 'Bearer',
+      model: 'deepseek-r1',
+      systemMessage: 'Você é um especialista em viagens altamente qualificado. Analise cuidadosamente o perfil do viajante e retorne apenas JSON válido com destinos detalhados que sejam grandes metrópoles com aeroportos internacionais.',
+      temperature: 0.1,  // Temperatura muito baixa para máxima precisão
+      max_tokens: 4000,   // Mais tokens para permitir raciocínio complexo
+      timeout: CONFIG.timeout.deepseek_r1
+    },
     deepseek: {
       url: 'https://api.deepseek.com/v1/chat/completions', 
       header: 'Authorization',
       prefix: 'Bearer',
-      model: 'deepseek-reasoner',
-      systemMessage: 'Você é um especialista em viagens com experiência em destinos globais. Retorne apenas JSON com destinos detalhados, respeitando o orçamento para voos.',
+      model: 'deepseek-chat',
+      systemMessage: 'Você é um especialista em viagens. Seja conciso e retorne apenas JSON válido com destinos detalhados.',
       temperature: 0.5,
-      max_tokens: 3000,
-      additionalParams: {
-        reasoner_enabled: true
-      }
+      max_tokens: 2500,
+      response_format: { type: 'json_object' },
+      timeout: CONFIG.timeout.deepseek_r1
+    },
+    openai: {
+      url: 'https://api.openai.com/v1/chat/completions',
+      header: 'Authorization',
+      prefix: 'Bearer',
+      model: 'gpt-3.5-turbo',
+      systemMessage: 'Você é um especialista em viagens. Retorne apenas JSON com 4 destinos alternativos, respeitando o orçamento para voos.',
+      temperature: 0.2,
+      max_tokens: 2000
+    },
+    claude: {
+      url: 'https://api.anthropic.com/v1/messages',
+      header: 'x-api-key',
+      prefix: '',
+      model: 'claude-3-haiku-20240307',
+      systemMessage: 'Você é um especialista em viagens. Retorne apenas JSON com 4 destinos alternativos, respeitando o orçamento para voos.',
+      temperature: 0.7,
+      max_tokens: 2000
     },
     perplexity: {
       url: 'https://api.perplexity.ai/chat/completions',
@@ -483,24 +671,6 @@ async function callAIAPI(provider, prompt, requestData) {
       systemMessage: 'Você é um especialista em viagens. Sua prioridade é não exceder o orçamento para voos. Retorne apenas JSON puro com 4 destinos alternativos.',
       temperature: 0.5,
       max_tokens: 2000
-    },
-    openai: {
-      url: 'https://api.openai.com/v1/chat/completions',
-      header: 'Authorization',
-      prefix: 'Bearer',
-      model: 'gpt-3.5-turbo',
-      systemMessage: 'Você é um especialista em viagens. Retorne apenas JSON com 4 destinos alternativos, respeitando o orçamento para voos.',
-      temperature: 0.7,
-      max_tokens: 2000
-    },
-    claude: {
-      url: 'https://api.anthropic.com/v1/messages',
-      header: 'anthropic-api-key',
-      prefix: '',
-      model: 'claude-3-haiku-20240307',
-      systemMessage: 'Você é um especialista em viagens. Retorne apenas JSON com 4 destinos alternativos, respeitando o orçamento para voos.',
-      temperature: 0.7,
-      max_tokens: 2000
     }
   };
   
@@ -509,34 +679,31 @@ async function callAIAPI(provider, prompt, requestData) {
   }
   
   const config = apiConfig[provider];
-  const apiKey = process.env[`${provider.toUpperCase()}_API_KEY`];
+  const apiKey = process.env[`${provider === 'deepseek_r1' ? 'DEEPSEEK' : provider.toUpperCase()}_API_KEY`];
   
   if (!apiKey) {
     throw new Error(`Chave da API ${provider} não configurada`);
   }
 
-    // Configuração dos cabeçalhos
-  const headers = {
-    'Content-Type': 'application/json'
-  };
-  headers[config.header] = config.prefix ? `${config.prefix} ${apiKey}` : apiKey;
-
-  // Adicione um log para verificar os headers
-  console.log('Headers:', headers);
-  
-  const finalPrompt = provider === 'deepseek' 
-    ? gerarPromptParaDeepseekReasoner(requestData)
-    : `${prompt}
+  // Usar prompt específico para DeepSeek R1, DeepSeek padrão ou prompt genérico para outros
+  let finalPrompt;
+  if (provider === 'deepseek_r1') {
+    finalPrompt = gerarPromptParaDeepseekR1(requestData);
+  } else if (provider === 'deepseek') {
+    finalPrompt = gerarPromptParaDeepseek(requestData);
+  } else {
+    finalPrompt = `${prompt}
   
 IMPORTANTE: 
-1. Cada voo DEVE respeitar o orçamento.
-2. Retorne apenas JSON.
+1. Cada destino DEVE respeitar o orçamento para voo de ida e volta.
+2. Retorne apenas JSON válido.
 3. Forneça 4 destinos alternativos.
 4. Inclua pontos turísticos específicos.
 5. Inclua o código IATA de cada aeroporto.`;
+  }
 
   try {
-    utils.log(`Enviando requisição para ${provider}...`, null);
+    utils.log(`Enviando requisição para ${provider} (timeout: ${config.timeout || CONFIG.timeout.request}ms)...`, null);
     
     let requestData;
     
@@ -545,10 +712,6 @@ IMPORTANTE:
         model: config.model,
         max_tokens: config.max_tokens || 2000,
         messages: [
-          {
-            role: "system",
-            content: config.systemMessage
-          },
           {
             role: "user",
             content: finalPrompt
@@ -573,8 +736,9 @@ IMPORTANTE:
         max_tokens: config.max_tokens || 2000
       };
       
-      if (config.additionalParams) {
-        Object.assign(requestData, config.additionalParams);
+      // Adicionar response_format para DeepSeek padrão (não para R1)
+      if (provider === 'deepseek' && config.response_format) {
+        requestData.response_format = config.response_format;
       }
       
       if (provider === 'perplexity') {
@@ -591,12 +755,18 @@ IMPORTANTE:
       headers['anthropic-version'] = '2023-06-01';
     }
     
-    const response = await apiClient({
+    // Usar timeout específico para cada provedor
+    const timeoutValue = config.timeout || CONFIG.timeout.request;
+    
+    // Usar cliente específico para DeepSeek R1
+    const client = (provider === 'deepseek_r1' || provider === 'deepseek') ? deepseekR1Client : apiClient;
+    
+    const response = await client({
       method: 'post',
       url: config.url,
       headers,
       data: requestData,
-      timeout: config.timeout || CONFIG.timeout.request
+      timeout: timeoutValue
     });
     
     let content;
@@ -614,6 +784,30 @@ IMPORTANTE:
     }
     
     utils.log(`Conteúdo recebido da API ${provider} (primeiros 200 caracteres):`, content.substring(0, 200));
+    
+    if (provider === 'deepseek_r1') {
+      try {
+        // DeepSeek R1 pode incluir tags de pensamento, vamos extrair apenas o JSON
+        let cleanContent = content;
+        
+        // Remove tags de pensamento se existirem
+        if (content.includes('<thinking>')) {
+          cleanContent = content.replace(/<thinking>[\s\S]*?<\/thinking>/g, '').trim();
+        }
+        
+        const jsonConteudo = utils.extrairJSONDaResposta(cleanContent);
+        if (jsonConteudo) {
+          const dados = JSON.parse(jsonConteudo);
+          utils.log('DeepSeek R1 forneceu destinos válidos:', {
+            topPick: dados.topPick?.destino,
+            alternativas: dados.alternativas?.map(a => a.destino).join(', '),
+            surpresa: dados.surpresa?.destino
+          });
+        }
+      } catch (error) {
+        console.error('Erro ao analisar resposta do DeepSeek R1:', error.message);
+      }
+    }
     
     if (provider === 'deepseek') {
       try {
@@ -634,6 +828,12 @@ IMPORTANTE:
     return utils.extrairJSONDaResposta(content);
   } catch (error) {
     console.error(`Erro na chamada à API ${provider}:`, error.message);
+    
+    // Log específico para timeout
+    if (error.code === 'ECONNABORTED' || error.message.includes('timeout') || error.message.includes('aborted')) {
+      console.error(`Timeout na API ${provider} após ${config.timeout || CONFIG.timeout.request}ms`);
+    }
+    
     if (error.response) {
       utils.log(`Resposta de erro (${provider}):`, error.response.data);
     }
@@ -698,11 +898,12 @@ const pontosPopulares = {
   "generico_America": ["Parques nacionais", "Centros urbanos"]
 };
 
-function ensureTouristAttractionsAndComments(jsonString, requestData) {
+async function ensureTouristAttractionsAndComments(jsonString, requestData) {
   try {
     const data = typeof jsonString === 'string' ? JSON.parse(jsonString) : jsonString;
     let modificado = false;
     
+    // Processar topPick
     if (data.topPick) {
       if (!data.topPick.pontosTuristicos?.length || data.topPick.pontosTuristicos.length < 2) {
         const destino = data.topPick.destino;
@@ -725,12 +926,22 @@ function ensureTouristAttractionsAndComments(jsonString, requestData) {
         modificado = true;
       }
       
-      if (!data.topPick.aeroporto?.codigo) {
-        data.topPick.aeroporto = {
-          codigo: obterCodigoIATAPadrao(data.topPick.destino, data.topPick.pais),
-          nome: `Aeroporto de ${data.topPick.destino}`
-        };
-        modificado = true;
+      // Validar e corrigir aeroporto do topPick
+      if (!data.topPick.aeroporto?.codigo || !utils.validarCodigoIATA(data.topPick.aeroporto.codigo)) {
+        try {
+          const aeroportoValidado = await validarECorrigirAeroporto(
+            data.topPick.destino, 
+            data.topPick.pais, 
+            data.topPick.aeroporto?.codigo
+          );
+          data.topPick.aeroporto = aeroportoValidado;
+          modificado = true;
+          console.log(`Aeroporto corrigido para ${data.topPick.destino}: ${aeroportoValidado.codigo}`);
+        } catch (error) {
+          console.warn(`Erro ao validar aeroporto para ${data.topPick.destino}:`, error.message);
+          data.topPick.aeroporto = obterCodigoIATAMelhorado(data.topPick.destino, data.topPick.pais);
+          modificado = true;
+        }
       }
       
       if (!data.topPick.clima) {
@@ -743,6 +954,7 @@ function ensureTouristAttractionsAndComments(jsonString, requestData) {
       }
     }
     
+    // Processar surpresa
     if (data.surpresa) {
       if (!data.surpresa.pontosTuristicos?.length || data.surpresa.pontosTuristicos.length < 2) {
         const destino = data.surpresa.destino;
@@ -765,12 +977,22 @@ function ensureTouristAttractionsAndComments(jsonString, requestData) {
         modificado = true;
       }
       
-      if (!data.surpresa.aeroporto?.codigo) {
-        data.surpresa.aeroporto = {
-          codigo: obterCodigoIATAPadrao(data.surpresa.destino, data.surpresa.pais),
-          nome: `Aeroporto de ${data.surpresa.destino}`
-        };
-        modificado = true;
+      // Validar e corrigir aeroporto da surpresa
+      if (!data.surpresa.aeroporto?.codigo || !utils.validarCodigoIATA(data.surpresa.aeroporto.codigo)) {
+        try {
+          const aeroportoValidado = await validarECorrigirAeroporto(
+            data.surpresa.destino, 
+            data.surpresa.pais, 
+            data.surpresa.aeroporto?.codigo
+          );
+          data.surpresa.aeroporto = aeroportoValidado;
+          modificado = true;
+          console.log(`Aeroporto corrigido para ${data.surpresa.destino}: ${aeroportoValidado.codigo}`);
+        } catch (error) {
+          console.warn(`Erro ao validar aeroporto para ${data.surpresa.destino}:`, error.message);
+          data.surpresa.aeroporto = obterCodigoIATAMelhorado(data.surpresa.destino, data.surpresa.pais);
+          modificado = true;
+        }
       }
       
       if (!data.surpresa.clima) {
@@ -783,24 +1005,37 @@ function ensureTouristAttractionsAndComments(jsonString, requestData) {
       }
     }
     
+    // Processar alternativas
     if (!data.alternativas || !Array.isArray(data.alternativas)) {
       data.alternativas = [];
       modificado = true;
     }
     
-    data.alternativas.forEach(alternativa => {
+    // Validar aeroportos das alternativas existentes
+    for (let i = 0; i < data.alternativas.length; i++) {
+      const alternativa = data.alternativas[i];
+      
       if (!alternativa.pontoTuristico) {
         const destino = alternativa.destino;
         alternativa.pontoTuristico = (pontosPopulares[destino] || ["Atrações turísticas"])[0];
         modificado = true;
       }
       
-      if (!alternativa.aeroporto?.codigo) {
-        alternativa.aeroporto = {
-          codigo: obterCodigoIATAPadrao(alternativa.destino, alternativa.pais),
-          nome: `Aeroporto de ${alternativa.destino}`
-        };
-        modificado = true;
+      if (!alternativa.aeroporto?.codigo || !utils.validarCodigoIATA(alternativa.aeroporto.codigo)) {
+        try {
+          const aeroportoValidado = await validarECorrigirAeroporto(
+            alternativa.destino, 
+            alternativa.pais, 
+            alternativa.aeroporto?.codigo
+          );
+          alternativa.aeroporto = aeroportoValidado;
+          modificado = true;
+          console.log(`Aeroporto corrigido para ${alternativa.destino}: ${aeroportoValidado.codigo}`);
+        } catch (error) {
+          console.warn(`Erro ao validar aeroporto para ${alternativa.destino}:`, error.message);
+          alternativa.aeroporto = obterCodigoIATAMelhorado(alternativa.destino, alternativa.pais);
+          modificado = true;
+        }
       }
       
       if (!alternativa.clima) {
@@ -809,32 +1044,36 @@ function ensureTouristAttractionsAndComments(jsonString, requestData) {
         };
         modificado = true;
       }
-    });
+    }
     
+    // Completar alternativas se necessário (usando aeroportos validados)
     const destinosReserva = ["Lisboa", "Barcelona", "Roma", "Tóquio"];
     const paisesReserva = ["Portugal", "Espanha", "Itália", "Japão"];
     const codigosPaisesReserva = ["PT", "ES", "IT", "JP"];
-    const codigosIATAReserva = ["LIS", "BCN", "FCO", "HND"];
     
     while (data.alternativas.length < 4) {
       const index = data.alternativas.length % destinosReserva.length;
       const destino = destinosReserva[index];
+      const pais = paisesReserva[index];
       const pontosConhecidos = pontosPopulares[destino] || ["Atrações turísticas"];
+      
+      // Usar aeroporto validado para destinos de reserva
+      const aeroportoReserva = obterCodigoIATAMelhorado(destino, pais);
       
       data.alternativas.push({
         destino: destino,
-        pais: paisesReserva[index],
+        pais: pais,
         codigoPais: codigosPaisesReserva[index],
         porque: `Cidade com rica história, gastronomia única e atmosfera encantadora`,
         pontoTuristico: pontosConhecidos[0] || "Atrações turísticas",
-        aeroporto: {
-          codigo: codigosIATAReserva[index],
-          nome: `Aeroporto de ${destino}`
-        },
+        aeroporto: aeroportoReserva,
         clima: {
           temperatura: "Temperatura típica para a estação"
         },
-
+        preco: {
+          voo: 1500,
+          hotel: 200
+        }
       });
       
       modificado = true;
@@ -847,43 +1086,388 @@ function ensureTouristAttractionsAndComments(jsonString, requestData) {
     
     return modificado ? JSON.stringify(data) : jsonString;
   } catch (error) {
-    console.error("Erro ao processar pontos turísticos:", error);
+    console.error("Erro ao processar pontos turísticos e aeroportos:", error);
     return jsonString;
   }
 }
 
-function obterCodigoIATAPadrao(cidade, pais) {
-  const mapeamentoIATA = {
-    'São Paulo': 'GRU', 'Rio de Janeiro': 'GIG', 'Buenos Aires': 'EZE',
-    'Santiago': 'SCL', 'Lima': 'LIM', 'Bogotá': 'BOG',
-    'Cartagena': 'CTG', 'Cidade do México': 'MEX', 'Cancún': 'CUN',
-    'Nova York': 'JFK', 'Los Angeles': 'LAX', 'Miami': 'MIA',
-    'Londres': 'LHR', 'Paris': 'CDG', 'Roma': 'FCO',
-    'Madri': 'MAD', 'Lisboa': 'LIS', 'Barcelona': 'BCN',
-    'Tóquio': 'HND', 'Dubai': 'DXB', 'Sydney': 'SYD',
-    'Amsterdã': 'AMS', 'Berlim': 'BER', 'Munique': 'MUC',
-    'Porto': 'OPO', 'Praga': 'PRG', 'Viena': 'VIE',
-    'Bangkok': 'BKK', 'Singapura': 'SIN', 'Hong Kong': 'HKG',
-    'Toronto': 'YYZ', 'Vancouver': 'YVR', 'Montreal': 'YUL'
+// =======================
+// Filtros para garantir aeroportos principais
+// =======================
+
+// Lista de aeroportos pequenos/regionais que devem ser evitados
+const aeroportosProibidos = new Set([
+  'BQQ', 'CPQ', 'BZC', 'CAW', 'CXJ', 'JDO', 'PAV', 'PHB', 'LDB', 'IOS',
+  'PIU', 'PNZ', 'QAK', 'SLZ', 'TFF', 'TOW', 'ITB', 'JTI', 'AFL', 'CDJ',
+  'IZA', 'IPU', 'PBU', 'QDV', 'QNV', 'SBJ', 'TKS', 'XAP', 'CFB', 'FLN',
+  'JPA', 'MCZ', 'PNB', 'SJP', 'UNA', 'URG', 'VCP', 'NVT', 'RAO', 'PGZ'
+]);
+
+// Lista de aeroportos principais válidos (com voos comerciais regulares)
+const aeroportosPrincipais = new Set([
+  // Brasil - Principais
+  'GRU', 'GIG', 'BSB', 'CNF', 'SSA', 'FOR', 'REC', 'POA', 'CWB', 'MAO',
+  'BEL', 'CGB', 'FLN', 'VIX', 'AJU', 'JPA', 'THE', 'PMW', 'PVH', 'MCZ',
+  
+  // América do Sul - Principais
+  'EZE', 'AEP', 'SCL', 'LIM', 'BOG', 'CTG', 'MDE', 'UIO', 'MVD', 'ASU',
+  'LPB', 'CBB', 'VVI', 'CCS', 'GYE', 'GPS', 'PDP', 'IGU',
+  
+  // América do Norte - Principais
+  'JFK', 'LAX', 'ORD', 'DFW', 'DEN', 'SFO', 'SEA', 'LAS', 'PHX', 'IAH',
+  'MIA', 'MCO', 'BOS', 'ATL', 'CLT', 'DTW', 'MSP', 'PHL', 'LGA', 'BWI',
+  'YYZ', 'YVR', 'YUL', 'YOW', 'YYC', 'MEX', 'CUN', 'PVR', 'SJD', 'MTY',
+  
+  // Europa - Principais
+  'LHR', 'CDG', 'FRA', 'AMS', 'MAD', 'FCO', 'MUC', 'ZUR', 'VIE', 'ARN',
+  'CPH', 'OSL', 'HEL', 'LIS', 'OPO', 'BCN', 'BRU', 'DUS', 'HAM', 'STR',
+  'PRG', 'WAW', 'BUD', 'SOF', 'OTP', 'ATH', 'LCA', 'SKG', 'DBV', 'LJU',
+  
+  // Ásia - Principais
+  'NRT', 'HND', 'KIX', 'ICN', 'PVG', 'PEK', 'CAN', 'SHA', 'HKG', 'TPE',
+  'SIN', 'BKK', 'KUL', 'CGK', 'MNL', 'BOM', 'DEL', 'BLR', 'MAA', 'CCU',
+  
+  // Oriente Médio/África - Principais
+  'DXB', 'DOH', 'AUH', 'IST', 'CAI', 'JNB', 'CPT', 'DUR', 'LOS', 'ACC',
+  
+  // Oceania - Principais
+  'SYD', 'MEL', 'BNE', 'PER', 'AKL', 'CHC', 'WLG', 'PPT', 'NAN', 'SUV'
+]);
+
+// Coordenadas aproximadas das principais cidades (para cálculo de distância)
+const coordenadasCidades = {
+  'São Paulo': { lat: -23.5505, lon: -46.6333 },
+  'Rio de Janeiro': { lat: -22.9068, lon: -43.1729 },
+  'Brasília': { lat: -15.7942, lon: -47.8822 },
+  'Buenos Aires': { lat: -34.6037, lon: -58.3816 },
+  'Santiago': { lat: -33.4489, lon: -70.6693 },
+  'Lima': { lat: -12.0464, lon: -77.0428 },
+  'Bogotá': { lat: 4.7110, lon: -74.0721 },
+  'Nova York': { lat: 40.7128, lon: -74.0060 },
+  'Los Angeles': { lat: 34.0522, lon: -118.2437 },
+  'Miami': { lat: 25.7617, lon: -80.1918 },
+  'Londres': { lat: 51.5074, lon: -0.1278 },
+  'Paris': { lat: 48.8566, lon: 2.3522 },
+  'Roma': { lat: 41.9028, lon: 12.4964 },
+  'Madrid': { lat: 40.4168, lon: -3.7038 },
+  'Lisboa': { lat: 38.7223, lon: -9.1393 },
+  'Barcelona': { lat: 41.3851, lon: 2.1734 },
+  'Amsterdã': { lat: 52.3676, lon: 4.9041 },
+  'Berlim': { lat: 52.5200, lon: 13.4050 },
+  'Tóquio': { lat: 35.6762, lon: 139.6503 },
+  'Singapura': { lat: 1.3521, lon: 103.8198 },
+  'Bangkok': { lat: 13.7563, lon: 100.5018 },
+  'Dubai': { lat: 25.2048, lon: 55.2708 },
+  'Sydney': { lat: -33.8688, lon: 151.2093 }
+};
+
+// Calcular distância entre duas coordenadas (fórmula de Haversine)
+function calcularDistancia(coord1, coord2) {
+  const R = 6371; // Raio da Terra em km
+  const dLat = (coord2.lat - coord1.lat) * Math.PI / 180;
+  const dLon = (coord2.lon - coord1.lon) * Math.PI / 180;
+  const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.cos(coord1.lat * Math.PI / 180) * Math.cos(coord2.lat * Math.PI / 180) *
+    Math.sin(dLon/2) * Math.sin(dLon/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return R * c;
+}
+
+// Verificar se destino está muito próximo da origem
+function destinoMuitoProximo(cidadeOrigem, cidadeDestino, distanciaMinima = 300) {
+  const coordOrigem = coordenadasCidades[cidadeOrigem];
+  const coordDestino = coordenadasCidades[cidadeDestino];
+  
+  if (!coordOrigem || !coordDestino) {
+    return false; // Se não temos coordenadas, assumimos que não é próximo
+  }
+  
+  const distancia = calcularDistancia(coordOrigem, coordDestino);
+  return distancia < distanciaMinima;
+}
+
+// Validar se é um aeroporto principal válido
+function validarAeroportoPrincipal(codigoIATA, cidade, pais) {
+  // Se está na lista de proibidos, rejeita
+  if (aeroportosProibidos.has(codigoIATA)) {
+    console.warn(`Aeroporto ${codigoIATA} (${cidade}) está na lista de aeroportos pequenos - rejeitado`);
+    return false;
+  }
+  
+  // Se está na lista de principais, aceita
+  if (aeroportosPrincipais.has(codigoIATA)) {
+    return true;
+  }
+  
+  // Se não está em nenhuma lista, faz validação adicional
+  if (codigoIATA && /^[A-Z]{3}$/.test(codigoIATA)) {
+    console.warn(`Aeroporto ${codigoIATA} (${cidade}) não está na lista de aeroportos principais - verificando...`);
+    return true; // Permite, mas com warning
+  }
+  
+  return false;
+}
+
+async function validarECorrigirAeroporto(cidade, pais, codigoAtual) {
+  try {
+    // Primeira validação: verificar se é um aeroporto principal válido
+    if (codigoAtual && validarAeroportoPrincipal(codigoAtual, cidade, pais)) {
+      return { codigo: codigoAtual, nome: `Aeroporto de ${cidade}` };
+    }
+    
+    // Se código atual é proibido ou inválido, busca alternativa
+    if (codigoAtual && aeroportosProibidos.has(codigoAtual)) {
+      console.log(`Aeroporto ${codigoAtual} (${cidade}) é muito pequeno - buscando aeroporto principal da região...`);
+    }
+    
+    // Usa API de Autocomplete do Aviasales para encontrar aeroporto principal
+    const termoBusca = `${cidade} airport`;
+    const response = await axios.get(
+      `https://autocomplete.travelpayouts.com/places2?term=${encodeURIComponent(termoBusca)}&locale=en&types[]=airport`,
+      { timeout: 5000 }
+    );
+    
+    if (response.data && response.data.length > 0) {
+      // Filtra apenas aeroportos principais (não pequenos/regionais)
+      const aeroportosValidos = response.data
+        .filter(item => 
+          item.type === 'airport' && 
+          item.code && 
+          aeroportosPrincipais.has(item.code) && // Deve estar na lista de principais
+          !aeroportosProibidos.has(item.code) && // Não deve estar na lista de proibidos
+          (item.city_name && item.city_name.toLowerCase().includes(cidade.toLowerCase()))
+        )
+        .sort((a, b) => (b.weight || 0) - (a.weight || 0));
+      
+      if (aeroportosValidos.length > 0) {
+        const melhorAeroporto = aeroportosValidos[0];
+        console.log(`Aeroporto principal encontrado para ${cidade}: ${melhorAeroporto.code} - ${melhorAeroporto.name}`);
+        return {
+          codigo: melhorAeroporto.code,
+          nome: melhorAeroporto.name || `Aeroporto de ${cidade}`
+        };
+      }
+      
+      // Se não encontrou aeroporto principal na cidade, busca na região/país
+      console.log(`Não encontrou aeroporto principal em ${cidade}, buscando aeroporto principal da região...`);
+      const aeroportosRegiao = response.data
+        .filter(item => 
+          item.type === 'airport' && 
+          item.code && 
+          aeroportosPrincipais.has(item.code) && 
+          !aeroportosProibidos.has(item.code)
+        )
+        .sort((a, b) => (b.weight || 0) - (a.weight || 0));
+      
+      if (aeroportosRegiao.length > 0) {
+        const aeroportoRegiao = aeroportosRegiao[0];
+        console.log(`Aeroporto regional principal encontrado: ${aeroportoRegiao.code} - ${aeroportoRegiao.name}`);
+        return {
+          codigo: aeroportoRegiao.code,
+          nome: aeroportoRegiao.name
+        };
+      }
+    }
+    
+    // Se não encontrou via API, usa fallback inteligente
+    return obterAeroportoPrincipalMaisProximo(cidade, pais);
+    
+  } catch (error) {
+    console.warn(`Erro ao validar aeroporto para ${cidade}:`, error.message);
+    return obterAeroportoPrincipalMaisProximo(cidade, pais);
+  }
+}
+
+// Função para encontrar aeroporto principal mais próximo
+function obterAeroportoPrincipalMaisProximo(cidade, pais) {
+  // Primeiro, tenta encontrar por cidade na nossa lista expandida
+  const aeroportoMelhorado = obterCodigoIATAMelhorado(cidade, pais);
+  
+  // Verifica se o aeroporto encontrado é principal
+  if (aeroportoMelhorado.codigo && aeroportosPrincipais.has(aeroportoMelhorado.codigo)) {
+    return aeroportoMelhorado;
+  }
+  
+  // Se não é principal, busca o aeroporto principal do país
+  console.log(`Aeroporto de ${cidade} não é principal, usando aeroporto principal do país ${pais}`);
+  
+  const aeroportoPrincipalPorPais = {
+    'Brasil': { codigo: 'GRU', nome: 'Aeroporto Internacional de Guarulhos' },
+    'Argentina': { codigo: 'EZE', nome: 'Aeroporto Internacional Ezeiza' },
+    'Chile': { codigo: 'SCL', nome: 'Aeroporto Internacional Arturo Merino Benítez' },
+    'Colômbia': { codigo: 'BOG', nome: 'Aeroporto Internacional El Dorado' },
+    'Peru': { codigo: 'LIM', nome: 'Aeroporto Internacional Jorge Chávez' },
+    'Uruguai': { codigo: 'MVD', nome: 'Aeroporto Internacional de Carrasco' },
+    'Estados Unidos': { codigo: 'JFK', nome: 'Aeroporto Internacional John F. Kennedy' },
+    'México': { codigo: 'MEX', nome: 'Aeroporto Internacional Benito Juárez' },
+    'Canadá': { codigo: 'YYZ', nome: 'Aeroporto Internacional Pearson' },
+    'Reino Unido': { codigo: 'LHR', nome: 'Aeroporto de Heathrow' },
+    'França': { codigo: 'CDG', nome: 'Aeroporto Charles de Gaulle' },
+    'Itália': { codigo: 'FCO', nome: 'Aeroporto Leonardo da Vinci' },
+    'Espanha': { codigo: 'MAD', nome: 'Aeroporto Adolfo Suárez Madrid-Barajas' },
+    'Portugal': { codigo: 'LIS', nome: 'Aeroporto Humberto Delgado' },
+    'Alemanha': { codigo: 'FRA', nome: 'Aeroporto de Frankfurt' },
+    'Holanda': { codigo: 'AMS', nome: 'Aeroporto de Amsterdã Schiphol' },
+    'Japão': { codigo: 'HND', nome: 'Aeroporto de Haneda' },
+    'China': { codigo: 'PEK', nome: 'Aeroporto Internacional de Pequim' },
+    'Coreia do Sul': { codigo: 'ICN', nome: 'Aeroporto Internacional de Incheon' },
+    'Tailândia': { codigo: 'BKK', nome: 'Aeroporto Suvarnabhumi' },
+    'Singapura': { codigo: 'SIN', nome: 'Aeroporto de Changi' },
+    'Emirados Árabes Unidos': { codigo: 'DXB', nome: 'Aeroporto Internacional de Dubai' },
+    'Austrália': { codigo: 'SYD', nome: 'Aeroporto Kingsford Smith' }
   };
   
-  if (mapeamentoIATA[cidade]) return mapeamentoIATA[cidade];
+  if (aeroportoPrincipalPorPais[pais]) {
+    const aeroportoPais = aeroportoPrincipalPorPais[pais];
+    console.log(`Usando aeroporto principal do ${pais}: ${aeroportoPais.codigo}`);
+    return aeroportoPais;
+  }
   
-  const mapeamentoPais = {
-    'Brasil': 'GRU', 'Estados Unidos': 'JFK', 'México': 'MEX',
-    'Reino Unido': 'LHR', 'França': 'CDG', 'Itália': 'FCO',
-    'Espanha': 'MAD', 'Portugal': 'LIS', 'Japão': 'HND',
-    'China': 'PEK', 'Austrália': 'SYD', 'Alemanha': 'FRA',
-    'Canadá': 'YYZ', 'Tailândia': 'BKK', 'Emirados Árabes': 'DXB',
-    'Colômbia': 'BOG', 'Peru': 'LIM', 'Chile': 'SCL',
-    'Argentina': 'EZE', 'Uruguai': 'MVD', 'Costa Rica': 'SJO'
+  // Último recurso: usar um aeroporto principal genérico da região
+  console.warn(`País ${pais} não encontrado na lista, usando aeroporto genérico`);
+  return { codigo: 'GRU', nome: 'Aeroporto Internacional de Guarulhos' };
+}
+
+// Função de fallback melhorada com lista expandida
+function obterCodigoIATAMelhorado(cidade, pais) {
+  // Lista expandida dos aeroportos principais por cidade
+  const mapeamentoCompleto = {
+    // Brasil
+    'São Paulo': { codigo: 'GRU', nome: 'Aeroporto Internacional de Guarulhos' },
+    'Rio de Janeiro': { codigo: 'GIG', nome: 'Aeroporto Internacional do Galeão' },
+    'Brasília': { codigo: 'BSB', nome: 'Aeroporto Internacional de Brasília' },
+    'Belo Horizonte': { codigo: 'CNF', nome: 'Aeroporto Internacional Tancredo Neves' },
+    'Salvador': { codigo: 'SSA', nome: 'Aeroporto Internacional Deputado Luís Eduardo Magalhães' },
+    'Fortaleza': { codigo: 'FOR', nome: 'Aeroporto Internacional Pinto Martins' },
+    'Recife': { codigo: 'REC', nome: 'Aeroporto Internacional dos Guararapes' },
+    'Manaus': { codigo: 'MAO', nome: 'Aeroporto Internacional Eduardo Gomes' },
+    
+    // América do Sul
+    'Buenos Aires': { codigo: 'EZE', nome: 'Aeroporto Internacional Ezeiza' },
+    'Santiago': { codigo: 'SCL', nome: 'Aeroporto Internacional Arturo Merino Benítez' },
+    'Lima': { codigo: 'LIM', nome: 'Aeroporto Internacional Jorge Chávez' },
+    'Bogotá': { codigo: 'BOG', nome: 'Aeroporto Internacional El Dorado' },
+    'Cartagena': { codigo: 'CTG', nome: 'Aeroporto Internacional Rafael Núñez' },
+    'Medellín': { codigo: 'MDE', nome: 'Aeroporto Internacional José María Córdova' },
+    'Montevidéu': { codigo: 'MVD', nome: 'Aeroporto Internacional de Carrasco' },
+    'La Paz': { codigo: 'LPB', nome: 'Aeroporto Internacional El Alto' },
+    'Quito': { codigo: 'UIO', nome: 'Aeroporto Internacional Mariscal Sucre' },
+    
+    // América do Norte
+    'Nova York': { codigo: 'JFK', nome: 'Aeroporto Internacional John F. Kennedy' },
+    'Los Angeles': { codigo: 'LAX', nome: 'Aeroporto Internacional de Los Angeles' },
+    'Miami': { codigo: 'MIA', nome: 'Aeroporto Internacional de Miami' },
+    'Chicago': { codigo: 'ORD', nome: 'Aeroporto Internacional O\'Hare' },
+    'San Francisco': { codigo: 'SFO', nome: 'Aeroporto Internacional de San Francisco' },
+    'Las Vegas': { codigo: 'LAS', nome: 'Aeroporto Internacional McCarran' },
+    'Toronto': { codigo: 'YYZ', nome: 'Aeroporto Internacional Pearson' },
+    'Vancouver': { codigo: 'YVR', nome: 'Aeroporto Internacional de Vancouver' },
+    'Cidade do México': { codigo: 'MEX', nome: 'Aeroporto Internacional Benito Juárez' },
+    'Cancún': { codigo: 'CUN', nome: 'Aeroporto Internacional de Cancún' },
+    
+    // Europa
+    'Londres': { codigo: 'LHR', nome: 'Aeroporto de Heathrow' },
+    'Paris': { codigo: 'CDG', nome: 'Aeroporto Charles de Gaulle' },
+    'Roma': { codigo: 'FCO', nome: 'Aeroporto Leonardo da Vinci' },
+    'Madri': { codigo: 'MAD', nome: 'Aeroporto Adolfo Suárez Madrid-Barajas' },
+    'Lisboa': { codigo: 'LIS', nome: 'Aeroporto Humberto Delgado' },
+    'Porto': { codigo: 'OPO', nome: 'Aeroporto Francisco Sá Carneiro' },
+    'Barcelona': { codigo: 'BCN', nome: 'Aeroporto de Barcelona-El Prat' },
+    'Amsterdã': { codigo: 'AMS', nome: 'Aeroporto de Amsterdã Schiphol' },
+    'Berlim': { codigo: 'BER', nome: 'Aeroporto de Berlim Brandemburgo' },
+    'Munique': { codigo: 'MUC', nome: 'Aeroporto de Munique' },
+    'Zurique': { codigo: 'ZUR', nome: 'Aeroporto de Zurique' },
+    'Viena': { codigo: 'VIE', nome: 'Aeroporto Internacional de Viena' },
+    'Praga': { codigo: 'PRG', nome: 'Aeroporto Václav Havel de Praga' },
+    'Budapeste': { codigo: 'BUD', nome: 'Aeroporto Ferenc Liszt' },
+    'Varsóvia': { codigo: 'WAW', nome: 'Aeroporto Frederic Chopin' },
+    'Estocolmo': { codigo: 'ARN', nome: 'Aeroporto de Estocolmo-Arlanda' },
+    'Copenhague': { codigo: 'CPH', nome: 'Aeroporto de Copenhague' },
+    'Oslo': { codigo: 'OSL', nome: 'Aeroporto de Oslo' },
+    'Helsinque': { codigo: 'HEL', nome: 'Aeroporto de Helsinque-Vantaa' },
+    
+    // Ásia
+    'Tóquio': { codigo: 'HND', nome: 'Aeroporto de Haneda' },
+    'Osaka': { codigo: 'KIX', nome: 'Aeroporto Internacional de Kansai' },
+    'Seul': { codigo: 'ICN', nome: 'Aeroporto Internacional de Incheon' },
+    'Pequim': { codigo: 'PEK', nome: 'Aeroporto Internacional de Pequim' },
+    'Xangai': { codigo: 'PVG', nome: 'Aeroporto Internacional Pudong' },
+    'Hong Kong': { codigo: 'HKG', nome: 'Aeroporto Internacional de Hong Kong' },
+    'Singapura': { codigo: 'SIN', nome: 'Aeroporto de Changi' },
+    'Bangkok': { codigo: 'BKK', nome: 'Aeroporto Suvarnabhumi' },
+    'Kuala Lumpur': { codigo: 'KUL', nome: 'Aeroporto Internacional de Kuala Lumpur' },
+    'Jacarta': { codigo: 'CGK', nome: 'Aeroporto Internacional Soekarno-Hatta' },
+    'Manila': { codigo: 'MNL', nome: 'Aeroporto Internacional Ninoy Aquino' },
+    'Mumbai': { codigo: 'BOM', nome: 'Aeroporto Internacional Chhatrapati Shivaji' },
+    'Delhi': { codigo: 'DEL', nome: 'Aeroporto Internacional Indira Gandhi' },
+    
+    // Oriente Médio e África
+    'Dubai': { codigo: 'DXB', nome: 'Aeroporto Internacional de Dubai' },
+    'Doha': { codigo: 'DOH', nome: 'Aeroporto Internacional Hamad' },
+    'Abu Dhabi': { codigo: 'AUH', nome: 'Aeroporto Internacional de Abu Dhabi' },
+    'Istambul': { codigo: 'IST', nome: 'Aeroporto de Istambul' },
+    'Cairo': { codigo: 'CAI', nome: 'Aeroporto Internacional do Cairo' },
+    'Cidade do Cabo': { codigo: 'CPT', nome: 'Aeroporto Internacional da Cidade do Cabo' },
+    'Joanesburgo': { codigo: 'JNB', nome: 'Aeroporto Internacional O.R. Tambo' },
+    
+    // Oceania
+    'Sydney': { codigo: 'SYD', nome: 'Aeroporto Kingsford Smith' },
+    'Melbourne': { codigo: 'MEL', nome: 'Aeroporto de Melbourne' },
+    'Auckland': { codigo: 'AKL', nome: 'Aeroporto de Auckland' }
   };
   
-  if (mapeamentoPais[pais]) return mapeamentoPais[pais];
+  // Primeiro, tenta encontrar por cidade exata
+  if (mapeamentoCompleto[cidade]) {
+    return mapeamentoCompleto[cidade];
+  }
   
-  if (cidade?.length >= 3) return cidade.substring(0, 3).toUpperCase();
+  // Depois, tenta por correspondência parcial da cidade
+  for (const [cidadeKey, aeroporto] of Object.entries(mapeamentoCompleto)) {
+    if (cidadeKey.toLowerCase().includes(cidade.toLowerCase()) || 
+        cidade.toLowerCase().includes(cidadeKey.toLowerCase())) {
+      return aeroporto;
+    }
+  }
   
-  return "AAA";
+  // Mapeamento por país (aeroporto principal)
+  const aeroportoPrincipalPorPais = {
+    'Brasil': { codigo: 'GRU', nome: 'Aeroporto Internacional de Guarulhos' },
+    'Argentina': { codigo: 'EZE', nome: 'Aeroporto Internacional Ezeiza' },
+    'Chile': { codigo: 'SCL', nome: 'Aeroporto Internacional Arturo Merino Benítez' },
+    'Colômbia': { codigo: 'BOG', nome: 'Aeroporto Internacional El Dorado' },
+    'Peru': { codigo: 'LIM', nome: 'Aeroporto Internacional Jorge Chávez' },
+    'Uruguai': { codigo: 'MVD', nome: 'Aeroporto Internacional de Carrasco' },
+    'Estados Unidos': { codigo: 'JFK', nome: 'Aeroporto Internacional John F. Kennedy' },
+    'México': { codigo: 'MEX', nome: 'Aeroporto Internacional Benito Juárez' },
+    'Canadá': { codigo: 'YYZ', nome: 'Aeroporto Internacional Pearson' },
+    'Reino Unido': { codigo: 'LHR', nome: 'Aeroporto de Heathrow' },
+    'França': { codigo: 'CDG', nome: 'Aeroporto Charles de Gaulle' },
+    'Itália': { codigo: 'FCO', nome: 'Aeroporto Leonardo da Vinci' },
+    'Espanha': { codigo: 'MAD', nome: 'Aeroporto Adolfo Suárez Madrid-Barajas' },
+    'Portugal': { codigo: 'LIS', nome: 'Aeroporto Humberto Delgado' },
+    'Alemanha': { codigo: 'FRA', nome: 'Aeroporto de Frankfurt' },
+    'Holanda': { codigo: 'AMS', nome: 'Aeroporto de Amsterdã Schiphol' },
+    'Japão': { codigo: 'HND', nome: 'Aeroporto de Haneda' },
+    'China': { codigo: 'PEK', nome: 'Aeroporto Internacional de Pequim' },
+    'Coreia do Sul': { codigo: 'ICN', nome: 'Aeroporto Internacional de Incheon' },
+    'Tailândia': { codigo: 'BKK', nome: 'Aeroporto Suvarnabhumi' },
+    'Singapura': { codigo: 'SIN', nome: 'Aeroporto de Changi' },
+    'Emirados Árabes Unidos': { codigo: 'DXB', nome: 'Aeroporto Internacional de Dubai' },
+    'Austrália': { codigo: 'SYD', nome: 'Aeroporto Kingsford Smith' }
+  };
+  
+  if (aeroportoPrincipalPorPais[pais]) {
+    return aeroportoPrincipalPorPais[pais];
+  }
+  
+  // Último recurso: gera um código genérico (não recomendado)
+  const codigoGenerico = cidade?.length >= 3 ? 
+    cidade.substring(0, 3).toUpperCase() : 'AAA';
+  
+  return {
+    codigo: codigoGenerico,
+    nome: `Aeroporto de ${cidade}`
+  };
 }
 
 // =======================
@@ -1045,7 +1629,7 @@ function generateEmergencyData(dadosUsuario = {}) {
 }
 
 // =======================
-// Geração de prompt padrão
+// Geração de prompt padrão para outros provedores
 // =======================
 function gerarPromptParaDestinos(dados) {
   const infoViajante = {
@@ -1136,7 +1720,7 @@ IMPORTANTE:
 1. Com base na sua experiência traga destinos em que o preço do VOO de IDA e VOLTA sejam PRÓXIMOS do orçamento de ${infoViajante.orcamento} ${infoViajante.moeda}.
 2. Forneça um mix equilibrado: inclua tanto destinos populares quanto alternativas.
 3. Forneça EXATAMENTE 4 destinos alternativos diferentes entre si.
-4. Garanta que os destinos sejam sejam realistas para o orçamento voos de ida e volta partindo de ${infoViajante.cidadeOrigem}.
+4. Garanta que os preços sejam realistas para voos de ida e volta partindo de ${infoViajante.cidadeOrigem}.
 5. Para CADA destino, inclua o código IATA (3 letras) do aeroporto principal.
 6. Para cada destino, INCLUA PONTOS TURÍSTICOS ESPECÍFICOS E CONHECIDOS.
 7. Os comentários da Tripinha DEVEM mencionar pelo menos um dos pontos turísticos do destino.
@@ -1307,22 +1891,76 @@ module.exports = async function handler(req, res) {
     const prompt = gerarPromptParaDestinos(requestData);
     const orcamento = requestData.orcamento_valor ? parseFloat(requestData.orcamento_valor) : null;
     
+    // Verificar provedores disponíveis com prioridade para DeepSeek R1
     const providers = CONFIG.providerOrder.filter(
-      provider => process.env[`${provider.toUpperCase()}_API_KEY`]
+      provider => {
+        const apiKeyName = provider === 'deepseek_r1' ? 'DEEPSEEK_API_KEY' : `${provider.toUpperCase()}_API_KEY`;
+        const apiKey = process.env[apiKeyName];
+        const hasKey = !!apiKey;
+        console.log(`Provedor ${provider}: ${hasKey ? 'Chave configurada' : 'Chave não encontrada'}`);
+        return hasKey;
+      }
     );
     
+    console.log(`Provedores disponíveis: ${providers.join(', ')}`);
+    
+    if (providers.length === 0) {
+      console.error('Nenhuma chave de API configurada');
+      if (!isResponseSent) {
+        isResponseSent = true;
+        clearTimeout(serverTimeout);
+        return res.status(500).json({ 
+          tipo: "erro-config",
+          conteudo: JSON.stringify(generateEmergencyData(requestData)),
+          error: "Nenhuma chave de API configurada"
+        });
+      }
+    }
+    
+    // Tentar obter recomendações com cada provedor
     for (const provider of providers) {
       try {
         console.log(`Tentando obter recomendações via ${provider}...`);
-        const responseAI = await callAIAPI(provider, prompt, requestData);
+        
+        // Retry específico para DeepSeek R1 e DeepSeek devido a timeouts
+        let responseAI;
+        if (provider === 'deepseek_r1') {
+          console.log('Usando DeepSeek R1 com timeout estendido e prompt especializado...');
+          responseAI = await retryAsync(
+            () => callAIAPI(provider, prompt, requestData),
+            3,  // 3 tentativas para DeepSeek R1
+            3000  // 3 segundos entre tentativas
+          );
+        } else if (provider === 'deepseek') {
+          responseAI = await retryAsync(
+            () => callAIAPI(provider, prompt, requestData),
+            3,  // 3 tentativas para DeepSeek
+            2000  // 2 segundos entre tentativas
+          );
+        } else {
+          responseAI = await callAIAPI(provider, prompt, requestData);
+        }
         
         let processedResponse = responseAI;
         if (responseAI && utils.isPartiallyValidJSON(responseAI)) {
-          processedResponse = ensureTouristAttractionsAndComments(responseAI, requestData);
+          processedResponse = await ensureTouristAttractionsAndComments(responseAI, requestData);
         }
         
         if (processedResponse && utils.isValidDestinationJSON(processedResponse, requestData)) {
           utils.log(`Resposta ${provider} válida recebida`, null);
+          
+          // Log específico para DeepSeek R1
+          if (provider === 'deepseek_r1') {
+            try {
+              const parsedResponse = JSON.parse(processedResponse);
+              console.log(`[DeepSeek R1] TopPick: ${parsedResponse.topPick?.destino} (${parsedResponse.topPick?.pais})`);
+              console.log(`[DeepSeek R1] Alternativas: ${parsedResponse.alternativas?.map(a => a.destino).join(', ')}`);
+              console.log(`[DeepSeek R1] Surpresa: ${parsedResponse.surpresa?.destino} (${parsedResponse.surpresa?.pais})`);
+              console.log(`[DeepSeek R1] ✅ Resposta de alta qualidade obtida com raciocínio avançado`);
+            } catch (error) {
+              console.error('Erro ao analisar resposta DeepSeek R1 para log:', error.message);
+            }
+          }
           
           if (provider === 'deepseek') {
             try {
@@ -1373,6 +2011,12 @@ module.exports = async function handler(req, res) {
         }
       } catch (error) {
         console.error(`Erro ao usar ${provider}:`, error.message);
+        
+        // Para DeepSeek R1 e DeepSeek, se der timeout, tenta o próximo provedor
+        if ((provider === 'deepseek_r1' || provider === 'deepseek') && 
+            (error.message.includes('timeout') || error.message.includes('aborted'))) {
+          console.log(`${provider} com timeout - passando para próximo provedor...`);
+        }
       }
     }
     
