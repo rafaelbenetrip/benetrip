@@ -1,3 +1,4 @@
+
 // api/recommendations.js - Endpoint da API Vercel para recomendações de destino
 const axios = require('axios');
 const http = require('http');
@@ -17,8 +18,7 @@ const CONFIG = {
     enabled: true,
     maxLength: 500
   },
-  // Prioridade: Deepseek R1 Reasoner primeiro, depois Perplexity
-  providerOrder: ['deepseek', 'perplexity', 'openai', 'claude']
+  providerOrder: ['perplexity', 'openai', 'claude', 'deepseek']
 };
 
 // =======================
@@ -287,7 +287,7 @@ function obterDatasViagem(dadosUsuario) {
 }
 
 // =======================
-// Prompt Deepseek R1 Reasoner aprimorado
+// Prompt Deepseek Reasoner aprimorado
 // =======================
 function gerarPromptParaDeepseekReasoner(dados) {
   const infoViajante = {
@@ -470,10 +470,10 @@ async function callAIAPI(provider, prompt, requestData) {
       prefix: 'Bearer',
       model: 'deepseek-reasoner',
       systemMessage: 'Você é um especialista em viagens com experiência em destinos globais. Retorne apenas JSON com destinos detalhados, respeitando o orçamento para voos.',
-      temperature: 0.3,
-      max_tokens: 4000,
+      temperature: 0.5,
+      max_tokens: 3000,
       additionalParams: {
-        response_format: { type: "json_object" }
+        reasoner_enabled: true
       }
     },
     perplexity: {
@@ -483,31 +483,25 @@ async function callAIAPI(provider, prompt, requestData) {
       model: 'sonar',
       systemMessage: 'Você é um especialista em viagens. Sua prioridade é não exceder o orçamento para voos. Retorne apenas JSON puro com 4 destinos alternativos.',
       temperature: 0.5,
-      max_tokens: 3000,
-      additionalParams: {
-        response_format: { type: "json_object" }
-      }
+      max_tokens: 2000
     },
     openai: {
       url: 'https://api.openai.com/v1/chat/completions',
       header: 'Authorization',
       prefix: 'Bearer',
-      model: 'gpt-4',
+      model: 'gpt-3.5-turbo',
       systemMessage: 'Você é um especialista em viagens. Retorne apenas JSON com 4 destinos alternativos, respeitando o orçamento para voos.',
       temperature: 0.7,
-      max_tokens: 3000,
-      additionalParams: {
-        response_format: { type: "json_object" }
-      }
+      max_tokens: 2000
     },
     claude: {
       url: 'https://api.anthropic.com/v1/messages',
       header: 'anthropic-api-key',
       prefix: '',
-      model: 'claude-3-5-sonnet-20241022',
+      model: 'claude-3-haiku-20240307',
       systemMessage: 'Você é um especialista em viagens. Retorne apenas JSON com 4 destinos alternativos, respeitando o orçamento para voos.',
       temperature: 0.7,
-      max_tokens: 3000
+      max_tokens: 2000
     }
   };
   
@@ -522,13 +516,14 @@ async function callAIAPI(provider, prompt, requestData) {
     throw new Error(`Chave da API ${provider} não configurada`);
   }
 
-  // Configuração dos cabeçalhos
+    // Configuração dos cabeçalhos
   const headers = {
     'Content-Type': 'application/json'
   };
   headers[config.header] = config.prefix ? `${config.prefix} ${apiKey}` : apiKey;
 
-  console.log(`[${provider.toUpperCase()}] Iniciando chamada à API...`);
+  // Adicione um log para verificar os headers
+  console.log('Headers:', headers);
   
   const finalPrompt = provider === 'deepseek' 
     ? gerarPromptParaDeepseekReasoner(requestData)
@@ -536,30 +531,34 @@ async function callAIAPI(provider, prompt, requestData) {
   
 IMPORTANTE: 
 1. Cada voo DEVE respeitar o orçamento.
-2. Retorne apenas JSON válido.
+2. Retorne apenas JSON.
 3. Forneça 4 destinos alternativos.
 4. Inclua pontos turísticos específicos.
 5. Inclua o código IATA de cada aeroporto.`;
 
   try {
-    utils.log(`[${provider.toUpperCase()}] Enviando requisição...`, null);
+    utils.log(`Enviando requisição para ${provider}...`, null);
     
-    let requestBody;
+    let requestData;
     
     if (provider === 'claude') {
-      requestBody = {
+      requestData = {
         model: config.model,
-        max_tokens: config.max_tokens || 3000,
+        max_tokens: config.max_tokens || 2000,
         messages: [
           {
+            role: "system",
+            content: config.systemMessage
+          },
+          {
             role: "user",
-            content: `Sistema: ${config.systemMessage}\n\nUsuário: ${finalPrompt}`
+            content: finalPrompt
           }
         ],
         temperature: config.temperature || 0.7
       };
     } else {
-      requestBody = {
+      requestData = {
         model: config.model,
         messages: [
           {
@@ -572,13 +571,22 @@ IMPORTANTE:
           }
         ],
         temperature: config.temperature || 0.7,
-        max_tokens: config.max_tokens || 3000
+        max_tokens: config.max_tokens || 2000
       };
       
       if (config.additionalParams) {
-        Object.assign(requestBody, config.additionalParams);
+        Object.assign(requestData, config.additionalParams);
+      }
+      
+      if (provider === 'perplexity') {
+        requestData.response_format = { type: "text" };
       }
     }
+    
+    const headers = {
+      'Content-Type': 'application/json'
+    };
+    headers[config.header] = config.prefix ? `${config.prefix} ${apiKey}` : apiKey;
     
     if (provider === 'claude') {
       headers['anthropic-version'] = '2023-06-01';
@@ -588,8 +596,8 @@ IMPORTANTE:
       method: 'post',
       url: config.url,
       headers,
-      data: requestBody,
-      timeout: CONFIG.timeout.request
+      data: requestData,
+      timeout: config.timeout || CONFIG.timeout.request
     });
     
     let content;
@@ -606,29 +614,29 @@ IMPORTANTE:
       content = response.data.choices[0].message.content;
     }
     
-    console.log(`[${provider.toUpperCase()}] Resposta recebida com sucesso`);
-    utils.log(`[${provider.toUpperCase()}] Conteúdo (primeiros 300 chars):`, content.substring(0, 300));
+    utils.log(`Conteúdo recebido da API ${provider} (primeiros 200 caracteres):`, content.substring(0, 200));
     
     if (provider === 'deepseek') {
       try {
         const jsonConteudo = utils.extrairJSONDaResposta(content);
         if (jsonConteudo) {
           const dados = JSON.parse(jsonConteudo);
-          console.log(`[DEEPSEEK] TopPick: ${dados.topPick?.destino} (${dados.topPick?.pais})`);
-          console.log(`[DEEPSEEK] Alternativas: ${dados.alternativas?.map(a => a.destino).join(', ')}`);
-          console.log(`[DEEPSEEK] Surpresa: ${dados.surpresa?.destino} (${dados.surpresa?.pais})`);
+          utils.log('Deepseek forneceu destinos válidos:', {
+            topPick: dados.topPick?.destino,
+            alternativas: dados.alternativas?.map(a => a.destino).join(', '),
+            surpresa: dados.surpresa?.destino
+          });
         }
       } catch (error) {
-        console.error('[DEEPSEEK] Erro ao analisar resposta:', error.message);
+        console.error('Erro ao analisar resposta do Deepseek:', error.message);
       }
     }
     
     return utils.extrairJSONDaResposta(content);
   } catch (error) {
-    console.error(`[${provider.toUpperCase()}] Erro na chamada à API:`, error.message);
+    console.error(`Erro na chamada à API ${provider}:`, error.message);
     if (error.response) {
-      console.error(`[${provider.toUpperCase()}] Status:`, error.response.status);
-      utils.log(`[${provider.toUpperCase()}] Resposta de erro:`, error.response.data);
+      utils.log(`Resposta de erro (${provider}):`, error.response.data);
     }
     throw error;
   }
@@ -827,10 +835,7 @@ function ensureTouristAttractionsAndComments(jsonString, requestData) {
         clima: {
           temperatura: "Temperatura típica para a estação"
         },
-        preco: {
-          voo: 1200 + (index * 200),
-          hotel: 150 + (index * 50)
-        }
+
       });
       
       modificado = true;
@@ -1023,7 +1028,7 @@ function generateEmergencyData(dadosUsuario = {}) {
         descricao: "Pequena capital europeia encantadora.",
         porque: "Joia escondida com arquitetura única e natureza exuberante.",
         destaque: "Visita ao deslumbrante Lago Bled",
-        comentario: "Ljubljana é um segredo que poucos conhecem! Adorei correr pelo Parque Tivoli e explorar a Ponte do Dragão! Que lugar mágico! 🐾",
+        comentario: "Ljubljana é um segredo que poucos conhecem! Adorei correr pelo parque Tivoli e explorar a Ponte do Dragão! Que lugar mágico! 🐾",
         pontosTuristicos: ["Parque Tivoli", "Ponte do Dragão"],
         eventos: ["Festival de Verão de Ljubljana", "Mercado de Natal"],
         clima: {
@@ -1307,11 +1312,9 @@ module.exports = async function handler(req, res) {
       provider => process.env[`${provider.toUpperCase()}_API_KEY`]
     );
     
-    console.log('🎯 Ordem de tentativa dos provedores:', providers);
-    
     for (const provider of providers) {
       try {
-        console.log(`🚀 Tentando obter recomendações via ${provider.toUpperCase()}...`);
+        console.log(`Tentando obter recomendações via ${provider}...`);
         const responseAI = await callAIAPI(provider, prompt, requestData);
         
         let processedResponse = responseAI;
@@ -1320,16 +1323,16 @@ module.exports = async function handler(req, res) {
         }
         
         if (processedResponse && utils.isValidDestinationJSON(processedResponse, requestData)) {
-          console.log(`✅ Resposta ${provider.toUpperCase()} válida recebida`);
+          utils.log(`Resposta ${provider} válida recebida`, null);
           
           if (provider === 'deepseek') {
             try {
               const parsedResponse = JSON.parse(processedResponse);
-              console.log(`🎯 [DEEPSEEK R1] TopPick: ${parsedResponse.topPick?.destino} (${parsedResponse.topPick?.pais})`);
-              console.log(`🎯 [DEEPSEEK R1] Alternativas: ${parsedResponse.alternativas?.map(a => a.destino).join(', ')}`);
-              console.log(`🎯 [DEEPSEEK R1] Surpresa: ${parsedResponse.surpresa?.destino} (${parsedResponse.surpresa?.pais})`);
+              console.log(`[Deepseek] TopPick: ${parsedResponse.topPick?.destino} (${parsedResponse.topPick?.pais})`);
+              console.log(`[Deepseek] Alternativas: ${parsedResponse.alternativas?.map(a => a.destino).join(', ')}`);
+              console.log(`[Deepseek] Surpresa: ${parsedResponse.surpresa?.destino} (${parsedResponse.surpresa?.pais})`);
             } catch (error) {
-              console.error('❌ Erro ao analisar resposta Deepseek para log:', error.message);
+              console.error('Erro ao analisar resposta Deepseek para log:', error.message);
             }
           }
           
@@ -1354,7 +1357,7 @@ module.exports = async function handler(req, res) {
             }
             return;
           } catch (processError) {
-            console.error('❌ Erro ao processar recomendações:', processError.message);
+            console.error('Erro ao processar recomendações:', processError.message);
           }
           
           if (!isResponseSent) {
@@ -1367,14 +1370,14 @@ module.exports = async function handler(req, res) {
           }
           return;
         } else {
-          console.log(`❌ Resposta de ${provider.toUpperCase()} não passou na validação. Tentando próximo provedor...`);
+          console.log(`Resposta de ${provider} não passou na validação. Tentando próximo provedor...`);
         }
       } catch (error) {
-        console.error(`❌ Erro ao usar ${provider.toUpperCase()}:`, error.message);
+        console.error(`Erro ao usar ${provider}:`, error.message);
       }
     }
     
-    console.log('⚠️ Todos os provedores falharam, gerando resposta de emergência...');
+    console.log('Todos os provedores falharam, gerando resposta de emergência...');
     const emergencyData = generateEmergencyData(requestData);
     
     try {
@@ -1390,7 +1393,7 @@ module.exports = async function handler(req, res) {
         });
       }
     } catch (emergencyError) {
-      console.error('❌ Erro ao processar dados de emergência:', emergencyError.message);
+      console.error('Erro ao processar dados de emergência:', emergencyError.message);
     }
     
     if (!isResponseSent) {
@@ -1403,7 +1406,7 @@ module.exports = async function handler(req, res) {
     }
     
   } catch (globalError) {
-    console.error('❌ Erro global:', globalError.message);
+    console.error('Erro global:', globalError.message);
     
     if (!isResponseSent) {
       isResponseSent = true;
@@ -1415,9 +1418,9 @@ module.exports = async function handler(req, res) {
       });
     }
   } finally {
-    clearTimeout(serverTimeout);
     if (!isResponseSent) {
       isResponseSent = true;
+      clearTimeout(serverTimeout);
       res.status(200).json({
         tipo: "erro-finally",
         conteudo: JSON.stringify(generateEmergencyData(req.body)),
