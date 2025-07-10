@@ -8,7 +8,7 @@ const https = require('https');
 // =======================
 const CONFIG = {
   timeout: {
-    request: 50000,
+    request: 80000,
     handler: 300000,
     retry: 1500
   },
@@ -410,7 +410,7 @@ ${adaptacoesPorTipo[infoViajante.companhia] || "Considere experiências versáte
 
 3) Diversifique suas recomendações:
    - topPick: Destino com máxima adequação ao perfil
-   - alternativas: 4 destinos diversos em geografia, custo e experiências
+   - alternativas: 4 destinos diversos, custo e experiências
    - surpresa: Destino incomum mas encantador (pode ser mais desafiador, desde que viável)
 
 ## Formato de Retorno (JSON estrito)
@@ -1136,7 +1136,7 @@ IMPORTANTE:
 1. Com base na sua experiência traga destinos em que o preço do VOO de IDA e VOLTA sejam PRÓXIMOS do orçamento de ${infoViajante.orcamento} ${infoViajante.moeda}.
 2. Forneça um mix equilibrado: inclua tanto destinos populares quanto alternativas.
 3. Forneça EXATAMENTE 4 destinos alternativos diferentes entre si.
-4. Garanta que os preços sejam realistas para voos de ida e volta partindo de ${infoViajante.cidadeOrigem}.
+4. Garanta que os destinos sejam sejam realistas para o orçamento voos de ida e volta partindo de ${infoViajante.cidadeOrigem}.
 5. Para CADA destino, inclua o código IATA (3 letras) do aeroporto principal.
 6. Para cada destino, INCLUA PONTOS TURÍSTICOS ESPECÍFICOS E CONHECIDOS.
 7. Os comentários da Tripinha DEVEM mencionar pelo menos um dos pontos turísticos do destino.
