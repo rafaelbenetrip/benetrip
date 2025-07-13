@@ -1,5 +1,5 @@
 // api/recommendations.js - Endpoint da API Vercel para recomendações de destino
-// Versão 3.0 - Corrigida com diagnóstico, validação flexível e sistema anti-repetição
+// Versão 4.0 - Corrigida MANTENDO todas as funcionalidades originais
 const axios = require('axios');
 const http = require('http');
 const https = require('https');
@@ -16,7 +16,7 @@ const CONFIG = {
   retries: 2,
   logging: {
     enabled: true,
-    maxLength: 500
+    maxLength: null // REMOVIDO LIMITE - logs completos
   },
   providerOrder: ['perplexity', 'deepseek', 'openai', 'claude']
 };
@@ -137,12 +137,12 @@ const utils = {
     }
   },
   
-  log: (mensagem, dados, limite = CONFIG.logging.maxLength) => {
+  // LOG COMPLETO SEM LIMITAÇÃO
+  log: (mensagem, dados) => {
     if (!CONFIG.logging.enabled) return;
     console.log(mensagem);
     if (dados) {
-      const dadosStr = typeof dados === 'string' ? dados : JSON.stringify(dados);
-      console.log(dadosStr.length > limite ? dadosStr.substring(0, limite) + '...' : dadosStr);
+      console.log(typeof dados === 'string' ? dados : JSON.stringify(dados, null, 2));
     }
   },
   
@@ -203,10 +203,12 @@ const utils = {
     }
   },
   
-  // VALIDAÇÃO FLEXÍVEL COM AUTO-CORREÇÃO - VERSÃO CORRIGIDA
+  // VALIDAÇÃO MAIS FLEXÍVEL - PRIORIZA RESPOSTAS DAS LLMs
   isValidDestinationJSON: (jsonString, requestData) => {
     try {
       const data = typeof jsonString === 'string' ? JSON.parse(jsonString) : jsonString;
+      
+      console.log('🔍 VALIDAÇÃO FLEXÍVEL - Verificando estrutura recebida...');
       
       // VALIDAÇÕES ESSENCIAIS (não opcionais)
       if (!data.topPick?.destino) {
@@ -765,7 +767,8 @@ IMPORTANTE:
       content = response.data.choices[0].message.content;
     }
     
-    utils.log(`Conteúdo recebido da API ${provider} (primeiros 200 caracteres):`, content.substring(0, 200));
+    // LOG COMPLETO DA RESPOSTA (SEM TRUNCAR)
+    utils.log(`Conteúdo COMPLETO recebido da API ${provider}:`, content);
     
     if (provider === 'deepseek') {
       try {
@@ -1487,8 +1490,8 @@ module.exports = async function handler(req, res) {
         console.log(`🤖 TENTANDO ${provider.toUpperCase()}...`);
         const responseAI = await callAIAPI(provider, prompt, requestData);
         
-        // LOG DA RESPOSTA BRUTA
-        console.log(`📥 Resposta bruta ${provider}:`, responseAI ? responseAI.substring(0, 500) + '...' : 'NULA');
+        // LOG DA RESPOSTA BRUTA COMPLETA
+        console.log(`📥 Resposta bruta COMPLETA ${provider}:`, responseAI || 'NULA');
         
         let processedResponse = responseAI;
         if (responseAI && utils.isPartiallyValidJSON(responseAI)) {
