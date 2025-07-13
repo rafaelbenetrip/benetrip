@@ -643,7 +643,7 @@ async function callAIAPI(provider, prompt, requestData) {
       header: 'Authorization',
       prefix: 'Bearer',
       model: 'sonar',
-      systemMessage: 'Você é um especialista em viagens. Sua prioridade é não exceder o orçamento para voos. Retorne apenas JSON puro com 4 destinos alternativos.',
+      systemMessage: 'Você é um especialista em viagens. Sua prioridade é não exceder o orçamento para voos. Retorne apenas JSON puro com destinos adequados ao perfil.',
       temperature: 0.5,
       max_tokens: 3000
     },
@@ -652,7 +652,7 @@ async function callAIAPI(provider, prompt, requestData) {
       header: 'Authorization',
       prefix: 'Bearer',
       model: 'gpt-3.5-turbo',
-      systemMessage: 'Você é um especialista em viagens. Retorne apenas JSON com 4 destinos alternativos, respeitando o orçamento para voos.',
+      systemMessage: 'Você é um especialista em viagens. Retorne apenas JSON com destinos adequados ao perfil, respeitando o orçamento para voos.',
       temperature: 0.7,
       max_tokens: 2000
     },
@@ -661,7 +661,7 @@ async function callAIAPI(provider, prompt, requestData) {
       header: 'anthropic-api-key',
       prefix: '',
       model: 'claude-3-haiku-20240307',
-      systemMessage: 'Você é um especialista em viagens. Retorne apenas JSON com 4 destinos alternativos, respeitando o orçamento para voos.',
+      systemMessage: 'Você é um especialista em viagens. Retorne apenas JSON com destinos adequados ao perfil, respeitando o orçamento para voos.',
       temperature: 0.7,
       max_tokens: 2000
     }
@@ -685,7 +685,7 @@ async function callAIAPI(provider, prompt, requestData) {
 IMPORTANTE: 
 1. Cada voo DEVE respeitar o orçamento.
 2. Retorne apenas JSON.
-3. Forneça 4 destinos alternativos.
+3. Forneça de 3 a 4 destinos alternativos adequados ao perfil.
 4. Inclua pontos turísticos específicos.
 5. Inclua o código IATA de cada aeroporto.`;
 
@@ -966,33 +966,18 @@ function ensureTouristAttractionsAndComments(jsonString, requestData) {
       }
     });
     
-    const destinosReserva = ["Lisboa", "Barcelona", "Roma", "Praga"];
-    const paisesReserva = ["Portugal", "Espanha", "Itália", "República Tcheca"];
-    const codigosPaisesReserva = ["PT", "ES", "IT", "CZ"];
-    const codigosIATAReserva = ["LIS", "BCN", "FCO", "PRG"];
+    // REMOVIDO: Não forçar mais 4 alternativas - aceitar o que a LLM forneceu
+    // Se a LLM forneceu 3 alternativas, aceitar 3
+    // Se forneceu 2, aceitar 2
+    // Não adicionar destinos de fallback automaticamente
     
-    while (data.alternativas.length < 4) {
-      const index = data.alternativas.length % destinosReserva.length;
-      const destino = destinosReserva[index];
-      const pontosConhecidos = pontosPopulares[destino] || ["Atrações turísticas"];
-      
-      data.alternativas.push({
-        destino: destino,
-        pais: paisesReserva[index],
-        codigoPais: codigosPaisesReserva[index],
-        porque: `Cidade com rica história, gastronomia única e atmosfera encantadora`,
-        pontoTuristico: pontosConhecidos[0] || "Atrações turísticas",
-        aeroporto: {
-          codigo: codigosIATAReserva[index],
-          nome: `Aeroporto de ${destino}`
-        },
-        clima: {
-          temperatura: "Temperatura típica para a estação"
-        },
-
-      });
-      
+    console.log(`✅ Mantendo ${data.alternativas.length} alternativas fornecidas pela LLM`);
+    
+    // Apenas garantir que alternativas não ultrapassem 4 (se por algum motivo vieram mais)
+    if (data.alternativas.length > 4) {
+      data.alternativas = data.alternativas.slice(0, 4);
       modificado = true;
+      console.log('⚠️ Limitando alternativas a 4 (LLM forneceu mais que o necessário)');
     }
     
     if (data.alternativas.length > 4) {
@@ -1303,7 +1288,7 @@ PERFIL DO VIAJANTE:
 IMPORTANTE:
 1. Com base na sua experiência traga destinos em que o preço do VOO de IDA e VOLTA sejam PRÓXIMOS do orçamento de ${infoViajante.orcamento} ${infoViajante.moeda}.
 2. Forneça um mix equilibrado: inclua tanto destinos populares quanto alternativas.
-3. Forneça EXATAMENTE 4 destinos alternativos diferentes entre si.
+3. Forneça entre 3 a 4 destinos alternativos adequados ao perfil (o número exato depende das melhores opções disponíveis).
 4. Garanta que os destinos sejam sejam realistas para o orçamento voos de ida e volta partindo de ${infoViajante.cidadeOrigem}.
 5. Para CADA destino, inclua o código IATA (3 letras) do aeroporto principal.
 6. Para cada destino, INCLUA PONTOS TURÍSTICOS ESPECÍFICOS E CONHECIDOS.
