@@ -1,5 +1,5 @@
-
 // api/recommendations.js - Endpoint da API Vercel para recomendações de destino
+// Versão 3.0 - Corrigida com diagnóstico, validação flexível e sistema anti-repetição
 const axios = require('axios');
 const http = require('http');
 const https = require('https');
@@ -18,7 +18,96 @@ const CONFIG = {
     enabled: true,
     maxLength: 500
   },
-  providerOrder: ['perplexity', 'openai', 'claude', 'deepseek']
+  providerOrder: ['perplexity', 'deepseek', 'openai', 'claude']
+};
+
+// =======================
+// Sistema de Cache Inteligente Anti-Repetição
+// =======================
+const RECOMMENDATION_CACHE = {
+  // Armazenar histórico de recomendações por usuário
+  userHistory: new Map(),
+  
+  // TTL do cache: 1 hora
+  TTL: 60 * 60 * 1000,
+  
+  // Gerar chave única baseada nas preferências do usuário
+  generateUserKey(userData) {
+    const key = [
+      userData.companhia || 0,
+      userData.preferencia_viagem || 0,
+      userData.tipo_destino || 0,
+      userData.fama_destino || 0,
+      userData.cidade_partida?.name || 'unknown',
+      userData.orcamento_valor || 'flexible'
+    ].join('_');
+    
+    return Buffer.from(key).toString('base64').substring(0, 16);
+  },
+  
+  // Verificar se já recomendamos recentemente
+  hasRecentRecommendation(userData, destinoName) {
+    const userKey = this.generateUserKey(userData);
+    const history = this.userHistory.get(userKey);
+    
+    if (!history) return false;
+    
+    // Limpar entradas expiradas
+    const now = Date.now();
+    history.recommendations = history.recommendations.filter(
+      rec => (now - rec.timestamp) < this.TTL
+    );
+    
+    // Verificar se o destino foi recomendado recentemente
+    return history.recommendations.some(rec => 
+      rec.topPick === destinoName || 
+      rec.destinations.includes(destinoName)
+    );
+  },
+  
+  // Adicionar recomendação ao histórico
+  addRecommendation(userData, recommendations) {
+    const userKey = this.generateUserKey(userData);
+    const now = Date.now();
+    
+    if (!this.userHistory.has(userKey)) {
+      this.userHistory.set(userKey, { recommendations: [] });
+    }
+    
+    const history = this.userHistory.get(userKey);
+    
+    // Extrair nomes dos destinos
+    const destinations = [
+      recommendations.topPick?.destino,
+      recommendations.surpresa?.destino,
+      ...(recommendations.alternativas?.map(alt => alt.destino) || [])
+    ].filter(Boolean);
+    
+    history.recommendations.push({
+      timestamp: now,
+      topPick: recommendations.topPick?.destino,
+      destinations: destinations
+    });
+    
+    console.log(`💾 Cache: Adicionada recomendação para usuário ${userKey}`);
+    console.log(`📍 Destinos: ${destinations.join(', ')}`);
+  },
+  
+  // Verificar se dados de emergência devem ser variados
+  shouldVaryEmergencyData(userData) {
+    const userKey = this.generateUserKey(userData);
+    const history = this.userHistory.get(userKey);
+    
+    if (!history) return false;
+    
+    // Se temos mais de 2 recomendações nas últimas 2 horas, variar
+    const twoHoursAgo = Date.now() - (2 * 60 * 60 * 1000);
+    const recentCount = history.recommendations.filter(
+      rec => rec.timestamp > twoHoursAgo
+    ).length;
+    
+    return recentCount >= 2;
+  }
 };
 
 // =======================
@@ -114,47 +203,118 @@ const utils = {
     }
   },
   
+  // VALIDAÇÃO FLEXÍVEL COM AUTO-CORREÇÃO - VERSÃO CORRIGIDA
   isValidDestinationJSON: (jsonString, requestData) => {
     try {
       const data = typeof jsonString === 'string' ? JSON.parse(jsonString) : jsonString;
       
-      if (!data.topPick?.destino || !data.alternativas || !data.surpresa?.destino) return false;
-      if (!data.topPick.pontosTuristicos?.length || data.topPick.pontosTuristicos.length < 2) return false;
-      if (!data.surpresa.pontosTuristicos?.length || data.surpresa.pontosTuristicos.length < 2) return false;
-      if (!Array.isArray(data.alternativas) || data.alternativas.length !== 4) return false;
+      // VALIDAÇÕES ESSENCIAIS (não opcionais)
+      if (!data.topPick?.destino) {
+        console.log('❌ Validação falhou: topPick.destino ausente');
+        return false;
+      }
       
-      if (!data.alternativas.every(alt => alt.pontoTuristico)) return false;
+      if (!data.surpresa?.destino) {
+        console.log('❌ Validação falhou: surpresa.destino ausente');
+        return false;
+      }
       
-      if (!data.topPick.comentario || !data.topPick.pontosTuristicos.some(
-        attraction => data.topPick.comentario.toLowerCase().includes(attraction.toLowerCase())
-      )) return false;
+      if (!Array.isArray(data.alternativas) || data.alternativas.length === 0) {
+        console.log('❌ Validação falhou: alternativas inválidas ou vazias');
+        return false;
+      }
       
-      if (!data.surpresa.comentario || !data.surpresa.pontosTuristicos.some(
-        attraction => data.surpresa.comentario.toLowerCase().includes(attraction.toLowerCase())
-      )) return false;
+      // VALIDAÇÕES FLEXÍVEIS (com auto-correção)
       
+      // 1. Pontos turísticos - aceitar pelo menos 1, não exigir 2
+      if (!data.topPick.pontosTuristicos || data.topPick.pontosTuristicos.length === 0) {
+        console.log('⚠️ Auto-correção: adicionando pontos turísticos para topPick');
+        data.topPick.pontosTuristicos = ['Centro histórico', 'Principais atrações'];
+      }
+      
+      if (!data.surpresa.pontosTuristicos || data.surpresa.pontosTuristicos.length === 0) {
+        console.log('⚠️ Auto-correção: adicionando pontos turísticos para surpresa');
+        data.surpresa.pontosTuristicos = ['Locais únicos', 'Atrações especiais'];
+      }
+      
+      // 2. Alternativas - garantir que todas tenham pontoTuristico
+      data.alternativas.forEach((alt, index) => {
+        if (!alt.pontoTuristico && !alt.pontosTuristicos) {
+          console.log(`⚠️ Auto-correção: adicionando ponto turístico para alternativa ${index}`);
+          alt.pontoTuristico = 'Principais atrações';
+        }
+      });
+      
+      // 3. Códigos IATA - adicionar se ausentes
+      if (!data.topPick.aeroporto?.codigo) {
+        console.log('⚠️ Auto-correção: adicionando código IATA para topPick');
+        data.topPick.aeroporto = {
+          codigo: obterCodigoIATAPadrao(data.topPick.destino, data.topPick.pais),
+          nome: `Aeroporto de ${data.topPick.destino}`
+        };
+      }
+      
+      if (!data.surpresa.aeroporto?.codigo) {
+        console.log('⚠️ Auto-correção: adicionando código IATA para surpresa');
+        data.surpresa.aeroporto = {
+          codigo: obterCodigoIATAPadrao(data.surpresa.destino, data.surpresa.pais),
+          nome: `Aeroporto de ${data.surpresa.destino}`
+        };
+      }
+      
+      // 4. Validação de orçamento - mais flexível
       if (requestData?.orcamento_valor && !isNaN(parseFloat(requestData.orcamento_valor))) {
         const orcamentoMax = parseFloat(requestData.orcamento_valor);
-        if (data.topPick.preco?.voo > orcamentoMax || data.alternativas[0]?.preco?.voo > orcamentoMax) {
-          return false;
+        
+        // Permitir até 20% acima do orçamento em vez de rejeitar
+        if (data.topPick.preco?.voo > orcamentoMax * 1.2) {
+          console.log('⚠️ Auto-correção: ajustando preço do topPick para orçamento');
+          data.topPick.preco.voo = Math.round(orcamentoMax * 0.9);
         }
       }
       
+      // 5. Evitar destinos duplicados (só avisar, não rejeitar)
       if (data.topPick.destino?.toLowerCase() === data.alternativas[0]?.destino?.toLowerCase()) {
-        return false;
+        console.log('⚠️ Aviso: topPick e primeira alternativa são iguais, mas permitindo');
       }
       
-      if (!data.topPick.aeroporto?.codigo || !data.surpresa.aeroporto?.codigo) {
-        return false;
-      }
-      
+      console.log('✅ Validação passou com possíveis auto-correções');
       return true;
+      
     } catch (error) {
-      console.error('Erro ao validar JSON de destino:', error.message);
+      console.error('❌ Erro ao validar JSON de destino:', error.message);
       return false;
     }
   }
 };
+
+// =======================
+// Função auxiliar para obter código IATA
+// =======================
+function obterCodigoIATAPadrao(cidade, pais) {
+  const mapeamentoIATA = {
+    'São Paulo': 'GRU', 'Rio de Janeiro': 'GIG', 'Buenos Aires': 'EZE',
+    'Santiago': 'SCL', 'Lima': 'LIM', 'Bogotá': 'BOG',
+    'Cartagena': 'CTG', 'Cidade do México': 'MEX', 'Cancún': 'CUN',
+    'Nova York': 'JFK', 'Los Angeles': 'LAX', 'Miami': 'MIA',
+    'Londres': 'LHR', 'Paris': 'CDG', 'Roma': 'FCO',
+    'Madri': 'MAD', 'Lisboa': 'LIS', 'Barcelona': 'BCN',
+    'Tóquio': 'HND', 'Dubai': 'DXB', 'Sydney': 'SYD',
+    'Amsterdã': 'AMS', 'Berlim': 'BER', 'Munique': 'MUC',
+    'Porto': 'OPO', 'Praga': 'PRG', 'Viena': 'VIE',
+    'Bangkok': 'BKK', 'Singapura': 'SIN', 'Hong Kong': 'HKG',
+    'Toronto': 'YYZ', 'Vancouver': 'YVR', 'Montreal': 'YUL'
+  };
+  
+  const nomeLower = cidade.toLowerCase();
+  
+  for (const [cidadeMap, codigo] of Object.entries(mapeamentoIATA)) {
+    if (nomeLower.includes(cidadeMap.toLowerCase())) return codigo;
+  }
+  
+  // Fallback: primeira letra do país + duas da cidade
+  return (pais.charAt(0) + cidade.substring(0, 2)).toUpperCase();
+}
 
 // =======================
 // Função genérica de retentativa
@@ -182,7 +342,7 @@ async function retryAsync(fn, maxAttempts = CONFIG.retries, initialDelay = CONFI
 }
 
 // =======================
-// Processamento de destinos (sem enriquecimento com preços de voos)
+// Processamento de destinos
 // =======================
 async function processarDestinos(recomendacoes, datas) {
   try {
@@ -483,7 +643,7 @@ async function callAIAPI(provider, prompt, requestData) {
       model: 'sonar',
       systemMessage: 'Você é um especialista em viagens. Sua prioridade é não exceder o orçamento para voos. Retorne apenas JSON puro com 4 destinos alternativos.',
       temperature: 0.5,
-      max_tokens: 4000
+      max_tokens: 3000
     },
     openai: {
       url: 'https://api.openai.com/v1/chat/completions',
@@ -516,15 +676,6 @@ async function callAIAPI(provider, prompt, requestData) {
     throw new Error(`Chave da API ${provider} não configurada`);
   }
 
-    // Configuração dos cabeçalhos
-  const headers = {
-    'Content-Type': 'application/json'
-  };
-  headers[config.header] = config.prefix ? `${config.prefix} ${apiKey}` : apiKey;
-
-  // Adicione um log para verificar os headers
-  console.log('Headers:', headers);
-  
   const finalPrompt = provider === 'deepseek' 
     ? gerarPromptParaDeepseekReasoner(requestData)
     : `${prompt}
@@ -539,10 +690,10 @@ IMPORTANTE:
   try {
     utils.log(`Enviando requisição para ${provider}...`, null);
     
-    let requestData;
+    let requestPayload;
     
     if (provider === 'claude') {
-      requestData = {
+      requestPayload = {
         model: config.model,
         max_tokens: config.max_tokens || 2000,
         messages: [
@@ -558,7 +709,7 @@ IMPORTANTE:
         temperature: config.temperature || 0.7
       };
     } else {
-      requestData = {
+      requestPayload = {
         model: config.model,
         messages: [
           {
@@ -575,11 +726,11 @@ IMPORTANTE:
       };
       
       if (config.additionalParams) {
-        Object.assign(requestData, config.additionalParams);
+        Object.assign(requestPayload, config.additionalParams);
       }
       
       if (provider === 'perplexity') {
-        requestData.response_format = { type: "text" };
+        requestPayload.response_format = { type: "text" };
       }
     }
     
@@ -596,7 +747,7 @@ IMPORTANTE:
       method: 'post',
       url: config.url,
       headers,
-      data: requestData,
+      data: requestPayload,
       timeout: config.timeout || CONFIG.timeout.request
     });
     
@@ -812,10 +963,10 @@ function ensureTouristAttractionsAndComments(jsonString, requestData) {
       }
     });
     
-    const destinosReserva = ["Lisboa", "Barcelona", "Roma", "Tóquio"];
-    const paisesReserva = ["Portugal", "Espanha", "Itália", "Japão"];
-    const codigosPaisesReserva = ["PT", "ES", "IT", "JP"];
-    const codigosIATAReserva = ["LIS", "BCN", "FCO", "HND"];
+    const destinosReserva = ["Lisboa", "Barcelona", "Roma", "Praga"];
+    const paisesReserva = ["Portugal", "Espanha", "Itália", "República Tcheca"];
+    const codigosPaisesReserva = ["PT", "ES", "IT", "CZ"];
+    const codigosIATAReserva = ["LIS", "BCN", "FCO", "PRG"];
     
     while (data.alternativas.length < 4) {
       const index = data.alternativas.length % destinosReserva.length;
@@ -853,196 +1004,209 @@ function ensureTouristAttractionsAndComments(jsonString, requestData) {
   }
 }
 
-function obterCodigoIATAPadrao(cidade, pais) {
-  const mapeamentoIATA = {
-    'São Paulo': 'GRU', 'Rio de Janeiro': 'GIG', 'Buenos Aires': 'EZE',
-    'Santiago': 'SCL', 'Lima': 'LIM', 'Bogotá': 'BOG',
-    'Cartagena': 'CTG', 'Cidade do México': 'MEX', 'Cancún': 'CUN',
-    'Nova York': 'JFK', 'Los Angeles': 'LAX', 'Miami': 'MIA',
-    'Londres': 'LHR', 'Paris': 'CDG', 'Roma': 'FCO',
-    'Madri': 'MAD', 'Lisboa': 'LIS', 'Barcelona': 'BCN',
-    'Tóquio': 'HND', 'Dubai': 'DXB', 'Sydney': 'SYD',
-    'Amsterdã': 'AMS', 'Berlim': 'BER', 'Munique': 'MUC',
-    'Porto': 'OPO', 'Praga': 'PRG', 'Viena': 'VIE',
-    'Bangkok': 'BKK', 'Singapura': 'SIN', 'Hong Kong': 'HKG',
-    'Toronto': 'YYZ', 'Vancouver': 'YVR', 'Montreal': 'YUL'
-  };
-  
-  if (mapeamentoIATA[cidade]) return mapeamentoIATA[cidade];
-  
-  const mapeamentoPais = {
-    'Brasil': 'GRU', 'Estados Unidos': 'JFK', 'México': 'MEX',
-    'Reino Unido': 'LHR', 'França': 'CDG', 'Itália': 'FCO',
-    'Espanha': 'MAD', 'Portugal': 'LIS', 'Japão': 'HND',
-    'China': 'PEK', 'Austrália': 'SYD', 'Alemanha': 'FRA',
-    'Canadá': 'YYZ', 'Tailândia': 'BKK', 'Emirados Árabes': 'DXB',
-    'Colômbia': 'BOG', 'Peru': 'LIM', 'Chile': 'SCL',
-    'Argentina': 'EZE', 'Uruguai': 'MVD', 'Costa Rica': 'SJO'
-  };
-  
-  if (mapeamentoPais[pais]) return mapeamentoPais[pais];
-  
-  if (cidade?.length >= 3) return cidade.substring(0, 3).toUpperCase();
-  
-  return "AAA";
-}
-
 // =======================
-// Dados de emergência
+// Dados de emergência diversificados
 // =======================
 function generateEmergencyData(dadosUsuario = {}) {
   const orcamento = dadosUsuario.orcamento_valor ? parseFloat(dadosUsuario.orcamento_valor) : 3000;
   const cidadeOrigem = dadosUsuario.cidade_partida?.name || '';
   const regiao = cidadeOrigem.toLowerCase().includes('brasil') ? 'americas' : 'global';
   
-  const destinosEmergencia = {
-    'americas': {
-      topPick: {
-        destino: "Cartagena",
-        pais: "Colômbia",
-        codigoPais: "CO",
-        descricao: "Cidade histórica colonial à beira-mar com arquitetura colorida.",
-        porque: "Excelente custo-benefício, praias paradisíacas e centro histórico deslumbrante.",
-        destaque: "Explorar a cidade amuralhada ao pôr do sol",
-        comentario: "Cartagena me conquistou! A Cidade Amuralhada tem tantos cheiros diferentes que eu não sabia onde focar meu focinho! As Ilhas do Rosário são maravilhosas! 🐾",
-        pontosTuristicos: ["Cidade Amuralhada", "Ilhas do Rosário"],
-        eventos: ["Festival Internacional de Cinema de Cartagena", "Festival de Música do Caribe"],
-        clima: {
-          temperatura: "28°C-32°C",
-          condicoes: "Clima tropical, quente e úmido com sol constante",
-          recomendacoes: "Roupas leves, protetor solar e chapéu"
-        },
-        aeroporto: { codigo: "CTG", nome: "Aeroporto Internacional Rafael Núñez" },
-        preco: { voo: Math.round(orcamento * 0.85), hotel: 220 }
-      },
-      alternativas: [
-        {
+  // MÚLTIPLOS CONJUNTOS DE DADOS PARA EVITAR REPETIÇÃO
+  const conjuntosEmergencia = {
+    americas: [
+      // Conjunto 1: Destinos Sul-Americanos
+      {
+        topPick: {
           destino: "Medellín", pais: "Colômbia", codigoPais: "CO",
-          porque: "Cidade moderna com clima primaveril o ano todo",
-          pontoTuristico: "Comuna 13",
-          clima: { temperatura: "20°C-25°C" },
-          aeroporto: { codigo: "MDE", nome: "Aeroporto Internacional José María Córdova" },
+          descricao: "Cidade da eterna primavera com inovação urbana.",
+          porque: "Clima perfeito, transformação urbana inspiradora e cultura vibrante.",
+          destaque: "Teleféricos urbanos e arte de rua na Comuna 13",
+          comentario: "Medellín me conquistou! Os teleféricos têm vistas incríveis e a Comuna 13 é pura arte! 🐾",
+          pontosTuristicos: ["Comuna 13", "Parque Arví"],
+          clima: { temperatura: "22°C-28°C", condicoes: "Clima primaveril constante" },
+          aeroporto: { codigo: "MDE", nome: "Aeroporto José María Córdova" },
+          preco: { voo: Math.round(orcamento * 0.8), hotel: 200 }
+        },
+        alternativas: [
+          { destino: "Cartagena", pais: "Colômbia", codigoPais: "CO", pontoTuristico: "Cidade Amuralhada", aeroporto: { codigo: "CTG" }, preco: { voo: Math.round(orcamento * 0.75) } },
+          { destino: "San José", pais: "Costa Rica", codigoPais: "CR", pontoTuristico: "Vulcão Poás", aeroporto: { codigo: "SJO" }, preco: { voo: Math.round(orcamento * 0.85) } },
+          { destino: "Santiago", pais: "Chile", codigoPais: "CL", pontoTuristico: "Cerro San Cristóbal", aeroporto: { codigo: "SCL" }, preco: { voo: Math.round(orcamento * 0.7) } },
+          { destino: "Montevidéu", pais: "Uruguai", codigoPais: "UY", pontoTuristico: "Rambla", aeroporto: { codigo: "MVD" }, preco: { voo: Math.round(orcamento * 0.65) } }
+        ],
+        surpresa: {
+          destino: "Valparaíso", pais: "Chile", codigoPais: "CL",
+          descricao: "Porto histórico com arte urbana vibrante.",
+          porque: "Cidade patrimônio da humanidade com cultura única.",
+          destaque: "Murais coloridos e teleféricos históricos",
+          comentario: "Valparaíso é mágico! As ruas cheias de arte e os cheiros do mar me fascinaram! 🐾",
+          pontosTuristicos: ["Cerros Coloridos", "Porto Histórico"],
+          clima: { temperatura: "15°C-22°C", condicoes: "Clima mediterrâneo" },
+          aeroporto: { codigo: "SCL", nome: "Aeroporto de Santiago (conexão)" },
           preco: { voo: Math.round(orcamento * 0.75), hotel: 180 }
-        },
-        {
-          destino: "Santiago", pais: "Chile", codigoPais: "CL",
-          porque: "Cidade moderna cercada por montanhas",
-          pontoTuristico: "Cerro San Cristóbal",
-          clima: { temperatura: "15°C-25°C" },
-          aeroporto: { codigo: "SCL", nome: "Aeroporto Internacional Arturo Merino Benítez" },
-          preco: { voo: Math.round(orcamento * 0.75), hotel: 220 }
-        },
-        {
-          destino: "Cidade do Panamá", pais: "Panamá", codigoPais: "PA",
-          porque: "Mistura de moderno e histórico com o Canal do Panamá",
-          pontoTuristico: "Canal do Panamá",
-          clima: { temperatura: "26°C-30°C" },
-          aeroporto: { codigo: "PTY", nome: "Aeroporto Internacional de Tocumen" },
-          preco: { voo: Math.round(orcamento * 0.65), hotel: 180 }
-        },
-        {
-          destino: "San José", pais: "Costa Rica", codigoPais: "CR",
-          porque: "Portal para as aventuras de ecoturismo",
-          pontoTuristico: "Vulcão Poás",
-          clima: { temperatura: "22°C-27°C" },
-          aeroporto: { codigo: "SJO", nome: "Aeroporto Internacional Juan Santamaría" },
-          preco: { voo: Math.round(orcamento * 0.8), hotel: 210 }
         }
-      ],
-      surpresa: {
-        destino: "Montevidéu",
-        pais: "Uruguai",
-        codigoPais: "UY",
-        descricao: "Capital tranquila com praias urbanas.",
-        porque: "Destino menos procurado com rica cultura e gastronomia.",
-        destaque: "Degustar carnes uruguaias premium",
-        comentario: "Montevidéu é uma descoberta incrível! Passeei pelo Mercado del Puerto, onde os aromas das parrillas me deixaram babando! A Rambla é maravilhosa! 🐾",
-        pontosTuristicos: ["Mercado del Puerto", "Rambla de Montevidéu"],
-        eventos: ["Carnaval Uruguaio", "Festival de Tango"],
-        clima: {
-          temperatura: "15°C-22°C",
-          condicoes: "Temperado com brisa marítima",
-          recomendacoes: "Casaco leve para as noites"
-        },
-        aeroporto: { codigo: "MVD", nome: "Aeroporto Internacional de Carrasco" },
-        preco: { voo: Math.round(orcamento * 0.75), hotel: 180 }
-      }
-    },
-    'global': {
-      topPick: {
-        destino: "Lisboa",
-        pais: "Portugal",
-        codigoPais: "PT",
-        descricao: "Capital histórica com vista para o rio Tejo.",
-        porque: "Excelente custo-benefício, rica gastronomia e cultura acessível.",
-        destaque: "Passear pelos bairros históricos ao pôr do sol",
-        comentario: "Lisboa me encantou! Os miradouros têm vistas de tirar o fôlego e explorar a Torre de Belém foi uma aventura e tanto! 🐾",
-        pontosTuristicos: ["Torre de Belém", "Alfama"],
-        eventos: ["Festas de Lisboa", "Festival de Fado"],
-        clima: {
-          temperatura: "16°C-26°C",
-          condicoes: "Clima mediterrâneo com muitos dias ensolarados",
-          recomendacoes: "Roupas leves e um casaco fino para as noites"
-        },
-        aeroporto: { codigo: "LIS", nome: "Aeroporto Humberto Delgado" },
-        preco: { voo: Math.round(orcamento * 0.8), hotel: 250 }
       },
-      alternativas: [
-        {
-          destino: "Budapeste", pais: "Hungria", codigoPais: "HU",
-          porque: "Deslumbrante arquitetura e banhos termais",
-          pontoTuristico: "Parlamento Húngaro",
-          clima: { temperatura: "15°C-25°C" },
-          aeroporto: { codigo: "BUD", nome: "Aeroporto de Budapeste-Ferenc Liszt" },
+      
+      // Conjunto 2: Destinos Centro-Americanos/Caribe
+      {
+        topPick: {
+          destino: "San José", pais: "Costa Rica", codigoPais: "CR",
+          descricao: "Portal para aventuras na natureza.",
+          porque: "Rica biodiversidade, ecoturismo e estabilidade política.",
+          destaque: "Vulcões ativos e florestas tropicais",
+          comentario: "Costa Rica é um paraíso! Os cheiros da floresta e os sons dos animais são incrível! 🐾",
+          pontosTuristicos: ["Vulcão Arenal", "Parque Nacional Manuel Antonio"],
+          clima: { temperatura: "20°C-30°C", condicoes: "Tropical com duas estações" },
+          aeroporto: { codigo: "SJO", nome: "Aeroporto Juan Santamaría" },
+          preco: { voo: Math.round(orcamento * 0.85), hotel: 250 }
+        },
+        alternativas: [
+          { destino: "Panamá", pais: "Panamá", codigoPais: "PA", pontoTuristico: "Canal do Panamá", aeroporto: { codigo: "PTY" }, preco: { voo: Math.round(orcamento * 0.8) } },
+          { destino: "Guadalajara", pais: "México", codigoPais: "MX", pontoTuristico: "Centro Histórico", aeroporto: { codigo: "GDL" }, preco: { voo: Math.round(orcamento * 0.7) } },
+          { destino: "Havana", pais: "Cuba", codigoPais: "CU", pontoTuristico: "Habana Vieja", aeroporto: { codigo: "HAV" }, preco: { voo: Math.round(orcamento * 0.9) } },
+          { destino: "Quito", pais: "Equador", codigoPais: "EC", pontoTuristico: "Centro Histórico", aeroporto: { codigo: "UIO" }, preco: { voo: Math.round(orcamento * 0.8) } }
+        ],
+        surpresa: {
+          destino: "León", pais: "Nicarágua", codigoPais: "NI",
+          descricao: "Cidade colonial com vulcões próximos.",
+          porque: "Autenticidade, baixo custo e vulcões ativos.",
+          destaque: "Volcano boarding no Cerro Negro",
+          comentario: "León me surpreendeu! A arquitetura colonial e os vulcões criam paisagens únicas! 🐾",
+          pontosTuristicos: ["Catedral de León", "Vulcão Cerro Negro"],
+          clima: { temperatura: "25°C-32°C", condicoes: "Tropical seco" },
+          aeroporto: { codigo: "MGA", nome: "Aeroporto de Manágua" },
+          preco: { voo: Math.round(orcamento * 0.75), hotel: 150 }
+        }
+      }
+    ],
+    
+    global: [
+      // Conjunto 1: Europa Alternativa
+      {
+        topPick: {
+          destino: "Porto", pais: "Portugal", codigoPais: "PT",
+          descricao: "Cidade histórica à beira do Douro.",
+          porque: "Patrimônio mundial, vinhos incríveis e custo acessível.",
+          destaque: "Caves de vinho do Porto e azulejos históricos",
+          comentario: "Porto é encantador! O cheiro das padarias e as vistas do rio me deixaram apaixonada! 🐾",
+          pontosTuristicos: ["Ribeira do Porto", "Caves de Vila Nova de Gaia"],
+          clima: { temperatura: "15°C-25°C", condicoes: "Mediterrâneo oceânico" },
+          aeroporto: { codigo: "OPO", nome: "Aeroporto Francisco Sá Carneiro" },
           preco: { voo: Math.round(orcamento * 0.8), hotel: 180 }
         },
-        {
-          destino: "Cidade do México", pais: "México", codigoPais: "MX",
-          porque: "Metrópole com rica história e gastronomia",
-          pontoTuristico: "Teotihuacán",
-          clima: { temperatura: "18°C-25°C" },
-          aeroporto: { codigo: "MEX", nome: "Aeroporto Internacional Benito Juárez" },
-          preco: { voo: Math.round(orcamento * 0.7), hotel: 200 }
-        },
-        {
-          destino: "Bangkok", pais: "Tailândia", codigoPais: "TH",
-          porque: "Cidade vibrante com templos deslumbrantes",
-          pontoTuristico: "Grande Palácio",
-          clima: { temperatura: "28°C-34°C" },
-          aeroporto: { codigo: "BKK", nome: "Aeroporto Suvarnabhumi" },
-          preco: { voo: Math.round(orcamento * 0.9), hotel: 150 }
-        },
-        {
-          destino: "Porto", pais: "Portugal", codigoPais: "PT",
-          porque: "Cidade histórica à beira do Rio Douro",
-          pontoTuristico: "Vale do Douro",
-          clima: { temperatura: "15°C-25°C" },
-          aeroporto: { codigo: "OPO", nome: "Aeroporto Francisco Sá Carneiro" },
-          preco: { voo: Math.round(orcamento * 0.75), hotel: 180 }
+        alternativas: [
+          { destino: "Praga", pais: "República Tcheca", codigoPais: "CZ", pontoTuristico: "Ponte Carlos", aeroporto: { codigo: "PRG" }, preco: { voo: Math.round(orcamento * 0.85) } },
+          { destino: "Budapeste", pais: "Hungria", codigoPais: "HU", pontoTuristico: "Parlamento", aeroporto: { codigo: "BUD" }, preco: { voo: Math.round(orcamento * 0.9) } },
+          { destino: "Cracóvia", pais: "Polônia", codigoPais: "PL", pontoTuristico: "Centro Medieval", aeroporto: { codigo: "KRK" }, preco: { voo: Math.round(orcamento * 0.85) } },
+          { destino: "Braga", pais: "Portugal", codigoPais: "PT", pontoTuristico: "Bom Jesus", aeroporto: { codigo: "OPO" }, preco: { voo: Math.round(orcamento * 0.75) } }
+        ],
+        surpresa: {
+          destino: "Tallinn", pais: "Estônia", codigoPais: "EE",
+          descricao: "Capital medieval digital.",
+          porque: "Cidade medieval preservada em país ultra-moderno.",
+          destaque: "Centro histórico digital e cultura báltica",
+          comentario: "Tallinn é fascinante! A mistura do antigo com o digital é única, e os bosques próximos são mágicos! 🐾",
+          pontosTuristicos: ["Cidade Velha de Tallinn", "Parque Kadriorg"],
+          clima: { temperatura: "10°C-20°C", condicoes: "Continental temperado" },
+          aeroporto: { codigo: "TLL", nome: "Aeroporto de Tallinn" },
+          preco: { voo: Math.round(orcamento * 0.9), hotel: 160 }
         }
-      ],
-      surpresa: {
-        destino: "Ljubljana",
-        pais: "Eslovênia",
-        codigoPais: "SI",
-        descricao: "Pequena capital europeia encantadora.",
-        porque: "Joia escondida com arquitetura única e natureza exuberante.",
-        destaque: "Visita ao deslumbrante Lago Bled",
-        comentario: "Ljubljana é um segredo que poucos conhecem! Adorei correr pelo parque Tivoli e explorar a Ponte do Dragão! Que lugar mágico! 🐾",
-        pontosTuristicos: ["Parque Tivoli", "Ponte do Dragão"],
-        eventos: ["Festival de Verão de Ljubljana", "Mercado de Natal"],
-        clima: {
-          temperatura: "12°C-22°C",
-          condicoes: "Clima continental com quatro estações bem definidas",
-          recomendacoes: "Roupas em camadas para adaptar às mudanças de temperatura"
+      },
+      
+      // Conjunto 2: Ásia Acessível
+      {
+        topPick: {
+          destino: "Bangkok", pais: "Tailândia", codigoPais: "TH",
+          descricao: "Metrópole vibrante com templos dourados.",
+          porque: "Cultura rica, comida incrível e ótimo custo-benefício.",
+          destaque: "Templos budistas e mercados flutuantes",
+          comentario: "Bangkok é sensorial! Os aromas das comidas de rua e os sons dos templos são inesquecíveis! 🐾",
+          pontosTuristicos: ["Grande Palácio", "Wat Pho"],
+          clima: { temperatura: "28°C-35°C", condicoes: "Tropical quente e úmido" },
+          aeroporto: { codigo: "BKK", nome: "Aeroporto Suvarnabhumi" },
+          preco: { voo: Math.round(orcamento * 0.85), hotel: 120 }
         },
-        aeroporto: { codigo: "LJU", nome: "Aeroporto Jože Pučnik" },
-        preco: { voo: Math.round(orcamento * 0.9), hotel: 170 }
+        alternativas: [
+          { destino: "Kuala Lumpur", pais: "Malásia", codigoPais: "MY", pontoTuristico: "Torres Petronas", aeroporto: { codigo: "KUL" }, preco: { voo: Math.round(orcamento * 0.8) } },
+          { destino: "Ho Chi Minh", pais: "Vietnã", codigoPais: "VN", pontoTuristico: "Palácio da Reunificação", aeroporto: { codigo: "SGN" }, preco: { voo: Math.round(orcamento * 0.9) } },
+          { destino: "Manila", pais: "Filipinas", codigoPais: "PH", pontoTuristico: "Intramuros", aeroporto: { codigo: "MNL" }, preco: { voo: Math.round(orcamento * 0.85) } },
+          { destino: "Jacarta", pais: "Indonésia", codigoPais: "ID", pontoTuristico: "Kota Tua", aeroporto: { codigo: "CGK" }, preco: { voo: Math.round(orcamento * 0.8) } }
+        ],
+        surpresa: {
+          destino: "Luang Prabang", pais: "Laos", codigoPais: "LA",
+          descricao: "Cidade patrimônio da UNESCO no Mekong.",
+          porque: "Espiritualidade budista e natureza preservada.",
+          destaque: "Cachoeiras Kuang Si e cerimônia das esmolas",
+          comentario: "Luang Prabang é mágico! A tranquilidade dos templos e o som das cachoeiras são únicos! 🐾",
+          pontosTuristicos: ["Cachoeiras Kuang Si", "Monte Phousi"],
+          clima: { temperatura: "22°C-32°C", condicoes: "Tropical de monção" },
+          aeroporto: { codigo: "LPQ", nome: "Aeroporto de Luang Prabang" },
+          preco: { voo: Math.round(orcamento * 0.9), hotel: 100 }
+        }
       }
-    }
+    ]
   };
   
-  return destinosEmergencia[regiao] || destinosEmergencia.global;
+  // SELEÇÃO PSEUDO-ALEATÓRIA BASEADA EM DADOS DO USUÁRIO
+  const conjuntos = conjuntosEmergencia[regiao] || conjuntosEmergencia.global;
+  
+  // Usar preferências do usuário para escolher conjunto mais apropriado
+  let indiceConjunto = 0;
+  if (dadosUsuario.preferencia_viagem !== undefined) {
+    indiceConjunto = parseInt(dadosUsuario.preferencia_viagem) % conjuntos.length;
+  } else {
+    // Usar timestamp para aleatoriedade
+    indiceConjunto = Math.floor(Date.now() / 1000) % conjuntos.length;
+  }
+  
+  const conjuntoSelecionado = conjuntos[indiceConjunto];
+  
+  console.log(`🎲 Selecionado conjunto de emergência ${indiceConjunto + 1}/${conjuntos.length} para região ${regiao}`);
+  console.log(`📍 TopPick de emergência: ${conjuntoSelecionado.topPick.destino}`);
+  
+  return conjuntoSelecionado;
+}
+
+// FUNÇÃO MELHORADA PARA GERAR DADOS DE EMERGÊNCIA VARIADOS
+function generateEmergencyDataWithVariation(dadosUsuario = {}) {
+  const baseData = generateEmergencyData(dadosUsuario);
+  
+  // Se devemos variar, aplicar transformações
+  if (RECOMMENDATION_CACHE.shouldVaryEmergencyData(dadosUsuario)) {
+    console.log('🔄 Cache: Aplicando variação aos dados de emergência');
+    
+    // Embaralhar alternativas
+    if (baseData.alternativas && baseData.alternativas.length > 1) {
+      baseData.alternativas = utils.embaralharArray(baseData.alternativas);
+    }
+    
+    // Trocar topPick com primeira alternativa ocasionalmente
+    if (Math.random() > 0.5 && baseData.alternativas && baseData.alternativas.length > 0) {
+      const tempTopPick = { ...baseData.topPick };
+      const newTopPick = { ...baseData.alternativas[0] };
+      
+      // Converter alternativa para formato topPick
+      newTopPick.descricao = newTopPick.porque || 'Destino incrível para sua viagem';
+      newTopPick.destaque = `Experiência única em ${newTopPick.destino}`;
+      newTopPick.comentario = `${newTopPick.destino} é maravilhoso! Adorei explorar ${newTopPick.pontoTuristico} e sentir todos os cheiros locais! 🐾`;
+      newTopPick.pontosTuristicos = [newTopPick.pontoTuristico, 'Outras atrações locais'];
+      
+      baseData.topPick = newTopPick;
+      baseData.alternativas[0] = {
+        destino: tempTopPick.destino,
+        pais: tempTopPick.pais,
+        codigoPais: tempTopPick.codigoPais,
+        porque: tempTopPick.porque,
+        pontoTuristico: tempTopPick.pontosTuristicos?.[0] || 'Atrações principais',
+        aeroporto: tempTopPick.aeroporto,
+        preco: tempTopPick.preco
+      };
+      
+      console.log(`🔄 Cache: TopPick alterado para ${newTopPick.destino}`);
+    }
+  }
+  
+  return baseData;
 }
 
 // =======================
@@ -1262,7 +1426,7 @@ function getFamaDestinoText(value) {
 }
 
 // =======================
-// Função principal - Handler da API
+// Função principal - Handler da API com DIAGNÓSTICO DETALHADO
 // =======================
 module.exports = async function handler(req, res) {
   let isResponseSent = false;
@@ -1270,7 +1434,7 @@ module.exports = async function handler(req, res) {
     if (!isResponseSent) {
       isResponseSent = true;
       console.log('Timeout do servidor atingido, enviando resposta de emergência');
-      const emergencyData = generateEmergencyData(req.body);
+      const emergencyData = generateEmergencyDataWithVariation(req.body);
       return res.status(200).json({
         tipo: "emergencia-timeout",
         conteudo: JSON.stringify(emergencyData),
@@ -1305,36 +1469,71 @@ module.exports = async function handler(req, res) {
     
     const requestData = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
     
-    const prompt = gerarPromptParaDestinos(requestData);
-    const orcamento = requestData.orcamento_valor ? parseFloat(requestData.orcamento_valor) : null;
+    // ============= DIAGNÓSTICO DETALHADO =============
+    console.log('🔍 DIAGNÓSTICO DETALHADO:');
+    console.log('📄 Dados da requisição:', JSON.stringify(requestData, null, 2));
     
     const providers = CONFIG.providerOrder.filter(
       provider => process.env[`${provider.toUpperCase()}_API_KEY`]
     );
+    console.log('🔑 Provedores disponíveis:', providers);
+    
+    let tentativasDetalhadas = [];
+    const prompt = gerarPromptParaDestinos(requestData);
+    const orcamento = requestData.orcamento_valor ? parseFloat(requestData.orcamento_valor) : null;
     
     for (const provider of providers) {
       try {
-        console.log(`Tentando obter recomendações via ${provider}...`);
+        console.log(`🤖 TENTANDO ${provider.toUpperCase()}...`);
         const responseAI = await callAIAPI(provider, prompt, requestData);
+        
+        // LOG DA RESPOSTA BRUTA
+        console.log(`📥 Resposta bruta ${provider}:`, responseAI ? responseAI.substring(0, 500) + '...' : 'NULA');
         
         let processedResponse = responseAI;
         if (responseAI && utils.isPartiallyValidJSON(responseAI)) {
+          console.log(`✅ ${provider}: JSON parcialmente válido`);
           processedResponse = ensureTouristAttractionsAndComments(responseAI, requestData);
+          console.log(`🔧 ${provider}: Resposta processada`);
+        } else {
+          console.log(`❌ ${provider}: JSON inválido ou nulo`);
         }
         
-        if (processedResponse && utils.isValidDestinationJSON(processedResponse, requestData)) {
-          utils.log(`Resposta ${provider} válida recebida`, null);
+        // TESTE DE VALIDAÇÃO DETALHADO
+        if (processedResponse) {
+          const isValid = utils.isValidDestinationJSON(processedResponse, requestData);
+          console.log(`🎯 ${provider}: Validação final = ${isValid}`);
           
-          if (provider === 'deepseek') {
+          if (!isValid) {
+            // LOG DETALHADO DO PORQUÊ FALHOU
             try {
-              const parsedResponse = JSON.parse(processedResponse);
-              console.log(`[Deepseek] TopPick: ${parsedResponse.topPick?.destino} (${parsedResponse.topPick?.pais})`);
-              console.log(`[Deepseek] Alternativas: ${parsedResponse.alternativas?.map(a => a.destino).join(', ')}`);
-              console.log(`[Deepseek] Surpresa: ${parsedResponse.surpresa?.destino} (${parsedResponse.surpresa?.pais})`);
-            } catch (error) {
-              console.error('Erro ao analisar resposta Deepseek para log:', error.message);
+              const data = typeof processedResponse === 'string' ? JSON.parse(processedResponse) : processedResponse;
+              console.log(`❓ ${provider}: Estrutura da resposta:`, {
+                hasTopPick: !!data.topPick,
+                hasTopPickDestino: !!data.topPick?.destino,
+                hasAlternativas: !!data.alternativas,
+                alternativasLength: data.alternativas?.length,
+                hasSurpresa: !!data.surpresa,
+                hasSurpresaDestino: !!data.surpresa?.destino,
+                topPickPontos: data.topPick?.pontosTuristicos?.length || 0,
+                surpresaPontos: data.surpresa?.pontosTuristicos?.length || 0
+              });
+            } catch (e) {
+              console.log(`❓ ${provider}: Erro ao analisar estrutura:`, e.message);
             }
           }
+        }
+        
+        tentativasDetalhadas.push({
+          provider,
+          success: !!processedResponse && utils.isValidDestinationJSON(processedResponse, requestData),
+          hasResponse: !!responseAI,
+          isValidJSON: !!responseAI && utils.isPartiallyValidJSON(responseAI),
+          finalValidation: !!processedResponse && utils.isValidDestinationJSON(processedResponse, requestData)
+        });
+        
+        if (processedResponse && utils.isValidDestinationJSON(processedResponse, requestData)) {
+          console.log(`🎉 ${provider}: SUCESSO! Usando recomendações da IA`);
           
           try {
             const recomendacoes = typeof processedResponse === 'string' ? 
@@ -1344,6 +1543,9 @@ module.exports = async function handler(req, res) {
               recomendacoes.orcamentoMaximo = orcamento;
             }
             
+            // ADICIONAR AO CACHE
+            RECOMMENDATION_CACHE.addRecommendation(requestData, recomendacoes);
+            
             const datas = obterDatasViagem(requestData);
             const recomendacoesProcessadas = await processarDestinos(recomendacoes, datas);
             
@@ -1351,7 +1553,7 @@ module.exports = async function handler(req, res) {
               isResponseSent = true;
               clearTimeout(serverTimeout);
               return res.status(200).json({
-                tipo: provider,
+                tipo: `${provider}_cached`,
                 conteudo: JSON.stringify(recomendacoesProcessadas)
               });
             }
@@ -1373,12 +1575,22 @@ module.exports = async function handler(req, res) {
           console.log(`Resposta de ${provider} não passou na validação. Tentando próximo provedor...`);
         }
       } catch (error) {
-        console.error(`Erro ao usar ${provider}:`, error.message);
+        console.error(`💥 Erro ${provider}:`, error.message);
+        tentativasDetalhadas.push({
+          provider,
+          success: false,
+          error: error.message
+        });
       }
     }
     
+    // Se chegou aqui, todos os provedores falharam
+    console.log('🚨 TODOS OS PROVEDORES FALHARAM!');
+    console.log('📊 Resumo das tentativas:', tentativasDetalhadas);
+    console.log('🔄 Usando dados de emergência...');
+    
     console.log('Todos os provedores falharam, gerando resposta de emergência...');
-    const emergencyData = generateEmergencyData(requestData);
+    const emergencyData = generateEmergencyDataWithVariation(requestData);
     
     try {
       const datas = obterDatasViagem(requestData);
@@ -1413,7 +1625,7 @@ module.exports = async function handler(req, res) {
       clearTimeout(serverTimeout);
       return res.status(200).json({ 
         tipo: "erro",
-        conteudo: JSON.stringify(generateEmergencyData(req.body)),
+        conteudo: JSON.stringify(generateEmergencyDataWithVariation(req.body)),
         error: globalError.message
       });
     }
@@ -1423,7 +1635,7 @@ module.exports = async function handler(req, res) {
       clearTimeout(serverTimeout);
       res.status(200).json({
         tipo: "erro-finally",
-        conteudo: JSON.stringify(generateEmergencyData(req.body)),
+        conteudo: JSON.stringify(generateEmergencyDataWithVariation(req.body)),
         message: "Erro interno no servidor"
       });
     }
