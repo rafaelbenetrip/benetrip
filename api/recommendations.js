@@ -483,7 +483,7 @@ async function callAIAPI(provider, prompt, requestData) {
       model: 'sonar',
       systemMessage: 'Você é um especialista em viagens. Sua prioridade é não exceder o orçamento para voos. Retorne apenas JSON puro com 4 destinos alternativos.',
       temperature: 0.5,
-      max_tokens: 2000
+      max_tokens: 4000
     },
     openai: {
       url: 'https://api.openai.com/v1/chat/completions',
