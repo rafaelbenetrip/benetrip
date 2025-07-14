@@ -1,5 +1,5 @@
 // api/recommendations.js - Endpoint da API Vercel para recomendações de destino
-// Versão 4.0 - Corrigida MANTENDO todas as funcionalidades originais
+// Versão 3.0 - Corrigida com diagnóstico, validação flexível e sistema anti-repetição
 const axios = require('axios');
 const http = require('http');
 const https = require('https');
@@ -16,7 +16,7 @@ const CONFIG = {
   retries: 2,
   logging: {
     enabled: true,
-    maxLength: null // REMOVIDO LIMITE - logs completos
+    maxLength: 500
   },
   providerOrder: ['perplexity', 'deepseek', 'openai', 'claude']
 };
@@ -137,12 +137,12 @@ const utils = {
     }
   },
   
-  // LOG COMPLETO SEM LIMITAÇÃO
-  log: (mensagem, dados) => {
+  log: (mensagem, dados, limite = CONFIG.logging.maxLength) => {
     if (!CONFIG.logging.enabled) return;
     console.log(mensagem);
     if (dados) {
-      console.log(typeof dados === 'string' ? dados : JSON.stringify(dados, null, 2));
+      const dadosStr = typeof dados === 'string' ? dados : JSON.stringify(dados);
+      console.log(dadosStr.length > limite ? dadosStr.substring(0, limite) + '...' : dadosStr);
     }
   },
   
@@ -203,12 +203,10 @@ const utils = {
     }
   },
   
-  // VALIDAÇÃO MAIS FLEXÍVEL - PRIORIZA RESPOSTAS DAS LLMs
+  // VALIDAÇÃO FLEXÍVEL COM AUTO-CORREÇÃO - VERSÃO CORRIGIDA
   isValidDestinationJSON: (jsonString, requestData) => {
     try {
       const data = typeof jsonString === 'string' ? JSON.parse(jsonString) : jsonString;
-      
-      console.log('🔍 VALIDAÇÃO FLEXÍVEL - Verificando estrutura recebida...');
       
       // VALIDAÇÕES ESSENCIAIS (não opcionais)
       if (!data.topPick?.destino) {
@@ -643,7 +641,7 @@ async function callAIAPI(provider, prompt, requestData) {
       header: 'Authorization',
       prefix: 'Bearer',
       model: 'sonar',
-      systemMessage: 'Você é um especialista em viagens. Sua prioridade é não exceder o orçamento para voos. Retorne apenas JSON puro com destinos adequados ao perfil.',
+      systemMessage: 'Você é um especialista em viagens. Sua prioridade é não exceder o orçamento para voos. Retorne apenas JSON puro com 4 destinos alternativos.',
       temperature: 0.5,
       max_tokens: 3000
     },
@@ -652,7 +650,7 @@ async function callAIAPI(provider, prompt, requestData) {
       header: 'Authorization',
       prefix: 'Bearer',
       model: 'gpt-3.5-turbo',
-      systemMessage: 'Você é um especialista em viagens. Retorne apenas JSON com destinos adequados ao perfil, respeitando o orçamento para voos.',
+      systemMessage: 'Você é um especialista em viagens. Retorne apenas JSON com 4 destinos alternativos, respeitando o orçamento para voos.',
       temperature: 0.7,
       max_tokens: 2000
     },
@@ -661,7 +659,7 @@ async function callAIAPI(provider, prompt, requestData) {
       header: 'anthropic-api-key',
       prefix: '',
       model: 'claude-3-haiku-20240307',
-      systemMessage: 'Você é um especialista em viagens. Retorne apenas JSON com destinos adequados ao perfil, respeitando o orçamento para voos.',
+      systemMessage: 'Você é um especialista em viagens. Retorne apenas JSON com 4 destinos alternativos, respeitando o orçamento para voos.',
       temperature: 0.7,
       max_tokens: 2000
     }
@@ -685,7 +683,7 @@ async function callAIAPI(provider, prompt, requestData) {
 IMPORTANTE: 
 1. Cada voo DEVE respeitar o orçamento.
 2. Retorne apenas JSON.
-3. Forneça de 3 a 4 destinos alternativos adequados ao perfil.
+3. Forneça 4 destinos alternativos.
 4. Inclua pontos turísticos específicos.
 5. Inclua o código IATA de cada aeroporto.`;
 
@@ -767,8 +765,7 @@ IMPORTANTE:
       content = response.data.choices[0].message.content;
     }
     
-    // LOG COMPLETO DA RESPOSTA (SEM TRUNCAR)
-    utils.log(`Conteúdo COMPLETO recebido da API ${provider}:`, content);
+    utils.log(`Conteúdo recebido da API ${provider} (primeiros 200 caracteres):`, content.substring(0, 200));
     
     if (provider === 'deepseek') {
       try {
@@ -966,18 +963,33 @@ function ensureTouristAttractionsAndComments(jsonString, requestData) {
       }
     });
     
-    // REMOVIDO: Não forçar mais 4 alternativas - aceitar o que a LLM forneceu
-    // Se a LLM forneceu 3 alternativas, aceitar 3
-    // Se forneceu 2, aceitar 2
-    // Não adicionar destinos de fallback automaticamente
+    const destinosReserva = ["Lisboa", "Barcelona", "Roma", "Praga"];
+    const paisesReserva = ["Portugal", "Espanha", "Itália", "República Tcheca"];
+    const codigosPaisesReserva = ["PT", "ES", "IT", "CZ"];
+    const codigosIATAReserva = ["LIS", "BCN", "FCO", "PRG"];
     
-    console.log(`✅ Mantendo ${data.alternativas.length} alternativas fornecidas pela LLM`);
-    
-    // Apenas garantir que alternativas não ultrapassem 4 (se por algum motivo vieram mais)
-    if (data.alternativas.length > 4) {
-      data.alternativas = data.alternativas.slice(0, 4);
+    while (data.alternativas.length < 4) {
+      const index = data.alternativas.length % destinosReserva.length;
+      const destino = destinosReserva[index];
+      const pontosConhecidos = pontosPopulares[destino] || ["Atrações turísticas"];
+      
+      data.alternativas.push({
+        destino: destino,
+        pais: paisesReserva[index],
+        codigoPais: codigosPaisesReserva[index],
+        porque: `Cidade com rica história, gastronomia única e atmosfera encantadora`,
+        pontoTuristico: pontosConhecidos[0] || "Atrações turísticas",
+        aeroporto: {
+          codigo: codigosIATAReserva[index],
+          nome: `Aeroporto de ${destino}`
+        },
+        clima: {
+          temperatura: "Temperatura típica para a estação"
+        },
+
+      });
+      
       modificado = true;
-      console.log('⚠️ Limitando alternativas a 4 (LLM forneceu mais que o necessário)');
     }
     
     if (data.alternativas.length > 4) {
@@ -1288,7 +1300,7 @@ PERFIL DO VIAJANTE:
 IMPORTANTE:
 1. Com base na sua experiência traga destinos em que o preço do VOO de IDA e VOLTA sejam PRÓXIMOS do orçamento de ${infoViajante.orcamento} ${infoViajante.moeda}.
 2. Forneça um mix equilibrado: inclua tanto destinos populares quanto alternativas.
-3. Forneça entre 3 a 4 destinos alternativos adequados ao perfil (o número exato depende das melhores opções disponíveis).
+3. Forneça 6 destinos alternativos diferentes entre si.
 4. Garanta que os destinos sejam sejam realistas para o orçamento voos de ida e volta partindo de ${infoViajante.cidadeOrigem}.
 5. Para CADA destino, inclua o código IATA (3 letras) do aeroporto principal.
 6. Para cada destino, INCLUA PONTOS TURÍSTICOS ESPECÍFICOS E CONHECIDOS.
@@ -1475,8 +1487,8 @@ module.exports = async function handler(req, res) {
         console.log(`🤖 TENTANDO ${provider.toUpperCase()}...`);
         const responseAI = await callAIAPI(provider, prompt, requestData);
         
-        // LOG DA RESPOSTA BRUTA COMPLETA
-        console.log(`📥 Resposta bruta COMPLETA ${provider}:`, responseAI || 'NULA');
+        // LOG DA RESPOSTA BRUTA
+        console.log(`📥 Resposta bruta ${provider}:`, responseAI ? responseAI.substring(0, 500) + '...' : 'NULA');
         
         let processedResponse = responseAI;
         if (responseAI && utils.isPartiallyValidJSON(responseAI)) {
