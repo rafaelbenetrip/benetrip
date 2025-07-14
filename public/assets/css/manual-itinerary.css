@@ -815,3 +815,30 @@ body {
         background-position: 200% 0;
     }
 }
+
+/* ✅ Classes para compatibilidade total com itinerary.js */
+.roteiro-content {
+    max-width: 480px;
+    margin: 0 auto;
+    padding: 0 16px;
+}
+
+.dia-roteiro.continuo {
+    margin-bottom: 24px;
+    border: 1px solid var(--medium-gray);
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.atividades-continuas {
+    space-y: 16px;
+}
+
+.atividade-continua {
+    border: 1px solid #e5e5e5;
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 16px;
+    background: white;
+}
