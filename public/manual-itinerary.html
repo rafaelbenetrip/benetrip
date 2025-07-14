@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#E87722">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    
+    <title>Criar Roteiro - Benetrip</title>
+    <meta name="description" content="Crie seu roteiro personalizado com a Tripinha - Escolha seus critérios e descubra experiências únicas!">
+    
+    <!-- Fonts -->
+    <link rel="preload" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Montserrat:wght@400;500&display=swap" as="style">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Montserrat:wght@400;500&display=swap" rel="stylesheet">
+    
+    <!-- CSS -->
+    <link rel="stylesheet" href="assets/css/manual-itinerary.css">
+</head>
+
+<body>
+    <div class="benetrip-container">
+        <!-- Header -->
+        <header class="app-header">
+            <h1>🐕 Criar Roteiro Personalizado</h1>
+            <p>Preencha os critérios e a Tripinha criará seu roteiro perfeito!</p>
+        </header>
+
+        <!-- Formulário de Critérios -->
+        <div class="form-container">
+            <form id="itineraryForm">
+                <!-- Informações Básicas -->
+                <div class="form-section">
+                    <h3>📍 Informações Básicas</h3>
+                    
+                    <div class="form-group">
+                        <label class="form-label" for="destino">Destino da viagem</label>
+                        <input type="text" id="destino" class="form-input" placeholder="Ex: Lisboa, Portugal" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label" for="cidadePartida">Cidade de partida</label>
+                        <input type="text" id="cidadePartida" class="form-input" placeholder="Ex: São Paulo" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">Datas da viagem</label>
+                        <div class="date-inputs">
+                            <input type="date" id="dataIda" class="form-input" required>
+                            <input type="date" id="dataVolta" class="form-input" required>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">Horários dos voos</label>
+                        <div class="time-inputs">
+                            <div class="time-input-group">
+                                <label class="form-label">Chegada</label>
+                                <input type="time" id="horarioChegada" class="form-input" value="15:30" required>
+                            </div>
+                            <div class="time-input-group">
+                                <label class="form-label">Partida</label>
+                                <input type="time" id="horarioPartida" class="form-input" value="21:00" required>
+                            </div>
+                        </div>
+                        <p style="font-size: 12px; color: #666; margin-top: 8px; line-height: 1.4;">
+                            💡 <strong>Dica:</strong> Os horários influenciam diretamente as atividades do primeiro e último dia do seu roteiro.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Companhia de Viagem -->
+                <div class="form-section">
+                    <h3>👥 Companhia de Viagem</h3>
+                    
+                    <div class="form-group">
+                        <label class="form-label" for="tipoCompanhia">Com quem você vai viajar?</label>
+                        <select id="tipoCompanhia" class="form-select" required>
+                            <option value="">Selecione...</option>
+                            <option value="sozinho">🧳 Sozinho(a)</option>
+                            <option value="casal">❤️ Casal</option>
+                            <option value="familia">👨‍👩‍👧‍👦 Família</option>
+                            <option value="amigos">🎉 Grupo de Amigos</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group" id="quantidadeGroup" style="display: none;">
+                        <label class="form-label" for="quantidade">Quantas pessoas?</label>
+                        <input type="number" id="quantidade" class="form-input number-input" min="2" max="15" placeholder="2">
+                    </div>
+                </div>
+
+                <!-- Preferências de Viagem -->
+                <div class="form-section">
+                    <h3>✨ Preferências de Viagem</h3>
+                    
+                    <div class="form-group">
+                        <label class="form-label" for="tipoViagem">Que tipo de experiência você busca?</label>
+                        <select id="tipoViagem" class="form-select" required>
+                            <option value="">Selecione...</option>
+                            <option value="relaxar">🏖️ Relaxar e descansar</option>
+                            <option value="aventura">🏔️ Aventura e natureza</option>
+                            <option value="cultura">🏛️ Cultura e história</option>
+                            <option value="urbano">🏙️ Urbano e moderno</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label" for="intensidade">Intensidade do roteiro</label>
+                        <select id="intensidade" class="form-select" required>
+                            <option value="">Selecione...</option>
+                            <option value="leve">🐌 Leve - Poucas atividades por dia</option>
+                            <option value="moderado">🚶 Moderado - Equilibrio entre atividades e descanso</option>
+                            <option value="intenso">🏃 Intenso - Máximo de atividades</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Orçamento -->
+                <div class="form-section">
+                    <h3>💰 Orçamento</h3>
+                    
+                    <div class="form-group">
+                        <label class="form-label" for="nivelOrcamento">Nível de orçamento</label>
+                        <select id="nivelOrcamento" class="form-select" required>
+                            <option value="">Selecione...</option>
+                            <option value="economico">💵 Econômico</option>
+                            <option value="medio">💴 Médio</option>
+                            <option value="alto">💎 Alto</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Botão Gerar -->
+                <button type="submit" class="generate-button" id="generateBtn">
+                    <span id="btnText">🎯 Criar Meu Roteiro</span>
+                    <div id="btnSpinner" class="loading-spinner" style="display: none;"></div>
+                </button>
+            </form>
+        </div>
+
+        <!-- Área do Roteiro Gerado -->
+        <div id="itineraryResult" class="itinerary-result">
+            <!-- Conteúdo será inserido dinamicamente pelo JavaScript -->
+        </div>
+    </div>
+
+    <!-- Container para Toast Notifications -->
+    <div id="toastContainer" class="toast-container"></div>
+
+    <!-- JavaScript -->
+    <script src="assets/js/manual-itinerary.js"></script>
+</body>
+</html>
