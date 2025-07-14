@@ -1,6 +1,6 @@
 // ======================================
 // BENETRIP - ROTEIRO MANUAL JAVASCRIPT
-// ✅ VERSÃO CORRIGIDA COM SISTEMA DE IMAGENS
+// ✅ VERSÃO CORRIGIDA - Horários e botão "Ver no mapa"
 // ======================================
 
 class BenetripManualItinerary {
@@ -11,7 +11,7 @@ class BenetripManualItinerary {
         this.btnText = document.getElementById('btnText');
         this.btnSpinner = document.getElementById('btnSpinner');
         
-        // ✅ NOVO: Sistema de cache de imagens
+        // ✅ Sistema de cache de imagens
         this.imagensCache = new Map();
         this.imageObserver = null;
         
@@ -24,10 +24,10 @@ class BenetripManualItinerary {
         this.setupEventListeners();
         this.setupDateDefaults();
         this.setupHorarioPreview();
-        this.configurarLazyLoading(); // ✅ NOVO
+        this.configurarLazyLoading();
     }
 
-    // ✅ NOVO: Configurar Intersection Observer para lazy loading
+    // ✅ Configurar Intersection Observer para lazy loading
     configurarLazyLoading() {
         if ('IntersectionObserver' in window) {
             this.imageObserver = new IntersectionObserver((entries) => {
@@ -47,12 +47,11 @@ class BenetripManualItinerary {
         }
     }
 
-    // ✅ NOVO: Carregamento de imagem com fallback robusto
+    // ✅ Carregamento de imagem com fallback robusto
     carregarImagemComFallback(img) {
         const originalSrc = img.dataset.src;
         const local = img.alt || 'Local';
         
-        // Fallbacks robustos
         const fallbacks = [
             originalSrc,
             `https://picsum.photos/400/250?random=${Math.floor(Math.random() * 1000)}`,
@@ -88,7 +87,7 @@ class BenetripManualItinerary {
         tentarCarregar();
     }
 
-    // ✅ NOVO: Cria placeholder SVG
+    // ✅ Cria placeholder SVG
     criarImagemPlaceholderSVG(texto) {
         const svg = `<svg width="400" height="250" xmlns="http://www.w3.org/2000/svg">
             <rect width="100%" height="100%" fill="#E87722"/>
@@ -229,7 +228,7 @@ class BenetripManualItinerary {
             const formData = this.getFormData();
             const roteiro = await this.generateItinerary(formData);
             
-            // ✅ NOVO: Buscar imagens para o roteiro
+            // ✅ Buscar imagens para o roteiro
             await this.buscarImagensParaRoteiro(roteiro);
             
             this.displayItinerary(roteiro);
@@ -242,7 +241,7 @@ class BenetripManualItinerary {
         }
     }
 
-    // ✅ NOVO: Buscar imagens para todas as atividades do roteiro
+    // ✅ Buscar imagens para todas as atividades do roteiro
     async buscarImagensParaRoteiro(roteiro) {
         try {
             console.log('🖼️ Buscando imagens para o roteiro...');
@@ -315,7 +314,7 @@ class BenetripManualItinerary {
         }
     }
 
-    // ✅ NOVO: Buscar imagem com cache
+    // ✅ Buscar imagem com cache
     async buscarImagemComCache(local, destino) {
         const chaveCache = `${local}-${destino}`;
         
@@ -359,7 +358,7 @@ class BenetripManualItinerary {
         }
     }
 
-    // ✅ NOVO: Gerar fallback de imagem
+    // ✅ Gerar fallback de imagem
     gerarImagemFallback(local, diaIndex, ativIndex) {
         const fallbacks = [
             `https://picsum.photos/400/250?random=${diaIndex}${ativIndex}${Date.now()}`,
@@ -370,7 +369,7 @@ class BenetripManualItinerary {
         return fallbacks[ativIndex % fallbacks.length];
     }
 
-    // ✅ NOVO: Aplicar fallbacks globais
+    // ✅ Aplicar fallbacks globais
     aplicarFallbacksGlobal(roteiro) {
         console.log('🔄 Aplicando fallbacks globais...');
         
@@ -444,14 +443,14 @@ class BenetripManualItinerary {
         try {
             console.log('🤖 Tentando API real de roteiro...', formData);
             
-            // ✅ CHAMADA CORRIGIDA com melhor tratamento de erro
+            // ✅ CHAMADA CORRIGIDA - Agora incluindo os horários!
             const parametrosIA = {
                 destino: formData.destino,
                 pais: this.extrairPais(formData.destino),
                 dataInicio: formData.dataIda,
                 dataFim: formData.dataVolta,
-                horaChegada: formData.horarioChegada,
-                horaSaida: formData.horarioPartida,
+                horaChegada: formData.horarioChegada,  // ✅ CORRIGIDO!
+                horaSaida: formData.horarioPartida,    // ✅ CORRIGIDO!
                 tipoViagem: formData.tipoViagem,
                 tipoCompanhia: formData.tipoCompanhia,
                 quantidade: parseInt(formData.quantidade) || 1,
@@ -465,7 +464,7 @@ class BenetripManualItinerary {
                 modeloIA: 'deepseek'
             };
             
-            console.log('📡 Enviando para API (CORRIGIDO):', parametrosIA);
+            console.log('📡 Enviando para API (CORRIGIDO COM HORÁRIOS):', parametrosIA);
             
             const response = await fetch('/api/itinerary-generator', {
                 method: 'POST',
@@ -474,7 +473,6 @@ class BenetripManualItinerary {
                     'Accept': 'application/json'
                 },
                 body: JSON.stringify(parametrosIA),
-                // ✅ NOVO: timeout de 30 segundos
                 signal: AbortSignal.timeout(30000)
             });
             
@@ -498,9 +496,9 @@ class BenetripManualItinerary {
         }
     }
 
-    // ✅ NOVO: Fallback completo e inteligente
+    // ✅ NOVO: Fallback completo e inteligente COM HORÁRIOS
     gerarRoteiroFallbackCompleto(formData) {
-        console.log('🛡️ Gerando roteiro fallback COMPLETO...');
+        console.log('🛡️ Gerando roteiro fallback COMPLETO COM HORÁRIOS...');
         
         const diasViagem = this.calcularDiasViagem(formData.dataIda, formData.dataVolta);
         const destino = formData.destino;
@@ -519,7 +517,7 @@ class BenetripManualItinerary {
             });
         }
         
-        // Ajustar horários
+        // ✅ AJUSTAR ATIVIDADES POR HORÁRIOS (CORRIGIDO!)
         this.ajustarAtividadesPorHorarios(dias, formData);
         
         return {
@@ -540,7 +538,7 @@ class BenetripManualItinerary {
         };
     }
 
-    // ✅ NOVO: Gerar atividades mais inteligentes baseadas no perfil
+    // ✅ CORRIGIDO: Gerar atividades mais inteligentes baseadas no perfil
     gerarAtividadesInteligentes(formData, diaIndex, totalDias) {
         const numAtividades = this.obterNumeroAtividades(formData.intensidade);
         const atividadesPorTipo = this.obterAtividadesPorDestino(formData.destino, formData.tipoViagem);
@@ -566,7 +564,7 @@ class BenetripManualItinerary {
         return atividades;
     }
 
-    // ✅ NOVO: Personalizar dicas baseadas no perfil do usuário
+    // ✅ Personalizar dicas baseadas no perfil do usuário
     personalizarDica(dicaOriginal, formData) {
         const personalizado = {
             familia: dicaOriginal + ' Perfeito para toda a família!',
@@ -578,7 +576,7 @@ class BenetripManualItinerary {
         return personalizado[formData.tipoCompanhia] || dicaOriginal;
     }
 
-    // ✅ NOVO: Ajustar tags por perfil
+    // ✅ Ajustar tags por perfil
     ajustarTagsPorPerfil(tagsOriginais, formData) {
         const tags = [...tagsOriginais];
         
@@ -599,7 +597,7 @@ class BenetripManualItinerary {
         return tags.slice(0, 3); // Limitar a 3 tags
     }
 
-    // ✅ NOVO: Obter atividades específicas por destino
+    // ✅ Obter atividades específicas por destino
     obterAtividadesPorDestino(destino, tipoViagem) {
         const destinoLower = destino.toLowerCase();
         
@@ -719,6 +717,7 @@ class BenetripManualItinerary {
             return dia;
         });
         
+        // ✅ GARANTIR QUE OS HORÁRIOS SEJAM APLICADOS
         this.ajustarAtividadesPorHorarios(dias, formData);
         return dias;
     }
@@ -758,16 +757,20 @@ class BenetripManualItinerary {
         return atividades;
     }
 
+    // ✅ CORRIGIDO: Ajustar atividades por horários de chegada/partida
     ajustarAtividadesPorHorarios(dias, formData) {
         if (dias.length === 0) return;
         
         const horaChegada = parseInt(formData.horarioChegada.split(':')[0]);
         const horaPartida = parseInt(formData.horarioPartida.split(':')[0]);
         
-        // Ajustar primeiro dia
+        console.log(`🕒 Ajustando atividades: Chegada ${horaChegada}h, Partida ${horaPartida}h`);
+        
+        // ✅ Ajustar primeiro dia
         const primeiroDia = dias[0];
         
         if (horaChegada >= 20) {
+            // Chegada muito tarde - apenas check-in
             primeiroDia.atividades = [{
                 horario: formData.horarioChegada,
                 local: 'Chegada e Check-in no Hotel',
@@ -777,6 +780,7 @@ class BenetripManualItinerary {
             }];
             primeiroDia.descricao = `Chegada tardia em ${formData.destino} - tempo para descansar.`;
         } else if (horaChegada >= 16) {
+            // Chegada tarde - poucas atividades
             primeiroDia.atividades = [
                 {
                     horario: formData.horarioChegada,
@@ -790,13 +794,26 @@ class BenetripManualItinerary {
                     horario: this.ajustarHorarioAposChegada(ativ.horario, horaChegada)
                 }))
             ];
+        } else {
+            // Chegada cedo - adicionar atividade de check-in no início
+            primeiroDia.atividades = [
+                {
+                    horario: formData.horarioChegada,
+                    local: 'Chegada e Check-in',
+                    tags: ['Chegada'],
+                    dica: 'Deixe as bagagens e comece a explorar!',
+                    isEspecial: true
+                },
+                ...primeiroDia.atividades
+            ];
         }
         
-        // Ajustar último dia
+        // ✅ Ajustar último dia
         if (dias.length > 1) {
             const ultimoDia = dias[dias.length - 1];
             
             if (horaPartida <= 8) {
+                // Partida muito cedo
                 ultimoDia.atividades = [{
                     horario: '06:00',
                     local: 'Check-out e Transfer para Aeroporto',
@@ -806,6 +823,7 @@ class BenetripManualItinerary {
                 }];
                 ultimoDia.descricao = `Partida matinal de ${formData.destino} - prepare-se na véspera.`;
             } else if (horaPartida <= 12) {
+                // Partida manhã
                 ultimoDia.atividades = [
                     ...ultimoDia.atividades.filter(ativ => parseInt(ativ.horario.split(':')[0]) <= 9),
                     {
@@ -816,8 +834,19 @@ class BenetripManualItinerary {
                         isEspecial: true
                     }
                 ];
+            } else {
+                // Partida tarde/noite - adicionar checkout no final
+                ultimoDia.atividades.push({
+                    horario: this.calcularHorarioCheckout(horaPartida),
+                    local: 'Check-out e Transfer para Aeroporto',
+                    tags: ['Partida'],
+                    dica: 'Chegue ao aeroporto com 2h de antecedência!',
+                    isEspecial: true
+                });
             }
         }
+        
+        console.log(`✅ Atividades ajustadas para ${dias.length} dias`);
     }
 
     displayItinerary(roteiro) {
@@ -841,6 +870,14 @@ class BenetripManualItinerary {
                     <div class="texto">
                         <div class="label">Período:</div>
                         <p class="valor">${this.formatarDataBrasil(roteiro.resumo.dataIda)} até ${this.formatarDataBrasil(roteiro.resumo.dataVolta)}</p>
+                    </div>
+                </div>
+                
+                <div class="resumo-item">
+                    <div class="icone">✈️</div>
+                    <div class="texto">
+                        <div class="label">Voos:</div>
+                        <p class="valor">Chegada ${roteiro.resumo.horarioChegada} | Partida ${roteiro.resumo.horarioPartida}</p>
                     </div>
                 </div>
                 
@@ -869,7 +906,7 @@ class BenetripManualItinerary {
         this.resultContainer.innerHTML = html;
         this.resultContainer.classList.add('visible');
         
-        // ✅ NOVO: Configurar lazy loading para imagens inseridas
+        // ✅ Configurar lazy loading para imagens inseridas
         this.configurarLazyLoadingParaElementos();
         
         // Scroll suave para o resultado
@@ -881,7 +918,7 @@ class BenetripManualItinerary {
         }, 300);
     }
 
-    // ✅ NOVO: Configurar lazy loading para elementos já existentes
+    // ✅ Configurar lazy loading para elementos já existentes
     configurarLazyLoadingParaElementos() {
         if (this.imageObserver) {
             const imagens = document.querySelectorAll('img[data-src]');
@@ -912,6 +949,7 @@ class BenetripManualItinerary {
         `;
     }
 
+    // ✅ CORRIGIDO: Criar elemento de atividade COM BOTÃO "VER NO MAPA"
     criarElementoAtividade(atividade) {
         return `
             <div class="atividade-item">
@@ -934,6 +972,15 @@ class BenetripManualItinerary {
                         <strong>Dica da Tripinha:</strong> ${atividade.dica}
                     </div>
                 </div>
+
+                ${!atividade.isEspecial ? `
+                    <button class="btn-ver-mapa" onclick="window.open('https://www.google.com/maps/search/${encodeURIComponent(atividade.local)}', '_blank')">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                        </svg>
+                        Ver no mapa
+                    </button>
+                ` : ''}
                 
                 ${atividade.imagemUrl && !atividade.isEspecial ? `
                     <div class="atividade-imagem-responsiva">
