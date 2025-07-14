@@ -1,0 +1,588 @@
+/* ======================================
+   BENETRIP - ROTEIRO MANUAL STYLES
+   ====================================== */
+
+/* ✅ VARIÁVEIS CSS */
+:root {
+    --primary-color: #E87722; /* Laranja Vibrante */
+    --secondary-color: #00A3E0; /* Azul Sereno */
+    --white: #FFFFFF; /* Branco Neutro */
+    --dark: #21272A; /* Cinza Escuro */
+    --light-gray: #F5F5F5; /* Cinza Claro para fundos */
+    --medium-gray: #E0E0E0; /* Cinza Médio para bordas */
+    --success: #4CAF50; /* Verde para badges */
+    --info: #2196F3; /* Azul para badges */
+    --purple: #9C27B0; /* Roxo para badges */
+    --error: #f44336; /* Vermelho para erros */
+    --warning: #ff9800; /* Laranja para avisos */
+    
+    /* Shadows */
+    --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.1);
+    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.1);
+    --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.15);
+    
+    /* Transitions */
+    --transition-fast: 0.2s ease;
+    --transition-normal: 0.3s ease;
+    
+    /* Border radius */
+    --radius-sm: 6px;
+    --radius-md: 8px;
+    --radius-lg: 12px;
+    --radius-xl: 16px;
+}
+
+/* ✅ RESET E BASE STYLES */
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    padding: 0;
+    overflow-x: hidden;
+    background-color: var(--light-gray);
+    font-family: 'Montserrat', sans-serif;
+    line-height: 1.5;
+    color: var(--dark);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+/* ✅ CONTAINER PRINCIPAL */
+.benetrip-container {
+    max-width: 480px;
+    margin: 0 auto;
+    background-color: var(--white);
+    min-height: 100vh;
+    position: relative;
+}
+
+/* ✅ HEADER */
+.app-header {
+    background: linear-gradient(135deg, var(--primary-color), #f39c42);
+    color: var(--white);
+    padding: 20px 16px;
+    text-align: center;
+    box-shadow: var(--shadow-md);
+}
+
+.app-header h1 {
+    margin: 0;
+    font-size: 24px;
+    font-weight: 700;
+    font-family: 'Poppins', sans-serif;
+}
+
+.app-header p {
+    margin: 8px 0 0;
+    font-size: 14px;
+    opacity: 0.9;
+}
+
+/* ✅ FORMULÁRIO DE CRITÉRIOS */
+.form-container {
+    padding: 20px 16px;
+}
+
+.form-section {
+    background: var(--white);
+    border-radius: var(--radius-lg);
+    padding: 20px;
+    margin-bottom: 16px;
+    box-shadow: var(--shadow-sm);
+    border: 1px solid var(--medium-gray);
+}
+
+.form-section h3 {
+    margin: 0 0 16px;
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--primary-color);
+    font-family: 'Poppins', sans-serif;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-group:last-child {
+    margin-bottom: 0;
+}
+
+.form-label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 500;
+    color: var(--dark);
+    font-size: 14px;
+}
+
+.form-input,
+.form-select {
+    width: 100%;
+    padding: 12px 16px;
+    border: 2px solid var(--medium-gray);
+    border-radius: var(--radius-md);
+    font-size: 14px;
+    font-family: inherit;
+    transition: border-color var(--transition-fast);
+    background: var(--white);
+}
+
+.form-input:focus,
+.form-select:focus {
+    outline: none;
+    border-color: var(--secondary-color);
+    box-shadow: 0 0 0 3px rgba(0, 163, 224, 0.1);
+}
+
+.form-input::placeholder {
+    color: #999;
+}
+
+.date-inputs {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+
+.time-inputs {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+
+.time-input-group {
+    display: flex;
+    flex-direction: column;
+}
+
+.time-input-group .form-label {
+    font-size: 12px;
+    margin-bottom: 4px;
+    color: #666;
+    font-weight: 500;
+}
+
+.number-input {
+    max-width: 120px;
+}
+
+/* ✅ BOTÃO GERAR ROTEIRO */
+.generate-button {
+    width: 100%;
+    background: linear-gradient(135deg, var(--primary-color), #f39c42);
+    color: var(--white);
+    border: none;
+    padding: 16px 24px;
+    border-radius: var(--radius-lg);
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    margin: 20px 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 56px;
+}
+
+.generate-button:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+}
+
+.generate-button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.generate-button.loading {
+    background: var(--medium-gray);
+    cursor: wait;
+}
+
+.loading-spinner {
+    width: 20px;
+    height: 20px;
+    border: 2px solid transparent;
+    border-top: 2px solid var(--white);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* ✅ ÁREA DO ROTEIRO GERADO */
+.itinerary-result {
+    margin-top: 20px;
+    opacity: 0;
+    transform: translateY(20px);
+    transition: all var(--transition-normal);
+}
+
+.itinerary-result.visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.result-header {
+    background: linear-gradient(135deg, var(--secondary-color), #42a5f5);
+    color: var(--white);
+    padding: 16px;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.tripinha-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: var(--white);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+}
+
+.result-header h2 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 600;
+    font-family: 'Poppins', sans-serif;
+}
+
+/* ✅ RESUMO DA VIAGEM */
+.resumo-viagem {
+    background: var(--white);
+    border: 1px solid var(--medium-gray);
+    border-top: none;
+    padding: 20px;
+}
+
+.resumo-item {
+    display: flex;
+    align-items: flex-start;
+    margin-bottom: 12px;
+    gap: 12px;
+}
+
+.resumo-item:last-child {
+    margin-bottom: 0;
+}
+
+.resumo-item .icone {
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    font-size: 16px;
+}
+
+.resumo-item .texto {
+    flex-grow: 1;
+}
+
+.resumo-item .label {
+    font-size: 12px;
+    color: #666;
+    margin-bottom: 2px;
+    font-weight: 500;
+}
+
+.resumo-item .valor {
+    font-weight: 600;
+    margin: 0;
+    color: var(--dark);
+    line-height: 1.3;
+}
+
+/* ✅ DIAS DO ROTEIRO */
+.roteiro-content {
+    background: var(--white);
+    border: 1px solid var(--medium-gray);
+    border-top: none;
+    border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+    padding: 16px;
+}
+
+.dia-roteiro {
+    margin-bottom: 24px;
+    background: var(--white);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    box-shadow: var(--shadow-sm);
+    border: 1px solid var(--medium-gray);
+}
+
+.dia-roteiro:last-child {
+    margin-bottom: 0;
+}
+
+.dia-header {
+    display: flex;
+    align-items: center;
+    background: linear-gradient(135deg, var(--primary-color), #f39c42);
+    color: var(--white);
+    padding: 16px;
+    font-weight: 700;
+    font-size: 16px;
+}
+
+.dia-numero {
+    width: 36px;
+    height: 36px;
+    background-color: var(--white);
+    color: var(--primary-color);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 12px;
+    font-weight: 700;
+    font-size: 16px;
+}
+
+.dia-content {
+    padding: 20px;
+}
+
+.dia-descricao {
+    font-size: 14px;
+    color: #555;
+    line-height: 1.5;
+    margin-bottom: 16px;
+    font-style: italic;
+    background: rgba(232, 119, 34, 0.08);
+    padding: 12px;
+    border-radius: var(--radius-md);
+    border-left: 4px solid var(--primary-color);
+}
+
+.atividades-lista {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.atividade-item {
+    background: var(--light-gray);
+    border-radius: var(--radius-md);
+    padding: 16px;
+    border: 1px solid var(--medium-gray);
+    transition: all var(--transition-fast);
+}
+
+.atividade-item:hover {
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-sm);
+}
+
+.atividade-horario {
+    display: flex;
+    align-items: center;
+    margin-bottom: 8px;
+    color: var(--secondary-color);
+    font-weight: 600;
+    font-size: 14px;
+    gap: 6px;
+}
+
+.atividade-local {
+    font-weight: 600;
+    font-size: 16px;
+    color: var(--dark);
+    margin-bottom: 8px;
+}
+
+.atividade-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 8px;
+}
+
+.badge {
+    display: inline-flex;
+    align-items: center;
+    font-size: 10px;
+    padding: 4px 8px;
+    border-radius: 12px;
+    color: var(--white);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.badge-destaque {
+    background: linear-gradient(135deg, var(--primary-color), #f39c42);
+}
+
+.badge-cultura {
+    background: linear-gradient(135deg, var(--purple), #ba68c8);
+}
+
+.badge-gastronomia {
+    background: linear-gradient(135deg, #ff7043, #ff8a65);
+}
+
+.badge-natureza {
+    background: linear-gradient(135deg, var(--success), #66bb6a);
+}
+
+.badge-compras {
+    background: linear-gradient(135deg, #ffa726, #ffb74d);
+}
+
+.badge-padrao {
+    background: linear-gradient(135deg, #78909c, #90a4ae);
+}
+
+.atividade-dica {
+    background: rgba(232, 119, 34, 0.1);
+    padding: 12px;
+    border-radius: var(--radius-md);
+    margin-top: 12px;
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    border: 1px solid rgba(232, 119, 34, 0.2);
+}
+
+.dica-icon {
+    font-size: 16px;
+    flex-shrink: 0;
+}
+
+.dica-texto {
+    font-size: 13px;
+    color: var(--dark);
+    line-height: 1.4;
+}
+
+/* ✅ TOAST NOTIFICATIONS */
+.toast-container {
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1000;
+    width: 90%;
+    max-width: 400px;
+    pointer-events: none;
+}
+
+.toast {
+    background-color: var(--white);
+    border-radius: var(--radius-md);
+    padding: 16px;
+    margin-bottom: 8px;
+    box-shadow: var(--shadow-lg);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    opacity: 0;
+    transform: translateY(-20px);
+    transition: all var(--transition-normal);
+    border-left: 4px solid var(--info);
+    pointer-events: auto;
+}
+
+.toast-visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.toast-success {
+    border-left-color: var(--success);
+}
+
+.toast-error {
+    border-left-color: var(--error);
+}
+
+.toast-warning {
+    border-left-color: var(--warning);
+}
+
+.toast-icon {
+    font-size: 18px;
+    flex-shrink: 0;
+}
+
+.toast-message {
+    font-size: 14px;
+    color: var(--dark);
+    line-height: 1.4;
+}
+
+/* ✅ RESPONSIVIDADE */
+@media (max-width: 480px) {
+    .benetrip-container {
+        width: 100%;
+        margin: 0;
+    }
+    
+    .form-container {
+        padding: 16px 12px;
+    }
+    
+    .form-section {
+        padding: 16px;
+        margin-bottom: 12px;
+    }
+    
+    .date-inputs {
+        grid-template-columns: 1fr;
+        gap: 8px;
+    }
+    
+    .time-inputs {
+        grid-template-columns: 1fr;
+        gap: 8px;
+    }
+    
+    .app-header {
+        padding: 16px 12px;
+    }
+    
+    .app-header h1 {
+        font-size: 20px;
+    }
+}
+
+/* ✅ ESTADOS DE FOCO PARA ACESSIBILIDADE */
+.form-input:focus,
+.form-select:focus,
+.generate-button:focus {
+    outline: 2px solid var(--secondary-color);
+    outline-offset: 2px;
+}
+
+/* ✅ PREFERS REDUCED MOTION */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+    
+    .loading-spinner {
+        animation: none;
+    }
+}
