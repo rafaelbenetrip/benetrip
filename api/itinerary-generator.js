@@ -1,5 +1,5 @@
 // api/itinerary-generator.js - Endpoint para geração de roteiro personalizado
-// ✅ VERSÃO ATUALIZADA - Inclui todos os parâmetros do formulário
+// ✅ VERSÃO CORRIGIDA - Corrige erro de substring e melhora tratamento de dados
 const axios = require('axios');
 
 // Chaves de API
@@ -20,13 +20,26 @@ function logEvent(type, message, data = {}) {
   console.log(JSON.stringify(log));
 }
 
+// ✅ FUNÇÃO AUXILIAR PARA TRATAR ERROS DE FORMA SEGURA
+function formatErrorForLog(error) {
+  try {
+    if (error.response?.data) {
+      const dataStr = JSON.stringify(error.response.data);
+      return dataStr.length > 300 ? dataStr.substring(0, 300) + '...' : dataStr;
+    }
+    return 'No response data';
+  } catch (e) {
+    return 'Error formatting response data';
+  }
+}
+
 /**
  * ✅ ENDPOINT PRINCIPAL - Gera um roteiro personalizado através da API Deepseek ou Claude
  * Parâmetros suportados:
  * - destino, pais, dataInicio, dataFim
  * - horaChegada, horaSaida
  * - tipoViagem, tipoCompanhia, quantidade
- * - intensidade, nivelOrcamento (NOVOS!)
+ * - intensidade, nivelOrcamento
  * - modeloIA
  */
 module.exports = async (req, res) => {
@@ -61,8 +74,8 @@ module.exports = async (req, res) => {
       tipoViagem,
       tipoCompanhia,
       quantidade,
-      intensidade,        // NOVO! (leve, moderado, intenso)
-      nivelOrcamento,     // NOVO! (economico, medio, alto)
+      intensidade,
+      nivelOrcamento,
       preferencias,
       modeloIA
     } = req.body;
@@ -111,12 +124,14 @@ module.exports = async (req, res) => {
       diasViagem,
       tipoViagem,
       tipoCompanhia,
-      intensidade,        // Novo parâmetro incluído no log
-      nivelOrcamento,     // Novo parâmetro incluído no log
+      intensidade,
+      nivelOrcamento,
+      horaChegada,
+      horaSaida,
       quantidade: quantidade || 1
     });
     
-    // ✅ GERAR O PROMPT PARA A IA (ATUALIZADO!)
+    // ✅ GERAR O PROMPT PARA A IA
     const prompt = gerarPromptRoteiro({
       destino,
       pais,
@@ -128,8 +143,8 @@ module.exports = async (req, res) => {
       tipoViagem,
       tipoCompanhia,
       quantidade,
-      intensidade,        // NOVO!
-      nivelOrcamento,     // NOVO!
+      intensidade,
+      nivelOrcamento,
       preferencias
     });
     
@@ -180,10 +195,12 @@ module.exports = async (req, res) => {
           tipoCompanhia,
           intensidade,
           nivelOrcamento,
+          horaChegada,
+          horaSaida,
           quantidade: quantidade || 1
         },
         modelo: modelo,
-        versaoAPI: '2.0'
+        versaoAPI: '2.1'
       }
     };
     
@@ -233,7 +250,7 @@ function calcularDiasViagem(dataInicio, dataFim) {
 }
 
 /**
- * ✅ GERAR PROMPT APRIMORADO PARA A IA (INCLUINDO NOVOS PARÂMETROS!)
+ * ✅ GERAR PROMPT APRIMORADO PARA A IA (INCLUINDO HORÁRIOS!)
  */
 function gerarPromptRoteiro(params) {
   const {
@@ -247,8 +264,8 @@ function gerarPromptRoteiro(params) {
     tipoViagem,
     tipoCompanhia,
     quantidade,
-    intensidade,       // NOVO!
-    nivelOrcamento,    // NOVO!
+    intensidade,
+    nivelOrcamento,
     preferencias
   } = params;
   
@@ -268,19 +285,39 @@ function gerarPromptRoteiro(params) {
     'amigos': 'um grupo de amigos'
   }[tipoCompanhia] || 'um viajante';
   
-  // ✅ MAPEAR INTENSIDADE (NOVO!)
+  // ✅ MAPEAR INTENSIDADE
   const descricaoIntensidade = {
     'leve': 'com 2-3 atividades por dia, priorizando o descanso',
     'moderado': 'com 3-4 atividades balanceadas entre turismo e relaxamento',
     'intenso': 'com 4-5 atividades por dia, aproveitando ao máximo o tempo'
   }[intensidade] || 'com ritmo moderado';
   
-  // ✅ MAPEAR NÍVEL DE ORÇAMENTO (NOVO!)
+  // ✅ MAPEAR NÍVEL DE ORÇAMENTO
   const descricaoOrcamento = {
     'economico': 'opções econômicas como transporte público, restaurantes locais, atividades gratuitas/baratas',
     'medio': 'mix de opções econômicas e confortáveis, restaurantes de categoria média, atividades pagas moderadas',
     'alto': 'experiências premium, restaurantes refinados, atividades exclusivas, transporte privado quando necessário'
   }[nivelOrcamento] || 'opções variadas de orçamento';
+  
+  // ✅ ANÁLISE DE HORÁRIOS PARA PROMPT
+  const horaChegadaInt = horaChegada ? parseInt(horaChegada.split(':')[0]) : 15;
+  const horaSaidaInt = horaSaida ? parseInt(horaSaida.split(':')[0]) : 21;
+  
+  const instrucoesPrimeiroDia = horaChegadaInt >= 20 
+    ? 'PRIMEIRO DIA: Chegada muito tarde (após 20h) - apenas check-in e descanso. Não planeje atividades.'
+    : horaChegadaInt >= 16
+    ? 'PRIMEIRO DIA: Chegada tarde (após 16h) - máximo 2 atividades leves próximas ao hotel.'
+    : horaChegadaInt >= 12
+    ? 'PRIMEIRO DIA: Chegada meio-dia - tarde livre com 2-3 atividades.'
+    : 'PRIMEIRO DIA: Chegada cedo - dia completo de atividades!';
+    
+  const instrucoesUltimoDia = horaSaidaInt <= 8
+    ? 'ÚLTIMO DIA: Partida muito cedo (antes das 8h) - apenas check-out e transfer. Não planeje atividades.'
+    : horaSaidaInt <= 12
+    ? 'ÚLTIMO DIA: Partida manhã (antes do meio-dia) - máximo 1-2 atividades matinais.'
+    : horaSaidaInt <= 18
+    ? 'ÚLTIMO DIA: Partida tarde - manhã livre com atividades até 14h.'
+    : 'ÚLTIMO DIA: Partida noite - dia quase completo de atividades!';
   
   // ✅ MONTAR O PROMPT COMPLETO E DETALHADO
   return `
@@ -301,7 +338,11 @@ Crie um roteiro detalhado para uma viagem com as seguintes características:
 - Intensidade: ${descricaoIntensidade}
 - Orçamento: Priorizar ${descricaoOrcamento}
 
-🎯 **INSTRUÇÕES CRÍTICAS:**
+🕐 **INSTRUÇÕES CRÍTICAS SOBRE HORÁRIOS:**
+${instrucoesPrimeiroDia}
+${instrucoesUltimoDia}
+
+🎯 **INSTRUÇÕES GERAIS:**
 1. **CRIE EXATAMENTE ${diasViagem} DIAS DE ROTEIRO** - NÃO OMITA NENHUM DIA
 2. **INTENSIDADE**: ${intensidade === 'leve' ? 'Máximo 3 atividades por dia' : intensidade === 'moderado' ? '3-4 atividades balanceadas' : '4-5 atividades aproveitando bem o tempo'}
 3. **ORÇAMENTO**: ${nivelOrcamento === 'economico' ? 'Priorize atividades gratuitas/baratas, transporte público, restaurantes locais' : nivelOrcamento === 'medio' ? 'Balance opções econômicas e confortáveis' : 'Inclua experiências premium e exclusivas'}
@@ -330,7 +371,9 @@ Crie um roteiro detalhado para uma viagem com as seguintes características:
     "diasViagem": ${diasViagem},
     "tipoViagem": "${tipoViagem}",
     "intensidade": "${intensidade}",
-    "nivelOrcamento": "${nivelOrcamento}"
+    "nivelOrcamento": "${nivelOrcamento}",
+    "horaChegada": "${horaChegada || 'N/A'}",
+    "horaSaida": "${horaSaida || 'N/A'}"
   },
   "dias": [
     {
@@ -355,11 +398,12 @@ Crie um roteiro detalhado para uma viagem com as seguintes características:
 - Nomes de locais que realmente existem em ${destino}
 - Dicas considerando ${nivelOrcamento} orçamento e ${intensidade} intensidade
 - Tom amigável e despojado da Tripinha
+- RESPEITAR OS HORÁRIOS DE CHEGADA E PARTIDA!
 `;
 }
 
 /**
- * ✅ GERAR ROTEIRO COM DEEPSEEK (ATUALIZADO)
+ * ✅ GERAR ROTEIRO COM DEEPSEEK (CORRIGIDO)
  */
 async function gerarRoteiroComDeepseek(prompt) {
   try {
@@ -398,6 +442,11 @@ async function gerarRoteiroComDeepseek(prompt) {
       }
     );
     
+    // ✅ VERIFICAR SE A RESPOSTA EXISTE
+    if (!response?.data?.choices?.[0]?.message?.content) {
+      throw new Error('Resposta vazia ou inválida da API DeepSeek');
+    }
+    
     // ✅ EXTRAIR RESPOSTA
     const respostaText = response.data.choices[0].message.content;
     
@@ -432,12 +481,12 @@ async function gerarRoteiroComDeepseek(prompt) {
     }
     
   } catch (erro) {
-    // ✅ LOG DETALHADO DO ERRO
+    // ✅ LOG DETALHADO DO ERRO COM TRATAMENTO SEGURO
     logEvent('error', 'Erro na chamada à API DeepSeek', {
       error: erro.message,
       status: erro.response?.status,
       statusText: erro.response?.statusText,
-      responseData: JSON.stringify(erro.response?.data).substring(0, 300)
+      responseData: formatErrorForLog(erro) // ✅ CORRIGIDO!
     });
     
     throw erro;
@@ -445,7 +494,7 @@ async function gerarRoteiroComDeepseek(prompt) {
 }
 
 /**
- * ✅ GERAR ROTEIRO COM CLAUDE (ATUALIZADO)
+ * ✅ GERAR ROTEIRO COM CLAUDE (CORRIGIDO)
  */
 async function gerarRoteiroComClaude(prompt) {
   try {
@@ -478,6 +527,11 @@ async function gerarRoteiroComClaude(prompt) {
         timeout: 60000 // 60 segundos timeout
       }
     );
+    
+    // ✅ VERIFICAR SE A RESPOSTA EXISTE
+    if (!response?.data?.content?.[0]?.text) {
+      throw new Error('Resposta vazia ou inválida da API Claude');
+    }
     
     // ✅ EXTRAIR RESPOSTA
     const respostaText = response.data.content[0].text;
@@ -513,12 +567,12 @@ async function gerarRoteiroComClaude(prompt) {
     }
     
   } catch (erro) {
-    // ✅ LOG DETALHADO DO ERRO
+    // ✅ LOG DETALHADO DO ERRO COM TRATAMENTO SEGURO
     logEvent('error', 'Erro na chamada à API Claude', {
       error: erro.message,
       status: erro.response?.status,
       statusText: erro.response?.statusText,
-      responseData: JSON.stringify(erro.response?.data).substring(0, 300)
+      responseData: formatErrorForLog(erro) // ✅ CORRIGIDO!
     });
     
     throw erro;
