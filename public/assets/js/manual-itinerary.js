@@ -375,7 +375,7 @@ class BenetripManualItinerary {
         console.log('📡 Parâmetros para IA otimizados:', parametrosIA);
         
         // ✅ Timeout escalável otimizado
-        const timeout = 30000 + (tentativa - 1) * 15000;
+        const timeout = 90000 + (tentativa - 1) * 15000;
         
         const response = await fetch('/api/itinerary-generator', {
             method: 'POST',
