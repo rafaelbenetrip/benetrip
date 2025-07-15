@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#E87722">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    
+    <title>Benetrip - Criar Roteiro Personalizado</title>
+    <meta name="description" content="Crie seu roteiro de viagem personalizado com a Tripinha - Planeje experiências únicas!">
+    
+    <!-- Preload fonts para performance -->
+    <link rel="preload" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Montserrat:wght@400;500&display=swap" as="style">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Montserrat:wght@400;500&display=swap" rel="stylesheet">
+    
+    <!-- CSS -->
+    <link rel="stylesheet" href="assets/css/styles.css">
+    <link rel="stylesheet" href="assets/css/itinerary.css">
+    <link rel="stylesheet" href="assets/css/manual-form.css">
+    
+    <!-- PWA e favicons -->
+    <link rel="apple-touch-icon" href="assets/images/icon-192.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="assets/images/icon-192.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="assets/images/icon-32.png">
+</head>
+<body class="mobile-optimized">
+    <!-- Container principal otimizado para mobile -->
+    <div id="roteiro-container" class="benetrip-container">
+        
+        <!-- Header responsivo -->
+        <header class="app-header">
+            <button class="btn-voltar" aria-label="Voltar à página anterior" type="button">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M19 12H5M12 19l-7-7 7-7"></path>
+                </svg>
+            </button>
+            <h1>Criar Roteiro</h1>
+        </header>
+        
+        <!-- Conteúdo principal -->
+        <main class="roteiro-content" role="main">
+            
+            <!-- Formulário de Criação Manual -->
+            <div id="formulario-container" class="formulario-container">
+                
+                <!-- Header com Tripinha -->
+                <div class="formulario-header">
+                    <div class="tripinha-welcome">
+                        <img 
+                            src="assets/images/tripinha-avatar.png" 
+                            alt="Tripinha" 
+                            class="tripinha-avatar"
+                            onerror="this.style.display='none'; this.nextElementSibling.style.display='block';"
+                        >
+                        <div class="tripinha-emoji" style="display:none;">🐕</div>
+                    </div>
+                    <div class="welcome-text">
+                        <h2>Olá! Sou a Tripinha! 🐾</h2>
+                        <p>Vou criar um roteiro personalizado para sua viagem dos sonhos! Preencha os dados abaixo:</p>
+                    </div>
+                </div>
+                
+                <!-- Formulário -->
+                <form id="form-roteiro-manual" class="form-roteiro" novalidate>
+                    
+                    <!-- Destino -->
+                    <div class="form-group">
+                        <label for="destino" class="form-label">
+                            🎯 <strong>Qual é o seu destino?</strong>
+                        </label>
+                        <input 
+                            type="text" 
+                            id="destino" 
+                            name="destino" 
+                            class="form-input" 
+                            placeholder="Ex: Lisboa, Portugal"
+                            required
+                            autocomplete="off"
+                        >
+                        <div class="form-error" id="destino-error"></div>
+                    </div>
+                    
+                    <!-- Datas de Viagem -->
+                    <div class="form-group">
+                        <label class="form-label">
+                            📅 <strong>Quando será sua viagem?</strong>
+                        </label>
+                        
+                        <div class="data-group">
+                            <div class="data-item">
+                                <label for="data-ida" class="data-label">Data de Ida</label>
+                                <input 
+                                    type="date" 
+                                    id="data-ida" 
+                                    name="data_ida" 
+                                    class="form-input date-input" 
+                                    required
+                                >
+                            </div>
+                            
+                            <div class="data-item">
+                                <label for="horario-chegada" class="data-label">Horário de Chegada</label>
+                                <input 
+                                    type="time" 
+                                    id="horario-chegada" 
+                                    name="horario_chegada" 
+                                    class="form-input time-input" 
+                                    value="15:30"
+                                    required
+                                >
+                            </div>
+                        </div>
+                        
+                        <div class="data-group">
+                            <div class="data-item">
+                                <label for="data-volta" class="data-label">Data de Volta</label>
+                                <input 
+                                    type="date" 
+                                    id="data-volta" 
+                                    name="data_volta" 
+                                    class="form-input date-input"
+                                >
+                            </div>
+                            
+                            <div class="data-item">
+                                <label for="horario-partida" class="data-label">Horário de Partida</label>
+                                <input 
+                                    type="time" 
+                                    id="horario-partida" 
+                                    name="horario_partida" 
+                                    class="form-input time-input" 
+                                    value="21:00"
+                                >
+                            </div>
+                        </div>
+                        
+                        <div class="form-error" id="datas-error"></div>
+                    </div>
+                    
+                    <!-- Companhia de Viagem -->
+                    <div class="form-group">
+                        <label class="form-label">
+                            👥 <strong>Com quem você vai viajar?</strong>
+                        </label>
+                        
+                        <div class="radio-group">
+                            <label class="radio-option">
+                                <input type="radio" name="companhia" value="0" required>
+                                <span class="radio-custom"></span>
+                                <span class="radio-text">🧳 Sozinho(a)</span>
+                            </label>
+                            
+                            <label class="radio-option">
+                                <input type="radio" name="companhia" value="1" required>
+                                <span class="radio-custom"></span>
+                                <span class="radio-text">❤️ Casal</span>
+                            </label>
+                            
+                            <label class="radio-option">
+                                <input type="radio" name="companhia" value="2" required>
+                                <span class="radio-custom"></span>
+                                <span class="radio-text">👨‍👩‍👧‍👦 Família</span>
+                            </label>
+                            
+                            <label class="radio-option">
+                                <input type="radio" name="companhia" value="3" required>
+                                <span class="radio-custom"></span>
+                                <span class="radio-text">🎉 Amigos</span>
+                            </label>
+                        </div>
+                        
+                        <div class="form-error" id="companhia-error"></div>
+                    </div>
+                    
+                    <!-- Quantidade (condicional) -->
+                    <div class="form-group" id="quantidade-group" style="display: none;">
+                        <label for="quantidade" class="form-label">
+                            🔢 <strong>Quantas pessoas no total?</strong>
+                        </label>
+                        <select id="quantidade" name="quantidade" class="form-select">
+                            <option value="2">2 pessoas</option>
+                            <option value="3">3 pessoas</option>
+                            <option value="4" selected>4 pessoas</option>
+                            <option value="5">5 pessoas</option>
+                            <option value="6">6 pessoas</option>
+                            <option value="7">7 pessoas</option>
+                            <option value="8">8 pessoas</option>
+                        </select>
+                    </div>
+                    
+                    <!-- Preferências de Viagem -->
+                    <div class="form-group">
+                        <label class="form-label">
+                            ✨ <strong>Que tipo de experiência você busca?</strong>
+                        </label>
+                        
+                        <div class="radio-group">
+                            <label class="radio-option">
+                                <input type="radio" name="preferencias" value="0" required>
+                                <span class="radio-custom"></span>
+                                <span class="radio-text">🏖️ Relaxar e descansar</span>
+                            </label>
+                            
+                            <label class="radio-option">
+                                <input type="radio" name="preferencias" value="1" required>
+                                <span class="radio-custom"></span>
+                                <span class="radio-text">🏔️ Aventura e natureza</span>
+                            </label>
+                            
+                            <label class="radio-option">
+                                <input type="radio" name="preferencias" value="2" required>
+                                <span class="radio-custom"></span>
+                                <span class="radio-text">🏛️ Cultura e história</span>
+                            </label>
+                            
+                            <label class="radio-option">
+                                <input type="radio" name="preferencias" value="3" required>
+                                <span class="radio-custom"></span>
+                                <span class="radio-text">🏙️ Urbano e moderno</span>
+                            </label>
+                        </div>
+                        
+                        <div class="form-error" id="preferencias-error"></div>
+                    </div>
+                    
+                    <!-- Intensidade do Roteiro -->
+                    <div class="form-group">
+                        <label class="form-label">
+                            ⚡ <strong>Qual a intensidade ideal do seu roteiro?</strong>
+                        </label>
+                        
+                        <div class="radio-group">
+                            <label class="radio-option">
+                                <input type="radio" name="intensidade" value="leve" required>
+                                <span class="radio-custom"></span>
+                                <span class="radio-text">
+                                    <strong>🌸 Leve</strong><br>
+                                    <small>2-3 atividades por dia, muito tempo livre</small>
+                                </span>
+                            </label>
+                            
+                            <label class="radio-option">
+                                <input type="radio" name="intensidade" value="moderado" required>
+                                <span class="radio-custom"></span>
+                                <span class="radio-text">
+                                    <strong>⚖️ Moderado</strong><br>
+                                    <small>3-4 atividades por dia, equilibrado</small>
+                                </span>
+                            </label>
+                            
+                            <label class="radio-option">
+                                <input type="radio" name="intensidade" value="intenso" required>
+                                <span class="radio-custom"></span>
+                                <span class="radio-text">
+                                    <strong>🚀 Intenso</strong><br>
+                                    <small>5+ atividades por dia, aproveitar tudo</small>
+                                </span>
+                            </label>
+                        </div>
+                        
+                        <div class="form-error" id="intensidade-error"></div>
+                    </div>
+                    
+                    <!-- Orçamento -->
+                    <div class="form-group">
+                        <label class="form-label">
+                            💰 <strong>Qual seu orçamento para atividades?</strong>
+                        </label>
+                        
+                        <div class="radio-group">
+                            <label class="radio-option">
+                                <input type="radio" name="orcamento" value="economico" required>
+                                <span class="radio-custom"></span>
+                                <span class="radio-text">
+                                    <strong>💵 Econômico</strong><br>
+                                    <small>Atividades gratuitas e baixo custo</small>
+                                </span>
+                            </label>
+                            
+                            <label class="radio-option">
+                                <input type="radio" name="orcamento" value="medio" required>
+                                <span class="radio-custom"></span>
+                                <span class="radio-text">
+                                    <strong>💳 Médio</strong><br>
+                                    <small>Equilibrio entre gratuito e pago</small>
+                                </span>
+                            </label>
+                            
+                            <label class="radio-option">
+                                <input type="radio" name="orcamento" value="alto" required>
+                                <span class="radio-custom"></span>
+                                <span class="radio-text">
+                                    <strong>💎 Alto</strong><br>
+                                    <small>Experiências premium e exclusivas</small>
+                                </span>
+                            </label>
+                        </div>
+                        
+                        <div class="form-error" id="orcamento-error"></div>
+                    </div>
+                    
+                    <!-- Botão de Submit -->
+                    <div class="form-submit">
+                        <button type="submit" class="btn-criar-roteiro" id="btn-criar-roteiro">
+                            <span class="btn-text">✨ Criar Meu Roteiro</span>
+                            <span class="btn-loading" style="display: none;">
+                                <span class="spinner"></span>
+                                Criando...
+                            </span>
+                        </button>
+                    </div>
+                    
+                </form>
+                
+                <!-- Dica da Tripinha -->
+                <div class="tripinha-tip">
+                    <div class="tripinha-avatar-mini">
+                        <img 
+                            src="assets/images/tripinha-avatar.png" 
+                            alt="Tripinha" 
+                            class="avatar-img"
+                            onerror="this.style.display='none'; this.nextElementSibling.style.display='block';"
+                        >
+                        <div class="avatar-emoji" style="display:none;">🐕</div>
+                    </div>
+                    <div class="tip-text">
+                        <p><strong>Dica da Tripinha:</strong> Quanto mais detalhes você me der, mais personalizado será seu roteiro! Não se preocupe, posso ajustar tudo depois! 🐾</p>
+                    </div>
+                </div>
+                
+            </div>
+            
+            <!-- Loading (será exibido após submit) -->
+            <div class="loading-container" id="loading-inicial" style="display: none;">
+                <div class="loading-content">
+                    <img 
+                        src="assets/images/tripinha/loading2.png" 
+                        alt="Tripinha preparando seu roteiro" 
+                        class="loading-avatar"
+                        onerror="this.style.display='none'; this.nextElementSibling.style.display='block';"
+                    >
+                    <div class="loading-emoji" style="display:none;">🐕</div>
+                    
+                    <div class="loading-text" id="loading-message">
+                        Preparando seu roteiro personalizado...
+                    </div>
+                    
+                    <div class="progress-bar-container">
+                        <div 
+                            class="progress-bar" 
+                            id="progress-bar"
+                            role="progressbar" 
+                            style="width: 10%;" 
+                            aria-valuenow="10" 
+                            aria-valuemin="0" 
+                            aria-valuemax="100"
+                            aria-label="Progresso do carregamento"
+                        ></div>
+                    </div>
+                    
+                    <p class="loading-subtitle">
+                        A Tripinha está organizando as melhores experiências para você! 🐾
+                    </p>
+                </div>
+            </div>
+            
+        </main>
+        
+        <!-- Barra de ações (será exibida após gerar roteiro) -->
+        <div class="botao-acoes-fixo" role="toolbar" aria-label="Ações do roteiro" style="display: none;">
+            <button 
+                class="btn-secundario" 
+                id="btn-editar-roteiro" 
+                type="button"
+                aria-label="Personalizar roteiro"
+            >
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"></path>
+                </svg>
+                <span>Personalizar</span>
+            </button>
+            
+            <button 
+                class="btn-principal" 
+                id="btn-compartilhar-roteiro" 
+                type="button"
+                aria-label="Compartilhar roteiro"
+            >
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M15 8a3 3 0 10-2.977-2.63l-4.94 2.47a3 3 0 100 4.319l4.94 2.47a3 3 0 10.895-1.789l-4.94-2.47a3.027 3.027 0 000-.74l4.94-2.47C13.456 7.68 14.19 8 15 8z"></path>
+                </svg>
+                <span>Compartilhar</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Container para toast notifications -->
+    <div id="toast-container" class="toast-container" role="region" aria-live="polite" aria-label="Notificações"></div>
+
+    <!-- Scripts -->
+    <script>
+        // Configurações globais
+        window.BENETRIP_CONFIG = {
+            apiBaseUrl: '/api',
+            imageQuality: 'medium',
+            maxImagesPerDay: 50,
+            enableLazyLoading: true,
+            enableImageOptimization: true,
+            debugMode: false
+        };
+        
+        window.isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        
+        // Configurar datas mínimas
+        document.addEventListener('DOMContentLoaded', function() {
+            const hoje = new Date();
+            const amanha = new Date(hoje);
+            amanha.setDate(hoje.getDate() + 1);
+            
+            const dataIda = document.getElementById('data-ida');
+            const dataVolta = document.getElementById('data-volta');
+            
+            dataIda.min = amanha.toISOString().split('T')[0];
+            dataVolta.min = amanha.toISOString().split('T')[0];
+            
+            // Quando alterar data de ida, ajustar mínimo da volta
+            dataIda.addEventListener('change', function() {
+                if (this.value) {
+                    const dataIdaObj = new Date(this.value);
+                    dataIdaObj.setDate(dataIdaObj.getDate() + 1);
+                    dataVolta.min = dataIdaObj.toISOString().split('T')[0];
+                    
+                    // Se data de volta for anterior, limpar
+                    if (dataVolta.value && new Date(dataVolta.value) <= new Date(this.value)) {
+                        dataVolta.value = '';
+                    }
+                }
+            });
+        });
+    </script>
+    
+    <!-- Scripts principais -->
+    <script src="assets/js/api.js" defer></script>
+    <script src="assets/js/modal-handler.js" defer></script>
+    <script src="assets/js/itinerary.js" defer></script>
+    <script src="assets/js/manual-form.js" defer></script>
+</body>
+</html>
