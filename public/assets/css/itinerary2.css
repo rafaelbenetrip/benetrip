@@ -1,0 +1,1359 @@
+/* ======================================
+   BENETRIP - ITINERARY STYLES + FORMULÁRIO
+   Versão: 9.0 - Com formulário manual de entrada
+   ====================================== */
+
+/* ✅ VARIÁVEIS CSS UNIFICADAS */
+:root {
+    --primary-color: #E87722; /* Laranja Vibrante */
+    --secondary-color: #00A3E0; /* Azul Sereno */
+    --white: #FFFFFF; /* Branco Neutro */
+    --dark: #21272A; /* Cinza Escuro */
+    --light-gray: #F5F5F5; /* Cinza Claro para fundos */
+    --medium-gray: #E0E0E0; /* Cinza Médio para bordas */
+    --success: #4CAF50; /* Verde para badges */
+    --info: #2196F3; /* Azul para badges */
+    --purple: #9C27B0; /* Roxo para badges */
+    --error: #f44336; /* Vermelho para erros */
+    --warning: #ff9800; /* Laranja para avisos */
+    
+    /* Shadows */
+    --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.1);
+    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.1);
+    --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.15);
+    
+    /* Transitions */
+    --transition-fast: 0.2s ease;
+    --transition-normal: 0.3s ease;
+    
+    /* Border radius */
+    --radius-sm: 6px;
+    --radius-md: 8px;
+    --radius-lg: 12px;
+    --radius-xl: 16px;
+}
+
+/* ✅ RESET E BASE STYLES */
+* {
+    box-sizing: border-box;
+}
+
+body.mobile-optimized {
+    margin: 0;
+    padding: 0;
+    overflow-x: hidden;
+    background-color: var(--light-gray);
+    font-family: 'Montserrat', sans-serif;
+    line-height: 1.5;
+    color: var(--dark);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+/* ✅ CONTAINER PRINCIPAL */
+.benetrip-container {
+    max-width: 480px;
+    margin: 0 auto;
+    padding-bottom: 80px; /* Espaço para footer fixo */
+    background-color: var(--white);
+    min-height: 100vh;
+    position: relative;
+}
+
+/* ================================
+   🆕 ESTILOS DO FORMULÁRIO
+   ================================ */
+
+/* Container do formulário */
+.formulario-container {
+    padding: 20px 16px;
+    background-color: var(--white);
+    min-height: calc(100vh - 70px);
+}
+
+/* Header do formulário */
+.formulario-header {
+    text-align: center;
+    margin-bottom: 32px;
+    padding: 20px 0;
+}
+
+.tripinha-welcomer {
+    margin-bottom: 20px;
+}
+
+.tripinha-avatar {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 3px solid var(--primary-color);
+    box-shadow: var(--shadow-md);
+}
+
+.tripinha-emoji {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--primary-color), #f39c42);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 40px;
+    margin: 0 auto;
+    box-shadow: var(--shadow-md);
+}
+
+.formulario-header h2 {
+    color: var(--primary-color);
+    font-family: 'Poppins', sans-serif;
+    font-size: 24px;
+    font-weight: 700;
+    margin: 16px 0 8px 0;
+}
+
+.formulario-header p {
+    color: var(--dark);
+    font-size: 16px;
+    margin: 0;
+    line-height: 1.4;
+}
+
+/* Formulário */
+.form-viagem {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+/* Grupos de campos */
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+}
+
+/* Labels */
+.form-label {
+    font-weight: 600;
+    font-size: 16px;
+    color: var(--dark);
+    margin-bottom: 8px;
+    display: block;
+}
+
+/* Inputs de texto, data e hora */
+.form-input {
+    width: 100%;
+    padding: 14px 16px;
+    border: 2px solid var(--medium-gray);
+    border-radius: var(--radius-md);
+    font-size: 16px;
+    color: var(--dark);
+    background-color: var(--white);
+    transition: all var(--transition-fast);
+    -webkit-appearance: none;
+    appearance: none;
+}
+
+.form-input:focus {
+    outline: none;
+    border-color: var(--secondary-color);
+    box-shadow: 0 0 0 3px rgba(0, 163, 224, 0.1);
+}
+
+.form-input:invalid {
+    border-color: var(--error);
+}
+
+.form-input::placeholder {
+    color: #999;
+    font-style: italic;
+}
+
+/* Dicas e erros */
+.form-hint {
+    font-size: 12px;
+    color: #666;
+    font-style: italic;
+    margin-top: 4px;
+}
+
+.form-error {
+    font-size: 12px;
+    color: var(--error);
+    font-weight: 500;
+    margin-top: 4px;
+    min-height: 16px;
+}
+
+/* Radio groups */
+.form-radio-group {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 12px;
+    margin-top: 8px;
+}
+
+.form-radio-item {
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+}
+
+.form-radio-item input[type="radio"] {
+    display: none;
+}
+
+.radio-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: 16px 12px;
+    border: 2px solid var(--medium-gray);
+    border-radius: var(--radius-md);
+    background-color: var(--white);
+    transition: all var(--transition-fast);
+    min-height: 80px;
+    justify-content: center;
+}
+
+.radio-emoji {
+    font-size: 24px;
+    margin-bottom: 8px;
+    display: block;
+}
+
+.radio-text {
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--dark);
+    margin-bottom: 4px;
+}
+
+.radio-content small {
+    font-size: 11px;
+    color: #666;
+    line-height: 1.2;
+}
+
+/* Estados dos radio buttons */
+.form-radio-item:hover .radio-content {
+    border-color: var(--secondary-color);
+    background-color: rgba(0, 163, 224, 0.05);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-sm);
+}
+
+.form-radio-item input[type="radio"]:checked + .radio-content {
+    border-color: var(--primary-color);
+    background: linear-gradient(135deg, rgba(232, 119, 34, 0.1), rgba(232, 119, 34, 0.05));
+    box-shadow: var(--shadow-md);
+}
+
+.form-radio-item input[type="radio"]:checked + .radio-content .radio-text {
+    color: var(--primary-color);
+    font-weight: 700;
+}
+
+/* Adaptações para telas menores */
+@media (max-width: 480px) {
+    .form-row {
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+    
+    .form-radio-group {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 8px;
+    }
+    
+    .radio-content {
+        padding: 12px 8px;
+        min-height: 70px;
+    }
+    
+    .radio-emoji {
+        font-size: 20px;
+        margin-bottom: 6px;
+    }
+    
+    .radio-text {
+        font-size: 13px;
+    }
+    
+    .radio-content small {
+        font-size: 10px;
+    }
+}
+
+/* Botão de submissão */
+.form-submit {
+    margin-top: 32px;
+    padding-bottom: 20px;
+}
+
+.btn-gerar-roteiro {
+    width: 100%;
+    padding: 18px 24px;
+    background: linear-gradient(135deg, var(--primary-color), #f39c42);
+    color: var(--white);
+    border: none;
+    border-radius: var(--radius-lg);
+    font-size: 18px;
+    font-weight: 700;
+    font-family: 'Poppins', sans-serif;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    box-shadow: var(--shadow-md);
+    min-height: 56px;
+}
+
+.btn-gerar-roteiro:hover,
+.btn-gerar-roteiro:focus {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(232, 119, 34, 0.4);
+    outline: none;
+}
+
+.btn-gerar-roteiro:active {
+    transform: translateY(0);
+}
+
+.btn-gerar-roteiro:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: var(--shadow-sm);
+}
+
+.btn-icon {
+    font-size: 20px;
+}
+
+.btn-text {
+    font-size: 16px;
+    font-weight: 700;
+}
+
+/* Loading state do botão */
+.btn-gerar-roteiro.loading .btn-text {
+    opacity: 0.7;
+}
+
+.btn-gerar-roteiro.loading .btn-icon {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+/* ================================
+   ✅ ESTILOS EXISTENTES DO ROTEIRO
+   (mantidos integralmente)
+   ================================ */
+
+/* ✅ HEADER OTIMIZADO */
+.app-header {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background-color: var(--white);
+    padding: 16px;
+    display: flex;
+    align-items: center;
+    box-shadow: var(--shadow-sm);
+    border-bottom: 1px solid var(--medium-gray);
+}
+
+.btn-voltar {
+    background: none;
+    border: none;
+    padding: 8px;
+    margin-right: 12px;
+    color: var(--dark);
+    cursor: pointer;
+    border-radius: 50%;
+    transition: background-color var(--transition-fast);
+    min-width: 44px;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.btn-voltar:hover,
+.btn-voltar:focus {
+    background-color: var(--light-gray);
+    outline: none;
+}
+
+.app-header h1 {
+    color: var(--primary-color);
+    font-size: 20px;
+    font-weight: 700;
+    margin: 0;
+    flex-grow: 1;
+    text-align: center;
+    font-family: 'Poppins', sans-serif;
+}
+
+/* ✅ LOADING COMPLETO - CORRIGIDO */
+.loading-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 60px 20px;
+    text-align: center;
+    min-height: 60vh;
+}
+
+.loading-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+    max-width: 320px;
+}
+
+.loading-avatar {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    margin-bottom: 20px;
+    animation: bounce 2s infinite;
+    object-fit: cover;
+}
+
+.loading-emoji {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--primary-color), #f39c42);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 40px;
+    margin-bottom: 20px;
+    animation: bounce 2s infinite;
+}
+
+.loading-text {
+    font-size: 16px;
+    color: var(--dark);
+    margin-bottom: 12px;
+    font-weight: 500;
+    text-align: center;
+}
+
+.loading-subtitle {
+    font-size: 14px;
+    color: #777;
+    margin-top: 16px;
+    text-align: center;
+    line-height: 1.4;
+}
+
+.progress-bar-container {
+    width: 100%;
+    max-width: 280px;
+    height: 6px;
+    background-color: var(--medium-gray);
+    border-radius: 3px;
+    overflow: hidden;
+    margin: 20px 0;
+}
+
+.progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));
+    border-radius: 3px;
+    transition: width var(--transition-normal);
+    min-width: 0;
+}
+
+@keyframes bounce {
+    0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
+    40% { transform: translateY(-10px); }
+    60% { transform: translateY(-5px); }
+}
+
+.fade-out {
+    opacity: 0;
+    transition: opacity var(--transition-normal);
+}
+
+/* ✅ RESUMO DA VIAGEM OTIMIZADO */
+.resumo-viagem {
+    margin: 16px;
+    background-color: var(--white);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    box-shadow: var(--shadow-md);
+    border: 1px solid var(--medium-gray);
+}
+
+.resumo-viagem-header {
+    background: linear-gradient(135deg, var(--secondary-color), #42a5f5);
+    color: var(--white);
+    padding: 16px;
+    font-weight: 600;
+    font-size: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.icone-header {
+    font-size: 18px;
+}
+
+.resumo-viagem-content {
+    padding: 20px;
+}
+
+.resumo-item {
+    display: flex;
+    align-items: flex-start;
+    margin-bottom: 16px;
+}
+
+.resumo-item:last-child {
+    margin-bottom: 0;
+}
+
+.resumo-item .icone {
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 12px;
+    flex-shrink: 0;
+    font-size: 16px;
+}
+
+.resumo-item .texto {
+    flex-grow: 1;
+}
+
+.resumo-item .label {
+    font-size: 13px;
+    color: #666;
+    margin-bottom: 2px;
+    font-weight: 500;
+}
+
+.resumo-item .valor {
+    font-weight: 600;
+    margin: 0;
+    color: var(--dark);
+    line-height: 1.3;
+}
+
+.resumo-item .valor-secundario {
+    font-size: 13px;
+    color: #777;
+    margin: 2px 0 0 0;
+}
+
+/* ✅ DIAS DO ROTEIRO CONTÍNUO */
+.roteiro-content {
+    padding: 0 16px 20px;
+}
+
+.dia-roteiro {
+    margin-bottom: 24px;
+    background-color: var(--white);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    box-shadow: var(--shadow-md);
+    border: 1px solid var(--medium-gray);
+}
+
+.dia-roteiro.continuo {
+    /* Estilos específicos para layout contínuo */
+}
+
+.dia-header {
+    display: flex;
+    align-items: center;
+    background: linear-gradient(135deg, var(--primary-color), #f39c42);
+    color: var(--white);
+    padding: 16px;
+    font-weight: 700;
+    font-size: 16px;
+}
+
+.dia-numero {
+    width: 36px;
+    height: 36px;
+    background-color: var(--white);
+    color: var(--primary-color);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 12px;
+    font-weight: 700;
+    font-size: 16px;
+}
+
+.dia-content {
+    padding: 20px;
+}
+
+.dia-descricao {
+    font-size: 15px;
+    color: #555;
+    line-height: 1.5;
+    margin-bottom: 16px;
+    font-style: italic;
+    background-color: rgba(232, 119, 34, 0.08);
+    padding: 12px;
+    border-radius: var(--radius-md);
+    border-left: 4px solid var(--primary-color);
+}
+
+.dia-observacao {
+    display: flex;
+    align-items: center;
+    background-color: var(--light-gray);
+    padding: 12px;
+    border-radius: var(--radius-md);
+    margin-bottom: 16px;
+    font-size: 14px;
+    color: var(--dark);
+}
+
+.icone-obs {
+    margin-right: 8px;
+    font-size: 16px;
+}
+
+.dia-livre {
+    text-align: center;
+    padding: 40px 20px;
+    background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+    border-radius: var(--radius-lg);
+    border: 2px dashed var(--medium-gray);
+    color: #666;
+}
+
+.dia-livre p {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 500;
+}
+
+/* ✅ PREVISÃO DO TEMPO */
+.previsao-tempo {
+    display: flex;
+    align-items: center;
+    background: linear-gradient(135deg, #e3f2fd, #bbdefb);
+    padding: 12px;
+    border-radius: var(--radius-md);
+    margin-bottom: 20px;
+    font-size: 14px;
+    border: 1px solid #90caf9;
+}
+
+.previsao-icon {
+    margin-right: 8px;
+    font-size: 18px;
+}
+
+.previsao-texto {
+    font-weight: 500;
+    color: #1565c0;
+}
+
+/* ✅ ATIVIDADES CONTÍNUAS - LAYOUT PRINCIPAL */
+.atividades-continuas {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    margin-top: 16px;
+}
+
+.atividade-continua {
+    background: var(--white);
+    border: 1px solid var(--medium-gray);
+    border-radius: var(--radius-lg);
+    padding: 16px;
+    box-shadow: var(--shadow-sm);
+    transition: all var(--transition-fast);
+    position: relative;
+}
+
+.atividade-continua:hover {
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-md);
+}
+
+.atividade-especial {
+    background: linear-gradient(135deg, #fff3e0, #ffe0b2);
+    border-color: var(--primary-color);
+    border-width: 2px;
+}
+
+.atividade-horario {
+    display: flex;
+    align-items: center;
+    margin-bottom: 12px;
+    color: var(--secondary-color);
+    font-weight: 600;
+    font-size: 14px;
+}
+
+.horario-icon {
+    margin-right: 6px;
+    font-size: 16px;
+}
+
+.horario-texto {
+    font-weight: 700;
+}
+
+.duracao-texto {
+    color: #777;
+    font-weight: 400;
+    margin-left: 6px;
+}
+
+.atividade-info {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+/* Container do local com estrutura corrigida */
+.atividade-local {
+    display: flex;
+    align-items: flex-start;
+    margin-bottom: 12px;
+    gap: 8px;
+}
+
+.local-icon {
+    margin-top: 2px;
+    font-size: 16px;
+    color: var(--primary-color);
+    flex-shrink: 0;
+    width: 20px;
+    text-align: center;
+}
+
+.local-detalhes {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.local-nome {
+    font-weight: 600;
+    font-size: 16px;
+    color: var(--dark);
+    line-height: 1.3;
+    margin: 0;
+    word-wrap: break-word;
+}
+
+.atividade-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 6px;
+    align-items: center;
+}
+
+.badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    padding: 6px 12px;
+    min-height: 24px;
+    border-radius: 15px;
+    color: var(--white);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+    line-height: 1;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    text-align: center;
+    min-width: fit-content;
+}
+
+.badge-cultura,
+.badge-turismo,
+.badge-destaque {
+    font-size: 9px;
+    padding: 5px 10px;
+    min-height: 22px;
+    border-radius: 12px;
+}
+
+.badge-destaque {
+    background: linear-gradient(135deg, #E87722, #f39c42);
+    color: #FFFFFF;
+}
+
+.badge-voo {
+    background: linear-gradient(135deg, #00A3E0, #42a5f5);
+    color: #FFFFFF;
+}
+
+.badge-cultura {
+    background: linear-gradient(135deg, #9C27B0, #ba68c8);
+    color: #FFFFFF;
+}
+
+.badge-gastronomia {
+    background: linear-gradient(135deg, #ff7043, #ff8a65);
+    color: #FFFFFF;
+}
+
+.badge-natureza {
+    background: linear-gradient(135deg, #4CAF50, #66bb6a);
+    color: #FFFFFF;
+}
+
+.badge-compras {
+    background: linear-gradient(135deg, #ffa726, #ffb74d);
+    color: #FFFFFF;
+}
+
+.badge-noturno {
+    background: linear-gradient(135deg, #5c6bc0, #7986cb);
+    color: #FFFFFF;
+}
+
+.badge-vista {
+    background: linear-gradient(135deg, #26a69a, #4db6ac);
+    color: #FFFFFF;
+}
+
+.badge-padrao {
+    background: linear-gradient(135deg, #78909c, #90a4ae);
+    color: #FFFFFF;
+}
+
+/* ✅ DICA DA TRIPINHA OTIMIZADA */
+.tripinha-dica {
+    background: linear-gradient(135deg, rgba(232, 119, 34, 0.1), rgba(232, 119, 34, 0.05));
+    padding: 16px;
+    border-radius: var(--radius-lg);
+    margin: 16px 0;
+    display: flex;
+    align-items: flex-start;
+    border: 1px solid rgba(232, 119, 34, 0.2);
+    gap: 12px;
+}
+
+.tripinha-avatar-mini {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    overflow: hidden;
+    flex-shrink: 0;
+}
+
+.avatar-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.avatar-emoji {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--primary-color), #f39c42);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+}
+
+.dica-texto p {
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.4;
+    color: var(--dark);
+}
+
+/* ✅ IMAGENS RESPONSIVAS OTIMIZADAS */
+.atividade-imagem-responsiva {
+    margin: 16px 0;
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    background-color: var(--light-gray);
+    position: relative;
+}
+
+.imagem-lazy {
+    width: 100%;
+    height: auto;
+    min-height: 200px;
+    max-height: 300px;
+    object-fit: cover;
+    display: block;
+    transition: all var(--transition-normal);
+}
+
+.imagem-lazy[loading="lazy"] {
+    opacity: 0;
+}
+
+.imagem-lazy.loaded {
+    opacity: 1;
+}
+
+.atividade-imagem-responsiva:hover .imagem-lazy {
+    transform: scale(1.02);
+}
+
+.atividade-imagem-responsiva::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(90deg, var(--light-gray) 25%, transparent 37%, var(--light-gray) 63%);
+    background-size: 400% 100%;
+    animation: skeleton 1.5s ease-in-out infinite;
+    opacity: 0;
+    transition: opacity var(--transition-fast);
+}
+
+.atividade-imagem-responsiva:has(.imagem-lazy[style*="opacity: 0"])::before {
+    opacity: 1;
+}
+
+@keyframes skeleton {
+    0% { background-position: 100% 50%; }
+    100% { background-position: -100% 50%; }
+}
+
+/* ✅ BOTÃO DE MAPA OTIMIZADO */
+.btn-ver-mapa-mini {
+    margin-top: 12px;
+    padding: 10px 16px;
+    border: 2px solid var(--secondary-color);
+    background: transparent;
+    color: var(--secondary-color);
+    border-radius: var(--radius-md);
+    font-size: 14px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    transition: all var(--transition-fast);
+    cursor: pointer;
+    min-height: 44px;
+    width: 100%;
+}
+
+.btn-ver-mapa-mini:hover,
+.btn-ver-mapa-mini:focus {
+    background: var(--secondary-color);
+    color: var(--white);
+    transform: translateY(-1px);
+    outline: none;
+}
+
+.icon-mapa {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+}
+
+/* ✅ FOOTER COM BOTÕES OTIMIZADO */
+.botao-acoes-fixo {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    display: flex;
+    padding: 16px;
+    background-color: var(--white);
+    box-shadow: var(--shadow-lg);
+    z-index: 100;
+    max-width: 480px;
+    margin: 0 auto;
+    gap: 12px;
+    border-top: 1px solid var(--medium-gray);
+}
+
+.btn-principal, .btn-secundario {
+    flex: 1;
+    padding: 14px 16px;
+    font-weight: 600;
+    font-size: 14px;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    text-align: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition: all var(--transition-fast);
+    border: none;
+    min-height: 48px;
+}
+
+.btn-principal {
+    background: linear-gradient(135deg, var(--primary-color), #f39c42);
+    color: var(--white);
+}
+
+.btn-principal:hover,
+.btn-principal:focus {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(232, 119, 34, 0.3);
+    outline: none;
+}
+
+.btn-secundario {
+    background-color: var(--white);
+    color: var(--secondary-color);
+    border: 2px solid var(--secondary-color);
+}
+
+.btn-secundario:hover,
+.btn-secundario:focus {
+    background-color: var(--secondary-color);
+    color: var(--white);
+    outline: none;
+}
+
+/* ✅ TOAST NOTIFICATIONS COMPLETAS */
+.toast-container {
+    position: fixed;
+    top: 80px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1000;
+    width: 90%;
+    max-width: 400px;
+    pointer-events: none;
+}
+
+.toast {
+    background-color: var(--white);
+    border-radius: var(--radius-md);
+    padding: 16px;
+    margin-bottom: 8px;
+    box-shadow: var(--shadow-lg);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    opacity: 0;
+    transform: translateY(-20px);
+    transition: all var(--transition-normal);
+    border-left: 4px solid var(--info);
+    pointer-events: auto;
+}
+
+.toast-visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.toast-success {
+    border-left-color: var(--success);
+}
+
+.toast-error {
+    border-left-color: var(--error);
+}
+
+.toast-warning {
+    border-left-color: var(--warning);
+}
+
+.toast-info {
+    border-left-color: var(--info);
+}
+
+.toast-icon {
+    font-size: 18px;
+    flex-shrink: 0;
+}
+
+.toast-message {
+    font-size: 14px;
+    color: var(--dark);
+    line-height: 1.4;
+}
+
+/* ✅ CONTAINER DE ERRO COMPLETO */
+.erro-container {
+    text-align: center;
+    padding: 40px 20px;
+    max-width: 400px;
+    margin: 0 auto;
+}
+
+.erro-icon {
+    margin-bottom: 20px;
+}
+
+.erro-icon img {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+}
+
+.erro-titulo {
+    color: var(--primary-color);
+    font-size: 20px;
+    font-weight: 700;
+    margin-bottom: 12px;
+    font-family: 'Poppins', sans-serif;
+}
+
+.erro-mensagem {
+    color: var(--dark);
+    font-size: 14px;
+    line-height: 1.5;
+    margin-bottom: 24px;
+}
+
+.erro-acoes {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 20px;
+}
+
+.erro-acoes .btn {
+    flex: 1;
+    padding: 12px;
+    border-radius: var(--radius-md);
+    font-weight: 600;
+    cursor: pointer;
+    font-size: 14px;
+    border: none;
+    transition: all var(--transition-fast);
+}
+
+.erro-dica {
+    font-size: 12px;
+    color: #777;
+    line-height: 1.4;
+}
+
+/* ✅ RESPONSIVIDADE OTIMIZADA */
+@media (max-width: 480px) {
+    .benetrip-container {
+        width: 100%;
+        margin: 0;
+    }
+    
+    .formulario-container {
+        padding: 16px 12px;
+    }
+    
+    .formulario-header h2 {
+        font-size: 22px;
+    }
+    
+    .formulario-header p {
+        font-size: 15px;
+    }
+    
+    .tripinha-avatar,
+    .tripinha-emoji {
+        width: 60px;
+        height: 60px;
+    }
+    
+    .tripinha-emoji {
+        font-size: 30px;
+    }
+    
+    .resumo-viagem {
+        margin: 12px;
+    }
+    
+    .roteiro-content {
+        padding: 0 12px 20px;
+    }
+    
+    .dia-content {
+        padding: 16px;
+    }
+    
+    .atividade-continua {
+        padding: 12px;
+    }
+    
+    .botao-acoes-fixo {
+        padding: 12px;
+        gap: 8px;
+    }
+    
+    .btn-principal, .btn-secundario {
+        padding: 12px;
+        font-size: 13px;
+        min-height: 44px;
+    }
+    
+    .imagem-lazy {
+        min-height: 180px;
+        max-height: 250px;
+    }
+    
+    .app-header {
+        padding: 12px;
+    }
+    
+    .app-header h1 {
+        font-size: 18px;
+    }
+    
+    .badge {
+        font-size: 9px;
+        padding: 4px 8px;
+        min-height: 20px;
+        border-radius: 12px;
+    }
+    
+    .badge-cultura,
+    .badge-turismo,
+    .badge-destaque {
+        font-size: 8px;
+        padding: 3px 6px;
+        min-height: 18px;
+        border-radius: 10px;
+    }
+    
+    .atividade-badges {
+        gap: 6px;
+        margin-top: 8px;
+    }
+}
+
+@media (max-width: 360px) {
+    .resumo-viagem,
+    .roteiro-content {
+        margin: 8px;
+        padding: 8px;
+    }
+    
+    .atividade-continua {
+        padding: 10px;
+    }
+    
+    .dia-content {
+        padding: 12px;
+    }
+    
+    .loading-avatar,
+    .loading-emoji {
+        width: 60px;
+        height: 60px;
+    }
+    
+    .loading-text {
+        font-size: 14px;
+    }
+    
+    .badge {
+        font-size: 8px;
+        padding: 3px 6px;
+        min-height: 18px;
+    }
+    
+    .badge-cultura,
+    .badge-turismo,
+    .badge-destaque {
+        font-size: 7px;
+        padding: 2px 5px;
+        min-height: 16px;
+        border-radius: 8px;
+    }
+    
+    .atividade-badges {
+        gap: 4px;
+    }
+}
+
+/* ✅ OTIMIZAÇÕES DE PERFORMANCE */
+.imagem-lazy {
+    will-change: opacity;
+}
+
+.atividade-continua {
+    will-change: transform;
+}
+
+.btn-ver-mapa-mini,
+.btn-principal,
+.btn-secundario,
+.btn-gerar-roteiro {
+    will-change: transform;
+}
+
+/* ✅ ESTADOS DE FOCO PARA ACESSIBILIDADE */
+.btn-voltar:focus,
+.btn-ver-mapa-mini:focus,
+.btn-principal:focus,
+.btn-secundario:focus,
+.btn-gerar-roteiro:focus,
+.form-input:focus {
+    outline: 2px solid var(--secondary-color);
+    outline-offset: 2px;
+}
+
+/* ✅ PREFERS REDUCED MOTION */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+    
+    .loading-avatar,
+    .loading-emoji {
+        animation: none;
+    }
+}
+
+/* ✅ HIGH CONTRAST MODE */
+@media (prefers-contrast: high) {
+    .badge {
+        border: 1px solid var(--white);
+    }
+    
+    .btn-secundario {
+        border-width: 3px;
+    }
+    
+    .form-input {
+        border-width: 3px;
+    }
+}
