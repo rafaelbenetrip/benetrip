@@ -1,38 +1,51 @@
 /* ======================================
-   BENETRIP - ROTEIRO MANUAL STYLES
+   BENETRIP - MANUAL ITINERARY OPTIMIZED
+   Versão: 9.0 - Unificado e Otimizado
+   Combinando todas as funcionalidades do manual + otimizações do itinerary.css
    ====================================== */
 
-/* ✅ VARIÁVEIS CSS */
+/* ✅ VARIÁVEIS CSS UNIFICADAS E EXPANDIDAS */
 :root {
+    /* Cores principais */
     --primary-color: #E87722; /* Laranja Vibrante */
     --secondary-color: #00A3E0; /* Azul Sereno */
     --white: #FFFFFF; /* Branco Neutro */
     --dark: #21272A; /* Cinza Escuro */
     --light-gray: #F5F5F5; /* Cinza Claro para fundos */
     --medium-gray: #E0E0E0; /* Cinza Médio para bordas */
+    
+    /* Cores funcionais */
     --success: #4CAF50; /* Verde para badges */
     --info: #2196F3; /* Azul para badges */
     --purple: #9C27B0; /* Roxo para badges */
     --error: #f44336; /* Vermelho para erros */
     --warning: #ff9800; /* Laranja para avisos */
     
-    /* Shadows */
+    /* Shadows otimizadas */
     --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.1);
     --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.1);
     --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.15);
+    --shadow-upper: 0 -4px 12px rgba(0, 0, 0, 0.1);
     
-    /* Transitions */
+    /* Transitions otimizadas */
     --transition-fast: 0.2s ease;
     --transition-normal: 0.3s ease;
+    --transition-slow: 0.5s ease;
     
     /* Border radius */
     --radius-sm: 6px;
     --radius-md: 8px;
     --radius-lg: 12px;
     --radius-xl: 16px;
+    --radius-full: 50%;
+    
+    /* Z-index layers */
+    --z-header: 100;
+    --z-toast: 1000;
+    --z-modal: 1100;
 }
 
-/* ✅ RESET E BASE STYLES */
+/* ✅ RESET E BASE STYLES OTIMIZADOS */
 * {
     box-sizing: border-box;
 }
@@ -49,22 +62,62 @@ body {
     -moz-osx-font-smoothing: grayscale;
 }
 
-/* ✅ CONTAINER PRINCIPAL */
+body.mobile-optimized {
+    /* Classe adicional para compatibilidade */
+    touch-action: manipulation;
+}
+
+/* ✅ CONTAINER PRINCIPAL OTIMIZADO */
 .benetrip-container {
     max-width: 480px;
     margin: 0 auto;
     background-color: var(--white);
     min-height: 100vh;
     position: relative;
+    padding-bottom: 80px; /* Espaço para footer fixo quando necessário */
 }
 
-/* ✅ HEADER */
+/* ✅ HEADER UNIFICADO E OTIMIZADO */
 .app-header {
+    position: sticky;
+    top: 0;
+    z-index: var(--z-header);
     background: linear-gradient(135deg, var(--primary-color), #f39c42);
     color: var(--white);
     padding: 20px 16px;
     text-align: center;
     box-shadow: var(--shadow-md);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+}
+
+.app-header.with-back-button {
+    justify-content: flex-start;
+    text-align: left;
+}
+
+.btn-voltar {
+    background: none;
+    border: none;
+    padding: 8px;
+    margin-right: 12px;
+    color: var(--white);
+    cursor: pointer;
+    border-radius: var(--radius-full);
+    transition: background-color var(--transition-fast);
+    min-width: 44px; /* ✅ Área de toque mínima */
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.btn-voltar:hover,
+.btn-voltar:focus {
+    background-color: rgba(255, 255, 255, 0.2);
+    outline: none;
 }
 
 .app-header h1 {
@@ -72,6 +125,7 @@ body {
     font-size: 24px;
     font-weight: 700;
     font-family: 'Poppins', sans-serif;
+    flex-grow: 1;
 }
 
 .app-header p {
@@ -80,7 +134,115 @@ body {
     opacity: 0.9;
 }
 
-/* ✅ FORMULÁRIO DE CRITÉRIOS */
+/* ✅ LOADING AVANÇADO COMPLETO */
+.loading-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 60px 20px;
+    text-align: center;
+    min-height: 60vh;
+}
+
+.loading-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+    max-width: 320px;
+}
+
+.loading-avatar {
+    width: 80px;
+    height: 80px;
+    border-radius: var(--radius-full);
+    margin-bottom: 20px;
+    animation: bounce 2s infinite;
+    object-fit: cover;
+}
+
+/* ✅ EMOJI FALLBACK AVANÇADO */
+.loading-emoji {
+    width: 80px;
+    height: 80px;
+    border-radius: var(--radius-full);
+    background: linear-gradient(135deg, var(--primary-color), #f39c42);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 40px;
+    margin-bottom: 20px;
+    animation: bounce 2s infinite;
+}
+
+.loading-text {
+    font-size: 16px;
+    color: var(--dark);
+    margin-bottom: 12px;
+    font-weight: 500;
+    text-align: center;
+}
+
+.loading-subtitle {
+    font-size: 14px;
+    color: #777;
+    margin-top: 16px;
+    text-align: center;
+    line-height: 1.4;
+}
+
+.progress-bar-container {
+    width: 100%;
+    max-width: 280px;
+    height: 6px;
+    background-color: var(--medium-gray);
+    border-radius: 3px;
+    overflow: hidden;
+    margin: 20px 0;
+}
+
+.progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));
+    border-radius: 3px;
+    transition: width var(--transition-normal);
+    min-width: 0;
+}
+
+/* ✅ LOADING SPINNER AVANÇADO */
+.loading-spinner {
+    width: 20px;
+    height: 20px;
+    border: 2px solid transparent;
+    border-top: 2px solid var(--white);
+    border-radius: var(--radius-full);
+    animation: spin 1s linear infinite;
+}
+
+.loading-spinner.large {
+    width: 40px;
+    height: 40px;
+    border-width: 3px;
+}
+
+@keyframes bounce {
+    0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
+    40% { transform: translateY(-10px); }
+    60% { transform: translateY(-5px); }
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.fade-out {
+    opacity: 0;
+    transition: opacity var(--transition-normal);
+}
+
+/* ✅ FORMULÁRIO DE CRITÉRIOS OTIMIZADO */
 .form-container {
     padding: 20px 16px;
 }
@@ -92,6 +254,11 @@ body {
     margin-bottom: 16px;
     box-shadow: var(--shadow-sm);
     border: 1px solid var(--medium-gray);
+    transition: all var(--transition-fast);
+}
+
+.form-section:hover {
+    box-shadow: var(--shadow-md);
 }
 
 .form-section h3 {
@@ -129,8 +296,9 @@ body {
     border-radius: var(--radius-md);
     font-size: 14px;
     font-family: inherit;
-    transition: border-color var(--transition-fast);
+    transition: all var(--transition-fast);
     background: var(--white);
+    min-height: 44px; /* ✅ Área de toque adequada */
 }
 
 .form-input:focus,
@@ -138,10 +306,19 @@ body {
     outline: none;
     border-color: var(--secondary-color);
     box-shadow: 0 0 0 3px rgba(0, 163, 224, 0.1);
+    transform: translateY(-1px);
 }
 
 .form-input::placeholder {
     color: #999;
+}
+
+.form-input:invalid {
+    border-color: var(--error);
+}
+
+.form-input:valid {
+    border-color: var(--success);
 }
 
 .date-inputs {
@@ -172,7 +349,7 @@ body {
     max-width: 120px;
 }
 
-/* ✅ BOTÃO GERAR ROTEIRO */
+/* ✅ BOTÃO GERAR ROTEIRO OTIMIZADO */
 .generate-button {
     width: 100%;
     background: linear-gradient(135deg, var(--primary-color), #f39c42);
@@ -190,11 +367,16 @@ body {
     justify-content: center;
     gap: 8px;
     min-height: 56px;
+    will-change: transform; /* ✅ Performance */
 }
 
-.generate-button:hover {
+.generate-button:hover:not(:disabled) {
     transform: translateY(-2px);
     box-shadow: var(--shadow-lg);
+}
+
+.generate-button:active:not(:disabled) {
+    transform: translateY(-1px);
 }
 
 .generate-button:disabled {
@@ -208,21 +390,7 @@ body {
     cursor: wait;
 }
 
-.loading-spinner {
-    width: 20px;
-    height: 20px;
-    border: 2px solid transparent;
-    border-top: 2px solid var(--white);
-    border-radius: 50%;
-    animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
-}
-
-/* ✅ ÁREA DO ROTEIRO GERADO */
+/* ✅ ÁREA DO ROTEIRO GERADO OTIMIZADA */
 .itinerary-result {
     margin-top: 20px;
     opacity: 0;
@@ -248,7 +416,7 @@ body {
 .tripinha-avatar {
     width: 40px;
     height: 40px;
-    border-radius: 50%;
+    border-radius: var(--radius-full);
     background: var(--white);
     display: flex;
     align-items: center;
@@ -263,28 +431,49 @@ body {
     font-family: 'Poppins', sans-serif;
 }
 
-/* ✅ RESUMO DA VIAGEM */
+/* ✅ RESUMO DA VIAGEM OTIMIZADO */
 .resumo-viagem {
     background: var(--white);
     border: 1px solid var(--medium-gray);
     border-top: none;
     padding: 20px;
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    box-shadow: var(--shadow-md);
+    margin: 16px;
+}
+
+.resumo-viagem-header {
+    background: linear-gradient(135deg, var(--secondary-color), #42a5f5);
+    color: var(--white);
+    padding: 16px;
+    font-weight: 600;
+    font-size: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: -20px -20px 20px -20px;
+}
+
+.icone-header {
+    font-size: 18px;
+}
+
+.resumo-viagem-content {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
 }
 
 .resumo-item {
     display: flex;
     align-items: flex-start;
-    margin-bottom: 12px;
     gap: 12px;
 }
 
-.resumo-item:last-child {
-    margin-bottom: 0;
-}
-
 .resumo-item .icone {
-    width: 24px;
-    height: 24px;
+    width: 28px;
+    height: 28px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -297,7 +486,7 @@ body {
 }
 
 .resumo-item .label {
-    font-size: 12px;
+    font-size: 13px;
     color: #666;
     margin-bottom: 2px;
     font-weight: 500;
@@ -310,13 +499,21 @@ body {
     line-height: 1.3;
 }
 
-/* ✅ DIAS DO ROTEIRO */
+.resumo-item .valor-secundario {
+    font-size: 13px;
+    color: #777;
+    margin: 2px 0 0 0;
+}
+
+/* ✅ DIAS DO ROTEIRO CONTÍNUO OTIMIZADO */
 .roteiro-content {
     background: var(--white);
     border: 1px solid var(--medium-gray);
     border-top: none;
     border-radius: 0 0 var(--radius-lg) var(--radius-lg);
     padding: 16px;
+    max-width: 480px;
+    margin: 0 auto;
 }
 
 .dia-roteiro {
@@ -324,12 +521,22 @@ body {
     background: var(--white);
     border-radius: var(--radius-lg);
     overflow: hidden;
-    box-shadow: var(--shadow-sm);
+    box-shadow: var(--shadow-md);
     border: 1px solid var(--medium-gray);
+    transition: all var(--transition-fast);
 }
 
 .dia-roteiro:last-child {
     margin-bottom: 0;
+}
+
+.dia-roteiro:hover {
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-lg);
+}
+
+.dia-roteiro.continuo {
+    /* Estilos específicos para layout contínuo */
 }
 
 .dia-header {
@@ -347,7 +554,7 @@ body {
     height: 36px;
     background-color: var(--white);
     color: var(--primary-color);
-    border-radius: 50%;
+    border-radius: var(--radius-full);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -361,7 +568,7 @@ body {
 }
 
 .dia-descricao {
-    font-size: 14px;
+    font-size: 15px;
     color: #555;
     line-height: 1.5;
     margin-bottom: 16px;
@@ -372,94 +579,279 @@ body {
     border-left: 4px solid var(--primary-color);
 }
 
-.atividades-lista {
+.dia-observacao {
+    display: flex;
+    align-items: center;
+    background-color: var(--light-gray);
+    padding: 12px;
+    border-radius: var(--radius-md);
+    margin-bottom: 16px;
+    font-size: 14px;
+    color: var(--dark);
+}
+
+.icone-obs {
+    margin-right: 8px;
+    font-size: 16px;
+}
+
+/* ✅ DIA LIVRE - NOVO */
+.dia-livre {
+    text-align: center;
+    padding: 40px 20px;
+    background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+    border-radius: var(--radius-lg);
+    border: 2px dashed var(--medium-gray);
+    color: #666;
+}
+
+.dia-livre p {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 500;
+}
+
+/* ✅ PREVISÃO DO TEMPO OTIMIZADA */
+.previsao-tempo {
+    display: flex;
+    align-items: center;
+    background: linear-gradient(135deg, #e3f2fd, #bbdefb);
+    padding: 12px;
+    border-radius: var(--radius-md);
+    margin-bottom: 20px;
+    font-size: 14px;
+    border: 1px solid #90caf9;
+}
+
+.previsao-icon {
+    margin-right: 8px;
+    font-size: 18px;
+}
+
+.previsao-texto {
+    font-weight: 500;
+    color: #1565c0;
+}
+
+/* ✅ ATIVIDADES CONTÍNUAS OTIMIZADAS */
+.atividades-lista,
+.atividades-continuas {
     display: flex;
     flex-direction: column;
     gap: 16px;
+    margin-top: 16px;
 }
 
-.atividade-item {
-    background: var(--light-gray);
-    border-radius: var(--radius-md);
-    padding: 16px;
+.atividade-item,
+.atividade-continua {
+    background: var(--white);
     border: 1px solid var(--medium-gray);
+    border-radius: var(--radius-lg);
+    padding: 16px;
+    box-shadow: var(--shadow-sm);
     transition: all var(--transition-fast);
+    position: relative;
+    will-change: transform; /* ✅ Performance */
 }
 
-.atividade-item:hover {
+.atividade-item:hover,
+.atividade-continua:hover {
     transform: translateY(-1px);
-    box-shadow: var(--shadow-sm);
+    box-shadow: var(--shadow-md);
+}
+
+.atividade-especial {
+    background: linear-gradient(135deg, #fff3e0, #ffe0b2);
+    border-color: var(--primary-color);
+    border-width: 2px;
 }
 
 .atividade-horario {
     display: flex;
     align-items: center;
-    margin-bottom: 8px;
+    margin-bottom: 12px;
     color: var(--secondary-color);
     font-weight: 600;
     font-size: 14px;
     gap: 6px;
 }
 
+.horario-icon {
+    margin-right: 6px;
+    font-size: 16px;
+}
+
+.horario-texto {
+    font-weight: 700;
+}
+
+.duracao-texto {
+    color: #777;
+    font-weight: 400;
+    margin-left: 6px;
+}
+
+.atividade-info {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+/* ✅ CORREÇÃO ESPECÍFICA PARA LOCAIS E BADGES */
 .atividade-local {
+    display: flex;
+    align-items: flex-start;
+    margin-bottom: 12px;
+    gap: 8px;
+}
+
+.local-icon {
+    margin-top: 2px;
+    font-size: 16px;
+    color: var(--primary-color);
+    flex-shrink: 0;
+    width: 20px;
+    text-align: center;
+}
+
+.local-detalhes {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.local-nome {
     font-weight: 600;
     font-size: 16px;
     color: var(--dark);
-    margin-bottom: 8px;
+    line-height: 1.3;
+    margin: 0;
+    word-wrap: break-word;
 }
 
+/* ✅ BADGES OTIMIZADAS COM TAMANHOS ADEQUADOS */
+.atividade-badges,
 .atividade-tags {
     display: flex;
     flex-wrap: wrap;
-    gap: 6px;
-    margin-bottom: 8px;
+    gap: 8px;
+    margin-top: 6px;
+    align-items: center;
 }
 
 .badge {
     display: inline-flex;
     align-items: center;
+    justify-content: center;
     font-size: 10px;
-    padding: 4px 8px;
-    border-radius: 12px;
+    padding: 6px 12px; /* ✅ PADDING OTIMIZADO */
+    min-height: 24px; /* ✅ ALTURA MÍNIMA */
+    border-radius: 15px; /* ✅ BORDER RADIUS AJUSTADO */
     color: var(--white);
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.5px;
+    white-space: nowrap;
+    line-height: 1;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    text-align: center;
+    min-width: fit-content; /* ✅ LARGURA AUTOMÁTICA */
 }
 
+/* ✅ BADGES ESPECÍFICAS COM TAMANHOS ADEQUADOS */
+.badge-cultura,
+.badge-turismo,
 .badge-destaque {
-    background: linear-gradient(135deg, var(--primary-color), #f39c42);
+    font-size: 9px; /* ✅ FONTE MENOR PARA TEXTOS LONGOS */
+    padding: 5px 10px;
+    min-height: 22px;
+    border-radius: 12px;
+}
+
+/* ✅ CORES CORRIGIDAS E CONTRASTADAS */
+.badge-destaque {
+    background: linear-gradient(135deg, #E87722, #f39c42);
+    color: #FFFFFF;
+}
+
+.badge-voo {
+    background: linear-gradient(135deg, #00A3E0, #42a5f5);
+    color: #FFFFFF;
 }
 
 .badge-cultura {
-    background: linear-gradient(135deg, var(--purple), #ba68c8);
+    background: linear-gradient(135deg, #9C27B0, #ba68c8);
+    color: #FFFFFF;
 }
 
 .badge-gastronomia {
     background: linear-gradient(135deg, #ff7043, #ff8a65);
+    color: #FFFFFF;
 }
 
 .badge-natureza {
-    background: linear-gradient(135deg, var(--success), #66bb6a);
+    background: linear-gradient(135deg, #4CAF50, #66bb6a);
+    color: #FFFFFF;
 }
 
 .badge-compras {
     background: linear-gradient(135deg, #ffa726, #ffb74d);
+    color: #FFFFFF;
+}
+
+.badge-noturno {
+    background: linear-gradient(135deg, #5c6bc0, #7986cb);
+    color: #FFFFFF;
+}
+
+.badge-vista {
+    background: linear-gradient(135deg, #26a69a, #4db6ac);
+    color: #FFFFFF;
 }
 
 .badge-padrao {
     background: linear-gradient(135deg, #78909c, #90a4ae);
+    color: #FFFFFF;
 }
 
-.atividade-dica {
-    background: rgba(232, 119, 34, 0.1);
-    padding: 12px;
-    border-radius: var(--radius-md);
-    margin-top: 12px;
+/* ✅ DICA DA TRIPINHA OTIMIZADA */
+.atividade-dica,
+.tripinha-dica {
+    background: linear-gradient(135deg, rgba(232, 119, 34, 0.1), rgba(232, 119, 34, 0.05));
+    padding: 16px;
+    border-radius: var(--radius-lg);
+    margin: 16px 0;
     display: flex;
     align-items: flex-start;
-    gap: 8px;
     border: 1px solid rgba(232, 119, 34, 0.2);
+    gap: 12px;
+}
+
+.tripinha-avatar-mini {
+    width: 32px;
+    height: 32px;
+    border-radius: var(--radius-full);
+    overflow: hidden;
+    flex-shrink: 0;
+}
+
+.avatar-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.avatar-emoji {
+    width: 32px;
+    height: 32px;
+    border-radius: var(--radius-full);
+    background: linear-gradient(135deg, var(--primary-color), #f39c42);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
 }
 
 .dica-icon {
@@ -467,19 +859,199 @@ body {
     flex-shrink: 0;
 }
 
-.dica-texto {
-    font-size: 13px;
-    color: var(--dark);
+.dica-texto,
+.dica-texto p {
+    margin: 0;
+    font-size: 14px;
     line-height: 1.4;
+    color: var(--dark);
 }
 
-/* ✅ TOAST NOTIFICATIONS */
+/* ✅ IMAGENS RESPONSIVAS OTIMIZADAS */
+.atividade-imagem-responsiva {
+    margin: 16px 0;
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    background-color: var(--light-gray);
+    position: relative;
+    box-shadow: var(--shadow-sm);
+}
+
+.imagem-lazy {
+    width: 100%;
+    height: auto;
+    min-height: 200px;
+    max-height: 300px;
+    object-fit: cover;
+    display: block;
+    transition: all var(--transition-normal);
+    will-change: opacity; /* ✅ Performance */
+}
+
+/* ✅ LAZY LOADING STATES */
+.imagem-lazy[loading="lazy"] {
+    opacity: 0;
+}
+
+.imagem-lazy.loaded {
+    opacity: 1;
+}
+
+.atividade-imagem-responsiva:hover .imagem-lazy {
+    transform: scale(1.02);
+}
+
+/* ✅ SKELETON LOADING AVANÇADO */
+.atividade-imagem-responsiva::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(90deg, var(--light-gray) 25%, transparent 37%, var(--light-gray) 63%);
+    background-size: 400% 100%;
+    animation: skeleton 1.5s ease-in-out infinite;
+    opacity: 0;
+    transition: opacity var(--transition-fast);
+}
+
+.atividade-imagem-responsiva:has(.imagem-lazy[style*="opacity: 0"])::before {
+    opacity: 1;
+}
+
+@keyframes skeleton {
+    0% { background-position: 100% 50%; }
+    100% { background-position: -100% 50%; }
+}
+
+/* Estados de loading para imagens */
+.imagem-lazy:not(.loaded) {
+    background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+    background-size: 200% 100%;
+    animation: loading-shimmer 1.5s infinite;
+}
+
+@keyframes loading-shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+}
+
+/* ✅ BOTÕES DE MAPA OTIMIZADOS */
+.btn-ver-mapa,
+.btn-ver-mapa-mini {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    margin-top: 12px;
+    padding: 10px 16px;
+    border: 2px solid var(--secondary-color);
+    background: transparent;
+    color: var(--secondary-color);
+    border-radius: var(--radius-md);
+    font-size: 14px;
+    font-weight: 600;
+    text-decoration: none;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    min-height: 44px; /* ✅ Área de toque adequada */
+    gap: 6px;
+    will-change: transform; /* ✅ Performance */
+}
+
+.btn-ver-mapa:hover,
+.btn-ver-mapa-mini:hover,
+.btn-ver-mapa:focus,
+.btn-ver-mapa-mini:focus {
+    background: var(--secondary-color);
+    color: var(--white);
+    transform: translateY(-1px);
+    outline: none;
+    box-shadow: 0 4px 12px rgba(0, 163, 224, 0.3);
+}
+
+.btn-ver-mapa:active,
+.btn-ver-mapa-mini:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 8px rgba(0, 163, 224, 0.3);
+}
+
+.icon-mapa {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    stroke-width: 2;
+}
+
+/* ✅ FOOTER COM BOTÕES OTIMIZADO */
+.botao-acoes-fixo {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    display: flex;
+    padding: 16px;
+    background-color: var(--white);
+    box-shadow: var(--shadow-upper);
+    z-index: var(--z-header);
+    max-width: 480px;
+    margin: 0 auto;
+    gap: 12px;
+    border-top: 1px solid var(--medium-gray);
+}
+
+.btn-principal,
+.btn-secundario {
+    flex: 1;
+    padding: 14px 16px;
+    font-weight: 600;
+    font-size: 14px;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    text-align: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition: all var(--transition-fast);
+    border: none;
+    min-height: 48px; /* ✅ Área de toque adequada */
+    will-change: transform; /* ✅ Performance */
+}
+
+.btn-principal {
+    background: linear-gradient(135deg, var(--primary-color), #f39c42);
+    color: var(--white);
+}
+
+.btn-principal:hover,
+.btn-principal:focus {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(232, 119, 34, 0.3);
+    outline: none;
+}
+
+.btn-secundario {
+    background-color: var(--white);
+    color: var(--secondary-color);
+    border: 2px solid var(--secondary-color);
+}
+
+.btn-secundario:hover,
+.btn-secundario:focus {
+    background-color: var(--secondary-color);
+    color: var(--white);
+    outline: none;
+}
+
+/* ✅ TOAST NOTIFICATIONS COMPLETAS */
 .toast-container {
     position: fixed;
-    top: 20px;
+    top: 80px;
     left: 50%;
     transform: translateX(-50%);
-    z-index: 1000;
+    z-index: var(--z-toast);
     width: 90%;
     max-width: 400px;
     pointer-events: none;
@@ -518,6 +1090,10 @@ body {
     border-left-color: var(--warning);
 }
 
+.toast-info {
+    border-left-color: var(--info);
+}
+
 .toast-icon {
     font-size: 18px;
     flex-shrink: 0;
@@ -529,7 +1105,84 @@ body {
     line-height: 1.4;
 }
 
-/* ✅ RESPONSIVIDADE */
+/* ✅ CONTAINER DE ERRO COMPLETO */
+.erro-container {
+    text-align: center;
+    padding: 40px 20px;
+    max-width: 400px;
+    margin: 0 auto;
+}
+
+.erro-icon {
+    margin-bottom: 20px;
+}
+
+.erro-icon img {
+    width: 80px;
+    height: 80px;
+    border-radius: var(--radius-full);
+}
+
+.erro-titulo {
+    color: var(--primary-color);
+    font-size: 20px;
+    font-weight: 700;
+    margin-bottom: 12px;
+    font-family: 'Poppins', sans-serif;
+}
+
+.erro-mensagem {
+    color: var(--dark);
+    font-size: 14px;
+    line-height: 1.5;
+    margin-bottom: 24px;
+}
+
+.erro-acoes {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 20px;
+}
+
+.erro-acoes .btn {
+    flex: 1;
+    padding: 12px;
+    border-radius: var(--radius-md);
+    font-weight: 600;
+    cursor: pointer;
+    font-size: 14px;
+    border: none;
+    transition: all var(--transition-fast);
+}
+
+.erro-dica {
+    font-size: 12px;
+    color: #777;
+    line-height: 1.4;
+}
+
+/* ✅ ANIMAÇÕES AVANÇADAS */
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.atividade-item,
+.atividade-continua {
+    animation: fadeInUp 0.5s ease-out;
+}
+
+.dia-roteiro {
+    animation: fadeInUp 0.5s ease-out;
+}
+
+/* ✅ RESPONSIVIDADE OTIMIZADA EM 3 BREAKPOINTS */
 @media (max-width: 480px) {
     .benetrip-container {
         width: 100%;
@@ -545,11 +1198,7 @@ body {
         margin-bottom: 12px;
     }
     
-    .date-inputs {
-        grid-template-columns: 1fr;
-        gap: 8px;
-    }
-    
+    .date-inputs,
     .time-inputs {
         grid-template-columns: 1fr;
         gap: 8px;
@@ -562,17 +1211,161 @@ body {
     .app-header h1 {
         font-size: 20px;
     }
+    
+    .resumo-viagem {
+        margin: 12px;
+    }
+    
+    .roteiro-content {
+        padding: 0 12px 20px;
+    }
+    
+    .dia-content {
+        padding: 16px;
+    }
+    
+    .atividade-item,
+    .atividade-continua {
+        padding: 12px;
+    }
+    
+    .botao-acoes-fixo {
+        padding: 12px;
+        gap: 8px;
+    }
+    
+    .btn-principal,
+    .btn-secundario {
+        padding: 12px;
+        font-size: 13px;
+        min-height: 44px;
+    }
+    
+    .imagem-lazy {
+        min-height: 180px;
+        max-height: 250px;
+    }
+    
+    .badge {
+        font-size: 9px;
+        padding: 4px 8px;
+        min-height: 20px;
+        border-radius: 12px;
+    }
+    
+    .badge-cultura,
+    .badge-turismo,
+    .badge-destaque {
+        font-size: 8px;
+        padding: 3px 6px;
+        min-height: 18px;
+        border-radius: 10px;
+    }
+    
+    .atividade-badges {
+        gap: 6px;
+        margin-top: 8px;
+    }
 }
 
-/* ✅ ESTADOS DE FOCO PARA ACESSIBILIDADE */
+@media (max-width: 360px) {
+    .resumo-viagem,
+    .roteiro-content {
+        margin: 8px;
+        padding: 8px;
+    }
+    
+    .atividade-item,
+    .atividade-continua {
+        padding: 10px;
+    }
+    
+    .dia-content {
+        padding: 12px;
+    }
+    
+    .loading-avatar,
+    .loading-emoji {
+        width: 60px;
+        height: 60px;
+    }
+    
+    .loading-text {
+        font-size: 14px;
+    }
+    
+    .badge {
+        font-size: 8px;
+        padding: 3px 6px;
+        min-height: 18px;
+    }
+    
+    .badge-cultura,
+    .badge-turismo,
+    .badge-destaque {
+        font-size: 7px;
+        padding: 2px 5px;
+        min-height: 16px;
+        border-radius: 8px;
+    }
+    
+    .atividade-badges {
+        gap: 4px;
+    }
+}
+
+@media (max-width: 320px) {
+    .form-container {
+        padding: 12px 8px;
+    }
+    
+    .form-section {
+        padding: 12px;
+    }
+    
+    .app-header {
+        padding: 12px 8px;
+    }
+    
+    .btn-ver-mapa,
+    .btn-ver-mapa-mini {
+        font-size: 12px;
+        padding: 8px 12px;
+    }
+}
+
+/* ✅ OTIMIZAÇÕES DE PERFORMANCE */
+.imagem-lazy {
+    will-change: opacity;
+}
+
+.atividade-item,
+.atividade-continua {
+    will-change: transform;
+}
+
+.btn-ver-mapa,
+.btn-ver-mapa-mini,
+.btn-principal,
+.btn-secundario,
+.generate-button {
+    will-change: transform;
+}
+
+/* ✅ ESTADOS DE FOCO PARA ACESSIBILIDADE AVANÇADA */
+.btn-voltar:focus,
 .form-input:focus,
 .form-select:focus,
-.generate-button:focus {
+.generate-button:focus,
+.btn-ver-mapa:focus,
+.btn-ver-mapa-mini:focus,
+.btn-principal:focus,
+.btn-secundario:focus {
     outline: 2px solid var(--secondary-color);
     outline-offset: 2px;
 }
 
-/* ✅ PREFERS REDUCED MOTION */
+/* ✅ PREFERS REDUCED MOTION - ACESSIBILIDADE */
 @media (prefers-reduced-motion: reduce) {
     *,
     *::before,
@@ -582,241 +1375,48 @@ body {
         transition-duration: 0.01ms !important;
     }
     
+    .loading-avatar,
+    .loading-emoji,
     .loading-spinner {
+        animation: none;
+    }
+    
+    .atividade-item,
+    .atividade-continua,
+    .dia-roteiro {
         animation: none;
     }
 }
 
-/* ===== ADIÇÕES CSS PARA BOTÃO "VER NO MAPA" ===== */
-/* Adicione este CSS ao arquivo assets/css/manual-itinerary.css */
-
-/* Botão Ver no Mapa */
-.btn-ver-mapa {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 100%;
-    margin-top: 8px;
-    padding: 8px 12px;
-    background: rgba(0, 163, 224, 0.1);
-    border: 1px solid var(--secondary-color);
-    border-radius: 6px;
-    color: var(--secondary-color);
-    font-size: 13px;
-    font-weight: 500;
-    text-decoration: none;
-    cursor: pointer;
-    transition: all 0.2s ease;
-}
-
-.btn-ver-mapa:hover {
-    background: var(--secondary-color);
-    color: white;
-    transform: translateY(-1px);
-    box-shadow: 0 2px 8px rgba(0, 163, 224, 0.3);
-}
-
-.btn-ver-mapa:active {
-    transform: translateY(0);
-    box-shadow: 0 1px 4px rgba(0, 163, 224, 0.3);
-}
-
-.btn-ver-mapa svg {
-    width: 16px;
-    height: 16px;
-    margin-right: 4px;
-    stroke-width: 2;
-}
-
-/* Melhorias no layout das atividades */
-.atividade-item {
-    background: white;
-    border: 1px solid var(--medium-gray);
-    border-radius: 12px;
-    padding: 16px;
-    margin-bottom: 16px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-    transition: all 0.3s ease;
-}
-
-.atividade-item:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-}
-
-.atividade-horario {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 14px;
-    font-weight: 600;
-    color: var(--secondary-color);
-    margin-bottom: 8px;
-}
-
-.atividade-local {
-    font-size: 16px;
-    font-weight: 600;
-    color: var(--dark);
-    margin-bottom: 12px;
-    line-height: 1.3;
-}
-
-.atividade-tags {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-    margin-bottom: 12px;
-}
-
-.badge {
-    padding: 4px 8px;
-    border-radius: 12px;
-    font-size: 11px;
-    font-weight: 500;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
-
-.badge-destaque {
-    background: var(--primary-color);
-    color: white;
-}
-
-.badge-cultura {
-    background: rgba(139, 69, 19, 0.1);
-    color: #8B4513;
-    border: 1px solid rgba(139, 69, 19, 0.3);
-}
-
-.badge-gastronomia {
-    background: rgba(255, 140, 0, 0.1);
-    color: #FF8C00;
-    border: 1px solid rgba(255, 140, 0, 0.3);
-}
-
-.badge-natureza {
-    background: rgba(34, 139, 34, 0.1);
-    color: #228B22;
-    border: 1px solid rgba(34, 139, 34, 0.3);
-}
-
-.badge-compras {
-    background: rgba(147, 112, 219, 0.1);
-    color: #9370DB;
-    border: 1px solid rgba(147, 112, 219, 0.3);
-}
-
-.badge-padrao {
-    background: rgba(108, 117, 125, 0.1);
-    color: #6c757d;
-    border: 1px solid rgba(108, 117, 125, 0.3);
-}
-
-.atividade-dica {
-    display: flex;
-    gap: 8px;
-    background: rgba(232, 119, 34, 0.1);
-    border-left: 3px solid var(--primary-color);
-    border-radius: 6px;
-    padding: 12px;
-    margin-bottom: 12px;
-}
-
-.dica-icon {
-    font-size: 16px;
-    flex-shrink: 0;
-}
-
-.dica-texto {
-    font-size: 13px;
-    line-height: 1.4;
-    color: var(--dark);
-}
-
-.atividade-imagem-responsiva {
-    margin-top: 12px;
-    border-radius: 8px;
-    overflow: hidden;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-}
-
-.atividade-imagem-responsiva img {
-    width: 100%;
-    height: 180px;
-    object-fit: cover;
-    transition: opacity 0.3s ease;
-}
-
-.imagem-lazy.loaded {
-    opacity: 1 !important;
-}
-
-/* Estilos para atividades especiais (chegada/partida) */
-.atividade-item:has([data-especial="true"]) {
-    background: linear-gradient(135deg, rgba(0, 163, 224, 0.05), rgba(232, 119, 34, 0.05));
-    border-color: var(--secondary-color);
-}
-
-/* Responsividade melhorada */
-@media (max-width: 480px) {
-    .btn-ver-mapa {
-        font-size: 12px;
-        padding: 6px 10px;
-    }
-    
-    .atividade-item {
-        padding: 12px;
-        margin-bottom: 12px;
-    }
-    
-    .atividade-local {
-        font-size: 15px;
-    }
-    
-    .atividade-tags {
-        gap: 4px;
-    }
-    
+/* ✅ HIGH CONTRAST MODE - ACESSIBILIDADE */
+@media (prefers-contrast: high) {
     .badge {
-        font-size: 10px;
-        padding: 3px 6px;
+        border: 1px solid var(--white);
+        text-shadow: 1px 1px 1px rgba(0, 0, 0, 0.5);
+    }
+    
+    .btn-secundario {
+        border-width: 3px;
+    }
+    
+    .form-input,
+    .form-select {
+        border-width: 3px;
     }
 }
 
-/* Animações */
-@keyframes fadeInUp {
-    from {
-        opacity: 0;
-        transform: translateY(20px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-.atividade-item {
-    animation: fadeInUp 0.5s ease-out;
-}
-
-/* Estados de loading para imagens */
-.imagem-lazy {
-    background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
-    background-size: 200% 100%;
-    animation: loading-shimmer 1.5s infinite;
-}
-
-@keyframes loading-shimmer {
-    0% {
-        background-position: -200% 0;
-    }
-    100% {
-        background-position: 200% 0;
+/* ✅ DARK MODE SUPPORT (preparação futura) */
+@media (prefers-color-scheme: dark) {
+    /* Implementar quando necessário */
+    :root {
+        --white: #1a1a1a;
+        --dark: #ffffff;
+        --light-gray: #2d2d2d;
+        --medium-gray: #404040;
     }
 }
 
-/* ✅ Classes para compatibilidade total com itinerary.js */
+/* ✅ CLASSES DE COMPATIBILIDADE TOTAL */
 .roteiro-content {
     max-width: 480px;
     margin: 0 auto;
@@ -835,10 +1435,51 @@ body {
     space-y: 16px;
 }
 
-.atividade-continua {
-    border: 1px solid #e5e5e5;
-    border-radius: 8px;
-    padding: 16px;
-    margin-bottom: 16px;
-    background: white;
+/* ✅ ESTADOS ESPECIAIS PARA ATIVIDADES */
+.atividade-item:has([data-especial="true"]),
+.atividade-continua:has([data-especial="true"]) {
+    background: linear-gradient(135deg, rgba(0, 163, 224, 0.05), rgba(232, 119, 34, 0.05));
+    border-color: var(--secondary-color);
+    border-width: 2px;
+}
+
+/* ✅ MELHORIAS FINAIS DE UX */
+.form-input:focus + .form-label,
+.form-select:focus + .form-label {
+    color: var(--secondary-color);
+}
+
+.generate-button:focus {
+    box-shadow: 0 0 0 3px rgba(232, 119, 34, 0.3);
+}
+
+/* ✅ ESTADO DE CARREGAMENTO GLOBAL */
+.loading-state * {
+    pointer-events: none;
+    user-select: none;
+}
+
+.loading-state .generate-button {
+    background: var(--medium-gray);
+    color: #999;
+}
+
+/* ✅ SCROLL SUAVE */
+html {
+    scroll-behavior: smooth;
+}
+
+/* ✅ SUPORTE A PRINT */
+@media print {
+    .botao-acoes-fixo,
+    .generate-button,
+    .btn-ver-mapa,
+    .btn-ver-mapa-mini {
+        display: none;
+    }
+    
+    .benetrip-container {
+        box-shadow: none;
+        max-width: 100%;
+    }
 }
