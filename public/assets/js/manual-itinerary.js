@@ -690,7 +690,8 @@ class BenetripManualItinerary {
         }
         
         try {
-            const query = `${local}`.trim();
+            const destino = this.roteiroPronto?.resumo?.destino || this.roteiroPronto?.destino || 'Brasil';
+            const query = `${local} ${destino}`.trim();
             const url = `/api/image-search?query=${encodeURIComponent(query)}&perPage=1`;
             
             const controller = new AbortController();
