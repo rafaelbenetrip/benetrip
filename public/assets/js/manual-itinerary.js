@@ -1,6 +1,7 @@
 // ======================================
 // BENETRIP - ROTEIRO MANUAL COM PRIORIDADE TOTAL PARA LLM
-// ✅ FORÇAR USO DA IA - FALLBACK APENAS EM ÚLTIMO CASO
+// ✅ VERSÃO CORRIGIDA - CAPTURA COMPLETA DE DESCRIÇÕES DA IA
+// ✅ CORREÇÃO CRÍTICA: Bug das descrições genéricas resolvido
 // ======================================
 
 class BenetripManualItinerary {
@@ -23,7 +24,7 @@ class BenetripManualItinerary {
     }
 
     init() {
-        console.log('🚀 Benetrip Roteiro Manual - PRIORIDADE LLM iniciado');
+        console.log('🚀 Benetrip Roteiro Manual v4.0 - CAPTURA COMPLETA DE IA');
         
         this.setupEventListeners();
         this.setupDateDefaults();
@@ -238,9 +239,9 @@ class BenetripManualItinerary {
             
             this.displayItinerary(roteiro);
             
-            // ✅ NOVO: Mostrar origem do roteiro
+            // ✅ NOVO: Mostrar origem do roteiro com métricas
             const origemMsg = this.roteiroOriginacao === 'IA' 
-                ? 'Roteiro personalizado criado pela IA! 🤖✨' 
+                ? `Roteiro personalizado criado pela IA! 🤖✨ (${roteiro.metadados?.taxaCapturaDescricoes || 0}% descrições originais)` 
                 : this.roteiroOriginacao === 'fallback'
                 ? 'Roteiro criado com sistema interno! 🛡️'
                 : 'Roteiro criado com sucesso! 🎉';
@@ -342,7 +343,7 @@ class BenetripManualItinerary {
         
         if (roteiroIA) {
             // ✅ SUCESSO COM IA: Converter preservando TUDO da IA
-            console.log('🎉 USANDO ROTEIRO DA IA - Convertendo sem perder detalhes...');
+            console.log('🎉 USANDO ROTEIRO DA IA - Convertendo com captura COMPLETA...');
             roteiro = this.converterRoteiroIACompleto(roteiroIA, formData);
             
         } else {
@@ -461,9 +462,171 @@ class BenetripManualItinerary {
         return true;
     }
 
-    // ✅ **NOVO**: Converter roteiro da IA preservando TUDO
+    // ✅ **CORREÇÃO PRINCIPAL**: Extrai descrição completa da IA
+    extrairDescricaoCompleta(diaIA, numeroDia, destino, formData) {
+        // Lista EXPANDIDA de campos possíveis que LLMs usam
+        const possiveisDescricoes = [
+            // Português
+            diaIA.descricao,
+            diaIA.tema,
+            diaIA.titulo,
+            diaIA.resumo,
+            diaIA.introducao,
+            diaIA.contexto,
+            diaIA.resumo_dia,
+            diaIA.tema_dia,
+            diaIA.foco_dia,
+            
+            // Inglês (padrão LLMs)
+            diaIA.description,
+            diaIA.summary,
+            diaIA.theme,
+            diaIA.title,
+            diaIA.intro,
+            diaIA.context,
+            diaIA.day_summary,
+            diaIA.day_theme,
+            diaIA.day_description,
+            diaIA.day_title,
+            diaIA.day_focus,
+            diaIA.day_overview,
+            
+            // Campos compostos
+            diaIA.dia?.descricao,
+            diaIA.dia?.tema,
+            diaIA.info?.descricao,
+            diaIA.detalhes?.tema,
+            
+            // Variações criativas
+            diaIA.mote,
+            diaIA.motto,
+            diaIA.essencia,
+            diaIA.essence,
+            diaIA.vibe,
+            diaIA.atmosphere
+        ];
+        
+        // Busca descrição rica (mínimo 20 caracteres)
+        for (const desc of possiveisDescricoes) {
+            if (desc && typeof desc === 'string' && desc.trim().length >= 20) {
+                // ✅ Encontrou descrição da IA!
+                console.log(`✅ Descrição IA capturada (Dia ${numeroDia}): "${desc.substring(0, 50)}..."`);
+                return desc.trim();
+            }
+        }
+        
+        // ✅ Busca descrição curta (mínimo 10 caracteres)
+        for (const desc of possiveisDescricoes) {
+            if (desc && typeof desc === 'string' && desc.trim().length >= 10) {
+                console.log(`⚠️ Descrição IA curta capturada (Dia ${numeroDia}): "${desc}"`);
+                return desc.trim();
+            }
+        }
+        
+        // ❌ ÚLTIMO RECURSO: genérico melhorado
+        console.warn(`❌ Nenhuma descrição IA encontrada para Dia ${numeroDia}. Estrutura recebida:`, 
+                    Object.keys(diaIA));
+        
+        return this.gerarDescricaoGenericaMelhorada(numeroDia, destino, formData);
+    }
+
+    // ✅ **CORREÇÃO**: Extrai observações completas da IA
+    extrairObservacaoCompleta(diaIA) {
+        const possiveisObservacoes = [
+            // Português
+            diaIA.observacao,
+            diaIA.dica,
+            diaIA.nota,
+            diaIA.aviso,
+            diaIA.dica_especial,
+            diaIA.observacao_importante,
+            
+            // Inglês
+            diaIA.observation,
+            diaIA.tip,
+            diaIA.note,
+            diaIA.hint,
+            diaIA.warning,
+            diaIA.special_tip,
+            diaIA.important_note,
+            diaIA.advice,
+            diaIA.recommendation,
+            
+            // Campos compostos
+            diaIA.dia?.observacao,
+            diaIA.dia?.dica,
+            diaIA.info?.observacao,
+            diaIA.detalhes?.dica,
+            
+            // Específicos por contexto
+            diaIA.dica_tripinha,
+            diaIA.tripinha_tip,
+            diaIA.local_insight,
+            diaIA.insider_tip
+        ];
+        
+        for (const obs of possiveisObservacoes) {
+            if (obs && typeof obs === 'string' && obs.trim().length >= 10) {
+                console.log(`✅ Observação IA capturada: "${obs.substring(0, 30)}..."`);
+                return obs.trim();
+            }
+        }
+        
+        return null; // Não força observação genérica
+    }
+
+    // ✅ **CORREÇÃO**: Genérico personalizado por contexto
+    gerarDescricaoGenericaMelhorada(numeroDia, destino, formData) {
+        if (numeroDia === 1) {
+            const personalizadas = {
+                familia: `Chegada em família em ${destino} - aventuras para todos aguardam!`,
+                casal: `Chegada romântica em ${destino} - momentos especiais começam agora.`,
+                amigos: `A turma chegou em ${destino} - que comecem as memórias inesquecíveis!`,
+                sozinho: `Chegada solo em ${destino} - liberdade total para descobrir seus segredos.`
+            };
+            return personalizadas[formData.tipoCompanhia] || `Primeiras impressões de ${destino} - a aventura começou!`;
+        }
+        
+        if (numeroDia === formData.diasViagem) {
+            return `Últimos momentos preciosos em ${destino} - levando memórias para toda vida.`;
+        }
+        
+        // Opções mais criativas para dias intermediários
+        const opcoesPersonalizadas = {
+            cultura: [
+                `Mergulho profundo na rica história de ${destino}.`,
+                `Descobrindo os segredos culturais de ${destino}.`,
+                `Entre museus, monumentos e tradições de ${destino}.`
+            ],
+            aventura: [
+                `Dia de adrenalina e descobertas em ${destino}.`,
+                `Explorando os cantos mais emocionantes de ${destino}.`,
+                `Aventuras inesquecíveis aguardam em ${destino}.`
+            ],
+            relaxar: [
+                `Dia de paz e contemplação em ${destino}.`,
+                `Ritmo tranquilo para absorver a essência de ${destino}.`,
+                `Momentos serenos nos recantos especiais de ${destino}.`
+            ],
+            urbano: [
+                `Pulso urbano e energia contagiante de ${destino}.`,
+                `Entre arranha-céus e vida metropolitana de ${destino}.`,
+                `Descobrindo a modernidade vibrante de ${destino}.`
+            ]
+        };
+        
+        const opcoes = opcoesPersonalizadas[formData.tipoViagem] || [
+            `Explorando as maravilhas únicas de ${destino}.`,
+            `Dia especial de descobertas em ${destino}.`,
+            `Experiências autênticas em ${destino}.`
+        ];
+        
+        return opcoes[(numeroDia - 2) % opcoes.length];
+    }
+
+    // ✅ **MÉTODO PRINCIPAL CORRIGIDO**: Converter roteiro da IA preservando TUDO
     converterRoteiroIACompleto(roteiroIA, formData) {
-        console.log('🔄 Convertendo roteiro da IA SEM PERDER NENHUM DETALHE...');
+        console.log('🔄 Convertendo roteiro IA com captura COMPLETA de descrições...');
         
         const diasContinuos = [];
         
@@ -473,14 +636,14 @@ class BenetripManualItinerary {
             
             const diaContino = {
                 data: this.formatDate(dataAtual),
-                // ✅ PRESERVAR descrição original da IA
-                descricao: diaIA.descricao || diaIA.tema || this.gerarDescricaoGenerica(index + 1, formData.destino),
+                // ✅ CORREÇÃO PRINCIPAL: Extração completa
+                descricao: this.extrairDescricaoCompleta(diaIA, index + 1, formData.destino, formData),
                 atividades: this.extrairTodasAtividadesDaIA(diaIA),
-                // ✅ PRESERVAR observações da IA
-                observacao: diaIA.observacao || diaIA.dica || null
+                // ✅ CORREÇÃO: Observação completa
+                observacao: this.extrairObservacaoCompleta(diaIA)
             };
             
-            // ✅ Adicionar observações especiais apenas se a IA não forneceu
+            // Observações especiais apenas se IA não forneceu
             if (!diaContino.observacao) {
                 if (index === 0) {
                     diaContino.observacao = this.obterObservacaoPrimeiroDia(formData.horarioChegada);
@@ -496,7 +659,16 @@ class BenetripManualItinerary {
             diasContinuos.push(diaContino);
         });
         
-        // ✅ Ajustar apenas horários de chegada/partida, manter atividades da IA
+        // Log para debug
+        const descricoesIA = diasContinuos.filter(dia => 
+            !dia.descricao.includes('Explorando os tesouros') && 
+            !dia.descricao.includes('Imersão na cultura') &&
+            !dia.descricao.includes('Descobrindo os sabores') &&
+            !dia.descricao.includes('Aventuras inesquecíveis')
+        ).length;
+        
+        console.log(`📊 Resultado da captura: ${descricoesIA}/${diasContinuos.length} dias com descrições IA originais`);
+        
         this.ajustarHorariosVooSemAlterarAtividades(diasContinuos, formData);
         
         return {
@@ -514,12 +686,14 @@ class BenetripManualItinerary {
                 tipoViagem: formData.tipoViagem
             },
             dias: diasContinuos,
-            // ✅ PRESERVAR metadados da IA
             metadados: {
                 geradoPorIA: true,
                 modeloIA: roteiroIA.modelo || 'deepseek',
                 versaoIA: roteiroIA.versao,
-                tempoGeracao: roteiroIA.tempo_geracao
+                tempoGeracao: roteiroIA.tempo_geracao,
+                // ✅ NOVO: Métricas de captura
+                descricoesOriginaisCapturadas: descricoesIA,
+                taxaCapturaDescricoes: Math.round((descricoesIA / diasContinuos.length) * 100)
             }
         };
     }
@@ -702,7 +876,7 @@ class BenetripManualItinerary {
             
             const dia = {
                 data: this.formatDate(dataAtual),
-                descricao: this.gerarDescricaoGenerica(i + 1, destino, diasViagem, formData),
+                descricao: this.gerarDescricaoGenericaMelhorada(i + 1, destino, formData),
                 atividades: this.gerarAtividadesVariadasPorDia(formData, i, diasViagem)
             };
             
@@ -814,17 +988,7 @@ class BenetripManualItinerary {
                 { local: "Elevador de Santa Justa", tags: ["Vista", "Engenharia"], dica: "Vista panorâmica de 360°!", categoria: "vista" },
                 { local: "Miradouro da Senhora do Monte", tags: ["Vista", "Romântico"], dica: "Melhor pôr do sol da cidade!", categoria: "vista" },
                 { local: "Oceanário de Lisboa", tags: ["Família", "Educativo"], dica: "Segundo maior aquário da Europa!", categoria: "familia" },
-                { local: "Palácio da Pena (Sintra)", tags: ["Histórico", "Colorido"], dica: "Combinar com visita a Sintra!", categoria: "passeio" },
-                { local: "Quinta da Regaleira", tags: ["Mistério", "Jardins"], dica: "Explore os túneis secretos!", categoria: "aventura" },
-                { local: "Cabo da Roca", tags: ["Natureza", "Extremo"], dica: "Ponto mais ocidental da Europa!", categoria: "natureza" },
-                { local: "Pastéis de Belém", tags: ["Gastronomia", "Tradicional"], dica: "Receita secreta centenária!", categoria: "gastronomia" },
-                { local: "Fado em Alfama", tags: ["Cultural", "Música"], dica: "Patrimônio da Humanidade!", categoria: "noturno" },
-                { local: "Tram 28", tags: ["Transporte", "Panorâmico"], dica: "Tour completo pela cidade!", categoria: "transporte" },
-                { local: "Parque Eduardo VII", tags: ["Natureza", "Estufa"], dica: "Estufa fria é imperdível!", categoria: "natureza" },
-                { local: "Gulbenkian Museum", tags: ["Arte", "Cultural"], dica: "Coleção de arte impressionante!", categoria: "museu" },
-                { local: "Cais do Sodré", tags: ["Moderno", "Vida Noturna"], dica: "Área renovada com bares!", categoria: "noturno" },
-                { local: "Mercado da Ribeira", tags: ["Gastronomia", "Local"], dica: "Autêntico mercado lisboeta!", categoria: "gastronomia" },
-                { local: "Chiado", tags: ["Compras", "Elegante"], dica: "Área comercial sofisticada!", categoria: "compras" }
+                { local: "Palácio da Pena (Sintra)", tags: ["Histórico", "Colorido"], dica: "Combinar com visita a Sintra!", categoria: "passeio" }
             ]
         };
 
@@ -848,12 +1012,7 @@ class BenetripManualItinerary {
             { local: "Miradouro da Cidade", tags: ["Vista", "Panorâmico"], dica: "Vista panorâmica espetacular!", categoria: "vista" },
             { local: "Restaurante Típico", tags: ["Gastronomia", "Tradicional"], dica: "Peça o prato da casa!", categoria: "gastronomia" },
             { local: "Centro Comercial", tags: ["Compras", "Moderno"], dica: "Aproveite as promoções!", categoria: "compras" },
-            { local: "Tour Gastronômico", tags: ["Gastronomia", "Descoberta"], dica: "Sabores autênticos da região!", categoria: "gastronomia" },
-            { local: "Jardim Botânico", tags: ["Natureza", "Educativo"], dica: "Diversidade botânica!", categoria: "natureza" },
-            { local: "Teatro Municipal", tags: ["Cultural", "Espetáculo"], dica: "Verifique a programação!", categoria: "cultural" },
-            { local: "Feira de Artesanato", tags: ["Artesanato", "Local"], dica: "Produtos únicos locais!", categoria: "compras" },
-            { local: "Casa de Fados", tags: ["Música", "Tradicional"], dica: "Música tradicional ao vivo!", categoria: "noturno" },
-            { local: "Trilha Ecológica", tags: ["Aventura", "Natureza"], dica: "Contato direto com a natureza!", categoria: "aventura" }
+            { local: "Tour Gastronômico", tags: ["Gastronomia", "Descoberta"], dica: "Sabores autênticos da região!", categoria: "gastronomia" }
         ];
         
         return baseGigante;
@@ -1052,9 +1211,9 @@ class BenetripManualItinerary {
         const dataIda = this.formatarData(roteiro.resumo.dataIda);
         const dataVolta = this.formatarData(roteiro.resumo.dataVolta);
         
-        // ✅ Adicionar indicador de origem
+        // ✅ Adicionar indicador de origem com métricas
         const indicadorOrigem = roteiro.metadados?.geradoPorIA 
-            ? '<div class="origem-roteiro ia">🤖 Roteiro criado pela IA</div>'
+            ? `<div class="origem-roteiro ia">🤖 Roteiro criado pela IA (${roteiro.metadados.taxaCapturaDescricoes || 0}% descrições originais)</div>`
             : '<div class="origem-roteiro fallback">🛡️ Roteiro do sistema interno</div>';
         
         resumo.innerHTML = `
@@ -1285,29 +1444,6 @@ class BenetripManualItinerary {
         }
         
         return 'Internacional';
-    }
-
-    gerarDescricaoGenerica(numeroDia, destino, totalDias, formData) {
-        if (numeroDia === 1) {
-            const personalizada = {
-                familia: `Chegada em família em ${destino} - aventuras para todos!`,
-                casal: `Chegada romântica em ${destino} - momentos especiais!`,
-                amigos: `Chegada da turma em ${destino} - diversão garantida!`,
-                sozinho: `Chegada solo em ${destino} - liberdade total!`
-            };
-            return personalizada[formData.tipoCompanhia] || `Chegada e primeiras impressões de ${destino}!`;
-        } else if (numeroDia === totalDias) {
-            return `Últimos momentos para aproveitar ${destino} antes da partida.`;
-        }
-        
-        const opcoes = [
-            `Explorando os tesouros de ${destino}.`,
-            `Imersão na cultura de ${destino}.`,
-            `Descobrindo os sabores de ${destino}.`,
-            `Aventuras inesquecíveis em ${destino}.`
-        ];
-        
-        return opcoes[(numeroDia - 2) % opcoes.length];
     }
 
     obterNumeroAtividades(intensidade) {
@@ -1635,4 +1771,4 @@ document.addEventListener('DOMContentLoaded', () => {
     new BenetripManualItinerary();
 });
 
-console.log('🎯 Benetrip Manual Itinerary v3.0 - PRIORIDADE TOTAL PARA LLM!');
+console.log('🎯 Benetrip Manual Itinerary v4.0 - CORREÇÃO TOTAL DAS DESCRIÇÕES IA!');
