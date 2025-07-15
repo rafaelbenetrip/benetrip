@@ -44,7 +44,7 @@ const BENETRIP_ROTEIRO = {
     if (formulario) formulario.style.display = 'block';
     if (roteiro) roteiro.style.display = 'none';
     if (acoes) acoes.style.display = 'none';
-    if (header) header.textContent = 'Planeje sua Viagem';
+    if (header) header.textContent = 'Faça seu roteiro ideal';
   },
 
   /**
