@@ -1,7 +1,8 @@
 /**
- * Benetrip - Manual Itinerary v5.0 - OTIMIZADO IGUAL AO ITINERARY.JS
+ * Benetrip - Manual Itinerary v5.1 - FALLBACKS MELHORADOS
  * ✅ Mantém: Origem dos dados do formulário + Extração robusta da IA
  * ✅ Aplica: Performance, eventos, lazy loading, imagens completas, previsão real
+ * ✅ NOVO: Fallbacks de imagem específicos por destino (igual ao itinerary.js)
  */
 
 class BenetripManualItinerary {
@@ -29,7 +30,7 @@ class BenetripManualItinerary {
     }
 
     init() {
-        console.log('🚀 Benetrip Manual Itinerary v5.0 - OTIMIZADO COMO ITINERARY.JS');
+        console.log('🚀 Benetrip Manual Itinerary v5.1 - FALLBACKS MELHORADOS');
         
         this.configurarEventosOtimizados();
         this.setupDateDefaults();
@@ -118,15 +119,21 @@ class BenetripManualItinerary {
         }
     }
 
+    /**
+     * ✅ CARREGAMENTO COM FALLBACK MELHORADO (igual ao itinerary.js)
+     */
     carregarImagemComFallbackOtimizado(img) {
         const originalSrc = img.dataset.src;
         const local = img.alt || 'Local';
         
-        // ✅ Fallbacks otimizados (sem via.placeholder.com)
+        // ✅ MUDANÇA: Usar destino específico nos fallbacks
+        const destino = this.roteiroPronto?.resumo?.destino || this.roteiroPronto?.destino || 'Brasil';
+        
+        // Fallbacks melhorados (igual ao itinerary.js)
         const fallbacks = [
             originalSrc,
             `https://picsum.photos/400/250?random=${Math.floor(Math.random() * 1000)}`,
-            `https://source.unsplash.com/400x250/?travel`,
+            `https://source.unsplash.com/400x250/?travel,${encodeURIComponent(destino)}`, // <- ESPECÍFICO
             this.criarImagemPlaceholderSVG(local)
         ];
         
@@ -579,7 +586,7 @@ class BenetripManualItinerary {
     }
 
     // ===============================================
-    // ✅ BUSCA DE IMAGENS OTIMIZADA (igual itinerary.js)
+    // ✅ BUSCA DE IMAGENS OTIMIZADA (com fallbacks melhorados)
     // ===============================================
 
     async buscarTodasImagensOtimizado() {
@@ -674,22 +681,33 @@ class BenetripManualItinerary {
         }
     }
 
+    /**
+     * ✅ FALLBACK PARA ATIVIDADES MELHORADO (igual ao itinerary.js)
+     */
     gerarImagemFallbackOtimizado(local, diaIndex, ativIndex) {
+        // ✅ MUDANÇA: Usar destino específico
+        const destino = this.roteiroPronto?.resumo?.destino || this.roteiroPronto?.destino || 'Brasil';
+        
+        // Fallbacks funcionais com destino específico
         const fallbacks = [
             `https://picsum.photos/400/250?random=${diaIndex}${ativIndex}${Date.now()}`,
-            `https://source.unsplash.com/400x250/?travel`,
+            `https://source.unsplash.com/400x250/?travel,${encodeURIComponent(destino)}`, // <- ESPECÍFICO
             this.criarImagemPlaceholderSVG(local)
         ];
         
         return fallbacks[ativIndex % fallbacks.length];
     }
 
+    /**
+     * ✅ BUSCA DE IMAGEM COM CACHE MELHORADA (igual ao itinerary.js)
+     */
     async buscarImagemComCache(local) {
         if (this.imagensCache.has(local)) {
             return this.imagensCache.get(local);
         }
         
         try {
+            // ✅ MUDANÇA: Query mais específica incluindo o destino
             const destino = this.roteiroPronto?.resumo?.destino || this.roteiroPronto?.destino || 'Brasil';
             const query = `${local} ${destino}`.trim();
             const url = `/api/image-search?query=${encodeURIComponent(query)}&perPage=1`;
@@ -1218,7 +1236,8 @@ class BenetripManualItinerary {
     }
 
     abrirMapa(local) {
-        const query = `${local}`;
+        const destino = this.roteiroPronto?.resumo?.destino || this.roteiroPronto?.destino || 'Brasil';
+        const query = `${local}, ${destino}`;
         const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
         window.open(url, '_blank', 'noopener,noreferrer');
     }
@@ -1562,4 +1581,4 @@ document.addEventListener('DOMContentLoaded', () => {
     new BenetripManualItinerary();
 });
 
-console.log('🎯 Benetrip Manual Itinerary v5.0 - OTIMIZADO IGUAL AO ITINERARY.JS!');
+console.log('🎯 Benetrip Manual Itinerary v5.1 - FALLBACKS MELHORADOS IGUAL AO ITINERARY.JS!');
