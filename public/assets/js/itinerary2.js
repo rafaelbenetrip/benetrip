@@ -78,26 +78,90 @@ const BENETRIP_ROTEIRO = {
   },
 
   /**
-   * ✅ NOVO: Configura campos condicionais (quantidade de pessoas)
-   */
-  configurarCamposCondicionais() {
+ * ✅ CONFIGURAR CAMPOS CONDICIONAIS - VERSÃO EXPANDIDA
+ */
+configurarCamposCondicionais() {
     const radioCompanhia = document.querySelectorAll('input[name="companhia"]');
     const grupoQuantidade = document.getElementById('grupo-quantidade');
+    const grupoFamilia = document.getElementById('grupo-familia');
     
-    radioCompanhia.forEach(radio => {
-      radio.addEventListener('change', (e) => {
-        const valor = e.target.value;
+    // Campos de família
+    const quantidadeAdultos = document.getElementById('quantidade-adultos');
+    const quantidadeCriancas = document.getElementById('quantidade-criancas');
+    const quantidadeBebes = document.getElementById('quantidade-bebes');
+    const totalFamilia = document.getElementById('total-familia');
+    
+    // Função para calcular total da família
+    const calcularTotalFamilia = () => {
+        if (!quantidadeAdultos || !quantidadeCriancas || !quantidadeBebes) return;
         
-        if (valor === 'familia' || valor === 'amigos') {
-          grupoQuantidade.style.display = 'block';
-          document.getElementById('quantidade-pessoas').required = true;
-        } else {
-          grupoQuantidade.style.display = 'none';
-          document.getElementById('quantidade-pessoas').required = false;
+        const adultos = parseInt(quantidadeAdultos.value) || 0;
+        const criancas = parseInt(quantidadeCriancas.value) || 0;
+        const bebes = parseInt(quantidadeBebes.value) || 0;
+        const total = adultos + criancas + bebes;
+        
+        if (totalFamilia) {
+            totalFamilia.value = `${total} pessoa${total !== 1 ? 's' : ''}`;
         }
-      });
+        
+        // Validação
+        if (total > 10) {
+            this.exibirToast('Máximo de 10 pessoas por grupo familiar.', 'warning');
+            return false;
+        }
+        
+        if (adultos === 0) {
+            this.exibirToast('É necessário pelo menos 1 adulto.', 'warning');
+            return false;
+        }
+        
+        return true;
+    };
+    
+    // Event listeners para campos de família
+    if (quantidadeAdultos) {
+        quantidadeAdultos.addEventListener('input', calcularTotalFamilia);
+    }
+    if (quantidadeCriancas) {
+        quantidadeCriancas.addEventListener('input', calcularTotalFamilia);
+    }
+    if (quantidadeBebes) {
+        quantidadeBebes.addEventListener('input', calcularTotalFamilia);
+    }
+    
+    // Event listeners para radio buttons
+    radioCompanhia.forEach(radio => {
+        radio.addEventListener('change', (e) => {
+            const valor = e.target.value;
+            
+            // Ocultar todos os campos condicionais primeiro
+            if (grupoQuantidade) {
+                grupoQuantidade.style.display = 'none';
+                document.getElementById('quantidade-pessoas').required = false;
+            }
+            if (grupoFamilia) {
+                grupoFamilia.style.display = 'none';
+                quantidadeAdultos.required = false;
+            }
+            
+            // Mostrar campos apropriados
+            if (valor === 'familia') {
+                grupoFamilia.style.display = 'block';
+                quantidadeAdultos.required = true;
+                calcularTotalFamilia(); // Calcular total inicial
+            } else if (valor === 'amigos') {
+                grupoQuantidade.style.display = 'block';
+                document.getElementById('quantidade-pessoas').required = true;
+            }
+        });
     });
-  },
+    
+    // Calcular total inicial se família já estiver selecionada
+    const familiaRadio = document.querySelector('input[name="companhia"][value="familia"]');
+    if (familiaRadio && familiaRadio.checked) {
+        calcularTotalFamilia();
+    }
+},
 
   /**
    * ✅ NOVO: Configura validação em tempo real
@@ -226,34 +290,66 @@ const BENETRIP_ROTEIRO = {
   },
 
   /**
-   * ✅ NOVO: Captura dados do formulário
-   */
-  capturarDadosFormulario() {
+ * ✅ CAPTURAR DADOS DO FORMULÁRIO - VERSÃO EXPANDIDA
+ */
+capturarDadosFormulario() {
     const formData = new FormData(document.getElementById('form-viagem'));
     
     const dados = {
-      destino: formData.get('destino').trim(),
-      dataIda: formData.get('data-ida'),
-      horarioChegada: formData.get('horario-chegada'),
-      dataVolta: formData.get('data-volta') || null,
-      horarioPartida: formData.get('horario-partida'),
-      companhia: formData.get('companhia'),
-      quantidadePessoas: parseInt(formData.get('quantidade-pessoas')) || 1,
-      preferencias: formData.get('preferencias'),
-      intensidade: formData.get('intensidade'),
-      orcamento: formData.get('orcamento')
+        destino: formData.get('destino').trim(),
+        dataIda: formData.get('data-ida'),
+        horarioChegada: formData.get('horario-chegada'),
+        dataVolta: formData.get('data-volta') || null,
+        horarioPartida: formData.get('horario-partida'),
+        companhia: formData.get('companhia'),
+        preferencias: formData.get('preferencias'),
+        intensidade: formData.get('intensidade'),
+        orcamento: formData.get('orcamento')
     };
     
-    // Validar e ajustar dados
+    // ✅ NOVO: Processar dados específicos por tipo de companhia
+    if (dados.companhia === 'familia') {
+        dados.quantidadeAdultos = parseInt(formData.get('quantidade-adultos')) || 2;
+        dados.quantidadeCriancas = parseInt(formData.get('quantidade-criancas')) || 0;
+        dados.quantidadeBebes = parseInt(formData.get('quantidade-bebes')) || 0;
+        dados.quantidadePessoas = dados.quantidadeAdultos + dados.quantidadeCriancas + dados.quantidadeBebes;
+    } else if (dados.companhia === 'amigos') {
+        dados.quantidadePessoas = parseInt(formData.get('quantidade-pessoas')) || 2;
+        dados.quantidadeAdultos = dados.quantidadePessoas;
+        dados.quantidadeCriancas = 0;
+        dados.quantidadeBebes = 0;
+    } else if (dados.companhia === 'casal') {
+        dados.quantidadePessoas = 2;
+        dados.quantidadeAdultos = 2;
+        dados.quantidadeCriancas = 0;
+        dados.quantidadeBebes = 0;
+    } else {
+        dados.quantidadePessoas = 1;
+        dados.quantidadeAdultos = 1;
+        dados.quantidadeCriancas = 0;
+        dados.quantidadeBebes = 0;
+    }
+    
+    // Validar dados de família
+    if (dados.companhia === 'familia') {
+        if (dados.quantidadeAdultos === 0) {
+            throw new Error('É necessário pelo menos 1 adulto na família.');
+        }
+        if (dados.quantidadePessoas > 10) {
+            throw new Error('Máximo de 10 pessoas por grupo familiar.');
+        }
+    }
+    
+    // Validar e ajustar dados de data
     if (dados.dataVolta && dados.dataVolta <= dados.dataIda) {
-      const novaDataVolta = new Date(dados.dataIda);
-      novaDataVolta.setDate(novaDataVolta.getDate() + 3);
-      dados.dataVolta = novaDataVolta.toISOString().split('T')[0];
-      console.warn('⚠️ Data de volta ajustada automaticamente');
+        const novaDataVolta = new Date(dados.dataIda);
+        novaDataVolta.setDate(novaDataVolta.getDate() + 3);
+        dados.dataVolta = novaDataVolta.toISOString().split('T')[0];
+        console.warn('⚠️ Data de volta ajustada automaticamente');
     }
     
     return dados;
-  },
+},
 
   /**
    * ✅ NOVO: Mostra tela de roteiro
@@ -288,49 +384,53 @@ const BENETRIP_ROTEIRO = {
   },
 
   /**
-   * ✅ NOVO: Converte dados do formulário para formato existente
-   */
-  converterDadosFormulario() {
+ * ✅ CONVERSÃO DE DADOS - VERSÃO EXPANDIDA
+ */
+converterDadosFormulario() {
     const dados = this.dadosFormulario;
     
     // Criar estrutura de voo simulada
     this.dadosVoo = {
-      infoIda: {
-        dataPartida: dados.dataIda,
-        horaChegada: dados.horarioChegada,
-        aeroportoChegada: 'INT' // Internacional genérico
-      },
-      infoVolta: dados.dataVolta ? {
-        dataPartida: dados.dataVolta,
-        horaPartida: dados.horarioPartida
-      } : null
+        infoIda: {
+            dataPartida: dados.dataIda,
+            horaChegada: dados.horarioChegada,
+            aeroportoChegada: 'INT'
+        },
+        infoVolta: dados.dataVolta ? {
+            dataPartida: dados.dataVolta,
+            horaPartida: dados.horarioPartida
+        } : null
     };
     
-    // Criar estrutura de usuário simulada
+    // ✅ NOVO: Estrutura expandida de usuário
     this.dadosUsuario = {
-      respostas: {
-        companhia: this.mapearCompanhia(dados.companhia),
-        quantidade_familia: dados.companhia === 'familia' ? dados.quantidadePessoas : null,
-        quantidade_amigos: dados.companhia === 'amigos' ? dados.quantidadePessoas : null,
-        tipo_viagem: this.mapearPreferencias(dados.preferencias),
-        intensidade_roteiro: dados.intensidade,
-        orcamento_nivel: dados.orcamento
-      }
+        respostas: {
+            companhia: this.mapearCompanhia(dados.companhia),
+            quantidade_familia: dados.companhia === 'familia' ? dados.quantidadePessoas : null,
+            quantidade_amigos: dados.companhia === 'amigos' ? dados.quantidadePessoas : null,
+            // ✅ NOVO: Campos específicos
+            quantidade_adultos: dados.quantidadeAdultos,
+            quantidade_criancas: dados.quantidadeCriancas,
+            quantidade_bebes: dados.quantidadeBebes,
+            tipo_viagem: this.mapearPreferencias(dados.preferencias),
+            intensidade_roteiro: dados.intensidade,
+            orcamento_nivel: dados.orcamento
+        }
     };
     
     // Criar estrutura de destino
     this.dadosDestino = {
-      destino: dados.destino,
-      codigo_iata: 'INT',
-      pais: this.extrairPais(dados.destino)
+        destino: dados.destino,
+        codigo_iata: 'INT',
+        pais: this.extrairPais(dados.destino)
     };
     
     console.log('✅ Dados convertidos:', {
-      voo: this.dadosVoo,
-      usuario: this.dadosUsuario,
-      destino: this.dadosDestino
+        voo: this.dadosVoo,
+        usuario: this.dadosUsuario,
+        destino: this.dadosDestino
     });
-  },
+},
 
   /**
    * ✅ NOVO: Mapear companhia para índice
@@ -1818,19 +1918,35 @@ const BENETRIP_ROTEIRO = {
     return mapa[this.obterTipoViagem()] || '✨';
   },
 
-  obterTextoCompanhia() {
-    const quantidade = this.obterQuantidadePessoas();
-    const tipo = this.obterTipoCompanhia();
+  /**
+ * ✅ OBTER TEXTO DA COMPANHIA - VERSÃO EXPANDIDA
+ */
+obterTextoCompanhia() {
+    const dados = this.dadosFormulario;
+    const tipo = dados.companhia;
+    
+    if (tipo === 'familia') {
+        const adultos = dados.quantidadeAdultos || 0;
+        const criancas = dados.quantidadeCriancas || 0;
+        const bebes = dados.quantidadeBebes || 0;
+        const total = dados.quantidadePessoas || 0;
+        
+        let detalhes = [`${total} pessoas`];
+        if (adultos > 0) detalhes.push(`${adultos} adulto${adultos > 1 ? 's' : ''}`);
+        if (criancas > 0) detalhes.push(`${criancas} criança${criancas > 1 ? 's' : ''}`);
+        if (bebes > 0) detalhes.push(`${bebes} bebê${bebes > 1 ? 's' : ''}`);
+        
+        return `Família (${detalhes.join(', ')})`;
+    }
     
     const textos = {
-      'sozinho': 'Viagem Solo',
-      'casal': 'Casal',
-      'familia': `Família (${quantidade} pessoas)`,
-      'amigos': `Grupo de Amigos (${quantidade} pessoas)`
+        'sozinho': 'Viagem Solo',
+        'casal': 'Casal',
+        'amigos': `Grupo de Amigos (${dados.quantidadePessoas || 2} pessoas)`
     };
     
     return textos[tipo] || 'Viagem Individual';
-  },
+},
 
   obterIconeCompanhia() {
     const mapa = {
