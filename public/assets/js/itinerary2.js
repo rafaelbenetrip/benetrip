@@ -722,92 +722,104 @@ converterDadosFormulario() {
   },
 
   /**
-   * ✅ GERAÇÃO DE ROTEIRO COM API REAL (mantido com pequenos ajustes)
-   */
-  async gerarRoteiroIA() {
+ * ✅ FUNÇÃO ATUALIZADA: Gerar roteiro com parâmetros completos
+ */
+async gerarRoteiroIA() {
+  try {
+    console.log('🤖 Iniciando geração do roteiro com IA...');
+    
+    await this.carregarDados();
+    
+    const dataIda = this.getDataIda();
+    const dataVolta = this.getDataVolta();
+    const diasViagem = this.calcularDiasViagem(dataIda, dataVolta);
+    
+    // ✅ PARÂMETROS COMPLETOS PARA A API
+    const parametrosIA = {
+      destino: this.dadosDestino.destino,
+      pais: this.dadosDestino.pais,
+      dataInicio: dataIda,
+      dataFim: dataVolta,
+      horaChegada: this.extrairHorarioChegada(),
+      horaSaida: this.extrairHorarioPartida(),
+      tipoViagem: this.obterTipoViagem(),
+      tipoCompanhia: this.obterTipoCompanhia(),
+      
+      // ✅ NOVO: Agora envia TODAS as preferências
+      intensidade: this.dadosFormulario.intensidade || 'moderado',
+      orcamento: this.dadosFormulario.orcamento || 'medio',
+      preferencias: this.obterPreferenciasCompletas(), // Objeto completo
+      
+      modeloIA: 'deepseek'
+    };
+    
+    console.log('🚀 Parâmetros COMPLETOS enviados para API:', parametrosIA);
+    
     try {
-      console.log('🤖 Iniciando geração do roteiro com IA...');
-      
-      // Primeiro carregar dados
-      await this.carregarDados();
-      
-      const dataIda = this.getDataIda();
-      const dataVolta = this.getDataVolta();
-      const diasViagem = this.calcularDiasViagem(dataIda, dataVolta);
-      
-      console.log('📊 Parâmetros para IA:', {
-        destino: this.dadosDestino,
-        dataIda,
-        dataVolta,
-        diasViagem,
-        intensidade: this.dadosFormulario.intensidade,
-        preferencias: this.obterPreferenciasCompletas()
-      });
-      
-      await this.delay(1500);
-      
-      const parametrosIA = {
-        destino: this.dadosDestino.destino,
-        pais: this.dadosDestino.pais,
-        dataInicio: dataIda,
-        dataFim: dataVolta,
-        horaChegada: this.extrairHorarioChegada(),
-        horaSaida: this.extrairHorarioPartida(),
-        tipoViagem: this.obterTipoViagem(),
-        tipoCompanhia: this.obterTipoCompanhia(),
-        intensidade: this.dadosFormulario.intensidade,
-        orcamento: this.dadosFormulario.orcamento,
-        preferencias: this.obterPreferenciasCompletas(),
-        modeloIA: 'deepseek'
-      };
-      
-      console.log('🚀 Chamando API de roteiro...', parametrosIA);
-      
-      try {
-        const roteiroIA = await this.chamarAPIRoteiroReal(parametrosIA);
-        this.roteiroPronto = this.converterRoteiroParaContinuo(roteiroIA);
-        console.log('✅ Roteiro da IA convertido para formato contínuo');
-      } catch (erroAPI) {
-        console.warn('⚠️ Erro na API, usando fallback:', erroAPI.message);
-        this.roteiroPronto = await this.gerarRoteiroFallback(dataIda, dataVolta, diasViagem);
-      }
-      
-      // Executar tarefas em paralelo
-      await Promise.all([
-        this.buscarPrevisaoTempo(),
-        this.buscarTodasImagensCorrigido()
-      ]);
-      
-      this.atualizarUIComRoteiroContino();
-      
-      console.log('✅ Roteiro contínuo gerado com sucesso!');
-      
-    } catch (erro) {
-      console.error('❌ Erro ao gerar roteiro:', erro);
-      this.mostrarErro('Não foi possível gerar seu roteiro. Por favor, tente novamente.');
-      throw erro;
-    } finally {
-      this.finalizarCarregamento();
+      const roteiroIA = await this.chamarAPIRoteiroReal(parametrosIA);
+      this.roteiroPronto = this.converterRoteiroParaContinuo(roteiroIA);
+      console.log('✅ Roteiro da IA convertido considerando TODAS as preferências');
+    } catch (erroAPI) {
+      console.warn('⚠️ Erro na API, usando fallback:', erroAPI.message);
+      this.roteiroPronto = await this.gerarRoteiroFallback(dataIda, dataVolta, diasViagem);
     }
-  },
+    
+    // Executar tarefas em paralelo
+    await Promise.all([
+      this.buscarPrevisaoTempo(),
+      this.buscarTodasImagensCorrigido()
+    ]);
+    
+    this.atualizarUIComRoteiroContino();
+    
+    console.log('✅ Roteiro completo gerado considerando TODAS as preferências!');
+    
+  } catch (erro) {
+    console.error('❌ Erro ao gerar roteiro:', erro);
+    this.mostrarErro('Não foi possível gerar seu roteiro. Por favor, tente novamente.');
+    throw erro;
+  } finally {
+    this.finalizarCarregamento();
+  }
+},
 
   // ===========================================
   // MÉTODOS ADAPTADOS PARA DADOS DO FORMULÁRIO
   // ===========================================
 
   /**
-   * ✅ OBTER PREFERÊNCIAS COMPLETAS ADAPTADO
-   */
-  obterPreferenciasCompletas() {
-    return {
-      tipoViagem: this.obterTipoViagem(),
-      tipoCompanhia: this.obterTipoCompanhia(),
-      quantidade: this.obterQuantidadePessoas(),
-      intensidade: this.dadosFormulario.intensidade,
-      orcamento: this.dadosFormulario.orcamento,
-      destino_preferido: this.dadosFormulario.preferencias
-    };
-  },
+ * ✅ FUNÇÃO CORRIGIDA: Obter preferências completas
+ * Agora envia TODAS as preferências capturadas do formulário
+ */
+obterPreferenciasCompletas() {
+  const dados = this.dadosFormulario;
+  
+  return {
+    // Tipo básico de viagem
+    tipoViagem: this.obterTipoViagem(),
+    tipoCompanhia: this.obterTipoCompanhia(),
+    
+    // ✅ NOVO: Quantidade específica por tipo
+    quantidade: this.obterQuantidadePessoas(),
+    quantidade_adultos: dados?.quantidadeAdultos || 1,
+    quantidade_criancas: dados?.quantidadeCriancas || 0,
+    quantidade_bebes: dados?.quantidadeBebes || 0,
+    
+    // ✅ NOVO: Preferências específicas
+    intensidade: dados?.intensidade || 'moderado',
+    orcamento: dados?.orcamento || 'medio',
+    destino_preferido: dados?.preferencias || 'cultura',
+    
+    // ✅ NOVO: Detalhes para adaptação
+    tem_criancas: (dados?.quantidadeCriancas || 0) > 0,
+    tem_bebes: (dados?.quantidadeBebes || 0) > 0,
+    grupo_grande: (dados?.quantidadePessoas || 1) >= 5,
+    
+    // ✅ NOVO: Horários para personalização
+    horario_chegada: dados?.horarioChegada,
+    horario_partida: dados?.horarioPartida
+  };
+},
 
   /**
    * ✅ OBTER TIPO DE VIAGEM ADAPTADO
