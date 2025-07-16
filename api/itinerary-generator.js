@@ -178,6 +178,31 @@ function gerarPromptRoteiro(params) {
     'amigos': 'um grupo de amigos'
   }[tipoCompanhia] || 'um viajante';
   
+  // ✅ NOVO: Mapear intensidade e orçamento
+  const intensidadeInfo = {
+    'leve': '2-3 atividades por dia (ritmo relaxado)',
+    'moderado': '4-5 atividades por dia (ritmo equilibrado)',
+    'intenso': '6+ atividades por dia (ritmo acelerado)'
+  };
+  
+  const orcamentoInfo = {
+    'economico': 'econômico (priorize atividades gratuitas e de baixo custo)',
+    'medio': 'médio (misture atividades gratuitas e pagas)',
+    'alto': 'alto (inclua experiências premium sem limitações de custo)'
+  };
+  
+  // ✅ NOVO: Criar informações detalhadas de viajantes
+  let infoViajantes = descricaoTipoCompanhia;
+  if (tipoCompanhia === 'familia' && preferencias) {
+    const adultos = preferencias.quantidade_adultos || 2;
+    const criancas = preferencias.quantidade_criancas || 0;
+    const bebes = preferencias.quantidade_bebes || 0;
+    infoViajantes += ` (${adultos} adulto${adultos > 1 ? 's' : ''}`;
+    if (criancas > 0) infoViajantes += `, ${criancas} criança${criancas > 1 ? 's' : ''}`;
+    if (bebes > 0) infoViajantes += `, ${bebes} bebê${bebes > 1 ? 's' : ''}`;
+    infoViajantes += ')';
+  }
+  
   // Montar o prompt
   return `
 Você é a Tripinha, uma vira-lata caramelo magra, esperta, despojada e especialista em viagens na Benetrip. Sua missão é transformar as respostas do usuário em um roteiro de viagem completo, personalizado e incrível. Fale como se fosse uma amiga: com leveza, simpatia, bom humor e dicas práticas, sem enrolação.. 
@@ -189,23 +214,28 @@ Crie um roteiro detalhado para uma viagem com as seguintes características:
 - Horário de chegada no primeiro dia: ${horaChegada || 'Não informado'}
 - Horário de partida no último dia: ${horaSaida || 'Não informado'}
 - Tipo de viagem: Foco em ${descricaoTipoViagem}
-- Viajantes: ${descricaoTipoCompanhia}
+- Viajantes: ${infoViajantes}
+- Intensidade do roteiro: ${intensidadeInfo[preferencias?.intensidade_roteiro] || intensidadeInfo['moderado']}
+- Orçamento: ${orcamentoInfo[preferencias?.orcamento_nivel] || orcamentoInfo['medio']}
 
 INSTRUÇÕES:
 1. CRIE EXATAMENTE ${diasViagem} DIAS DE ROTEIRO - NÃO OMITA NENHUM DIA
-2. Organize o roteiro por dias, considerando o dia da semana real e se é fim de semana ou dia útil.
-3. Para cada dia, divida o roteiro em períodos: manhã, tarde e noite.
-4. Cada período deve ter 1-2 atividades relevantes, com locais reais (pontos turísticos, restaurantes, etc).
-5. Para cada atividade, inclua:
+2. RESPEITE A INTENSIDADE escolhida: ${intensidadeInfo[preferencias?.intensidade_roteiro] || intensidadeInfo['moderado']}
+3. CONSIDERE O ORÇAMENTO: ${orcamentoInfo[preferencias?.orcamento_nivel] || orcamentoInfo['medio']}
+4. ADAPTE AS ATIVIDADES para ${infoViajantes}
+5. Organize o roteiro por dias, considerando o dia da semana real e se é fim de semana ou dia útil.
+6. Para cada dia, divida o roteiro em períodos: manhã, tarde e noite.
+7. Cada período deve ter atividades relevantes conforme a intensidade escolhida, com locais reais (pontos turísticos, restaurantes, etc).
+8. Para cada atividade, inclua:
    - Horário sugerido
    - Nome do local
    - 1-2 tags relevantes (ex: Imperdível, Cultural, Família)
    - Uma dica personalizada da Tripinha (mascote da Benetrip)
-6. No primeiro dia, considere o horário de chegada (${horaChegada || 'não informado'}).
-7. No último dia, considere o horário de partida (${horaSaida || 'não informado'}).
-8. Inclua uma breve descrição para cada dia.
-9. FAÇA O MÁXIMO PARA QUE TODOS OS ${diasViagem} DIAS TENHAM ATIVIDADES DIFERENTES, CASO CONTRARIO, REPITA OS PASSEIOS MAIS CONHECIDOS.
-10. CRITICAL: Você DEVE criar atividades para TODOS os ${diasViagem} dias sem exceções. Se ${diasViagem} é 29, você DEVE criar 29 dias de roteiro completo.
+9. No primeiro dia, considere o horário de chegada (${horaChegada || 'não informado'}).
+10. No último dia, considere o horário de partida (${horaSaida || 'não informado'}).
+11. Inclua uma breve descrição para cada dia.
+12. FAÇA O MÁXIMO PARA QUE TODOS OS ${diasViagem} DIAS TENHAM ATIVIDADES DIFERENTES, CASO CONTRARIO, REPITA OS PASSEIOS MAIS CONHECIDOS.
+13. CRITICAL: Você DEVE criar atividades para TODOS os ${diasViagem} dias sem exceções. Se ${diasViagem} é 29, você DEVE criar 29 dias de roteiro completo.
 
 Retorne o roteiro em formato JSON com a seguinte estrutura:
 {
@@ -232,8 +262,10 @@ Retorne o roteiro em formato JSON com a seguinte estrutura:
 }
 
 Observações importantes:
-- Para ${descricaoTipoCompanhia}, dê prioridade a atividades compatíveis.
+- Para ${infoViajantes}, dê prioridade a atividades compatíveis.
 - Como o foco é ${descricaoTipoViagem}, sugira mais atividades relacionadas a esse tema.
+- Respeite rigorosamente a intensidade de ${intensidadeInfo[preferencias?.intensidade_roteiro] || intensidadeInfo['moderado']}.
+- Ajuste as sugestões ao orçamento ${orcamentoInfo[preferencias?.orcamento_nivel] || orcamentoInfo['medio']}.
 - Considere atividades para dias úteis e atividades específicas para fins de semana.
 - Inclua uma mistura de atrações turísticas populares e experiências locais.
 - Garanta que destinos mais conhecidos estejam no roteiro da viagem.
