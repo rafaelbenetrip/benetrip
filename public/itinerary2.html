@@ -174,20 +174,95 @@
                 </div>
 
                 <!-- Número de pessoas (conditional) -->
-                <div class="form-group" id="grupo-quantidade" style="display: none;">
-                    <label for="quantidade-pessoas" class="form-label">
-                        👥 Quantas pessoas no total?
-                    </label>
-                    <input 
-                        type="number" 
-                        id="quantidade-pessoas" 
-                        name="quantidade-pessoas" 
-                        class="form-input" 
-                        min="2" 
-                        max="10" 
-                        value="2"
-                    >
-                </div>
+<div class="form-group" id="grupo-quantidade" style="display: none;">
+    <label for="quantidade-pessoas" class="form-label">
+        👥 Quantas pessoas no total?
+    </label>
+    <input 
+        type="number" 
+        id="quantidade-pessoas" 
+        name="quantidade-pessoas" 
+        class="form-input" 
+        min="2" 
+        max="10" 
+        value="2"
+    >
+</div>
+
+<!-- ✅ NOVO: Campos específicos para família -->
+<div class="form-group" id="grupo-familia" style="display: none;">
+    <label class="form-label">
+        👨‍👩‍👧‍👦 Detalhes da família
+    </label>
+    
+    <div class="form-row">
+        <div class="form-group">
+            <label for="quantidade-adultos" class="form-label">
+                👨‍👩 Adultos
+            </label>
+            <input 
+                type="number" 
+                id="quantidade-adultos" 
+                name="quantidade-adultos" 
+                class="form-input" 
+                min="1" 
+                max="6" 
+                value="2"
+                required
+            >
+        </div>
+        
+        <div class="form-group">
+            <label for="quantidade-criancas" class="form-label">
+                👧 Crianças (2-11 anos)
+            </label>
+            <input 
+                type="number" 
+                id="quantidade-criancas" 
+                name="quantidade-criancas" 
+                class="form-input" 
+                min="0" 
+                max="4" 
+                value="0"
+            >
+        </div>
+    </div>
+    
+    <div class="form-row">
+        <div class="form-group">
+            <label for="quantidade-bebes" class="form-label">
+                👶 Bebês (0-2 anos)
+            </label>
+            <input 
+                type="number" 
+                id="quantidade-bebes" 
+                name="quantidade-bebes" 
+                class="form-input" 
+                min="0" 
+                max="2" 
+                value="0"
+            >
+        </div>
+        
+        <div class="form-group">
+            <label class="form-label" style="opacity: 0.7;">
+                📊 Total calculado
+            </label>
+            <input 
+                type="text" 
+                id="total-familia" 
+                class="form-input" 
+                readonly 
+                value="2 pessoas"
+                style="background-color: #f8f9fa; color: #666;"
+            >
+        </div>
+    </div>
+    
+    <small class="form-hint">
+        💡 Essa informação nos ajuda a personalizar melhor seu roteiro familiar!
+    </small>
+</div>
 
                 <!-- Preferências de Viagem -->
                 <div class="form-group">
