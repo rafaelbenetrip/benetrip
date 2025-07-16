@@ -28,6 +28,9 @@
     <link rel="preconnect" href="https://picsum.photos">
     <link rel="preconnect" href="https://source.unsplash.com">
     <link rel="preconnect" href="https://api.pexels.com">
+    
+    <!-- Preload da imagem oficial da Tripinha -->
+    <link rel="preload" href="assets/images/tripinha-avatar-oficial.png" as="image">
 </head>
 <body class="mobile-optimized">
     <!-- Container principal otimizado para mobile -->
@@ -43,20 +46,25 @@
             <h1>Planeje sua Viagem</h1>
         </header>
         
-        <!-- ✅ NOVO: Formulário de entrada de dados -->
+        <!-- ✨ FORMULÁRIO COM TRIPINHA PREMIUM -->
         <main class="formulario-container" id="formulario-dados" role="main">
-            <div class="formulario-header">
+            <div class="formulario-header-premium">
                 <div class="tripinha-welcomer">
                     <img 
-                        src="assets/images/tripinha-avatar.png" 
-                        alt="Tripinha" 
-                        class="tripinha-avatar"
+                        src="assets/images/tripinha-avatar-oficial.png" 
+                        alt="Tripinha - Sua guia de viagem personalizada" 
+                        class="tripinha-avatar-principal tripinha-context-welcome"
+                        role="img"
+                        aria-describedby="tripinha-description"
                         onerror="this.style.display='none'; this.nextElementSibling.style.display='block';"
                     >
-                    <div class="tripinha-emoji" style="display:none;">🐕</div>
+                    <!-- Fallback emoji para casos de erro -->
+                    <div class="tripinha-emoji" style="display:none;" role="img" aria-label="Tripinha">🐕</div>
                 </div>
                 <h2>Vamos planejar sua aventura!</h2>
-                <p>Conte-me sobre sua viagem e eu criarei um roteiro personalizado para você! 🐾</p>
+                <p id="tripinha-description">
+                    Eu sou a Tripinha, sua guia de viagem! 🐾 Conte-me sobre sua próxima aventura e criarei um roteiro personalizado especialmente para você, com as melhores experiências do seu destino!
+                </p>
             </div>
 
             <form id="form-viagem" class="form-viagem" novalidate>
@@ -70,11 +78,13 @@
                         id="destino" 
                         name="destino" 
                         class="form-input" 
-                        placeholder="Ex: Paris, Lisboa, Tóquio..."
+                        placeholder="Ex: Paris, Lisboa, Tóquio, Nova York..."
                         required
                         autocomplete="off"
+                        aria-describedby="destino-hint destino-error"
                     >
-                    <div class="form-error" id="destino-error"></div>
+                    <small id="destino-hint" class="form-hint">Digite o nome da cidade ou país que deseja visitar</small>
+                    <div class="form-error" id="destino-error" role="alert"></div>
                 </div>
 
                 <!-- Datas e Horários -->
@@ -89,8 +99,9 @@
                             name="data-ida" 
                             class="form-input" 
                             required
+                            aria-describedby="data-ida-error"
                         >
-                        <div class="form-error" id="data-ida-error"></div>
+                        <div class="form-error" id="data-ida-error" role="alert"></div>
                     </div>
                     
                     <div class="form-group">
@@ -104,7 +115,9 @@
                             class="form-input" 
                             value="15:30"
                             required
+                            aria-describedby="horario-chegada-hint"
                         >
+                        <small id="horario-chegada-hint" class="form-hint">Horário previsto de chegada no destino</small>
                     </div>
                 </div>
 
@@ -118,8 +131,9 @@
                             id="data-volta" 
                             name="data-volta" 
                             class="form-input"
+                            aria-describedby="data-volta-hint"
                         >
-                        <small class="form-hint"></small>
+                        <small id="data-volta-hint" class="form-hint">Deixe em branco para viagem só de ida</small>
                     </div>
                     
                     <div class="form-group">
@@ -132,7 +146,9 @@
                             name="horario-partida" 
                             class="form-input" 
                             value="21:00"
+                            aria-describedby="horario-partida-hint"
                         >
+                        <small id="horario-partida-hint" class="form-hint">Horário previsto de partida</small>
                     </div>
                 </div>
 
@@ -141,12 +157,13 @@
                     <label class="form-label">
                         👥 Quem está viajando?
                     </label>
-                    <div class="form-radio-group">
+                    <div class="form-radio-group" role="radiogroup" aria-labelledby="companhia-label">
                         <label class="form-radio-item">
                             <input type="radio" name="companhia" value="sozinho" checked>
                             <div class="radio-content">
                                 <span class="radio-emoji">🧳</span>
                                 <span class="radio-text">Sozinho(a)</span>
+                                <small>Aventura solo</small>
                             </div>
                         </label>
                         <label class="form-radio-item">
@@ -154,6 +171,7 @@
                             <div class="radio-content">
                                 <span class="radio-emoji">❤️</span>
                                 <span class="radio-text">Casal</span>
+                                <small>Viagem romântica</small>
                             </div>
                         </label>
                         <label class="form-radio-item">
@@ -161,6 +179,7 @@
                             <div class="radio-content">
                                 <span class="radio-emoji">👨‍👩‍👧‍👦</span>
                                 <span class="radio-text">Família</span>
+                                <small>Diversão para todos</small>
                             </div>
                         </label>
                         <label class="form-radio-item">
@@ -168,113 +187,124 @@
                             <div class="radio-content">
                                 <span class="radio-emoji">🎉</span>
                                 <span class="radio-text">Amigos</span>
+                                <small>Turma da diversão</small>
                             </div>
                         </label>
                     </div>
                 </div>
 
                 <!-- Número de pessoas (conditional) -->
-<div class="form-group" id="grupo-quantidade" style="display: none;">
-    <label for="quantidade-pessoas" class="form-label">
-        👥 Quantas pessoas no total?
-    </label>
-    <input 
-        type="number" 
-        id="quantidade-pessoas" 
-        name="quantidade-pessoas" 
-        class="form-input" 
-        min="2" 
-        max="10" 
-        value="2"
-    >
-</div>
+                <div class="form-group" id="grupo-quantidade" style="display: none;">
+                    <label for="quantidade-pessoas" class="form-label">
+                        👥 Quantas pessoas no total?
+                    </label>
+                    <input 
+                        type="number" 
+                        id="quantidade-pessoas" 
+                        name="quantidade-pessoas" 
+                        class="form-input" 
+                        min="2" 
+                        max="10" 
+                        value="2"
+                        aria-describedby="quantidade-hint"
+                    >
+                    <small id="quantidade-hint" class="form-hint">Incluindo você (máximo 10 pessoas)</small>
+                </div>
 
-<!-- ✅ NOVO: Campos específicos para família -->
-<div class="form-group" id="grupo-familia" style="display: none;">
-    <label class="form-label">
-        👨‍👩‍👧‍👦 Detalhes da família
-    </label>
-    
-    <div class="form-row">
-        <div class="form-group">
-            <label for="quantidade-adultos" class="form-label">
-                👨‍👩 Adultos
-            </label>
-            <input 
-                type="number" 
-                id="quantidade-adultos" 
-                name="quantidade-adultos" 
-                class="form-input" 
-                min="1" 
-                max="6" 
-                value="2"
-                required
-            >
-        </div>
-        
-        <div class="form-group">
-            <label for="quantidade-criancas" class="form-label">
-                👧 Crianças (2-11 anos)
-            </label>
-            <input 
-                type="number" 
-                id="quantidade-criancas" 
-                name="quantidade-criancas" 
-                class="form-input" 
-                min="0" 
-                max="4" 
-                value="0"
-            >
-        </div>
-    </div>
-    
-    <div class="form-row">
-        <div class="form-group">
-            <label for="quantidade-bebes" class="form-label">
-                👶 Bebês (0-2 anos)
-            </label>
-            <input 
-                type="number" 
-                id="quantidade-bebes" 
-                name="quantidade-bebes" 
-                class="form-input" 
-                min="0" 
-                max="2" 
-                value="0"
-            >
-        </div>
-        
-        <div class="form-group">
-            <label class="form-label" style="opacity: 0.7;">
-                📊 Total calculado
-            </label>
-            <input 
-                type="text" 
-                id="total-familia" 
-                class="form-input" 
-                readonly 
-                value="2 pessoas"
-                style="background-color: #f8f9fa; color: #666;"
-            >
-        </div>
-    </div>
-    
-    <small class="form-hint">
-        💡 Essa informação nos ajuda a personalizar melhor seu roteiro familiar!
-    </small>
-</div>
+                <!-- ✨ CAMPOS ESPECÍFICOS PARA FAMÍLIA -->
+                <div class="form-group" id="grupo-familia" style="display: none;">
+                    <label class="form-label">
+                        👨‍👩‍👧‍👦 Detalhes da família
+                    </label>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="quantidade-adultos" class="form-label">
+                                👨‍👩 Adultos
+                            </label>
+                            <input 
+                                type="number" 
+                                id="quantidade-adultos" 
+                                name="quantidade-adultos" 
+                                class="form-input" 
+                                min="1" 
+                                max="6" 
+                                value="2"
+                                required
+                                aria-describedby="adultos-hint"
+                            >
+                            <small id="adultos-hint" class="form-hint">Maiores de 12 anos</small>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="quantidade-criancas" class="form-label">
+                                👧 Crianças (2-11 anos)
+                            </label>
+                            <input 
+                                type="number" 
+                                id="quantidade-criancas" 
+                                name="quantidade-criancas" 
+                                class="form-input" 
+                                min="0" 
+                                max="4" 
+                                value="0"
+                                aria-describedby="criancas-hint"
+                            >
+                            <small id="criancas-hint" class="form-hint">Entre 2 e 11 anos</small>
+                        </div>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="quantidade-bebes" class="form-label">
+                                👶 Bebês (0-2 anos)
+                            </label>
+                            <input 
+                                type="number" 
+                                id="quantidade-bebes" 
+                                name="quantidade-bebes" 
+                                class="form-input" 
+                                min="0" 
+                                max="2" 
+                                value="0"
+                                aria-describedby="bebes-hint"
+                            >
+                            <small id="bebes-hint" class="form-hint">Menores de 2 anos</small>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label" style="opacity: 0.7;">
+                                📊 Total calculado
+                            </label>
+                            <input 
+                                type="text" 
+                                id="total-familia" 
+                                class="form-input" 
+                                readonly 
+                                value="2 pessoas"
+                                style="background-color: #f8f9fa; color: #666;"
+                                aria-label="Total de pessoas na família"
+                            >
+                        </div>
+                    </div>
+                    
+                    <small class="form-hint">
+                        💡 Essa informação nos ajuda a personalizar melhor seu roteiro familiar!
+                    </small>
+                </div>
 
                 <!-- Preferências de Viagem -->
                 <div class="form-group">
                     <label class="form-label">
                         🎨 Que tipo de experiência você busca?
                     </label>
-                    <div class="form-radio-group">
+                    <div class="form-radio-group" role="radiogroup" aria-labelledby="preferencias-label">
                         <label class="form-radio-item">
                             <input type="radio" name="preferencias" value="relaxar" checked>
                             <div class="radio-content">
                                 <span class="radio-emoji">🏖️</span>
                                 <span class="radio-text">Relaxamento</span>
+                                <small>Descanso e tranquilidade</small>
                             </div>
                         </label>
                         <label class="form-radio-item">
@@ -282,6 +312,7 @@
                             <div class="radio-content">
                                 <span class="radio-emoji">🏔️</span>
                                 <span class="radio-text">Aventura</span>
+                                <small>Trilhas e emoções</small>
                             </div>
                         </label>
                         <label class="form-radio-item">
@@ -289,6 +320,7 @@
                             <div class="radio-content">
                                 <span class="radio-emoji">🏛️</span>
                                 <span class="radio-text">Cultura</span>
+                                <small>História e arte</small>
                             </div>
                         </label>
                         <label class="form-radio-item">
@@ -296,6 +328,7 @@
                             <div class="radio-content">
                                 <span class="radio-emoji">🏙️</span>
                                 <span class="radio-text">Urbano</span>
+                                <small>Cidade e modernidade</small>
                             </div>
                         </label>
                     </div>
@@ -306,7 +339,7 @@
                     <label class="form-label">
                         ⚡ Qual a intensidade ideal do seu roteiro?
                     </label>
-                    <div class="form-radio-group">
+                    <div class="form-radio-group" role="radiogroup" aria-labelledby="intensidade-label">
                         <label class="form-radio-item">
                             <input type="radio" name="intensidade" value="leve" checked>
                             <div class="radio-content">
@@ -339,7 +372,7 @@
                     <label class="form-label">
                         💰 Qual seu orçamento para atividades?
                     </label>
-                    <div class="form-radio-group">
+                    <div class="form-radio-group" role="radiogroup" aria-labelledby="orcamento-label">
                         <label class="form-radio-item">
                             <input type="radio" name="orcamento" value="economico" checked>
                             <div class="radio-content">
@@ -369,27 +402,33 @@
 
                 <!-- Botão de Submissão -->
                 <div class="form-submit">
-                    <button type="submit" class="btn-gerar-roteiro" id="btn-gerar">
+                    <button type="submit" class="btn-gerar-roteiro" id="btn-gerar" aria-describedby="btn-gerar-hint">
                         <span class="btn-icon">✨</span>
                         <span class="btn-text">Criar Meu Roteiro!</span>
                     </button>
+                    <small id="btn-gerar-hint" class="form-hint" style="text-align: center; margin-top: 8px; display: block;">
+                        A Tripinha criará um roteiro personalizado baseado nas suas preferências! 🐾
+                    </small>
                 </div>
             </form>
         </main>
         
-        <!-- Conteúdo principal do roteiro (inicialmente oculto) -->
+        <!-- ✨ CONTEÚDO DO ROTEIRO COM TRIPINHA PREMIUM -->
         <main class="roteiro-content" id="roteiro-content" role="main" style="display: none;">
             
-            <!-- Loading inicial COMPLETO -->
+            <!-- Loading inicial PREMIUM -->
             <div class="loading-container" id="loading-inicial">
                 <div class="loading-content">
-                    <img 
-                        src="assets/images/tripinha/loading2.png" 
-                        alt="Tripinha preparando seu roteiro" 
-                        class="loading-avatar"
-                        onerror="this.style.display='none'; this.nextElementSibling.style.display='block';"
-                    >
-                    <div class="loading-emoji" style="display:none;">🐕</div>
+                    <div class="loading-tripinha-container">
+                        <img 
+                            src="assets/images/tripinha-avatar-oficial.png" 
+                            alt="Tripinha preparando seu roteiro" 
+                            class="loading-avatar-oficial tripinha-context-loading"
+                            role="img"
+                            onerror="this.style.display='none'; this.nextElementSibling.style.display='block';"
+                        >
+                        <div class="loading-emoji" style="display:none;" role="img" aria-label="Tripinha">🐕</div>
+                    </div>
                     
                     <div class="loading-text" id="loading-message">
                         Preparando seu roteiro personalizado...
@@ -409,7 +448,7 @@
                     </div>
                     
                     <p class="loading-subtitle">
-                        A Tripinha está organizando as melhores experiências para você! 🐾
+                        A Tripinha está organizando as melhores experiências para você! 🐾✨
                     </p>
                 </div>
             </div>
@@ -451,13 +490,14 @@
 
     <!-- Scripts otimizados com configuração global -->
     <script>
-        // Configurações globais para performance
+        // 🎯 Configurações globais para performance
         window.BENETRIP_CONFIG = {
             apiBaseUrl: '/api',
-            imageQuality: 'medium',
+            imageQuality: 'high', // Upgraded for premium Tripinha
             maxImagesPerDay: 50,
             enableLazyLoading: true,
             enableImageOptimization: true,
+            enableTripinhaInteractions: true, // ✨ NEW!
             debugMode: false
         };
         
@@ -471,16 +511,25 @@
             });
         }
         
-        // Preloader de recursos críticos CORRIGIDO
+        // ✨ Preloader de recursos críticos PREMIUM
         function preloadCriticalResources() {
             const criticalImages = [
+                'assets/images/tripinha-avatar-oficial.png', // ✨ NEW!
                 'assets/images/tripinha-avatar.png',
                 'assets/images/tripinha/loading2.png'
             ];
             
-            criticalImages.forEach(src => {
+            // Preload com prioridade para a imagem oficial
+            criticalImages.forEach((src, index) => {
                 const img = new Image();
                 img.onerror = () => console.warn('⚠️ Recurso não encontrado:', src);
+                
+                // Prioridade alta para a imagem oficial
+                if (index === 0) {
+                    img.decoding = 'sync';
+                    img.loading = 'eager';
+                }
+                
                 img.src = src;
             });
         }
@@ -492,7 +541,7 @@
             preloadCriticalResources();
         }
         
-        // Otimização de performance
+        // ✨ Otimização de performance com foco na Tripinha
         window.addEventListener('load', () => {
             setTimeout(() => {
                 const unnecessaryLoaders = document.querySelectorAll('.initial-loader, .page-loader');
@@ -501,6 +550,16 @@
                         loader.remove();
                     }
                 });
+                
+                // Trigger entrada especial da Tripinha
+                if (window.TRIPINHA_INTERACTIONS) {
+                    setTimeout(() => {
+                        const avatar = document.querySelector('.tripinha-avatar-principal');
+                        if (avatar) {
+                            avatar.classList.add('tripinha-entrada-especial');
+                        }
+                    }, 500);
+                }
             }, 100);
         });
         
@@ -534,12 +593,30 @@
                 }
             }
         });
+        
+        // ✨ Indicador de carregamento de imagem da Tripinha
+        document.addEventListener('DOMContentLoaded', () => {
+            const tripinhaImages = document.querySelectorAll('[src*="tripinha-avatar-oficial"]');
+            
+            tripinhaImages.forEach(img => {
+                if (!img.complete) {
+                    img.style.opacity = '0';
+                    img.style.transition = 'opacity 0.3s ease';
+                    
+                    img.addEventListener('load', () => {
+                        img.style.opacity = '1';
+                    });
+                }
+            });
+        });
     </script>
     
     <!-- Scripts principais na ordem correta -->
     <script src="assets/js/api.js" defer></script>
     <script src="assets/js/modal-handler.js" defer></script>
     <script src="assets/js/itinerary2.js" defer></script>
+    <!-- ✨ NOVO: Script das interações da Tripinha -->
+    <script src="assets/js/tripinha-interactions.js" defer></script>
     
     <!-- Schema.org para SEO -->
     <script type="application/ld+json">
@@ -551,7 +628,8 @@
         "provider": {
             "@type": "Organization",
             "name": "Benetrip",
-            "url": "https://benetrip.com.br"
+            "url": "https://benetrip.com.br",
+            "logo": "https://benetrip.com.br/assets/images/tripinha-avatar-oficial.png"
         },
         "instrument": {
             "@type": "SoftwareApplication",
