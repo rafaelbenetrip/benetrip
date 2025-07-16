@@ -1,4 +1,4 @@
-// api/itinerary-generator.js - VERSÃO CORRIGIDA COM TODAS AS PREFERÊNCIAS
+// api/itinerary-generator.js - Endpoint para geração de roteiro personalizado
 const axios = require('axios');
 
 // Chaves de API
@@ -50,9 +50,7 @@ module.exports = async (req, res) => {
       horaSaida,
       tipoViagem,
       tipoCompanhia,
-      intensidade,           // ✅ NOVO: Agora será usado
-      orcamento,            // ✅ NOVO: Agora será usado
-      preferencias,         // ✅ MELHORADO: Objeto completo
+      preferencias,
       modeloIA
     } = req.body;
     
@@ -64,23 +62,17 @@ module.exports = async (req, res) => {
     // Calcular número de dias
     const diasViagem = calcularDiasViagem(dataInicio, dataFim);
     
-    // ✅ NOVO: Extrair dados detalhados das preferências
-    const dadosDetalhados = extrairDadosDetalhados(preferencias, tipoCompanhia);
-    
     // Log dos parâmetros recebidos
-    logEvent('info', 'Gerando roteiro personalizado com TODAS as preferências', {
+    logEvent('info', 'Gerando roteiro personalizado', {
       destino,
       pais,
       diasViagem,
       tipoViagem,
-      tipoCompanhia,
-      intensidade,
-      orcamento,
-      dadosDetalhados
+      tipoCompanhia
     });
     
     // Gerar o prompt para a IA
-    const prompt = gerarPromptRoteiroCompleto({
+    const prompt = gerarPromptRoteiro({
       destino,
       pais,
       dataInicio,
@@ -90,9 +82,6 @@ module.exports = async (req, res) => {
       diasViagem,
       tipoViagem,
       tipoCompanhia,
-      intensidade,        // ✅ NOVO
-      orcamento,         // ✅ NOVO
-      dadosDetalhados,   // ✅ NOVO
       preferencias
     });
     
@@ -132,54 +121,34 @@ module.exports = async (req, res) => {
 };
 
 /**
- * ✅ NOVA FUNÇÃO: Extrai dados detalhados das preferências
- */
-function extrairDadosDetalhados(preferencias, tipoCompanhia) {
-  const dados = {
-    quantidadeTotal: 1,
-    quantidadeAdultos: 1,
-    quantidadeCriancas: 0,
-    quantidadeBebes: 0,
-    temCriancas: false,
-    temBebes: false,
-    grupoGrande: false
-  };
-  
-  if (preferencias) {
-    dados.quantidadeTotal = preferencias.quantidade || 1;
-    dados.quantidadeAdultos = preferencias.quantidade_adultos || 1;
-    dados.quantidadeCriancas = preferencias.quantidade_criancas || 0;
-    dados.quantidadeBebes = preferencias.quantidade_bebes || 0;
-    
-    dados.temCriancas = dados.quantidadeCriancas > 0;
-    dados.temBebes = dados.quantidadeBebes > 0;
-    dados.grupoGrande = dados.quantidadeTotal >= 5;
-  }
-  
-  return dados;
-}
-
-/**
  * Calcula o número de dias entre duas datas
+ * @param {string} dataInicio - Data de início no formato YYYY-MM-DD
+ * @param {string} dataFim - Data de fim no formato YYYY-MM-DD
+ * @returns {number} Número de dias
  */
 function calcularDiasViagem(dataInicio, dataFim) {
   if (!dataInicio) return 1;
   
   const inicio = new Date(dataInicio);
   
+  // Se não tiver data fim, assume 1 dia
   if (!dataFim) return 1;
   
   const fim = new Date(dataFim);
+  
+  // Calcular diferença em dias
   const diffTempo = Math.abs(fim - inicio);
-  const diffDias = Math.ceil(diffTempo / (1000 * 60 * 60 * 24)) + 1;
+  const diffDias = Math.ceil(diffTempo / (1000 * 60 * 60 * 24)) + 1;  // +1 para incluir o dia de chegada
   
   return diffDias;
 }
 
 /**
- * ✅ FUNÇÃO COMPLETAMENTE REESCRITA: Gera prompt completo considerando TODAS as preferências
+ * Gera o prompt para a IA baseado nos parâmetros
+ * @param {Object} params - Parâmetros para o prompt
+ * @returns {string} Prompt formatado
  */
-function gerarPromptRoteiroCompleto(params) {
+function gerarPromptRoteiro(params) {
   const {
     destino,
     pais,
@@ -190,188 +159,100 @@ function gerarPromptRoteiroCompleto(params) {
     diasViagem,
     tipoViagem,
     tipoCompanhia,
-    intensidade,
-    orcamento,
-    dadosDetalhados,
     preferencias
   } = params;
   
-  // ✅ MAPEAR TODAS AS PREFERÊNCIAS DETALHADAMENTE
+  // Mapear o tipo de viagem para descrição
+  const descricaoTipoViagem = {
+    'relaxar': 'relaxamento e descanso',
+    'aventura': 'aventura e adrenalina',
+    'cultura': 'cultura, história e gastronomia',
+    'urbano': 'urbanismo, compras e vida noturna'
+  }[tipoViagem] || 'cultura e experiências variadas';
   
-  // Intensidade do roteiro
-  const configIntensidade = {
-    'leve': {
-      atividades: '2-3 atividades por período',
-      ritmo: 'relaxado com bastante tempo livre',
-      descanso: 'muitas pausas para descanso'
-    },
-    'moderado': {
-      atividades: '3-4 atividades por período', 
-      ritmo: 'equilibrado entre atividades e descanso',
-      descanso: 'pausas regulares'
-    },
-    'intenso': {
-      atividades: '4-6 atividades por período',
-      ritmo: 'dinâmico com agenda cheia',
-      descanso: 'poucas pausas, máximo aproveitamento'
-    }
-  };
+  // Mapear o tipo de companhia para descrição
+  const descricaoTipoCompanhia = {
+    'sozinho': 'uma pessoa viajando sozinha',
+    'casal': 'um casal em viagem romântica',
+    'familia': 'uma família com crianças',
+    'amigos': 'um grupo de amigos'
+  }[tipoCompanhia] || 'um viajante';
   
-  const infoIntensidade = configIntensidade[intensidade] || configIntensidade['moderado'];
-  
-  // Orçamento
-  const configOrcamento = {
-    'baixo': {
-      descricao: 'econômico',
-      atividades: 'atrações gratuitas, museus com entrada grátis, parques públicos, mercados locais',
-      alimentacao: 'restaurantes locais simples, street food, mercados',
-      transporte: 'transporte público, caminhadas'
-    },
-    'medio': {
-      descricao: 'moderado',
-      atividades: 'mix de atrações pagas e gratuitas, museus principais, tours',
-      alimentacao: 'restaurantes tradicionais, algumas experiências gastronômicas',
-      transporte: 'transporte público e eventual táxi/uber'
-    },
-    'alto': {
-      descricao: 'premium',
-      atividades: 'principais atrações, tours privados, experiências exclusivas',
-      alimentacao: 'restaurantes renomados, experiências gastronômicas especiais',
-      transporte: 'conforto e conveniência priorizados'
-    }
-  };
-  
-  const infoOrcamento = configOrcamento[orcamento] || configOrcamento['medio'];
-  
-  // Tipo de viagem
-  const configTipoViagem = {
-    'relaxar': 'relaxamento, bem-estar, spas, praias, parques tranquilos',
-    'aventura': 'atividades outdoor, trilhas, esportes, adrenalina',
-    'cultura': 'museus, história, arquitetura, arte, patrimônio cultural',
-    'urbano': 'vida urbana, compras, gastronomia, vida noturna, modernidade'
-  };
-  
-  const descricaoTipoViagem = configTipoViagem[tipoViagem] || 'cultura e experiências variadas';
-  
-  // Companhia de viagem
-  const configCompanhia = {
-    'sozinho': {
-      descricao: 'uma pessoa viajando sozinha',
-      consideracoes: 'atividades que podem ser feitas individualmente, lugares seguros, oportunidades de socialização'
-    },
-    'casal': {
-      descricao: 'um casal em viagem romântica',
-      consideracoes: 'experiências românticas, restaurantes intimistas, atividades para dois'
-    },
-    'familia': {
-      descricao: `uma família de ${dadosDetalhados.quantidadeTotal} pessoas (${dadosDetalhados.quantidadeAdultos} adulto${dadosDetalhados.quantidadeAdultos > 1 ? 's' : ''}${dadosDetalhados.quantidadeCriancas > 0 ? `, ${dadosDetalhados.quantidadeCriancas} criança${dadosDetalhados.quantidadeCriancas > 1 ? 's' : ''}` : ''}${dadosDetalhados.quantidadeBebes > 0 ? `, ${dadosDetalhados.quantidadeBebes} bebê${dadosDetalhados.quantidadeBebes > 1 ? 's' : ''}` : ''})`,
-      consideracoes: `atividades family-friendly, ${dadosDetalhados.temCriancas ? 'entretenimento para crianças, ' : ''}${dadosDetalhados.temBebes ? 'facilidades para bebês, ' : ''}restaurantes que recebem bem famílias, atrações educativas`
-    },
-    'amigos': {
-      descricao: `um grupo de ${dadosDetalhados.quantidadeTotal} amigos`,
-      consideracoes: 'atividades em grupo, vida noturna, experiências compartilhadas, diversão'
-    }
-  };
-  
-  const infoCompanhia = configCompanhia[tipoCompanhia] || configCompanhia['sozinho'];
-  
-  // ✅ PROMPT COMPLETAMENTE MELHORADO
+  // Montar o prompt
   return `
-Você é a Tripinha, uma vira-lata caramelo magra, esperta, despojada e especialista em viagens na Benetrip. Sua missão é criar roteiros PERSONALIZADOS baseados em TODAS as preferências do usuário.
+Você é a Tripinha, uma vira-lata caramelo magra, esperta, despojada e especialista em viagens na Benetrip. Sua missão é transformar as respostas do usuário em um roteiro de viagem completo, personalizado e incrível. Fale como se fosse uma amiga: com leveza, simpatia, bom humor e dicas práticas, sem enrolação.. 
+Crie um roteiro detalhado para uma viagem com as seguintes características:
 
-📋 DADOS DA VIAGEM:
 - Destino: ${destino}, ${pais}
 - Data de início: ${dataInicio}${dataFim ? `\n- Data de término: ${dataFim}` : ''}
 - Duração: ${diasViagem} dias
-- Horário de chegada: ${horaChegada || 'Não informado'}
-- Horário de partida: ${horaSaida || 'Não informado'}
+- Horário de chegada no primeiro dia: ${horaChegada || 'Não informado'}
+- Horário de partida no último dia: ${horaSaida || 'Não informado'}
+- Tipo de viagem: Foco em ${descricaoTipoViagem}
+- Viajantes: ${descricaoTipoCompanhia}
 
-👥 PERFIL DO VIAJANTE:
-- Viajantes: ${infoCompanhia.descricao}
-- Considerações especiais: ${infoCompanhia.consideracoes}
+INSTRUÇÕES:
+1. CRIE EXATAMENTE ${diasViagem} DIAS DE ROTEIRO - NÃO OMITA NENHUM DIA
+2. Organize o roteiro por dias, considerando o dia da semana real e se é fim de semana ou dia útil.
+3. Para cada dia, divida o roteiro em períodos: manhã, tarde e noite.
+4. Cada período deve ter 1-2 atividades relevantes, com locais reais (pontos turísticos, restaurantes, etc).
+5. Para cada atividade, inclua:
+   - Horário sugerido
+   - Nome do local
+   - 1-2 tags relevantes (ex: Imperdível, Cultural, Família)
+   - Uma dica personalizada da Tripinha (mascote da Benetrip)
+6. No primeiro dia, considere o horário de chegada (${horaChegada || 'não informado'}).
+7. No último dia, considere o horário de partida (${horaSaida || 'não informado'}).
+8. Inclua uma breve descrição para cada dia.
+9. FAÇA O MÁXIMO PARA QUE TODOS OS ${diasViagem} DIAS TENHAM ATIVIDADES DIFERENTES, CASO CONTRARIO, REPITA OS PASSEIOS MAIS CONHECIDOS.
+10. CRITICAL: Você DEVE criar atividades para TODOS os ${diasViagem} dias sem exceções. Se ${diasViagem} é 29, você DEVE criar 29 dias de roteiro completo.
 
-🎯 PREFERÊNCIAS ESPECÍFICAS:
-- Estilo de viagem: ${descricaoTipoViagem}
-- Intensidade: ${intensidade.toUpperCase()} (${infoIntensidade.atividades}, ${infoIntensidade.ritmo})
-- Orçamento: ${infoOrcamento.descricao.toUpperCase()}
-- Foco em: ${infoOrcamento.atividades}
-- Alimentação: ${infoOrcamento.alimentacao}
-
-🔧 INSTRUÇÕES PERSONALIZADAS:
-
-1. **INTENSIDADE ${intensidade.toUpperCase()}**: 
-   - ${infoIntensidade.atividades}
-   - Ritmo ${infoIntensidade.ritmo}
-   - ${infoIntensidade.descanso}
-
-2. **ORÇAMENTO ${orcamento.toUpperCase()}**:
-   - Priorize: ${infoOrcamento.atividades}
-   - Restaurantes: ${infoOrcamento.alimentacao}
-   - Transporte: ${infoOrcamento.transporte}
-
-3. **ADAPTAÇÕES PARA ${tipoCompanhia.toUpperCase()}**:
-   ${dadosDetalhados.temCriancas ? '- PRIORIDADE: Atividades kid-friendly, playgrounds, museus interativos' : ''}
-   ${dadosDetalhados.temBebes ? '- ESSENCIAL: Locais com facilidades para troca de fraldas, carrinho de bebê' : ''}
-   ${dadosDetalhados.grupoGrande ? '- GRUPOS GRANDES: Restaurantes que comportem grupos, atividades coletivas' : ''}
-   ${tipoCompanhia === 'casal' ? '- ROMÂNTICO: Locais com vista, restaurantes intimistas, experiências para dois' : ''}
-   ${tipoCompanhia === 'sozinho' ? '- SOLO TRAVEL: Lugares seguros, oportunidades de conhecer pessoas' : ''}
-
-4. **TIMING INTELIGENTE**:
-   - Primeiro dia: Considere chegada às ${horaChegada || 'XX:XX'}
-   - Último dia: Considere partida às ${horaSaida || 'XX:XX'}
-   - ${intensidade === 'leve' ? 'Manhãs relaxadas, tardes tranquilas' : intensidade === 'intenso' ? 'Aproveite cada minuto, agenda cheia' : 'Equilíbrio entre atividades e descanso'}
-
-5. **EXPERIÊNCIAS AUTÊNTICAS**:
-   - Misture atrações famosas com experiências locais
-   - ${tipoViagem === 'cultura' ? 'Museus, sítios históricos, arte local' : ''}
-   - ${tipoViagem === 'aventura' ? 'Atividades outdoor, trilhas, esportes locais' : ''}
-   - ${tipoViagem === 'relaxar' ? 'Spas, praias, parques, café tranquilo' : ''}
-   - ${tipoViagem === 'urbano' ? 'Shopping, vida noturna, gastronomia moderna' : ''}
-
-CRIE EXATAMENTE ${diasViagem} DIAS DE ROTEIRO PERSONALIZADO.
-
-Retorne em formato JSON:
+Retorne o roteiro em formato JSON com a seguinte estrutura:
 {
   "destino": "Nome do destino",
-  "observacoes_personalizacao": "Como o roteiro foi adaptado às preferências específicas",
   "dias": [
     {
       "data": "YYYY-MM-DD",
-      "descricao": "Descrição do dia alinhada com as preferências",
-      "intensidade_dia": "${intensidade}",
-      "foco_orcamento": "${orcamento}",
+      "descricao": "Breve descrição sobre o dia",
       "manha": {
-        "horarioEspecial": "Chegada às XX:XX" (apenas se aplicável),
+        "horarioEspecial": "Chegada às XX:XX" (opcional, apenas se for chegada/partida),
         "atividades": [
           {
             "horario": "HH:MM",
-            "local": "Nome do local (adaptado ao orçamento ${orcamento})",
-            "tags": ["tag1", "tag2", "${tipoViagem}", "${tipoCompanhia}"],
-            "dica": "Dica específica da Tripinha considerando ${tipoCompanhia} com orçamento ${orcamento}",
-            "adequado_para": "${dadosDetalhados.temCriancas ? 'crianças, ' : ''}${dadosDetalhados.temBebes ? 'bebês, ' : ''}${tipoCompanhia}",
-            "custo_estimado": "${orcamento === 'baixo' ? 'Gratuito/Baixo' : orcamento === 'alto' ? 'Premium' : 'Moderado'}"
+            "local": "Nome do local",
+            "tags": ["tag1", "tag2"],
+            "dica": "Dica da Tripinha sobre o local"
           }
         ]
       },
-      "tarde": { "atividades": [...] },
-      "noite": { "atividades": [...] }
+      "tarde": { ... mesmo formato da manhã ... },
+      "noite": { ... mesmo formato da manhã ... }
     }
   ]
 }
 
-IMPORTANTE: O roteiro deve refletir TODAS as preferências: intensidade ${intensidade}, orçamento ${orcamento}, estilo ${tipoViagem}, perfil ${tipoCompanhia} com ${dadosDetalhados.quantidadeTotal} pessoa${dadosDetalhados.quantidadeTotal > 1 ? 's' : ''}.
+Observações importantes:
+- Para ${descricaoTipoCompanhia}, dê prioridade a atividades compatíveis.
+- Como o foco é ${descricaoTipoViagem}, sugira mais atividades relacionadas a esse tema.
+- Considere atividades para dias úteis e atividades específicas para fins de semana.
+- Inclua uma mistura de atrações turísticas populares e experiências locais.
+- Garanta que destinos mais conhecidos estejam no roteiro da viagem.
 `;
 }
 
 /**
  * Gera roteiro utilizando a API DeepSeek
+ * @param {string} prompt - Prompt para a IA
+ * @returns {Object} Roteiro gerado
  */
 async function gerarRoteiroComDeepseek(prompt) {
   try {
+    // Verificar se a chave da API está configurada
     if (!DEEPSEEK_API_KEY) {
       throw new Error('Chave da API DeepSeek não configurada');
     }
     
+    // Realizar chamada à API DeepSeek
     const response = await axios.post(
       'https://api.deepseek.com/v1/chat/completions',
       {
@@ -393,11 +274,16 @@ async function gerarRoteiroComDeepseek(prompt) {
       }
     );
     
+    // Extrair resposta
     const respostaText = response.data.choices[0].message.content;
     
+    // Processar a resposta JSON
     try {
+      // Limpar qualquer markdown ou texto antes/depois do JSON
       const jsonMatch = respostaText.match(/\{[\s\S]*\}/);
       const jsonText = jsonMatch ? jsonMatch[0] : respostaText;
+      
+      // Parsear para objeto
       const roteiro = JSON.parse(jsonText);
       return roteiro;
     } catch (parseError) {
@@ -421,13 +307,17 @@ async function gerarRoteiroComDeepseek(prompt) {
 
 /**
  * Gera roteiro utilizando a API Claude (Anthropic)
+ * @param {string} prompt - Prompt para a IA
+ * @returns {Object} Roteiro gerado
  */
 async function gerarRoteiroComClaude(prompt) {
   try {
+    // Verificar se a chave da API está configurada
     if (!CLAUDE_API_KEY) {
       throw new Error('Chave da API Claude não configurada');
     }
     
+    // Realizar chamada à API Claude (Anthropic)
     const response = await axios.post(
       'https://api.anthropic.com/v1/messages',
       {
@@ -438,7 +328,8 @@ async function gerarRoteiroComClaude(prompt) {
             role: 'user',
             content: prompt
           }
-        ]
+        ],
+        response_format: { type: 'json_object' }
       },
       {
         headers: {
@@ -449,11 +340,16 @@ async function gerarRoteiroComClaude(prompt) {
       }
     );
     
+    // Extrair resposta
     const respostaText = response.data.content[0].text;
     
+    // Processar a resposta JSON
     try {
+      // Limpar qualquer markdown ou texto antes/depois do JSON
       const jsonMatch = respostaText.match(/\{[\s\S]*\}/);
       const jsonText = jsonMatch ? jsonMatch[0] : respostaText;
+      
+      // Parsear para objeto
       const roteiro = JSON.parse(jsonText);
       return roteiro;
     } catch (parseError) {
