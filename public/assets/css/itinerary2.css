@@ -472,25 +472,45 @@ body.mobile-optimized {
 .progress-bar-container {
     width: 100%;
     max-width: 280px;
-    height: 6px;
+    height: 8px; /* ✅ Aumentei de 6px para 8px para melhor visibilidade */
     background-color: var(--medium-gray);
-    border-radius: 3px;
+    border-radius: 4px; /* ✅ Aumentei de 3px para 4px */
     overflow: hidden;
     margin: 20px 0;
+    position: relative; /* ✅ Adicionado para melhor controle */
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1); /* ✅ Sombra interna para profundidade */
 }
 
 .progress-bar {
     height: 100%;
     background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));
-    border-radius: 3px;
-    transition: width var(--transition-normal);
+    border-radius: 4px; /* ✅ Combinando com o container */
+    transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1); /* ✅ Transição mais suave */
     min-width: 0;
+    position: relative;
+    overflow: hidden;
 }
 
-@keyframes bounce {
-    0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
-    40% { transform: translateY(-10px); }
-    60% { transform: translateY(-5px); }
+/* ✅ NOVO: Efeito de brilho animado na barra */
+.progress-bar::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -50%;
+    width: 50%;
+    height: 100%;
+    background: linear-gradient(
+        90deg, 
+        transparent, 
+        rgba(255, 255, 255, 0.4), 
+        transparent
+    );
+    animation: progress-shine 2s infinite;
+}
+
+@keyframes progress-shine {
+    0% { left: -50%; }
+    100% { left: 100%; }
 }
 
 .fade-out {
