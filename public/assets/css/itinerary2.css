@@ -1407,3 +1407,247 @@ body.mobile-optimized {
         margin-bottom: 12px;
     }
 }
+
+/* ✨ ESTILOS ESPECIAIS PARA O AVATAR OFICIAL DA TRIPINHA ✨ */
+
+/* 🌟 Avatar Principal no Formulário */
+.tripinha-avatar-principal {
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 4px solid var(--primary-color);
+    box-shadow: 
+        0 8px 32px rgba(232, 119, 34, 0.3),
+        0 4px 16px rgba(0, 0, 0, 0.1);
+    transition: all 0.3s ease;
+    background: linear-gradient(135deg, #ffffff, #f8f9fa);
+    padding: 4px;
+}
+
+.tripinha-avatar-principal:hover {
+    transform: scale(1.05) rotate(2deg);
+    box-shadow: 
+        0 12px 40px rgba(232, 119, 34, 0.4),
+        0 6px 20px rgba(0, 0, 0, 0.15);
+}
+
+/* 🎯 Loading Screen Especial */
+.loading-avatar-oficial {
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 5px solid var(--white);
+    box-shadow: 
+        0 8px 32px rgba(232, 119, 34, 0.3),
+        0 4px 16px rgba(0, 0, 0, 0.1);
+    animation: tripinha-bounce 2s infinite, tripinha-glow 3s ease-in-out infinite alternate;
+    background: radial-gradient(circle, #ffffff 0%, #f8f9fa 100%);
+    padding: 6px;
+}
+
+/* 🐕 Animações Personalizadas */
+@keyframes tripinha-bounce {
+    0%, 20%, 50%, 80%, 100% { 
+        transform: translateY(0) scale(1); 
+    }
+    40% { 
+        transform: translateY(-15px) scale(1.02); 
+    }
+    60% { 
+        transform: translateY(-8px) scale(1.01); 
+    }
+}
+
+@keyframes tripinha-glow {
+    from {
+        box-shadow: 
+            0 8px 32px rgba(232, 119, 34, 0.3),
+            0 4px 16px rgba(0, 0, 0, 0.1);
+    }
+    to {
+        box-shadow: 
+            0 12px 40px rgba(232, 119, 34, 0.5),
+            0 6px 20px rgba(0, 163, 224, 0.2);
+    }
+}
+
+/* 💬 Avatar nas Dicas - Versão Oficial */
+.avatar-img-oficial {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid var(--primary-color);
+    box-shadow: 0 4px 12px rgba(232, 119, 34, 0.25);
+    background: var(--white);
+    padding: 2px;
+    transition: transform 0.2s ease;
+}
+
+.avatar-img-oficial:hover {
+    transform: scale(1.1) rotate(5deg);
+}
+
+/* 🎪 Header Especial com Avatar */
+.formulario-header-premium {
+    text-align: center;
+    margin-bottom: 40px;
+    padding: 30px 0;
+    background: linear-gradient(135deg, 
+        rgba(232, 119, 34, 0.05) 0%, 
+        rgba(0, 163, 224, 0.05) 100%);
+    border-radius: var(--radius-xl);
+    border: 1px solid rgba(232, 119, 34, 0.1);
+    position: relative;
+    overflow: hidden;
+}
+
+.formulario-header-premium::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: 
+        radial-gradient(circle, rgba(232, 119, 34, 0.03) 0%, transparent 70%),
+        radial-gradient(circle at 80% 20%, rgba(0, 163, 224, 0.03) 0%, transparent 50%);
+    animation: gentle-float 20s ease-in-out infinite;
+    pointer-events: none;
+}
+
+@keyframes gentle-float {
+    0%, 100% { transform: translate(0, 0) rotate(0deg); }
+    25% { transform: translate(-5px, -10px) rotate(1deg); }
+    50% { transform: translate(10px, -5px) rotate(-1deg); }
+    75% { transform: translate(-10px, 5px) rotate(0.5deg); }
+}
+
+/* 📱 Responsividade Otimizada */
+@media (max-width: 480px) {
+    .tripinha-avatar-principal {
+        width: 80px;
+        height: 80px;
+        border-width: 3px;
+    }
+    
+    .loading-avatar-oficial {
+        width: 90px;
+        height: 90px;
+        border-width: 4px;
+    }
+    
+    .avatar-img-oficial {
+        width: 32px;
+        height: 32px;
+        border-width: 2px;
+    }
+}
+
+@media (max-width: 360px) {
+    .tripinha-avatar-principal {
+        width: 70px;
+        height: 70px;
+    }
+    
+    .loading-avatar-oficial {
+        width: 75px;
+        height: 75px;
+    }
+}
+
+/* 🎨 Variante para Modo Escuro (futuro) */
+@media (prefers-color-scheme: dark) {
+    .tripinha-avatar-principal,
+    .loading-avatar-oficial,
+    .avatar-img-oficial {
+        border-color: var(--secondary-color);
+        background: linear-gradient(135deg, #2a2a2a, #3a3a3a);
+    }
+}
+
+/* ✨ Efeito Especial para Primeira Impressão */
+.tripinha-entrada-especial {
+    animation: tripinha-entrada 1.2s ease-out;
+}
+
+@keyframes tripinha-entrada {
+    0% {
+        opacity: 0;
+        transform: translateY(-30px) scale(0.8) rotate(-10deg);
+    }
+    50% {
+        opacity: 0.7;
+        transform: translateY(-5px) scale(1.05) rotate(2deg);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0) scale(1) rotate(0deg);
+    }
+}
+
+/* 🎯 Loading com Progresso Visual */
+.loading-tripinha-container {
+    position: relative;
+    display: inline-block;
+}
+
+.loading-tripinha-container::after {
+    content: '';
+    position: absolute;
+    top: -10px;
+    left: -10px;
+    right: -10px;
+    bottom: -10px;
+    border: 3px solid transparent;
+    border-top-color: var(--primary-color);
+    border-right-color: var(--secondary-color);
+    border-radius: 50%;
+    animation: tripinha-loading-ring 2s linear infinite;
+}
+
+@keyframes tripinha-loading-ring {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* 🎪 Contexto de Sucesso */
+.tripinha-sucesso {
+    animation: tripinha-celebration 0.6s ease-out;
+}
+
+@keyframes tripinha-celebration {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.15) rotate(5deg); }
+    100% { transform: scale(1) rotate(0deg); }
+}
+
+/* 🔄 Transições Suaves */
+.tripinha-avatar-principal,
+.loading-avatar-oficial,
+.avatar-img-oficial {
+    will-change: transform;
+    backface-visibility: hidden;
+    -webkit-font-smoothing: antialiased;
+}
+
+/* 🎨 Sombra Dinâmica Baseada no Contexto */
+.tripinha-context-welcome {
+    box-shadow: 
+        0 8px 32px rgba(232, 119, 34, 0.3),
+        0 0 0 1px rgba(232, 119, 34, 0.1);
+}
+
+.tripinha-context-loading {
+    box-shadow: 
+        0 8px 32px rgba(0, 163, 224, 0.3),
+        0 0 0 1px rgba(0, 163, 224, 0.1);
+}
+
+.tripinha-context-tip {
+    box-shadow: 
+        0 4px 16px rgba(232, 119, 34, 0.25),
+        0 0 0 1px rgba(232, 119, 34, 0.1);
+}
