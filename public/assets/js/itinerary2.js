@@ -248,6 +248,11 @@ configurarCamposCondicionais() {
       // Mostrar loading e ocultar formulário
       this.mostrarRoteiro();
       
+      // ✅ CORREÇÃO: Iniciar animação do progresso APÓS mostrar o loading
+      setTimeout(() => {
+        this.iniciarAnimacaoProgresso();
+      }, 100);
+      
       // Atualizar botão
       btnGerar.classList.add('loading');
       btnGerar.disabled = true;
