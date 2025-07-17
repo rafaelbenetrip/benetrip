@@ -3865,3 +3865,402 @@ input[type="range"]::-moz-range-thumb {
 .filtro-tab-pane.active {
   display: block;
 }
+
+/* ===================================================
+   BENETRIP - OTIMIZAÇÕES MOBILE PARA CALENDÁRIO
+   Adicione este CSS ao arquivo styles.css
+   ================================================== */
+
+/* ===== CONFIGURAÇÃO PRINCIPAL DO CALENDÁRIO MOBILE ===== */
+
+/* Ocultar o container original confuso */
+.flatpickr-calendar-container {
+    display: none !important;
+    height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+}
+
+/* Container principal do calendário - mais limpo */
+.calendar-container {
+    width: 100%;
+    margin: 16px 0 0 0 !important;
+    padding: 0 !important;
+    background-color: transparent !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+}
+
+/* ===== OTIMIZAÇÕES PRINCIPAIS DO FLATPICKR ===== */
+
+/* Configuração base para mobile */
+.flatpickr-calendar {
+    width: 100% !important;
+    max-width: 340px !important;
+    margin: 0 auto !important;
+    font-size: 16px !important;
+    border: 1px solid var(--gray-medium) !important;
+    border-radius: var(--border-radius-md) !important;
+    box-shadow: var(--shadow-sm) !important;
+    background-color: var(--white) !important;
+    padding: 8px !important;
+    font-family: var(--font-primary) !important;
+    position: relative !important;
+    display: inline-block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+
+/* Header do mês */
+.flatpickr-months {
+    padding: 12px 16px !important;
+    margin: 0 !important;
+    background-color: var(--gray-light) !important;
+    border-radius: var(--border-radius-sm) !important;
+}
+
+.flatpickr-current-month {
+    font-size: 18px !important;
+    font-weight: 600 !important;
+    color: var(--dark) !important;
+}
+
+/* Botões de navegação - área de toque otimizada */
+.flatpickr-prev-month,
+.flatpickr-next-month {
+    width: 44px !important;
+    height: 44px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    border-radius: 50% !important;
+    background-color: var(--white) !important;
+    transition: background-color 0.2s ease !important;
+}
+
+.flatpickr-prev-month:hover,
+.flatpickr-next-month:hover,
+.flatpickr-prev-month:active,
+.flatpickr-next-month:active {
+    background-color: var(--gray-medium) !important;
+}
+
+.flatpickr-prev-month svg,
+.flatpickr-next-month svg {
+    width: 20px !important;
+    height: 20px !important;
+    fill: var(--dark) !important;
+}
+
+/* Cabeçalhos dos dias da semana */
+.flatpickr-weekdays {
+    padding: 8px 4px !important;
+    margin: 8px 0 !important;
+    background-color: transparent !important;
+}
+
+.flatpickr-weekday {
+    font-size: 14px !important;
+    font-weight: 500 !important;
+    color: var(--dark) !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.5px !important;
+}
+
+/* Container dos dias */
+.flatpickr-days {
+    padding: 4px !important;
+    margin: 0 !important;
+    width: 100% !important;
+}
+
+.dayContainer {
+    width: 100% !important;
+    min-width: 100% !important;
+    max-width: 100% !important;
+    display: grid !important;
+    grid-template-columns: repeat(7, 1fr) !important;
+    gap: 2px !important;
+    padding: 0 !important;
+}
+
+/* ===== OTIMIZAÇÃO PRINCIPAL: DIAS INDIVIDUAIS ===== */
+.flatpickr-day {
+    width: 44px !important;
+    height: 44px !important;
+    min-height: 44px !important;
+    max-height: 44px !important;
+    line-height: 44px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border-radius: var(--border-radius-sm) !important;
+    font-size: 16px !important;
+    font-weight: 500 !important;
+    color: var(--dark) !important;
+    background-color: transparent !important;
+    border: 1px solid transparent !important;
+    cursor: pointer !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    transition: all 0.2s ease !important;
+    -webkit-tap-highlight-color: transparent !important;
+    justify-self: center !important;
+    position: relative !important;
+}
+
+/* Estados interativos dos dias */
+.flatpickr-day:hover {
+    background-color: rgba(232, 119, 34, 0.1) !important;
+    border-color: rgba(232, 119, 34, 0.3) !important;
+    transform: scale(1.05) !important;
+}
+
+.flatpickr-day:active {
+    transform: scale(0.95) !important;
+}
+
+/* Dias desabilitados */
+.flatpickr-day.flatpickr-disabled {
+    color: var(--gray-medium) !important;
+    background-color: transparent !important;
+    cursor: not-allowed !important;
+    opacity: 0.4 !important;
+}
+
+.flatpickr-day.flatpickr-disabled:hover {
+    background-color: transparent !important;
+    transform: none !important;
+}
+
+/* Dias de outros meses */
+.flatpickr-day.prevMonthDay,
+.flatpickr-day.nextMonthDay {
+    color: var(--gray-medium) !important;
+    opacity: 0.5 !important;
+}
+
+/* Dia de hoje */
+.flatpickr-day.today {
+    background-color: var(--blue-secondary) !important;
+    color: var(--white) !important;
+    font-weight: 600 !important;
+    box-shadow: 0 2px 4px rgba(0, 163, 224, 0.3) !important;
+}
+
+.flatpickr-day.today:hover {
+    background-color: var(--blue-secondary) !important;
+    opacity: 0.9 !important;
+}
+
+/* Dias selecionados - cores Benetrip */
+.flatpickr-day.selected,
+.flatpickr-day.startRange,
+.flatpickr-day.endRange,
+.flatpickr-day.selected.inRange,
+.flatpickr-day.startRange.inRange,
+.flatpickr-day.endRange.inRange,
+.flatpickr-day.selected:focus,
+.flatpickr-day.startRange:focus,
+.flatpickr-day.endRange:focus,
+.flatpickr-day.selected:hover,
+.flatpickr-day.startRange:hover,
+.flatpickr-day.endRange:hover,
+.flatpickr-day.selected.prevMonthDay,
+.flatpickr-day.startRange.prevMonthDay,
+.flatpickr-day.endRange.prevMonthDay,
+.flatpickr-day.selected.nextMonthDay,
+.flatpickr-day.startRange.nextMonthDay,
+.flatpickr-day.endRange.nextMonthDay {
+    background-color: var(--orange-primary) !important;
+    border-color: var(--orange-primary) !important;
+    color: var(--white) !important;
+    font-weight: 600 !important;
+    box-shadow: 0 2px 4px rgba(232, 119, 34, 0.3) !important;
+}
+
+/* Intervalo entre datas selecionadas */
+.flatpickr-day.inRange,
+.flatpickr-day.prevMonthDay.inRange,
+.flatpickr-day.nextMonthDay.inRange,
+.flatpickr-day.today.inRange,
+.flatpickr-day.prevMonthDay.today.inRange,
+.flatpickr-day.nextMonthDay.today.inRange,
+.flatpickr-day:hover,
+.flatpickr-day.prevMonthDay:hover,
+.flatpickr-day.nextMonthDay:hover,
+.flatpickr-day:focus,
+.flatpickr-day.prevMonthDay:focus,
+.flatpickr-day.nextMonthDay:focus {
+    background-color: rgba(232, 119, 34, 0.15) !important;
+    border-color: rgba(232, 119, 34, 0.1) !important;
+    color: var(--orange-primary) !important;
+    font-weight: 500 !important;
+}
+
+/* ===== PAINEL DE INFORMAÇÕES DAS DATAS ===== */
+.date-selection {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background-color: var(--gray-light);
+    padding: 16px;
+    border-radius: var(--border-radius-md);
+    margin: 16px 0;
+    font-family: var(--font-primary);
+}
+
+.date-selection p {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--dark);
+}
+
+.date-selection p span {
+    font-weight: 600;
+    color: var(--orange-primary);
+    margin-left: 4px;
+}
+
+/* ===== BOTÃO DE CONFIRMAÇÃO OTIMIZADO ===== */
+.confirm-button {
+    width: 100%;
+    background-color: var(--orange-primary);
+    color: var(--white);
+    border: none;
+    border-radius: 24px;
+    padding: 16px;
+    font-size: 16px;
+    font-weight: 600;
+    font-family: var(--font-primary);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 8px rgba(232, 119, 34, 0.3);
+    margin-top: 8px;
+    min-height: 44px; /* Área de toque mínima */
+}
+
+.confirm-button:hover:not(:disabled) {
+    background-color: #d66a1c;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(232, 119, 34, 0.4);
+}
+
+.confirm-button:active {
+    transform: translateY(0);
+}
+
+.confirm-button:disabled {
+    background-color: var(--gray-medium);
+    color: #999;
+    cursor: not-allowed;
+    box-shadow: none;
+    transform: none;
+}
+
+/* ===== RESPONSIVIDADE PARA TELAS PEQUENAS ===== */
+
+/* Telas de 360px ou menores */
+@media (max-width: 360px) {
+    .flatpickr-calendar {
+        max-width: 320px !important;
+        font-size: 14px !important;
+    }
+    
+    .flatpickr-day {
+        width: 40px !important;
+        height: 40px !important;
+        min-height: 40px !important;
+        line-height: 40px !important;
+        font-size: 14px !important;
+    }
+    
+    .flatpickr-current-month {
+        font-size: 16px !important;
+    }
+    
+    .flatpickr-prev-month,
+    .flatpickr-next-month {
+        width: 40px !important;
+        height: 40px !important;
+    }
+}
+
+/* Telas de 320px ou menores */
+@media (max-width: 320px) {
+    .flatpickr-calendar {
+        max-width: 300px !important;
+        padding: 6px !important;
+    }
+    
+    .flatpickr-day {
+        width: 38px !important;
+        height: 38px !important;
+        min-height: 38px !important;
+        line-height: 38px !important;
+        font-size: 13px !important;
+    }
+    
+    .dayContainer {
+        gap: 1px !important;
+    }
+    
+    .date-selection {
+        padding: 12px;
+        font-size: 13px;
+    }
+}
+
+/* ===== MELHORIAS DE ACESSIBILIDADE ===== */
+.flatpickr-day:focus {
+    outline: 2px solid var(--blue-secondary);
+    outline-offset: 2px;
+    z-index: 10;
+}
+
+/* ===== ANIMAÇÃO DE ENTRADA ===== */
+@keyframes fadeInCalendar {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.flatpickr-calendar {
+    animation: fadeInCalendar 0.3s ease-out;
+}
+
+/* ===== OVERRIDE PARA CONFLITOS COM CHAT ===== */
+.chat-message .message.with-calendar {
+    padding-top: 16px !important;
+    padding-bottom: 0 !important;
+}
+
+.chat-message .message.with-calendar .calendar-container {
+    margin-top: 0 !important;
+}
+
+/* ===== ESTADOS DE LOADING E ERRO ===== */
+.calendar-loading {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 200px;
+    color: var(--gray-dark);
+    font-style: italic;
+}
+
+.calendar-error {
+    background-color: #ffe6e6;
+    color: #d32f2f;
+    padding: 12px;
+    border-radius: var(--border-radius-md);
+    text-align: center;
+    font-size: 14px;
+}
