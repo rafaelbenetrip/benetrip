@@ -1,0 +1,503 @@
+/* ========================================
+   BENETRIP - CALENDÁRIO OTIMIZADO PARA MOBILE
+   Melhorias específicas para o componente Flatpickr
+   ======================================== */
+
+/* Container principal do calendário */
+.calendar-container {
+    background-color: white !important;
+    border-radius: 16px !important;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08) !important;
+    padding: 16px !important;
+    margin: 12px 0 !important;
+    overflow: hidden !important;
+    position: relative !important;
+}
+
+/* Ocultar completamente o container original problemático */
+.flatpickr-calendar-container {
+    display: none !important;
+    height: 0 !important;
+    width: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    overflow: hidden !important;
+}
+
+/* Configurações base do Flatpickr para mobile */
+.flatpickr-calendar {
+    /* Dimensionamento responsivo */
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 280px !important;
+    box-shadow: none !important;
+    border: none !important;
+    background: transparent !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    
+    /* Melhorar legibilidade */
+    font-family: 'Poppins', sans-serif !important;
+    font-size: 16px !important;
+    
+    /* Garantir visibilidade */
+    display: inline-block !important;
+    position: relative !important;
+    z-index: 1 !important;
+}
+
+/* Header do calendário (mês/ano) */
+.flatpickr-months {
+    padding: 8px 0 16px 0 !important;
+    margin: 0 !important;
+    position: relative !important;
+}
+
+.flatpickr-month {
+    margin: 0 !important;
+    padding: 0 !important;
+    height: auto !important;
+}
+
+.flatpickr-current-month {
+    font-size: 18px !important;
+    font-weight: 700 !important;
+    color: #21272A !important;
+    padding: 8px 0 !important;
+    text-align: center !important;
+}
+
+.flatpickr-current-month input {
+    font-size: 18px !important;
+    font-weight: 700 !important;
+    color: #21272A !important;
+    background: transparent !important;
+    border: none !important;
+    text-align: center !important;
+}
+
+/* Botões de navegação do mês */
+.flatpickr-prev-month,
+.flatpickr-next-month {
+    width: 44px !important;
+    height: 44px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    border-radius: 22px !important;
+    background-color: #f5f5f5 !important;
+    color: #21272A !important;
+    transition: all 0.2s ease !important;
+    position: absolute !important;
+    top: 0 !important;
+    z-index: 3 !important;
+}
+
+.flatpickr-prev-month {
+    left: 0 !important;
+}
+
+.flatpickr-next-month {
+    right: 0 !important;
+}
+
+.flatpickr-prev-month:hover,
+.flatpickr-next-month:hover {
+    background-color: #E87722 !important;
+    color: white !important;
+    transform: scale(1.05) !important;
+}
+
+/* SVGs dos botões de navegação */
+.flatpickr-prev-month svg,
+.flatpickr-next-month svg {
+    width: 16px !important;
+    height: 16px !important;
+    fill: currentColor !important;
+}
+
+/* Cabeçalho dos dias da semana */
+.flatpickr-weekdays {
+    background: transparent !important;
+    margin: 8px 0 !important;
+    padding: 0 !important;
+    height: auto !important;
+}
+
+.flatpickr-weekday {
+    background: transparent !important;
+    color: #777777 !important;
+    font-weight: 600 !important;
+    font-size: 12px !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.5px !important;
+    padding: 8px 0 !important;
+    height: auto !important;
+    line-height: 1 !important;
+}
+
+/* Container dos dias */
+.flatpickr-days {
+    padding: 0 !important;
+    margin: 0 !important;
+    background: transparent !important;
+    border: none !important;
+    width: 100% !important;
+}
+
+.dayContainer {
+    width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    min-width: 0 !important;
+    max-width: none !important;
+}
+
+/* OTIMIZAÇÃO PRINCIPAL: Dias do calendário para mobile */
+.flatpickr-day {
+    /* Área de toque otimizada para mobile */
+    width: calc(14.28% - 2px) !important;
+    height: 44px !important;
+    min-height: 44px !important;
+    max-height: 44px !important;
+    
+    /* Layout e alinhamento */
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    margin: 1px !important;
+    padding: 0 !important;
+    
+    /* Typography melhorada */
+    font-size: 16px !important;
+    font-weight: 500 !important;
+    line-height: 1 !important;
+    
+    /* Aparência base */
+    background: transparent !important;
+    border: 2px solid transparent !important;
+    border-radius: 8px !important;
+    color: #21272A !important;
+    cursor: pointer !important;
+    
+    /* Transições suaves */
+    transition: all 0.2s ease !important;
+    
+    /* Garantir que esteja acima de outros elementos */
+    position: relative !important;
+    z-index: 2 !important;
+}
+
+/* Estados dos dias */
+.flatpickr-day:hover {
+    background-color: rgba(232, 119, 34, 0.1) !important;
+    border-color: rgba(232, 119, 34, 0.3) !important;
+    transform: scale(1.05) !important;
+}
+
+/* Dias desabilitados (anteriores a hoje) */
+.flatpickr-day.flatpickr-disabled,
+.flatpickr-day.prevMonthDay,
+.flatpickr-day.nextMonthDay {
+    color: #cccccc !important;
+    background: transparent !important;
+    cursor: not-allowed !important;
+    opacity: 0.3 !important;
+}
+
+.flatpickr-day.flatpickr-disabled:hover {
+    background: transparent !important;
+    border-color: transparent !important;
+    transform: none !important;
+}
+
+/* Dia atual (hoje) */
+.flatpickr-day.today {
+    background-color: rgba(0, 163, 224, 0.1) !important;
+    border-color: #00A3E0 !important;
+    color: #00A3E0 !important;
+    font-weight: 700 !important;
+}
+
+.flatpickr-day.today:hover {
+    background-color: rgba(0, 163, 224, 0.2) !important;
+    border-color: #00A3E0 !important;
+}
+
+/* Dias selecionados (ida e volta) */
+.flatpickr-day.selected,
+.flatpickr-day.startRange,
+.flatpickr-day.endRange {
+    background-color: #E87722 !important;
+    border-color: #E87722 !important;
+    color: white !important;
+    font-weight: 700 !important;
+    box-shadow: 0 2px 4px rgba(232, 119, 34, 0.3) !important;
+}
+
+.flatpickr-day.selected:hover,
+.flatpickr-day.startRange:hover,
+.flatpickr-day.endRange:hover {
+    background-color: #d66a1c !important;
+    border-color: #d66a1c !important;
+    transform: scale(1.08) !important;
+}
+
+/* Dias no intervalo entre ida e volta */
+.flatpickr-day.inRange {
+    background-color: rgba(232, 119, 34, 0.15) !important;
+    border-color: rgba(232, 119, 34, 0.3) !important;
+    color: #E87722 !important;
+    font-weight: 600 !important;
+}
+
+.flatpickr-day.inRange:hover {
+    background-color: rgba(232, 119, 34, 0.25) !important;
+    transform: scale(1.03) !important;
+}
+
+/* Seção de seleção das datas (resumo) */
+.date-selection {
+    background-color: #f9f9f9 !important;
+    border-radius: 12px !important;
+    padding: 16px !important;
+    margin: 16px 0 !important;
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    border: 1px solid #e0e0e0 !important;
+}
+
+.date-selection p {
+    margin: 0 !important;
+    font-size: 14px !important;
+    font-weight: 500 !important;
+    color: #555 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    text-align: center !important;
+}
+
+.date-selection p span {
+    font-weight: 700 !important;
+    font-size: 16px !important;
+    color: #E87722 !important;
+    margin-top: 4px !important;
+}
+
+/* Botão de confirmação */
+.confirm-dates,
+.confirm-button {
+    background-color: #E87722 !important;
+    color: white !important;
+    border: none !important;
+    border-radius: 30px !important;
+    padding: 16px 24px !important;
+    font-size: 16px !important;
+    font-weight: 700 !important;
+    font-family: 'Poppins', sans-serif !important;
+    width: 100% !important;
+    margin-top: 16px !important;
+    cursor: pointer !important;
+    transition: all 0.2s ease !important;
+    
+    /* Área de toque otimizada */
+    min-height: 48px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+
+.confirm-dates:hover,
+.confirm-button:hover {
+    background-color: #d66a1c !important;
+    transform: translateY(-2px) !important;
+    box-shadow: 0 4px 8px rgba(232, 119, 34, 0.3) !important;
+}
+
+.confirm-dates:disabled,
+.confirm-button:disabled {
+    background-color: #cccccc !important;
+    color: #888888 !important;
+    cursor: not-allowed !important;
+    transform: none !important;
+    box-shadow: none !important;
+}
+
+.confirm-dates:active,
+.confirm-button:active {
+    transform: translateY(0) !important;
+    box-shadow: 0 2px 4px rgba(232, 119, 34, 0.3) !important;
+}
+
+/* ========================================
+   OTIMIZAÇÕES ESPECÍFICAS PARA TELAS PEQUENAS
+   ======================================== */
+
+/* Telas muito pequenas (< 320px) */
+@media screen and (max-width: 320px) {
+    .flatpickr-calendar {
+        min-width: 280px !important;
+        font-size: 14px !important;
+    }
+    
+    .flatpickr-day {
+        height: 40px !important;
+        min-height: 40px !important;
+        font-size: 14px !important;
+    }
+    
+    .flatpickr-current-month {
+        font-size: 16px !important;
+    }
+    
+    .date-selection {
+        padding: 12px !important;
+        flex-direction: column !important;
+        gap: 8px !important;
+    }
+    
+    .date-selection p {
+        flex-direction: row !important;
+        gap: 8px !important;
+    }
+}
+
+/* Telas médias mobile (321px - 480px) */
+@media screen and (min-width: 321px) and (max-width: 480px) {
+    .flatpickr-calendar {
+        font-size: 16px !important;
+    }
+    
+    .flatpickr-day {
+        height: 44px !important;
+        font-size: 16px !important;
+    }
+}
+
+/* ========================================
+   MELHORIAS DE ACESSIBILIDADE E UX
+   ======================================== */
+
+/* Feedback visual melhorado para touch */
+.flatpickr-day:focus {
+    outline: 2px solid #E87722 !important;
+    outline-offset: 2px !important;
+}
+
+/* Melhorar contraste para leitura */
+.flatpickr-calendar {
+    -webkit-font-smoothing: antialiased !important;
+    -moz-osx-font-smoothing: grayscale !important;
+}
+
+/* Prevenir seleção de texto indesejada */
+.flatpickr-calendar,
+.flatpickr-day,
+.flatpickr-weekday {
+    -webkit-user-select: none !important;
+    -moz-user-select: none !important;
+    -ms-user-select: none !important;
+    user-select: none !important;
+    -webkit-tap-highlight-color: transparent !important;
+}
+
+/* Otimizações para iPhone com notch */
+@supports (padding: max(0px)) {
+    .calendar-container {
+        padding-left: max(16px, env(safe-area-inset-left)) !important;
+        padding-right: max(16px, env(safe-area-inset-right)) !important;
+    }
+}
+
+/* ========================================
+   ANIMAÇÕES OTIMIZADAS PARA PERFORMANCE
+   ======================================== */
+
+/* Acelerar animações em dispositivos móveis */
+.flatpickr-day,
+.confirm-button,
+.flatpickr-prev-month,
+.flatpickr-next-month {
+    -webkit-transform: translateZ(0) !important;
+    transform: translateZ(0) !important;
+    will-change: transform, background-color !important;
+}
+
+/* Reduzir motion para usuários que preferem menos animação */
+@media (prefers-reduced-motion: reduce) {
+    .flatpickr-day,
+    .confirm-button,
+    .flatpickr-prev-month,
+    .flatpickr-next-month {
+        transition: none !important;
+        transform: none !important;
+    }
+    
+    .flatpickr-day:hover,
+    .confirm-button:hover {
+        transform: none !important;
+    }
+}
+
+/* ========================================
+   CORREÇÕES PARA PROBLEMAS ESPECÍFICOS
+   ======================================== */
+
+/* Prevenir zoom indesejado no iOS */
+input.flatpickr-current-month {
+    font-size: 16px !important;
+}
+
+/* Garantir que o calendário não cause overflow horizontal */
+.calendar-container {
+    max-width: 100% !important;
+    overflow-x: hidden !important;
+}
+
+.flatpickr-calendar {
+    overflow-x: hidden !important;
+}
+
+/* Melhorar performance de scroll */
+.flatpickr-calendar * {
+    -webkit-overflow-scrolling: touch !important;
+}
+
+/* ========================================
+   CLASSES AUXILIARES PARA JAVASCRIPT
+   ======================================== */
+
+/* Classe para indicar que o calendário foi inicializado */
+.calendar-initialized .flatpickr-calendar {
+    opacity: 1 !important;
+    visibility: visible !important;
+}
+
+/* Estado de carregamento */
+.calendar-loading {
+    position: relative !important;
+}
+
+.calendar-loading::before {
+    content: '' !important;
+    position: absolute !important;
+    top: 50% !important;
+    left: 50% !important;
+    width: 24px !important;
+    height: 24px !important;
+    margin: -12px 0 0 -12px !important;
+    border: 2px solid #E87722 !important;
+    border-radius: 50% !important;
+    border-top-color: transparent !important;
+    animation: spin 1s linear infinite !important;
+    z-index: 10 !important;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg) !important;
+    }
+}
