@@ -1,6 +1,6 @@
 /**
- * BENETRIP - CALENDÁRIO OTIMIZADO PARA MOBILE
- * Melhorias JavaScript para o componente Flatpickr em dispositivos móveis
+ * BENETRIP - CALENDÁRIO MOBILE CORRIGIDO
+ * Versão 2.0 - Resolvendo problemas de largura e exibição do mês
  */
 
 // Sobrescrever função de inicialização do calendário no BENETRIP
@@ -8,91 +8,97 @@ if (typeof BENETRIP !== 'undefined') {
     // Guardar referência da função original
     const inicializarCalendarioOriginal = BENETRIP.inicializarCalendario;
     
-    // Sobrescrever com versão mobile-otimizada
+    // Sobrescrever com versão corrigida
     BENETRIP.inicializarCalendario = function(pergunta) {
-        console.log("Iniciando calendário otimizado para mobile");
+        console.log("Iniciando calendário mobile corrigido - versão 2.0");
         
-        // Verificar se já foi inicializado
+        // Limpar qualquer calendário existente
         if (this.estado.calendarioAtual) {
-            console.log("Calendário já inicializado, limpando instância anterior");
-            this.estado.calendarioAtual.destroy();
+            console.log("Limpando instância anterior do calendário");
+            try {
+                this.estado.calendarioAtual.destroy();
+            } catch (e) {
+                console.log("Erro ao destruir calendário anterior:", e);
+            }
             this.estado.calendarioAtual = null;
         }
         
-        // Usar ID fixo para evitar conflitos
-        this.estado.currentCalendarId = 'benetrip-calendar-mobile';
+        // Usar ID fixo consistente
+        this.estado.currentCalendarId = 'benetrip-calendar-fixed';
         const calendarId = this.estado.currentCalendarId;
         
-        // Aguardar um pouco para garantir que o DOM esteja pronto
+        console.log(`Usando ID do calendário: ${calendarId}`);
+        
+        // Aguardar um tempo para garantir que o DOM esteja estável
         setTimeout(() => {
-            this.criarCalendarioMobileOtimizado(pergunta, calendarId);
-        }, 200);
+            this.inicializarCalendarioCorrigido(pergunta, calendarId);
+        }, 300);
     };
     
-    // Nova função para criar calendário otimizado
-    BENETRIP.criarCalendarioMobileOtimizado = function(pergunta, calendarId) {
-        console.log("Criando calendário mobile-otimizado");
-        
-        // Verificar se o container existe
-        let container = document.querySelector('.calendar-container');
-        if (!container) {
-            console.log("Container não encontrado, criando manualmente");
-            container = this.criarContainerCalendario(calendarId);
-        }
-        
-        // Adicionar classe de carregamento
-        container.classList.add('calendar-loading');
-        
-        // Verificar se Flatpickr está disponível
-        if (typeof flatpickr === 'undefined') {
-            console.error("Flatpickr não encontrado, carregando dinamicamente");
-            this.carregarFlatpickrParaMobile(pergunta, calendarId);
-            return;
-        }
-        
-        // Criar elemento do calendário se não existir
-        let calendarElement = document.getElementById(calendarId);
-        if (!calendarElement) {
-            calendarElement = document.createElement('div');
-            calendarElement.id = calendarId;
-            calendarElement.className = 'flatpickr-mobile-calendar';
-            container.appendChild(calendarElement);
-        }
-        
-        // Configuração otimizada para mobile
-        const configMobile = this.obterConfigMobile(pergunta, calendarId);
+    // Nova função de inicialização corrigida
+    BENETRIP.inicializarCalendarioCorrigido = function(pergunta, calendarId) {
+        console.log("Executando inicialização corrigida do calendário");
         
         try {
+            // Verificar se o Flatpickr está disponível
+            if (typeof flatpickr === 'undefined') {
+                console.error("Flatpickr não encontrado, carregando dinamicamente");
+                this.carregarFlatpickrCorrigido(pergunta, calendarId);
+                return;
+            }
+            
+            // Encontrar ou criar container
+            let container = document.querySelector('.calendar-container');
+            if (!container) {
+                console.log("Container não encontrado, criando novo");
+                container = this.criarContainerCalendarioCorrigido(calendarId);
+            }
+            
+            // Atualizar elementos com o ID correto
+            this.atualizarElementosCalendario(container, calendarId);
+            
+            // Criar elemento do calendário
+            let calendarElement = document.getElementById(calendarId);
+            if (!calendarElement) {
+                calendarElement = document.createElement('div');
+                calendarElement.id = calendarId;
+                calendarElement.className = 'flatpickr-mobile-calendar-fixed';
+                
+                // Inserir no início do container, antes dos outros elementos
+                container.insertBefore(calendarElement, container.firstChild);
+            }
+            
+            console.log("Elemento do calendário preparado:", calendarElement);
+            
+            // Configuração corrigida para mobile
+            const config = this.obterConfiguracaoCorrigida(pergunta, calendarId);
+            
             // Inicializar Flatpickr
-            const calendario = flatpickr(calendarElement, configMobile);
+            const calendario = flatpickr(calendarElement, config);
+            
+            if (!calendario) {
+                throw new Error("Falha ao criar instância do Flatpickr");
+            }
             
             // Salvar referência
             this.estado.calendarioAtual = calendario;
             
-            // Aplicar otimizações pós-inicialização
-            this.aplicarOtimizacoesPosInicializacao(container, calendario, calendarId);
+            console.log("Flatpickr inicializado com sucesso");
             
-            // Configurar eventos mobile
-            this.configurarEventosMobile(calendario, calendarId);
-            
-            // Remover indicador de carregamento
-            container.classList.remove('calendar-loading');
-            container.classList.add('calendar-initialized');
-            
-            console.log("Calendário mobile inicializado com sucesso");
+            // Aplicar correções pós-inicialização
+            setTimeout(() => {
+                this.aplicarCorrecoesFinais(container, calendario, calendarId);
+            }, 200);
             
         } catch (erro) {
-            console.error("Erro ao inicializar calendário mobile:", erro);
-            this.tratarErroCalendario(container, erro);
+            console.error("Erro na inicialização corrigida:", erro);
+            this.exibirErroCalendario(container, erro.message);
         }
     };
     
-    // Função para obter configuração mobile-otimizada
-    BENETRIP.obterConfigMobile = function(pergunta, calendarId) {
-        // Detectar tipo de dispositivo
-        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|Windows Phone/i.test(navigator.userAgent);
-        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-        const isTouch = 'ontouchstart' in window;
+    // Configuração corrigida do Flatpickr
+    BENETRIP.obterConfiguracaoCorrigida = function(pergunta, calendarId) {
+        console.log("Gerando configuração corrigida para mobile");
         
         // Data mínima (amanhã)
         const amanha = new Date();
@@ -100,22 +106,24 @@ if (typeof BENETRIP !== 'undefined') {
         amanha.setHours(0, 0, 0, 0);
         
         return {
-            // Configurações básicas
+            // Configurações essenciais
             mode: "range",
             dateFormat: "Y-m-d",
             inline: true,
-            static: true, // Previne problemas de posicionamento
+            static: true,
+            
+            // CRUCIAL: Forçar apenas 1 mês
+            showMonths: 1,
             
             // Limites de data
             minDate: pergunta.calendar?.min_date || this.formatarDataISO(amanha),
             maxDate: pergunta.calendar?.max_date,
             
-            // Otimizações mobile
-            animate: false, // Desabilitar animações para melhor performance
-            monthSelectorType: 'static', // Mais estável em mobile
-            showMonths: 1, // Sempre mostrar apenas 1 mês
+            // Otimizações para mobile
+            animate: false,
+            monthSelectorType: 'static',
             
-            // Localização
+            // Localização em português
             locale: {
                 weekdays: {
                     shorthand: ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'],
@@ -126,7 +134,7 @@ if (typeof BENETRIP !== 'undefined') {
                     longhand: ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro']
                 },
                 rangeSeparator: ' até ',
-                firstDayOfWeek: 0 // Domingo
+                firstDayOfWeek: 0
             },
             
             // Desabilitar datas passadas
@@ -138,55 +146,60 @@ if (typeof BENETRIP !== 'undefined') {
                 }
             ],
             
-            // Events otimizados para mobile
+            // Eventos
             onChange: (selectedDates, dateStr) => {
-                this.processarMudancaDatasMobile(selectedDates, calendarId);
+                console.log("Data alterada:", selectedDates);
+                this.processarMudancaDataCorrigida(selectedDates, calendarId);
             },
             
             onReady: () => {
-                this.aplicarEstilosMobilePosPronto(calendarId);
+                console.log("Flatpickr pronto, aplicando correções finais");
+                setTimeout(() => {
+                    this.garantirVisibilidadeHeader(calendarId);
+                    this.ajustarLarguraCalendario(calendarId);
+                }, 100);
             },
             
             onMonthChange: () => {
-                // Feedback tátil ao mudar mês (se disponível)
-                if (navigator.vibrate && isTouch) {
-                    navigator.vibrate(10);
-                }
+                console.log("Mês alterado");
+                setTimeout(() => {
+                    this.garantirVisibilidadeHeader(calendarId);
+                }, 50);
             },
             
             onDayCreate: (dObj, dStr, fp, dayElem) => {
-                // Melhorar acessibilidade e touch
-                this.otimizarDiaParaMobile(dayElem, dObj);
+                // Garantir que cada dia tenha o tamanho correto
+                dayElem.style.width = 'calc(100% / 7)';
+                dayElem.style.maxWidth = 'calc(100% / 7)';
+                dayElem.style.boxSizing = 'border-box';
             }
         };
     };
     
-    // Função para processar mudanças de data em mobile
-    BENETRIP.processarMudancaDatasMobile = function(selectedDates, calendarId) {
+    // Função para processar mudança de data corrigida
+    BENETRIP.processarMudancaDataCorrigida = function(selectedDates, calendarId) {
         const dataIdaElement = document.getElementById(`data-ida-${calendarId}`);
         const dataVoltaElement = document.getElementById(`data-volta-${calendarId}`);
         const confirmarBtn = document.getElementById(`confirmar-datas-${calendarId}`);
         
         if (!dataIdaElement || !dataVoltaElement || !confirmarBtn) {
-            console.error("Elementos de data não encontrados para mobile!");
+            console.error("Elementos de interface não encontrados!");
             return;
         }
         
-        // Feedback tátil para seleção
+        // Feedback tátil
         if (navigator.vibrate && selectedDates.length > 0) {
-            navigator.vibrate(15); // Vibração um pouco mais longa para feedback de seleção
+            navigator.vibrate(10);
         }
         
-        // Processar estados baseado na quantidade de datas selecionadas
+        // Atualizar interface baseado na seleção
         if (selectedDates.length === 0) {
-            // Nenhuma data selecionada
             dataIdaElement.textContent = "Selecione";
             dataVoltaElement.textContent = "Selecione";
             confirmarBtn.disabled = true;
             confirmarBtn.textContent = "Selecione as datas";
             
         } else if (selectedDates.length === 1) {
-            // Apenas data de ida selecionada
             const dataFormatada = this.formatarDataVisivel(selectedDates[0]);
             dataIdaElement.textContent = dataFormatada;
             dataVoltaElement.textContent = "Selecione volta";
@@ -194,7 +207,6 @@ if (typeof BENETRIP !== 'undefined') {
             confirmarBtn.textContent = "Selecione data de volta";
             
         } else if (selectedDates.length === 2) {
-            // Ambas as datas selecionadas
             const dataIdaFormatada = this.formatarDataVisivel(selectedDates[0]);
             const dataVoltaFormatada = this.formatarDataVisivel(selectedDates[1]);
             
@@ -203,7 +215,7 @@ if (typeof BENETRIP !== 'undefined') {
             confirmarBtn.disabled = false;
             confirmarBtn.textContent = "Confirmar Datas";
             
-            // Feedback visual adicional
+            // Feedback visual
             confirmarBtn.style.animation = 'pulse 0.5s ease-in-out';
             setTimeout(() => {
                 confirmarBtn.style.animation = '';
@@ -211,208 +223,216 @@ if (typeof BENETRIP !== 'undefined') {
         }
     };
     
-    // Função para otimizar cada dia do calendário
-    BENETRIP.otimizarDiaParaMobile = function(dayElem, dateObj) {
-        // Adicionar atributos de acessibilidade
-        dayElem.setAttribute('role', 'button');
-        dayElem.setAttribute('tabindex', '0');
+    // Função para garantir visibilidade do header
+    BENETRIP.garantirVisibilidadeHeader = function(calendarId) {
+        console.log("Garantindo visibilidade do header do mês");
         
-        // Melhorar área de toque
-        dayElem.style.minWidth = '44px';
-        dayElem.style.minHeight = '44px';
+        const calendar = document.getElementById(calendarId);
+        if (!calendar) return;
         
-        // Adicionar eventos de touch otimizados
-        let touchStartTime = 0;
+        const flatpickrCalendar = calendar.querySelector('.flatpickr-calendar');
+        if (!flatpickrCalendar) return;
         
-        dayElem.addEventListener('touchstart', (e) => {
-            touchStartTime = Date.now();
-            dayElem.style.transform = 'scale(0.95)';
-            
-            // Feedback tátil sutil
-            if (navigator.vibrate) {
-                navigator.vibrate(5);
+        // Forçar visibilidade dos elementos do header
+        const months = flatpickrCalendar.querySelector('.flatpickr-months');
+        const currentMonth = flatpickrCalendar.querySelector('.flatpickr-current-month');
+        const monthInput = flatpickrCalendar.querySelector('.flatpickr-current-month input');
+        
+        if (months) {
+            months.style.display = 'flex';
+            months.style.visibility = 'visible';
+            months.style.width = '100%';
+            months.style.justifyContent = 'center';
+            months.style.alignItems = 'center';
+            months.style.padding = '8px 0 12px 0';
+        }
+        
+        if (currentMonth) {
+            currentMonth.style.display = 'flex';
+            currentMonth.style.visibility = 'visible';
+            currentMonth.style.fontSize = '16px';
+            currentMonth.style.fontWeight = '700';
+            currentMonth.style.color = '#21272A';
+            currentMonth.style.justifyContent = 'center';
+            currentMonth.style.alignItems = 'center';
+        }
+        
+        if (monthInput) {
+            monthInput.style.display = 'block';
+            monthInput.style.visibility = 'visible';
+            monthInput.style.fontSize = '16px';
+            monthInput.style.fontWeight = '700';
+            monthInput.style.color = '#21272A';
+            monthInput.style.background = 'transparent';
+            monthInput.style.border = 'none';
+            monthInput.style.textAlign = 'center';
+            monthInput.style.width = 'auto';
+            monthInput.style.minWidth = '80px';
+        }
+        
+        // Garantir visibilidade dos botões de navegação
+        const prevBtn = flatpickrCalendar.querySelector('.flatpickr-prev-month');
+        const nextBtn = flatpickrCalendar.querySelector('.flatpickr-next-month');
+        
+        [prevBtn, nextBtn].forEach(btn => {
+            if (btn) {
+                btn.style.display = 'flex';
+                btn.style.visibility = 'visible';
+                btn.style.width = '32px';
+                btn.style.height = '32px';
+                btn.style.borderRadius = '50%';
+                btn.style.backgroundColor = '#f5f5f5';
+                btn.style.alignItems = 'center';
+                btn.style.justifyContent = 'center';
             }
-        }, { passive: true });
+        });
         
-        dayElem.addEventListener('touchend', (e) => {
-            dayElem.style.transform = '';
-            
-            // Verificar se foi um tap rápido (não um hold)
-            const touchDuration = Date.now() - touchStartTime;
-            if (touchDuration < 200) {
-                // Aplicar efeito visual de seleção
-                this.aplicarEfeitoSelecaoMobile(dayElem);
-            }
-        }, { passive: true });
-        
-        dayElem.addEventListener('touchcancel', () => {
-            dayElem.style.transform = '';
-        }, { passive: true });
+        console.log("Header do mês configurado para visibilidade");
     };
     
-    // Função para aplicar efeito visual de seleção
-    BENETRIP.aplicarEfeitoSelecaoMobile = function(elemento) {
-        // Criar efeito ripple simples
-        elemento.style.position = 'relative';
-        elemento.style.overflow = 'hidden';
+    // Função para ajustar largura do calendário
+    BENETRIP.ajustarLarguraCalendario = function(calendarId) {
+        console.log("Ajustando largura do calendário");
         
-        const ripple = document.createElement('span');
-        ripple.style.position = 'absolute';
-        ripple.style.borderRadius = '50%';
-        ripple.style.backgroundColor = 'rgba(232, 119, 34, 0.3)';
-        ripple.style.transform = 'scale(0)';
-        ripple.style.animation = 'ripple-mobile 0.4s linear';
-        ripple.style.left = '50%';
-        ripple.style.top = '50%';
-        ripple.style.width = '40px';
-        ripple.style.height = '40px';
-        ripple.style.marginLeft = '-20px';
-        ripple.style.marginTop = '-20px';
-        ripple.style.pointerEvents = 'none';
+        const calendar = document.getElementById(calendarId);
+        if (!calendar) return;
         
-        elemento.appendChild(ripple);
+        const flatpickrCalendar = calendar.querySelector('.flatpickr-calendar');
+        if (!flatpickrCalendar) return;
         
-        setTimeout(() => {
-            if (ripple.parentNode) {
-                ripple.parentNode.removeChild(ripple);
-            }
-        }, 400);
+        // Aplicar largura correta
+        flatpickrCalendar.style.width = '100%';
+        flatpickrCalendar.style.maxWidth = '100%';
+        flatpickrCalendar.style.minWidth = '280px';
+        flatpickrCalendar.style.boxSizing = 'border-box';
+        flatpickrCalendar.style.overflow = 'hidden';
+        
+        // Ajustar container interno
+        const innerContainer = flatpickrCalendar.querySelector('.flatpickr-innerContainer');
+        if (innerContainer) {
+            innerContainer.style.width = '100%';
+            innerContainer.style.maxWidth = '100%';
+            innerContainer.style.overflow = 'hidden';
+        }
+        
+        // Forçar layout correto dos dias
+        const dayContainer = flatpickrCalendar.querySelector('.dayContainer');
+        if (dayContainer) {
+            dayContainer.style.display = 'grid';
+            dayContainer.style.gridTemplateColumns = 'repeat(7, 1fr)';
+            dayContainer.style.gap = '1px';
+            dayContainer.style.width = '100%';
+            dayContainer.style.maxWidth = '100%';
+            
+            // Garantir que cada dia tenha largura correta
+            const days = dayContainer.querySelectorAll('.flatpickr-day');
+            days.forEach(day => {
+                day.style.width = '100%';
+                day.style.maxWidth = '100%';
+                day.style.height = '36px';
+                day.style.minHeight = '36px';
+                day.style.boxSizing = 'border-box';
+            });
+        }
+        
+        console.log("Largura do calendário ajustada");
     };
     
-    // Função para aplicar otimizações pós-inicialização
-    BENETRIP.aplicarOtimizacoesPosInicializacao = function(container, calendario, calendarId) {
+    // Aplicar correções finais
+    BENETRIP.aplicarCorrecoesFinais = function(container, calendario, calendarId) {
+        console.log("Aplicando correções finais do calendário");
+        
         // Ocultar elementos problemáticos
         const problematicContainers = container.querySelectorAll('.flatpickr-calendar-container');
         problematicContainers.forEach(el => {
             el.style.display = 'none';
             el.style.height = '0';
+            el.style.width = '0';
             el.style.overflow = 'hidden';
         });
         
-        // Garantir que o calendário principal esteja visível
-        const mainCalendar = container.querySelector('.flatpickr-calendar');
-        if (mainCalendar) {
-            mainCalendar.style.display = 'inline-block';
-            mainCalendar.style.visibility = 'visible';
-            mainCalendar.style.opacity = '1';
-        }
+        // Garantir visibilidade do calendário principal
+        this.garantirVisibilidadeHeader(calendarId);
+        this.ajustarLarguraCalendario(calendarId);
         
-        // Otimizar navegação por touch
-        const navButtons = container.querySelectorAll('.flatpickr-prev-month, .flatpickr-next-month');
-        navButtons.forEach(btn => {
-            btn.style.minWidth = '44px';
-            btn.style.minHeight = '44px';
-            
-            // Melhorar feedback visual
-            btn.addEventListener('touchstart', () => {
-                btn.style.transform = 'scale(0.9)';
-            }, { passive: true });
-            
-            btn.addEventListener('touchend', () => {
-                btn.style.transform = '';
-            }, { passive: true });
-        });
+        // Configurar botão de confirmação
+        this.configurarBotaoConfirmacao(calendario, calendarId);
+        
+        // Marcar como inicializado
+        container.classList.add('calendar-initialized');
+        
+        console.log("Correções finais aplicadas com sucesso");
     };
     
-    // Função para configurar eventos específicos para mobile
-    BENETRIP.configurarEventosMobile = function(calendario, calendarId) {
+    // Configurar botão de confirmação
+    BENETRIP.configurarBotaoConfirmacao = function(calendario, calendarId) {
         const confirmarBtn = document.getElementById(`confirmar-datas-${calendarId}`);
         
         if (confirmarBtn) {
-            // Remover event listeners antigos
+            // Remover listeners antigos clonando o elemento
             const novoBtn = confirmarBtn.cloneNode(true);
             confirmarBtn.parentNode.replaceChild(novoBtn, confirmarBtn);
             
-            // Adicionar novo event listener otimizado
+            // Adicionar novo listener
             novoBtn.addEventListener('click', (e) => {
                 e.preventDefault();
                 
                 try {
                     const datas = calendario.selectedDates;
                     if (datas.length === 2) {
-                        // Feedback tátil de confirmação
+                        // Feedback tátil
                         if (navigator.vibrate) {
-                            navigator.vibrate([50, 50, 100]); // Padrão de confirmação
+                            navigator.vibrate([50, 50, 100]);
                         }
                         
-                        // Processar datas com método otimizado
-                        const dadosDatas = this.processarDatasParaResposta(datas);
+                        // Processar datas
+                        const dadosDatas = {
+                            dataIda: this.formatarDataISO(datas[0]),
+                            dataVolta: this.formatarDataISO(datas[1])
+                        };
+                        
+                        console.log("Datas processadas:", dadosDatas);
                         
                         // Buscar pergunta atual
                         const pergunta = this.estado.perguntas[this.estado.perguntaAtual];
                         
                         if (pergunta) {
-                            // Desabilitar botão temporariamente para evitar cliques duplos
+                            // Desabilitar botão temporariamente
                             novoBtn.disabled = true;
                             novoBtn.textContent = "Processando...";
                             
                             // Processar resposta
                             setTimeout(() => {
                                 this.processarResposta(dadosDatas, pergunta);
-                            }, 100);
+                            }, 200);
                         }
                     } else {
-                        // Mostrar feedback de erro
-                        this.mostrarFeedbackErro("Por favor, selecione as datas de ida e volta");
+                        this.exibirToast("Por favor, selecione as datas de ida e volta", 'warning');
                     }
                 } catch (erro) {
-                    console.error("Erro ao processar datas:", erro);
-                    this.mostrarFeedbackErro("Erro ao processar datas. Tente novamente.");
+                    console.error("Erro ao confirmar datas:", erro);
+                    this.exibirToast("Erro ao processar datas. Tente novamente.", 'error');
                 }
             });
-            
-            // Melhorar feedback visual do botão
-            novoBtn.addEventListener('touchstart', () => {
-                if (!novoBtn.disabled) {
-                    novoBtn.style.transform = 'scale(0.98)';
-                }
-            }, { passive: true });
-            
-            novoBtn.addEventListener('touchend', () => {
-                novoBtn.style.transform = '';
-            }, { passive: true });
         }
     };
     
-    // Função para processar datas de forma segura
-    BENETRIP.processarDatasParaResposta = function(datas) {
-        try {
-            const dataIda = datas[0];
-            const dataVolta = datas[1];
-            
-            // Processar datas de forma mais robusta
-            const dadosDatas = {
-                dataIda: this.formatarDataISO(dataIda),
-                dataVolta: this.formatarDataISO(dataVolta)
-            };
-            
-            console.log("Datas processadas para mobile:", dadosDatas);
-            return dadosDatas;
-            
-        } catch (erro) {
-            console.error("Erro ao processar datas:", erro);
-            throw new Error("Falha ao processar datas selecionadas");
-        }
-    };
-    
-    // Função para mostrar feedback de erro
-    BENETRIP.mostrarFeedbackErro = function(mensagem) {
-        // Usar sistema de toast se disponível
-        if (this.exibirToast) {
-            this.exibirToast(mensagem, 'warning');
-        } else {
-            // Fallback para alert
-            alert(mensagem);
-        }
+    // Atualizar elementos do calendário com ID correto
+    BENETRIP.atualizarElementosCalendario = function(container, calendarId) {
+        // Atualizar IDs dos elementos existentes
+        const dataIdaElement = container.querySelector('.date-selection p:first-child span');
+        const dataVoltaElement = container.querySelector('.date-selection p:last-child span');
+        const confirmarBtn = container.querySelector('.confirm-button');
         
-        // Feedback tátil de erro
-        if (navigator.vibrate) {
-            navigator.vibrate([100, 50, 100, 50, 100]); // Padrão de erro
-        }
+        if (dataIdaElement) dataIdaElement.id = `data-ida-${calendarId}`;
+        if (dataVoltaElement) dataVoltaElement.id = `data-volta-${calendarId}`;
+        if (confirmarBtn) confirmarBtn.id = `confirmar-datas-${calendarId}`;
+        
+        console.log("Elementos do calendário atualizados com novo ID");
     };
     
-    // Função para criar container do calendário
-    BENETRIP.criarContainerCalendario = function(calendarId) {
+    // Criar container do calendário corrigido
+    BENETRIP.criarContainerCalendarioCorrigido = function(calendarId) {
         const mensagens = document.querySelectorAll('.chat-message.tripinha');
         if (mensagens.length === 0) {
             throw new Error("Nenhuma mensagem encontrada para adicionar calendário");
@@ -425,10 +445,9 @@ if (typeof BENETRIP !== 'undefined') {
             throw new Error("Container de mensagem não encontrado");
         }
         
-        // Criar HTML otimizado para mobile
+        // HTML otimizado para mobile
         const calendarHTML = `
             <div class="calendar-container" data-calendar-container="${calendarId}">
-                <div id="${calendarId}" class="flatpickr-mobile-calendar"></div>
                 <div class="date-selection">
                     <p>Ida:<br><span id="data-ida-${calendarId}">Selecione</span></p>
                     <p>Volta:<br><span id="data-volta-${calendarId}">Selecione</span></p>
@@ -444,54 +463,74 @@ if (typeof BENETRIP !== 'undefined') {
         return containerMensagem.querySelector('.calendar-container');
     };
     
-    // Função para tratar erros do calendário
-    BENETRIP.tratarErroCalendario = function(container, erro) {
-        console.error("Erro no calendário mobile:", erro);
+    // Carregamento dinâmico do Flatpickr corrigido
+    BENETRIP.carregarFlatpickrCorrigido = function(pergunta, calendarId) {
+        console.log("Carregando Flatpickr dinamicamente (versão corrigida)");
         
-        // Remover indicador de carregamento
-        container.classList.remove('calendar-loading');
+        if (document.querySelector('script[src*="flatpickr"]')) {
+            console.log("Flatpickr já em processo de carregamento");
+            return;
+        }
         
-        // Mostrar mensagem de erro
-        container.innerHTML = `
-            <div style="text-align: center; padding: 20px; color: #e74c3c;">
-                <p>❌ Erro ao carregar calendário</p>
-                <button onclick="location.reload()" style="background: #e74c3c; color: white; border: none; padding: 10px 20px; border-radius: 20px;">
-                    Tentar Novamente
-                </button>
-            </div>
-        `;
+        const script = document.createElement('script');
+        script.src = 'https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.js';
+        script.onload = () => {
+            console.log("Flatpickr carregado dinamicamente com sucesso");
+            
+            // Carregar CSS se necessário
+            if (!document.querySelector('link[href*="flatpickr"]')) {
+                const style = document.createElement('link');
+                style.rel = 'stylesheet';
+                style.href = 'https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.css';
+                document.head.appendChild(style);
+            }
+            
+            // Reinicializar após carregamento
+            setTimeout(() => {
+                this.inicializarCalendarioCorrigido(pergunta, calendarId);
+            }, 500);
+        };
+        
+        script.onerror = () => {
+            console.error("Falha ao carregar Flatpickr");
+            this.exibirToast("Erro ao carregar calendário. Recarregue a página.", 'error');
+        };
+        
+        document.head.appendChild(script);
     };
     
-    // Função para aplicar estilos após inicialização
-    BENETRIP.aplicarEstilosMobilePosPronto = function(calendarId) {
-        // Aguardar um pouco para garantir que o DOM foi atualizado
-        setTimeout(() => {
-            const calendar = document.getElementById(calendarId);
-            if (calendar) {
-                const flatpickrCalendar = calendar.querySelector('.flatpickr-calendar');
-                if (flatpickrCalendar) {
-                    // Aplicar classe para estilos específicos
-                    flatpickrCalendar.classList.add('mobile-optimized');
-                    
-                    // Forçar layout correto
-                    flatpickrCalendar.style.width = '100%';
-                    flatpickrCalendar.style.maxWidth = '100%';
-                }
-            }
-        }, 100);
+    // Exibir erro do calendário
+    BENETRIP.exibirErroCalendario = function(container, mensagem) {
+        console.error("Erro no calendário:", mensagem);
+        
+        if (container) {
+            container.innerHTML = `
+                <div style="text-align: center; padding: 20px; background: #ffebee; border-radius: 8px; color: #d32f2f;">
+                    <p>❌ ${mensagem}</p>
+                    <button onclick="location.reload()" 
+                            style="background: #d32f2f; color: white; border: none; padding: 10px 20px; border-radius: 20px; cursor: pointer;">
+                        Recarregar Página
+                    </button>
+                </div>
+            `;
+        }
     };
 }
 
-// Adicionar CSS para animação ripple
-if (!document.querySelector('#mobile-calendar-animations')) {
+// CSS adicional para garantir layout correto
+if (!document.querySelector('#mobile-calendar-fixes-v2')) {
     const style = document.createElement('style');
-    style.id = 'mobile-calendar-animations';
+    style.id = 'mobile-calendar-fixes-v2';
     style.textContent = `
-        @keyframes ripple-mobile {
-            to {
-                transform: scale(2);
-                opacity: 0;
-            }
+        .flatpickr-mobile-calendar-fixed {
+            width: 100% !important;
+            max-width: 100% !important;
+        }
+        
+        .calendar-initialized .flatpickr-calendar {
+            display: inline-block !important;
+            visibility: visible !important;
+            opacity: 1 !important;
         }
         
         @keyframes pulse {
@@ -499,16 +538,8 @@ if (!document.querySelector('#mobile-calendar-animations')) {
             50% { transform: scale(1.05); }
             100% { transform: scale(1); }
         }
-        
-        .flatpickr-mobile-calendar {
-            width: 100% !important;
-        }
-        
-        .mobile-optimized {
-            font-family: 'Poppins', sans-serif !important;
-        }
     `;
     document.head.appendChild(style);
 }
 
-console.log("Otimizações mobile para calendário carregadas com sucesso!");
+console.log("Calendário mobile corrigido - versão 2.0 carregado com sucesso!");
