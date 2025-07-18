@@ -970,7 +970,7 @@ configurarAutocomplete(pergunta) {
                         valor = (parseInt(valor) / 100).toFixed(2);
                         
                         // Formatar com separador decimal
-                        e.target.value = valor.replace('.');
+                        e.target.value = valor.replace('.',',');
                         
                         // Habilitar botão se tiver valor
                         confirmBtn.disabled = parseFloat(valor) <= 0;
