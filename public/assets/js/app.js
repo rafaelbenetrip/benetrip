@@ -794,10 +794,9 @@ const BENETRIP = {
         });
     },
     
-
-/**
- * Configura o campo de autocomplete para cidades/destinos - VERSÃO MELHORADA
- * COMPATÍVEL com o sistema existente + melhorias de UI/UX
+    /**
+ * Configura o campo de autocomplete para cidades/destinos
+ * VERSÃO OTIMIZADA: Compatível com sistema de edição
  */
 configurarAutocomplete(pergunta) {
     const autocompleteId = this.estado.currentAutocompleteId;
@@ -808,500 +807,133 @@ configurarAutocomplete(pergunta) {
     
     // Identificar o tipo de campo (origem ou destino)
     const tipoCampo = pergunta.key === 'destino_conhecido' ? 'destino' : 'origem';
-    console.log(`🎯 Configurando autocomplete melhorado para campo: ${tipoCampo}`);
+    console.log(`Configurando autocomplete para campo: ${tipoCampo}`);
     
     const input = document.getElementById(autocompleteId);
     const resultsContainer = document.getElementById(`${autocompleteId}-results`);
     const confirmBtn = document.getElementById(`${autocompleteId}-confirm`);
-    const autocompleteContainer = document.getElementById(`${autocompleteId}-container`);
     
-    if (!input || !resultsContainer || !confirmBtn || !autocompleteContainer) {
+    if (!input || !resultsContainer || !confirmBtn) {
         console.error("Elementos de autocomplete não encontrados!");
         return;
     }
     
-    // ===== ESTADO DO AUTOCOMPLETE =====
     let selectedItem = null;
     let currentQuery = '';
-    let currentResults = [];
-    let selectedIndex = -1;
-    let searchTimeout = null;
     
-    // ===== CONFIGURAÇÃO INICIAL =====
-    
-    // Melhorar placeholder e atributos de acessibilidade
-    input.placeholder = tipoCampo === 'destino' 
-        ? "Digite o destino (ex: Paris, Nova York, Tóquio...)"
-        : "Digite a cidade de partida (ex: São Paulo, Rio de Janeiro...)";
-    
-    input.setAttribute('role', 'combobox');
-    input.setAttribute('aria-expanded', 'false');
-    input.setAttribute('aria-autocomplete', 'list');
-    input.setAttribute('autocomplete', 'off');
-    input.setAttribute('spellcheck', 'false');
-    
-    resultsContainer.setAttribute('role', 'listbox');
-    
-    // Foco automático otimizado
-    setTimeout(() => {
-        input.focus();
-        input.style.borderColor = '#E87722'; // Destaque inicial
-        setTimeout(() => {
-            input.style.borderColor = '';
-        }, 1000);
-    }, 300);
-    
-    // ===== FUNÇÕES AUXILIARES =====
-    
-    /**
-     * Debounce otimizado
-     */
-    function debounceSearch(func, wait) {
-        return function executedFunction(...args) {
-            const later = () => {
-                clearTimeout(searchTimeout);
-                func(...args);
-            };
-            clearTimeout(searchTimeout);
-            searchTimeout = setTimeout(later, wait);
-        };
-    }
-    
-    /**
-     * Escapar HTML para segurança
-     */
-    function escapeHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
-    }
-    
-    /**
-     * Destacar texto correspondente à busca
-     */
-    function highlightMatch(text, query) {
-        if (!query.trim()) return escapeHtml(text);
-        
-        const regex = new RegExp(`(${escapeHtml(query.trim())})`, 'gi');
-        return escapeHtml(text).replace(regex, '<strong style="color: #E87722;">$1</strong>');
-    }
-    
-    /**
-     * Formatar nome da localização
-     */
-    function formatLocationName(item) {
-        if (item.type === 'city') {
-            return `${item.name}, ${item.country_name}`;
-        } else if (item.type === 'airport') {
-            return `${item.name} (${item.city_name})`;
-        }
-        return item.name;
-    }
-    
-    /**
-     * Obter código IATA
-     */
-    function getLocationCode(item) {
-        return item.code || item.iata || item.city_code || item.country_code || '?';
-    }
-    
-    // ===== FUNÇÕES DE BUSCA =====
-    
-    /**
-     * Buscar sugestões de forma otimizada
-     */
-    async function buscarSugestoes(termo) {
+    // Função para buscar sugestões com debounce (atraso)
+    const buscarSugestoes = _.debounce(async (termo) => {
         if (!termo || termo.length < 2) {
-            hideResults();
+            resultsContainer.innerHTML = '';
             return;
         }
         
+        // Mostrar indicador de carregamento
+        resultsContainer.innerHTML = '<div class="loading-autocomplete">Buscando...</div>';
+        
         try {
-            showLoadingState();
-            
             let sugestoes = [];
             
-            // Usar a API Aviasales através do serviço existente
-            if (window.BENETRIP_API && typeof window.BENETRIP_API.buscarSugestoesCidade === 'function') {
+            // Usar a API Aviasales através do serviço
+            if (window.BENETRIP_API) {
                 sugestoes = await window.BENETRIP_API.buscarSugestoesCidade(termo);
-                console.log(`✅ Sugestões recebidas para ${tipoCampo}:`, sugestoes);
+                console.log(`Sugestões recebidas para ${tipoCampo}:`, sugestoes);
             } else {
-                // Fallback melhorado para dados simulados
-                console.log(`⚠️ API não disponível, usando fallback para ${tipoCampo}`);
-                sugestoes = getFallbackSuggestions(termo);
+                // Fallback para dados simulados
+                sugestoes = [
+                    { type: "city", code: "SAO", name: "São Paulo", country_code: "BR", country_name: "Brasil" },
+                    { type: "city", code: "RIO", name: "Rio de Janeiro", country_code: "BR", country_name: "Brasil" },
+                    { type: "city", code: "NYC", name: "Nova York", country_code: "US", country_name: "Estados Unidos" }
+                ];
             }
             
             // Verificar se a consulta ainda é relevante
             if (termo !== currentQuery) return;
             
-            // Filtrar e limitar resultados
             if (sugestoes && sugestoes.length > 0) {
-                const filteredResults = sugestoes
-                    .filter(item => item && (item.code || item.iata) && item.name)
-                    .slice(0, 8); // Máximo 8 resultados
+                resultsContainer.innerHTML = sugestoes.map(item => {
+                    // Garantir compatibilidade com diferentes formatos de resposta
+                    const code = item.code || item.iata;
+                    const name = item.name || item.city_name;
+                    const country = item.country_name;
+                    
+                    return `
+                        <div class="autocomplete-item" data-code="${code}" data-name="${name}" data-country="${country}">
+                            <div class="item-code">${code}</div>
+                            <div class="item-details">
+                                <div class="item-name">${name}</div>
+                                <div class="item-country">${country}</div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
                 
-                currentResults = filteredResults;
-                displayResults(filteredResults, termo);
+                // Adicionar eventos aos itens
+                document.querySelectorAll(`#${autocompleteId}-results .autocomplete-item`).forEach(item => {
+                    item.addEventListener('click', () => {
+                        selectedItem = {
+                            code: item.dataset.code,
+                            name: item.dataset.name,
+                            country: item.dataset.country
+                        };
+                        input.value = `${selectedItem.name} (${selectedItem.code})`;
+                        resultsContainer.innerHTML = '';
+                        confirmBtn.disabled = false;
+                        
+                        // NOVO: Salvar dados selecionados no dataset para sistema de edição
+                        input.dataset.selectedItem = JSON.stringify(selectedItem);
+                    });
+                });
             } else {
-                showNoResults();
+                resultsContainer.innerHTML = '<div class="no-results">Nenhum resultado encontrado</div>';
             }
-            
         } catch (error) {
-            console.error(`❌ Erro ao buscar sugestões para ${tipoCampo}:`, error);
-            showErrorState();
+            console.error(`Erro ao buscar sugestões para ${tipoCampo}:`, error);
+            resultsContainer.innerHTML = '<div class="error">Erro ao buscar sugestões</div>';
         }
-    }
+    }, 300);
     
-    /**
-     * Fallback melhorado com mais dados
-     */
-    function getFallbackSuggestions(termo) {
-        const termoLower = termo.toLowerCase();
-        const sugestoesFallback = [
-            // Cidades brasileiras populares
-            { type: "city", code: "SAO", name: "São Paulo", country_code: "BR", country_name: "Brasil" },
-            { type: "city", code: "RIO", name: "Rio de Janeiro", country_code: "BR", country_name: "Brasil" },
-            { type: "city", code: "BSB", name: "Brasília", country_code: "BR", country_name: "Brasil" },
-            { type: "city", code: "SSA", name: "Salvador", country_code: "BR", country_name: "Brasil" },
-            { type: "city", code: "FOR", name: "Fortaleza", country_code: "BR", country_name: "Brasil" },
-            { type: "city", code: "REC", name: "Recife", country_code: "BR", country_name: "Brasil" },
-            { type: "city", code: "POA", name: "Porto Alegre", country_code: "BR", country_name: "Brasil" },
-            { type: "city", code: "CWB", name: "Curitiba", country_code: "BR", country_name: "Brasil" },
-            
-            // Destinos internacionais populares
-            { type: "city", code: "NYC", name: "Nova York", country_code: "US", country_name: "Estados Unidos" },
-            { type: "city", code: "PAR", name: "Paris", country_code: "FR", country_name: "França" },
-            { type: "city", code: "LON", name: "Londres", country_code: "GB", country_name: "Reino Unido" },
-            { type: "city", code: "TYO", name: "Tóquio", country_code: "JP", country_name: "Japão" },
-            { type: "city", code: "MAD", name: "Madrid", country_code: "ES", country_name: "Espanha" },
-            { type: "city", code: "ROM", name: "Roma", country_code: "IT", country_name: "Itália" },
-            { type: "city", code: "BCN", name: "Barcelona", country_code: "ES", country_name: "Espanha" },
-            { type: "city", code: "LIS", name: "Lisboa", country_code: "PT", country_name: "Portugal" },
-            { type: "city", code: "BUE", name: "Buenos Aires", country_code: "AR", country_name: "Argentina" },
-            { type: "city", code: "BOG", name: "Bogotá", country_code: "CO", country_name: "Colômbia" },
-            { type: "city", code: "LIM", name: "Lima", country_code: "PE", country_name: "Peru" },
-            { type: "city", code: "SCL", name: "Santiago", country_code: "CL", country_name: "Chile" }
-        ];
-        
-        return sugestoesFallback.filter(item => 
-            item.name.toLowerCase().includes(termoLower) ||
-            item.code.toLowerCase().includes(termoLower)
-        );
-    }
-    
-    // ===== FUNÇÕES DE EXIBIÇÃO =====
-    
-    /**
-     * Mostrar estado de carregamento melhorado
-     */
-    function showLoadingState() {
-        autocompleteContainer.classList.add('active');
-        resultsContainer.style.display = 'block';
-        resultsContainer.innerHTML = `
-            <div class="loading-autocomplete">
-                <div class="loading-spinner"></div>
-                Buscando ${tipoCampo}s...
-            </div>
-        `;
-        resultsContainer.classList.add('fade-in');
-        input.setAttribute('aria-expanded', 'true');
-    }
-    
-    /**
-     * Exibir resultados com layout melhorado
-     */
-    function displayResults(results, query) {
-        const html = results.map((item, index) => {
-            const locationName = formatLocationName(item);
-            const highlightedName = highlightMatch(locationName, query);
-            const code = getLocationCode(item);
-            const typeLabel = item.type === 'airport' ? 'Aeroporto' : 'Cidade';
-            
-            return `
-                <div class="autocomplete-item" 
-                     data-index="${index}"
-                     role="option"
-                     aria-selected="false"
-                     tabindex="-1">
-                    <div class="item-code">${escapeHtml(code)}</div>
-                    <div class="item-details">
-                        <div class="item-name">${highlightedName}</div>
-                        <div class="item-country">${escapeHtml(item.country_name || '')}</div>
-                    </div>
-                    <div class="item-type-badge">${typeLabel}</div>
-                </div>
-            `;
-        }).join('');
-        
-        resultsContainer.innerHTML = html;
-        resultsContainer.style.display = 'block';
-        selectedIndex = -1;
-        
-        // Adicionar event listeners otimizados
-        addResultEventListeners();
-        input.setAttribute('aria-expanded', 'true');
-    }
-    
-    /**
-     * Mostrar estado sem resultados
-     */
-    function showNoResults() {
-        resultsContainer.style.display = 'block';
-        resultsContainer.innerHTML = `
-            <div class="no-results">
-                📍 Nenhum ${tipoCampo} encontrado<br>
-                <small>Tente "${tipoCampo === 'destino' ? 'Paris' : 'São Paulo'}" ou "${tipoCampo === 'destino' ? 'Nova York' : 'Rio de Janeiro'}"</small>
-            </div>
-        `;
-        input.setAttribute('aria-expanded', 'true');
-    }
-    
-    /**
-     * Mostrar estado de erro
-     */
-    function showErrorState() {
-        resultsContainer.style.display = 'block';
-        resultsContainer.innerHTML = `
-            <div class="error">
-                ⚠️ Erro ao buscar ${tipoCampo}s<br>
-                <small>Verifique sua conexão e tente novamente</small>
-            </div>
-        `;
-        input.setAttribute('aria-expanded', 'true');
-    }
-    
-    /**
-     * Esconder resultados
-     */
-    function hideResults() {
-        resultsContainer.style.display = 'none';
-        resultsContainer.classList.remove('fade-in');
-        autocompleteContainer.classList.remove('active');
-        selectedIndex = -1;
-        input.setAttribute('aria-expanded', 'false');
-    }
-    
-    /**
-     * Adicionar event listeners nos resultados
-     */
-    function addResultEventListeners() {
-        const items = resultsContainer.querySelectorAll('.autocomplete-item');
-        
-        items.forEach((item, index) => {
-            // Click/Touch otimizado
-            item.addEventListener('click', (e) => {
-                e.preventDefault();
-                selectResult(index);
-            });
-            
-            // Hover para desktop
-            item.addEventListener('mouseenter', () => {
-                updateSelectedIndex(index);
-            });
-            
-            // Touch feedback melhorado para mobile
-            item.addEventListener('touchstart', (e) => {
-                item.style.backgroundColor = 'rgba(232, 119, 34, 0.1)';
-                item.style.transform = 'translateX(2px)';
-            });
-            
-            item.addEventListener('touchend', () => {
-                setTimeout(() => {
-                    item.style.backgroundColor = '';
-                    item.style.transform = '';
-                }, 150);
-            });
-        });
-    }
-    
-    /**
-     * Atualizar índice selecionado com feedback visual
-     */
-    function updateSelectedIndex(newIndex) {
-        const items = resultsContainer.querySelectorAll('.autocomplete-item');
-        
-        // Remover seleção anterior
-        items.forEach((item) => {
-            item.classList.remove('keyboard-selected');
-            item.setAttribute('aria-selected', 'false');
-        });
-        
-        // Adicionar nova seleção
-        if (newIndex >= 0 && newIndex < items.length) {
-            selectedIndex = newIndex;
-            const selectedItem = items[newIndex];
-            selectedItem.classList.add('keyboard-selected');
-            selectedItem.setAttribute('aria-selected', 'true');
-            
-            // Scroll suave para o item se necessário
-            selectedItem.scrollIntoView({
-                block: 'nearest',
-                behavior: 'smooth'
-            });
-        }
-    }
-    
-    /**
-     * Selecionar resultado com feedback melhorado
-     */
-    function selectResult(index) {
-        if (index >= 0 && index < currentResults.length) {
-            const selected = currentResults[index];
-            selectedItem = {
-                code: getLocationCode(selected),
-                name: selected.name,
-                country: selected.country_name || selected.country_code,
-                type: selected.type
-            };
-            
-            // Atualizar input com feedback visual
-            const displayName = formatLocationName(selected);
-            input.value = displayName;
-            
-            // Salvar dados no dataset para compatibilidade
-            input.dataset.selectedItem = JSON.stringify(selectedItem);
-            
-            // Habilitar botão com feedback
-            confirmBtn.disabled = false;
-            confirmBtn.textContent = '✓ Confirmar';
-            confirmBtn.style.backgroundColor = '#28A745';
-            
-            // Esconder resultados
-            hideResults();
-            
-            // Feedback visual no input
-            input.style.borderColor = '#28A745';
-            input.style.boxShadow = '0 0 0 3px rgba(40, 167, 69, 0.1)';
-            
-            setTimeout(() => {
-                input.style.borderColor = '';
-                input.style.boxShadow = '';
-                confirmBtn.style.backgroundColor = '';
-                confirmBtn.textContent = 'Confirmar';
-            }, 2000);
-            
-            console.log(`🎯 ${tipoCampo} selecionado:`, selectedItem);
-        }
-    }
-    
-    // ===== EVENT LISTENERS OTIMIZADOS =====
-    
-    /**
-     * Input com debounce otimizado
-     */
-    const debouncedSearch = debounceSearch(buscarSugestoes, 300);
-    
+    // Evento para input
     input.addEventListener('input', (e) => {
-        const query = e.target.value.trim();
-        currentQuery = query;
+        const termo = e.target.value.trim();
+        currentQuery = termo;
         
-        // Reset estado
-        selectedItem = null;
-        confirmBtn.disabled = true;
-        confirmBtn.textContent = 'Confirmar';
-        confirmBtn.style.backgroundColor = '';
-        
-        // Remover dados salvos
-        input.removeAttribute('data-selected-item');
-        
-        if (query.length >= 2) {
-            debouncedSearch(query);
-        } else {
-            hideResults();
-        }
-    });
-    
-    /**
-     * Navegação por teclado melhorada
-     */
-    input.addEventListener('keydown', (e) => {
-        const items = resultsContainer.querySelectorAll('.autocomplete-item');
-        
-        switch (e.key) {
-            case 'ArrowDown':
-                e.preventDefault();
-                const nextIndex = selectedIndex < items.length - 1 ? selectedIndex + 1 : 0;
-                updateSelectedIndex(nextIndex);
-                break;
-                
-            case 'ArrowUp':
-                e.preventDefault();
-                const prevIndex = selectedIndex > 0 ? selectedIndex - 1 : items.length - 1;
-                updateSelectedIndex(prevIndex);
-                break;
-                
-            case 'Enter':
-                e.preventDefault();
-                if (selectedIndex >= 0 && selectedIndex < currentResults.length) {
-                    selectResult(selectedIndex);
-                } else if (selectedItem) {
-                    confirmarSelecao();
-                }
-                break;
-                
-            case 'Escape':
-                hideResults();
-                input.blur();
-                break;
-        }
-    });
-    
-    /**
-     * Esconder resultados quando clicar fora
-     */
-    const handleClickOutside = (e) => {
-        if (!autocompleteContainer.contains(e.target)) {
-            hideResults();
-        }
-    };
-    
-    document.addEventListener('click', handleClickOutside);
-    
-    /**
-     * Confirmação da seleção otimizada
-     */
-    function confirmarSelecao() {
-        if (selectedItem) {
-            console.log(`✅ ${tipoCampo} confirmado:`, selectedItem);
-            
-            // Feedback visual de confirmação
-            confirmBtn.textContent = '✓ Confirmado!';
-            confirmBtn.style.backgroundColor = '#28A745';
+        if (!termo) {
+            resultsContainer.innerHTML = '';
             confirmBtn.disabled = true;
+            selectedItem = null;
             
-            // Garantir que dados estejam salvos
+            // NOVO: Limpar dados salvos quando input é limpo
+            input.removeAttribute('data-selected-item');
+        } else {
+            buscarSugestoes(termo);
+        }
+    });
+    
+    // Evento para o botão de confirmação
+    confirmBtn.addEventListener('click', () => {
+        if (selectedItem) {
+            // NOVO: Garantir que dados estejam salvos no dataset
             input.dataset.selectedItem = JSON.stringify(selectedItem);
             
-            // Processar resposta usando a função existente
             this.processarResposta(selectedItem, pergunta);
-            
-            // Limpeza
-            cleanup();
         }
-    }
+    });
     
-    confirmBtn.addEventListener('click', confirmarSelecao.bind(this));
+    // Evento para Enter no campo
+    input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && selectedItem) {
+            e.preventDefault();
+            
+            // NOVO: Garantir que dados estejam salvos no dataset
+            input.dataset.selectedItem = JSON.stringify(selectedItem);
+            
+            this.processarResposta(selectedItem, pergunta);
+        }
+    });
     
-    /**
-     * Limpeza dos event listeners
-     */
-    function cleanup() {
-        document.removeEventListener('click', handleClickOutside);
-        clearTimeout(searchTimeout);
-    }
-    
-    // Retornar objeto para controle externo se necessário
-    return {
-        focus: () => input.focus(),
-        getValue: () => selectedItem,
-        setValue: (item) => {
-            selectedItem = item;
-            input.value = formatLocationName(item);
-            confirmBtn.disabled = false;
-            input.dataset.selectedItem = JSON.stringify(item);
-        },
-        cleanup: cleanup
-    };
+    // Foco automático no campo
+    setTimeout(() => input.focus(), 300);
 },
 
     /**
