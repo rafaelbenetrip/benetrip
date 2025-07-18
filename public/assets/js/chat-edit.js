@@ -1,6 +1,7 @@
 /** 
  * BENETRIP - Sistema de Edição de Respostas
  * Permite ao usuário editar respostas já dadas
+ * VERSÃO OTIMIZADA: Integração com calendário e autocomplete APIs
  */
 
 // Extensão do BENETRIP para incluir funcionalidades de edição
@@ -19,6 +20,16 @@ Object.assign(BENETRIP, {
      * Pergunta sendo editada
      */
     perguntaEditando: null,
+
+    /**
+     * IDs únicos para componentes em edição
+     */
+    edicaoIds: {
+        calendarioAtual: null,
+        autocompleteAtual: null,
+        currencyAtual: null,
+        numberAtual: null
+    },
 
     /**
      * Versão melhorada da função mostrarRespostaUsuario com botão de edição
@@ -103,7 +114,7 @@ Object.assign(BENETRIP, {
     },
 
     /**
-     * Cria formulário de edição inline
+     * Cria formulário de edição inline - VERSÃO OTIMIZADA
      */
     criarFormularioEdicao(elementoMensagem, itemHistorico) {
         const pergunta = itemHistorico.pergunta;
@@ -131,36 +142,104 @@ Object.assign(BENETRIP, {
                     </div>
                 </div>
             `;
-        } else if (pergunta.input_field && !pergunta.calendar) {
-            // Campo de texto
+        } else if (pergunta.calendar) {
+            // Calendário - usando estrutura compatível com app.js
+            const calendarioId = `edicao-calendar-${Date.now()}`;
+            this.edicaoIds.calendarioAtual = calendarioId;
+            
+            formularioHTML = `
+                <div class="edicao-container">
+                    <p class="edicao-titulo">✏️ Editando: ${pergunta.question}</p>
+                    <p class="edicao-instrucao">Selecione novas datas:</p>
+                    <div class="calendar-container" data-calendar-container="${calendarioId}">
+                        <div id="${calendarioId}" class="flatpickr-calendar-container"></div>
+                        <div class="date-selection">
+                            <p>Ida: <span id="data-ida-${calendarioId}">Selecione</span></p>
+                            <p>Volta: <span id="data-volta-${calendarioId}">Selecione</span></p>
+                        </div>
+                        <div class="edicao-acoes">
+                            <button class="btn-cancelar-edicao">❌ Cancelar</button>
+                            <button id="confirmar-datas-${calendarioId}" class="btn-salvar-edicao confirm-button confirm-dates" disabled>✅ Salvar Datas</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        } else if (pergunta.autocomplete) {
+            // Autocomplete - usando estrutura compatível com app.js
+            const autocompleteId = `edicao-autocomplete-${Date.now()}`;
+            this.edicaoIds.autocompleteAtual = autocompleteId;
+            
             const valorAtual = typeof respostaAtual === 'object' ? 
                 `${respostaAtual.name} (${respostaAtual.code})` : respostaAtual;
                 
             formularioHTML = `
                 <div class="edicao-container">
                     <p class="edicao-titulo">✏️ Editando: ${pergunta.question}</p>
-                    <div class="input-edicao">
-                        <input type="text" class="campo-edicao" value="${valorAtual}" 
-                               placeholder="${pergunta.description}">
-                    </div>
-                    <div class="edicao-acoes">
-                        <button class="btn-cancelar-edicao">❌ Cancelar</button>
-                        <button class="btn-salvar-edicao">✅ Salvar</button>
+                    <div class="autocomplete-container" id="${autocompleteId}-container">
+                        <input type="text" id="${autocompleteId}" class="autocomplete-input" 
+                               value="${valorAtual}" placeholder="${pergunta.description}">
+                        <div id="${autocompleteId}-results" class="autocomplete-results"></div>
+                        <div class="edicao-acoes">
+                            <button class="btn-cancelar-edicao">❌ Cancelar</button>
+                            <button id="${autocompleteId}-confirm" class="btn-salvar-edicao confirm-autocomplete" disabled>✅ Salvar</button>
+                        </div>
                     </div>
                 </div>
             `;
-        } else if (pergunta.calendar) {
-            // Calendário
+        } else if (pergunta.currency_format) {
+            // Entrada de moeda
+            const currencyId = `edicao-currency-${Date.now()}`;
+            this.edicaoIds.currencyAtual = currencyId;
+            
             formularioHTML = `
                 <div class="edicao-container">
                     <p class="edicao-titulo">✏️ Editando: ${pergunta.question}</p>
-                    <p class="edicao-instrucao">Selecione novas datas:</p>
-                    <div class="calendar-edicao" id="calendar-edicao-${Date.now()}">
-                        <!-- Calendário será inicializado aqui -->
+                    <div class="currency-input-container">
+                        <input type="text" id="${currencyId}" class="currency-input" 
+                               value="${respostaAtual}" placeholder="0,00">
+                        <div class="edicao-acoes">
+                            <button class="btn-cancelar-edicao">❌ Cancelar</button>
+                            <button id="${currencyId}-confirm" class="btn-salvar-edicao confirm-currency" disabled>✅ Salvar</button>
+                        </div>
                     </div>
-                    <div class="edicao-acoes">
-                        <button class="btn-cancelar-edicao">❌ Cancelar</button>
-                        <button class="btn-salvar-edicao" disabled>✅ Salvar</button>
+                </div>
+            `;
+        } else if (pergunta.number_input) {
+            // Entrada numérica
+            const numberId = `edicao-number-${Date.now()}`;
+            this.edicaoIds.numberAtual = numberId;
+            
+            formularioHTML = `
+                <div class="edicao-container">
+                    <p class="edicao-titulo">✏️ Editando: ${pergunta.question}</p>
+                    <div class="number-input-container">
+                        <button class="decrement">-</button>
+                        <input type="number" min="1" max="20" value="${respostaAtual}" id="${numberId}" class="number-input">
+                        <button class="increment">+</button>
+                        <div class="edicao-acoes">
+                            <button class="btn-cancelar-edicao">❌ Cancelar</button>
+                            <button class="btn-salvar-edicao confirm-number">✅ Salvar</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        } else if (pergunta.input_field) {
+            // Campo de texto simples
+            const textId = `edicao-text-${Date.now()}`;
+            
+            const valorAtual = typeof respostaAtual === 'object' ? 
+                `${respostaAtual.name} (${respostaAtual.code})` : respostaAtual;
+                
+            formularioHTML = `
+                <div class="edicao-container">
+                    <p class="edicao-titulo">✏️ Editando: ${pergunta.question}</p>
+                    <div class="text-input-container">
+                        <input type="text" id="${textId}" class="text-input" 
+                               value="${valorAtual}" placeholder="${pergunta.description}">
+                        <div class="edicao-acoes">
+                            <button class="btn-cancelar-edicao">❌ Cancelar</button>
+                            <button id="${textId}-confirm" class="btn-salvar-edicao confirm-text" disabled>✅ Salvar</button>
+                        </div>
                     </div>
                 </div>
             `;
@@ -169,58 +248,265 @@ Object.assign(BENETRIP, {
         // Substituir conteúdo da mensagem
         elementoMensagem.querySelector('.message').innerHTML = formularioHTML;
         
-        // Configurar eventos do formulário
-        this.configurarEventosEdicao(elementoMensagem, itemHistorico);
+        // Configurar eventos do formulário - VERSÃO OTIMIZADA
+        this.configurarEventosEdicaoOtimizada(elementoMensagem, itemHistorico);
     },
 
     /**
-     * Configura eventos do formulário de edição
+     * Configura eventos do formulário de edição - VERSÃO OTIMIZADA
      */
-    configurarEventosEdicao(elementoMensagem, itemHistorico) {
+    configurarEventosEdicaoOtimizada(elementoMensagem, itemHistorico) {
         const container = elementoMensagem.querySelector('.edicao-container');
         const btnCancelar = container.querySelector('.btn-cancelar-edicao');
-        const btnSalvar = container.querySelector('.btn-salvar-edicao');
+        const pergunta = itemHistorico.pergunta;
         
         let novaResposta = null;
         
-        // Eventos baseados no tipo de pergunta
-        if (itemHistorico.pergunta.options) {
+        // Configurar componentes específicos usando as funções do app.js
+        if (pergunta.calendar && this.edicaoIds.calendarioAtual) {
+            this.configurarCalendarioEdicao(pergunta, (dadosDatas) => {
+                novaResposta = dadosDatas;
+                // O botão de salvar será habilitado dentro da função de calendário
+            });
+        } else if (pergunta.autocomplete && this.edicaoIds.autocompleteAtual) {
+            this.configurarAutocompleteEdicao(pergunta, (dadosLocal) => {
+                novaResposta = dadosLocal;
+                const btnSalvar = container.querySelector('.btn-salvar-edicao');
+                if (btnSalvar) btnSalvar.disabled = false;
+            });
+        } else if (pergunta.currency_format && this.edicaoIds.currencyAtual) {
+            this.configurarMoedaEdicao(pergunta, (valor) => {
+                novaResposta = valor;
+                const btnSalvar = container.querySelector('.btn-salvar-edicao');
+                if (btnSalvar) btnSalvar.disabled = false;
+            });
+        } else if (pergunta.number_input && this.edicaoIds.numberAtual) {
+            this.configurarNumeroEdicao(pergunta, (valor) => {
+                novaResposta = valor;
+                // Botão sempre habilitado para números
+            });
+        } else if (pergunta.options) {
             // Múltipla escolha
             const opcoes = container.querySelectorAll('.opcao-edicao');
+            const btnSalvar = container.querySelector('.btn-salvar-edicao');
+            
             opcoes.forEach(opcao => {
                 opcao.addEventListener('click', () => {
-                    // Remover seleção anterior
                     opcoes.forEach(o => o.classList.remove('selecionada'));
-                    // Adicionar seleção atual
                     opcao.classList.add('selecionada');
                     novaResposta = parseInt(opcao.dataset.valor);
                     btnSalvar.disabled = false;
                 });
             });
-        } else if (itemHistorico.pergunta.input_field && !itemHistorico.pergunta.calendar) {
-            // Campo de texto
-            const campo = container.querySelector('.campo-edicao');
-            campo.addEventListener('input', () => {
-                novaResposta = campo.value.trim();
-                btnSalvar.disabled = novaResposta.length === 0;
+        } else if (pergunta.input_field) {
+            // Campo de texto simples
+            const campo = container.querySelector('.text-input');
+            const btnSalvar = container.querySelector('.btn-salvar-edicao');
+            
+            if (campo && btnSalvar) {
+                campo.addEventListener('input', () => {
+                    novaResposta = campo.value.trim();
+                    btnSalvar.disabled = novaResposta.length === 0;
+                });
+                
+                btnSalvar.addEventListener('click', () => {
+                    if (novaResposta && novaResposta.length > 0) {
+                        this.salvarEdicao(elementoMensagem, itemHistorico, novaResposta);
+                    }
+                });
+            }
+        }
+        
+        // Botão cancelar - funciona para todos os tipos
+        if (btnCancelar) {
+            btnCancelar.addEventListener('click', () => {
+                this.cancelarEdicao(elementoMensagem, itemHistorico);
             });
         }
         
-        // Botão cancelar
-        btnCancelar.addEventListener('click', () => {
-            this.cancelarEdicao(elementoMensagem, itemHistorico);
-        });
+        // Configurar botão salvar geral (se não foi configurado especificamente acima)
+        const btnSalvarGeral = container.querySelector('.btn-salvar-edicao:not(.confirm-dates):not(.confirm-autocomplete)');
+        if (btnSalvarGeral && !pergunta.input_field) {
+            btnSalvarGeral.addEventListener('click', () => {
+                if (novaResposta !== null && novaResposta !== undefined) {
+                    this.salvarEdicao(elementoMensagem, itemHistorico, novaResposta);
+                }
+            });
+        }
+    },
+
+    /**
+     * Configura calendário para edição reutilizando função do app.js
+     */
+    configurarCalendarioEdicao(pergunta, callback) {
+        // Temporariamente definir o ID do calendário atual para reutilizar a função
+        const idOriginal = this.estado.currentCalendarId;
+        this.estado.currentCalendarId = this.edicaoIds.calendarioAtual;
         
-        // Botão salvar
-        btnSalvar.addEventListener('click', () => {
-            this.salvarEdicao(elementoMensagem, itemHistorico, novaResposta);
-        });
+        // Reutilizar a função de inicializar calendário
+        setTimeout(() => {
+            try {
+                this.inicializarCalendario(pergunta);
+                
+                // Configurar callback personalizado para edição
+                const btnConfirmar = document.getElementById(`confirmar-datas-${this.edicaoIds.calendarioAtual}`);
+                if (btnConfirmar) {
+                    // Remover eventos existentes
+                    btnConfirmar.replaceWith(btnConfirmar.cloneNode(true));
+                    const novoBtn = document.getElementById(`confirmar-datas-${this.edicaoIds.calendarioAtual}`);
+                    
+                    novoBtn.addEventListener('click', () => {
+                        const calendario = this.estado.calendarioAtual;
+                        if (calendario && calendario.selectedDates.length === 2) {
+                            const datas = calendario.selectedDates;
+                            const dadosDatas = {
+                                dataIda: this.formatarDataISO(datas[0]),
+                                dataVolta: this.formatarDataISO(datas[1])
+                            };
+                            callback(dadosDatas);
+                            
+                            // Processar edição
+                            const elementoMensagem = novoBtn.closest('.chat-message');
+                            const itemHistorico = this.perguntaEditando;
+                            this.salvarEdicao(elementoMensagem, itemHistorico, dadosDatas);
+                        }
+                    });
+                }
+            } catch (erro) {
+                console.error('Erro ao configurar calendário de edição:', erro);
+            } finally {
+                // Restaurar ID original
+                this.estado.currentCalendarId = idOriginal;
+            }
+        }, 300);
+    },
+
+    /**
+     * Configura autocomplete para edição reutilizando função do app.js
+     */
+    configurarAutocompleteEdicao(pergunta, callback) {
+        // Temporariamente definir o ID do autocomplete atual
+        const idOriginal = this.estado.currentAutocompleteId;
+        this.estado.currentAutocompleteId = this.edicaoIds.autocompleteAtual;
+        
+        setTimeout(() => {
+            try {
+                this.configurarAutocomplete(pergunta);
+                
+                // Configurar callback personalizado para edição
+                const btnConfirmar = document.getElementById(`${this.edicaoIds.autocompleteAtual}-confirm`);
+                if (btnConfirmar) {
+                    // Remover eventos existentes
+                    btnConfirmar.replaceWith(btnConfirmar.cloneNode(true));
+                    const novoBtn = document.getElementById(`${this.edicaoIds.autocompleteAtual}-confirm`);
+                    
+                    novoBtn.addEventListener('click', () => {
+                        // Acessar dados do autocomplete (precisa adaptar a lógica do app.js)
+                        const input = document.getElementById(this.edicaoIds.autocompleteAtual);
+                        if (input && input.dataset.selectedItem) {
+                            const dadosLocal = JSON.parse(input.dataset.selectedItem);
+                            callback(dadosLocal);
+                            
+                            // Processar edição
+                            const elementoMensagem = novoBtn.closest('.chat-message');
+                            const itemHistorico = this.perguntaEditando;
+                            this.salvarEdicao(elementoMensagem, itemHistorico, dadosLocal);
+                        }
+                    });
+                }
+            } catch (erro) {
+                console.error('Erro ao configurar autocomplete de edição:', erro);
+            } finally {
+                // Restaurar ID original
+                this.estado.currentAutocompleteId = idOriginal;
+            }
+        }, 300);
+    },
+
+    /**
+     * Configura entrada de moeda para edição reutilizando função do app.js
+     */
+    configurarMoedaEdicao(pergunta, callback) {
+        const idOriginal = this.estado.currentCurrencyId;
+        this.estado.currentCurrencyId = this.edicaoIds.currencyAtual;
+        
+        setTimeout(() => {
+            try {
+                this.configurarEntradaMoeda();
+                
+                const btnConfirmar = document.getElementById(`${this.edicaoIds.currencyAtual}-confirm`);
+                if (btnConfirmar) {
+                    btnConfirmar.replaceWith(btnConfirmar.cloneNode(true));
+                    const novoBtn = document.getElementById(`${this.edicaoIds.currencyAtual}-confirm`);
+                    
+                    novoBtn.addEventListener('click', () => {
+                        const input = document.getElementById(this.edicaoIds.currencyAtual);
+                        if (input) {
+                            const valor = parseFloat(input.value.replace(',', '.'));
+                            if (valor > 0) {
+                                callback(valor);
+                                
+                                const elementoMensagem = novoBtn.closest('.chat-message');
+                                const itemHistorico = this.perguntaEditando;
+                                this.salvarEdicao(elementoMensagem, itemHistorico, valor);
+                            }
+                        }
+                    });
+                }
+            } catch (erro) {
+                console.error('Erro ao configurar moeda de edição:', erro);
+            } finally {
+                this.estado.currentCurrencyId = idOriginal;
+            }
+        }, 300);
+    },
+
+    /**
+     * Configura entrada numérica para edição reutilizando função do app.js
+     */
+    configurarNumeroEdicao(pergunta, callback) {
+        const idOriginal = this.estado.currentNumberInputId;
+        this.estado.currentNumberInputId = this.edicaoIds.numberAtual;
+        
+        setTimeout(() => {
+            try {
+                this.configurarEntradaNumerica();
+                
+                const btnConfirmar = document.querySelector('.edicao-container .confirm-number');
+                if (btnConfirmar) {
+                    btnConfirmar.replaceWith(btnConfirmar.cloneNode(true));
+                    const novoBtn = document.querySelector('.edicao-container .confirm-number');
+                    
+                    novoBtn.addEventListener('click', () => {
+                        const input = document.getElementById(this.edicaoIds.numberAtual);
+                        if (input) {
+                            const valor = parseInt(input.value);
+                            callback(valor);
+                            
+                            const elementoMensagem = novoBtn.closest('.chat-message');
+                            const itemHistorico = this.perguntaEditando;
+                            this.salvarEdicao(elementoMensagem, itemHistorico, valor);
+                        }
+                    });
+                }
+            } catch (erro) {
+                console.error('Erro ao configurar número de edição:', erro);
+            } finally {
+                this.estado.currentNumberInputId = idOriginal;
+            }
+        }, 300);
     },
 
     /**
      * Cancela a edição e restaura a mensagem original
      */
     cancelarEdicao(elementoMensagem, itemHistorico) {
+        // Limpar calendário se existir
+        if (this.estado.calendarioAtual && this.estado.calendarioAtual.destroy) {
+            this.estado.calendarioAtual.destroy();
+            this.estado.calendarioAtual = null;
+        }
+        
         // Restaurar mensagem original
         elementoMensagem.querySelector('.message').innerHTML = `
             <div class="response-content">
@@ -230,6 +516,14 @@ Object.assign(BENETRIP, {
                 </button>
             </div>
         `;
+        
+        // Limpar IDs de edição
+        this.edicaoIds = {
+            calendarioAtual: null,
+            autocompleteAtual: null,
+            currencyAtual: null,
+            numberAtual: null
+        };
         
         // Sair do modo de edição
         this.modoEdicao = false;
@@ -245,6 +539,12 @@ Object.assign(BENETRIP, {
             return;
         }
         
+        // Limpar calendário se existir
+        if (this.estado.calendarioAtual && this.estado.calendarioAtual.destroy) {
+            this.estado.calendarioAtual.destroy();
+            this.estado.calendarioAtual = null;
+        }
+        
         // Atualizar resposta no estado
         this.estado.respostas[itemHistorico.pergunta.key] = novaResposta;
         
@@ -255,6 +555,18 @@ Object.assign(BENETRIP, {
         let novaMensagemResposta = '';
         if (itemHistorico.pergunta.options) {
             novaMensagemResposta = itemHistorico.pergunta.options[novaResposta];
+        } else if (itemHistorico.pergunta.calendar) {
+            const formatarDataVisual = (dataStr) => {
+                if (!dataStr || typeof dataStr !== 'string') return 'Data inválida';
+                if (dataStr.match(/^\d{4}-\d{2}-\d{2}$/)) {
+                    const [ano, mes, dia] = dataStr.split('-');
+                    return `${dia}/${mes}/${ano}`;
+                }
+                return dataStr;
+            };
+            novaMensagemResposta = `Ida: ${formatarDataVisual(novaResposta.dataIda)} | Volta: ${formatarDataVisual(novaResposta.dataVolta)}`;
+        } else if (itemHistorico.pergunta.autocomplete) {
+            novaMensagemResposta = `${novaResposta.name} (${novaResposta.code}), ${novaResposta.country}`;
         } else {
             novaMensagemResposta = novaResposta.toString();
         }
@@ -270,6 +582,14 @@ Object.assign(BENETRIP, {
                 </button>
             </div>
         `;
+        
+        // Limpar IDs de edição
+        this.edicaoIds = {
+            calendarioAtual: null,
+            autocompleteAtual: null,
+            currencyAtual: null,
+            numberAtual: null
+        };
         
         // Feedback visual
         this.exibirToast('Resposta atualizada com sucesso! ✅', 'success');
