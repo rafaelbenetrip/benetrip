@@ -1,6 +1,6 @@
 /**
- * BENETRIP - CSS Otimizado para Chat Fluido
- * Animações e transições otimizadas para melhor performance
+ * BENETRIP - CSS Fluido LIMPO (Sem otimizações de calendário)
+ * Apenas melhorias de fluidez geral para o chat
  */
 
 /* ===== VARIÁVEIS DE ANIMAÇÃO OTIMIZADAS ===== */
@@ -95,59 +95,6 @@
 .option-button:active {
     transform: translateY(0) scale(0.98);
     transition-duration: var(--animation-fast);
-}
-
-/* ===== CALENDÁRIO OTIMIZADO ===== */
-
-.calendar-container {
-    transition: all var(--animation-medium) var(--easing-smooth);
-    transform: translateZ(0);
-}
-
-.flatpickr-calendar {
-    animation: calendarFadeIn var(--animation-medium) var(--easing-out);
-}
-
-@keyframes calendarFadeIn {
-    0% {
-        opacity: 0;
-        transform: translateY(10px) scale(0.95);
-    }
-    100% {
-        opacity: 1;
-        transform: translateY(0) scale(1);
-    }
-}
-
-/* Otimização dos dias do calendário */
-.flatpickr-day {
-    transition: all var(--animation-fast) var(--easing-smooth);
-    position: relative;
-    overflow: hidden;
-}
-
-.flatpickr-day::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: var(--orange-primary);
-    opacity: 0;
-    transform: scale(0);
-    border-radius: inherit;
-    transition: all var(--animation-fast) var(--easing-bounce);
-}
-
-.flatpickr-day:hover::before {
-    opacity: 0.1;
-    transform: scale(1);
-}
-
-.flatpickr-day.selected::before {
-    opacity: 1;
-    transform: scale(1);
 }
 
 /* ===== INPUTS OTIMIZADOS ===== */
@@ -336,7 +283,7 @@
     }
     
     /* Aumentar área de toque */
-    .option-button, .autocomplete-item, .flatpickr-day {
+    .option-button, .autocomplete-item {
         min-height: 44px;
         min-width: 44px;
     }
@@ -435,4 +382,28 @@
     100% {
         background-position: -200% 0;
     }
+}
+
+/* ===== OTIMIZAÇÕES GERAIS DE PERFORMANCE ===== */
+
+/* Melhorar rendering de elementos que mudam frequentemente */
+.confirm-button,
+.option-button,
+.autocomplete-item,
+.toast {
+    contain: layout style paint;
+}
+
+/* Otimizar elementos que animam */
+.chat-message,
+.progress-bar,
+.visual-feedback {
+    contain: layout;
+}
+
+/* Reduzir repaints em hover states */
+.option-button,
+.autocomplete-item {
+    backface-visibility: hidden;
+    perspective: 1000px;
 }
