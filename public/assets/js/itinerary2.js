@@ -2493,7 +2493,7 @@ obterTextoCompanhia() {
 
 iniciarAnimacaoProgresso() {
   const mensagens = [
-    '🐾 Revirando minhas memórias dos lugares que já farejai...',
+    '🐾 Revirando minhas memórias dos lugares que já farejei...',
     '📸 Procurando as fotos mais fofas que tirei nessa aventura...',
     '🗺️ Lembrando dos cantinhos secretos que descobri...',
     '🌤️ Checando se o tempo vai estar bom pro passeio...',
