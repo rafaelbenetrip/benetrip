@@ -4271,3 +4271,431 @@ input[type="range"]::-moz-range-thumb {
     text-align: center;
     font-size: 14px;
 }
+
+/* =====================================================
+   BENETRIP - MELHORIAS PARA AUTOCOMPLETE DE CIDADE
+   Adicione este CSS ao arquivo styles.css
+   ===================================================== */
+
+/* ===== LAYOUT PRINCIPAL DO AUTOCOMPLETE ===== */
+
+/* Container principal - layout em coluna para mais espaço */
+.text-input-container,
+.autocomplete-container {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+    margin-top: var(--spacing-md);
+    position: relative;
+    width: 100%;
+}
+
+/* Quando em telas maiores, manter lado a lado */
+@media (min-width: 400px) {
+    .text-input-container,
+    .autocomplete-container {
+        flex-direction: row;
+        align-items: flex-start;
+        gap: var(--spacing-sm);
+    }
+}
+
+/* ===== CAMPO DE INPUT PRINCIPAL ===== */
+
+.text-input,
+.autocomplete-input {
+    width: 100%;
+    padding: 16px 20px; /* Aumentado para melhor área de toque */
+    border: 2px solid var(--gray-medium);
+    border-radius: 12px; /* Bordas mais arredondadas */
+    font-size: 16px; /* Tamanho mínimo recomendado para mobile */
+    font-weight: 500;
+    color: var(--dark);
+    background-color: var(--white);
+    transition: all 0.3s ease;
+    min-height: 48px; /* Altura mínima para acessibilidade */
+    box-sizing: border-box;
+}
+
+/* Estados do input */
+.text-input:focus,
+.autocomplete-input:focus {
+    outline: none;
+    border-color: var(--orange-primary);
+    box-shadow: 0 0 0 3px rgba(232, 119, 34, 0.1);
+    background-color: #fefefe;
+}
+
+.text-input:hover,
+.autocomplete-input:hover {
+    border-color: var(--blue-secondary);
+}
+
+/* Placeholder melhorado */
+.text-input::placeholder,
+.autocomplete-input::placeholder {
+    color: var(--gray-dark);
+    font-weight: 400;
+    opacity: 0.7;
+}
+
+/* ===== BOTÃO DE CONFIRMAÇÃO ===== */
+
+.confirm-text,
+.confirm-autocomplete {
+    background-color: var(--blue-secondary);
+    color: var(--white);
+    border: none;
+    border-radius: 12px;
+    padding: 16px 24px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    white-space: nowrap;
+    min-height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 8px rgba(0, 163, 224, 0.2);
+}
+
+/* Layout em coluna - botão ocupa largura total */
+@media (max-width: 399px) {
+    .confirm-text,
+    .confirm-autocomplete {
+        width: 100%;
+        margin-top: 4px;
+    }
+}
+
+/* Layout em linha - botão com largura fixa */
+@media (min-width: 400px) {
+    .confirm-text,
+    .confirm-autocomplete {
+        min-width: 100px;
+        flex-shrink: 0;
+    }
+}
+
+/* Estados do botão */
+.confirm-text:hover:not(:disabled),
+.confirm-autocomplete:hover:not(:disabled) {
+    background-color: #0086B8;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 163, 224, 0.3);
+}
+
+.confirm-text:active,
+.confirm-autocomplete:active {
+    transform: translateY(0);
+}
+
+.confirm-text:disabled,
+.confirm-autocomplete:disabled {
+    background-color: var(--gray-medium);
+    color: #999;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
+/* ===== RESULTADOS DO AUTOCOMPLETE ===== */
+
+.autocomplete-results {
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 0;
+    right: 0;
+    max-height: 250px; /* Aumentado para mostrar mais resultados */
+    overflow-y: auto;
+    background-color: var(--white);
+    border: 2px solid var(--gray-medium);
+    border-radius: 12px;
+    z-index: 1000;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+    animation: slideDown 0.2s ease-out;
+}
+
+/* Animação de entrada */
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* ===== ITENS DO AUTOCOMPLETE ===== */
+
+.autocomplete-item {
+    display: flex;
+    align-items: center;
+    padding: 16px 20px; /* Aumentado para melhor área de toque */
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border-bottom: 1px solid var(--gray-light);
+    min-height: 60px; /* Altura mínima para toque confortável */
+}
+
+.autocomplete-item:last-child {
+    border-bottom: none;
+}
+
+.autocomplete-item:hover,
+.autocomplete-item:focus {
+    background-color: rgba(232, 119, 34, 0.05);
+    transform: translateX(2px);
+}
+
+.autocomplete-item:active {
+    background-color: rgba(232, 119, 34, 0.1);
+    transform: translateX(0);
+}
+
+/* ===== CÓDIGO IATA DO AEROPORTO ===== */
+
+.item-code {
+    font-weight: 700;
+    background-color: var(--orange-primary);
+    color: var(--white);
+    padding: 6px 10px;
+    border-radius: 8px;
+    margin-right: 16px;
+    font-size: 14px;
+    min-width: 45px;
+    text-align: center;
+    flex-shrink: 0;
+    letter-spacing: 0.5px;
+}
+
+/* ===== DETALHES DO LOCAL ===== */
+
+.item-details {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.item-name {
+    font-weight: 600;
+    font-size: 16px;
+    color: var(--dark);
+    line-height: 1.3;
+}
+
+.item-country {
+    font-size: 14px;
+    color: var(--gray-dark);
+    font-weight: 400;
+}
+
+/* ===== ESTADOS DE CARREGAMENTO E ERRO ===== */
+
+.loading-autocomplete,
+.no-results,
+.error {
+    padding: 20px;
+    text-align: center;
+    font-size: 15px;
+    color: var(--gray-dark);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+}
+
+.loading-autocomplete {
+    color: var(--blue-secondary);
+    font-style: italic;
+}
+
+.loading-autocomplete::before {
+    content: "🔍";
+    font-size: 24px;
+    animation: pulse 1.5s infinite;
+}
+
+.no-results {
+    color: var(--gray-dark);
+}
+
+.no-results::before {
+    content: "📍";
+    font-size: 24px;
+}
+
+.error {
+    color: var(--danger);
+    background-color: rgba(244, 67, 54, 0.05);
+    border-radius: 8px;
+    margin: 8px;
+}
+
+.error::before {
+    content: "⚠️";
+    font-size: 24px;
+}
+
+/* ===== MELHORIAS PARA ACESSIBILIDADE ===== */
+
+/* Melhor contraste e foco */
+.autocomplete-item:focus {
+    outline: 2px solid var(--blue-secondary);
+    outline-offset: -2px;
+    background-color: rgba(0, 163, 224, 0.1);
+}
+
+/* Indicador visual para seleção via teclado */
+.autocomplete-item.keyboard-selected {
+    background-color: rgba(0, 163, 224, 0.1);
+    border-left: 4px solid var(--blue-secondary);
+}
+
+/* ===== RESPONSIVE DESIGN ESPECÍFICO ===== */
+
+/* Telas muito pequenas (< 320px) */
+@media (max-width: 320px) {
+    .text-input,
+    .autocomplete-input {
+        padding: 14px 16px;
+        font-size: 16px; /* Manter 16px para evitar zoom no iOS */
+    }
+    
+    .confirm-text,
+    .confirm-autocomplete {
+        padding: 14px 20px;
+        font-size: 15px;
+    }
+    
+    .autocomplete-item {
+        padding: 14px 16px;
+        min-height: 56px;
+    }
+    
+    .item-code {
+        min-width: 40px;
+        font-size: 12px;
+        padding: 4px 8px;
+    }
+}
+
+/* Telas pequenas (320px - 480px) */
+@media (min-width: 320px) and (max-width: 480px) {
+    .autocomplete-results {
+        max-height: 200px; /* Menos altura em telas pequenas */
+    }
+}
+
+/* Telas médias e grandes (> 480px) */
+@media (min-width: 481px) {
+    .text-input-container,
+    .autocomplete-container {
+        flex-direction: row;
+        align-items: flex-start;
+    }
+    
+    .text-input,
+    .autocomplete-input {
+        flex: 1;
+        margin-right: 0;
+    }
+    
+    .confirm-text,
+    .confirm-autocomplete {
+        min-width: 120px;
+        margin-left: 8px;
+    }
+}
+
+/* ===== MELHORIAS VISUAIS EXTRAS ===== */
+
+/* Sombra sutil no container quando ativo */
+.autocomplete-container.active .text-input,
+.autocomplete-container.active .autocomplete-input {
+    box-shadow: 0 2px 12px rgba(232, 119, 34, 0.1);
+}
+
+/* Transição suave para o container de resultados */
+.autocomplete-results.fade-in {
+    animation: fadeInScale 0.3s ease-out;
+}
+
+@keyframes fadeInScale {
+    from {
+        opacity: 0;
+        transform: translateY(-10px) scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+/* Separador visual entre grupos de resultados (se houver) */
+.autocomplete-separator {
+    height: 1px;
+    background-color: var(--gray-medium);
+    margin: 8px 16px;
+}
+
+/* Badge para indicar tipo de local (aeroporto, cidade) */
+.item-type-badge {
+    background-color: var(--gray-light);
+    color: var(--gray-dark);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-left: auto;
+    flex-shrink: 0;
+}
+
+/* ===== OVERRIDE PARA CONFLITOS ===== */
+
+/* Garantir que o autocomplete tenha prioridade sobre outros elementos */
+.chat-message .autocomplete-container {
+    position: relative;
+    z-index: 100;
+}
+
+.chat-message .autocomplete-results {
+    z-index: 1001;
+}
+
+/* Evitar que o autocomplete seja cortado pelo container do chat */
+.chat-messages {
+    overflow: visible;
+}
+
+/* Ajuste específico para a mensagem do chat */
+.chat-message .message {
+    overflow: visible;
+    position: relative;
+}
+
+/* ===== ANIMAÇÕES SUAVES ===== */
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+/* Feedback tátil no mobile */
+@media (hover: none) and (pointer: coarse) {
+    .autocomplete-item:active {
+        background-color: rgba(232, 119, 34, 0.15);
+        transform: scale(0.98);
+    }
+    
+    .confirm-text:active,
+    .confirm-autocomplete:active {
+        transform: scale(0.95);
+    }
+}
