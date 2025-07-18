@@ -4699,3 +4699,253 @@ input[type="range"]::-moz-range-thumb {
         transform: scale(0.95);
     }
 }
+
+/* ===== CORREÇÕES PARA AUTOCOMPLETE VISÍVEL ===== */
+
+/* Garantir que o container do chat permita overflow visível */
+.chat-messages {
+    overflow-y: auto;
+    overflow-x: visible; /* Permitir que autocomplete apareça lateralmente */
+    padding: var(--spacing-md);
+    display: flex;
+    flex-direction: column;
+}
+
+/* Permitir overflow visível nas mensagens */
+.chat-message {
+    overflow: visible !important;
+    position: relative;
+    z-index: 1;
+}
+
+.chat-message .message {
+    overflow: visible !important;
+    position: relative;
+}
+
+/* Container do autocomplete com posicionamento melhorado */
+.autocomplete-container {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+    margin-top: var(--spacing-md);
+    position: relative;
+    width: 100%;
+    z-index: 100; /* Aumentado */
+}
+
+/* Campo de input com melhor posicionamento */
+.autocomplete-input {
+    width: 100%;
+    padding: 16px 20px;
+    border: 2px solid var(--gray-medium);
+    border-radius: 12px;
+    font-size: 16px;
+    font-weight: 500;
+    color: var(--dark);
+    background-color: var(--white);
+    transition: all 0.3s ease;
+    min-height: 48px;
+    box-sizing: border-box;
+    position: relative;
+    z-index: 101;
+}
+
+/* Lista de resultados com posicionamento fixo melhorado */
+.autocomplete-results {
+    position: fixed !important; /* Mudado de absolute para fixed */
+    left: 16px !important; /* Margem da tela */
+    right: 16px !important; /* Margem da tela */
+    max-width: 448px !important; /* Largura máxima (480px - 32px de margem) */
+    margin: 0 auto !important;
+    max-height: 300px !important; /* Aumentado para mostrar mais resultados */
+    overflow-y: auto;
+    background-color: var(--white);
+    border: 2px solid var(--gray-medium);
+    border-radius: 12px;
+    z-index: 9999 !important; /* Z-index muito alto */
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25) !important; /* Sombra mais forte */
+    animation: slideDownImproved 0.3s ease-out;
+    
+    /* Garantir que apareça abaixo do input */
+    top: auto !important;
+    bottom: auto !important;
+}
+
+/* Posicionamento dinâmico da lista baseado na posição do input */
+.autocomplete-container.position-calculated .autocomplete-results {
+    /* A posição será calculada dinamicamente via JavaScript */
+}
+
+/* Animação melhorada */
+@keyframes slideDownImproved {
+    from {
+        opacity: 0;
+        transform: translateY(-15px) scale(0.95);
+        max-height: 0;
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+        max-height: 300px;
+    }
+}
+
+/* Itens da lista com melhor área de toque */
+.autocomplete-item {
+    display: flex;
+    align-items: center;
+    padding: 18px 20px; /* Aumentado para melhor toque */
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border-bottom: 1px solid var(--gray-light);
+    min-height: 64px; /* Altura mínima para toque confortável */
+    position: relative;
+}
+
+.autocomplete-item:last-child {
+    border-bottom: none;
+}
+
+.autocomplete-item:hover,
+.autocomplete-item:focus {
+    background-color: rgba(232, 119, 34, 0.08);
+    transform: translateX(3px);
+}
+
+.autocomplete-item:active {
+    background-color: rgba(232, 119, 34, 0.15);
+    transform: translateX(1px);
+}
+
+/* Melhor contraste para código IATA */
+.item-code {
+    font-weight: 700;
+    background-color: var(--orange-primary);
+    color: var(--white);
+    padding: 8px 12px;
+    border-radius: 8px;
+    margin-right: 16px;
+    font-size: 14px;
+    min-width: 50px;
+    text-align: center;
+    flex-shrink: 0;
+    letter-spacing: 0.5px;
+    box-shadow: 0 2px 4px rgba(232, 119, 34, 0.3);
+}
+
+/* Estados de loading e erro mais visíveis */
+.loading-autocomplete,
+.no-results,
+.error {
+    padding: 24px 20px;
+    text-align: center;
+    font-size: 15px;
+    color: var(--gray-dark);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    min-height: 80px;
+    justify-content: center;
+}
+
+.loading-autocomplete {
+    color: var(--blue-secondary);
+    font-style: italic;
+}
+
+.loading-autocomplete::before {
+    content: "🔍";
+    font-size: 28px;
+    animation: pulse 1.5s infinite;
+    margin-bottom: 8px;
+}
+
+/* Overlay para destacar autocomplete quando ativo */
+.autocomplete-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.1);
+    z-index: 9998;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s ease;
+    pointer-events: none;
+}
+
+.autocomplete-overlay.active {
+    opacity: 1;
+    visibility: visible;
+}
+
+/* Responsividade melhorada */
+@media (max-width: 480px) {
+    .autocomplete-results {
+        left: 8px !important;
+        right: 8px !important;
+        max-width: calc(100vw - 16px) !important;
+        border-radius: 8px;
+    }
+    
+    .autocomplete-item {
+        padding: 16px 16px;
+        min-height: 60px;
+    }
+    
+    .item-code {
+        min-width: 45px;
+        font-size: 13px;
+        padding: 6px 10px;
+    }
+}
+
+/* Ajuste para quando o autocomplete está no final da tela */
+.autocomplete-container.near-bottom .autocomplete-results {
+    /* Será posicionado acima do input quando necessário */
+    transform: translateY(-100%);
+    margin-top: -16px;
+}
+
+/* Indicador visual de que há mais resultados para rolar */
+.autocomplete-results::after {
+    content: "";
+    position: sticky;
+    bottom: 0;
+    height: 4px;
+    background: linear-gradient(transparent, rgba(0, 0, 0, 0.1));
+    pointer-events: none;
+}
+
+.autocomplete-results.scrolled-to-bottom::after {
+    display: none;
+}
+
+/* Melhor feedback visual para seleção */
+.autocomplete-item.keyboard-selected {
+    background-color: rgba(0, 163, 224, 0.12);
+    border-left: 4px solid var(--blue-secondary);
+    padding-left: 16px;
+}
+
+/* Scrollbar personalizada para a lista */
+.autocomplete-results::-webkit-scrollbar {
+    width: 6px;
+}
+
+.autocomplete-results::-webkit-scrollbar-track {
+    background: var(--gray-light);
+    border-radius: 3px;
+}
+
+.autocomplete-results::-webkit-scrollbar-thumb {
+    background: var(--gray-medium);
+    border-radius: 3px;
+}
+
+.autocomplete-results::-webkit-scrollbar-thumb:hover {
+    background: var(--gray-dark);
+}
