@@ -1,4 +1,4 @@
-/**
+/** 
  * BENETRIP - Sistema de Posicionamento Inteligente do Autocomplete
  * Garante que a lista de sugestões seja sempre visível
  */
