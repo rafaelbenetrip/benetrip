@@ -512,11 +512,12 @@ converterDadosFormulario() {
       }
       
       // Botão voltar
-      if (e.target.closest('.btn-voltar')) {
-        e.preventDefault();
-        this.voltarParaFormulario();
-        return;
-      }
+if (e.target.closest('.btn-voltar')) {
+  e.preventDefault();
+  // Redireciona para a página principal
+  window.location.href = 'https://www.benetrip.com.br';
+  return;
+}
       
       // Botões de mapa
       if (e.target.closest('.btn-ver-mapa-mini')) {
