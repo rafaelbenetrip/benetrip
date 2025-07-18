@@ -1,6 +1,15 @@
 [
     {
-        "question": "1️⃣ Com quem você vai viajar?",
+        "question": "1️⃣ De onde você partirá?",
+        "description": "Digite apenas o nome da cidade de onde você vai sair.",
+        "options": null,
+        "input_field": true,
+        "autocomplete": true,
+        "key": "cidade_partida"
+    },
+    
+    {
+        "question": "2️⃣ Com quem você vai viajar?",
         "description": "Escolha quem estará com você nessa aventura.",
         "options": [
             "🧳 Sozinho(a) – Estou pronto para qualquer parada!",
@@ -12,7 +21,7 @@
     },
     
     {
-        "question": "1️⃣.1️⃣ Quantas pessoas estão na sua família para esta viagem?",
+        "question": "2️⃣.1️⃣ Quantas pessoas estão na sua família para esta viagem?",
         "description": "Inclua todos, inclusive você!",
         "input_field": true,
         "numeric_only": true,
@@ -25,7 +34,7 @@
     },
     
     {
-        "question": "1️⃣.1️⃣ Quantos amigos vão nessa aventura, incluindo você?",
+        "question": "2️⃣.1️⃣ Quantos amigos vão nessa aventura, incluindo você?",
         "description": "Me diga o número total de pessoas da turma! 🐶🎒",
         "input_field": true,
         "numeric_only": true,
@@ -38,7 +47,7 @@
     },
     
     {
-        "question": "2️⃣ O que você mais busca nessa viagem?",
+        "question": "3️⃣ O que você mais busca nessa viagem?",
         "description": "Escolha o que é mais importante para você.",
         "options": [
             "🌊 Relaxar – Quero descansar e curtir sem pressa.",
@@ -47,15 +56,6 @@
             "🛍️ Urbano – Quero agito, compras e vida noturna."
         ],
         "key": "preferencia_viagem"
-    },
-    
-    {
-        "question": "3️⃣ De onde você partirá?",
-        "description": "Digite apenas o nome da cidade de onde você vai sair.",
-        "options": null,
-        "input_field": true,
-        "autocomplete": true,
-        "key": "cidade_partida"
     },
     
     {
