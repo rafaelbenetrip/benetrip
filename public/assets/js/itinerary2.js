@@ -1495,17 +1495,41 @@ if (e.target.closest('.btn-voltar')) {
 // ==========================================
 
 /**
- * ✅ COMPARTILHAR ROTEIRO - VERSÃO SIMPLIFICADA (APENAS TEXTO)
+ * ✅ COMPARTILHAMENTO CORRIGIDO - TODOS OS DIAS INCLUÍDOS
+ * Substituir no objeto BENETRIP_ROTEIRO
+ */
+
+// ==========================================
+// COMPARTILHAMENTO COMO TEXTO - VERSÃO CORRIGIDA
+// ==========================================
+
+/**
+ * ✅ COMPARTILHAR ROTEIRO - VERSÃO CORRIGIDA
  */
 async compartilharRoteiro() {
   try {
     console.log('📋 Iniciando compartilhamento como texto...');
     
+    // ✅ DEBUG: Verificar quantos dias temos
+    console.log('🔍 Debug roteiro:', {
+      temRoteiro: !!this.roteiroPronto,
+      totalDias: this.roteiroPronto?.dias?.length || 0,
+      destino: this.dadosDestino?.destino,
+      formData: this.dadosFormulario
+    });
+    
+    if (!this.roteiroPronto || !this.roteiroPronto.dias || this.roteiroPronto.dias.length === 0) {
+      this.exibirToast('❌ Nenhum roteiro encontrado para compartilhar', 'error');
+      return;
+    }
+    
     // Mostrar loading
     this.exibirToast('📋 Preparando roteiro para compartilhar...', 'info');
     
     // Gerar texto completo com links
-    const textoCompleto = await this.gerarTextoRoteiroCompleto();
+    const textoCompleto = await this.gerarTextoRoteiroCompletoCorrigido();
+    
+    console.log('📝 Texto gerado com', textoCompleto.split('📍 DIA').length - 1, 'dias');
     
     // Tentar compartilhamento nativo primeiro (mobile)
     if (this.podeCompartilharTexto()) {
@@ -1539,24 +1563,18 @@ async compartilharRoteiro() {
 },
 
 /**
- * ✅ NOVO: Verificar se pode usar compartilhamento nativo de texto
+ * ✅ CORRIGIDO: Gerar texto completo do roteiro - VERSÃO CORRIGIDA
  */
-podeCompartilharTexto() {
-  return (
-    navigator.share && 
-    /mobile|android|iphone|ipad/i.test(navigator.userAgent)
-  );
-},
-
-/**
- * ✅ MELHORADO: Gerar texto completo do roteiro com links de mapa
- */
-async gerarTextoRoteiroCompleto() {
+async gerarTextoRoteiroCompletoCorrigido() {
   const destino = this.dadosDestino.destino;
   const pais = this.dadosDestino.pais;
   const dataIda = this.formatarData(this.getDataIda());
   const dataVolta = this.getDataVolta() ? this.formatarData(this.getDataVolta()) : null;
   const diasViagem = this.calcularDiasViagem(this.getDataIda(), this.getDataVolta());
+  
+  // ✅ VERIFICAÇÃO IMPORTANTE
+  const totalDiasRoteiro = this.roteiroPronto.dias.length;
+  console.log(`📊 Estatísticas: ${diasViagem} dias calculados, ${totalDiasRoteiro} dias no roteiro`);
   
   // Cabeçalho
   let texto = `🐕 ROTEIRO BENETRIP\n`;
@@ -1565,7 +1583,7 @@ async gerarTextoRoteiroCompleto() {
   
   // Informações da viagem
   texto += `📅 PERÍODO: ${dataIda}${dataVolta ? ` até ${dataVolta}` : ''}\n`;
-  texto += `⏰ DURAÇÃO: ${diasViagem} ${diasViagem === 1 ? 'dia' : 'dias'}\n`;
+  texto += `⏰ DURAÇÃO: ${Math.max(diasViagem, totalDiasRoteiro)} ${diasViagem === 1 ? 'dia' : 'dias'}\n`;
   texto += `👥 VIAJANDO: ${this.obterTextoCompanhia()}\n`;
   texto += `🎯 ESTILO: ${this.obterTextoPreferencia()}\n`;
   texto += `⚡ INTENSIDADE: ${this.obterTextoIntensidade()}\n\n`;
@@ -1582,10 +1600,19 @@ async gerarTextoRoteiroCompleto() {
   texto += `📋 ROTEIRO DETALHADO:\n`;
   texto += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
   
-  // Processar cada dia
-  for (let index = 0; index < this.roteiroPronto.dias.length; index++) {
-    const dia = this.roteiroPronto.dias[index];
+  // ✅ CORREÇÃO PRINCIPAL: Processar TODOS os dias sem filtros
+  const diasParaProcessar = this.roteiroPronto.dias;
+  console.log(`🔄 Processando ${diasParaProcessar.length} dias:`, diasParaProcessar.map((d, i) => `Dia ${i+1}: ${d.data}`));
+  
+  for (let index = 0; index < diasParaProcessar.length; index++) {
+    const dia = diasParaProcessar[index];
     const numeroDia = index + 1;
+    
+    console.log(`📝 Processando dia ${numeroDia}:`, {
+      data: dia.data,
+      descricao: dia.descricao,
+      atividades: dia.atividades?.length || 0
+    });
     
     // Cabeçalho do dia
     texto += `📍 DIA ${numeroDia} - ${this.formatarDataCompleta(dia.data)}\n`;
@@ -1593,24 +1620,52 @@ async gerarTextoRoteiroCompleto() {
       texto += `${dia.descricao}\n`;
     }
     
-    // Previsão do tempo (se disponível)
+    // Previsão do tempo (apenas para primeiros 3 dias)
     if (dia.previsao && numeroDia <= 3) {
       texto += `🌤️ Clima: ${dia.previsao.temperature}°C, ${dia.previsao.condition}\n`;
     }
     
     texto += `\n`;
     
-    // Atividades do dia
-    if (dia.atividades && dia.atividades.length > 0) {
-      let atividadeNormal = 0;
+    // ✅ CORREÇÃO: Processar atividades com mais cuidado
+    if (dia.atividades && Array.isArray(dia.atividades) && dia.atividades.length > 0) {
+      let atividadesProcessadas = 0;
+      let atividadesEspeciais = 0;
       
-      for (const atividade of dia.atividades) {
-        // Pular atividades especiais (voos, transfers, etc)
+      for (let i = 0; i < dia.atividades.length; i++) {
+        const atividade = dia.atividades[i];
+        
+        // Debug da atividade
+        console.log(`  Atividade ${i+1}:`, {
+          local: atividade.local,
+          isEspecial: atividade.isEspecial,
+          horario: atividade.horario
+        });
+        
+        // ✅ MUDANÇA: Incluir atividades especiais importantes também
         if (atividade.isEspecial) {
+          atividadesEspeciais++;
+          
+          // Incluir apenas atividades especiais relevantes
+          if (atividade.local && (
+            atividade.local.includes('Check-in') || 
+            atividade.local.includes('Transfer') ||
+            atividade.local.includes('Chegada') ||
+            atividade.local.includes('Partida') ||
+            atividade.local.includes('Aeroporto')
+          )) {
+            texto += `${atividade.horario || ''} • ${atividade.local}\n`;
+            if (atividade.dica) {
+              texto += `   💡 ${atividade.dica}\n`;
+            }
+            texto += `\n`;
+            atividadesProcessadas++;
+          }
           continue;
         }
         
-        atividadeNormal++;
+        // Atividades normais
+        atividadesProcessadas++;
         
         // Horário e local
         let linhaAtividade = '';
@@ -1627,7 +1682,7 @@ async gerarTextoRoteiroCompleto() {
         texto += `${linhaAtividade}\n`;
         
         // Tags se disponíveis
-        if (atividade.tags && atividade.tags.length > 0) {
+        if (atividade.tags && Array.isArray(atividade.tags) && atividade.tags.length > 0) {
           const tagsTexto = atividade.tags.join(' • ');
           texto += `   🏷️ ${tagsTexto}\n`;
         }
@@ -1637,23 +1692,26 @@ async gerarTextoRoteiroCompleto() {
           texto += `   💡 Dica da Tripinha: ${atividade.dica}\n`;
         }
         
-        // Link do mapa - NOVIDADE!
+        // Link do mapa
         const linkMapa = this.gerarLinkMapa(atividade.local, destino, pais);
         texto += `   🗺️ Ver no mapa: ${linkMapa}\n`;
         
         texto += `\n`;
       }
       
-      // Se não há atividades normais
-      if (atividadeNormal === 0) {
+      console.log(`✅ Dia ${numeroDia}: ${atividadesProcessadas} atividades processadas (${atividadesEspeciais} especiais ignoradas)`);
+      
+      // Se não há atividades normais processadas
+      if (atividadesProcessadas === 0) {
         texto += `🏖️ Dia livre para descanso ou atividades opcionais\n\n`;
       }
     } else {
+      console.log(`⚠️ Dia ${numeroDia}: Sem atividades válidas`);
       texto += `🏖️ Dia livre para descanso ou atividades opcionais\n\n`;
     }
     
-    // Separador entre dias
-    if (index < this.roteiroPronto.dias.length - 1) {
+    // Separador entre dias (exceto último)
+    if (index < diasParaProcessar.length - 1) {
       texto += `${'─'.repeat(30)}\n\n`;
     }
   }
@@ -1664,7 +1722,8 @@ async gerarTextoRoteiroCompleto() {
   texto += `• Confirme horários de funcionamento\n`;
   texto += `• Leve documento de identidade\n`;
   texto += `• Verifique condições climáticas\n`;
-  texto += `• Tenha sempre um mapa offline\n\n`;
+  texto += `• Tenha sempre um mapa offline\n`;
+  texto += `• Mantenha-se hidratado e descanse bem\n\n`;
   
   // Link geral do destino
   const linkGeralDestino = this.gerarLinkMapa(destino, '', pais);
@@ -1676,177 +1735,112 @@ async gerarTextoRoteiroCompleto() {
   texto += `🌐 benetrip.com.br\n`;
   texto += `✨ Boas viagens! 🧳✈️`;
   
+  // ✅ LOG FINAL
+  const totalDiasTexto = (texto.match(/📍 DIA \d+/g) || []).length;
+  console.log(`✅ Texto final: ${totalDiasTexto} dias incluídos de ${diasParaProcessar.length} disponíveis`);
+  
   return texto;
 },
 
 /**
- * ✅ NOVO: Gerar link do Google Maps para um local
+ * ✅ NOVO: Verificar integridade do roteiro antes de compartilhar
+ */
+verificarIntegridadeRoteiro() {
+  if (!this.roteiroPronto) {
+    console.error('❌ Roteiro não encontrado');
+    return false;
+  }
+  
+  if (!this.roteiroPronto.dias || !Array.isArray(this.roteiroPronto.dias)) {
+    console.error('❌ Dias do roteiro inválidos');
+    return false;
+  }
+  
+  if (this.roteiroPronto.dias.length === 0) {
+    console.error('❌ Nenhum dia no roteiro');
+    return false;
+  }
+  
+  console.log(`✅ Roteiro válido com ${this.roteiroPronto.dias.length} dias`);
+  return true;
+},
+
+/**
+ * ✅ CORRIGIDO: Gerar link do Google Maps - versão mais robusta
  */
 gerarLinkMapa(local, destino, pais) {
-  // Limpar e preparar query
-  let query = local.trim();
-  
-  // Se o local não contém o destino, adicionar
-  if (!query.toLowerCase().includes(destino.toLowerCase())) {
-    query += `, ${destino}`;
-  }
-  
-  // Se não contém o país, adicionar
-  if (!query.toLowerCase().includes(pais.toLowerCase())) {
-    query += `, ${pais}`;
-  }
-  
-  // Codificar para URL
-  const queryEncoded = encodeURIComponent(query);
-  
-  // Gerar URL do Google Maps
-  return `https://maps.google.com/maps?q=${queryEncoded}`;
-},
-
-/**
- * ✅ NOVO: Copiar texto usando método legacy (para navegadores antigos)
- */
-copiarTextoLegacy(texto) {
   try {
-    const textarea = document.createElement('textarea');
-    textarea.value = texto;
-    textarea.style.position = 'fixed';
-    textarea.style.left = '-9999px';
-    textarea.style.opacity = '0';
+    // Limpar e preparar query
+    let query = local ? local.trim() : '';
     
-    document.body.appendChild(textarea);
-    textarea.focus();
-    textarea.select();
-    
-    const sucesso = document.execCommand('copy');
-    document.body.removeChild(textarea);
-    
-    if (!sucesso) {
-      throw new Error('Comando copy falhou');
+    // Se não tem local, usar apenas destino
+    if (!query || query.length < 2) {
+      query = destino || 'Local de interesse';
     }
     
-    console.log('✅ Texto copiado usando método legacy');
+    // Se o local não contém o destino e destino existe, adicionar
+    if (destino && !query.toLowerCase().includes(destino.toLowerCase())) {
+      query += `, ${destino}`;
+    }
+    
+    // Se não contém o país e país existe, adicionar  
+    if (pais && !query.toLowerCase().includes(pais.toLowerCase())) {
+      query += `, ${pais}`;
+    }
+    
+    // Codificar para URL de forma segura
+    const queryLimpa = query.replace(/[^\w\s,.-]/g, '').trim();
+    const queryEncoded = encodeURIComponent(queryLimpa);
+    
+    // Gerar URL do Google Maps
+    return `https://maps.google.com/maps?q=${queryEncoded}`;
     
   } catch (erro) {
-    console.error('❌ Método legacy também falhou:', erro);
-    
-    // Último recurso: mostrar modal com texto
-    this.mostrarTextoParaCopiar(texto);
+    console.warn('⚠️ Erro ao gerar link do mapa:', erro);
+    return `https://maps.google.com/maps?q=${encodeURIComponent(destino || 'Local')}`;
   }
 },
 
 /**
- * ✅ NOVO: Mostrar modal com texto para copiar manualmente (último recurso)
+ * ✅ MELHORADO: Formatação de data mais robusta
  */
-mostrarTextoParaCopiar(texto) {
-  // Remover modal existente
-  const modalExistente = document.getElementById('modal-texto-copiar');
-  if (modalExistente) modalExistente.remove();
+formatarDataCompleta(dataString) {
+  if (!dataString) return 'Data indefinida';
   
-  // Criar modal
-  const modal = document.createElement('div');
-  modal.id = 'modal-texto-copiar';
-  modal.className = 'modal-overlay';
-  
-  modal.innerHTML = `
-    <div class="modal-content modal-texto">
-      <div class="modal-header">
-        <h3>📋 Seu Roteiro</h3>
-        <button class="modal-close" onclick="this.closest('.modal-overlay').remove()">×</button>
-      </div>
-      
-      <div class="modal-body">
-        <p class="instrucao">Selecione todo o texto abaixo e copie:</p>
-        <textarea class="texto-roteiro" readonly>${texto}</textarea>
-        <div class="modal-acoes">
-          <button class="btn btn-principal" onclick="this.previousElementSibling.select(); document.execCommand('copy'); this.textContent='✅ Copiado!'">
-            📋 Selecionar Tudo
-          </button>
-          <button class="btn btn-secundario" onclick="this.closest('.modal-overlay').remove()">
-            Fechar
-          </button>
-        </div>
-      </div>
-    </div>
-  `;
-  
-  document.body.appendChild(modal);
-  
-  // Fechar ao clicar fora
-  modal.addEventListener('click', (e) => {
-    if (e.target === modal) modal.remove();
-  });
-  
-  // Animar entrada
-  requestAnimationFrame(() => {
-    modal.classList.add('modal-visible');
-  });
-  
-  // Selecionar texto automaticamente
-  setTimeout(() => {
-    const textarea = modal.querySelector('.texto-roteiro');
-    if (textarea) {
-      textarea.focus();
-      textarea.select();
+  try {
+    // Tentar diferentes formatos de entrada
+    let data;
+    
+    if (dataString.includes('T')) {
+      // Formato ISO com tempo
+      data = new Date(dataString);
+    } else if (dataString.match(/^\d{4}-\d{2}-\d{2}$/)) {
+      // Formato ISO sem tempo
+      data = new Date(dataString + 'T12:00:00');
+    } else {
+      // Outros formatos
+      data = new Date(dataString);
     }
-  }, 300);
-},
-
-/**
- * ✅ MELHORADO: Obter texto da intensidade com mais detalhes
- */
-obterTextoIntensidade() {
-  const mapas = {
-    'leve': 'Leve e relaxante',
-    'moderado': 'Equilibrado', 
-    'intenso': 'Completo e dinâmico'
-  };
-  
-  return mapas[this.dadosFormulario?.intensidade] || 'Equilibrado';
-},
-
-/**
- * ✅ MELHORADO: Obter texto de preferência mais descritivo
- */
-obterTextoPreferencia() {
-  const mapas = {
-    'relaxar': 'Descanso e bem-estar',
-    'aventura': 'Aventura e natureza',
-    'cultura': 'Cultura e história',
-    'urbano': 'Urbano e moderno'
-  };
-  
-  return mapas[this.obterTipoViagem()] || 'Experiências variadas';
-},
-
-/**
- * ✅ MELHORADO: Obter texto da companhia mais detalhado
- */
-obterTextoCompanhia() {
-  const dados = this.dadosFormulario;
-  const tipo = dados?.companhia || 'sozinho';
-  
-  if (tipo === 'familia') {
-    const total = dados.quantidadePessoas || 2;
-    const adultos = dados.quantidadeAdultos || 1;
-    const criancas = dados.quantidadeCriancas || 0;
-    const bebes = dados.quantidadeBebes || 0;
     
-    let detalhes = [`${total} pessoas`];
-    if (adultos > 0) detalhes.push(`${adultos} adulto${adultos > 1 ? 's' : ''}`);
-    if (criancas > 0) detalhes.push(`${criancas} criança${criancas > 1 ? 's' : ''}`);
-    if (bebes > 0) detalhes.push(`${bebes} bebê${bebes > 1 ? 's' : ''}`);
+    if (isNaN(data.getTime())) {
+      console.warn('⚠️ Data inválida:', dataString);
+      return dataString;
+    }
     
-    return `Família (${detalhes.slice(0, 2).join(', ')})`;
+    const options = {
+      weekday: 'long',
+      day: 'numeric',
+      month: 'numeric',
+      year: 'numeric'
+    };
+    
+    const formatada = data.toLocaleDateString('pt-BR', options);
+    return formatada.charAt(0).toUpperCase() + formatada.slice(1);
+    
+  } catch (erro) {
+    console.warn('⚠️ Erro ao formatar data:', erro);
+    return dataString;
   }
-  
-  const textos = {
-    'sozinho': 'Viagem solo',
-    'casal': 'Casal',
-    'amigos': `Grupo de amigos (${dados?.quantidadePessoas || 2} pessoas)`
-  };
-  
-  return textos[tipo] || 'Viagem individual';
 },
 
   editarRoteiro() {
