@@ -1,0 +1,438 @@
+/**
+ * BENETRIP - CSS Otimizado para Chat Fluido
+ * Animações e transições otimizadas para melhor performance
+ */
+
+/* ===== VARIÁVEIS DE ANIMAÇÃO OTIMIZADAS ===== */
+:root {
+    --animation-fast: 150ms;
+    --animation-medium: 250ms;
+    --animation-slow: 350ms;
+    --easing-smooth: cubic-bezier(0.25, 0.8, 0.25, 1);
+    --easing-bounce: cubic-bezier(0.68, -0.55, 0.265, 1.55);
+    --easing-out: cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+/* ===== OTIMIZAÇÕES DE PERFORMANCE ===== */
+
+/* Usar transform e opacity para animações (GPU accelerated) */
+.chat-message {
+    will-change: transform, opacity;
+    transform: translateZ(0); /* Force GPU acceleration */
+    backface-visibility: hidden;
+}
+
+/* Scroll suave e otimizado */
+.chat-messages {
+    scroll-behavior: smooth;
+    overflow-anchor: auto; /* Manter posição durante updates */
+    scroll-padding-bottom: 20px;
+}
+
+/* ===== ANIMAÇÕES DE ENTRADA OTIMIZADAS ===== */
+
+/* Animação de entrada para mensagens - mais rápida */
+@keyframes messageSlideIn {
+    0% {
+        opacity: 0;
+        transform: translateY(20px) scale(0.95);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.chat-message {
+    animation: messageSlideIn var(--animation-medium) var(--easing-out);
+}
+
+/* Animação específica para mensagens da Tripinha */
+.chat-message.tripinha {
+    animation: messageSlideIn var(--animation-medium) var(--easing-out);
+}
+
+/* Animação específica para mensagens do usuário */
+.chat-message.user {
+    animation: messageSlideIn var(--animation-fast) var(--easing-out);
+}
+
+/* ===== BOTÕES DE OPÇÃO OTIMIZADOS ===== */
+
+.option-button {
+    transition: all var(--animation-fast) var(--easing-smooth);
+    transform: translateZ(0); /* GPU acceleration */
+    position: relative;
+    overflow: hidden;
+}
+
+/* Efeito ripple otimizado */
+.option-button::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    background: rgba(232, 119, 34, 0.1);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    transition: width var(--animation-medium) var(--easing-out),
+                height var(--animation-medium) var(--easing-out);
+}
+
+.option-button:active::before {
+    width: 300px;
+    height: 300px;
+}
+
+/* Estados de hover e active otimizados */
+.option-button:hover {
+    transform: translateY(-2px) scale(1.02);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+}
+
+.option-button:active {
+    transform: translateY(0) scale(0.98);
+    transition-duration: var(--animation-fast);
+}
+
+/* ===== CALENDÁRIO OTIMIZADO ===== */
+
+.calendar-container {
+    transition: all var(--animation-medium) var(--easing-smooth);
+    transform: translateZ(0);
+}
+
+.flatpickr-calendar {
+    animation: calendarFadeIn var(--animation-medium) var(--easing-out);
+}
+
+@keyframes calendarFadeIn {
+    0% {
+        opacity: 0;
+        transform: translateY(10px) scale(0.95);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+/* Otimização dos dias do calendário */
+.flatpickr-day {
+    transition: all var(--animation-fast) var(--easing-smooth);
+    position: relative;
+    overflow: hidden;
+}
+
+.flatpickr-day::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: var(--orange-primary);
+    opacity: 0;
+    transform: scale(0);
+    border-radius: inherit;
+    transition: all var(--animation-fast) var(--easing-bounce);
+}
+
+.flatpickr-day:hover::before {
+    opacity: 0.1;
+    transform: scale(1);
+}
+
+.flatpickr-day.selected::before {
+    opacity: 1;
+    transform: scale(1);
+}
+
+/* ===== INPUTS OTIMIZADOS ===== */
+
+.text-input, .autocomplete-input, .currency-input, .number-input {
+    transition: all var(--animation-fast) var(--easing-smooth);
+    position: relative;
+}
+
+/* Animação de foco otimizada */
+.text-input:focus, .autocomplete-input:focus, .currency-input:focus {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(232, 119, 34, 0.2),
+                0 0 0 3px rgba(232, 119, 34, 0.1);
+}
+
+/* ===== AUTOCOMPLETE OTIMIZADO ===== */
+
+.autocomplete-results {
+    animation: dropdownSlideIn var(--animation-medium) var(--easing-out);
+    max-height: 300px;
+    overflow-y: auto;
+    scroll-behavior: smooth;
+}
+
+@keyframes dropdownSlideIn {
+    0% {
+        opacity: 0;
+        transform: translateY(-10px) scale(0.95);
+        max-height: 0;
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+        max-height: 300px;
+    }
+}
+
+.autocomplete-item {
+    transition: all var(--animation-fast) var(--easing-smooth);
+    position: relative;
+    overflow: hidden;
+}
+
+.autocomplete-item::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(232, 119, 34, 0.1), transparent);
+    transition: left var(--animation-medium) var(--easing-smooth);
+}
+
+.autocomplete-item:hover::before {
+    left: 100%;
+}
+
+/* ===== INDICADORES DE CARREGAMENTO OTIMIZADOS ===== */
+
+.thinking-dots span {
+    animation: thinkingPulse 1.4s infinite ease-in-out;
+    transform-origin: center;
+}
+
+@keyframes thinkingPulse {
+    0%, 100% {
+        transform: scale(0.8);
+        opacity: 0.5;
+    }
+    50% {
+        transform: scale(1.2);
+        opacity: 1;
+    }
+}
+
+/* Stagger animation para os dots */
+.thinking-dots span:nth-child(1) { animation-delay: -0.32s; }
+.thinking-dots span:nth-child(2) { animation-delay: -0.16s; }
+.thinking-dots span:nth-child(3) { animation-delay: 0s; }
+
+/* ===== BARRA DE PROGRESSO OTIMIZADA ===== */
+
+.progress-container {
+    animation: progressSlideIn var(--animation-medium) var(--easing-out);
+}
+
+@keyframes progressSlideIn {
+    0% {
+        opacity: 0;
+        transform: translateX(-20px);
+    }
+    100% {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+.progress-bar {
+    transition: width var(--animation-medium) var(--easing-smooth);
+    position: relative;
+    overflow: hidden;
+}
+
+/* Shimmer effect na barra de progresso */
+.progress-bar::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, 
+        transparent, 
+        rgba(255, 255, 255, 0.4), 
+        transparent
+    );
+    animation: shimmer 2s infinite;
+}
+
+@keyframes shimmer {
+    0% { left: -100%; }
+    100% { left: 100%; }
+}
+
+/* ===== FEEDBACK VISUAL OTIMIZADO ===== */
+
+.visual-feedback {
+    animation: feedbackPop var(--animation-medium) var(--easing-bounce);
+}
+
+@keyframes feedbackPop {
+    0% {
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(0);
+    }
+    50% {
+        transform: translate(-50%, -50%) scale(1.2);
+    }
+    100% {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1);
+    }
+}
+
+/* ===== TOASTS OTIMIZADOS ===== */
+
+.toast {
+    animation: toastSlideUp var(--animation-medium) var(--easing-out);
+}
+
+@keyframes toastSlideUp {
+    0% {
+        opacity: 0;
+        transform: translateY(100%) scale(0.95);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.toast.removing {
+    animation: toastSlideDown var(--animation-fast) var(--easing-smooth);
+}
+
+@keyframes toastSlideDown {
+    0% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+    100% {
+        opacity: 0;
+        transform: translateY(-100%) scale(0.95);
+    }
+}
+
+/* ===== OTIMIZAÇÕES PARA DISPOSITIVOS MÓVEIS ===== */
+
+@media (hover: none) and (pointer: coarse) {
+    /* Reduzir animações em dispositivos touch */
+    .option-button:hover {
+        transform: none;
+        box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
+    }
+    
+    /* Aumentar área de toque */
+    .option-button, .autocomplete-item, .flatpickr-day {
+        min-height: 44px;
+        min-width: 44px;
+    }
+}
+
+/* ===== MODO REDUZIDO DE MOVIMENTO ===== */
+
+@media (prefers-reduced-motion: reduce) {
+    * {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+    
+    .chat-message {
+        animation: none;
+    }
+    
+    .thinking-dots span {
+        animation: none;
+        opacity: 1;
+    }
+}
+
+/* ===== OTIMIZAÇÕES DE SCROLL ===== */
+
+/* Scroll personalizado para webkit */
+.chat-messages::-webkit-scrollbar {
+    width: 4px;
+}
+
+.chat-messages::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.chat-messages::-webkit-scrollbar-thumb {
+    background: rgba(232, 119, 34, 0.3);
+    border-radius: 2px;
+    transition: background var(--animation-fast);
+}
+
+.chat-messages::-webkit-scrollbar-thumb:hover {
+    background: rgba(232, 119, 34, 0.5);
+}
+
+/* ===== MICRO-INTERAÇÕES ===== */
+
+/* Pulse para elementos importantes */
+@keyframes gentlePulse {
+    0%, 100% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.05);
+    }
+}
+
+.important-element {
+    animation: gentlePulse 2s infinite ease-in-out;
+}
+
+/* Bounce para confirmações */
+@keyframes confirmBounce {
+    0%, 20%, 50%, 80%, 100% {
+        transform: translateY(0);
+    }
+    40% {
+        transform: translateY(-10px);
+    }
+    60% {
+        transform: translateY(-5px);
+    }
+}
+
+.confirm-success {
+    animation: confirmBounce 0.6s ease-in-out;
+}
+
+/* ===== LOADING STATES OTIMIZADOS ===== */
+
+.loading-skeleton {
+    background: linear-gradient(90deg, 
+        #f0f0f0 25%, 
+        #e0e0e0 50%, 
+        #f0f0f0 75%
+    );
+    background-size: 200% 100%;
+    animation: skeletonLoading 1.5s infinite;
+}
+
+@keyframes skeletonLoading {
+    0% {
+        background-position: 200% 0;
+    }
+    100% {
+        background-position: -200% 0;
+    }
+}
