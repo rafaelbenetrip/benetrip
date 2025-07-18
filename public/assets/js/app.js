@@ -795,132 +795,146 @@ const BENETRIP = {
     },
     
     /**
-     * Configura o campo de autocomplete para cidades/destinos
-     */
-    configurarAutocomplete(pergunta) {
-        const autocompleteId = this.estado.currentAutocompleteId;
-        if (!autocompleteId) {
-            console.error("ID de autocomplete não encontrado!");
+ * Configura o campo de autocomplete para cidades/destinos
+ * VERSÃO OTIMIZADA: Compatível com sistema de edição
+ */
+configurarAutocomplete(pergunta) {
+    const autocompleteId = this.estado.currentAutocompleteId;
+    if (!autocompleteId) {
+        console.error("ID de autocomplete não encontrado!");
+        return;
+    }
+    
+    // Identificar o tipo de campo (origem ou destino)
+    const tipoCampo = pergunta.key === 'destino_conhecido' ? 'destino' : 'origem';
+    console.log(`Configurando autocomplete para campo: ${tipoCampo}`);
+    
+    const input = document.getElementById(autocompleteId);
+    const resultsContainer = document.getElementById(`${autocompleteId}-results`);
+    const confirmBtn = document.getElementById(`${autocompleteId}-confirm`);
+    
+    if (!input || !resultsContainer || !confirmBtn) {
+        console.error("Elementos de autocomplete não encontrados!");
+        return;
+    }
+    
+    let selectedItem = null;
+    let currentQuery = '';
+    
+    // Função para buscar sugestões com debounce (atraso)
+    const buscarSugestoes = _.debounce(async (termo) => {
+        if (!termo || termo.length < 2) {
+            resultsContainer.innerHTML = '';
             return;
         }
         
-        // Identificar o tipo de campo (origem ou destino)
-        const tipoCampo = pergunta.key === 'destino_conhecido' ? 'destino' : 'origem';
-        console.log(`Configurando autocomplete para campo: ${tipoCampo}`);
+        // Mostrar indicador de carregamento
+        resultsContainer.innerHTML = '<div class="loading-autocomplete">Buscando...</div>';
         
-        const input = document.getElementById(autocompleteId);
-        const resultsContainer = document.getElementById(`${autocompleteId}-results`);
-        const confirmBtn = document.getElementById(`${autocompleteId}-confirm`);
-        
-        if (!input || !resultsContainer || !confirmBtn) {
-            console.error("Elementos de autocomplete não encontrados!");
-            return;
-        }
-        
-        let selectedItem = null;
-        let currentQuery = '';
-        
-        // Função para buscar sugestões com debounce (atraso)
-        const buscarSugestoes = _.debounce(async (termo) => {
-            if (!termo || termo.length < 2) {
-                resultsContainer.innerHTML = '';
-                return;
-            }
+        try {
+            let sugestoes = [];
             
-            // Mostrar indicador de carregamento
-            resultsContainer.innerHTML = '<div class="loading-autocomplete">Buscando...</div>';
-            
-            try {
-                let sugestoes = [];
-                
-                // Usar a API Aviasales através do serviço
-                if (window.BENETRIP_API) {
-                    sugestoes = await window.BENETRIP_API.buscarSugestoesCidade(termo);
-                    console.log(`Sugestões recebidas para ${tipoCampo}:`, sugestoes);
-                } else {
-                    // Fallback para dados simulados
-                    sugestoes = [
-                        { type: "city", code: "SAO", name: "São Paulo", country_code: "BR", country_name: "Brasil" },
-                        { type: "city", code: "RIO", name: "Rio de Janeiro", country_code: "BR", country_name: "Brasil" },
-                        { type: "city", code: "NYC", name: "Nova York", country_code: "US", country_name: "Estados Unidos" }
-                    ];
-                }
-                
-                // Verificar se a consulta ainda é relevante
-                if (termo !== currentQuery) return;
-                
-                if (sugestoes && sugestoes.length > 0) {
-                    resultsContainer.innerHTML = sugestoes.map(item => {
-                        // Garantir compatibilidade com diferentes formatos de resposta
-                        const code = item.code || item.iata;
-                        const name = item.name || item.city_name;
-                        const country = item.country_name;
-                        
-                        return `
-                            <div class="autocomplete-item" data-code="${code}" data-name="${name}" data-country="${country}">
-                                <div class="item-code">${code}</div>
-                                <div class="item-details">
-                                    <div class="item-name">${name}</div>
-                                    <div class="item-country">${country}</div>
-                                </div>
-                            </div>
-                        `;
-                    }).join('');
-                    
-                    // Adicionar eventos aos itens
-                    document.querySelectorAll(`#${autocompleteId}-results .autocomplete-item`).forEach(item => {
-                        item.addEventListener('click', () => {
-                            selectedItem = {
-                                code: item.dataset.code,
-                                name: item.dataset.name,
-                                country: item.dataset.country
-                            };
-                            input.value = `${selectedItem.name} (${selectedItem.code})`;
-                            resultsContainer.innerHTML = '';
-                            confirmBtn.disabled = false;
-                        });
-                    });
-                } else {
-                    resultsContainer.innerHTML = '<div class="no-results">Nenhum resultado encontrado</div>';
-                }
-            } catch (error) {
-                console.error(`Erro ao buscar sugestões para ${tipoCampo}:`, error);
-                resultsContainer.innerHTML = '<div class="error">Erro ao buscar sugestões</div>';
-            }
-        }, 300);
-        
-        // Evento para input
-        input.addEventListener('input', (e) => {
-            const termo = e.target.value.trim();
-            currentQuery = termo;
-            
-            if (!termo) {
-                resultsContainer.innerHTML = '';
-                confirmBtn.disabled = true;
-                selectedItem = null;
+            // Usar a API Aviasales através do serviço
+            if (window.BENETRIP_API) {
+                sugestoes = await window.BENETRIP_API.buscarSugestoesCidade(termo);
+                console.log(`Sugestões recebidas para ${tipoCampo}:`, sugestoes);
             } else {
-                buscarSugestoes(termo);
+                // Fallback para dados simulados
+                sugestoes = [
+                    { type: "city", code: "SAO", name: "São Paulo", country_code: "BR", country_name: "Brasil" },
+                    { type: "city", code: "RIO", name: "Rio de Janeiro", country_code: "BR", country_name: "Brasil" },
+                    { type: "city", code: "NYC", name: "Nova York", country_code: "US", country_name: "Estados Unidos" }
+                ];
             }
-        });
-        
-        // Evento para o botão de confirmação
-        confirmBtn.addEventListener('click', () => {
-            if (selectedItem) {
-                this.processarResposta(selectedItem, pergunta);
+            
+            // Verificar se a consulta ainda é relevante
+            if (termo !== currentQuery) return;
+            
+            if (sugestoes && sugestoes.length > 0) {
+                resultsContainer.innerHTML = sugestoes.map(item => {
+                    // Garantir compatibilidade com diferentes formatos de resposta
+                    const code = item.code || item.iata;
+                    const name = item.name || item.city_name;
+                    const country = item.country_name;
+                    
+                    return `
+                        <div class="autocomplete-item" data-code="${code}" data-name="${name}" data-country="${country}">
+                            <div class="item-code">${code}</div>
+                            <div class="item-details">
+                                <div class="item-name">${name}</div>
+                                <div class="item-country">${country}</div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+                
+                // Adicionar eventos aos itens
+                document.querySelectorAll(`#${autocompleteId}-results .autocomplete-item`).forEach(item => {
+                    item.addEventListener('click', () => {
+                        selectedItem = {
+                            code: item.dataset.code,
+                            name: item.dataset.name,
+                            country: item.dataset.country
+                        };
+                        input.value = `${selectedItem.name} (${selectedItem.code})`;
+                        resultsContainer.innerHTML = '';
+                        confirmBtn.disabled = false;
+                        
+                        // NOVO: Salvar dados selecionados no dataset para sistema de edição
+                        input.dataset.selectedItem = JSON.stringify(selectedItem);
+                    });
+                });
+            } else {
+                resultsContainer.innerHTML = '<div class="no-results">Nenhum resultado encontrado</div>';
             }
-        });
+        } catch (error) {
+            console.error(`Erro ao buscar sugestões para ${tipoCampo}:`, error);
+            resultsContainer.innerHTML = '<div class="error">Erro ao buscar sugestões</div>';
+        }
+    }, 300);
+    
+    // Evento para input
+    input.addEventListener('input', (e) => {
+        const termo = e.target.value.trim();
+        currentQuery = termo;
         
-        // Evento para Enter no campo
-        input.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' && selectedItem) {
-                e.preventDefault();
-                this.processarResposta(selectedItem, pergunta);
-            }
-        });
-        
-        // Foco automático no campo
-        setTimeout(() => input.focus(), 300);
-    },
+        if (!termo) {
+            resultsContainer.innerHTML = '';
+            confirmBtn.disabled = true;
+            selectedItem = null;
+            
+            // NOVO: Limpar dados salvos quando input é limpo
+            input.removeAttribute('data-selected-item');
+        } else {
+            buscarSugestoes(termo);
+        }
+    });
+    
+    // Evento para o botão de confirmação
+    confirmBtn.addEventListener('click', () => {
+        if (selectedItem) {
+            // NOVO: Garantir que dados estejam salvos no dataset
+            input.dataset.selectedItem = JSON.stringify(selectedItem);
+            
+            this.processarResposta(selectedItem, pergunta);
+        }
+    });
+    
+    // Evento para Enter no campo
+    input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && selectedItem) {
+            e.preventDefault();
+            
+            // NOVO: Garantir que dados estejam salvos no dataset
+            input.dataset.selectedItem = JSON.stringify(selectedItem);
+            
+            this.processarResposta(selectedItem, pergunta);
+        }
+    });
+    
+    // Foco automático no campo
+    setTimeout(() => input.focus(), 300);
+},
 
     /**
      * Configura a entrada de valor monetário
@@ -956,7 +970,7 @@ const BENETRIP = {
                         valor = (parseInt(valor) / 100).toFixed(2);
                         
                         // Formatar com separador decimal
-                        e.target.value = valor.replace('.', ',');
+                        e.target.value = valor.replace('.');
                         
                         // Habilitar botão se tiver valor
                         confirmBtn.disabled = parseFloat(valor) <= 0;
