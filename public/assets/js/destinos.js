@@ -44,7 +44,7 @@ const BENETRIP_DESTINOS = {
     const btnVoltar = document.getElementById('btn-voltar');
     if (btnVoltar) {
       btnVoltar.addEventListener('click', () => {
-        window.location.href = 'index.html';
+        window.location.href = 'chat.html';
       });
     }
     
