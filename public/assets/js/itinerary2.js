@@ -2087,15 +2087,16 @@ obterTextoCompanhia() {
     if (loading) loading.style.display = 'none';
   },
 
-  iniciarAnimacaoProgresso() {
-    const mensagens = [
-      '🤖 Consultando IA para seu roteiro personalizado...',
-      '🗺️ Mapeando pontos turísticos especiais...',
-      '📸 Buscando imagens dos locais...',
-      '🌤️ Checando previsão do tempo...',
-      '📝 Finalizando seu roteiro perfeito...'
-    ];
-    
+iniciarAnimacaoProgresso() {
+  const mensagens = [
+    '🐾 Revirando minhas memórias dos lugares que já farejai...',
+    '📸 Procurando as fotos mais fofas que tirei nessa aventura...',
+    '🗺️ Lembrando dos cantinhos secretos que descobri...',
+    '🌤️ Checando se o tempo vai estar bom pro passeio...',
+    '💭 Organizando minhas dicas especiais pra você...',
+    '📝 Preparando seu roteiro com todo carinho! 🐕'
+  ];
+  
     let indice = 0;
     
     this.intervalId = setInterval(() => {
