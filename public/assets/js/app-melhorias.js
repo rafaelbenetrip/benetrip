@@ -1,366 +1,307 @@
 /**
- * BENETRIP - App.js Otimizado para Fluidez
- * Principais otimizações a serem aplicadas no código existente
+ * BENETRIP - Melhorias Simples para Fluidez
+ * Versão simplificada sem dependências externas
  */
 
-// ===== 1. OTIMIZAÇÃO DA FUNÇÃO mostrarProximaPergunta =====
-BENETRIP.mostrarProximaPergunta = function() {
-    // Performance mark para monitoramento
-    BENETRIP_CHAT_OPTIMIZED.performanceMonitor.mark('showQuestion_start');
+// Aguardar o BENETRIP estar disponível
+(function() {
+    'use strict';
     
-    if (this.estado.perguntaAtual >= this.estado.perguntas.length) {
-        this.finalizarQuestionario();
-        return;
-    }
-
-    const pergunta = this.estado.perguntas[this.estado.perguntaAtual];
-
-    if (pergunta.conditional && !this.deveExibirPerguntaCondicional(pergunta)) {
-        this.estado.perguntaAtual++;
-        // Chamada recursiva otimizada com requestAnimationFrame
-        requestAnimationFrame(() => this.mostrarProximaPergunta());
-        return;
-    }
-
-    // Usar requestAnimationFrame para melhor performance
-    requestAnimationFrame(() => {
-        const mensagemHTML = this.montarHTMLPergunta(pergunta);
-        const chatMessages = document.getElementById('chat-messages');
+    function aplicarMelhoriasSimples() {
+        if (typeof BENETRIP === 'undefined') {
+            setTimeout(aplicarMelhoriasSimples, 100);
+            return;
+        }
         
-        // Usar insertAdjacentHTML para melhor performance
-        chatMessages.insertAdjacentHTML('beforeend', mensagemHTML);
+        console.log("📱 Aplicando melhorias de fluidez...");
         
-        // Scroll otimizado
-        BENETRIP_CHAT_OPTIMIZED.smoothScrollToBottom();
+        // ===== 1. DELAYS MAIS RÁPIDOS =====
+        if (BENETRIP.config) {
+            BENETRIP.config.animationDelay = 400; // Reduzido de 800ms
+        }
         
-        // Configurar eventos de forma assíncrona
-        setTimeout(() => {
-            this.configurarEventosPergunta(pergunta);
-            BENETRIP_CHAT_OPTIMIZED.performanceMonitor.measure('showQuestion', 'showQuestion_start');
-        }, 0);
-    });
-};
-
-// ===== 2. OTIMIZAÇÃO DA FUNÇÃO processarResposta =====
-BENETRIP.processarResposta = function(valor, pergunta) {
-    // Feedback tátil imediato
-    BENETRIP_CHAT_OPTIMIZED.hapticFeedback('light');
-    
-    // Armazenar resposta
-    this.estado.respostas[pergunta.key] = valor;
-    
-    // Mostrar resposta do usuário de forma otimizada
-    this.mostrarRespostaUsuarioOtimizada(valor, pergunta);
-    
-    if (pergunta.key === 'conhece_destino') {
-        this.estado.fluxo = valor === 0 ? 'destino_conhecido' : 'destino_desconhecido';
-    }
-    
-    this.estado.perguntaAtual++;
-    
-    if (this.verificarLimitePerguntas()) {
-        this.finalizarQuestionario();
-        return;
-    }
-    
-    // Transição otimizada usando requestAnimationFrame
-    requestAnimationFrame(() => {
-        setTimeout(() => {
-            this.mostrarProximaPergunta();
-        }, BENETRIP_CHAT_OPTIMIZED.config.messageDelay);
-    });
-};
-
-// ===== 3. NOVA FUNÇÃO OTIMIZADA PARA RESPOSTA DO USUÁRIO =====
-BENETRIP.mostrarRespostaUsuarioOtimizada = function(valor, pergunta) {
-    let mensagemResposta = '';
-    
-    if (pergunta.options) {
-        mensagemResposta = pergunta.options[valor];
-    } else if (pergunta.calendar) {
-        const formatarDataVisual = (dataStr) => {
-            if (!dataStr || typeof dataStr !== 'string') return 'Data inválida';
-            if (dataStr.match(/^\d{4}-\d{2}-\d{2}$/)) {
-                const [ano, mes, dia] = dataStr.split('-');
-                return `${dia}/${mes}/${ano}`;
+        // ===== 2. SCROLL SUAVE MELHORADO =====
+        const scrollOriginal = BENETRIP.rolarParaFinal;
+        BENETRIP.rolarParaFinal = function() {
+            const chatMessages = document.getElementById('chat-messages');
+            if (!chatMessages) return;
+            
+            // Verificar se usuário está próximo do final
+            const isNearBottom = chatMessages.scrollHeight - chatMessages.clientHeight <= chatMessages.scrollTop + 100;
+            
+            if (isNearBottom) {
+                chatMessages.scrollTo({
+                    top: chatMessages.scrollHeight,
+                    behavior: 'smooth'
+                });
             }
-            return dataStr;
         };
-        mensagemResposta = `✈️ ${formatarDataVisual(valor.dataIda)} → ${formatarDataVisual(valor.dataVolta)}`;
-    } else if (pergunta.autocomplete) {
-        mensagemResposta = `📍 ${valor.name} (${valor.code}), ${valor.country}`;
-    } else {
-        mensagemResposta = valor.toString();
-    }
-    
-    // Criar mensagem usando DocumentFragment para melhor performance
-    const fragment = document.createDocumentFragment();
-    const messageDiv = document.createElement('div');
-    messageDiv.className = 'chat-message user';
-    messageDiv.innerHTML = `
-        <div class="message">
-            <p>${mensagemResposta}</p>
-        </div>
-    `;
-    
-    fragment.appendChild(messageDiv);
-    
-    // Adicionar feedback visual
-    BENETRIP_CHAT_OPTIMIZED.addVisualFeedback(messageDiv, 'success');
-    
-    // Adicionar ao chat de forma otimizada
-    const chatMessages = document.getElementById('chat-messages');
-    chatMessages.appendChild(fragment);
-    
-    // Scroll suave
-    BENETRIP_CHAT_OPTIMIZED.smoothScrollToBottom();
-};
-
-// ===== 4. OTIMIZAÇÃO DO CALENDÁRIO =====
-BENETRIP.inicializarCalendarioOtimizado = async function(pergunta) {
-    console.log("Inicializando calendário otimizado");
-    
-    if (this.estado.calendarioAtual) {
-        console.log("Calendário já inicializado");
-        return;
-    }
-    
-    this.estado.currentCalendarId = 'benetrip-calendar-principal';
-    const calendarId = this.estado.currentCalendarId;
-    
-    // Aguardar que o elemento esteja disponível
-    const waitForElement = (selector, timeout = 5000) => {
-        return new Promise((resolve, reject) => {
-            const element = document.getElementById(selector);
-            if (element) {
-                resolve(element);
-                return;
-            }
+        
+        // ===== 3. FEEDBACK VISUAL SIMPLES =====
+        function adicionarFeedbackVisual(elemento, tipo = 'success') {
+            const cores = {
+                success: '#4CAF50',
+                error: '#F44336',
+                info: '#2196F3'
+            };
             
-            const observer = new MutationObserver((mutations) => {
-                const element = document.getElementById(selector);
-                if (element) {
-                    observer.disconnect();
-                    resolve(element);
-                }
+            const feedback = document.createElement('div');
+            feedback.innerHTML = tipo === 'success' ? '✓' : (tipo === 'error' ? '✕' : 'i');
+            feedback.style.cssText = `
+                position: absolute;
+                top: -5px;
+                right: -5px;
+                width: 20px;
+                height: 20px;
+                background: ${cores[tipo]};
+                color: white;
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 12px;
+                font-weight: bold;
+                opacity: 0;
+                transform: scale(0);
+                transition: all 0.3s ease;
+                z-index: 10;
+                pointer-events: none;
+            `;
+            
+            elemento.style.position = 'relative';
+            elemento.appendChild(feedback);
+            
+            // Mostrar feedback
+            requestAnimationFrame(() => {
+                feedback.style.opacity = '1';
+                feedback.style.transform = 'scale(1)';
             });
             
-            observer.observe(document.body, {
-                childList: true,
-                subtree: true
-            });
-            
+            // Remover após 1.5s
             setTimeout(() => {
-                observer.disconnect();
-                reject(new Error('Element not found'));
-            }, timeout);
-        });
-    };
-    
-    try {
-        const calendarElement = await waitForElement(calendarId);
-        
-        // Garantir que Flatpickr está carregado
-        if (typeof flatpickr === 'undefined') {
-            await BENETRIP_CHAT_OPTIMIZED.loadFlatpickr();
+                feedback.style.opacity = '0';
+                feedback.style.transform = 'scale(0)';
+                setTimeout(() => feedback.remove(), 300);
+            }, 1500);
         }
         
-        const amanha = new Date();
-        amanha.setDate(amanha.getDate() + 1);
-        
-        const calendar = await BENETRIP_CHAT_OPTIMIZED.initOptimizedCalendar(calendarId, {
-            mode: "range",
-            dateFormat: "Y-m-d",
-            minDate: this.formatarDataISO(amanha),
-            maxDate: pergunta.calendar?.max_date,
-            inline: true,
-            locale: {
-                weekdays: {
-                    shorthand: ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'],
-                    longhand: ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado']
-                },
-                months: {
-                    shorthand: ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'],
-                    longhand: ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro']
-                }
-            },
-            onChange: (selectedDates) => {
-                this.atualizarExibicaoDatas(selectedDates, calendarId);
+        // ===== 4. VIBRAÇÃO MÓVEL =====
+        function vibrarMobile(intensidade = 'light') {
+            if ('vibrate' in navigator) {
+                const padroes = {
+                    light: [10],
+                    medium: [20],
+                    heavy: [30]
+                };
+                navigator.vibrate(padroes[intensidade] || padroes.light);
             }
-        });
-        
-        this.estado.calendarioAtual = calendar;
-        this.configurarBotaoConfirmacaoDatas(calendarId, pergunta);
-        
-    } catch (error) {
-        console.error("Erro ao inicializar calendário:", error);
-        this.exibirToast("Erro ao carregar calendário. Tente recarregar a página.", "error");
-    }
-};
-
-// ===== 5. FUNÇÃO AUXILIAR PARA ATUALIZAR DATAS =====
-BENETRIP.atualizarExibicaoDatas = function(selectedDates, calendarId) {
-    const dataIdaElement = document.getElementById(`data-ida-${calendarId}`);
-    const dataVoltaElement = document.getElementById(`data-volta-${calendarId}`);
-    const confirmarBtn = document.getElementById(`confirmar-datas-${calendarId}`);
-    
-    if (!dataIdaElement || !dataVoltaElement || !confirmarBtn) return;
-    
-    // Usar requestAnimationFrame para animações suaves
-    requestAnimationFrame(() => {
-        if (selectedDates.length === 0) {
-            dataIdaElement.textContent = "Selecione";
-            dataVoltaElement.textContent = "Selecione";
-            confirmarBtn.disabled = true;
-        } else if (selectedDates.length === 1) {
-            dataIdaElement.textContent = this.formatarDataVisivel(selectedDates[0]);
-            dataVoltaElement.textContent = "Selecione";
-            confirmarBtn.disabled = true;
-            // Feedback visual
-            BENETRIP_CHAT_OPTIMIZED.addVisualFeedback(dataIdaElement.parentElement, 'success');
-        } else if (selectedDates.length === 2) {
-            dataIdaElement.textContent = this.formatarDataVisivel(selectedDates[0]);
-            dataVoltaElement.textContent = this.formatarDataVisivel(selectedDates[1]);
-            confirmarBtn.disabled = false;
-            // Feedback visual e tátil
-            BENETRIP_CHAT_OPTIMIZED.addVisualFeedback(dataVoltaElement.parentElement, 'success');
-            BENETRIP_CHAT_OPTIMIZED.hapticFeedback('medium');
-        }
-    });
-};
-
-// ===== 6. OTIMIZAÇÃO DO AUTOCOMPLETE =====
-BENETRIP.configurarAutocompleteOtimizado = function(pergunta) {
-    const autocompleteId = this.estado.currentAutocompleteId;
-    if (!autocompleteId) return;
-    
-    const input = document.getElementById(autocompleteId);
-    const confirmBtn = document.getElementById(`${autocompleteId}-confirm`);
-    
-    if (!input || !confirmBtn) return;
-    
-    let selectedItem = null;
-    
-    // Função de busca otimizada
-    const searchFunction = async (query, options = {}) => {
-        if (window.BENETRIP_API) {
-            return await window.BENETRIP_API.buscarSugestoesCidade(query);
         }
         
-        // Fallback com dados simulados
-        return [
-            { type: "city", code: "SAO", name: "São Paulo", country_code: "BR", country_name: "Brasil" },
-            { type: "city", code: "RIO", name: "Rio de Janeiro", country_code: "BR", country_name: "Brasil" }
-        ].filter(item => item.name.toLowerCase().includes(query.toLowerCase()));
-    };
-    
-    // Usar autocomplete otimizado
-    BENETRIP_CHAT_OPTIMIZED.optimizedAutocomplete(input, searchFunction);
-    
-    // Configurar seleção de item
-    input.addEventListener('focus', () => {
-        BENETRIP_CHAT_OPTIMIZED.addMicroInteraction(input, 'focus');
-    });
-    
-    confirmBtn.addEventListener('click', () => {
-        if (selectedItem) {
-            BENETRIP_CHAT_OPTIMIZED.hapticFeedback('medium');
-            this.processarResposta(selectedItem, pergunta);
-        }
-    });
-    
-    // Auto-focus otimizado
-    requestAnimationFrame(() => {
-        input.focus();
-    });
-};
-
-// ===== 7. OTIMIZAÇÃO DA BARRA DE PROGRESSO =====
-BENETRIP.atualizarBarraProgressoOtimizada = function(porcentagem, mensagem) {
-    requestAnimationFrame(() => {
-        const progressBar = document.querySelector('.progress-bar');
-        const progressText = document.querySelector('.progress-text');
-        
-        if (progressBar && progressText) {
-            // Animação suave da barra
-            progressBar.style.width = `${porcentagem}%`;
-            progressText.textContent = mensagem || 'Processando...';
+        // ===== 5. MELHORIAS NA RESPOSTA DO USUÁRIO =====
+        const processarRespostaOriginal = BENETRIP.processarResposta;
+        BENETRIP.processarResposta = function(valor, pergunta) {
+            // Vibração ao selecionar resposta
+            vibrarMobile('light');
             
-            // Feedback visual quando completa
-            if (porcentagem >= 100) {
-                BENETRIP_CHAT_OPTIMIZED.hapticFeedback('double');
+            // Chamar função original
+            processarRespostaOriginal.call(this, valor, pergunta);
+        };
+        
+        // ===== 6. OTIMIZAÇÃO DOS BOTÕES =====
+        function otimizarBotoes() {
+            // Adicionar efeitos aos botões de opção
+            document.addEventListener('click', function(e) {
+                if (e.target.classList.contains('option-button')) {
+                    // Feedback visual
+                    adicionarFeedbackVisual(e.target, 'success');
+                    
+                    // Vibração
+                    vibrarMobile('medium');
+                    
+                    // Efeito visual no botão
+                    e.target.style.transform = 'scale(0.95)';
+                    setTimeout(() => {
+                        e.target.style.transform = 'scale(1)';
+                    }, 150);
+                }
+            });
+        }
+        
+        // ===== 7. ANIMAÇÕES CSS DINÂMICAS =====
+        function adicionarEstilosOtimizados() {
+            const style = document.createElement('style');
+            style.textContent = `
+                /* Animações mais fluidas */
+                .chat-message {
+                    animation: messageSlideIn 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
+                }
+                
+                @keyframes messageSlideIn {
+                    0% {
+                        opacity: 0;
+                        transform: translateY(20px) scale(0.95);
+                    }
+                    100% {
+                        opacity: 1;
+                        transform: translateY(0) scale(1);
+                    }
+                }
+                
+                /* Botões mais responsivos */
+                .option-button {
+                    transition: all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
+                    transform: translateZ(0);
+                }
+                
+                .option-button:hover {
+                    transform: translateY(-2px) scale(1.02);
+                    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+                }
+                
+                .option-button:active {
+                    transform: translateY(0) scale(0.98);
+                    transition-duration: 0.1s;
+                }
+                
+                /* Scroll suave */
+                .chat-messages {
+                    scroll-behavior: smooth;
+                    overflow-anchor: auto;
+                }
+                
+                /* Calendário mais fluido */
+                .flatpickr-day {
+                    transition: all 0.2s ease;
+                }
+                
+                .flatpickr-day:hover {
+                    transform: scale(1.1);
+                    background-color: rgba(232, 119, 34, 0.1) !important;
+                }
+                
+                /* Inputs mais responsivos */
+                .text-input, .autocomplete-input, .currency-input {
+                    transition: all 0.2s ease;
+                }
+                
+                .text-input:focus, .autocomplete-input:focus, .currency-input:focus {
+                    transform: translateY(-1px);
+                    box-shadow: 0 4px 12px rgba(232, 119, 34, 0.2);
+                }
+                
+                /* Loading mais suave */
+                .thinking-dots span {
+                    animation: thinkingPulse 1.2s infinite ease-in-out;
+                }
+                
+                @keyframes thinkingPulse {
+                    0%, 100% { 
+                        transform: scale(0.8);
+                        opacity: 0.5;
+                    }
+                    50% { 
+                        transform: scale(1.2);
+                        opacity: 1;
+                    }
+                }
+                
+                /* Toasts otimizados */
+                .toast {
+                    animation: toastSlideUp 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+                }
+                
+                @keyframes toastSlideUp {
+                    0% {
+                        opacity: 0;
+                        transform: translateY(100%) scale(0.95);
+                    }
+                    100% {
+                        opacity: 1;
+                        transform: translateY(0) scale(1);
+                    }
+                }
+                
+                /* Reduzir movimento se necessário */
+                @media (prefers-reduced-motion: reduce) {
+                    * {
+                        animation-duration: 0.01ms !important;
+                        transition-duration: 0.01ms !important;
+                    }
+                }
+            `;
+            document.head.appendChild(style);
+        }
+        
+        // ===== 8. OTIMIZAÇÃO DO TOAST =====
+        const exibirToastOriginal = BENETRIP.exibirToast;
+        if (exibirToastOriginal) {
+            BENETRIP.exibirToast = function(mensagem, tipo = 'info') {
+                // Vibração baseada no tipo
+                const vibracaoMap = {
+                    error: 'heavy',
+                    success: 'medium',
+                    warning: 'light',
+                    info: 'light'
+                };
+                vibrarMobile(vibracaoMap[tipo]);
+                
+                // Chamar função original
+                exibirToastOriginal.call(this, mensagem, tipo);
+            };
+        }
+        
+        // ===== 9. OTIMIZAÇÃO DO CALENDÁRIO =====
+        const inicializarCalendarioOriginal = BENETRIP.inicializarCalendario;
+        if (inicializarCalendarioOriginal) {
+            BENETRIP.inicializarCalendario = function(pergunta) {
+                console.log("🗓️ Inicializando calendário otimizado...");
+                
+                // Chamar versão original mas com melhorias
+                const resultado = inicializarCalendarioOriginal.call(this, pergunta);
+                
+                // Adicionar melhorias após inicialização
                 setTimeout(() => {
-                    document.querySelectorAll('.progress-container').forEach(el => {
-                        el.style.transition = 'opacity 0.3s ease';
-                        el.style.opacity = '0';
+                    const dias = document.querySelectorAll('.flatpickr-day');
+                    dias.forEach(dia => {
+                        dia.addEventListener('click', () => {
+                            vibrarMobile('light');
+                        });
                     });
                 }, 500);
-            }
+                
+                return resultado;
+            };
         }
-    });
-};
-
-// ===== 8. SISTEMA DE TOAST OTIMIZADO =====
-BENETRIP.exibirToastOtimizado = function(mensagem, tipo = 'info') {
-    let toastContainer = document.getElementById('toast-container');
-    if (!toastContainer) {
-        toastContainer = document.createElement('div');
-        toastContainer.id = 'toast-container';
-        document.body.appendChild(toastContainer);
-    }
-    
-    const toast = document.createElement('div');
-    toast.className = `toast toast-${tipo}`;
-    toast.textContent = mensagem;
-    
-    // Feedback tátil baseado no tipo
-    const hapticMap = { error: 'heavy', success: 'medium', warning: 'light', info: 'light' };
-    BENETRIP_CHAT_OPTIMIZED.hapticFeedback(hapticMap[tipo]);
-    
-    toastContainer.appendChild(toast);
-    
-    // Animação de entrada
-    requestAnimationFrame(() => {
-        toast.classList.add('show');
-    });
-    
-    // Remoção otimizada
-    setTimeout(() => {
-        toast.classList.add('removing');
-        toast.addEventListener('animationend', () => {
-            toast.remove();
-        }, { once: true });
-    }, 3000);
-};
-
-// ===== 9. SUBSTITUIÇÃO DA FUNÇÃO ORIGINAL DE SCROLL =====
-BENETRIP.rolarParaFinal = BENETRIP_CHAT_OPTIMIZED.smoothScrollToBottom;
-
-// ===== 10. OTIMIZAÇÃO DOS DELAYS =====
-BENETRIP.config.animationDelay = BENETRIP_CHAT_OPTIMIZED.config.messageDelay;
-
-// ===== 11. INICIALIZAÇÃO OTIMIZADA =====
-const originalInit = BENETRIP.init;
-BENETRIP.init = function() {
-    // Pré-carregamento de recursos
-    BENETRIP_CHAT_OPTIMIZED.preloadResources();
-    
-    // Configurar observador de performance
-    if ('PerformanceObserver' in window) {
-        const observer = new PerformanceObserver((list) => {
-            for (const entry of list.getEntries()) {
-                if (entry.duration > 100) {
-                    console.warn(`Performance: ${entry.name} took ${entry.duration}ms`);
+        
+        // ===== 10. INICIALIZAR MELHORIAS =====
+        function inicializar() {
+            console.log("✅ Melhorias de fluidez aplicadas!");
+            
+            // Aplicar estilos
+            adicionarEstilosOtimizados();
+            
+            // Otimizar botões
+            otimizarBotoes();
+            
+            // Marcar como aplicado
+            window.BENETRIP_MELHORIAS_APLICADAS = true;
+            
+            // Mostrar confirmação
+            setTimeout(() => {
+                if (BENETRIP.exibirToast) {
+                    BENETRIP.exibirToast("Chat otimizado para melhor fluidez! 🚀", "success");
                 }
-            }
-        });
-        observer.observe({ entryTypes: ['measure'] });
+            }, 1000);
+        }
+        
+        // Executar quando DOM estiver pronto
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', inicializar);
+        } else {
+            inicializar();
+        }
     }
     
-    // Chamar inicialização original
-    return originalInit.call(this);
-};
-
-// ===== 12. EXPORTAR MELHORIAS =====
-window.BENETRIP_OPTIMIZATIONS_APPLIED = true;
-console.log("✅ Otimizações de fluidez aplicadas ao BENETRIP");
+    // Iniciar processo
+    aplicarMelhoriasSimples();
+})();
