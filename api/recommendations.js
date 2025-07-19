@@ -566,7 +566,7 @@ ${adaptacoesPorTipo[infoViajante.companhia] || "Considere experiências versáte
    - Preço realista de voo
    - Pontos turísticos específicos e conhecidos
    - Eventos sazonais ou especiais no período da viagem
-   - Comentário personalizado da Tripinha mencionando detalhes sensoriais
+   - Comentário personalizado em 1ª pessoa da Tripinha mencionando detalhes sensoriais
    - Informações práticas de clima para o período
 
 3) Diversifique suas recomendações:
@@ -583,7 +583,7 @@ ${adaptacoesPorTipo[infoViajante.companhia] || "Considere experiências versáte
     "descricao": "Breve descrição de 1-2 frases sobre o destino",
     "porque": "Razão específica para este viajante visitar este destino",
     "destaque": "Uma experiência/atividade única neste destino",
-    "comentario": "Comentário entusiasmado da Tripinha mencionando um ponto turístico específico e aspectos sensoriais",
+    "comentario": "Comentário entusiasmado em 1a pessoa da Tripinha como foi interessante ter visitado esse local",
     "pontosTuristicos": ["Nome do Primeiro Ponto", "Nome do Segundo Ponto"],
     "eventos": ["Festival ou evento especial durante o período", "Outro evento relevante se houver"],
     "clima": {
@@ -613,7 +613,7 @@ ${adaptacoesPorTipo[infoViajante.companhia] || "Considere experiências versáte
 
 ## Verificação Final Obrigatória - CONFIRME QUE:
 - ✓ Considerou eventos sazonais, clima e atrações para CADA destino
-- ✓ Todos os comentários da Tripinha mencionam pontos turísticos específicos e incluem observações sensoriais
+- ✓ Todos os comentários da Tripinha são em 1a pessoa e simulam como foi a experiência dela nesse local
 - ✓ As recomendações estão adaptadas para viajantes ${infoViajante.companhia}
 - ✓ Todos os destinos incluem código IATA válido do aeroporto
 - ✓ Diversificou geograficamente as alternativas`;
@@ -1304,7 +1304,7 @@ IMPORTANTE:
 4. Garanta que os destinos sejam sejam realistas para o orçamento voos de ida e volta partindo de ${infoViajante.cidadeOrigem}.
 5. Para CADA destino, inclua o código IATA (3 letras) do aeroporto principal.
 6. Para cada destino, INCLUA PONTOS TURÍSTICOS ESPECÍFICOS E CONHECIDOS.
-7. Os comentários da Tripinha DEVEM mencionar pelo menos um dos pontos turísticos do destino.
+7. Os comentários da Tripinha DEVEM ser em 1a pessoa e comentar curiosidades que ela conhece sobre o local.
 8. NOVO: Forneça informações sobre o CLIMA esperado no destino durante a viagem (temperatura média e condições).
 
 Forneça no formato JSON exato abaixo, SEM formatação markdown:
@@ -1316,7 +1316,7 @@ Forneça no formato JSON exato abaixo, SEM formatação markdown:
     "descricao": "Breve descrição do destino",
     "porque": "Razão específica para visitar",
     "destaque": "Uma experiência única neste destino",
-    "comentario": "Comentário entusiasmado da Tripinha, mencionando pelo menos um ponto turístico",
+    "comentario": "Comentário entusiasmado da Tripinha em 1ª pessoa, falando sobre como foi sua experiência no local",
     "pontosTuristicos": [
       "Nome do Primeiro Ponto Turístico", 
       "Nome do Segundo Ponto Turístico"
@@ -1363,7 +1363,7 @@ Forneça no formato JSON exato abaixo, SEM formatação markdown:
     "descricao": "Breve descrição do destino",
     "porque": "Razão para visitar, destacando o fator surpresa",
     "destaque": "Uma experiência única neste destino",
-    "comentario": "Comentário entusiasmado da Tripinha, mencionando pelo menos um ponto turístico",
+    "comentario": "Comentário entusiasmado da Tripinha em 1ª pessoa, comentando como foi sua experiencia no local",
     "pontosTuristicos": [
       "Nome do Primeiro Ponto Turístico", 
       "Nome do Segundo Ponto Turístico"
