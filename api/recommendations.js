@@ -533,7 +533,6 @@ function gerarPromptParaDeepseekReasoner(dados) {
 - Quantidade: ${infoViajante.pessoas} pessoa(s)
 - Interesses: ${infoViajante.preferencia}
 - Período: ${dataIda} a ${dataVolta} (${duracaoViagem})
-- Estação na viagem: ${estacaoViagem}
 - Tipo de destino preferido: ${getTipoDestinoText(infoViajante.tipoDestino)}
 - Nível de popularidade desejado: ${getFamaDestinoText(infoViajante.famaDestino)}
 
@@ -557,10 +556,9 @@ ${adaptacoesPorTipo[infoViajante.companhia] || "Considere experiências versáte
 
 ## Processo de Raciocínio Passo a Passo
 1) Identifique destinos adequados considerando:
-   - Clima apropriado para ${estacaoViagem}
    - Eventos especiais/festivais no período
    - Adaptação para viajantes ${infoViajante.companhia}
-   - Destinos que fiquem entre 80% e 105% orçamento estipulado para voos de ${infoViajante.orcamento} ${infoViajante.moeda}
+   - Destinos que fiquem entre 80% e 120% orçamento estipulado para voos de ${infoViajante.orcamento} ${infoViajante.moeda}
 
 2) Para cada destino, determine:
    - Preço realista de voo
@@ -1292,7 +1290,6 @@ PERFIL DO VIAJANTE:
 - Número de pessoas: ${infoViajante.pessoas}
 - Atividades preferidas: ${infoViajante.preferencia}
 - Período da viagem: ${dataIda} a ${dataVolta} (${duracaoViagem})
-- Estação do ano na viagem: ${estacaoViagem}
 - Experiência como viajante: ${infoViajante.conheceDestino === 1 ? 'Com experiência' : 'Iniciante'} 
 - Preferência por destinos: ${getTipoDestinoText(infoViajante.tipoDestino)}
 - Popularidade do destino: ${getFamaDestinoText(infoViajante.famaDestino)}
