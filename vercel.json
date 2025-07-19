@@ -30,19 +30,6 @@
       "maxDuration": 180
     }
   },
-  "redirects": [
-    {
-      "source": "/(.*)",
-      "has": [
-        {
-          "type": "host",
-          "value": "benetrip.com.br"
-        }
-      ],
-      "destination": "https://www.benetrip.com.br/$1",
-      "permanent": true
-    }
-  ],
   "routes": [
     {
       "src": "/assets/js/(.*)\\.js",
