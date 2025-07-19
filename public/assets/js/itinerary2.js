@@ -1537,17 +1537,32 @@ mostrarModalCompartilhamento() {
         <div class="compartilhar-info">
           <div class="info-icon">📋</div>
           <div class="info-texto">
-            <h4>Compartilhar como Texto</h4>
-            <p>Seu roteiro será copiado como texto com todos os detalhes e links dos mapas para cada local.</p>
+            <h4>Escolha o formato ideal:</h4>
+            <p>Versão resumida funciona melhor no WhatsApp, versão completa tem todos os detalhes.</p>
           </div>
         </div>
         
-        <div class="modal-acoes">
-          <button class="btn btn-principal btn-compartilhar-texto">
-            <span class="btn-icon">📋</span>
-            <span class="btn-text">Compartilhar Roteiro</span>
+        <div class="opcoes-tamanho">
+          <button class="opcao-tamanho opcao-destaque" data-tipo="resumido">
+            <div class="opcao-icon">📱</div>
+            <div class="opcao-info">
+              <div class="opcao-titulo">Versão Resumida</div>
+              <div class="opcao-desc">Ideal para WhatsApp • ~2.000 caracteres</div>
+              <div class="opcao-preview">✅ Roteiro principal + links dos mapas</div>
+            </div>
           </button>
           
+          <button class="opcao-tamanho" data-tipo="completo">
+            <div class="opcao-icon">📄</div>
+            <div class="opcao-info">
+              <div class="opcao-titulo">Versão Completa</div>
+              <div class="opcao-desc">Todos os detalhes • ~4.000+ caracteres</div>
+              <div class="opcao-preview">📋 Informações + dicas + previsão + links</div>
+            </div>
+          </button>
+        </div>
+        
+        <div class="modal-acoes">
           <button class="btn btn-secundario" onclick="this.closest('.modal-overlay').remove()">
             Cancelar
           </button>
@@ -1563,10 +1578,23 @@ mostrarModalCompartilhamento() {
     if (e.target === modal) modal.remove();
   });
   
-  // Evento do botão compartilhar
-  modal.querySelector('.btn-compartilhar-texto').addEventListener('click', async () => {
-    modal.remove();
-    await this.compartilharTextoCompleto();
+  // Eventos dos botões de opção
+  modal.querySelectorAll('.opcao-tamanho').forEach(opcao => {
+    opcao.addEventListener('click', async (e) => {
+      const tipo = opcao.dataset.tipo;
+      modal.remove();
+      
+      try {
+        if (tipo === 'resumido') {
+          await this.compartilharTextoResumido();
+        } else {
+          await this.compartilharTextoCompleto();
+        }
+      } catch (erro) {
+        console.error('❌ Erro na ação de compartilhamento:', erro);
+        this.exibirToast('Erro ao processar compartilhamento', 'error');
+      }
+    });
   });
   
   // Animação de entrada
@@ -1576,13 +1604,115 @@ mostrarModalCompartilhamento() {
 },
 
 /**
+ * ✅ NOVO: Compartilhar versão resumida (para WhatsApp)
+ */
+async compartilharTextoResumido() {
+  try {
+    this.exibirToast('📱 Preparando versão resumida...', 'info');
+    
+    const textoResumido = this.gerarTextoRoteiroResumido();
+    
+    // Verificar tamanho
+    if (textoResumido.length > 3500) {
+      console.warn(`⚠️ Texto resumido ainda muito longo: ${textoResumido.length} caracteres`);
+      this.exibirToast('⚠️ Roteiro muito extenso, pode ser cortado em alguns apps', 'warning');
+    }
+    
+    // Tentar compartilhamento nativo primeiro (mobile)
+    if (navigator.share && /mobile|android|iphone/i.test(navigator.userAgent)) {
+      try {
+        await navigator.share({
+          title: `Roteiro Benetrip - ${this.dadosDestino.destino}`,
+          text: textoResumido
+        });
+        this.exibirToast('📤 Versão resumida compartilhada!', 'success');
+        return;
+      } catch (e) {
+        console.log('ℹ️ Share cancelado, copiando para clipboard');
+      }
+    }
+    
+    // Fallback: Copiar para clipboard
+    try {
+      await navigator.clipboard.writeText(textoResumido);
+      this.exibirToast('📱 Versão resumida copiada! Perfeita para WhatsApp.', 'success');
+    } catch (e) {
+      this.copiarTextoLegacy(textoResumido);
+      this.exibirToast('📱 Versão resumida copiada!', 'success');
+    }
+    
+  } catch (erro) {
+    console.error('❌ Erro ao compartilhar versão resumida:', erro);
+    this.exibirToast('❌ Erro ao preparar versão resumida.', 'error');
+  }
+},
+
+/**
+ * ✅ NOVO: Gerar texto resumido (otimizado para WhatsApp)
+ */
+gerarTextoRoteiroResumido() {
+  const destino = this.dadosDestino.destino;
+  const pais = this.dadosDestino.pais;
+  const dataIda = this.formatarData(this.getDataIda());
+  const dataVolta = this.getDataVolta() ? this.formatarData(this.getDataVolta()) : null;
+  const diasViagem = this.calcularDiasViagem(this.getDataIda(), this.getDataVolta());
+  
+  let texto = `🐕 ROTEIRO BENETRIP - ${destino.toUpperCase()} ✈️\n\n`;
+  
+  // Informações básicas (mais concisas)
+  texto += `📍 ${destino}, ${pais}\n`;
+  texto += `📅 ${dataIda}${dataVolta ? ` até ${dataVolta}` : ''} (${diasViagem} dias)\n`;
+  texto += `👥 ${this.obterTextoCompanhiaResumido()}\n`;
+  texto += `🎯 ${this.obterTextoPreferencia()}\n\n`;
+  
+  // Roteiro por dias (versão compacta)
+  this.roteiroPronto.dias.forEach((dia, index) => {
+    const numeroDia = index + 1;
+    const dataFormatada = this.formatarDataSimples(dia.data);
+    
+    texto += `📅 DIA ${numeroDia} - ${dataFormatada}\n`;
+    
+    if (dia.descricao) {
+      texto += `"${dia.descricao}"\n`;
+    }
+    
+    // Apenas atividades principais (máximo 3 por dia)
+    if (dia.atividades && dia.atividades.length > 0) {
+      const atividadesPrincipais = dia.atividades
+        .filter(ativ => !ativ.isEspecial)
+        .slice(0, 3); // Máximo 3 atividades
+      
+      atividadesPrincipais.forEach((atividade) => {
+        texto += `${atividade.horario || ''} 📍 ${atividade.local}\n`;
+        
+        // Link do mapa mais curto
+        const linkMapa = this.gerarLinkGoogleMaps(atividade.local);
+        texto += `🗺️ ${linkMapa}\n`;
+      });
+    }
+    
+    texto += `\n`;
+  });
+  
+  // Rodapé simples
+  texto += `🐾 Criado pela Tripinha em www.benetrip.com.br`;
+  
+  return texto;
+},
+
+/**
  * ✅ NOVO: Compartilhar texto completo com mapas
  */
 async compartilharTextoCompleto() {
   try {
-    this.exibirToast('📋 Preparando seu roteiro...', 'info');
+    this.exibirToast('📄 Preparando versão completa...', 'info');
     
     const textoCompleto = this.gerarTextoRoteiroCompleto();
+    
+    // Verificar tamanho e avisar
+    if (textoCompleto.length > 4000) {
+      this.exibirToast('⚠️ Versão completa pode ser cortada no WhatsApp. Use a versão resumida para melhor resultado.', 'warning');
+    }
     
     // Tentar compartilhamento nativo primeiro (mobile)
     if (navigator.share && /mobile|android|iphone/i.test(navigator.userAgent)) {
@@ -1591,7 +1721,7 @@ async compartilharTextoCompleto() {
           title: `Roteiro Benetrip - ${this.dadosDestino.destino}`,
           text: textoCompleto
         });
-        this.exibirToast('📤 Roteiro compartilhado!', 'success');
+        this.exibirToast('📤 Versão completa compartilhada!', 'success');
         return;
       } catch (e) {
         console.log('ℹ️ Share cancelado, copiando para clipboard');
@@ -1601,19 +1731,84 @@ async compartilharTextoCompleto() {
     // Fallback: Copiar para clipboard
     try {
       await navigator.clipboard.writeText(textoCompleto);
-      this.exibirToast('📋 Roteiro copiado! Cole no WhatsApp, email ou onde quiser.', 'success');
+      this.exibirToast('📄 Versão completa copiada! Pode ser cortada em alguns apps.', 'success');
     } catch (e) {
-      // Fallback do fallback
       this.copiarTextoLegacy(textoCompleto);
-      this.exibirToast('📋 Roteiro copiado para a área de transferência!', 'success');
+      this.exibirToast('📄 Versão completa copiada!', 'success');
     }
     
   } catch (erro) {
-    console.error('❌ Erro ao compartilhar texto:', erro);
-    this.exibirToast('❌ Erro ao preparar roteiro. Tente novamente.', 'error');
+    console.error('❌ Erro ao compartilhar versão completa:', erro);
+    this.exibirToast('❌ Erro ao preparar versão completa.', 'error');
   }
 },
 
+/**
+ * ✅ NOVO: Texto de companhia resumido
+ */
+obterTextoCompanhiaResumido() {
+  const dados = this.dadosFormulario;
+  const tipo = dados.companhia;
+  
+  if (tipo === 'familia') {
+    return `Família (${dados.quantidadePessoas || 0} pessoas)`;
+  }
+  
+  const textos = {
+    'sozinho': 'Solo',
+    'casal': 'Casal',
+    'amigos': `Amigos (${dados.quantidadePessoas || 2})`
+  };
+  
+  return textos[tipo] || 'Individual';
+},
+
+  /**
+ * ✅ NOVO: Data formatada simples
+ */
+formatarDataSimples(dataString) {
+  if (!dataString) return 'Data indefinida';
+  
+  try {
+    const data = new Date(dataString + 'T12:00:00');
+    if (isNaN(data.getTime())) {
+      return dataString;
+    }
+    
+    const options = { 
+      day: '2-digit', 
+      month: '2-digit'
+    };
+    
+    return data.toLocaleDateString('pt-BR', options);
+  } catch (e) {
+    return dataString;
+  }
+},
+
+/**
+ * ✅ NOVO: Validar tamanho antes de compartilhar
+ */
+validarTamanhoTexto(texto, limite = 4000) {
+  const tamanho = texto.length;
+  
+  if (tamanho > limite) {
+    console.warn(`⚠️ Texto muito longo: ${tamanho} caracteres (limite: ${limite})`);
+    return {
+      valido: false,
+      tamanho,
+      limite,
+      excesso: tamanho - limite
+    };
+  }
+  
+  return {
+    valido: true,
+    tamanho,
+    limite
+  };
+},
+  
 /**
  * ✅ NOVO: Gerar texto completo do roteiro com mapas
  */
