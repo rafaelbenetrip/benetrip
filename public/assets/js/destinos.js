@@ -830,20 +830,78 @@ const BENETRIP_DESTINOS = {
           </div>
         </div>
         
-        <!-- Sistema de abas - CONDICIONAL PARA CLIMA -->
-        <div class="flex border-b border-gray-200 overflow-x-auto">
-          <button id="aba-surpresa-info" class="botao-aba aba-ativa px-4 py-2 text-sm font-medium" onclick="BENETRIP_DESTINOS.trocarAbaSurpresa('info')">
-            Informações
-          </button>
-          <button id="aba-surpresa-pontos" class="botao-aba aba-inativa px-4 py-2 text-sm font-medium" onclick="BENETRIP_DESTINOS.trocarAbaSurpresa('pontos')">
-            Pontos Turísticos
-          </button>
-          ${destino.clima ? `
-            <button id="aba-surpresa-clima" class="botao-aba aba-inativa px-4 py-2 text-sm font-medium" onclick="BENETRIP_DESTINOS.trocarAbaSurpresa('clima')">
-              Clima
-            </button>
-          ` : ''}
+        <!-- Sistema de abas - INCLUINDO COMENTÁRIOS -->
+<div class="flex border-b border-gray-200 overflow-x-auto">
+  <button id="aba-surpresa-info" class="botao-aba aba-ativa px-4 py-2 text-sm font-medium" onclick="BENETRIP_DESTINOS.trocarAbaSurpresa('info')">
+    Informações
+  </button>
+  <button id="aba-surpresa-pontos" class="botao-aba aba-inativa px-4 py-2 text-sm font-medium" onclick="BENETRIP_DESTINOS.trocarAbaSurpresa('pontos')">
+    Pontos Turísticos
+  </button>
+  ${destino.clima ? `
+    <button id="aba-surpresa-clima" class="botao-aba aba-inativa px-4 py-2 text-sm font-medium" onclick="BENETRIP_DESTINOS.trocarAbaSurpresa('clima')">
+      Clima
+    </button>
+  ` : ''}
+  <button id="aba-surpresa-comentarios" class="botao-aba aba-inativa px-4 py-2 text-sm font-medium" onclick="BENETRIP_DESTINOS.trocarAbaSurpresa('comentarios')">
+    Comentários
+  </button>
+</div>
+
+<!-- Conteúdo da aba Informações -->
+<div id="conteudo-surpresa-info" class="conteudo-aba-surpresa p-4 overflow-y-auto" style="max-height: calc(90vh - 280px);">
+  <!-- ... conteúdo existente ... -->
+</div>
+
+<!-- Conteúdo da aba Pontos Turísticos -->
+<div id="conteudo-surpresa-pontos" class="conteudo-aba-surpresa p-4 overflow-y-auto hidden" style="max-height: calc(90vh - 280px);">
+  <!-- ... conteúdo existente ... -->
+</div>
+
+${destino.clima ? `
+  <!-- Conteúdo da aba Clima -->
+  <div id="conteudo-surpresa-clima" class="conteudo-aba-surpresa p-4 overflow-y-auto hidden" style="max-height: calc(90vh - 280px);">
+    <!-- ... conteúdo existente ... -->
+  </div>
+` : ''}
+
+<!-- ✨ AQUI: Conteúdo da aba Comentários -->
+<div id="conteudo-surpresa-comentarios" class="conteudo-aba-surpresa p-4 overflow-y-auto hidden" style="max-height: calc(90vh - 280px);">
+  ${destino.comentario ? `
+    <div class="bg-gray-50 p-4 rounded-lg">
+      <div class="flex items-start gap-3">
+        <div class="w-10 h-10 rounded-full overflow-hidden flex-shrink-0 bg-orange-100 border-2 border-orange-200">
+          <img src="assets/images/tripinha/avatar-normal.png" alt="Tripinha" class="w-full h-full object-cover" onerror="this.src='https://placehold.co/60x60?text=🐶'">
         </div>
+        <div>
+          <p class="font-medium text-sm mb-1">Minha experiência em ${destino.destino}:</p>
+          <p class="italic">"${destino.comentario}"</p>
+        </div>
+      </div>
+    </div>
+  ` : `
+    <div class="bg-gray-50 p-4 rounded-lg text-center">
+      <div class="w-10 h-10 rounded-full overflow-hidden mx-auto mb-2 bg-orange-100 border-2 border-orange-200">
+        <img src="assets/images/tripinha/avatar-normal.png" alt="Tripinha" class="w-full h-full object-cover" onerror="this.src='https://placehold.co/60x60?text=🐶'">
+      </div>
+      <p class="text-gray-500">A Tripinha ainda não visitou este destino, mas está animada para descobrir junto com você! 🐾✨</p>
+    </div>
+  `}
+  
+  ${destino.eventos && destino.eventos.length > 0 ? `
+    <div class="mt-4 bg-yellow-50 p-4 rounded-lg">
+      <h4 class="font-medium mb-2">Eventos especiais durante sua viagem:</h4>
+      <ul class="list-disc pl-5 text-sm text-gray-700 space-y-1">
+        ${destino.eventos.map(evento => `<li>${evento}</li>`).join('')}
+      </ul>
+    </div>
+  ` : ''}
+</div>
+
+<!-- Botões de ação -->
+<div class="p-4 border-t border-gray-200">
+  <!-- ... botões existentes ... -->
+</div>
         
         <!-- Conteúdo da aba Informações -->
         <div id="conteudo-surpresa-info" class="conteudo-aba-surpresa p-4 overflow-y-auto" style="max-height: calc(90vh - 280px);">
