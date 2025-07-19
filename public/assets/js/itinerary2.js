@@ -1485,362 +1485,430 @@ if (e.target.closest('.btn-voltar')) {
     window.open(url, '_blank', 'noopener,noreferrer');
   },
 
- /**
- * ✅ COMPARTILHAMENTO SIMPLIFICADO - APENAS TEXTO COM LINKS DE MAPA
- * Substituir no objeto BENETRIP_ROTEIRO
+  /**
+ * ✅ MODIFICAÇÕES PARA COMPARTILHAMENTO COMO IMAGEM
+ * Adicionar estes métodos ao objeto BENETRIP_ROTEIRO
  */
 
 // ==========================================
-// COMPARTILHAMENTO COMO TEXTO - SIMPLIFICADO
+// COMPARTILHAMENTO COMO IMAGEM - NOVO
 // ==========================================
 
 /**
- * ✅ COMPARTILHAMENTO CORRIGIDO - TODOS OS DIAS INCLUÍDOS
- * Substituir no objeto BENETRIP_ROTEIRO
- */
-
-// ==========================================
-// COMPARTILHAMENTO COMO TEXTO - VERSÃO CORRIGIDA
-// ==========================================
-
-/**
- * ✅ COMPARTILHAR ROTEIRO - VERSÃO CORRIGIDA
+ * ✅ COMPARTILHAR ROTEIRO - VERSÃO EXPANDIDA COM IMAGEM
  */
 async compartilharRoteiro() {
   try {
-    console.log('📋 Iniciando compartilhamento como texto...');
-    
-    // ✅ DEBUG: Verificar quantos dias temos
-    console.log('🔍 Debug roteiro:', {
-      temRoteiro: !!this.roteiroPronto,
-      totalDias: this.roteiroPronto?.dias?.length || 0,
-      destino: this.dadosDestino?.destino,
-      formData: this.dadosFormulario
-    });
-    
-    if (!this.roteiroPronto || !this.roteiroPronto.dias || this.roteiroPronto.dias.length === 0) {
-      this.exibirToast('❌ Nenhum roteiro encontrado para compartilhar', 'error');
-      return;
+    // Verificar se html2canvas está disponível
+    if (typeof html2canvas === 'undefined') {
+      console.warn('⚠️ html2canvas não encontrado, usando compartilhamento básico');
+      return this.compartilharLink();
     }
     
-    // Mostrar loading
-    this.exibirToast('📋 Preparando roteiro para compartilhar...', 'info');
-    
-    // Gerar texto completo com links
-    const textoCompleto = await this.gerarTextoRoteiroCompletoCorrigido();
-    
-    console.log('📝 Texto gerado com', textoCompleto.split('📍 DIA').length - 1, 'dias');
-    
-    // Tentar compartilhamento nativo primeiro (mobile)
-    if (this.podeCompartilharTexto()) {
-      try {
-        await navigator.share({
-          title: `Roteiro Benetrip - ${this.dadosDestino.destino}`,
-          text: textoCompleto
-        });
-        
-        this.exibirToast('📤 Roteiro compartilhado!', 'success');
-        return;
-      } catch (erroShare) {
-        console.log('ℹ️ Compartilhamento nativo cancelado ou falhou:', erroShare.message);
-      }
-    }
-    
-    // Fallback: Copiar para clipboard
-    try {
-      await navigator.clipboard.writeText(textoCompleto);
-      this.exibirToast('📋 Roteiro copiado! Cole no WhatsApp, Instagram ou onde quiser.', 'success');
-    } catch (erroClipboard) {
-      console.warn('⚠️ Clipboard falhou, usando método legacy:', erroClipboard);
-      this.copiarTextoLegacy(textoCompleto);
-      this.exibirToast('📋 Roteiro copiado! Cole onde quiser compartilhar.', 'success');
-    }
+    // Mostrar modal de opções
+    this.mostrarModalCompartilhamento();
     
   } catch (erro) {
     console.error('❌ Erro no compartilhamento:', erro);
-    this.exibirToast('❌ Erro ao preparar compartilhamento. Tente novamente.', 'error');
+    this.exibirToast('Erro ao compartilhar. Tente novamente.', 'error');
   }
 },
 
 /**
- * ✅ CORRIGIDO: Gerar texto completo do roteiro - VERSÃO CORRIGIDA
+ * ✅ NOVO: Modal de opções de compartilhamento
  */
-async gerarTextoRoteiroCompletoCorrigido() {
-  const destino = this.dadosDestino.destino;
-  const pais = this.dadosDestino.pais;
-  const dataIda = this.formatarData(this.getDataIda());
-  const dataVolta = this.getDataVolta() ? this.formatarData(this.getDataVolta()) : null;
-  const diasViagem = this.calcularDiasViagem(this.getDataIda(), this.getDataVolta());
+mostrarModalCompartilhamento() {
+  // Remover modal existente se houver
+  const modalExistente = document.getElementById('modal-compartilhar');
+  if (modalExistente) modalExistente.remove();
   
-  // ✅ VERIFICAÇÃO IMPORTANTE
-  const totalDiasRoteiro = this.roteiroPronto.dias.length;
-  console.log(`📊 Estatísticas: ${diasViagem} dias calculados, ${totalDiasRoteiro} dias no roteiro`);
+  // Criar modal
+  const modal = document.createElement('div');
+  modal.id = 'modal-compartilhar';
+  modal.className = 'modal-overlay';
   
-  // Cabeçalho
-  let texto = `🐕 ROTEIRO BENETRIP\n`;
-  texto += `✈️ ${destino.toUpperCase()}, ${pais.toUpperCase()}\n`;
-  texto += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+  modal.innerHTML = `
+    <div class="modal-content modal-compartilhar">
+      <div class="modal-header">
+        <h3>📤 Compartilhar Roteiro</h3>
+        <button class="modal-close" onclick="this.closest('.modal-overlay').remove()">×</button>
+      </div>
+      
+      <div class="modal-body">
+        <div class="opcoes-compartilhamento">
+          <button class="opcao-compartilhar opcao-destaque" data-tipo="imagem">
+            <div class="opcao-icon">📸</div>
+            <div class="opcao-info">
+              <div class="opcao-titulo">Imagem</div>
+              <div class="opcao-desc">Perfeito para redes sociais</div>
+            </div>
+          </button>
+          
+          <button class="opcao-compartilhar" data-tipo="link">
+            <div class="opcao-icon">🔗</div>
+            <div class="opcao-info">
+              <div class="opcao-titulo">Link</div>
+              <div class="opcao-desc">Copiar link da página</div>
+            </div>
+          </button>
+          
+          <button class="opcao-compartilhar" data-tipo="texto">
+            <div class="opcao-icon">📋</div>
+            <div class="opcao-info">
+              <div class="opcao-titulo">Texto</div>
+              <div class="opcao-desc">Resumo do roteiro</div>
+            </div>
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
   
-  // Informações da viagem
-  texto += `📅 PERÍODO: ${dataIda}${dataVolta ? ` até ${dataVolta}` : ''}\n`;
-  texto += `⏰ DURAÇÃO: ${Math.max(diasViagem, totalDiasRoteiro)} ${diasViagem === 1 ? 'dia' : 'dias'}\n`;
-  texto += `👥 VIAJANDO: ${this.obterTextoCompanhia()}\n`;
-  texto += `🎯 ESTILO: ${this.obterTextoPreferencia()}\n`;
-  texto += `⚡ INTENSIDADE: ${this.obterTextoIntensidade()}\n\n`;
+  document.body.appendChild(modal);
   
-  // Informações de voo
-  texto += `✈️ INFORMAÇÕES DE VOO:\n`;
-  texto += `🛬 Chegada: ${this.extrairHorarioChegada()}\n`;
-  if (this.getDataVolta()) {
-    texto += `🛫 Partida: ${this.extrairHorarioPartida()}\n`;
-  }
-  texto += `\n`;
+  // Adicionar eventos
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) modal.remove();
+  });
   
-  // Roteiro detalhado
-  texto += `📋 ROTEIRO DETALHADO:\n`;
-  texto += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+  modal.querySelectorAll('.opcao-compartilhar').forEach(opcao => {
+    opcao.addEventListener('click', async (e) => {
+      const tipo = opcao.dataset.tipo;
+      modal.remove();
+      
+      // Desabilitar botão temporariamente
+      opcao.disabled = true;
+      
+      try {
+        switch (tipo) {
+          case 'imagem':
+            await this.gerarImagemRoteiro();
+            break;
+          case 'link':
+            await this.compartilharLink();
+            break;
+          case 'texto':
+            await this.compartilharTexto();
+            break;
+        }
+      } catch (erro) {
+        console.error('❌ Erro na ação de compartilhamento:', erro);
+        this.exibirToast('Erro ao processar compartilhamento', 'error');
+      }
+    });
+  });
   
-  // ✅ CORREÇÃO PRINCIPAL: Processar TODOS os dias sem filtros
-  const diasParaProcessar = this.roteiroPronto.dias;
-  console.log(`🔄 Processando ${diasParaProcessar.length} dias:`, diasParaProcessar.map((d, i) => `Dia ${i+1}: ${d.data}`));
-  
-  for (let index = 0; index < diasParaProcessar.length; index++) {
-    const dia = diasParaProcessar[index];
-    const numeroDia = index + 1;
+  // Animação de entrada
+  requestAnimationFrame(() => {
+    modal.classList.add('modal-visible');
+  });
+},
+
+/**
+ * ✅ NOVO: Gerar imagem do roteiro
+ */
+async gerarImagemRoteiro() {
+  try {
+    console.log('📸 Iniciando geração da imagem...');
     
-    console.log(`📝 Processando dia ${numeroDia}:`, {
-      data: dia.data,
-      descricao: dia.descricao,
-      atividades: dia.atividades?.length || 0
+    // Mostrar loading
+    this.exibirToast('📸 Gerando imagem do roteiro...', 'info');
+    
+    // Preparar elemento para captura
+    const elemento = await this.prepararElementoParaCaptura();
+    
+    // Configurações otimizadas do html2canvas
+    const opcoes = {
+      scale: 2, // Alta qualidade
+      useCORS: true,
+      allowTaint: false,
+      backgroundColor: '#ffffff',
+      width: elemento.offsetWidth,
+      height: elemento.offsetHeight,
+      scrollX: 0,
+      scrollY: 0,
+      windowWidth: elemento.offsetWidth,
+      windowHeight: elemento.offsetHeight,
+      onclone: (clonedDoc) => {
+        // Ajustar estilos no clone
+        this.ajustarEstilosParaImagem(clonedDoc);
+      }
+    };
+    
+    console.log('🎨 Capturando elemento...', opcoes);
+    
+    // Gerar canvas
+    const canvas = await html2canvas(elemento, opcoes);
+    
+    console.log('✅ Canvas gerado:', canvas.width, 'x', canvas.height);
+    
+    // Processar e compartilhar imagem
+    await this.processarECompartilharImagem(canvas);
+    
+  } catch (erro) {
+    console.error('❌ Erro ao gerar imagem:', erro);
+    this.exibirToast('❌ Erro ao gerar imagem. Tente novamente.', 'error');
+  }
+},
+
+/**
+ * ✅ NOVO: Preparar elemento para captura
+ */
+async prepararElementoParaCaptura() {
+  // Elemento principal do roteiro
+  let elemento = document.querySelector('.roteiro-content');
+  
+  if (!elemento) {
+    throw new Error('Elemento do roteiro não encontrado');
+  }
+  
+  // Aguardar imagens carregarem
+  await this.aguardarImagensCarregarem(elemento);
+  
+  // Garantir que está visível
+  elemento.style.display = 'block';
+  elemento.style.visibility = 'visible';
+  
+  return elemento;
+},
+
+/**
+ * ✅ NOVO: Aguardar todas as imagens carregarem
+ */
+async aguardarImagensCarregarem(elemento) {
+  const imagens = elemento.querySelectorAll('img');
+  const promessas = Array.from(imagens).map(img => {
+    return new Promise((resolve) => {
+      if (img.complete) {
+        resolve();
+      } else {
+        img.onload = resolve;
+        img.onerror = resolve; // Resolve mesmo com erro
+        // Timeout de segurança
+        setTimeout(resolve, 3000);
+      }
+    });
+  });
+  
+  await Promise.all(promessas);
+  console.log(`✅ ${imagens.length} imagens processadas para captura`);
+},
+
+/**
+ * ✅ NOVO: Ajustar estilos para imagem
+ */
+ajustarEstilosParaImagem(clonedDoc) {
+  const elemento = clonedDoc.querySelector('.roteiro-content');
+  
+  if (elemento) {
+    // Garantir fundo branco
+    elemento.style.backgroundColor = '#ffffff';
+    elemento.style.padding = '20px';
+    elemento.style.margin = '0';
+    
+    // Ajustar fontes e cores
+    const textos = elemento.querySelectorAll('*');
+    textos.forEach(el => {
+      // Garantir contraste
+      if (window.getComputedStyle(el).color === 'rgb(255, 255, 255)') {
+        el.style.color = '#333333';
+      }
+      
+      // Ajustar tamanhos de fonte muito pequenos
+      const fontSize = window.getComputedStyle(el).fontSize;
+      if (fontSize && parseInt(fontSize) < 12) {
+        el.style.fontSize = '12px';
+      }
     });
     
-    // Cabeçalho do dia
-    texto += `📍 DIA ${numeroDia} - ${this.formatarDataCompleta(dia.data)}\n`;
-    if (dia.descricao) {
-      texto += `${dia.descricao}\n`;
-    }
-    
-    // Previsão do tempo (apenas para primeiros 3 dias)
-    if (dia.previsao && numeroDia <= 3) {
-      texto += `🌤️ Clima: ${dia.previsao.temperature}°C, ${dia.previsao.condition}\n`;
-    }
-    
-    texto += `\n`;
-    
-    // ✅ CORREÇÃO: Processar atividades com mais cuidado
-    if (dia.atividades && Array.isArray(dia.atividades) && dia.atividades.length > 0) {
-      let atividadesProcessadas = 0;
-      let atividadesEspeciais = 0;
-      
-      for (let i = 0; i < dia.atividades.length; i++) {
-        const atividade = dia.atividades[i];
+    // Garantir que badges sejam visíveis
+    const badges = elemento.querySelectorAll('.badge');
+    badges.forEach(badge => {
+      badge.style.fontWeight = 'bold';
+      badge.style.padding = '4px 8px';
+    });
+  }
+},
+
+/**
+ * ✅ NOVO: Processar e compartilhar imagem
+ */
+async processarECompartilharImagem(canvas) {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(async (blob) => {
+      try {
+        if (!blob) {
+          throw new Error('Falha ao gerar blob da imagem');
+        }
         
-        // Debug da atividade
-        console.log(`  Atividade ${i+1}:`, {
-          local: atividade.local,
-          isEspecial: atividade.isEspecial,
-          horario: atividade.horario
-        });
+        console.log('📦 Blob gerado:', blob.size, 'bytes');
         
-        // ✅ MUDANÇA: Incluir atividades especiais importantes também
-        if (atividade.isEspecial) {
-          atividadesEspeciais++;
-          
-          // Incluir apenas atividades especiais relevantes
-          if (atividade.local && (
-            atividade.local.includes('Check-in') || 
-            atividade.local.includes('Transfer') ||
-            atividade.local.includes('Chegada') ||
-            atividade.local.includes('Partida') ||
-            atividade.local.includes('Aeroporto')
-          )) {
-            texto += `${atividade.horario || ''} • ${atividade.local}\n`;
-            if (atividade.dica) {
-              texto += `   💡 ${atividade.dica}\n`;
-            }
-            texto += `\n`;
-            atividadesProcessadas++;
+        const nomeArquivo = `roteiro-${this.dadosDestino.destino.toLowerCase().replace(/[^a-z0-9]/g, '-')}-benetrip.png`;
+        
+        // Tentar compartilhamento nativo primeiro (mobile)
+        if (this.podeCompartilharArquivos()) {
+          try {
+            const arquivo = new File([blob], nomeArquivo, { type: 'image/png' });
+            
+            await navigator.share({
+              title: `Roteiro Benetrip - ${this.dadosDestino.destino}`,
+              text: `Confira meu roteiro personalizado para ${this.dadosDestino.destino}! 🐕✈️`,
+              files: [arquivo]
+            });
+            
+            this.exibirToast('📤 Imagem compartilhada!', 'success');
+            resolve();
+            return;
+          } catch (erroShare) {
+            console.log('ℹ️ Compartilhamento nativo falhou, usando download:', erroShare.message);
           }
-          continue;
         }
         
-        // Atividades normais
-        atividadesProcessadas++;
+        // Fallback: Download da imagem
+        this.baixarImagem(blob, nomeArquivo);
+        this.exibirToast('📸 Imagem salva! Compartilhe onde quiser.', 'success');
+        resolve();
         
-        // Horário e local
-        let linhaAtividade = '';
-        if (atividade.horario) {
-          linhaAtividade += `${atividade.horario} `;
-        }
-        linhaAtividade += `• ${atividade.local}`;
-        
-        // Duração se disponível
-        if (atividade.duracao) {
-          linhaAtividade += ` (${atividade.duracao})`;
-        }
-        
-        texto += `${linhaAtividade}\n`;
-        
-        // Tags se disponíveis
-        if (atividade.tags && Array.isArray(atividade.tags) && atividade.tags.length > 0) {
-          const tagsTexto = atividade.tags.join(' • ');
-          texto += `   🏷️ ${tagsTexto}\n`;
-        }
-        
-        // Dica da Tripinha se disponível
-        if (atividade.dica) {
-          texto += `   💡 Dica da Tripinha: ${atividade.dica}\n`;
-        }
-        
-        // Link do mapa
-        const linkMapa = this.gerarLinkMapa(atividade.local, destino, pais);
-        texto += `   🗺️ Ver no mapa: ${linkMapa}\n`;
-        
-        texto += `\n`;
+      } catch (erro) {
+        console.error('❌ Erro ao processar imagem:', erro);
+        reject(erro);
       }
-      
-      console.log(`✅ Dia ${numeroDia}: ${atividadesProcessadas} atividades processadas (${atividadesEspeciais} especiais ignoradas)`);
-      
-      // Se não há atividades normais processadas
-      if (atividadesProcessadas === 0) {
-        texto += `🏖️ Dia livre para descanso ou atividades opcionais\n\n`;
-      }
-    } else {
-      console.log(`⚠️ Dia ${numeroDia}: Sem atividades válidas`);
-      texto += `🏖️ Dia livre para descanso ou atividades opcionais\n\n`;
-    }
-    
-    // Separador entre dias (exceto último)
-    if (index < diasParaProcessar.length - 1) {
-      texto += `${'─'.repeat(30)}\n\n`;
+    }, 'image/png', 0.95);
+  });
+},
+
+/**
+ * ✅ NOVO: Verificar se pode compartilhar arquivos
+ */
+podeCompartilharArquivos() {
+  return (
+    navigator.share && 
+    navigator.canShare && 
+    /mobile|android|iphone|ipad/i.test(navigator.userAgent)
+  );
+},
+
+/**
+ * ✅ NOVO: Baixar imagem
+ */
+baixarImagem(blob, nomeArquivo) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = nomeArquivo;
+  link.style.display = 'none';
+  
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  
+  // Liberar memória
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+},
+
+/**
+ * ✅ MELHORADO: Compartilhar link (mantido como fallback)
+ */
+async compartilharLink() {
+  const titulo = `Roteiro Benetrip - ${this.dadosDestino.destino}`;
+  const texto = `Confira meu roteiro personalizado para ${this.dadosDestino.destino}! 🐕✈️`;
+  const url = window.location.href;
+  
+  // Tentar compartilhamento nativo
+  if (navigator.share && /mobile|android|iphone/i.test(navigator.userAgent)) {
+    try {
+      await navigator.share({ title: titulo, text: texto, url });
+      this.exibirToast('🔗 Link compartilhado!', 'success');
+      return;
+    } catch (e) {
+      console.log('ℹ️ Share cancelado ou falhou');
     }
   }
   
-  // Observações importantes
-  texto += `\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
-  texto += `📌 DICAS IMPORTANTES:\n\n`;
-  texto += `• Confirme horários de funcionamento\n`;
-  texto += `• Leve documento de identidade\n`;
-  texto += `• Verifique condições climáticas\n`;
-  texto += `• Tenha sempre um mapa offline\n`;
-  texto += `• Mantenha-se hidratado e descanse bem\n\n`;
+  // Fallback: Copiar para clipboard
+  try {
+    await navigator.clipboard.writeText(url);
+    this.exibirToast('🔗 Link copiado! Cole onde quiser compartilhar.', 'success');
+  } catch (e) {
+    // Fallback do fallback
+    this.copiarTextoLegacy(url);
+    this.exibirToast('🔗 Link copiado!', 'success');
+  }
+},
+
+/**
+ * ✅ NOVO: Compartilhar como texto
+ */
+async compartilharTexto() {
+  const texto = this.gerarTextoRoteiro();
   
-  // Link geral do destino
-  const linkGeralDestino = this.gerarLinkMapa(destino, '', pais);
-  texto += `🗺️ Mapa geral de ${destino}:\n${linkGeralDestino}\n\n`;
+  if (navigator.share && /mobile|android|iphone/i.test(navigator.userAgent)) {
+    try {
+      await navigator.share({
+        title: `Roteiro para ${this.dadosDestino.destino}`,
+        text: texto
+      });
+      this.exibirToast('📋 Texto compartilhado!', 'success');
+      return;
+    } catch (e) {
+      console.log('ℹ️ Share de texto cancelado');
+    }
+  }
   
-  // Rodapé
-  texto += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
-  texto += `🐾 Roteiro criado com amor pela Tripinha\n`;
-  texto += `🌐 benetrip.com.br\n`;
-  texto += `✨ Boas viagens! 🧳✈️`;
+  // Fallback: Copiar texto
+  try {
+    await navigator.clipboard.writeText(texto);
+    this.exibirToast('📋 Texto do roteiro copiado!', 'success');
+  } catch (e) {
+    this.copiarTextoLegacy(texto);
+    this.exibirToast('📋 Texto copiado!', 'success');
+  }
+},
+
+/**
+ * ✅ NOVO: Gerar texto do roteiro
+ */
+gerarTextoRoteiro() {
+  const destino = this.dadosDestino.destino;
+  const dataIda = this.formatarData(this.getDataIda());
+  const dataVolta = this.getDataVolta() ? this.formatarData(this.getDataVolta()) : null;
   
-  // ✅ LOG FINAL
-  const totalDiasTexto = (texto.match(/📍 DIA \d+/g) || []).length;
-  console.log(`✅ Texto final: ${totalDiasTexto} dias incluídos de ${diasParaProcessar.length} disponíveis`);
+  let texto = `🐕 ROTEIRO BENETRIP - ${destino.toUpperCase()} ✈️\n\n`;
+  texto += `📅 ${dataIda}${dataVolta ? ` até ${dataVolta}` : ''}\n`;
+  texto += `👥 ${this.obterTextoCompanhia()}\n\n`;
+  
+  this.roteiroPronto.dias.forEach((dia, index) => {
+    texto += `📍 DIA ${index + 1} - ${this.formatarDataCompleta(dia.data)}\n`;
+    if (dia.descricao) texto += `"${dia.descricao}"\n\n`;
+    
+    dia.atividades.forEach(ativ => {
+      if (!ativ.isEspecial) {
+        texto += `${ativ.horario || ''} • ${ativ.local}\n`;
+        if (ativ.dica) texto += `💡 ${ativ.dica}\n`;
+        texto += '\n';
+      }
+    });
+    
+    texto += '---\n\n';
+  });
+  
+  texto += '🐾 Criado com amor pela Tripinha em benetrip.com.br';
   
   return texto;
 },
 
 /**
- * ✅ NOVO: Verificar integridade do roteiro antes de compartilhar
+ * ✅ NOVO: Copiar texto (método legacy)
  */
-verificarIntegridadeRoteiro() {
-  if (!this.roteiroPronto) {
-    console.error('❌ Roteiro não encontrado');
-    return false;
-  }
-  
-  if (!this.roteiroPronto.dias || !Array.isArray(this.roteiroPronto.dias)) {
-    console.error('❌ Dias do roteiro inválidos');
-    return false;
-  }
-  
-  if (this.roteiroPronto.dias.length === 0) {
-    console.error('❌ Nenhum dia no roteiro');
-    return false;
-  }
-  
-  console.log(`✅ Roteiro válido com ${this.roteiroPronto.dias.length} dias`);
-  return true;
-},
-
-/**
- * ✅ CORRIGIDO: Gerar link do Google Maps - versão mais robusta
- */
-gerarLinkMapa(local, destino, pais) {
-  try {
-    // Limpar e preparar query
-    let query = local ? local.trim() : '';
-    
-    // Se não tem local, usar apenas destino
-    if (!query || query.length < 2) {
-      query = destino || 'Local de interesse';
-    }
-    
-    // Se o local não contém o destino e destino existe, adicionar
-    if (destino && !query.toLowerCase().includes(destino.toLowerCase())) {
-      query += `, ${destino}`;
-    }
-    
-    // Se não contém o país e país existe, adicionar  
-    if (pais && !query.toLowerCase().includes(pais.toLowerCase())) {
-      query += `, ${pais}`;
-    }
-    
-    // Codificar para URL de forma segura
-    const queryLimpa = query.replace(/[^\w\s,.-]/g, '').trim();
-    const queryEncoded = encodeURIComponent(queryLimpa);
-    
-    // Gerar URL do Google Maps
-    return `https://maps.google.com/maps?q=${queryEncoded}`;
-    
-  } catch (erro) {
-    console.warn('⚠️ Erro ao gerar link do mapa:', erro);
-    return `https://maps.google.com/maps?q=${encodeURIComponent(destino || 'Local')}`;
-  }
-},
-
-/**
- * ✅ MELHORADO: Formatação de data mais robusta
- */
-formatarDataCompleta(dataString) {
-  if (!dataString) return 'Data indefinida';
-  
-  try {
-    // Tentar diferentes formatos de entrada
-    let data;
-    
-    if (dataString.includes('T')) {
-      // Formato ISO com tempo
-      data = new Date(dataString);
-    } else if (dataString.match(/^\d{4}-\d{2}-\d{2}$/)) {
-      // Formato ISO sem tempo
-      data = new Date(dataString + 'T12:00:00');
-    } else {
-      // Outros formatos
-      data = new Date(dataString);
-    }
-    
-    if (isNaN(data.getTime())) {
-      console.warn('⚠️ Data inválida:', dataString);
-      return dataString;
-    }
-    
-    const options = {
-      weekday: 'long',
-      day: 'numeric',
-      month: 'numeric',
-      year: 'numeric'
-    };
-    
-    const formatada = data.toLocaleDateString('pt-BR', options);
-    return formatada.charAt(0).toUpperCase() + formatada.slice(1);
-    
-  } catch (erro) {
-    console.warn('⚠️ Erro ao formatar data:', erro);
-    return dataString;
-  }
+copiarTextoLegacy(texto) {
+  const textarea = document.createElement('textarea');
+  textarea.value = texto;
+  textarea.style.position = 'fixed';
+  textarea.style.opacity = '0';
+  document.body.appendChild(textarea);
+  textarea.select();
+  document.execCommand('copy');
+  document.body.removeChild(textarea);
 },
 
   editarRoteiro() {
@@ -2502,4 +2570,3 @@ if (window.BENETRIP_ROTEIRO_LOADED) {
 } else {
   window.BENETRIP_ROTEIRO_LOADED = true;
 }
-
