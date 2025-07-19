@@ -1694,7 +1694,7 @@ gerarTextoRoteiroCompleto() {
           texto += `🐕 Dica da Tripinha: ${atividade.dica}\n`;
         }
         
-        // ✅ NOVO: Link do Google Maps
+        // ✅ CORRIGIDO: Link do Google Maps mais robusto
         if (!atividade.isEspecial && atividade.local) {
           const linkMapa = this.gerarLinkGoogleMaps(atividade.local);
           texto += `🗺️ Ver no mapa: ${linkMapa}\n`;
@@ -1721,11 +1721,42 @@ gerarTextoRoteiroCompleto() {
  * ✅ NOVO: Gerar link do Google Maps
  */
 gerarLinkGoogleMaps(local) {
-  const destino = `${this.dadosDestino.destino}, ${this.dadosDestino.pais}`;
-  const query = `${local}, ${destino}`;
-  return `https://maps.google.com/search?query=${encodeURIComponent(query)}`;
+  // Limpar e simplificar o nome do local
+  const localLimpo = this.limparTextoParaURL(local);
+  const destinoLimpo = this.limparTextoParaURL(this.dadosDestino.destino);
+  
+  // Criar query mais simples
+  const query = `${localLimpo} ${destinoLimpo}`;
+  
+  // URL mais curta e robusta
+  return `https://maps.google.com/?q=${encodeURIComponent(query)}`;
 },
 
+/**
+ * ✅ NOVO: Limpar texto para URLs
+ */
+limparTextoParaURL(texto) {
+  if (!texto) return '';
+  
+  return texto
+    // Remover acentos e caracteres especiais
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    // Substituir caracteres problemáticos
+    .replace(/[àáâãäå]/g, 'a')
+    .replace(/[èéêë]/g, 'e')
+    .replace(/[ìíîï]/g, 'i')
+    .replace(/[òóôõö]/g, 'o')
+    .replace(/[ùúûü]/g, 'u')
+    .replace(/[ç]/g, 'c')
+    .replace(/[ñ]/g, 'n')
+    // Remover caracteres especiais exceto espaços e hífens
+    .replace(/[^a-zA-Z0-9\s\-]/g, '')
+    // Normalizar espaços
+    .replace(/\s+/g, ' ')
+    .trim();
+},
+  
 /**
  * ✅ NOVO: Copiar texto (método legacy para browsers antigos)
  */
