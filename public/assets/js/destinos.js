@@ -2,6 +2,7 @@
  * BENETRIP - Visualização de Destinos Recomendados
  * Versão 4.0 - Integração com Whitelabel Benetrip
  * Redireciona para www.benetrip.com.br com parâmetros de busca
+ * ATUALIZADO: Remove fallback de clima, usa apenas dados da LLM
  */
 
 const BENETRIP_DESTINOS = {
@@ -520,7 +521,7 @@ const BENETRIP_DESTINOS = {
       </div>
     `;
     
-    // Sistema de abas
+    // Sistema de abas - CONDICIONAL PARA CLIMA
     let abasHtml = `
       <div class="flex border-b border-gray-200 overflow-x-auto">
         <button id="aba-visao-geral" class="botao-aba aba-ativa px-4 py-2 text-sm font-medium" onclick="BENETRIP_DESTINOS.trocarAba('visao-geral')">
@@ -529,9 +530,11 @@ const BENETRIP_DESTINOS = {
         <button id="aba-pontos-turisticos" class="botao-aba aba-inativa px-4 py-2 text-sm font-medium" onclick="BENETRIP_DESTINOS.trocarAba('pontos-turisticos')">
           Pontos Turísticos
         </button>
-        <button id="aba-clima" class="botao-aba aba-inativa px-4 py-2 text-sm font-medium" onclick="BENETRIP_DESTINOS.trocarAba('clima')">
-          Clima
-        </button>
+        ${destino.clima ? `
+          <button id="aba-clima" class="botao-aba aba-inativa px-4 py-2 text-sm font-medium" onclick="BENETRIP_DESTINOS.trocarAba('clima')">
+            Clima
+          </button>
+        ` : ''}
         <button id="aba-comentarios" class="botao-aba aba-inativa px-4 py-2 text-sm font-medium" onclick="BENETRIP_DESTINOS.trocarAba('comentarios')">
           Comentários
         </button>
@@ -555,7 +558,6 @@ const BENETRIP_DESTINOS = {
             <span class="font-medium">Período da Viagem</span>
           </div>
           <p class="font-medium">${this.obterDatasViagem()}</p>
-          <p class="text-sm text-gray-600 mt-1">Estação no destino: ${this.recomendacoes.estacaoViagem || 'Não informada'}</p>
         </div>
         
         ${destino.porque ? `
@@ -600,16 +602,26 @@ const BENETRIP_DESTINOS = {
       </div>
     `;
     
-    // Conteúdo da aba Clima - USANDO APENAS DADOS DA API
-    let climaHtml = `
-      <div id="conteudo-clima" class="conteudo-aba p-4 hidden">
-        ${destino.clima ? `
+    // Conteúdo da aba Clima - APENAS DADOS DA LLM
+    let climaHtml = '';
+    if (destino.clima) {
+      climaHtml = `
+        <div id="conteudo-clima" class="conteudo-aba p-4 hidden">
           <div class="text-center bg-blue-50 p-4 rounded-lg">
             <h4 class="font-medium text-lg mb-2">Clima durante sua viagem</h4>
             <div class="text-4xl mb-2">🌤️</div>
-            <p class="text-lg font-bold">${this.recomendacoes.estacaoViagem || 'Estação não informada'}</p>
-            ${destino.clima.temperatura ? `<p class="text-sm text-gray-600 mt-2">Temperatura: ${destino.clima.temperatura}</p>` : ''}
-            ${destino.clima.condicoes ? `<p class="text-sm text-gray-600 mt-1">${destino.clima.condicoes}</p>` : ''}
+            
+            ${destino.clima.estacao ? `
+              <p class="text-lg font-bold">${destino.clima.estacao}</p>
+            ` : ''}
+            
+            ${destino.clima.temperatura ? `
+              <p class="text-sm text-gray-600 mt-2">Temperatura: ${destino.clima.temperatura}</p>
+            ` : ''}
+            
+            ${destino.clima.condicoes ? `
+              <p class="text-sm text-gray-600 mt-1">${destino.clima.condicoes}</p>
+            ` : ''}
           </div>
           
           ${destino.clima.recomendacoes ? `
@@ -623,13 +635,9 @@ const BENETRIP_DESTINOS = {
               }
             </div>
           ` : ''}
-        ` : `
-          <div class="text-center p-6">
-            <p class="text-gray-500">Informações climáticas não disponíveis para este destino.</p>
-          </div>
-        `}
-      </div>
-    `;
+        </div>
+      `;
+    }
     
     // Conteúdo da aba Comentários
     let comentariosHtml = `
@@ -822,7 +830,7 @@ const BENETRIP_DESTINOS = {
           </div>
         </div>
         
-        <!-- Sistema de abas -->
+        <!-- Sistema de abas - CONDICIONAL PARA CLIMA -->
         <div class="flex border-b border-gray-200 overflow-x-auto">
           <button id="aba-surpresa-info" class="botao-aba aba-ativa px-4 py-2 text-sm font-medium" onclick="BENETRIP_DESTINOS.trocarAbaSurpresa('info')">
             Informações
@@ -830,9 +838,11 @@ const BENETRIP_DESTINOS = {
           <button id="aba-surpresa-pontos" class="botao-aba aba-inativa px-4 py-2 text-sm font-medium" onclick="BENETRIP_DESTINOS.trocarAbaSurpresa('pontos')">
             Pontos Turísticos
           </button>
-          <button id="aba-surpresa-clima" class="botao-aba aba-inativa px-4 py-2 text-sm font-medium" onclick="BENETRIP_DESTINOS.trocarAbaSurpresa('clima')">
-            Clima
-          </button>
+          ${destino.clima ? `
+            <button id="aba-surpresa-clima" class="botao-aba aba-inativa px-4 py-2 text-sm font-medium" onclick="BENETRIP_DESTINOS.trocarAbaSurpresa('clima')">
+              Clima
+            </button>
+          ` : ''}
         </div>
         
         <!-- Conteúdo da aba Informações -->
@@ -851,7 +861,6 @@ const BENETRIP_DESTINOS = {
               <span class="font-medium">Período da Viagem</span>
             </div>
             <p class="font-medium">${this.obterDatasViagem()}</p>
-            <p class="text-sm text-gray-600 mt-1">Estação no destino: ${this.recomendacoes.estacaoViagem || 'Não informada'}</p>
           </div>
           
           ${destino.porque ? `
@@ -898,15 +907,24 @@ const BENETRIP_DESTINOS = {
           }
         </div>
         
-        <!-- Conteúdo da aba Clima -->
-        <div id="conteudo-surpresa-clima" class="conteudo-aba-surpresa p-4 overflow-y-auto hidden" style="max-height: calc(90vh - 280px);">
-          ${destino.clima ? `
+        ${destino.clima ? `
+          <!-- Conteúdo da aba Clima - APENAS DADOS DA LLM -->
+          <div id="conteudo-surpresa-clima" class="conteudo-aba-surpresa p-4 overflow-y-auto hidden" style="max-height: calc(90vh - 280px);">
             <div class="text-center bg-blue-50 p-4 rounded-lg">
               <h4 class="font-medium text-lg mb-2">Clima durante sua viagem</h4>
               <div class="text-4xl mb-2">🌤️</div>
-              <p class="text-lg font-bold">${this.recomendacoes.estacaoViagem || 'Estação não informada'}</p>
-              ${destino.clima.temperatura ? `<p class="text-sm text-gray-600 mt-2">Temperatura: ${destino.clima.temperatura}</p>` : ''}
-              ${destino.clima.condicoes ? `<p class="text-sm text-gray-600 mt-1">${destino.clima.condicoes}</p>` : ''}
+              
+              ${destino.clima.estacao ? `
+                <p class="text-lg font-bold">${destino.clima.estacao}</p>
+              ` : ''}
+              
+              ${destino.clima.temperatura ? `
+                <p class="text-sm text-gray-600 mt-2">Temperatura: ${destino.clima.temperatura}</p>
+              ` : ''}
+              
+              ${destino.clima.condicoes ? `
+                <p class="text-sm text-gray-600 mt-1">${destino.clima.condicoes}</p>
+              ` : ''}
             </div>
             
             ${destino.clima.recomendacoes ? `
@@ -920,12 +938,8 @@ const BENETRIP_DESTINOS = {
                 }
               </div>
             ` : ''}
-          ` : `
-            <div class="text-center p-6">
-              <p class="text-gray-500">Informações climáticas não disponíveis para este destino.</p>
-            </div>
-          `}
-        </div>
+          </div>
+        ` : ''}
         
         <!-- Botões de ação -->
         <div class="p-4 border-t border-gray-200">
