@@ -2748,3 +2748,289 @@ body.mobile-optimized {
   background: rgba(0, 0, 0, 0.02);
   border-top: 1px solid rgba(0, 0, 0, 0.05);
 }
+
+/* ==========================================
+   OPÇÕES DE TAMANHO DE COMPARTILHAMENTO
+   ========================================== */
+
+.opcoes-tamanho {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.opcao-tamanho {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 16px;
+  border: 2px solid #E0E0E0;
+  border-radius: 12px;
+  background: white;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  width: 100%;
+  text-align: left;
+}
+
+.opcao-tamanho:hover {
+  border-color: #00A3E0;
+  background-color: rgba(0, 163, 224, 0.05);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 163, 224, 0.15);
+}
+
+.opcao-tamanho.opcao-destaque {
+  border-color: #E87722;
+  background-color: rgba(232, 119, 34, 0.08);
+  position: relative;
+}
+
+.opcao-tamanho.opcao-destaque::before {
+  content: "RECOMENDADO";
+  position: absolute;
+  top: -8px;
+  right: 12px;
+  background: #E87722;
+  color: white;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 4px 8px;
+  border-radius: 4px;
+  letter-spacing: 0.5px;
+}
+
+.opcao-tamanho.opcao-destaque:hover {
+  border-color: #E87722;
+  background-color: rgba(232, 119, 34, 0.15);
+  box-shadow: 0 4px 12px rgba(232, 119, 34, 0.2);
+}
+
+.opcao-tamanho .opcao-icon {
+  font-size: 24px;
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 163, 224, 0.1);
+  border-radius: 12px;
+  flex-shrink: 0;
+}
+
+.opcao-destaque .opcao-icon {
+  background: rgba(232, 119, 34, 0.15);
+}
+
+.opcao-tamanho .opcao-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.opcao-tamanho .opcao-titulo {
+  font-weight: 600;
+  font-size: 16px;
+  color: #21272A;
+  margin-bottom: 4px;
+}
+
+.opcao-tamanho .opcao-desc {
+  font-size: 13px;
+  color: #666;
+  margin-bottom: 6px;
+  line-height: 1.3;
+}
+
+.opcao-tamanho .opcao-preview {
+  font-size: 12px;
+  color: #00A3E0;
+  font-weight: 500;
+  line-height: 1.3;
+}
+
+.opcao-destaque .opcao-preview {
+  color: #E87722;
+}
+
+/* ==========================================
+   MELHORIAS NO MODAL PRINCIPAL
+   ========================================== */
+
+.modal-compartilhar {
+  width: 480px;
+  max-width: 95vw;
+}
+
+.compartilhar-info {
+  margin-bottom: 20px;
+}
+
+.compartilhar-info .info-texto h4 {
+  margin-bottom: 6px;
+}
+
+.modal-acoes {
+  display: flex;
+  justify-content: center;
+  margin-top: 8px;
+}
+
+/* ==========================================
+   INDICADORES VISUAIS DE TAMANHO
+   ========================================== */
+
+.tamanho-indicador {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: #666;
+  background: rgba(0, 0, 0, 0.05);
+  padding: 2px 6px;
+  border-radius: 4px;
+  margin-left: 8px;
+}
+
+.tamanho-indicador.pequeno {
+  color: #4CAF50;
+  background: rgba(76, 175, 80, 0.1);
+}
+
+.tamanho-indicador.medio {
+  color: #FF9800;
+  background: rgba(255, 152, 0, 0.1);
+}
+
+.tamanho-indicador.grande {
+  color: #F44336;
+  background: rgba(244, 67, 54, 0.1);
+}
+
+/* ==========================================
+   RESPONSIVIDADE PARA OPÇÕES
+   ========================================== */
+
+@media (max-width: 520px) {
+  .modal-compartilhar {
+    width: 95vw;
+    margin: 20px auto;
+  }
+  
+  .opcao-tamanho {
+    padding: 14px;
+    gap: 12px;
+  }
+  
+  .opcao-tamanho .opcao-icon {
+    font-size: 20px;
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+  }
+  
+  .opcao-tamanho .opcao-titulo {
+    font-size: 15px;
+  }
+  
+  .opcao-tamanho .opcao-desc {
+    font-size: 12px;
+  }
+  
+  .opcao-tamanho .opcao-preview {
+    font-size: 11px;
+  }
+  
+  .opcao-tamanho.opcao-destaque::before {
+    font-size: 9px;
+    padding: 3px 6px;
+    top: -6px;
+    right: 8px;
+  }
+}
+
+@media (max-width: 400px) {
+  .opcoes-tamanho {
+    gap: 10px;
+  }
+  
+  .opcao-tamanho {
+    padding: 12px;
+    gap: 10px;
+  }
+  
+  .opcao-tamanho .opcao-icon {
+    font-size: 18px;
+    width: 36px;
+    height: 36px;
+  }
+  
+  .opcao-tamanho .opcao-titulo {
+    font-size: 14px;
+  }
+  
+  .opcao-tamanho .opcao-desc,
+  .opcao-tamanho .opcao-preview {
+    font-size: 11px;
+  }
+}
+
+/* ==========================================
+   ESTADOS ESPECIAIS
+   ========================================== */
+
+.opcao-tamanho:active {
+  transform: translateY(0);
+  transition: transform 0.1s ease;
+}
+
+.opcao-tamanho:focus {
+  outline: 2px solid #00A3E0;
+  outline-offset: 2px;
+}
+
+.opcao-destaque:focus {
+  outline-color: #E87722;
+}
+
+/* ==========================================
+   ANIMAÇÕES SUAVES
+   ========================================== */
+
+.opcoes-tamanho {
+  animation: slideInUp 0.3s ease-out;
+}
+
+@keyframes slideInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.opcao-tamanho {
+  animation: fadeIn 0.4s ease-out backwards;
+}
+
+.opcao-tamanho:nth-child(1) {
+  animation-delay: 0.1s;
+}
+
+.opcao-tamanho:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
