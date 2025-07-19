@@ -1,7 +1,7 @@
 /**
  * BENETRIP - Visualização de Destinos Recomendados
- * Versão 3.0 - Otimizada para usar dados diretos da API
- * Remove fallbacks e usa apenas informações reais da API
+ * Versão 4.0 - Integração com Whitelabel Benetrip
+ * Redireciona para www.benetrip.com.br com parâmetros de busca
  */
 
 const BENETRIP_DESTINOS = {
@@ -1029,7 +1029,132 @@ const BENETRIP_DESTINOS = {
     };
   },
   
-  // Mostrar confirmação de seleção
+  // ========== NOVA FUNCIONALIDADE: CONSTRUIR URL WHITELABEL ==========
+  
+  /**
+   * Constrói a URL da whitelabel Benetrip com os parâmetros de busca
+   * Formato: https://www.benetrip.com.br/?flightSearch=SAO1208RIO22081
+   * Onde: ORIGEM+DIA_IDA+MES_IDA+DESTINO+DIA_VOLTA+MES_VOLTA+PASSAGEIROS
+   */
+  construirURLWhitelabel(destinoSelecionado) {
+    try {
+      console.log('🔧 Construindo URL da whitelabel...');
+      console.log('📍 Destino selecionado:', destinoSelecionado);
+      console.log('👤 Dados do usuário:', this.dadosUsuario);
+      
+      // Obter dados necessários
+      const dadosUsuario = this.dadosUsuario;
+      const respostas = dadosUsuario?.respostas;
+      
+      if (!respostas) {
+        throw new Error('Dados do usuário não encontrados');
+      }
+      
+      // ===== ORIGEM =====
+      let codigoOrigem = 'SAO'; // Padrão São Paulo
+      
+      if (respostas.cidade_partida) {
+        const cidadePartida = respostas.cidade_partida;
+        
+        if (typeof cidadePartida === 'string') {
+          // Extrair código IATA se estiver no formato "Cidade (XXX)"
+          const match = cidadePartida.match(/\(([A-Z]{3})\)/);
+          if (match && match[1]) {
+            codigoOrigem = match[1];
+          } else {
+            // Buscar no mapeamento por nome da cidade
+            const cidadeLower = cidadePartida.toLowerCase();
+            const mapeamentoCidades = {
+              'são paulo': 'SAO', 'sao paulo': 'SAO',
+              'rio de janeiro': 'RIO', 
+              'brasilia': 'BSB', 'brasília': 'BSB',
+              'salvador': 'SSA', 'belo horizonte': 'CNF',
+              'recife': 'REC', 'fortaleza': 'FOR',
+              'porto alegre': 'POA', 'curitiba': 'CWB'
+            };
+            codigoOrigem = mapeamentoCidades[cidadeLower] || 'SAO';
+          }
+        } else if (typeof cidadePartida === 'object' && cidadePartida.code) {
+          codigoOrigem = cidadePartida.code;
+        }
+      }
+      
+      // ===== DESTINO =====
+      const codigoDestino = destinoSelecionado.codigo_iata || 
+                           destinoSelecionado.aeroporto?.codigo || 
+                           'XXX';
+      
+      // ===== DATAS =====
+      const datas = respostas.datas;
+      if (!datas || !datas.dataIda) {
+        throw new Error('Datas de viagem não encontradas');
+      }
+      
+      // Processar data de ida (formato YYYY-MM-DD)
+      const [anoIda, mesIda, diaIda] = datas.dataIda.split('-');
+      const diaIdaFormatado = diaIda.padStart(2, '0');
+      const mesIdaFormatado = mesIda.padStart(2, '0');
+      
+      // Processar data de volta (se existir)
+      let diaVoltaFormatado = diaIdaFormatado;
+      let mesVoltaFormatado = mesIdaFormatado;
+      
+      if (datas.dataVolta) {
+        const [anoVolta, mesVolta, diaVolta] = datas.dataVolta.split('-');
+        diaVoltaFormatado = diaVolta.padStart(2, '0');
+        mesVoltaFormatado = mesVolta.padStart(2, '0');
+      }
+      
+      // ===== QUANTIDADE DE PASSAGEIROS =====
+      let quantidadePassageiros = 1;
+      
+      // Verificar diferentes campos onde a quantidade pode estar
+      if (respostas.passageiros?.adultos) {
+        quantidadePassageiros = parseInt(respostas.passageiros.adultos) || 1;
+      } else if (respostas.quantidade_familia) {
+        quantidadePassageiros = parseInt(respostas.quantidade_familia) || 1;
+      } else if (respostas.quantidade_amigos) {
+        quantidadePassageiros = parseInt(respostas.quantidade_amigos) || 1;
+      } else if (respostas.companhia !== undefined) {
+        // Mapear tipo de companhia para quantidade
+        const companhia = parseInt(respostas.companhia);
+        switch (companhia) {
+          case 0: quantidadePassageiros = 1; break; // Sozinho
+          case 1: quantidadePassageiros = 2; break; // Casal
+          case 2: quantidadePassageiros = 3; break; // Família (estimativa)
+          case 3: quantidadePassageiros = 4; break; // Amigos (estimativa)
+          default: quantidadePassageiros = 1;
+        }
+      }
+      
+      // ===== CONSTRUIR PARÂMETRO flightSearch =====
+      const flightSearchParam = 
+        `${codigoOrigem}${diaIdaFormatado}${mesIdaFormatado}${codigoDestino}${diaVoltaFormatado}${mesVoltaFormatado}${quantidadePassageiros}`;
+      
+      // ===== URL FINAL =====
+      const urlWhitelabel = `https://www.benetrip.com.br/?flightSearch=${flightSearchParam}`;
+      
+      console.log('✅ URL construída com sucesso:');
+      console.log(`🔗 ${urlWhitelabel}`);
+      console.log('📊 Parâmetros utilizados:', {
+        origem: codigoOrigem,
+        destino: codigoDestino,
+        dataIda: `${diaIdaFormatado}/${mesIdaFormatado}`,
+        dataVolta: `${diaVoltaFormatado}/${mesVoltaFormatado}`,
+        passageiros: quantidadePassageiros,
+        parametroCompleto: flightSearchParam
+      });
+      
+      return urlWhitelabel;
+      
+    } catch (erro) {
+      console.error('❌ Erro ao construir URL da whitelabel:', erro);
+      // URL de fallback
+      return 'https://www.benetrip.com.br/';
+    }
+  },
+  
+  // Mostrar confirmação de seleção (MODIFICADO para usar whitelabel)
   mostrarConfirmacaoSelecao(destino) {
     const modalContainer = document.createElement('div');
     modalContainer.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
@@ -1050,7 +1175,7 @@ const BENETRIP_DESTINOS = {
                 </label>
               </div>
               <p class="mt-3 text-sm">
-                Você poderá consultar os preços reais de voos e hospedagens na próxima etapa, com nossos parceiros confiáveis.
+                Você será direcionado para a Benetrip onde poderá consultar preços reais e finalizar sua reserva com nossos parceiros confiáveis.
               </p>
             </div>
           </div>
@@ -1060,7 +1185,7 @@ const BENETRIP_DESTINOS = {
             Voltar
           </button>
           <button id="btn-confirmar" class="flex-1 py-2 px-4 text-white rounded transition-colors hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed" style="background-color: #E87722;" disabled>
-            Confirmar
+            Buscar Voos
           </button>
         </div>
       </div>
@@ -1079,8 +1204,32 @@ const BENETRIP_DESTINOS = {
       document.getElementById('modal-confirmacao').remove();
     });
     
+    // MODIFICADO: Redirecionar para whitelabel em vez de flights.html
     btnConfirmar.addEventListener('click', () => {
-      window.location.href = 'flights.html';
+      console.log('🚀 Redirecionando para a whitelabel Benetrip...');
+      
+      try {
+        // Construir URL da whitelabel
+        const urlWhitelabel = this.construirURLWhitelabel(destino);
+        
+        // Mostrar toast de confirmação
+        this.exibirToast('Redirecionando para a Benetrip...', 'info');
+        
+        // Aguardar um pouco e redirecionar
+        setTimeout(() => {
+          window.open(urlWhitelabel, '_blank');
+          
+          // Opcional: Também redirecionar a página atual ou apenas fechar o modal
+          document.getElementById('modal-confirmacao').remove();
+          
+          // Mostrar mensagem de sucesso
+          this.exibirToast('Boa viagem! 🛫', 'success');
+        }, 1000);
+        
+      } catch (erro) {
+        console.error('❌ Erro ao redirecionar:', erro);
+        this.exibirToast('Erro ao redirecionar. Tente novamente.', 'error');
+      }
     });
     
     // Fechar modal ao clicar fora
@@ -1089,6 +1238,58 @@ const BENETRIP_DESTINOS = {
         this.remove();
       }
     });
+  },
+  
+  // ========== UTILITÁRIOS AUXILIARES ==========
+  
+  /**
+   * Exibe uma mensagem toast
+   */
+  exibirToast(mensagem, tipo = 'info') {
+    // Criar container se não existir
+    let toastContainer = document.getElementById('toast-container');
+    if (!toastContainer) {
+      toastContainer = document.createElement('div');
+      toastContainer.id = 'toast-container';
+      toastContainer.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 9999;
+        pointer-events: none;
+      `;
+      document.body.appendChild(toastContainer);
+    }
+    
+    // Criar toast
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${tipo}`;
+    toast.style.cssText = `
+      background: ${tipo === 'success' ? '#10B981' : tipo === 'error' ? '#EF4444' : tipo === 'warning' ? '#F59E0B' : '#3B82F6'};
+      color: white;
+      padding: 12px 20px;
+      border-radius: 8px;
+      margin-bottom: 8px;
+      font-weight: 500;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      transform: translateX(100%);
+      transition: transform 0.3s ease;
+      pointer-events: auto;
+    `;
+    toast.textContent = mensagem;
+    
+    toastContainer.appendChild(toast);
+    
+    // Animar entrada
+    setTimeout(() => {
+      toast.style.transform = 'translateX(0)';
+    }, 10);
+    
+    // Remover após tempo
+    setTimeout(() => {
+      toast.style.transform = 'translateX(100%)';
+      setTimeout(() => toast.remove(), 300);
+    }, 3000);
   },
   
   // Obter período de datas da viagem
@@ -1165,6 +1366,31 @@ const BENETRIP_DESTINOS = {
         overflow: hidden;
         text-overflow: ellipsis;
       }
+      
+      /* Toast container e estilos */
+      #toast-container {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 9999;
+        pointer-events: none;
+      }
+      
+      .toast {
+        pointer-events: auto;
+        margin-bottom: 8px;
+        border-radius: 8px;
+        padding: 12px 20px;
+        color: white;
+        font-weight: 500;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        transition: all 0.3s ease;
+      }
+      
+      .toast-success { background-color: #10B981; }
+      .toast-error { background-color: #EF4444; }
+      .toast-warning { background-color: #F59E0B; }
+      .toast-info { background-color: #3B82F6; }
     `;
     
     document.head.appendChild(estiloElement);
