@@ -1490,22 +1490,21 @@ if (e.target.closest('.btn-voltar')) {
  * Adicionar estes métodos ao objeto BENETRIP_ROTEIRO
  */
 
+/**
+ * ✅ COMPARTILHAMENTO SIMPLIFICADO + LINKS DE MAPAS
+ * Substituir/adicionar estes métodos no objeto BENETRIP_ROTEIRO
+ */
+
 // ==========================================
-// COMPARTILHAMENTO COMO IMAGEM - NOVO
+// COMPARTILHAMENTO SIMPLIFICADO - MODIFICADO
 // ==========================================
 
 /**
- * ✅ COMPARTILHAR ROTEIRO - VERSÃO EXPANDIDA COM IMAGEM
+ * ✅ COMPARTILHAR ROTEIRO - VERSÃO SIMPLIFICADA COM TEXTO
  */
 async compartilharRoteiro() {
   try {
-    // Verificar se html2canvas está disponível
-    if (typeof html2canvas === 'undefined') {
-      console.warn('⚠️ html2canvas não encontrado, usando compartilhamento básico');
-      return this.compartilharLink();
-    }
-    
-    // Mostrar modal de opções
+    // Mostrar modal simples de compartilhamento
     this.mostrarModalCompartilhamento();
     
   } catch (erro) {
@@ -1515,7 +1514,7 @@ async compartilharRoteiro() {
 },
 
 /**
- * ✅ NOVO: Modal de opções de compartilhamento
+ * ✅ NOVO: Modal simplificado de compartilhamento
  */
 mostrarModalCompartilhamento() {
   // Remover modal existente se houver
@@ -1535,29 +1534,22 @@ mostrarModalCompartilhamento() {
       </div>
       
       <div class="modal-body">
-        <div class="opcoes-compartilhamento">
-          <button class="opcao-compartilhar opcao-destaque" data-tipo="imagem">
-            <div class="opcao-icon">📸</div>
-            <div class="opcao-info">
-              <div class="opcao-titulo">Imagem</div>
-              <div class="opcao-desc">Perfeito para redes sociais</div>
-            </div>
+        <div class="compartilhar-info">
+          <div class="info-icon">📋</div>
+          <div class="info-texto">
+            <h4>Compartilhar como Texto</h4>
+            <p>Seu roteiro será copiado como texto com todos os detalhes e links dos mapas para cada local.</p>
+          </div>
+        </div>
+        
+        <div class="modal-acoes">
+          <button class="btn btn-principal btn-compartilhar-texto">
+            <span class="btn-icon">📋</span>
+            <span class="btn-text">Compartilhar Roteiro</span>
           </button>
           
-          <button class="opcao-compartilhar" data-tipo="link">
-            <div class="opcao-icon">🔗</div>
-            <div class="opcao-info">
-              <div class="opcao-titulo">Link</div>
-              <div class="opcao-desc">Copiar link da página</div>
-            </div>
-          </button>
-          
-          <button class="opcao-compartilhar" data-tipo="texto">
-            <div class="opcao-icon">📋</div>
-            <div class="opcao-info">
-              <div class="opcao-titulo">Texto</div>
-              <div class="opcao-desc">Resumo do roteiro</div>
-            </div>
+          <button class="btn btn-secundario" onclick="this.closest('.modal-overlay').remove()">
+            Cancelar
           </button>
         </div>
       </div>
@@ -1571,31 +1563,10 @@ mostrarModalCompartilhamento() {
     if (e.target === modal) modal.remove();
   });
   
-  modal.querySelectorAll('.opcao-compartilhar').forEach(opcao => {
-    opcao.addEventListener('click', async (e) => {
-      const tipo = opcao.dataset.tipo;
-      modal.remove();
-      
-      // Desabilitar botão temporariamente
-      opcao.disabled = true;
-      
-      try {
-        switch (tipo) {
-          case 'imagem':
-            await this.gerarImagemRoteiro();
-            break;
-          case 'link':
-            await this.compartilharLink();
-            break;
-          case 'texto':
-            await this.compartilharTexto();
-            break;
-        }
-      } catch (erro) {
-        console.error('❌ Erro na ação de compartilhamento:', erro);
-        this.exibirToast('Erro ao processar compartilhamento', 'error');
-      }
-    });
+  // Evento do botão compartilhar
+  modal.querySelector('.btn-compartilhar-texto').addEventListener('click', async () => {
+    modal.remove();
+    await this.compartilharTextoCompleto();
   });
   
   // Animação de entrada
@@ -1605,310 +1576,177 @@ mostrarModalCompartilhamento() {
 },
 
 /**
- * ✅ NOVO: Gerar imagem do roteiro
+ * ✅ NOVO: Compartilhar texto completo com mapas
  */
-async gerarImagemRoteiro() {
+async compartilharTextoCompleto() {
   try {
-    console.log('📸 Iniciando geração da imagem...');
+    this.exibirToast('📋 Preparando seu roteiro...', 'info');
     
-    // Mostrar loading
-    this.exibirToast('📸 Gerando imagem do roteiro...', 'info');
+    const textoCompleto = this.gerarTextoRoteiroCompleto();
     
-    // Preparar elemento para captura
-    const elemento = await this.prepararElementoParaCaptura();
-    
-    // Configurações otimizadas do html2canvas
-    const opcoes = {
-      scale: 2, // Alta qualidade
-      useCORS: true,
-      allowTaint: false,
-      backgroundColor: '#ffffff',
-      width: elemento.offsetWidth,
-      height: elemento.offsetHeight,
-      scrollX: 0,
-      scrollY: 0,
-      windowWidth: elemento.offsetWidth,
-      windowHeight: elemento.offsetHeight,
-      onclone: (clonedDoc) => {
-        // Ajustar estilos no clone
-        this.ajustarEstilosParaImagem(clonedDoc);
+    // Tentar compartilhamento nativo primeiro (mobile)
+    if (navigator.share && /mobile|android|iphone/i.test(navigator.userAgent)) {
+      try {
+        await navigator.share({
+          title: `Roteiro Benetrip - ${this.dadosDestino.destino}`,
+          text: textoCompleto
+        });
+        this.exibirToast('📤 Roteiro compartilhado!', 'success');
+        return;
+      } catch (e) {
+        console.log('ℹ️ Share cancelado, copiando para clipboard');
       }
-    };
+    }
     
-    console.log('🎨 Capturando elemento...', opcoes);
-    
-    // Gerar canvas
-    const canvas = await html2canvas(elemento, opcoes);
-    
-    console.log('✅ Canvas gerado:', canvas.width, 'x', canvas.height);
-    
-    // Processar e compartilhar imagem
-    await this.processarECompartilharImagem(canvas);
+    // Fallback: Copiar para clipboard
+    try {
+      await navigator.clipboard.writeText(textoCompleto);
+      this.exibirToast('📋 Roteiro copiado! Cole no WhatsApp, email ou onde quiser.', 'success');
+    } catch (e) {
+      // Fallback do fallback
+      this.copiarTextoLegacy(textoCompleto);
+      this.exibirToast('📋 Roteiro copiado para a área de transferência!', 'success');
+    }
     
   } catch (erro) {
-    console.error('❌ Erro ao gerar imagem:', erro);
-    this.exibirToast('❌ Erro ao gerar imagem. Tente novamente.', 'error');
+    console.error('❌ Erro ao compartilhar texto:', erro);
+    this.exibirToast('❌ Erro ao preparar roteiro. Tente novamente.', 'error');
   }
 },
 
 /**
- * ✅ NOVO: Preparar elemento para captura
+ * ✅ NOVO: Gerar texto completo do roteiro com mapas
  */
-async prepararElementoParaCaptura() {
-  // Elemento principal do roteiro
-  let elemento = document.querySelector('.roteiro-content');
-  
-  if (!elemento) {
-    throw new Error('Elemento do roteiro não encontrado');
-  }
-  
-  // Aguardar imagens carregarem
-  await this.aguardarImagensCarregarem(elemento);
-  
-  // Garantir que está visível
-  elemento.style.display = 'block';
-  elemento.style.visibility = 'visible';
-  
-  return elemento;
-},
-
-/**
- * ✅ NOVO: Aguardar todas as imagens carregarem
- */
-async aguardarImagensCarregarem(elemento) {
-  const imagens = elemento.querySelectorAll('img');
-  const promessas = Array.from(imagens).map(img => {
-    return new Promise((resolve) => {
-      if (img.complete) {
-        resolve();
-      } else {
-        img.onload = resolve;
-        img.onerror = resolve; // Resolve mesmo com erro
-        // Timeout de segurança
-        setTimeout(resolve, 3000);
-      }
-    });
-  });
-  
-  await Promise.all(promessas);
-  console.log(`✅ ${imagens.length} imagens processadas para captura`);
-},
-
-/**
- * ✅ NOVO: Ajustar estilos para imagem
- */
-ajustarEstilosParaImagem(clonedDoc) {
-  const elemento = clonedDoc.querySelector('.roteiro-content');
-  
-  if (elemento) {
-    // Garantir fundo branco
-    elemento.style.backgroundColor = '#ffffff';
-    elemento.style.padding = '20px';
-    elemento.style.margin = '0';
-    
-    // Ajustar fontes e cores
-    const textos = elemento.querySelectorAll('*');
-    textos.forEach(el => {
-      // Garantir contraste
-      if (window.getComputedStyle(el).color === 'rgb(255, 255, 255)') {
-        el.style.color = '#333333';
-      }
-      
-      // Ajustar tamanhos de fonte muito pequenos
-      const fontSize = window.getComputedStyle(el).fontSize;
-      if (fontSize && parseInt(fontSize) < 12) {
-        el.style.fontSize = '12px';
-      }
-    });
-    
-    // Garantir que badges sejam visíveis
-    const badges = elemento.querySelectorAll('.badge');
-    badges.forEach(badge => {
-      badge.style.fontWeight = 'bold';
-      badge.style.padding = '4px 8px';
-    });
-  }
-},
-
-/**
- * ✅ NOVO: Processar e compartilhar imagem
- */
-async processarECompartilharImagem(canvas) {
-  return new Promise((resolve, reject) => {
-    canvas.toBlob(async (blob) => {
-      try {
-        if (!blob) {
-          throw new Error('Falha ao gerar blob da imagem');
-        }
-        
-        console.log('📦 Blob gerado:', blob.size, 'bytes');
-        
-        const nomeArquivo = `roteiro-${this.dadosDestino.destino.toLowerCase().replace(/[^a-z0-9]/g, '-')}-benetrip.png`;
-        
-        // Tentar compartilhamento nativo primeiro (mobile)
-        if (this.podeCompartilharArquivos()) {
-          try {
-            const arquivo = new File([blob], nomeArquivo, { type: 'image/png' });
-            
-            await navigator.share({
-              title: `Roteiro Benetrip - ${this.dadosDestino.destino}`,
-              text: `Confira meu roteiro personalizado para ${this.dadosDestino.destino}! 🐕✈️`,
-              files: [arquivo]
-            });
-            
-            this.exibirToast('📤 Imagem compartilhada!', 'success');
-            resolve();
-            return;
-          } catch (erroShare) {
-            console.log('ℹ️ Compartilhamento nativo falhou, usando download:', erroShare.message);
-          }
-        }
-        
-        // Fallback: Download da imagem
-        this.baixarImagem(blob, nomeArquivo);
-        this.exibirToast('📸 Imagem salva! Compartilhe onde quiser.', 'success');
-        resolve();
-        
-      } catch (erro) {
-        console.error('❌ Erro ao processar imagem:', erro);
-        reject(erro);
-      }
-    }, 'image/png', 0.95);
-  });
-},
-
-/**
- * ✅ NOVO: Verificar se pode compartilhar arquivos
- */
-podeCompartilharArquivos() {
-  return (
-    navigator.share && 
-    navigator.canShare && 
-    /mobile|android|iphone|ipad/i.test(navigator.userAgent)
-  );
-},
-
-/**
- * ✅ NOVO: Baixar imagem
- */
-baixarImagem(blob, nomeArquivo) {
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = nomeArquivo;
-  link.style.display = 'none';
-  
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  
-  // Liberar memória
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-},
-
-/**
- * ✅ MELHORADO: Compartilhar link (mantido como fallback)
- */
-async compartilharLink() {
-  const titulo = `Roteiro Benetrip - ${this.dadosDestino.destino}`;
-  const texto = `Confira meu roteiro personalizado para ${this.dadosDestino.destino}! 🐕✈️`;
-  const url = window.location.href;
-  
-  // Tentar compartilhamento nativo
-  if (navigator.share && /mobile|android|iphone/i.test(navigator.userAgent)) {
-    try {
-      await navigator.share({ title: titulo, text: texto, url });
-      this.exibirToast('🔗 Link compartilhado!', 'success');
-      return;
-    } catch (e) {
-      console.log('ℹ️ Share cancelado ou falhou');
-    }
-  }
-  
-  // Fallback: Copiar para clipboard
-  try {
-    await navigator.clipboard.writeText(url);
-    this.exibirToast('🔗 Link copiado! Cole onde quiser compartilhar.', 'success');
-  } catch (e) {
-    // Fallback do fallback
-    this.copiarTextoLegacy(url);
-    this.exibirToast('🔗 Link copiado!', 'success');
-  }
-},
-
-/**
- * ✅ NOVO: Compartilhar como texto
- */
-async compartilharTexto() {
-  const texto = this.gerarTextoRoteiro();
-  
-  if (navigator.share && /mobile|android|iphone/i.test(navigator.userAgent)) {
-    try {
-      await navigator.share({
-        title: `Roteiro para ${this.dadosDestino.destino}`,
-        text: texto
-      });
-      this.exibirToast('📋 Texto compartilhado!', 'success');
-      return;
-    } catch (e) {
-      console.log('ℹ️ Share de texto cancelado');
-    }
-  }
-  
-  // Fallback: Copiar texto
-  try {
-    await navigator.clipboard.writeText(texto);
-    this.exibirToast('📋 Texto do roteiro copiado!', 'success');
-  } catch (e) {
-    this.copiarTextoLegacy(texto);
-    this.exibirToast('📋 Texto copiado!', 'success');
-  }
-},
-
-/**
- * ✅ NOVO: Gerar texto do roteiro
- */
-gerarTextoRoteiro() {
+gerarTextoRoteiroCompleto() {
   const destino = this.dadosDestino.destino;
+  const pais = this.dadosDestino.pais;
   const dataIda = this.formatarData(this.getDataIda());
   const dataVolta = this.getDataVolta() ? this.formatarData(this.getDataVolta()) : null;
+  const diasViagem = this.calcularDiasViagem(this.getDataIda(), this.getDataVolta());
   
-  let texto = `🐕 ROTEIRO BENETRIP - ${destino.toUpperCase()} ✈️\n\n`;
-  texto += `📅 ${dataIda}${dataVolta ? ` até ${dataVolta}` : ''}\n`;
-  texto += `👥 ${this.obterTextoCompanhia()}\n\n`;
+  let texto = `🐕 ROTEIRO BENETRIP - ${destino.toUpperCase()} ✈️\n`;
+  texto += `═══════════════════════════════\n\n`;
+  
+  // Informações gerais
+  texto += `📍 DESTINO: ${destino}, ${pais}\n`;
+  texto += `📅 PERÍODO: ${dataIda}${dataVolta ? ` até ${dataVolta}` : ''}\n`;
+  texto += `⏱️ DURAÇÃO: ${diasViagem} ${diasViagem === 1 ? 'dia' : 'dias'}\n`;
+  texto += `👥 VIAJANTES: ${this.obterTextoCompanhia()}\n`;
+  texto += `🎯 ESTILO: ${this.obterTextoPreferencia()}\n`;
+  texto += `⚡ INTENSIDADE: ${this.obterTextoIntensidade()}\n\n`;
+  
+  // Informações de voo
+  texto += `✈️ INFORMAÇÕES DE VOO:\n`;
+  texto += `🛬 Chegada: ${this.extrairHorarioChegada()}\n`;
+  if (this.getDataVolta()) {
+    texto += `🛫 Partida: ${this.extrairHorarioPartida()}\n`;
+  }
+  texto += `\n`;
+  
+  // Roteiro por dias
+  texto += `📋 ROTEIRO DETALHADO:\n`;
+  texto += `═══════════════════════════════\n\n`;
   
   this.roteiroPronto.dias.forEach((dia, index) => {
-    texto += `📍 DIA ${index + 1} - ${this.formatarDataCompleta(dia.data)}\n`;
-    if (dia.descricao) texto += `"${dia.descricao}"\n\n`;
+    const numeroDia = index + 1;
+    const dataFormatada = this.formatarDataCompleta(dia.data);
     
-    dia.atividades.forEach(ativ => {
-      if (!ativ.isEspecial) {
-        texto += `${ativ.horario || ''} • ${ativ.local}\n`;
-        if (ativ.dica) texto += `💡 ${ativ.dica}\n`;
-        texto += '\n';
-      }
-    });
+    texto += `📅 DIA ${numeroDia} - ${dataFormatada}\n`;
+    texto += `${'-'.repeat(40)}\n`;
     
-    texto += '---\n\n';
+    if (dia.descricao) {
+      texto += `💭 "${dia.descricao}"\n\n`;
+    }
+    
+    if (dia.observacao) {
+      texto += `💡 ${dia.observacao}\n\n`;
+    }
+    
+    // Previsão do tempo (se disponível)
+    if (dia.previsao && index < 3) {
+      texto += `🌤️ PREVISÃO: ${dia.previsao.temperature}°C, ${dia.previsao.condition}\n\n`;
+    }
+    
+    // Atividades do dia
+    if (dia.atividades && dia.atividades.length > 0) {
+      texto += `📍 PROGRAMAÇÃO:\n\n`;
+      
+      dia.atividades.forEach((atividade, ativIndex) => {
+        // Horário
+        if (atividade.horario) {
+          texto += `🕒 ${atividade.horario}`;
+          if (atividade.duracao) {
+            texto += ` (${atividade.duracao})`;
+          }
+          texto += `\n`;
+        }
+        
+        // Local/Atividade
+        texto += `📍 ${atividade.local}\n`;
+        
+        // Tags
+        if (atividade.tags && atividade.tags.length > 0) {
+          texto += `🏷️ ${atividade.tags.join(' • ')}\n`;
+        }
+        
+        // Dica da Tripinha
+        if (atividade.dica) {
+          texto += `🐕 Dica da Tripinha: ${atividade.dica}\n`;
+        }
+        
+        // ✅ NOVO: Link do Google Maps
+        if (!atividade.isEspecial && atividade.local) {
+          const linkMapa = this.gerarLinkGoogleMaps(atividade.local);
+          texto += `🗺️ Ver no mapa: ${linkMapa}\n`;
+        }
+        
+        texto += `\n`;
+      });
+    } else {
+      texto += `🏖️ Dia livre para descanso ou atividades opcionais.\n\n`;
+    }
+    
+    texto += `${'-'.repeat(40)}\n\n`;
   });
   
-  texto += '🐾 Criado com amor pela Tripinha em benetrip.com.br';
+  // Rodapé
+  texto += `🐾 Roteiro criado com amor pela Tripinha!\n`;
+  texto += `📱 Crie o seu em: benetrip.com.br\n`;
+  texto += `\n#Benetrip #Viagem #Roteiro #${destino.replace(/\s+/g, '')}`;
   
   return texto;
 },
 
 /**
- * ✅ NOVO: Copiar texto (método legacy)
+ * ✅ NOVO: Gerar link do Google Maps
+ */
+gerarLinkGoogleMaps(local) {
+  const destino = `${this.dadosDestino.destino}, ${this.dadosDestino.pais}`;
+  const query = `${local}, ${destino}`;
+  return `https://maps.google.com/search?query=${encodeURIComponent(query)}`;
+},
+
+/**
+ * ✅ NOVO: Copiar texto (método legacy para browsers antigos)
  */
 copiarTextoLegacy(texto) {
   const textarea = document.createElement('textarea');
   textarea.value = texto;
   textarea.style.position = 'fixed';
+  textarea.style.left = '-9999px';
   textarea.style.opacity = '0';
   document.body.appendChild(textarea);
   textarea.select();
   document.execCommand('copy');
   document.body.removeChild(textarea);
+},
+
+/**
+ * ✅ MELHORADO: Abrir mapa (mantido para compatibilidade)
+ */
+abrirMapa(local) {
+  const link = this.gerarLinkGoogleMaps(local);
+  window.open(link, '_blank', 'noopener,noreferrer');
 },
 
   editarRoteiro() {
