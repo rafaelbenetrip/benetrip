@@ -1683,7 +1683,8 @@ gerarTextoRoteiroResumido() {
   });
   
   // Rodapé simples
-  texto += `🐾 Criado pela Tripinha em www.benetrip.com.br`;
+  texto += `🐾 Roteiro criado com amor pela Tripinha!\n`;
+  texto += `📱 Crie o seu em: www.benetrip.com.br\n`;
   
   return texto;
 },
@@ -1905,7 +1906,7 @@ gerarTextoRoteiroCompleto() {
   
   // Rodapé
   texto += `🐾 Roteiro criado com amor pela Tripinha!\n`;
-  texto += `📱 Crie o seu em: benetrip.com.br\n`;
+  texto += `📱 Crie o seu em: www.benetrip.com.br\n`;
   texto += `\n#Benetrip #Viagem #Roteiro #${destino.replace(/\s+/g, '')}`;
   
   return texto;
