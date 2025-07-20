@@ -1,0 +1,848 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Perguntas Frequentes - Benetrip</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: #F5F5F5;
+            color: #21272A;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 480px;
+            margin: 0 auto;
+            background-color: #FFFFFF;
+            min-height: 100vh;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Header */
+        .header {
+            background: linear-gradient(135deg, #E87722 0%, #00A3E0 100%);
+            color: #FFFFFF;
+            padding: 24px 20px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .header::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: repeating-linear-gradient(
+                45deg,
+                transparent,
+                transparent 15px,
+                rgba(255, 255, 255, 0.05) 15px,
+                rgba(255, 255, 255, 0.05) 30px
+            );
+            animation: movePattern 25s linear infinite;
+        }
+
+        @keyframes movePattern {
+            0% { transform: translateX(-50px) translateY(-50px); }
+            100% { transform: translateX(0px) translateY(0px); }
+        }
+
+        .header-content {
+            position: relative;
+            z-index: 2;
+        }
+
+        .header h1 {
+            font-family: 'Poppins', sans-serif;
+            font-weight: bold;
+            font-size: 24px;
+            margin-bottom: 8px;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .header .subtitle {
+            font-size: 15px;
+            opacity: 0.95;
+            margin-bottom: 16px;
+        }
+
+        .mascot-header {
+            font-size: 32px;
+            margin-bottom: 8px;
+            animation: questionBounce 3s ease-in-out infinite;
+        }
+
+        @keyframes questionBounce {
+            0%, 20%, 50%, 80%, 100% { transform: translateY(0) rotate(0deg); }
+            40% { transform: translateY(-10px) rotate(5deg); }
+            60% { transform: translateY(-5px) rotate(-5deg); }
+        }
+
+        /* Back Button */
+        .back-button {
+            position: absolute;
+            left: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            color: #FFFFFF;
+            padding: 10px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+            z-index: 3;
+        }
+
+        .back-button:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-50%) scale(1.05);
+        }
+
+        /* Content */
+        .content {
+            padding: 24px 20px;
+            padding-bottom: 120px;
+        }
+
+        .intro-section {
+            background: linear-gradient(135deg, rgba(232, 119, 34, 0.08) 0%, rgba(0, 163, 224, 0.08) 100%);
+            padding: 20px;
+            border-radius: 16px;
+            margin-bottom: 32px;
+            border: 1px solid rgba(232, 119, 34, 0.2);
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .intro-section::before {
+            content: '❓';
+            position: absolute;
+            top: -15px;
+            right: -15px;
+            font-size: 80px;
+            opacity: 0.1;
+        }
+
+        .intro-section h2 {
+            font-family: 'Poppins', sans-serif;
+            font-weight: bold;
+            color: #E87722;
+            font-size: 20px;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .intro-section p {
+            font-size: 14px;
+            color: #666;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* FAQ Sections */
+        .faq-category {
+            margin-bottom: 24px;
+            animation: fadeInUp 0.8s ease-out;
+        }
+
+        .category-title {
+            font-family: 'Poppins', sans-serif;
+            font-weight: bold;
+            color: #00A3E0;
+            font-size: 16px;
+            margin-bottom: 16px;
+            padding: 12px 16px;
+            background: linear-gradient(135deg, rgba(0, 163, 224, 0.1) 0%, rgba(0, 163, 224, 0.05) 100%);
+            border-radius: 8px;
+            border-left: 4px solid #00A3E0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        /* FAQ Items */
+        .faq-item {
+            background: #FFFFFF;
+            border: 1px solid #E0E0E0;
+            border-radius: 12px;
+            margin-bottom: 12px;
+            overflow: hidden;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+        }
+
+        .faq-item:hover {
+            box-shadow: 0 4px 16px rgba(232, 119, 34, 0.1);
+            border-color: #E87722;
+        }
+
+        .faq-question {
+            padding: 16px 20px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            transition: all 0.3s ease;
+            user-select: none;
+        }
+
+        .faq-question:hover {
+            background: rgba(232, 119, 34, 0.05);
+        }
+
+        .faq-icon {
+            font-size: 20px;
+            flex-shrink: 0;
+        }
+
+        .faq-question-text {
+            flex: 1;
+            font-weight: 600;
+            color: #21272A;
+            font-size: 14px;
+            line-height: 1.4;
+        }
+
+        .faq-toggle {
+            font-size: 12px;
+            color: #E87722;
+            transition: transform 0.3s ease;
+            flex-shrink: 0;
+        }
+
+        .faq-item.open .faq-toggle {
+            transform: rotate(180deg);
+        }
+
+        .faq-answer {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease, padding 0.3s ease;
+            background: rgba(248, 249, 250, 0.8);
+        }
+
+        .faq-item.open .faq-answer {
+            max-height: 500px;
+            padding: 20px;
+            border-top: 1px solid rgba(232, 119, 34, 0.1);
+        }
+
+        .faq-answer p {
+            font-size: 14px;
+            line-height: 1.6;
+            color: #555;
+            margin: 0;
+        }
+
+        .faq-answer a {
+            color: #E87722;
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .faq-answer a:hover {
+            text-decoration: underline;
+        }
+
+        /* Contact Section */
+        .contact-section {
+            background: linear-gradient(135deg, #E87722 0%, #00A3E0 100%);
+            color: #FFFFFF;
+            padding: 24px;
+            border-radius: 16px;
+            text-align: center;
+            margin: 32px 0;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .contact-section::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255, 255, 255, 0.1) 2px, transparent 2px);
+            background-size: 25px 25px;
+            animation: sparkle 20s linear infinite;
+        }
+
+        @keyframes sparkle {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .contact-content {
+            position: relative;
+            z-index: 2;
+        }
+
+        .contact-section h3 {
+            font-family: 'Poppins', sans-serif;
+            font-weight: bold;
+            font-size: 18px;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .contact-section p {
+            font-size: 15px;
+            margin-bottom: 16px;
+            opacity: 0.95;
+        }
+
+        .contact-section a {
+            color: #FFFFFF;
+            text-decoration: none;
+            font-weight: bold;
+            background: rgba(255, 255, 255, 0.2);
+            padding: 10px 20px;
+            border-radius: 25px;
+            display: inline-block;
+            transition: all 0.3s;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .contact-section a:hover {
+            background: rgba(255, 255, 255, 0.3);
+            border-color: rgba(255, 255, 255, 0.5);
+            transform: translateY(-2px);
+        }
+
+        /* Search Box */
+        .search-box {
+            background: #FFFFFF;
+            border: 2px solid #E0E0E0;
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 24px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+            transition: border-color 0.3s ease;
+        }
+
+        .search-box:focus-within {
+            border-color: #E87722;
+        }
+
+        .search-input {
+            width: 100%;
+            border: none;
+            outline: none;
+            font-size: 14px;
+            background: transparent;
+            color: #21272A;
+        }
+
+        .search-input::placeholder {
+            color: #999;
+        }
+
+        .search-icon {
+            color: #E87722;
+            margin-right: 12px;
+        }
+
+        /* Footer */
+        .footer {
+            position: fixed;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 100%;
+            max-width: 480px;
+            background: linear-gradient(135deg, #E87722 0%, #00A3E0 100%);
+            padding: 16px 20px;
+            text-align: center;
+            box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.15);
+        }
+
+        .footer-button {
+            background: rgba(255, 255, 255, 0.2);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            color: #FFFFFF;
+            padding: 12px 24px;
+            border-radius: 25px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 14px;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            text-decoration: none;
+        }
+
+        .footer-button:hover {
+            background: rgba(255, 255, 255, 0.3);
+            border-color: rgba(255, 255, 255, 0.5);
+            transform: translateY(-2px);
+        }
+
+        /* Responsive */
+        @media (max-width: 480px) {
+            .container {
+                box-shadow: none;
+            }
+            
+            .content {
+                padding: 20px 16px;
+                padding-bottom: 120px;
+            }
+            
+            .header {
+                padding: 20px 16px;
+            }
+        }
+
+        /* Animations */
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .faq-category:nth-child(1) { animation-delay: 0.1s; }
+        .faq-category:nth-child(2) { animation-delay: 0.2s; }
+        .faq-category:nth-child(3) { animation-delay: 0.3s; }
+        .faq-category:nth-child(4) { animation-delay: 0.4s; }
+
+        /* Highlight matching search results */
+        .faq-item.hidden {
+            display: none;
+        }
+
+        .faq-item.highlight {
+            border-color: #E87722;
+            box-shadow: 0 4px 16px rgba(232, 119, 34, 0.2);
+        }
+
+        .search-highlight {
+            background: rgba(232, 119, 34, 0.2);
+            padding: 1px 3px;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <a href="https://www.benetrip.com.br" class="back-button">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.42-1.41L7.83 13H20v-2z"/>
+                </svg>
+            </a>
+            <div class="header-content">
+                <div class="mascot-header">🐾❓</div>
+                <h1>Perguntas Frequentes</h1>
+                <p class="subtitle">Tire todas suas dúvidas sobre a Benetrip</p>
+            </div>
+        </div>
+
+        <!-- Content -->
+        <div class="content">
+            <!-- Intro Section -->
+            <div class="intro-section">
+                <h2>
+                    <span>💡</span>
+                    Como podemos ajudar você?
+                </h2>
+                <p>Aqui você encontra respostas para as principais dúvidas sobre a Benetrip e a Tripinha. Use a busca ou explore as categorias abaixo!</p>
+            </div>
+
+            <!-- Search Box -->
+            <div class="search-box">
+                <span class="search-icon">🔍</span>
+                <input type="text" class="search-input" placeholder="Busque por uma pergunta ou palavra-chave..." id="searchInput">
+            </div>
+
+            <!-- FAQ Categories -->
+            
+            <!-- Categoria: Sobre a Benetrip -->
+            <div class="faq-category">
+                <div class="category-title">
+                    <span>🌟</span>
+                    Sobre a Benetrip
+                </div>
+
+                <div class="faq-item">
+                    <div class="faq-question">
+                        <span class="faq-icon">❓</span>
+                        <span class="faq-question-text">O que é a Benetrip?</span>
+                        <span class="faq-toggle">▼</span>
+                    </div>
+                    <div class="faq-answer">
+                        <p>A Benetrip é uma plataforma que te ajuda a planejar viagens de forma leve, divertida e sem complicação. Através de um bate-papo com a Tripinha, você recebe sugestões personalizadas de destinos, datas, hospedagens e até um roteiro completo, tudo com base no seu estilo, preferências e orçamento.</p>
+                    </div>
+                </div>
+
+                <div class="faq-item">
+                    <div class="faq-question">
+                        <span class="faq-icon">🐶</span>
+                        <span class="faq-question-text">Quem é a Tripinha?</span>
+                        <span class="faq-toggle">▼</span>
+                    </div>
+                    <div class="faq-answer">
+                        <p>A Tripinha é a nossa mascote caramelo e especialista em viagens. Ela é magrinha, curiosa, despojada e sabe tudo sobre os melhores destinos. Com seu jeito leve e esperto, ela conversa com você e usa inteligência artificial pra montar a viagem ideal — como se fosse uma amiga que topa qualquer parada com você.</p>
+                    </div>
+                </div>
+
+                <div class="faq-item">
+                    <div class="faq-question">
+                        <span class="faq-icon">💰</span>
+                        <span class="faq-question-text">A Benetrip é gratuita?</span>
+                        <span class="faq-toggle">▼</span>
+                    </div>
+                    <div class="faq-answer">
+                        <p>Sim! Você pode usar a Benetrip gratuitamente para descobrir destinos, montar um roteiro e planejar sua viagem. No futuro, alguns recursos premium podem ser adicionados, mas o essencial sempre será gratuito.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Categoria: Como Funciona -->
+            <div class="faq-category">
+                <div class="category-title">
+                    <span>⚙️</span>
+                    Como Funciona
+                </div>
+
+                <div class="faq-item">
+                    <div class="faq-question">
+                        <span class="faq-icon">📍</span>
+                        <span class="faq-question-text">Como a Tripinha escolhe os destinos?</span>
+                        <span class="faq-toggle">▼</span>
+                    </div>
+                    <div class="faq-answer">
+                        <p>Com base nas suas respostas sobre preferências, companhia de viagem, orçamento, cidade de origem e datas. A Tripinha usa IA + dados reais de passagens e hospedagens para sugerir destinos que fazem sentido pra você — sem empurrar o que está fora da realidade do seu perfil.</p>
+                    </div>
+                </div>
+
+                <div class="faq-item">
+                    <div class="faq-question">
+                        <span class="faq-icon">🗺️</span>
+                        <span class="faq-question-text">A Tripinha também cria o roteiro?</span>
+                        <span class="faq-toggle">▼</span>
+                    </div>
+                    <div class="faq-answer">
+                        <p>Sim! Depois que você define seu destino e datas, a Tripinha monta um roteiro personalizado, com sugestões de o que fazer em cada dia, pontos turísticos imperdíveis e até dicas locais. Tudo adaptado ao seu estilo de viagem.</p>
+                    </div>
+                </div>
+
+                <div class="faq-item">
+                    <div class="faq-question">
+                        <span class="faq-icon">🧠</span>
+                        <span class="faq-question-text">A Tripinha aprende com o que respondi?</span>
+                        <span class="faq-toggle">▼</span>
+                    </div>
+                    <div class="faq-answer">
+                        <p>Sim! Ela usa IA para entender melhor seu perfil e montar sugestões cada vez mais certeiras. Cada resposta ajuda a ajustar os filtros e criar experiências mais alinhadas com o que você curte.</p>
+                    </div>
+                </div>
+
+                <div class="faq-item">
+                    <div class="faq-question">
+                        <span class="faq-icon">💬</span>
+                        <span class="faq-question-text">Posso mudar minhas respostas depois?</span>
+                        <span class="faq-toggle">▼</span>
+                    </div>
+                    <div class="faq-answer">
+                        <p>Ainda não temos edição dinâmica de respostas. Mas é só reiniciar a conversa com a Tripinha pra começar um novo planejamento com outras escolhas.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Categoria: Vendas e Reservas -->
+            <div class="faq-category">
+                <div class="category-title">
+                    <span>✈️</span>
+                    Vendas e Reservas
+                </div>
+
+                <div class="faq-item">
+                    <div class="faq-question">
+                        <span class="faq-icon">✈️</span>
+                        <span class="faq-question-text">A Benetrip vende passagens ou hospedagens?</span>
+                        <span class="faq-toggle">▼</span>
+                    </div>
+                    <div class="faq-answer">
+                        <p>Não. A Benetrip não vende nada diretamente. A Tripinha te ajuda a planejar a viagem e sugere opções reais em sites parceiros confiáveis. Você finaliza as reservas diretamente nesses sites.</p>
+                    </div>
+                </div>
+
+                <div class="faq-item">
+                    <div class="faq-question">
+                        <span class="faq-icon">🎯</span>
+                        <span class="faq-question-text">A Tripinha considera o valor total da viagem?</span>
+                        <span class="faq-toggle">▼</span>
+                    </div>
+                    <div class="faq-answer">
+                        <p>Ainda não. No momento, ela considera o orçamento por pessoa para transporte (passagens) como base para filtrar os destinos. Mas em breve, também vai incluir valores de hospedagem e atividades no cálculo total.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Categoria: Tipos de Viagem -->
+            <div class="faq-category">
+                <div class="category-title">
+                    <span>🧳</span>
+                    Tipos de Viagem
+                </div>
+
+                <div class="faq-item">
+                    <div class="faq-question">
+                        <span class="faq-icon">👨‍👩‍👧‍👦</span>
+                        <span class="faq-question-text">Posso planejar uma viagem com crianças?</span>
+                        <span class="faq-toggle">▼</span>
+                    </div>
+                    <div class="faq-answer">
+                        <p>Com certeza! Basta indicar que você está viajando com a família, e a Tripinha vai priorizar destinos e roteiros que sejam legais pra adultos e crianças. Ela pensa em todo mundo!</p>
+                    </div>
+                </div>
+
+                <div class="faq-item">
+                    <div class="faq-question">
+                        <span class="faq-icon">🌎</span>
+                        <span class="faq-question-text">A Tripinha só sugere viagens no Brasil?</span>
+                        <span class="faq-toggle">▼</span>
+                    </div>
+                    <div class="faq-answer">
+                        <p>Não! A Tripinha pode sugerir destinos nacionais e internacionais, tudo depende do seu orçamento, da cidade de origem e da disponibilidade de voos no período.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Categoria: Tecnologia e Segurança -->
+            <div class="faq-category">
+                <div class="category-title">
+                    <span>🔒</span>
+                    Tecnologia e Segurança
+                </div>
+
+                <div class="faq-item">
+                    <div class="faq-question">
+                        <span class="faq-icon">📲</span>
+                        <span class="faq-question-text">A Benetrip tem aplicativo ou é só no navegador?</span>
+                        <span class="faq-toggle">▼</span>
+                    </div>
+                    <div class="faq-answer">
+                        <p>Por enquanto, a Benetrip funciona direto pelo navegador — sem precisar instalar nada. Mas a versão em app já está no radar da Tripinha! 💡📱</p>
+                    </div>
+                </div>
+
+                <div class="faq-item">
+                    <div class="faq-question">
+                        <span class="faq-icon">🔐</span>
+                        <span class="faq-question-text">Meus dados estão protegidos?</span>
+                        <span class="faq-toggle">▼</span>
+                    </div>
+                    <div class="faq-answer">
+                        <p>Sim! A gente leva sua privacidade a sério. Seus dados são usados apenas para personalizar sua experiência e nunca serão vendidos ou compartilhados sem autorização. Saiba mais na nossa <a href="#">Política de Privacidade</a>.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Contact Section -->
+            <div class="contact-section">
+                <div class="contact-content">
+                    <h3>
+                        <span>📧</span>
+                        Ainda tem dúvidas?
+                    </h3>
+                    <p>Entre em contato conosco! A Tripinha (e a equipe por trás dela) está sempre pronta pra ajudar!</p>
+                    <a href="mailto:contato@benetrip.com.br">contato@benetrip.com.br</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+            <a href="https://www.benetrip.com.br" class="footer-button">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>
+                </svg>
+                Voltar ao site principal
+            </a>
+        </div>
+    </div>
+
+    <script>
+        // FAQ Toggle Functionality
+        document.querySelectorAll('.faq-question').forEach(question => {
+            question.addEventListener('click', function() {
+                const faqItem = this.parentElement;
+                const isOpen = faqItem.classList.contains('open');
+                
+                // Close all other FAQ items
+                document.querySelectorAll('.faq-item.open').forEach(item => {
+                    if (item !== faqItem) {
+                        item.classList.remove('open');
+                    }
+                });
+                
+                // Toggle current item
+                faqItem.classList.toggle('open');
+                
+                // Smooth scroll to question if opening
+                if (!isOpen) {
+                    setTimeout(() => {
+                        question.scrollIntoView({
+                            behavior: 'smooth',
+                            block: 'start'
+                        });
+                    }, 300);
+                }
+            });
+        });
+
+        // Search Functionality
+        const searchInput = document.getElementById('searchInput');
+        const faqItems = document.querySelectorAll('.faq-item');
+        
+        searchInput.addEventListener('input', function() {
+            const searchTerm = this.value.toLowerCase().trim();
+            
+            if (searchTerm === '') {
+                // Show all items and remove highlights
+                faqItems.forEach(item => {
+                    item.classList.remove('hidden', 'highlight');
+                    // Remove search highlights
+                    const questionText = item.querySelector('.faq-question-text');
+                    const answerText = item.querySelector('.faq-answer p');
+                    questionText.innerHTML = questionText.textContent;
+                    answerText.innerHTML = answerText.textContent;
+                });
+                return;
+            }
+            
+            faqItems.forEach(item => {
+                const questionText = item.querySelector('.faq-question-text').textContent.toLowerCase();
+                const answerText = item.querySelector('.faq-answer p').textContent.toLowerCase();
+                
+                if (questionText.includes(searchTerm) || answerText.includes(searchTerm)) {
+                    item.classList.remove('hidden');
+                    item.classList.add('highlight');
+                    
+                    // Highlight matching text
+                    highlightText(item.querySelector('.faq-question-text'), searchTerm);
+                    highlightText(item.querySelector('.faq-answer p'), searchTerm);
+                } else {
+                    item.classList.add('hidden');
+                    item.classList.remove('highlight');
+                }
+            });
+        });
+        
+        function highlightText(element, searchTerm) {
+            const text = element.textContent;
+            const regex = new RegExp(`(${searchTerm})`, 'gi');
+            element.innerHTML = text.replace(regex, '<span class="search-highlight">$1</span>');
+        }
+
+        // Animation on scroll
+        const observerOptions = {
+            threshold: 0.1,
+            rootMargin: '0px 0px -50px 0px'
+        };
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.style.opacity = '1';
+                    entry.target.style.transform = 'translateY(0)';
+                }
+            });
+        }, observerOptions);
+
+        document.querySelectorAll('.faq-category').forEach(category => {
+            category.style.opacity = '0';
+            category.style.transform = 'translateY(30px)';
+            category.style.transition = 'opacity 0.8s ease-out, transform 0.8s ease-out';
+            observer.observe(category);
+        });
+
+        // Feedback de clique nos botões
+        document.querySelectorAll('.footer-button, .back-button').forEach(button => {
+            button.addEventListener('click', function() {
+                this.style.transform = this.classList.contains('back-button') ? 
+                    'translateY(-50%) scale(0.95)' : 'translateY(-2px) scale(0.98)';
+                setTimeout(() => {
+                    this.style.transform = this.classList.contains('back-button') ? 
+                        'translateY(-50%) scale(1)' : 'translateY(-2px) scale(1)';
+                }, 150);
+            });
+        });
+
+        // Easter egg: Tripinha bounce no header
+        document.querySelector('.mascot-header').addEventListener('click', function() {
+            this.style.animation = 'none';
+            this.style.transform = 'scale(1.2) rotate(10deg)';
+            
+            setTimeout(() => {
+                this.style.transform = 'scale(1) rotate(0deg)';
+                this.style.animation = 'questionBounce 3s ease-in-out infinite';
+            }, 300);
+            
+            // Mostrar mensagem
+            const message = document.createElement('div');
+            message.textContent = 'Au au! Tem alguma pergunta aí? 🐾❓';
+            message.style.cssText = `
+                position: absolute;
+                top: 100%;
+                left: 50%;
+                transform: translateX(-50%);
+                background: rgba(255, 255, 255, 0.9);
+                color: #E87722;
+                padding: 8px 16px;
+                border-radius: 20px;
+                font-size: 12px;
+                font-weight: bold;
+                pointer-events: none;
+                animation: fadeInUp 0.3s ease-out;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+                white-space: nowrap;
+                z-index: 10;
+                margin-top: 8px;
+            `;
+            
+            this.style.position = 'relative';
+            this.appendChild(message);
+            
+            setTimeout(() => {
+                message.remove();
+            }, 3000);
+        });
+
+        // Auto-focus search on page load
+        window.addEventListener('load', function() {
+            setTimeout(() => {
+                searchInput.focus();
+            }, 1000);
+        });
+    </script>
+</body>
+</html>
