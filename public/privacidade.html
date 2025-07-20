@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Política de Privacidade - Benetrip</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: #F5F5F5;
+            color: #21272A;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 480px;
+            margin: 0 auto;
+            background-color: #FFFFFF;
+            min-height: 100vh;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Header */
+        .header {
+            background: linear-gradient(135deg, #E87722 0%, #00A3E0 100%);
+            color: #FFFFFF;
+            padding: 20px;
+            text-align: center;
+            position: relative;
+        }
+
+        .header h1 {
+            font-family: 'Poppins', sans-serif;
+            font-weight: bold;
+            font-size: 22px;
+            margin-bottom: 8px;
+        }
+
+        .header .subtitle {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .mascot {
+            position: absolute;
+            right: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 24px;
+        }
+
+        /* Back Button */
+        .back-button {
+            position: absolute;
+            left: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            color: #FFFFFF;
+            padding: 8px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        .back-button:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        /* Content */
+        .content {
+            padding: 20px;
+            padding-bottom: 100px;
+        }
+
+        .last-updated {
+            background-color: #F5F5F5;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 13px;
+            color: #666;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .intro {
+            background: linear-gradient(135deg, rgba(232, 119, 34, 0.1) 0%, rgba(0, 163, 224, 0.1) 100%);
+            padding: 16px;
+            border-radius: 12px;
+            margin-bottom: 24px;
+            border-left: 4px solid #E87722;
+        }
+
+        .intro p {
+            margin: 0;
+            font-size: 15px;
+        }
+
+        .section {
+            margin-bottom: 28px;
+        }
+
+        .section h2 {
+            font-family: 'Poppins', sans-serif;
+            font-weight: bold;
+            color: #E87722;
+            font-size: 18px;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .section h3 {
+            font-family: 'Poppins', sans-serif;
+            font-weight: 600;
+            color: #00A3E0;
+            font-size: 16px;
+            margin-bottom: 10px;
+            margin-top: 16px;
+        }
+
+        .section p {
+            margin-bottom: 12px;
+            font-size: 14px;
+            text-align: justify;
+        }
+
+        .section ul {
+            margin: 12px 0;
+            padding-left: 20px;
+        }
+
+        .section li {
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+
+        /* Highlight boxes */
+        .highlight-box {
+            background-color: #FFF3E0;
+            border: 1px solid #FFE0B2;
+            border-radius: 8px;
+            padding: 16px;
+            margin: 16px 0;
+        }
+
+        .highlight-box.important {
+            background-color: #E3F2FD;
+            border-color: #BBDEFB;
+        }
+
+        .highlight-box .title {
+            font-weight: bold;
+            color: #E87722;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .highlight-box.important .title {
+            color: #00A3E0;
+        }
+
+        /* Contact section */
+        .contact-section {
+            background: linear-gradient(135deg, #E87722 0%, #00A3E0 100%);
+            color: #FFFFFF;
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+            margin: 24px 0;
+        }
+
+        .contact-section h3 {
+            font-family: 'Poppins', sans-serif;
+            margin-bottom: 12px;
+            font-size: 18px;
+        }
+
+        .contact-section a {
+            color: #FFFFFF;
+            text-decoration: none;
+            font-weight: bold;
+            background: rgba(255, 255, 255, 0.2);
+            padding: 8px 16px;
+            border-radius: 20px;
+            display: inline-block;
+            margin-top: 8px;
+            transition: background-color 0.3s;
+        }
+
+        .contact-section a:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        /* Rights section */
+        .rights-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 12px;
+            margin: 16px 0;
+        }
+
+        .right-item {
+            background-color: #F9F9F9;
+            padding: 12px;
+            border-radius: 8px;
+            border-left: 3px solid #00A3E0;
+        }
+
+        .right-item .icon {
+            font-size: 16px;
+            margin-right: 8px;
+        }
+
+        /* Footer */
+        .footer {
+            position: fixed;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 100%;
+            max-width: 480px;
+            background: #FFFFFF;
+            border-top: 1px solid #E0E0E0;
+            padding: 16px 20px;
+            text-align: center;
+            box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .footer-buttons {
+            display: flex;
+            gap: 12px;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 14px;
+        }
+
+        .btn-secondary {
+            background-color: transparent;
+            color: #00A3E0;
+            border: 2px solid #00A3E0;
+        }
+
+        .btn-secondary:hover {
+            background-color: #00A3E0;
+            color: #FFFFFF;
+        }
+
+        .btn-primary {
+            background-color: #E87722;
+            color: #FFFFFF;
+        }
+
+        .btn-primary:hover {
+            background-color: #D16A1A;
+        }
+
+        /* Responsive */
+        @media (max-width: 480px) {
+            .container {
+                box-shadow: none;
+            }
+            
+            .content {
+                padding: 16px;
+            }
+            
+            .header {
+                padding: 16px;
+            }
+        }
+
+        /* Animations */
+        .section {
+            animation: fadeInUp 0.6s ease-out;
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <button class="back-button" onclick="window.history.back()">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.42-1.41L7.83 13H20v-2z"/>
+                </svg>
+            </button>
+            <h1>Política de Privacidade</h1>
+            <p class="subtitle">Transparência e proteção dos seus dados</p>
+            <div class="mascot">🐾</div>
+        </div>
+
+        <!-- Content -->
+        <div class="content">
+            <div class="last-updated">
+                <strong>Última atualização:</strong> 20 de julho de 2025
+            </div>
+
+            <div class="intro">
+                <p>Na Benetrip, a sua privacidade é levada a sério. Criamos esta política para explicar, de forma simples e transparente, como coletamos, usamos e protegemos seus dados durante o uso do nosso site e do nosso chatbot com a Tripinha 🐾.</p>
+            </div>
+
+            <div class="section">
+                <h2>
+                    <span>📋</span>
+                    1. Quais dados coletamos?
+                </h2>
+                <p>Coletamos apenas os dados necessários para te ajudar a planejar a melhor viagem possível:</p>
+                <ul>
+                    <li>✈️ <strong>Cidade de partida</strong></li>
+                    <li>📅 <strong>Datas da viagem</strong></li>
+                    <li>💰 <strong>Orçamento por pessoa</strong></li>
+                    <li>🧳 <strong>Preferências de destino</strong> (praia, cidade, natureza, etc)</li>
+                    <li>💻 <strong>Informações técnicas</strong> como IP, navegador e tempo de acesso (para fins analíticos)</li>
+                </ul>
+            </div>
+
+            <div class="section">
+                <h2>
+                    <span>🎯</span>
+                    2. Como usamos esses dados?
+                </h2>
+                <p>Seus dados são usados para:</p>
+                <ul>
+                    <li>Personalizar recomendações de destinos e roteiros com a ajuda da Tripinha</li>
+                    <li>Buscar passagens e hospedagens dentro do seu perfil e orçamento</li>
+                    <li>Melhorar a experiência do site com base no uso real (via cookies e analytics)</li>
+                </ul>
+                
+                <div class="highlight-box important">
+                    <div class="title">
+                        <span>🛡️</span>
+                        Importante
+                    </div>
+                    <p><strong>Não vendemos seus dados. Jamais.</strong></p>
+                </div>
+            </div>
+
+            <div class="section">
+                <h2>
+                    <span>🤝</span>
+                    3. Com quem compartilhamos seus dados?
+                </h2>
+                <p>Podemos compartilhar dados com serviços de terceiros <strong>somente quando necessário</strong> para funcionamento da plataforma, como:</p>
+                <ul>
+                    <li>Ferramentas de analytics (ex: Google Analytics)</li>
+                    <li>APIs de parceiros para busca de voos e hospedagens</li>
+                    <li>Serviços de armazenamento em nuvem</li>
+                </ul>
+                <p>Sempre que possível, os dados são <strong>anonimizados</strong>.</p>
+            </div>
+
+            <div class="section">
+                <h2>
+                    <span>⚖️</span>
+                    4. Seus direitos
+                </h2>
+                <p>Você pode, a qualquer momento:</p>
+                
+                <div class="rights-grid">
+                    <div class="right-item">
+                        <span class="icon">👁️</span>
+                        <strong>Ver</strong> quais dados temos sobre você
+                    </div>
+                    <div class="right-item">
+                        <span class="icon">✏️</span>
+                        <strong>Corrigir</strong> informações incorretas
+                    </div>
+                    <div class="right-item">
+                        <span class="icon">🗑️</span>
+                        <strong>Solicitar exclusão</strong> de seus dados
+                    </div>
+                    <div class="right-item">
+                        <span class="icon">🚫</span>
+                        <strong>Retirar o consentimento</strong> para uso
+                    </div>
+                </div>
+            </div>
+
+            <div class="section">
+                <h2>
+                    <span>🍪</span>
+                    5. Cookies
+                </h2>
+                <p>Utilizamos cookies para melhorar sua experiência. Você pode configurar ou desativar os cookies nas configurações do seu navegador.</p>
+                <div class="highlight-box">
+                    <div class="title">
+                        <span>📖</span>
+                        Saiba mais
+                    </div>
+                    <p>Consulte nossa <a href="#" style="color: #E87722; text-decoration: none; font-weight: bold;">Política de Cookies</a> para informações detalhadas.</p>
+                </div>
+            </div>
+
+            <div class="section">
+                <h2>
+                    <span>🔒</span>
+                    6. Segurança
+                </h2>
+                <p>Adotamos medidas técnicas e organizacionais para proteger seus dados contra acessos não autorizados, perda ou vazamento.</p>
+            </div>
+
+            <div class="section">
+                <h2>
+                    <span>🔄</span>
+                    7. Atualizações nesta política
+                </h2>
+                <p>Podemos atualizar esta Política de Privacidade periodicamente. Recomendamos que você consulte esta página com frequência.</p>
+            </div>
+
+            <div class="contact-section">
+                <h3>
+                    <span>❓</span>
+                    8. Dúvidas?
+                </h3>
+                <p>Fale com a gente em:</p>
+                <a href="mailto:contato@benetrip.com.br">contato@benetrip.com.br</a>
+                <p style="margin-top: 12px; font-size: 14px;">A Tripinha está sempre pronta pra ajudar! 🐶💼</p>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+            <div class="footer-buttons">
+                <button class="btn btn-secondary" onclick="window.history.back()">
+                    Voltar
+                </button>
+                <button class="btn btn-primary" onclick="window.print()">
+                    Imprimir
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Smooth scroll para links internos
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start'
+                    });
+                }
+            });
+        });
+
+        // Animação de entrada das seções
+        const observerOptions = {
+            threshold: 0.1,
+            rootMargin: '0px 0px -50px 0px'
+        };
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.style.opacity = '1';
+                    entry.target.style.transform = 'translateY(0)';
+                }
+            });
+        }, observerOptions);
+
+        document.querySelectorAll('.section').forEach(section => {
+            section.style.opacity = '0';
+            section.style.transform = 'translateY(20px)';
+            section.style.transition = 'opacity 0.6s ease-out, transform 0.6s ease-out';
+            observer.observe(section);
+        });
+
+        // Feedback de interação nos botões
+        document.querySelectorAll('.btn').forEach(button => {
+            button.addEventListener('click', function() {
+                this.style.transform = 'scale(0.95)';
+                setTimeout(() => {
+                    this.style.transform = 'scale(1)';
+                }, 150);
+            });
+        });
+    </script>
+</body>
+</html>
