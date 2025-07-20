@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quem Somos - Benetrip</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: #F5F5F5;
+            color: #21272A;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 480px;
+            margin: 0 auto;
+            background-color: #FFFFFF;
+            min-height: 100vh;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Header */
+        .header {
+            background: linear-gradient(135deg, #E87722 0%, #00A3E0 100%);
+            color: #FFFFFF;
+            padding: 24px 20px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .header::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: repeating-linear-gradient(
+                45deg,
+                transparent,
+                transparent 10px,
+                rgba(255, 255, 255, 0.05) 10px,
+                rgba(255, 255, 255, 0.05) 20px
+            );
+            animation: movePattern 20s linear infinite;
+        }
+
+        @keyframes movePattern {
+            0% { transform: translateX(-50px) translateY(-50px); }
+            100% { transform: translateX(0px) translateY(0px); }
+        }
+
+        .header-content {
+            position: relative;
+            z-index: 2;
+        }
+
+        .header h1 {
+            font-family: 'Poppins', sans-serif;
+            font-weight: bold;
+            font-size: 24px;
+            margin-bottom: 8px;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .header .subtitle {
+            font-size: 15px;
+            opacity: 0.95;
+            margin-bottom: 16px;
+        }
+
+        .mascot-header {
+            font-size: 32px;
+            margin-bottom: 8px;
+            animation: bounce 2s ease-in-out infinite;
+        }
+
+        @keyframes bounce {
+            0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
+            40% { transform: translateY(-8px); }
+            60% { transform: translateY(-4px); }
+        }
+
+        /* Back Button */
+        .back-button {
+            position: absolute;
+            left: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            color: #FFFFFF;
+            padding: 10px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+            z-index: 3;
+        }
+
+        .back-button:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-50%) scale(1.05);
+        }
+
+        /* Content */
+        .content {
+            padding: 24px 20px;
+            padding-bottom: 100px;
+        }
+
+        .section {
+            margin-bottom: 32px;
+            animation: fadeInUp 0.8s ease-out;
+        }
+
+        .intro-section {
+            background: linear-gradient(135deg, rgba(232, 119, 34, 0.08) 0%, rgba(0, 163, 224, 0.08) 100%);
+            padding: 20px;
+            border-radius: 16px;
+            margin-bottom: 32px;
+            border: 1px solid rgba(232, 119, 34, 0.2);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .intro-section::before {
+            content: '🐾';
+            position: absolute;
+            top: -10px;
+            right: -10px;
+            font-size: 80px;
+            opacity: 0.1;
+        }
+
+        .intro-section h2 {
+            font-family: 'Poppins', sans-serif;
+            font-weight: bold;
+            color: #E87722;
+            font-size: 20px;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .intro-section p {
+            font-size: 15px;
+            margin-bottom: 16px;
+            text-align: justify;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* What we do section */
+        .what-we-do {
+            background-color: #FFFFFF;
+            border-radius: 16px;
+            padding: 20px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            border: 1px solid #E0E0E0;
+        }
+
+        .what-we-do h3 {
+            font-family: 'Poppins', sans-serif;
+            font-weight: bold;
+            color: #00A3E0;
+            font-size: 18px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .features-grid {
+            display: grid;
+            gap: 16px;
+        }
+
+        .feature-card {
+            background: linear-gradient(135deg, #F9F9F9 0%, #FFFFFF 100%);
+            padding: 16px;
+            border-radius: 12px;
+            border-left: 4px solid #E87722;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .feature-card:hover {
+            transform: translateX(4px);
+            box-shadow: 0 4px 12px rgba(232, 119, 34, 0.15);
+            border-left-color: #00A3E0;
+        }
+
+        .feature-card .icon {
+            font-size: 20px;
+            margin-bottom: 8px;
+            display: block;
+        }
+
+        .feature-card .title {
+            font-weight: 600;
+            color: #21272A;
+            font-size: 14px;
+            line-height: 1.4;
+        }
+
+        /* Tripinha section */
+        .tripinha-section {
+            background: linear-gradient(135deg, #E87722 0%, #D16A1A 100%);
+            color: #FFFFFF;
+            padding: 24px;
+            border-radius: 20px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+            margin: 32px 0;
+        }
+
+        .tripinha-section::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255, 255, 255, 0.1) 2px, transparent 2px);
+            background-size: 20px 20px;
+            animation: sparkle 15s linear infinite;
+        }
+
+        @keyframes sparkle {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .tripinha-content {
+            position: relative;
+            z-index: 2;
+        }
+
+        .tripinha-avatar {
+            width: 80px;
+            height: 80px;
+            background: #FFFFFF;
+            border-radius: 50%;
+            margin: 0 auto 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 36px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+            animation: pulse 3s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+
+        .tripinha-section h3 {
+            font-family: 'Poppins', sans-serif;
+            font-weight: bold;
+            font-size: 20px;
+            margin-bottom: 16px;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .tripinha-section p {
+            font-size: 15px;
+            line-height: 1.6;
+            text-align: justify;
+            opacity: 0.95;
+        }
+
+        /* Stats section */
+        .stats-section {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 16px;
+            margin: 32px 0;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #FFFFFF 0%, #F9F9F9 100%);
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+            border: 2px solid #E0E0E0;
+            transition: all 0.3s ease;
+        }
+
+        .stat-card:hover {
+            border-color: #E87722;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(232, 119, 34, 0.15);
+        }
+
+        .stat-card .number {
+            font-family: 'Poppins', sans-serif;
+            font-weight: bold;
+            font-size: 24px;
+            color: #E87722;
+            display: block;
+            margin-bottom: 4px;
+        }
+
+        .stat-card .label {
+            font-size: 12px;
+            color: #666;
+            font-weight: 500;
+        }
+
+        /* Footer */
+        .footer {
+            position: fixed;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 100%;
+            max-width: 480px;
+            background: linear-gradient(135deg, #E87722 0%, #00A3E0 100%);
+            padding: 16px 20px;
+            text-align: center;
+            box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.15);
+        }
+
+        .footer-button {
+            background: rgba(255, 255, 255, 0.2);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            color: #FFFFFF;
+            padding: 12px 24px;
+            border-radius: 25px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 14px;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            text-decoration: none;
+        }
+
+        .footer-button:hover {
+            background: rgba(255, 255, 255, 0.3);
+            border-color: rgba(255, 255, 255, 0.5);
+            transform: translateY(-2px);
+        }
+
+        /* Responsive */
+        @media (max-width: 480px) {
+            .container {
+                box-shadow: none;
+            }
+            
+            .content {
+                padding: 20px 16px;
+            }
+            
+            .header {
+                padding: 20px 16px;
+            }
+
+            .stats-section {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Animations */
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .section:nth-child(1) { animation-delay: 0.1s; }
+        .section:nth-child(2) { animation-delay: 0.2s; }
+        .section:nth-child(3) { animation-delay: 0.3s; }
+        .section:nth-child(4) { animation-delay: 0.4s; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <a href="https://www.benetrip.com.br" class="back-button">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.42-1.41L7.83 13H20v-2z"/>
+                </svg>
+            </a>
+            <div class="header-content">
+                <div class="mascot-header">🐾</div>
+                <h1>Quem Somos</h1>
+                <p class="subtitle">Conheça a Benetrip e a Tripinha</p>
+            </div>
+        </div>
+
+        <!-- Content -->
+        <div class="content">
+            <!-- Intro Section -->
+            <div class="section">
+                <div class="intro-section">
+                    <h2>
+                        <span>🌟</span>
+                        Quem e o que somos nós
+                    </h2>
+                    <p>A Benetrip nasceu pra descomplicar o planejamento de viagens e te ajudar a viver experiências incríveis sem perder tempo nem dinheiro. Aqui, quem manda é você — e quem ajuda é a Tripinha, sua parceira caramelo pronta pra achar o rolê ideal.</p>
+                    <p>Somos uma plataforma inteligente que combina tecnologia, intuição e carinho pra entender o que você realmente quer numa viagem. A partir das suas respostas, a Tripinha monta sugestões personalizadas de destinos, datas, hospedagens e até o roteiro completo da viagem, tudo de um jeito leve, divertido e realista.</p>
+                </div>
+            </div>
+
+            <!-- What we do Section -->
+            <div class="section">
+                <div class="what-we-do">
+                    <h3>
+                        <span>💡</span>
+                        O que a gente faz:
+                    </h3>
+                    <div class="features-grid">
+                        <div class="feature-card">
+                            <span class="icon">🎯</span>
+                            <div class="title">Te ajuda a descobrir para onde ir, quando ir e quanto vai custar</div>
+                        </div>
+                        <div class="feature-card">
+                            <span class="icon">💰</span>
+                            <div class="title">Sugere destinos realistas com base no seu orçamento</div>
+                        </div>
+                        <div class="feature-card">
+                            <span class="icon">🗺️</span>
+                            <div class="title">Cria um roteiro de viagem sob medida, com dicas práticas e inspiradoras</div>
+                        </div>
+                        <div class="feature-card">
+                            <span class="icon">🔗</span>
+                            <div class="title">Conecta você com plataformas confiáveis de passagens e hospedagens</div>
+                        </div>
+                        <div class="feature-card">
+                            <span class="icon">✨</span>
+                            <div class="title">Transforma preferências em possibilidades</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Stats Section -->
+            <div class="section">
+                <div class="stats-section">
+                    <div class="stat-card">
+                        <span class="number">100%</span>
+                        <span class="label">Personalizado</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="number">0$</span>
+                        <span class="label">Taxa de uso</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="number">24/7</span>
+                        <span class="label">Tripinha disponível</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="number">∞</span>
+                        <span class="label">Possibilidades</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tripinha Section -->
+            <div class="section">
+                <div class="tripinha-section">
+                    <div class="tripinha-content">
+                        <div class="w-12 h-12 rounded-full overflow-hidden flex-shrink-0">
+    <img src="/logo-tripinha.png" alt="Tripinha" class="w-full h-full object-cover" />
+</div>
+                        <h3>Quem é a Tripinha?</h3>
+                        <p>A Tripinha é a alma da Benetrip. Uma vira-lata caramelo, magrinha, esperta e cheia de histórias pra contar. Ela é curiosa, despojada e ama explorar o mundo — e vai usar toda essa experiência pra te guiar desde o "onde ir" até o "o que fazer em cada dia da viagem". Sempre leve, prática e com aquele toque carismático de quem topa qualquer parada.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+            <a href="https://www.benetrip.com.br" class="footer-button">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>
+                </svg>
+                Voltar ao site principal
+            </a>
+        </div>
+    </div>
+
+    <script>
+        // Animação de entrada das seções
+        const observerOptions = {
+            threshold: 0.1,
+            rootMargin: '0px 0px -50px 0px'
+        };
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.style.opacity = '1';
+                    entry.target.style.transform = 'translateY(0)';
+                }
+            });
+        }, observerOptions);
+
+        document.querySelectorAll('.section').forEach(section => {
+            section.style.opacity = '0';
+            section.style.transform = 'translateY(30px)';
+            section.style.transition = 'opacity 0.8s ease-out, transform 0.8s ease-out';
+            observer.observe(section);
+        });
+
+        // Interatividade nos cards de features
+        document.querySelectorAll('.feature-card').forEach(card => {
+            card.addEventListener('mouseenter', function() {
+                this.style.transform = 'translateX(8px) translateY(-2px)';
+            });
+            
+            card.addEventListener('mouseleave', function() {
+                this.style.transform = 'translateX(0) translateY(0)';
+            });
+        });
+
+        // Feedback de clique nos botões
+        document.querySelectorAll('.footer-button, .back-button').forEach(button => {
+            button.addEventListener('click', function() {
+                this.style.transform = this.classList.contains('back-button') ? 
+                    'translateY(-50%) scale(0.95)' : 'translateY(-2px) scale(0.98)';
+                setTimeout(() => {
+                    this.style.transform = this.classList.contains('back-button') ? 
+                        'translateY(-50%) scale(1)' : 'translateY(-2px) scale(1)';
+                }, 150);
+            });
+        });
+
+        // Animação especial para a seção da Tripinha
+        const tripinhaSection = document.querySelector('.tripinha-section');
+        const tripinhaObserver = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    const avatar = entry.target.querySelector('.tripinha-avatar');
+                    avatar.style.animation = 'pulse 3s ease-in-out infinite, bounce 2s ease-in-out infinite';
+                }
+            });
+        }, { threshold: 0.5 });
+
+        tripinhaObserver.observe(tripinhaSection);
+
+        // Easter egg: Clique na Tripinha
+        document.querySelector('.tripinha-avatar').addEventListener('click', function() {
+            this.style.animation = 'bounce 0.5s ease-in-out';
+            setTimeout(() => {
+                this.style.animation = 'pulse 3s ease-in-out infinite, bounce 2s ease-in-out infinite';
+            }, 500);
+            
+            // Mostrar mensagem temporária
+            const message = document.createElement('div');
+            message.textContent = 'Au au! 🐾';
+            message.style.cssText = `
+                position: absolute;
+                top: -40px;
+                left: 50%;
+                transform: translateX(-50%);
+                background: rgba(255, 255, 255, 0.9);
+                color: #E87722;
+                padding: 4px 12px;
+                border-radius: 20px;
+                font-size: 12px;
+                font-weight: bold;
+                pointer-events: none;
+                animation: fadeInUp 0.3s ease-out;
+            `;
+            this.style.position = 'relative';
+            this.appendChild(message);
+            
+            setTimeout(() => {
+                message.remove();
+            }, 2000);
+        });
+    </script>
+</body>
+</html>
