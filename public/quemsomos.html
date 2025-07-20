@@ -212,74 +212,6 @@
             line-height: 1.4;
         }
 
-        /* Tripinha section */
-        .tripinha-section {
-            background: linear-gradient(135deg, #E87722 0%, #D16A1A 100%);
-            color: #FFFFFF;
-            padding: 24px;
-            border-radius: 20px;
-            text-align: center;
-            position: relative;
-            overflow: hidden;
-            margin: 32px 0;
-        }
-
-        .tripinha-section::before {
-            content: '';
-            position: absolute;
-            top: -50%;
-            left: -50%;
-            width: 200%;
-            height: 200%;
-            background: radial-gradient(circle, rgba(255, 255, 255, 0.1) 2px, transparent 2px);
-            background-size: 20px 20px;
-            animation: sparkle 15s linear infinite;
-        }
-
-        @keyframes sparkle {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-
-        .tripinha-content {
-            position: relative;
-            z-index: 2;
-        }
-
-        .tripinha-avatar {
-            width: 80px;
-            height: 80px;
-            background: #FFFFFF;
-            border-radius: 50%;
-            margin: 0 auto 16px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 36px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
-            animation: pulse 3s ease-in-out infinite;
-        }
-
-        @keyframes pulse {
-            0%, 100% { transform: scale(1); }
-            50% { transform: scale(1.05); }
-        }
-
-        .tripinha-section h3 {
-            font-family: 'Poppins', sans-serif;
-            font-weight: bold;
-            font-size: 20px;
-            margin-bottom: 16px;
-            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-        }
-
-        .tripinha-section p {
-            font-size: 15px;
-            line-height: 1.6;
-            text-align: justify;
-            opacity: 0.95;
-        }
-
         /* Stats section */
         .stats-section {
             display: grid;
@@ -316,6 +248,134 @@
             font-size: 12px;
             color: #666;
             font-weight: 500;
+        }
+
+        /* Tripinha section - UPDATED */
+        .tripinha-section {
+            background: linear-gradient(135deg, #FFFFFF 0%, #F8F9FA 100%);
+            border: 2px solid #E87722;
+            padding: 24px;
+            border-radius: 20px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+            margin: 32px 0;
+            box-shadow: 0 8px 32px rgba(232, 119, 34, 0.15);
+        }
+
+        .tripinha-section::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, #E87722 0%, #00A3E0 100%);
+        }
+
+        .tripinha-content {
+            position: relative;
+            z-index: 2;
+        }
+
+        .tripinha-logo-container {
+            width: 120px;
+            height: 120px;
+            margin: 0 auto 20px;
+            position: relative;
+            cursor: pointer;
+        }
+
+        .tripinha-logo {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            animation: float 3s ease-in-out infinite;
+            transition: transform 0.3s ease;
+            filter: drop-shadow(0 4px 12px rgba(232, 119, 34, 0.2));
+        }
+
+        .tripinha-logo:hover {
+            transform: scale(1.05);
+        }
+
+        @keyframes float {
+            0%, 100% { 
+                transform: translateY(0) rotate(0deg); 
+            }
+            25% { 
+                transform: translateY(-8px) rotate(1deg); 
+            }
+            50% { 
+                transform: translateY(-4px) rotate(0deg); 
+            }
+            75% { 
+                transform: translateY(-8px) rotate(-1deg); 
+            }
+        }
+
+        .tripinha-section h3 {
+            font-family: 'Poppins', sans-serif;
+            font-weight: bold;
+            font-size: 20px;
+            margin-bottom: 16px;
+            color: #E87722;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .tripinha-section p {
+            font-size: 15px;
+            line-height: 1.6;
+            text-align: justify;
+            color: #21272A;
+            margin-bottom: 0;
+        }
+
+        /* Decorative paw prints */
+        .paw-decoration {
+            position: absolute;
+            font-size: 24px;
+            opacity: 0.1;
+            color: #E87722;
+            animation: pawFloat 4s ease-in-out infinite;
+        }
+
+        .paw-decoration:nth-child(1) {
+            top: 20px;
+            left: 20px;
+            animation-delay: 0s;
+        }
+
+        .paw-decoration:nth-child(2) {
+            top: 40px;
+            right: 30px;
+            animation-delay: 1s;
+        }
+
+        .paw-decoration:nth-child(3) {
+            bottom: 30px;
+            left: 30px;
+            animation-delay: 2s;
+        }
+
+        .paw-decoration:nth-child(4) {
+            bottom: 20px;
+            right: 20px;
+            animation-delay: 1.5s;
+        }
+
+        @keyframes pawFloat {
+            0%, 100% { 
+                transform: translateY(0) scale(1); 
+                opacity: 0.1;
+            }
+            50% { 
+                transform: translateY(-10px) scale(1.1); 
+                opacity: 0.2;
+            }
         }
 
         /* Footer */
@@ -370,6 +430,11 @@
 
             .stats-section {
                 grid-template-columns: 1fr;
+            }
+
+            .tripinha-logo-container {
+                width: 100px;
+                height: 100px;
             }
         }
 
@@ -461,7 +526,7 @@
                         <span class="label">Personalizado</span>
                     </div>
                     <div class="stat-card">
-                        <span class="number">0$</span>
+                        <span class="number">0€</span>
                         <span class="label">Taxa de uso</span>
                     </div>
                     <div class="stat-card">
@@ -475,14 +540,23 @@
                 </div>
             </div>
 
-            <!-- Tripinha Section -->
+            <!-- Tripinha Section - UPDATED WITH LOGO -->
             <div class="section">
                 <div class="tripinha-section">
+                    <!-- Decorative paw prints -->
+                    <div class="paw-decoration">🐾</div>
+                    <div class="paw-decoration">🐾</div>
+                    <div class="paw-decoration">🐾</div>
+                    <div class="paw-decoration">🐾</div>
+                    
                     <div class="tripinha-content">
-                        <div class="w-12 h-12 rounded-full overflow-hidden flex-shrink-0">
-    <img src="/logo-tripinha.png" alt="Tripinha" class="w-full h-full object-cover" />
-</div>
-                        <h3>Quem é a Tripinha?</h3>
+                        <div class="tripinha-logo-container">
+                            <img src="public/logo-tripinha.png" alt="Tripinha - Mascote da Benetrip" class="tripinha-logo">
+                        </div>
+                        <h3>
+                            <span>🐶</span>
+                            Quem é a Tripinha?
+                        </h3>
                         <p>A Tripinha é a alma da Benetrip. Uma vira-lata caramelo, magrinha, esperta e cheia de histórias pra contar. Ela é curiosa, despojada e ama explorar o mundo — e vai usar toda essa experiência pra te guiar desde o "onde ir" até o "o que fazer em cada dia da viagem". Sempre leve, prática e com aquele toque carismático de quem topa qualquer parada.</p>
                     </div>
                 </div>
@@ -551,8 +625,8 @@
         const tripinhaObserver = new IntersectionObserver((entries) => {
             entries.forEach(entry => {
                 if (entry.isIntersecting) {
-                    const avatar = entry.target.querySelector('.tripinha-avatar');
-                    avatar.style.animation = 'pulse 3s ease-in-out infinite, bounce 2s ease-in-out infinite';
+                    const logo = entry.target.querySelector('.tripinha-logo');
+                    logo.style.animation = 'float 3s ease-in-out infinite';
                 }
             });
         }, { threshold: 0.5 });
@@ -560,35 +634,54 @@
         tripinhaObserver.observe(tripinhaSection);
 
         // Easter egg: Clique na Tripinha
-        document.querySelector('.tripinha-avatar').addEventListener('click', function() {
-            this.style.animation = 'bounce 0.5s ease-in-out';
+        document.querySelector('.tripinha-logo').addEventListener('click', function() {
+            // Parar animação atual
+            this.style.animation = 'none';
+            
+            // Aplicar animação de bounce
+            this.style.transform = 'scale(1.1) rotate(5deg)';
+            
             setTimeout(() => {
-                this.style.animation = 'pulse 3s ease-in-out infinite, bounce 2s ease-in-out infinite';
-            }, 500);
+                this.style.transform = 'scale(1) rotate(0deg)';
+                this.style.animation = 'float 3s ease-in-out infinite';
+            }, 300);
             
             // Mostrar mensagem temporária
             const message = document.createElement('div');
-            message.textContent = 'Au au! 🐾';
+            message.textContent = 'Au au! Pronta para a próxima aventura! 🐾✈️';
             message.style.cssText = `
                 position: absolute;
-                top: -40px;
+                top: -50px;
                 left: 50%;
                 transform: translateX(-50%);
-                background: rgba(255, 255, 255, 0.9);
-                color: #E87722;
-                padding: 4px 12px;
+                background: linear-gradient(135deg, #E87722, #00A3E0);
+                color: white;
+                padding: 8px 16px;
                 border-radius: 20px;
                 font-size: 12px;
                 font-weight: bold;
                 pointer-events: none;
                 animation: fadeInUp 0.3s ease-out;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+                white-space: nowrap;
+                z-index: 10;
             `;
-            this.style.position = 'relative';
-            this.appendChild(message);
+            
+            this.parentElement.style.position = 'relative';
+            this.parentElement.appendChild(message);
             
             setTimeout(() => {
                 message.remove();
-            }, 2000);
+            }, 3000);
+        });
+
+        // Adicionar animação de hover suave na logo
+        document.querySelector('.tripinha-logo').addEventListener('mouseenter', function() {
+            this.style.filter = 'drop-shadow(0 8px 20px rgba(232, 119, 34, 0.4))';
+        });
+
+        document.querySelector('.tripinha-logo').addEventListener('mouseleave', function() {
+            this.style.filter = 'drop-shadow(0 4px 12px rgba(232, 119, 34, 0.2))';
         });
     </script>
 </body>
