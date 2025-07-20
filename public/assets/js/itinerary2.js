@@ -1500,11 +1500,11 @@ if (e.target.closest('.btn-voltar')) {
 // ==========================================
 
 /**
- * ✅ COMPARTILHAR ROTEIRO - VERSÃO SIMPLIFICADA COM TEXTO
+ * ✅ COMPARTILHAR ROTEIRO - VERSÃO OTIMIZADA APENAS CÓPIA
  */
 async compartilharRoteiro() {
   try {
-    // Mostrar modal simples de compartilhamento
+    // Mostrar modal otimizado de compartilhamento
     this.mostrarModalCompartilhamento();
     
   } catch (erro) {
@@ -1514,7 +1514,7 @@ async compartilharRoteiro() {
 },
 
 /**
- * ✅ NOVO: Modal simplificado de compartilhamento
+ * ✅ MODAL OTIMIZADO - FOCO EM CÓPIA PARA CLIPBOARD
  */
 mostrarModalCompartilhamento() {
   // Remover modal existente se houver
@@ -1529,7 +1529,7 @@ mostrarModalCompartilhamento() {
   modal.innerHTML = `
     <div class="modal-content modal-compartilhar">
       <div class="modal-header">
-        <h3>📤 Compartilhar Roteiro</h3>
+        <h3>📤 Copiar Roteiro</h3>
         <button class="modal-close" onclick="this.closest('.modal-overlay').remove()">×</button>
       </div>
       
@@ -1537,8 +1537,8 @@ mostrarModalCompartilhamento() {
         <div class="compartilhar-info">
           <div class="info-icon">📋</div>
           <div class="info-texto">
-            <h4>Escolha o formato ideal:</h4>
-            <p>Versão resumida funciona melhor no WhatsApp, versão completa tem todos os detalhes.</p>
+            <h4>Vamos copiar seu roteiro!</h4>
+            <p>Escolha o formato e depois cole onde quiser: WhatsApp, email, notas...</p>
           </div>
         </div>
         
@@ -1547,8 +1547,8 @@ mostrarModalCompartilhamento() {
             <div class="opcao-icon">📱</div>
             <div class="opcao-info">
               <div class="opcao-titulo">Versão Resumida</div>
-              <div class="opcao-desc">Ideal para WhatsApp • ~2.000 caracteres</div>
-              <div class="opcao-preview">✅ Roteiro principal + links dos mapas</div>
+              <div class="opcao-desc">Perfeita para WhatsApp • Principais pontos</div>
+              <div class="opcao-preview">✅ Roteiro + mapas + 2.000 caracteres</div>
             </div>
           </button>
           
@@ -1556,10 +1556,17 @@ mostrarModalCompartilhamento() {
             <div class="opcao-icon">📄</div>
             <div class="opcao-info">
               <div class="opcao-titulo">Versão Completa</div>
-              <div class="opcao-desc">Todos os detalhes • ~4.000+ caracteres</div>
-              <div class="opcao-preview">📋 Informações + dicas + previsão + links</div>
+              <div class="opcao-desc">Todos os detalhes • Para documentos</div>
+              <div class="opcao-preview">📋 Tudo incluso: dicas + previsão + mapas</div>
             </div>
           </button>
+        </div>
+        
+        <div class="dica-compartilhamento">
+          <div class="dica-icon">💡</div>
+          <div class="dica-texto">
+            <strong>Dica:</strong> Após copiar, cole no app que você preferir. A versão completa funciona melhor em documentos e emails!
+          </div>
         </div>
         
         <div class="modal-acoes">
@@ -1586,13 +1593,13 @@ mostrarModalCompartilhamento() {
       
       try {
         if (tipo === 'resumido') {
-          await this.compartilharTextoResumido();
+          await this.copiarRoteiroResumido();
         } else {
-          await this.compartilharTextoCompleto();
+          await this.copiarRoteiroCompleto();
         }
       } catch (erro) {
-        console.error('❌ Erro na ação de compartilhamento:', erro);
-        this.exibirToast('Erro ao processar compartilhamento', 'error');
+        console.error('❌ Erro na cópia:', erro);
+        this.exibirToast('Erro ao copiar roteiro', 'error');
       }
     });
   });
@@ -1604,49 +1611,30 @@ mostrarModalCompartilhamento() {
 },
 
 /**
- * ✅ NOVO: Compartilhar versão resumida (para WhatsApp)
+ * ✅ COPIAR ROTEIRO RESUMIDO - APENAS CLIPBOARD
  */
-async compartilharTextoResumido() {
+async copiarRoteiroResumido() {
   try {
     this.exibirToast('📱 Preparando versão resumida...', 'info');
     
     const textoResumido = this.gerarTextoRoteiroResumido();
     
-    // Verificar tamanho
-    if (textoResumido.length > 3500) {
-      console.warn(`⚠️ Texto resumido ainda muito longo: ${textoResumido.length} caracteres`);
-      this.exibirToast('⚠️ Roteiro muito extenso, pode ser cortado em alguns apps', 'warning');
-    }
-    
-    // Tentar compartilhamento nativo primeiro (mobile)
-    if (navigator.share && /mobile|android|iphone/i.test(navigator.userAgent)) {
-      try {
-        await navigator.share({
-          title: `Roteiro Benetrip - ${this.dadosDestino.destino}`,
-          text: textoResumido
-        });
-        this.exibirToast('📤 Versão resumida compartilhada!', 'success');
-        return;
-      } catch (e) {
-        console.log('ℹ️ Share cancelado, copiando para clipboard');
-      }
-    }
-    
-    // Fallback: Copiar para clipboard
+    // Copiar direto para clipboard
     try {
       await navigator.clipboard.writeText(textoResumido);
-      this.exibirToast('📱 Versão resumida copiada! Perfeita para WhatsApp.', 'success');
+      this.mostrarToastSucesso('resumido', textoResumido.length);
     } catch (e) {
+      // Fallback para browsers antigos
       this.copiarTextoLegacy(textoResumido);
-      this.exibirToast('📱 Versão resumida copiada!', 'success');
+      this.mostrarToastSucesso('resumido', textoResumido.length);
     }
     
   } catch (erro) {
-    console.error('❌ Erro ao compartilhar versão resumida:', erro);
+    console.error('❌ Erro ao copiar versão resumida:', erro);
     this.exibirToast('❌ Erro ao preparar versão resumida.', 'error');
   }
 },
-
+  
 /**
  * ✅ NOVO: Gerar texto resumido (otimizado para WhatsApp)
  */
@@ -1701,48 +1689,59 @@ gerarTextoRoteiroResumido() {
 },
 
 /**
- * ✅ NOVO: Compartilhar texto completo com mapas
+ * ✅ COPIAR ROTEIRO COMPLETO - APENAS CLIPBOARD
  */
-async compartilharTextoCompleto() {
+async copiarRoteiroCompleto() {
   try {
     this.exibirToast('📄 Preparando versão completa...', 'info');
     
     const textoCompleto = this.gerarTextoRoteiroCompleto();
     
-    // Verificar tamanho e avisar
-    if (textoCompleto.length > 4000) {
-      this.exibirToast('⚠️ Versão completa pode ser cortada no WhatsApp. Use a versão resumida para melhor resultado.', 'warning');
-    }
-    
-    // Tentar compartilhamento nativo primeiro (mobile)
-    if (navigator.share && /mobile|android|iphone/i.test(navigator.userAgent)) {
-      try {
-        await navigator.share({
-          title: `Roteiro Benetrip - ${this.dadosDestino.destino}`,
-          text: textoCompleto
-        });
-        this.exibirToast('📤 Versão completa compartilhada!', 'success');
-        return;
-      } catch (e) {
-        console.log('ℹ️ Share cancelado, copiando para clipboard');
-      }
-    }
-    
-    // Fallback: Copiar para clipboard
+    // Copiar direto para clipboard
     try {
       await navigator.clipboard.writeText(textoCompleto);
-      this.exibirToast('📄 Versão completa copiada! Pode ser cortada em alguns apps.', 'success');
+      this.mostrarToastSucesso('completo', textoCompleto.length);
     } catch (e) {
+      // Fallback para browsers antigos
       this.copiarTextoLegacy(textoCompleto);
-      this.exibirToast('📄 Versão completa copiada!', 'success');
+      this.mostrarToastSucesso('completo', textoCompleto.length);
     }
     
   } catch (erro) {
-    console.error('❌ Erro ao compartilhar versão completa:', erro);
+    console.error('❌ Erro ao copiar versão completa:', erro);
     this.exibirToast('❌ Erro ao preparar versão completa.', 'error');
   }
 },
 
+/**
+ * ✅ NOVO: Toast de sucesso personalizado
+ */
+mostrarToastSucesso(tipo, tamanho) {
+  const isMobile = /mobile|android|iphone/i.test(navigator.userAgent);
+  
+  let mensagem, dica;
+  
+  if (tipo === 'resumido') {
+    mensagem = `📱 Versão resumida copiada! (${tamanho} caracteres)`;
+    dica = isMobile ? 
+      '💡 Perfeita para WhatsApp! Pode colar diretamente.' :
+      '💡 Ideal para WhatsApp e redes sociais!';
+  } else {
+    mensagem = `📄 Versão completa copiada! (${tamanho} caracteres)`;
+    dica = isMobile ?
+      '💡 Melhor para documentos ou email. No WhatsApp, prefira a versão resumida.' :
+      '💡 Ideal para salvar em documentos ou enviar por email!';
+  }
+  
+  // Toast principal
+  this.exibirToast(mensagem, 'success');
+  
+  // Toast secundário com dica (após 1.5s)
+  setTimeout(() => {
+    this.exibirToast(dica, 'info');
+  }, 1500);
+},
+  
 /**
  * ✅ NOVO: Texto de companhia resumido
  */
