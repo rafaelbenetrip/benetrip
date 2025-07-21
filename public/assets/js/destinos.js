@@ -833,7 +833,7 @@ const BENETRIP_DESTINOS = {
         <!-- Sistema de abas - INCLUINDO COMENTÁRIOS -->
         <div class="flex border-b border-gray-200 overflow-x-auto">
           <button id="aba-surpresa-info" class="botao-aba aba-ativa px-4 py-2 text-sm font-medium" onclick="BENETRIP_DESTINOS.trocarAbaSurpresa('info')">
-            Informações
+            Visão Geral
           </button>
           <button id="aba-surpresa-pontos" class="botao-aba aba-inativa px-4 py-2 text-sm font-medium" onclick="BENETRIP_DESTINOS.trocarAbaSurpresa('pontos')">
             Pontos Turísticos
