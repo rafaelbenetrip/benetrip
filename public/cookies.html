@@ -77,7 +77,7 @@
         /* Content */
         .content {
             padding: 20px;
-            padding-bottom: 100px;
+            padding-bottom: 120px; /* Aumentado para evitar sobreposição */
         }
 
         .last-updated {
@@ -337,6 +337,8 @@
             padding: 16px 20px;
             text-align: center;
             box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+            min-height: 68px; /* Altura mínima definida */
         }
 
         .footer-buttons {
@@ -383,10 +385,65 @@
             
             .content {
                 padding: 16px;
+                padding-bottom: 140px; /* Mais espaço em mobile */
             }
             
             .header {
                 padding: 16px;
+            }
+
+            .header h1 {
+                font-size: 20px;
+            }
+
+            .header .subtitle {
+                font-size: 13px;
+            }
+
+            .footer {
+                padding: 12px 16px;
+                min-height: 80px; /* Altura maior em mobile */
+            }
+
+            .btn {
+                padding: 14px 12px;
+                font-size: 13px;
+            }
+
+            .section h2 {
+                font-size: 17px;
+            }
+
+            .cookie-type {
+                padding: 14px;
+            }
+
+            .cookie-type-title {
+                font-size: 15px;
+            }
+
+            .cookie-type-description {
+                font-size: 13px;
+            }
+        }
+
+        @media (max-width: 360px) {
+            .content {
+                padding: 12px;
+                padding-bottom: 160px; /* Ainda mais espaço em telas muito pequenas */
+            }
+
+            .footer {
+                min-height: 90px;
+            }
+
+            .footer-buttons {
+                gap: 8px;
+            }
+
+            .btn {
+                padding: 12px 8px;
+                font-size: 12px;
             }
         }
 
@@ -404,6 +461,13 @@
                 opacity: 1;
                 transform: translateY(0);
             }
+        }
+
+        /* Espaçamento adicional para garantir que o último elemento seja visível */
+        .content::after {
+            content: '';
+            display: block;
+            height: 20px;
         }
     </style>
 </head>
@@ -663,6 +727,21 @@
                 this.style.transform = 'translateY(0)';
             });
         });
+
+        // Ajuste dinâmico do padding-bottom baseado na altura do footer
+        function adjustContentPadding() {
+            const footer = document.querySelector('.footer');
+            const content = document.querySelector('.content');
+            
+            if (footer && content) {
+                const footerHeight = footer.offsetHeight;
+                content.style.paddingBottom = (footerHeight + 40) + 'px';
+            }
+        }
+
+        // Chama a função ao carregar e ao redimensionar
+        window.addEventListener('load', adjustContentPadding);
+        window.addEventListener('resize', adjustContentPadding);
     </script>
 </body>
 </html>
