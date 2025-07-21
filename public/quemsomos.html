@@ -18,6 +18,10 @@
             line-height: 1.6;
         }
 
+        html {
+            scroll-behavior: smooth;
+        }
+
         .container {
             max-width: 480px;
             margin: 0 auto;
@@ -113,7 +117,14 @@
         /* Content */
         .content {
             padding: 24px 20px;
-            padding-bottom: 100px;
+            padding-bottom: 120px; /* Aumentado para garantir espaço */
+        }
+
+        /* Garantir que sempre haja espaço suficiente */
+        .content::after {
+            content: '';
+            display: block;
+            height: 20px; /* Altura extra de segurança */
         }
 
         .section {
@@ -250,7 +261,7 @@
             font-weight: 500;
         }
 
-        /* Tripinha section - UPDATED */
+        /* Tripinha section */
         .tripinha-section {
             background: linear-gradient(135deg, #FFFFFF 0%, #F8F9FA 100%);
             border: 2px solid #E87722;
@@ -390,6 +401,7 @@
             padding: 16px 20px;
             text-align: center;
             box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.15);
+            z-index: 1000; /* Garantir que esteja acima de outros elementos */
         }
 
         .footer-button {
@@ -422,6 +434,7 @@
             
             .content {
                 padding: 20px 16px;
+                padding-bottom: 140px; /* Ainda mais espaço em mobile */
             }
             
             .header {
@@ -435,6 +448,26 @@
             .tripinha-logo-container {
                 width: 100px;
                 height: 100px;
+            }
+            
+            .footer {
+                padding: 20px 16px; /* Mais padding em mobile */
+            }
+            
+            .footer-button {
+                padding: 14px 20px; /* Botão ligeiramente maior em mobile */
+                font-size: 15px; /* Texto um pouco maior para melhor toque */
+            }
+        }
+
+        /* Media query adicional para telas muito pequenas */
+        @media (max-width: 360px) {
+            .content {
+                padding-bottom: 160px; /* Ainda mais espaço para telas pequenas */
+            }
+            
+            .footer {
+                padding: 18px 12px;
             }
         }
 
@@ -540,7 +573,7 @@
                 </div>
             </div>
 
-            <!-- Tripinha Section - UPDATED WITH LOGO -->
+            <!-- Tripinha Section -->
             <div class="section">
                 <div class="tripinha-section">
                     <!-- Decorative paw prints -->
