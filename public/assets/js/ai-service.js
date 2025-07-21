@@ -239,7 +239,39 @@ window.BENETRIP_AI = {
     return new Promise(resolve => setTimeout(resolve, ms));
   },
   
+  // Funções auxiliares para formatação do prompt
+  getTipoDestinoText(tipoDestino) {
+    switch(tipoDestino) {
+      case 0: return "Nacional - Prefere viajar dentro do próprio país";
+      case 1: return "Internacional - Prefere viajar para fora do país";
+      default: return "Destinos nacionais ou internacionais";
+    }
+  },
 
+  getFamaDestinoText(famaDestino) {
+    switch(famaDestino) {
+      case 0: return "Destinos famosos e populares";
+      case 1: return "Destinos menos conhecidos e alternativos";
+      default: return "Mix de destinos populares e alternativos";
+    }
+  },
+
+  // Função para determinar a estação do ano em uma data
+  determinarEstacaoDoAno(data, hemisferio = 'sul') {
+    const mes = new Date(data).getMonth();
+    
+    if (hemisferio === 'sul') {
+      if (mes >= 2 && mes <= 4) return 'Outono';
+      if (mes >= 5 && mes <= 7) return 'Inverno';
+      if (mes >= 8 && mes <= 10) return 'Primavera';
+      return 'Verão';
+    } else {
+      if (mes >= 2 && mes <= 4) return 'Primavera';
+      if (mes >= 5 && mes <= 7) return 'Verão';
+      if (mes >= 8 && mes <= 10) return 'Outono';
+      return 'Inverno';
+    }
+  },
 
   // Função para calcular a duração da viagem em dias
   calcularDuracaoViagem(dataIda, dataVolta) {
@@ -261,6 +293,8 @@ window.BENETRIP_AI = {
       companhia = 0,
       destino_imaginado = 2,
       tipo_viagem = 1,
+      fama_destino = 2,
+      tipo_destino = 2,
       item_essencial = 4,
       quantidade_familia = 0,
       quantidade_amigos = 0,
@@ -276,6 +310,9 @@ window.BENETRIP_AI = {
     const dataIda = datas.dataIda || new Date().toISOString().split('T')[0];
     const dataVolta = datas.dataVolta || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
     const duracaoViagem = this.calcularDuracaoViagem(dataIda, dataVolta);
+    
+    // Determinar estação do ano
+    const estacaoViagem = this.determinarEstacaoDoAno(dataIda);
     
     // Calcular número de pessoas
     let quantidadePessoas = 1;
@@ -293,6 +330,15 @@ window.BENETRIP_AI = {
       default: companheiroTexto = "Sozinho";
     }
     
+    // Formatar preferência de viagem
+    let preferenciaTexto;
+    switch(tipo_viagem) {
+      case 0: preferenciaTexto = "relaxamento e tranquilidade"; break;
+      case 1: preferenciaTexto = "exploração e descoberta"; break;
+      case 2: preferenciaTexto = "aventura e adrenalina"; break;
+      case 3: preferenciaTexto = "cultura, gastronomia e experiências locais"; break;
+      default: preferenciaTexto = "experiências variadas";
+    }
     
     // Formatar preferência de atrações
     let atracaoTexto;
@@ -304,8 +350,27 @@ window.BENETRIP_AI = {
       default: atracaoTexto = "experiências variadas";
     }
     
+    // Sugestão de distância baseada no tipo de destino
+    let sugestaoDistancia = "";
+    if (tipo_destino === 0) {
+      sugestaoDistancia = "(buscar destinos domésticos)";
+    } else if (tipo_destino === 1) {
+      sugestaoDistancia = "(buscar destinos internacionais)";
+    }
+    
+    // Mensagem específica para orçamento
+    let mensagemOrcamento;
+    if (orcamento < 1000) {
+      mensagemOrcamento = `Orçamento muito restrito de ${orcamento} ${moeda} por pessoa para voos (ida e volta). Priorize destinos próximos e econômicos.`;
+    } else if (orcamento < 2000) {
+      mensagemOrcamento = `Orçamento econômico de ${orcamento} ${moeda} por pessoa para voos (ida e volta). Foque em opções com boa relação custo-benefício.`;
+    } else if (orcamento < 4000) {
+      mensagemOrcamento = `Orçamento moderado de ${orcamento} ${moeda} por pessoa para voos (ida e volta). Pode incluir destinos de médio alcance com preços acessíveis.`;
+    } else {
+      mensagemOrcamento = `Orçamento confortável de ${orcamento} ${moeda} por pessoa para voos (ida e volta). Pode incluir destinos mais distantes e premium.`;
+    }
 
-    return `Crie recomendações de viagem que respeitam ESTRITAMENTE o orçamento do usuário para voos de ida e volta:
+    return `Crie recomendações de viagem que respeitam ESTRITAMENTE o orçamento do usuário:
 ${mensagemOrcamento}
 PERFIL DO VIAJANTE:
 - Partindo de: ${cidadeOrigem} ${sugestaoDistancia}
@@ -313,15 +378,23 @@ PERFIL DO VIAJANTE:
 - Número de pessoas: ${quantidadePessoas}
 - Atividades preferidas: ${preferenciaTexto} e ${atracaoTexto}
 - Período da viagem: ${dataIda} a ${dataVolta} (${duracaoViagem} dias)
+- Estação do ano na viagem: ${estacaoViagem}
+- Experiência como viajante: ${conhece_destino === 1 ? 'Com experiência' : 'Iniciante'} 
+- Preferência por destinos: ${this.getTipoDestinoText(tipo_destino)}
+- Popularidade do destino: ${this.getFamaDestinoText(fama_destino)}
 
 IMPORTANTE:
-1. O preço do VOO de ida e volta de CADA destino DEVE ser entre 80% e 120% do orçamento máximo de ${orcamento} ${moeda}.
-2. FORNEÇA INFORMAÇÕES CLIMÁTICAS detalhadas para o destino na época da viagem (temperatura, condições e recomendações).
-3. Forneça um mix equilibrado: inclua tanto destinos populares quanto alternativas.
-4. Forneça EXATAMENTE 4 destinos alternativos diferentes entre si.
-5. Para CADA destino, inclua o código IATA (3 letras) do aeroporto principal.
-6. Para cada destino, INCLUA PONTOS TURÍSTICOS ESPECÍFICOS E CONHECIDOS.
-7. Os comentários da Tripinha DEVEM mencionar pelo menos um dos pontos turísticos do destino, ter curiosidades sobre o destino e ser escritos em primeira pessoa, como se ela tivesse visitado o local.
+1. O preço do VOO de CADA destino DEVE ser MENOR que o orçamento máximo de ${orcamento} ${moeda}.
+2. INCLUA ESTIMATIVAS REALISTAS de preços para voos (ida e volta) e hospedagem por noite para TODOS os destinos.
+3. FORNEÇA INFORMAÇÕES CLIMÁTICAS detalhadas para o destino na época da viagem (temperatura, condições e recomendações).
+4. Forneça um mix equilibrado: inclua tanto destinos populares quanto alternativas.
+5. Forneça EXATAMENTE 4 destinos alternativos diferentes entre si.
+6. Considere a ÉPOCA DO ANO (${estacaoViagem}) para sugerir destinos com clima adequado.
+7. Inclua destinos de diferentes continentes/regiões.
+8. Garanta que os preços sejam realistas para voos de ida e volta partindo de ${cidadeOrigem}.
+9. Para CADA destino, inclua o código IATA (3 letras) do aeroporto principal.
+10. Para cada destino, INCLUA PONTOS TURÍSTICOS ESPECÍFICOS E CONHECIDOS.
+11. Os comentários da Tripinha DEVEM mencionar pelo menos um dos pontos turísticos do destino e ser escritos em primeira pessoa, como se ela tivesse visitado o local.
 
 Forneça no formato JSON exato abaixo, SEM formatação markdown:
 {
@@ -332,7 +405,7 @@ Forneça no formato JSON exato abaixo, SEM formatação markdown:
     "descricao": "Breve descrição do destino",
     "porque": "Razão específica para visitar",
     "destaque": "Uma experiência única neste destino",
-    "comentario": "Comentário da Tripinha em primeira pessoa, mencionando pelo menos um ponto turístico e tendo curiosidades sobre o destino, como se ela tivesse visitado o local",
+    "comentario": "Comentário da Tripinha em primeira pessoa, mencionando pelo menos um ponto turístico como se ela tivesse visitado o local",
     "pontosTuristicos": [
       "Nome do Primeiro Ponto Turístico", 
       "Nome do Segundo Ponto Turístico"
@@ -345,6 +418,10 @@ Forneça no formato JSON exato abaixo, SEM formatação markdown:
     "aeroporto": {
       "codigo": "XYZ",
       "nome": "Nome do Aeroporto Principal"
+    },
+    "preco": {
+      "voo": número,
+      "hotel": número
     }
   },
   "alternativas": [
@@ -360,6 +437,10 @@ Forneça no formato JSON exato abaixo, SEM formatação markdown:
       "aeroporto": {
         "codigo": "XYZ",
         "nome": "Nome do Aeroporto Principal"
+      },
+      "preco": {
+        "voo": número,
+        "hotel": número
       }
     },
     ...
@@ -371,7 +452,7 @@ Forneça no formato JSON exato abaixo, SEM formatação markdown:
     "descricao": "Breve descrição do destino",
     "porque": "Razão para visitar, destacando o fator surpresa",
     "destaque": "Uma experiência única neste destino",
-    "comentario": "Comentário da Tripinha em primeira pessoa, mencionando pelo menos um ponto turístico e tendo curiosidades sobre o destino, como se ela tivesse visitado o local",
+    "comentario": "Comentário da Tripinha em primeira pessoa, mencionando pelo menos um ponto turístico como se ela tivesse visitado o local",
     "pontosTuristicos": [
       "Nome do Primeiro Ponto Turístico", 
       "Nome do Segundo Ponto Turístico"
@@ -384,6 +465,10 @@ Forneça no formato JSON exato abaixo, SEM formatação markdown:
     "aeroporto": {
       "codigo": "XYZ",
       "nome": "Nome do Aeroporto Principal"
+    },
+    "preco": {
+      "voo": número,
+      "hotel": número
     }
   },
   "estacaoViagem": "${estacaoViagem}"
