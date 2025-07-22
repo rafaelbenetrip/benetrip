@@ -219,7 +219,7 @@ Crie um roteiro detalhado para uma viagem com as seguintes características:
 - Orçamento: ${orcamentoInfo[preferencias?.orcamento_nivel] || orcamentoInfo['medio']}
 
 INSTRUÇÕES:
-1. CRIE EXATAMENTE ${diasViagem} DIAS DE ROTEIRO - NÃO OMITA NENHUM DIA
+1. CRIE UM ROTEIRO PARA TODOS OS ${diasViagem} DIAS DE VIAGEM - TODOS OS DIAS ESSENCIALMENTE TEM DE TER ROTEIRO!
 2. RESPEITE A INTENSIDADE escolhida: ${intensidadeInfo[preferencias?.intensidade_roteiro] || intensidadeInfo['moderado']}
 3. CONSIDERE O ORÇAMENTO: ${orcamentoInfo[preferencias?.orcamento_nivel] || orcamentoInfo['medio']}
 4. ADAPTE AS ATIVIDADES para ${infoViajantes}
