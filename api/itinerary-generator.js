@@ -1,4 +1,4 @@
-// api/itinerary-generator.js - Endpoint para geração de roteiro personalizado
+// api/itinerary-generator.js - Endpoint para geração de roteiro personalizado (CORRIGIDO)
 const axios = require('axios');
 
 // Chaves de API
@@ -68,7 +68,8 @@ module.exports = async (req, res) => {
       pais,
       diasViagem,
       tipoViagem,
-      tipoCompanhia
+      tipoCompanhia,
+      preferencias
     });
     
     // Gerar o prompt para a IA
@@ -144,25 +145,31 @@ function calcularDiasViagem(dataInicio, dataFim) {
 }
 
 /**
- * ✅ NOVO: Calcula a data final baseada na data de início e número de dias
+ * ✅ CORRIGIDO: Calcula a data final baseada na data de início e número de dias
  * @param {string} dataInicio - Data de início no formato YYYY-MM-DD
  * @param {number} diasViagem - Número de dias da viagem
  * @returns {string} Data final no formato YYYY-MM-DD
  */
 function calcularDataFinal(dataInicio, diasViagem) {
-  const inicio = new Date(dataInicio + 'T12:00:00');
-  const final = new Date(inicio);
-  final.setDate(inicio.getDate() + diasViagem - 1);
-  
-  const ano = final.getFullYear();
-  const mes = String(final.getMonth() + 1).padStart(2, '0');
-  const dia = String(final.getDate()).padStart(2, '0');
-  
-  return `${ano}-${mes}-${dia}`;
+  try {
+    const inicio = new Date(dataInicio + 'T12:00:00');
+    const final = new Date(inicio);
+    final.setDate(inicio.getDate() + diasViagem - 1);
+    
+    const ano = final.getFullYear();
+    const mes = String(final.getMonth() + 1).padStart(2, '0');
+    const dia = String(final.getDate()).padStart(2, '0');
+    
+    return `${ano}-${mes}-${dia}`;
+  } catch (erro) {
+    logEvent('error', 'Erro ao calcular data final', { dataInicio, diasViagem, erro: erro.message });
+    // Fallback: retorna data de início se houver erro
+    return dataInicio;
+  }
 }
 
 /**
- * ✅ MELHORADO: Gera o prompt para a IA baseado nos parâmetros
+ * ✅ CORRIGIDO: Gera o prompt para a IA baseado nos parâmetros
  * @param {Object} params - Parâmetros para o prompt
  * @returns {string} Prompt formatado
  */
@@ -180,6 +187,9 @@ function gerarPromptRoteiro(params) {
     preferencias
   } = params;
   
+  // ✅ CORRIGIDO: Tratamento seguro de preferencias
+  const prefSegura = preferencias || {};
+  
   // Mapear o tipo de viagem para descrição
   const descricaoTipoViagem = {
     'relaxar': 'relaxamento e descanso',
@@ -196,7 +206,7 @@ function gerarPromptRoteiro(params) {
     'amigos': 'um grupo de amigos'
   }[tipoCompanhia] || 'um viajante';
   
-  // ✅ NOVO: Mapear intensidade e orçamento
+  // ✅ CORRIGIDO: Mapear intensidade e orçamento com fallbacks seguros
   const intensidadeInfo = {
     'leve': '2-3 atividades por dia (ritmo relaxado)',
     'moderado': '4-5 atividades por dia (ritmo equilibrado)',
@@ -209,19 +219,23 @@ function gerarPromptRoteiro(params) {
     'alto': 'alto (inclua experiências premium sem limitações de custo)'
   };
   
-  // ✅ NOVO: Criar informações detalhadas de viajantes
+  // ✅ CORRIGIDO: Acesso seguro às preferências
+  const intensidadeEscolhida = prefSegura.intensidade_roteiro || prefSegura.intensidade || 'moderado';
+  const orcamentoEscolhido = prefSegura.orcamento_nivel || prefSegura.orcamento || 'medio';
+  
+  // ✅ CORRIGIDO: Criar informações detalhadas de viajantes
   let infoViajantes = descricaoTipoCompanhia;
-  if (tipoCompanhia === 'familia' && preferencias) {
-    const adultos = preferencias.quantidade_adultos || 2;
-    const criancas = preferencias.quantidade_criancas || 0;
-    const bebes = preferencias.quantidade_bebes || 0;
+  if (tipoCompanhia === 'familia' && prefSegura) {
+    const adultos = prefSegura.quantidade_adultos || 2;
+    const criancas = prefSegura.quantidade_criancas || 0;
+    const bebes = prefSegura.quantidade_bebes || 0;
     infoViajantes += ` (${adultos} adulto${adultos > 1 ? 's' : ''}`;
     if (criancas > 0) infoViajantes += `, ${criancas} criança${criancas > 1 ? 's' : ''}`;
     if (bebes > 0) infoViajantes += `, ${bebes} bebê${bebes > 1 ? 's' : ''}`;
     infoViajantes += ')';
   }
   
-  // Calcular data final
+  // ✅ CORRIGIDO: Calcular data final com tratamento de erro
   const dataFinal = calcularDataFinal(dataInicio, diasViagem);
   
   // ✅ PROMPT REFORÇADO PARA GARANTIR TODOS OS DIAS
@@ -243,15 +257,15 @@ DADOS DA VIAGEM:
 - Horário de partida no último dia: ${horaSaida || 'Não informado'}
 - Tipo de viagem: Foco em ${descricaoTipoViagem}
 - Viajantes: ${infoViajantes}
-- Intensidade do roteiro: ${intensidadeInfo[preferencias?.intensidade_roteiro] || intensidadeInfo['moderado']}
-- Orçamento: ${orcamentoInfo[preferencias?.orcamento_nivel] || orcamentoInfo['medio']}
+- Intensidade do roteiro: ${intensidadeInfo[intensidadeEscolhida] || intensidadeInfo['moderado']}
+- Orçamento: ${orcamentoInfo[orcamentoEscolhido] || orcamentoInfo['medio']}
 
 REGRAS OBRIGATÓRIAS:
 1. 🚨 CRÍTICO: Crie EXATAMENTE ${diasViagem} dias - NÃO OMITA NENHUM DIA
 2. 🚨 Se ${diasViagem} > 10, distribua atividades variadas e repita locais populares
 3. 🚨 Para viagens longas, intercale dias mais intensos com dias de descanso
-4. RESPEITE A INTENSIDADE escolhida: ${intensidadeInfo[preferencias?.intensidade_roteiro] || intensidadeInfo['moderado']}
-5. CONSIDERE O ORÇAMENTO: ${orcamentoInfo[preferencias?.orcamento_nivel] || orcamentoInfo['medio']}
+4. RESPEITE A INTENSIDADE escolhida: ${intensidadeInfo[intensidadeEscolhida] || intensidadeInfo['moderado']}
+5. CONSIDERE O ORÇAMENTO: ${orcamentoInfo[orcamentoEscolhido] || orcamentoInfo['medio']}
 6. ADAPTE AS ATIVIDADES para ${infoViajantes}
 7. Organize o roteiro por dias, considerando o dia da semana real e se é fim de semana ou dia útil
 8. Para cada dia, divida o roteiro em períodos: manhã, tarde e noite
@@ -285,16 +299,26 @@ ESTRUTURA OBRIGATÓRIA DO JSON:
           }
         ]
       },
-      "tarde": { ... mesmo formato da manhã ... },
-      "noite": { ... mesmo formato da manhã ... }
-    },
-    // ... CONTINUE ATÉ O DIA ${diasViagem}
-    {
-      "data": "${dataFinal}",
-      "descricao": "Breve descrição sobre o último dia",
-      "manha": { ... },
-      "tarde": { ... },
-      "noite": { ... }
+      "tarde": { 
+        "atividades": [
+          {
+            "horario": "HH:MM",
+            "local": "Nome do local",
+            "tags": ["tag1", "tag2"],
+            "dica": "Dica da Tripinha sobre o local"
+          }
+        ]
+      },
+      "noite": { 
+        "atividades": [
+          {
+            "horario": "HH:MM",
+            "local": "Nome do local",
+            "tags": ["tag1", "tag2"],
+            "dica": "Dica da Tripinha sobre o local"
+          }
+        ]
+      }
     }
   ]
 }
@@ -307,8 +331,8 @@ O array "dias" DEVE ter length = ${diasViagem}.
 OBSERVAÇÕES IMPORTANTES:
 - Para ${infoViajantes}, dê prioridade a atividades compatíveis
 - Como o foco é ${descricaoTipoViagem}, sugira mais atividades relacionadas a esse tema
-- Respeite rigorosamente a intensidade de ${intensidadeInfo[preferencias?.intensidade_roteiro] || intensidadeInfo['moderado']}
-- Ajuste as sugestões ao orçamento ${orcamentoInfo[preferencias?.orcamento_nivel] || orcamentoInfo['medio']}
+- Respeite rigorosamente a intensidade de ${intensidadeInfo[intensidadeEscolhida] || intensidadeInfo['moderado']}
+- Ajuste as sugestões ao orçamento ${orcamentoInfo[orcamentoEscolhido] || orcamentoInfo['medio']}
 - Considere atividades para dias úteis e atividades específicas para fins de semana
 - Inclua uma mistura de atrações turísticas populares e experiências locais
 - Garanta que destinos mais conhecidos estejam no roteiro da viagem
@@ -332,7 +356,13 @@ async function gerarRoteiroComDeepseek(prompt, diasViagem, dataInicio) {
     }
     
     // ✅ TIMEOUT AUMENTADO PARA ROTEIROS LONGOS
-    const timeoutMs = 180000; // 3 minutos (era padrão ~30s)
+    const timeoutMs = 180000; // 3 minutos
+    
+    logEvent('info', 'Iniciando chamada à API DeepSeek', {
+      diasViagem,
+      timeoutMs,
+      promptLength: prompt.length
+    });
     
     // Realizar chamada à API DeepSeek
     const response = await axios.post(
@@ -346,7 +376,7 @@ async function gerarRoteiroComDeepseek(prompt, diasViagem, dataInicio) {
           }
         ],
         temperature: 0.7,
-        max_tokens: 8000, // ✅ AUMENTADO para roteiros longos (era ~2000)
+        max_tokens: 8000, // ✅ AUMENTADO para roteiros longos
         response_format: { type: 'json_object' }
       },
       {
@@ -357,6 +387,11 @@ async function gerarRoteiroComDeepseek(prompt, diasViagem, dataInicio) {
         timeout: timeoutMs // ✅ TIMEOUT EXPLÍCITO
       }
     );
+    
+    logEvent('success', 'Resposta recebida da API DeepSeek', {
+      status: response.status,
+      responseLength: response.data?.choices?.[0]?.message?.content?.length || 0
+    });
     
     // Extrair resposta
     const respostaText = response.data.choices[0].message.content;
@@ -376,7 +411,8 @@ async function gerarRoteiroComDeepseek(prompt, diasViagem, dataInicio) {
     } catch (parseError) {
       logEvent('error', 'Erro ao processar resposta JSON da DeepSeek', {
         error: parseError.message,
-        response: respostaText
+        responseLength: respostaText.length,
+        responsePreview: respostaText.substring(0, 500)
       });
       
       throw new Error('Resposta da DeepSeek não é um JSON válido');
@@ -385,7 +421,9 @@ async function gerarRoteiroComDeepseek(prompt, diasViagem, dataInicio) {
   } catch (erro) {
     logEvent('error', 'Erro na chamada à API DeepSeek', {
       error: erro.message,
-      response: erro.response?.data
+      code: erro.code,
+      status: erro.response?.status,
+      data: erro.response?.data
     });
     
     throw erro;
@@ -408,6 +446,12 @@ async function gerarRoteiroComClaude(prompt, diasViagem, dataInicio) {
     
     // ✅ TIMEOUT AUMENTADO
     const timeoutMs = 180000; // 3 minutos
+    
+    logEvent('info', 'Iniciando chamada à API Claude', {
+      diasViagem,
+      timeoutMs,
+      promptLength: prompt.length
+    });
     
     // Realizar chamada à API Claude (Anthropic)
     const response = await axios.post(
@@ -432,6 +476,11 @@ async function gerarRoteiroComClaude(prompt, diasViagem, dataInicio) {
       }
     );
     
+    logEvent('success', 'Resposta recebida da API Claude', {
+      status: response.status,
+      responseLength: response.data?.content?.[0]?.text?.length || 0
+    });
+    
     // Extrair resposta
     const respostaText = response.data.content[0].text;
     
@@ -450,7 +499,8 @@ async function gerarRoteiroComClaude(prompt, diasViagem, dataInicio) {
     } catch (parseError) {
       logEvent('error', 'Erro ao processar resposta JSON da Claude', {
         error: parseError.message,
-        response: respostaText
+        responseLength: respostaText.length,
+        responsePreview: respostaText.substring(0, 500)
       });
       
       throw new Error('Resposta da Claude não é um JSON válido');
@@ -459,7 +509,9 @@ async function gerarRoteiroComClaude(prompt, diasViagem, dataInicio) {
   } catch (erro) {
     logEvent('error', 'Erro na chamada à API Claude', {
       error: erro.message,
-      response: erro.response?.data
+      code: erro.code,
+      status: erro.response?.status,
+      data: erro.response?.data
     });
     
     throw erro;
@@ -467,175 +519,218 @@ async function gerarRoteiroComClaude(prompt, diasViagem, dataInicio) {
 }
 
 /**
- * ✅ NOVO: Valida e corrige o roteiro para garantir o número correto de dias
+ * ✅ CORRIGIDO: Valida e corrige o roteiro para garantir o número correto de dias
  * @param {Object} roteiro - Roteiro recebido da IA
  * @param {number} diasEsperados - Número de dias esperados
  * @param {string} dataInicio - Data de início da viagem
  * @returns {Object} Roteiro validado e corrigido
  */
 function validarECorrigirRoteiro(roteiro, diasEsperados, dataInicio) {
-  // Validar estrutura básica
-  if (!roteiro.dias || !Array.isArray(roteiro.dias)) {
-    throw new Error('Estrutura de roteiro inválida: propriedade "dias" não encontrada ou não é array');
-  }
-  
-  const diasRecebidos = roteiro.dias.length;
-  
-  logEvent('info', 'Validando roteiro da IA', {
-    diasEsperados,
-    diasRecebidos,
-    diferenca: diasEsperados - diasRecebidos
-  });
-  
-  // Se o número de dias está correto, retornar como está
-  if (diasRecebidos === diasEsperados) {
-    logEvent('success', 'Roteiro da IA tem o número correto de dias');
+  try {
+    // Validar estrutura básica
+    if (!roteiro || typeof roteiro !== 'object') {
+      throw new Error('Roteiro não é um objeto válido');
+    }
+    
+    if (!roteiro.dias || !Array.isArray(roteiro.dias)) {
+      throw new Error('Estrutura de roteiro inválida: propriedade "dias" não encontrada ou não é array');
+    }
+    
+    const diasRecebidos = roteiro.dias.length;
+    
+    logEvent('info', 'Validando roteiro da IA', {
+      diasEsperados,
+      diasRecebidos,
+      diferenca: diasEsperados - diasRecebidos
+    });
+    
+    // Se o número de dias está correto, retornar como está
+    if (diasRecebidos === diasEsperados) {
+      logEvent('success', 'Roteiro da IA tem o número correto de dias');
+      return roteiro;
+    }
+    
+    // Se recebeu menos dias que esperado, estender o roteiro
+    if (diasRecebidos < diasEsperados) {
+      logEvent('warning', 'IA retornou menos dias que solicitado, estendendo roteiro', {
+        esperado: diasEsperados,
+        recebido: diasRecebidos,
+        faltam: diasEsperados - diasRecebidos
+      });
+      
+      roteiro.dias = estenderRoteiro(roteiro.dias, diasEsperados, dataInicio);
+    }
+    
+    // Se recebeu mais dias que esperado, truncar
+    if (diasRecebidos > diasEsperados) {
+      logEvent('warning', 'IA retornou mais dias que solicitado, truncando roteiro', {
+        esperado: diasEsperados,
+        recebido: diasRecebidos
+      });
+      
+      roteiro.dias = roteiro.dias.slice(0, diasEsperados);
+    }
+    
+    logEvent('success', 'Roteiro corrigido com sucesso', {
+      diasFinais: roteiro.dias.length
+    });
+    
     return roteiro;
-  }
-  
-  // Se recebeu menos dias que esperado, estender o roteiro
-  if (diasRecebidos < diasEsperados) {
-    logEvent('warning', 'IA retornou menos dias que solicitado, estendendo roteiro', {
-      esperado: diasEsperados,
-      recebido: diasRecebidos,
-      faltam: diasEsperados - diasRecebidos
-    });
     
-    roteiro.dias = estenderRoteiro(roteiro.dias, diasEsperados, dataInicio);
-  }
-  
-  // Se recebeu mais dias que esperado, truncar
-  if (diasRecebidos > diasEsperados) {
-    logEvent('warning', 'IA retornou mais dias que solicitado, truncando roteiro', {
-      esperado: diasEsperados,
-      recebido: diasRecebidos
+  } catch (erro) {
+    logEvent('error', 'Erro na validação do roteiro', {
+      error: erro.message,
+      roteiro: typeof roteiro,
+      diasEsperados
     });
-    
-    roteiro.dias = roteiro.dias.slice(0, diasEsperados);
+    throw erro;
   }
-  
-  logEvent('success', 'Roteiro corrigido com sucesso', {
-    diasFinais: roteiro.dias.length
-  });
-  
-  return roteiro;
 }
 
 /**
- * ✅ NOVO: Estende roteiro quando IA retorna menos dias que solicitado
+ * ✅ CORRIGIDO: Estende roteiro quando IA retorna menos dias que solicitado
  * @param {Array} diasExistentes - Dias já criados pela IA
  * @param {number} diasTotal - Total de dias necessários
  * @param {string} dataInicio - Data de início da viagem
  * @returns {Array} Array de dias estendido
  */
 function estenderRoteiro(diasExistentes, diasTotal, dataInicio) {
-  const diasEstendidos = [...diasExistentes];
-  
-  // Calcular próxima data baseada no último dia existente ou data de início
-  let ultimaData;
-  if (diasExistentes.length > 0 && diasExistentes[diasExistentes.length - 1].data) {
-    ultimaData = new Date(diasExistentes[diasExistentes.length - 1].data + 'T12:00:00');
-  } else {
-    ultimaData = new Date(dataInicio + 'T12:00:00');
-    ultimaData.setDate(ultimaData.getDate() + diasExistentes.length - 1);
-  }
-  
-  // Criar atividades variadas para repetir
-  const atividadesVariadas = [
-    {
-      horario: "09:00",
-      local: "Exploração livre do centro da cidade",
-      tags: ["Livre", "Descoberta"],
-      dica: "Caminhe sem pressa e descubra novos cantinhos!"
-    },
-    {
-      horario: "14:00", 
-      local: "Visita a mercados locais",
-      tags: ["Cultural", "Gastronomia"],
-      dica: "Prove frutas e produtos locais!"
-    },
-    {
-      horario: "19:00",
-      local: "Jantar em restaurante típico",
-      tags: ["Gastronomia", "Típico"],
-      dica: "Peça a especialidade da casa!"
+  try {
+    const diasEstendidos = [...diasExistentes];
+    
+    // Calcular próxima data baseada no último dia existente ou data de início
+    let ultimaData;
+    if (diasExistentes.length > 0 && diasExistentes[diasExistentes.length - 1].data) {
+      ultimaData = new Date(diasExistentes[diasExistentes.length - 1].data + 'T12:00:00');
+    } else {
+      ultimaData = new Date(dataInicio + 'T12:00:00');
+      ultimaData.setDate(ultimaData.getDate() + diasExistentes.length - 1);
     }
-  ];
-  
-  const atividadesAlternativas = [
-    {
-      horario: "10:00",
-      local: "Revisitar locais favoritos",
-      tags: ["Favoritos", "Relaxante"],
-      dica: "Volte aos lugares que mais gostou!"
-    },
-    {
-      horario: "15:30",
-      local: "Compras de lembranças",
-      tags: ["Compras", "Lembranças"],
-      dica: "Hora de comprar presentes especiais!"
-    },
-    {
-      horario: "20:00",
-      local: "Experiência noturna local",
-      tags: ["Noturno", "Cultural"],
-      dica: "Viva a vida noturna como um local!"
-    }
-  ];
-  
-  // Adicionar dias faltantes
-  while (diasEstendidos.length < diasTotal) {
-    const proximoDia = diasEstendidos.length + 1;
     
-    // Calcular próxima data
-    ultimaData.setDate(ultimaData.getDate() + 1);
-    const dataProxima = formatarDataISO(ultimaData);
-    
-    // Escolher conjunto de atividades (alternando)
-    const atividades = proximoDia % 2 === 0 ? atividadesAlternativas : atividadesVariadas;
-    
-    const novoDia = {
-      data: dataProxima,
-      descricao: `Dia ${proximoDia} - Explorando mais do destino e aproveitando experiências adicionais`,
-      manha: {
-        atividades: [atividades[0]]
+    // Criar atividades variadas para repetir
+    const atividadesVariadas = [
+      {
+        horario: "09:00",
+        local: "Exploração livre do centro da cidade",
+        tags: ["Livre", "Descoberta"],
+        dica: "Caminhe sem pressa e descubra novos cantinhos!"
       },
-      tarde: {
-        atividades: [atividades[1]]
+      {
+        horario: "14:00", 
+        local: "Visita a mercados locais",
+        tags: ["Cultural", "Gastronomia"],
+        dica: "Prove frutas e produtos locais!"
       },
-      noite: {
-        atividades: [atividades[2]]
+      {
+        horario: "19:00",
+        local: "Jantar em restaurante típico",
+        tags: ["Gastronomia", "Típico"],
+        dica: "Peça a especialidade da casa!"
       }
-    };
+    ];
     
-    // Se for o último dia, ajustar para partida
-    if (proximoDia === diasTotal) {
-      novoDia.descricao = `Dia ${proximoDia} - Últimos momentos e preparação para a partida`;
-      novoDia.noite = {
-        atividades: [{
-          horario: "18:00",
-          local: "Preparação para partida",
-          tags: ["Partida", "Organização"],
-          dica: "Organize as malas e prepare-se para a despedida!"
-        }]
+    const atividadesAlternativas = [
+      {
+        horario: "10:00",
+        local: "Revisitar locais favoritos",
+        tags: ["Favoritos", "Relaxante"],
+        dica: "Volte aos lugares que mais gostou!"
+      },
+      {
+        horario: "15:30",
+        local: "Compras de lembranças",
+        tags: ["Compras", "Lembranças"],
+        dica: "Hora de comprar presentes especiais!"
+      },
+      {
+        horario: "20:00",
+        local: "Experiência noturna local",
+        tags: ["Noturno", "Cultural"],
+        dica: "Viva a vida noturna como um local!"
+      }
+    ];
+    
+    // Adicionar dias faltantes
+    while (diasEstendidos.length < diasTotal) {
+      const proximoDia = diasEstendidos.length + 1;
+      
+      // Calcular próxima data
+      ultimaData.setDate(ultimaData.getDate() + 1);
+      const dataProxima = formatarDataISO(ultimaData);
+      
+      // Escolher conjunto de atividades (alternando)
+      const atividades = proximoDia % 2 === 0 ? atividadesAlternativas : atividadesVariadas;
+      
+      const novoDia = {
+        data: dataProxima,
+        descricao: `Dia ${proximoDia} - Explorando mais do destino e aproveitando experiências adicionais`,
+        manha: {
+          atividades: [atividades[0]]
+        },
+        tarde: {
+          atividades: [atividades[1]]
+        },
+        noite: {
+          atividades: [atividades[2]]
+        }
       };
+      
+      // Se for o último dia, ajustar para partida
+      if (proximoDia === diasTotal) {
+        novoDia.descricao = `Dia ${proximoDia} - Últimos momentos e preparação para a partida`;
+        novoDia.noite = {
+          atividades: [{
+            horario: "18:00",
+            local: "Preparação para partida",
+            tags: ["Partida", "Organização"],
+            dica: "Organize as malas e prepare-se para a despedida!"
+          }]
+        };
+      }
+      
+      diasEstendidos.push(novoDia);
     }
     
-    diasEstendidos.push(novoDia);
+    logEvent('info', 'Roteiro estendido com sucesso', {
+      diasOriginais: diasExistentes.length,
+      diasFinais: diasEstendidos.length,
+      diasAdicionados: diasEstendidos.length - diasExistentes.length
+    });
+    
+    return diasEstendidos;
+    
+  } catch (erro) {
+    logEvent('error', 'Erro ao estender roteiro', {
+      error: erro.message,
+      diasExistentes: diasExistentes.length,
+      diasTotal
+    });
+    throw erro;
   }
-  
-  return diasEstendidos;
 }
 
 /**
- * ✅ NOVO: Formatar data no padrão ISO (YYYY-MM-DD)
+ * ✅ CORRIGIDO: Formatar data no padrão ISO (YYYY-MM-DD)
  * @param {Date} data - Objeto Date
  * @returns {string} Data formatada
  */
 function formatarDataISO(data) {
-  const ano = data.getFullYear();
-  const mes = String(data.getMonth() + 1).padStart(2, '0');
-  const dia = String(data.getDate()).padStart(2, '0');
-  
-  return `${ano}-${mes}-${dia}`;
+  try {
+    const ano = data.getFullYear();
+    const mes = String(data.getMonth() + 1).padStart(2, '0');
+    const dia = String(data.getDate()).padStart(2, '0');
+    
+    return `${ano}-${mes}-${dia}`;
+  } catch (erro) {
+    logEvent('error', 'Erro ao formatar data ISO', {
+      error: erro.message,
+      data: data
+    });
+    // Fallback para data atual
+    const agora = new Date();
+    const ano = agora.getFullYear();
+    const mes = String(agora.getMonth() + 1).padStart(2, '0');
+    const dia = String(agora.getDate()).padStart(2, '0');
+    return `${ano}-${mes}-${dia}`;
+  }
 }
