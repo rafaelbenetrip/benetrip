@@ -313,7 +313,7 @@ const BENETRIP_ROTEIRO = {
         tipoViagem: this.obterTipoViagem(),
         tipoCompanhia: this.obterTipoCompanhia(),
         preferencias: this.obterPreferenciasCompletas(),
-        modeloIA: 'deepseek'
+        modeloIA: 'claude'
       };
       
       console.log('🚀 Chamando API de roteiro...', parametrosIA);
