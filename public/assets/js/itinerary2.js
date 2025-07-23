@@ -764,7 +764,7 @@ if (e.target.closest('.btn-voltar')) {
         intensidade: this.dadosFormulario.intensidade,
         orcamento: this.dadosFormulario.orcamento,
         preferencias: this.obterPreferenciasCompletas(),
-        modeloIA: 'deepseek'
+        modeloIA: 'claude'
       };
       
       console.log('🚀 Chamando API de roteiro...', parametrosIA);
