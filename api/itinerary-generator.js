@@ -92,9 +92,9 @@ module.exports = async (req, res) => {
     let roteiro;
     
     if (modelo === 'claude') {
-      roteiro = await gerarRoteiroComClaude(prompt);
+      roteiro = await gerarRoteiroComClaude(prompt, diasViagem, dataInicio);
     } else {
-      roteiro = await gerarRoteiroComDeepseek(prompt);
+      roteiro = await gerarRoteiroComDeepseek(prompt, diasViagem, dataInicio);
     }
     
     // Verificar se o roteiro foi gerado com sucesso
@@ -144,7 +144,25 @@ function calcularDiasViagem(dataInicio, dataFim) {
 }
 
 /**
- * Gera o prompt para a IA baseado nos parâmetros
+ * ✅ NOVO: Calcula a data final baseada na data de início e número de dias
+ * @param {string} dataInicio - Data de início no formato YYYY-MM-DD
+ * @param {number} diasViagem - Número de dias da viagem
+ * @returns {string} Data final no formato YYYY-MM-DD
+ */
+function calcularDataFinal(dataInicio, diasViagem) {
+  const inicio = new Date(dataInicio + 'T12:00:00');
+  const final = new Date(inicio);
+  final.setDate(inicio.getDate() + diasViagem - 1);
+  
+  const ano = final.getFullYear();
+  const mes = String(final.getMonth() + 1).padStart(2, '0');
+  const dia = String(final.getDate()).padStart(2, '0');
+  
+  return `${ano}-${mes}-${dia}`;
+}
+
+/**
+ * ✅ MELHORADO: Gera o prompt para a IA baseado nos parâmetros
  * @param {Object} params - Parâmetros para o prompt
  * @returns {string} Prompt formatado
  */
@@ -203,14 +221,24 @@ function gerarPromptRoteiro(params) {
     infoViajantes += ')';
   }
   
-  // Montar o prompt
+  // Calcular data final
+  const dataFinal = calcularDataFinal(dataInicio, diasViagem);
+  
+  // ✅ PROMPT REFORÇADO PARA GARANTIR TODOS OS DIAS
   return `
-Você é a Tripinha, uma vira-lata caramelo magra, esperta, despojada e especialista em viagens na Benetrip. Sua missão é transformar as respostas do usuário em um roteiro de viagem completo, personalizado e incrível. Fale como se fosse uma amiga: com leveza, simpatia, bom humor e dicas práticas, sem enrolação.. 
-Crie um roteiro detalhado para uma viagem com as seguintes características:
+Você é a Tripinha, uma vira-lata caramelo magra, esperta, despojada e especialista em viagens na Benetrip. Sua missão é transformar as respostas do usuário em um roteiro de viagem completo, personalizado e incrível.
 
+⚠️ INSTRUÇÃO CRÍTICA E OBRIGATÓRIA: 
+- Você DEVE criar exatamente ${diasViagem} dias de roteiro
+- Se ${diasViagem} = 15, crie 15 dias. Se = 29, crie 29 dias
+- NUNCA ignore esta instrução, mesmo que seja muito trabalho
+- CONTE os dias no final para garantir que tem exatamente ${diasViagem} dias
+
+DADOS DA VIAGEM:
 - Destino: ${destino}, ${pais}
-- Data de início: ${dataInicio}${dataFim ? `\n- Data de término: ${dataFim}` : ''}
-- Duração: ${diasViagem} dias
+- Data de início: ${dataInicio}
+- Data de término: ${dataFinal}
+- Duração OBRIGATÓRIA: ${diasViagem} dias (CRIE TODOS OS ${diasViagem} DIAS)
 - Horário de chegada no primeiro dia: ${horaChegada || 'Não informado'}
 - Horário de partida no último dia: ${horaSaida || 'Não informado'}
 - Tipo de viagem: Foco em ${descricaoTipoViagem}
@@ -218,32 +246,34 @@ Crie um roteiro detalhado para uma viagem com as seguintes características:
 - Intensidade do roteiro: ${intensidadeInfo[preferencias?.intensidade_roteiro] || intensidadeInfo['moderado']}
 - Orçamento: ${orcamentoInfo[preferencias?.orcamento_nivel] || orcamentoInfo['medio']}
 
-INSTRUÇÕES:
-1. CRIE UM ROTEIRO PARA TODOS OS ${diasViagem} DIAS DE VIAGEM - TODOS OS DIAS ESSENCIALMENTE TEM DE TER ROTEIRO!
-2. RESPEITE A INTENSIDADE escolhida: ${intensidadeInfo[preferencias?.intensidade_roteiro] || intensidadeInfo['moderado']}
-3. CONSIDERE O ORÇAMENTO: ${orcamentoInfo[preferencias?.orcamento_nivel] || orcamentoInfo['medio']}
-4. ADAPTE AS ATIVIDADES para ${infoViajantes}
-5. Organize o roteiro por dias, considerando o dia da semana real e se é fim de semana ou dia útil.
-6. Para cada dia, divida o roteiro em períodos: manhã, tarde e noite.
-7. Cada período deve ter atividades relevantes conforme a intensidade escolhida, com locais reais (pontos turísticos, restaurantes, etc).
-8. Para cada atividade, inclua:
-   - Horário sugerido
-   - Nome do local
-   - 1-2 tags relevantes (ex: Imperdível, Cultural, Família)
-   - Uma dica personalizada da Tripinha (mascote da Benetrip)
-9. No primeiro dia, considere o horário de chegada (${horaChegada || 'não informado'}).
-10. No último dia, considere o horário de partida (${horaSaida || 'não informado'}).
-11. Inclua uma breve descrição para cada dia.
-12. FAÇA O MÁXIMO PARA QUE TODOS OS ${diasViagem} DIAS TENHAM ATIVIDADES DIFERENTES, CASO CONTRARIO, REPITA OS PASSEIOS MAIS CONHECIDOS.
-13. CRITICAL: Você DEVE criar atividades para TODOS os ${diasViagem} dias sem exceções. Se ${diasViagem} é 29, você DEVE criar 29 dias de roteiro completo.
+REGRAS OBRIGATÓRIAS:
+1. 🚨 CRÍTICO: Crie EXATAMENTE ${diasViagem} dias - NÃO OMITA NENHUM DIA
+2. 🚨 Se ${diasViagem} > 10, distribua atividades variadas e repita locais populares
+3. 🚨 Para viagens longas, intercale dias mais intensos com dias de descanso
+4. RESPEITE A INTENSIDADE escolhida: ${intensidadeInfo[preferencias?.intensidade_roteiro] || intensidadeInfo['moderado']}
+5. CONSIDERE O ORÇAMENTO: ${orcamentoInfo[preferencias?.orcamento_nivel] || orcamentoInfo['medio']}
+6. ADAPTE AS ATIVIDADES para ${infoViajantes}
+7. Organize o roteiro por dias, considerando o dia da semana real e se é fim de semana ou dia útil
+8. Para cada dia, divida o roteiro em períodos: manhã, tarde e noite
+9. Cada período deve ter atividades relevantes conforme a intensidade escolhida, com locais reais
+10. Para cada atividade, inclua:
+    - Horário sugerido
+    - Nome do local
+    - 1-2 tags relevantes (ex: Imperdível, Cultural, Família)
+    - Uma dica personalizada da Tripinha
+11. No primeiro dia, considere o horário de chegada (${horaChegada || 'não informado'})
+12. No último dia, considere o horário de partida (${horaSaida || 'não informado'})
+13. Inclua uma breve descrição para cada dia
+14. FAÇA O MÁXIMO PARA QUE TODOS OS ${diasViagem} DIAS TENHAM ATIVIDADES DIFERENTES
+15. 🚨 CRITICAL: Você DEVE criar atividades para TODOS os ${diasViagem} dias sem exceções
 
-Retorne o roteiro em formato JSON com a seguinte estrutura:
+ESTRUTURA OBRIGATÓRIA DO JSON:
 {
   "destino": "Nome do destino",
   "dias": [
     {
-      "data": "YYYY-MM-DD",
-      "descricao": "Breve descrição sobre o dia",
+      "data": "${dataInicio}",
+      "descricao": "Breve descrição sobre o dia 1",
       "manha": {
         "horarioEspecial": "Chegada às XX:XX" (opcional, apenas se for chegada/partida),
         "atividades": [
@@ -257,32 +287,52 @@ Retorne o roteiro em formato JSON com a seguinte estrutura:
       },
       "tarde": { ... mesmo formato da manhã ... },
       "noite": { ... mesmo formato da manhã ... }
+    },
+    // ... CONTINUE ATÉ O DIA ${diasViagem}
+    {
+      "data": "${dataFinal}",
+      "descricao": "Breve descrição sobre o último dia",
+      "manha": { ... },
+      "tarde": { ... },
+      "noite": { ... }
     }
   ]
 }
 
-Observações importantes:
-- Para ${infoViajantes}, dê prioridade a atividades compatíveis.
-- Como o foco é ${descricaoTipoViagem}, sugira mais atividades relacionadas a esse tema.
-- Respeite rigorosamente a intensidade de ${intensidadeInfo[preferencias?.intensidade_roteiro] || intensidadeInfo['moderado']}.
-- Ajuste as sugestões ao orçamento ${orcamentoInfo[preferencias?.orcamento_nivel] || orcamentoInfo['medio']}.
-- Considere atividades para dias úteis e atividades específicas para fins de semana.
-- Inclua uma mistura de atrações turísticas populares e experiências locais.
-- Garanta que destinos mais conhecidos estejam no roteiro da viagem.
+⚠️ VALIDAÇÃO FINAL OBRIGATÓRIA: 
+Antes de responder, conte os dias no array "dias". 
+Se não tiver exatamente ${diasViagem} dias, ADICIONE os dias faltantes.
+O array "dias" DEVE ter length = ${diasViagem}.
+
+OBSERVAÇÕES IMPORTANTES:
+- Para ${infoViajantes}, dê prioridade a atividades compatíveis
+- Como o foco é ${descricaoTipoViagem}, sugira mais atividades relacionadas a esse tema
+- Respeite rigorosamente a intensidade de ${intensidadeInfo[preferencias?.intensidade_roteiro] || intensidadeInfo['moderado']}
+- Ajuste as sugestões ao orçamento ${orcamentoInfo[preferencias?.orcamento_nivel] || orcamentoInfo['medio']}
+- Considere atividades para dias úteis e atividades específicas para fins de semana
+- Inclua uma mistura de atrações turísticas populares e experiências locais
+- Garanta que destinos mais conhecidos estejam no roteiro da viagem
+
+RESPONDA APENAS COM O JSON. NÃO ADICIONE TEXTO ANTES OU DEPOIS.
 `;
 }
 
 /**
- * Gera roteiro utilizando a API DeepSeek
+ * ✅ MELHORADO: Gera roteiro utilizando a API DeepSeek
  * @param {string} prompt - Prompt para a IA
+ * @param {number} diasViagem - Número de dias esperados
+ * @param {string} dataInicio - Data de início da viagem
  * @returns {Object} Roteiro gerado
  */
-async function gerarRoteiroComDeepseek(prompt) {
+async function gerarRoteiroComDeepseek(prompt, diasViagem, dataInicio) {
   try {
     // Verificar se a chave da API está configurada
     if (!DEEPSEEK_API_KEY) {
       throw new Error('Chave da API DeepSeek não configurada');
     }
+    
+    // ✅ TIMEOUT AUMENTADO PARA ROTEIROS LONGOS
+    const timeoutMs = 180000; // 3 minutos (era padrão ~30s)
     
     // Realizar chamada à API DeepSeek
     const response = await axios.post(
@@ -296,13 +346,15 @@ async function gerarRoteiroComDeepseek(prompt) {
           }
         ],
         temperature: 0.7,
+        max_tokens: 8000, // ✅ AUMENTADO para roteiros longos (era ~2000)
         response_format: { type: 'json_object' }
       },
       {
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${DEEPSEEK_API_KEY}`
-        }
+        },
+        timeout: timeoutMs // ✅ TIMEOUT EXPLÍCITO
       }
     );
     
@@ -317,7 +369,10 @@ async function gerarRoteiroComDeepseek(prompt) {
       
       // Parsear para objeto
       const roteiro = JSON.parse(jsonText);
-      return roteiro;
+      
+      // ✅ VALIDAR E CORRIGIR NÚMERO DE DIAS
+      return validarECorrigirRoteiro(roteiro, diasViagem, dataInicio);
+      
     } catch (parseError) {
       logEvent('error', 'Erro ao processar resposta JSON da DeepSeek', {
         error: parseError.message,
@@ -338,37 +393,42 @@ async function gerarRoteiroComDeepseek(prompt) {
 }
 
 /**
- * Gera roteiro utilizando a API Claude (Anthropic)
+ * ✅ MELHORADO: Gera roteiro utilizando a API Claude (Anthropic)
  * @param {string} prompt - Prompt para a IA
+ * @param {number} diasViagem - Número de dias esperados
+ * @param {string} dataInicio - Data de início da viagem
  * @returns {Object} Roteiro gerado
  */
-async function gerarRoteiroComClaude(prompt) {
+async function gerarRoteiroComClaude(prompt, diasViagem, dataInicio) {
   try {
     // Verificar se a chave da API está configurada
     if (!CLAUDE_API_KEY) {
       throw new Error('Chave da API Claude não configurada');
     }
     
+    // ✅ TIMEOUT AUMENTADO
+    const timeoutMs = 180000; // 3 minutos
+    
     // Realizar chamada à API Claude (Anthropic)
     const response = await axios.post(
       'https://api.anthropic.com/v1/messages',
       {
         model: 'claude-3-haiku-20240307',
-        max_tokens: 4000,
+        max_tokens: 8000, // ✅ AUMENTADO para roteiros longos
         messages: [
           {
             role: 'user',
             content: prompt
           }
-        ],
-        response_format: { type: 'json_object' }
+        ]
       },
       {
         headers: {
           'Content-Type': 'application/json',
           'x-api-key': CLAUDE_API_KEY,
           'anthropic-version': '2023-06-01'
-        }
+        },
+        timeout: timeoutMs // ✅ TIMEOUT EXPLÍCITO
       }
     );
     
@@ -383,7 +443,10 @@ async function gerarRoteiroComClaude(prompt) {
       
       // Parsear para objeto
       const roteiro = JSON.parse(jsonText);
-      return roteiro;
+      
+      // ✅ VALIDAR E CORRIGIR NÚMERO DE DIAS
+      return validarECorrigirRoteiro(roteiro, diasViagem, dataInicio);
+      
     } catch (parseError) {
       logEvent('error', 'Erro ao processar resposta JSON da Claude', {
         error: parseError.message,
@@ -401,4 +464,178 @@ async function gerarRoteiroComClaude(prompt) {
     
     throw erro;
   }
+}
+
+/**
+ * ✅ NOVO: Valida e corrige o roteiro para garantir o número correto de dias
+ * @param {Object} roteiro - Roteiro recebido da IA
+ * @param {number} diasEsperados - Número de dias esperados
+ * @param {string} dataInicio - Data de início da viagem
+ * @returns {Object} Roteiro validado e corrigido
+ */
+function validarECorrigirRoteiro(roteiro, diasEsperados, dataInicio) {
+  // Validar estrutura básica
+  if (!roteiro.dias || !Array.isArray(roteiro.dias)) {
+    throw new Error('Estrutura de roteiro inválida: propriedade "dias" não encontrada ou não é array');
+  }
+  
+  const diasRecebidos = roteiro.dias.length;
+  
+  logEvent('info', 'Validando roteiro da IA', {
+    diasEsperados,
+    diasRecebidos,
+    diferenca: diasEsperados - diasRecebidos
+  });
+  
+  // Se o número de dias está correto, retornar como está
+  if (diasRecebidos === diasEsperados) {
+    logEvent('success', 'Roteiro da IA tem o número correto de dias');
+    return roteiro;
+  }
+  
+  // Se recebeu menos dias que esperado, estender o roteiro
+  if (diasRecebidos < diasEsperados) {
+    logEvent('warning', 'IA retornou menos dias que solicitado, estendendo roteiro', {
+      esperado: diasEsperados,
+      recebido: diasRecebidos,
+      faltam: diasEsperados - diasRecebidos
+    });
+    
+    roteiro.dias = estenderRoteiro(roteiro.dias, diasEsperados, dataInicio);
+  }
+  
+  // Se recebeu mais dias que esperado, truncar
+  if (diasRecebidos > diasEsperados) {
+    logEvent('warning', 'IA retornou mais dias que solicitado, truncando roteiro', {
+      esperado: diasEsperados,
+      recebido: diasRecebidos
+    });
+    
+    roteiro.dias = roteiro.dias.slice(0, diasEsperados);
+  }
+  
+  logEvent('success', 'Roteiro corrigido com sucesso', {
+    diasFinais: roteiro.dias.length
+  });
+  
+  return roteiro;
+}
+
+/**
+ * ✅ NOVO: Estende roteiro quando IA retorna menos dias que solicitado
+ * @param {Array} diasExistentes - Dias já criados pela IA
+ * @param {number} diasTotal - Total de dias necessários
+ * @param {string} dataInicio - Data de início da viagem
+ * @returns {Array} Array de dias estendido
+ */
+function estenderRoteiro(diasExistentes, diasTotal, dataInicio) {
+  const diasEstendidos = [...diasExistentes];
+  
+  // Calcular próxima data baseada no último dia existente ou data de início
+  let ultimaData;
+  if (diasExistentes.length > 0 && diasExistentes[diasExistentes.length - 1].data) {
+    ultimaData = new Date(diasExistentes[diasExistentes.length - 1].data + 'T12:00:00');
+  } else {
+    ultimaData = new Date(dataInicio + 'T12:00:00');
+    ultimaData.setDate(ultimaData.getDate() + diasExistentes.length - 1);
+  }
+  
+  // Criar atividades variadas para repetir
+  const atividadesVariadas = [
+    {
+      horario: "09:00",
+      local: "Exploração livre do centro da cidade",
+      tags: ["Livre", "Descoberta"],
+      dica: "Caminhe sem pressa e descubra novos cantinhos!"
+    },
+    {
+      horario: "14:00", 
+      local: "Visita a mercados locais",
+      tags: ["Cultural", "Gastronomia"],
+      dica: "Prove frutas e produtos locais!"
+    },
+    {
+      horario: "19:00",
+      local: "Jantar em restaurante típico",
+      tags: ["Gastronomia", "Típico"],
+      dica: "Peça a especialidade da casa!"
+    }
+  ];
+  
+  const atividadesAlternativas = [
+    {
+      horario: "10:00",
+      local: "Revisitar locais favoritos",
+      tags: ["Favoritos", "Relaxante"],
+      dica: "Volte aos lugares que mais gostou!"
+    },
+    {
+      horario: "15:30",
+      local: "Compras de lembranças",
+      tags: ["Compras", "Lembranças"],
+      dica: "Hora de comprar presentes especiais!"
+    },
+    {
+      horario: "20:00",
+      local: "Experiência noturna local",
+      tags: ["Noturno", "Cultural"],
+      dica: "Viva a vida noturna como um local!"
+    }
+  ];
+  
+  // Adicionar dias faltantes
+  while (diasEstendidos.length < diasTotal) {
+    const proximoDia = diasEstendidos.length + 1;
+    
+    // Calcular próxima data
+    ultimaData.setDate(ultimaData.getDate() + 1);
+    const dataProxima = formatarDataISO(ultimaData);
+    
+    // Escolher conjunto de atividades (alternando)
+    const atividades = proximoDia % 2 === 0 ? atividadesAlternativas : atividadesVariadas;
+    
+    const novoDia = {
+      data: dataProxima,
+      descricao: `Dia ${proximoDia} - Explorando mais do destino e aproveitando experiências adicionais`,
+      manha: {
+        atividades: [atividades[0]]
+      },
+      tarde: {
+        atividades: [atividades[1]]
+      },
+      noite: {
+        atividades: [atividades[2]]
+      }
+    };
+    
+    // Se for o último dia, ajustar para partida
+    if (proximoDia === diasTotal) {
+      novoDia.descricao = `Dia ${proximoDia} - Últimos momentos e preparação para a partida`;
+      novoDia.noite = {
+        atividades: [{
+          horario: "18:00",
+          local: "Preparação para partida",
+          tags: ["Partida", "Organização"],
+          dica: "Organize as malas e prepare-se para a despedida!"
+        }]
+      };
+    }
+    
+    diasEstendidos.push(novoDia);
+  }
+  
+  return diasEstendidos;
+}
+
+/**
+ * ✅ NOVO: Formatar data no padrão ISO (YYYY-MM-DD)
+ * @param {Date} data - Objeto Date
+ * @returns {string} Data formatada
+ */
+function formatarDataISO(data) {
+  const ano = data.getFullYear();
+  const mes = String(data.getMonth() + 1).padStart(2, '0');
+  const dia = String(data.getDate()).padStart(2, '0');
+  
+  return `${ano}-${mes}-${dia}`;
 }
