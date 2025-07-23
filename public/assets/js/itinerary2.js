@@ -1318,7 +1318,7 @@ if (e.target.closest('.btn-voltar')) {
             'Accept': 'application/json',
             'Content-Type': 'application/json'
           },
-          signal: AbortSignal.timeout(8000)
+          signal: AbortSignal.timeout(30000)
         });
         
         if (!response.ok) {
