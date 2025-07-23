@@ -219,7 +219,7 @@ Crie um roteiro detalhado para uma viagem com as seguintes características:
 - Orçamento: ${orcamentoInfo[preferencias?.orcamento_nivel] || orcamentoInfo['medio']}
 
 INSTRUÇÕES:
-1. CRIE UM ROTEIRO PARA TODOS OS ${diasViagem} DIAS DE VIAGEM - TODOS OS DIAS ESSENCIALMENTE TEM DE TER ROTEIRO!
+1. OBRIGATÓRIO: CRIE UM ROTEIRO COMPLETO PARA EXATAMENTE ${diasViagem} DIAS DE VIAGEM. CADA UM DOS ${diasViagem} DIAS DEVE CONTER ATIVIDADES.
 2. RESPEITE A INTENSIDADE escolhida: ${intensidadeInfo[preferencias?.intensidade_roteiro] || intensidadeInfo['moderado']}
 3. CONSIDERE O ORÇAMENTO: ${orcamentoInfo[preferencias?.orcamento_nivel] || orcamentoInfo['medio']}
 4. ADAPTE AS ATIVIDADES para ${infoViajantes}
@@ -231,11 +231,11 @@ INSTRUÇÕES:
    - Nome do local
    - 1-2 tags relevantes (ex: Imperdível, Cultural, Família)
    - Uma dica personalizada da Tripinha (mascote da Benetrip)
-9. No primeiro dia, considere o horário de chegada (${horaChegada || 'não informado'}).
-10. No último dia, considere o horário de partida (${horaSaida || 'não informado'}).
+9. No primeiro dia, considere o horário de chegada (${horaChegada || 'Não informado'}).
+10. No último dia, considere o horário de partida (${horaSaida || 'Não informado'}).
 11. Inclua uma breve descrição para cada dia.
-12. FAÇA O MÁXIMO PARA QUE TODOS OS ${diasViagem} DIAS TENHAM ATIVIDADES DIFERENTES, CASO CONTRARIO, REPITA OS PASSEIOS MAIS CONHECIDOS.
-13. CRITICAL: Você DEVE criar atividades para TODOS os ${diasViagem} dias sem exceções. Se ${diasViagem} é 29, você DEVE criar 29 dias de roteiro completo.
+12. IMPORTANTE: FAÇA O MÁXIMO PARA QUE TODOS OS ${diasViagem} DIAS TENHAM ATIVIDADES DIFERENTES. SE ESGOTAR AS SUGESTÕES, REPITA OS PASSEIOS MAIS CONHECIDOS OU CRIE ATIVIDADES GENÉRICAS (Ex: "Dia livre para explorar", "Visitar lojas locais").
+13. ESSENCIAL: O array "dias" no JSON FINAL DEVE CONTER EXATAMENTE ${diasViagem} OBJETOS DE DIAS, SEM EXCEÇÕES.
 
 Retorne o roteiro em formato JSON com a seguinte estrutura:
 {
