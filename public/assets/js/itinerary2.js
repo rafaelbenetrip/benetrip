@@ -1,4 +1,3 @@
-
 /**
  * Benetrip - Sistema de Roteiro com Formulário Manual (VERSÃO 9.0)
  * Novidades:
@@ -1306,7 +1305,7 @@ if (e.target.closest('.btn-voltar')) {
       const cidade = this.dadosDestino.destino;
       const dataInicio = this.getDataIda();
       const dataFim = this.getDataVolta();
-      const diasComPrevisao = this.roteiroPronto.dias.length;
+      const diasComPrevisao = Math.min(3, this.roteiroPronto.dias.length);
       
       console.log(`📊 Buscando previsão para: ${cidade} (${diasComPrevisao} dias)`);
       
@@ -1319,7 +1318,7 @@ if (e.target.closest('.btn-voltar')) {
             'Accept': 'application/json',
             'Content-Type': 'application/json'
           },
-          signal: AbortSignal.timeout(30000)
+          signal: AbortSignal.timeout(8000)
         });
         
         if (!response.ok) {
