@@ -1,5 +1,5 @@
 /**
- * Benetrip - Sistema de Roteiro com Formulário Manual (VERSÃO 9.0)
+ * Benetrip  - Sistema de Roteiro com Formulário Manual (VERSÃO 9.0)
  * Novidades:
  * - ✅ Formulário manual para entrada de dados
  * - ✅ Validação completa de campos
