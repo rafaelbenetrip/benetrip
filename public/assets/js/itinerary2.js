@@ -1305,7 +1305,7 @@ if (e.target.closest('.btn-voltar')) {
       const cidade = this.dadosDestino.destino;
       const dataInicio = this.getDataIda();
       const dataFim = this.getDataVolta();
-      const diasComPrevisao = Math.min(3, this.roteiroPronto.dias.length);
+      const diasComPrevisao = this.roteiroPronto.dias.length;
       
       console.log(`📊 Buscando previsão para: ${cidade} (${diasComPrevisao} dias)`);
       
