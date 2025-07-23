@@ -289,7 +289,7 @@ async function gerarRoteiroComDeepseek(prompt) {
       'https://api.deepseek.com/v1/chat/completions',
       {
         model: 'deepseek-chat',
-        max_tokens: 8100, // ✅ ADICIONADO: Limite explícito de tokens
+        max_tokens: 8192, // ✅ ADICIONADO: Limite explícito de tokens
         messages: [
           {
             role: 'user',
