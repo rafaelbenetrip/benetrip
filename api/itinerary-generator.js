@@ -277,12 +277,25 @@ Observações importantes:
  * @param {string} prompt - Prompt para a IA
  * @returns {Object} Roteiro gerado
  */
+/**
+ * Gera roteiro utilizando a API DeepSeek
+ * @param {string} prompt - Prompt para a IA
+ * @returns {Object} Roteiro gerado
+ */
 async function gerarRoteiroComDeepseek(prompt) {
   try {
     // Verificar se a chave da API está configurada
     if (!DEEPSEEK_API_KEY) {
       throw new Error('Chave da API DeepSeek não configurada');
     }
+    
+    // ✅ LOG DO PROMPT ENVIADO
+    logEvent('info', 'Enviando prompt para DeepSeek', {
+      tamanhoPrompt: prompt.length,
+      diasSolicitados: prompt.match(/Duração: (\d+) dias/)?.[1] || 'não encontrado',
+      diasExtraidos: prompt.match(/EXATAMENTE (\d+) DIAS/)?.[1] || 'não encontrado',
+      promptPreview: prompt.substring(0, 500) + '...'
+    });
     
     // Realizar chamada à API DeepSeek
     const response = await axios.post(
@@ -296,18 +309,34 @@ async function gerarRoteiroComDeepseek(prompt) {
           }
         ],
         temperature: 0.7,
+        max_tokens: 16000, // ✅ AUMENTADO PARA ROTEIROS LONGOS
         response_format: { type: 'json_object' }
       },
       {
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${DEEPSEEK_API_KEY}`
-        }
+        },
+        timeout: 45000 // ✅ 45 segundos
       }
     );
     
     // Extrair resposta
     const respostaText = response.data.choices[0].message.content;
+    
+    // ✅ LOG DETALHADO DA RESPOSTA
+    logEvent('info', 'Resposta bruta da DeepSeek', {
+      tamanhoResposta: respostaText.length,
+      tokensUsados: response.data.usage?.total_tokens || 'não informado',
+      tokensPrompt: response.data.usage?.prompt_tokens || 'não informado',
+      tokensCompletion: response.data.usage?.completion_tokens || 'não informado',
+      statusCode: response.status,
+      model: response.data.model || 'deepseek-chat',
+      // ✅ PRIMEIROS 1000 CARACTERES DA RESPOSTA
+      respostaInicio: respostaText.substring(0, 1000),
+      // ✅ ÚLTIMOS 500 CARACTERES DA RESPOSTA  
+      respostaFim: respostaText.substring(Math.max(0, respostaText.length - 500))
+    });
     
     // Processar a resposta JSON
     try {
@@ -315,22 +344,58 @@ async function gerarRoteiroComDeepseek(prompt) {
       const jsonMatch = respostaText.match(/\{[\s\S]*\}/);
       const jsonText = jsonMatch ? jsonMatch[0] : respostaText;
       
+      // ✅ LOG DO JSON EXTRAÍDO
+      logEvent('info', 'JSON extraído da resposta', {
+        tamanhoJsonExtraido: jsonText.length,
+        tamanhoOriginal: respostaText.length,
+        jsonFoiExtraido: jsonText !== respostaText,
+        jsonInicio: jsonText.substring(0, 200) + '...'
+      });
+      
       // Parsear para objeto
       const roteiro = JSON.parse(jsonText);
+      
+      // ✅ LOG CRÍTICO - ANÁLISE DETALHADA DO ROTEIRO
+      logEvent('info', 'Roteiro parseado da DeepSeek', {
+        diasRetornados: roteiro.dias?.length || 0,
+        destino: roteiro.destino,
+        estruturaValida: !!(roteiro.dias && Array.isArray(roteiro.dias)),
+        primeiraData: roteiro.dias?.[0]?.data,
+        ultimaData: roteiro.dias?.[roteiro.dias?.length - 1]?.data,
+        // ✅ DETALHES DE CADA DIA
+        diasDetalhes: roteiro.dias?.map((dia, index) => ({
+          diaNumero: index + 1,
+          data: dia.data,
+          temDescricao: !!dia.descricao,
+          temManha: !!(dia.manha?.atividades?.length),
+          temTarde: !!(dia.tarde?.atividades?.length),
+          temNoite: !!(dia.noite?.atividades?.length),
+          totalAtividades: (dia.manha?.atividades?.length || 0) + 
+                          (dia.tarde?.atividades?.length || 0) + 
+                          (dia.noite?.atividades?.length || 0)
+        })) || []
+      });
+      
       return roteiro;
+      
     } catch (parseError) {
       logEvent('error', 'Erro ao processar resposta JSON da DeepSeek', {
         error: parseError.message,
-        response: respostaText
+        stack: parseError.stack,
+        response: respostaText.substring(0, 1000) + '...',
+        responseLength: respostaText.length
       });
       
-      throw new Error('Resposta da DeepSeek não é um JSON válido');
+      throw new Error(`Resposta da DeepSeek não é um JSON válido: ${parseError.message}`);
     }
     
   } catch (erro) {
     logEvent('error', 'Erro na chamada à API DeepSeek', {
       error: erro.message,
-      response: erro.response?.data
+      errorCode: erro.code,
+      isTimeout: erro.code === 'ECONNABORTED',
+      response: erro.response?.data,
+      stack: erro.stack
     });
     
     throw erro;
