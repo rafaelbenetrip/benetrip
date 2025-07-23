@@ -971,98 +971,130 @@ if (e.target.closest('.btn-voltar')) {
     return fallbacks[ativIndex % fallbacks.length];
   },
 
-  async chamarAPIRoteiroReal(parametros) {
-    try {
-      const response = await fetch('/api/itinerary-generator', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        body: JSON.stringify(parametros)
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Erro na API: ${response.status}`);
-      }
-      
-      const roteiro = await response.json();
-      
-      if (!roteiro.dias || !Array.isArray(roteiro.dias)) {
-        throw new Error('Formato de resposta inválido da API');
-      }
-      
-      console.log('📋 Roteiro recebido da API:', roteiro);
-      return roteiro;
-      
-    } catch (erro) {
-      console.error('❌ Erro ao chamar API de roteiro:', erro);
-      throw erro;
-    }
-  },
-
-  converterRoteiroParaContinuo(roteiroAPI) {
-    console.log('🔄 Convertendo roteiro para formato contínuo...');
+  /**
+ * ✅ CHAMA API DE ROTEIRO REAL COM LOGS DETALHADOS
+ */
+async chamarAPIRoteiroReal(parametros) {
+  try {
+    // ✅ CALCULAR DIAS ESPERADOS
+    const diasEsperados = parametros.diasViagem || 
+                         this.calcularDiasViagem(parametros.dataInicio, parametros.dataFim);
     
-    const diasContinuos = [];
-    
-    if (!roteiroAPI.dias || !Array.isArray(roteiroAPI.dias)) {
-      throw new Error('Estrutura de dias inválida');
-    }
-    
-    roteiroAPI.dias.forEach((dia, index) => {
-      const diaContino = {
-        data: dia.data,
-        descricao: dia.descricao || this.obterDescricaoDia(index + 1, this.dadosDestino.destino, roteiroAPI.dias.length),
-        atividades: []
-      };
-      
-      if (index === 0) {
-        diaContino.observacao = this.obterObservacaoPrimeiroDia();
-      } else if (index === roteiroAPI.dias.length - 1) {
-        diaContino.observacao = this.obterObservacaoUltimoDia();
-      }
-      
-      ['manha', 'tarde', 'noite'].forEach(periodo => {
-        if (dia[periodo]?.atividades?.length) {
-          dia[periodo].atividades.forEach(atividade => {
-            const atividadeContina = {
-              ...atividade,
-              periodo: periodo,
-              duracao: this.estimarDuracao(atividade.local),
-              tags: atividade.tags || this.gerarTagsAtividade(atividade.local, periodo)
-            };
-            
-            if (atividade.local?.includes('Check-in') || 
-                atividade.local?.includes('Transfer') ||
-                atividade.local?.includes('Chegada') ||
-                atividade.local?.includes('Partida')) {
-              atividadeContina.isEspecial = true;
-            }
-            
-            diaContino.atividades.push(atividadeContina);
-          });
-        }
-      });
-      
-      if (diaContino.atividades.length === 0) {
-        diaContino.atividades.push({
-          horario: '09:00',
-          local: 'Dia livre para atividades opcionais',
-          dica: 'Aproveite para relaxar ou explorar por conta própria!',
-          tags: ['Livre', 'Descanso'],
-          isEspecial: true
-        });
-      }
-      
-      diasContinuos.push(diaContino);
+    // ✅ LOG DOS PARÂMETROS ENVIADOS
+    console.log('🔍 DEBUG - Parâmetros enviados para API:', {
+      diasSolicitados: diasEsperados,
+      destino: parametros.destino,
+      pais: parametros.pais,
+      dataInicio: parametros.dataInicio,
+      dataFim: parametros.dataFim,
+      tipoViagem: parametros.tipoViagem,
+      tipoCompanhia: parametros.tipoCompanhia,
+      modeloIA: parametros.modeloIA,
+      parametrosCompletos: parametros
     });
     
-    return {
-      destino: roteiroAPI.destino || `${this.dadosDestino.destino}, ${this.dadosDestino.pais}`,
-      dias: diasContinuos
-    };
-  },
+    // ✅ LOG DO PAYLOAD JSON
+    const payload = JSON.stringify(parametros);
+    console.log('📦 DEBUG - Payload JSON:', {
+      tamanhoPayload: payload.length,
+      payloadCompleto: payload
+    });
+    
+    const response = await fetch('/api/itinerary-generator', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: payload
+    });
+    
+    // ✅ LOG DA RESPOSTA HTTP
+    console.log('📡 DEBUG - Resposta HTTP:', {
+      status: response.status,
+      statusText: response.statusText,
+      ok: response.ok,
+      headers: Object.fromEntries(response.headers.entries())
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('❌ DEBUG - Erro HTTP:', {
+        status: response.status,
+        statusText: response.statusText,
+        errorBody: errorText
+      });
+      throw new Error(`Erro na API: ${response.status} - ${errorText}`);
+    }
+    
+    const roteiro = await response.json();
+    
+    // ✅ LOG CRÍTICO - ANÁLISE COMPLETA DA RESPOSTA
+    console.log('🔍 DEBUG - Resposta da API (ANÁLISE COMPLETA):', {
+      diasRecebidos: roteiro.dias?.length || 0,
+      diasEsperados: diasEsperados,
+      discrepancia: (roteiro.dias?.length || 0) !== diasEsperados,
+      estruturaValida: !!(roteiro.dias && Array.isArray(roteiro.dias)),
+      temDestino: !!roteiro.destino,
+      destino: roteiro.destino,
+      // ✅ ANÁLISE DIA POR DIA
+      diasDetalhados: roteiro.dias?.map((dia, index) => ({
+        numero: index + 1,
+        data: dia.data,
+        descricao: dia.descricao?.substring(0, 50) + '...',
+        temManha: !!(dia.manha?.atividades?.length),
+        temTarde: !!(dia.tarde?.atividades?.length),
+        temNoite: !!(dia.noite?.atividades?.length),
+        totalAtividades: (dia.manha?.atividades?.length || 0) + 
+                        (dia.tarde?.atividades?.length || 0) + 
+                        (dia.noite?.atividades?.length || 0)
+      })) || [],
+      // ✅ OBJETO COMPLETO PARA DEBUG
+      roteiroCompleto: roteiro
+    });
+    
+    // ✅ ALERTA VISUAL DESTACADO SE HOUVER DISCREPÂNCIA
+    if ((roteiro.dias?.length || 0) !== diasEsperados) {
+      console.error('🚨🚨🚨 PROBLEMA CRÍTICO DETECTADO 🚨🚨🚨');
+      console.error('📊 DETALHES DA DISCREPÂNCIA:', {
+        solicitado: diasEsperados,
+        recebido: roteiro.dias?.length || 0,
+        diferenca: diasEsperados - (roteiro.dias?.length || 0),
+        porcentagemRecebida: Math.round(((roteiro.dias?.length || 0) / diasEsperados) * 100) + '%'
+      });
+      console.error('🔍 POSSÍVEIS CAUSAS:');
+      console.error('   1. IA limitando roteiros longos internamente');
+      console.error('   2. Timeout na geração do roteiro');
+      console.error('   3. Problema no parsing da resposta');
+      console.error('   4. Limite de tokens atingido');
+    }
+    
+    // ✅ VALIDAÇÃO DA ESTRUTURA
+    if (!roteiro.dias || !Array.isArray(roteiro.dias)) {
+      console.error('❌ DEBUG - Estrutura inválida:', {
+        temPropriedadeDias: 'dias' in roteiro,
+        tipoPropriedadeDias: typeof roteiro.dias,
+        isArray: Array.isArray(roteiro.dias),
+        keys: Object.keys(roteiro)
+      });
+      throw new Error('Formato de resposta inválido da API: propriedade "dias" ausente ou inválida');
+    }
+    
+    console.log('✅ DEBUG - Roteiro validado com sucesso');
+    return roteiro;
+    
+  } catch (erro) {
+    console.error('❌ DEBUG - Erro detalhado na chamada da API:', {
+      errorName: erro.name,
+      errorMessage: erro.message,
+      errorStack: erro.stack,
+      isNetworkError: erro instanceof TypeError,
+      isFetchError: erro.name === 'TypeError'
+    });
+    
+    throw erro;
+  }
+},
 
   atualizarUIComRoteiroContino() {
     console.log('🎨 Atualizando interface com roteiro contínuo...');
