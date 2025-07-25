@@ -1,12 +1,18 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-    <meta name='impact-site-verification' value='1837f7ad-080e-487a-84d2-8e5b8b2f4634' />
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Benetrip - Sua Próxima Aventura Começa Aqui! 🐾</title>
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&family=Montserrat:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <meta name="impact-site-verification" content="1837f7ad-080e-487a-84d2-8e5b8b2f4634">
     <meta name="description" content="Planeje sua viagem perfeita com a Tripinha! Descubra destinos incríveis, encontre passagens baratas e crie roteiros personalizados.">
+    
+    <title>Benetrip - Sua Próxima Aventura Começa Aqui! 🐾</title>
+    
+    <!-- Fontes Google -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&family=Montserrat:wght@300;400;500;600&display=swap" rel="stylesheet">
+    
     <style>
         :root {
             --primary-orange: #E87722;
@@ -37,7 +43,9 @@
             padding: 0 20px;
         }
 
-        /* Header */
+        /* =================================
+           HEADER STYLES
+        ================================= */
         .header {
             background: linear-gradient(135deg, #E87722 0%, #FF8C42 25%, #FFB366 45%, #66C2FF 70%, #00A3E0 100%);
             color: var(--white);
@@ -46,33 +54,29 @@
             overflow: hidden;
         }
 
-        .header::before {
+        .header::before,
+        .header::after {
             content: '';
             position: absolute;
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 50%;
+        }
+
+        .header::before {
             top: -50%;
             right: -20%;
             width: 200px;
             height: 200px;
-            background: rgba(255, 255, 255, 0.08);
-            border-radius: 50%;
             animation: float 6s ease-in-out infinite;
         }
 
         .header::after {
-            content: '';
-            position: absolute;
             bottom: -30%;
             left: -10%;
             width: 150px;
             height: 150px;
             background: rgba(255, 255, 255, 0.05);
-            border-radius: 50%;
             animation: float 8s ease-in-out infinite reverse;
-        }
-
-        @keyframes float {
-            0%, 100% { transform: translateY(0px) rotate(0deg); }
-            50% { transform: translateY(-20px) rotate(180deg); }
         }
 
         .header-content {
@@ -124,7 +128,9 @@
             margin-top: 10px;
         }
 
-        /* Menu Button */
+        /* =================================
+           MENU BUTTON STYLES
+        ================================= */
         .menu-button {
             background: rgba(255, 255, 255, 0.2);
             border: 2px solid rgba(255, 255, 255, 0.3);
@@ -176,7 +182,9 @@
             transform: rotate(-45deg) translate(7px, -6px);
         }
 
-        /* Side Navigation */
+        /* =================================
+           SIDE NAVIGATION STYLES
+        ================================= */
         .sidenav {
             position: fixed;
             top: 0;
@@ -335,7 +343,27 @@
             background: rgba(255, 255, 255, 0.1);
         }
 
-        /* Overlay */
+        .nav-badge {
+            background: var(--primary-orange);
+            color: var(--white);
+            font-size: 0.7rem;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-weight: 600;
+        }
+
+        .nav-badge.new {
+            background: #22c55e;
+        }
+
+        .nav-badge.hot {
+            background: #ef4444;
+            animation: pulse 2s infinite;
+        }
+
+        /* =================================
+           OVERLAY STYLES
+        ================================= */
         .overlay {
             position: fixed;
             top: 0;
@@ -355,26 +383,9 @@
             visibility: visible;
         }
 
-        /* Badge */
-        .nav-badge {
-            background: var(--primary-orange);
-            color: var(--white);
-            font-size: 0.7rem;
-            padding: 3px 8px;
-            border-radius: 12px;
-            font-weight: 600;
-        }
-
-        .nav-badge.new {
-            background: #22c55e;
-        }
-
-        .nav-badge.hot {
-            background: #ef4444;
-            animation: pulse 2s infinite;
-        }
-
-        /* Hero Section */
+        /* =================================
+           HERO SECTION STYLES
+        ================================= */
         .hero {
             background: linear-gradient(45deg, var(--light-gray) 0%, var(--white) 100%);
             padding: 60px 0;
@@ -426,6 +437,12 @@
             animation: bounce 2s ease-in-out infinite;
             position: relative;
             overflow: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .tripinha-avatar:hover {
+            transform: scale(1.05);
+            box-shadow: 0 12px 40px rgba(232, 119, 34, 0.4);
         }
 
         .tripinha-avatar img {
@@ -447,26 +464,21 @@
             z-index: -1;
         }
 
-        @keyframes bounce {
-            0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
-            40% { transform: translateY(-10px); }
-            60% { transform: translateY(-5px); }
-        }
-
-        @keyframes rotate {
-            from { transform: rotate(0deg); }
-            to { transform: rotate(360deg); }
-        }
-
         .speech-bubble {
             background: var(--white);
-            padding: 20px;
+            padding: 25px;
             border-radius: 20px;
             border: 2px solid var(--primary-orange);
             position: relative;
             max-width: 400px;
             margin: 0 auto 40px;
-            box-shadow: 0 4px 20px rgba(232, 119, 34, 0.15);
+            box-shadow: 0 8px 30px rgba(232, 119, 34, 0.2);
+            transition: all 0.3s ease;
+        }
+
+        .speech-bubble:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 12px 40px rgba(232, 119, 34, 0.25);
         }
 
         .speech-bubble::before {
@@ -487,7 +499,9 @@
             text-align: center;
         }
 
-        /* Options Section */
+        /* =================================
+           OPTIONS SECTION STYLES
+        ================================= */
         .options {
             padding: 80px 0;
             background: var(--white);
@@ -521,6 +535,8 @@
             border: 2px solid transparent;
             position: relative;
             overflow: hidden;
+            min-height: 44px;
+            min-width: 44px;
         }
 
         .option-card::before {
@@ -548,6 +564,15 @@
             transition: all 0.2s ease;
         }
 
+        .option-card:focus-visible {
+            outline: 3px solid var(--secondary-blue);
+            outline-offset: 3px;
+        }
+
+        .option-card.loading .option-icon {
+            animation: spin 1s linear infinite;
+        }
+
         .popular-badge {
             position: absolute;
             top: -12px;
@@ -561,12 +586,6 @@
             box-shadow: 0 4px 15px rgba(34, 197, 94, 0.4);
             z-index: 10;
             animation: pulse 2s infinite;
-        }
-
-        @keyframes pulse {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.05); }
-            100% { transform: scale(1); }
         }
 
         .option-card.primary {
@@ -602,8 +621,9 @@
 
         .option-description {
             font-size: 1rem;
-            opacity: 0.9;
+            opacity: 0.95;
             margin-bottom: 25px;
+            line-height: 1.6;
         }
 
         .option-button {
@@ -624,7 +644,9 @@
             transform: scale(1.05);
         }
 
-        /* Features Section */
+        /* =================================
+           FEATURES SECTION STYLES
+        ================================= */
         .features {
             background: var(--light-gray);
             padding: 80px 0;
@@ -645,7 +667,6 @@
             gap: 30px;
         }
 
-        /* Melhorias nos feature cards */
         .feature {
             text-align: center;
             padding: 30px 20px;
@@ -657,6 +678,11 @@
             transform: translateY(-5px);
             background: rgba(255, 255, 255, 0.5);
             box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        }
+
+        .feature:hover .feature-title {
+            color: var(--primary-orange);
+            transition: color 0.3s ease;
         }
 
         .feature-icon {
@@ -679,107 +705,6 @@
             box-shadow: 0 8px 30px rgba(232, 119, 34, 0.4);
         }
 
-        /* Melhorias no speech bubble */
-        .speech-bubble {
-            background: var(--white);
-            padding: 25px;
-            border-radius: 20px;
-            border: 2px solid var(--primary-orange);
-            position: relative;
-            max-width: 400px;
-            margin: 0 auto 40px;
-            box-shadow: 0 8px 30px rgba(232, 119, 34, 0.2);
-            transition: all 0.3s ease;
-        }
-
-        .speech-bubble:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 12px 40px rgba(232, 119, 34, 0.25);
-        }
-
-        /* Melhorias no avatar da Tripinha */
-        .tripinha-avatar {
-            width: 120px;
-            height: 120px;
-            background: linear-gradient(135deg, #D2691E, #F4A460);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            box-shadow: 0 8px 32px rgba(232, 119, 34, 0.3);
-            animation: bounce 2s ease-in-out infinite;
-            position: relative;
-            overflow: hidden;
-            transition: all 0.3s ease;
-        }
-
-        .tripinha-avatar:hover {
-            transform: scale(1.05);
-            box-shadow: 0 12px 40px rgba(232, 119, 34, 0.4);
-        }
-
-        /* Smooth scroll */
-        html {
-            scroll-behavior: smooth;
-        }
-
-        /* Melhorias finais de acessibilidade e UX */
-        @media (prefers-reduced-motion: reduce) {
-            *,
-            *::before,
-            *::after {
-                animation-duration: 0.01ms !important;
-                animation-iteration-count: 1 !important;
-                transition-duration: 0.01ms !important;
-            }
-        }
-
-        /* Melhoria no foco do teclado */
-        .option-card:focus-visible {
-            outline: 3px solid var(--secondary-blue);
-            outline-offset: 3px;
-        }
-
-        .footer-link:focus-visible {
-            outline: 2px solid var(--primary-orange);
-            outline-offset: 2px;
-            border-radius: 4px;
-        }
-
-        /* Estados de carregamento melhorados */
-        .option-card.loading .option-icon {
-            animation: spin 1s linear infinite;
-        }
-
-        @keyframes spin {
-            from { transform: rotate(0deg); }
-            to { transform: rotate(360deg); }
-        }
-
-        /* Hover states mais refinados */
-        .feature:hover .feature-title {
-            color: var(--primary-orange);
-            transition: color 0.3s ease;
-        }
-
-        /* Melhorias de contraste */
-        .option-description {
-            opacity: 0.95;
-            line-height: 1.6;
-        }
-
-        /* Otimização para touch */
-        .option-card,
-        .footer-link {
-            min-height: 44px;
-            min-width: 44px;
-        }
-
-        /* Feedback visual para cliques */
-        .option-card:active {
-            transform: scale(0.98) !important;
-        }
-
         .feature-title {
             font-family: 'Poppins', sans-serif;
             font-size: 1.2rem;
@@ -793,7 +718,9 @@
             opacity: 0.8;
         }
 
-        /* Footer */
+        /* =================================
+           FOOTER STYLES
+        ================================= */
         .footer {
             background: var(--dark-gray);
             color: var(--white);
@@ -862,12 +789,20 @@
             display: flex;
             align-items: center;
             gap: 8px;
+            min-height: 44px;
+            min-width: 44px;
         }
 
         .footer-link:hover {
             opacity: 1;
             color: var(--primary-orange);
             transform: translateX(5px);
+        }
+
+        .footer-link:focus-visible {
+            outline: 2px solid var(--primary-orange);
+            outline-offset: 2px;
+            border-radius: 4px;
         }
 
         .copyright {
@@ -877,7 +812,125 @@
             font-size: 0.9rem;
         }
 
-        /* Responsive Design */
+        /* =================================
+           ANIMATIONS
+        ================================= */
+        @keyframes float {
+            0%, 100% { 
+                transform: translateY(0px) rotate(0deg); 
+            }
+            50% { 
+                transform: translateY(-20px) rotate(180deg); 
+            }
+        }
+
+        @keyframes bounce {
+            0%, 20%, 50%, 80%, 100% { 
+                transform: translateY(0); 
+            }
+            40% { 
+                transform: translateY(-10px); 
+            }
+            60% { 
+                transform: translateY(-5px); 
+            }
+        }
+
+        @keyframes rotate {
+            from { 
+                transform: rotate(0deg); 
+            }
+            to { 
+                transform: rotate(360deg); 
+            }
+        }
+
+        @keyframes pulse {
+            0% { 
+                transform: scale(1); 
+            }
+            50% { 
+                transform: scale(1.05); 
+            }
+            100% { 
+                transform: scale(1); 
+            }
+        }
+
+        @keyframes spin {
+            from { 
+                transform: rotate(0deg); 
+            }
+            to { 
+                transform: rotate(360deg); 
+            }
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes slideInLeft {
+            from {
+                opacity: 0;
+                transform: translateX(-50px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        @keyframes slideInRight {
+            from {
+                opacity: 0;
+                transform: translateX(50px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .fade-in {
+            animation: fadeIn 1s ease-in;
+        }
+
+        .slide-in-left {
+            animation: slideInLeft 1s ease-out;
+        }
+
+        .slide-in-right {
+            animation: slideInRight 1s ease-out;
+        }
+
+        /* =================================
+           ACCESSIBILITY
+        ================================= */
+        @media (prefers-reduced-motion: reduce) {
+            *,
+            *::before,
+            *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        /* =================================
+           RESPONSIVE DESIGN
+        ================================= */
         @media (max-width: 480px) {
             .logo {
                 height: 85px;
@@ -897,6 +950,16 @@
 
             .menu-button {
                 padding: 10px;
+            }
+
+            .footer-links {
+                grid-template-columns: 1fr;
+                gap: 25px;
+                text-align: center;
+            }
+
+            .footer-section {
+                align-items: center;
             }
         }
 
@@ -1028,168 +1091,110 @@
                 padding: 0 40px;
             }
         }
-
-        /* CSS para mobile */
-        @media (max-width: 767px) {
-            .footer-links {
-                grid-template-columns: 1fr;
-                gap: 25px;
-                text-align: center;
-            }
-
-            .footer-section {
-                align-items: center;
-            }
-        }
-
-        /* Animações */
-        .fade-in {
-            animation: fadeIn 1s ease-in;
-        }
-
-        @keyframes fadeIn {
-            from {
-                opacity: 0;
-                transform: translateY(30px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        .slide-in-left {
-            animation: slideInLeft 1s ease-out;
-        }
-
-        @keyframes slideInLeft {
-            from {
-                opacity: 0;
-                transform: translateX(-50px);
-            }
-            to {
-                opacity: 1;
-                transform: translateX(0);
-            }
-        }
-
-        .slide-in-right {
-            animation: slideInRight 1s ease-out;
-        }
-
-        @keyframes slideInRight {
-            from {
-                opacity: 0;
-                transform: translateX(50px);
-            }
-            to {
-                opacity: 1;
-                transform: translateX(0);
-            }
-        }
     </style>
 </head>
+
 <body>
     <!-- Overlay -->
     <div class="overlay" id="overlay"></div>
 
     <!-- Side Navigation -->
-    <nav class="sidenav" id="sidenav">
-        <div class="sidenav-header">
+    <nav class="sidenav" id="sidenav" role="navigation" aria-label="Menu de navegação principal">
+        <header class="sidenav-header">
             <div class="sidenav-logo">
                 <img src="logo1.png" alt="Benetrip Logo">
             </div>
             <h3 class="sidenav-title">Menu de Navegação</h3>
             <p class="sidenav-subtitle">Tudo que você precisa em um só lugar!</p>
-        </div>
+        </header>
         
         <div class="sidenav-content">
             <!-- Ações Principais -->
-            <div class="nav-section">
+            <section class="nav-section">
                 <h4 class="nav-section-title">🚀 Ações Principais</h4>
                 
                 <a href="https://benetrip.com.br/chat.html" class="nav-link primary" onclick="startDestinationFinder()">
-                    <span class="nav-link-icon">🎯</span>
+                    <span class="nav-link-icon" aria-hidden="true">🎯</span>
                     <span class="nav-link-text">Encontrar Destino Perfeito</span>
                     <span class="nav-badge hot">Popular</span>
                 </a>
                 
                 <a href="https://benetrip.com.br/itinerary2.html" class="nav-link" onclick="startItineraryBuilder()">
-                    <span class="nav-link-icon">📋</span>
+                    <span class="nav-link-icon" aria-hidden="true">📋</span>
                     <span class="nav-link-text">Criar Roteiro dos Sonhos</span>
                     <span class="nav-badge new">Novo</span>
                 </a>
                 
-                <a href="https://www.benetrip.com.br/" class="nav-link" target="_blank">
-                    <span class="nav-link-icon">✈️</span>
+                <a href="https://www.benetrip.com.br/" class="nav-link" target="_blank" rel="noopener">
+                    <span class="nav-link-icon" aria-hidden="true">✈️</span>
                     <span class="nav-link-text">Busca Rápida de Voos</span>
                 </a>
-            </div>
+            </section>
 
             <!-- Navegação do Site -->
-            <div class="nav-section">
+            <section class="nav-section">
                 <h4 class="nav-section-title">🧭 Navegação</h4>
                 
                 <a href="#hero" class="nav-link" onclick="closeNavAndScrollTo('hero')">
-                    <span class="nav-link-icon">🏠</span>
+                    <span class="nav-link-icon" aria-hidden="true">🏠</span>
                     <span class="nav-link-text">Início</span>
                 </a>
                 
                 <a href="#options" class="nav-link" onclick="closeNavAndScrollTo('options')">
-                    <span class="nav-link-icon">🎮</span>
+                    <span class="nav-link-icon" aria-hidden="true">🎮</span>
                     <span class="nav-link-text">Como Funciona</span>
                 </a>
                 
                 <a href="#features" class="nav-link" onclick="closeNavAndScrollTo('features')">
-                    <span class="nav-link-icon">⭐</span>
+                    <span class="nav-link-icon" aria-hidden="true">⭐</span>
                     <span class="nav-link-text">Por Que Escolher a Benetrip</span>
                 </a>
-            </div>
+            </section>
 
             <!-- Redes Sociais -->
-            <div class="nav-section">
+            <section class="nav-section">
                 <h4 class="nav-section-title">📱 Redes Sociais</h4>
                 
-                <a href="https://www.instagram.com/benetrip.oficial/" class="nav-link" target="_blank">
-                    <span class="nav-link-icon">📷</span>
+                <a href="https://www.instagram.com/benetrip.oficial/" class="nav-link" target="_blank" rel="noopener">
+                    <span class="nav-link-icon" aria-hidden="true">📷</span>
                     <span class="nav-link-text">Instagram Oficial</span>
                 </a>
-            </div>
+            </section>
 
             <!-- Sobre Nós -->
-            <div class="nav-section">
+            <section class="nav-section">
                 <h4 class="nav-section-title">ℹ️ Sobre Nós</h4>
                 
-                <a href="https://benetrip.com.br/quemsomos.html" class="nav-link" target="_blank">
-                    <span class="nav-link-icon">🏢</span>
+                <a href="https://benetrip.com.br/quemsomos.html" class="nav-link" target="_blank" rel="noopener">
+                    <span class="nav-link-icon" aria-hidden="true">🏢</span>
                     <span class="nav-link-text">Quem Somos</span>
                 </a>
                 
-                <a href="https://benetrip.com.br/perguntasfrequentes.html" class="nav-link" target="_blank">
-                    <span class="nav-link-icon">❓</span>
+                <a href="https://benetrip.com.br/perguntasfrequentes.html" class="nav-link" target="_blank" rel="noopener">
+                    <span class="nav-link-icon" aria-hidden="true">❓</span>
                     <span class="nav-link-text">Perguntas Frequentes</span>
                 </a>
-            </div>
+            </section>
 
             <!-- Políticas -->
-            <div class="nav-section">
+            <section class="nav-section">
                 <h4 class="nav-section-title">📋 Políticas</h4>
                 
-                <a href="https://benetrip.com.br/termos.html" class="nav-link" target="_blank">
-                    <span class="nav-link-icon">📜</span>
+                <a href="https://benetrip.com.br/termos.html" class="nav-link" target="_blank" rel="noopener">
+                    <span class="nav-link-icon" aria-hidden="true">📜</span>
                     <span class="nav-link-text">Termos de Uso</span>
                 </a>
                 
-                <a href="https://benetrip.com.br/privacidade.html" class="nav-link" target="_blank">
-                    <span class="nav-link-icon">🔒</span>
+                <a href="https://benetrip.com.br/privacidade.html" class="nav-link" target="_blank" rel="noopener">
+                    <span class="nav-link-icon" aria-hidden="true">🔒</span>
                     <span class="nav-link-text">Política de Privacidade</span>
                 </a>
                 
-                <a href="https://benetrip.com.br/cookies.html" class="nav-link" target="_blank">
-                    <span class="nav-link-icon">🍪</span>
+                <a href="https://benetrip.com.br/cookies.html" class="nav-link" target="_blank" rel="noopener">
+                    <span class="nav-link-icon" aria-hidden="true">🍪</span>
                     <span class="nav-link-text">Política de Cookies</span>
                 </a>
-            </div>
+            </section>
         </div>
     </nav>
 
@@ -1197,7 +1202,7 @@
     <header class="header">
         <div class="container">
             <div class="header-top">
-                <button class="menu-button" id="menuButton" onclick="toggleNav()">
+                <button class="menu-button" id="menuButton" onclick="toggleNav()" aria-label="Abrir menu de navegação">
                     <div class="hamburger">
                         <span></span>
                         <span></span>
@@ -1206,10 +1211,10 @@
                 </button>
                 
                 <div class="logo-container">
-                    <img src="logo1.png" alt="Benetrip Logo" class="logo">
+                    <img src="logo1.png" alt="Benetrip - Sua próxima aventura começa aqui" class="logo">
                 </div>
                 
-                <div style="width: 50px;"></div> <!-- Spacer for centering -->
+                <div style="width: 50px;" aria-hidden="true"></div> <!-- Spacer for centering -->
             </div>
             
             <div class="header-content">
@@ -1218,111 +1223,115 @@
         </div>
     </header>
 
-    <!-- Hero Section -->
-    <section class="hero" id="hero">
-        <div class="container">
-            <div class="hero-content">
-                <div class="hero-text slide-in-left">
-                    <h2 class="hero-title">Conheça a Benetrip: sua parceira de viagem! 🌍</h2>
-                    <p class="hero-subtitle">
-A Benetrip é a sua nova melhor amiga na hora de planejar viagens! E quem comanda tudo por aqui é a Tripinha, uma vira-lata caramelo cheia de histórias e aventuras pelo mundo. Ela sabe como ninguém encontrar destinos incríveis, passagens com preços justos e experiências que combinam com você. Com a ajuda dela, planejar sua próxima viagem fica fácil, divertido e do jeitinho que você gosta!                    </p>
-                </div>
-                
-                <div class="slide-in-right">
-                    <div class="tripinha-container">
-                        <div class="tripinha-avatar">
-                            <img src="assets/images/tripinha/piscando.png" alt="Tripinha - Mascote da Benetrip">
-                        </div>
-                    </div>
-                    
-                    <div class="speech-bubble">
-                        <p class="speech-text">
-                            <strong>Oi, meu nome é Tripinha! 🐾</strong><br>
-                            Sou sua companheira de viagem e vou te ajudar a encontrar aventuras incríveis! Que tal a gente começar essa jornada juntos? ✈️✨
+    <!-- Main Content -->
+    <main>
+        <!-- Hero Section -->
+        <section class="hero" id="hero">
+            <div class="container">
+                <div class="hero-content">
+                    <div class="hero-text slide-in-left">
+                        <h1 class="hero-title">Conheça a Benetrip: sua parceira de viagem! 🌍</h1>
+                        <p class="hero-subtitle">
+                            A Benetrip é a sua nova melhor amiga na hora de planejar viagens! E quem comanda tudo por aqui é a Tripinha, uma vira-lata caramelo cheia de histórias e aventuras pelo mundo. Ela sabe como ninguém encontrar destinos incríveis, passagens com preços justos e experiências que combinam com você. Com a ajuda dela, planejar sua próxima viagem fica fácil, divertido e do jeitinho que você gosta!
                         </p>
                     </div>
+                    
+                    <div class="slide-in-right">
+                        <div class="tripinha-container">
+                            <div class="tripinha-avatar">
+                                <img src="assets/images/tripinha/piscando.png" alt="Tripinha - Mascote da Benetrip piscando">
+                            </div>
+                        </div>
+                        
+                        <div class="speech-bubble">
+                            <p class="speech-text">
+                                <strong>Oi, meu nome é Tripinha! 🐾</strong><br>
+                                Sou sua companheira de viagem e vou te ajudar a encontrar aventuras incríveis! Que tal a gente começar essa jornada juntos? ✈️✨
+                            </p>
+                        </div>
+                    </div>
                 </div>
             </div>
-        </div>
-    </section>
+        </section>
 
-    <!-- Options Section -->
-    <section class="options" id="options">
-        <div class="container">
-            <h2 class="options-title fade-in">Como posso te ajudar hoje? 🐾</h2>
-            
-            <div class="options-grid">
-                <div class="option-card primary fade-in" onclick="startDestinationFinder()">
-                    <div class="popular-badge">✨ Mais Popular</div>
-                    <span class="option-icon">🎯</span>
-                    <h3 class="option-title">Vou encontrar seu destino perfeito!</h3>
-                    <p class="option-description">
-                        Me conta suas preferências que eu faço a mágica! Vou te ajudar a descobrir o lugar ideal para sua próxima aventura! 🌟
-                    </p>
-                    <button class="option-button">Bora começar!</button>
-                </div>
+        <!-- Options Section -->
+        <section class="options" id="options">
+            <div class="container">
+                <h2 class="options-title fade-in">Como posso te ajudar hoje? 🐾</h2>
+                
+                <div class="options-grid">
+                    <article class="option-card primary fade-in" onclick="startDestinationFinder()" tabindex="0" role="button" aria-label="Encontrar destino perfeito">
+                        <div class="popular-badge">✨ Mais Popular</div>
+                        <span class="option-icon" aria-hidden="true">🎯</span>
+                        <h3 class="option-title">Vou encontrar seu destino perfeito!</h3>
+                        <p class="option-description">
+                            Me conta suas preferências que eu faço a mágica! Vou te ajudar a descobrir o lugar ideal para sua próxima aventura! 🌟
+                        </p>
+                        <button class="option-button">Bora começar!</button>
+                    </article>
 
-                <div class="option-card secondary fade-in" onclick="startItineraryBuilder()">
-                    <span class="option-icon">📋</span>
-                    <h3 class="option-title">Vamos criar seu roteiro dos sonhos!</h3>
-                    <p class="option-description">
-                        Já escolheu o destino? Perfeito! Agora deixa comigo que eu monto um roteiro incrível e personalizado só pra você! 🗺️
-                    </p>
-                    <button class="option-button">Vamos nessa!</button>
-                </div>
+                    <article class="option-card secondary fade-in" onclick="startItineraryBuilder()" tabindex="0" role="button" aria-label="Criar roteiro dos sonhos">
+                        <span class="option-icon" aria-hidden="true">📋</span>
+                        <h3 class="option-title">Vamos criar seu roteiro dos sonhos!</h3>
+                        <p class="option-description">
+                            Já escolheu o destino? Perfeito! Agora deixa comigo que eu monto um roteiro incrível e personalizado só pra você! 🗺️
+                        </p>
+                        <button class="option-button">Vamos nessa!</button>
+                    </article>
 
-                <div class="option-card tertiary fade-in" onclick="startClassicSearch()">
-                    <span class="option-icon">✈️</span>
-                    <h3 class="option-title">Prefere buscar voos do seu jeito?</h3>
-                    <p class="option-description">
-                        Sem problemas! Aqui você faz uma busca rápida e tradicional. Eu te mostro as melhores opções na velocidade da luz! ⚡
-                    </p>
-                    <button class="option-button">Buscar agora!</button>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- Features Section -->
-    <section class="features" id="features">
-        <div class="container">
-            <h2 class="features-title">Por que viajar comigo é a melhor escolha? 🌍</h2>
-            
-            <div class="features-grid">
-                <div class="feature fade-in">
-                    <div class="feature-icon">🌍</div>
-                    <h3 class="feature-title">Conheço o mundo todo!</h3>
-                    <p class="feature-description">
-                        Já visitei centenas de países e sei exatamente onde encontrar as melhores experiências para você!
-                    </p>
-                </div>
-
-                <div class="feature fade-in">
-                    <div class="feature-icon">💰</div>
-                    <h3 class="feature-title">Farejoo os melhores preços!</h3>
-                    <p class="feature-description">
-                        Com minha experiência, sei onde encontrar as melhores ofertas e passagens mais baratas do mercado!
-                    </p>
-                </div>
-
-                <div class="feature fade-in">
-                    <div class="feature-icon">⚡</div>
-                    <h3 class="feature-title">Sou rápida como um raio!</h3>
-                    <p class="feature-description">
-                        Em poucos minutos você tem sua viagem toda planejada. Eficiência é comigo mesmo!
-                    </p>
-                </div>
-
-                <div class="feature fade-in">
-                    <div class="feature-icon">🎯</div>
-                    <h3 class="feature-title">Conheço você melhor que ninguém!</h3>
-                    <p class="feature-description">
-                        Com minha experiência em viagens, sei exatamente o que cada tipo de viajante adora!
-                    </p>
+                    <article class="option-card tertiary fade-in" onclick="startClassicSearch()" tabindex="0" role="button" aria-label="Buscar voos tradicional">
+                        <span class="option-icon" aria-hidden="true">✈️</span>
+                        <h3 class="option-title">Prefere buscar voos do seu jeito?</h3>
+                        <p class="option-description">
+                            Sem problemas! Aqui você faz uma busca rápida e tradicional. Eu te mostro as melhores opções na velocidade da luz! ⚡
+                        </p>
+                        <button class="option-button">Buscar agora!</button>
+                    </article>
                 </div>
             </div>
-        </div>
-    </section>
+        </section>
+
+        <!-- Features Section -->
+        <section class="features" id="features">
+            <div class="container">
+                <h2 class="features-title">Por que viajar comigo é a melhor escolha? 🌍</h2>
+                
+                <div class="features-grid">
+                    <article class="feature fade-in">
+                        <div class="feature-icon" aria-hidden="true">🌍</div>
+                        <h3 class="feature-title">Conheço o mundo todo!</h3>
+                        <p class="feature-description">
+                            Já visitei centenas de países e sei exatamente onde encontrar as melhores experiências para você!
+                        </p>
+                    </article>
+
+                    <article class="feature fade-in">
+                        <div class="feature-icon" aria-hidden="true">💰</div>
+                        <h3 class="feature-title">Farejoo os melhores preços!</h3>
+                        <p class="feature-description">
+                            Com minha experiência, sei onde encontrar as melhores ofertas e passagens mais baratas do mercado!
+                        </p>
+                    </article>
+
+                    <article class="feature fade-in">
+                        <div class="feature-icon" aria-hidden="true">⚡</div>
+                        <h3 class="feature-title">Sou rápida como um raio!</h3>
+                        <p class="feature-description">
+                            Em poucos minutos você tem sua viagem toda planejada. Eficiência é comigo mesmo!
+                        </p>
+                    </article>
+
+                    <article class="feature fade-in">
+                        <div class="feature-icon" aria-hidden="true">🎯</div>
+                        <h3 class="feature-title">Conheço você melhor que ninguém!</h3>
+                        <p class="feature-description">
+                            Com minha experiência em viagens, sei exatamente o que cada tipo de viajante adora!
+                        </p>
+                    </article>
+                </div>
+            </div>
+        </section>
+    </main>
 
     <!-- Footer -->
     <footer class="footer">
@@ -1335,37 +1344,37 @@ A Benetrip é a sua nova melhor amiga na hora de planejar viagens! E quem comand
                     Sua próxima aventura começa aqui!🐾
                 </p>
                 
-                <div class="footer-links">
-                    <div class="footer-section">
+                <nav class="footer-links" aria-label="Links do rodapé">
+                    <section class="footer-section">
                         <h4>📱 Redes Sociais</h4>
-                        <a href="https://www.instagram.com/benetrip.oficial/" class="footer-link" target="_blank">
-                            <span>📷</span> Instagram Oficial
+                        <a href="https://www.instagram.com/benetrip.oficial/" class="footer-link" target="_blank" rel="noopener">
+                            <span aria-hidden="true">📷</span> Instagram Oficial
                         </a>
-                    </div>
+                    </section>
                     
-                    <div class="footer-section">
+                    <section class="footer-section">
                         <h4>ℹ️ Sobre Nós</h4>
                         <a href="https://benetrip.com.br/quemsomos.html" class="footer-link">
-                            <span>🏢</span> Quem Somos
+                            <span aria-hidden="true">🏢</span> Quem Somos
                         </a>
                         <a href="https://benetrip.com.br/perguntasfrequentes.html" class="footer-link">
-                            <span>❓</span> Perguntas Frequentes
+                            <span aria-hidden="true">❓</span> Perguntas Frequentes
                         </a>
-                    </div>
+                    </section>
                     
-                    <div class="footer-section">
+                    <section class="footer-section">
                         <h4>📋 Políticas</h4>
                         <a href="https://benetrip.com.br/termos.html" class="footer-link">
-                            <span>📜</span> Termos de Uso
+                            <span aria-hidden="true">📜</span> Termos de Uso
                         </a>
                         <a href="https://benetrip.com.br/privacidade.html" class="footer-link">
-                            <span>🔒</span> Política de Privacidade
+                            <span aria-hidden="true">🔒</span> Política de Privacidade
                         </a>
                         <a href="https://benetrip.com.br/cookies.html" class="footer-link">
-                            <span>🍪</span> Política de Cookies
+                            <span aria-hidden="true">🍪</span> Política de Cookies
                         </a>
-                    </div>
-                </div>
+                    </section>
+                </nav>
             </div>
             
             <div class="copyright">
@@ -1375,7 +1384,13 @@ A Benetrip é a sua nova melhor amiga na hora de planejar viagens! E quem comand
     </footer>
 
     <script>
-        // Função para navegar para o seletor de destinos
+        // =================================
+        // NAVEGAÇÃO E FUNCIONALIDADES
+        // =================================
+
+        /**
+         * Navegar para o seletor de destinos
+         */
         function startDestinationFinder() {
             const card = event.currentTarget;
             addLoadingState(card);
@@ -1384,7 +1399,9 @@ A Benetrip é a sua nova melhor amiga na hora de planejar viagens! E quem comand
             }, 800);
         }
 
-        // Função para navegar para o criador de roteiros
+        /**
+         * Navegar para o criador de roteiros
+         */
         function startItineraryBuilder() {
             const card = event.currentTarget;
             addLoadingState(card);
@@ -1393,7 +1410,9 @@ A Benetrip é a sua nova melhor amiga na hora de planejar viagens! E quem comand
             }, 800);
         }
 
-        // Função para navegar para a busca clássica
+        /**
+         * Navegar para a busca clássica
+         */
         function startClassicSearch() {
             const card = event.currentTarget;
             addLoadingState(card);
@@ -1402,7 +1421,10 @@ A Benetrip é a sua nova melhor amiga na hora de planejar viagens! E quem comand
             }, 800);
         }
 
-        // Função para adicionar estado de loading
+        /**
+         * Adicionar estado de loading
+         * @param {HTMLElement} card - Elemento do card
+         */
         function addLoadingState(card) {
             card.classList.add('loading');
             card.style.transform = 'scale(0.95)';
@@ -1418,12 +1440,15 @@ A Benetrip é a sua nova melhor amiga na hora de planejar viagens! E quem comand
             button.appendChild(loadingDot);
         }
 
-        // Controle do menu lateral
+        // =================================
+        // CONTROLE DO MENU LATERAL
+        // =================================
+
+        /**
+         * Alternar visibilidade do menu lateral
+         */
         function toggleNav() {
             const sidenav = document.getElementById('sidenav');
-            const overlay = document.getElementById('overlay');
-            const menuButton = document.getElementById('menuButton');
-            
             const isOpen = sidenav.classList.contains('open');
             
             if (isOpen) {
@@ -1433,6 +1458,9 @@ A Benetrip é a sua nova melhor amiga na hora de planejar viagens! E quem comand
             }
         }
 
+        /**
+         * Abrir menu lateral
+         */
         function openNav() {
             const sidenav = document.getElementById('sidenav');
             const overlay = document.getElementById('overlay');
@@ -1444,6 +1472,9 @@ A Benetrip é a sua nova melhor amiga na hora de planejar viagens! E quem comand
             document.body.style.overflow = 'hidden';
         }
 
+        /**
+         * Fechar menu lateral
+         */
         function closeNav() {
             const sidenav = document.getElementById('sidenav');
             const overlay = document.getElementById('overlay');
@@ -1455,6 +1486,10 @@ A Benetrip é a sua nova melhor amiga na hora de planejar viagens! E quem comand
             document.body.style.overflow = '';
         }
 
+        /**
+         * Fechar menu e rolar para seção
+         * @param {string} sectionId - ID da seção
+         */
         function closeNavAndScrollTo(sectionId) {
             closeNav();
             setTimeout(() => {
@@ -1464,6 +1499,10 @@ A Benetrip é a sua nova melhor amiga na hora de planejar viagens! E quem comand
                 }
             }, 300);
         }
+
+        // =================================
+        // EVENT LISTENERS
+        // =================================
 
         // Fechar menu ao clicar no overlay
         document.getElementById('overlay').addEventListener('click', closeNav);
@@ -1475,7 +1514,11 @@ A Benetrip é a sua nova melhor amiga na hora de planejar viagens! E quem comand
             }
         });
 
-        // Animações ao rolar a página com Intersection Observer melhorado
+        // =================================
+        // ANIMAÇÕES E EFEITOS
+        // =================================
+
+        // Configuração do Intersection Observer para animações
         const observerOptions = {
             threshold: 0.1,
             rootMargin: '0px 0px -50px 0px'
@@ -1492,8 +1535,9 @@ A Benetrip é a sua nova melhor amiga na hora de planejar viagens! E quem comand
             });
         }, observerOptions);
 
-        // Observa elementos para animação
+        // Inicialização quando o DOM estiver carregado
         document.addEventListener('DOMContentLoaded', () => {
+            // Configura elementos para animação
             const animatedElements = document.querySelectorAll('.fade-in, .slide-in-left, .slide-in-right');
             animatedElements.forEach(el => {
                 el.style.opacity = '0';
@@ -1507,9 +1551,12 @@ A Benetrip é a sua nova melhor amiga na hora de planejar viagens! E quem comand
                 const img = new Image();
                 img.src = src;
             });
+
+            // Configurar fallback para imagens com erro
+            setupImageFallbacks();
         });
 
-        // Efeito de parallax mais suave no header
+        // Efeito de parallax no header
         let ticking = false;
         window.addEventListener('scroll', () => {
             if (!ticking) {
@@ -1519,13 +1566,22 @@ A Benetrip é a sua nova melhor amiga na hora de planejar viagens! E quem comand
                     if (header && scrolled < window.innerHeight) {
                         header.style.transform = `translateY(${scrolled * 0.3}px)`;
                     }
+                    
+                    // Atualizar progresso do scroll
+                    const scrollProgress = (window.scrollY / (document.documentElement.scrollHeight - window.innerHeight)) * 100;
+                    document.documentElement.style.setProperty('--scroll-progress', `${scrollProgress}%`);
+                    
                     ticking = false;
                 });
                 ticking = true;
             }
         });
 
-        // Adiciona efeito de hover nos cards melhorado
+        // =================================
+        // EFEITOS INTERATIVOS
+        // =================================
+
+        // Adicionar efeitos nos cards de opção
         document.querySelectorAll('.option-card').forEach(card => {
             let hoverTimeout;
             
@@ -1533,7 +1589,6 @@ A Benetrip é a sua nova melhor amiga na hora de planejar viagens! E quem comand
                 clearTimeout(hoverTimeout);
                 this.style.transform = 'translateY(-15px) scale(1.02)';
                 
-                // Adiciona brilho sutil
                 const icon = this.querySelector('.option-icon');
                 if (icon) {
                     icon.style.transform = 'scale(1.1) rotate(5deg)';
@@ -1551,7 +1606,7 @@ A Benetrip é a sua nova melhor amiga na hora de planejar viagens! E quem comand
                 }, 50);
             });
 
-            // Adiciona feedback tátil no mobile
+            // Feedback tátil no mobile
             card.addEventListener('touchstart', function() {
                 this.style.transform = 'scale(0.98)';
             });
@@ -1559,12 +1614,20 @@ A Benetrip é a sua nova melhor amiga na hora de planejar viagens! E quem comand
             card.addEventListener('touchend', function() {
                 this.style.transform = 'scale(1)';
             });
+
+            // Suporte para teclado
+            card.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    this.click();
+                }
+            });
         });
 
-        // Adiciona efeito nos links do footer melhorado
+        // Adicionar efeitos nos links do footer
         document.querySelectorAll('.footer-link').forEach(link => {
             link.addEventListener('mouseenter', function() {
-                const emoji = this.querySelector('span');
+                const emoji = this.querySelector('span[aria-hidden="true"]');
                 if (emoji) {
                     emoji.style.transform = 'scale(1.3) rotate(15deg)';
                     emoji.style.transition = 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)';
@@ -1572,48 +1635,14 @@ A Benetrip é a sua nova melhor amiga na hora de planejar viagens! E quem comand
             });
             
             link.addEventListener('mouseleave', function() {
-                const emoji = this.querySelector('span');
+                const emoji = this.querySelector('span[aria-hidden="true"]');
                 if (emoji) {
                     emoji.style.transform = 'scale(1) rotate(0deg)';
                 }
             });
         });
 
-        // Fallback melhorado para imagens
-        document.addEventListener('DOMContentLoaded', function() {
-            const images = document.querySelectorAll('img');
-            images.forEach(img => {
-                img.addEventListener('error', function() {
-                    if (this.alt.includes('Benetrip Logo')) {
-                        this.style.display = 'none';
-                        const logoText = document.createElement('span');
-                        logoText.textContent = '🐾 Benetrip';
-                        logoText.style.fontFamily = 'Poppins, sans-serif';
-                        logoText.style.fontWeight = '700';
-                        logoText.style.fontSize = '2.5rem';
-                        logoText.style.color = '#E87722';
-                        logoText.style.animation = 'fadeIn 0.5s ease';
-                        this.parentNode.appendChild(logoText);
-                    }
-                    if (this.alt.includes('Tripinha')) {
-                        this.style.display = 'none';
-                        const emoji = document.createElement('span');
-                        emoji.textContent = '🐕';
-                        emoji.style.fontSize = '4rem';
-                        emoji.style.animation = 'bounce 2s infinite';
-                        this.parentNode.appendChild(emoji);
-                    }
-                });
-            });
-        });
-
-        // Adiciona indicador de progresso de scroll sutil
-        window.addEventListener('scroll', () => {
-            const scrollProgress = (window.scrollY / (document.documentElement.scrollHeight - window.innerHeight)) * 100;
-            document.documentElement.style.setProperty('--scroll-progress', `${scrollProgress}%`);
-        });
-
-        // Adiciona efeito de hover nos links de navegação
+        // Adicionar efeitos nos links de navegação
         document.querySelectorAll('.nav-link').forEach(link => {
             link.addEventListener('mouseenter', function() {
                 const icon = this.querySelector('.nav-link-icon');
@@ -1641,6 +1670,42 @@ A Benetrip é a sua nova melhor amiga na hora de planejar viagens! E quem comand
                 }
             });
         });
+
+        // =================================
+        // FALLBACKS E TRATAMENTO DE ERROS
+        // =================================
+
+        /**
+         * Configurar fallbacks para imagens com erro
+         */
+        function setupImageFallbacks() {
+            const images = document.querySelectorAll('img');
+            images.forEach(img => {
+                img.addEventListener('error', function() {
+                    if (this.alt.includes('Benetrip Logo') || this.alt.includes('Benetrip')) {
+                        this.style.display = 'none';
+                        const logoText = document.createElement('span');
+                        logoText.textContent = '🐾 Benetrip';
+                        logoText.style.fontFamily = 'Poppins, sans-serif';
+                        logoText.style.fontWeight = '700';
+                        logoText.style.fontSize = '2.5rem';
+                        logoText.style.color = '#E87722';
+                        logoText.style.animation = 'fadeIn 0.5s ease';
+                        this.parentNode.appendChild(logoText);
+                    }
+                    
+                    if (this.alt.includes('Tripinha')) {
+                        this.style.display = 'none';
+                        const emoji = document.createElement('span');
+                        emoji.textContent = '🐕';
+                        emoji.style.fontSize = '4rem';
+                        emoji.style.animation = 'bounce 2s infinite';
+                        emoji.setAttribute('aria-label', 'Mascote Tripinha');
+                        this.parentNode.appendChild(emoji);
+                    }
+                });
+            });
+        }
     </script>
 </body>
 </html>
