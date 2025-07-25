@@ -45,6 +45,13 @@
             padding: 0 20px;
         }
 
+        /* Melhoria para desktop */
+        @media (min-width: 1200px) {
+            .container {
+                padding: 0 40px;
+            }
+        }
+
         /* Header */
         .header {
             background: linear-gradient(135deg, var(--primary-orange) 0%, var(--secondary-blue) 100%);
@@ -535,13 +542,27 @@
                 font-size: 1.4rem;
             }
 
+            .hero {
+                padding: 80px 0;
+            }
+
             .hero-content {
                 grid-template-columns: 1fr 1fr;
                 gap: 60px;
+                align-items: center;
             }
 
             .hero-text {
                 text-align: left;
+                order: 1;
+            }
+
+            .slide-in-right {
+                order: 2;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
             }
 
             .hero-title {
@@ -552,12 +573,18 @@
                 font-size: 1.3rem;
             }
 
-            .options-grid {
-                grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            .tripinha-avatar {
+                width: 140px;
+                height: 140px;
             }
 
             .speech-bubble {
-                margin: 0 0 40px;
+                margin: 30px 0 0;
+                max-width: 350px;
+            }
+
+            .options-grid {
+                grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
             }
 
             .footer-links {
@@ -577,12 +604,44 @@
                 min-width: 320px;
             }
 
+            .hero {
+                padding: 100px 0;
+            }
+
+            .hero-content {
+                gap: 80px;
+                max-width: 1200px;
+                margin: 0 auto;
+            }
+
             .hero-title {
                 font-size: 3.5rem;
+                margin-bottom: 25px;
+            }
+
+            .hero-subtitle {
+                font-size: 1.4rem;
+                margin-bottom: 40px;
+            }
+
+            .tripinha-avatar {
+                width: 160px;
+                height: 160px;
+            }
+
+            .speech-bubble {
+                max-width: 400px;
+                padding: 25px;
+            }
+
+            .options {
+                padding: 100px 0;
             }
 
             .options-grid {
                 grid-template-columns: repeat(3, 1fr);
+                max-width: 1000px;
+                margin: 0 auto;
             }
 
             .footer-links {
@@ -644,7 +703,7 @@
         <div class="container">
             <div class="header-content">
                 <div class="logo-container">
-                    <img src="public/logo-tripinha.png" alt="Benetrip Logo" class="logo">
+                    <img src="logo-tripinha.png" alt="Benetrip Logo" class="logo">
                 </div>
                 <p class="tagline">Sua próxima aventura começa aqui!</p>
             </div>
@@ -666,7 +725,7 @@
                 <div class="slide-in-right">
                     <div class="tripinha-container">
                         <div class="tripinha-avatar">
-                            <img src="public/assets/images/tripinha/piscando.png" alt="Tripinha - Mascote da Benetrip">
+                            <img src="assets/images/tripinha/piscando.png" alt="Tripinha - Mascote da Benetrip">
                         </div>
                     </div>
                     
@@ -763,7 +822,7 @@
         <div class="container">
             <div class="footer-content">
                 <div class="footer-logo">
-                    <img src="public/logo-tripinha.png" alt="Benetrip Logo">
+                    <img src="logo-tripinha.png" alt="Benetrip Logo">
                 </div>
                 <p class="footer-text">
                     Transformando seus sonhos em viagens inesquecíveis! 🐾
