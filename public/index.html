@@ -1,296 +1,1664 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
+    <meta name='impact-site-verification' value='1837f7ad-080e-487a-84d2-8e5b8b2f4634' />
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="theme-color" content="#E87722">
-    <title>Benetrip - Planeje sua Viagem com a Tripinha!</title>
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;700&family=Montserrat:wght@400;500&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
-    <link rel="stylesheet" href="assets/css/styles.css">
-    <link rel="stylesheet" href="assets/css/mobile-optimizations.css">
-    
-    <!-- Estilos customizados para alinhar com o protótipo -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Benetrip - Sua Próxima Aventura Começa Aqui! 🐾</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&family=Montserrat:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <meta name="description" content="Planeje sua viagem perfeita com a Tripinha! Descubra destinos incríveis, encontre passagens baratas e crie roteiros personalizados.">
     <style>
         :root {
-            --orange-primary: #E87722;
-            --blue-secondary: #00A3E0;
-            --background-gray: #f5f5f5;
-            --border-radius-button: 30px;
-            --border-radius-card: 16px;
-            --border-radius-bubble: 20px;
-            --shadow-light: 0 2px 6px rgba(0,0,0,0.08);
+            --primary-orange: #E87722;
+            --secondary-blue: #00A3E0;
+            --white: #FFFFFF;
+            --dark-gray: #21272A;
+            --light-gray: #F5F5F5;
+            --medium-gray: #E0E0E0;
+            --scroll-progress: 0%;
         }
-        
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
         body {
-            background-color: var(--background-gray);
+            font-family: 'Montserrat', sans-serif;
+            line-height: 1.6;
+            color: var(--dark-gray);
+            overflow-x: hidden;
         }
-        
-        #chat-container {
-            background-color: var(--background-gray);
-            max-width: 480px;
-            box-shadow: none;
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
         }
-        
-        .chat-header {
-            background-color: var(--background-gray);
-            padding: 16px;
-            text-align: center;
-            border-bottom: none;
-            box-shadow: none;
+
+        /* Header */
+        .header {
+            background: linear-gradient(135deg, #E87722 0%, #FF8C42 25%, #FFB366 45%, #66C2FF 70%, #00A3E0 100%);
+            color: var(--white);
+            padding: 40px 0;
+            position: relative;
+            overflow: hidden;
         }
-        
-        .chat-header .logo {
-            height: 36px;
+
+        .header::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            right: -20%;
+            width: 200px;
+            height: 200px;
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 50%;
+            animation: float 6s ease-in-out infinite;
         }
-        
-        .chat-messages {
-            padding: 16px;
+
+        .header::after {
+            content: '';
+            position: absolute;
+            bottom: -30%;
+            left: -10%;
+            width: 150px;
+            height: 150px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 50%;
+            animation: float 8s ease-in-out infinite reverse;
         }
-        
-        /* Estilo dos balões de chat */
-        .chat-message .message {
-            background-color: white;
-            border-radius: var(--border-radius-bubble);
-            box-shadow: var(--shadow-light);
-            padding: 16px;
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0px) rotate(0deg); }
+            50% { transform: translateY(-20px) rotate(180deg); }
         }
-        
-        .chat-message.tripinha .message {
-            border-top-left-radius: 4px;
-        }
-        
-        .chat-message.user .message {
-            background-color: var(--orange-primary);
-            border-top-right-radius: 4px;
-            color: white;
-        }
-        
-        /* Estilo dos botões de opção */
-        .option-button {
+
+        .header-content {
+            position: relative;
+            z-index: 2;
             display: flex;
+            flex-direction: column;
             align-items: center;
-            background-color: white;
-            border-radius: var(--border-radius-button);
-            box-shadow: var(--shadow-light);
-            padding: 14px 18px;
-            margin-bottom: 10px;
-            transition: all 0.2s ease;
-            border: none;
-            text-align: left;
-            font-family: 'Poppins', sans-serif;
+            gap: 25px;
         }
-        
-        .option-button:hover, .option-button:active {
-            background-color: #fff8f3;
-            border-color: var(--orange-primary);
-            transform: translateY(-2px);
-            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-        }
-        
-        /* Estilo do calendário */
-        .calendar-container {
-            background-color: white;
-            border-radius: var(--border-radius-card);
-            box-shadow: var(--shadow-light);
-            padding: 16px;
-            margin-top: 12px;
-        }
-        
-        .flatpickr-day.selected, 
-        .flatpickr-day.startRange, 
-        .flatpickr-day.endRange {
-            background: var(--orange-primary) !important;
-            border-color: var(--orange-primary) !important;
-            color: white !important;
-        }
-        
-        .flatpickr-day.inRange {
-            background: rgba(232, 119, 34, 0.1) !important;
-            border-color: rgba(232, 119, 34, 0.1) !important;
-        }
-        
-        .date-selection {
-            background-color: white;
-            border-radius: 12px;
-            padding: 12px;
-            margin-top: 12px;
-            font-size: 14px;
-        }
-        
-        .confirm-button {
-            background-color: var(--orange-primary);
-            color: white;
-            border-radius: var(--border-radius-button);
-            font-weight: 700;
-            padding: 14px;
-            border: none;
+
+        .header-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
             width: 100%;
-            margin-top: 12px;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
         }
-        
-        .confirm-button:disabled {
-            opacity: 0.6;
-        }
-        
-        /* Input de texto e autocomplete */
-        .text-input, .autocomplete-input, .currency-input {
-            border-radius: 20px;
-            padding: 14px 18px;
-            border: 1px solid #e0e0e0;
-            font-family: 'Poppins', sans-serif;
-        }
-        
-        .confirm-text, .confirm-autocomplete, .confirm-currency, .confirm-number {
-            background-color: var(--orange-primary);
-            color: white;
-            border-radius: 20px;
-            padding: 14px 18px;
-            border: none;
-            font-weight: 600;
-        }
-        
-        /* Input numérico */
-        .number-input-container {
-            background-color: white;
-            border-radius: var(--border-radius-card);
-            padding: 16px;
-            align-items: center;
-        }
-        
-        .number-input-container button {
-            width: 44px;
-            height: 44px;
-            border-radius: 22px;
-            background-color: #f5f5f5;
-            border: none;
-            font-size: 24px;
+
+        .logo-container {
             display: flex;
             align-items: center;
             justify-content: center;
+            padding: 5px;
+            margin: 0;
+            flex: 1;
         }
-        
-        .number-input-container input {
-            width: 80px;
+
+        .logo {
+            height: 102px;
+            width: auto;
+            border-radius: 12px;
+            transition: transform 0.3s ease;
+            object-fit: contain;
+            max-width: 100%;
+        }
+
+        .logo:hover {
+            transform: scale(1.05);
+        }
+
+        .tagline {
+            font-size: 1.2rem;
             text-align: center;
-            font-size: 24px;
-            border: none;
-            font-weight: 700;
+            opacity: 0.95;
+            font-weight: 400;
+            margin-top: 10px;
         }
-        
-        /* Botão grande inferior */
-        .action-button-large {
-            background-color: var(--orange-primary);
-            color: white;
-            border-radius: var(--border-radius-button);
-            padding: 16px;
-            font-weight: 700;
-            font-size: 16px;
-            border: none;
-            margin-top: 24px;
+
+        /* Menu Button */
+        .menu-button {
+            background: rgba(255, 255, 255, 0.2);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 12px;
+            padding: 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(10px);
+            position: relative;
+            z-index: 1001;
+        }
+
+        .menu-button:hover {
+            background: rgba(255, 255, 255, 0.3);
+            border-color: rgba(255, 255, 255, 0.5);
+            transform: scale(1.05);
+        }
+
+        .menu-button:active {
+            transform: scale(0.95);
+        }
+
+        .hamburger {
+            width: 24px;
+            height: 18px;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .hamburger span {
             width: 100%;
+            height: 2px;
+            background: var(--white);
+            border-radius: 2px;
+            transition: all 0.3s ease;
+        }
+
+        .menu-button.active .hamburger span:nth-child(1) {
+            transform: rotate(45deg) translate(6px, 6px);
+        }
+
+        .menu-button.active .hamburger span:nth-child(2) {
+            opacity: 0;
+        }
+
+        .menu-button.active .hamburger span:nth-child(3) {
+            transform: rotate(-45deg) translate(7px, -6px);
+        }
+
+        /* Side Navigation */
+        .sidenav {
+            position: fixed;
+            top: 0;
+            left: -100%;
+            width: 320px;
+            height: 100vh;
+            background: var(--white);
+            box-shadow: 5px 0 25px rgba(0, 0, 0, 0.15);
+            transition: left 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            z-index: 1000;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .sidenav.open {
+            left: 0;
+        }
+
+        .sidenav-header {
+            background: linear-gradient(135deg, var(--primary-orange), var(--secondary-blue));
+            color: var(--white);
+            padding: 30px 25px;
+            text-align: center;
+            position: relative;
+        }
+
+        .sidenav-logo {
+            width: 60px;
+            height: 60px;
+            background: var(--white);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 15px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+        }
+
+        .sidenav-logo img {
+            width: 45px;
+            height: 45px;
+            object-fit: contain;
+            border-radius: 50%;
+        }
+
+        .sidenav-title {
+            font-family: 'Poppins', sans-serif;
+            font-size: 1.2rem;
+            font-weight: 700;
+            margin-bottom: 5px;
+        }
+
+        .sidenav-subtitle {
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+
+        .sidenav-content {
+            flex: 1;
+            padding: 0;
+        }
+
+        .nav-section {
+            border-bottom: 1px solid var(--light-gray);
+        }
+
+        .nav-section:last-child {
+            border-bottom: none;
+        }
+
+        .nav-section-title {
+            font-family: 'Poppins', sans-serif;
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--primary-orange);
+            padding: 20px 25px 10px;
+            margin: 0;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .nav-link {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            padding: 15px 25px;
+            color: var(--dark-gray);
+            text-decoration: none;
+            transition: all 0.3s ease;
+            border-left: 4px solid transparent;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .nav-link::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 0;
+            height: 100%;
+            background: linear-gradient(90deg, rgba(232, 119, 34, 0.1), rgba(0, 163, 224, 0.05));
+            transition: width 0.3s ease;
+            z-index: -1;
+        }
+
+        .nav-link:hover::before {
+            width: 100%;
+        }
+
+        .nav-link:hover {
+            color: var(--primary-orange);
+            border-left-color: var(--primary-orange);
+            padding-left: 30px;
+        }
+
+        .nav-link:active {
+            transform: scale(0.98);
+        }
+
+        .nav-link-icon {
+            font-size: 1.3rem;
+            width: 24px;
+            text-align: center;
+            transition: transform 0.3s ease;
+        }
+
+        .nav-link:hover .nav-link-icon {
+            transform: scale(1.2) rotate(10deg);
+        }
+
+        .nav-link-text {
+            flex: 1;
+            font-weight: 500;
+        }
+
+        .nav-link.primary {
+            background: linear-gradient(135deg, var(--primary-orange), #ff9a47);
+            color: var(--white);
+            border-left-color: var(--white);
+            margin: 15px;
+            border-radius: 12px;
+            font-weight: 600;
+            box-shadow: 0 4px 15px rgba(232, 119, 34, 0.3);
+        }
+
+        .nav-link.primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(232, 119, 34, 0.4);
+            color: var(--white);
+            padding-left: 25px;
+        }
+
+        .nav-link.primary::before {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        /* Overlay */
+        .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+            z-index: 999;
+            backdrop-filter: blur(2px);
+        }
+
+        .overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        /* Sistema de Badges Padronizado */
+        .option-badge {
+            position: absolute;
+            top: 16px;
+            right: 16px;
+            padding: 6px 12px;
+            border-radius: 16px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            z-index: 10;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            animation: pulse 2s infinite;
+            backdrop-filter: blur(10px);
+        }
+
+        /* Badge Popular */
+        .option-badge.popular {
+            background: linear-gradient(135deg, #4ade80, #22c55e);
+            color: white;
+        }
+
+        /* Badge Novo */
+        .option-badge.new {
+            background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+            color: white;
+        }
+
+        /* Garantir que as badges sejam visíveis sobre qualquer fundo */
+        .option-card .option-badge {
+            border: 2px solid rgba(255, 255, 255, 0.3);
+        }
+
+        /* Badge para navegação lateral (padronização) */
+        .nav-badge {
+            font-size: 0.65rem;
+            padding: 3px 8px;
+            border-radius: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            transition: all 0.3s ease;
+        }
+
+        .nav-badge.popular {
+            background: linear-gradient(135deg, #4ade80, #22c55e);
+            color: white;
+        }
+
+        .nav-badge.new {
+            background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+            color: white;
+        }
+
+        .nav-badge.hot {
+            background: linear-gradient(135deg, #ef4444, #dc2626);
+            color: white;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+
+        /* Efeito hover para badges dentro dos cards */
+        .option-card:hover .option-badge {
+            transform: scale(1.1);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+        }
+
+        /* Hero Section */
+        .hero {
+            background: linear-gradient(45deg, var(--light-gray) 0%, var(--white) 100%);
+            padding: 60px 0;
+            position: relative;
+        }
+
+        .hero-content {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 40px;
+            align-items: center;
+        }
+
+        .hero-text {
+            text-align: center;
+        }
+
+        .hero-title {
+            font-family: 'Poppins', sans-serif;
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--dark-gray);
+            margin-bottom: 20px;
+            line-height: 1.2;
+        }
+
+        .hero-subtitle {
+            font-size: 1.2rem;
+            color: var(--dark-gray);
+            margin-bottom: 30px;
+            opacity: 0.8;
+        }
+
+        .tripinha-container {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 30px;
+        }
+
+        .tripinha-avatar {
+            width: 120px;
+            height: 120px;
+            background: linear-gradient(135deg, #D2691E, #F4A460);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 8px 32px rgba(232, 119, 34, 0.3);
+            animation: bounce 2s ease-in-out infinite;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .tripinha-avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 50%;
+        }
+
+        .tripinha-avatar::before {
+            content: '';
+            position: absolute;
+            width: 140px;
+            height: 140px;
+            border: 3px solid var(--primary-orange);
+            border-radius: 50%;
+            border-style: dashed;
+            animation: rotate 10s linear infinite;
+            z-index: -1;
+        }
+
+        @keyframes bounce {
+            0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
+            40% { transform: translateY(-10px); }
+            60% { transform: translateY(-5px); }
+        }
+
+        @keyframes rotate {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        .speech-bubble {
+            background: var(--white);
+            padding: 20px;
+            border-radius: 20px;
+            border: 2px solid var(--primary-orange);
+            position: relative;
+            max-width: 400px;
+            margin: 0 auto 40px;
+            box-shadow: 0 4px 20px rgba(232, 119, 34, 0.15);
+        }
+
+        .speech-bubble::before {
+            content: '';
+            position: absolute;
+            bottom: -10px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 20px;
+            height: 10px;
+            background: var(--primary-orange);
+            clip-path: polygon(50% 100%, 0 0, 100% 0);
+        }
+
+        .speech-text {
+            font-weight: 500;
+            color: var(--dark-gray);
+            text-align: center;
+        }
+
+        /* Options Section */
+        .options {
+            padding: 80px 0;
+            background: var(--white);
+        }
+
+        .options-title {
+            font-family: 'Poppins', sans-serif;
+            font-size: 2.2rem;
+            font-weight: 700;
+            text-align: center;
+            margin-bottom: 50px;
+            color: var(--dark-gray);
+        }
+
+        .options-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 30px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .option-card {
+            background: var(--white);
+            border-radius: 20px;
+            padding: 30px;
+            text-align: center;
+            box-shadow: 0 8px 40px rgba(0, 0, 0, 0.1);
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            cursor: pointer;
+            border: 2px solid transparent;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .option-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+            transition: left 0.6s ease;
+        }
+
+        .option-card:hover::before {
+            left: 100%;
+        }
+
+        .option-card:hover {
+            transform: translateY(-15px) scale(1.02);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+        }
+
+        .option-card:active {
+            transform: translateY(-10px) scale(0.98);
+            transition: all 0.2s ease;
+        }
+
+        .option-card.primary {
+            border-color: var(--primary-orange);
+            background: linear-gradient(135deg, var(--primary-orange) 0%, #ff9a47 100%);
+            color: var(--white);
+        }
+
+        .option-card.secondary {
+            border-color: var(--secondary-blue);
+            background: linear-gradient(135deg, var(--secondary-blue) 0%, #33b5e5 100%);
+            color: var(--white);
+        }
+
+        .option-card.tertiary {
+            border-color: var(--medium-gray);
+            background: linear-gradient(135deg, var(--dark-gray) 0%, #434a52 100%);
+            color: var(--white);
+        }
+
+        .option-icon {
+            font-size: 3rem;
+            margin-bottom: 20px;
+            display: block;
+        }
+
+        .option-title {
+            font-family: 'Poppins', sans-serif;
+            font-size: 1.4rem;
+            font-weight: 600;
+            margin-bottom: 15px;
+        }
+
+        .option-description {
+            font-size: 1rem;
+            opacity: 0.9;
+            margin-bottom: 25px;
+        }
+
+        .option-button {
+            background: rgba(255, 255, 255, 0.2);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            color: var(--white);
+            padding: 12px 30px;
+            border-radius: 50px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            font-size: 1rem;
+        }
+
+        .option-button:hover {
+            background: rgba(255, 255, 255, 0.3);
+            border-color: rgba(255, 255, 255, 0.5);
+            transform: scale(1.05);
+        }
+
+        /* Features Section */
+        .features {
+            background: var(--light-gray);
+            padding: 80px 0;
+        }
+
+        .features-title {
+            font-family: 'Poppins', sans-serif;
+            font-size: 2.2rem;
+            font-weight: 700;
+            text-align: center;
+            margin-bottom: 50px;
+            color: var(--dark-gray);
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 30px;
+        }
+
+        /* Melhorias nos feature cards */
+        .feature {
+            text-align: center;
+            padding: 30px 20px;
+            transition: all 0.3s ease;
+            border-radius: 15px;
+        }
+
+        .feature:hover {
+            transform: translateY(-5px);
+            background: rgba(255, 255, 255, 0.5);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        }
+
+        .feature-icon {
+            width: 80px;
+            height: 80px;
+            background: var(--primary-orange);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+            color: var(--white);
+            margin: 0 auto 20px;
+            box-shadow: 0 4px 20px rgba(232, 119, 34, 0.3);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .feature:hover .feature-icon {
+            transform: scale(1.1) rotate(10deg);
+            box-shadow: 0 8px 30px rgba(232, 119, 34, 0.4);
+        }
+
+        .feature-title {
+            font-family: 'Poppins', sans-serif;
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin-bottom: 10px;
+            color: var(--dark-gray);
+        }
+
+        .feature-description {
+            color: var(--dark-gray);
+            opacity: 0.8;
+        }
+
+        /* Footer */
+        .footer {
+            background: var(--dark-gray);
+            color: var(--white);
+            padding: 40px 0;
+            text-align: center;
+        }
+
+        .footer-content {
+            margin-bottom: 30px;
+        }
+
+        .footer-logo-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 20px;
+            padding: 0;
+        }
+
+        .footer-logo {
+            height: 60px;
+            width: auto;
+            border-radius: 10px;
+            transition: transform 0.3s ease;
+            object-fit: contain;
+            max-width: 100%;
+        }
+
+        .footer-logo:hover {
+            transform: scale(1.05);
+        }
+
+        .footer-text {
+            opacity: 0.8;
+            margin-bottom: 30px;
+        }
+
+        .footer-links {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+            text-align: left;
+        }
+
+        .footer-section {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .footer-section h4 {
+            color: var(--primary-orange);
+            font-family: 'Poppins', sans-serif;
+            font-weight: 600;
+            font-size: 1rem;
+            margin-bottom: 8px;
+        }
+
+        .footer-link {
+            color: var(--white);
+            text-decoration: none;
+            opacity: 0.8;
+            transition: all 0.3s ease;
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .footer-link:hover {
+            opacity: 1;
+            color: var(--primary-orange);
+            transform: translateX(5px);
+        }
+
+        .copyright {
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            padding-top: 20px;
+            opacity: 0.6;
+            font-size: 0.9rem;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 480px) {
+            .logo {
+                height: 85px;
+            }
+
+            .footer-logo {
+                height: 50px;
+            }
+
+            .sidenav {
+                width: 280px;
+            }
+
+            .header-top {
+                padding: 0 10px;
+            }
+
+            .menu-button {
+                padding: 10px;
+            }
+        }
+
+        @media (min-width: 768px) {
+            .logo {
+                height: 119px;
+            }
+
+            .footer-logo {
+                height: 70px;
+            }
+
+            .header {
+                padding: 45px 0;
+            }
+
+            .tagline {
+                font-size: 1.4rem;
+            }
+
+            .hero {
+                padding: 80px 0;
+            }
+
+            .hero-content {
+                grid-template-columns: 1fr 1fr;
+                gap: 60px;
+                align-items: center;
+            }
+
+            .hero-text {
+                text-align: left;
+                order: 1;
+            }
+
+            .slide-in-right {
+                order: 2;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+            }
+
+            .hero-title {
+                font-size: 3rem;
+            }
+
+            .hero-subtitle {
+                font-size: 1.3rem;
+            }
+
+            .tripinha-avatar {
+                width: 140px;
+                height: 140px;
+            }
+
+            .speech-bubble {
+                margin: 30px 0 0;
+                max-width: 350px;
+            }
+
+            .options-grid {
+                grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            }
+
+            .footer-links {
+                grid-template-columns: repeat(3, 1fr);
+                text-align: center;
+            }
+        }
+
+        @media (min-width: 1024px) {
+            .logo {
+                height: 80px;
+            }
+
+            .footer-logo {
+                height: 80px;
+            }
+
+            .hero {
+                padding: 100px 0;
+            }
+
+            .hero-content {
+                gap: 80px;
+                max-width: 1200px;
+                margin: 0 auto;
+            }
+
+            .hero-title {
+                font-size: 3.5rem;
+                margin-bottom: 25px;
+            }
+
+            .hero-subtitle {
+                font-size: 1.4rem;
+                margin-bottom: 40px;
+            }
+
+            .tripinha-avatar {
+                width: 160px;
+                height: 160px;
+            }
+
+            .speech-bubble {
+                max-width: 400px;
+                padding: 25px;
+            }
+
+            .options {
+                padding: 100px 0;
+            }
+
+            .options-grid {
+                grid-template-columns: repeat(3, 1fr);
+                max-width: 1000px;
+                margin: 0 auto;
+            }
+
+            .footer-links {
+                max-width: 800px;
+                margin: 0 auto 30px;
+            }
+        }
+
+        @media (min-width: 1200px) {
+            .container {
+                padding: 0 40px;
+            }
+        }
+
+        /* CSS para mobile */
+        @media (max-width: 767px) {
+            .footer-links {
+                grid-template-columns: 1fr;
+                gap: 25px;
+                text-align: center;
+            }
+
+            .footer-section {
+                align-items: center;
+            }
+        }
+
+        /* Animações */
+        .fade-in {
+            animation: fadeIn 1s ease-in;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .slide-in-left {
+            animation: slideInLeft 1s ease-out;
+        }
+
+        @keyframes slideInLeft {
+            from {
+                opacity: 0;
+                transform: translateX(-50px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .slide-in-right {
+            animation: slideInRight 1s ease-out;
+        }
+
+        @keyframes slideInRight {
+            from {
+                opacity: 0;
+                transform: translateX(50px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        /* Melhorias nos speech bubble */
+        .speech-bubble {
+            background: var(--white);
+            padding: 25px;
+            border-radius: 20px;
+            border: 2px solid var(--primary-orange);
+            position: relative;
+            max-width: 400px;
+            margin: 0 auto 40px;
+            box-shadow: 0 8px 30px rgba(232, 119, 34, 0.2);
+            transition: all 0.3s ease;
+        }
+
+        .speech-bubble:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 12px 40px rgba(232, 119, 34, 0.25);
+        }
+
+        /* Melhorias no avatar da Tripinha */
+        .tripinha-avatar:hover {
+            transform: scale(1.05);
+            box-shadow: 0 12px 40px rgba(232, 119, 34, 0.4);
+        }
+
+        /* Smooth scroll */
+        html {
+            scroll-behavior: smooth;
+        }
+
+        /* Melhorias finais de acessibilidade e UX */
+        @media (prefers-reduced-motion: reduce) {
+            *,
+            *::before,
+            *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+
+        /* Melhoria no foco do teclado */
+        .option-card:focus-visible {
+            outline: 3px solid var(--secondary-blue);
+            outline-offset: 3px;
+        }
+
+        .footer-link:focus-visible {
+            outline: 2px solid var(--primary-orange);
+            outline-offset: 2px;
+            border-radius: 4px;
+        }
+
+        /* Estados de carregamento melhorados */
+        .option-card.loading .option-icon {
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        /* Hover states mais refinados */
+        .feature:hover .feature-title {
+            color: var(--primary-orange);
+            transition: color 0.3s ease;
+        }
+
+        /* Melhorias de contraste */
+        .option-description {
+            opacity: 0.95;
+            line-height: 1.6;
+        }
+
+        /* Otimização para touch */
+        .option-card,
+        .footer-link {
+            min-height: 44px;
+            min-width: 44px;
+        }
+
+        /* Feedback visual para cliques */
+        .option-card:active {
+            transform: scale(0.98) !important;
         }
     </style>
 </head>
-<body class="mobile-optimized">
-    <!-- Barra de status estilo app -->
-    <div class="native-status-bar" style="background-color: #E87722;"></div>
-    
-    <!-- Container principal do chat -->
-    <div id="chat-container">
-        <!-- Header simplificado e centralizado como no protótipo -->
-        <div class="chat-header">
-            <img src="assets/images/logo.png" alt="Benetrip" class="logo">
+<body>
+    <!-- Overlay -->
+    <div class="overlay" id="overlay"></div>
+
+    <!-- Side Navigation -->
+    <nav class="sidenav" id="sidenav">
+        <div class="sidenav-header">
+            <div class="sidenav-logo">
+                <img src="logo1.png" alt="Benetrip Logo">
+            </div>
+            <h3 class="sidenav-title">Menu de Navegação</h3>
+            <p class="sidenav-subtitle">Tudo que você precisa em um só lugar!</p>
         </div>
         
-        <div id="chat-messages" class="chat-messages">
-            <!-- As mensagens do chat serão inseridas aqui dinamicamente -->
-        </div>
-
-        <!-- Indicador de digitação -->
-        <div id="typing-indicator" class="typing-indicator" style="display: none;">
-            <div class="thinking-animation">
-                <div class="thinking-dot"></div>
-                <div class="thinking-dot"></div>
-                <div class="thinking-dot"></div>
-            </div>
-        </div>
-
-        <!-- Indicador de carregamento -->
-        <div id="loading-indicator" class="loading-overlay" style="display: none;">
-            <div class="loading-container">
-                <img src="assets/images/tripinha/avatar-pensando.png" alt="Tripinha carregando" class="loading-avatar">
-                <div class="loading-text">Carregando...</div>
-                <div class="loading-spinner"></div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Toast notification container -->
-    <div id="toast-container"></div>
-
-    <!-- Scripts -->
-    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
-    <script src="https://cdn.jsdelivr.net/npm/lodash@4.17.21/lodash.min.js"></script>
-    <script src="assets/js/api.js"></script>
-    <script src="assets/js/ai-service.js"></script>
-    <script src="assets/js/chat.js"></script>
-    <script src="assets/js/app.js"></script>
-    <script src="assets/js/loading-transition.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/hammer.js@2.0.8/hammer.min.js"></script>
-    <script src="assets/js/mobile-interactions.js"></script>
-    
-    <!-- Script adicional para modificar a montagem dos botões de opção -->
-    <script>
-        // Este script sobrescreve a função original para adicionar emojis aos botões
-        document.addEventListener('DOMContentLoaded', function() {
-            // Verificar se a função original existe antes de tentar sobrescrevê-la
-            if (BENETRIP && BENETRIP.montarHTMLPergunta) {
-                // Guarda a referência da função original
-                const montarHTMLPerguntaOriginal = BENETRIP.montarHTMLPergunta;
+        <div class="sidenav-content">
+            <!-- Ações Principais -->
+            <div class="nav-section">
+                <h4 class="nav-section-title">🚀 Ações Principais</h4>
                 
-                // Sobrescreve a função
-                BENETRIP.montarHTMLPergunta = function(pergunta) {
-                    // Se não tem opções, usa a função original
-                    if (!pergunta.options) {
-                        return montarHTMLPerguntaOriginal.call(BENETRIP, pergunta);
-                    }
-                    
-                    // Se tem opções, personaliza o HTML
-                    let opcoesHTML = `
-                        <div class="options-container">
-                            ${pergunta.options.map((opcao, index) => {
-                                // Tenta extrair emoji do início da string
-                                const emojiMatch = opcao.match(/^([\u{1F300}-\u{1F6FF}\u{1F900}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}])/u);
-                                let emoji = '';
-                                let texto = opcao;
-                                
-                                if (emojiMatch) {
-                                    emoji = emojiMatch[1];
-                                    texto = opcao.replace(emoji, '').trim();
-                                }
-                                
-                                return `
-                                    <button class="option-button" data-index="${index}" data-valor="${index}">
-                                        ${emoji ? `<span style="margin-right: 8px; font-size: 20px;">${emoji}</span>` : ''}
-                                        <span>${texto}</span>
-                                    </button>`;
-                            }).join('')}
+                <a href="https://benetrip.com.br/chat.html" class="nav-link primary" onclick="startDestinationFinder()">
+                    <span class="nav-link-icon">🎯</span>
+                    <span class="nav-link-text">Encontrar Destino Perfeito</span>
+                    <span class="nav-badge popular">Popular</span>
+                </a>
+                
+                <a href="https://benetrip.com.br/itinerary2.html" class="nav-link" onclick="startItineraryBuilder()">
+                    <span class="nav-link-icon">📋</span>
+                    <span class="nav-link-text">Criar Roteiro dos Sonhos</span>
+                    <span class="nav-badge new">Novo</span>
+                </a>
+                
+                <a href="https://www.benetrip.com.br/" class="nav-link" target="_blank">
+                    <span class="nav-link-icon">✈️</span>
+                    <span class="nav-link-text">Busca Rápida de Voos</span>
+                </a>
+            </div>
+
+            <!-- Navegação do Site -->
+            <div class="nav-section">
+                <h4 class="nav-section-title">🧭 Navegação</h4>
+                
+                <a href="#hero" class="nav-link" onclick="closeNavAndScrollTo('hero')">
+                    <span class="nav-link-icon">🏠</span>
+                    <span class="nav-link-text">Início</span>
+                </a>
+                
+                <a href="#options" class="nav-link" onclick="closeNavAndScrollTo('options')">
+                    <span class="nav-link-icon">🎮</span>
+                    <span class="nav-link-text">Como Funciona</span>
+                </a>
+                
+                <a href="#features" class="nav-link" onclick="closeNavAndScrollTo('features')">
+                    <span class="nav-link-icon">⭐</span>
+                    <span class="nav-link-text">Por Que Escolher a Benetrip</span>
+                </a>
+            </div>
+
+            <!-- Redes Sociais -->
+            <div class="nav-section">
+                <h4 class="nav-section-title">📱 Redes Sociais</h4>
+                
+                <a href="https://www.instagram.com/benetrip.oficial/" class="nav-link" target="_blank">
+                    <span class="nav-link-icon">📷</span>
+                    <span class="nav-link-text">Instagram Oficial</span>
+                </a>
+            </div>
+
+            <!-- Sobre Nós -->
+            <div class="nav-section">
+                <h4 class="nav-section-title">ℹ️ Sobre Nós</h4>
+                
+                <a href="https://benetrip.com.br/quemsomos.html" class="nav-link" target="_blank">
+                    <span class="nav-link-icon">🏢</span>
+                    <span class="nav-link-text">Quem Somos</span>
+                </a>
+                
+                <a href="https://benetrip.com.br/perguntasfrequentes.html" class="nav-link" target="_blank">
+                    <span class="nav-link-icon">❓</span>
+                    <span class="nav-link-text">Perguntas Frequentes</span>
+                </a>
+            </div>
+
+            <!-- Políticas -->
+            <div class="nav-section">
+                <h4 class="nav-section-title">📋 Políticas</h4>
+                
+                <a href="https://benetrip.com.br/termos.html" class="nav-link" target="_blank">
+                    <span class="nav-link-icon">📜</span>
+                    <span class="nav-link-text">Termos de Uso</span>
+                </a>
+                
+                <a href="https://benetrip.com.br/privacidade.html" class="nav-link" target="_blank">
+                    <span class="nav-link-icon">🔒</span>
+                    <span class="nav-link-text">Política de Privacidade</span>
+                </a>
+                
+                <a href="https://benetrip.com.br/cookies.html" class="nav-link" target="_blank">
+                    <span class="nav-link-icon">🍪</span>
+                    <span class="nav-link-text">Política de Cookies</span>
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Header -->
+    <header class="header">
+        <div class="container">
+            <div class="header-top">
+                <button class="menu-button" id="menuButton" onclick="toggleNav()">
+                    <div class="hamburger">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </div>
+                </button>
+                
+                <div class="logo-container">
+                    <img src="logo1.png" alt="Benetrip Logo" class="logo">
+                </div>
+                
+                <div style="width: 50px;"></div> <!-- Spacer for centering -->
+            </div>
+            
+            <div class="header-content">
+                <p class="tagline">Sua próxima aventura começa aqui!</p>
+            </div>
+        </div>
+    </header>
+
+    <!-- Hero Section -->
+    <section class="hero" id="hero">
+        <div class="container">
+            <div class="hero-content">
+                <div class="hero-text slide-in-left">
+                    <h2 class="hero-title">Conheça a Benetrip: sua parceira de viagem! 🌍</h2>
+                    <p class="hero-subtitle">
+A Benetrip é a sua nova melhor amiga na hora de planejar viagens! E quem comanda tudo por aqui é a Tripinha, uma vira-lata caramelo cheia de histórias e aventuras pelo mundo. Ela sabe como ninguém encontrar destinos incríveis, passagens com preços justos e experiências que combinam com você. Com a ajuda dela, planejar sua próxima viagem fica fácil, divertido e do jeitinho que você gosta!                    </p>
+                </div>
+                
+                <div class="slide-in-right">
+                    <div class="tripinha-container">
+                        <div class="tripinha-avatar">
+                            <img src="assets/images/tripinha/piscando.png" alt="Tripinha - Mascote da Benetrip">
                         </div>
-                    `;
+                    </div>
                     
-                    // Use a função original para o resto da montagem, mas substitua a parte das opções
-                    const htmlCompleto = montarHTMLPerguntaOriginal.call(BENETRIP, pergunta);
+                    <div class="speech-bubble">
+                        <p class="speech-text">
+                            <strong>Oi, meu nome é Tripinha! 🐾</strong><br>
+                            Sou sua companheira de viagem e vou te ajudar a encontrar aventuras incríveis! Que tal a gente começar essa jornada juntos? ✈️✨
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Options Section -->
+    <section class="options" id="options">
+        <div class="container">
+            <h2 class="options-title fade-in">Como posso te ajudar hoje? 🐾</h2>
+            
+            <div class="options-grid">
+                <div class="option-card primary fade-in" onclick="startDestinationFinder()">
+                    <div class="option-badge popular">Popular</div>
+                    <span class="option-icon">🎯</span>
+                    <h3 class="option-title">Vou encontrar seu destino perfeito!</h3>
+                    <p class="option-description">
+                        Me conta suas preferências que eu faço a mágica! Vou te ajudar a descobrir o lugar ideal para sua próxima aventura! 🌟
+                    </p>
+                    <button class="option-button">Bora começar!</button>
+                </div>
+
+                <div class="option-card secondary fade-in" onclick="startItineraryBuilder()">
+                    <div class="option-badge new">Novo</div>
+                    <span class="option-icon">📋</span>
+                    <h3 class="option-title">Vamos criar seu roteiro dos sonhos!</h3>
+                    <p class="option-description">
+                        Já escolheu o destino? Perfeito! Agora deixa comigo que eu monto um roteiro incrível e personalizado só pra você! 🗺️
+                    </p>
+                    <button class="option-button">Vamos nessa!</button>
+                </div>
+
+                <div class="option-card tertiary fade-in" onclick="startClassicSearch()">
+                    <span class="option-icon">✈️</span>
+                    <h3 class="option-title">Prefere buscar voos do seu jeito?</h3>
+                    <p class="option-description">
+                        Sem problemas! Aqui você faz uma busca rápida e tradicional. Eu te mostro as melhores opções na velocidade da luz! ⚡
+                    </p>
+                    <button class="option-button">Buscar agora!</button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section class="features" id="features">
+        <div class="container">
+            <h2 class="features-title">Por que viajar comigo é a melhor escolha? 🌍</h2>
+            
+            <div class="features-grid">
+                <div class="feature fade-in">
+                    <div class="feature-icon">🌍</div>
+                    <h3 class="feature-title">Conheço o mundo todo!</h3>
+                    <p class="feature-description">
+                        Já visitei centenas de países e sei exatamente onde encontrar as melhores experiências para você!
+                    </p>
+                </div>
+
+                <div class="feature fade-in">
+                    <div class="feature-icon">💰</div>
+                    <h3 class="feature-title">Farejoo os melhores preços!</h3>
+                    <p class="feature-description">
+                        Com minha experiência, sei onde encontrar as melhores ofertas e passagens mais baratas do mercado!
+                    </p>
+                </div>
+
+                <div class="feature fade-in">
+                    <div class="feature-icon">⚡</div>
+                    <h3 class="feature-title">Sou rápida como um raio!</h3>
+                    <p class="feature-description">
+                        Em poucos minutos você tem sua viagem toda planejada. Eficiência é comigo mesmo!
+                    </p>
+                </div>
+
+                <div class="feature fade-in">
+                    <div class="feature-icon">🎯</div>
+                    <h3 class="feature-title">Conheço você melhor que ninguém!</h3>
+                    <p class="feature-description">
+                        Com minha experiência em viagens, sei exatamente o que cada tipo de viajante adora!
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-logo-container">
+                    <img src="logo1.png" alt="Benetrip Logo" class="footer-logo">
+                </div>
+                <p class="footer-text">
+                    Sua próxima aventura começa aqui!🐾
+                </p>
+                
+                <div class="footer-links">
+                    <div class="footer-section">
+                        <h4>📱 Redes Sociais</h4>
+                        <a href="https://www.instagram.com/benetrip.oficial/" class="footer-link" target="_blank">
+                            <span>📷</span> Instagram Oficial
+                        </a>
+                    </div>
                     
-                    // Se não tem options-container no HTML original, retorna sem modificar
-                    if (!htmlCompleto.includes('options-container')) {
-                        return htmlCompleto;
-                    }
+                    <div class="footer-section">
+                        <h4>ℹ️ Sobre Nós</h4>
+                        <a href="https://benetrip.com.br/quemsomos.html" class="footer-link">
+                            <span>🏢</span> Quem Somos
+                        </a>
+                        <a href="https://benetrip.com.br/perguntasfrequentes.html" class="footer-link">
+                            <span>❓</span> Perguntas Frequentes
+                        </a>
+                    </div>
                     
-                    // Substitui a parte das opções
-                    return htmlCompleto.replace(/<div class="options-container">.*?<\/div>/s, opcoesHTML);
-                };
+                    <div class="footer-section">
+                        <h4>📋 Políticas</h4>
+                        <a href="https://benetrip.com.br/termos.html" class="footer-link">
+                            <span>📜</span> Termos de Uso
+                        </a>
+                        <a href="https://benetrip.com.br/privacidade.html" class="footer-link">
+                            <span>🔒</span> Política de Privacidade
+                        </a>
+                        <a href="https://benetrip.com.br/cookies.html" class="footer-link">
+                            <span>🍪</span> Política de Cookies
+                        </a>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="copyright">
+                © 2025 Benetrip. Todos os direitos reservados. Feito com muito ❤️ e carinho pela Tripinha! 🐾
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // Função para navegar para o seletor de destinos
+        function startDestinationFinder() {
+            const card = event.currentTarget;
+            addLoadingState(card);
+            setTimeout(() => {
+                window.location.href = 'chat.html';
+            }, 800);
+        }
+
+        // Função para navegar para o criador de roteiros
+        function startItineraryBuilder() {
+            const card = event.currentTarget;
+            addLoadingState(card);
+            setTimeout(() => {
+                window.location.href = 'itinerary2.html';
+            }, 800);
+        }
+
+        // Função para navegar para a busca clássica
+        function startClassicSearch() {
+            const card = event.currentTarget;
+            addLoadingState(card);
+            setTimeout(() => {
+                window.location.href = 'https://www.benetrip.com.br/';
+            }, 800);
+        }
+
+        // Função para adicionar estado de loading
+        function addLoadingState(card) {
+            card.classList.add('loading');
+            card.style.transform = 'scale(0.95)';
+            
+            const button = card.querySelector('.option-button');
+            const originalText = button.textContent;
+            button.textContent = 'Carregando...';
+            
+            // Adiciona indicador visual de carregamento
+            const loadingDot = document.createElement('span');
+            loadingDot.textContent = ' 🐾';
+            loadingDot.style.animation = 'bounce 1s infinite';
+            button.appendChild(loadingDot);
+        }
+
+        // Controle do menu lateral
+        function toggleNav() {
+            const sidenav = document.getElementById('sidenav');
+            const overlay = document.getElementById('overlay');
+            const menuButton = document.getElementById('menuButton');
+            
+            const isOpen = sidenav.classList.contains('open');
+            
+            if (isOpen) {
+                closeNav();
+            } else {
+                openNav();
             }
+        }
+
+        function openNav() {
+            const sidenav = document.getElementById('sidenav');
+            const overlay = document.getElementById('overlay');
+            const menuButton = document.getElementById('menuButton');
+            
+            sidenav.classList.add('open');
+            overlay.classList.add('active');
+            menuButton.classList.add('active');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeNav() {
+            const sidenav = document.getElementById('sidenav');
+            const overlay = document.getElementById('overlay');
+            const menuButton = document.getElementById('menuButton');
+            
+            sidenav.classList.remove('open');
+            overlay.classList.remove('active');
+            menuButton.classList.remove('active');
+            document.body.style.overflow = '';
+        }
+
+        function closeNavAndScrollTo(sectionId) {
+            closeNav();
+            setTimeout(() => {
+                const element = document.getElementById(sectionId);
+                if (element) {
+                    element.scrollIntoView({ behavior: 'smooth' });
+                }
+            }, 300);
+        }
+
+        // Fechar menu ao clicar no overlay
+        document.getElementById('overlay').addEventListener('click', closeNav);
+
+        // Fechar menu com tecla ESC
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                closeNav();
+            }
+        });
+
+        // Animações ao rolar a página com Intersection Observer melhorado
+        const observerOptions = {
+            threshold: 0.1,
+            rootMargin: '0px 0px -50px 0px'
+        };
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach((entry, index) => {
+                if (entry.isIntersecting) {
+                    setTimeout(() => {
+                        entry.target.style.opacity = '1';
+                        entry.target.style.transform = 'translateY(0)';
+                    }, index * 100); // Animação escalonada
+                }
+            });
+        }, observerOptions);
+
+        // Observa elementos para animação
+        document.addEventListener('DOMContentLoaded', () => {
+            const animatedElements = document.querySelectorAll('.fade-in, .slide-in-left, .slide-in-right');
+            animatedElements.forEach(el => {
+                el.style.opacity = '0';
+                el.style.transform = 'translateY(30px)';
+                observer.observe(el);
+            });
+
+            // Preload de imagens importantes
+            const importantImages = ['logo1.png', 'assets/images/tripinha/piscando.png'];
+            importantImages.forEach(src => {
+                const img = new Image();
+                img.src = src;
+            });
+        });
+
+        // Efeito de parallax mais suave no header
+        let ticking = false;
+        window.addEventListener('scroll', () => {
+            if (!ticking) {
+                requestAnimationFrame(() => {
+                    const scrolled = window.pageYOffset;
+                    const header = document.querySelector('.header');
+                    if (header && scrolled < window.innerHeight) {
+                        header.style.transform = `translateY(${scrolled * 0.3}px)`;
+                    }
+                    ticking = false;
+                });
+                ticking = true;
+            }
+        });
+
+        // Adiciona efeito de hover nos cards melhorado
+        document.querySelectorAll('.option-card').forEach(card => {
+            let hoverTimeout;
+            
+            card.addEventListener('mouseenter', function() {
+                clearTimeout(hoverTimeout);
+                this.style.transform = 'translateY(-15px) scale(1.02)';
+                
+                // Adiciona brilho sutil
+                const icon = this.querySelector('.option-icon');
+                if (icon) {
+                    icon.style.transform = 'scale(1.1) rotate(5deg)';
+                }
+            });
+            
+            card.addEventListener('mouseleave', function() {
+                hoverTimeout = setTimeout(() => {
+                    this.style.transform = 'translateY(0) scale(1)';
+                    
+                    const icon = this.querySelector('.option-icon');
+                    if (icon) {
+                        icon.style.transform = 'scale(1) rotate(0deg)';
+                    }
+                }, 50);
+            });
+
+            // Adiciona feedback tátil no mobile
+            card.addEventListener('touchstart', function() {
+                this.style.transform = 'scale(0.98)';
+            });
+
+            card.addEventListener('touchend', function() {
+                this.style.transform = 'scale(1)';
+            });
+        });
+
+        // Adiciona efeito nos links do footer melhorado
+        document.querySelectorAll('.footer-link').forEach(link => {
+            link.addEventListener('mouseenter', function() {
+                const emoji = this.querySelector('span');
+                if (emoji) {
+                    emoji.style.transform = 'scale(1.3) rotate(15deg)';
+                    emoji.style.transition = 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)';
+                }
+            });
+            
+            link.addEventListener('mouseleave', function() {
+                const emoji = this.querySelector('span');
+                if (emoji) {
+                    emoji.style.transform = 'scale(1) rotate(0deg)';
+                }
+            });
+        });
+
+        // Fallback melhorado para imagens
+        document.addEventListener('DOMContentLoaded', function() {
+            const images = document.querySelectorAll('img');
+            images.forEach(img => {
+                img.addEventListener('error', function() {
+                    if (this.alt.includes('Benetrip Logo')) {
+                        this.style.display = 'none';
+                        const logoText = document.createElement('span');
+                        logoText.textContent = '🐾 Benetrip';
+                        logoText.style.fontFamily = 'Poppins, sans-serif';
+                        logoText.style.fontWeight = '700';
+                        logoText.style.fontSize = '2.5rem';
+                        logoText.style.color = '#E87722';
+                        logoText.style.animation = 'fadeIn 0.5s ease';
+                        this.parentNode.appendChild(logoText);
+                    }
+                    if (this.alt.includes('Tripinha')) {
+                        this.style.display = 'none';
+                        const emoji = document.createElement('span');
+                        emoji.textContent = '🐕';
+                        emoji.style.fontSize = '4rem';
+                        emoji.style.animation = 'bounce 2s infinite';
+                        this.parentNode.appendChild(emoji);
+                    }
+                });
+            });
+        });
+
+        // Adiciona indicador de progresso de scroll sutil
+        window.addEventListener('scroll', () => {
+            const scrollProgress = (window.scrollY / (document.documentElement.scrollHeight - window.innerHeight)) * 100;
+            document.documentElement.style.setProperty('--scroll-progress', `${scrollProgress}%`);
+        });
+
+        // Adiciona efeito de hover nos links de navegação
+        document.querySelectorAll('.nav-link').forEach(link => {
+            link.addEventListener('mouseenter', function() {
+                const icon = this.querySelector('.nav-link-icon');
+                const badge = this.querySelector('.nav-badge');
+                
+                if (icon) {
+                    icon.style.transform = 'scale(1.2) rotate(10deg)';
+                }
+                
+                if (badge) {
+                    badge.style.transform = 'scale(1.1)';
+                }
+            });
+            
+            link.addEventListener('mouseleave', function() {
+                const icon = this.querySelector('.nav-link-icon');
+                const badge = this.querySelector('.nav-badge');
+                
+                if (icon) {
+                    icon.style.transform = 'scale(1) rotate(0deg)';
+                }
+                
+                if (badge) {
+                    badge.style.transform = 'scale(1)';
+                }
+            });
         });
     </script>
 </body>
