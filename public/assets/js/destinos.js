@@ -1,7 +1,7 @@
 /**
  * BENETRIP - Visualização de Destinos Recomendados
  * Versão 4.1 - Integração com Whitelabel Benetrip + Comentários no Destino Surpresa
- * Redireciona para www.benetrip.com.br com parâmetros de busca
+ * Redireciona para voos.benetrip.com.br com parâmetros de busca
  * ATUALIZADO: Remove fallback de clima, usa apenas dados da LLM + Adiciona comentários no destino surpresa
  */
 
@@ -1083,7 +1083,7 @@ const BENETRIP_DESTINOS = {
   
   /**
    * Constrói a URL da whitelabel Benetrip com os parâmetros de busca
-   * Formato: https://www.benetrip.com.br/?flightSearch=SAO1208RIO22081
+   * Formato: https://voos.benetrip.com.br/?flightSearch=SAO1208RIO22081
    * Onde: ORIGEM+DIA_IDA+MES_IDA+DESTINO+DIA_VOLTA+MES_VOLTA+PASSAGEIROS
    */
   construirURLWhitelabel(destinoSelecionado) {
@@ -1182,7 +1182,7 @@ const BENETRIP_DESTINOS = {
         `${codigoOrigem}${diaIdaFormatado}${mesIdaFormatado}${codigoDestino}${diaVoltaFormatado}${mesVoltaFormatado}${quantidadePassageiros}`;
       
       // ===== URL FINAL =====
-      const urlWhitelabel = `https://www.benetrip.com.br/?flightSearch=${flightSearchParam}`;
+      const urlWhitelabel = `https://voos.benetrip.com.br/?flightSearch=${flightSearchParam}`;
       
       console.log('✅ URL construída com sucesso:');
       console.log(`🔗 ${urlWhitelabel}`);
@@ -1200,7 +1200,7 @@ const BENETRIP_DESTINOS = {
     } catch (erro) {
       console.error('❌ Erro ao construir URL da whitelabel:', erro);
       // URL de fallback
-      return 'https://www.benetrip.com.br/';
+      return 'https://voos.benetrip.com.br/';
     }
   },
   
