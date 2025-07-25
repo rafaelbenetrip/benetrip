@@ -87,19 +87,21 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            min-width: 220px;
-            position: relative;
-            padding: 8px;
-            transition: transform 0.3s ease;
+            padding: 0;
+            margin: 0;
         }
 
         .logo {
-            height: 45px;
+            height: 60px;
             width: auto;
+            border-radius: 10px;
+            transition: transform 0.3s ease;
+            object-fit: contain;
             max-width: 100%;
-            position: relative;
-            z-index: 1;
-            border-radius: 8px;
+        }
+
+        .logo:hover {
+            transform: scale(1.05);
         }
 
         .tagline {
@@ -454,15 +456,6 @@
             box-shadow: 0 12px 40px rgba(232, 119, 34, 0.4);
         }
 
-        /* Melhorias no container do logo */
-        .logo-container:hover {
-            transform: translateY(-2px);
-        }
-
-        .footer-logo-container:hover {
-            transform: translateY(-2px);
-        }
-
         /* Smooth scroll */
         html {
             scroll-behavior: smooth;
@@ -551,19 +544,24 @@
         }
 
         .footer-logo-container {
-            display: inline-flex;
+            display: flex;
             align-items: center;
             justify-content: center;
             margin-bottom: 20px;
-            padding: 8px;
-            min-width: 220px;
-            transition: transform 0.3s ease;
+            padding: 0;
         }
 
-        .footer-logo img {
-            height: 45px;
+        .footer-logo {
+            height: 60px;
             width: auto;
-            border-radius: 8px;
+            border-radius: 10px;
+            transition: transform 0.3s ease;
+            object-fit: contain;
+            max-width: 100%;
+        }
+
+        .footer-logo:hover {
+            transform: scale(1.05);
         }
 
         .footer-text {
@@ -618,23 +616,23 @@
         }
 
         /* Responsive Design */
-        @media (min-width: 768px) {
+        @media (max-width: 480px) {
             .logo {
                 height: 50px;
             }
 
-            .logo-container {
-                padding: 10px;
-                min-width: 250px;
-            }
-
-            .footer-logo-container {
-                padding: 10px;
-                min-width: 250px;
-            }
-
-            .footer-logo img {
+            .footer-logo {
                 height: 50px;
+            }
+        }
+
+        @media (min-width: 768px) {
+            .logo {
+                height: 70px;
+            }
+
+            .footer-logo {
+                height: 70px;
             }
 
             .tagline {
@@ -694,21 +692,11 @@
 
         @media (min-width: 1024px) {
             .logo {
-                height: 55px;
+                height: 80px;
             }
 
-            .logo-container {
-                padding: 12px;
-                min-width: 280px;
-            }
-
-            .footer-logo-container {
-                padding: 12px;
-                min-width: 280px;
-            }
-
-            .footer-logo img {
-                height: 55px;
+            .footer-logo {
+                height: 80px;
             }
 
             .hero {
@@ -1152,7 +1140,7 @@ Somos uma plataforma inovadora que transforma o jeito de planejar viagens com a 
                         logoText.textContent = '🐾 Benetrip';
                         logoText.style.fontFamily = 'Poppins, sans-serif';
                         logoText.style.fontWeight = '700';
-                        logoText.style.fontSize = '1.5rem';
+                        logoText.style.fontSize = '2rem';
                         logoText.style.color = '#E87722';
                         logoText.style.animation = 'fadeIn 0.5s ease';
                         this.parentNode.appendChild(logoText);
