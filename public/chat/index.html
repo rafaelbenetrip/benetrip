@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#E87722">
+    <title>Benetrip - Planeje sua Viagem com a Tripinha!</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;700&family=Montserrat:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <link rel="stylesheet" href="assets/css/styles.css">
+    <link rel="stylesheet" href="assets/css/chat-fluido.css">
+    <link rel="stylesheet" href="assets/css/mobile-optimizations.css">
+    
+    <!-- Estilos customizados para alinhar com o protótipo -->
+    <style>
+        :root {
+            --orange-primary: #E87722;
+            --blue-secondary: #00A3E0;
+            --background-gray: #f5f5f5;
+            --border-radius-button: 30px;
+            --border-radius-card: 16px;
+            --border-radius-bubble: 20px;
+            --shadow-light: 0 2px 6px rgba(0,0,0,0.08);
+        }
+        
+        body {
+            background-color: var(--background-gray);
+        }
+        
+        #chat-container {
+            background-color: var(--background-gray);
+            max-width: 480px;
+            box-shadow: none;
+        }
+        
+        .chat-header {
+            background-color: var(--background-gray);
+            padding: 16px;
+            text-align: center;
+            border-bottom: none;
+            box-shadow: none;
+        }
+        
+        .chat-header .logo {
+            height: 36px;
+        }
+        
+        .chat-messages {
+            padding: 16px;
+        }
+        
+        /* Estilo dos balões de chat */
+        .chat-message .message {
+            background-color: white;
+            border-radius: var(--border-radius-bubble);
+            box-shadow: var(--shadow-light);
+            padding: 16px;
+        }
+        
+        .chat-message.tripinha .message {
+            border-top-left-radius: 4px;
+        }
+        
+        .chat-message.user .message {
+            background-color: var(--orange-primary);
+            border-top-right-radius: 4px;
+            color: white;
+        }
+        
+        /* Estilo dos botões de opção */
+        .option-button {
+            display: flex;
+            align-items: center;
+            background-color: white;
+            border-radius: var(--border-radius-button);
+            box-shadow: var(--shadow-light);
+            padding: 14px 18px;
+            margin-bottom: 10px;
+            transition: all 0.2s ease;
+            border: none;
+            text-align: left;
+            font-family: 'Poppins', sans-serif;
+        }
+        
+        .option-button:hover, .option-button:active {
+            background-color: #fff8f3;
+            border-color: var(--orange-primary);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        
+        /* Estilo do calendário */
+        .calendar-container {
+            background-color: white;
+            border-radius: var(--border-radius-card);
+            box-shadow: var(--shadow-light);
+            padding: 16px;
+            margin-top: 12px;
+        }
+        
+        .flatpickr-day.selected, 
+        .flatpickr-day.startRange, 
+        .flatpickr-day.endRange {
+            background: var(--orange-primary) !important;
+            border-color: var(--orange-primary) !important;
+            color: white !important;
+        }
+        
+        .flatpickr-day.inRange {
+            background: rgba(232, 119, 34, 0.1) !important;
+            border-color: rgba(232, 119, 34, 0.1) !important;
+        }
+        
+        .date-selection {
+            background-color: white;
+            border-radius: 12px;
+            padding: 12px;
+            margin-top: 12px;
+            font-size: 14px;
+        }
+        
+        .confirm-button {
+            background-color: var(--orange-primary);
+            color: white;
+            border-radius: var(--border-radius-button);
+            font-weight: 700;
+            padding: 14px;
+            border: none;
+            width: 100%;
+            margin-top: 12px;
+        }
+        
+        .confirm-button:disabled {
+            opacity: 0.6;
+        }
+        
+        /* Input de texto e autocomplete */
+        .text-input, .autocomplete-input, .currency-input {
+            border-radius: 20px;
+            padding: 14px 18px;
+            border: 1px solid #e0e0e0;
+            font-family: 'Poppins', sans-serif;
+        }
+        
+        .confirm-text, .confirm-autocomplete, .confirm-currency, .confirm-number {
+            background-color: var(--orange-primary);
+            color: white;
+            border-radius: 20px;
+            padding: 14px 18px;
+            border: none;
+            font-weight: 600;
+        }
+        
+        /* Input numérico */
+        .number-input-container {
+            background-color: white;
+            border-radius: var(--border-radius-card);
+            padding: 16px;
+            align-items: center;
+        }
+        
+        .number-input-container button {
+            width: 44px;
+            height: 44px;
+            border-radius: 22px;
+            background-color: #f5f5f5;
+            border: none;
+            font-size: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .number-input-container input {
+            width: 80px;
+            text-align: center;
+            font-size: 24px;
+            border: none;
+            font-weight: 700;
+        }
+        
+        /* Botão grande inferior */
+        .action-button-large {
+            background-color: var(--orange-primary);
+            color: white;
+            border-radius: var(--border-radius-button);
+            padding: 16px;
+            font-weight: 700;
+            font-size: 16px;
+            border: none;
+            margin-top: 24px;
+            width: 100%;
+        }
+    </style>
+</head>
+<body class="mobile-optimized">
+    <!-- Barra de status estilo app -->
+    <div class="native-status-bar" style="background-color: #E87722;"></div>
+    
+    <!-- Container principal do chat -->
+    <div id="chat-container">
+        
+        <div id="chat-messages" class="chat-messages">
+            <!-- As mensagens do chat serão inseridas aqui dinamicamente -->
+        </div>
+
+        <!-- Indicador de digitação -->
+        <div id="typing-indicator" class="typing-indicator" style="display: none;">
+            <div class="thinking-animation">
+                <div class="thinking-dot"></div>
+                <div class="thinking-dot"></div>
+                <div class="thinking-dot"></div>
+            </div>
+        </div>
+
+        <!-- Indicador de carregamento -->
+        <div id="loading-indicator" class="loading-overlay" style="display: none;">
+            <div class="loading-container">
+                <img src="assets/images/tripinha/avatar-pensando.png" alt="Tripinha carregando" class="loading-avatar">
+                <div class="loading-text">Carregando...</div>
+                <div class="loading-spinner"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast notification container -->
+    <div id="toast-container"></div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="https://cdn.jsdelivr.net/npm/lodash@4.17.21/lodash.min.js"></script>
+    <script src="assets/js/api.js"></script>
+    <script src="assets/js/ai-service.js"></script>
+    <script src="assets/js/chat.js"></script>
+    <script src="assets/js/chat-otimizado.js"></script>
+    <script src="assets/js/app.js"></script>
+    <script src="assets/js/loading-transition.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/hammer.js@2.0.8/hammer.min.js"></script>
+    <script src="assets/js/mobile-interactions.js"></script>
+    
+    <!-- Script adicional para modificar a montagem dos botões de opção -->
+    <script>
+        // Este script sobrescreve a função original para adicionar emojis aos botões
+        document.addEventListener('DOMContentLoaded', function() {
+            // Verificar se a função original existe antes de tentar sobrescrevê-la
+            if (BENETRIP && BENETRIP.montarHTMLPergunta) {
+                // Guarda a referência da função original
+                const montarHTMLPerguntaOriginal = BENETRIP.montarHTMLPergunta;
+                
+                // Sobrescreve a função
+                BENETRIP.montarHTMLPergunta = function(pergunta) {
+                    // Se não tem opções, usa a função original
+                    if (!pergunta.options) {
+                        return montarHTMLPerguntaOriginal.call(BENETRIP, pergunta);
+                    }
+                    
+                    // Se tem opções, personaliza o HTML
+                    let opcoesHTML = `
+                        <div class="options-container">
+                            ${pergunta.options.map((opcao, index) => {
+                                // Tenta extrair emoji do início da string
+                                const emojiMatch = opcao.match(/^([\u{1F300}-\u{1F6FF}\u{1F900}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}])/u);
+                                let emoji = '';
+                                let texto = opcao;
+                                
+                                if (emojiMatch) {
+                                    emoji = emojiMatch[1];
+                                    texto = opcao.replace(emoji, '').trim();
+                                }
+                                
+                                return `
+                                    <button class="option-button" data-index="${index}" data-valor="${index}">
+                                        ${emoji ? `<span style="margin-right: 8px; font-size: 20px;">${emoji}</span>` : ''}
+                                        <span>${texto}</span>
+                                    </button>`;
+                            }).join('')}
+                        </div>
+                    `;
+                    
+                    // Use a função original para o resto da montagem, mas substitua a parte das opções
+                    const htmlCompleto = montarHTMLPerguntaOriginal.call(BENETRIP, pergunta);
+                    
+                    // Se não tem options-container no HTML original, retorna sem modificar
+                    if (!htmlCompleto.includes('options-container')) {
+                        return htmlCompleto;
+                    }
+                    
+                    // Substitui a parte das opções
+                    return htmlCompleto.replace(/<div class="options-container">.*?<\/div>/s, opcoesHTML);
+                };
+            }
+        });
+    </script>
+</body>
+</html>
