@@ -83,12 +83,23 @@
             gap: 25px;
         }
 
+        .header-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+
         .logo-container {
             display: flex;
             align-items: center;
             justify-content: center;
             padding: 5px;
             margin: 0;
+            flex: 1;
         }
 
         .logo {
@@ -110,6 +121,256 @@
             opacity: 0.95;
             font-weight: 400;
             margin-top: 10px;
+        }
+
+        /* Menu Button */
+        .menu-button {
+            background: rgba(255, 255, 255, 0.2);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 12px;
+            padding: 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(10px);
+            position: relative;
+            z-index: 1001;
+        }
+
+        .menu-button:hover {
+            background: rgba(255, 255, 255, 0.3);
+            border-color: rgba(255, 255, 255, 0.5);
+            transform: scale(1.05);
+        }
+
+        .menu-button:active {
+            transform: scale(0.95);
+        }
+
+        .hamburger {
+            width: 24px;
+            height: 18px;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .hamburger span {
+            width: 100%;
+            height: 2px;
+            background: var(--white);
+            border-radius: 2px;
+            transition: all 0.3s ease;
+        }
+
+        .menu-button.active .hamburger span:nth-child(1) {
+            transform: rotate(45deg) translate(6px, 6px);
+        }
+
+        .menu-button.active .hamburger span:nth-child(2) {
+            opacity: 0;
+        }
+
+        .menu-button.active .hamburger span:nth-child(3) {
+            transform: rotate(-45deg) translate(7px, -6px);
+        }
+
+        /* Side Navigation */
+        .sidenav {
+            position: fixed;
+            top: 0;
+            left: -100%;
+            width: 320px;
+            height: 100vh;
+            background: var(--white);
+            box-shadow: 5px 0 25px rgba(0, 0, 0, 0.15);
+            transition: left 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            z-index: 1000;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .sidenav.open {
+            left: 0;
+        }
+
+        .sidenav-header {
+            background: linear-gradient(135deg, var(--primary-orange), var(--secondary-blue));
+            color: var(--white);
+            padding: 30px 25px;
+            text-align: center;
+            position: relative;
+        }
+
+        .sidenav-logo {
+            width: 60px;
+            height: 60px;
+            background: var(--white);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 15px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+        }
+
+        .sidenav-logo img {
+            width: 45px;
+            height: 45px;
+            object-fit: contain;
+            border-radius: 50%;
+        }
+
+        .sidenav-title {
+            font-family: 'Poppins', sans-serif;
+            font-size: 1.2rem;
+            font-weight: 700;
+            margin-bottom: 5px;
+        }
+
+        .sidenav-subtitle {
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+
+        .sidenav-content {
+            flex: 1;
+            padding: 0;
+        }
+
+        .nav-section {
+            border-bottom: 1px solid var(--light-gray);
+        }
+
+        .nav-section:last-child {
+            border-bottom: none;
+        }
+
+        .nav-section-title {
+            font-family: 'Poppins', sans-serif;
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--primary-orange);
+            padding: 20px 25px 10px;
+            margin: 0;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .nav-link {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            padding: 15px 25px;
+            color: var(--dark-gray);
+            text-decoration: none;
+            transition: all 0.3s ease;
+            border-left: 4px solid transparent;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .nav-link::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 0;
+            height: 100%;
+            background: linear-gradient(90deg, rgba(232, 119, 34, 0.1), rgba(0, 163, 224, 0.05));
+            transition: width 0.3s ease;
+            z-index: -1;
+        }
+
+        .nav-link:hover::before {
+            width: 100%;
+        }
+
+        .nav-link:hover {
+            color: var(--primary-orange);
+            border-left-color: var(--primary-orange);
+            padding-left: 30px;
+        }
+
+        .nav-link:active {
+            transform: scale(0.98);
+        }
+
+        .nav-link-icon {
+            font-size: 1.3rem;
+            width: 24px;
+            text-align: center;
+            transition: transform 0.3s ease;
+        }
+
+        .nav-link:hover .nav-link-icon {
+            transform: scale(1.2) rotate(10deg);
+        }
+
+        .nav-link-text {
+            flex: 1;
+            font-weight: 500;
+        }
+
+        .nav-link.primary {
+            background: linear-gradient(135deg, var(--primary-orange), #ff9a47);
+            color: var(--white);
+            border-left-color: var(--white);
+            margin: 15px;
+            border-radius: 12px;
+            font-weight: 600;
+            box-shadow: 0 4px 15px rgba(232, 119, 34, 0.3);
+        }
+
+        .nav-link.primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(232, 119, 34, 0.4);
+            color: var(--white);
+            padding-left: 25px;
+        }
+
+        .nav-link.primary::before {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        /* Overlay */
+        .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+            z-index: 999;
+            backdrop-filter: blur(2px);
+        }
+
+        .overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        /* Badge */
+        .nav-badge {
+            background: var(--primary-orange);
+            color: var(--white);
+            font-size: 0.7rem;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-weight: 600;
+        }
+
+        .nav-badge.new {
+            background: #22c55e;
+        }
+
+        .nav-badge.hot {
+            background: #ef4444;
+            animation: pulse 2s infinite;
         }
 
         /* Hero Section */
@@ -624,6 +885,18 @@
             .footer-logo {
                 height: 50px;
             }
+
+            .sidenav {
+                width: 280px;
+            }
+
+            .header-top {
+                padding: 0 10px;
+            }
+
+            .menu-button {
+                padding: 10px;
+            }
         }
 
         @media (min-width: 768px) {
@@ -816,20 +1089,136 @@
     </style>
 </head>
 <body>
+    <!-- Overlay -->
+    <div class="overlay" id="overlay"></div>
+
+    <!-- Side Navigation -->
+    <nav class="sidenav" id="sidenav">
+        <div class="sidenav-header">
+            <div class="sidenav-logo">
+                <img src="logo1.png" alt="Benetrip Logo">
+            </div>
+            <h3 class="sidenav-title">Menu de Navegação</h3>
+            <p class="sidenav-subtitle">Tudo que você precisa em um só lugar!</p>
+        </div>
+        
+        <div class="sidenav-content">
+            <!-- Ações Principais -->
+            <div class="nav-section">
+                <h4 class="nav-section-title">🚀 Ações Principais</h4>
+                
+                <a href="javascript:void(0)" class="nav-link primary" onclick="startDestinationFinder()">
+                    <span class="nav-link-icon">🎯</span>
+                    <span class="nav-link-text">Encontrar Destino Perfeito</span>
+                    <span class="nav-badge hot">Popular</span>
+                </a>
+                
+                <a href="javascript:void(0)" class="nav-link" onclick="startItineraryBuilder()">
+                    <span class="nav-link-icon">📋</span>
+                    <span class="nav-link-text">Criar Roteiro dos Sonhos</span>
+                    <span class="nav-badge new">Novo</span>
+                </a>
+                
+                <a href="https://www.benetrip.com.br/" class="nav-link" target="_blank">
+                    <span class="nav-link-icon">✈️</span>
+                    <span class="nav-link-text">Busca Rápida de Voos</span>
+                </a>
+            </div>
+
+            <!-- Navegação do Site -->
+            <div class="nav-section">
+                <h4 class="nav-section-title">🧭 Navegação</h4>
+                
+                <a href="#hero" class="nav-link" onclick="closeNavAndScrollTo('hero')">
+                    <span class="nav-link-icon">🏠</span>
+                    <span class="nav-link-text">Início</span>
+                </a>
+                
+                <a href="#options" class="nav-link" onclick="closeNavAndScrollTo('options')">
+                    <span class="nav-link-icon">🎮</span>
+                    <span class="nav-link-text">Como Funciona</span>
+                </a>
+                
+                <a href="#features" class="nav-link" onclick="closeNavAndScrollTo('features')">
+                    <span class="nav-link-icon">⭐</span>
+                    <span class="nav-link-text">Por Que Escolher a Benetrip</span>
+                </a>
+            </div>
+
+            <!-- Redes Sociais -->
+            <div class="nav-section">
+                <h4 class="nav-section-title">📱 Redes Sociais</h4>
+                
+                <a href="https://www.instagram.com/benetrip.oficial/" class="nav-link" target="_blank">
+                    <span class="nav-link-icon">📷</span>
+                    <span class="nav-link-text">Instagram Oficial</span>
+                </a>
+            </div>
+
+            <!-- Sobre Nós -->
+            <div class="nav-section">
+                <h4 class="nav-section-title">ℹ️ Sobre Nós</h4>
+                
+                <a href="https://benetrip.com.br/quemsomos.html" class="nav-link" target="_blank">
+                    <span class="nav-link-icon">🏢</span>
+                    <span class="nav-link-text">Quem Somos</span>
+                </a>
+                
+                <a href="https://benetrip.com.br/perguntasfrequentes.html" class="nav-link" target="_blank">
+                    <span class="nav-link-icon">❓</span>
+                    <span class="nav-link-text">Perguntas Frequentes</span>
+                </a>
+            </div>
+
+            <!-- Políticas -->
+            <div class="nav-section">
+                <h4 class="nav-section-title">📋 Políticas</h4>
+                
+                <a href="https://benetrip.com.br/termos.html" class="nav-link" target="_blank">
+                    <span class="nav-link-icon">📜</span>
+                    <span class="nav-link-text">Termos de Uso</span>
+                </a>
+                
+                <a href="https://benetrip.com.br/privacidade.html" class="nav-link" target="_blank">
+                    <span class="nav-link-icon">🔒</span>
+                    <span class="nav-link-text">Política de Privacidade</span>
+                </a>
+                
+                <a href="https://benetrip.com.br/cookies.html" class="nav-link" target="_blank">
+                    <span class="nav-link-icon">🍪</span>
+                    <span class="nav-link-text">Política de Cookies</span>
+                </a>
+            </div>
+        </div>
+    </nav>
+
     <!-- Header -->
     <header class="header">
         <div class="container">
-            <div class="header-content">
+            <div class="header-top">
+                <button class="menu-button" id="menuButton" onclick="toggleNav()">
+                    <div class="hamburger">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </div>
+                </button>
+                
                 <div class="logo-container">
                     <img src="logo1.png" alt="Benetrip Logo" class="logo">
                 </div>
+                
+                <div style="width: 50px;"></div> <!-- Spacer for centering -->
+            </div>
+            
+            <div class="header-content">
                 <p class="tagline">Sua próxima aventura começa aqui!</p>
             </div>
         </div>
     </header>
 
     <!-- Hero Section -->
-    <section class="hero">
+    <section class="hero" id="hero">
         <div class="container">
             <div class="hero-content">
                 <div class="hero-text slide-in-left">
@@ -858,7 +1247,7 @@ Somos uma plataforma inovadora que transforma o jeito de planejar viagens com a 
     </section>
 
     <!-- Options Section -->
-    <section class="options">
+    <section class="options" id="options">
         <div class="container">
             <h2 class="options-title fade-in">Como posso te ajudar hoje? 🐾</h2>
             
@@ -895,7 +1284,7 @@ Somos uma plataforma inovadora que transforma o jeito de planejar viagens com a 
     </section>
 
     <!-- Features Section -->
-    <section class="features">
+    <section class="features" id="features">
         <div class="container">
             <h2 class="features-title">Por que viajar comigo é a melhor escolha? 🌍</h2>
             
@@ -1028,6 +1417,63 @@ Somos uma plataforma inovadora que transforma o jeito de planejar viagens com a 
             loadingDot.style.animation = 'bounce 1s infinite';
             button.appendChild(loadingDot);
         }
+
+        // Controle do menu lateral
+        function toggleNav() {
+            const sidenav = document.getElementById('sidenav');
+            const overlay = document.getElementById('overlay');
+            const menuButton = document.getElementById('menuButton');
+            
+            const isOpen = sidenav.classList.contains('open');
+            
+            if (isOpen) {
+                closeNav();
+            } else {
+                openNav();
+            }
+        }
+
+        function openNav() {
+            const sidenav = document.getElementById('sidenav');
+            const overlay = document.getElementById('overlay');
+            const menuButton = document.getElementById('menuButton');
+            
+            sidenav.classList.add('open');
+            overlay.classList.add('active');
+            menuButton.classList.add('active');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeNav() {
+            const sidenav = document.getElementById('sidenav');
+            const overlay = document.getElementById('overlay');
+            const menuButton = document.getElementById('menuButton');
+            
+            sidenav.classList.remove('open');
+            overlay.classList.remove('active');
+            menuButton.classList.remove('active');
+            document.body.style.overflow = '';
+        }
+
+        function closeNavAndScrollTo(sectionId) {
+            closeNav();
+            setTimeout(() => {
+                const element = document.getElementById(sectionId);
+                if (element) {
+                    element.scrollIntoView({ behavior: 'smooth' });
+                }
+            }, 300);
+        }
+
+        // Fechar menu ao clicar no overlay
+        document.getElementById('overlay').addEventListener('click', closeNav);
+
+        // Fechar menu com tecla ESC
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                closeNav();
+            }
+        });
 
         // Animações ao rolar a página com Intersection Observer melhorado
         const observerOptions = {
@@ -1165,6 +1611,35 @@ Somos uma plataforma inovadora que transforma o jeito de planejar viagens com a 
         window.addEventListener('scroll', () => {
             const scrollProgress = (window.scrollY / (document.documentElement.scrollHeight - window.innerHeight)) * 100;
             document.documentElement.style.setProperty('--scroll-progress', `${scrollProgress}%`);
+        });
+
+        // Adiciona efeito de hover nos links de navegação
+        document.querySelectorAll('.nav-link').forEach(link => {
+            link.addEventListener('mouseenter', function() {
+                const icon = this.querySelector('.nav-link-icon');
+                const badge = this.querySelector('.nav-badge');
+                
+                if (icon) {
+                    icon.style.transform = 'scale(1.2) rotate(10deg)';
+                }
+                
+                if (badge) {
+                    badge.style.transform = 'scale(1.1)';
+                }
+            });
+            
+            link.addEventListener('mouseleave', function() {
+                const icon = this.querySelector('.nav-link-icon');
+                const badge = this.querySelector('.nav-badge');
+                
+                if (icon) {
+                    icon.style.transform = 'scale(1) rotate(0deg)';
+                }
+                
+                if (badge) {
+                    badge.style.transform = 'scale(1)';
+                }
+            });
         });
     </script>
 </body>
