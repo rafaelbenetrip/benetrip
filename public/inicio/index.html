@@ -24,21 +24,6 @@
     <meta name="twitter:description" content="A Tripinha, uma vira-lata caramelo que já andou pelo mundo todo, te ajuda a encontrar destinos incríveis.">
     <meta name="twitter:image" content="https://benetrip.com.br/assets/images/og-image.jpg">
     
-    <!-- Structured Data -->
-    <script type="application/ld+json">
-    {
-        "@context": "https://schema.org",
-        "@type": "TravelAgency",
-        "name": "Benetrip",
-        "description": "Planejador de viagens com a expertise da Tripinha",
-        "url": "https://benetrip.com.br",
-        "logo": "https://benetrip.com.br/logo-tripinha.png",
-        "sameAs": [
-            "https://www.instagram.com/benetrip.oficial/"
-        ]
-    }
-    </script>
-
     <style>
         :root {
             --primary-orange: #E87722;
@@ -156,16 +141,20 @@
         }
 
         .logo-container {
-            background: var(--white);
-            padding: 15px 25px;
-            border-radius: 15px;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+            background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+            padding: 20px 30px;
+            border-radius: 20px;
+            box-shadow: 
+                0 10px 40px rgba(0, 0, 0, 0.12),
+                0 4px 20px rgba(0, 0, 0, 0.08),
+                inset 0 1px 0 rgba(255, 255, 255, 0.9);
             display: flex;
             align-items: center;
             justify-content: center;
-            min-width: 250px;
+            min-width: 280px;
             position: relative;
             overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.8);
         }
 
         .logo-container::before {
@@ -175,7 +164,7 @@
             left: -100%;
             width: 100%;
             height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(232, 119, 34, 0.1), transparent);
+            background: linear-gradient(90deg, transparent, rgba(232, 119, 34, 0.08), transparent);
             transition: left 0.8s;
         }
 
@@ -184,11 +173,12 @@
         }
 
         .logo {
-            height: 80px;
+            height: 90px;
             width: auto;
             max-width: 100%;
             position: relative;
             z-index: 1;
+            filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.1));
         }
 
         .tagline {
@@ -197,6 +187,7 @@
             opacity: 0.95;
             font-weight: 400;
             margin-top: 5px;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
         }
 
         /* Hero Section */
@@ -241,6 +232,49 @@
             margin-bottom: 25px;
             opacity: 0.8;
             line-height: 1.5;
+        }
+
+        /* Sistema de expansão mobile */
+        .hero-expandable {
+            position: relative;
+        }
+
+        .hero-summary {
+            display: block;
+        }
+
+        .hero-full {
+            display: none;
+        }
+
+        .expand-btn {
+            background: transparent;
+            border: none;
+            color: var(--primary-orange);
+            font-weight: 600;
+            font-size: 0.9rem;
+            cursor: pointer;
+            padding: 8px 0;
+            margin-top: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+            transition: all 0.3s ease;
+            width: 100%;
+        }
+
+        .expand-btn:hover {
+            color: var(--secondary-blue);
+            transform: translateY(-1px);
+        }
+
+        .expand-btn .icon {
+            transition: transform 0.3s ease;
+        }
+
+        .expand-btn.expanded .icon {
+            transform: rotate(180deg);
         }
 
         .tripinha-container {
@@ -323,34 +357,6 @@
             font-size: 0.95rem;
         }
 
-        /* Process Preview */
-        .process-preview {
-            background: rgba(232, 119, 34, 0.1);
-            border-radius: 12px;
-            padding: 15px;
-            margin-top: 20px;
-            text-align: center;
-        }
-
-        .process-preview h4 {
-            font-size: 0.9rem;
-            color: var(--dark-gray);
-            margin-bottom: 10px;
-            font-weight: 600;
-        }
-
-        .steps {
-            display: flex;
-            flex-direction: column;
-            gap: 5px;
-        }
-
-        .step {
-            font-size: 0.8rem;
-            color: var(--dark-gray);
-            opacity: 0.8;
-        }
-
         /* Options Section */
         .options {
             padding: 60px 0;
@@ -385,7 +391,7 @@
             cursor: pointer;
             border: 2px solid transparent;
             position: relative;
-            overflow: hidden;
+            overflow: visible; /* Mudado para visible para permitir tag externa */
         }
 
         .option-card::before {
@@ -397,6 +403,7 @@
             height: 100%;
             background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
             transition: left 0.5s;
+            z-index: 1;
         }
 
         .option-card:hover::before {
@@ -420,21 +427,29 @@
             box-shadow: 0 15px 60px rgba(232, 119, 34, 0.25);
         }
 
-        /* Tag "Mais Popular" corrigida para ficar fora do card */
-        .option-card.primary::after {
-            content: "🔥 MAIS POPULAR";
+        /* Tag "Mais Popular" corrigida */
+        .popular-tag {
             position: absolute;
-            top: -12px;
-            right: 15px;
-            background: var(--success-green);
+            top: -15px;
+            right: 20px;
+            background: linear-gradient(135deg, var(--success-green) 0%, #059669 100%);
             color: white;
-            padding: 6px 12px;
-            border-radius: 15px;
-            font-size: 0.7rem;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.75rem;
             font-weight: bold;
-            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+            box-shadow: 
+                0 4px 12px rgba(16, 185, 129, 0.4),
+                0 2px 6px rgba(16, 185, 129, 0.2);
             z-index: 10;
             white-space: nowrap;
+            border: 2px solid white;
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
         }
 
         .option-card.secondary {
@@ -453,6 +468,8 @@
             font-size: 2.5rem;
             margin-bottom: 15px;
             display: block;
+            position: relative;
+            z-index: 2;
         }
 
         .option-title {
@@ -460,6 +477,8 @@
             font-size: 1.3rem;
             font-weight: 600;
             margin-bottom: 12px;
+            position: relative;
+            z-index: 2;
         }
 
         .option-description {
@@ -467,6 +486,8 @@
             opacity: 0.9;
             margin-bottom: 20px;
             line-height: 1.4;
+            position: relative;
+            z-index: 2;
         }
 
         .option-button {
@@ -488,6 +509,7 @@
             justify-content: center;
             gap: 2px;
             width: 100%;
+            z-index: 2;
         }
 
         .option-button::before {
@@ -599,19 +621,24 @@
         }
 
         .footer-logo-container {
-            background: var(--white);
-            padding: 8px 16px;
-            border-radius: 12px;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+            background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+            padding: 12px 20px;
+            border-radius: 16px;
+            box-shadow: 
+                0 8px 32px rgba(0, 0, 0, 0.15),
+                0 4px 16px rgba(0, 0, 0, 0.1),
+                inset 0 1px 0 rgba(255, 255, 255, 0.9);
             display: inline-flex;
             align-items: center;
             justify-content: center;
             margin-bottom: 15px;
+            border: 1px solid rgba(255, 255, 255, 0.8);
         }
 
         .footer-logo img {
-            height: 28px;
+            height: 32px;
             width: auto;
+            filter: drop-shadow(0 1px 4px rgba(0, 0, 0, 0.1));
         }
 
         .footer-text {
@@ -684,13 +711,13 @@
             }
 
             .logo {
-                height: 100px;
+                height: 110px;
             }
 
             .logo-container {
-                padding: 20px 30px;
-                border-radius: 20px;
-                min-width: 300px;
+                padding: 25px 35px;
+                border-radius: 25px;
+                min-width: 320px;
             }
 
             .tagline {
@@ -761,22 +788,29 @@
                 margin: 0 auto 30px;
             }
 
-            .steps {
-                flex-direction: row;
-                justify-content: center;
-                gap: 15px;
+            /* No desktop, sempre mostra texto completo */
+            .hero-summary {
+                display: none;
+            }
+
+            .hero-full {
+                display: block;
+            }
+
+            .expand-btn {
+                display: none;
             }
         }
 
         @media (min-width: 1024px) {
             .logo {
-                height: 120px;
+                height: 130px;
             }
 
             .logo-container {
-                padding: 25px 40px;
-                border-radius: 25px;
-                min-width: 380px;
+                padding: 30px 45px;
+                border-radius: 30px;
+                min-width: 400px;
             }
 
             .hero {
@@ -883,6 +917,22 @@
         .option-card.loading .option-button {
             background: rgba(255, 255, 255, 0.4);
         }
+
+        /* Animação suave para expansão */
+        .hero-full {
+            overflow: hidden;
+            transition: max-height 0.3s ease-out, opacity 0.3s ease-out;
+        }
+
+        .hero-full.collapsed {
+            max-height: 0;
+            opacity: 0;
+        }
+
+        .hero-full.expanded {
+            max-height: 500px;
+            opacity: 1;
+        }
     </style>
 </head>
 
@@ -896,8 +946,8 @@
                          alt="Benetrip - Planejador de viagens com a Tripinha" 
                          class="logo"
                          loading="eager"
-                         width="120" 
-                         height="120">
+                         width="130" 
+                         height="130">
                 </div>
                 <p class="tagline">Sua próxima aventura começa aqui!</p>
             </div>
@@ -911,19 +961,28 @@
                 <div class="hero-content">
                     <div class="hero-text slide-in-left">
                         <h1 id="hero-title" class="hero-title">Conheça a Benetrip: sua parceira de viagem! 🌍</h1>
-                        <p class="hero-subtitle">
-                            Somos uma plataforma inovadora que revoluciona o planejamento de viagens! 
-                            Nossa mascote, a Tripinha, é uma vira-lata caramelo super esperta que já andou pelo mundo todo e sabe tudo sobre os melhores destinos. 
-                            Com toda sua experiência de viagem, ela te ajuda a encontrar as passagens mais baratas e experiências personalizadas para cada viajante. 
-                            Com a Benetrip, planejar sua próxima aventura nunca foi tão fácil e divertido!
-                        </p>
                         
-                        <div class="process-preview">
-                            <h4>Como funciona:</h4>
-                            <div class="steps">
-                                <span class="step">1️⃣ 5 perguntas rápidas</span>
-                                <span class="step">2️⃣ Tripinha analisa suas preferências</span>
-                                <span class="step">3️⃣ Destinos personalizados</span>
+                        <div class="hero-expandable">
+                            <!-- Versão resumida para mobile -->
+                            <div class="hero-summary">
+                                <p class="hero-subtitle">
+                                    A Tripinha é uma vira-lata caramelo super esperta que já andou pelo mundo todo! 
+                                    Com toda sua experiência, ela te ajuda a encontrar destinos incríveis e passagens baratas.
+                                </p>
+                                <button class="expand-btn" onclick="toggleHeroText()">
+                                    <span>Conheça mais sobre a Benetrip</span>
+                                    <span class="icon">▼</span>
+                                </button>
+                            </div>
+
+                            <!-- Versão completa -->
+                            <div class="hero-full collapsed" id="hero-full">
+                                <p class="hero-subtitle">
+                                    Somos uma plataforma inovadora que revoluciona o planejamento de viagens! 
+                                    Nossa mascote, a Tripinha, é uma vira-lata caramelo super esperta que já andou pelo mundo todo e sabe tudo sobre os melhores destinos. 
+                                    Com toda sua experiência de viagem, ela te ajuda a encontrar as passagens mais baratas e experiências personalizadas para cada viajante. 
+                                    Com a Benetrip, planejar sua próxima aventura nunca foi tão fácil e divertido!
+                                </p>
                             </div>
                         </div>
                     </div>
@@ -957,6 +1016,7 @@
                 
                 <div class="options-grid" role="group" aria-label="Opções de planejamento de viagem">
                     <article class="option-card primary fade-in" onclick="startDestinationFinder(this)">
+                        <div class="popular-tag">🔥 MAIS POPULAR</div>
                         <span class="option-icon" aria-hidden="true">🎯</span>
                         <h3 class="option-title">Vou encontrar seu destino perfeito!</h3>
                         <p class="option-description">
@@ -1055,8 +1115,8 @@
                          alt="Benetrip Logo" 
                          class="footer-logo"
                          loading="lazy"
-                         width="28" 
-                         height="28">
+                         width="32" 
+                         height="32">
                 </div>
                 <p class="footer-text">
                     Transformando seus sonhos em viagens inesquecíveis! 🐾
@@ -1106,6 +1166,28 @@
     </footer>
 
     <script>
+        // Função para expandir/recolher texto do hero
+        function toggleHeroText() {
+            const heroFull = document.getElementById('hero-full');
+            const expandBtn = document.querySelector('.expand-btn');
+            const icon = expandBtn.querySelector('.icon');
+            const text = expandBtn.querySelector('span:first-child');
+            
+            if (heroFull.classList.contains('collapsed')) {
+                heroFull.classList.remove('collapsed');
+                heroFull.classList.add('expanded');
+                expandBtn.classList.add('expanded');
+                text.textContent = 'Mostrar menos';
+                icon.textContent = '▲';
+            } else {
+                heroFull.classList.remove('expanded');
+                heroFull.classList.add('collapsed');
+                expandBtn.classList.remove('expanded');
+                text.textContent = 'Conheça mais sobre a Benetrip';
+                icon.textContent = '▼';
+            }
+        }
+
         // Função para adicionar loading state e navegar
         function addLoadingState(card, buttonText, redirectUrl) {
             const button = card.querySelector('.option-button');
@@ -1145,7 +1227,7 @@
 
         // Função para navegar para o criador de roteiros
         function startItineraryBuilder(card) {
-            addLoadingState(card, 'Preparando...', 'itinerary.html');
+            addLoadingState(card, 'Preparando...', 'itinerary2.html');
             
             if (typeof gtag !== 'undefined') {
                 gtag('event', 'click', {
@@ -1157,7 +1239,7 @@
 
         // Função para navegar para a busca clássica
         function startClassicSearch(card) {
-            addLoadingState(card, 'Buscando...', 'flights.html');
+            addLoadingState(card, 'Buscando...', 'www.benetrip.com.br');
             
             if (typeof gtag !== 'undefined') {
                 gtag('event', 'click', {
@@ -1253,22 +1335,6 @@
                     }
                 });
             });
-
-            // Análise de performance (se disponível)
-            if (typeof PerformanceObserver !== 'undefined') {
-                try {
-                    const perfObserver = new PerformanceObserver((list) => {
-                        for (const entry of list.getEntries()) {
-                            if (entry.entryType === 'largest-contentful-paint') {
-                                console.log('LCP:', entry.startTime);
-                            }
-                        }
-                    });
-                    perfObserver.observe({entryTypes: ['largest-contentful-paint']});
-                } catch (e) {
-                    // Silently fail if PerformanceObserver not fully supported
-                }
-            }
         });
 
         // Efeito de parallax sutil no header (apenas se não houver preferência por movimento reduzido)
@@ -1281,38 +1347,6 @@
                 }
             }, { passive: true });
         }
-
-        // Service Worker para cache (se disponível)
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('/sw.js')
-                    .then(registration => {
-                        console.log('SW registered: ', registration);
-                    })
-                    .catch(registrationError => {
-                        console.log('SW registration failed: ', registrationError);
-                    });
-            });
-        }
-    </script>
-
-    <!-- Schema Markup adicional para SEO -->
-    <script type="application/ld+json">
-    {
-        "@context": "https://schema.org",
-        "@type": "WebPage",
-        "name": "Benetrip - Planeje sua viagem perfeita com a Tripinha",
-        "description": "A Tripinha, uma vira-lata caramelo que já andou pelo mundo todo, te ajuda a encontrar destinos incríveis e passagens baratas.",
-        "url": "https://benetrip.com.br",
-        "mainEntity": {
-            "@type": "Service",
-            "name": "Planejamento de Viagens",
-            "provider": {
-                "@type": "Organization",
-                "name": "Benetrip"
-            }
-        }
-    }
     </script>
 </body>
 </html>
