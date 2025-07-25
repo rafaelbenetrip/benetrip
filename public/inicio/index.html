@@ -3,25 +3,25 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Benetrip - Planeje sua viagem perfeita com IA 🐾</title>
+    <title>Benetrip - Planeje sua viagem perfeita com a Tripinha 🐾</title>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&family=Montserrat:wght@300;400;500;600&display=swap" rel="stylesheet">
     
     <!-- SEO e Meta Tags Otimizadas -->
-    <meta name="description" content="A Tripinha usa IA para encontrar seu destino ideal, passagens baratas e roteiros personalizados. Mais de 10.000 viajantes já economizaram com a Benetrip!">
-    <meta name="keywords" content="viagem, destinos, passagens baratas, roteiro personalizado, IA, planejamento de viagem">
+    <meta name="description" content="A Tripinha, uma vira-lata caramelo que já andou pelo mundo todo, te ajuda a encontrar seu destino ideal, passagens baratas e roteiros personalizados!">
+    <meta name="keywords" content="viagem, destinos, passagens baratas, roteiro personalizado, planejamento de viagem">
     <link rel="canonical" href="https://benetrip.com.br">
     
     <!-- Open Graph -->
-    <meta property="og:title" content="Benetrip - Planeje sua viagem perfeita com IA">
-    <meta property="og:description" content="A Tripinha usa IA para encontrar seu destino ideal, passagens baratas e roteiros personalizados. Comece sua aventura!">
+    <meta property="og:title" content="Benetrip - Planeje sua viagem perfeita com a Tripinha">
+    <meta property="og:description" content="A Tripinha, uma vira-lata caramelo que já andou pelo mundo todo, te ajuda a encontrar destinos incríveis e passagens baratas!">
     <meta property="og:image" content="https://benetrip.com.br/assets/images/og-image.jpg">
     <meta property="og:url" content="https://benetrip.com.br">
     <meta property="og:type" content="website">
     
     <!-- Twitter Card -->
     <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="Benetrip - Planeje sua viagem perfeita com IA">
-    <meta name="twitter:description" content="A Tripinha usa IA para encontrar seu destino ideal, passagens baratas e roteiros personalizados.">
+    <meta name="twitter:title" content="Benetrip - Planeje sua viagem perfeita com a Tripinha">
+    <meta name="twitter:description" content="A Tripinha, uma vira-lata caramelo que já andou pelo mundo todo, te ajuda a encontrar destinos incríveis.">
     <meta name="twitter:image" content="https://benetrip.com.br/assets/images/og-image.jpg">
     
     <!-- Structured Data -->
@@ -30,7 +30,7 @@
         "@context": "https://schema.org",
         "@type": "TravelAgency",
         "name": "Benetrip",
-        "description": "Planejador de viagens com inteligência artificial",
+        "description": "Planejador de viagens com a expertise da Tripinha",
         "url": "https://benetrip.com.br",
         "logo": "https://benetrip.com.br/logo-tripinha.png",
         "sameAs": [
@@ -197,41 +197,6 @@
             opacity: 0.95;
             font-weight: 400;
             margin-top: 5px;
-        }
-
-        /* Stats Bar - Social Proof */
-        .stats-bar {
-            background: var(--white);
-            border-bottom: 1px solid var(--medium-gray);
-            padding: 15px 0;
-        }
-
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-            gap: 20px;
-            text-align: center;
-        }
-
-        .stat {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
-
-        .stat-number {
-            font-family: 'Poppins', sans-serif;
-            font-size: 1.5rem;
-            font-weight: 700;
-            color: var(--primary-orange);
-            display: block;
-        }
-
-        .stat-label {
-            font-size: 0.85rem;
-            color: var(--dark-gray);
-            opacity: 0.8;
-            margin-top: 2px;
         }
 
         /* Hero Section */
@@ -407,6 +372,7 @@
             gap: 20px;
             max-width: 800px;
             margin: 0 auto;
+            position: relative;
         }
 
         .option-card {
@@ -454,18 +420,21 @@
             box-shadow: 0 15px 60px rgba(232, 119, 34, 0.25);
         }
 
+        /* Tag "Mais Popular" corrigida para ficar fora do card */
         .option-card.primary::after {
             content: "🔥 MAIS POPULAR";
             position: absolute;
-            top: -8px;
+            top: -12px;
             right: 15px;
             background: var(--success-green);
             color: white;
-            padding: 4px 10px;
-            border-radius: 12px;
+            padding: 6px 12px;
+            border-radius: 15px;
             font-size: 0.7rem;
             font-weight: bold;
-            box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+            z-index: 10;
+            white-space: nowrap;
         }
 
         .option-card.secondary {
@@ -728,15 +697,6 @@
                 font-size: 1.2rem;
             }
 
-            .stats-grid {
-                grid-template-columns: repeat(3, 1fr);
-                gap: 30px;
-            }
-
-            .stat-number {
-                font-size: 1.8rem;
-            }
-
             .hero {
                 padding: 60px 0;
             }
@@ -933,7 +893,7 @@
             <div class="header-content">
                 <div class="logo-container">
                     <img src="logo-tripinha.png" 
-                         alt="Benetrip - Planejador de viagens com IA" 
+                         alt="Benetrip - Planejador de viagens com a Tripinha" 
                          class="logo"
                          loading="eager"
                          width="120" 
@@ -944,26 +904,6 @@
         </div>
     </header>
 
-    <!-- Stats Bar - Social Proof -->
-    <section class="stats-bar" aria-label="Estatísticas da Benetrip">
-        <div class="container">
-            <div class="stats-grid">
-                <div class="stat">
-                    <span class="stat-number" aria-label="Mais de dez mil">10.000+</span>
-                    <span class="stat-label">Viajantes Felizes</span>
-                </div>
-                <div class="stat">
-                    <span class="stat-number" aria-label="Dois mil e quinhentos reais">R$ 2.500</span>
-                    <span class="stat-label">Economia Média</span>
-                </div>
-                <div class="stat">
-                    <span class="stat-number" aria-label="Mais de cento e cinquenta">150+</span>
-                    <span class="stat-label">Destinos</span>
-                </div>
-            </div>
-        </div>
-    </section>
-
     <!-- Hero Section -->
     <main role="main">
         <section class="hero" aria-labelledby="hero-title">
@@ -972,16 +912,17 @@
                     <div class="hero-text slide-in-left">
                         <h1 id="hero-title" class="hero-title">Conheça a Benetrip: sua parceira de viagem! 🌍</h1>
                         <p class="hero-subtitle">
-                            Somos uma plataforma inovadora que revoluciona o planejamento de viagens através da inteligência artificial. 
-                            Nossa mascote, a Tripinha, é uma vira-lata caramelo super esperta que usa tecnologia avançada para encontrar 
-                            os melhores destinos, passagens mais baratas e experiências personalizadas para cada viajante.
+                            Somos uma plataforma inovadora que revoluciona o planejamento de viagens! 
+                            Nossa mascote, a Tripinha, é uma vira-lata caramelo super esperta que já andou pelo mundo todo e sabe tudo sobre os melhores destinos. 
+                            Com toda sua experiência de viagem, ela te ajuda a encontrar as passagens mais baratas e experiências personalizadas para cada viajante. 
+                            Com a Benetrip, planejar sua próxima aventura nunca foi tão fácil e divertido!
                         </p>
                         
                         <div class="process-preview">
                             <h4>Como funciona:</h4>
                             <div class="steps">
                                 <span class="step">1️⃣ 5 perguntas rápidas</span>
-                                <span class="step">2️⃣ IA analisa suas preferências</span>
+                                <span class="step">2️⃣ Tripinha analisa suas preferências</span>
                                 <span class="step">3️⃣ Destinos personalizados</span>
                             </div>
                         </div>
@@ -1001,7 +942,7 @@
                         <div class="speech-bubble">
                             <p class="speech-text">
                                 <strong>Oi, meu nome é Tripinha! 🐾</strong><br>
-                                Sou sua companheira de viagem e vou te ajudar a encontrar aventuras incríveis! Que tal a gente começar essa jornada juntos? ✈️✨
+                                Sou uma vira-lata caramelo que já andou pelo mundo todo! Com toda minha experiência, vou te ajudar a encontrar aventuras incríveis! Que tal a gente começar essa jornada juntos? ✈️✨
                             </p>
                         </div>
                     </div>
@@ -1019,7 +960,7 @@
                         <span class="option-icon" aria-hidden="true">🎯</span>
                         <h3 class="option-title">Vou encontrar seu destino perfeito!</h3>
                         <p class="option-description">
-                            Me conta suas preferências que eu faço a mágica! Vou te ajudar a descobrir o lugar ideal para sua próxima aventura! 🌟
+                            Me conta suas preferências que eu faço a mágica! Com toda minha experiência de viagem, vou te ajudar a descobrir o lugar ideal para sua próxima aventura! 🌟
                         </p>
                         <button class="option-button" aria-describedby="dest-desc">
                             <span class="cta-text">Encontrar Meu Destino</span>
@@ -1070,10 +1011,10 @@
                 
                 <div class="features-grid">
                     <article class="feature fade-in">
-                        <div class="feature-icon" aria-hidden="true">🤖</div>
-                        <h3 class="feature-title">Sou super inteligente!</h3>
+                        <div class="feature-icon" aria-hidden="true">🌍</div>
+                        <h3 class="feature-title">Já andei pelo mundo todo!</h3>
                         <p class="feature-description">
-                            Uso toda minha esperteza e IA para encontrar as opções perfeitas para você!
+                            Com toda minha experiência de viagem, conheço os melhores destinos e segredos de cada lugar!
                         </p>
                     </article>
 
@@ -1097,7 +1038,7 @@
                         <div class="feature-icon" aria-hidden="true">🎯</div>
                         <h3 class="feature-title">Conheço você melhor que ninguém!</h3>
                         <p class="feature-description">
-                            Aprendo suas preferências e sempre sugiro o que combina mais com seu perfil!
+                            Aprendo suas preferências e sempre sugiro o que combina mais com seu perfil de viajante!
                         </p>
                     </article>
                 </div>
@@ -1360,12 +1301,12 @@
     {
         "@context": "https://schema.org",
         "@type": "WebPage",
-        "name": "Benetrip - Planeje sua viagem perfeita com IA",
-        "description": "A Tripinha usa IA para encontrar seu destino ideal, passagens baratas e roteiros personalizados.",
+        "name": "Benetrip - Planeje sua viagem perfeita com a Tripinha",
+        "description": "A Tripinha, uma vira-lata caramelo que já andou pelo mundo todo, te ajuda a encontrar destinos incríveis e passagens baratas.",
         "url": "https://benetrip.com.br",
         "mainEntity": {
             "@type": "Service",
-            "name": "Planejamento de Viagens com IA",
+            "name": "Planejamento de Viagens",
             "provider": {
                 "@type": "Organization",
                 "name": "Benetrip"
