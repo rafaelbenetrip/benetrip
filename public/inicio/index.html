@@ -3,9 +3,42 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Benetrip - Sua Próxima Aventura Começa Aqui! 🐾</title>
+    <title>Benetrip - Planeje sua viagem perfeita com IA 🐾</title>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&family=Montserrat:wght@300;400;500;600&display=swap" rel="stylesheet">
-    <meta name="description" content="Planeje sua viagem perfeita com a Tripinha! Descubra destinos incríveis, encontre passagens baratas e crie roteiros personalizados.">
+    
+    <!-- SEO e Meta Tags Otimizadas -->
+    <meta name="description" content="A Tripinha usa IA para encontrar seu destino ideal, passagens baratas e roteiros personalizados. Mais de 10.000 viajantes já economizaram com a Benetrip!">
+    <meta name="keywords" content="viagem, destinos, passagens baratas, roteiro personalizado, IA, planejamento de viagem">
+    <link rel="canonical" href="https://benetrip.com.br">
+    
+    <!-- Open Graph -->
+    <meta property="og:title" content="Benetrip - Planeje sua viagem perfeita com IA">
+    <meta property="og:description" content="A Tripinha usa IA para encontrar seu destino ideal, passagens baratas e roteiros personalizados. Comece sua aventura!">
+    <meta property="og:image" content="https://benetrip.com.br/assets/images/og-image.jpg">
+    <meta property="og:url" content="https://benetrip.com.br">
+    <meta property="og:type" content="website">
+    
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Benetrip - Planeje sua viagem perfeita com IA">
+    <meta name="twitter:description" content="A Tripinha usa IA para encontrar seu destino ideal, passagens baratas e roteiros personalizados.">
+    <meta name="twitter:image" content="https://benetrip.com.br/assets/images/og-image.jpg">
+    
+    <!-- Structured Data -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "TravelAgency",
+        "name": "Benetrip",
+        "description": "Planejador de viagens com inteligência artificial",
+        "url": "https://benetrip.com.br",
+        "logo": "https://benetrip.com.br/logo-tripinha.png",
+        "sameAs": [
+            "https://www.instagram.com/benetrip.oficial/"
+        ]
+    }
+    </script>
+
     <style>
         :root {
             --primary-orange: #E87722;
@@ -14,12 +47,27 @@
             --dark-gray: #21272A;
             --light-gray: #F5F5F5;
             --medium-gray: #E0E0E0;
+            --success-green: #10B981;
+            --warning-yellow: #F59E0B;
         }
 
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
+        }
+
+        /* Classe para leitores de tela */
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border: 0;
         }
 
         body {
@@ -35,11 +83,36 @@
             padding: 0 20px;
         }
 
+        /* Spinner para loading states */
+        .spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Respeitar preferências de movimento */
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+                scroll-behavior: auto !important;
+            }
+        }
+
         /* Header */
         .header {
             background: linear-gradient(135deg, var(--primary-orange) 0%, var(--secondary-blue) 100%);
             color: var(--white);
-            padding: 30px 0;
+            padding: 20px 0;
             position: relative;
             overflow: hidden;
         }
@@ -79,18 +152,18 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 20px;
+            gap: 15px;
         }
 
         .logo-container {
             background: var(--white);
-            padding: 20px 30px;
-            border-radius: 20px;
+            padding: 15px 25px;
+            border-radius: 15px;
             box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
             display: flex;
             align-items: center;
             justify-content: center;
-            min-width: 280px;
+            min-width: 250px;
             position: relative;
             overflow: hidden;
         }
@@ -111,7 +184,7 @@
         }
 
         .logo {
-            height: 110px;
+            height: 80px;
             width: auto;
             max-width: 100%;
             position: relative;
@@ -119,24 +192,59 @@
         }
 
         .tagline {
-            font-size: 1.2rem;
+            font-size: 1.1rem;
             text-align: center;
             opacity: 0.95;
             font-weight: 400;
-            margin-top: 10px;
+            margin-top: 5px;
+        }
+
+        /* Stats Bar - Social Proof */
+        .stats-bar {
+            background: var(--white);
+            border-bottom: 1px solid var(--medium-gray);
+            padding: 15px 0;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 20px;
+            text-align: center;
+        }
+
+        .stat {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .stat-number {
+            font-family: 'Poppins', sans-serif;
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--primary-orange);
+            display: block;
+        }
+
+        .stat-label {
+            font-size: 0.85rem;
+            color: var(--dark-gray);
+            opacity: 0.8;
+            margin-top: 2px;
         }
 
         /* Hero Section */
         .hero {
             background: linear-gradient(45deg, var(--light-gray) 0%, var(--white) 100%);
-            padding: 60px 0;
+            padding: 40px 0;
             position: relative;
         }
 
         .hero-content {
             display: grid;
             grid-template-columns: 1fr;
-            gap: 40px;
+            gap: 30px;
             align-items: center;
         }
 
@@ -146,29 +254,39 @@
 
         .hero-title {
             font-family: 'Poppins', sans-serif;
-            font-size: 2.5rem;
+            font-size: 2.2rem;
             font-weight: 700;
-            color: var(--dark-gray);
-            margin-bottom: 20px;
-            line-height: 1.2;
+            margin-bottom: 15px;
+            line-height: 1.1;
+            background: linear-gradient(135deg, var(--primary-orange), var(--secondary-blue));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            animation: shimmer 3s ease-in-out infinite;
+        }
+
+        @keyframes shimmer {
+            0%, 100% { filter: brightness(1); }
+            50% { filter: brightness(1.2); }
         }
 
         .hero-subtitle {
-            font-size: 1.2rem;
+            font-size: 1.1rem;
             color: var(--dark-gray);
-            margin-bottom: 30px;
+            margin-bottom: 25px;
             opacity: 0.8;
+            line-height: 1.5;
         }
 
         .tripinha-container {
             display: flex;
             justify-content: center;
-            margin-bottom: 30px;
+            margin-bottom: 25px;
         }
 
         .tripinha-avatar {
-            width: 120px;
-            height: 120px;
+            width: 100px;
+            height: 100px;
             background: linear-gradient(135deg, #D2691E, #F4A460);
             border-radius: 50%;
             display: flex;
@@ -190,8 +308,8 @@
         .tripinha-avatar::before {
             content: '';
             position: absolute;
-            width: 140px;
-            height: 140px;
+            width: 120px;
+            height: 120px;
             border: 3px solid var(--primary-orange);
             border-radius: 50%;
             border-style: dashed;
@@ -201,8 +319,8 @@
 
         @keyframes bounce {
             0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
-            40% { transform: translateY(-10px); }
-            60% { transform: translateY(-5px); }
+            40% { transform: translateY(-8px); }
+            60% { transform: translateY(-4px); }
         }
 
         @keyframes rotate {
@@ -212,12 +330,12 @@
 
         .speech-bubble {
             background: var(--white);
-            padding: 20px;
-            border-radius: 20px;
+            padding: 18px;
+            border-radius: 18px;
             border: 2px solid var(--primary-orange);
             position: relative;
-            max-width: 400px;
-            margin: 0 auto 40px;
+            max-width: 350px;
+            margin: 0 auto 30px;
             box-shadow: 0 4px 20px rgba(232, 119, 34, 0.15);
         }
 
@@ -237,35 +355,64 @@
             font-weight: 500;
             color: var(--dark-gray);
             text-align: center;
+            font-size: 0.95rem;
+        }
+
+        /* Process Preview */
+        .process-preview {
+            background: rgba(232, 119, 34, 0.1);
+            border-radius: 12px;
+            padding: 15px;
+            margin-top: 20px;
+            text-align: center;
+        }
+
+        .process-preview h4 {
+            font-size: 0.9rem;
+            color: var(--dark-gray);
+            margin-bottom: 10px;
+            font-weight: 600;
+        }
+
+        .steps {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .step {
+            font-size: 0.8rem;
+            color: var(--dark-gray);
+            opacity: 0.8;
         }
 
         /* Options Section */
         .options {
-            padding: 80px 0;
+            padding: 60px 0;
             background: var(--white);
         }
 
         .options-title {
             font-family: 'Poppins', sans-serif;
-            font-size: 2.2rem;
+            font-size: 2rem;
             font-weight: 700;
             text-align: center;
-            margin-bottom: 50px;
+            margin-bottom: 40px;
             color: var(--dark-gray);
         }
 
         .options-grid {
             display: grid;
             grid-template-columns: 1fr;
-            gap: 30px;
+            gap: 20px;
             max-width: 800px;
             margin: 0 auto;
         }
 
         .option-card {
             background: var(--white);
-            border-radius: 20px;
-            padding: 30px;
+            border-radius: 18px;
+            padding: 25px;
             text-align: center;
             box-shadow: 0 8px 40px rgba(0, 0, 0, 0.1);
             transition: all 0.3s ease;
@@ -291,14 +438,34 @@
         }
 
         .option-card:hover {
-            transform: translateY(-10px);
+            transform: translateY(-8px) scale(1.01);
             box-shadow: 0 15px 50px rgba(0, 0, 0, 0.15);
         }
 
+        .option-card:active {
+            transform: translateY(-5px) scale(0.98);
+        }
+
         .option-card.primary {
+            transform: scale(1.03);
             border-color: var(--primary-orange);
             background: linear-gradient(135deg, var(--primary-orange) 0%, #ff9a47 100%);
             color: var(--white);
+            box-shadow: 0 15px 60px rgba(232, 119, 34, 0.25);
+        }
+
+        .option-card.primary::after {
+            content: "🔥 MAIS POPULAR";
+            position: absolute;
+            top: -8px;
+            right: 15px;
+            background: var(--success-green);
+            color: white;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.7rem;
+            font-weight: bold;
+            box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
         }
 
         .option-card.secondary {
@@ -314,34 +481,62 @@
         }
 
         .option-icon {
-            font-size: 3rem;
-            margin-bottom: 20px;
+            font-size: 2.5rem;
+            margin-bottom: 15px;
             display: block;
         }
 
         .option-title {
             font-family: 'Poppins', sans-serif;
-            font-size: 1.4rem;
+            font-size: 1.3rem;
             font-weight: 600;
-            margin-bottom: 15px;
+            margin-bottom: 12px;
         }
 
         .option-description {
-            font-size: 1rem;
+            font-size: 0.95rem;
             opacity: 0.9;
-            margin-bottom: 25px;
+            margin-bottom: 20px;
+            line-height: 1.4;
         }
 
         .option-button {
             background: rgba(255, 255, 255, 0.2);
             border: 2px solid rgba(255, 255, 255, 0.3);
             color: var(--white);
-            padding: 12px 30px;
+            padding: 14px 30px;
             border-radius: 50px;
             font-weight: 600;
             transition: all 0.3s ease;
             cursor: pointer;
             font-size: 1rem;
+            min-height: 48px;
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 2px;
+            width: 100%;
+        }
+
+        .option-button::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            background: rgba(255,255,255,0.3);
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            transition: width 0.6s, height 0.6s;
+        }
+
+        .option-button:active::before {
+            width: 200px;
+            height: 200px;
         }
 
         .option-button:hover {
@@ -350,57 +545,76 @@
             transform: scale(1.05);
         }
 
+        .option-button:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .cta-text {
+            font-weight: 600;
+            font-size: 1rem;
+        }
+
+        .cta-subtext {
+            font-size: 0.8rem;
+            opacity: 0.8;
+            font-weight: 400;
+        }
+
         /* Features Section */
         .features {
             background: var(--light-gray);
-            padding: 80px 0;
+            padding: 60px 0;
         }
 
         .features-title {
             font-family: 'Poppins', sans-serif;
-            font-size: 2.2rem;
+            font-size: 2rem;
             font-weight: 700;
             text-align: center;
-            margin-bottom: 50px;
+            margin-bottom: 40px;
             color: var(--dark-gray);
         }
 
         .features-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 30px;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 25px;
         }
 
         .feature {
             text-align: center;
-            padding: 20px;
+            padding: 20px 15px;
         }
 
         .feature-icon {
-            width: 80px;
-            height: 80px;
+            width: 70px;
+            height: 70px;
             background: var(--primary-orange);
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 2rem;
+            font-size: 1.8rem;
             color: var(--white);
-            margin: 0 auto 20px;
+            margin: 0 auto 15px;
             box-shadow: 0 4px 20px rgba(232, 119, 34, 0.3);
         }
 
         .feature-title {
             font-family: 'Poppins', sans-serif;
-            font-size: 1.2rem;
+            font-size: 1.1rem;
             font-weight: 600;
-            margin-bottom: 10px;
+            margin-bottom: 8px;
             color: var(--dark-gray);
         }
 
         .feature-description {
             color: var(--dark-gray);
             opacity: 0.8;
+            font-size: 0.9rem;
+            line-height: 1.4;
         }
 
         /* Footer */
@@ -412,7 +626,7 @@
         }
 
         .footer-content {
-            margin-bottom: 30px;
+            margin-bottom: 25px;
         }
 
         .footer-logo-container {
@@ -423,7 +637,7 @@
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            margin-bottom: 20px;
+            margin-bottom: 15px;
         }
 
         .footer-logo img {
@@ -433,29 +647,31 @@
 
         .footer-text {
             opacity: 0.8;
-            margin-bottom: 30px;
+            margin-bottom: 25px;
+            font-size: 0.9rem;
         }
 
         .footer-links {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            grid-template-columns: 1fr;
             gap: 20px;
-            margin-bottom: 30px;
-            text-align: left;
+            margin-bottom: 25px;
+            text-align: center;
         }
 
         .footer-section {
             display: flex;
             flex-direction: column;
-            gap: 12px;
+            gap: 10px;
+            align-items: center;
         }
 
         .footer-section h4 {
             color: var(--primary-orange);
             font-family: 'Poppins', sans-serif;
             font-weight: 600;
-            font-size: 1rem;
-            margin-bottom: 8px;
+            font-size: 0.95rem;
+            margin-bottom: 6px;
         }
 
         .footer-link {
@@ -463,48 +679,71 @@
             text-decoration: none;
             opacity: 0.8;
             transition: all 0.3s ease;
-            font-size: 0.9rem;
+            font-size: 0.85rem;
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 6px;
         }
 
-        .footer-link:hover {
+        .footer-link:hover, .footer-link:focus {
             opacity: 1;
             color: var(--primary-orange);
-            transform: translateX(5px);
+            transform: translateX(3px);
+        }
+
+        .footer-link:focus {
+            outline: 2px solid var(--primary-orange);
+            outline-offset: 2px;
+            border-radius: 4px;
         }
 
         .copyright {
             border-top: 1px solid rgba(255, 255, 255, 0.1);
             padding-top: 20px;
             opacity: 0.6;
-            font-size: 0.9rem;
+            font-size: 0.85rem;
         }
 
         /* Responsive Design */
         @media (min-width: 768px) {
+            .container {
+                padding: 0 30px;
+            }
+
+            .header {
+                padding: 25px 0;
+            }
+
             .logo {
-                height: 130px;
+                height: 100px;
             }
 
             .logo-container {
-                padding: 25px 40px;
-                border-radius: 25px;
-                min-width: 350px;
+                padding: 20px 30px;
+                border-radius: 20px;
+                min-width: 300px;
             }
 
             .tagline {
-                font-size: 1.4rem;
+                font-size: 1.2rem;
+            }
+
+            .stats-grid {
+                grid-template-columns: repeat(3, 1fr);
+                gap: 30px;
+            }
+
+            .stat-number {
+                font-size: 1.8rem;
             }
 
             .hero {
-                padding: 80px 0;
+                padding: 60px 0;
             }
 
             .hero-content {
                 grid-template-columns: 1fr 1fr;
-                gap: 60px;
+                gap: 50px;
                 align-items: center;
             }
 
@@ -522,11 +761,82 @@
             }
 
             .hero-title {
-                font-size: 3rem;
+                font-size: 2.8rem;
+            }
+
+            .hero-subtitle {
+                font-size: 1.2rem;
+            }
+
+            .tripinha-avatar {
+                width: 120px;
+                height: 120px;
+            }
+
+            .speech-bubble {
+                margin: 25px 0 0;
+                max-width: 300px;
+            }
+
+            .options {
+                padding: 80px 0;
+            }
+
+            .options-grid {
+                grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+                gap: 25px;
+            }
+
+            .option-card {
+                padding: 30px;
+            }
+
+            .features {
+                padding: 80px 0;
+            }
+
+            .footer-links {
+                grid-template-columns: repeat(3, 1fr);
+                max-width: 800px;
+                margin: 0 auto 30px;
+            }
+
+            .steps {
+                flex-direction: row;
+                justify-content: center;
+                gap: 15px;
+            }
+        }
+
+        @media (min-width: 1024px) {
+            .logo {
+                height: 120px;
+            }
+
+            .logo-container {
+                padding: 25px 40px;
+                border-radius: 25px;
+                min-width: 380px;
+            }
+
+            .hero {
+                padding: 80px 0;
+            }
+
+            .hero-content {
+                gap: 60px;
+                max-width: 1200px;
+                margin: 0 auto;
+            }
+
+            .hero-title {
+                font-size: 3.2rem;
+                margin-bottom: 20px;
             }
 
             .hero-subtitle {
                 font-size: 1.3rem;
+                margin-bottom: 30px;
             }
 
             .tripinha-avatar {
@@ -535,59 +845,8 @@
             }
 
             .speech-bubble {
-                margin: 30px 0 0;
                 max-width: 350px;
-            }
-
-            .options-grid {
-                grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            }
-
-            .footer-links {
-                grid-template-columns: repeat(3, 1fr);
-                text-align: center;
-            }
-        }
-
-        @media (min-width: 1024px) {
-            .logo {
-                height: 150px;
-            }
-
-            .logo-container {
-                padding: 30px 50px;
-                border-radius: 30px;
-                min-width: 420px;
-            }
-
-            .hero {
-                padding: 100px 0;
-            }
-
-            .hero-content {
-                gap: 80px;
-                max-width: 1200px;
-                margin: 0 auto;
-            }
-
-            .hero-title {
-                font-size: 3.5rem;
-                margin-bottom: 25px;
-            }
-
-            .hero-subtitle {
-                font-size: 1.4rem;
-                margin-bottom: 40px;
-            }
-
-            .tripinha-avatar {
-                width: 160px;
-                height: 160px;
-            }
-
-            .speech-bubble {
-                max-width: 400px;
-                padding: 25px;
+                padding: 22px;
             }
 
             .options {
@@ -600,28 +859,12 @@
                 margin: 0 auto;
             }
 
+            .features {
+                padding: 100px 0;
+            }
+
             .footer-links {
-                max-width: 800px;
-                margin: 0 auto 30px;
-            }
-        }
-
-        @media (min-width: 1200px) {
-            .container {
-                padding: 0 40px;
-            }
-        }
-
-        /* CSS para mobile */
-        @media (max-width: 767px) {
-            .footer-links {
-                grid-template-columns: 1fr;
-                gap: 25px;
-                text-align: center;
-            }
-
-            .footer-section {
-                align-items: center;
+                max-width: 900px;
             }
         }
 
@@ -633,7 +876,7 @@
         @keyframes fadeIn {
             from {
                 opacity: 0;
-                transform: translateY(30px);
+                transform: translateY(20px);
             }
             to {
                 opacity: 1;
@@ -648,7 +891,7 @@
         @keyframes slideInLeft {
             from {
                 opacity: 0;
-                transform: translateX(-50px);
+                transform: translateX(-30px);
             }
             to {
                 opacity: 1;
@@ -663,143 +906,216 @@
         @keyframes slideInRight {
             from {
                 opacity: 0;
-                transform: translateX(50px);
+                transform: translateX(30px);
             }
             to {
                 opacity: 1;
                 transform: translateX(0);
             }
         }
+
+        /* Loading state para botões */
+        .option-card.loading {
+            opacity: 0.8;
+            pointer-events: none;
+        }
+
+        .option-card.loading .option-button {
+            background: rgba(255, 255, 255, 0.4);
+        }
     </style>
 </head>
+
 <body>
     <!-- Header -->
-    <header class="header">
+    <header class="header" role="banner">
         <div class="container">
             <div class="header-content">
                 <div class="logo-container">
-                    <img src="logo-tripinha.png" alt="Benetrip Logo" class="logo">
+                    <img src="logo-tripinha.png" 
+                         alt="Benetrip - Planejador de viagens com IA" 
+                         class="logo"
+                         loading="eager"
+                         width="120" 
+                         height="120">
                 </div>
                 <p class="tagline">Sua próxima aventura começa aqui!</p>
             </div>
         </div>
     </header>
 
-    <!-- Hero Section -->
-    <section class="hero">
+    <!-- Stats Bar - Social Proof -->
+    <section class="stats-bar" aria-label="Estatísticas da Benetrip">
         <div class="container">
-            <div class="hero-content">
-                <div class="hero-text slide-in-left">
-                    <h2 class="hero-title">Conheça a Benetrip: sua parceira de viagem! 🌍</h2>
-                    <p class="hero-subtitle">
-                        Somos uma plataforma inovadora que revoluciona o planejamento de viagens através da inteligência artificial. 
-                        Nossa mascote, a Tripinha, é uma vira-lata caramelo super esperta que usa tecnologia avançada para encontrar 
-                        os melhores destinos, passagens mais baratas e experiências personalizadas para cada viajante. 
-                        Com a Benetrip, planejar sua próxima aventura nunca foi tão fácil e divertido!
-                    </p>
+            <div class="stats-grid">
+                <div class="stat">
+                    <span class="stat-number" aria-label="Mais de dez mil">10.000+</span>
+                    <span class="stat-label">Viajantes Felizes</span>
                 </div>
-                
-                <div class="slide-in-right">
-                    <div class="tripinha-container">
-                        <div class="tripinha-avatar">
-                            <img src="assets/images/tripinha/piscando.png" alt="Tripinha - Mascote da Benetrip">
+                <div class="stat">
+                    <span class="stat-number" aria-label="Dois mil e quinhentos reais">R$ 2.500</span>
+                    <span class="stat-label">Economia Média</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-number" aria-label="Mais de cento e cinquenta">150+</span>
+                    <span class="stat-label">Destinos</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Hero Section -->
+    <main role="main">
+        <section class="hero" aria-labelledby="hero-title">
+            <div class="container">
+                <div class="hero-content">
+                    <div class="hero-text slide-in-left">
+                        <h1 id="hero-title" class="hero-title">Conheça a Benetrip: sua parceira de viagem! 🌍</h1>
+                        <p class="hero-subtitle">
+                            Somos uma plataforma inovadora que revoluciona o planejamento de viagens através da inteligência artificial. 
+                            Nossa mascote, a Tripinha, é uma vira-lata caramelo super esperta que usa tecnologia avançada para encontrar 
+                            os melhores destinos, passagens mais baratas e experiências personalizadas para cada viajante.
+                        </p>
+                        
+                        <div class="process-preview">
+                            <h4>Como funciona:</h4>
+                            <div class="steps">
+                                <span class="step">1️⃣ 5 perguntas rápidas</span>
+                                <span class="step">2️⃣ IA analisa suas preferências</span>
+                                <span class="step">3️⃣ Destinos personalizados</span>
+                            </div>
                         </div>
                     </div>
                     
-                    <div class="speech-bubble">
-                        <p class="speech-text">
-                            <strong>Oi, meu nome é Tripinha! 🐾</strong><br>
-                            Sou sua companheira de viagem e vou te ajudar a encontrar aventuras incríveis! Que tal a gente começar essa jornada juntos? ✈️✨
-                        </p>
+                    <div class="slide-in-right">
+                        <div class="tripinha-container">
+                            <div class="tripinha-avatar">
+                                <img src="assets/images/tripinha/piscando.webp" 
+                                     alt="Tripinha - Mascote da Benetrip piscando"
+                                     loading="lazy"
+                                     width="140" 
+                                     height="140">
+                            </div>
+                        </div>
+                        
+                        <div class="speech-bubble">
+                            <p class="speech-text">
+                                <strong>Oi, meu nome é Tripinha! 🐾</strong><br>
+                                Sou sua companheira de viagem e vou te ajudar a encontrar aventuras incríveis! Que tal a gente começar essa jornada juntos? ✈️✨
+                            </p>
+                        </div>
                     </div>
                 </div>
             </div>
-        </div>
-    </section>
+        </section>
 
-    <!-- Options Section -->
-    <section class="options">
-        <div class="container">
-            <h2 class="options-title fade-in">Como posso te ajudar hoje? 🐾</h2>
-            
-            <div class="options-grid">
-                <div class="option-card primary fade-in" onclick="startDestinationFinder()">
-                    <span class="option-icon">🎯</span>
-                    <h3 class="option-title">Vou encontrar seu destino perfeito!</h3>
-                    <p class="option-description">
-                        Me conta suas preferências que eu faço a mágica! Vou te ajudar a descobrir o lugar ideal para sua próxima aventura! 🌟
-                    </p>
-                    <button class="option-button">Bora começar!</button>
-                </div>
+        <!-- Options Section -->
+        <section class="options" aria-labelledby="options-title">
+            <div class="container">
+                <h2 id="options-title" class="options-title fade-in">Como posso te ajudar hoje? 🐾</h2>
+                
+                <div class="options-grid" role="group" aria-label="Opções de planejamento de viagem">
+                    <article class="option-card primary fade-in" onclick="startDestinationFinder(this)">
+                        <span class="option-icon" aria-hidden="true">🎯</span>
+                        <h3 class="option-title">Vou encontrar seu destino perfeito!</h3>
+                        <p class="option-description">
+                            Me conta suas preferências que eu faço a mágica! Vou te ajudar a descobrir o lugar ideal para sua próxima aventura! 🌟
+                        </p>
+                        <button class="option-button" aria-describedby="dest-desc">
+                            <span class="cta-text">Encontrar Meu Destino</span>
+                            <span class="cta-subtext">Só leva 2 minutos!</span>
+                        </button>
+                        <span id="dest-desc" class="sr-only">
+                            Encontrar destino personalizado baseado em suas preferências através de questionário interativo
+                        </span>
+                    </article>
 
-                <div class="option-card secondary fade-in" onclick="startItineraryBuilder()">
-                    <span class="option-icon">📋</span>
-                    <h3 class="option-title">Vamos criar seu roteiro dos sonhos!</h3>
-                    <p class="option-description">
-                        Já escolheu o destino? Perfeito! Agora deixa comigo que eu monto um roteiro incrível e personalizado só pra você! 🗺️
-                    </p>
-                    <button class="option-button">Vamos nessa!</button>
-                </div>
+                    <article class="option-card secondary fade-in" onclick="startItineraryBuilder(this)">
+                        <span class="option-icon" aria-hidden="true">📋</span>
+                        <h3 class="option-title">Vamos criar seu roteiro dos sonhos!</h3>
+                        <p class="option-description">
+                            Já escolheu o destino? Perfeito! Agora deixa comigo que eu monto um roteiro incrível e personalizado só pra você! 🗺️
+                        </p>
+                        <button class="option-button" aria-describedby="itinerary-desc">
+                            <span class="cta-text">Criar Meu Roteiro</span>
+                            <span class="cta-subtext">Personalizado para você!</span>
+                        </button>
+                        <span id="itinerary-desc" class="sr-only">
+                            Criar roteiro de viagem personalizado para destinos já escolhidos
+                        </span>
+                    </article>
 
-                <div class="option-card tertiary fade-in" onclick="startClassicSearch()">
-                    <span class="option-icon">✈️</span>
-                    <h3 class="option-title">Prefere buscar voos do seu jeito?</h3>
-                    <p class="option-description">
-                        Sem problemas! Aqui você faz uma busca rápida e tradicional. Eu te mostro as melhores opções na velocidade da luz! ⚡
-                    </p>
-                    <button class="option-button">Buscar agora!</button>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- Features Section -->
-    <section class="features">
-        <div class="container">
-            <h2 class="features-title">Por que viajar comigo é a melhor escolha? 🐕</h2>
-            
-            <div class="features-grid">
-                <div class="feature fade-in">
-                    <div class="feature-icon">🤖</div>
-                    <h3 class="feature-title">Sou super inteligente!</h3>
-                    <p class="feature-description">
-                        Uso toda minha esperteza e IA para encontrar as opções perfeitas para você!
-                    </p>
-                </div>
-
-                <div class="feature fade-in">
-                    <div class="feature-icon">💰</div>
-                    <h3 class="feature-title">Farejoo os melhores preços!</h3>
-                    <p class="feature-description">
-                        Comparo centenas de sites para garantir que você pague menos e viaje mais!
-                    </p>
-                </div>
-
-                <div class="feature fade-in">
-                    <div class="feature-icon">⚡</div>
-                    <h3 class="feature-title">Sou rápida como um raio!</h3>
-                    <p class="feature-description">
-                        Em poucos minutos você tem sua viagem toda planejada. Eficiência é comigo mesmo!
-                    </p>
-                </div>
-
-                <div class="feature fade-in">
-                    <div class="feature-icon">🎯</div>
-                    <h3 class="feature-title">Conheço você melhor que ninguém!</h3>
-                    <p class="feature-description">
-                        Aprendo suas preferências e sempre sugiro o que combina mais com seu perfil!
-                    </p>
+                    <article class="option-card tertiary fade-in" onclick="startClassicSearch(this)">
+                        <span class="option-icon" aria-hidden="true">✈️</span>
+                        <h3 class="option-title">Prefere buscar voos do seu jeito?</h3>
+                        <p class="option-description">
+                            Sem problemas! Aqui você faz uma busca rápida e tradicional. Eu te mostro as melhores opções na velocidade da luz! ⚡
+                        </p>
+                        <button class="option-button" aria-describedby="search-desc">
+                            <span class="cta-text">Buscar Voos</span>
+                            <span class="cta-subtext">Busca tradicional</span>
+                        </button>
+                        <span id="search-desc" class="sr-only">
+                            Busca tradicional de voos com origem, destino e datas específicas
+                        </span>
+                    </article>
                 </div>
             </div>
-        </div>
-    </section>
+        </section>
+
+        <!-- Features Section -->
+        <section class="features" aria-labelledby="features-title">
+            <div class="container">
+                <h2 id="features-title" class="features-title">Por que viajar comigo é a melhor escolha? 🐕</h2>
+                
+                <div class="features-grid">
+                    <article class="feature fade-in">
+                        <div class="feature-icon" aria-hidden="true">🤖</div>
+                        <h3 class="feature-title">Sou super inteligente!</h3>
+                        <p class="feature-description">
+                            Uso toda minha esperteza e IA para encontrar as opções perfeitas para você!
+                        </p>
+                    </article>
+
+                    <article class="feature fade-in">
+                        <div class="feature-icon" aria-hidden="true">💰</div>
+                        <h3 class="feature-title">Farejoo os melhores preços!</h3>
+                        <p class="feature-description">
+                            Comparo centenas de sites para garantir que você pague menos e viaje mais!
+                        </p>
+                    </article>
+
+                    <article class="feature fade-in">
+                        <div class="feature-icon" aria-hidden="true">⚡</div>
+                        <h3 class="feature-title">Sou rápida como um raio!</h3>
+                        <p class="feature-description">
+                            Em poucos minutos você tem sua viagem toda planejada. Eficiência é comigo mesmo!
+                        </p>
+                    </article>
+
+                    <article class="feature fade-in">
+                        <div class="feature-icon" aria-hidden="true">🎯</div>
+                        <h3 class="feature-title">Conheço você melhor que ninguém!</h3>
+                        <p class="feature-description">
+                            Aprendo suas preferências e sempre sugiro o que combina mais com seu perfil!
+                        </p>
+                    </article>
+                </div>
+            </div>
+        </section>
+    </main>
 
     <!-- Footer -->
-    <footer class="footer">
+    <footer class="footer" role="contentinfo">
         <div class="container">
             <div class="footer-content">
                 <div class="footer-logo-container">
-                    <img src="logo-tripinha.png" alt="Benetrip Logo" class="footer-logo">
+                    <img src="logo-tripinha.png" 
+                         alt="Benetrip Logo" 
+                         class="footer-logo"
+                         loading="lazy"
+                         width="28" 
+                         height="28">
                 </div>
                 <p class="footer-text">
                     Transformando seus sonhos em viagens inesquecíveis! 🐾
@@ -808,31 +1124,35 @@
                 <div class="footer-links">
                     <div class="footer-section">
                         <h4>📱 Redes Sociais</h4>
-                        <a href="https://www.instagram.com/benetrip.oficial/" class="footer-link" target="_blank">
-                            <span>📷</span> Instagram Oficial
+                        <a href="https://www.instagram.com/benetrip.oficial/" 
+                           class="footer-link" 
+                           target="_blank" 
+                           rel="noopener noreferrer"
+                           aria-label="Visite nosso Instagram oficial (abre em nova aba)">
+                            <span aria-hidden="true">📷</span> Instagram Oficial
                         </a>
                     </div>
                     
                     <div class="footer-section">
                         <h4>ℹ️ Sobre Nós</h4>
                         <a href="https://benetrip.com.br/quemsomos.html" class="footer-link">
-                            <span>🏢</span> Quem Somos
+                            <span aria-hidden="true">🏢</span> Quem Somos
                         </a>
                         <a href="https://benetrip.com.br/perguntasfrequentes.html" class="footer-link">
-                            <span>❓</span> Perguntas Frequentes
+                            <span aria-hidden="true">❓</span> Perguntas Frequentes
                         </a>
                     </div>
                     
                     <div class="footer-section">
                         <h4>📋 Políticas</h4>
                         <a href="https://benetrip.com.br/termos.html" class="footer-link">
-                            <span>📜</span> Termos de Uso
+                            <span aria-hidden="true">📜</span> Termos de Uso
                         </a>
                         <a href="https://benetrip.com.br/privacidade.html" class="footer-link">
-                            <span>🔒</span> Política de Privacidade
+                            <span aria-hidden="true">🔒</span> Política de Privacidade
                         </a>
                         <a href="https://benetrip.com.br/cookies.html" class="footer-link">
-                            <span>🍪</span> Política de Cookies
+                            <span aria-hidden="true">🍪</span> Política de Cookies
                         </a>
                     </div>
                 </div>
@@ -845,37 +1165,71 @@
     </footer>
 
     <script>
-        // Função para navegar para o seletor de destinos
-        function startDestinationFinder() {
-            const card = event.currentTarget;
-            card.style.transform = 'scale(0.95)';
+        // Função para adicionar loading state e navegar
+        function addLoadingState(card, buttonText, redirectUrl) {
+            const button = card.querySelector('.option-button');
+            const ctaText = button.querySelector('.cta-text');
+            const ctaSubtext = button.querySelector('.cta-subtext');
+            
+            // Adicionar classe de loading
+            card.classList.add('loading');
+            button.disabled = true;
+            
+            // Alterar conteúdo do botão
+            ctaText.innerHTML = '<span class="spinner"></span> Carregando...';
+            ctaSubtext.style.display = 'none';
+            
+            // Efeito visual no card
+            card.style.transform = 'scale(0.98)';
+            card.style.opacity = '0.8';
+            
+            // Redirecionar após delay
             setTimeout(() => {
-                window.location.href = 'chat.html';
-            }, 200);
+                window.location.href = redirectUrl;
+            }, 1200);
+        }
+
+        // Função para navegar para o seletor de destinos
+        function startDestinationFinder(card) {
+            addLoadingState(card, 'Carregando...', 'chat.html');
+            
+            // Analytics tracking (se disponível)
+            if (typeof gtag !== 'undefined') {
+                gtag('event', 'click', {
+                    'event_category': 'Navigation',
+                    'event_label': 'Destination Finder'
+                });
+            }
         }
 
         // Função para navegar para o criador de roteiros
-        function startItineraryBuilder() {
-            const card = event.currentTarget;
-            card.style.transform = 'scale(0.95)';
-            setTimeout(() => {
-                window.location.href = 'itinerary.html';
-            }, 200);
+        function startItineraryBuilder(card) {
+            addLoadingState(card, 'Preparando...', 'itinerary.html');
+            
+            if (typeof gtag !== 'undefined') {
+                gtag('event', 'click', {
+                    'event_category': 'Navigation',
+                    'event_label': 'Itinerary Builder'
+                });
+            }
         }
 
         // Função para navegar para a busca clássica
-        function startClassicSearch() {
-            const card = event.currentTarget;
-            card.style.transform = 'scale(0.95)';
-            setTimeout(() => {
-                window.location.href = 'flights.html';
-            }, 200);
+        function startClassicSearch(card) {
+            addLoadingState(card, 'Buscando...', 'flights.html');
+            
+            if (typeof gtag !== 'undefined') {
+                gtag('event', 'click', {
+                    'event_category': 'Navigation',
+                    'event_label': 'Classic Search'
+                });
+            }
         }
 
         // Animações ao rolar a página
         const observerOptions = {
             threshold: 0.1,
-            rootMargin: '0px 0px -50px 0px'
+            rootMargin: '0px 0px -30px 0px'
         };
 
         const observer = new IntersectionObserver((entries) => {
@@ -887,77 +1241,137 @@
             });
         }, observerOptions);
 
-        // Observa elementos para animação
-        document.addEventListener('DOMContentLoaded', () => {
+        // Fallback para imagens que não carregarem
+        function handleImageError(img) {
+            if (img.alt.includes('Benetrip') || img.alt.includes('Logo')) {
+                img.style.display = 'none';
+                const logoText = document.createElement('span');
+                logoText.textContent = '🐾 Benetrip';
+                logoText.style.fontFamily = 'Poppins, sans-serif';
+                logoText.style.fontWeight = '700';
+                logoText.style.fontSize = img.classList.contains('footer-logo') ? '1.2rem' : '2rem';
+                logoText.style.color = '#E87722';
+                logoText.setAttribute('aria-label', 'Logo da Benetrip');
+                img.parentNode.appendChild(logoText);
+            }
+            if (img.alt.includes('Tripinha')) {
+                img.style.display = 'none';
+                const emoji = document.createElement('span');
+                emoji.textContent = '🐕';
+                emoji.style.fontSize = '4rem';
+                emoji.setAttribute('aria-label', 'Mascote Tripinha');
+                img.parentNode.appendChild(emoji);
+            }
+        }
+
+        // Event listeners e inicialização
+        document.addEventListener('DOMContentLoaded', function() {
+            // Observa elementos para animação
             const animatedElements = document.querySelectorAll('.fade-in, .slide-in-left, .slide-in-right');
             animatedElements.forEach(el => {
                 observer.observe(el);
             });
-        });
 
-        // Efeito de parallax sutil no header
-        window.addEventListener('scroll', () => {
-            const scrolled = window.pageYOffset;
-            const header = document.querySelector('.header');
-            if (header) {
-                header.style.transform = `translateY(${scrolled * 0.5}px)`;
-            }
-        });
-
-        // Adiciona efeito de hover nos cards
-        document.querySelectorAll('.option-card').forEach(card => {
-            card.addEventListener('mouseenter', function() {
-                this.style.transform = 'translateY(-10px) scale(1.02)';
-            });
-            
-            card.addEventListener('mouseleave', function() {
-                this.style.transform = 'translateY(0) scale(1)';
-            });
-        });
-
-        // Adiciona efeito nos links do footer
-        document.querySelectorAll('.footer-link').forEach(link => {
-            link.addEventListener('mouseenter', function() {
-                const emoji = this.querySelector('span');
-                if (emoji) {
-                    emoji.style.transform = 'scale(1.2) rotate(10deg)';
-                    emoji.style.transition = 'all 0.3s ease';
-                }
-            });
-            
-            link.addEventListener('mouseleave', function() {
-                const emoji = this.querySelector('span');
-                if (emoji) {
-                    emoji.style.transform = 'scale(1) rotate(0deg)';
-                }
-            });
-        });
-
-        // Fallback para imagens que não carregarem
-        document.addEventListener('DOMContentLoaded', function() {
+            // Configura fallback para imagens
             const images = document.querySelectorAll('img');
             images.forEach(img => {
-                img.addEventListener('error', function() {
-                    if (this.alt.includes('Benetrip Logo')) {
-                        this.style.display = 'none';
-                        const logoText = document.createElement('span');
-                        logoText.textContent = '🐾 Benetrip';
-                        logoText.style.fontFamily = 'Poppins, sans-serif';
-                        logoText.style.fontWeight = '700';
-                        logoText.style.fontSize = '2rem';
-                        logoText.style.color = '#E87722';
-                        this.parentNode.appendChild(logoText);
+                img.addEventListener('error', () => handleImageError(img));
+            });
+
+            // Adiciona efeito de hover nos cards
+            document.querySelectorAll('.option-card').forEach(card => {
+                card.addEventListener('mouseenter', function() {
+                    if (!this.classList.contains('loading')) {
+                        this.style.transform = this.classList.contains('primary') ? 
+                            'translateY(-10px) scale(1.04)' : 'translateY(-10px) scale(1.02)';
                     }
-                    if (this.alt.includes('Tripinha')) {
-                        this.style.display = 'none';
-                        const emoji = document.createElement('span');
-                        emoji.textContent = '🐕';
-                        emoji.style.fontSize = '4rem';
-                        this.parentNode.appendChild(emoji);
+                });
+                
+                card.addEventListener('mouseleave', function() {
+                    if (!this.classList.contains('loading')) {
+                        this.style.transform = this.classList.contains('primary') ? 
+                            'scale(1.03)' : 'scale(1)';
                     }
                 });
             });
+
+            // Adiciona efeito nos links do footer
+            document.querySelectorAll('.footer-link').forEach(link => {
+                link.addEventListener('mouseenter', function() {
+                    const emoji = this.querySelector('span[aria-hidden="true"]');
+                    if (emoji) {
+                        emoji.style.transform = 'scale(1.2) rotate(10deg)';
+                        emoji.style.transition = 'all 0.3s ease';
+                    }
+                });
+                
+                link.addEventListener('mouseleave', function() {
+                    const emoji = this.querySelector('span[aria-hidden="true"]');
+                    if (emoji) {
+                        emoji.style.transform = 'scale(1) rotate(0deg)';
+                    }
+                });
+            });
+
+            // Análise de performance (se disponível)
+            if (typeof PerformanceObserver !== 'undefined') {
+                try {
+                    const perfObserver = new PerformanceObserver((list) => {
+                        for (const entry of list.getEntries()) {
+                            if (entry.entryType === 'largest-contentful-paint') {
+                                console.log('LCP:', entry.startTime);
+                            }
+                        }
+                    });
+                    perfObserver.observe({entryTypes: ['largest-contentful-paint']});
+                } catch (e) {
+                    // Silently fail if PerformanceObserver not fully supported
+                }
+            }
         });
+
+        // Efeito de parallax sutil no header (apenas se não houver preferência por movimento reduzido)
+        if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+            window.addEventListener('scroll', () => {
+                const scrolled = window.pageYOffset;
+                const header = document.querySelector('.header');
+                if (header && scrolled < window.innerHeight) {
+                    header.style.transform = `translateY(${scrolled * 0.3}px)`;
+                }
+            }, { passive: true });
+        }
+
+        // Service Worker para cache (se disponível)
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js')
+                    .then(registration => {
+                        console.log('SW registered: ', registration);
+                    })
+                    .catch(registrationError => {
+                        console.log('SW registration failed: ', registrationError);
+                    });
+            });
+        }
+    </script>
+
+    <!-- Schema Markup adicional para SEO -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "WebPage",
+        "name": "Benetrip - Planeje sua viagem perfeita com IA",
+        "description": "A Tripinha usa IA para encontrar seu destino ideal, passagens baratas e roteiros personalizados.",
+        "url": "https://benetrip.com.br",
+        "mainEntity": {
+            "@type": "Service",
+            "name": "Planejamento de Viagens com IA",
+            "provider": {
+                "@type": "Organization",
+                "name": "Benetrip"
+            }
+        }
+    }
     </script>
 </body>
 </html>
