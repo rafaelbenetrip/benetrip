@@ -87,13 +87,14 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            min-width: 250px;
+            min-width: 220px;
             position: relative;
-            padding: 5px;
+            padding: 8px;
+            transition: transform 0.3s ease;
         }
 
         .logo {
-            height: 50px;
+            height: 45px;
             width: auto;
             max-width: 100%;
             position: relative;
@@ -458,6 +459,10 @@
             transform: translateY(-2px);
         }
 
+        .footer-logo-container:hover {
+            transform: translateY(-2px);
+        }
+
         /* Smooth scroll */
         html {
             scroll-behavior: smooth;
@@ -550,11 +555,13 @@
             align-items: center;
             justify-content: center;
             margin-bottom: 20px;
-            padding: 5px;
+            padding: 8px;
+            min-width: 220px;
+            transition: transform 0.3s ease;
         }
 
         .footer-logo img {
-            height: 50px;
+            height: 45px;
             width: auto;
             border-radius: 8px;
         }
@@ -613,16 +620,21 @@
         /* Responsive Design */
         @media (min-width: 768px) {
             .logo {
-                height: 55px;
+                height: 50px;
             }
 
             .logo-container {
-                padding: 8px;
-                min-width: 280px;
+                padding: 10px;
+                min-width: 250px;
+            }
+
+            .footer-logo-container {
+                padding: 10px;
+                min-width: 250px;
             }
 
             .footer-logo img {
-                height: 55px;
+                height: 50px;
             }
 
             .tagline {
@@ -682,16 +694,21 @@
 
         @media (min-width: 1024px) {
             .logo {
-                height: 60px;
+                height: 55px;
             }
 
             .logo-container {
-                padding: 10px;
-                min-width: 320px;
+                padding: 12px;
+                min-width: 280px;
+            }
+
+            .footer-logo-container {
+                padding: 12px;
+                min-width: 280px;
             }
 
             .footer-logo img {
-                height: 60px;
+                height: 55px;
             }
 
             .hero {
@@ -1135,7 +1152,7 @@ Somos uma plataforma inovadora que transforma o jeito de planejar viagens com a 
                         logoText.textContent = '🐾 Benetrip';
                         logoText.style.fontFamily = 'Poppins, sans-serif';
                         logoText.style.fontWeight = '700';
-                        logoText.style.fontSize = '1.8rem';
+                        logoText.style.fontSize = '1.5rem';
                         logoText.style.color = '#E87722';
                         logoText.style.animation = 'fadeIn 0.5s ease';
                         this.parentNode.appendChild(logoText);
