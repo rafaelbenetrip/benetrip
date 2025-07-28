@@ -1305,7 +1305,7 @@ if (e.target.closest('.btn-voltar')) {
       const cidade = this.dadosDestino.destino;
       const dataInicio = this.getDataIda();
       const dataFim = this.getDataVolta();
-      const diasComPrevisao = Math.min(3, this.roteiroPronto.dias.length);
+      const diasComPrevisao = Math.min(1, this.roteiroPronto.dias.length);
       
       console.log(`📊 Buscando previsão para: ${cidade} (${diasComPrevisao} dias)`);
       
@@ -1358,7 +1358,7 @@ if (e.target.closest('.btn-voltar')) {
     } catch (erro) {
       console.error('❌ Erro geral na busca de previsão:', erro);
       
-      const diasComPrevisao = Math.min(3, this.roteiroPronto.dias.length);
+      const diasComPrevisao = Math.min(1, this.roteiroPronto.dias.length);
       for (let i = 0; i < diasComPrevisao; i++) {
         if (!this.roteiroPronto.dias[i].previsao) {
           this.roteiroPronto.dias[i].previsao = this.gerarPrevisaoFallback(i);
