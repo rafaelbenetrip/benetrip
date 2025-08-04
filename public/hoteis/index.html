@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hotéis - Benetrip</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&family=Montserrat:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #E87722;    /* Laranja Vibrante Benetrip */
+            --secondary: #00A3E0;  /* Azul Sereno Benetrip */
+            --white: #FFFFFF;      /* Branco Neutro */
+            --dark: #21272A;       /* Cinza Escuro Benetrip */
+            --light-gray: #F5F5F5; /* Fundo claro */
+            --medium-gray: #E0E0E0; /* Bordas */
+        }
+
+        body {
+            font-family: 'Montserrat', sans-serif;
+            background-color: var(--light-gray);
+            color: var(--dark);
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 480px;
+            margin: 0 auto;
+            background-color: var(--white);
+            min-height: 100vh;
+            box-shadow: 0 0 20px rgba(0,0,0,0.1);
+        }
+
+        /* Header */
+        .header {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            color: var(--white);
+            padding: 20px;
+            text-align: center;
+            position: relative;
+        }
+
+        .header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grid" width="10" height="10" patternUnits="userSpaceOnUse"><path d="M 10 0 L 0 0 0 10" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="0.5"/></pattern></defs><rect width="100" height="100" fill="url(%23grid)"/></svg>');
+            opacity: 0.3;
+        }
+
+        .header-content {
+            position: relative;
+            z-index: 2;
+        }
+
+        .header h1 {
+            font-family: 'Poppins', sans-serif;
+            font-weight: 700;
+            font-size: 28px;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+        }
+
+        .tripinha-avatar {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: var(--white);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            border: 3px solid rgba(255,255,255,0.3);
+        }
+
+        .header p {
+            font-size: 16px;
+            opacity: 0.95;
+            margin-top: 8px;
+        }
+
+        /* Breadcrumb */
+        .breadcrumb {
+            padding: 15px 20px;
+            background-color: var(--white);
+            border-bottom: 1px solid var(--medium-gray);
+            font-size: 14px;
+        }
+
+        .breadcrumb a {
+            color: var(--secondary);
+            text-decoration: none;
+        }
+
+        .breadcrumb a:hover {
+            text-decoration: underline;
+        }
+
+        /* Main Content */
+        .main-content {
+            padding: 20px;
+        }
+
+        .intro-section {
+            background: linear-gradient(135deg, rgba(232, 119, 34, 0.05) 0%, rgba(0, 163, 224, 0.05) 100%);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 25px;
+            border: 1px solid var(--medium-gray);
+        }
+
+        .intro-section h2 {
+            font-family: 'Poppins', sans-serif;
+            font-weight: 600;
+            color: var(--primary);
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin: 20px 0;
+        }
+
+        .feature-card {
+            background: var(--white);
+            border: 1px solid var(--medium-gray);
+            border-radius: 10px;
+            padding: 15px;
+            text-align: center;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(232, 119, 34, 0.15);
+        }
+
+        .feature-icon {
+            font-size: 24px;
+            margin-bottom: 8px;
+            display: block;
+        }
+
+        .feature-title {
+            font-weight: 600;
+            color: var(--dark);
+            font-size: 14px;
+            margin-bottom: 4px;
+        }
+
+        .feature-desc {
+            font-size: 12px;
+            color: #666;
+        }
+
+        /* Widget Container */
+        .widget-container {
+            background: var(--white);
+            border-radius: 15px;
+            padding: 25px 20px;
+            margin: 20px 0;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+            border: 2px solid var(--medium-gray);
+        }
+
+        .widget-title {
+            font-family: 'Poppins', sans-serif;
+            font-weight: 600;
+            color: var(--dark);
+            margin-bottom: 15px;
+            text-align: center;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        /* Loading State */
+        .widget-loading {
+            text-align: center;
+            padding: 40px 20px;
+            color: #666;
+        }
+
+        .loading-spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid var(--medium-gray);
+            border-top: 3px solid var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Tips Section */
+        .tips-section {
+            background: rgba(0, 163, 224, 0.05);
+            border-left: 4px solid var(--secondary);
+            border-radius: 0 10px 10px 0;
+            padding: 20px;
+            margin: 25px 0;
+        }
+
+        .tips-section h3 {
+            font-family: 'Poppins', sans-serif;
+            font-weight: 600;
+            color: var(--secondary);
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .tip-item {
+            margin-bottom: 8px;
+            font-size: 14px;
+            padding-left: 20px;
+            position: relative;
+        }
+
+        .tip-item::before {
+            content: '✓';
+            position: absolute;
+            left: 0;
+            color: var(--secondary);
+            font-weight: bold;
+        }
+
+        /* Footer */
+        .footer {
+            background: var(--dark);
+            color: var(--white);
+            padding: 30px 20px;
+            text-align: center;
+            margin-top: 40px;
+        }
+
+        .footer-logo {
+            font-family: 'Poppins', sans-serif;
+            font-weight: 700;
+            font-size: 24px;
+            margin-bottom: 10px;
+            color: var(--primary);
+        }
+
+        .footer p {
+            font-size: 14px;
+            opacity: 0.8;
+        }
+
+        /* Responsive */
+        @media (max-width: 480px) {
+            .container {
+                max-width: 100%;
+                box-shadow: none;
+            }
+            
+            .features-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .main-content {
+                padding: 15px;
+            }
+        }
+
+        /* Custom widget styles override */
+        iframe[src*="tpembd.com"] {
+            border-radius: 10px;
+            border: 1px solid var(--medium-gray);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <h1>
+                    <div class="tripinha-avatar">🐕</div>
+                    Hotéis Incríveis
+                </h1>
+                <p>A Tripinha encontrou as melhores hospedagens para você! 🏨✨</p>
+            </div>
+        </header>
+
+        <!-- Breadcrumb -->
+        <nav class="breadcrumb">
+            <a href="#" onclick="window.history.back()">← Voltar para destinos</a> 
+            <span style="color: #999; margin: 0 8px;">•</span>
+            <span>Hotéis</span>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Intro Section -->
+            <section class="intro-section">
+                <h2>🎯 Encontre sua hospedagem perfeita</h2>
+                <p>Compare preços, avaliações e comodidades de milhares de hotéis ao redor do mundo. A Tripinha garante que você encontre o lugar ideal para descansar!</p>
+                
+                <div class="features-grid">
+                    <div class="feature-card">
+                        <span class="feature-icon">💰</span>
+                        <div class="feature-title">Melhor Preço</div>
+                        <div class="feature-desc">Garantia de preço baixo</div>
+                    </div>
+                    <div class="feature-card">
+                        <span class="feature-icon">⭐</span>
+                        <div class="feature-title">Avaliações Reais</div>
+                        <div class="feature-desc">Reviews de viajantes</div>
+                    </div>
+                    <div class="feature-card">
+                        <span class="feature-icon">🗺️</span>
+                        <div class="feature-title">Localização</div>
+                        <div class="feature-desc">Hotéis bem localizados</div>
+                    </div>
+                    <div class="feature-card">
+                        <span class="feature-icon">🎉</span>
+                        <div class="feature-title">Sem Taxa</div>
+                        <div class="feature-desc">Reserva gratuita</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Widget Container -->
+            <section class="widget-container">
+                <h2 class="widget-title">
+                    🔍 Buscar Hotéis
+                </h2>
+                
+                <!-- Loading State (será substituído pelo widget) -->
+                <div class="widget-loading" id="widgetLoading">
+                    <div class="loading-spinner"></div>
+                    <p>Carregando busca de hotéis...</p>
+                </div>
+
+                <!-- Widget de Hotéis Travelpayouts - CORES AJUSTADAS -->
+                <script async 
+                    src="https://tpembd.com/content?currency=brl&trs=389722&shmarker=604241&show_hotels=true&powered_by=true&locale=pt&searchUrl=search.hotellook.com&primary_override=%23E87722&color_button=%23E87722&color_icons=%23E87722&secondary=%23FFFFFF&dark=%2321272A&light=%23FFFFFF&special=%23C4C4C4&color_focused=%2300A3E0&border_radius=10&plain=true&promo_id=7873&campaign_id=101" 
+                    charset="utf-8"
+                    onload="document.getElementById('widgetLoading').style.display='none'">
+                </script>
+            </section>
+
+            <!-- Tips Section -->
+            <section class="tips-section">
+                <h3>💡 Dicas da Tripinha</h3>
+                <div class="tip-item">Reserve com antecedência para garantir melhores preços</div>
+                <div class="tip-item">Verifique as avaliações e fotos recentes</div>
+                <div class="tip-item">Considere a localização em relação aos pontos turísticos</div>
+                <div class="tip-item">Leia as políticas de cancelamento antes de reservar</div>
+                <div class="tip-item">Confirme se o hotel oferece WiFi gratuito</div>
+            </section>
+        </main>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <div class="footer-logo">Benetrip</div>
+            <p>Sua companheira de viagens • Powered by Tripinha 🐕</p>
+        </footer>
+    </div>
+</body>
+</html>
