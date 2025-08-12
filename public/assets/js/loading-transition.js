@@ -1,7 +1,7 @@
 /**
  * BENETRIP - Animação Interativa de Transição
  * Melhora a experiência de espera entre o chat e os destinos recomendados
- * Versão 1.5 - Com correções para progresso consistente e sincronização com carregamento de dados
+ * Versão 1.6 - Com mapa SVG corrigido e posicionamento otimizado
  */
 
 (function() {
@@ -23,14 +23,14 @@
       pendingRedirect: false  // Flag para indicar redirecionamento pendente
     },
     destinations: [
-      { name: 'Paris', emoji: '🗼', x: 48, y: 22 },
-      { name: 'New York', emoji: '🗽', x: 25, y: 28 },
-      { name: 'Tokyo', emoji: '🏯', x: 82, y: 30 },
-      { name: 'Rio', emoji: '🏖️', x: 35, y: 70 },
-      { name: 'Cape Town', emoji: '🏔️', x: 52, y: 80 },
-      { name: 'Sydney', emoji: '🏄', x: 85, y: 78 },
-      { name: 'Bangkok', emoji: '🛕', x: 75, y: 45 },
-      { name: 'Rome', emoji: '🏛️', x: 52, y: 32 },
+      { name: 'Paris', emoji: '🗼', x: 47, y: 25 },        // Europa
+      { name: 'New York', emoji: '🗽', x: 18, y: 30 },     // América do Norte
+      { name: 'Tokyo', emoji: '🏯', x: 78, y: 35 },        // Ásia
+      { name: 'Rio', emoji: '🏖️', x: 15, y: 65 },         // América do Sul  
+      { name: 'Cape Town', emoji: '🏔️', x: 48, y: 85 },   // África
+      { name: 'Sydney', emoji: '🏄', x: 82, y: 68 },       // Oceania
+      { name: 'Bangkok', emoji: '🛕', x: 68, y: 42 },      // Ásia
+      { name: 'Rome', emoji: '🏛️', x: 45, y: 32 },        // Europa
     ],
     travelTips: [
       "Sabia que as pessoas fazem mais de 1 bilhão de viagens internacionais por ano? 🌍",
@@ -173,15 +173,40 @@
           
           <!-- Mapa interativo com a Tripinha -->
           <div class="world-map relative w-full h-48 bg-blue-50 rounded-lg mb-4 overflow-hidden">
-            <!-- Mapa do mundo simplificado (simulado com gradientes) -->
-            <div class="map-background absolute inset-0 bg-gradient-to-b from-blue-100 to-blue-200">
-              <!-- Silhuetas de continentes (simuladas com elementos div) -->
-              <div class="continent absolute left-[20%] top-[25%] w-[25%] h-[30%] bg-green-200 rounded-xl"></div>
-              <div class="continent absolute left-[50%] top-[20%] w-[30%] h-[25%] bg-green-200 rounded-xl"></div>
-              <div class="continent absolute left-[30%] top-[60%] w-[15%] h-[20%] bg-green-200 rounded-xl"></div>
-              <div class="continent absolute left-[80%] top-[40%] w-[15%] h-[30%] bg-green-200 rounded-xl"></div>
-              <div class="continent absolute left-[70%] top-[70%] w-[20%] h-[15%] bg-green-200 rounded-xl"></div>
-            </div>
+            <!-- Mapa do mundo com SVG -->
+            <svg class="map-background absolute inset-0 w-full h-full" viewBox="0 0 400 200" xmlns="http://www.w3.org/2000/svg">
+              <!-- Oceano de fundo -->
+              <rect width="400" height="200" fill="#e0f2fe"/>
+              
+              <!-- América do Norte -->
+              <path d="M20 40 L70 35 L75 45 L90 42 L95 55 L85 65 L70 70 L50 75 L35 65 L25 50 Z" 
+                    fill="#a7f3d0" stroke="#34d399" stroke-width="1"/>
+              
+              <!-- América do Sul -->
+              <path d="M55 85 L70 80 L75 95 L72 120 L65 135 L58 140 L50 135 L48 120 L52 100 Z" 
+                    fill="#a7f3d0" stroke="#34d399" stroke-width="1"/>
+              
+              <!-- Europa -->
+              <path d="M180 45 L200 40 L210 50 L205 60 L190 65 L175 55 Z" 
+                    fill="#a7f3d0" stroke="#34d399" stroke-width="1"/>
+              
+              <!-- África -->
+              <path d="M185 70 L210 65 L215 85 L220 110 L210 130 L190 135 L175 120 L180 95 Z" 
+                    fill="#a7f3d0" stroke="#34d399" stroke-width="1"/>
+              
+              <!-- Ásia -->
+              <path d="M220 35 L280 30 L320 40 L330 55 L315 70 L290 75 L260 65 L235 55 Z" 
+                    fill="#a7f3d0" stroke="#34d399" stroke-width="1"/>
+              
+              <!-- Oceania/Austrália -->
+              <path d="M300 120 L330 115 L340 125 L335 135 L315 140 L305 130 Z" 
+                    fill="#a7f3d0" stroke="#34d399" stroke-width="1"/>
+              
+              <!-- Algumas ilhas decorativas -->
+              <circle cx="140" cy="90" r="3" fill="#a7f3d0"/>
+              <circle cx="150" cy="85" r="2" fill="#a7f3d0"/>
+              <circle cx="280" cy="100" r="2.5" fill="#a7f3d0"/>
+            </svg>
             
             <!-- Destinos no mapa -->
             <div class="destinations-container"></div>
@@ -279,24 +304,21 @@
           box-shadow: 0 2px 10px rgba(0,0,0,0.05);
         }
         
+        /* Mapa SVG */
         .map-background {
-          background: linear-gradient(to bottom, #cfe7ff, #a1cfff);
-        }
-        
-        .continent {
-          background-color: rgba(144, 238, 144, 0.6);
-          border-radius: 12px;
-          position: absolute;
+          filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));
         }
         
         /* Destinos no mapa */
         .destination-point {
           position: absolute;
-          font-size: 22px;
+          font-size: 20px;
           transform: translate(-50%, -50%);
           transition: all 0.5s ease;
           cursor: pointer;
-          z-index: 1;
+          z-index: 5;
+          text-shadow: 0 1px 3px rgba(255,255,255,0.8);
+          filter: drop-shadow(0 1px 2px rgba(0,0,0,0.3));
         }
         
         .destination-point:hover {
@@ -311,15 +333,15 @@
         @keyframes pulse {
           0% {
             transform: translate(-50%, -50%) scale(1);
-            text-shadow: 0 0 0 rgba(0,0,0,0);
+            text-shadow: 0 1px 3px rgba(255,255,255,0.8);
           }
           50% {
             transform: translate(-50%, -50%) scale(1.2);
-            text-shadow: 0 0 10px rgba(255,255,255,0.7);
+            text-shadow: 0 0 10px rgba(255,255,255,0.9);
           }
           100% {
             transform: translate(-50%, -50%) scale(1);
-            text-shadow: 0 0 0 rgba(0,0,0,0);
+            text-shadow: 0 1px 3px rgba(255,255,255,0.8);
           }
         }
         
@@ -704,10 +726,11 @@
       
       const dest = this.destinations[this.state.currentPosition];
       
-      // Posicionar a Tripinha à direita do destino (pois o focinho está à esquerda)
-      const offsetX = 8; // Deslocamento à direita em porcentagem
+      // Posicionar a Tripinha próximo ao destino
+      const offsetX = 3; // Deslocamento menor para ficar próximo ao destino
+      const offsetY = -2; // Pequeno deslocamento vertical para parecer mais natural
       tripinhaElement.style.left = `${dest.x + offsetX}%`;
-      tripinhaElement.style.top = `${dest.y}%`;
+      tripinhaElement.style.top = `${dest.y + offsetY}%`;
       
       // Ajustar o tamanho proporcionalmente à quantidade de destinos descobertos
       this.updateTripihaSize();
@@ -715,7 +738,7 @@
 
     /**
      * Move a Tripinha para uma nova posição no mapa
-     * Modificado para posicionar sempre à direita do destino
+     * Modificado para posicionar próximo aos destinos
      */
     moveTripihaToNewPosition() {
       // Escolher uma nova posição aleatória (diferente da atual)
@@ -731,10 +754,11 @@
       if (tripinhaElement) {
         const dest = this.destinations[this.state.currentPosition];
         
-        // Posicionar a Tripinha à direita do destino (pois o focinho está à esquerda)
-        const offsetX = 10; // Deslocamento à direita em porcentagem (aumentado para a Tripinha maior)
+        // Posicionar a Tripinha próximo ao destino, mas um pouco deslocada
+        const offsetX = 3; // Deslocamento menor para ficar próximo ao destino
+        const offsetY = -2; // Pequeno deslocamento vertical para parecer mais natural
         tripinhaElement.style.left = `${dest.x + offsetX}%`;
-        tripinhaElement.style.top = `${dest.y}%`;
+        tripinhaElement.style.top = `${dest.y + offsetY}%`;
         
         // Animar balão de fala
         this.showSpeechBubble();
