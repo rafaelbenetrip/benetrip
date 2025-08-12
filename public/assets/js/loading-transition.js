@@ -23,14 +23,14 @@
       pendingRedirect: false  // Flag para indicar redirecionamento pendente
     },
     destinations: [
-      { name: 'Paris', emoji: '🗼', x: 47, y: 25 },        // Europa
-      { name: 'New York', emoji: '🗽', x: 18, y: 30 },     // América do Norte
-      { name: 'Tokyo', emoji: '🏯', x: 78, y: 35 },        // Ásia
-      { name: 'Rio', emoji: '🏖️', x: 15, y: 65 },         // América do Sul  
-      { name: 'Cape Town', emoji: '🏔️', x: 48, y: 85 },   // África
-      { name: 'Sydney', emoji: '🏄', x: 82, y: 68 },       // Oceania
-      { name: 'Bangkok', emoji: '🛕', x: 68, y: 42 },      // Ásia
-      { name: 'Rome', emoji: '🏛️', x: 45, y: 32 },        // Europa
+      { name: 'Paris', emoji: '🗼', x: 48, y: 35 },        // Europa
+      { name: 'New York', emoji: '🗽', x: 22, y: 40 },     // América do Norte
+      { name: 'Tokyo', emoji: '🏯', x: 85, y: 45 },        // Ásia (Japão)
+      { name: 'Rio', emoji: '🏖️', x: 32, y: 75 },         // América do Sul  
+      { name: 'Cape Town', emoji: '🏔️', x: 52, y: 85 },   // África do Sul
+      { name: 'Sydney', emoji: '🏄', x: 82, y: 82 },       // Oceania/Austrália
+      { name: 'Bangkok', emoji: '🛕', x: 72, y: 55 },      // Ásia (Tailândia)
+      { name: 'Rome', emoji: '🏛️', x: 50, y: 42 },        // Europa (Itália)
     ],
     travelTips: [
       "Sabia que as pessoas fazem mais de 1 bilhão de viagens internacionais por ano? 🌍",
@@ -304,9 +304,18 @@
           box-shadow: 0 2px 10px rgba(0,0,0,0.05);
         }
         
-        /* Mapa SVG */
+        /* Mapa com imagem */
         .map-background {
           filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));
+          border-radius: 12px;
+        }
+        
+        /* Garantir que a imagem do mapa seja responsiva */
+        .world-map img {
+          border-radius: 12px;
+          object-fit: cover;
+          width: 100%;
+          height: 100%;
         }
         
         /* Destinos no mapa */
@@ -317,8 +326,12 @@
           transition: all 0.5s ease;
           cursor: pointer;
           z-index: 5;
-          text-shadow: 0 1px 3px rgba(255,255,255,0.8);
-          filter: drop-shadow(0 1px 2px rgba(0,0,0,0.3));
+          text-shadow: 0 2px 4px rgba(255,255,255,0.9), 0 0 8px rgba(255,255,255,0.6);
+          filter: drop-shadow(0 2px 3px rgba(0,0,0,0.4));
+          background: rgba(255,255,255,0.1);
+          border-radius: 50%;
+          padding: 2px;
+          backdrop-filter: blur(2px);
         }
         
         .destination-point:hover {
@@ -333,15 +346,18 @@
         @keyframes pulse {
           0% {
             transform: translate(-50%, -50%) scale(1);
-            text-shadow: 0 1px 3px rgba(255,255,255,0.8);
+            text-shadow: 0 2px 4px rgba(255,255,255,0.9), 0 0 8px rgba(255,255,255,0.6);
+            background: rgba(255,255,255,0.1);
           }
           50% {
             transform: translate(-50%, -50%) scale(1.2);
-            text-shadow: 0 0 10px rgba(255,255,255,0.9);
+            text-shadow: 0 3px 6px rgba(255,255,255,1), 0 0 12px rgba(255,255,255,0.8);
+            background: rgba(255,255,255,0.2);
           }
           100% {
             transform: translate(-50%, -50%) scale(1);
-            text-shadow: 0 1px 3px rgba(255,255,255,0.8);
+            text-shadow: 0 2px 4px rgba(255,255,255,0.9), 0 0 8px rgba(255,255,255,0.6);
+            background: rgba(255,255,255,0.1);
           }
         }
         
@@ -352,12 +368,13 @@
           z-index: 10;
           background-color: transparent !important;
           /* Ajustado para um tamanho maior */
-          width: calc(32px + 0.3vw);
-          height: calc(32px + 0.3vw);
-          min-width: 32px;
-          min-height: 32px;
-          max-width: 64px;
-          max-height: 64px;
+          width: calc(36px + 0.3vw);
+          height: calc(36px + 0.3vw);
+          min-width: 36px;
+          min-height: 36px;
+          max-width: 68px;
+          max-height: 68px;
+          filter: drop-shadow(0 3px 6px rgba(0,0,0,0.3));
         }
         
         /* Animação para a Tripinha "farejando" */
@@ -486,10 +503,10 @@
           
           .tripinha-character {
             /* Tripinha tamanho em mobile */
-            width: calc(28px + 0.3vw);
-            height: calc(28px + 0.3vw);
-            max-width: 48px;
-            max-height: 48px;
+            width: calc(32px + 0.3vw);
+            height: calc(32px + 0.3vw);
+            max-width: 52px;
+            max-height: 52px;
           }
           
           .speech-bubble {
@@ -513,6 +530,9 @@
         .bg-blue-200 { background-color: #bae6fd; }
         .bg-green-200 { background-color: #bbf7d0; }
         .bg-white { background-color: white; }
+        .bg-gradient-to-b { background-image: linear-gradient(to bottom, var(--tw-gradient-stops)); }
+        .from-blue-100 { --tw-gradient-from: #e0f2fe; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to, rgba(224, 242, 254, 0)); }
+        .to-blue-200 { --tw-gradient-to: #bae6fd; }
         
         .text-center { text-align: center; }
         .text-gray-600 { color: #4b5563; }
@@ -556,6 +576,10 @@
         .relative { position: relative; }
         .absolute { position: absolute; }
         .hidden { display: none; }
+        .flex { display: flex; }
+        .items-center { align-items: center; }
+        .justify-center { justify-content: center; }
+        .justify-between { justify-content: space-between; }
         .inset-0 { top: 0; right: 0; bottom: 0; left: 0; }
         
         .transform { transform: translateX(-50%) translateY(-50%); }
