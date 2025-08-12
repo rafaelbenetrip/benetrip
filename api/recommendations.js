@@ -1,5 +1,5 @@
 // api/recommendations.js - Endpoint da API Vercel para recomendações de destino
-// Versão 4.0 - SEM FALLBACK AUTOMÁTICO - Apenas dados da LLM
+// Versão 5.0 - SEM FALLBACKS AUTOMÁTICOS - Apenas dados da LLM
 const axios = require('axios');
 const http = require('http');
 const https = require('https');
@@ -194,36 +194,20 @@ async function retryAsync(fn, maxAttempts = CONFIG.retries, initialDelay = CONFI
 }
 
 // =======================
-// Processamento de destinos
+// Processamento de destinos - SEM FALLBACKS
 // =======================
 async function processarDestinos(recomendacoes, datas) {
   try {
-    if (!recomendacoes.estacaoViagem && datas.dataIda) {
-      try {
-        const dataObj = new Date(datas.dataIda);
-        const mes = dataObj.getMonth();
-        let estacaoViagem = '';
-        
-        if (mes >= 2 && mes <= 4) estacaoViagem = 'primavera';
-        else if (mes >= 5 && mes <= 7) estacaoViagem = 'verão';
-        else if (mes >= 8 && mes <= 10) estacaoViagem = 'outono';
-        else estacaoViagem = 'inverno';
-        
-        if (recomendacoes.topPick?.pais?.toLowerCase().includes('brasil')) {
-          const mapaEstacoes = {
-            'verão': 'inverno',
-            'inverno': 'verão',
-            'primavera': 'outono',
-            'outono': 'primavera'
-          };
-          estacaoViagem = mapaEstacoes[estacaoViagem] || estacaoViagem;
-        }
-        
-        recomendacoes.estacaoViagem = estacaoViagem;
-      } catch (error) {
-        console.warn('Erro ao determinar estação do ano:', error);
-      }
-    }
+    console.log('✅ Processando destinos usando APENAS dados da LLM');
+    console.log('📊 Dados recebidos:', {
+      temTopPick: !!recomendacoes.topPick,
+      temAlternativas: !!recomendacoes.alternativas,
+      temSurpresa: !!recomendacoes.surpresa,
+      estacaoViagem: recomendacoes.estacaoViagem || 'não fornecida pela LLM'
+    });
+    
+    // REMOVIDO: Cálculo automático de estação/clima
+    // Agora usa apenas o que vier da LLM
     
     return recomendacoes;
   } catch (error) {
@@ -299,7 +283,7 @@ function obterDatasViagem(dadosUsuario) {
 }
 
 // =======================
-// Prompt Deepseek Reasoner aprimorado
+// Prompt Deepseek Reasoner aprimorado - SEM CÁLCULOS DE ESTAÇÃO
 // =======================
 function gerarPromptParaDeepseekReasoner(dados) {
   const infoViajante = {
@@ -339,33 +323,6 @@ function gerarPromptParaDeepseekReasoner(dados) {
     }
   }
   
-  let estacaoViagem = 'não determinada';
-  let hemisferio = infoViajante.cidadeOrigem.toLowerCase().includes('brasil') ? 'sul' : 'norte';
-  
-  try {
-    if (dataIda !== 'não especificada') {
-      const dataObj = new Date(dataIda);
-      const mes = dataObj.getMonth();
-      
-      if (mes >= 2 && mes <= 4) estacaoViagem = 'primavera';
-      else if (mes >= 5 && mes <= 7) estacaoViagem = 'verão';
-      else if (mes >= 8 && mes <= 10) estacaoViagem = 'outono';
-      else estacaoViagem = 'inverno';
-      
-      if (hemisferio === 'sul') {
-        const mapaEstacoes = {
-          'verão': 'inverno',
-          'inverno': 'verão',
-          'primavera': 'outono',
-          'outono': 'primavera'
-        };
-        estacaoViagem = mapaEstacoes[estacaoViagem] || estacaoViagem;
-      }
-    }
-  } catch (error) {
-    console.error('Erro ao determinar estação do ano:', error.message);
-  }
-  
   const adaptacoesPorTipo = {
     "sozinho(a)": "Destinos seguros para viajantes solo, atividades para conhecer pessoas, bairros com boa vida noturna e transporte público eficiente",
     "em casal (viagem romântica)": "Cenários românticos, jantares especiais, passeios a dois, hotéis boutique, praias privativas, mirantes com vistas panorâmicas e vinícolas",
@@ -389,10 +346,13 @@ function gerarPromptParaDeepseekReasoner(dados) {
 - Nível de popularidade desejado: ${getFamaDestinoText(infoViajante.famaDestino)}
 
 ## ASPECTOS SAZONAIS E CLIMÁTICOS CRÍTICOS
-- Para o período ${dataIda} a ${dataVolta}, verifique:
+- Para o período ${dataIda} a ${dataVolta}, VOCÊ DEVE determinar e incluir:
+  * Estação do ano no destino durante essas datas
+  * Temperatura média esperada e condições climáticas
   * Festivais, feriados e eventos especiais que agregam valor à viagem
   * Condições climáticas adversas a evitar: monções, furacões, temperaturas extremas
   * Temporada turística (alta/baixa) e impacto em preços, disponibilidade e experiência
+  * Recomendações específicas sobre o que levar/vestir
 
 ## ADAPTAÇÕES ESPECÍFICAS PARA: ${infoViajante.companhia.toUpperCase()}
 ${adaptacoesPorTipo[infoViajante.companhia] || "Considere experiências versáteis para diferentes perfis"}
@@ -408,6 +368,7 @@ ${adaptacoesPorTipo[infoViajante.companhia] || "Considere experiências versáte
 
 ## Processo de Raciocínio Passo a Passo
 1) Identifique destinos adequados considerando:
+   - Clima e estação no período especificado
    - Eventos especiais/festivais no período
    - Adaptação para viajantes ${infoViajante.companhia}
    - Destinos que fiquem entre 80% e 120% orçamento estipulado para voos de ${infoViajante.orcamento} ${infoViajante.moeda}
@@ -415,9 +376,10 @@ ${adaptacoesPorTipo[infoViajante.companhia] || "Considere experiências versáte
 2) Para cada destino, determine:
    - Preço realista de voo
    - Pontos turísticos específicos e conhecidos
+   - INFORMAÇÕES CLIMÁTICAS DETALHADAS para o período da viagem
    - Eventos sazonais ou especiais no período da viagem
    - Comentário personalizado em 1ª pessoa da Tripinha mencionando detalhes sensoriais
-   - Informações práticas de clima para o período
+   - Recomendações práticas sobre clima/vestuário
 
 3) Diversifique suas recomendações:
    - topPick: Destino com máxima adequação ao perfil
@@ -437,6 +399,7 @@ ${adaptacoesPorTipo[infoViajante.companhia] || "Considere experiências versáte
     "pontosTuristicos": ["Nome do Primeiro Ponto", "Nome do Segundo Ponto"],
     "eventos": ["Festival ou evento especial durante o período", "Outro evento relevante se houver"],
     "clima": {
+      "estacao": "Estação do ano no destino durante o período da viagem",
       "temperatura": "Faixa de temperatura média esperada (ex: 15°C-25°C)",
       "condicoes": "Descrição das condições típicas (ex: ensolarado com chuvas ocasionais)",
       "recomendacoes": "Dicas relacionadas ao clima (o que levar/vestir)"
@@ -453,20 +416,23 @@ ${adaptacoesPorTipo[infoViajante.companhia] || "Considere experiências versáte
   "alternativas": [
     // EXATAMENTE 4 destinos com estrutura similar à descrita acima
     // Cada destino alternativo deve ser de uma região/continente diferente para maximizar a diversidade
+    // TODOS devem incluir informações climáticas detalhadas
   ],
   "surpresa": {
-    // Mesma estrutura do topPick
+    // Mesma estrutura do topPick, incluindo informações climáticas
     // Deve ser um destino menos óbvio, mas igualmente adequado
   },
-  "estacaoViagem": "${estacaoViagem}"
+  "estacaoViagem": "Estação predominante nos destinos recomendados"
 }
 
 ## Verificação Final Obrigatória - CONFIRME QUE:
+- ✓ TODAS as informações climáticas foram determinadas por você para cada destino
 - ✓ Considerou eventos sazonais, clima e atrações para CADA destino
 - ✓ Todos os comentários da Tripinha são em 1a pessoa e simulam como foi a experiência dela nesse local
 - ✓ As recomendações estão adaptadas para viajantes ${infoViajante.companhia}
 - ✓ Todos os destinos incluem código IATA válido do aeroporto
-- ✓ Diversificou geograficamente as alternativas`;
+- ✓ Diversificou geograficamente as alternativas
+- ✓ Incluiu informações climáticas COMPLETAS para cada destino (estação, temperatura, condições, recomendações)`;
 }
 
 // =======================
@@ -479,7 +445,7 @@ async function callAIAPI(provider, prompt, requestData) {
       header: 'Authorization',
       prefix: 'Bearer',
       model: 'deepseek-reasoner',
-      systemMessage: 'Você é um especialista em viagens com experiência em destinos globais. Retorne apenas JSON com destinos detalhados, respeitando o orçamento para voos.',
+      systemMessage: 'Você é um especialista em viagens com experiência em destinos globais. Retorne apenas JSON com destinos detalhados, respeitando o orçamento para voos. INCLUA informações climáticas completas para cada destino.',
       temperature: 0.5,
       max_tokens: 3000,
       additionalParams: {
@@ -491,7 +457,7 @@ async function callAIAPI(provider, prompt, requestData) {
       header: 'Authorization',
       prefix: 'Bearer',
       model: 'sonar',
-      systemMessage: 'Você é um especialista em viagens. Sua prioridade é não exceder o orçamento para voos. Retorne apenas JSON puro com 4 destinos alternativos.',
+      systemMessage: 'Você é um especialista em viagens. Sua prioridade é não exceder o orçamento para voos. Retorne apenas JSON puro com 4 destinos alternativos. INCLUA informações climáticas para cada destino.',
       temperature: 0.5,
       max_tokens: 3000
     },
@@ -500,7 +466,7 @@ async function callAIAPI(provider, prompt, requestData) {
       header: 'Authorization',
       prefix: 'Bearer',
       model: 'gpt-3.5-turbo',
-      systemMessage: 'Você é um especialista em viagens. Retorne apenas JSON com 4 destinos alternativos, respeitando o orçamento para voos.',
+      systemMessage: 'Você é um especialista em viagens. Retorne apenas JSON com 4 destinos alternativos, respeitando o orçamento para voos. INCLUA informações climáticas para cada destino.',
       temperature: 0.7,
       max_tokens: 2000
     },
@@ -509,7 +475,7 @@ async function callAIAPI(provider, prompt, requestData) {
       header: 'anthropic-api-key',
       prefix: '',
       model: 'claude-3-haiku-20240307',
-      systemMessage: 'Você é um especialista em viagens. Retorne apenas JSON com 4 destinos alternativos, respeitando o orçamento para voos.',
+      systemMessage: 'Você é um especialista em viagens. Retorne apenas JSON com 4 destinos alternativos, respeitando o orçamento para voos. INCLUA informações climáticas para cada destino.',
       temperature: 0.7,
       max_tokens: 2000
     }
@@ -535,7 +501,8 @@ IMPORTANTE:
 2. Retorne apenas JSON.
 3. Forneça 4 destinos alternativos.
 4. Inclua pontos turísticos específicos.
-5. Inclua o código IATA de cada aeroporto.`;
+5. Inclua o código IATA de cada aeroporto.
+6. OBRIGATÓRIO: Inclua informações climáticas COMPLETAS para cada destino (estação, temperatura, condições, recomendações).`;
 
   try {
     utils.log(`Enviando requisição para ${provider}...`, null);
@@ -625,7 +592,8 @@ IMPORTANTE:
           utils.log('Deepseek forneceu destinos válidos:', {
             topPick: dados.topPick?.destino,
             alternativas: dados.alternativas?.map(a => a.destino).join(', '),
-            surpresa: dados.surpresa?.destino
+            surpresa: dados.surpresa?.destino,
+            climaIncluido: !!(dados.topPick?.clima || dados.surpresa?.clima)
           });
         }
       } catch (error) {
@@ -710,7 +678,7 @@ function ensureTouristAttractionsAndComments(jsonString, requestData) {
 }
 
 // =======================
-// Geração de prompt padrão
+// Geração de prompt padrão - SEM CÁLCULOS DE ESTAÇÃO
 // =======================
 function gerarPromptParaDestinos(dados) {
   const infoViajante = {
@@ -749,31 +717,6 @@ function gerarPromptParaDestinos(dados) {
     } catch {}
   }
   
-  let estacaoViagem = 'não determinada';
-  let hemisferio = infoViajante.cidadeOrigem.toLowerCase().includes('brasil') ? 'sul' : 'norte';
-  
-  try {
-    if (dataIda !== 'não especificada') {
-      const dataObj = new Date(dataIda);
-      const mes = dataObj.getMonth();
-      
-      if (mes >= 2 && mes <= 4) estacaoViagem = 'outono';
-      else if (mes >= 5 && mes <= 7) estacaoViagem = 'inverno';
-      else if (mes >= 8 && mes <= 10) estacaoViagem = 'primavera';
-      else estacaoViagem = 'verão';
-      
-      if (hemisferio === 'norte') {
-        const mapaEstacoes = {
-          'verão': 'inverno',
-          'inverno': 'verão',
-          'primavera': 'outono',
-          'outono': 'primavera'
-        };
-        estacaoViagem = mapaEstacoes[estacaoViagem] || estacaoViagem;
-      }
-    }
-  } catch {}
-  
   const mensagemOrcamento = infoViajante.orcamento !== 'flexível' ?
     `⚠️ ORÇAMENTO MÁXIMO: ${infoViajante.orcamento} ${infoViajante.moeda} para voos. Todos os destinos DEVEM ter preços próximos a este valor.` : 
     'Orçamento flexível';
@@ -804,7 +747,7 @@ IMPORTANTE:
 5. Para CADA destino, inclua o código IATA (3 letras) do aeroporto principal.
 6. Para cada destino, INCLUA PONTOS TURÍSTICOS ESPECÍFICOS E CONHECIDOS.
 7. Os comentários da Tripinha DEVEM ser em 1a pessoa e comentar curiosidades que ela conhece sobre o local.
-8. NOVO: Forneça informações sobre o CLIMA esperado no destino durante a viagem (temperatura média e condições).
+8. OBRIGATÓRIO: Forneça informações COMPLETAS sobre o CLIMA esperado no destino durante a viagem (estação, temperatura média, condições e recomendações).
 
 Forneça no formato JSON exato abaixo, SEM formatação markdown:
 {
@@ -821,6 +764,7 @@ Forneça no formato JSON exato abaixo, SEM formatação markdown:
       "Nome do Segundo Ponto Turístico"
     ],
     "clima": {
+      "estacao": "Estação do ano no destino durante o período da viagem",
       "temperatura": "Faixa de temperatura média esperada",
       "condicoes": "Descrição das condições climáticas esperadas",
       "recomendacoes": "Dicas relacionadas ao clima"
@@ -842,6 +786,7 @@ Forneça no formato JSON exato abaixo, SEM formatação markdown:
       "porque": "Razão específica para visitar",
       "pontoTuristico": "Nome de um Ponto Turístico",
       "clima": {
+        "estacao": "Estação do ano no destino",
         "temperatura": "Faixa de temperatura média esperada"
       },
       "aeroporto": {
@@ -868,6 +813,7 @@ Forneça no formato JSON exato abaixo, SEM formatação markdown:
       "Nome do Segundo Ponto Turístico"
     ],
     "clima": {
+      "estacao": "Estação do ano no destino durante o período da viagem",
       "temperatura": "Faixa de temperatura média esperada",
       "condicoes": "Descrição das condições climáticas esperadas",
       "recomendacoes": "Dicas relacionadas ao clima"
@@ -881,7 +827,7 @@ Forneça no formato JSON exato abaixo, SEM formatação markdown:
       "hotel": número
     }
   },
-  "estacaoViagem": "${estacaoViagem}"
+  "estacaoViagem": "Estação determinada com base nos destinos recomendados"
 }`;
 }
 
@@ -968,7 +914,7 @@ module.exports = async function handler(req, res) {
     const requestData = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
     
     // ============= DIAGNÓSTICO =============
-    console.log('🔍 DIAGNÓSTICO:');
+    console.log('🔍 DIAGNÓSTICO (Versão SEM FALLBACKS):');
     console.log('📄 Dados da requisição:', JSON.stringify(requestData, null, 2));
     
     const providers = CONFIG.providerOrder.filter(
@@ -1025,7 +971,9 @@ module.exports = async function handler(req, res) {
                 hasAlternativas: !!data.alternativas,
                 alternativasLength: data.alternativas?.length,
                 hasSurpresa: !!data.surpresa,
-                hasSurpresaDestino: !!data.surpresa?.destino
+                hasSurpresaDestino: !!data.surpresa?.destino,
+                climaTopPick: !!data.topPick?.clima,
+                climaSurpresa: !!data.surpresa?.clima
               });
             } catch (e) {
               console.log(`❓ ${provider}: Erro ao analisar estrutura:`, e.message);
@@ -1042,7 +990,7 @@ module.exports = async function handler(req, res) {
         });
         
         if (processedResponse && utils.isValidDestinationJSON(processedResponse, requestData)) {
-          console.log(`🎉 ${provider}: SUCESSO! Usando recomendações da IA`);
+          console.log(`🎉 ${provider}: SUCESSO! Usando recomendações da IA (sem fallbacks)`);
           
           try {
             const recomendacoes = typeof processedResponse === 'string' ? 
@@ -1059,7 +1007,7 @@ module.exports = async function handler(req, res) {
               isResponseSent = true;
               clearTimeout(serverTimeout);
               return res.status(200).json({
-                tipo: `${provider}_success`,
+                tipo: `${provider}_success_no_fallback`,
                 conteudo: JSON.stringify(recomendacoesProcessadas)
               });
             }
@@ -1072,7 +1020,7 @@ module.exports = async function handler(req, res) {
             isResponseSent = true;
             clearTimeout(serverTimeout);
             return res.status(200).json({
-              tipo: provider,
+              tipo: `${provider}_no_fallback`,
               conteudo: processedResponse
             });
           }
@@ -1091,7 +1039,7 @@ module.exports = async function handler(req, res) {
     }
     
     // Se chegou aqui, todos os provedores falharam
-    console.log('🚨 TODOS OS PROVEDORES FALHARAM!');
+    console.log('🚨 TODOS OS PROVEDORES FALHARAM (sem fallbacks)!');
     console.log('📊 Resumo das tentativas:', tentativasDetalhadas);
     
     // SEM FALLBACK - Retornar erro
@@ -1101,7 +1049,7 @@ module.exports = async function handler(req, res) {
       return res.status(503).json({
         tipo: "erro",
         message: "Não foi possível obter recomendações de destinos no momento. Por favor, tente novamente em alguns instantes.",
-        error: "all_providers_failed",
+        error: "all_providers_failed_no_fallback",
         details: tentativasDetalhadas.map(t => ({
           provider: t.provider,
           success: t.success,
