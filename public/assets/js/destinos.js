@@ -1,8 +1,7 @@
 /**
  * BENETRIP - Visualização de Destinos Recomendados
- * Versão 4.1 - Integração com Whitelabel Benetrip + Comentários no Destino Surpresa
+ * Versão 5.0 - SEM FALLBACKS DE CLIMA - Apenas dados da LLM
  * Redireciona para voos.benetrip.com.br com parâmetros de busca
- * ATUALIZADO: Remove fallback de clima, usa apenas dados da LLM + Adiciona comentários no destino surpresa
  */
 
 const BENETRIP_DESTINOS = {
@@ -16,7 +15,7 @@ const BENETRIP_DESTINOS = {
   
   // Inicialização
   init() {
-    console.log('Inicializando sistema de recomendações de destinos...');
+    console.log('Inicializando sistema de recomendações de destinos (SEM fallbacks)...');
     
     this.configurarEventos();
     this.carregarDados()
@@ -179,21 +178,25 @@ const BENETRIP_DESTINOS = {
         }
       }
       
-      console.log('Buscando novas recomendações com IA');
+      console.log('Buscando novas recomendações com IA (sem fallbacks)');
       this.atualizarProgresso('Consultando serviços de viagem...', 40);
       
       const recomendacoes = await window.BENETRIP_AI.obterRecomendacoes(this.dadosUsuario.respostas);
       
       // Atualizar progresso baseado no tipo de resposta
-      if (recomendacoes && recomendacoes.tipo && recomendacoes.tipo.includes('enriquecido')) {
-        this.atualizarProgresso('Preços reais de voos obtidos!', 90);
-      } else {
-        this.atualizarProgresso('Recomendações geradas com preços estimados', 85);
+      if (recomendacoes && recomendacoes.tipo) {
+        if (recomendacoes.tipo.includes('no_fallback')) {
+          this.atualizarProgresso('Dados climáticos obtidos da IA especializada!', 90);
+        } else if (recomendacoes.tipo.includes('enriquecido')) {
+          this.atualizarProgresso('Preços reais de voos obtidos!', 90);
+        } else {
+          this.atualizarProgresso('Recomendações geradas com preços estimados', 85);
+        }
       }
       
       const conteudo = recomendacoes.conteudo || recomendacoes;
       const dados = typeof conteudo === 'string' ? JSON.parse(conteudo) : conteudo;
-      console.log('Recomendações obtidas:', dados);
+      console.log('Recomendações obtidas (sem fallbacks):', dados);
       
       if (!dados || !dados.topPick) {
         throw new Error('Dados de recomendação inválidos');
@@ -325,7 +328,7 @@ const BENETRIP_DESTINOS = {
         return;
       }
       
-      console.log('Renderizando interface com recomendações válidas');
+      console.log('Renderizando interface com recomendações válidas (sem fallbacks de clima)');
       
       // Ocultar loader e mostrar conteúdo principal
       const loader = document.querySelector('.loading-container');
@@ -481,19 +484,19 @@ const BENETRIP_DESTINOS = {
             <img src="assets/images/tripinha/avatar-normal.png" alt="Tripinha" class="w-full h-full object-cover" onerror="this.src='https://placehold.co/60x60?text=🐶'">
           </div>
           <p class="text-gray-800 leading-relaxed">
-            Dei uma boa farejada por aí e encontrei destinos incríveis pra sua próxima aventura! 🐾 Dá uma olhada na minha escolha TOP e em outras opções cheias de potencial! Quer sair do óbvio? Confia na Tripinha: clica em “Me Surpreenda!” e deixa que eu te levo pra um lugar especial e inesperado! 💫🐶
+            Dei uma boa farejada por aí e encontrei destinos incríveis pra sua próxima aventura! 🐾 Dá uma olhada na minha escolha TOP e em outras opções cheias de potencial! Quer sair do óbvio? Confia na Tripinha: clica em "Me Surpreenda!" e deixa que eu te levo pra um lugar especial e inesperado! 💫🐶
           </p>
         </div>
       </div>
     `;
   },
   
-  // Renderizar destino destaque com sistema de abas
+  // Renderizar destino destaque com sistema de abas - APENAS DADOS DA LLM
   renderizarDestinoDestaque(destino) {
     const container = document.getElementById('destino-destaque');
     if (!container) return;
     
-    console.log('Renderizando destino destaque:', destino);
+    console.log('Renderizando destino destaque (apenas dados da LLM):', destino);
     
     // Imagem de cabeçalho
     let headerHtml = `
@@ -521,7 +524,7 @@ const BENETRIP_DESTINOS = {
       </div>
     `;
     
-    // Sistema de abas - CONDICIONAL PARA CLIMA
+    // Sistema de abas - APENAS SE DADOS DA LLM ESTIVEREM DISPONÍVEIS
     let abasHtml = `
       <div class="flex border-b border-gray-200 overflow-x-auto">
         <button id="aba-visao-geral" class="botao-aba aba-ativa px-4 py-2 text-sm font-medium" onclick="BENETRIP_DESTINOS.trocarAba('visao-geral')">
@@ -530,7 +533,7 @@ const BENETRIP_DESTINOS = {
         <button id="aba-pontos-turisticos" class="botao-aba aba-inativa px-4 py-2 text-sm font-medium" onclick="BENETRIP_DESTINOS.trocarAba('pontos-turisticos')">
           Pontos Turísticos
         </button>
-        ${destino.clima ? `
+        ${destino.clima && destino.clima.temperatura ? `
           <button id="aba-clima" class="botao-aba aba-inativa px-4 py-2 text-sm font-medium" onclick="BENETRIP_DESTINOS.trocarAba('clima')">
             Clima
           </button>
@@ -604,7 +607,7 @@ const BENETRIP_DESTINOS = {
     
     // Conteúdo da aba Clima - APENAS DADOS DA LLM
     let climaHtml = '';
-    if (destino.clima) {
+    if (destino.clima && destino.clima.temperatura) {
       climaHtml = `
         <div id="conteudo-clima" class="conteudo-aba p-4 hidden">
           <div class="text-center bg-blue-50 p-4 rounded-lg">
@@ -635,6 +638,13 @@ const BENETRIP_DESTINOS = {
               }
             </div>
           ` : ''}
+          
+          <div class="mt-4 bg-green-50 p-3 rounded-lg border border-green-200">
+            <div class="flex items-center">
+              <span class="text-lg mr-2">🤖</span>
+              <span class="text-sm font-medium text-green-800">Informações climáticas fornecidas pela IA especializada</span>
+            </div>
+          </div>
         </div>
       `;
     }
@@ -753,6 +763,18 @@ const BENETRIP_DESTINOS = {
             </div>
           ` : ''}
           
+          ${destino.clima && destino.clima.temperatura ? `
+            <div class="mt-2">
+              <div class="flex items-center">
+                <span class="text-xs mr-1">🌡️</span>
+                <span class="text-xs text-gray-700">Clima:</span>
+              </div>
+              <span class="bg-green-50 text-green-800 text-xs px-2 py-0.5 rounded-full inline-block max-w-full truncate">
+                ${destino.clima.temperatura}
+              </span>
+            </div>
+          ` : ''}
+          
           <button class="btn-selecionar-destino w-full mt-3 py-1.5 px-2 rounded text-white text-sm font-medium transition-colors hover:opacity-90" 
             style="background-color: #E87722;"
             data-destino="${destino.destino}">
@@ -785,7 +807,7 @@ const BENETRIP_DESTINOS = {
     `;
   },
   
-  // Mostrar destino surpresa
+  // Mostrar destino surpresa - APENAS DADOS DA LLM
   mostrarDestinoSurpresa() {
     if (!this.recomendacoes || !this.recomendacoes.surpresa) {
       console.error('Destino surpresa não disponível');
@@ -793,7 +815,7 @@ const BENETRIP_DESTINOS = {
     }
     
     const destino = this.recomendacoes.surpresa;
-    console.log('Mostrando destino surpresa:', destino);
+    console.log('Mostrando destino surpresa (apenas dados da LLM):', destino);
     
     const modalContainer = document.createElement('div');
     modalContainer.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto modal-surpresa-container';
@@ -830,7 +852,7 @@ const BENETRIP_DESTINOS = {
           </div>
         </div>
         
-        <!-- Sistema de abas - INCLUINDO COMENTÁRIOS -->
+        <!-- Sistema de abas - APENAS SE DADOS DA LLM ESTIVEREM DISPONÍVEIS -->
         <div class="flex border-b border-gray-200 overflow-x-auto">
           <button id="aba-surpresa-info" class="botao-aba aba-ativa px-4 py-2 text-sm font-medium" onclick="BENETRIP_DESTINOS.trocarAbaSurpresa('info')">
             Visão Geral
@@ -838,7 +860,7 @@ const BENETRIP_DESTINOS = {
           <button id="aba-surpresa-pontos" class="botao-aba aba-inativa px-4 py-2 text-sm font-medium" onclick="BENETRIP_DESTINOS.trocarAbaSurpresa('pontos')">
             Pontos Turísticos
           </button>
-          ${destino.clima ? `
+          ${destino.clima && destino.clima.temperatura ? `
             <button id="aba-surpresa-clima" class="botao-aba aba-inativa px-4 py-2 text-sm font-medium" onclick="BENETRIP_DESTINOS.trocarAbaSurpresa('clima')">
               Clima
             </button>
@@ -910,7 +932,7 @@ const BENETRIP_DESTINOS = {
           }
         </div>
         
-        ${destino.clima ? `
+        ${destino.clima && destino.clima.temperatura ? `
           <!-- Conteúdo da aba Clima - APENAS DADOS DA LLM -->
           <div id="conteudo-surpresa-clima" class="conteudo-aba-surpresa p-4 overflow-y-auto hidden" style="max-height: calc(90vh - 280px);">
             <div class="text-center bg-blue-50 p-4 rounded-lg">
@@ -941,6 +963,13 @@ const BENETRIP_DESTINOS = {
                 }
               </div>
             ` : ''}
+            
+            <div class="mt-4 bg-green-50 p-3 rounded-lg border border-green-200">
+              <div class="flex items-center">
+                <span class="text-lg mr-2">🤖</span>
+                <span class="text-sm font-medium text-green-800">Informações climáticas fornecidas pela IA especializada</span>
+              </div>
+            </div>
           </div>
         ` : ''}
         
@@ -1079,7 +1108,7 @@ const BENETRIP_DESTINOS = {
     };
   },
   
-  // ========== NOVA FUNCIONALIDADE: CONSTRUIR URL WHITELABEL ==========
+  // ========== FUNCIONALIDADE: CONSTRUIR URL WHITELABEL ==========
   
   /**
    * Constrói a URL da whitelabel Benetrip com os parâmetros de busca
@@ -1204,7 +1233,7 @@ const BENETRIP_DESTINOS = {
     }
   },
   
-  // Mostrar confirmação de seleção (MODIFICADO para usar whitelabel)
+  // Mostrar confirmação de seleção (usando whitelabel)
   mostrarConfirmacaoSelecao(destino) {
     const modalContainer = document.createElement('div');
     modalContainer.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
@@ -1254,7 +1283,7 @@ const BENETRIP_DESTINOS = {
       document.getElementById('modal-confirmacao').remove();
     });
     
-    // MODIFICADO: Redirecionar para whitelabel em vez de flights.html
+    // Redirecionar para whitelabel
     btnConfirmar.addEventListener('click', () => {
       console.log('🚀 Redirecionando para a whitelabel Benetrip...');
       
@@ -1269,7 +1298,7 @@ const BENETRIP_DESTINOS = {
         setTimeout(() => {
           window.open(urlWhitelabel, '_blank');
           
-          // Opcional: Também redirecionar a página atual ou apenas fechar o modal
+          // Fechar o modal
           document.getElementById('modal-confirmacao').remove();
           
           // Mostrar mensagem de sucesso
