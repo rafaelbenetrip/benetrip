@@ -63,7 +63,7 @@
         "description": "Selecione a data de ida e volta.",
         "calendar": {
             "min_date": "2025-03-23",
-            "max_date": "2026-03-23"
+            "max_date": "2026-12-31"
         },
         "date_format": "YYYY-MM-DD",
         "key": "datas"
