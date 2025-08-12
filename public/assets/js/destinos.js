@@ -1,5 +1,5 @@
 /**
- * BENETRIP - Visualização de Destinos Recomendados
+ * BENETRIP - Visualização de Destinos Recomendados 
  * Versão 5.0 - SEM FALLBACKS DE CLIMA - Apenas dados da LLM
  * Redireciona para voos.benetrip.com.br com parâmetros de busca
  */
