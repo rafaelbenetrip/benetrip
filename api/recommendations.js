@@ -316,7 +316,7 @@ ${adaptacoesPorTipo[infoViajante.companhia] || "Experiências versáteis para di
 ## 🌍 MINHAS RECOMENDAÇÕES COMO TRIPINHA
 
 ### REGRAS DE OURO:
-1. **Orçamento Sagrado:** Voos DEVEM ficar próximos de ${infoViajante.orcamento} ${infoViajante.moeda}
+1. **ORÇAMENTO, MUITO IMPORTANTE:** Voos de ida e volta DEVEM ficar entre 90% e 110% de ${infoViajante.orcamento} ${infoViajante.moeda}
 2. **Informações Climáticas:** Para CADA destino, inclua estação, temperatura, condições e dicas do que levar
 3. **Pontos Turísticos:** Cite locais específicos que EU visitei pessoalmente
 4. **Códigos IATA:** Aeroporto principal de cada destino (3 letras)
