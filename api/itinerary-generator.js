@@ -69,7 +69,8 @@ module.exports = async (req, res) => {
     logEvent('success', 'Roteiro gerado com Groq', { 
       dias: roteiro.dias?.length,
       tempoMs: Date.now() - startTime,
-      atividadesTotal: contarAtividadesTotal(roteiro)
+      atividadesTotal: contarAtividadesTotal(roteiro),
+      climaIncluido: !!roteiro.clima
     });
     
     // Validar estrutura básica apenas
@@ -220,7 +221,7 @@ function gerarPromptOtimizado(params) {
   const orcamentoEscolhido = preferencias?.orcamento_nivel || 'medio';
   
   return `
-MISSÃO: Criar um roteiro COMPLETO de ${diasViagem} dias para ${destino}, ${pais}
+MISSÃO: Criar um roteiro COMPLETO de ${diasViagem} dias para ${destino}, ${pais} com informações climáticas
 
 PERFIL DO VIAJANTE:
 - Tipo: ${descricaoCompanhia}
@@ -237,16 +238,22 @@ DATAS E HORÁRIOS:
 
 INSTRUÇÕES CRÍTICAS:
 1. OBRIGATÓRIO: Crie EXATAMENTE ${diasViagem} dias de roteiro
-2. CADA DIA deve ter atividades para manhã, tarde e noite
-3. RESPEITE a intensidade ${intensidadeEscolhida} (${intensidadeDetalhes[intensidadeEscolhida]})
-4. AJUSTE ao orçamento ${orcamentoEscolhido}
-5. PRIMEIRO DIA: considere chegada às ${horaChegada || '15:30'}
-6. ÚLTIMO DIA: considere partida às ${horaSaida || '21:00'}
-7. USE APENAS locais reais e específicos de ${destino}
-8. NÃO use locais genéricos como "Centro Histórico" ou "Museu Nacional"
-9. CADA ATIVIDADE deve ter horário específico, local real, tags apropriadas e dica da Tripinha
-10. INCLUA nomes reais: restaurantes, museus, praças, atrações turísticas
-11. SEJA ESPECÍFICO: "Museu do Louvre" não "Museu Nacional", "Praça da Sé" não "Praça Central"
+2. INCLUA informações climáticas detalhadas para o período
+3. CADA DIA deve ter atividades para manhã, tarde e noite
+4. RESPEITE a intensidade ${intensidadeEscolhida} (${intensidadeDetalhes[intensidadeEscolhida]})
+5. AJUSTE ao orçamento ${orcamentoEscolhido}
+6. PRIMEIRO DIA: considere chegada às ${horaChegada || '15:30'}
+7. ÚLTIMO DIA: considere partida às ${horaSaida || '21:00'}
+8. USE APENAS locais reais e específicos de ${destino}
+9. NÃO use locais genéricos como "Centro Histórico" ou "Museu Nacional"
+10. CADA ATIVIDADE deve ter horário específico, local real, tags apropriadas e dica da Tripinha
+11. INCLUA nomes reais: restaurantes, museus, praças, atrações turísticas
+12. SEJA ESPECÍFICO: "Museu do Louvre" não "Museu Nacional", "Praça da Sé" não "Praça Central"
+
+INFORMAÇÕES CLIMÁTICAS:
+- Base as informações no conhecimento geral sobre ${destino} em ${dataInicio.split('-')[1]}/${dataInicio.split('-')[0]}
+- Inclua temperatura típica, padrão de chuvas e dicas de vestimenta
+- Seja específico sobre o que esperar no período da viagem
 
 ESTILO DE COMUNICAÇÃO:
 - Fale como a Tripinha: descontraída, esperta, com dicas práticas
@@ -257,6 +264,12 @@ ESTILO DE COMUNICAÇÃO:
 ESTRUTURA JSON OBRIGATÓRIA:
 {
   "destino": "${destino}, ${pais}",
+  "clima": {
+    "resumo": "Como geralmente é o clima em ${destino} nesta época (${dataInicio.split('-')[1]}/${dataInicio.split('-')[0]})",
+    "temperatura": "Faixa de temperatura esperada (ex: 18°C a 25°C)",
+    "chuva": "Padrão de chuvas no período (ex: poucas chuvas, chuvas frequentes à tarde)",
+    "dicas": "Dicas da Tripinha sobre o que levar na mala e como se preparar"
+  },
   "dias": [
     {
       "data": "YYYY-MM-DD",
@@ -291,10 +304,15 @@ IMPORTANTE:
 - SEMPRE inclua pelo menos 1 "Imperdível" por dia
 - Horários realistas (viagem entre locais, tempo de atividade)
 - USE NOMES REAIS: Restaurante da Maria, Museu de Arte Moderna, Igreja de São Bento, etc.
+- INFORMAÇÕES CLIMÁTICAS baseadas no seu conhecimento geral sobre ${destino}
 
 EXEMPLOS DE ESPECIFICIDADE:
 ❌ GENÉRICO: "Centro Histórico", "Museu Nacional", "Restaurante Típico"
 ✅ ESPECÍFICO: "Pelourinho", "Museu Nacional de Belas Artes", "Restaurante Amado"
+
+EXEMPLO DE CLIMA:
+❌ GENÉRICO: "Clima agradável"
+✅ ESPECÍFICO: "Verão europeu com temperaturas entre 20°C-28°C, chuvas raras, ideal para caminhadas"
 
 Responda APENAS com o JSON válido, sem texto adicional.
 `;
@@ -312,6 +330,18 @@ function validarEstruturaBasica(roteiro) {
   if (!roteiro.destino || typeof roteiro.destino !== 'string') {
     throw new Error('Roteiro inválido: destino ausente ou inválido');
   }
+  
+  // Validar informações climáticas
+  if (!roteiro.clima || typeof roteiro.clima !== 'object') {
+    throw new Error('Roteiro inválido: informações climáticas ausentes');
+  }
+  
+  const camposClima = ['resumo', 'temperatura', 'chuva', 'dicas'];
+  camposClima.forEach(campo => {
+    if (!roteiro.clima[campo] || typeof roteiro.clima[campo] !== 'string') {
+      throw new Error(`Roteiro inválido: campo clima.${campo} ausente ou inválido`);
+    }
+  });
   
   if (!Array.isArray(roteiro.dias) || roteiro.dias.length === 0) {
     throw new Error('Roteiro inválido: array de dias ausente ou vazio');
