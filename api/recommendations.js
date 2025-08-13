@@ -414,35 +414,13 @@ function gerarPromptParaGroq(dados) {
 
 ## 💰 ANÁLISE CRÍTICA DE ORÇAMENTO - EXTREMAMENTE IMPORTANTE!
 
-**ORÇAMENTO MÁXIMO PARA VOOS:** ${infoViajante.orcamento} ${infoViajante.moeda}
+**ORÇAMENTO MÁXIMO PARA VOOS DE IDA E VOLTA:** ${infoViajante.orcamento} ${infoViajante.moeda}
 
 ${!orcamentoAnalise.flexivel ? `
 ⚠️  **RESTRIÇÃO ORÇAMENTÁRIA ABSOLUTA** ⚠️
-- NENHUM voo pode custar mais que ${infoViajante.orcamento} ${infoViajante.moeda}
+- A SOMA DOS VOOS DE IDA E VOLTA NÃO PODEM custar mais que ${infoViajante.orcamento} ${infoViajante.moeda}
 - Tolerância máxima: 10% (${Math.round(parseFloat(infoViajante.orcamento) * 1.1)} ${infoViajante.moeda})
 - Se não conseguir respeitar o orçamento, REDUZA o alcance geográfico dos destinos
-
-**FAIXAS REALISTAS DE PREÇOS DE VOO SAINDO DE ${infoViajante.cidadeOrigem}:**
-- 🇧🇷 Destinos Nacionais: R$ 300-800 (média R$ 500)
-- 🌎 América do Sul: R$ 800-1.800 (média R$ 1.200)  
-- 🌎 América do Norte: R$ 1.500-3.500 (média R$ 2.200)
-- 🌍 Europa: R$ 1.800-4.000 (média R$ 2.500)
-- 🌏 Ásia: R$ 2.200-5.000 (média R$ 3.000)
-- 🌏 Oceania: R$ 3.000-6.000 (média R$ 4.000)
-
-**INSTRUÇÕES OBRIGATÓRIAS:**
-1. Se orçamento ≤ R$ 1.000: APENAS destinos nacionais e América do Sul próxima
-2. Se orçamento ≤ R$ 2.000: Máximo até América do Norte ou Europa básica
-3. Se orçamento ≤ R$ 3.000: Europa e algumas opções asiáticas
-4. Se orçamento > R$ 3.000: Pode considerar destinos mais distantes
-
-**EXEMPLO DE COMO RESPEITAR ORÇAMENTO DE ${infoViajante.orcamento} ${infoViajante.moeda}:**
-${parseFloat(infoViajante.orcamento) <= 1000 ? 
-  '- Buenos Aires: R$ 900, Santiago: R$ 950, Salvador: R$ 400' :
-parseFloat(infoViajante.orcamento) <= 2000 ?
-  '- Lisboa: R$ 1.800, México: R$ 1.600, Miami: R$ 1.700' :
-  '- Paris: R$ 2.400, Tóquio: R$ 2.800, Dubai: R$ 2.200'}` :
-'**ORÇAMENTO FLEXÍVEL** - Pode sugerir destinos variados, mas mantenha preços realistas'}
 
 **Preferências Declaradas:**
 - Atividades preferidas: ${infoViajante.preferencia}
@@ -460,7 +438,7 @@ Analise profundamente:
 ### PASSO 2: **FILTRO RIGOROSO DE ORÇAMENTO** 🚨
 ${!orcamentoAnalise.flexivel ? `
 **ESTA É A ETAPA MAIS CRÍTICA:**
-- Elimine IMEDIATAMENTE qualquer destino com voo > ${Math.round(parseFloat(infoViajante.orcamento) * 1.1)} ${infoViajante.moeda}
+- Elimine IMEDIATAMENTE qualquer destino com vooS de ida e volta > ${Math.round(parseFloat(infoViajante.orcamento) * 1.1)} ${infoViajante.moeda}
 - Priorize destinos na faixa de ${Math.round(parseFloat(infoViajante.orcamento) * 0.8)}-${infoViajante.orcamento} ${infoViajante.moeda}
 - Se não encontrar destinos suficientes, REDUZA o alcance geográfico
 - NÃO SUGIRA destinos "quase no orçamento" - seja rigoroso!` :
@@ -584,7 +562,7 @@ Para cada destino selecionado, adicione:
 ## 🔍 VALIDAÇÃO FINAL OBRIGATÓRIA:
 Antes de responder, confirme que:
 ${!orcamentoAnalise.flexivel ? `
-- 🚨 **CRÍTICO:** TODOS os preços de voo estão ≤ ${Math.round(parseFloat(infoViajante.orcamento) * 1.1)} ${infoViajante.moeda}
+- 🚨 **CRÍTICO:** A SOMA DOS preços de voo de ida e de volta estão ≤ ${Math.round(parseFloat(infoViajante.orcamento) * 1.1)} ${infoViajante.moeda}
 - 🚨 **CRÍTICO:** Nenhum destino excede o orçamento de ${infoViajante.orcamento} ${infoViajante.moeda}
 - 💰 Justificou como cada preço respeita o orçamento` :
 '- 💰 Todos os preços são realistas e justificados'}
