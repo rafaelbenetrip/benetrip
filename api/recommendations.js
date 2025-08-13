@@ -1,28 +1,30 @@
 // api/recommendations.js - Endpoint da API Vercel para recomendações de destino
-// Versão 6.0 - GROQ ONLY - Otimizado para llama-3.3-70b-versatile
+// Versão 6.0 - GROQ REASONING OPTIMIZED - DeepSeek R1 Distill + Fallbacks Inteligentes
+// Prioriza modelo de reasoning para análise complexa com fallback para personalidade e velocidade
 const axios = require('axios');
 const http = require('http');
 const https = require('https');
 
 // =======================
-// Configurações Groq
+// Configurações Groq - REASONING OPTIMIZED
 // =======================
 const CONFIG = {
   groq: {
     baseURL: 'https://api.groq.com/openai/v1',
     models: {
-      primary: 'llama-3.3-70b-versatile',      // Análise complexa
-      fast: 'llama-3.1-8b-instant',            // Respostas rápidas
-      toolUse: 'llama3-groq-70b-8192-tool-use-preview' // APIs
+      reasoning: 'deepseek-r1-distill-llama-70b',     // Reasoning principal
+      personality: 'llama-3.3-70b-versatile',         // Personalidade Tripinha
+      fast: 'llama-3.1-8b-instant',                   // Backup rápido
+      toolUse: 'llama3-groq-70b-8192-tool-use-preview' // APIs futuras
     },
-    timeout: 120000,
-    maxTokens: 4000,
-    temperature: 0.7
+    timeout: 180000,     // Aumentado para reasoning (3min)
+    maxTokens: 4500,     // Mais tokens para reasoning detalhado
+    temperature: 0.6     // Mais focado para análise
   },
-  retries: 3,
+  retries: 2,            // Menos retries devido ao tempo maior
   logging: {
     enabled: true,
-    maxLength: 500
+    maxLength: 600
   }
 };
 
@@ -34,6 +36,20 @@ const apiClient = axios.create({
   httpAgent: new http.Agent({ keepAlive: true }),
   httpsAgent: new https.Agent({ keepAlive: true })
 });
+
+// =======================
+// Base de dados de preços realistas por região
+// =======================
+const PRECOS_REFERENCIAIS = {
+  'Brasil': {
+    'Nacional': { min: 300, max: 800, media: 500 },
+    'América do Sul': { min: 800, max: 1800, media: 1200 },
+    'América do Norte': { min: 1500, max: 3500, media: 2200 },
+    'Europa': { min: 1800, max: 4000, media: 2500 },
+    'Ásia': { min: 2200, max: 5000, media: 3000 },
+    'Oceania': { min: 3000, max: 6000, media: 4000 }
+  }
+};
 
 // =======================
 // Funções utilitárias
@@ -51,6 +67,23 @@ const utils = {
       console.warn(`Erro ao formatar duração "${duracao}":`, e);
       return null;
     }
+  },
+
+  // Nova função para validar orçamento
+  validarOrcamentoDestino: (preco, orcamentoMax, tolerancia = 0.1) => {
+    if (!orcamentoMax || orcamentoMax === 'flexível') return true;
+    const limite = parseFloat(orcamentoMax) * (1 + tolerancia); // 10% de tolerância
+    return parseFloat(preco) <= limite;
+  },
+
+  // Obter faixa de preços realista baseado na origem
+  obterFaixaPrecos: (origem, regiao) => {
+    const paisOrigem = origem.toLowerCase().includes('brasil') || 
+                      origem.toLowerCase().includes('são paulo') || 
+                      origem.toLowerCase().includes('rio') ? 'Brasil' : 'Brasil';
+    
+    return PRECOS_REFERENCIAIS[paisOrigem]?.[regiao] || 
+           PRECOS_REFERENCIAIS['Brasil']['América do Sul'];
   },
   
   log: (mensagem, dados, limite = CONFIG.logging.maxLength) => {
@@ -117,7 +150,46 @@ const utils = {
         return false;
       }
       
-      console.log('✅ Validação passou');
+      // NOVA VALIDAÇÃO DE ORÇAMENTO
+      const orcamentoMax = requestData.orcamento_valor;
+      if (orcamentoMax && orcamentoMax !== 'flexível') {
+        const orcamentoNum = parseFloat(orcamentoMax);
+        let destinosForaOrcamento = [];
+        
+        // Verificar topPick
+        if (data.topPick?.preco?.voo && !utils.validarOrcamentoDestino(data.topPick.preco.voo, orcamentoMax)) {
+          destinosForaOrcamento.push(`topPick (${data.topPick.destino}: ${data.topPick.preco.voo})`);
+        }
+        
+        // Verificar alternativas
+        if (data.alternativas) {
+          data.alternativas.forEach((alt, i) => {
+            if (alt.preco?.voo && !utils.validarOrcamentoDestino(alt.preco.voo, orcamentoMax)) {
+              destinosForaOrcamento.push(`alternativa ${i+1} (${alt.destino}: ${alt.preco.voo})`);
+            }
+          });
+        }
+        
+        // Verificar surpresa
+        if (data.surpresa?.preco?.voo && !utils.validarOrcamentoDestino(data.surpresa.preco.voo, orcamentoMax)) {
+          destinosForaOrcamento.push(`surpresa (${data.surpresa.destino}: ${data.surpresa.preco.voo})`);
+        }
+        
+        if (destinosForaOrcamento.length > 2) { // Mais de 2 destinos fora = problema
+          console.log(`❌ ORÇAMENTO VIOLADO! Destinos fora do orçamento de ${orcamentoMax}:`, destinosForaOrcamento);
+          return false;
+        } else if (destinosForaOrcamento.length > 0) {
+          console.log(`⚠️ Alguns destinos fora do orçamento (aceitável):`, destinosForaOrcamento);
+        }
+      }
+      
+      // Validação específica para modelo de reasoning
+      const hasReasoningData = data.raciocinio && typeof data.raciocinio === 'object';
+      if (hasReasoningData) {
+        console.log('🧠 Dados de raciocínio detectados:', Object.keys(data.raciocinio));
+      }
+      
+      console.log('✅ Validação passou (incluindo orçamento)');
       return true;
       
     } catch (error) {
@@ -169,41 +241,56 @@ function obterCodigoIATAPadrao(cidade, pais) {
 }
 
 // =======================
-// Função para chamada ao Groq
+// Função para chamada ao Groq - REASONING OPTIMIZED
 // =======================
-async function callGroqAPI(prompt, requestData, model = CONFIG.groq.models.primary) {
+async function callGroqAPI(prompt, requestData, model = CONFIG.groq.models.reasoning) {
   const apiKey = process.env.GROQ_API_KEY;
   
   if (!apiKey) {
     throw new Error('Chave da API Groq não configurada (GROQ_API_KEY)');
   }
 
-  const systemMessage = model === CONFIG.groq.models.primary ?
-    `Você é a Tripinha, uma vira-lata caramelo especialista em viagens do mundo todo! 🐾
+  let systemMessage;
+  
+  if (model === CONFIG.groq.models.reasoning) {
+    // Sistema otimizado para reasoning
+    systemMessage = `Você é um sistema especialista em recomendações de viagem que utiliza raciocínio estruturado.
 
-Sua missão é criar recomendações de destinos PERSONALIZADAS e DETALHADAS baseadas no perfil do viajante.
+PROCESSO DE RACIOCÍNIO OBRIGATÓRIO:
+1. ANÁLISE DO PERFIL: Examine detalhadamente cada preferência do viajante
+2. MAPEAMENTO DE COMPATIBILIDADE: Correlacione destinos com o perfil analisado  
+3. VALIDAÇÃO DE ORÇAMENTO: Verifique se preços de voo são realistas e compatíveis
+4. ANÁLISE CLIMÁTICA: Determine condições climáticas exatas para as datas
+5. PERSONALIZAÇÃO TRIPINHA: Adicione perspectiva autêntica da mascote cachorrinha
 
-CARACTERÍSTICAS DA TRIPINHA:
+CRITÉRIOS DE DECISÃO:
+- Orçamento de voo DEVE ser respeitado rigorosamente
+- Destinos DEVEM ser adequados para o tipo de companhia especificado
+- Informações climáticas DEVEM ser precisas para o período da viagem
+- Pontos turísticos DEVEM ser específicos e reais
+- Comentários da Tripinha DEVEM ser em 1ª pessoa com detalhes sensoriais
+
+RESULTADO: JSON estruturado com recomendações fundamentadas no raciocínio acima.`;
+  } else if (model === CONFIG.groq.models.personality) {
+    // Sistema focado na personalidade da Tripinha
+    systemMessage = `Você é a Tripinha, uma vira-lata caramelo especialista em viagens! 🐾
+
+PERSONALIDADE DA TRIPINHA:
 - Conhece todos os destinos do mundo pessoalmente
-- Fala sempre em 1ª pessoa sobre suas experiências nos lugares
-- É entusiasmada, carismática e usa emojis naturalmente
-- Inclui detalhes sensoriais que um cachorro notaria (cheiros, sons, texturas)
+- Fala sempre em 1ª pessoa sobre suas experiências
+- É entusiasmada, carismática e usa emojis naturalmente  
+- Inclui detalhes sensoriais que um cachorro notaria
 - Sempre menciona pontos turísticos específicos que visitou
 - Dá dicas práticas baseadas nas suas "aventuras"
 
-OBRIGATÓRIO EM CADA DESTINO:
-✅ Código IATA válido do aeroporto principal
-✅ Informações climáticas COMPLETAS (estação, temperatura, condições, recomendações)
-✅ Pontos turísticos específicos e conhecidos
-✅ Preços realistas de voo compatíveis com o orçamento
-✅ Comentários da Tripinha em 1ª pessoa sobre suas experiências
-
-RETORNE APENAS JSON VÁLIDO sem formatação markdown.` :
-    `Você é um especialista em viagens focado em recomendações rápidas e precisas. 
-     Retorne apenas JSON válido com destinos que respeitem o orçamento do usuário.`;
+RETORNE APENAS JSON VÁLIDO sem formatação markdown.`;
+  } else {
+    // Sistema padrão para modelos rápidos
+    systemMessage = `Especialista em recomendações de viagem. Retorne apenas JSON válido com destinos que respeitem o orçamento do usuário.`;
+  }
 
   try {
-    utils.log(`🚀 Enviando requisição para Groq (${model})...`);
+    utils.log(`🧠 Enviando requisição para Groq (${model})...`);
     
     const requestPayload = {
       model: model,
@@ -217,10 +304,15 @@ RETORNE APENAS JSON VÁLIDO sem formatação markdown.` :
           content: prompt
         }
       ],
-      temperature: CONFIG.groq.temperature,
+      temperature: model === CONFIG.groq.models.reasoning ? 0.6 : CONFIG.groq.temperature,
       max_tokens: CONFIG.groq.maxTokens,
       stream: false
     };
+    
+    // Adicionar parâmetros específicos para DeepSeek R1
+    if (model === CONFIG.groq.models.reasoning) {
+      requestPayload.reasoner_enabled = true;
+    }
     
     const response = await apiClient({
       method: 'post',
@@ -229,29 +321,30 @@ RETORNE APENAS JSON VÁLIDO sem formatação markdown.` :
         'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json'
       },
-      data: requestPayload
+      data: requestPayload,
+      timeout: model === CONFIG.groq.models.reasoning ? CONFIG.groq.timeout : 60000
     });
     
     if (!response.data?.choices?.[0]?.message?.content) {
-      throw new Error('Formato de resposta do Groq inválido');
+      throw new Error(`Formato de resposta do Groq inválido (${model})`);
     }
     
     const content = response.data.choices[0].message.content;
-    utils.log('📥 Resposta recebida do Groq:', content.substring(0, 300));
+    utils.log(`📥 Resposta recebida (${model}):`, content.substring(0, 300));
     
     return utils.extrairJSONDaResposta(content);
     
   } catch (error) {
-    console.error('❌ Erro na chamada à API Groq:', error.message);
+    console.error(`❌ Erro na chamada à API Groq (${model}):`, error.message);
     if (error.response) {
-      utils.log('🔴 Resposta de erro do Groq:', error.response.data);
+      utils.log(`🔴 Resposta de erro do Groq (${model}):`, error.response.data);
     }
     throw error;
   }
 }
 
 // =======================
-// Geração de prompt otimizado para Groq
+// Geração de prompt otimizado para REASONING
 // =======================
 function gerarPromptParaGroq(dados) {
   const infoViajante = {
@@ -292,128 +385,216 @@ function gerarPromptParaGroq(dados) {
     }
   }
 
-  const adaptacoesPorTipo = {
-    "sozinho(a)": "Destinos seguros para viajantes solo, atividades para conhecer pessoas, transporte público eficiente",
-    "em casal (viagem romântica)": "Cenários românticos, jantares especiais, hotéis boutique, praias privativas, mirantes com vistas panorâmicas",
-    "em família": "Atividades kid-friendly, segurança, acomodações espaçosas, parques temáticos, atrações educativas",
-    "com amigos": "Vida noturna, atividades em grupo, diversão coletiva, esportes de aventura, festivais locais"
+  // NOVA SEÇÃO: Análise de orçamento e faixas realistas
+  const orcamentoAnalise = {
+    valor: infoViajante.orcamento,
+    moeda: infoViajante.moeda,
+    flexivel: infoViajante.orcamento === 'flexível',
+    faixasRealistas: {}
   };
 
-  return `# 🐾 MISSÃO TRIPINHA: Recomendações Personalizadas de Viagem
+  if (!orcamentoAnalise.flexivel) {
+    const orcamentoNum = parseFloat(infoViajante.orcamento);
+    orcamentoAnalise.faixasRealistas = {
+      'Nacional': utils.obterFaixaPrecos(infoViajante.cidadeOrigem, 'Nacional'),
+      'América do Sul': utils.obterFaixaPrecos(infoViajante.cidadeOrigem, 'América do Sul'),
+      'América do Norte': utils.obterFaixaPrecos(infoViajante.cidadeOrigem, 'América do Norte'),
+      'Europa': utils.obterFaixaPrecos(infoViajante.cidadeOrigem, 'Europa'),
+      'Ásia': utils.obterFaixaPrecos(infoViajante.cidadeOrigem, 'Ásia')
+    };
+  }
 
-## 👤 PERFIL DO MEU HUMANO FAVORITO
-- **Partindo de:** ${infoViajante.cidadeOrigem}
-- **Viajando:** ${infoViajante.companhia} (${infoViajante.pessoas} pessoa(s))
-- **Período:** ${dataIda} a ${dataVolta} (${duracaoViagem})
-- **Paixões:** ${infoViajante.preferencia}
-- **Orçamento para voos:** ${infoViajante.orcamento} ${infoViajante.moeda}
-- **Tipo de destino:** ${getTipoDestinoText(infoViajante.tipoDestino)}
-- **Popularidade:** ${getFamaDestinoText(infoViajante.famaDestino)}
+  return `# 🧠 SISTEMA DE RECOMENDAÇÃO INTELIGENTE DE DESTINOS - REASONING MODE
 
-## 🎯 ADAPTAÇÕES ESPECIAIS PARA: ${infoViajante.companhia.toUpperCase()}
-${adaptacoesPorTipo[infoViajante.companhia] || "Experiências versáteis para diferentes perfis"}
+## 📊 DADOS DO VIAJANTE PARA ANÁLISE:
+**Perfil Básico:**
+- Origem: ${infoViajante.cidadeOrigem}
+- Composição: ${infoViajante.companhia} (${infoViajante.pessoas} pessoa(s))
+- Período: ${dataIda} a ${dataVolta} (${duracaoViagem})
 
-## 🌍 MINHAS RECOMENDAÇÕES COMO TRIPINHA
+## 💰 ANÁLISE CRÍTICA DE ORÇAMENTO - EXTREMAMENTE IMPORTANTE!
 
-### REGRAS DE OURO:
-1. **ORÇAMENTO, MUITO IMPORTANTE:** Voos de ida e volta DEVEM ficar entre 90% e 110% de ${infoViajante.orcamento} ${infoViajante.moeda}
-2. **Informações Climáticas:** Para CADA destino, inclua estação, temperatura, condições e dicas do que levar
-3. **Pontos Turísticos:** Cite locais específicos que EU visitei pessoalmente
-4. **Códigos IATA:** Aeroporto principal de cada destino (3 letras)
-5. **Meus Comentários:** Sempre em 1ª pessoa, falando das MINHAS experiências nos lugares
+**ORÇAMENTO MÁXIMO PARA VOOS:** ${infoViajante.orcamento} ${infoViajante.moeda}
 
-### FORMATO DE RESPOSTA (JSON PURO):
+${!orcamentoAnalise.flexivel ? `
+⚠️  **RESTRIÇÃO ORÇAMENTÁRIA ABSOLUTA** ⚠️
+- NENHUM voo pode custar mais que ${infoViajante.orcamento} ${infoViajante.moeda}
+- Tolerância máxima: 10% (${Math.round(parseFloat(infoViajante.orcamento) * 1.1)} ${infoViajante.moeda})
+- Se não conseguir respeitar o orçamento, REDUZA o alcance geográfico dos destinos
+
+**FAIXAS REALISTAS DE PREÇOS DE VOO SAINDO DE ${infoViajante.cidadeOrigem}:**
+- 🇧🇷 Destinos Nacionais: R$ 300-800 (média R$ 500)
+- 🌎 América do Sul: R$ 800-1.800 (média R$ 1.200)  
+- 🌎 América do Norte: R$ 1.500-3.500 (média R$ 2.200)
+- 🌍 Europa: R$ 1.800-4.000 (média R$ 2.500)
+- 🌏 Ásia: R$ 2.200-5.000 (média R$ 3.000)
+- 🌏 Oceania: R$ 3.000-6.000 (média R$ 4.000)
+
+**INSTRUÇÕES OBRIGATÓRIAS:**
+1. Se orçamento ≤ R$ 1.000: APENAS destinos nacionais e América do Sul próxima
+2. Se orçamento ≤ R$ 2.000: Máximo até América do Norte ou Europa básica
+3. Se orçamento ≤ R$ 3.000: Europa e algumas opções asiáticas
+4. Se orçamento > R$ 3.000: Pode considerar destinos mais distantes
+
+**EXEMPLO DE COMO RESPEITAR ORÇAMENTO DE ${infoViajante.orcamento} ${infoViajante.moeda}:**
+${parseFloat(infoViajante.orcamento) <= 1000 ? 
+  '- Buenos Aires: R$ 900, Santiago: R$ 950, Salvador: R$ 400' :
+parseFloat(infoViajante.orcamento) <= 2000 ?
+  '- Lisboa: R$ 1.800, México: R$ 1.600, Miami: R$ 1.700' :
+  '- Paris: R$ 2.400, Tóquio: R$ 2.800, Dubai: R$ 2.200'}` :
+'**ORÇAMENTO FLEXÍVEL** - Pode sugerir destinos variados, mas mantenha preços realistas'}
+
+**Preferências Declaradas:**
+- Atividades preferidas: ${infoViajante.preferencia}
+- Tipo de destino: ${getTipoDestinoText(infoViajante.tipoDestino)}
+- Popularidade desejada: ${getFamaDestinoText(infoViajante.famaDestino)}
+
+## 🎯 PROCESSO DE RACIOCÍNIO OBRIGATÓRIO:
+
+### PASSO 1: ANÁLISE DO PERFIL DO VIAJANTE
+Analise profundamente:
+- Que tipo de experiências esse perfil de viajante valoriza?
+- Quais destinos se alinham com suas preferências específicas?
+- Que adaptações são necessárias para ${infoViajante.companhia}?
+
+### PASSO 2: **FILTRO RIGOROSO DE ORÇAMENTO** 🚨
+${!orcamentoAnalise.flexivel ? `
+**ESTA É A ETAPA MAIS CRÍTICA:**
+- Elimine IMEDIATAMENTE qualquer destino com voo > ${Math.round(parseFloat(infoViajante.orcamento) * 1.1)} ${infoViajante.moeda}
+- Priorize destinos na faixa de ${Math.round(parseFloat(infoViajante.orcamento) * 0.8)}-${infoViajante.orcamento} ${infoViajante.moeda}
+- Se não encontrar destinos suficientes, REDUZA o alcance geográfico
+- NÃO SUGIRA destinos "quase no orçamento" - seja rigoroso!` :
+'Mantenha preços realistas mesmo com orçamento flexível'}
+
+### PASSO 3: MAPEAMENTO DE DESTINOS COMPATÍVEIS
+Para cada destino considerado, avalie:
+- Adequação às preferências declaradas (${infoViajante.preferencia})
+- **VIABILIDADE ORÇAMENTÁRIA CONFIRMADA**
+- Conveniência para ${infoViajante.companhia}
+- Atratividade no período ${dataIda} a ${dataVolta}
+
+### PASSO 4: VALIDAÇÃO CLIMÁTICA E SAZONAL
+Para as datas ${dataIda} a ${dataVolta}, determine:
+- Estação do ano em cada destino considerado
+- Condições climáticas típicas (temperatura, chuva, etc.)
+- Eventos/festivais especiais no período
+- Recomendações práticas de vestuário/equipamentos
+
+### PASSO 5: SELEÇÃO E RANQUEAMENTO
+Baseado na análise acima, selecione:
+- 1 destino TOP que melhor combina com TODOS os critérios **E RESPEITA O ORÇAMENTO**
+- 4 alternativas diversificadas geograficamente **TODAS DENTRO DO ORÇAMENTO**
+- 1 surpresa que pode surpreender positivamente **SEM EXCEDER O ORÇAMENTO**
+
+### PASSO 6: PERSONALIZAÇÃO TRIPINHA 🐾
+Para cada destino selecionado, adicione:
+- Comentário em 1ª pessoa da Tripinha sobre SUA experiência no local
+- Detalhes sensoriais que uma cachorrinha notaria (sons, cheiros, texturas)
+- Dicas práticas baseadas nas "aventuras" da Tripinha
+- Pontos turísticos específicos que ela "visitou"
+
+## 📋 FORMATO DE RESPOSTA (JSON ESTRUTURADO):
+
 \`\`\`json
 {
+  "raciocinio": {
+    "analise_perfil": "Resumo da análise do perfil do viajante",
+    "criterios_selecao": "Principais critérios usados na seleção",
+    "consideracoes_orcamento": "DETALHE como o orçamento de ${infoViajante.orcamento} ${infoViajante.moeda} influenciou CADA escolha",
+    "destinos_rejeitados": "Mencione destinos que foram rejeitados por exceder o orçamento"
+  },
   "topPick": {
     "destino": "Nome da Cidade",
     "pais": "Nome do País", 
     "codigoPais": "XX",
-    "descricao": "Descrição breve do destino",
-    "porque": "Por que é perfeito para este viajante",
+    "justificativa": "Por que este é o destino PERFEITO para este viajante específico",
+    "justificativa_orcamento": "CONFIRME que o preço de R$ X está dentro do orçamento de ${infoViajante.orcamento} ${infoViajante.moeda}",
+    "descricao": "Descrição detalhada do destino",
+    "porque": "Razões específicas para esta recomendação",
     "destaque": "Experiência única do destino",
-    "comentario": "MEU comentário em 1ª pessoa sobre como foi incrível visitar este lugar! Mencione cheiros, sons ou texturas que notei 🐾",
+    "comentario": "Comentário entusiasmado da Tripinha em 1ª pessoa: 'Eu adorei quando visitei [destino]! O cheiro de... me deixou maluca! 🐾'",
     "pontosTuristicos": [
-      "Nome do Primeiro Ponto Turístico Específico",
-      "Nome do Segundo Ponto Turístico Específico"
+      "Nome específico do primeiro ponto turístico",
+      "Nome específico do segundo ponto turístico"
     ],
-    "eventos": ["Festival ou evento especial no período", "Outro evento se houver"],
+    "eventos": ["Evento/festival específico no período se houver"],
     "clima": {
-      "estacao": "Estação do ano no destino durante a viagem",
-      "temperatura": "Faixa de temperatura (ex: 18°C-28°C)",
-      "condicoes": "Condições típicas esperadas",
-      "recomendacoes": "O que levar/vestir baseado no clima"
+      "estacao": "Estação exata no destino durante ${dataIda} a ${dataVolta}",
+      "temperatura": "Faixa de temperatura precisa (ex: 18°C-28°C)",
+      "condicoes": "Condições climáticas detalhadas esperadas",
+      "recomendacoes": "Dicas específicas do que levar/vestir"
     },
     "aeroporto": {
       "codigo": "XYZ",
-      "nome": "Nome do Aeroporto Principal"
+      "nome": "Nome oficial do aeroporto principal"
     },
     "preco": {
-      "voo": número_realista,
-      "hotel": número_estimado
+      "voo": ${!orcamentoAnalise.flexivel ? `número_MÁXIMO_${Math.round(parseFloat(infoViajante.orcamento) * 1.1)}` : 'número_realista'},
+      "hotel": número_estimado_por_noite,
+      "justificativa_preco": "Explique por que este preço está correto e dentro do orçamento"
     }
   },
   "alternativas": [
     {
       "destino": "Nome da Cidade",
       "pais": "Nome do País",
-      "codigoPais": "XX", 
-      "porque": "Razão específica para visitar",
-      "pontoTuristico": "Ponto turístico específico",
+      "codigoPais": "XX",
+      "porque": "Razão específica para esta alternativa",
+      "pontoTuristico": "Ponto turístico específico de destaque",
       "clima": {
-        "estacao": "Estação no destino",
+        "estacao": "Estação no destino durante a viagem",
         "temperatura": "Faixa de temperatura"
       },
-      "aeroporto": {
-        "codigo": "XYZ",
-        "nome": "Nome do Aeroporto"
-      },
+      "aeroporto": {"codigo": "XYZ", "nome": "Nome do Aeroporto"},
       "preco": {
-        "voo": número,
+        "voo": ${!orcamentoAnalise.flexivel ? `número_MÁXIMO_${Math.round(parseFloat(infoViajante.orcamento) * 1.1)}` : 'número_realista'},
         "hotel": número
       }
     }
-    // EXATAMENTE 4 alternativas
+    // EXATAMENTE 4 alternativas geograficamente diversas - TODAS COM PREÇOS DENTRO DO ORÇAMENTO
   ],
   "surpresa": {
     "destino": "Nome da Cidade Inusitada",
     "pais": "Nome do País",
     "codigoPais": "XX",
-    "descricao": "Por que é uma surpresa especial",
-    "porque": "Razão para ser destino surpresa",
+    "justificativa": "Por que é uma surpresa perfeita para este perfil",
+    "justificativa_orcamento": "CONFIRME que mesmo sendo surpresa, está dentro do orçamento",
+    "descricao": "Descrição do destino surpresa",
+    "porque": "Razões para ser destino surpresa",
     "destaque": "Experiência única e inesperada",
-    "comentario": "MEU comentário empolgado em 1ª pessoa sobre este lugar surpreendente que visitei! 🐾",
-    "pontosTuristicos": [
-      "Primeiro Ponto Específico",
-      "Segundo Ponto Específico"
-    ],
+    "comentario": "Comentário empolgado da Tripinha: 'Nossa, quando cheguei em [destino], não esperava que... 🐾'",
+    "pontosTuristicos": ["Primeiro ponto específico", "Segundo ponto específico"],
     "clima": {
-      "estacao": "Estação durante a viagem",
+      "estacao": "Estação durante ${dataIda} a ${dataVolta}",
       "temperatura": "Faixa de temperatura",
       "condicoes": "Condições climáticas",
       "recomendacoes": "Dicas de vestuário"
     },
-    "aeroporto": {
-      "codigo": "XYZ", 
-      "nome": "Nome do Aeroporto"
-    },
+    "aeroporto": {"codigo": "XYZ", "nome": "Nome do Aeroporto"},
     "preco": {
-      "voo": número,
+      "voo": ${!orcamentoAnalise.flexivel ? `número_MÁXIMO_${Math.round(parseFloat(infoViajante.orcamento) * 1.1)}` : 'número_realista'},
       "hotel": número
     }
   },
-  "estacaoViagem": "Estação predominante nos destinos"
+  "estacaoViagem": "Estação predominante nos destinos selecionados",
+  "resumoIA": "Resumo de como a IA chegou às recomendações respeitando rigorosamente o orçamento"
 }
 \`\`\`
 
-## 🐕 LEMBRE-SE:
-- Sou a Tripinha e já visitei TODOS esses lugares pessoalmente
-- Meus comentários são baseados nas MINHAS aventuras caninas
-- Sempre menciono o que mais me impressionou em cada lugar
-- Uso emoji 🐾 para mostrar minha personalidade
-- Dou dicas práticas baseadas na minha experiência de viagem
+## 🔍 VALIDAÇÃO FINAL OBRIGATÓRIA:
+Antes de responder, confirme que:
+${!orcamentoAnalise.flexivel ? `
+- 🚨 **CRÍTICO:** TODOS os preços de voo estão ≤ ${Math.round(parseFloat(infoViajante.orcamento) * 1.1)} ${infoViajante.moeda}
+- 🚨 **CRÍTICO:** Nenhum destino excede o orçamento de ${infoViajante.orcamento} ${infoViajante.moeda}
+- 💰 Justificou como cada preço respeita o orçamento` :
+'- 💰 Todos os preços são realistas e justificados'}
+- ✅ Informações climáticas são precisas para o período da viagem  
+- ✅ Comentários da Tripinha são autênticos e em 1ª pessoa
+- ✅ Pontos turísticos são específicos e reais
+- ✅ Códigos IATA dos aeroportos estão corretos
+- ✅ Destinos são adequados para ${infoViajante.companhia}
 
-**AGORA ME AJUDE A FAZER MEU HUMANO FELIZ! LATIDOS E RECOMENDAÇÕES! 🐾**`;
+**Execute o raciocínio passo-a-passo e forneça recomendações fundamentadas que RESPEITEM RIGOROSAMENTE O ORÇAMENTO!**`;
 }
 
 // =======================
@@ -455,6 +636,61 @@ function getFamaDestinoText(value) {
     2: "mistura de ambos"
   };
   return options[typeof value === 'string' ? parseInt(value, 10) : value] || "qualquer";
+}
+
+// =======================
+// Nova função para filtrar destinos por orçamento
+// =======================
+function filtrarDestinosPorOrcamento(jsonString, orcamentoMax, moeda = 'BRL') {
+  if (!orcamentoMax || orcamentoMax === 'flexível') return jsonString;
+  
+  try {
+    const data = typeof jsonString === 'string' ? JSON.parse(jsonString) : jsonString;
+    const orcamentoNum = parseFloat(orcamentoMax);
+    const tolerancia = 1.1; // 10% de tolerância
+    const limite = orcamentoNum * tolerancia;
+    
+    console.log(`🔍 Filtrando destinos com orçamento máximo: ${limite} ${moeda}`);
+    
+    let modificado = false;
+    
+    // Filtrar topPick
+    if (data.topPick?.preco?.voo && parseFloat(data.topPick.preco.voo) > limite) {
+      console.log(`❌ TopPick ${data.topPick.destino} removido: R$ ${data.topPick.preco.voo} > R$ ${limite}`);
+      data.topPick = null;
+      modificado = true;
+    }
+    
+    // Filtrar alternativas
+    if (data.alternativas && Array.isArray(data.alternativas)) {
+      const alternativasOriginais = data.alternativas.length;
+      data.alternativas = data.alternativas.filter(alt => {
+        if (alt.preco?.voo && parseFloat(alt.preco.voo) > limite) {
+          console.log(`❌ Alternativa ${alt.destino} removida: R$ ${alt.preco.voo} > R$ ${limite}`);
+          return false;
+        }
+        return true;
+      });
+      if (data.alternativas.length < alternativasOriginais) modificado = true;
+    }
+    
+    // Filtrar surpresa
+    if (data.surpresa?.preco?.voo && parseFloat(data.surpresa.preco.voo) > limite) {
+      console.log(`❌ Surpresa ${data.surpresa.destino} removida: R$ ${data.surpresa.preco.voo} > R$ ${limite}`);
+      data.surpresa = null;
+      modificado = true;
+    }
+    
+    if (modificado) {
+      console.log('✂️ Destinos filtrados por orçamento - alguns destinos foram removidos');
+      data.observacaoOrcamento = `Alguns destinos foram automaticamente removidos por excederem o orçamento de ${orcamentoMax} ${moeda}`;
+    }
+    
+    return JSON.stringify(data);
+  } catch (error) {
+    console.error('Erro ao filtrar destinos por orçamento:', error.message);
+    return jsonString;
+  }
 }
 
 // =======================
@@ -504,35 +740,51 @@ function ensureValidDestinationData(jsonString, requestData) {
 }
 
 // =======================
-// Função de retry com backoff exponencial
+// Função de retry com fallback inteligente entre modelos
 // =======================
-async function retryWithBackoff(fn, maxAttempts = CONFIG.retries, initialDelay = 1000) {
-  let attempt = 1;
-  let delay = initialDelay;
+async function retryWithBackoffAndFallback(prompt, requestData, maxAttempts = CONFIG.retries) {
+  const modelOrder = [
+    CONFIG.groq.models.reasoning,     // Primeiro: DeepSeek R1 (melhor qualidade)
+    CONFIG.groq.models.personality,  // Segundo: Llama 3.3 70B (personalidade)
+    CONFIG.groq.models.fast          // Terceiro: Llama 3.1 8B (backup rápido)
+  ];
   
-  while (attempt <= maxAttempts) {
-    try {
-      console.log(`🔄 Tentativa ${attempt}/${maxAttempts}...`);
-      const result = await fn();
-      if (result) {
-        console.log(`✅ Sucesso na tentativa ${attempt}`);
-        return result;
+  for (const model of modelOrder) {
+    console.log(`🔄 Tentando modelo: ${model}`);
+    
+    let attempt = 1;
+    let delay = 1500;
+    
+    while (attempt <= maxAttempts) {
+      try {
+        console.log(`🔄 Modelo ${model} - Tentativa ${attempt}/${maxAttempts}...`);
+        
+        const result = await callGroqAPI(prompt, requestData, model);
+        
+        if (result && utils.isValidDestinationJSON(result, requestData)) {
+          console.log(`✅ Sucesso com ${model} na tentativa ${attempt}`);
+          return { result, model };
+        } else {
+          console.log(`❌ ${model} - Tentativa ${attempt}: resposta inválida`);
+        }
+        
+      } catch (error) {
+        console.error(`❌ ${model} - Tentativa ${attempt} falhou:`, error.message);
       }
-    } catch (error) {
-      console.error(`❌ Tentativa ${attempt} falhou:`, error.message);
+      
+      if (attempt === maxAttempts) {
+        console.log(`🚫 ${model}: Todas as ${maxAttempts} tentativas falharam`);
+        break;
+      }
+      
+      console.log(`⏳ Aguardando ${delay}ms antes da próxima tentativa...`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+      delay = Math.min(delay * 1.2, 5000); // Backoff mais suave
+      attempt++;
     }
-    
-    if (attempt === maxAttempts) {
-      console.log(`🚫 Todas as ${maxAttempts} tentativas falharam`);
-      return null;
-    }
-    
-    console.log(`⏳ Aguardando ${delay}ms antes da próxima tentativa...`);
-    await new Promise(resolve => setTimeout(resolve, delay));
-    delay = Math.min(delay * 1.5, 10000); // Max 10s
-    attempt++;
   }
   
+  console.log('🚫 Todos os modelos falharam');
   return null;
 }
 
@@ -551,7 +803,7 @@ module.exports = async function handler(req, res) {
         error: "timeout"
       });
     }
-  }, 290000); // 290s (Vercel limit is 300s)
+  }, 350000); // 350s - Aumentado para acomodar reasoning model
 
   // Headers CORS
   res.setHeader('Access-Control-Allow-Credentials', true);
@@ -572,7 +824,7 @@ module.exports = async function handler(req, res) {
   }
 
   try {
-    console.log('🚀 === BENETRIP GROQ API v6.0 ===');
+    console.log('🧠 === BENETRIP GROQ REASONING API v6.0 ===');
     
     if (!req.body) {
       isResponseSent = true;
@@ -610,57 +862,94 @@ module.exports = async function handler(req, res) {
     const prompt = gerarPromptParaGroq(requestData);
     console.log('📝 Prompt gerado para Groq');
     
-    // Tentar obter recomendações com retry
-    const recomendacoes = await retryWithBackoff(async () => {
-      const response = await callGroqAPI(prompt, requestData, CONFIG.groq.models.primary);
-      
-      if (response && utils.isValidDestinationJSON(response, requestData)) {
-        console.log('✅ Resposta válida recebida do Groq');
-        return ensureValidDestinationData(response, requestData);
-      }
-      
-      console.log('❌ Resposta inválida, tentando novamente...');
-      return null;
-    });
+    // Tentar obter recomendações com fallback inteligente entre modelos
+    const resultado = await retryWithBackoffAndFallback(prompt, requestData);
     
-    if (!recomendacoes) {
-      console.error('🚫 Falha em todas as tentativas com Groq');
+    if (!resultado) {
+      console.error('🚫 Falha em todos os modelos do Groq');
       if (!isResponseSent) {
         isResponseSent = true;
         clearTimeout(serverTimeout);
         return res.status(503).json({
           tipo: "erro",
           message: "Não foi possível obter recomendações no momento. Tente novamente em alguns instantes.",
-          error: "groq_all_attempts_failed"
+          error: "groq_all_models_failed"
         });
       }
       return;
     }
     
+    const { result: recomendacoesBrutas, model: modeloUsado } = resultado;
+    
+    // NOVA ETAPA: Filtrar destinos por orçamento
+    console.log('💰 Aplicando filtro de orçamento...');
+    const recomendacoesFiltradas = filtrarDestinosPorOrcamento(
+      recomendacoesBrutas, 
+      requestData.orcamento_valor, 
+      requestData.moeda_escolhida || 'BRL'
+    );
+    
     // Processar e retornar resultado
     try {
-      const dados = typeof recomendacoes === 'string' ? JSON.parse(recomendacoes) : recomendacoes;
+      const recomendacoesProcessadas = ensureValidDestinationData(recomendacoesFiltradas, requestData);
+      const dados = typeof recomendacoesProcessadas === 'string' ? 
+        JSON.parse(recomendacoesProcessadas) : recomendacoesProcessadas;
       
-      // Adicionar metadados
+      // Adicionar metadados incluindo modelo usado
       dados.metadados = {
-        modelo: CONFIG.groq.models.primary,
+        modelo: modeloUsado,
         provider: 'groq',
-        versao: '6.0',
-        timestamp: new Date().toISOString()
+        versao: '6.0-reasoning-budget',
+        timestamp: new Date().toISOString(),
+        reasoning_enabled: modeloUsado === CONFIG.groq.models.reasoning,
+        orcamento_filtrado: !!dados.observacaoOrcamento,
+        orcamento_maximo: requestData.orcamento_valor
       };
       
       console.log('🎉 Recomendações processadas com sucesso!');
+      console.log('🧠 Modelo usado:', modeloUsado);
+      console.log('💰 Orçamento respeitado:', requestData.orcamento_valor);
       console.log('📋 Destinos encontrados:', {
         topPick: dados.topPick?.destino,
+        topPickPreco: dados.topPick?.preco?.voo,
         alternativas: dados.alternativas?.length || 0,
-        surpresa: dados.surpresa?.destino
+        surpresa: dados.surpresa?.destino,
+        surpresaPreco: dados.surpresa?.preco?.voo,
+        temRaciocinio: !!dados.raciocinio,
+        filtradoPorOrcamento: !!dados.observacaoOrcamento
       });
+      
+      // Verificação final de orçamento
+      if (requestData.orcamento_valor && requestData.orcamento_valor !== 'flexível') {
+        const orcamentoMax = parseFloat(requestData.orcamento_valor);
+        const violacoes = [];
+        
+        if (dados.topPick?.preco?.voo && parseFloat(dados.topPick.preco.voo) > orcamentoMax * 1.1) {
+          violacoes.push(`topPick: R$ ${dados.topPick.preco.voo}`);
+        }
+        
+        if (dados.alternativas) {
+          dados.alternativas.forEach((alt, i) => {
+            if (alt.preco?.voo && parseFloat(alt.preco.voo) > orcamentoMax * 1.1) {
+              violacoes.push(`alt${i+1}: R$ ${alt.preco.voo}`);
+            }
+          });
+        }
+        
+        if (violacoes.length > 0) {
+          console.log(`⚠️ ATENÇÃO: Ainda há violações de orçamento:`, violacoes);
+        } else {
+          console.log(`✅ ORÇAMENTO RESPEITADO: Todos os destinos ≤ R$ ${orcamentoMax}`);
+        }
+      }
       
       if (!isResponseSent) {
         isResponseSent = true;
         clearTimeout(serverTimeout);
         return res.status(200).json({
-          tipo: "groq_success",
+          tipo: "groq_reasoning_budget_success",
+          modelo: modeloUsado,
+          orcamento_controlado: true,
           conteudo: JSON.stringify(dados)
         });
       }
@@ -673,7 +962,8 @@ module.exports = async function handler(req, res) {
         clearTimeout(serverTimeout);
         return res.status(200).json({
           tipo: "groq_partial_success",
-          conteudo: recomendacoes
+          modelo: modeloUsado,
+          conteudo: recomendacoesFiltradas
         });
       }
     }
