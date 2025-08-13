@@ -1,14 +1,12 @@
-// api/itinerary-generator.js - Gerador de roteiro com Groq (Otimizado)
+// api/itinerary-generator.js - Endpoint para geração de roteiro personalizado
 const axios = require('axios');
 
-// Configurações da API Groq
-const GROQ_API_KEY = process.env.GROQ_API_KEY || process.env.GROK_API_KEY;
-const GROQ_BASE_URL = 'https://api.groq.com/openai/v1';
-const GROQ_MODEL = 'llama-3.3-70b-versatile'; // Modelo mais recente e performático
+// Chaves de API
+const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY;
+const CLAUDE_API_KEY = process.env.CLAUDE_API_KEY;
 
-// Configurações de timeout e retry
-const API_TIMEOUT = 60000; // 60 segundos
-const MAX_RETRIES = 2;
+// Modelo padrão a ser usado (DeepSeek Coder)
+const DEFAULT_MODEL = 'deepseek-chat';
 
 // Função auxiliar para logging estruturado
 function logEvent(type, message, data = {}) {
@@ -16,47 +14,33 @@ function logEvent(type, message, data = {}) {
     timestamp: new Date().toISOString(),
     type,
     message,
-    service: 'itinerary-generator',
-    model: GROQ_MODEL,
     ...data
   };
   console.log(JSON.stringify(log));
 }
 
 /**
- * Endpoint principal para geração de roteiro personalizado via Groq
+ * Gera um roteiro personalizado através da API Deepseek ou Claude
  */
 module.exports = async (req, res) => {
   // Configurar cabeçalhos CORS
   res.setHeader('Access-Control-Allow-Credentials', true);
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   
   // Responder a preflight requests
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
   
-  // Verificar método HTTP
+  // Verificar método
   if (req.method !== 'POST') {
-    return res.status(405).json({ 
-      error: 'Método não permitido', 
-      message: 'Use POST para este endpoint' 
-    });
+    return res.status(405).json({ error: 'Método não permitido. Use POST.' });
   }
   
   try {
-    // Validar chave da API
-    if (!GROQ_API_KEY) {
-      logEvent('error', 'Chave da API Groq não configurada');
-      return res.status(500).json({ 
-        error: 'Configuração inválida', 
-        message: 'Chave da API não encontrada' 
-      });
-    }
-    
-    // Extrair e validar parâmetros
+    // Obter parâmetros do corpo da requisição
     const {
       destino,
       pais,
@@ -67,40 +51,28 @@ module.exports = async (req, res) => {
       tipoViagem,
       tipoCompanhia,
       preferencias,
-      testMode = false
+      modeloIA
     } = req.body;
     
-    // Validação de parâmetros obrigatórios
+    // Validar parâmetros obrigatórios
     if (!destino || !dataInicio) {
-      return res.status(400).json({ 
-        error: 'Parâmetros obrigatórios ausentes', 
-        message: 'destino e dataInicio são obrigatórios' 
-      });
+      return res.status(400).json({ error: 'Parâmetros obrigatórios: destino, dataInicio' });
     }
     
-    // Calcular duração da viagem
+    // Calcular número de dias
     const diasViagem = calcularDiasViagem(dataInicio, dataFim);
     
-    // Validar duração máxima (limite prático)
-    if (diasViagem > 21) {
-      return res.status(400).json({ 
-        error: 'Duração inválida', 
-        message: 'Máximo de 21 dias de viagem suportado' 
-      });
-    }
-    
-    // Log da requisição
-    logEvent('info', 'Iniciando geração de roteiro', {
+    // Log dos parâmetros recebidos
+    logEvent('info', 'Gerando roteiro personalizado', {
       destino,
       pais,
       diasViagem,
       tipoViagem,
-      tipoCompanhia,
-      testMode
+      tipoCompanhia
     });
     
-    // Gerar prompt otimizado para Groq
-    const prompt = gerarPromptRoteiroGroq({
+    // Gerar o prompt para a IA
+    const prompt = gerarPromptRoteiro({
       destino,
       pais,
       dataInicio,
@@ -113,85 +85,70 @@ module.exports = async (req, res) => {
       preferencias
     });
     
-    // Gerar roteiro com Groq (com retry automático)
-    const roteiro = await gerarRoteiroComGroq(prompt, testMode);
+    // Selecionar o modelo de IA a ser usado
+    const modelo = modeloIA || DEFAULT_MODEL;
     
-    // Validar estrutura do roteiro
-    if (!validarEstrutulaRoteiro(roteiro, diasViagem)) {
-      throw new Error('Roteiro gerado com estrutura inválida');
+    // Gerar o roteiro usando a API correspondente
+    let roteiro;
+    
+    if (modelo === 'claude') {
+      roteiro = await gerarRoteiroComClaude(prompt);
+    } else {
+      roteiro = await gerarRoteiroComDeepseek(prompt);
     }
     
-    // Log de sucesso
-    logEvent('success', 'Roteiro gerado com sucesso', {
-      destino,
-      diasGerados: roteiro.dias?.length || 0,
-      diasEsperados: diasViagem
-    });
+    // Verificar se o roteiro foi gerado com sucesso
+    if (!roteiro) {
+      throw new Error('Falha ao gerar roteiro');
+    }
     
-    // Retornar roteiro com metadata
-    return res.status(200).json({
-      ...roteiro,
-      metadata: {
-        generatedAt: new Date().toISOString(),
-        model: GROQ_MODEL,
-        requestId: generateRequestId(),
-        diasViagem,
-        parametros: {
-          destino,
-          pais,
-          tipoViagem,
-          tipoCompanhia
-        }
-      }
-    });
+    // Retornar o roteiro gerado
+    return res.status(200).json(roteiro);
     
   } catch (erro) {
-    // Log detalhado do erro
-    logEvent('error', 'Erro na geração do roteiro', {
+    // Log do erro
+    logEvent('error', 'Erro ao gerar roteiro', {
       message: erro.message,
-      stack: processo.env.NODE_ENV === 'development' ? erro.stack : undefined,
-      body: req.body
+      stack: erro.stack
     });
     
-    // Retornar erro estruturado
+    // Retornar erro
     return res.status(500).json({
-      error: 'Erro interno do servidor',
-      message: 'Falha ao gerar roteiro personalizado',
-      details: processo.env.NODE_ENV === 'development' ? erro.message : undefined,
-      requestId: generateRequestId()
+      error: 'Erro ao gerar roteiro personalizado',
+      details: erro.message
     });
   }
 };
 
 /**
  * Calcula o número de dias entre duas datas
- * @param {string} dataInicio - Data de início (YYYY-MM-DD)
- * @param {string} dataFim - Data de fim (YYYY-MM-DD)
- * @returns {number} Número de dias da viagem
+ * @param {string} dataInicio - Data de início no formato YYYY-MM-DD
+ * @param {string} dataFim - Data de fim no formato YYYY-MM-DD
+ * @returns {number} Número de dias
  */
 function calcularDiasViagem(dataInicio, dataFim) {
   if (!dataInicio) return 1;
   
   const inicio = new Date(dataInicio);
   
-  // Se não tiver data fim, assume viagem de 1 dia
+  // Se não tiver data fim, assume 1 dia
   if (!dataFim) return 1;
   
   const fim = new Date(dataFim);
   
-  // Calcular diferença em dias (incluindo dia de chegada)
+  // Calcular diferença em dias
   const diffTempo = Math.abs(fim - inicio);
-  const diffDias = Math.ceil(diffTempo / (1000 * 60 * 60 * 24)) + 1;
+  const diffDias = Math.ceil(diffTempo / (1000 * 60 * 60 * 24)) + 1;  // +1 para incluir o dia de chegada
   
-  return Math.max(1, diffDias); // Mínimo 1 dia
+  return diffDias;
 }
 
 /**
- * Gera prompt otimizado específico para Groq Llama
- * @param {Object} params - Parâmetros da viagem
- * @returns {string} Prompt formatado para Groq
+ * Gera o prompt para a IA baseado nos parâmetros
+ * @param {Object} params - Parâmetros para o prompt
+ * @returns {string} Prompt formatado
  */
-function gerarPromptRoteiroGroq(params) {
+function gerarPromptRoteiro(params) {
   const {
     destino,
     pais,
@@ -205,284 +162,244 @@ function gerarPromptRoteiroGroq(params) {
     preferencias
   } = params;
   
-  // Mapear tipos para descrições mais específicas
-  const tipoViagemMap = {
-    'relaxar': 'relaxamento, bem-estar e descanso',
-    'aventura': 'aventura, adrenalina e atividades radicais',
-    'cultura': 'cultura, história, gastronomia e arte local',
-    'urbano': 'vida urbana, compras, entretenimento e vida noturna',
-    'natureza': 'natureza, trilhas e contato com o meio ambiente'
-  };
+  // Mapear o tipo de viagem para descrição
+  const descricaoTipoViagem = {
+    'relaxar': 'relaxamento e descanso',
+    'aventura': 'aventura e adrenalina',
+    'cultura': 'cultura, história e gastronomia',
+    'urbano': 'urbanismo, compras e vida noturna'
+  }[tipoViagem] || 'cultura e experiências variadas';
   
-  const tipoCompanhiaMap = {
-    'sozinho': 'viajante solo',
-    'casal': 'casal romântico',
-    'familia': 'família com crianças',
-    'amigos': 'grupo de amigos'
-  };
+  // Mapear o tipo de companhia para descrição
+  const descricaoTipoCompanhia = {
+    'sozinho': 'uma pessoa viajando sozinha',
+    'casal': 'um casal em viagem romântica',
+    'familia': 'uma família com crianças',
+    'amigos': 'um grupo de amigos'
+  }[tipoCompanhia] || 'um viajante';
   
-  // Informações de intensidade e orçamento
-  const intensidadeMap = {
+  // ✅ NOVO: Mapear intensidade e orçamento
+  const intensidadeInfo = {
     'leve': '2-3 atividades por dia (ritmo relaxado)',
-    'moderado': '3-4 atividades por dia (ritmo equilibrado)',
-    'intenso': '5+ atividades por dia (ritmo acelerado)'
+    'moderado': '4-5 atividades por dia (ritmo equilibrado)',
+    'intenso': '6+ atividades por dia (ritmo acelerado)'
   };
   
-  const orcamentoMap = {
-    'economico': 'econômico (priorize atividades gratuitas ou de baixo custo)',
-    'medio': 'médio (balance atividades gratuitas e pagas)',
-    'alto': 'premium (inclua experiências exclusivas sem limitação de custo)'
+  const orcamentoInfo = {
+    'economico': 'econômico (priorize atividades gratuitas e de baixo custo)',
+    'medio': 'médio (misture atividades gratuitas e pagas)',
+    'alto': 'alto (inclua experiências premium sem limitações de custo)'
   };
   
-  // Informações adicionais sobre viajantes
-  let infoViajantes = tipoCompanhiaMap[tipoCompanhia] || 'viajante';
+  // ✅ NOVO: Criar informações detalhadas de viajantes
+  let infoViajantes = descricaoTipoCompanhia;
   if (tipoCompanhia === 'familia' && preferencias) {
     const adultos = preferencias.quantidade_adultos || 2;
     const criancas = preferencias.quantidade_criancas || 0;
-    if (criancas > 0) {
-      infoViajantes += ` (${adultos} adulto${adultos > 1 ? 's' : ''}, ${criancas} criança${criancas > 1 ? 's' : ''})`;
-    }
+    const bebes = preferencias.quantidade_bebes || 0;
+    infoViajantes += ` (${adultos} adulto${adultos > 1 ? 's' : ''}`;
+    if (criancas > 0) infoViajantes += `, ${criancas} criança${criancas > 1 ? 's' : ''}`;
+    if (bebes > 0) infoViajantes += `, ${bebes} bebê${bebes > 1 ? 's' : ''}`;
+    infoViajantes += ')';
   }
   
-  const intensidade = intensidadeMap[preferencias?.intensidade_roteiro] || intensidadeMap['moderado'];
-  const orcamento = orcamentoMap[preferencias?.orcamento_nivel] || orcamentoMap['medio'];
-  const focoPrincipal = tipoViagemMap[tipoViagem] || 'experiências variadas';
-  
-  return `Você é a Tripinha, uma vira-lata caramelo esperta e carismática da Benetrip. Crie um roteiro de viagem COMPLETO e DETALHADO em formato JSON.
+  // Montar o prompt
+  return `
+Você é a Tripinha, uma vira-lata caramelo magra, esperta, despojada e especialista em viagens na Benetrip. Sua missão é transformar as respostas do usuário em um roteiro de viagem completo, personalizado e incrível. Fale como se fosse uma amiga: com leveza, simpatia, bom humor e dicas práticas, sem enrolação.. 
+Crie um roteiro detalhado para uma viagem com as seguintes características:
 
-DADOS DA VIAGEM:
-🎯 Destino: ${destino}, ${pais}
-📅 Período: ${dataInicio}${dataFim ? ` até ${dataFim}` : ''} (${diasViagem} dias)
-✈️ Chegada: ${horaChegada || 'Flexível'}
-🛫 Partida: ${horaSaida || 'Flexível'}
-👥 Viajantes: ${infoViajantes}
-🎨 Foco: ${focoPrincipal}
-⚡ Intensidade: ${intensidade}
-💰 Orçamento: ${orcamento}
+- Destino: ${destino}, ${pais}
+- Data de início: ${dataInicio}${dataFim ? `\n- Data de término: ${dataFim}` : ''}
+- Duração: ${diasViagem} dias
+- Horário de chegada no primeiro dia: ${horaChegada || 'Não informado'}
+- Horário de partida no último dia: ${horaSaida || 'Não informado'}
+- Tipo de viagem: Foco em ${descricaoTipoViagem}
+- Viajantes: ${infoViajantes}
+- Intensidade do roteiro: ${intensidadeInfo[preferencias?.intensidade_roteiro] || intensidadeInfo['moderado']}
+- Orçamento: ${orcamentoInfo[preferencias?.orcamento_nivel] || orcamentoInfo['medio']}
 
-INSTRUÇÕES CRÍTICAS:
-1. OBRIGATÓRIO: Crie EXATAMENTE ${diasViagem} dias de roteiro
-2. Cada dia deve ter atividades para manhã, tarde e noite
-3. Respeite a intensidade: ${intensidade}
-4. Adeque ao orçamento: ${orcamento}
-5. Adapte para ${infoViajantes}
-6. No primeiro dia, considere chegada às ${horaChegada || 'flexível'}
-7. No último dia, considere partida às ${horaSaida || 'flexível'}
+INSTRUÇÕES:
+1. OBRIGATÓRIO: CRIE UM ROTEIRO COMPLETO PARA EXATAMENTE ${diasViagem} DIAS DE VIAGEM. CADA UM DOS ${diasViagem} DIAS DEVE CONTER ATIVIDADES.
+2. RESPEITE A INTENSIDADE escolhida: ${intensidadeInfo[preferencias?.intensidade_roteiro] || intensidadeInfo['moderado']}
+3. CONSIDERE O ORÇAMENTO: ${orcamentoInfo[preferencias?.orcamento_nivel] || orcamentoInfo['medio']}
+4. ADAPTE AS ATIVIDADES para ${infoViajantes}
+5. Organize o roteiro por dias, considerando o dia da semana real e se é fim de semana ou dia útil.
+6. Para cada dia, divida o roteiro em períodos: manhã, tarde e noite.
+7. Cada período deve ter atividades relevantes conforme a intensidade escolhida, com locais reais (pontos turísticos, restaurantes, etc).
+8. Para cada atividade, inclua:
+   - Horário sugerido
+   - Nome do local
+   - 1-2 tags relevantes (ex: Imperdível, Cultural, Família)
+   - Uma dica personalizada da Tripinha (mascote da Benetrip)
+9. No primeiro dia, considere o horário de chegada (${horaChegada || 'Não informado'}).
+10. No último dia, considere o horário de partida (${horaSaida || 'Não informado'}).
+11. Inclua uma breve descrição para cada dia.
+12. IMPORTANTE: FAÇA O MÁXIMO PARA QUE TODOS OS ${diasViagem} DIAS TENHAM ATIVIDADES DIFERENTES. SE ESGOTAR AS SUGESTÕES, REPITA OS PASSEIOS MAIS CONHECIDOS OU CRIE ATIVIDADES GENÉRICAS (Ex: "Dia livre para explorar", "Visitar lojas locais").
+13. ESSENCIAL: O array "dias" no JSON FINAL DEVE CONTER EXATAMENTE ${diasViagem} OBJETOS DE DIAS, SEM EXCEÇÕES.
 
-FORMATO JSON OBRIGATÓRIO:
+Retorne o roteiro em formato JSON com a seguinte estrutura:
 {
-  "destino": "${destino}",
-  "resumo": "Breve descrição da viagem",
+  "destino": "Nome do destino",
   "dias": [
     {
-      "numero": 1,
-      "data": "${dataInicio}",
-      "diaSemana": "Nome do dia da semana",
-      "tema": "Tema principal do dia",
-      "descricao": "Descrição geral do dia",
+      "data": "YYYY-MM-DD",
+      "descricao": "Breve descrição sobre o dia",
       "manha": {
-        "horarioEspecial": "Se chegada/partida",
+        "horarioEspecial": "Chegada às XX:XX" (opcional, apenas se for chegada/partida),
         "atividades": [
           {
             "horario": "HH:MM",
-            "local": "Nome específico do local",
-            "tipo": "categoria da atividade",
+            "local": "Nome do local",
             "tags": ["tag1", "tag2"],
-            "descricao": "Breve descrição",
-            "dica": "Dica personalizada da Tripinha",
-            "custo": "gratuito|baixo|medio|alto"
+            "dica": "Dica da Tripinha sobre o local"
           }
         ]
       },
-      "tarde": { /* mesmo formato */ },
-      "noite": { /* mesmo formato */ }
+      "tarde": { ... mesmo formato da manhã ... },
+      "noite": { ... mesmo formato da manhã ... }
     }
   ]
 }
 
-REGRAS IMPORTANTES:
-- Use locais REAIS e específicos de ${destino}
-- Inclua pelo menos 1 dica da Tripinha por período
-- Varie os tipos de atividade conforme o foco em ${focoPrincipal}
-- Para família, priorize atividades kid-friendly
-- Para casal, inclua experiências românticas
-- Para amigos, foque em diversão e vida noturna
-- Para solo, inclua experiências introspectivas e sociais
-
-Responda APENAS com o JSON válido, sem texto adicional.`;
+Observações importantes:
+- Para ${infoViajantes}, dê prioridade a atividades compatíveis.
+- Como o foco é ${descricaoTipoViagem}, sugira mais atividades relacionadas a esse tema.
+- Respeite rigorosamente a intensidade de ${intensidadeInfo[preferencias?.intensidade_roteiro] || intensidadeInfo['moderado']}.
+- Ajuste as sugestões ao orçamento ${orcamentoInfo[preferencias?.orcamento_nivel] || orcamentoInfo['medio']}.
+- Considere atividades para dias úteis e atividades específicas para fins de semana.
+- Inclua uma mistura de atrações turísticas populares e experiências locais.
+- Garanta que destinos mais conhecidos estejam no roteiro da viagem.
+`;
 }
 
 /**
- * Gera roteiro utilizando a API Groq com retry automático
+ * Gera roteiro utilizando a API DeepSeek
  * @param {string} prompt - Prompt para a IA
- * @param {boolean} testMode - Modo de teste (menos tokens)
  * @returns {Object} Roteiro gerado
  */
-async function gerarRoteiroComGroq(prompt, testMode = false) {
-  let ultimoErro;
-  
-  for (let tentativa = 1; tentativa <= MAX_RETRIES; tentativa++) {
-    try {
-      logEvent('info', `Tentativa ${tentativa} de geração com Groq`);
-      
-      const config = {
-        timeout: API_TIMEOUT,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${GROQ_API_KEY}`
-        }
-      };
-      
-      const payload = {
-        model: GROQ_MODEL,
+async function gerarRoteiroComDeepseek(prompt) {
+  try {
+    // Verificar se a chave da API está configurada
+    if (!DEEPSEEK_API_KEY) {
+      throw new Error('Chave da API DeepSeek não configurada');
+    }
+    
+    // Realizar chamada à API DeepSeek
+    const response = await axios.post(
+      'https://api.deepseek.com/v1/chat/completions',
+      {
+        model: 'deepseek-chat',
+        max_tokens: 8192, // ✅ ADICIONADO: Limite explícito de tokens
         messages: [
-          {
-            role: 'system',
-            content: 'Você é a Tripinha da Benetrip. Responda SEMPRE em JSON válido conforme o formato solicitado. Seja criativa, detalhada e útil.'
-          },
           {
             role: 'user',
             content: prompt
           }
         ],
-        max_tokens: testMode ? 4000 : 8000,
         temperature: 0.7,
-        top_p: 0.9,
-        response_format: { type: 'json_object' },
-        stream: false
-      };
-      
-      // Fazer chamada à API Groq
-      const response = await axios.post(
-        `${GROQ_BASE_URL}/chat/completions`,
-        payload,
-        config
-      );
-      
-      // Validar resposta da API
-      if (!response.data?.choices?.[0]?.message?.content) {
-        throw new Error('Resposta inválida da API Groq');
+        response_format: { type: 'json_object' }
+      },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${DEEPSEEK_API_KEY}`
+        }
       }
+    );
+    
+    // Extrair resposta
+    const respostaText = response.data.choices[0].message.content;
+    
+    // Processar a resposta JSON
+    try {
+      // Limpar qualquer markdown ou texto antes/depois do JSON
+      const jsonMatch = respostaText.match(/\{[\s\S]*\}/);
+      const jsonText = jsonMatch ? jsonMatch[0] : respostaText;
       
-      const respostaTexto = response.data.choices[0].message.content;
-      
-      // Log da resposta bruta (apenas em desenvolvimento)
-      if (processo.env.NODE_ENV === 'development') {
-        logEvent('debug', 'Resposta bruta da Groq', { content: respostaTexto.substring(0, 500) });
-      }
-      
-      // Processar e validar JSON
-      const roteiro = processarRespostaJSON(respostaTexto);
-      
-      // Log de sucesso
-      logEvent('success', 'Resposta processada com sucesso', {
-        tentativa,
-        diasGerados: roteiro.dias?.length || 0,
-        tokensUsados: response.data.usage?.total_tokens || 0
-      });
-      
+      // Parsear para objeto
+      const roteiro = JSON.parse(jsonText);
       return roteiro;
-      
-    } catch (erro) {
-      ultimoErro = erro;
-      
-      logEvent('warning', `Tentativa ${tentativa} falhou`, {
-        error: erro.message,
-        tentativa,
-        maxTentativas: MAX_RETRIES
+    } catch (parseError) {
+      logEvent('error', 'Erro ao processar resposta JSON da DeepSeek', {
+        error: parseError.message,
+        response: respostaText
       });
       
-      // Se for a última tentativa, relançar o erro
-      if (tentativa === MAX_RETRIES) {
-        throw ultimoErro;
-      }
-      
-      // Aguardar antes da próxima tentativa (backoff exponencial)
-      await new Promise(resolve => setTimeout(resolve, tentativa * 1000));
+      throw new Error('Resposta da DeepSeek não é um JSON válido');
     }
-  }
-}
-
-/**
- * Processa a resposta JSON da Groq, limpando formatação
- * @param {string} respostaTexto - Resposta bruta da API
- * @returns {Object} Objeto JSON parseado
- */
-function processarRespostaJSON(respostaTexto) {
-  try {
-    // Limpar possível markdown ou texto extra
-    let jsonTexto = respostaTexto.trim();
-    
-    // Remover markdown se existir
-    if (jsonTexto.startsWith('```json')) {
-      jsonTexto = jsonTexto.replace(/^```json\s*/, '').replace(/\s*```$/, '');
-    } else if (jsonTexto.startsWith('```')) {
-      jsonTexto = jsonTexto.replace(/^```\s*/, '').replace(/\s*```$/, '');
-    }
-    
-    // Encontrar JSON válido na resposta
-    const jsonMatch = jsonTexto.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      jsonTexto = jsonMatch[0];
-    }
-    
-    // Tentar parsear JSON
-    const roteiro = JSON.parse(jsonTexto);
-    
-    return roteiro;
     
   } catch (erro) {
-    logEvent('error', 'Erro ao processar JSON da resposta', {
+    logEvent('error', 'Erro na chamada à API DeepSeek', {
       error: erro.message,
-      rawContent: respostaTexto.substring(0, 1000)
+      response: erro.response?.data
     });
     
-    throw new Error(`Resposta da Groq não contém JSON válido: ${erro.message}`);
+    throw erro;
   }
 }
 
 /**
- * Valida a estrutura do roteiro gerado
- * @param {Object} roteiro - Roteiro a ser validado
- * @param {number} diasEsperados - Número de dias esperado
- * @returns {boolean} Se é válido
+ * Gera roteiro utilizando a API Claude (Anthropic)
+ * @param {string} prompt - Prompt para a IA
+ * @returns {Object} Roteiro gerado
  */
-function validarEstrutulaRoteiro(roteiro, diasEsperados) {
-  if (!roteiro || typeof roteiro !== 'object') {
-    logEvent('error', 'Roteiro não é um objeto válido');
-    return false;
-  }
-  
-  if (!roteiro.destino || !Array.isArray(roteiro.dias)) {
-    logEvent('error', 'Roteiro não possui estrutura básica (destino, dias)');
-    return false;
-  }
-  
-  if (roteiro.dias.length !== diasEsperados) {
-    logEvent('error', 'Número de dias incorreto', {
-      esperado: diasEsperados,
-      gerado: roteiro.dias.length
-    });
-    return false;
-  }
-  
-  // Validar cada dia
-  for (let i = 0; i < roteiro.dias.length; i++) {
-    const dia = roteiro.dias[i];
-    
-    if (!dia.data || !dia.manha || !dia.tarde || !dia.noite) {
-      logEvent('error', `Dia ${i + 1} possui estrutura inválida`);
-      return false;
+async function gerarRoteiroComClaude(prompt) {
+  try {
+    // Verificar se a chave da API está configurada
+    if (!CLAUDE_API_KEY) {
+      throw new Error('Chave da API Claude não configurada');
     }
+    
+    // Realizar chamada à API Claude (Anthropic)
+    const response = await axios.post(
+      'https://api.anthropic.com/v1/messages',
+      {
+        model: 'claude-3-haiku-20240307',
+        max_tokens: 4000,
+        messages: [
+          {
+            role: 'user',
+            content: prompt
+          }
+        ],
+        response_format: { type: 'json_object' }
+      },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': CLAUDE_API_KEY,
+          'anthropic-version': '2023-06-01'
+        }
+      }
+    );
+    
+    // Extrair resposta
+    const respostaText = response.data.content[0].text;
+    
+    // Processar a resposta JSON
+    try {
+      // Limpar qualquer markdown ou texto antes/depois do JSON
+      const jsonMatch = respostaText.match(/\{[\s\S]*\}/);
+      const jsonText = jsonMatch ? jsonMatch[0] : respostaText;
+      
+      // Parsear para objeto
+      const roteiro = JSON.parse(jsonText);
+      return roteiro;
+    } catch (parseError) {
+      logEvent('error', 'Erro ao processar resposta JSON da Claude', {
+        error: parseError.message,
+        response: respostaText
+      });
+      
+      throw new Error('Resposta da Claude não é um JSON válido');
+    }
+    
+  } catch (erro) {
+    logEvent('error', 'Erro na chamada à API Claude', {
+      error: erro.message,
+      response: erro.response?.data
+    });
+    
+    throw erro;
   }
-  
-  return true;
-}
-
-/**
- * Gera um ID único para a requisição
- * @returns {string} ID da requisição
- */
-function generateRequestId() {
-  return `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 }
