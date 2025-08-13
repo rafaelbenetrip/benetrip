@@ -2118,4 +2118,735 @@ const BENETRIP_ROTEIRO = {
           this.roteiroPronto.dias[i].previsao = this.gerarPrevisaoFallback(i);
         }
         
-        console.log(`🛡️ Previsão FALL
+        console.log(`🛡️ Previsão FALLBACK aplicada aos primeiros ${diasComPrevisao} dias`);
+      }
+      
+    } catch (erro) {
+      console.error('❌ Erro geral na busca de previsão:', erro);
+      
+      const diasComPrevisao = Math.min(this.roteiroPronto.dias.length, this.CONFIG.LIMITE_PREVISAO_DIAS);
+      for (let i = 0; i < diasComPrevisao; i++) {
+        if (!this.roteiroPronto.dias[i].previsao) {
+          this.roteiroPronto.dias[i].previsao = this.gerarPrevisaoFallback(i);
+        }
+      }
+    }
+  },
+
+  /**
+   * ✅ GERAR PREVISÃO FALLBACK
+   */
+  gerarPrevisaoFallback(diaIndex) {
+    const cidade = this.dadosDestino?.destino?.toLowerCase() || '';
+    
+    let condicoesPrincipais;
+    
+    if (cidade.includes('paris') || cidade.includes('londres') || cidade.includes('berlim')) {
+      condicoesPrincipais = [
+        { icon: '🌤️', condition: 'Parcialmente nublado', tempBase: 18 },
+        { icon: '☁️', condition: 'Nublado', tempBase: 16 },
+        { icon: '🌦️', condition: 'Chuva leve', tempBase: 14 },
+        { icon: '☀️', condition: 'Ensolarado', tempBase: 22 }
+      ];
+    } else if (cidade.includes('miami') || cidade.includes('rio') || cidade.includes('salvador')) {
+      condicoesPrincipais = [
+        { icon: '☀️', condition: 'Ensolarado', tempBase: 28 },
+        { icon: '🌤️', condition: 'Parcialmente nublado', tempBase: 26 },
+        { icon: '⛈️', condition: 'Pancadas de chuva', tempBase: 24 },
+        { icon: '🌊', condition: 'Brisa marítima', tempBase: 25 }
+      ];
+    } else {
+      condicoesPrincipais = [
+        { icon: '☀️', condition: 'Ensolarado', tempBase: 24 },
+        { icon: '🌤️', condition: 'Parcialmente nublado', tempBase: 22 },
+        { icon: '☁️', condition: 'Nublado', tempBase: 20 },
+        { icon: '🌦️', condition: 'Possibilidade de chuva', tempBase: 18 }
+      ];
+    }
+    
+    let condicao;
+    if (diaIndex === 0) {
+      condicao = Math.random() < 0.7 ? condicoesPrincipais[0] : condicoesPrincipais[1];
+    } else {
+      condicao = condicoesPrincipais[diaIndex % condicoesPrincipais.length];
+    }
+    
+    const variacaoTemp = Math.floor(Math.random() * 5) - 2;
+    const temperaturaFinal = Math.max(10, Math.min(40, condicao.tempBase + variacaoTemp));
+    
+    return {
+      icon: condicao.icon,
+      temperature: temperaturaFinal,
+      condition: condicao.condition,
+      date: this.calcularDataDia(diaIndex)
+    };
+  },
+
+  /**
+   * ✅ CALCULAR DATA DIA
+   */
+  calcularDataDia(diaIndex) {
+    const dataInicio = new Date(this.getDataIda() + 'T12:00:00');
+    const dataAlvo = new Date(dataInicio);
+    dataAlvo.setDate(dataInicio.getDate() + diaIndex);
+    
+    return this.formatarDataISO(dataAlvo);
+  },
+
+  // =====================================
+  // MÉTODOS DE COMPARTILHAMENTO
+  // =====================================
+
+  /**
+   * ✅ COMPARTILHAR ROTEIRO
+   */
+  async compartilharRoteiro() {
+    try {
+      this.mostrarModalCompartilhamento();
+    } catch (erro) {
+      console.error('❌ Erro no compartilhamento:', erro);
+      this.exibirToast('Erro ao compartilhar. Tente novamente.', 'error');
+    }
+  },
+
+  /**
+   * ✅ MODAL COMPARTILHAMENTO
+   */
+  mostrarModalCompartilhamento() {
+    const modalExistente = document.getElementById('modal-compartilhar');
+    if (modalExistente) modalExistente.remove();
+    
+    const modal = document.createElement('div');
+    modal.id = 'modal-compartilhar';
+    modal.className = 'modal-overlay';
+    
+    modal.innerHTML = `
+      <div class="modal-content modal-compartilhar">
+        <div class="modal-header">
+          <h3>📤 Copiar Roteiro</h3>
+          <button class="modal-close" onclick="this.closest('.modal-overlay').remove()">×</button>
+        </div>
+        
+        <div class="modal-body">
+          <div class="compartilhar-info">
+            <div class="info-icon">📋</div>
+            <div class="info-texto">
+              <h4>Vamos copiar seu roteiro!</h4>
+              <p>Escolha o formato e depois cole onde quiser: WhatsApp, email, notas...</p>
+            </div>
+          </div>
+          
+          <div class="opcoes-tamanho">
+            <button class="opcao-tamanho opcao-destaque" data-tipo="resumido">
+              <div class="opcao-icon">📱</div>
+              <div class="opcao-info">
+                <div class="opcao-titulo">Versão Resumida</div>
+                <div class="opcao-desc">Perfeita para WhatsApp • Principais pontos</div>
+                <div class="opcao-preview">✅ Roteiro + mapas + 2.000 caracteres</div>
+              </div>
+            </button>
+            
+            <button class="opcao-tamanho" data-tipo="completo">
+              <div class="opcao-icon">📄</div>
+              <div class="opcao-info">
+                <div class="opcao-titulo">Versão Completa</div>
+                <div class="opcao-desc">Todos os detalhes • Para documentos</div>
+                <div class="opcao-preview">📋 Tudo incluso: dicas + previsão + mapas</div>
+              </div>
+            </button>
+          </div>
+          
+          <div class="dica-compartilhamento">
+            <div class="dica-icon">💡</div>
+            <div class="dica-texto">
+              <strong>Dica:</strong> Após copiar, cole no app que você preferir. A versão completa funciona melhor em documentos e emails!
+            </div>
+          </div>
+          
+          <div class="modal-acoes">
+            <button class="btn btn-secundario" onclick="this.closest('.modal-overlay').remove()">
+              Cancelar
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) modal.remove();
+    });
+    
+    modal.querySelectorAll('.opcao-tamanho').forEach(opcao => {
+      opcao.addEventListener('click', async (e) => {
+        const tipo = opcao.dataset.tipo;
+        modal.remove();
+        
+        try {
+          if (tipo === 'resumido') {
+            await this.copiarRoteiroResumido();
+          } else {
+            await this.copiarRoteiroCompleto();
+          }
+        } catch (erro) {
+          console.error('❌ Erro na cópia:', erro);
+          this.exibirToast('Erro ao copiar roteiro', 'error');
+        }
+      });
+    });
+    
+    requestAnimationFrame(() => {
+      modal.classList.add('modal-visible');
+    });
+  },
+
+  /**
+   * ✅ COPIAR ROTEIRO RESUMIDO
+   */
+  async copiarRoteiroResumido() {
+    try {
+      this.exibirToast('📱 Preparando versão resumida...', 'info');
+      
+      const textoResumido = this.gerarTextoRoteiroResumido();
+      
+      try {
+        await navigator.clipboard.writeText(textoResumido);
+        this.mostrarToastSucesso('resumido', textoResumido.length);
+      } catch (e) {
+        this.copiarTextoLegacy(textoResumido);
+        this.mostrarToastSucesso('resumido', textoResumido.length);
+      }
+      
+    } catch (erro) {
+      console.error('❌ Erro ao copiar versão resumida:', erro);
+      this.exibirToast('❌ Erro ao preparar versão resumida.', 'error');
+    }
+  },
+
+  /**
+   * ✅ GERAR TEXTO RESUMIDO
+   */
+  gerarTextoRoteiroResumido() {
+    const destino = this.dadosDestino?.destino || 'Destino';
+    const pais = this.dadosDestino?.pais || 'País';
+    const dataIda = this.formatarData(this.getDataIda());
+    const dataVolta = this.getDataVolta() ? this.formatarData(this.getDataVolta()) : null;
+    const diasViagem = this.calcularDiasViagem(this.getDataIda(), this.getDataVolta());
+    
+    let texto = `🐕 ROTEIRO BENETRIP - ${destino.toUpperCase()} ✈️\n\n`;
+    
+    texto += `📍 ${destino}, ${pais}\n`;
+    
+    if (diasViagem === 1) {
+      texto += `📅 ${dataIda} (bate e volta)\n`;
+    } else {
+      texto += `📅 ${dataIda}${dataVolta ? ` até ${dataVolta}` : ''} (${diasViagem} dias)\n`;
+    }
+    
+    texto += `👥 ${this.obterTextoCompanhiaResumido()}\n`;
+    texto += `🎯 ${this.obterTextoPreferencia()}\n\n`;
+    
+    this.roteiroPronto?.dias?.forEach((dia, index) => {
+      const numeroDia = index + 1;
+      const dataFormatada = this.formatarDataSimples(dia.data);
+      
+      if (diasViagem === 1) {
+        texto += `📅 ${dataFormatada} - BATE E VOLTA\n`;
+      } else {
+        texto += `📅 DIA ${numeroDia} - ${dataFormatada}\n`;
+      }
+      
+      if (dia.descricao) {
+        texto += `"${dia.descricao}"\n`;
+      }
+      
+      if (dia.atividades && dia.atividades.length > 0) {
+        const atividadesPrincipais = dia.atividades
+          .filter(ativ => !ativ.isEspecial)
+          .slice(0, 3);
+        
+        atividadesPrincipais.forEach((atividade) => {
+          texto += `${atividade.horario || ''} 📍 ${atividade.local}\n`;
+          
+          const linkMapa = this.gerarLinkGoogleMaps(atividade.local);
+          texto += `🗺️ ${linkMapa}\n`;
+        });
+      }
+      
+      texto += `\n`;
+    });
+    
+    texto += `🐾 Roteiro criado com amor pela Tripinha!\n`;
+    texto += `📱 Crie o seu em: www.benetrip.com.br\n`;
+    
+    return texto;
+  },
+
+  /**
+   * ✅ COPIAR ROTEIRO COMPLETO
+   */
+  async copiarRoteiroCompleto() {
+    try {
+      this.exibirToast('📄 Preparando versão completa...', 'info');
+      
+      const textoCompleto = this.gerarTextoRoteiroCompleto();
+      
+      try {
+        await navigator.clipboard.writeText(textoCompleto);
+        this.mostrarToastSucesso('completo', textoCompleto.length);
+      } catch (e) {
+        this.copiarTextoLegacy(textoCompleto);
+        this.mostrarToastSucesso('completo', textoCompleto.length);
+      }
+      
+    } catch (erro) {
+      console.error('❌ Erro ao copiar versão completa:', erro);
+      this.exibirToast('❌ Erro ao preparar versão completa.', 'error');
+    }
+  },
+
+  /**
+   * ✅ GERAR TEXTO COMPLETO
+   */
+  gerarTextoRoteiroCompleto() {
+    const destino = this.dadosDestino?.destino || 'Destino';
+    const pais = this.dadosDestino?.pais || 'País';
+    const dataIda = this.formatarData(this.getDataIda());
+    const dataVolta = this.getDataVolta() ? this.formatarData(this.getDataVolta()) : null;
+    const diasViagem = this.calcularDiasViagem(this.getDataIda(), this.getDataVolta());
+    
+    let texto = `🐕 ROTEIRO BENETRIP - ${destino.toUpperCase()} ✈️\n`;
+    texto += `═══════════════════════════════\n\n`;
+    
+    texto += `📍 DESTINO: ${destino}, ${pais}\n`;
+    
+    if (diasViagem === 1) {
+      texto += `📅 DATA: ${dataIda} (bate e volta)\n`;
+      texto += `⏱️ TIPO: Viagem de 1 dia\n`;
+    } else {
+      texto += `📅 PERÍODO: ${dataIda}${dataVolta ? ` até ${dataVolta}` : ''}\n`;
+      texto += `⏱️ DURAÇÃO: ${diasViagem} ${diasViagem === 1 ? 'dia' : 'dias'}\n`;
+    }
+    
+    texto += `👥 VIAJANTES: ${this.obterTextoCompanhia()}\n`;
+    texto += `🎯 ESTILO: ${this.obterTextoPreferencia()}\n`;
+    texto += `⚡ INTENSIDADE: ${this.obterTextoIntensidade()}\n\n`;
+    
+    texto += `✈️ INFORMAÇÕES DE VIAGEM:\n`;
+    texto += `🛬 Chegada: ${this.extrairHorarioChegada()}\n`;
+    
+    if (diasViagem === 1) {
+      texto += `🛫 Partida: ${this.extrairHorarioPartida()}\n`;
+      texto += `⏰ Tempo total: ${this.calcularTempoTotalDia()}\n`;
+    } else if (this.getDataVolta()) {
+      texto += `🛫 Partida: ${this.extrairHorarioPartida()}\n`;
+    }
+    texto += `\n`;
+    
+    if (diasViagem === 1) {
+      texto += `📋 ROTEIRO DO DIA:\n`;
+    } else {
+      texto += `📋 ROTEIRO DETALHADO:\n`;
+    }
+    texto += `═══════════════════════════════\n\n`;
+    
+    this.roteiroPronto?.dias?.forEach((dia, index) => {
+      const numeroDia = index + 1;
+      const dataFormatada = this.formatarDataCompleta(dia.data);
+      
+      if (diasViagem === 1) {
+        texto += `📅 ${dataFormatada} - BATE E VOLTA\n`;
+      } else {
+        texto += `📅 DIA ${numeroDia} - ${dataFormatada}\n`;
+      }
+      texto += `${'-'.repeat(40)}\n`;
+      
+      if (dia.descricao) {
+        texto += `💭 "${dia.descricao}"\n\n`;
+      }
+      
+      if (dia.observacao) {
+        texto += `💡 ${dia.observacao}\n\n`;
+      }
+      
+      if (dia.previsao && index < this.CONFIG.LIMITE_PREVISAO_DIAS) {
+        texto += `🌤️ PREVISÃO: ${dia.previsao.temperature}°C, ${dia.previsao.condition}\n\n`;
+      }
+      
+      if (dia.atividades && dia.atividades.length > 0) {
+        texto += `📍 PROGRAMAÇÃO:\n\n`;
+        
+        dia.atividades.forEach((atividade, ativIndex) => {
+          if (atividade.horario) {
+            texto += `🕒 ${atividade.horario}`;
+            if (atividade.duracao) {
+              texto += ` (${atividade.duracao})`;
+            }
+            texto += `\n`;
+          }
+          
+          texto += `📍 ${atividade.local}\n`;
+          
+          if (atividade.tags && atividade.tags.length > 0) {
+            texto += `🏷️ ${atividade.tags.join(' • ')}\n`;
+          }
+          
+          if (atividade.dica) {
+            texto += `🐕 Dica da Tripinha: ${atividade.dica}\n`;
+          }
+          
+          if (!atividade.isEspecial && atividade.local) {
+            const linkMapa = this.gerarLinkGoogleMaps(atividade.local);
+            texto += `🗺️ Ver no mapa: ${linkMapa}\n`;
+          }
+          
+          texto += `\n`;
+        });
+      } else {
+        texto += `🏖️ Dia livre para descanso ou atividades opcionais.\n\n`;
+      }
+      
+      texto += `${'-'.repeat(40)}\n\n`;
+    });
+    
+    texto += `🐾 Roteiro criado com amor pela Tripinha!\n`;
+    texto += `📱 Crie o seu em: www.benetrip.com.br\n`;
+    
+    const hashtag = diasViagem === 1 ? 'BateEVolta' : 'Viagem';
+    texto += `\n#Benetrip #${hashtag} #Roteiro #${destino.replace(/\s+/g, '')}`;
+    
+    return texto;
+  },
+
+  /**
+   * ✅ CALCULAR TEMPO TOTAL DO DIA
+   */
+  calcularTempoTotalDia() {
+    const chegada = this.extrairHorarioChegada();
+    const partida = this.extrairHorarioPartida();
+    
+    const [horaChegada, minutoChegada] = chegada.split(':').map(Number);
+    const [horaPartida, minutoPartida] = partida.split(':').map(Number);
+    
+    const totalMinutos = (horaPartida * 60 + minutoPartida) - (horaChegada * 60 + minutoChegada);
+    const horas = Math.floor(totalMinutos / 60);
+    const minutos = totalMinutos % 60;
+    
+    return `${horas}h${minutos > 0 ? minutos.toString().padStart(2, '0') : ''}`;
+  },
+
+  /**
+   * ✅ GERAR LINK GOOGLE MAPS
+   */
+  gerarLinkGoogleMaps(local) {
+    const localLimpo = this.limparTextoParaURL(local);
+    const destinoLimpo = this.limparTextoParaURL(this.dadosDestino?.destino || '');
+    
+    const query = `${localLimpo} ${destinoLimpo}`;
+    return `https://maps.google.com/?q=${encodeURIComponent(query)}`;
+  },
+
+  /**
+   * ✅ LIMPAR TEXTO PARA URL
+   */
+  limparTextoParaURL(texto) {
+    if (!texto) return '';
+    
+    return texto
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[àáâãäå]/g, 'a')
+      .replace(/[èéêë]/g, 'e')
+      .replace(/[ìíîï]/g, 'i')
+      .replace(/[òóôõö]/g, 'o')
+      .replace(/[ùúûü]/g, 'u')
+      .replace(/[ç]/g, 'c')
+      .replace(/[ñ]/g, 'n')
+      .replace(/[^a-zA-Z0-9\s\-]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+  },
+
+  /**
+   * ✅ TEXTO COMPANHIA RESUMIDO
+   */
+  obterTextoCompanhiaResumido() {
+    const dados = this.dadosFormulario;
+    const tipo = dados?.companhia;
+    
+    if (tipo === 'familia') {
+      return `Família (${dados.quantidadePessoas || 0} pessoas)`;
+    }
+    
+    const textos = {
+      'sozinho': 'Solo',
+      'casal': 'Casal',
+      'amigos': `Amigos (${dados?.quantidadePessoas || 2})`
+    };
+    
+    return textos[tipo] || 'Individual';
+  },
+
+  /**
+   * ✅ FORMATAR DATA SIMPLES
+   */
+  formatarDataSimples(dataString) {
+    if (!dataString) return 'Data indefinida';
+    
+    try {
+      const data = new Date(dataString + 'T12:00:00');
+      if (isNaN(data.getTime())) {
+        return dataString;
+      }
+      
+      const options = { 
+        day: '2-digit', 
+        month: '2-digit'
+      };
+      
+      return data.toLocaleDateString('pt-BR', options);
+    } catch (e) {
+      return dataString;
+    }
+  },
+
+  /**
+   * ✅ TOAST DE SUCESSO
+   */
+  mostrarToastSucesso(tipo, tamanho) {
+    const isMobile = /mobile|android|iphone/i.test(navigator.userAgent);
+    
+    let mensagem, dica;
+    
+    if (tipo === 'resumido') {
+      mensagem = `📱 Versão resumida copiada! (${tamanho} caracteres)`;
+      dica = isMobile ? 
+        '💡 Perfeita para WhatsApp! Pode colar diretamente.' :
+        '💡 Ideal para WhatsApp e redes sociais!';
+    } else {
+      mensagem = `📄 Versão completa copiada! (${tamanho} caracteres)`;
+      dica = isMobile ?
+        '💡 Melhor para documentos ou email. No WhatsApp, prefira a versão resumida.' :
+        '💡 Ideal para salvar em documentos ou enviar por email!';
+    }
+    
+    this.exibirToast(mensagem, 'success');
+    
+    setTimeout(() => {
+      this.exibirToast(dica, 'info');
+    }, 1500);
+  },
+
+  /**
+   * ✅ COPIAR TEXTO LEGACY
+   */
+  copiarTextoLegacy(texto) {
+    const textarea = document.createElement('textarea');
+    textarea.value = texto;
+    textarea.style.position = 'fixed';
+    textarea.style.left = '-9999px';
+    textarea.style.opacity = '0';
+    document.body.appendChild(textarea);
+    textarea.select();
+    document.execCommand('copy');
+    document.body.removeChild(textarea);
+  },
+
+  // =====================================
+  // MÉTODOS DE INTERAÇÃO
+  // =====================================
+
+  /**
+   * ✅ ABRIR MAPA
+   */
+  abrirMapa(local) {
+    const destino = `${this.dadosDestino?.destino || ''}, ${this.dadosDestino?.pais || ''}`;
+    const query = `${local}, ${destino}`;
+    const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
+    window.open(url, '_blank', 'noopener,noreferrer');
+  },
+
+  /**
+   * ✅ EDITAR ROTEIRO
+   */
+  editarRoteiro() {
+    if (confirm('Deseja voltar ao formulário para editar suas preferências?')) {
+      this.voltarParaFormulario();
+    }
+  },
+
+  // =====================================
+  // MÉTODOS DE CONTROLE DE ESTADO
+  // =====================================
+
+  /**
+   * ✅ MOSTRAR ERRO
+   */
+  mostrarErro(mensagem) {
+    console.error('❌ Erro exibido ao usuário:', mensagem);
+    
+    clearInterval(this.intervalId);
+    this.estaCarregando = false;
+    
+    const container = document.querySelector('.roteiro-content');
+    if (!container) return;
+    
+    container.innerHTML = `
+      <div class="erro-container">
+        <div class="erro-icon">
+          <div style="font-size: 72px;">😢</div>
+        </div>
+        
+        <h2 class="erro-titulo">Ops! Algo deu errado...</h2>
+        <p class="erro-mensagem">${mensagem}</p>
+        
+        <div class="erro-acoes">
+          <button class="btn btn-principal" onclick="BENETRIP_ROTEIRO.voltarParaFormulario()">
+            🔄 Tentar Novamente
+          </button>
+          <button class="btn btn-secundario" onclick="history.back()">
+            ⬅️ Voltar
+          </button>
+        </div>
+        
+        <p class="erro-dica">
+          <strong>Dica:</strong> Verifique se todos os campos foram preenchidos corretamente.
+        </p>
+      </div>
+    `;
+    
+    const loading = document.querySelector('.loading-container');
+    if (loading) loading.style.display = 'none';
+  },
+
+  /**
+   * ✅ INICIAR ANIMAÇÃO PROGRESSO
+   */
+  iniciarAnimacaoProgresso() {
+    const mensagens = [
+      '🐾 Revirando minhas memórias dos lugares que já farejei...',
+      '📸 Procurando as fotos mais fofas que tirei nessa aventura...',
+      '🗺️ Lembrando dos cantinhos secretos que descobri...',
+      '🌤️ Checando se o tempo vai estar bom pro passeio...',
+      '💭 Organizando minhas dicas especiais pra você...',
+      '📝 Preparando seu roteiro com todo carinho! 🐕'
+    ];
+    
+    let indice = 0;
+    
+    this.intervalId = setInterval(() => {
+      this.progressoAtual = Math.min(this.progressoAtual + 12, 90);
+      this.atualizarBarraProgresso(this.progressoAtual, mensagens[indice % mensagens.length]);
+      indice++;
+      
+      if (this.progressoAtual >= 90) {
+        clearInterval(this.intervalId);
+      }
+    }, 1000);
+  },
+
+  /**
+   * ✅ ATUALIZAR BARRA PROGRESSO
+   */
+  atualizarBarraProgresso(porcentagem, mensagem) {
+    const barra = document.querySelector('.progress-bar');
+    const texto = document.querySelector('.loading-text');
+    
+    if (barra) {
+      barra.style.width = `${porcentagem}%`;
+      barra.setAttribute('aria-valuenow', porcentagem);
+    }
+    
+    if (texto) {
+      texto.textContent = mensagem;
+    }
+  },
+
+  /**
+   * ✅ FINALIZAR CARREGAMENTO
+   */
+  finalizarCarregamento() {
+    clearInterval(this.intervalId);
+    this.estaCarregando = false;
+    
+    this.atualizarBarraProgresso(100, '✨ Roteiro pronto!');
+    
+    setTimeout(() => {
+      const loading = document.querySelector('.loading-container');
+      if (loading) {
+        loading.classList.add('fade-out');
+        setTimeout(() => loading.style.display = 'none', 300);
+      }
+    }, 500);
+  },
+
+  /**
+   * ✅ EXIBIR TOAST
+   */
+  exibirToast(mensagem, tipo = 'info') {
+    let container = document.getElementById('toast-container');
+    if (!container) {
+      container = document.createElement('div');
+      container.id = 'toast-container';
+      container.className = 'toast-container';
+      document.body.appendChild(container);
+    }
+    
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${tipo}`;
+    
+    const icones = {
+      success: '✅',
+      error: '❌',
+      info: 'ℹ️',
+      warning: '⚠️'
+    };
+    
+    toast.innerHTML = `
+      <span class="toast-icon">${icones[tipo] || icones.info}</span>
+      <span class="toast-message">${mensagem}</span>
+    `;
+    
+    container.appendChild(toast);
+    
+    requestAnimationFrame(() => {
+      toast.classList.add('toast-visible');
+    });
+    
+    setTimeout(() => {
+      toast.classList.remove('toast-visible');
+      setTimeout(() => toast.remove(), 300);
+    }, 4000);
+  },
+
+  /**
+   * ✅ DELAY
+   */
+  delay(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+};
+
+// ===========================================
+// INICIALIZAÇÃO
+// ===========================================
+
+document.addEventListener('DOMContentLoaded', () => {
+  if (document.getElementById('roteiro-container') || 
+      document.querySelector('.formulario-container')) {
+    
+    console.log('📄 Página de planejamento de viagem detectada');
+    
+    document.body.classList.add('pagina-roteiro');
+    BENETRIP_ROTEIRO.init();
+  }
+});
+
+window.BENETRIP_ROTEIRO = BENETRIP_ROTEIRO;
+
+if (window.BENETRIP_ROTEIRO_LOADED) {
+  console.warn('⚠️ Módulo de roteiro já foi carregado');
+} else {
+  window.BENETRIP_ROTEIRO_LOADED = true;
+}
