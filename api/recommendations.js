@@ -12,7 +12,7 @@ const CONFIG = {
   groq: {
     baseURL: 'https://api.groq.com/openai/v1',
     models: {
-      reasoning: 'deepseek-r1-distill-llama-70b',     // Reasoning principal
+      reasoning: 'openai/gpt-oss-120b',     // Reasoning principal
       personality: 'llama-3.3-70b-versatile',         // Personalidade Tripinha
       fast: 'llama-3.1-8b-instant',                   // Backup rápido
       toolUse: 'llama3-groq-70b-8192-tool-use-preview' // APIs futuras
