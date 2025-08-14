@@ -1,12 +1,13 @@
 // api/recommendations.js - Endpoint da API Vercel para recomendações de destino
-// Versão 6.0 - GROQ REASONING OPTIMIZED - DeepSeek R1 Distill + Fallbacks Inteligentes
+// Versão 7.0 - GROQ REASONING + VIAGENS DE ÔNIBUS - DeepSeek R1 Distill + Fallbacks Inteligentes
 // Prioriza modelo de reasoning para análise complexa com fallback para personalidade e velocidade
+// NOVO: Suporte para viagens de ônibus em orçamentos baixos (< R$ 400)
 const axios = require('axios');
 const http = require('http');
 const https = require('https');
 
 // =======================
-// Configurações Groq - REASONING OPTIMIZED
+// Configurações Groq - REASONING OPTIMIZED + BUS TRAVEL
 // =======================
 const CONFIG = {
   groq: {
@@ -25,6 +26,12 @@ const CONFIG = {
   logging: {
     enabled: true,
     maxLength: 600
+  },
+  // NOVO: Configuração para viagens de ônibus
+  viagemOnibus: {
+    orcamentoLimite: 400,  // Valor limite para sugerir ônibus
+    distanciaMaxima: 1200, // Distância máxima em km para viagem de ônibus
+    duracaoMaxima: 15      // Duração máxima em horas
   }
 };
 
@@ -52,7 +59,7 @@ const PRECOS_REFERENCIAIS = {
 };
 
 // =======================
-// Funções utilitárias
+// Funções utilitárias - ATUALIZADAS
 // =======================
 const utils = {
   validarCodigoIATA: codigo => codigo && /^[A-Z]{3}$/.test(codigo),
@@ -69,11 +76,51 @@ const utils = {
     }
   },
 
-  // Nova função para validar orçamento
+  // NOVA função para detectar se deve sugerir viagem de ônibus
+  deveUsarViagemOnibus: (orcamento, moeda = 'BRL') => {
+    if (!orcamento || orcamento === 'flexível') return false;
+    
+    // Converter orçamento para BRL se necessário
+    let orcamentoBRL = parseFloat(orcamento);
+    if (moeda !== 'BRL') {
+      // Conversões aproximadas - pode ser melhorado com API de câmbio
+      const taxas = { 'USD': 5.2, 'EUR': 5.8, 'GBP': 6.5 };
+      orcamentoBRL = orcamentoBRL * (taxas[moeda] || 1);
+    }
+    
+    return orcamentoBRL < CONFIG.viagemOnibus.orcamentoLimite;
+  },
+
+  // Função para validar orçamento (voo ou ônibus)
   validarOrcamentoDestino: (preco, orcamentoMax, tolerancia = 0.1) => {
     if (!orcamentoMax || orcamentoMax === 'flexível') return true;
     const limite = parseFloat(orcamentoMax) * (1 + tolerancia); // 10% de tolerância
     return parseFloat(preco) <= limite;
+  },
+
+  // NOVA função para obter destinos de ônibus baseado na origem
+  obterDestinosOnibus: (cidadeOrigem, orcamento) => {
+    const origem = cidadeOrigem.toLowerCase();
+    let cidadeBase = 'São Paulo'; // Padrão
+    
+    if (origem.includes('rio') || origem.includes('rj')) {
+      cidadeBase = 'Rio de Janeiro';
+    } else if (origem.includes('são paulo') || origem.includes('sp')) {
+      cidadeBase = 'São Paulo';
+    }
+    
+    const destinos = DESTINOS_ONIBUS_BRASIL[cidadeBase] || DESTINOS_ONIBUS_BRASIL['São Paulo'];
+    const orcamentoNum = parseFloat(orcamento);
+    
+    // Filtrar destinos pelo orçamento
+    const proximosFiltrados = destinos.Próximos.filter(d => d.preco <= orcamentoNum);
+    const regionaisFiltrados = destinos.Regionais.filter(d => d.preco <= orcamentoNum);
+    
+    return {
+      proximos: proximosFiltrados,
+      regionais: regionaisFiltrados,
+      cidadeBase
+    };
   },
 
   // Obter faixa de preços realista baseado na origem
@@ -135,44 +182,51 @@ const utils = {
     }
   },
   
+  // ATUALIZADA: Validação considerando viagens de ônibus
   isValidDestinationJSON: (jsonString, requestData) => {
     try {
       const data = typeof jsonString === 'string' ? JSON.parse(jsonString) : jsonString;
       
       // Verificar estrutura mínima necessária
-      const hasValidTopPick = data.topPick && data.topPick.destino && data.topPick.pais;
+      const hasValidTopPick = data.topPick && data.topPick.destino;
       const hasValidAlternatives = Array.isArray(data.alternativas) && 
                                    data.alternativas.length >= 2 &&
-                                   data.alternativas.every(alt => alt.destino && alt.pais);
+                                   data.alternativas.every(alt => alt.destino);
       
       if (!hasValidTopPick && !hasValidAlternatives) {
         console.log('❌ Validação falhou: nem topPick nem alternativas válidas');
         return false;
       }
       
-      // NOVA VALIDAÇÃO DE ORÇAMENTO
+      // Detectar se é viagem de ônibus
+      const viagemOnibus = utils.deveUsarViagemOnibus(requestData.orcamento_valor, requestData.moeda_escolhida);
+      
+      // NOVA VALIDAÇÃO DE ORÇAMENTO (considerando ônibus)
       const orcamentoMax = requestData.orcamento_valor;
       if (orcamentoMax && orcamentoMax !== 'flexível') {
         const orcamentoNum = parseFloat(orcamentoMax);
         let destinosForaOrcamento = [];
         
         // Verificar topPick
-        if (data.topPick?.preco?.voo && !utils.validarOrcamentoDestino(data.topPick.preco.voo, orcamentoMax)) {
-          destinosForaOrcamento.push(`topPick (${data.topPick.destino}: ${data.topPick.preco.voo})`);
+        const precoTopPick = viagemOnibus ? data.topPick?.preco?.onibus : data.topPick?.preco?.voo;
+        if (precoTopPick && !utils.validarOrcamentoDestino(precoTopPick, orcamentoMax)) {
+          destinosForaOrcamento.push(`topPick (${data.topPick.destino}: ${precoTopPick})`);
         }
         
         // Verificar alternativas
         if (data.alternativas) {
           data.alternativas.forEach((alt, i) => {
-            if (alt.preco?.voo && !utils.validarOrcamentoDestino(alt.preco.voo, orcamentoMax)) {
-              destinosForaOrcamento.push(`alternativa ${i+1} (${alt.destino}: ${alt.preco.voo})`);
+            const precoAlt = viagemOnibus ? alt.preco?.onibus : alt.preco?.voo;
+            if (precoAlt && !utils.validarOrcamentoDestino(precoAlt, orcamentoMax)) {
+              destinosForaOrcamento.push(`alternativa ${i+1} (${alt.destino}: ${precoAlt})`);
             }
           });
         }
         
         // Verificar surpresa
-        if (data.surpresa?.preco?.voo && !utils.validarOrcamentoDestino(data.surpresa.preco.voo, orcamentoMax)) {
-          destinosForaOrcamento.push(`surpresa (${data.surpresa.destino}: ${data.surpresa.preco.voo})`);
+        const precoSurpresa = viagemOnibus ? data.surpresa?.preco?.onibus : data.surpresa?.preco?.voo;
+        if (precoSurpresa && !utils.validarOrcamentoDestino(precoSurpresa, orcamentoMax)) {
+          destinosForaOrcamento.push(`surpresa (${data.surpresa.destino}: ${precoSurpresa})`);
         }
         
         if (destinosForaOrcamento.length > 2) { // Mais de 2 destinos fora = problema
@@ -189,7 +243,22 @@ const utils = {
         console.log('🧠 Dados de raciocínio detectados:', Object.keys(data.raciocinio));
       }
       
-      console.log('✅ Validação passou (incluindo orçamento)');
+      // NOVA: Validação específica para viagens de ônibus
+      if (viagemOnibus) {
+        console.log('🚌 Viagem de ônibus detectada - validando campos específicos');
+        
+        // Verificar se tem informações de ônibus nos destinos
+        const temInfoOnibus = data.topPick?.transporte?.tipo === 'onibus' || 
+                              data.topPick?.preco?.onibus !== undefined;
+        
+        if (temInfoOnibus) {
+          console.log('✅ Informações de ônibus encontradas');
+        } else {
+          console.log('⚠️ Faltam informações específicas de ônibus');
+        }
+      }
+      
+      console.log('✅ Validação passou (incluindo orçamento e transporte)');
       return true;
       
     } catch (error) {
@@ -200,7 +269,7 @@ const utils = {
 };
 
 // =======================
-// Mapeamento de códigos IATA
+// Mapeamento de códigos IATA - EXPANDIDO PARA BRASIL
 // =======================
 function obterCodigoIATAPadrao(cidade, pais) {
   const mapeamentoIATA = {
@@ -208,6 +277,13 @@ function obterCodigoIATAPadrao(cidade, pais) {
     'São Paulo': 'GRU', 'Rio de Janeiro': 'GIG', 'Brasília': 'BSB',
     'Salvador': 'SSA', 'Fortaleza': 'FOR', 'Recife': 'REC',
     'Porto Alegre': 'POA', 'Belém': 'BEL', 'Manaus': 'MAO',
+    'Belo Horizonte': 'CNF', 'Curitiba': 'CWB', 'Florianópolis': 'FLN',
+    'Goiânia': 'GYN', 'Vitória': 'VIX', 'Natal': 'NAT',
+    
+    // NOVO: Destinos nacionais de ônibus (usando códigos identificadores)
+    'Campos do Jordão': 'CJD', 'Santos': 'SNT', 'Guarujá': 'GRJ',
+    'Aparecida': 'APR', 'Búzios': 'BUZ', 'Petrópolis': 'PET',
+    'Paraty': 'PTY', 'Cabo Frio': 'CFR',
     
     // América do Sul
     'Buenos Aires': 'EZE', 'Santiago': 'SCL', 'Lima': 'LIM',
@@ -258,13 +334,16 @@ async function callGroqAPI(prompt, requestData, model = CONFIG.groq.models.reaso
 
 PROCESSO DE RACIOCÍNIO OBRIGATÓRIO:
 1. ANÁLISE DO PERFIL: Examine detalhadamente cada preferência do viajante
-2. MAPEAMENTO DE COMPATIBILIDADE: Correlacione destinos com o perfil analisado  
-3. VALIDAÇÃO DE ORÇAMENTO: Verifique se preços de voo são realistas e compatíveis
-4. ANÁLISE CLIMÁTICA: Determine condições climáticas exatas para as datas
-5. PERSONALIZAÇÃO TRIPINHA: Adicione perspectiva autêntica da mascote cachorrinha
+2. DETERMINAÇÃO DO TRANSPORTE: Avalie se deve sugerir ÔNIBUS ou AVIÃO baseado no orçamento
+3. MAPEAMENTO DE COMPATIBILIDADE: Correlacione destinos com o perfil analisado  
+4. VALIDAÇÃO DE ORÇAMENTO: Verifique se preços são realistas e compatíveis
+5. ANÁLISE CLIMÁTICA: Determine condições climáticas exatas para as datas
+6. PERSONALIZAÇÃO TRIPINHA: Adicione perspectiva autêntica da mascote cachorrinha
 
 CRITÉRIOS DE DECISÃO:
-- Orçamento de voo DEVE ser respeitado rigorosamente
+- Orçamento DEVE ser respeitado rigorosamente
+- Para orçamentos < R$ 400: PRIORIZAR destinos acessíveis de ÔNIBUS no Brasil
+- Para orçamentos ≥ R$ 400: Considerar voos nacionais e internacionais
 - Destinos DEVEM ser adequados para o tipo de companhia especificado
 - Informações climáticas DEVEM ser precisas para o período da viagem
 - Pontos turísticos DEVEM ser específicos e reais
@@ -282,11 +361,12 @@ PERSONALIDADE DA TRIPINHA:
 - Inclui detalhes sensoriais que um cachorro notaria
 - Sempre menciona pontos turísticos específicos que visitou
 - Dá dicas práticas baseadas nas suas "aventuras"
+- NOVO: Conhece muito bem viagens de ônibus pelo Brasil!
 
 RETORNE APENAS JSON VÁLIDO sem formatação markdown.`;
   } else {
     // Sistema padrão para modelos rápidos
-    systemMessage = `Especialista em recomendações de viagem. Retorne apenas JSON válido com destinos que respeitem o orçamento do usuário.`;
+    systemMessage = `Especialista em recomendações de viagem. Retorne apenas JSON válido com destinos que respeitem o orçamento do usuário. Para orçamentos baixos, considere viagens de ônibus.`;
   }
 
   try {
@@ -344,9 +424,9 @@ RETORNE APENAS JSON VÁLIDO sem formatação markdown.`;
 }
 
 // =======================
-// Geração de prompt otimizado para REASONING
+// NOVA função para gerar prompt de viagem de ônibus - SEM BASE LOCAL
 // =======================
-function gerarPromptParaGroq(dados) {
+function gerarPromptViagemOnibus(dados) {
   const infoViajante = {
     companhia: getCompanhiaText(dados.companhia || 0),
     preferencia: getPreferenciaText(dados.preferencia_viagem || 0),
@@ -385,7 +465,255 @@ function gerarPromptParaGroq(dados) {
     }
   }
 
-  // NOVA SEÇÃO: Análise de orçamento e faixas realistas
+  return `# 🚌 SISTEMA DE RECOMENDAÇÃO INTELIGENTE - VIAGENS DE ÔNIBUS NO BRASIL
+
+## 📊 DADOS DO VIAJANTE PARA ANÁLISE:
+**Perfil Básico:**
+- Origem: ${infoViajante.cidadeOrigem}
+- Composição: ${infoViajante.companhia} (${infoViajante.pessoas} pessoa(s))
+- Período: ${dataIda} a ${dataVolta} (${duracaoViagem})
+
+## 🚌 MODALIDADE DE TRANSPORTE: ÔNIBUS RODOVIÁRIO
+
+**ORÇAMENTO PARA TRANSPORTE:** ${infoViajante.orcamento} ${infoViajante.moeda}
+
+⚠️  **FOCO EXCLUSIVO EM VIAGENS DE ÔNIBUS** ⚠️
+- Como o orçamento é de ${infoViajante.orcamento} ${infoViajante.moeda}, vamos focar em destinos acessíveis de ÔNIBUS
+- TODOS os destinos devem ser acessíveis por transporte rodoviário do Brasil
+- Priorizar destinos dentro do Brasil com boa infraestrutura de ônibus
+- Considerar tempo de viagem realista (máximo 20 horas de ônibus)
+- Usar seu conhecimento sobre destinos brasileiros acessíveis de ônibus
+
+**INSTRUÇÕES OBRIGATÓRIAS PARA VIAGEM DE ÔNIBUS:**
+1. Todos os destinos DEVEM ser acessíveis de ônibus saindo de ${infoViajante.cidadeOrigem}
+2. Preços DEVEM incluir ida e volta de ônibus (dentro do orçamento ${infoViajante.orcamento} ${infoViajante.moeda})
+3. Priorizar destinos nacionais com boa infraestrutura rodoviária
+4. Considerar conforto da viagem vs. economia
+5. Incluir dicas específicas para viagens rodoviárias
+6. Destacar vantagens: economia, paisagens, flexibilidade de paradas
+7. Use seu conhecimento sobre cidades brasileiras acessíveis de ônibus
+
+**Preferências Declaradas:**
+- Atividades preferidas: ${infoViajante.preferencia}
+- Tipo de destino: ${getTipoDestinoText(infoViajante.tipoDestino)}
+- Popularidade desejada: ${getFamaDestinoText(infoViajante.famaDestino)}
+
+## 🎯 PROCESSO DE RACIOCÍNIO PARA VIAGEM DE ÔNIBUS:
+
+### PASSO 1: ANÁLISE DE VIABILIDADE RODOVIÁRIA
+- Quais destinos brasileiros são acessíveis de ônibus dentro do orçamento?
+- Qual a relação custo x tempo x conforto para viagens rodoviárias?
+- Como maximizar a experiência mesmo com orçamento limitado?
+
+### PASSO 2: **FILTRO RIGOROSO DE ORÇAMENTO DE ÔNIBUS** 🚨
+- Elimine destinos com passagem de ônibus (ida+volta) > ${infoViajante.orcamento} ${infoViajante.moeda}
+- Priorize destinos brasileiros na faixa de R$ 50-${infoViajante.orcamento}
+- Considere que ônibus permite economizar no transporte para gastar mais no destino
+
+### PASSO 3: SELEÇÃO DE DESTINOS RODOVIÁRIOS
+Para cada destino considerado, avalie:
+- Adequação às preferências declaradas (${infoViajante.preferencia})
+- **VIABILIDADE DE ÔNIBUS CONFIRMADA** (destinos brasileiros acessíveis por estrada)
+- Conveniência para ${infoViajante.companhia}
+- Infraestrutura turística no destino
+- Qualidade da viagem rodoviária
+
+### PASSO 4: VALIDAÇÃO CLIMÁTICA E SAZONAL
+Para as datas ${dataIda} a ${dataVolta}, determine:
+- Estação do ano em cada destino brasileiro
+- Condições climáticas para viagem de ônibus
+- Eventos/festivais no período
+- Dicas específicas para viagem rodoviária
+
+### PASSO 5: SELEÇÃO E RANQUEAMENTO RODOVIÁRIO
+Baseado na análise acima, selecione:
+- 1 destino TOP de ônibus no Brasil que melhor combina com TODOS os critérios
+- 4 alternativas diversificadas geograficamente (todas acessíveis de ônibus)
+- 1 surpresa rodoviária brasileira que pode surpreender positivamente
+
+### PASSO 6: PERSONALIZAÇÃO TRIPINHA 🐾
+Para cada destino selecionado, adicione:
+- Comentário em 1ª pessoa da Tripinha sobre SUA experiência de ônibus
+- Detalhes específicos da viagem rodoviária que ela fez
+- Dicas práticas para viagem de ônibus
+- Menção a empresas de ônibus ou paradas interessantes no caminho
+
+## 📋 FORMATO DE RESPOSTA PARA VIAGEM DE ÔNIBUS (JSON ESTRUTURADO):
+
+\`\`\`json
+{
+  "modalidade_transporte": "onibus",
+  "raciocinio": {
+    "analise_perfil": "Resumo da análise do perfil do viajante",
+    "criterios_selecao": "Principais critérios para viagem de ônibus",
+    "consideracoes_orcamento": "Como o orçamento de ${infoViajante.orcamento} ${infoViajante.moeda} direcionou para viagem de ônibus",
+    "vantagens_onibus": "Benefícios específicos da viagem rodoviária para este perfil"
+  },
+  "topPick": {
+    "destino": "Nome da Cidade",
+    "estado": "Estado",
+    "pais": "Brasil",
+    "codigoPais": "BR",
+    "justificativa": "Por que este é o destino PERFEITO para viagem de ônibus",
+    "justificativa_orcamento": "CONFIRME que o preço de R$ X está dentro do orçamento de ${infoViajante.orcamento} ${infoViajante.moeda}",
+    "descricao": "Descrição detalhada do destino",
+    "porque": "Razões específicas para esta recomendação rodoviária",
+    "destaque": "Experiência única do destino",
+    "comentario": "Comentário entusiasmado da Tripinha: 'Adorei minha viagem de ônibus para [destino]! O cheiro da estrada e... 🐾'",
+    "pontosTuristicos": [
+      "Nome específico do primeiro ponto turístico",
+      "Nome específico do segundo ponto turístico"
+    ],
+    "transporte": {
+      "tipo": "onibus",
+      "duracao_viagem": "Estimativa realista em horas",
+      "empresas_sugeridas": ["Nome de empresas de ônibus conhecidas"],
+      "dicas_viagem": "Dicas específicas para a viagem de ônibus",
+      "paradas_interessantes": "Cidades ou pontos no caminho"
+    },
+    "clima": {
+      "estacao": "Estação exata no destino durante ${dataIda} a ${dataVolta}",
+      "temperatura": "Faixa de temperatura precisa",
+      "condicoes": "Condições climáticas detalhadas esperadas",
+      "recomendacoes": "Dicas específicas do que levar para viagem de ônibus"
+    },
+    "preco": {
+      "onibus": número_MÁXIMO_${infoViajante.orcamento},
+      "hotel": número_estimado_por_noite,
+      "total_estimado": número_total_viagem,
+      "justificativa_preco": "Por que este preço de ônibus está correto e dentro do orçamento"
+    }
+  },
+  "alternativas": [
+    {
+      "destino": "Nome da Cidade",
+      "estado": "Estado",
+      "pais": "Brasil",
+      "codigoPais": "BR",
+      "porque": "Razão específica para esta alternativa rodoviária",
+      "pontoTuristico": "Ponto turístico específico de destaque",
+      "transporte": {
+        "tipo": "onibus",
+        "duracao_viagem": "Estimativa em horas",
+        "empresa_sugerida": "Nome da empresa"
+      },
+      "clima": {
+        "estacao": "Estação no destino durante a viagem",
+        "temperatura": "Faixa de temperatura"
+      },
+      "preco": {
+        "onibus": número_MÁXIMO_${infoViajante.orcamento},
+        "hotel": número
+      }
+    }
+    // EXATAMENTE 4 alternativas brasileiras - TODAS com ônibus dentro do orçamento
+  ],
+  "surpresa": {
+    "destino": "Nome da Cidade Brasileira Próxima",
+    "estado": "Estado",
+    "pais": "Brasil",
+    "codigoPais": "BR",
+    "justificativa": "Por que é uma surpresa perfeita para viagem de ônibus",
+    "justificativa_orcamento": "CONFIRME que está dentro do orçamento de ônibus",
+    "descricao": "Descrição do destino surpresa acessível de ônibus",
+    "porque": "Razões para ser destino surpresa rodoviário",
+    "destaque": "Experiência única e inesperada",
+    "comentario": "Comentário empolgado da Tripinha: 'Nossa, quando peguei o ônibus para [destino]... 🐾'",
+    "pontosTuristicos": ["Primeiro ponto específico", "Segundo ponto específico"],
+    "transporte": {
+      "tipo": "onibus",
+      "duracao_viagem": "Estimativa em horas",
+      "empresa_sugerida": "Nome da empresa",
+      "dicas_especiais": "Dica especial para esta viagem rodoviária"
+    },
+    "clima": {
+      "estacao": "Estação durante ${dataIda} a ${dataVolta}",
+      "temperatura": "Faixa de temperatura",
+      "condicoes": "Condições climáticas",
+      "recomendacoes": "Dicas de vestuário para ônibus"
+    },
+    "preco": {
+      "onibus": número_MÁXIMO_${infoViajante.orcamento},
+      "hotel": número
+    }
+  },
+  "estacaoViagem": "Estação predominante nos destinos selecionados",
+  "dicas_gerais_onibus": [
+    "Dica 1 para viagem de ônibus",
+    "Dica 2 específica para o perfil do viajante",
+    "Dica 3 sobre empresas ou rotas"
+  ],
+  "resumoIA": "Como a IA escolheu viagem de ônibus e os destinos específicos usando seu conhecimento"
+}
+\`\`\`
+
+## 🔍 VALIDAÇÃO FINAL OBRIGATÓRIA PARA ÔNIBUS:
+Antes de responder, confirme que:
+- 🚌 **CRÍTICO:** TODOS os destinos são brasileiros e acessíveis de ÔNIBUS
+- 🚌 **CRÍTICO:** TODOS os preços de ônibus estão ≤ ${infoViajante.orcamento} ${infoViajante.moeda}
+- 🚌 **CRÍTICO:** Tempos de viagem são realistas para ônibus no Brasil
+- ✅ Informações de empresas de ônibus são baseadas em seu conhecimento
+- ✅ Comentários da Tripinha mencionam experiências rodoviárias específicas
+- ✅ Destinos são adequados para ${infoViajante.companhia}
+- ✅ Dicas são específicas para viagem de ônibus
+
+**Execute o raciocínio passo-a-passo usando SEU CONHECIMENTO sobre destinos brasileiros acessíveis de ÔNIBUS!**`;
+}
+
+// =======================
+// Geração de prompt otimizado para REASONING - ATUALIZADO
+// =======================
+function gerarPromptParaGroq(dados) {
+  // Verificar se deve usar viagem de ônibus
+  const viagemOnibus = utils.deveUsarViagemOnibus(dados.orcamento_valor, dados.moeda_escolhida);
+  
+  if (viagemOnibus) {
+    console.log('🚌 Orçamento baixo detectado - gerando prompt para viagem de ônibus');
+    return gerarPromptViagemOnibus(dados);
+  }
+  
+  console.log('✈️ Orçamento adequado - gerando prompt para viagem aérea');
+  
+  // Prompt original para viagens aéreas (orçamento ≥ R$ 400)
+  const infoViajante = {
+    companhia: getCompanhiaText(dados.companhia || 0),
+    preferencia: getPreferenciaText(dados.preferencia_viagem || 0),
+    cidadeOrigem: dados.cidade_partida?.name || 'origem não especificada',
+    orcamento: dados.orcamento_valor || 'flexível',
+    moeda: dados.moeda_escolhida || 'BRL',
+    pessoas: dados.quantidade_familia || dados.quantidade_amigos || 1,
+    tipoDestino: dados.tipo_destino || 'qualquer',
+    famaDestino: dados.fama_destino || 'qualquer'
+  };
+  
+  // Processar datas
+  let dataIda = 'não especificada';
+  let dataVolta = 'não especificada';
+  let duracaoViagem = 'não especificada';
+  
+  if (dados.datas) {
+    if (typeof dados.datas === 'string' && dados.datas.includes(',')) {
+      const partes = dados.datas.split(',');
+      dataIda = partes[0]?.trim() || 'não especificada';
+      dataVolta = partes[1]?.trim() || 'não especificada';
+    } else if (dados.datas.dataIda && dados.datas.dataVolta) {
+      dataIda = dados.datas.dataIda;
+      dataVolta = dados.datas.dataVolta;
+    }
+    
+    try {
+      if (dataIda !== 'não especificada' && dataVolta !== 'não especificada') {
+        const ida = new Date(dataIda);
+        const volta = new Date(dataVolta);
+        const diff = Math.abs(volta - ida);
+        duracaoViagem = `${Math.ceil(diff / (1000 * 60 * 60 * 24))} dias`;
+      }
+    } catch (error) {
+      console.error('Erro ao calcular duração da viagem:', error.message);
+    }
+  }
+
+  // Análise de orçamento e faixas realistas
   const orcamentoAnalise = {
     valor: infoViajante.orcamento,
     moeda: infoViajante.moeda,
@@ -497,6 +825,7 @@ Para cada destino selecionado, adicione:
 
 \`\`\`json
 {
+  "modalidade_transporte": "aviao",
   "raciocinio": {
     "analise_perfil": "Resumo da análise do perfil do viajante",
     "criterios_selecao": "Principais critérios usados na seleção",
@@ -597,6 +926,7 @@ ${!orcamentoAnalise.flexivel ? `
 **Execute o raciocínio passo-a-passo e forneça recomendações fundamentadas que RESPEITEM RIGOROSAMENTE O ORÇAMENTO!**`;
 }
 
+// [Resto das funções permanecem iguais - getCompanhiaText, getPreferenciaText, etc.]
 // =======================
 // Funções auxiliares de texto
 // =======================
@@ -639,7 +969,7 @@ function getFamaDestinoText(value) {
 }
 
 // =======================
-// Nova função para filtrar destinos por orçamento
+// Nova função para filtrar destinos por orçamento - ATUALIZADA
 // =======================
 function filtrarDestinosPorOrcamento(jsonString, orcamentoMax, moeda = 'BRL') {
   if (!orcamentoMax || orcamentoMax === 'flexível') return jsonString;
@@ -650,13 +980,17 @@ function filtrarDestinosPorOrcamento(jsonString, orcamentoMax, moeda = 'BRL') {
     const tolerancia = 1.1; // 10% de tolerância
     const limite = orcamentoNum * tolerancia;
     
-    console.log(`🔍 Filtrando destinos com orçamento máximo: ${limite} ${moeda}`);
+    // Detectar tipo de transporte
+    const viagemOnibus = utils.deveUsarViagemOnibus(orcamentoMax, moeda);
+    const campoPreco = viagemOnibus ? 'onibus' : 'voo';
+    
+    console.log(`🔍 Filtrando destinos (${viagemOnibus ? 'ônibus' : 'voo'}) com orçamento máximo: ${limite} ${moeda}`);
     
     let modificado = false;
     
     // Filtrar topPick
-    if (data.topPick?.preco?.voo && parseFloat(data.topPick.preco.voo) > limite) {
-      console.log(`❌ TopPick ${data.topPick.destino} removido: R$ ${data.topPick.preco.voo} > R$ ${limite}`);
+    if (data.topPick?.preco?.[campoPreco] && parseFloat(data.topPick.preco[campoPreco]) > limite) {
+      console.log(`❌ TopPick ${data.topPick.destino} removido: R$ ${data.topPick.preco[campoPreco]} > R$ ${limite}`);
       data.topPick = null;
       modificado = true;
     }
@@ -665,8 +999,8 @@ function filtrarDestinosPorOrcamento(jsonString, orcamentoMax, moeda = 'BRL') {
     if (data.alternativas && Array.isArray(data.alternativas)) {
       const alternativasOriginais = data.alternativas.length;
       data.alternativas = data.alternativas.filter(alt => {
-        if (alt.preco?.voo && parseFloat(alt.preco.voo) > limite) {
-          console.log(`❌ Alternativa ${alt.destino} removida: R$ ${alt.preco.voo} > R$ ${limite}`);
+        if (alt.preco?.[campoPreco] && parseFloat(alt.preco[campoPreco]) > limite) {
+          console.log(`❌ Alternativa ${alt.destino} removida: R$ ${alt.preco[campoPreco]} > R$ ${limite}`);
           return false;
         }
         return true;
@@ -675,15 +1009,15 @@ function filtrarDestinosPorOrcamento(jsonString, orcamentoMax, moeda = 'BRL') {
     }
     
     // Filtrar surpresa
-    if (data.surpresa?.preco?.voo && parseFloat(data.surpresa.preco.voo) > limite) {
-      console.log(`❌ Surpresa ${data.surpresa.destino} removida: R$ ${data.surpresa.preco.voo} > R$ ${limite}`);
+    if (data.surpresa?.preco?.[campoPreco] && parseFloat(data.surpresa.preco[campoPreco]) > limite) {
+      console.log(`❌ Surpresa ${data.surpresa.destino} removida: R$ ${data.surpresa.preco[campoPreco]} > R$ ${limite}`);
       data.surpresa = null;
       modificado = true;
     }
     
     if (modificado) {
-      console.log('✂️ Destinos filtrados por orçamento - alguns destinos foram removidos');
-      data.observacaoOrcamento = `Alguns destinos foram automaticamente removidos por excederem o orçamento de ${orcamentoMax} ${moeda}`;
+      console.log(`✂️🚌 Destinos filtrados por orçamento (${campoPreco}) - alguns destinos foram removidos`);
+      data.observacaoOrcamento = `Alguns destinos foram automaticamente removidos por excederem o orçamento de ${orcamentoMax} ${moeda} para ${viagemOnibus ? 'viagem de ônibus' : 'voos'}`;
     }
     
     return JSON.stringify(data);
@@ -693,43 +1027,67 @@ function filtrarDestinosPorOrcamento(jsonString, orcamentoMax, moeda = 'BRL') {
   }
 }
 
+// [Resto das funções permanecem iguais - ensureValidDestinationData, retryWithBackoffAndFallback, handler principal]
+
 // =======================
-// Processamento e validação de destinos
+// Processamento e validação de destinos - ATUALIZADA
 // =======================
 function ensureValidDestinationData(jsonString, requestData) {
   try {
     const data = typeof jsonString === 'string' ? JSON.parse(jsonString) : jsonString;
     let modificado = false;
     
-    // Garantir códigos IATA para topPick
-    if (data.topPick && !data.topPick.aeroporto?.codigo) {
-      data.topPick.aeroporto = {
-        codigo: obterCodigoIATAPadrao(data.topPick.destino, data.topPick.pais),
-        nome: `Aeroporto de ${data.topPick.destino}`
-      };
-      modificado = true;
-    }
+    // Detectar se é viagem de ônibus
+    const viagemOnibus = utils.deveUsarViagemOnibus(requestData.orcamento_valor, requestData.moeda_escolhida);
     
-    // Garantir códigos IATA para surpresa
-    if (data.surpresa && !data.surpresa.aeroporto?.codigo) {
-      data.surpresa.aeroporto = {
-        codigo: obterCodigoIATAPadrao(data.surpresa.destino, data.surpresa.pais),
-        nome: `Aeroporto de ${data.surpresa.destino}`
-      };
-      modificado = true;
-    }
-    
-    // Garantir códigos IATA para alternativas
-    if (data.alternativas && Array.isArray(data.alternativas)) {
-      data.alternativas.forEach(alternativa => {
-        if (!alternativa.aeroporto?.codigo) {
-          alternativa.aeroporto = {
-            codigo: obterCodigoIATAPadrao(alternativa.destino, alternativa.pais),
-            nome: `Aeroporto de ${alternativa.destino}`
-          };
-          modificado = true;
-        }
-      });
+    // Para viagens de ônibus, não precisamos de códigos IATA tradicionais
+    if (!viagemOnibus) {
+      // Garantir códigos IATA para topPick
+      if (data.topPick && !data.topPick.aeroporto?.codigo) {
+        data.topPick.aeroporto = {
+          codigo: obterCodigoIATAPadrao(data.topPick.destino, data.topPick.pais),
+          nome: `Aeroporto de ${data.topPick.destino}`
+        };
+        modificado = true;
+      }
+      
+      // Garantir códigos IATA para surpresa
+      if (data.surpresa && !data.surpresa.aeroporto?.codigo) {
+        data.surpresa.aeroporto = {
+          codigo: obterCodigoIATAPadrao(data.surpresa.destino, data.surpresa.pais),
+          nome: `Aeroporto de ${data.surpresa.destino}`
+        };
+        modificado = true;
+      }
+      
+      // Garantir códigos IATA para alternativas
+      if (data.alternativas && Array.isArray(data.alternativas)) {
+        data.alternativas.forEach(alternativa => {
+          if (!alternativa.aeroporto?.codigo) {
+            alternativa.aeroporto = {
+              codigo: obterCodigoIATAPadrao(alternativa.destino, alternativa.pais),
+              nome: `Aeroporto de ${alternativa.destino}`
+            };
+            modificado = true;
+          }
+        });
+      }
+    } else {
+      // Para viagens de ônibus, garantir informações de transporte rodoviário
+      if (data.topPick && !data.topPick.transporte) {
+        data.topPick.transporte = {
+          tipo: 'onibus',
+          duracao_viagem: 'A definir',
+          empresas_sugeridas: ['Consultar rodoviária']
+        };
+        modificado = true;
+      }
+      
+      // Adicionar modalidade de transporte se não existir
+      if (!data.modalidade_transporte) {
+        data.modalidade_transporte = 'onibus';
+        modificado = true;
+      }
     }
     
     return modificado ? JSON.stringify(data) : jsonString;
@@ -789,7 +1147,7 @@ async function retryWithBackoffAndFallback(prompt, requestData, maxAttempts = CO
 }
 
 // =======================
-// Handler principal da API
+// Handler principal da API - ATUALIZADO
 // =======================
 module.exports = async function handler(req, res) {
   let isResponseSent = false;
@@ -824,7 +1182,7 @@ module.exports = async function handler(req, res) {
   }
 
   try {
-    console.log('🧠 === BENETRIP GROQ REASONING API v6.0 ===');
+    console.log('🧠🚌 === BENETRIP GROQ REASONING + BUS API v7.0 ===');
     
     if (!req.body) {
       isResponseSent = true;
@@ -849,16 +1207,21 @@ module.exports = async function handler(req, res) {
       return;
     }
     
+    // NOVA DETECÇÃO: Verificar se deve usar viagem de ônibus
+    const viagemOnibus = utils.deveUsarViagemOnibus(requestData.orcamento_valor, requestData.moeda_escolhida);
+    console.log(`🚌 Viagem de ônibus detectada: ${viagemOnibus} (orçamento: ${requestData.orcamento_valor} ${requestData.moeda_escolhida || 'BRL'})`);
+    
     // Log dos dados recebidos
     utils.log('📊 Dados da requisição:', {
       companhia: requestData.companhia,
       cidade_partida: requestData.cidade_partida?.name,
       datas: requestData.datas,
       orcamento: requestData.orcamento_valor,
-      moeda: requestData.moeda_escolhida
+      moeda: requestData.moeda_escolhida,
+      tipo_transporte: viagemOnibus ? 'ônibus' : 'voo'
     });
     
-    // Gerar prompt otimizado para Groq
+    // Gerar prompt otimizado para Groq (que automaticamente detecta tipo de transporte)
     const prompt = gerarPromptParaGroq(requestData);
     console.log('📝 Prompt gerado para Groq');
     
@@ -881,8 +1244,8 @@ module.exports = async function handler(req, res) {
     
     const { result: recomendacoesBrutas, model: modeloUsado } = resultado;
     
-    // NOVA ETAPA: Filtrar destinos por orçamento
-    console.log('💰 Aplicando filtro de orçamento...');
+    // NOVA ETAPA: Filtrar destinos por orçamento (considerando tipo de transporte)
+    console.log('💰🚌 Aplicando filtro de orçamento (incluindo viagens de ônibus)...');
     const recomendacoesFiltradas = filtrarDestinosPorOrcamento(
       recomendacoesBrutas, 
       requestData.orcamento_valor, 
@@ -895,51 +1258,56 @@ module.exports = async function handler(req, res) {
       const dados = typeof recomendacoesProcessadas === 'string' ? 
         JSON.parse(recomendacoesProcessadas) : recomendacoesProcessadas;
       
-      // Adicionar metadados incluindo modelo usado
+      // Adicionar metadados incluindo modelo usado e tipo de transporte
       dados.metadados = {
         modelo: modeloUsado,
         provider: 'groq',
-        versao: '6.0-reasoning-budget',
+        versao: '7.0-reasoning-budget-bus',
         timestamp: new Date().toISOString(),
         reasoning_enabled: modeloUsado === CONFIG.groq.models.reasoning,
         orcamento_filtrado: !!dados.observacaoOrcamento,
-        orcamento_maximo: requestData.orcamento_valor
+        orcamento_maximo: requestData.orcamento_valor,
+        tipo_transporte: viagemOnibus ? 'onibus' : 'voo',
+        viagem_onibus: viagemOnibus
       };
       
       console.log('🎉 Recomendações processadas com sucesso!');
       console.log('🧠 Modelo usado:', modeloUsado);
+      console.log('🚌✈️ Tipo de transporte:', viagemOnibus ? 'ÔNIBUS' : 'VOO');
       console.log('💰 Orçamento respeitado:', requestData.orcamento_valor);
       console.log('📋 Destinos encontrados:', {
         topPick: dados.topPick?.destino,
-        topPickPreco: dados.topPick?.preco?.voo,
+        topPickPreco: dados.topPick?.preco?.[viagemOnibus ? 'onibus' : 'voo'],
         alternativas: dados.alternativas?.length || 0,
         surpresa: dados.surpresa?.destino,
-        surpresaPreco: dados.surpresa?.preco?.voo,
+        surpresaPreco: dados.surpresa?.preco?.[viagemOnibus ? 'onibus' : 'voo'],
         temRaciocinio: !!dados.raciocinio,
-        filtradoPorOrcamento: !!dados.observacaoOrcamento
+        filtradoPorOrcamento: !!dados.observacaoOrcamento,
+        modalidadeTransporte: dados.modalidade_transporte
       });
       
-      // Verificação final de orçamento
+      // Verificação final de orçamento (considerando tipo de transporte)
       if (requestData.orcamento_valor && requestData.orcamento_valor !== 'flexível') {
         const orcamentoMax = parseFloat(requestData.orcamento_valor);
+        const campoPreco = viagemOnibus ? 'onibus' : 'voo';
         const violacoes = [];
         
-        if (dados.topPick?.preco?.voo && parseFloat(dados.topPick.preco.voo) > orcamentoMax * 1.1) {
-          violacoes.push(`topPick: R$ ${dados.topPick.preco.voo}`);
+        if (dados.topPick?.preco?.[campoPreco] && parseFloat(dados.topPick.preco[campoPreco]) > orcamentoMax * 1.1) {
+          violacoes.push(`topPick: R$ ${dados.topPick.preco[campoPreco]}`);
         }
         
         if (dados.alternativas) {
           dados.alternativas.forEach((alt, i) => {
-            if (alt.preco?.voo && parseFloat(alt.preco.voo) > orcamentoMax * 1.1) {
-              violacoes.push(`alt${i+1}: R$ ${alt.preco.voo}`);
+            if (alt.preco?.[campoPreco] && parseFloat(alt.preco[campoPreco]) > orcamentoMax * 1.1) {
+              violacoes.push(`alt${i+1}: R$ ${alt.preco[campoPreco]}`);
             }
           });
         }
         
         if (violacoes.length > 0) {
-          console.log(`⚠️ ATENÇÃO: Ainda há violações de orçamento:`, violacoes);
+          console.log(`⚠️ ATENÇÃO: Ainda há violações de orçamento (${campoPreco}):`, violacoes);
         } else {
-          console.log(`✅ ORÇAMENTO RESPEITADO: Todos os destinos ≤ R$ ${orcamentoMax}`);
+          console.log(`✅ ORÇAMENTO RESPEITADO: Todos os destinos (${campoPreco}) ≤ R$ ${orcamentoMax}`);
         }
       }
       
@@ -947,9 +1315,10 @@ module.exports = async function handler(req, res) {
         isResponseSent = true;
         clearTimeout(serverTimeout);
         return res.status(200).json({
-          tipo: "groq_reasoning_budget_success",
+          tipo: "groq_reasoning_budget_bus_success",
           modelo: modeloUsado,
           orcamento_controlado: true,
+          viagem_onibus: viagemOnibus,
           conteudo: JSON.stringify(dados)
         });
       }
@@ -963,6 +1332,7 @@ module.exports = async function handler(req, res) {
         return res.status(200).json({
           tipo: "groq_partial_success",
           modelo: modeloUsado,
+          viagem_onibus: viagemOnibus,
           conteudo: recomendacoesFiltradas
         });
       }
