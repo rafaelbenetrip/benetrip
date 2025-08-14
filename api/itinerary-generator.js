@@ -1,4 +1,4 @@
-// api/itinerary-generator.js - Gerador de Roteiro com Groq IA (Versão Limpa)
+// api/itinerary-generator.js - Gerador de Roteiro com Groq IA + Fallback DeepSeek
 const axios = require('axios');
 
 // ============================================
@@ -8,6 +8,9 @@ const axios = require('axios');
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 
+// Fallback para DeepSeek
+const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY;
+
 // Configurações
 const TIMEOUT_MS = 45000; // 45 segundos
 const MAX_TOKENS = 8192;
@@ -16,11 +19,83 @@ const MAX_TOKENS = 8192;
 // LOGGING ESTRUTURADO
 // ============================================
 
-function logEvent(type, message, data = {}) {
+function logEvent(type, message, data = {}
+
+// ============================================
+// FALLBACK COM DEEPSEEK
+// ============================================
+
+async function gerarRoteiroComDeepseek(params) {
+  if (!DEEPSEEK_API_KEY) {
+    throw new Error('Chave da API DeepSeek não configurada - verifique DEEPSEEK_API_KEY no Vercel');
+  }
+  
+  const prompt = gerarPromptOtimizado(params);
+  
+  logEvent('info', 'Chamando DeepSeek API (fallback)', { 
+    model: 'deepseek-chat',
+    tokens: MAX_TOKENS 
+  });
+  
+  try {
+    const response = await axios.post(
+      'https://api.deepseek.com/v1/chat/completions',
+      {
+        model: 'deepseek-chat',
+        max_tokens: MAX_TOKENS,
+        messages: [
+          {
+            role: 'system',
+            content: 'Você é a Tripinha, especialista em viagens da Benetrip. Responda SEMPRE em JSON válido seguindo exatamente o schema fornecido. Use apenas locais e atividades REAIS do destino solicitado.'
+          },
+          {
+            role: 'user',
+            content: prompt
+          }
+        ],
+        temperature: 0.7,
+        response_format: { type: 'json_object' }
+      },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${DEEPSEEK_API_KEY}`
+        },
+        timeout: TIMEOUT_MS
+      }
+    );
+    
+    const respostaText = response.data.choices[0].message.content;
+    
+    // Processar resposta JSON
+    try {
+      const roteiro = JSON.parse(respostaText);
+      return validarEstruturaBasica(roteiro);
+    } catch (parseError) {
+      logEvent('error', 'Erro ao processar JSON do DeepSeek', {
+        error: parseError.message,
+        response: respostaText.substring(0, 500)
+      });
+      throw new Error('Resposta do DeepSeek não é um JSON válido');
+    }
+    
+  } catch (erro) {
+    if (erro.code === 'ECONNABORTED') {
+      throw new Error('Timeout na chamada ao DeepSeek API');
+    }
+    
+    logEvent('error', 'Erro na chamada ao DeepSeek API', {
+      error: erro.message,
+      status: erro.response?.status,
+      data: erro.response?.data
+    });
+    
+    throw erro;
+  }) {
   const log = {
     timestamp: new Date().toISOString(),
     service: 'itinerary-generator',
-    version: '2.0-clean',
+    version: '2.0-groq-deepseek',
     type,
     message,
     ...data
@@ -63,15 +138,45 @@ module.exports = async (req, res) => {
       orcamento: params.preferencias?.orcamento_nivel
     });
     
-    // Gerar roteiro usando APENAS Groq
-    const roteiro = await gerarRoteiroComGroq(params);
+    // Gerar roteiro usando Groq (com fallback para DeepSeek)
+    let roteiro;
     
-    logEvent('success', 'Roteiro gerado com Groq', { 
-      dias: roteiro.dias?.length,
-      tempoMs: Date.now() - startTime,
-      atividadesTotal: contarAtividadesTotal(roteiro),
-      temClimaInfo: !!roteiro.informacoesGerais?.climaInfo
-    });
+    try {
+      roteiro = await gerarRoteiroComGroq(params);
+      logEvent('success', 'Roteiro gerado com Groq', { 
+        dias: roteiro.dias?.length,
+        tempoMs: Date.now() - startTime,
+        atividadesTotal: contarAtividadesTotal(roteiro),
+        temClimaInfo: !!roteiro.informacoesGerais?.climaInfo
+      });
+    } catch (erroGroq) {
+      logEvent('warning', 'Groq falhou, tentando DeepSeek', { 
+        erro: erroGroq.message 
+      });
+      
+      if (DEEPSEEK_API_KEY) {
+        try {
+          roteiro = await gerarRoteiroComDeepseek(params);
+          logEvent('success', 'Roteiro gerado com DeepSeek (fallback)', { 
+            dias: roteiro.dias?.length,
+            tempoMs: Date.now() - startTime,
+            atividadesTotal: contarAtividadesTotal(roteiro),
+            temClimaInfo: !!roteiro.informacoesGerais?.climaInfo
+          });
+        } catch (erroDeepSeek) {
+          logEvent('error', 'DeepSeek também falhou', { 
+            erroGroq: erroGroq.message,
+            erroDeepSeek: erroDeepSeek.message 
+          });
+          throw new Error(`Falha em ambas as APIs: Groq (${erroGroq.message}) e DeepSeek (${erroDeepSeek.message})`);
+        }
+      } else {
+        logEvent('error', 'DeepSeek não configurado, não há fallback', { 
+          erroGroq: erroGroq.message 
+        });
+        throw new Error(`Groq falhou e DeepSeek não está configurado: ${erroGroq.message}`);
+      }
+    }
     
     // Validar estrutura básica apenas
     const roteiroValidado = validarEstruturaBasica(roteiro);
@@ -93,7 +198,7 @@ module.exports = async (req, res) => {
 };
 
 // ============================================
-// GERAÇÃO COM GROQ (MÉTODO ÚNICO)
+// GERAÇÃO COM GROQ (MÉTODO PRINCIPAL)
 // ============================================
 
 async function gerarRoteiroComGroq(params) {
@@ -422,3 +527,19 @@ function contarAtividadesTotal(roteiro) {
     return total + manha + tarde + noite;
   }, 0);
 }
+
+// ============================================
+// SISTEMA DE FALLBACK
+// ============================================
+/*
+  FLUXO DE GERAÇÃO:
+  1. Groq API (principal) → llama3-70b-8192
+  2. Se falhar → DeepSeek API (fallback) → deepseek-chat  
+  3. Se ambos falharem → Erro 500
+  
+  BENEFÍCIOS:
+  - Alta disponibilidade (99%+ uptime)
+  - Qualidade consistente (ambas as APIs são LLMs avançadas)
+  - Logs detalhados para debugging
+  - Zero conteúdo genérico (só aceita respostas das LLMs)
+*/
