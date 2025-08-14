@@ -1,545 +1,569 @@
-// api/itinerary-generator.js - Gerador de Roteiro com Groq IA + Fallback DeepSeek
-const axios = require('axios');
+// api/itinerary-generator.js - VERSÃO CORRIGIDA PARA MOBILE
+// Corrige problema de sintaxe async e melhora compatibilidade
+const https = require('https');
+const http = require('http');
 
-// ============================================
-// CONFIGURAÇÃO E CHAVES DE API
-// ============================================
-
-const GROQ_API_KEY = process.env.GROQ_API_KEY;
-const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
-
-// Fallback para DeepSeek
-const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY;
-
-// Configurações
-const TIMEOUT_MS = 45000; // 45 segundos
-const MAX_TOKENS = 8192;
-
-// ============================================
-// LOGGING ESTRUTURADO
-// ============================================
-
-function logEvent(type, message, data = {}
-
-// ============================================
-// FALLBACK COM DEEPSEEK
-// ============================================
-
-async function gerarRoteiroComDeepseek(params) {
-  if (!DEEPSEEK_API_KEY) {
-    throw new Error('Chave da API DeepSeek não configurada - verifique DEEPSEEK_API_KEY no Vercel');
-  }
-  
-  const prompt = gerarPromptOtimizado(params);
-  
-  logEvent('info', 'Chamando DeepSeek API (fallback)', { 
-    model: 'deepseek-chat',
-    tokens: MAX_TOKENS 
-  });
-  
-  try {
-    const response = await axios.post(
-      'https://api.deepseek.com/v1/chat/completions',
-      {
+// ===================================
+// CONFIGURAÇÃO PRINCIPAL
+// ===================================
+const CONFIG = {
+    deepseek: {
+        baseURL: 'https://api.deepseek.com/v1/chat/completions',
         model: 'deepseek-chat',
-        max_tokens: MAX_TOKENS,
-        messages: [
-          {
-            role: 'system',
-            content: 'Você é a Tripinha, especialista em viagens da Benetrip. Responda SEMPRE em JSON válido seguindo exatamente o schema fornecido. Use apenas locais e atividades REAIS do destino solicitado.'
-          },
-          {
-            role: 'user',
-            content: prompt
-          }
-        ],
-        temperature: 0.7,
-        response_format: { type: 'json_object' }
-      },
-      {
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${DEEPSEEK_API_KEY}`
-        },
-        timeout: TIMEOUT_MS
-      }
-    );
-    
-    const respostaText = response.data.choices[0].message.content;
-    
-    // Processar resposta JSON
-    try {
-      const roteiro = JSON.parse(respostaText);
-      return validarEstruturaBasica(roteiro);
-    } catch (parseError) {
-      logEvent('error', 'Erro ao processar JSON do DeepSeek', {
-        error: parseError.message,
-        response: respostaText.substring(0, 500)
-      });
-      throw new Error('Resposta do DeepSeek não é um JSON válido');
-    }
-    
-  } catch (erro) {
-    if (erro.code === 'ECONNABORTED') {
-      throw new Error('Timeout na chamada ao DeepSeek API');
-    }
-    
-    logEvent('error', 'Erro na chamada ao DeepSeek API', {
-      error: erro.message,
-      status: erro.response?.status,
-      data: erro.response?.data
-    });
-    
-    throw erro;
-  }) {
-  const log = {
-    timestamp: new Date().toISOString(),
-    service: 'itinerary-generator',
-    version: '2.0-groq-deepseek',
-    type,
-    message,
-    ...data
-  };
-  console.log(JSON.stringify(log));
-}
-
-// ============================================
-// ENDPOINT PRINCIPAL
-// ============================================
-
-module.exports = async (req, res) => {
-  // Configurar CORS
-  res.setHeader('Access-Control-Allow-Credentials', true);
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-  
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
-  
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Método não permitido. Use POST.' });
-  }
-  
-  const startTime = Date.now();
-  
-  try {
-    // Extrair e validar parâmetros
-    const params = extrairParametros(req.body);
-    
-    logEvent('info', 'Iniciando geração de roteiro', {
-      destino: params.destino,
-      pais: params.pais,
-      diasViagem: params.diasViagem,
-      tipoViagem: params.tipoViagem,
-      tipoCompanhia: params.tipoCompanhia,
-      intensidade: params.preferencias?.intensidade_roteiro,
-      orcamento: params.preferencias?.orcamento_nivel
-    });
-    
-    // Gerar roteiro usando Groq (com fallback para DeepSeek)
-    let roteiro;
-    
-    try {
-      roteiro = await gerarRoteiroComGroq(params);
-      logEvent('success', 'Roteiro gerado com Groq', { 
-        dias: roteiro.dias?.length,
-        tempoMs: Date.now() - startTime,
-        atividadesTotal: contarAtividadesTotal(roteiro),
-        temClimaInfo: !!roteiro.informacoesGerais?.climaInfo
-      });
-    } catch (erroGroq) {
-      logEvent('warning', 'Groq falhou, tentando DeepSeek', { 
-        erro: erroGroq.message 
-      });
-      
-      if (DEEPSEEK_API_KEY) {
-        try {
-          roteiro = await gerarRoteiroComDeepseek(params);
-          logEvent('success', 'Roteiro gerado com DeepSeek (fallback)', { 
-            dias: roteiro.dias?.length,
-            tempoMs: Date.now() - startTime,
-            atividadesTotal: contarAtividadesTotal(roteiro),
-            temClimaInfo: !!roteiro.informacoesGerais?.climaInfo
-          });
-        } catch (erroDeepSeek) {
-          logEvent('error', 'DeepSeek também falhou', { 
-            erroGroq: erroGroq.message,
-            erroDeepSeek: erroDeepSeek.message 
-          });
-          throw new Error(`Falha em ambas as APIs: Groq (${erroGroq.message}) e DeepSeek (${erroDeepSeek.message})`);
-        }
-      } else {
-        logEvent('error', 'DeepSeek não configurado, não há fallback', { 
-          erroGroq: erroGroq.message 
-        });
-        throw new Error(`Groq falhou e DeepSeek não está configurado: ${erroGroq.message}`);
-      }
-    }
-    
-    // Validar estrutura básica apenas
-    const roteiroValidado = validarEstruturaBasica(roteiro);
-    
-    return res.status(200).json(roteiroValidado);
-    
-  } catch (erro) {
-    logEvent('error', 'Erro na geração de roteiro', {
-      message: erro.message,
-      stack: erro.stack,
-      tempoMs: Date.now() - startTime
-    });
-    
-    return res.status(500).json({
-      error: 'Erro ao gerar roteiro personalizado',
-      details: erro.message
-    });
-  }
+        timeout: 60000,
+        maxTokens: 3000,
+        temperature: 0.7
+    },
+    groq: {
+        baseURL: 'https://api.groq.com/openai/v1/chat/completions',
+        model: 'llama-3.1-70b-versatile',
+        timeout: 45000,
+        maxTokens: 2500,
+        temperature: 0.6
+    },
+    retries: 2,
+    fallbackEnabled: true
 };
 
-// ============================================
-// GERAÇÃO COM GROQ (MÉTODO PRINCIPAL)
-// ============================================
+// ===================================
+// TEMPLATES DE ROTEIRO LOCAIS
+// ===================================
+const ROTEIROS_TEMPLATE = {
+    'Lisboa': {
+        dias: [
+            {
+                periodo: 'manha',
+                atividades: [
+                    { local: 'Mosteiro dos Jerónimos', horario: '09:00', dica: 'Chegue cedo para evitar multidões! A arquitetura manuelina é impressionante.' },
+                    { local: 'Torre de Belém', horario: '11:00', dica: 'Símbolo de Lisboa, perfeita para fotos!' }
+                ]
+            },
+            {
+                periodo: 'tarde',
+                atividades: [
+                    { local: 'Castelo de São Jorge', horario: '14:00', dica: 'Vista incrível de Lisboa, especialmente no fim da tarde!' },
+                    { local: 'Bairro de Alfama', horario: '16:30', dica: 'Perca-se nas ruelas históricas e ouça fado!' }
+                ]
+            }
+        ]
+    },
+    'Paris': {
+        dias: [
+            {
+                periodo: 'manha',
+                atividades: [
+                    { local: 'Torre Eiffel', horario: '09:00', dica: 'Compre ingressos online para evitar filas!' },
+                    { local: 'Champs-Élysées', horario: '11:00', dica: 'Caminhada icônica até o Arco do Triunfo!' }
+                ]
+            },
+            {
+                periodo: 'tarde',
+                atividades: [
+                    { local: 'Museu do Louvre', horario: '14:00', dica: 'Reserve pelo menos 3 horas, é gigante!' },
+                    { local: 'Île de la Cité', horario: '17:00', dica: 'Notre-Dame e Sainte-Chapelle!' }
+                ]
+            }
+        ]
+    },
+    'Roma': {
+        dias: [
+            {
+                periodo: 'manha',
+                atividades: [
+                    { local: 'Coliseu', horario: '09:00', dica: 'Entre cedo e imagine os gladiadores!' },
+                    { local: 'Fórum Romano', horario: '11:00', dica: 'História viva do Império Romano!' }
+                ]
+            },
+            {
+                periodo: 'tarde',
+                atividades: [
+                    { local: 'Vaticano', horario: '14:00', dica: 'Capela Sistina é imperdível!' },
+                    { local: 'Fontana di Trevi', horario: '17:00', dica: 'Jogue uma moeda e faça um pedido!' }
+                ]
+            }
+        ]
+    }
+};
 
-async function gerarRoteiroComGroq(params) {
-  if (!GROQ_API_KEY) {
-    throw new Error('Chave da API Groq não configurada - verifique GROQ_API_KEY no Vercel');
-  }
-  
-  const prompt = gerarPromptOtimizado(params);
-  
-  logEvent('info', 'Chamando Groq API', { 
-    model: 'llama3-70b-8192',
-    tokens: MAX_TOKENS 
-  });
-  
-  try {
-    const response = await axios.post(
-      GROQ_API_URL,
-      {
-        model: 'llama3-70b-8192', // Modelo mais poderoso do Groq
-        messages: [
-          {
-            role: 'system',
-            content: 'Você é a Tripinha, especialista em viagens da Benetrip. Responda SEMPRE em JSON válido seguindo exatamente o schema fornecido. Use apenas locais e atividades REAIS do destino solicitado.'
-          },
-          {
-            role: 'user',
-            content: prompt
-          }
-        ],
-        temperature: 0.7,
-        max_tokens: MAX_TOKENS,
-        top_p: 0.9,
-        stream: false,
-        response_format: { 
-          type: "json_object" 
-        }
-      },
-      {
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${GROQ_API_KEY}`
-        },
-        timeout: TIMEOUT_MS
-      }
-    );
-    
-    const respostaText = response.data.choices[0].message.content;
-    
-    // Processar resposta JSON
-    try {
-      const roteiro = JSON.parse(respostaText);
-      return validarEstruturaBasica(roteiro);
-    } catch (parseError) {
-      logEvent('error', 'Erro ao processar JSON do Groq', {
-        error: parseError.message,
-        response: respostaText.substring(0, 500)
-      });
-      throw new Error('Resposta do Groq não é um JSON válido');
-    }
-    
-  } catch (erro) {
-    if (erro.code === 'ECONNABORTED') {
-      throw new Error('Timeout na chamada ao Groq API');
-    }
-    
-    logEvent('error', 'Erro na chamada ao Groq API', {
-      error: erro.message,
-      status: erro.response?.status,
-      data: erro.response?.data
-    });
-    
-    throw erro;
-  }
+// ===================================
+// FUNÇÕES AUXILIARES
+// ===================================
+function criarClienteHTTP(timeout = 30000) {
+    return {
+        httpAgent: new http.Agent({ 
+            keepAlive: true,
+            timeout: timeout
+        }),
+        httpsAgent: new https.Agent({ 
+            keepAlive: true,
+            timeout: timeout
+        })
+    };
 }
 
-// ============================================
-// GERAÇÃO DE PROMPT OTIMIZADO
-// ============================================
+function validarParametros(params) {
+    const erros = [];
+    
+    if (!params.destino || typeof params.destino !== 'string') {
+        erros.push('Destino é obrigatório');
+    }
+    
+    if (!params.dataInicio) {
+        erros.push('Data de início é obrigatória');
+    }
+    
+    if (!params.horaChegada) {
+        erros.push('Hora de chegada é obrigatória');
+    }
+    
+    return erros;
+}
 
-function gerarPromptOtimizado(params) {
-  const {
-    destino,
-    pais,
-    dataInicio,
-    dataFim,
-    horaChegada,
-    horaSaida,
-    diasViagem,
-    tipoViagem,
-    tipoCompanhia,
-    preferencias
-  } = params;
-  
-  // Mapear tipos para descrições mais específicas
-  const descricaoTipoViagem = {
-    'relaxar': 'relaxamento, spa, praias e descanso',
-    'aventura': 'aventura, esportes radicais e natureza',
-    'cultura': 'cultura, história, museus e gastronomia',
-    'urbano': 'vida urbana, compras, arquitetura moderna e vida noturna'
-  }[tipoViagem] || 'experiências variadas e equilibradas';
-  
-  const descricaoCompanhia = {
-    'sozinho': 'uma pessoa viajando sozinha',
-    'casal': 'um casal em viagem romântica',
-    'familia': 'uma família com crianças',
-    'amigos': 'um grupo de amigos'
-  }[tipoCompanhia] || 'viajantes';
-  
-  // Intensidade detalhada
-  const intensidadeDetalhes = {
-    'leve': 'LEVE: máximo 2-3 atividades por dia, com bastante tempo livre',
-    'moderado': 'MODERADO: 3-4 atividades por dia, ritmo equilibrado',
-    'intenso': 'INTENSO: 4-6 atividades por dia, aproveitamento máximo'
-  };
-  
-  const intensidadeEscolhida = preferencias?.intensidade_roteiro || 'moderado';
-  
-  // Orçamento específico
-  const orcamentoDetalhes = {
-    'economico': 'ECONÔMICO: priorize atividades gratuitas, mercados locais, caminhadas',
-    'medio': 'MÉDIO: misture atividades pagas e gratuitas, restaurantes locais',
-    'alto': 'ALTO: inclua experiências premium, restaurantes renomados, tours privativos'
-  };
-  
-  const orcamentoEscolhido = preferencias?.orcamento_nivel || 'medio';
-  
-  // Informações de data para clima
-  const mesViagem = new Date(dataInicio).toLocaleDateString('pt-BR', { month: 'long' });
-  const mesAno = new Date(dataInicio).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
-  
-  return `
-MISSÃO: Criar um roteiro COMPLETO de ${diasViagem} dias para ${destino}, ${pais}
+function calcularDuracaoViagem(dataInicio, dataFim) {
+    try {
+        const inicio = new Date(dataInicio);
+        const fim = dataFim ? new Date(dataFim) : inicio;
+        
+        const diffTime = Math.abs(fim - inicio);
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+        
+        return Math.min(Math.max(diffDays, 1), 15); // Entre 1 e 15 dias
+    } catch (error) {
+        console.warn('Erro ao calcular duração:', error);
+        return 3; // Fallback para 3 dias
+    }
+}
 
-PERFIL DO VIAJANTE:
-- Tipo: ${descricaoCompanhia}
-- Preferência: ${descricaoTipoViagem}
-- ${intensidadeDetalhes[intensidadeEscolhida]}
-- ${orcamentoDetalhes[orcamentoEscolhido]}
+function gerarPromptRoteiro(params) {
+    const duracao = calcularDuracaoViagem(params.dataInicio, params.dataFim);
+    
+    return `Crie um roteiro de viagem DETALHADO para ${params.destino} com as seguintes especificações:
 
-DATAS E HORÁRIOS:
-- Data início: ${dataInicio}
-- Data fim: ${dataFim || 'Viagem de 1 dia'}
-- Chegada: ${horaChegada || '15:30'}
-- Partida: ${horaSaida || '21:00'}
-- DURAÇÃO TOTAL: ${diasViagem} dias
+INFORMAÇÕES DA VIAGEM:
+- Destino: ${params.destino}
+- Duração: ${duracao} dias
+- Data início: ${params.dataInicio}
+- Data fim: ${params.dataFim || 'Não especificada'}
+- Hora chegada: ${params.horaChegada}
+- Hora saída: ${params.horaSaida || 'Não especificada'}
+- Tipo de viagem: ${params.tipoViagem || 'turismo'}
+- Companhia: ${params.tipoCompanhia || 'casal'}
+- Intensidade: ${params.intensidade || 'moderado'}
 
-INSTRUÇÕES CRÍTICAS:
-1. OBRIGATÓRIO: Crie EXATAMENTE ${diasViagem} dias de roteiro
-2. CADA DIA deve ter atividades para manhã, tarde e noite
-3. RESPEITE a intensidade ${intensidadeEscolhida} (${intensidadeDetalhes[intensidadeEscolhida]})
-4. AJUSTE ao orçamento ${orcamentoEscolhido}
-5. PRIMEIRO DIA: considere chegada às ${horaChegada || '15:30'}
-6. ÚLTIMO DIA: considere partida às ${horaSaida || '21:00'}
-7. USE APENAS locais reais e específicos de ${destino}
-8. NÃO use locais genéricos como "Centro Histórico" ou "Museu Nacional"
-9. CADA ATIVIDADE deve ter horário específico, local real, tags apropriadas e dica da Tripinha
-10. INCLUA nomes reais: restaurantes, museus, praças, atrações turísticas
-11. SEJA ESPECÍFICO: "Museu do Louvre" não "Museu Nacional", "Praça da Sé" não "Praça Central"
-12. ADICIONE informações sobre o clima: baseado na época do ano (${mesViagem}) e localização de ${destino}, comente sobre temperatura, chuvas, como se vestir
+INSTRUÇÕES ESPECÍFICAS:
+1. Crie um roteiro para EXATAMENTE ${duracao} dias
+2. Inclua 4-6 atividades por dia (dependendo da intensidade)
+3. Considere os horários de chegada e partida
+4. Inclua dicas práticas da "Tripinha" (nossa mascote cachorrinha)
+5. Adicione horários específicos para cada atividade
 
-ESTILO DE COMUNICAÇÃO:
-- Fale como a Tripinha: descontraída, esperta, com dicas práticas
-- Dicas curtas e úteis (máximo 150 caracteres)
-- Use expressões brasileiras casuais
-- Seja entusiasta mas prática
-
-ESTRUTURA JSON OBRIGATÓRIA:
+FORMATO DE RESPOSTA (JSON):
 {
-  "destino": "${destino}, ${pais}",
-  "informacoesGerais": {
-    "climaInfo": "Comentário sobre como geralmente é o clima em ${destino} durante ${mesAno} (período de ${mesViagem}). Inclua temperatura média, se é época de chuva/seca, como se vestir, o que esperar do tempo. Máximo 300 caracteres."
-  },
+  "destino": "${params.destino}",
+  "duracao": ${duracao},
   "dias": [
     {
       "data": "YYYY-MM-DD",
-      "descricao": "Breve descrição do dia (até 200 chars)",
+      "descricao": "Descrição do dia",
       "manha": {
-        "horarioEspecial": "Chegada às XX:XX" (se aplicável),
         "atividades": [
           {
-            "horario": "HH:MM",
-            "local": "Nome específico e real do local",
-            "tags": ["tag1", "tag2"],
-            "dica": "Dica prática da Tripinha"
+            "horario": "09:00",
+            "local": "Nome do local",
+            "dica": "Dica prática da Tripinha em primeira pessoa"
           }
         ]
       },
       "tarde": {
-        "atividades": [...]
+        "atividades": [
+          {
+            "horario": "14:00",
+            "local": "Nome do local",
+            "dica": "Dica prática da Tripinha"
+          }
+        ]
       },
       "noite": {
-        "atividades": [...]
+        "atividades": [
+          {
+            "horario": "19:00",
+            "local": "Nome do local",
+            "dica": "Dica da Tripinha"
+          }
+        ]
       }
     }
   ]
 }
 
-TAGS DISPONÍVEIS: ["Imperdível", "Cultural", "Gastronomia", "Natureza", "Compras", "Religioso", "Vida Noturna", "Vista Panorâmica", "Histórico", "Chegada", "Partida", "Família", "Aventura", "Relaxante", "Fotogênico"]
-
 IMPORTANTE: 
-- Se ${tipoCompanhia} = "familia", priorize atividades family-friendly
-- Se ${intensidadeEscolhida} = "leve", menos atividades por período
-- Se ${orcamentoEscolhido} = "economico", mais atividades gratuitas
-- SEMPRE inclua pelo menos 1 "Imperdível" por dia
-- Horários realistas (viagem entre locais, tempo de atividade)
-- USE NOMES REAIS: Restaurante da Maria, Museu de Arte Moderna, Igreja de São Bento, etc.
-
-EXEMPLOS DE ESPECIFICIDADE:
-❌ GENÉRICO: "Centro Histórico", "Museu Nacional", "Restaurante Típico"
-✅ ESPECÍFICO: "Pelourinho", "Museu Nacional de Belas Artes", "Restaurante Amado"
-
-Responda APENAS com o JSON válido, sem texto adicional.
-`;
+- Retorne APENAS o JSON, sem markdown ou texto adicional
+- Locais devem ser reais e específicos
+- Dicas da Tripinha em primeira pessoa: "Eu adorei quando..."
+- Horários realistas e práticos`;
 }
 
-// ============================================
-// VALIDAÇÃO MÍNIMA
-// ============================================
-
-function validarEstruturaBasica(roteiro) {
-  if (!roteiro || typeof roteiro !== 'object') {
-    throw new Error('Roteiro inválido: não é um objeto');
-  }
-  
-  if (!roteiro.destino || typeof roteiro.destino !== 'string') {
-    throw new Error('Roteiro inválido: destino ausente ou inválido');
-  }
-  
-  if (!Array.isArray(roteiro.dias) || roteiro.dias.length === 0) {
-    throw new Error('Roteiro inválido: array de dias ausente ou vazio');
-  }
-  
-  if (!roteiro.informacoesGerais || !roteiro.informacoesGerais.climaInfo) {
-    throw new Error('Roteiro inválido: informações sobre clima ausentes');
-  }
-  
-  // Validação básica da estrutura de cada dia
-  roteiro.dias.forEach((dia, index) => {
-    if (!dia.data || typeof dia.data !== 'string') {
-      throw new Error(`Dia ${index + 1}: data inválida ou ausente`);
-    }
-    
-    if (!dia.descricao || typeof dia.descricao !== 'string') {
-      throw new Error(`Dia ${index + 1}: descrição inválida ou ausente`);
-    }
-    
-    ['manha', 'tarde', 'noite'].forEach(periodo => {
-      if (!dia[periodo] || !Array.isArray(dia[periodo].atividades)) {
-        throw new Error(`Dia ${index + 1}: período ${periodo} inválido`);
-      }
-      
-      dia[periodo].atividades.forEach((atividade, ativIndex) => {
-        if (!atividade.horario || !atividade.local || !atividade.dica) {
-          throw new Error(`Dia ${index + 1}, ${periodo}, atividade ${ativIndex + 1}: campos obrigatórios ausentes`);
-        }
+// ===================================
+// FUNÇÃO PRINCIPAL DE GERAÇÃO (SEM ASYNC NA DECLARAÇÃO)
+// ===================================
+function gerarRoteiroComDeepseek(params) {
+    return new Promise((resolve, reject) => {
+        const prompt = gerarPromptRoteiro(params);
         
-        if (!Array.isArray(atividade.tags)) {
-          throw new Error(`Dia ${index + 1}, ${periodo}, atividade ${ativIndex + 1}: tags deve ser um array`);
-        }
-      });
+        const payload = {
+            model: CONFIG.deepseek.model,
+            messages: [
+                {
+                    role: "system",
+                    content: "Você é um especialista em roteiros de viagem. Retorne sempre JSON válido com roteiros detalhados e práticos."
+                },
+                {
+                    role: "user",
+                    content: prompt
+                }
+            ],
+            temperature: CONFIG.deepseek.temperature,
+            max_tokens: CONFIG.deepseek.maxTokens
+        };
+
+        const options = {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${process.env.DEEPSEEK_API_KEY}`,
+                'Content-Type': 'application/json'
+            },
+            timeout: CONFIG.deepseek.timeout
+        };
+
+        const req = https.request(CONFIG.deepseek.baseURL, options, (res) => {
+            let data = '';
+            
+            res.on('data', (chunk) => {
+                data += chunk;
+            });
+            
+            res.on('end', () => {
+                try {
+                    const response = JSON.parse(data);
+                    
+                    if (response.choices && response.choices[0]) {
+                        const content = response.choices[0].message.content;
+                        const roteiro = JSON.parse(content);
+                        resolve(roteiro);
+                    } else {
+                        reject(new Error('Resposta inválida da API DeepSeek'));
+                    }
+                } catch (error) {
+                    console.error('Erro ao processar resposta DeepSeek:', error);
+                    reject(error);
+                }
+            });
+        });
+
+        req.on('error', (error) => {
+            console.error('Erro na requisição DeepSeek:', error);
+            reject(error);
+        });
+
+        req.on('timeout', () => {
+            req.destroy();
+            reject(new Error('Timeout na API DeepSeek'));
+        });
+
+        req.write(JSON.stringify(payload));
+        req.end();
     });
-  });
-  
-  return roteiro;
 }
 
-// ============================================
-// FUNÇÕES AUXILIARES
-// ============================================
+// ===================================
+// FUNÇÃO GROQ (FALLBACK)
+// ===================================
+function gerarRoteiroComGroq(params) {
+    return new Promise((resolve, reject) => {
+        const prompt = gerarPromptRoteiro(params);
+        
+        const payload = {
+            model: CONFIG.groq.model,
+            messages: [
+                {
+                    role: "system",
+                    content: "Especialista em roteiros de viagem. Retorne JSON válido."
+                },
+                {
+                    role: "user",
+                    content: prompt
+                }
+            ],
+            temperature: CONFIG.groq.temperature,
+            max_tokens: CONFIG.groq.maxTokens
+        };
 
-function extrairParametros(body) {
-  const {
-    destino,
-    pais,
-    dataInicio,
-    dataFim,
-    horaChegada,
-    horaSaida,
-    tipoViagem,
-    tipoCompanhia,
-    preferencias
-  } = body;
-  
-  if (!destino || !dataInicio) {
-    throw new Error('Parâmetros obrigatórios: destino, dataInicio');
-  }
-  
-  const diasViagem = calcularDiasViagem(dataInicio, dataFim);
-  
-  return {
-    destino: String(destino).trim(),
-    pais: String(pais || 'Internacional').trim(),
-    dataInicio: String(dataInicio),
-    dataFim: dataFim ? String(dataFim) : null,
-    horaChegada: String(horaChegada || '15:30'),
-    horaSaida: String(horaSaida || '21:00'),
-    diasViagem,
-    tipoViagem: String(tipoViagem || 'cultura'),
-    tipoCompanhia: String(tipoCompanhia || 'sozinho'),
-    preferencias: preferencias || {}
-  };
+        const options = {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
+                'Content-Type': 'application/json'
+            },
+            timeout: CONFIG.groq.timeout
+        };
+
+        const req = https.request(CONFIG.groq.baseURL, options, (res) => {
+            let data = '';
+            
+            res.on('data', (chunk) => {
+                data += chunk;
+            });
+            
+            res.on('end', () => {
+                try {
+                    const response = JSON.parse(data);
+                    
+                    if (response.choices && response.choices[0]) {
+                        const content = response.choices[0].message.content;
+                        const roteiro = JSON.parse(content);
+                        resolve(roteiro);
+                    } else {
+                        reject(new Error('Resposta inválida da API Groq'));
+                    }
+                } catch (error) {
+                    console.error('Erro ao processar resposta Groq:', error);
+                    reject(error);
+                }
+            });
+        });
+
+        req.on('error', (error) => {
+            console.error('Erro na requisição Groq:', error);
+            reject(error);
+        });
+
+        req.on('timeout', () => {
+            req.destroy();
+            reject(new Error('Timeout na API Groq'));
+        });
+
+        req.write(JSON.stringify(payload));
+        req.end();
+    });
 }
 
-function calcularDiasViagem(dataInicio, dataFim) {
-  if (!dataInicio) return 1;
-  
-  const inicio = new Date(dataInicio);
-  
-  if (!dataFim) return 1;
-  
-  const fim = new Date(dataFim);
-  
-  const diffTempo = Math.abs(fim - inicio);
-  const diffDias = Math.ceil(diffTempo / (1000 * 60 * 60 * 24)) + 1;
-  
-  return Math.max(1, Math.min(30, diffDias)); // Entre 1 e 30 dias
+// ===================================
+// FUNÇÃO DE FALLBACK LOCAL
+// ===================================
+function gerarRoteiroFallback(params) {
+    console.log('🛡️ Gerando roteiro fallback local para:', params.destino);
+    
+    const destino = params.destino;
+    const duracao = calcularDuracaoViagem(params.dataInicio, params.dataFim);
+    
+    // Buscar template específico ou usar genérico
+    let templateBase = ROTEIROS_TEMPLATE[destino] || ROTEIROS_TEMPLATE['Lisboa'];
+    
+    // Gerar roteiro baseado no template
+    const dias = [];
+    const dataInicio = new Date(params.dataInicio);
+    
+    for (let i = 0; i < duracao; i++) {
+        const dataAtual = new Date(dataInicio);
+        dataAtual.setDate(dataInicio.getDate() + i);
+        
+        const diaTemplate = templateBase.dias[i % templateBase.dias.length];
+        
+        const dia = {
+            data: dataAtual.toISOString().split('T')[0],
+            descricao: i === 0 ? 
+                `Chegada e primeiras impressões de ${destino}!` :
+                i === duracao - 1 ?
+                `Últimos momentos para aproveitar ${destino}.` :
+                `Explorando os tesouros de ${destino}.`,
+            manha: {
+                atividades: adaptarAtividades(diaTemplate.atividades || [], 'manha', destino)
+            },
+            tarde: {
+                atividades: adaptarAtividades(diaTemplate.atividades || [], 'tarde', destino)
+            },
+            noite: {
+                atividades: adaptarAtividades(diaTemplate.atividades || [], 'noite', destino)
+            }
+        };
+        
+        dias.push(dia);
+    }
+    
+    return {
+        destino: destino,
+        duracao: duracao,
+        dias: dias
+    };
 }
 
-function contarAtividadesTotal(roteiro) {
-  if (!roteiro.dias) return 0;
-  
-  return roteiro.dias.reduce((total, dia) => {
-    const manha = dia.manha?.atividades?.length || 0;
-    const tarde = dia.tarde?.atividades?.length || 0;
-    const noite = dia.noite?.atividades?.length || 0;
-    return total + manha + tarde + noite;
-  }, 0);
+function adaptarAtividades(atividadesBase, periodo, destino) {
+    const horarios = {
+        'manha': ['09:00', '10:30'],
+        'tarde': ['14:00', '16:00'],
+        'noite': ['19:00', '21:00']
+    };
+    
+    const atividades = [];
+    const horariosDisp = horarios[periodo] || ['10:00'];
+    
+    for (let i = 0; i < Math.min(2, horariosDisp.length); i++) {
+        if (atividadesBase[i]) {
+            atividades.push({
+                horario: horariosDisp[i],
+                local: atividadesBase[i].local || `Atração Local ${i + 1}`,
+                dica: atividadesBase[i].dica || `Eu adorei este lugar em ${destino}! Vale muito a pena conhecer!`
+            });
+        }
+    }
+    
+    return atividades;
 }
 
-// ============================================
-// SISTEMA DE FALLBACK
-// ============================================
-/*
-  FLUXO DE GERAÇÃO:
-  1. Groq API (principal) → llama3-70b-8192
-  2. Se falhar → DeepSeek API (fallback) → deepseek-chat  
-  3. Se ambos falharem → Erro 500
-  
-  BENEFÍCIOS:
-  - Alta disponibilidade (99%+ uptime)
-  - Qualidade consistente (ambas as APIs são LLMs avançadas)
-  - Logs detalhados para debugging
-  - Zero conteúdo genérico (só aceita respostas das LLMs)
-*/
+// ===================================
+// HANDLER PRINCIPAL (SEM ASYNC)
+// ===================================
+function handler(req, res) {
+    let responseHandled = false;
+    
+    // Timeout de segurança
+    const timeoutId = setTimeout(() => {
+        if (!responseHandled) {
+            responseHandled = true;
+            console.error('⏰ Timeout do servidor atingido');
+            res.status(500).json({
+                error: 'Timeout na geração do roteiro',
+                fallback: true
+            });
+        }
+    }, 120000); // 2 minutos
+
+    // Headers CORS
+    res.setHeader('Access-Control-Allow-Credentials', true);
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,POST');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+    if (req.method === 'OPTIONS') {
+        clearTimeout(timeoutId);
+        responseHandled = true;
+        return res.status(200).end();
+    }
+
+    if (req.method !== 'POST') {
+        clearTimeout(timeoutId);
+        responseHandled = true;
+        return res.status(405).json({ error: 'Método não permitido' });
+    }
+
+    try {
+        console.log('🚀 === BENETRIP ITINERARY GENERATOR v3.0 ===');
+        
+        const params = req.body;
+        
+        // Validar parâmetros
+        const erros = validarParametros(params);
+        if (erros.length > 0) {
+            clearTimeout(timeoutId);
+            responseHandled = true;
+            return res.status(400).json({
+                error: 'Parâmetros inválidos',
+                details: erros
+            });
+        }
+
+        console.log('📊 Parâmetros recebidos:', {
+            destino: params.destino,
+            dataInicio: params.dataInicio,
+            dataFim: params.dataFim,
+            duracao: calcularDuracaoViagem(params.dataInicio, params.dataFim)
+        });
+
+        // Função para finalizar resposta
+        function finalizarResposta(roteiro, fonte, tentativa = 1) {
+            if (responseHandled) return;
+            
+            clearTimeout(timeoutId);
+            responseHandled = true;
+            
+            console.log(`✅ Roteiro gerado com sucesso via ${fonte} (tentativa ${tentativa})`);
+            console.log(`📋 Roteiro: ${roteiro.dias?.length || 0} dias para ${roteiro.destino}`);
+            
+            res.status(200).json({
+                ...roteiro,
+                fonte: fonte,
+                tentativa: tentativa,
+                timestamp: new Date().toISOString()
+            });
+        }
+
+        function tentarProximaOpcao(tentativa) {
+            if (responseHandled) return;
+            
+            console.log(`🔄 Tentativa ${tentativa}...`);
+            
+            if (tentativa === 1 && process.env.DEEPSEEK_API_KEY) {
+                // Primeira tentativa: DeepSeek
+                gerarRoteiroComDeepseek(params)
+                    .then(roteiro => finalizarResposta(roteiro, 'DeepSeek', tentativa))
+                    .catch(error => {
+                        console.warn(`❌ DeepSeek falhou (tentativa ${tentativa}):`, error.message);
+                        tentarProximaOpcao(tentativa + 1);
+                    });
+                    
+            } else if (tentativa === 2 && process.env.GROQ_API_KEY) {
+                // Segunda tentativa: Groq
+                gerarRoteiroComGroq(params)
+                    .then(roteiro => finalizarResposta(roteiro, 'Groq', tentativa))
+                    .catch(error => {
+                        console.warn(`❌ Groq falhou (tentativa ${tentativa}):`, error.message);
+                        tentarProximaOpcao(tentativa + 1);
+                    });
+                    
+            } else {
+                // Fallback local
+                try {
+                    const roteiroFallback = gerarRoteiroFallback(params);
+                    finalizarResposta(roteiroFallback, 'Fallback Local', tentativa);
+                } catch (error) {
+                    console.error('❌ Até o fallback falhou:', error);
+                    
+                    if (!responseHandled) {
+                        clearTimeout(timeoutId);
+                        responseHandled = true;
+                        res.status(500).json({
+                            error: 'Não foi possível gerar o roteiro',
+                            details: error.message
+                        });
+                    }
+                }
+            }
+        }
+
+        // Iniciar processo
+        tentarProximaOpcao(1);
+
+    } catch (error) {
+        console.error('💥 Erro global:', error);
+        
+        if (!responseHandled) {
+            clearTimeout(timeoutId);
+            responseHandled = true;
+            res.status(500).json({
+                error: 'Erro interno do servidor',
+                details: error.message
+            });
+        }
+    }
+}
+
+// ===================================
+// EXPORTAÇÃO (COMPATÍVEL COM VERCEL)
+// ===================================
+module.exports = handler;
+
+// Manter compatibilidade para diferentes ambientes
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports.handler = handler;
+    module.exports.gerarRoteiroFallback = gerarRoteiroFallback;
+}
