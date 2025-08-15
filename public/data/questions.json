@@ -50,10 +50,10 @@
         "question": "3️⃣ O que você mais busca nessa viagem?",
         "description": "Escolha o que é mais importante para você.",
         "options": [
-            "🌊 Relaxar – Quero descansar e curtir sem pressa.",
-            "🏔️ Aventura – Quero experiências excitantes e adrenalina.",
-            "🏛️ Cultura – Quero conhecer história, arte e gastronomia.",
-            "🛍️ Urbano – Quero agito, compras e vida noturna."
+            "🌊 Relax total – Descansar, aproveitar sem pressa e recarregar as energias",
+            "🏔️ Aventura e emoção – Trilhar, explorar e sentir a adrenalina.",
+            "🏛️ Cultura e história – Mergulhar em tradições, arte e sabores locais.",
+            "🛍️ Agito urbano – Compras, vida noturna e muito movimento."
         ],
         "key": "preferencia_viagem"
     },
