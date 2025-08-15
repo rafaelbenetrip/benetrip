@@ -326,8 +326,8 @@ function gerarPromptParaGroq(dados) {
 ${infoViajante.orcamento !== 'flexível' ? `
 ⚠️ **ORIENTAÇÃO DE ORÇAMENTO:**
 - Considere destinos que sejam acessíveis dentro deste orçamento
-- Priorize destinos mais próximos se o orçamento for limitado
-- Para orçamentos maiores, considere destinos mais distantes
+- NUNCA sugira cidades com orçamento menor que 70% do orçamento
+- NUNCA sugira cidades com orçamento maior que 120% do orçamento
 - Leve em conta a cidade de origem (${infoViajante.cidadeOrigem}) ao avaliar distâncias
 ` : 
 '**ORÇAMENTO FLEXÍVEL** - Sugira destinos variados considerando diferentes faixas de custo'}
