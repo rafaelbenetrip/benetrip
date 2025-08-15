@@ -1,4 +1,4 @@
-// api/itinerary-generator.js - Endpoint para geração de roteiro personalizado com Groq OTIMIZADO
+// api/itinerary-generator.js - Endpoint para geração de roteiro personalizado com Groq OTIMIZADO E CORRIGIDO
 const axios = require('axios');
 const http = require('http');
 const https = require('https');
@@ -302,7 +302,7 @@ function gerarDatasRoteiro(dataInicio, diasViagem) {
 }
 
 // =======================
-// Prompt Engineering Avançado para Roteiros
+// Prompt Engineering Avançado para Roteiros - CORRIGIDO
 // =======================
 function gerarPromptRoteiro(params) {
   const {
@@ -312,11 +312,24 @@ function gerarPromptRoteiro(params) {
     dataFim,
     horaChegada,
     horaSaida,
-    diasViagem,
     tipoViagem,
     tipoCompanhia,
+    intensidade,
+    orcamento,
     preferencias
   } = params;
+  
+  // ✅ CORREÇÃO: Calcular diasViagem se não fornecido
+  const diasViagem = params.diasViagem || calcularDiasViagem(dataInicio, dataFim);
+  
+  // ✅ CORREÇÃO: Processar preferências se for objeto complexo
+  const preferenciasProcesadas = typeof preferencias === 'object' 
+    ? preferencias 
+    : { intensidade_roteiro: intensidade, orcamento_nivel: orcamento };
+  
+  // ✅ CORREÇÃO: Usar valores enviados pelo itinerary2.js
+  const intensidadeEscolhida = intensidade || preferenciasProcesadas.intensidade_roteiro || 'moderado';
+  const orcamentoEscolhido = orcamento || preferenciasProcesadas.orcamento_nivel || 'medio';
   
   // Mapear o tipo de viagem para descrição
   const descricaoTipoViagem = {
@@ -347,16 +360,19 @@ function gerarPromptRoteiro(params) {
     'alto': 'alto (inclua experiências premium sem limitações de custo)'
   };
   
-  // Criar informações detalhadas de viajantes
+  // ✅ CORREÇÃO: Criar informações detalhadas de viajantes compatível com itinerary2.js
   let infoViajantes = descricaoTipoCompanhia;
-  if (tipoCompanhia === 'familia' && preferencias) {
-    const adultos = preferencias.quantidade_adultos || 2;
-    const criancas = preferencias.quantidade_criancas || 0;
-    const bebes = preferencias.quantidade_bebes || 0;
+  if (tipoCompanhia === 'familia' && (preferencias || params.quantidadeAdultos)) {
+    const adultos = params.quantidadeAdultos || preferenciasProcesadas?.quantidade_adultos || 2;
+    const criancas = params.quantidadeCriancas || preferenciasProcesadas?.quantidade_criancas || 0;
+    const bebes = params.quantidadeBebes || preferenciasProcesadas?.quantidade_bebes || 0;
     infoViajantes += ` (${adultos} adulto${adultos > 1 ? 's' : ''}`;
     if (criancas > 0) infoViajantes += `, ${criancas} criança${criancas > 1 ? 's' : ''}`;
     if (bebes > 0) infoViajantes += `, ${bebes} bebê${bebes > 1 ? 's' : ''}`;
     infoViajantes += ')';
+  } else if (tipoCompanhia === 'amigos' && (params.quantidadePessoas || preferenciasProcesadas?.quantidade)) {
+    const quantidade = params.quantidadePessoas || preferenciasProcesadas?.quantidade || 2;
+    infoViajantes += ` (${quantidade} pessoas)`;
   }
   
   // Gerar datas para cada dia
@@ -366,14 +382,14 @@ function gerarPromptRoteiro(params) {
 
 ## 📊 DADOS DO VIAJANTE PARA ANÁLISE:
 **Perfil Básico:**
-- Destino: ${destino}, ${pais}
+- Destino: ${destino}, ${pais || 'Internacional'}
 - Período: ${dataInicio} a ${dataFim || dataInicio} (${diasViagem} dia${diasViagem > 1 ? 's' : ''})
 - Composição: ${infoViajantes}
 - Horário de chegada: ${horaChegada || 'Não informado'}
 - Horário de partida: ${horaSaida || 'Não informado'}
 - Preferência principal: ${descricaoTipoViagem}
-- Intensidade: ${intensidadeInfo[preferencias?.intensidade_roteiro] || intensidadeInfo['moderado']}
-- Orçamento: ${orcamentoInfo[preferencias?.orcamento_nivel] || orcamentoInfo['medio']}
+- Intensidade: ${intensidadeInfo[intensidadeEscolhida] || intensidadeInfo['moderado']}
+- Orçamento: ${orcamentoInfo[orcamentoEscolhido] || orcamentoInfo['medio']}
 
 ## 🎯 PROCESSO DE RACIOCÍNIO OBRIGATÓRIO:
 
@@ -394,7 +410,7 @@ Para ${infoViajantes} com foco em ${descricaoTipoViagem}:
 - Agrupe atividades por proximidade geográfica para otimizar deslocamentos
 - Considere horários de funcionamento e tempos de deslocamento realistas
 - Balanceie atividades de alta e baixa energia ao longo do dia
-- Respeite a intensidade escolhida: ${intensidadeInfo[preferencias?.intensidade_roteiro] || intensidadeInfo['moderado']}
+- Respeite a intensidade escolhida: ${intensidadeInfo[intensidadeEscolhida] || intensidadeInfo['moderado']}
 
 ### PASSO 4: PERSONALIZAÇÃO EXPERIENCIAL
 - Incorpore experiências sensoriais que a Tripinha vivenciou
@@ -418,10 +434,10 @@ Para ${infoViajantes} com foco em ${descricaoTipoViagem}:
     "organizacao_logistica": "Estratégia de organização geográfica e temporal das atividades",
     "personalizacao_tripinha": "Como as experiências da Tripinha influenciaram as escolhas"
   },
-  "destino": "${destino}, ${pais}",
+  "destino": "${destino}, ${pais || 'Internacional'}",
   "periodo_viagem": "${dataInicio} a ${dataFim || dataInicio}",
   "perfil_viajante": "${infoViajantes}",
-  "intensidade_roteiro": "${intensidadeInfo[preferencias?.intensidade_roteiro] || intensidadeInfo['moderado']}",
+  "intensidade_roteiro": "${intensidadeInfo[intensidadeEscolhida] || intensidadeInfo['moderado']}",
   "dias": [${datasRoteiro.map((data, index) => `
     {
       "dia_numero": ${index + 1},
@@ -470,7 +486,7 @@ Para ${infoViajantes} com foco em ${descricaoTipoViagem}:
   "resumo_roteiro": {
     "total_dias": ${diasViagem},
     "foco_principal": "${descricaoTipoViagem}",
-    "intensidade_aplicada": "${intensidadeInfo[preferencias?.intensidade_roteiro] || intensidadeInfo['moderado']}",
+    "intensidade_aplicada": "${intensidadeInfo[intensidadeEscolhida] || intensidadeInfo['moderado']}",
     "pontos_turisticos_incluidos": "Lista dos principais pontos visitados",
     "experiencias_unicas": "Experiências especiais que tornam este roteiro único"
   },
@@ -485,7 +501,7 @@ Para ${infoViajantes} com foco em ${descricaoTipoViagem}:
 ## 🔍 VALIDAÇÃO FINAL OBRIGATÓRIA:
 Antes de responder, confirme que:
 - ✅ O roteiro tem EXATAMENTE ${diasViagem} dia${diasViagem > 1 ? 's' : ''} completo${diasViagem > 1 ? 's' : ''}
-- ✅ Cada dia respeita a intensidade: ${intensidadeInfo[preferencias?.intensidade_roteiro] || intensidadeInfo['moderado']}
+- ✅ Cada dia respeita a intensidade: ${intensidadeInfo[intensidadeEscolhida] || intensidadeInfo['moderado']}
 - ✅ Atividades são adequadas para ${infoViajantes}
 - ✅ Horários são realistas e bem distribuídos
 - ✅ Informações climáticas são precisas para ${dataInicio} a ${dataFim || dataInicio}
@@ -497,7 +513,7 @@ Antes de responder, confirme que:
 }
 
 // =======================
-// Handler principal da API - OTIMIZADO
+// Handler principal da API - CORRIGIDO
 // =======================
 module.exports = async function handler(req, res) {
   let isResponseSent = false;
@@ -532,7 +548,7 @@ module.exports = async function handler(req, res) {
   }
 
   try {
-    console.log('🧠 === BENETRIP GROQ ITINERARY API v2.0 - OTIMIZADA ===');
+    console.log('🧠 === BENETRIP GROQ ITINERARY API v2.1 - CORRIGIDA ===');
     
     if (!req.body) {
       isResponseSent = true;
@@ -557,31 +573,46 @@ module.exports = async function handler(req, res) {
       return;
     }
     
-    // Validar parâmetros obrigatórios
-    const { destino, pais, dataInicio } = requestData;
+    // ✅ CORREÇÃO: Validar parâmetros obrigatórios com melhor debugging
+    const { destino, dataInicio } = requestData;
     if (!destino || !dataInicio) {
+      console.log('❌ Parâmetros faltando:', { destino, dataInicio });
+      console.log('📊 Parâmetros recebidos:', Object.keys(requestData));
       isResponseSent = true;
       clearTimeout(serverTimeout);
       return res.status(400).json({ 
-        error: 'Parâmetros obrigatórios: destino, dataInicio' 
+        error: 'Parâmetros obrigatórios: destino, dataInicio',
+        received: Object.keys(requestData),
+        values: { destino, dataInicio }
       });
+    }
+    
+    // ✅ CORREÇÃO: Adicionar país padrão se não fornecido
+    if (!requestData.pais) {
+      requestData.pais = 'Internacional';
     }
     
     // Calcular número de dias
     const diasViagem = calcularDiasViagem(requestData.dataInicio, requestData.dataFim);
     
-    // Log dos dados recebidos
+    // ✅ CORREÇÃO: Log dos dados recebidos com estrutura correta
     utils.log('📊 Dados da requisição de roteiro:', {
       destino: destino,
-      pais: pais,
+      pais: requestData.pais,
       diasViagem: diasViagem,
       dataInicio: requestData.dataInicio,
       dataFim: requestData.dataFim,
       tipoViagem: requestData.tipoViagem,
       tipoCompanhia: requestData.tipoCompanhia,
-      intensidade: requestData.preferencias?.intensidade_roteiro,
-      orcamento: requestData.preferencias?.orcamento_nivel
+      intensidade: requestData.intensidade || requestData.preferencias?.intensidade_roteiro,
+      orcamento: requestData.orcamento || requestData.preferencias?.orcamento_nivel,
+      horaChegada: requestData.horaChegada,
+      horaSaida: requestData.horaSaida,
+      parametrosCompletos: Object.keys(requestData)
     });
+    
+    // ✅ CORREÇÃO: Adicionar diasViagem aos parâmetros antes de gerar prompt
+    requestData.diasViagem = diasViagem;
     
     // Gerar prompt otimizado para roteiros
     const prompt = gerarPromptRoteiro(requestData);
@@ -616,26 +647,36 @@ module.exports = async function handler(req, res) {
         throw new Error('Estrutura de roteiro inválida: falta array de dias');
       }
       
-      // Adicionar metadados
+      // ✅ CORREÇÃO: Adicionar metadados expandidos
       dados.metadados = {
         modelo: modeloUsado,
         provider: 'groq',
-        versao: '2.0-otimizada',
+        versao: '2.1-corrigida',
         timestamp: new Date().toISOString(),
         reasoning_enabled: modeloUsado === CONFIG.groq.models.reasoning,
-        destino_completo: `${destino}, ${pais}`,
+        destino_completo: `${destino}, ${requestData.pais}`,
         dias_viagem: diasViagem,
-        gerado_em: new Date().toLocaleString('pt-BR')
+        gerado_em: new Date().toLocaleString('pt-BR'),
+        parametros_utilizados: {
+          intensidade: requestData.intensidade,
+          orcamento: requestData.orcamento,
+          tipoViagem: requestData.tipoViagem,
+          tipoCompanhia: requestData.tipoCompanhia,
+          horaChegada: requestData.horaChegada,
+          horaSaida: requestData.horaSaida
+        }
       };
       
       console.log('🎉 Roteiro processado com sucesso!');
       console.log('🧠 Modelo usado:', modeloUsado);
-      console.log('📍 Destino:', `${destino}, ${pais}`);
+      console.log('📍 Destino:', `${destino}, ${requestData.pais}`);
       console.log('📋 Roteiro gerado:', {
         diasTotal: dados.dias?.length || 0,
         temProcessoCriacao: !!dados.processo_criacao,
         temDicasTripinha: !!dados.dicas_gerais_tripinha,
-        periodoViagem: `${requestData.dataInicio} a ${requestData.dataFim || requestData.dataInicio}`
+        periodoViagem: `${requestData.dataInicio} a ${requestData.dataFim || requestData.dataInicio}`,
+        intensidade: requestData.intensidade,
+        orcamento: requestData.orcamento
       });
       
       if (!isResponseSent) {
@@ -671,7 +712,8 @@ module.exports = async function handler(req, res) {
       return res.status(500).json({
         tipo: "erro",
         message: "Erro interno do servidor. Tente novamente.",
-        error: globalError.message
+        error: globalError.message,
+        stack: globalError.stack
       });
     }
   } finally {
