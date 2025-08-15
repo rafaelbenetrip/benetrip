@@ -1,5 +1,5 @@
 // api/recommendations.js - Endpoint da API Vercel para recomendações de destino
-// Versão 7.0 - SIMPLIFIED & OPTIMIZED - Sem preços hardcoded, genérico para qualquer origem
+// Versão 7.1 - SIMPLIFIED & GENERIC - Sem considerações de distância
 const axios = require('axios');
 const http = require('http');
 const https = require('https');
@@ -196,7 +196,6 @@ CRITÉRIOS DE DECISÃO:
 - Informações climáticas DEVEM ser precisas para o período da viagem
 - Pontos turísticos DEVEM ser específicos e reais
 - Comentários da Tripinha DEVEM ser em 1ª pessoa com detalhes sensoriais
-- Considere a distância e facilidade de acesso a partir da cidade de origem
 
 RESULTADO: JSON estruturado com recomendações fundamentadas no raciocínio acima.`;
   } else if (model === CONFIG.groq.models.personality) {
@@ -325,12 +324,11 @@ function gerarPromptParaGroq(dados) {
 
 ${infoViajante.orcamento !== 'flexível' ? `
 ⚠️ **ORIENTAÇÃO DE ORÇAMENTO:**
-- Considere destinos que sejam acessíveis dentro deste orçamento
-- Priorize destinos mais próximos se o orçamento for limitado
-- Para orçamentos maiores, considere destinos mais distantes
-- Leve em conta a cidade de origem (${infoViajante.cidadeOrigem}) ao avaliar distâncias
+- Considere o orçamento informado ao sugerir destinos
+- Sugira uma variedade de destinos que se adequem a diferentes faixas de preço
+- Ofereça opções nacionais e internacionais quando aplicável
 ` : 
-'**ORÇAMENTO FLEXÍVEL** - Sugira destinos variados considerando diferentes faixas de custo'}
+'**ORÇAMENTO FLEXÍVEL** - Sugira destinos variados, incluindo opções para diferentes faixas de custo'}
 
 ## 🎯 PROCESSO DE RACIOCÍNIO OBRIGATÓRIO:
 
@@ -341,10 +339,10 @@ Analise profundamente:
 - Que adaptações são necessárias para ${infoViajante.companhia}?
 - Como a duração da viagem (${duracaoViagem}) influencia as opções?
 
-### PASSO 2: CONSIDERAÇÃO GEOGRÁFICA E LOGÍSTICA
-- Avalie a distância a partir de ${infoViajante.cidadeOrigem}
-- Considere a facilidade de acesso e conexões disponíveis
-- Pense na relação custo-benefício considerando o orçamento ${infoViajante.orcamento !== 'flexível' ? `de ${infoViajante.orcamento} ${infoViajante.moeda}` : 'flexível'}
+### PASSO 2: DIVERSIDADE DE DESTINOS
+- Ofereça uma mistura equilibrada de destinos nacionais e internacionais
+- Inclua destinos famosos e joias escondidas
+- Considere diferentes tipos de experiências (praia, montanha, cidade, natureza)
 
 ### PASSO 3: MAPEAMENTO DE DESTINOS COMPATÍVEIS
 Para cada destino considerado, avalie:
@@ -363,7 +361,7 @@ Para as datas ${dataIda} a ${dataVolta}, determine:
 ### PASSO 5: SELEÇÃO E RANQUEAMENTO
 Baseado na análise acima, selecione:
 - 1 destino TOP que melhor combina com TODOS os critérios
-- 4 alternativas diversificadas geograficamente
+- 4 alternativas diversificadas (misture destinos próximos e distantes, famosos e desconhecidos)
 - 1 surpresa que pode surpreender positivamente
 
 ### PASSO 6: PERSONALIZAÇÃO TRIPINHA 🐾
@@ -379,8 +377,7 @@ Para cada destino selecionado, adicione:
 {
   "raciocinio": {
     "analise_perfil": "Resumo da análise do perfil do viajante",
-    "criterios_selecao": "Principais critérios usados na seleção",
-    "consideracoes_geograficas": "Como a origem ${infoViajante.cidadeOrigem} influenciou as escolhas"
+    "criterios_selecao": "Principais critérios usados na seleção"
   },
   "topPick": {
     "destino": "Nome da Cidade",
@@ -423,7 +420,7 @@ Para cada destino selecionado, adicione:
         "nome": "Nome do Aeroporto"
       }
     }
-    // EXATAMENTE 4 alternativas geograficamente diversas
+    // EXATAMENTE 4 alternativas diversificadas
   ],
   "surpresa": {
     "destino": "Nome da Cidade Inusitada",
@@ -450,7 +447,7 @@ Para cada destino selecionado, adicione:
     }
   },
   "estacaoViagem": "Estação predominante nos destinos selecionados",
-  "resumoIA": "Resumo de como a IA chegou às recomendações considerando origem, preferências e orçamento"
+  "resumoIA": "Resumo de como a IA chegou às recomendações considerando preferências e orçamento"
 }
 \`\`\`
 
@@ -461,7 +458,7 @@ Antes de responder, confirme que:
 - ✅ Pontos turísticos são específicos e reais
 - ✅ Códigos IATA dos aeroportos estão corretos
 - ✅ Destinos são adequados para ${infoViajante.companhia}
-- ✅ Considerou a cidade de origem ${infoViajante.cidadeOrigem} nas sugestões
+- ✅ Há diversidade geográfica nas sugestões
 
 **Execute o raciocínio passo-a-passo e forneça recomendações fundamentadas e personalizadas!**`;
 }
@@ -620,7 +617,7 @@ module.exports = async function handler(req, res) {
   }
 
   try {
-    console.log('🧠 === BENETRIP GROQ API v7.0 - SIMPLIFIED ===');
+    console.log('🧠 === BENETRIP GROQ API v7.1 - GENERIC ===');
     
     if (!req.body) {
       isResponseSent = true;
@@ -688,7 +685,7 @@ module.exports = async function handler(req, res) {
       dados.metadados = {
         modelo: modeloUsado,
         provider: 'groq',
-        versao: '7.0-simplified',
+        versao: '7.1-generic',
         timestamp: new Date().toISOString(),
         reasoning_enabled: modeloUsado === CONFIG.groq.models.reasoning,
         origem: requestData.cidade_partida?.name || requestData.cidade_partida
