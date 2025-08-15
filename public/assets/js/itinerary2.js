@@ -2371,25 +2371,31 @@ abrirMapa(local) {
     return "Voo à noite - dia completo para aproveitar!";
   },
 
-  obterTextoPreferencia() {
+/**
+ * ✅ OBTER TEXTO DA PREFERÊNCIA - VERSÃO ATUALIZADA
+ */
+obterTextoPreferencia() {
     const mapa = {
-      'relaxar': 'Relaxamento e Descanso',
-      'aventura': 'Aventura e Natureza',
-      'cultura': 'Cultura e História',
-      'urbano': 'Urbano e Moderno'
+      'relaxar': 'Relax total',
+      'aventura': 'Aventura e emoção',
+      'cultura': 'Cultura e história',
+      'urbano': 'Agito urbano'
     };
     return mapa[this.obterTipoViagem()] || 'Experiências Variadas';
-  },
+},
 
-  obterIconePreferencia() {
+/**
+ * ✅ OBTER ÍCONE DA PREFERÊNCIA - VERSÃO ATUALIZADA
+ */
+obterIconePreferencia() {
     const mapa = {
-      'relaxar': '🏖️',
+      'relaxar': '🌊',
       'aventura': '🏔️',
       'cultura': '🏛️',
       'urbano': '🏙️'
     };
     return mapa[this.obterTipoViagem()] || '✨';
-  },
+},
 
   /**
  * ✅ OBTER TEXTO DA COMPANHIA - VERSÃO EXPANDIDA
