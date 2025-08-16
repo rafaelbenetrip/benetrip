@@ -25,7 +25,7 @@ const CONFIG = {
     enabled: true,
     maxLength: 600
   },
-  budgetThreshold: 400,  // Limite para viagens rodoviárias
+  budgetThreshold: 401,  // Limite para viagens rodoviárias
   busTravel: {
     maxDistance: 700,    // Distância máxima em km
     maxHours: 10        // Tempo máximo em horas
