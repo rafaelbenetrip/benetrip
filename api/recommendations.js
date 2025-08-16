@@ -187,7 +187,7 @@ async function callGroqAPI(prompt, requestData, model = CONFIG.groq.models.reaso
 PROCESSO DE RACIOCÍNIO OBRIGATÓRIO:
 1. ANÁLISE DO PERFIL: Examine detalhadamente cada preferência do viajante
 2. MAPEAMENTO DE COMPATIBILIDADE: Correlacione destinos com o perfil analisado  
-3. CONSIDERAÇÃO DE ORÇAMENTO: Considere o orçamento informado ao sugerir destinos
+3. CONSIDERAÇÃO DE ORÇAMENTO para passagens de ida e volta: Considere o orçamento informado ao sugerir destinos
 4. ANÁLISE CLIMÁTICA: Determine condições climáticas exatas para as datas
 5. PERSONALIZAÇÃO TRIPINHA: Adicione perspectiva autêntica da mascote cachorrinha
 
@@ -325,9 +325,9 @@ function gerarPromptParaGroq(dados) {
 
 ${infoViajante.orcamento !== 'flexível' ? `
 ⚠️ **ORIENTAÇÃO DE ORÇAMENTO:**
-- Considere destinos que sejam acessíveis dentro deste orçamento
-- NUNCA sugira cidades com orçamento menor que 70% do orçamento
-- NUNCA sugira cidades com orçamento maior que 120% do orçamento
+- Considere destinos que sejam acessíveis dentro deste orçamento para passagens de ida e volta
+- NUNCA sugira cidades com orçamento menor que 70% do orçamento para passagens de ida e volta
+- NUNCA sugira cidades com orçamento maior que 120% do orçamento para passagens de ida e volta
 - Leve em conta a cidade de origem (${infoViajante.cidadeOrigem}) ao avaliar distâncias
 ` : 
 '**ORÇAMENTO FLEXÍVEL** - Sugira destinos variados considerando diferentes faixas de custo'}
@@ -344,7 +344,7 @@ Analise profundamente:
 ### PASSO 2: CONSIDERAÇÃO GEOGRÁFICA E LOGÍSTICA
 - Avalie a distância a partir de ${infoViajante.cidadeOrigem}
 - Considere a facilidade de acesso e conexões disponíveis
-- Pense na relação custo-benefício considerando o orçamento ${infoViajante.orcamento !== 'flexível' ? `de ${infoViajante.orcamento} ${infoViajante.moeda}` : 'flexível'}
+- Pense na relação custo-benefício considerando o orçamento para passagens ${infoViajante.orcamento !== 'flexível' ? `de ${infoViajante.orcamento} ${infoViajante.moeda}` : 'flexível'}
 
 ### PASSO 3: MAPEAMENTO DE DESTINOS COMPATÍVEIS
 Para cada destino considerado, avalie:
