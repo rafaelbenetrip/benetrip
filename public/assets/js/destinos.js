@@ -808,251 +808,230 @@ const BENETRIP_DESTINOS = {
   },
   
   // Mostrar destino surpresa - APENAS DADOS DA LLM
-  // Função otimizada para mostrar destino surpresa com mais espaço para conteúdo
-mostrarDestinoSurpresa() {
-  if (!this.recomendacoes || !this.recomendacoes.surpresa) {
-    console.error('Destino surpresa não disponível');
-    return;
-  }
-  
-  const destino = this.recomendacoes.surpresa;
-  console.log('Mostrando destino surpresa otimizado:', destino);
-  
-  const modalContainer = document.createElement('div');
-  modalContainer.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto modal-surpresa-container';
-  modalContainer.id = 'modal-surpresa';
-  
-  modalContainer.innerHTML = `
-    <div class="bg-white rounded-lg w-full max-w-md relative transform transition-transform duration-500 modal-surpresa-content">
-      <!-- IMAGEM REDUZIDA: de h-48 para h-32 (economiza 64px) -->
-      <div class="relative">
-        <div class="h-32 bg-gray-200">
-          ${this.renderizarImagemComCreditos(
-            destino.imagens && destino.imagens.length > 0 ? destino.imagens[0] : null,
-            destino.destino,
-            'h-full w-full',
-            { isSurpriseDestination: true }
-          )}
+  mostrarDestinoSurpresa() {
+    if (!this.recomendacoes || !this.recomendacoes.surpresa) {
+      console.error('Destino surpresa não disponível');
+      return;
+    }
+    
+    const destino = this.recomendacoes.surpresa;
+    console.log('Mostrando destino surpresa (apenas dados da LLM):', destino);
+    
+    const modalContainer = document.createElement('div');
+    modalContainer.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto modal-surpresa-container';
+    modalContainer.id = 'modal-surpresa';
+    
+    modalContainer.innerHTML = `
+      <div class="bg-white rounded-lg w-full max-w-md relative max-h-[90vh] overflow-hidden transform transition-transform duration-500 modal-surpresa-content">
+        <!-- Imagem com banner e botão de fechar -->
+        <div class="relative">
+          <div class="h-48 bg-gray-200">
+            ${this.renderizarImagemComCreditos(
+              destino.imagens && destino.imagens.length > 0 ? destino.imagens[0] : null,
+              destino.destino,
+              'h-full w-full',
+              { isSurpriseDestination: true }
+            )}
+          </div>
+          
+          <button class="absolute top-2 right-2 z-10 w-8 h-8 flex items-center justify-center text-white bg-black bg-opacity-60 rounded-full hover:bg-opacity-80 transition-all" 
+                  onclick="document.getElementById('modal-surpresa').remove()">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
         </div>
         
-        <button class="absolute top-2 right-2 z-10 w-8 h-8 flex items-center justify-center text-white bg-black bg-opacity-60 rounded-full hover:bg-opacity-80 transition-all" 
-                onclick="document.getElementById('modal-surpresa').remove()">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
-      </div>
-      
-      <!-- TÍTULO COMPACTO -->
-      <div class="px-4 py-2 bg-white border-b border-gray-100">
-        <div class="flex justify-between items-center">
-          <h3 class="text-lg font-bold">${destino.destino}, ${destino.pais}</h3>
-          <span class="text-xs font-medium px-2 py-1 rounded-lg" style="background-color: #E0E0E0;">
-            ${destino.codigoPais || 'XX'}
-          </span>
+        <!-- Título do destino -->
+        <div class="p-4 bg-white">
+          <div class="flex justify-between items-center">
+            <h3 class="text-xl font-bold">${destino.destino}, ${destino.pais}</h3>
+            <span class="text-xs font-medium px-2 py-1 rounded-lg" style="background-color: #E0E0E0;">
+              ${destino.codigoPais || 'XX'}
+            </span>
+          </div>
         </div>
-      </div>
-      
-      <!-- SISTEMA DE ABAS COMPACTO -->
-      <div class="flex border-b border-gray-200 overflow-x-auto bg-white sticky top-0 z-10">
-        <button id="aba-surpresa-info" class="botao-aba aba-ativa px-3 py-2 text-xs font-medium whitespace-nowrap" onclick="BENETRIP_DESTINOS.trocarAbaSurpresa('info')">
-          📍 Visão Geral
-        </button>
-        <button id="aba-surpresa-pontos" class="botao-aba aba-inativa px-3 py-2 text-xs font-medium whitespace-nowrap" onclick="BENETRIP_DESTINOS.trocarAbaSurpresa('pontos')">
-          🎯 Pontos Turísticos
-        </button>
-        ${destino.clima && destino.clima.temperatura ? `
-          <button id="aba-surpresa-clima" class="botao-aba aba-inativa px-3 py-2 text-xs font-medium whitespace-nowrap" onclick="BENETRIP_DESTINOS.trocarAbaSurpresa('clima')">
-            🌤️ Clima
+        
+        <!-- Sistema de abas - APENAS SE DADOS DA LLM ESTIVEREM DISPONÍVEIS -->
+        <div class="flex border-b border-gray-200 overflow-x-auto">
+          <button id="aba-surpresa-info" class="botao-aba aba-ativa px-4 py-2 text-sm font-medium" onclick="BENETRIP_DESTINOS.trocarAbaSurpresa('info')">
+            Visão Geral
           </button>
-        ` : ''}
-        <button id="aba-surpresa-comentarios" class="botao-aba aba-inativa px-3 py-2 text-xs font-medium whitespace-nowrap" onclick="BENETRIP_DESTINOS.trocarAbaSurpresa('comentarios')">
-          💬 Comentários
-        </button>
-      </div>
-      
-      <!-- CONTÊINER SCROLLÁVEL OTIMIZADO -->
-      <div class="modal-content-container" style="max-height: calc(100vh - 220px); overflow-y: auto;">
+          <button id="aba-surpresa-pontos" class="botao-aba aba-inativa px-4 py-2 text-sm font-medium" onclick="BENETRIP_DESTINOS.trocarAbaSurpresa('pontos')">
+            Pontos Turísticos
+          </button>
+          ${destino.clima && destino.clima.temperatura ? `
+            <button id="aba-surpresa-clima" class="botao-aba aba-inativa px-4 py-2 text-sm font-medium" onclick="BENETRIP_DESTINOS.trocarAbaSurpresa('clima')">
+              Clima
+            </button>
+          ` : ''}
+          <button id="aba-surpresa-comentarios" class="botao-aba aba-inativa px-4 py-2 text-sm font-medium" onclick="BENETRIP_DESTINOS.trocarAbaSurpresa('comentarios')">
+            Comentários
+          </button>
+        </div>
         
         <!-- Conteúdo da aba Informações -->
-        <div id="conteudo-surpresa-info" class="conteudo-aba-surpresa p-4">
-          <div class="space-y-3">
-            <!-- Período da viagem - Card compacto -->
-            <div class="bg-blue-50 p-3 rounded-lg border border-blue-100">
-              <div class="flex items-center mb-1">
-                <span class="text-sm mr-2">🗓️</span>
-                <span class="font-medium text-sm">Período da Viagem</span>
-              </div>
-              <p class="text-sm font-medium">${this.obterDatasViagem()}</p>
+        <div id="conteudo-surpresa-info" class="conteudo-aba-surpresa p-4 overflow-y-auto" style="max-height: calc(90vh - 280px);">
+          <div class="bg-gray-50 p-3 rounded-lg">
+            <div class="flex items-center mb-2">
+              <span class="text-lg mr-2">✈️</span>
+              <span class="font-medium">Aeroporto</span>
             </div>
-            
-            <!-- Aeroporto - Card compacto -->
-            <div class="bg-gray-50 p-3 rounded-lg">
-              <div class="flex items-center mb-1">
-                <span class="text-sm mr-2">✈️</span>
-                <span class="font-medium text-sm">Aeroporto</span>
-              </div>
-              <p class="text-sm font-medium">${destino.aeroporto?.codigo || 'N/A'} - ${destino.aeroporto?.nome || `Aeroporto de ${destino.destino}`}</p>
-            </div>
-            
-            ${destino.porque ? `
-              <div class="bg-yellow-50 p-3 rounded-lg border border-yellow-100">
-                <div class="flex items-start">
-                  <span class="text-sm mr-2 mt-0.5">🎁</span>
-                  <div>
-                    <h4 class="font-medium text-sm mb-1">Por que este destino é especial:</h4>
-                    <p class="text-gray-800 text-sm leading-relaxed">${destino.porque}</p>
-                  </div>
-                </div>
-              </div>
-            ` : ''}
-            
-            ${destino.destaque ? `
-              <div class="bg-orange-50 p-3 rounded-lg border border-orange-100">
-                <div class="flex items-start">
-                  <span class="text-sm mr-2 mt-0.5">⭐</span>
-                  <div>
-                    <h4 class="font-medium text-sm mb-1">Destaque da experiência:</h4>
-                    <p class="text-gray-800 text-sm leading-relaxed">${destino.destaque}</p>
-                  </div>
-                </div>
-              </div>
-            ` : ''}
+            <p class="font-medium">${destino.aeroporto?.codigo || 'N/A'} - ${destino.aeroporto?.nome || `Aeroporto de ${destino.destino}`}</p>
           </div>
+          
+          <div class="mt-4 bg-gray-50 p-3 rounded-lg">
+            <div class="flex items-center mb-2">
+              <span class="text-lg mr-2">🗓️</span>
+              <span class="font-medium">Período da Viagem</span>
+            </div>
+            <p class="font-medium">${this.obterDatasViagem()}</p>
+          </div>
+          
+          ${destino.porque ? `
+            <div class="mt-4 bg-yellow-50 p-3 rounded-lg border border-yellow-100">
+              <div class="flex items-start">
+                <span class="text-lg mr-2">🎁</span>
+                <div>
+                  <h4 class="font-medium mb-1">Por que visitar:</h4>
+                  <p class="text-gray-800 text-sm">${destino.porque}</p>
+                </div>
+              </div>
+            </div>
+          ` : ''}
+          
+          ${destino.destaque ? `
+            <div class="mt-4">
+              <h4 class="font-medium mb-2">Destaque da experiência:</h4>
+              <p class="text-gray-800">${destino.destaque}</p>
+            </div>
+          ` : ''}
         </div>
         
         <!-- Conteúdo da aba Pontos Turísticos -->
-        <div id="conteudo-surpresa-pontos" class="conteudo-aba-surpresa p-4 hidden">
-          <div class="space-y-3">
-            ${destino.pontosTuristicos && destino.pontosTuristicos.length > 0 ? 
-              destino.pontosTuristicos.map((ponto, idx) => {
-                const imagem = this.encontrarImagemParaPontoTuristico(destino.imagens, ponto, idx);
-                return `
-                  <div class="bg-white border border-gray-200 rounded-lg p-3 shadow-sm">
-                    <div class="flex items-center mb-2">
-                      <span class="flex items-center justify-center w-6 h-6 rounded-full mr-2 text-white text-xs font-bold" style="background-color: #00A3E0;">${idx + 1}</span>
-                      <h5 class="font-medium text-sm">${ponto}</h5>
-                    </div>
-                    
-                    ${imagem ? `
-                      <div class="ml-8 rounded-lg overflow-hidden h-24 mt-2">
-                        ${this.renderizarImagemComCreditos(imagem, ponto, 'h-full w-full', { showPontoTuristico: false })}
-                      </div>
-                    ` : ''}
+        <div id="conteudo-surpresa-pontos" class="conteudo-aba-surpresa p-4 overflow-y-auto hidden" style="max-height: calc(90vh - 280px);">
+          ${destino.pontosTuristicos && destino.pontosTuristicos.length > 0 ? 
+            destino.pontosTuristicos.map((ponto, idx) => {
+              const imagem = this.encontrarImagemParaPontoTuristico(destino.imagens, ponto, idx);
+              return `
+                <div class="bg-white border border-gray-200 rounded-lg p-3 mb-3 shadow-sm">
+                  <div class="flex items-center">
+                    <span class="flex items-center justify-center w-8 h-8 rounded-full mr-3 text-white font-bold" style="background-color: #00A3E0;">${idx + 1}</span>
+                    <h5 class="font-medium">${ponto}</h5>
                   </div>
-                `;
-              }).join('') : 
-              '<div class="text-center py-8"><p class="text-gray-500 text-sm">Informações sobre pontos turísticos não disponíveis</p></div>'
-            }
-          </div>
+                  
+                  ${imagem ? `
+                    <div class="mt-2 ml-11 rounded-lg overflow-hidden h-28">
+                      ${this.renderizarImagemComCreditos(imagem, ponto, 'h-full w-full', { showPontoTuristico: false })}
+                    </div>
+                  ` : ''}
+                </div>
+              `;
+            }).join('') : 
+            '<p class="text-center text-gray-500 my-6">Informações sobre pontos turísticos não disponíveis</p>'
+          }
         </div>
         
         ${destino.clima && destino.clima.temperatura ? `
-          <!-- Conteúdo da aba Clima -->
-          <div id="conteudo-surpresa-clima" class="conteudo-aba-surpresa p-4 hidden">
-            <div class="space-y-3">
-              <!-- Card principal do clima -->
-              <div class="text-center bg-blue-50 p-4 rounded-lg border border-blue-100">
-                <h4 class="font-medium text-base mb-2">Clima durante sua viagem</h4>
-                <div class="text-3xl mb-2">🌤️</div>
-                
-                ${destino.clima.estacao ? `
-                  <p class="text-base font-bold mb-1">${destino.clima.estacao}</p>
-                ` : ''}
-                
-                ${destino.clima.temperatura ? `
-                  <p class="text-sm text-gray-600">${destino.clima.temperatura}</p>
-                ` : ''}
-                
-                ${destino.clima.condicoes ? `
-                  <p class="text-sm text-gray-600 mt-1">${destino.clima.condicoes}</p>
-                ` : ''}
-              </div>
+          <!-- Conteúdo da aba Clima - APENAS DADOS DA LLM -->
+          <div id="conteudo-surpresa-clima" class="conteudo-aba-surpresa p-4 overflow-y-auto hidden" style="max-height: calc(90vh - 280px);">
+            <div class="text-center bg-blue-50 p-4 rounded-lg">
+              <h4 class="font-medium text-lg mb-2">Clima durante sua viagem</h4>
+              <div class="text-4xl mb-2">🌤️</div>
               
-              ${destino.clima.recomendacoes ? `
-                <div class="bg-white border border-gray-200 rounded-lg p-3">
-                  <h5 class="font-medium mb-2 text-sm">☂️ Recomendações:</h5>
-                  ${Array.isArray(destino.clima.recomendacoes) ? 
-                    `<ul class="list-disc pl-4 text-sm text-gray-700 space-y-1">
-                      ${destino.clima.recomendacoes.map(rec => `<li>${rec}</li>`).join('')}
-                    </ul>` :
-                    `<p class="text-sm text-gray-700">${destino.clima.recomendacoes}</p>`
-                  }
-                </div>
+              ${destino.clima.estacao ? `
+                <p class="text-lg font-bold">${destino.clima.estacao}</p>
               ` : ''}
               
-              <div class="bg-green-50 p-3 rounded-lg border border-green-200">
-                <div class="flex items-center">
-                  <span class="text-sm mr-2">🤖</span>
-                  <span class="text-xs font-medium text-green-800">Informações climáticas da IA especializada</span>
-                </div>
+              ${destino.clima.temperatura ? `
+                <p class="text-sm text-gray-600 mt-2">Temperatura: ${destino.clima.temperatura}</p>
+              ` : ''}
+              
+              ${destino.clima.condicoes ? `
+                <p class="text-sm text-gray-600 mt-1">${destino.clima.condicoes}</p>
+              ` : ''}
+            </div>
+            
+            ${destino.clima.recomendacoes ? `
+              <div class="mt-4 bg-white border border-gray-200 rounded-lg p-3">
+                <h5 class="font-medium mb-2">Recomendações:</h5>
+                ${Array.isArray(destino.clima.recomendacoes) ? 
+                  `<ul class="list-disc pl-5 text-sm text-gray-700 space-y-1">
+                    ${destino.clima.recomendacoes.map(rec => `<li>${rec}</li>`).join('')}
+                  </ul>` :
+                  `<p class="text-sm text-gray-700">${destino.clima.recomendacoes}</p>`
+                }
+              </div>
+            ` : ''}
+            
+            <div class="mt-4 bg-green-50 p-3 rounded-lg border border-green-200">
+              <div class="flex items-center">
+                <span class="text-lg mr-2">🤖</span>
+                <span class="text-sm font-medium text-green-800">Informações climáticas fornecidas pela IA especializada</span>
               </div>
             </div>
           </div>
         ` : ''}
         
         <!-- Conteúdo da aba Comentários -->
-        <div id="conteudo-surpresa-comentarios" class="conteudo-aba-surpresa p-4 hidden">
-          <div class="space-y-3">
-            ${destino.comentario ? `
-              <div class="bg-gray-50 p-3 rounded-lg">
-                <div class="flex items-start gap-3">
-                  <div class="w-8 h-8 rounded-full overflow-hidden flex-shrink-0 bg-orange-100 border-2 border-orange-200">
-                    <img src="assets/images/tripinha/avatar-normal.png" alt="Tripinha" class="w-full h-full object-cover" onerror="this.src='https://placehold.co/60x60?text=🐶'">
-                  </div>
-                  <div>
-                    <p class="font-medium text-xs mb-1">Minha experiência em ${destino.destino}:</p>
-                    <p class="italic text-sm">"${destino.comentario}"</p>
-                  </div>
-                </div>
-              </div>
-            ` : `
-              <div class="bg-gray-50 p-4 rounded-lg text-center">
-                <div class="w-10 h-10 rounded-full overflow-hidden mx-auto mb-2 bg-orange-100 border-2 border-orange-200">
+        <div id="conteudo-surpresa-comentarios" class="conteudo-aba-surpresa p-4 overflow-y-auto hidden" style="max-height: calc(90vh - 280px);">
+          ${destino.comentario ? `
+            <div class="bg-gray-50 p-4 rounded-lg">
+              <div class="flex items-start gap-3">
+                <div class="w-10 h-10 rounded-full overflow-hidden flex-shrink-0 bg-orange-100 border-2 border-orange-200">
                   <img src="assets/images/tripinha/avatar-normal.png" alt="Tripinha" class="w-full h-full object-cover" onerror="this.src='https://placehold.co/60x60?text=🐶'">
                 </div>
-                <p class="text-gray-500 text-sm">A Tripinha ainda não visitou este destino, mas está animada para descobrir junto com você! 🐾✨</p>
+                <div>
+                  <p class="font-medium text-sm mb-1">Minha experiência em ${destino.destino}:</p>
+                  <p class="italic">"${destino.comentario}"</p>
+                </div>
               </div>
-            `}
-            
-            ${destino.eventos && destino.eventos.length > 0 ? `
-              <div class="bg-yellow-50 p-3 rounded-lg border border-yellow-100">
-                <h4 class="font-medium mb-2 text-sm">🎉 Eventos especiais durante sua viagem:</h4>
-                <ul class="list-disc pl-4 text-sm text-gray-700 space-y-1">
-                  ${destino.eventos.map(evento => `<li>${evento}</li>`).join('')}
-                </ul>
+            </div>
+          ` : `
+            <div class="bg-gray-50 p-4 rounded-lg text-center">
+              <div class="w-10 h-10 rounded-full overflow-hidden mx-auto mb-2 bg-orange-100 border-2 border-orange-200">
+                <img src="assets/images/tripinha/avatar-normal.png" alt="Tripinha" class="w-full h-full object-cover" onerror="this.src='https://placehold.co/60x60?text=🐶'">
               </div>
-            ` : ''}
-          </div>
+              <p class="text-gray-500">A Tripinha ainda não visitou este destino, mas está animada para descobrir junto com você! 🐾✨</p>
+            </div>
+          `}
+          
+          ${destino.eventos && destino.eventos.length > 0 ? `
+            <div class="mt-4 bg-yellow-50 p-4 rounded-lg">
+              <h4 class="font-medium mb-2">Eventos especiais durante sua viagem:</h4>
+              <ul class="list-disc pl-5 text-sm text-gray-700 space-y-1">
+                ${destino.eventos.map(evento => `<li>${evento}</li>`).join('')}
+              </ul>
+            </div>
+          ` : ''}
+        </div>
+        
+        <!-- Botões de ação -->
+        <div class="p-4 border-t border-gray-200">
+          <button class="btn-selecionar-destino w-full font-bold py-3 px-4 rounded-lg text-white transition-colors duration-200 hover:opacity-90 mb-2" 
+            style="background-color: #00A3E0;" 
+            data-destino="${destino.destino}"
+            onclick="document.getElementById('modal-surpresa').remove()">
+            Quero Este Destino Surpresa!
+          </button>
+          
+          <button class="w-full font-medium py-2.5 px-4 rounded-lg border border-gray-300 transition-colors duration-200 hover:bg-gray-100" 
+            onclick="document.getElementById('modal-surpresa').remove()">
+            Voltar às Sugestões
+          </button>
         </div>
       </div>
-      
-      <!-- BOTÕES DE AÇÃO FIXOS NO RODAPÉ -->
-      <div class="p-4 border-t border-gray-200 bg-white sticky bottom-0">
-        <button class="btn-selecionar-destino w-full font-bold py-2.5 px-4 rounded-lg text-white transition-colors duration-200 hover:opacity-90 mb-2" 
-          style="background-color: #00A3E0;" 
-          data-destino="${destino.destino}"
-          onclick="document.getElementById('modal-surpresa').remove()">
-          🎯 Quero Este Destino Surpresa!
-        </button>
-        
-        <button class="w-full font-medium py-2 px-4 rounded-lg border border-gray-300 transition-colors duration-200 hover:bg-gray-100 text-sm" 
-          onclick="document.getElementById('modal-surpresa').remove()">
-          ← Voltar às Sugestões
-        </button>
-      </div>
-    </div>
-  `;
-  
-  document.body.appendChild(modalContainer);
-  
-  // Fechar modal ao clicar fora
-  modalContainer.addEventListener('click', function(e) {
-    if (e.target === this) {
-      this.remove();
-    }
-  });
-},
+    `;
+    
+    document.body.appendChild(modalContainer);
+    
+    // Fechar modal ao clicar fora
+    modalContainer.addEventListener('click', function(e) {
+      if (e.target === this) {
+        this.remove();
+      }
+    });
+  },
   
   // Selecionar um destino
   selecionarDestino(nomeDestino) {
