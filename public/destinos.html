@@ -35,6 +35,30 @@
         border-bottom: 2px solid transparent;
       }
       
+      /* Modal surpresa com scroll livre */
+      .modal-surpresa-container {
+        padding: 1rem !important;
+        overflow-y: auto !important;
+        align-items: flex-start !important;
+      }
+      
+      .modal-surpresa-content {
+        max-height: none !important;
+        overflow: visible !important;
+        margin: 2rem auto !important;
+        position: relative;
+      }
+      
+      .conteudo-aba-surpresa {
+        max-height: none !important;
+        overflow: visible !important;
+      }
+      
+      /* Garantir que o body permita scroll quando modal estiver aberto */
+      body:has(.modal-surpresa-container) {
+        overflow: auto !important;
+      }
+      
       /* Animações e transições */
       .transition-all {
         transition-property: all;
@@ -64,6 +88,18 @@
       @media (max-width: 479px) {
         #destinos-alternativos .grid {
           grid-template-columns: 1fr;
+        }
+        
+        /* Em mobile, garantir ainda mais que o modal seja scrollável */
+        .modal-surpresa-container {
+          align-items: flex-start !important;
+          justify-content: center !important;
+          padding: 0.5rem !important;
+        }
+        
+        .modal-surpresa-content {
+          margin: 1rem auto !important;
+          width: calc(100% - 1rem) !important;
         }
       }
     </style>
