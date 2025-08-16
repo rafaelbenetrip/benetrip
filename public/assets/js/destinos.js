@@ -1,4 +1,3 @@
-
 /**
  * BENETRIP - Visualização de Destinos Recomendados 
  * Versão 5.0 - SEM FALLBACKS DE CLIMA - Apenas dados da LLM
@@ -823,7 +822,7 @@ const BENETRIP_DESTINOS = {
     modalContainer.id = 'modal-surpresa';
     
     modalContainer.innerHTML = `
-      <div class="bg-white rounded-lg w-full max-w-md relative max-h-[90vh] overflow-y-auto transform transition-transform duration-500 modal-surpresa-content">
+      <div class="bg-white rounded-lg w-full max-w-md relative max-h-[90vh] overflow-hidden transform transition-transform duration-500 modal-surpresa-content">
         <!-- Imagem com banner e botão de fechar -->
         <div class="relative">
           <div class="h-48 bg-gray-200">
@@ -872,7 +871,7 @@ const BENETRIP_DESTINOS = {
         </div>
         
         <!-- Conteúdo da aba Informações -->
-        <div id="conteudo-surpresa-info" class="conteudo-aba-surpresa p-4">
+        <div id="conteudo-surpresa-info" class="conteudo-aba-surpresa p-4 overflow-y-auto" style="max-height: calc(90vh - 280px);">
           <div class="bg-gray-50 p-3 rounded-lg">
             <div class="flex items-center mb-2">
               <span class="text-lg mr-2">✈️</span>
