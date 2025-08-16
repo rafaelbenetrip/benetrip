@@ -1,5 +1,5 @@
 // api/recommendations.js - Endpoint da API Vercel para recomendações de destino
-// Versão 8.1 - ENHANCED - Limite ajustado para viagens rodoviárias (700km/10h)
+// Versão 8.2 - GROQ API FIX - Parâmetro reasoner_enabled removido
 const axios = require('axios');
 const http = require('http');
 const https = require('https');
@@ -11,9 +11,9 @@ const CONFIG = {
   groq: {
     baseURL: 'https://api.groq.com/openai/v1',
     models: {
-      reasoning: 'openai/gpt-oss-120b',     // Reasoning principal
-      personality: 'llama-3.3-70b-versatile',         // Personalidade Tripinha
-      fast: 'llama-3.1-8b-instant',                   // Backup rápido
+      reasoning: 'openai/gpt-oss-120b',                  // Reasoning principal
+      personality: 'llama-3.3-70b-versatile',          // Personalidade Tripinha
+      fast: 'llama-3.1-8b-instant',                    // Backup rápido
       toolUse: 'llama3-groq-70b-8192-tool-use-preview' // APIs futuras
     },
     timeout: 180000,     // 3 minutos para reasoning
@@ -248,7 +248,19 @@ function obterNomeRodoviariaPadrao(cidade) {
     'Águas de Lindóia': 'Rodoviária de Águas de Lindóia',
     'Holambra': 'Terminal Rodoviário de Holambra',
     'Penedo': 'Rodoviária de Penedo',
-    'Pirenópolis': 'Terminal Rodoviário de Pirenópolis'
+    'Pirenópolis': 'Terminal Rodoviário de Pirenópolis',
+    
+    // Cidades do Equador para viagens rodoviárias
+    'Quito': 'Terminal Terrestre de Quitumbe',
+    'Guayaquil': 'Terminal Terrestre de Guayaquil',
+    'Cuenca': 'Terminal Terrestre de Cuenca',
+    'Baños': 'Terminal de Baños de Agua Santa',
+    'Riobamba': 'Terminal Terrestre de Riobamba',
+    'Ambato': 'Terminal Terrestre de Ambato',
+    'Latacunga': 'Terminal de Latacunga',
+    'Otavalo': 'Terminal de Otavalo',
+    'Manta': 'Terminal Terrestre de Manta',
+    'Esmeraldas': 'Terminal Terrestre de Esmeraldas'
   };
   
   const nomeLower = cidade.toLowerCase();
@@ -258,11 +270,11 @@ function obterNomeRodoviariaPadrao(cidade) {
   }
   
   // Fallback genérico
-  return `Terminal Rodoviário de ${cidade}`;
+  return `Terminal Terrestre de ${cidade}`;
 }
 
 // =======================
-// Função para chamada ao Groq - REASONING OPTIMIZED
+// Função para chamada ao Groq - CORRIGIDA (sem reasoner_enabled)
 // =======================
 async function callGroqAPI(prompt, requestData, model = CONFIG.groq.models.reasoning) {
   const apiKey = process.env.GROQ_API_KEY;
@@ -336,10 +348,8 @@ RETORNE APENAS JSON VÁLIDO sem formatação markdown.`;
       stream: false
     };
     
-    // Adicionar parâmetros específicos para DeepSeek R1
-    if (model === CONFIG.groq.models.reasoning) {
-      requestPayload.reasoner_enabled = true;
-    }
+    // CORREÇÃO: Removido parâmetro reasoner_enabled que não é suportado pela API do Groq
+    // O modelo openai/gpt-oss-120b funciona como qualquer outro modelo na API do Groq
     
     const response = await apiClient({
       method: 'post',
@@ -432,7 +442,7 @@ function gerarPromptParaGroq(dados) {
 - APENAS destinos acessíveis por ÔNIBUS a partir de ${infoViajante.cidadeOrigem}
 - **DISTÂNCIA MÁXIMA: 700 QUILÔMETROS**
 - **TEMPO MÁXIMO DE VIAGEM: 10 HORAS DE ÔNIBUS**
-- Priorize destinos dentro do mesmo estado ou estados vizinhos
+- Priorize destinos dentro do mesmo país ou regiões próximas
 - Considere o conforto da viagem de ônibus para ${infoViajante.companhia}
 - Sugira destinos onde o valor das passagens de ônibus caiba no orçamento
 
@@ -489,8 +499,8 @@ Para cada destino, adicione:
   },
   "topPick": {
     "destino": "Nome da Cidade",
-    "pais": "Brasil", 
-    "codigoPais": "BR",
+    "pais": "País", 
+    "codigoPais": "XX",
     "distanciaRodoviaria": "XXX km (MÁXIMO 700km)",
     "tempoViagem": "X horas de ônibus (MÁXIMO 10h)",
     "justificativa": "Por que este destino próximo é PERFEITO para viagem de ônibus",
@@ -518,8 +528,8 @@ Para cada destino, adicione:
   "alternativas": [
     {
       "destino": "Nome da Cidade",
-      "pais": "Brasil",
-      "codigoPais": "BR",
+      "pais": "País",
+      "codigoPais": "XX",
       "distanciaRodoviaria": "XXX km (≤ 700km)",
       "tempoViagem": "X horas (≤ 10h)",
       "porque": "Razão para esta alternativa rodoviária próxima",
@@ -537,8 +547,8 @@ Para cada destino, adicione:
   ],
   "surpresa": {
     "destino": "Cidade Surpresa Rodoviária",
-    "pais": "Brasil",
-    "codigoPais": "BR",
+    "pais": "País",
+    "codigoPais": "XX",
     "distanciaRodoviaria": "XXX km (MÁXIMO 700km)",
     "tempoViagem": "X horas (MÁXIMO 10h)",
     "justificativa": "Por que é uma surpresa perfeita de ônibus",
@@ -925,7 +935,7 @@ module.exports = async function handler(req, res) {
   }
 
   try {
-    console.log('🚌✈️ === BENETRIP GROQ API v8.1 - LIMITES AJUSTADOS ===');
+    console.log('🚌✈️ === BENETRIP GROQ API v8.2 - GROQ API FIXED ===');
     
     if (!req.body) {
       isResponseSent = true;
@@ -1004,7 +1014,7 @@ module.exports = async function handler(req, res) {
       dados.metadados = {
         modelo: modeloUsado,
         provider: 'groq',
-        versao: '8.1-limits-adjusted',
+        versao: '8.2-groq-api-fixed',
         timestamp: new Date().toISOString(),
         reasoning_enabled: modeloUsado === CONFIG.groq.models.reasoning,
         origem: requestData.cidade_partida?.name || requestData.cidade_partida,
