@@ -818,3 +818,34 @@ h3 {
 .image-container a.absolute svg {
   color: #333;
 }
+
+/* Melhorias para o modal de destino surpresa com scroll contínuo */
+.modal-surpresa-content {
+  display: flex;
+  flex-direction: column;
+  max-height: 90vh;
+}
+
+.modal-surpresa-content .flex-1 {
+  flex: 1;
+  min-height: 0; /* Importante para flexbox funcionar corretamente */
+}
+
+.modal-surpresa-content .flex-shrink-0 {
+  flex-shrink: 0;
+}
+
+/* Garantir que as abas não quebrem em telas pequenas */
+.botao-aba.whitespace-nowrap {
+  white-space: nowrap;
+}
+
+/* Smooth scroll para o conteúdo */
+.modal-surpresa-content .overflow-y-auto {
+  scroll-behavior: smooth;
+}
+
+/* Melhorar a área de scroll em dispositivos móveis */
+.modal-surpresa-content .overflow-y-auto {
+  -webkit-overflow-scrolling: touch;
+}
