@@ -483,9 +483,10 @@ Selecione APENAS destinos dentro do limite de 700km/10h:
 
 ### PASSO 6: PERSONALIZAÇÃO TRIPINHA 🐾
 Para cada destino, adicione:
-- Comentário sobre a viagem de ônibus pela Tripinha
-- Dicas sobre as rodoviárias
-- Experiências nas paradas do trajeto
+- Comentário em 1ª pessoa sobre SUA experiência no local (não sobre a viagem)
+- Detalhes sensoriais que uma cachorrinha notaria no destino (sons, cheiros, texturas)
+- Dicas práticas baseadas nas "aventuras" da Tripinha no local
+- Pontos turísticos específicos que ela "visitou"
 
 ## 📋 FORMATO DE RESPOSTA (JSON ESTRUTURADO):
 
@@ -507,12 +508,12 @@ Para cada destino, adicione:
     "descricao": "Descrição do destino",
     "porque": "Razões específicas para esta recomendação rodoviária",
     "destaque": "Experiência única do destino",
-    "comentario": "Comentário da Tripinha: 'Adorei a viagem de ônibus para [destino]! São apenas X horas, super tranquilo! 🚌🐾'",
+    "comentario": "Comentário entusiasmado da Tripinha em 1ª pessoa: 'Eu adorei quando visitei [destino]! O cheiro de... me deixou maluca! 🐾'",
     "pontosTuristicos": [
       "Ponto turístico 1",
       "Ponto turístico 2"
     ],
-    "dicasRodoviarias": "Dicas sobre a viagem de ônibus e rodoviárias",
+    "dicasTransporte": "Dicas sobre a viagem de ônibus e rodoviárias (informação técnica)",
     "empresasOnibus": ["Empresa 1", "Empresa 2"],
     "clima": {
       "estacao": "Estação durante a viagem",
@@ -555,7 +556,7 @@ Para cada destino, adicione:
     "descricao": "Descrição",
     "porque": "Razões",
     "destaque": "Experiência única",
-    "comentario": "Tripinha: 'Que aventura de ônibus tranquila! Apenas X horas! 🚌🐾'",
+    "comentario": "Comentário empolgado da Tripinha: 'Nossa, quando cheguei em [destino], não esperava que... 🐾'",
     "pontosTuristicos": ["Ponto 1", "Ponto 2"],
     "clima": {
       "estacao": "Estação",
