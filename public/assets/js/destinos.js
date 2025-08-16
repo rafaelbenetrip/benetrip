@@ -818,11 +818,13 @@ const BENETRIP_DESTINOS = {
     console.log('Mostrando destino surpresa (apenas dados da LLM):', destino);
     
     const modalContainer = document.createElement('div');
-    modalContainer.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto modal-surpresa-container';
+    modalContainer.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-start z-50 modal-surpresa-container';
     modalContainer.id = 'modal-surpresa';
+    modalContainer.style.overflowY = 'auto';
+    modalContainer.style.padding = '1rem 0';
     
     modalContainer.innerHTML = `
-      <div class="bg-white rounded-lg w-full max-w-md relative max-h-[90vh] overflow-hidden transform transition-transform duration-500 modal-surpresa-content">
+      <div class="bg-white rounded-lg w-full max-w-md relative mx-auto my-4 transform transition-transform duration-500 modal-surpresa-content">
         <!-- Imagem com banner e botão de fechar -->
         <div class="relative">
           <div class="h-48 bg-gray-200">
@@ -871,7 +873,7 @@ const BENETRIP_DESTINOS = {
         </div>
         
         <!-- Conteúdo da aba Informações -->
-        <div id="conteudo-surpresa-info" class="conteudo-aba-surpresa p-4 overflow-y-auto" style="max-height: calc(90vh - 280px);">
+        <div id="conteudo-surpresa-info" class="conteudo-aba-surpresa p-4">
           <div class="bg-gray-50 p-3 rounded-lg">
             <div class="flex items-center mb-2">
               <span class="text-lg mr-2">✈️</span>
@@ -909,7 +911,7 @@ const BENETRIP_DESTINOS = {
         </div>
         
         <!-- Conteúdo da aba Pontos Turísticos -->
-        <div id="conteudo-surpresa-pontos" class="conteudo-aba-surpresa p-4 overflow-y-auto hidden" style="max-height: calc(90vh - 280px);">
+        <div id="conteudo-surpresa-pontos" class="conteudo-aba-surpresa p-4 hidden">
           ${destino.pontosTuristicos && destino.pontosTuristicos.length > 0 ? 
             destino.pontosTuristicos.map((ponto, idx) => {
               const imagem = this.encontrarImagemParaPontoTuristico(destino.imagens, ponto, idx);
@@ -934,7 +936,7 @@ const BENETRIP_DESTINOS = {
         
         ${destino.clima && destino.clima.temperatura ? `
           <!-- Conteúdo da aba Clima - APENAS DADOS DA LLM -->
-          <div id="conteudo-surpresa-clima" class="conteudo-aba-surpresa p-4 overflow-y-auto hidden" style="max-height: calc(90vh - 280px);">
+          <div id="conteudo-surpresa-clima" class="conteudo-aba-surpresa p-4 hidden">
             <div class="text-center bg-blue-50 p-4 rounded-lg">
               <h4 class="font-medium text-lg mb-2">Clima durante sua viagem</h4>
               <div class="text-4xl mb-2">🌤️</div>
@@ -974,7 +976,7 @@ const BENETRIP_DESTINOS = {
         ` : ''}
         
         <!-- Conteúdo da aba Comentários -->
-        <div id="conteudo-surpresa-comentarios" class="conteudo-aba-surpresa p-4 overflow-y-auto hidden" style="max-height: calc(90vh - 280px);">
+        <div id="conteudo-surpresa-comentarios" class="conteudo-aba-surpresa p-4 hidden">
           ${destino.comentario ? `
             <div class="bg-gray-50 p-4 rounded-lg">
               <div class="flex items-start gap-3">
