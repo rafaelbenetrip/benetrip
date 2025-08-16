@@ -419,7 +419,7 @@ function gerarPromptParaGroq(dados) {
 
 ⚠️ **IMPORTANTE - VIAGEM RODOVIÁRIA:**
 - APENAS destinos acessíveis por ÔNIBUS a partir de ${infoViajante.cidadeOrigem}
-- Considere distâncias de até 1.500km (viagens de até 24 horas de ônibus)
+- Considere distâncias de até 750km (viagens de até 12 horas de ônibus)
 - Priorize destinos dentro do mesmo país ou países vizinhos
 - Considere o conforto da viagem de ônibus para ${infoViajante.companhia}
 - Sugira destinos onde o valor das passagens de ônibus caiba no orçamento
@@ -436,7 +436,7 @@ Analise profundamente:
 - Avalie destinos alcançáveis por ônibus a partir de ${infoViajante.cidadeOrigem}
 - Considere a qualidade das estradas e empresas de ônibus
 - Pense em paradas interessantes durante o trajeto
-- Calcule tempo total de viagem (máximo 24 horas por trecho)
+- Calcule tempo total de viagem (máximo 12 horas por trecho)
 
 ### PASSO 3: MAPEAMENTO DE DESTINOS RODOVIÁRIOS
 Para cada destino considerado, avalie:
@@ -459,9 +459,9 @@ Selecione:
 
 ### PASSO 6: PERSONALIZAÇÃO TRIPINHA 🐾
 Para cada destino, adicione:
-- Comentário sobre a viagem de ônibus pela Tripinha
-- Dicas sobre as rodoviárias
-- Experiências nas paradas do trajeto
+- Comentário sobre a viagem pela Tripinha
+- Dicas sobre o destino
+- Experiências vividas pela Tripinha quando passou por lá
 
 ## 📋 FORMATO DE RESPOSTA (JSON ESTRUTURADO):
 
