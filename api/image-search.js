@@ -543,13 +543,13 @@ function getPlaceholderImages(query, options = {}) {
     success: true,
     images: [
       {
-        url: `https://via.placeholder.com/${width}x${height}.png?text=${encodeURIComponent(placeholderText)}`,
+        url: `/assets/images/tripinha/tripinha_placeholder.png`,
         source: "placeholder",
         photographer: "Placeholder",
         photographerId: "placeholder",
         photographerUrl: "#",
         sourceUrl: "#",
-        downloadUrl: `https://via.placeholder.com/${width}x${height}.png?text=${encodeURIComponent(placeholderText)}`,
+        downloadUrl: `/assets/images/tripinha/tripinha_placeholder.png`,
         alt: placeholderText,
         pontoTuristico: (classificacao.tipo === 'ponto_turistico_especifico' ||
                          classificacao.tipo === 'ponto_turistico_conhecido' ||
@@ -557,13 +557,13 @@ function getPlaceholderImages(query, options = {}) {
                          ? classificacao.termo : null
       },
       {
-        url: `https://via.placeholder.com/${width}x${height}.png?text=${encodeURIComponent(placeholderText + ' - Vista 2')}`,
+        url: `/assets/images/tripinha/tripinha_placeholder.png`,
         source: "placeholder",
         photographer: "Placeholder",
         photographerId: "placeholder",
         photographerUrl: "#",
         sourceUrl: "#",
-        downloadUrl: `https://via.placeholder.com/${width}x${height}.png?text=${encodeURIComponent(placeholderText)}`,
+        downloadUrl: `/assets/images/tripinha/tripinha_placeholder.png`,
         alt: `${placeholderText} - Vista alternativa`,
         pontoTuristico: (classificacao.tipo === 'ponto_turistico_especifico' ||
                          classificacao.tipo === 'ponto_turistico_conhecido' ||
