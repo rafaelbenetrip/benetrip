@@ -724,7 +724,7 @@ h3 {
 .modal-surpresa-content {
   display: flex;
   flex-direction: column;
-  max-height: 90vh !important;
+  max-height: 95vh !important;
   overflow: hidden !important;
 }
 
@@ -817,4 +817,65 @@ h3 {
 /* Garantir que o ícone fique visível em imagens claras */
 .image-container a.absolute svg {
   color: #333;
+}
+
+/* ===== MODAL DE DESTINO SURPRESA - SCROLL ADAPTATIVO ===== */
+
+/* Container principal do modal com altura flexível */
+.modal-surpresa-content {
+  display: flex;
+  flex-direction: column;
+  max-height: 95vh !important; /* Aumentar altura máxima */
+  overflow: hidden;
+}
+
+/* Seção de imagem com altura mais controlada */
+.modal-surpresa-content .destino-imagem {
+  flex-shrink: 0; /* Não permitir que a imagem seja comprimida */
+  max-height: 35vh; /* Limitar altura da imagem a 35% da viewport */
+  min-height: 180px; /* Altura mínima para manter proporção */
+}
+
+/* Sistema de abas fixo */
+.modal-surpresa-content .abas-surpresa {
+  flex-shrink: 0;
+  background-color: white;
+  border-bottom: 1px solid #e5e7eb;
+  z-index: 15;
+}
+
+/* Conteúdo das abas com scroll dinâmico */
+.conteudo-aba-surpresa {
+  flex: 1; /* Ocupar espaço restante disponível */
+  overflow-y: auto;
+  padding: 16px;
+  min-height: 0; /* Permitir que flex funcione corretamente */
+}
+
+/* Botões de ação fixos na parte inferior */
+.modal-surpresa-content .acoes-modal {
+  flex-shrink: 0;
+  border-top: 1px solid #e5e7eb;
+  background-color: white;
+}
+
+/* Melhorar o scroll em dispositivos móveis */
+.conteudo-aba-surpresa {
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
+}
+
+/* Ajustar altura da imagem responsivamente */
+@media (max-height: 600px) {
+  .modal-surpresa-content .destino-imagem {
+    max-height: 25vh;
+    min-height: 120px;
+  }
+}
+
+@media (min-height: 800px) {
+  .modal-surpresa-content .destino-imagem {
+    max-height: 40vh;
+    min-height: 200px;
+  }
 }
