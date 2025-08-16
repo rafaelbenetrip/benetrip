@@ -8,7 +8,7 @@ window.BENETRIP_IMAGES = {
   // Configurações do serviço
   config: {
     // URLs base para imagens de fallback
-    placeholderUrl: 'https://via.placeholder.com/',
+    placeholderUrl: 'assets/images/tripinha/tripinha_placeholder.png',
     unsplashBaseUrl: 'https://source.unsplash.com/featured/',
     googleBaseUrl: 'https://source.unsplash.com/featured/', // URL de fallback enquanto não usa diretamente a API
     // Tempo máximo para verificar se uma imagem existe
@@ -388,12 +388,12 @@ window.BENETRIP_IMAGES = {
       imgElement.src = `${this.config.unsplashBaseUrl}?${encodeURIComponent(query)}`;
       imgElement.onerror = () => {
         // Se Unsplash falhar, usar placeholder
-        imgElement.src = `${this.config.placeholderUrl}${size}?text=${encodeURIComponent(query)}`;
+        imgElement.src = this.config.placeholderUrl;
       };
-    } catch (error) {
-      console.error('Erro ao aplicar fallback de imagem:', error);
-      imgElement.src = `${this.config.placeholderUrl}${size}?text=${encodeURIComponent(alt)}`;
-    }
+} catch (error) {
+  console.error('Erro ao aplicar fallback de imagem:', error);
+  imgElement.src = this.config.placeholderUrl;
+}
   },
   
   // Verificar se uma imagem existe e pode ser carregada
@@ -482,14 +482,9 @@ window.BENETRIP_IMAGES = {
       return unsplashUrl;
     }
     
-    // Último recurso: placeholder
-    const placeholderText = pontoTuristico 
-                          ? `${pontoTuristico} em ${destination.destino}` 
-                          : destination.destino;
-    
-    const placeholderUrl = `${this.config.placeholderUrl}${this.config.sizes[size]}?text=${encodeURIComponent(placeholderText)}`;
-    return placeholderUrl;
-  },
+
+// Último recurso: placeholder fixo
+return this.config.placeholderUrl;
   
   // Renderiza uma imagem com créditos e ponto turístico (quando disponível)
   renderImageWithCredits(imageData, container, options = {}) {
