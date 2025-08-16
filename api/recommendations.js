@@ -1,5 +1,5 @@
 // api/recommendations.js - Endpoint da API Vercel para recomendações de destino
-// Versão 8.0 - ENHANCED - Suporte para viagens rodoviárias e aéreas
+// Versão 8.1 - ENHANCED - Limite ajustado para viagens rodoviárias (700km/10h)
 const axios = require('axios');
 const http = require('http');
 const https = require('https');
@@ -25,7 +25,11 @@ const CONFIG = {
     enabled: true,
     maxLength: 600
   },
-  budgetThreshold: 400  // Limite para viagens rodoviárias
+  budgetThreshold: 400,  // Limite para viagens rodoviárias
+  busTravel: {
+    maxDistance: 700,    // Distância máxima em km
+    maxHours: 10        // Tempo máximo em horas
+  }
 };
 
 // =======================
@@ -217,7 +221,7 @@ function obterNomeRodoviariaPadrao(cidade) {
     'Blumenau': 'Terminal Rodoviário de Blumenau',
     'Maringá': 'Terminal Rodoviário de Maringá',
     
-    // Cidades turísticas
+    // Cidades turísticas próximas (até 700km de distância das capitais)
     'Foz do Iguaçu': 'Terminal de Transporte Urbano',
     'Paraty': 'Rodoviária de Paraty',
     'Búzios': 'Rodoviária de Búzios',
@@ -237,7 +241,14 @@ function obterNomeRodoviariaPadrao(cidade) {
     'Cabo Frio': 'Rodoviária de Cabo Frio',
     'Bonito': 'Terminal Rodoviário de Bonito',
     'Caldas Novas': 'Rodoviária de Caldas Novas',
-    'São Lourenço': 'Terminal Rodoviário de São Lourenço'
+    'São Lourenço': 'Terminal Rodoviário de São Lourenço',
+    'Poços de Caldas': 'Terminal Rodoviário de Poços de Caldas',
+    'Aparecida': 'Terminal Rodoviário de Aparecida',
+    'Guarapari': 'Terminal Rodoviário de Guarapari',
+    'Águas de Lindóia': 'Rodoviária de Águas de Lindóia',
+    'Holambra': 'Terminal Rodoviário de Holambra',
+    'Penedo': 'Rodoviária de Penedo',
+    'Pirenópolis': 'Terminal Rodoviário de Pirenópolis'
   };
   
   const nomeLower = cidade.toLowerCase();
@@ -267,18 +278,18 @@ async function callGroqAPI(prompt, requestData, model = CONFIG.groq.models.reaso
   if (model === CONFIG.groq.models.reasoning) {
     // Sistema otimizado para reasoning
     systemMessage = `Você é um sistema especialista em recomendações de viagem que utiliza raciocínio estruturado.
-${tipoViagem === 'rodoviario' ? 'ESPECIALIZADO EM VIAGENS RODOVIÁRIAS DE ÔNIBUS.' : ''}
+${tipoViagem === 'rodoviario' ? 'ESPECIALIZADO EM VIAGENS RODOVIÁRIAS DE ÔNIBUS COM LIMITE DE 700KM OU 10 HORAS.' : ''}
 
 PROCESSO DE RACIOCÍNIO OBRIGATÓRIO:
 1. ANÁLISE DO PERFIL: Examine detalhadamente cada preferência do viajante
 2. MAPEAMENTO DE COMPATIBILIDADE: Correlacione destinos com o perfil analisado  
-3. CONSIDERAÇÃO DE ORÇAMENTO: ${tipoViagem === 'rodoviario' ? 'Considere viagens de ÔNIBUS dentro do orçamento limitado' : 'Considere o orçamento informado para passagens aéreas'}
+3. CONSIDERAÇÃO DE ORÇAMENTO: ${tipoViagem === 'rodoviario' ? 'Considere viagens de ÔNIBUS dentro do orçamento limitado (máx 700km/10h)' : 'Considere o orçamento informado para passagens aéreas'}
 4. ANÁLISE CLIMÁTICA: Determine condições climáticas exatas para as datas
 5. PERSONALIZAÇÃO TRIPINHA: Adicione perspectiva autêntica da mascote cachorrinha
 
 CRITÉRIOS DE DECISÃO:
 - Destinos DEVEM ser adequados para o tipo de companhia especificado
-- ${tipoViagem === 'rodoviario' ? 'Destinos DEVEM ser acessíveis por ÔNIBUS a partir da origem' : 'Informações de voos DEVEM ser consideradas'}
+- ${tipoViagem === 'rodoviario' ? 'Destinos DEVEM estar a NO MÁXIMO 700km ou 10 horas de ônibus da origem' : 'Informações de voos DEVEM ser consideradas'}
 - Informações climáticas DEVEM ser precisas para o período da viagem
 - Pontos turísticos DEVEM ser específicos e reais
 - Comentários da Tripinha DEVEM ser em 1ª pessoa com detalhes sensoriais
@@ -288,11 +299,11 @@ RESULTADO: JSON estruturado com recomendações fundamentadas no raciocínio aci
   } else if (model === CONFIG.groq.models.personality) {
     // Sistema focado na personalidade da Tripinha
     systemMessage = `Você é a Tripinha, uma vira-lata caramelo especialista em viagens! 🐾
-${tipoViagem === 'rodoviario' ? 'ESPECIALISTA EM VIAGENS DE ÔNIBUS E ESTRADAS!' : ''}
+${tipoViagem === 'rodoviario' ? 'ESPECIALISTA EM VIAGENS DE ÔNIBUS DE ATÉ 700KM!' : ''}
 
 PERSONALIDADE DA TRIPINHA:
 - Conhece todos os destinos do mundo pessoalmente
-- ${tipoViagem === 'rodoviario' ? 'Adora viagens de ônibus e conhece todas as rodoviárias!' : 'Adora viagens de avião e conhece todos os aeroportos!'}
+- ${tipoViagem === 'rodoviario' ? 'Adora viagens de ônibus curtas e médias (até 10h)!' : 'Adora viagens de avião e conhece todos os aeroportos!'}
 - Fala sempre em 1ª pessoa sobre suas experiências
 - É entusiasmada, carismática e usa emojis naturalmente  
 - Inclui detalhes sensoriais que um cachorro notaria
@@ -302,7 +313,7 @@ PERSONALIDADE DA TRIPINHA:
 RETORNE APENAS JSON VÁLIDO sem formatação markdown.`;
   } else {
     // Sistema padrão para modelos rápidos
-    systemMessage = `Especialista em recomendações de viagem ${tipoViagem === 'rodoviario' ? 'RODOVIÁRIA' : 'AÉREA'}. Retorne apenas JSON válido com destinos personalizados.`;
+    systemMessage = `Especialista em recomendações de viagem ${tipoViagem === 'rodoviario' ? 'RODOVIÁRIA (máx 700km)' : 'AÉREA'}. Retorne apenas JSON válido com destinos personalizados.`;
   }
 
   try {
@@ -417,10 +428,11 @@ function gerarPromptParaGroq(dados) {
 ## 💰 ORÇAMENTO PARA VIAGEM RODOVIÁRIA:
 **Orçamento informado:** ${infoViajante.orcamento} ${infoViajante.moeda} por pessoa para passagens de ÔNIBUS (ida e volta)
 
-⚠️ **IMPORTANTE - VIAGEM RODOVIÁRIA:**
+⚠️ **IMPORTANTE - LIMITES DA VIAGEM RODOVIÁRIA:**
 - APENAS destinos acessíveis por ÔNIBUS a partir de ${infoViajante.cidadeOrigem}
-- Considere distâncias de até 750km (viagens de até 12 horas de ônibus)
-- Priorize destinos dentro do mesmo país ou países vizinhos
+- **DISTÂNCIA MÁXIMA: 700 QUILÔMETROS**
+- **TEMPO MÁXIMO DE VIAGEM: 10 HORAS DE ÔNIBUS**
+- Priorize destinos dentro do mesmo estado ou estados vizinhos
 - Considere o conforto da viagem de ônibus para ${infoViajante.companhia}
 - Sugira destinos onde o valor das passagens de ônibus caiba no orçamento
 
@@ -429,18 +441,20 @@ function gerarPromptParaGroq(dados) {
 ### PASSO 1: ANÁLISE DO PERFIL DO VIAJANTE
 Analise profundamente:
 - Que tipo de experiências esse perfil valoriza (${infoViajante.preferencia})?
-- Quais destinos RODOVIÁRIOS se alinham com suas preferências?
+- Quais destinos RODOVIÁRIOS (máx 700km) se alinham com suas preferências?
 - Como tornar a viagem de ônibus confortável para ${infoViajante.companhia}?
 
-### PASSO 2: CONSIDERAÇÃO DE ROTAS RODOVIÁRIAS
-- Avalie destinos alcançáveis por ônibus a partir de ${infoViajante.cidadeOrigem}
-- Considere a qualidade das estradas e empresas de ônibus
+### PASSO 2: CONSIDERAÇÃO DE ROTAS RODOVIÁRIAS (MÁXIMO 700KM)
+- Avalie destinos alcançáveis por ônibus em até 10 horas a partir de ${infoViajante.cidadeOrigem}
+- Considere apenas cidades dentro do raio de 700km
+- Priorize destinos com boa infraestrutura rodoviária
 - Pense em paradas interessantes durante o trajeto
-- Calcule tempo total de viagem (máximo 12 horas por trecho)
+- Calcule tempo real de viagem (máximo 10 horas por trecho)
 
-### PASSO 3: MAPEAMENTO DE DESTINOS RODOVIÁRIOS
+### PASSO 3: MAPEAMENTO DE DESTINOS PRÓXIMOS
 Para cada destino considerado, avalie:
-- Distância rodoviária a partir de ${infoViajante.cidadeOrigem}
+- Distância rodoviária EXATA a partir de ${infoViajante.cidadeOrigem} (deve ser ≤ 700km)
+- Tempo de viagem EXATO (deve ser ≤ 10 horas)
 - Qualidade da infraestrutura rodoviária
 - Empresas de ônibus que fazem a rota
 - Custo estimado das passagens de ônibus
@@ -451,17 +465,17 @@ Para as datas ${dataIda} a ${dataVolta}, determine:
 - Clima nos destinos
 - Eventos regionais ou festivais locais
 
-### PASSO 5: SELEÇÃO DE DESTINOS RODOVIÁRIOS
-Selecione:
-- 1 destino TOP acessível por ônibus
-- 4 alternativas rodoviárias diversificadas
-- 1 surpresa rodoviária inusitada
+### PASSO 5: SELEÇÃO DE DESTINOS RODOVIÁRIOS PRÓXIMOS
+Selecione APENAS destinos dentro do limite de 700km/10h:
+- 1 destino TOP acessível por ônibus (máx 700km)
+- 4 alternativas rodoviárias diversificadas (todas ≤ 700km)
+- 1 surpresa rodoviária inusitada (máx 700km)
 
 ### PASSO 6: PERSONALIZAÇÃO TRIPINHA 🐾
 Para cada destino, adicione:
-- Comentário sobre a viagem pela Tripinha
-- Dicas sobre o destino
-- Experiências vividas pela Tripinha quando passou por lá
+- Comentário sobre a viagem de ônibus pela Tripinha
+- Dicas sobre as rodoviárias
+- Experiências nas paradas do trajeto
 
 ## 📋 FORMATO DE RESPOSTA (JSON ESTRUTURADO):
 
@@ -469,21 +483,21 @@ Para cada destino, adicione:
 {
   "tipoViagem": "rodoviario",
   "raciocinio": {
-    "analise_perfil": "Análise considerando viagem de ônibus",
-    "rotas_consideradas": "Principais rotas rodoviárias analisadas",
-    "criterios_selecao": "Critérios para destinos rodoviários"
+    "analise_perfil": "Análise considerando viagem de ônibus de até 700km",
+    "rotas_consideradas": "Principais rotas rodoviárias analisadas (todas ≤ 700km)",
+    "criterios_selecao": "Critérios para destinos rodoviários próximos"
   },
   "topPick": {
     "destino": "Nome da Cidade",
-    "pais": "Nome do País", 
-    "codigoPais": "XX",
-    "distanciaRodoviaria": "XXX km",
-    "tempoViagem": "XX horas de ônibus",
-    "justificativa": "Por que este destino é PERFEITO para viagem de ônibus",
+    "pais": "Brasil", 
+    "codigoPais": "BR",
+    "distanciaRodoviaria": "XXX km (MÁXIMO 700km)",
+    "tempoViagem": "X horas de ônibus (MÁXIMO 10h)",
+    "justificativa": "Por que este destino próximo é PERFEITO para viagem de ônibus",
     "descricao": "Descrição do destino",
     "porque": "Razões específicas para esta recomendação rodoviária",
     "destaque": "Experiência única do destino",
-    "comentario": "Comentário da Tripinha: 'Adorei a viagem de ônibus para [destino]! As paradas pelo caminho foram incríveis! 🚌🐾'",
+    "comentario": "Comentário da Tripinha: 'Adorei a viagem de ônibus para [destino]! São apenas X horas, super tranquilo! 🚌🐾'",
     "pontosTuristicos": [
       "Ponto turístico 1",
       "Ponto turístico 2"
@@ -504,11 +518,11 @@ Para cada destino, adicione:
   "alternativas": [
     {
       "destino": "Nome da Cidade",
-      "pais": "Nome do País",
-      "codigoPais": "XX",
-      "distanciaRodoviaria": "XXX km",
-      "tempoViagem": "XX horas",
-      "porque": "Razão para esta alternativa rodoviária",
+      "pais": "Brasil",
+      "codigoPais": "BR",
+      "distanciaRodoviaria": "XXX km (≤ 700km)",
+      "tempoViagem": "X horas (≤ 10h)",
+      "porque": "Razão para esta alternativa rodoviária próxima",
       "pontoTuristico": "Principal atração",
       "empresaOnibus": "Principal empresa de ônibus",
       "clima": {
@@ -519,19 +533,19 @@ Para cada destino, adicione:
         "nome": "Nome da Rodoviária"
       }
     }
-    // EXATAMENTE 4 alternativas rodoviárias
+    // EXATAMENTE 4 alternativas rodoviárias, TODAS ≤ 700km
   ],
   "surpresa": {
     "destino": "Cidade Surpresa Rodoviária",
-    "pais": "País",
-    "codigoPais": "XX",
-    "distanciaRodoviaria": "XXX km",
-    "tempoViagem": "XX horas",
+    "pais": "Brasil",
+    "codigoPais": "BR",
+    "distanciaRodoviaria": "XXX km (MÁXIMO 700km)",
+    "tempoViagem": "X horas (MÁXIMO 10h)",
     "justificativa": "Por que é uma surpresa perfeita de ônibus",
     "descricao": "Descrição",
     "porque": "Razões",
     "destaque": "Experiência única",
-    "comentario": "Tripinha: 'Que aventura de ônibus! 🚌🐾'",
+    "comentario": "Tripinha: 'Que aventura de ônibus tranquila! Apenas X horas! 🚌🐾'",
     "pontosTuristicos": ["Ponto 1", "Ponto 2"],
     "clima": {
       "estacao": "Estação",
@@ -544,12 +558,17 @@ Para cada destino, adicione:
       "localizacao": "Localização"
     }
   },
-  "dicasGeraisOnibus": "Dicas gerais para viagens de ônibus confortáveis",
-  "resumoIA": "Como foram selecionados os destinos rodoviários"
+  "dicasGeraisOnibus": "Dicas gerais para viagens de ônibus confortáveis de até 10 horas",
+  "resumoIA": "Como foram selecionados os destinos rodoviários próximos (todos ≤ 700km)"
 }
 \`\`\`
 
-**Execute o raciocínio e forneça destinos RODOVIÁRIOS acessíveis por ÔNIBUS!**`;
+⚠️ **VALIDAÇÃO CRÍTICA:**
+- TODOS os destinos DEVEM estar a NO MÁXIMO 700km de ${infoViajante.cidadeOrigem}
+- TODOS os tempos de viagem DEVEM ser de NO MÁXIMO 10 horas
+- NÃO sugira destinos mais distantes que esses limites
+
+**Execute o raciocínio e forneça destinos RODOVIÁRIOS PRÓXIMOS (máx 700km/10h)!**`;
   }
 
   // Prompt padrão para viagens aéreas (orçamento maior que R$ 400)
@@ -906,7 +925,7 @@ module.exports = async function handler(req, res) {
   }
 
   try {
-    console.log('🚌✈️ === BENETRIP GROQ API v8.0 - RODOVIÁRIO & AÉREO ===');
+    console.log('🚌✈️ === BENETRIP GROQ API v8.1 - LIMITES AJUSTADOS ===');
     
     if (!req.body) {
       isResponseSent = true;
@@ -943,10 +962,14 @@ module.exports = async function handler(req, res) {
       orcamento: requestData.orcamento_valor,
       moeda: requestData.moeda_escolhida,
       preferencia: requestData.preferencia_viagem,
-      tipoViagem: tipoViagem
+      tipoViagem: tipoViagem,
+      limiteRodoviario: isRodoviario ? '700km/10h' : 'N/A'
     });
     
     console.log(`${isRodoviario ? '🚌' : '✈️'} Tipo de viagem: ${tipoViagem.toUpperCase()}`);
+    if (isRodoviario) {
+      console.log('📏 Limite máximo: 700km ou 10 horas de ônibus');
+    }
     
     // Gerar prompt otimizado para Groq
     const prompt = gerarPromptParaGroq(requestData);
@@ -981,13 +1004,14 @@ module.exports = async function handler(req, res) {
       dados.metadados = {
         modelo: modeloUsado,
         provider: 'groq',
-        versao: '8.0-enhanced',
+        versao: '8.1-limits-adjusted',
         timestamp: new Date().toISOString(),
         reasoning_enabled: modeloUsado === CONFIG.groq.models.reasoning,
         origem: requestData.cidade_partida?.name || requestData.cidade_partida,
         tipoViagem: tipoViagem,
         orcamento: requestData.orcamento_valor,
-        moeda: requestData.moeda_escolhida
+        moeda: requestData.moeda_escolhida,
+        limiteRodoviario: isRodoviario ? '700km/10h' : null
       };
       
       console.log('🎉 Recomendações processadas com sucesso!');
@@ -999,7 +1023,7 @@ module.exports = async function handler(req, res) {
         alternativas: dados.alternativas?.length || 0,
         surpresa: dados.surpresa?.destino,
         temRaciocinio: !!dados.raciocinio,
-        tipoTransporte: isRodoviario ? 'Rodoviário' : 'Aéreo'
+        tipoTransporte: isRodoviario ? 'Rodoviário (máx 700km/10h)' : 'Aéreo'
       });
       
       if (!isResponseSent) {
