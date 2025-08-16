@@ -974,38 +974,31 @@ mostrarDestinoSurpresa() {
         </div>
       ` : ''}
       
-      <!-- Conteúdo da aba Comentários (fontes e espaçamentos reduzidos) -->
-      <div id="conteudo-surpresa-comentarios" class="conteudo-aba-surpresa p-3 overflow-y-auto hidden" style="max-height: calc(90vh - 240px);">
-        ${destino.comentario ? `
-          <div class="bg-gray-50 p-3 rounded-lg">
-            <div class="flex items-start gap-2">
-              <div class="w-8 h-8 rounded-full overflow-hidden flex-shrink-0 bg-orange-100 border-2 border-orange-200">
-                <img src="assets/images/tripinha/avatar-normal.png" alt="Tripinha" class="w-full h-full object-cover" onerror="this.src='https://placehold.co/60x60?text=🐶'">
-              </div>
-              <div>
-                <p class="font-medium text-xs mb-1">Minha experiência em ${destino.destino}:</p>
-                <p class="italic text-sm">"${destino.comentario}"</p>
-              </div>
-            </div>
-          </div>
-        ` : `
-          <div class="bg-gray-50 p-3 rounded-lg text-center">
-            <div class="w-8 h-8 rounded-full overflow-hidden mx-auto mb-1 bg-orange-100 border-2 border-orange-200">
-              <img src="assets/images/tripinha/avatar-normal.png" alt="Tripinha" class="w-full h-full object-cover" onerror="this.src='https://placehold.co/60x60?text=🐶'">
-            </div>
-            <p class="text-gray-500 text-sm">A Tripinha ainda não visitou este destino, mas está animada para descobrir junto com você! 🐾✨</p>
-          </div>
-        `}
-        
-        ${destino.eventos && destino.eventos.length > 0 ? `
-          <div class="mt-3 bg-yellow-50 p-3 rounded-lg">
-            <h4 class="font-medium mb-1 text-sm">Eventos especiais durante sua viagem:</h4>
-            <ul class="list-disc pl-4 text-xs text-gray-700 space-y-0.5">
-              ${destino.eventos.map(evento => `<li>${evento}</li>`).join('')}
-            </ul>
-          </div>
-        ` : ''}
+      <!-- Conteúdo da aba Comentários (igual ao destino top) -->
+<div id="conteudo-surpresa-comentarios" class="conteudo-aba-surpresa p-3 overflow-y-auto hidden" style="max-height: calc(90vh - 240px);">
+  ${destino.comentario ? `
+    <div class="bg-gray-50 p-3 rounded-lg">
+      <div class="flex items-start gap-2">
+        <div class="w-8 h-8 rounded-full overflow-hidden flex-shrink-0 bg-orange-100 border-2 border-orange-200">
+          <img src="assets/images/tripinha/avatar-normal.png" alt="Tripinha" class="w-full h-full object-cover" onerror="this.src='https://placehold.co/60x60?text=🐶'">
+        </div>
+        <div>
+          <p class="font-medium text-xs mb-1">Minha experiência em ${destino.destino}:</p>
+          <p class="italic text-sm">"${destino.comentario}"</p>
+        </div>
       </div>
+    </div>
+  ` : ''}
+  
+  ${destino.eventos && destino.eventos.length > 0 ? `
+    <div class="mt-3 bg-yellow-50 p-3 rounded-lg">
+      <h4 class="font-medium mb-1 text-sm">Eventos especiais durante sua viagem:</h4>
+      <ul class="list-disc pl-4 text-xs text-gray-700 space-y-0.5">
+        ${destino.eventos.map(evento => `<li>${evento}</li>`).join('')}
+      </ul>
+    </div>
+  ` : ''}
+</div>
       
       <!-- Botões de ação (padding reduzido) -->
       <div class="p-3 border-t border-gray-200">
