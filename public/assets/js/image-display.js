@@ -485,7 +485,8 @@ window.BENETRIP_IMAGES = {
 
 // Último recurso: placeholder fixo
 return this.config.placeholderUrl;
-  
+  },
+    
   // Renderiza uma imagem com créditos e ponto turístico (quando disponível)
   renderImageWithCredits(imageData, container, options = {}) {
     if (!imageData) {
