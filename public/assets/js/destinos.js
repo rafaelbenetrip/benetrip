@@ -1,7 +1,7 @@
 /**
  * BENETRIP - Visualização de Destinos Recomendados 
- * Versão 5.0 - SEM FALLBACKS DE CLIMA - Apenas dados da LLM
- * Redireciona para voos.benetrip.com.br com parâmetros de busca
+ * Versão 6.0 - SUPORTE A VIAGENS RODOVIÁRIAS E AÉREAS
+ * Adaptado para mostrar informações de ônibus (< R$ 401) e avião (>= R$ 401)
  */
 
 const BENETRIP_DESTINOS = {
@@ -12,10 +12,11 @@ const BENETRIP_DESTINOS = {
   temErro: false,
   mensagemErro: '',
   abaAtiva: 'visao-geral',
+  tipoViagem: 'aereo', // 'aereo' ou 'rodoviario'
   
   // Inicialização
   init() {
-    console.log('Inicializando sistema de recomendações de destinos (SEM fallbacks)...');
+    console.log('Inicializando sistema de recomendações (rodoviárias + aéreas)...');
     
     this.configurarEventos();
     this.carregarDados()
@@ -125,6 +126,10 @@ const BENETRIP_DESTINOS = {
       this.atualizarProgresso('Buscando melhores destinos para você...', 10);
       this.recomendacoes = await this.buscarRecomendacoes();
       
+      // Detectar tipo de viagem baseado nos dados retornados
+      this.tipoViagem = this.recomendacoes.tipoViagem || 'aereo';
+      console.log(`🚌✈️ Tipo de viagem detectado: ${this.tipoViagem.toUpperCase()}`);
+      
       this.atualizarProgresso('Buscando imagens dos destinos...', 70);
       await this.enriquecerComImagens();
       
@@ -178,7 +183,7 @@ const BENETRIP_DESTINOS = {
         }
       }
       
-      console.log('Buscando novas recomendações com IA (sem fallbacks)');
+      console.log('Buscando novas recomendações com IA (suporte rodoviário + aéreo)');
       this.atualizarProgresso('Consultando serviços de viagem...', 40);
       
       const recomendacoes = await window.BENETRIP_AI.obterRecomendacoes(this.dadosUsuario.respostas);
@@ -196,7 +201,7 @@ const BENETRIP_DESTINOS = {
       
       const conteudo = recomendacoes.conteudo || recomendacoes;
       const dados = typeof conteudo === 'string' ? JSON.parse(conteudo) : conteudo;
-      console.log('Recomendações obtidas (sem fallbacks):', dados);
+      console.log('Recomendações obtidas (rodoviário + aéreo):', dados);
       
       if (!dados || !dados.topPick) {
         throw new Error('Dados de recomendação inválidos');
@@ -328,7 +333,7 @@ const BENETRIP_DESTINOS = {
         return;
       }
       
-      console.log('Renderizando interface com recomendações válidas (sem fallbacks de clima)');
+      console.log(`Renderizando interface para viagens ${this.tipoViagem.toUpperCase()}`);
       
       // Ocultar loader e mostrar conteúdo principal
       const loader = document.querySelector('.loading-container');
@@ -472,10 +477,15 @@ const BENETRIP_DESTINOS = {
     `;
   },
   
-  // Renderizar mensagem da Tripinha
+  // Renderizar mensagem da Tripinha adaptada ao tipo de viagem
   renderizarMensagemTripinha() {
     const container = document.getElementById('mensagem-tripinha');
     if (!container) return;
+    
+    const isRodoviario = this.tipoViagem === 'rodoviario';
+    const mensagem = isRodoviario 
+      ? "Farejei umas rotas incríveis de ônibus pra você! 🚌🐾 Achei destinos próximos e econômicos que vão ser uma delícia explorar. Dá uma olhada nas minhas sugestões e, se quiser uma surpresa pertinho de casa, clica em 'Me Surpreenda!' 💫"
+      : "Dei uma boa farejada por aí e encontrei destinos incríveis pra sua próxima aventura! 🐾 Dá uma olhada na minha escolha TOP e em outras opções cheias de potencial! Quer sair do óbvio? Confia na Tripinha: clica em 'Me Surpreenda!' e deixa que eu te levo pra um lugar especial e inesperado! 💫🐶";
     
     container.innerHTML = `
       <div class="bg-gray-50 p-4 rounded-lg shadow-sm border border-gray-200">
@@ -484,19 +494,74 @@ const BENETRIP_DESTINOS = {
             <img src="assets/images/tripinha/avatar-normal.png" alt="Tripinha" class="w-full h-full object-cover" onerror="this.src='https://placehold.co/60x60?text=🐶'">
           </div>
           <p class="text-gray-800 leading-relaxed">
-            Dei uma boa farejada por aí e encontrei destinos incríveis pra sua próxima aventura! 🐾 Dá uma olhada na minha escolha TOP e em outras opções cheias de potencial! Quer sair do óbvio? Confia na Tripinha: clica em "Me Surpreenda!" e deixa que eu te levo pra um lugar especial e inesperado! 💫🐶
+            ${mensagem}
           </p>
         </div>
       </div>
     `;
   },
   
-  // Renderizar destino destaque com sistema de abas - APENAS DADOS DA LLM
+  // Renderizar informações de transporte (aeroporto ou rodoviária)
+  renderizarInfoTransporte(destino) {
+    const isRodoviario = this.tipoViagem === 'rodoviario';
+    
+    if (isRodoviario) {
+      return `
+        <div class="mt-2 bg-gray-50 p-3 rounded-lg">
+          <div class="flex items-center mb-2">
+            <span class="text-lg mr-2">🚌</span>
+            <span class="font-medium">Terminal Rodoviário</span>
+          </div>
+          <p class="font-medium">${destino.rodoviaria?.nome || `Terminal Rodoviário de ${destino.destino}`}</p>
+          ${destino.rodoviaria?.localizacao ? `
+            <p class="text-sm text-gray-600 mt-1">${destino.rodoviaria.localizacao}</p>
+          ` : ''}
+        </div>
+        
+        ${destino.distanciaRodoviaria || destino.tempoViagem ? `
+          <div class="mt-4 bg-blue-50 p-3 rounded-lg">
+            <div class="flex items-center mb-2">
+              <span class="text-lg mr-2">🛣️</span>
+              <span class="font-medium">Informações da Viagem</span>
+            </div>
+            ${destino.distanciaRodoviaria ? `
+              <p class="text-sm"><strong>Distância:</strong> ${destino.distanciaRodoviaria}</p>
+            ` : ''}
+            ${destino.tempoViagem ? `
+              <p class="text-sm"><strong>Tempo estimado:</strong> ${destino.tempoViagem}</p>
+            ` : ''}
+          </div>
+        ` : ''}
+        
+        ${destino.empresasOnibus && destino.empresasOnibus.length > 0 ? `
+          <div class="mt-4 bg-green-50 p-3 rounded-lg">
+            <div class="flex items-center mb-2">
+              <span class="text-lg mr-2">🏢</span>
+              <span class="font-medium">Empresas de Ônibus</span>
+            </div>
+            <p class="text-sm">${destino.empresasOnibus.join(', ')}</p>
+          </div>
+        ` : ''}
+      `;
+    } else {
+      return `
+        <div class="mt-2 bg-gray-50 p-3 rounded-lg">
+          <div class="flex items-center mb-2">
+            <span class="text-lg mr-2">✈️</span>
+            <span class="font-medium">Aeroporto</span>
+          </div>
+          <p class="font-medium">${destino.aeroporto?.codigo || 'N/A'} - ${destino.aeroporto?.nome || `Aeroporto de ${destino.destino}`}</p>
+        </div>
+      `;
+    }
+  },
+  
+  // Renderizar destino destaque com sistema de abas adaptado
   renderizarDestinoDestaque(destino) {
     const container = document.getElementById('destino-destaque');
     if (!container) return;
     
-    console.log('Renderizando destino destaque (apenas dados da LLM):', destino);
+    console.log('Renderizando destino destaque:', destino);
     
     // Imagem de cabeçalho
     let headerHtml = `
@@ -524,7 +589,7 @@ const BENETRIP_DESTINOS = {
       </div>
     `;
     
-    // Sistema de abas - APENAS SE DADOS DA LLM ESTIVEREM DISPONÍVEIS
+    // Sistema de abas adaptado
     let abasHtml = `
       <div class="flex border-b border-gray-200 overflow-x-auto">
         <button id="aba-visao-geral" class="botao-aba aba-ativa px-4 py-2 text-sm font-medium" onclick="BENETRIP_DESTINOS.trocarAba('visao-geral')">
@@ -538,22 +603,21 @@ const BENETRIP_DESTINOS = {
             Clima
           </button>
         ` : ''}
+        ${this.tipoViagem === 'rodoviario' && (destino.dicasTransporte || destino.empresasOnibus) ? `
+          <button id="aba-transporte" class="botao-aba aba-inativa px-4 py-2 text-sm font-medium" onclick="BENETRIP_DESTINOS.trocarAba('transporte')">
+            Transporte
+          </button>
+        ` : ''}
         <button id="aba-comentarios" class="botao-aba aba-inativa px-4 py-2 text-sm font-medium" onclick="BENETRIP_DESTINOS.trocarAba('comentarios')">
           Comentários
         </button>
       </div>
     `;
     
-    // Conteúdo da aba Visão Geral
+    // Conteúdo da aba Visão Geral (adaptado)
     let visaoGeralHtml = `
       <div id="conteudo-visao-geral" class="conteudo-aba p-4">
-        <div class="mt-2 bg-gray-50 p-3 rounded-lg">
-          <div class="flex items-center mb-2">
-            <span class="text-lg mr-2">✈️</span>
-            <span class="font-medium">Aeroporto</span>
-          </div>
-          <p class="font-medium">${destino.aeroporto?.codigo || 'N/A'} - ${destino.aeroporto?.nome || `Aeroporto de ${destino.destino}`}</p>
-        </div>
+        ${this.renderizarInfoTransporte(destino)}
         
         <div class="mt-4 bg-gray-50 p-3 rounded-lg">
           <div class="flex items-center mb-2">
@@ -605,7 +669,7 @@ const BENETRIP_DESTINOS = {
       </div>
     `;
     
-    // Conteúdo da aba Clima - APENAS DADOS DA LLM
+    // Conteúdo da aba Clima
     let climaHtml = '';
     if (destino.clima && destino.clima.temperatura) {
       climaHtml = `
@@ -649,6 +713,50 @@ const BENETRIP_DESTINOS = {
       `;
     }
     
+    // Conteúdo da aba Transporte (apenas para rodoviário)
+    let transporteHtml = '';
+    if (this.tipoViagem === 'rodoviario' && (destino.dicasTransporte || destino.empresasOnibus)) {
+      transporteHtml = `
+        <div id="conteudo-transporte" class="conteudo-aba p-4 hidden">
+          ${destino.empresasOnibus && destino.empresasOnibus.length > 0 ? `
+            <div class="bg-blue-50 p-4 rounded-lg mb-4">
+              <h4 class="font-medium mb-2 flex items-center">
+                <span class="mr-2">🚌</span>
+                Empresas de Ônibus
+              </h4>
+              <div class="space-y-2">
+                ${destino.empresasOnibus.map(empresa => `
+                  <div class="bg-white p-2 rounded border">
+                    <span class="font-medium">${empresa}</span>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+          ` : ''}
+          
+          ${destino.dicasTransporte ? `
+            <div class="bg-yellow-50 p-4 rounded-lg">
+              <h4 class="font-medium mb-2 flex items-center">
+                <span class="mr-2">💡</span>
+                Dicas de Viagem
+              </h4>
+              <p class="text-sm text-gray-700">${destino.dicasTransporte}</p>
+            </div>
+          ` : ''}
+          
+          ${this.recomendacoes.dicasGeraisOnibus ? `
+            <div class="mt-4 bg-green-50 p-4 rounded-lg">
+              <h4 class="font-medium mb-2 flex items-center">
+                <span class="mr-2">🎒</span>
+                Dicas Gerais para Viagens de Ônibus
+              </h4>
+              <p class="text-sm text-gray-700">${this.recomendacoes.dicasGeraisOnibus}</p>
+            </div>
+          ` : ''}
+        </div>
+      `;
+    }
+    
     // Conteúdo da aba Comentários
     let comentariosHtml = `
       <div id="conteudo-comentarios" class="conteudo-aba p-4 hidden">
@@ -677,13 +785,14 @@ const BENETRIP_DESTINOS = {
       </div>
     `;
     
-    // Botão de seleção
+    // Botão de seleção adaptado
+    const isRodoviario = this.tipoViagem === 'rodoviario';
     let botaoSelecaoHtml = `
       <div class="p-4 border-t border-gray-200">
         <button class="btn-selecionar-destino w-full font-bold py-3 px-4 rounded-lg text-white transition-colors duration-200 hover:opacity-90" 
           style="background-color: #E87722;" 
           data-destino="${destino.destino}">
-          Escolher Este Destino!
+          ${isRodoviario ? 'Escolher Esta Viagem de Ônibus!' : 'Escolher Este Destino!'}
         </button>
       </div>
     `;
@@ -697,23 +806,26 @@ const BENETRIP_DESTINOS = {
         ${visaoGeralHtml}
         ${pontosTuristicosHtml}
         ${climaHtml}
+        ${transporteHtml}
         ${comentariosHtml}
         ${botaoSelecaoHtml}
       </div>
     `;
   },
   
-  // Renderizar destinos alternativos
+  // Renderizar destinos alternativos adaptado
   renderizarDestinosAlternativos(destinos) {
     const container = document.getElementById('destinos-alternativos');
     if (!container || !destinos || destinos.length === 0) {
       if (container) {
-        container.innerHTML = '<p class="text-center text-gray-500 my-6">Nenhum destino alternativo disponível.</p>';
+        const isRodoviario = this.tipoViagem === 'rodoviario';
+        container.innerHTML = `<p class="text-center text-gray-500 my-6">Nenhum ${isRodoviario ? 'destino rodoviário' : 'destino'} alternativo disponível.</p>`;
       }
       return;
     }
     
-    container.innerHTML = '<h3 class="font-bold text-lg mt-4 mb-3">Mais Destinos Incríveis</h3>';
+    const isRodoviario = this.tipoViagem === 'rodoviario';
+    container.innerHTML = `<h3 class="font-bold text-lg mt-4 mb-3">${isRodoviario ? 'Mais Destinos de Ônibus' : 'Mais Destinos Incríveis'}</h3>`;
     
     const gridContainer = document.createElement('div');
     gridContainer.className = 'grid grid-cols-2 gap-3';
@@ -723,6 +835,56 @@ const BENETRIP_DESTINOS = {
     destinosLimitados.forEach(destino => {
       const elementoDestino = document.createElement('div');
       elementoDestino.className = 'card-destino border border-gray-200 rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow duration-200 bg-white';
+      
+      // Informações de transporte adaptadas
+      let infoTransporte = '';
+      if (isRodoviario) {
+        if (destino.rodoviaria && destino.rodoviaria.nome) {
+          infoTransporte = `
+            <div class="flex justify-between items-center">
+              <span class="text-sm font-medium">
+                <span class="mr-1">🚌</span>
+                Terminal
+              </span>
+              <span class="text-xs text-gray-500">Rodoviário</span>
+            </div>
+          `;
+        }
+        if (destino.distanciaRodoviaria) {
+          infoTransporte += `
+            <div class="flex justify-between items-center mt-1">
+              <span class="text-sm font-medium">
+                <span class="mr-1">🛣️</span>
+                Distância
+              </span>
+              <span class="text-xs text-gray-500">${destino.distanciaRodoviaria}</span>
+            </div>
+          `;
+        }
+        if (destino.tempoViagem) {
+          infoTransporte += `
+            <div class="flex justify-between items-center mt-1">
+              <span class="text-sm font-medium">
+                <span class="mr-1">⏰</span>
+                Tempo
+              </span>
+              <span class="text-xs text-gray-500">${destino.tempoViagem}</span>
+            </div>
+          `;
+        }
+      } else {
+        if (destino.aeroporto && destino.aeroporto.codigo) {
+          infoTransporte = `
+            <div class="flex justify-between items-center">
+              <span class="text-sm font-medium">
+                <span class="mr-1">✈️</span>
+                Aeroporto
+              </span>
+              <span class="text-xs text-gray-500">${destino.aeroporto.codigo}</span>
+            </div>
+          `;
+        }
+      }
       
       elementoDestino.innerHTML = `
         <div class="relative">
@@ -741,15 +903,7 @@ const BENETRIP_DESTINOS = {
           </div>
           <p class="text-xs text-gray-600 mb-2">${destino.pais}</p>
           
-          ${destino.aeroporto && destino.aeroporto.codigo ? `
-            <div class="flex justify-between items-center">
-              <span class="text-sm font-medium">
-                <span class="mr-1">✈️</span>
-                Aeroporto
-              </span>
-              <span class="text-xs text-gray-500">${destino.aeroporto.codigo}</span>
-            </div>
-          ` : ''}
+          ${infoTransporte}
           
           ${destino.pontoTuristico ? `
             <div class="mt-2">
@@ -778,7 +932,7 @@ const BENETRIP_DESTINOS = {
           <button class="btn-selecionar-destino w-full mt-3 py-1.5 px-2 rounded text-white text-sm font-medium transition-colors hover:opacity-90" 
             style="background-color: #E87722;"
             data-destino="${destino.destino}">
-            Escolher Este Destino
+            ${isRodoviario ? 'Escolher Ônibus' : 'Escolher Destino'}
           </button>
         </div>
       `;
@@ -787,7 +941,7 @@ const BENETRIP_DESTINOS = {
     });
   },
   
-  // Renderizar opção "Me Surpreenda"
+  // Renderizar opção "Me Surpreenda" adaptada
   renderizarOpcaoSurpresa() {
     const container = document.getElementById('opcao-surpresa');
     if (!container) return;
@@ -797,9 +951,14 @@ const BENETRIP_DESTINOS = {
       return;
     }
     
+    const isRodoviario = this.tipoViagem === 'rodoviario';
+    const mensagem = isRodoviario 
+      ? "Ainda não decidiu? Sem problemas! Clique em 'Me Surpreenda!' e eu escolho um destino de ônibus especial baseado nas suas vibes de viagem! 🚌🐾"
+      : "Ainda não decidiu? Sem problemas! Clique em 'Me Surpreenda!' e eu escolho um lugar baseado nas suas vibes de viagem! 🐾";
+    
     container.innerHTML = `
       <div class="p-4 rounded-lg mt-2 text-white" style="background-color: #E87722;">
-        <p class="font-bold text-lg text-center">Ainda não decidiu? Sem problemas! Clique em 'Me Surpreenda!' e eu escolho um lugar baseado nas suas vibes de viagem! 🐾</p>
+        <p class="font-bold text-lg text-center">${mensagem}</p>
         <button id="btn-surpresa" class="w-full font-bold py-2.5 px-4 rounded mt-3 transition-colors duration-200 hover:bg-blue-600" style="background-color: #00A3E0; color: white;">
           Me Surpreenda! 🎲
         </button>
@@ -807,7 +966,7 @@ const BENETRIP_DESTINOS = {
     `;
   },
   
-  // Mostrar destino surpresa - APENAS DADOS DA LLM
+  // Mostrar destino surpresa adaptado
   mostrarDestinoSurpresa() {
     if (!this.recomendacoes || !this.recomendacoes.surpresa) {
       console.error('Destino surpresa não disponível');
@@ -815,13 +974,58 @@ const BENETRIP_DESTINOS = {
     }
     
     const destino = this.recomendacoes.surpresa;
-    console.log('Mostrando destino surpresa (apenas dados da LLM):', destino);
+    const isRodoviario = this.tipoViagem === 'rodoviario';
+    console.log(`Mostrando destino surpresa ${isRodoviario ? 'rodoviário' : 'aéreo'}:`, destino);
     
     const modalContainer = document.createElement('div');
     modalContainer.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-start z-50 modal-surpresa-container';
     modalContainer.id = 'modal-surpresa';
     modalContainer.style.overflowY = 'auto';
     modalContainer.style.padding = '1rem 0';
+    
+    // Abas adaptadas para tipo de viagem
+    let abasTransporteHtml = '';
+    if (isRodoviario && (destino.dicasTransporte || destino.empresasOnibus)) {
+      abasTransporteHtml = `
+        <button id="aba-surpresa-transporte" class="botao-aba aba-inativa px-4 py-2 text-sm font-medium" onclick="BENETRIP_DESTINOS.trocarAbaSurpresa('transporte')">
+          Transporte
+        </button>
+      `;
+    }
+    
+    let conteudoTransporteHtml = '';
+    if (isRodoviario && (destino.dicasTransporte || destino.empresasOnibus)) {
+      conteudoTransporteHtml = `
+        <!-- Conteúdo da aba Transporte -->
+        <div id="conteudo-surpresa-transporte" class="conteudo-aba-surpresa p-4 hidden">
+          ${destino.empresasOnibus && destino.empresasOnibus.length > 0 ? `
+            <div class="bg-blue-50 p-4 rounded-lg mb-4">
+              <h4 class="font-medium mb-2 flex items-center">
+                <span class="mr-2">🚌</span>
+                Empresas de Ônibus
+              </h4>
+              <div class="space-y-2">
+                ${destino.empresasOnibus.map(empresa => `
+                  <div class="bg-white p-2 rounded border">
+                    <span class="font-medium">${empresa}</span>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+          ` : ''}
+          
+          ${destino.dicasTransporte ? `
+            <div class="bg-yellow-50 p-4 rounded-lg">
+              <h4 class="font-medium mb-2 flex items-center">
+                <span class="mr-2">💡</span>
+                Dicas de Viagem
+              </h4>
+              <p class="text-sm text-gray-700">${destino.dicasTransporte}</p>
+            </div>
+          ` : ''}
+        </div>
+      `;
+    }
     
     modalContainer.innerHTML = `
       <div class="bg-white rounded-lg w-full max-w-md relative mx-auto my-4 transform transition-transform duration-500 modal-surpresa-content">
@@ -854,7 +1058,7 @@ const BENETRIP_DESTINOS = {
           </div>
         </div>
         
-        <!-- Sistema de abas - APENAS SE DADOS DA LLM ESTIVEREM DISPONÍVEIS -->
+        <!-- Sistema de abas adaptado -->
         <div class="flex border-b border-gray-200 overflow-x-auto">
           <button id="aba-surpresa-info" class="botao-aba aba-ativa px-4 py-2 text-sm font-medium" onclick="BENETRIP_DESTINOS.trocarAbaSurpresa('info')">
             Visão Geral
@@ -867,6 +1071,7 @@ const BENETRIP_DESTINOS = {
               Clima
             </button>
           ` : ''}
+          ${abasTransporteHtml}
           <button id="aba-surpresa-comentarios" class="botao-aba aba-inativa px-4 py-2 text-sm font-medium" onclick="BENETRIP_DESTINOS.trocarAbaSurpresa('comentarios')">
             Comentários
           </button>
@@ -874,13 +1079,7 @@ const BENETRIP_DESTINOS = {
         
         <!-- Conteúdo da aba Informações -->
         <div id="conteudo-surpresa-info" class="conteudo-aba-surpresa p-4">
-          <div class="bg-gray-50 p-3 rounded-lg">
-            <div class="flex items-center mb-2">
-              <span class="text-lg mr-2">✈️</span>
-              <span class="font-medium">Aeroporto</span>
-            </div>
-            <p class="font-medium">${destino.aeroporto?.codigo || 'N/A'} - ${destino.aeroporto?.nome || `Aeroporto de ${destino.destino}`}</p>
-          </div>
+          ${this.renderizarInfoTransporte(destino)}
           
           <div class="mt-4 bg-gray-50 p-3 rounded-lg">
             <div class="flex items-center mb-2">
@@ -935,7 +1134,7 @@ const BENETRIP_DESTINOS = {
         </div>
         
         ${destino.clima && destino.clima.temperatura ? `
-          <!-- Conteúdo da aba Clima - APENAS DADOS DA LLM -->
+          <!-- Conteúdo da aba Clima -->
           <div id="conteudo-surpresa-clima" class="conteudo-aba-surpresa p-4 hidden">
             <div class="text-center bg-blue-50 p-4 rounded-lg">
               <h4 class="font-medium text-lg mb-2">Clima durante sua viagem</h4>
@@ -974,6 +1173,8 @@ const BENETRIP_DESTINOS = {
             </div>
           </div>
         ` : ''}
+        
+        ${conteudoTransporteHtml}
         
         <!-- Conteúdo da aba Comentários -->
         <div id="conteudo-surpresa-comentarios" class="conteudo-aba-surpresa p-4 hidden">
@@ -1014,7 +1215,7 @@ const BENETRIP_DESTINOS = {
             style="background-color: #00A3E0;" 
             data-destino="${destino.destino}"
             onclick="document.getElementById('modal-surpresa').remove()">
-            Quero Este Destino Surpresa!
+            ${isRodoviario ? 'Quero Esta Viagem de Ônibus!' : 'Quero Este Destino Surpresa!'}
           </button>
           
           <button class="w-full font-medium py-2.5 px-4 rounded-lg border border-gray-300 transition-colors duration-200 hover:bg-gray-100" 
@@ -1035,7 +1236,7 @@ const BENETRIP_DESTINOS = {
     });
   },
   
-  // Selecionar um destino
+  // Selecionar um destino (adaptado para rodoviário/aéreo)
   selecionarDestino(nomeDestino) {
     console.log(`Destino selecionado: ${nomeDestino}`);
     let destinoSelecionado = null;
@@ -1055,10 +1256,13 @@ const BENETRIP_DESTINOS = {
         return;
     }
     
-    // Padronizar os dados do destino
+    // Padronizar os dados do destino baseado no tipo de viagem
+    const isRodoviario = this.tipoViagem === 'rodoviario';
     const destinoPadronizado = {
         ...destinoSelecionado,
-        codigo_iata: destinoSelecionado.aeroporto?.codigo || 'XXX'
+        codigo_iata: isRodoviario ? null : (destinoSelecionado.aeroporto?.codigo || 'XXX'),
+        terminal_rodoviario: isRodoviario ? (destinoSelecionado.rodoviaria?.nome || `Terminal de ${destinoSelecionado.destino}`) : null,
+        tipo_viagem: this.tipoViagem
     };
     
     // Salvar destino selecionado
@@ -1073,7 +1277,8 @@ const BENETRIP_DESTINOS = {
         dadosUsuario.respostas.destino_escolhido = {
             name: destinoPadronizado.destino,
             pais: destinoPadronizado.pais,
-            code: destinoPadronizado.codigo_iata
+            code: destinoPadronizado.codigo_iata,
+            tipo_viagem: this.tipoViagem
         };
         
         localStorage.setItem('benetrip_user_data', JSON.stringify(dadosUsuario));
@@ -1110,16 +1315,17 @@ const BENETRIP_DESTINOS = {
     };
   },
   
-  // ========== FUNCIONALIDADE: CONSTRUIR URL WHITELABEL ==========
+  // ========== FUNCIONALIDADE: CONSTRUIR URL WHITELABEL (ADAPTADA) ==========
   
   /**
    * Constrói a URL da whitelabel Benetrip com os parâmetros de busca
-   * Formato: https://voos.benetrip.com.br/?flightSearch=SAO1208RIO22081
-   * Onde: ORIGEM+DIA_IDA+MES_IDA+DESTINO+DIA_VOLTA+MES_VOLTA+PASSAGEIROS
+   * Para AÉREO: https://voos.benetrip.com.br/?flightSearch=SAO1208RIO22081
+   * Para RODOVIÁRIO: https://onibus.benetrip.com.br/?busSearch=SAO1208RIO22081
    */
   construirURLWhitelabel(destinoSelecionado) {
     try {
-      console.log('🔧 Construindo URL da whitelabel...');
+      const isRodoviario = this.tipoViagem === 'rodoviario';
+      console.log(`🔧 Construindo URL da whitelabel ${isRodoviario ? 'RODOVIÁRIA' : 'AÉREA'}...`);
       console.log('📍 Destino selecionado:', destinoSelecionado);
       console.log('👤 Dados do usuário:', this.dadosUsuario);
       
@@ -1161,9 +1367,18 @@ const BENETRIP_DESTINOS = {
       }
       
       // ===== DESTINO =====
-      const codigoDestino = destinoSelecionado.codigo_iata || 
-                           destinoSelecionado.aeroporto?.codigo || 
-                           'XXX';
+      let codigoDestino;
+      
+      if (isRodoviario) {
+        // Para rodoviário, usar código da cidade ou criar um baseado no nome
+        codigoDestino = destinoSelecionado.codigoPais || 
+                       destinoSelecionado.destino.substring(0, 3).toUpperCase();
+      } else {
+        // Para aéreo, usar código IATA do aeroporto
+        codigoDestino = destinoSelecionado.codigo_iata || 
+                       destinoSelecionado.aeroporto?.codigo || 
+                       'XXX';
+      }
       
       // ===== DATAS =====
       const datas = respostas.datas;
@@ -1208,35 +1423,47 @@ const BENETRIP_DESTINOS = {
         }
       }
       
-      // ===== CONSTRUIR PARÂMETRO flightSearch =====
-      const flightSearchParam = 
+      // ===== CONSTRUIR PARÂMETRO DE BUSCA =====
+      const searchParam = 
         `${codigoOrigem}${diaIdaFormatado}${mesIdaFormatado}${codigoDestino}${diaVoltaFormatado}${mesVoltaFormatado}${quantidadePassageiros}`;
       
-      // ===== URL FINAL =====
-      const urlWhitelabel = `https://voos.benetrip.com.br/?flightSearch=${flightSearchParam}`;
+      // ===== URL FINAL (DIFERENTE PARA CADA TIPO) =====
+      let urlWhitelabel;
       
-      console.log('✅ URL construída com sucesso:');
+      if (isRodoviario) {
+        // Para viagens rodoviárias, usar domínio de ônibus
+        urlWhitelabel = `https://onibus.benetrip.com.br/?busSearch=${searchParam}`;
+      } else {
+        // Para viagens aéreas, usar domínio de voos
+        urlWhitelabel = `https://voos.benetrip.com.br/?flightSearch=${searchParam}`;
+      }
+      
+      console.log(`✅ URL ${isRodoviario ? 'RODOVIÁRIA' : 'AÉREA'} construída com sucesso:`);
       console.log(`🔗 ${urlWhitelabel}`);
       console.log('📊 Parâmetros utilizados:', {
+        tipoViagem: this.tipoViagem,
         origem: codigoOrigem,
         destino: codigoDestino,
         dataIda: `${diaIdaFormatado}/${mesIdaFormatado}`,
         dataVolta: `${diaVoltaFormatado}/${mesVoltaFormatado}`,
         passageiros: quantidadePassageiros,
-        parametroCompleto: flightSearchParam
+        parametroCompleto: searchParam
       });
       
       return urlWhitelabel;
       
     } catch (erro) {
       console.error('❌ Erro ao construir URL da whitelabel:', erro);
-      // URL de fallback
-      return 'https://voos.benetrip.com.br/';
+      // URL de fallback baseada no tipo de viagem
+      const isRodoviario = this.tipoViagem === 'rodoviario';
+      return isRodoviario ? 'https://onibus.benetrip.com.br/' : 'https://voos.benetrip.com.br/';
     }
   },
   
-  // Mostrar confirmação de seleção (usando whitelabel)
+  // Mostrar confirmação de seleção (adaptado para ambos os tipos)
   mostrarConfirmacaoSelecao(destino) {
+    const isRodoviario = this.tipoViagem === 'rodoviario';
+    
     const modalContainer = document.createElement('div');
     modalContainer.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
     modalContainer.id = 'modal-confirmacao';
@@ -1248,7 +1475,12 @@ const BENETRIP_DESTINOS = {
               <img src="assets/images/tripinha/avatar-normal.png" alt="Tripinha" class="w-full h-full object-cover" onerror="this.src='https://placehold.co/60x60?text=🐶'">
             </div>
             <div>
-              <p class="font-bold">Ótima escolha, Triper! 🐾 ${destino.destino} é incrível! Tem certeza que este é o destino certo para sua aventura?</p>
+              <p class="font-bold">
+                ${isRodoviario 
+                  ? `Ótima escolha, Triper! 🚌🐾 ${destino.destino} é perfeito para uma viagem de ônibus! Tem certeza que quer essa aventura rodoviária?` 
+                  : `Ótima escolha, Triper! 🐾 ${destino.destino} é incrível! Tem certeza que este é o destino certo para sua aventura?`
+                }
+              </p>
               <div class="mt-3">
                 <label class="flex items-center space-x-2 cursor-pointer">
                   <input type="checkbox" id="confirmar-selecao" class="form-checkbox h-5 w-5 rounded" style="color: #E87722;">
@@ -1256,7 +1488,7 @@ const BENETRIP_DESTINOS = {
                 </label>
               </div>
               <p class="mt-3 text-sm">
-                Você será direcionado para a Benetrip onde poderá consultar preços reais e finalizar sua reserva com nossos parceiros confiáveis.
+                Você será direcionado para a Benetrip onde poderá consultar preços reais de ${isRodoviario ? 'passagens de ônibus' : 'passagens aéreas'} e finalizar sua reserva com nossos parceiros confiáveis.
               </p>
             </div>
           </div>
@@ -1266,7 +1498,7 @@ const BENETRIP_DESTINOS = {
             Voltar
           </button>
           <button id="btn-confirmar" class="flex-1 py-2 px-4 text-white rounded transition-colors hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed" style="background-color: #E87722;" disabled>
-            Buscar Voos
+            ${isRodoviario ? 'Buscar Ônibus 🚌' : 'Buscar Voos ✈️'}
           </button>
         </div>
       </div>
@@ -1285,16 +1517,16 @@ const BENETRIP_DESTINOS = {
       document.getElementById('modal-confirmacao').remove();
     });
     
-    // Redirecionar para whitelabel
+    // Redirecionar para whitelabel adaptada
     btnConfirmar.addEventListener('click', () => {
-      console.log('🚀 Redirecionando para a whitelabel Benetrip...');
+      console.log(`🚀 Redirecionando para a whitelabel Benetrip ${isRodoviario ? 'RODOVIÁRIA' : 'AÉREA'}...`);
       
       try {
-        // Construir URL da whitelabel
+        // Construir URL da whitelabel (adaptada)
         const urlWhitelabel = this.construirURLWhitelabel(destino);
         
         // Mostrar toast de confirmação
-        this.exibirToast('Redirecionando para a Benetrip...', 'info');
+        this.exibirToast(`Redirecionando para ${isRodoviario ? 'busca de ônibus' : 'busca de voos'}...`, 'info');
         
         // Aguardar um pouco e redirecionar
         setTimeout(() => {
@@ -1304,7 +1536,7 @@ const BENETRIP_DESTINOS = {
           document.getElementById('modal-confirmacao').remove();
           
           // Mostrar mensagem de sucesso
-          this.exibirToast('Boa viagem! 🛫', 'success');
+          this.exibirToast(`Boa viagem! ${isRodoviario ? '🚌' : '🛫'}`, 'success');
         }, 1000);
         
       } catch (erro) {
@@ -1472,6 +1704,25 @@ const BENETRIP_DESTINOS = {
       .toast-error { background-color: #EF4444; }
       .toast-warning { background-color: #F59E0B; }
       .toast-info { background-color: #3B82F6; }
+      
+      /* Indicadores visuais para tipo de viagem */
+      .rodoviario-indicator {
+        background: linear-gradient(45deg, #22C55E, #16A34A);
+        color: white;
+        padding: 4px 8px;
+        border-radius: 12px;
+        font-size: 10px;
+        font-weight: bold;
+      }
+      
+      .aereo-indicator {
+        background: linear-gradient(45deg, #3B82F6, #2563EB);
+        color: white;
+        padding: 4px 8px;
+        border-radius: 12px;
+        font-size: 10px;
+        font-weight: bold;
+      }
     `;
     
     document.head.appendChild(estiloElement);
