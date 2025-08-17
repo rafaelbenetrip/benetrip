@@ -1306,7 +1306,8 @@ const BENETRIP_DESTINOS = {
       
       if (isRodoviario) {
         // Para viagens rodoviárias, usar domínio de ônibus
-        urlWhitelabel = `https://onibus.benetrip.com.br/?busSearch=${searchParam}`;
+              return this.construirURLBuser(destinoSelecionado);
+    }
       } else {
         // Para viagens aéreas, usar domínio de voos
         urlWhitelabel = `https://voos.benetrip.com.br/?flightSearch=${searchParam}`;
@@ -1330,9 +1331,142 @@ const BENETRIP_DESTINOS = {
       console.error('❌ Erro ao construir URL da whitelabel:', erro);
       // URL de fallback baseada no tipo de viagem
       const isRodoviario = this.tipoViagem === 'rodoviario';
+      console.log(`🔧 Construindo URL ${isRodoviario ? 'RODOVIÁRIA com afiliado Buser' : 'AÉREA'}...`);
       return isRodoviario ? 'https://onibus.benetrip.com.br/' : 'https://voos.benetrip.com.br/';
     }
   },
+
+// Nova função para construir URL da Buser
+construirURLBuser(destinoSelecionado) {
+  try {
+    console.log('🚌 Construindo link de afiliado Buser...', destinoSelecionado);
+    
+    // Dados do usuário
+    const respostas = this.dadosUsuario?.respostas;
+    if (!respostas) throw new Error('Dados do usuário não encontrados');
+    
+    // === ORIGEM ===
+    let cidadeOrigem = 'são-paulo';
+    let siglaOrigem = 'sp';
+    
+    if (respostas.cidade_partida) {
+      const cidadePartida = respostas.cidade_partida;
+      
+      if (typeof cidadePartida === 'string') {
+        cidadeOrigem = this.normalizarNomeCidade(cidadePartida);
+        siglaOrigem = this.obterSiglaEstadoLocal(cidadePartida);
+      } else if (typeof cidadePartida === 'object' && cidadePartida.name) {
+        cidadeOrigem = this.normalizarNomeCidade(cidadePartida.name);
+        siglaOrigem = this.obterSiglaEstadoLocal(cidadePartida.name);
+      }
+    }
+    
+    // === DESTINO ===
+    const cidadeDestino = this.normalizarNomeCidade(destinoSelecionado.destino);
+    const siglaDestino = destinoSelecionado.siglaEstado || 
+                        this.obterSiglaEstadoLocal(destinoSelecionado.destino);
+    
+    // === DATAS ===
+    const datas = respostas.datas;
+    if (!datas || !datas.dataIda) {
+      throw new Error('Datas de viagem não encontradas');
+    }
+    
+    const dataIda = datas.dataIda; // Formato: YYYY-MM-DD
+    const dataVolta = datas.dataVolta || datas.dataIda;
+    
+    // === CONSTRUIR URL BUSER ===
+    const baseAfiliado = 'https://dhwnh.com/g/2gm32wfk80315383f785fe12268cba/';
+    
+    // SubID para tracking
+    const subid = `benetrip_${this.removerAcentos(cidadeOrigem)}_${this.removerAcentos(cidadeDestino)}_${dataIda.replace(/-/g, '')}`;
+    
+    // URL da Buser (será codificada)
+    const urlBuser = `https://www.buser.com.br/onibus/${cidadeOrigem}-${siglaOrigem}/${cidadeDestino}-${siglaDestino}`;
+    const queryParams = new URLSearchParams({
+      ida: dataIda,
+      volta: dataVolta,
+      utm_source: 'benetrip',
+      utm_medium: 'affiliate',
+      utm_campaign: 'chatbot_onibus'
+    });
+    
+    // Montar URL final
+    const urlCompleta = `${urlBuser}?${queryParams.toString()}`;
+    
+    // URL de afiliado final
+    const urlAfiliado = `${baseAfiliado}?subid=${subid}&ulp=${encodeURIComponent(urlCompleta)}`;
+    
+    console.log('✅ URL Buser construída:', {
+      origem: `${cidadeOrigem}-${siglaOrigem}`,
+      destino: `${cidadeDestino}-${siglaDestino}`,
+      dataIda,
+      dataVolta,
+      urlFinal: urlAfiliado
+    });
+    
+    return urlAfiliado;
+    
+  } catch (erro) {
+    console.error('❌ Erro ao construir URL Buser:', erro);
+    // Fallback para página inicial da Buser
+    return 'https://www.buser.com.br/?utm_source=benetrip';
+  }
+}
+
+// Funções auxiliares
+normalizarNomeCidade(nome) {
+  if (!nome) return 'sao-paulo';
+  
+  return nome
+    .toLowerCase()
+    .replace(/\s+/g, '-')
+    .replace(/[áàãâ]/g, 'a')
+    .replace(/[éèê]/g, 'e')
+    .replace(/[íì]/g, 'i')
+    .replace(/[óòôõ]/g, 'o')
+    .replace(/[úù]/g, 'u')
+    .replace(/ç/g, 'c')
+    .replace(/[^a-z0-9-]/g, '');
+}
+
+removerAcentos(str) {
+  return str
+    .replace(/[áàãâ]/g, 'a')
+    .replace(/[éèê]/g, 'e')
+    .replace(/[íì]/g, 'i')
+    .replace(/[óòôõ]/g, 'o')
+    .replace(/[úù]/g, 'u')
+    .replace(/ç/g, 'c')
+    .replace(/\s+/g, '')
+    .replace(/[^a-zA-Z0-9]/g, '');
+}
+
+obterSiglaEstadoLocal(cidade) {
+  const mapeamento = {
+    'são paulo': 'sp', 'sao paulo': 'sp', 'campinas': 'sp', 'santos': 'sp',
+    'rio de janeiro': 'rj', 'niterói': 'rj', 'niteroi': 'rj', 'petrópolis': 'rj',
+    'belo horizonte': 'mg', 'ouro preto': 'mg', 'uberlândia': 'mg',
+    'salvador': 'ba', 'porto seguro': 'ba',
+    'curitiba': 'pr', 'foz do iguaçu': 'pr',
+    'florianópolis': 'sc', 'florianopolis': 'sc', 'balneário camboriú': 'sc',
+    'porto alegre': 'rs', 'gramado': 'rs', 'canela': 'rs',
+    'brasília': 'df', 'brasilia': 'df',
+    'recife': 'pe', 'olinda': 'pe',
+    'fortaleza': 'ce',
+    'goiânia': 'go', 'goiania': 'go',
+    'campo grande': 'ms', 'bonito': 'ms',
+    'vitória': 'es', 'vitoria': 'es'
+  };
+  
+  const cidadeLower = cidade.toLowerCase();
+  
+  for (const [cidadeMap, sigla] of Object.entries(mapeamento)) {
+    if (cidadeLower.includes(cidadeMap)) return sigla;
+  }
+  
+  return 'sp'; // Default
+}
   
   // Mostrar confirmação de seleção (adaptado para ambos os tipos)
   mostrarConfirmacaoSelecao(destino) {
