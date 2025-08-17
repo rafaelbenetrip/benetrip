@@ -102,6 +102,72 @@
           width: calc(100% - 1rem) !important;
         }
       }
+
+      /* ========== ESTILOS ESPECÍFICOS PARA TIPOS DE VIAGEM ========== */
+      
+      /* Indicadores de tipo de viagem */
+      .tipo-viagem-indicator {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        padding: 4px 8px;
+        border-radius: 12px;
+        font-size: 10px;
+        font-weight: bold;
+        z-index: 15;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+      }
+      
+      .tipo-viagem-rodoviario {
+        background: linear-gradient(135deg, #22C55E 0%, #16A34A 100%);
+        color: white;
+      }
+      
+      .tipo-viagem-aereo {
+        background: linear-gradient(135deg, #3B82F6 0%, #2563EB 100%);
+        color: white;
+      }
+      
+      /* Header adaptado para mostrar tipo de viagem */
+      .header-tipo-viagem {
+        background: linear-gradient(135deg, #F3F4F6 0%, #E5E7EB 100%);
+        padding: 8px 16px;
+        border-radius: 8px;
+        margin-bottom: 16px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+      }
+      
+      .header-rodoviario {
+        background: linear-gradient(135deg, #ECFDF5 0%, #D1FAE5 100%);
+        border: 1px solid #BBF7D0;
+      }
+      
+      .header-aereo {
+        background: linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 100%);
+        border: 1px solid #BFDBFE;
+      }
+      
+      /* Animações para ícones */
+      @keyframes bounce-bus {
+        0%, 20%, 50%, 80%, 100% { transform: translateX(0); }
+        40% { transform: translateX(-3px); }
+        60% { transform: translateX(3px); }
+      }
+      
+      @keyframes fly-plane {
+        0% { transform: translateX(-3px) translateY(1px); }
+        50% { transform: translateX(3px) translateY(-1px); }
+        100% { transform: translateX(-3px) translateY(1px); }
+      }
+      
+      .bus-icon { animation: bounce-bus 2s infinite; }
+      .plane-icon { animation: fly-plane 3s ease-in-out infinite; }
     </style>
 </head>
 <body class="mobile-optimized">
@@ -109,7 +175,7 @@
     <div class="native-status-bar"></div>
     
     <div class="container" style="max-width: 480px; margin: 0 auto; padding: 0 1rem;">
-        <!-- Header com botão de voltar -->
+        <!-- Header com botão de voltar e indicador de tipo de viagem -->
         <header class="app-header">
             <button id="btn-voltar" class="btn-voltar" aria-label="Voltar para a página anterior">
                 <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -117,33 +183,90 @@
                 </svg>
                 <span class="sr-only">Voltar</span>
             </button>
-            <h1>Destinos Recomendados</h1>
+            <h1 id="titulo-dinamico">Destinos Recomendados</h1>
         </header>
+
+        <!-- Indicador do tipo de viagem (será preenchido dinamicamente) -->
+        <div id="header-tipo-viagem" class="header-tipo-viagem hidden" role="region" aria-label="Tipo de viagem">
+            <span id="icone-tipo-viagem" class="text-lg" aria-hidden="true"></span>
+            <span id="texto-tipo-viagem" class="font-medium text-sm"></span>
+            <span id="badge-economia" class="badge-economia hidden" aria-label="Opção econômica">
+                💰 Econômico
+            </span>
+        </div>
     
-        <!-- Conteúdo principal --->
+        <!-- Conteúdo principal -->
         <main id="destinos-container">
             <!-- Conteúdo de carregamento inicial -->
             <div class="loading-container">
                 <div style="text-align: center; padding: 2rem 0;">
-                    <img src="assets/images/tripinha/avatar-pensando.png" alt="Tripinha carregando" class="loading-avatar" style="width: 80px; height: 80px; margin: 0 auto;" />
-                    <div class="loading-text" style="margin: 1rem 0;">Farejando destinos incríveis para você...</div>
+                    <img id="loading-avatar" src="assets/images/tripinha/avatar-pensando.png" alt="Tripinha carregando" class="loading-avatar" style="width: 80px; height: 80px; margin: 0 auto;" />
+                    <div id="loading-text" class="loading-text" style="margin: 1rem 0;">Farejando destinos incríveis para você...</div>
                     <div class="progress-bar-container">
                         <div class="progress-bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" aria-label="Progresso da busca de destinos"></div>
                     </div>
+                    <!-- Mensagens de progresso específicas por tipo -->
+                    <div id="progresso-especifico" class="text-xs text-gray-500 mt-2" aria-live="polite"></div>
                 </div>
             </div>
             
             <!-- Interface principal (hidden inicialmente) -->
             <div id="conteudo-recomendacoes" class="hidden">
+                <!-- Mensagem da Tripinha adaptada -->
                 <div id="mensagem-tripinha" aria-live="polite"></div>
-                <h2 id="titulo-destaque" class="sr-only">Destino em destaque</h2>
-                <div id="destino-destaque" class="mt-4" aria-labelledby="titulo-destaque"></div>
                 
-                <h2 id="titulo-alternativos" class="sr-only">Destinos alternativos</h2>
-                <div id="destinos-alternativos" class="mt-4" aria-labelledby="titulo-alternativos"></div>
+                <!-- Destino em destaque -->
+                <section aria-labelledby="titulo-destaque">
+                    <h2 id="titulo-destaque" class="sr-only">Destino em destaque</h2>
+                    <div id="destino-destaque" class="mt-4" role="region" aria-labelledby="titulo-destaque"></div>
+                </section>
                 
-                <h2 id="titulo-surpresa" class="sr-only">Opção de destino surpresa</h2>
-                <div id="opcao-surpresa" class="mt-4" aria-labelledby="titulo-surpresa"></div>
+                <!-- Destinos alternativos -->
+                <section aria-labelledby="titulo-alternativos">
+                    <h2 id="titulo-alternativos" class="sr-only">Destinos alternativos</h2>
+                    <div id="destinos-alternativos" class="mt-4" role="region" aria-labelledby="titulo-alternativos"></div>
+                </section>
+                
+                <!-- Opção surpresa -->
+                <section aria-labelledby="titulo-surpresa">
+                    <h2 id="titulo-surpresa" class="sr-only">Opção de destino surpresa</h2>
+                    <div id="opcao-surpresa" class="mt-4" role="region" aria-labelledby="titulo-surpresa"></div>
+                </section>
+
+                <!-- Informações adicionais por tipo de viagem -->
+                <div id="info-adicional-tipo-viagem" class="mt-6 hidden">
+                    <!-- Para viagens rodoviárias -->
+                    <div id="info-rodoviario" class="info-rodoviario hidden">
+                        <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+                            <h3 class="font-medium text-green-800 mb-2 flex items-center">
+                                <span class="mr-2">🚌</span>
+                                Dicas para Viagens de Ônibus
+                            </h3>
+                            <ul class="text-sm text-green-700 space-y-1">
+                                <li>• Chegue ao terminal com 30 minutos de antecedência</li>
+                                <li>• Leve documento de identidade original</li>
+                                <li>• Mantenha-se hidratado durante a viagem</li>
+                                <li>• Leve entretenimento para viagens longas</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- Para viagens aéreas -->
+                    <div id="info-aereo" class="info-aereo hidden">
+                        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                            <h3 class="font-medium text-blue-800 mb-2 flex items-center">
+                                <span class="mr-2">✈️</span>
+                                Dicas para Viagens Aéreas
+                            </h3>
+                            <ul class="text-sm text-blue-700 space-y-1">
+                                <li>• Chegue ao aeroporto com 2h de antecedência (voos nacionais)</li>
+                                <li>• Faça check-in online para agilizar o processo</li>
+                                <li>• Consulte as regras de bagagem da companhia aérea</li>
+                                <li>• Mantenha documentos de viagem sempre à mão</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
             </div>
             
             <!-- Mensagem de erro (hidden inicialmente) -->
@@ -163,13 +286,36 @@
             <!-- Fixed bottom bar para ações principais -->
             <div id="bottom-actions" class="fixed-bottom-bar" style="display:none;">
                 <button class="btn-secundario btn-voltar">Refazer Quiz</button>
-                <button class="btn-principal btn-avancar">Ver Voos</button>
+                <button id="btn-principal-acao" class="btn-principal btn-avancar">Ver Opções</button>
             </div>
         </main>
+
+        <!-- Seção de feedback do usuário -->
+        <section id="feedback-secao" class="mt-8 hidden" aria-labelledby="feedback-titulo">
+            <h2 id="feedback-titulo" class="sr-only">Feedback sobre as recomendações</h2>
+            <div class="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                <h3 class="font-medium mb-3 text-center">Como você avalia nossas recomendações?</h3>
+                <div class="flex justify-center gap-2">
+                    <button class="feedback-btn" data-rating="1" aria-label="Muito ruim">😞</button>
+                    <button class="feedback-btn" data-rating="2" aria-label="Ruim">😐</button>
+                    <button class="feedback-btn" data-rating="3" aria-label="Bom">😊</button>
+                    <button class="feedback-btn" data-rating="4" aria-label="Muito bom">😍</button>
+                    <button class="feedback-btn" data-rating="5" aria-label="Excelente">🤩</button>
+                </div>
+            </div>
+        </section>
     </div>
 
     <!-- Toast notification container -->
     <div id="toast-container" aria-live="polite"></div>
+
+    <!-- Loading overlay para transições entre tipos de viagem -->
+    <div id="loading-overlay" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="bg-white rounded-lg p-6 text-center">
+            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500 mx-auto mb-4"></div>
+            <p class="text-gray-700">Adaptando recomendações...</p>
+        </div>
+    </div>
 
     <!-- Scripts em ordem específica para garantir carregamento correto -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.21/lodash.min.js"></script>
@@ -211,5 +357,143 @@
     </script>
     <script src="assets/js/destinos.js"></script>
     <script src="assets/js/mobile-interactions.js"></script>
+
+    <!-- Script adicional para configurar indicadores visuais -->
+    <script>
+        // Configurar indicadores visuais baseados no tipo de viagem
+        document.addEventListener('DOMContentLoaded', function() {
+            // Listener para mudanças no tipo de viagem
+            document.addEventListener('benetrip_tipo_viagem_detectado', function(evento) {
+                const tipoViagem = evento.detail.tipo;
+                const isRodoviario = tipoViagem === 'rodoviario';
+                
+                // Atualizar classe do body
+                document.body.classList.remove('viagem-rodoviaria', 'viagem-aerea');
+                document.body.classList.add(isRodoviario ? 'viagem-rodoviaria' : 'viagem-aerea');
+                
+                // Atualizar header
+                const headerTipoViagem = document.getElementById('header-tipo-viagem');
+                const iconeTipoViagem = document.getElementById('icone-tipo-viagem');
+                const textoTipoViagem = document.getElementById('texto-tipo-viagem');
+                const badgeEconomia = document.getElementById('badge-economia');
+                const tituloDinamico = document.getElementById('titulo-dinamico');
+                
+                if (headerTipoViagem && iconeTipoViagem && textoTipoViagem) {
+                    headerTipoViagem.classList.remove('hidden', 'header-rodoviario', 'header-aereo');
+                    headerTipoViagem.classList.add(isRodoviario ? 'header-rodoviario' : 'header-aereo');
+                    
+                    if (isRodoviario) {
+                        iconeTipoViagem.textContent = '🚌';
+                        iconeTipoViagem.className = 'text-lg bus-icon';
+                        textoTipoViagem.textContent = 'Viagens de Ônibus';
+                        badgeEconomia.classList.remove('hidden');
+                        tituloDinamico.textContent = 'Destinos de Ônibus';
+                    } else {
+                        iconeTipoViagem.textContent = '✈️';
+                        iconeTipoViagem.className = 'text-lg plane-icon';
+                        textoTipoViagem.textContent = 'Viagens Aéreas';
+                        badgeEconomia.classList.add('hidden');
+                        tituloDinamico.textContent = 'Destinos de Avião';
+                    }
+                }
+                
+                // Mostrar informações específicas do tipo
+                const infoRodoviario = document.getElementById('info-rodoviario');
+                const infoAereo = document.getElementById('info-aereo');
+                const infoAdicional = document.getElementById('info-adicional-tipo-viagem');
+                
+                if (infoRodoviario && infoAereo && infoAdicional) {
+                    infoRodoviario.classList.toggle('hidden', !isRodoviario);
+                    infoAereo.classList.toggle('hidden', isRodoviario);
+                    infoAdicional.classList.remove('hidden');
+                }
+                
+                // Atualizar mensagens de progresso
+                const progressoEspecifico = document.getElementById('progresso-especifico');
+                if (progressoEspecifico) {
+                    progressoEspecifico.textContent = isRodoviario 
+                        ? 'Buscando rotas de ônibus próximas...' 
+                        : 'Consultando companhias aéreas...';
+                }
+                
+                // Atualizar avatar de loading
+                const loadingAvatar = document.getElementById('loading-avatar');
+                if (loadingAvatar) {
+                    loadingAvatar.src = isRodoviario 
+                        ? 'assets/images/tripinha/avatar-onibus.png' 
+                        : 'assets/images/tripinha/avatar-aviao.png';
+                    loadingAvatar.onerror = function() {
+                        this.src = 'assets/images/tripinha/avatar-pensando.png';
+                    };
+                }
+                
+                console.log(`🎨 Indicadores visuais configurados para ${tipoViagem.toUpperCase()}`);
+            });
+            
+            // Configurar botões de feedback
+            document.querySelectorAll('.feedback-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const rating = this.dataset.rating;
+                    console.log(`👍 Feedback recebido: ${rating}/5`);
+                    
+                    // Destacar botão selecionado
+                    document.querySelectorAll('.feedback-btn').forEach(b => b.classList.remove('selected'));
+                    this.classList.add('selected');
+                    
+                    // Salvar feedback
+                    localStorage.setItem('benetrip_feedback_destinos', rating);
+                    
+                    // Mostrar agradecimento
+                    setTimeout(() => {
+                        const feedbackSecao = document.getElementById('feedback-secao');
+                        if (feedbackSecao) {
+                            feedbackSecao.innerHTML = `
+                                <div class="text-center p-4">
+                                    <span class="text-2xl">🙏</span>
+                                    <p class="text-sm text-gray-600 mt-2">Obrigado pelo seu feedback!</p>
+                                </div>
+                            `;
+                        }
+                    }, 1000);
+                });
+            });
+        });
+        
+        // Estilo para botões de feedback
+        const feedbackStyle = document.createElement('style');
+        feedbackStyle.textContent = `
+            .feedback-btn {
+                font-size: 24px;
+                padding: 8px;
+                border: 2px solid transparent;
+                border-radius: 50%;
+                background: none;
+                cursor: pointer;
+                transition: all 0.2s ease;
+            }
+            .feedback-btn:hover {
+                background: rgba(232, 119, 34, 0.1);
+                border-color: rgba(232, 119, 34, 0.3);
+            }
+            .feedback-btn.selected {
+                background: rgba(232, 119, 34, 0.2);
+                border-color: #E87722;
+                transform: scale(1.1);
+            }
+            .badge-economia {
+                background: linear-gradient(135deg, #FEF3C7 0%, #FBBF24 100%);
+                color: #92400E;
+                padding: 4px 8px;
+                border-radius: 16px;
+                font-size: 10px;
+                font-weight: bold;
+                display: inline-flex;
+                align-items: center;
+                gap: 4px;
+                border: 1px solid #F59E0B;
+            }
+        `;
+        document.head.appendChild(feedbackStyle);
+    </script>
 </body>
 </html>
