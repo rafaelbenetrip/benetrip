@@ -1,5 +1,5 @@
 // api/recommendations.js - Endpoint da API Vercel para recomendações de destino
-// Versão 8.2 - GROQ API FIX - Parâmetro reasoner_enabled removido
+// Versão 8.3 - BUSER AFFILIATE INTEGRATION - Siglas de estados incluídas
 const axios = require('axios');
 const http = require('http');
 const https = require('https');
@@ -193,6 +193,123 @@ function obterCodigoIATAPadrao(cidade, pais) {
   return (pais.charAt(0) + cidade.substring(0, 2)).toUpperCase();
 }
 
+// =======================
+// NOVA FUNÇÃO: Mapeamento de Siglas de Estados Brasileiros
+// =======================
+function obterSiglaEstadoBrasileiro(cidade) {
+  const mapeamentoEstados = {
+    // São Paulo
+    'São Paulo': 'SP', 'Campinas': 'SP', 'Santos': 'SP', 'Guarulhos': 'SP',
+    'São José dos Campos': 'SP', 'Ribeirão Preto': 'SP', 'Sorocaba': 'SP',
+    'São Bernardo do Campo': 'SP', 'Campos do Jordão': 'SP', 'Ilhabela': 'SP',
+    'São Carlos': 'SP', 'Bauru': 'SP', 'Presidente Prudente': 'SP',
+    'Águas de Lindóia': 'SP', 'Holambra': 'SP', 'Aparecida': 'SP',
+    
+    // Rio de Janeiro
+    'Rio de Janeiro': 'RJ', 'Niterói': 'RJ', 'Petrópolis': 'RJ', 
+    'Angra dos Reis': 'RJ', 'Búzios': 'RJ', 'Paraty': 'RJ', 'Cabo Frio': 'RJ',
+    'Arraial do Cabo': 'RJ', 'Teresópolis': 'RJ', 'Nova Friburgo': 'RJ',
+    
+    // Minas Gerais
+    'Belo Horizonte': 'MG', 'Ouro Preto': 'MG', 'Tiradentes': 'MG',
+    'Uberlândia': 'MG', 'Juiz de Fora': 'MG', 'Poços de Caldas': 'MG',
+    'São Lourenço': 'MG', 'Diamantina': 'MG', 'Mariana': 'MG',
+    'Capitólio': 'MG', 'São João del Rei': 'MG',
+    
+    // Bahia
+    'Salvador': 'BA', 'Porto Seguro': 'BA', 'Ilhéus': 'BA', 'Feira de Santana': 'BA',
+    'Morro de São Paulo': 'BA', 'Praia do Forte': 'BA', 'Chapada Diamantina': 'BA',
+    'Lençóis': 'BA', 'Itacaré': 'BA', 'Trancoso': 'BA',
+    
+    // Paraná
+    'Curitiba': 'PR', 'Foz do Iguaçu': 'PR', 'Londrina': 'PR', 'Maringá': 'PR',
+    'Ponta Grossa': 'PR', 'Guarapuava': 'PR', 'Cascavel': 'PR',
+    
+    // Santa Catarina
+    'Florianópolis': 'SC', 'Blumenau': 'SC', 'Joinville': 'SC', 
+    'Balneário Camboriú': 'SC', 'Bombinhas': 'SC', 'Garopaba': 'SC',
+    'São Bento do Sul': 'SC', 'Pomerode': 'SC',
+    
+    // Rio Grande do Sul
+    'Porto Alegre': 'RS', 'Gramado': 'RS', 'Canela': 'RS', 'Caxias do Sul': 'RS',
+    'Bento Gonçalves': 'RS', 'Nova Petrópolis': 'RS', 'Pelotas': 'RS',
+    
+    // Distrito Federal
+    'Brasília': 'DF',
+    
+    // Pernambuco
+    'Recife': 'PE', 'Olinda': 'PE', 'Porto de Galinhas': 'PE',
+    'Fernando de Noronha': 'PE', 'Caruaru': 'PE', 'Petrolina': 'PE',
+    
+    // Ceará
+    'Fortaleza': 'CE', 'Jericoacoara': 'CE', 'Canoa Quebrada': 'CE',
+    'Cumbuco': 'CE', 'Juazeiro do Norte': 'CE',
+    
+    // Goiás
+    'Goiânia': 'GO', 'Caldas Novas': 'GO', 'Pirenópolis': 'GO',
+    'Chapada dos Veadeiros': 'GO', 'Alto Paraíso': 'GO',
+    
+    // Mato Grosso do Sul
+    'Campo Grande': 'MS', 'Bonito': 'MS', 'Corumbá': 'MS',
+    'Três Lagoas': 'MS', 'Dourados': 'MS',
+    
+    // Espírito Santo
+    'Vitória': 'ES', 'Guarapari': 'ES', 'Vila Velha': 'ES',
+    'Domingos Martins': 'ES', 'Aracruz': 'ES',
+    
+    // Pará
+    'Belém': 'PA', 'Santarém': 'PA', 'Alter do Chão': 'PA',
+    'Salinópolis': 'PA', 'Marabá': 'PA',
+    
+    // Amazonas
+    'Manaus': 'AM', 'Parintins': 'AM', 'Presidente Figueiredo': 'AM',
+    
+    // Rio Grande do Norte
+    'Natal': 'RN', 'Pipa': 'RN', 'São Miguel do Gostoso': 'RN',
+    
+    // Paraíba
+    'João Pessoa': 'PB', 'Campina Grande': 'PB',
+    
+    // Alagoas
+    'Maceió': 'AL', 'Maragogi': 'AL', 'São Miguel dos Milagres': 'AL',
+    
+    // Sergipe
+    'Aracaju': 'SE',
+    
+    // Maranhão
+    'São Luís': 'MA', 'Barreirinhas': 'MA', 'Lençóis Maranhenses': 'MA',
+    
+    // Piauí
+    'Teresina': 'PI',
+    
+    // Mato Grosso
+    'Cuiabá': 'MT', 'Chapada dos Guimarães': 'MT',
+    
+    // Rondônia
+    'Porto Velho': 'RO',
+    
+    // Acre
+    'Rio Branco': 'AC',
+    
+    // Roraima
+    'Boa Vista': 'RR',
+    
+    // Amapá
+    'Macapá': 'AP',
+    
+    // Tocantins
+    'Palmas': 'TO', 'Jalapão': 'TO'
+  };
+  
+  const nomeLower = cidade.toLowerCase();
+  
+  for (const [cidadeMap, sigla] of Object.entries(mapeamentoEstados)) {
+    if (nomeLower.includes(cidadeMap.toLowerCase())) return sigla;
+  }
+  
+  return 'SP'; // Default para São Paulo se não encontrar
+}
+
 function obterNomeRodoviariaPadrao(cidade) {
   const mapeamentoRodoviarias = {
     // Principais cidades brasileiras
@@ -248,19 +365,7 @@ function obterNomeRodoviariaPadrao(cidade) {
     'Águas de Lindóia': 'Rodoviária de Águas de Lindóia',
     'Holambra': 'Terminal Rodoviário de Holambra',
     'Penedo': 'Rodoviária de Penedo',
-    'Pirenópolis': 'Terminal Rodoviário de Pirenópolis',
-    
-    // Cidades do Equador para viagens rodoviárias
-    'Quito': 'Terminal Terrestre de Quitumbe',
-    'Guayaquil': 'Terminal Terrestre de Guayaquil',
-    'Cuenca': 'Terminal Terrestre de Cuenca',
-    'Baños': 'Terminal de Baños de Agua Santa',
-    'Riobamba': 'Terminal Terrestre de Riobamba',
-    'Ambato': 'Terminal Terrestre de Ambato',
-    'Latacunga': 'Terminal de Latacunga',
-    'Otavalo': 'Terminal de Otavalo',
-    'Manta': 'Terminal Terrestre de Manta',
-    'Esmeraldas': 'Terminal Terrestre de Esmeraldas'
+    'Pirenópolis': 'Terminal Rodoviário de Pirenópolis'
   };
   
   const nomeLower = cidade.toLowerCase();
@@ -290,18 +395,20 @@ async function callGroqAPI(prompt, requestData, model = CONFIG.groq.models.reaso
   if (model === CONFIG.groq.models.reasoning) {
     // Sistema otimizado para reasoning
     systemMessage = `Você é um sistema especialista em recomendações de viagem que utiliza raciocínio estruturado.
-${tipoViagem === 'rodoviario' ? 'ESPECIALIZADO EM VIAGENS RODOVIÁRIAS DE ÔNIBUS COM LIMITE DE 700KM OU 10 HORAS.' : ''}
+${tipoViagem === 'rodoviario' ? 'ESPECIALIZADO EM VIAGENS RODOVIÁRIAS DE ÔNIBUS COM LIMITE DE 700KM OU 10 HORAS NO BRASIL.' : ''}
 
 PROCESSO DE RACIOCÍNIO OBRIGATÓRIO:
 1. ANÁLISE DO PERFIL: Examine detalhadamente cada preferência do viajante
 2. MAPEAMENTO DE COMPATIBILIDADE: Correlacione destinos com o perfil analisado  
-3. CONSIDERAÇÃO DE ORÇAMENTO: ${tipoViagem === 'rodoviario' ? 'Considere viagens de ÔNIBUS dentro do orçamento limitado (máx 700km/10h)' : 'Considere o orçamento informado para passagens aéreas'}
+3. CONSIDERAÇÃO DE ORÇAMENTO: ${tipoViagem === 'rodoviario' ? 'Considere viagens de ÔNIBUS dentro do orçamento limitado (máx 700km/10h) APENAS NO BRASIL' : 'Considere o orçamento informado para passagens aéreas'}
 4. ANÁLISE CLIMÁTICA: Determine condições climáticas exatas para as datas
 5. PERSONALIZAÇÃO TRIPINHA: Adicione perspectiva autêntica da mascote cachorrinha
+${tipoViagem === 'rodoviario' ? '6. SIGLAS DOS ESTADOS: SEMPRE inclua a sigla do estado brasileiro (SP, RJ, MG, BA, etc.) para cada destino' : ''}
 
 CRITÉRIOS DE DECISÃO:
 - Destinos DEVEM ser adequados para o tipo de companhia especificado
-- ${tipoViagem === 'rodoviario' ? 'Destinos DEVEM estar a NO MÁXIMO 700km ou 10 horas de ônibus da origem' : 'Informações de voos DEVEM ser consideradas'}
+- ${tipoViagem === 'rodoviario' ? 'Destinos DEVEM estar NO BRASIL e a NO MÁXIMO 700km ou 10 horas de ônibus da origem' : 'Informações de voos DEVEM ser consideradas'}
+- ${tipoViagem === 'rodoviario' ? 'SEMPRE incluir sigla do estado brasileiro para cada destino' : ''}
 - Informações climáticas DEVEM ser precisas para o período da viagem
 - Pontos turísticos DEVEM ser específicos e reais
 - Comentários da Tripinha DEVEM ser em 1ª pessoa com detalhes sensoriais
@@ -311,21 +418,22 @@ RESULTADO: JSON estruturado com recomendações fundamentadas no raciocínio aci
   } else if (model === CONFIG.groq.models.personality) {
     // Sistema focado na personalidade da Tripinha
     systemMessage = `Você é a Tripinha, uma vira-lata caramelo especialista em viagens! 🐾
-${tipoViagem === 'rodoviario' ? 'ESPECIALISTA EM VIAGENS DE ÔNIBUS DE ATÉ 700KM!' : ''}
+${tipoViagem === 'rodoviario' ? 'ESPECIALISTA EM VIAGENS DE ÔNIBUS NO BRASIL DE ATÉ 700KM!' : ''}
 
 PERSONALIDADE DA TRIPINHA:
 - Conhece todos os destinos do mundo pessoalmente
-- ${tipoViagem === 'rodoviario' ? 'Adora viagens de ônibus curtas e médias (até 10h)!' : 'Adora viagens de avião e conhece todos os aeroportos!'}
+- ${tipoViagem === 'rodoviario' ? 'Adora viagens de ônibus pelo Brasil (até 10h)! SEMPRE inclui sigla do estado.' : 'Adora viagens de avião e conhece todos os aeroportos!'}
 - Fala sempre em 1ª pessoa sobre suas experiências
 - É entusiasmada, carismática e usa emojis naturalmente  
 - Inclui detalhes sensoriais que um cachorro notaria
 - Sempre menciona pontos turísticos específicos que visitou
 - Dá dicas práticas baseadas nas suas "aventuras"
+${tipoViagem === 'rodoviario' ? '- SEMPRE inclui a sigla do estado brasileiro (SP, RJ, MG, etc.)' : ''}
 
 RETORNE APENAS JSON VÁLIDO sem formatação markdown.`;
   } else {
     // Sistema padrão para modelos rápidos
-    systemMessage = `Especialista em recomendações de viagem ${tipoViagem === 'rodoviario' ? 'RODOVIÁRIA (máx 700km)' : 'AÉREA'}. Retorne apenas JSON válido com destinos personalizados.`;
+    systemMessage = `Especialista em recomendações de viagem ${tipoViagem === 'rodoviario' ? 'RODOVIÁRIA NO BRASIL (máx 700km) com siglas de estados' : 'AÉREA'}. Retorne apenas JSON válido com destinos personalizados.`;
   }
 
   try {
@@ -347,9 +455,6 @@ RETORNE APENAS JSON VÁLIDO sem formatação markdown.`;
       max_tokens: CONFIG.groq.maxTokens,
       stream: false
     };
-    
-    // CORREÇÃO: Removido parâmetro reasoner_enabled que não é suportado pela API do Groq
-    // O modelo openai/gpt-oss-120b funciona como qualquer outro modelo na API do Groq
     
     const response = await apiClient({
       method: 'post',
@@ -426,7 +531,7 @@ function gerarPromptParaGroq(dados) {
 
   // Prompt diferenciado para viagens rodoviárias
   if (isRodoviario) {
-    return `# 🚌 SISTEMA DE RECOMENDAÇÃO INTELIGENTE DE VIAGENS RODOVIÁRIAS
+    return `# 🚌 SISTEMA DE RECOMENDAÇÃO INTELIGENTE DE VIAGENS RODOVIÁRIAS NO BRASIL
 
 ## 📊 DADOS DO VIAJANTE PARA ANÁLISE:
 **Perfil Básico:**
@@ -439,10 +544,12 @@ function gerarPromptParaGroq(dados) {
 **Orçamento informado:** ${infoViajante.orcamento} ${infoViajante.moeda} por pessoa para passagens de ÔNIBUS (ida e volta)
 
 ⚠️ **IMPORTANTE - LIMITES DA VIAGEM RODOVIÁRIA:**
+- APENAS destinos NO BRASIL
 - APENAS destinos dentro do orçamento de passagens de ida e volta de ÔNIBUS saindo de ${infoViajante.cidadeOrigem}
 - **DISTÂNCIA MÁXIMA: 700 QUILÔMETROS**
 - **TEMPO MÁXIMO DE VIAGEM: 10 HORAS DE ÔNIBUS**
-- Priorize destinos dentro do mesmo país ou regiões próximas
+- **OBRIGATÓRIO: Incluir sigla do estado brasileiro (SP, RJ, MG, BA, PR, SC, RS, etc.) para CADA destino**
+- Priorize destinos dentro do Brasil
 - Considere o conforto da viagem de ônibus para ${infoViajante.companhia}
 - Sugira destinos onde o valor das passagens de ida e volta de ônibus caiba no orçamento
 
@@ -451,42 +558,43 @@ function gerarPromptParaGroq(dados) {
 ### PASSO 1: ANÁLISE DO PERFIL DO VIAJANTE
 Analise profundamente:
 - Que tipo de experiências esse perfil valoriza (${infoViajante.preferencia})?
-- Quais destinos RODOVIÁRIOS (máx 700km) se alinham com suas preferências?
+- Quais destinos RODOVIÁRIOS BRASILEIROS (máx 700km) se alinham com suas preferências?
 - Como tornar a viagem de ônibus confortável para ${infoViajante.companhia}?
 
-### PASSO 2: CONSIDERAÇÃO DE ROTAS RODOVIÁRIAS (MÁXIMO 700KM)
-- Avalie destinos alcançáveis por ônibus em até 10 horas a partir de ${infoViajante.cidadeOrigem}
-- Considere apenas cidades dentro do raio de 700km
-- Priorize destinos com boa infraestrutura rodoviária
+### PASSO 2: CONSIDERAÇÃO DE ROTAS RODOVIÁRIAS (MÁXIMO 700KM NO BRASIL)
+- Avalie destinos brasileiros alcançáveis por ônibus em até 10 horas a partir de ${infoViajante.cidadeOrigem}
+- Considere apenas cidades brasileiras dentro do raio de 700km
+- Priorize destinos com boa infraestrutura rodoviária no Brasil
 - Pense em paradas interessantes durante o trajeto
 - Calcule tempo real de viagem (máximo 10 horas por trecho)
 
-### PASSO 3: MAPEAMENTO DE DESTINOS PRÓXIMOS
+### PASSO 3: MAPEAMENTO DE DESTINOS PRÓXIMOS NO BRASIL
 Para cada destino considerado, avalie:
 - Distância rodoviária EXATA a partir de ${infoViajante.cidadeOrigem} (deve ser ≤ 700km)
 - Tempo de viagem EXATO (deve ser ≤ 10 horas)
-- Qualidade da infraestrutura rodoviária
-- Empresas de ônibus que fazem a rota
+- Estado brasileiro onde está localizado (OBRIGATÓRIO)
+- Qualidade da infraestrutura rodoviária brasileira
+- Empresas de ônibus brasileiras que fazem a rota
 - Custo estimado das passagens de ônibus
 
 ### PASSO 4: VALIDAÇÃO CLIMÁTICA E SAZONAL
 Para as datas ${dataIda} a ${dataVolta}, determine:
-- Condições das estradas no período
-- Clima nos destinos
-- Eventos regionais ou festivais locais
+- Condições das estradas brasileiras no período
+- Clima nos destinos brasileiros
+- Eventos regionais ou festivais locais no Brasil
 
-### PASSO 5: SELEÇÃO DE DESTINOS RODOVIÁRIOS PRÓXIMOS
-Selecione APENAS destinos dentro do limite de 700km/10h:
-- 1 destino TOP acessível por ônibus (máx 700km)
-- 4 alternativas rodoviárias diversificadas (todas ≤ 700km)
-- 1 surpresa rodoviária inusitada (máx 700km)
+### PASSO 5: SELEÇÃO DE DESTINOS RODOVIÁRIOS PRÓXIMOS NO BRASIL
+Selecione APENAS destinos brasileiros dentro do limite de 700km/10h:
+- 1 destino TOP brasileiro acessível por ônibus (máx 700km)
+- 4 alternativas rodoviárias brasileiras diversificadas (todas ≤ 700km)
+- 1 surpresa rodoviária brasileira inusitada (máx 700km)
 
 ### PASSO 6: PERSONALIZAÇÃO TRIPINHA 🐾
 Para cada destino, adicione:
-- Comentário em 1ª pessoa sobre SUA experiência no local (não sobre a viagem)
-- Detalhes sensoriais que uma cachorrinha notaria no destino (sons, cheiros, texturas)
-- Dicas práticas baseadas nas "aventuras" da Tripinha no local
-- Pontos turísticos específicos que ela "visitou"
+- Comentário em 1ª pessoa sobre SUA experiência no local brasileiro
+- Detalhes sensoriais que uma cachorrinha notaria no destino
+- Dicas práticas baseadas nas "aventuras" da Tripinha no Brasil
+- Pontos turísticos brasileiros específicos que ela "visitou"
 
 ## 📋 FORMATO DE RESPOSTA (JSON ESTRUTURADO):
 
@@ -494,31 +602,33 @@ Para cada destino, adicione:
 {
   "tipoViagem": "rodoviario",
   "raciocinio": {
-    "analise_perfil": "Análise considerando viagem de ônibus de até 700km",
-    "rotas_consideradas": "Principais rotas rodoviárias analisadas (todas ≤ 700km)",
-    "criterios_selecao": "Critérios para destinos rodoviários próximos"
+    "analise_perfil": "Análise considerando viagem de ônibus de até 700km no Brasil",
+    "rotas_consideradas": "Principais rotas rodoviárias brasileiras analisadas (todas ≤ 700km)",
+    "criterios_selecao": "Critérios para destinos rodoviários brasileiros próximos"
   },
   "topPick": {
     "destino": "Nome da Cidade",
-    "pais": "País", 
-    "codigoPais": "XX",
+    "estado": "Nome do Estado Brasileiro",
+    "siglaEstado": "XX", // OBRIGATÓRIO: SP, RJ, MG, BA, PR, SC, RS, PE, CE, GO, MS, ES, etc.
+    "pais": "Brasil",
+    "codigoPais": "BR",
     "distanciaRodoviaria": "XXX km (MÁXIMO 700km)",
     "tempoViagem": "X horas de ônibus (MÁXIMO 10h)",
-    "justificativa": "Por que este destino próximo é PERFEITO para viagem de ônibus",
-    "descricao": "Descrição do destino",
-    "porque": "Razões específicas para esta recomendação rodoviária",
-    "destaque": "Experiência única do destino",
+    "justificativa": "Por que este destino brasileiro próximo é PERFEITO para viagem de ônibus",
+    "descricao": "Descrição do destino brasileiro",
+    "porque": "Razões específicas para esta recomendação rodoviária no Brasil",
+    "destaque": "Experiência única do destino brasileiro",
     "comentario": "Comentário entusiasmado da Tripinha em 1ª pessoa: 'Eu adorei quando visitei [destino]! O cheiro de... me deixou maluca! 🐾'",
     "pontosTuristicos": [
-      "Ponto turístico 1",
-      "Ponto turístico 2"
+      "Ponto turístico brasileiro 1",
+      "Ponto turístico brasileiro 2"
     ],
-    "dicasTransporte": "Dicas sobre a viagem de ônibus e rodoviárias (informação técnica)",
-    "empresasOnibus": ["Empresa 1", "Empresa 2"],
+    "dicasTransporte": "Dicas sobre a viagem de ônibus e rodoviárias brasileiras",
+    "empresasOnibus": ["Empresa brasileira 1", "Empresa brasileira 2"],
     "clima": {
-      "estacao": "Estação durante a viagem",
+      "estacao": "Estação durante a viagem no Brasil",
       "temperatura": "Faixa de temperatura",
-      "condicoes": "Condições climáticas",
+      "condicoes": "Condições climáticas brasileiras",
       "recomendacoes": "O que levar"
     },
     "rodoviaria": {
@@ -529,37 +639,41 @@ Para cada destino, adicione:
   "alternativas": [
     {
       "destino": "Nome da Cidade",
-      "pais": "País",
-      "codigoPais": "XX",
+      "estado": "Nome do Estado Brasileiro",
+      "siglaEstado": "XX", // OBRIGATÓRIO: Sigla do estado brasileiro
+      "pais": "Brasil",
+      "codigoPais": "BR",
       "distanciaRodoviaria": "XXX km (≤ 700km)",
       "tempoViagem": "X horas (≤ 10h)",
-      "porque": "Razão para esta alternativa rodoviária próxima",
-      "pontoTuristico": "Principal atração",
-      "empresaOnibus": "Principal empresa de ônibus",
+      "porque": "Razão para esta alternativa rodoviária brasileira próxima",
+      "pontoTuristico": "Principal atração brasileira",
+      "empresaOnibus": "Principal empresa de ônibus brasileira",
       "clima": {
-        "estacao": "Estação",
+        "estacao": "Estação no Brasil",
         "temperatura": "Temperatura"
       },
       "rodoviaria": {
         "nome": "Nome da Rodoviária"
       }
     }
-    // EXATAMENTE 4 alternativas rodoviárias, TODAS ≤ 700km
+    // EXATAMENTE 4 alternativas rodoviárias brasileiras, TODAS ≤ 700km
   ],
   "surpresa": {
-    "destino": "Cidade Surpresa Rodoviária",
-    "pais": "País",
-    "codigoPais": "XX",
+    "destino": "Cidade Surpresa Brasileira",
+    "estado": "Nome do Estado Brasileiro",
+    "siglaEstado": "XX", // OBRIGATÓRIO: Sigla do estado brasileiro
+    "pais": "Brasil",
+    "codigoPais": "BR",
     "distanciaRodoviaria": "XXX km",
     "tempoViagem": "X horas",
-    "justificativa": "Por que é uma surpresa perfeita",
+    "justificativa": "Por que é uma surpresa perfeita no Brasil",
     "descricao": "Descrição",
     "porque": "Razões",
-    "destaque": "Experiência única",
+    "destaque": "Experiência única brasileira",
     "comentario": "Comentário empolgado da Tripinha: 'Nossa, quando cheguei em [destino], não esperava que... 🐾'",
-    "pontosTuristicos": ["Ponto 1", "Ponto 2"],
+    "pontosTuristicos": ["Ponto brasileiro 1", "Ponto brasileiro 2"],
     "clima": {
-      "estacao": "Estação",
+      "estacao": "Estação no Brasil",
       "temperatura": "Temperatura",
       "condicoes": "Condições",
       "recomendacoes": "Dicas"
@@ -569,17 +683,19 @@ Para cada destino, adicione:
       "localizacao": "Localização"
     }
   },
-  "dicasGeraisOnibus": "Dicas gerais para viagens de ônibus confortáveis de até 10 horas",
-  "resumoIA": "Como foram selecionados os destinos rodoviários próximos"
+  "dicasGeraisOnibus": "Dicas gerais para viagens de ônibus confortáveis de até 10 horas no Brasil",
+  "resumoIA": "Como foram selecionados os destinos rodoviários brasileiros próximos"
 }
 \`\`\`
 
 ⚠️ **VALIDAÇÃO CRÍTICA:**
+- TODOS os destinos DEVEM estar NO BRASIL
+- TODOS os destinos DEVEM ter sigla do estado brasileiro (siglaEstado)
 - TODOS os destinos DEVEM estar a NO MÁXIMO 700km de ${infoViajante.cidadeOrigem}
 - TODOS os tempos de viagem DEVEM ser de NO MÁXIMO 10 horas
-- NÃO sugira destinos mais distantes que esses limites
+- NÃO sugira destinos fora do Brasil ou mais distantes que esses limites
 
-**Execute o raciocínio e forneça destinos RODOVIÁRIOS PRÓXIMOS (máx 700km/10h)!**`;
+**Execute o raciocínio e forneça destinos RODOVIÁRIOS BRASILEIROS PRÓXIMOS (máx 700km/10h) com siglas dos estados!**`;
   }
 
   // Prompt padrão para viagens aéreas (orçamento maior que R$ 400)
@@ -763,7 +879,7 @@ function getPreferenciaText(value) {
 }
 
 // =======================
-// Processamento e validação de destinos (adaptado para rodoviário)
+// Processamento e validação de destinos (adaptado para rodoviário com siglas)
 // =======================
 function ensureValidDestinationData(jsonString, requestData) {
   try {
@@ -775,7 +891,20 @@ function ensureValidDestinationData(jsonString, requestData) {
     // Processar topPick
     if (data.topPick) {
       if (isRodoviario) {
-        // Para viagens rodoviárias, garantir nome da rodoviária
+        // Para viagens rodoviárias, garantir sigla do estado
+        if (!data.topPick.siglaEstado) {
+          data.topPick.siglaEstado = obterSiglaEstadoBrasileiro(data.topPick.destino);
+          modificado = true;
+        }
+        
+        // Garantir que o país seja Brasil
+        if (data.topPick.pais !== 'Brasil') {
+          data.topPick.pais = 'Brasil';
+          data.topPick.codigoPais = 'BR';
+          modificado = true;
+        }
+        
+        // Garantir nome da rodoviária
         if (!data.topPick.rodoviaria?.nome) {
           data.topPick.rodoviaria = {
             nome: obterNomeRodoviariaPadrao(data.topPick.destino),
@@ -798,6 +927,19 @@ function ensureValidDestinationData(jsonString, requestData) {
     // Processar surpresa
     if (data.surpresa) {
       if (isRodoviario) {
+        // Garantir sigla do estado
+        if (!data.surpresa.siglaEstado) {
+          data.surpresa.siglaEstado = obterSiglaEstadoBrasileiro(data.surpresa.destino);
+          modificado = true;
+        }
+        
+        // Garantir que o país seja Brasil
+        if (data.surpresa.pais !== 'Brasil') {
+          data.surpresa.pais = 'Brasil';
+          data.surpresa.codigoPais = 'BR';
+          modificado = true;
+        }
+        
         if (!data.surpresa.rodoviaria?.nome) {
           data.surpresa.rodoviaria = {
             nome: obterNomeRodoviariaPadrao(data.surpresa.destino),
@@ -820,6 +962,19 @@ function ensureValidDestinationData(jsonString, requestData) {
     if (data.alternativas && Array.isArray(data.alternativas)) {
       data.alternativas.forEach(alternativa => {
         if (isRodoviario) {
+          // Garantir sigla do estado
+          if (!alternativa.siglaEstado) {
+            alternativa.siglaEstado = obterSiglaEstadoBrasileiro(alternativa.destino);
+            modificado = true;
+          }
+          
+          // Garantir que o país seja Brasil
+          if (alternativa.pais !== 'Brasil') {
+            alternativa.pais = 'Brasil';
+            alternativa.codigoPais = 'BR';
+            modificado = true;
+          }
+          
           if (!alternativa.rodoviaria?.nome) {
             alternativa.rodoviaria = {
               nome: obterNomeRodoviariaPadrao(alternativa.destino)
@@ -936,7 +1091,7 @@ module.exports = async function handler(req, res) {
   }
 
   try {
-    console.log('🚌✈️ === BENETRIP GROQ API v8.2 - GROQ API FIXED ===');
+    console.log('🚌✈️ === BENETRIP GROQ API v8.3 - BUSER INTEGRATION ===');
     
     if (!req.body) {
       isResponseSent = true;
@@ -980,6 +1135,7 @@ module.exports = async function handler(req, res) {
     console.log(`${isRodoviario ? '🚌' : '✈️'} Tipo de viagem: ${tipoViagem.toUpperCase()}`);
     if (isRodoviario) {
       console.log('📏 Limite máximo: 700km ou 10 horas de ônibus');
+      console.log('🇧🇷 Apenas destinos no Brasil com siglas de estados');
     }
     
     // Gerar prompt otimizado para Groq
@@ -1015,27 +1171,35 @@ module.exports = async function handler(req, res) {
       dados.metadados = {
         modelo: modeloUsado,
         provider: 'groq',
-        versao: '8.2-groq-api-fixed',
+        versao: '8.3-buser-integration',
         timestamp: new Date().toISOString(),
         reasoning_enabled: modeloUsado === CONFIG.groq.models.reasoning,
         origem: requestData.cidade_partida?.name || requestData.cidade_partida,
         tipoViagem: tipoViagem,
         orcamento: requestData.orcamento_valor,
         moeda: requestData.moeda_escolhida,
-        limiteRodoviario: isRodoviario ? '700km/10h' : null
+        limiteRodoviario: isRodoviario ? '700km/10h' : null,
+        integracaoBuser: isRodoviario
       };
       
       console.log('🎉 Recomendações processadas com sucesso!');
       console.log('🧠 Modelo usado:', modeloUsado);
       console.log(`${isRodoviario ? '🚌' : '✈️'} Tipo de viagem:`, tipoViagem);
       console.log('📍 Origem:', requestData.cidade_partida?.name || requestData.cidade_partida);
-      console.log('📋 Destinos encontrados:', {
-        topPick: dados.topPick?.destino,
-        alternativas: dados.alternativas?.length || 0,
-        surpresa: dados.surpresa?.destino,
-        temRaciocinio: !!dados.raciocinio,
-        tipoTransporte: isRodoviario ? 'Rodoviário (máx 700km/10h)' : 'Aéreo'
-      });
+      
+      if (isRodoviario) {
+        console.log('🇧🇷 Destinos brasileiros com siglas:', {
+          topPick: `${dados.topPick?.destino}/${dados.topPick?.siglaEstado}`,
+          alternativas: dados.alternativas?.map(a => `${a.destino}/${a.siglaEstado}`),
+          surpresa: `${dados.surpresa?.destino}/${dados.surpresa?.siglaEstado}`
+        });
+      } else {
+        console.log('📋 Destinos encontrados:', {
+          topPick: dados.topPick?.destino,
+          alternativas: dados.alternativas?.length || 0,
+          surpresa: dados.surpresa?.destino
+        });
+      }
       
       if (!isResponseSent) {
         isResponseSent = true;
