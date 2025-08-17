@@ -439,12 +439,12 @@ function gerarPromptParaGroq(dados) {
 **Orçamento informado:** ${infoViajante.orcamento} ${infoViajante.moeda} por pessoa para passagens de ÔNIBUS (ida e volta)
 
 ⚠️ **IMPORTANTE - LIMITES DA VIAGEM RODOVIÁRIA:**
-- APENAS destinos acessíveis por ÔNIBUS a partir de ${infoViajante.cidadeOrigem}
+- APENAS destinos dentro do orçamento de passagens de ida e volta de ÔNIBUS saindo de ${infoViajante.cidadeOrigem}
 - **DISTÂNCIA MÁXIMA: 700 QUILÔMETROS**
 - **TEMPO MÁXIMO DE VIAGEM: 10 HORAS DE ÔNIBUS**
 - Priorize destinos dentro do mesmo país ou regiões próximas
 - Considere o conforto da viagem de ônibus para ${infoViajante.companhia}
-- Sugira destinos onde o valor das passagens de ônibus caiba no orçamento
+- Sugira destinos onde o valor das passagens de ida e volta de ônibus caiba no orçamento
 
 ## 🎯 PROCESSO DE RACIOCÍNIO PARA VIAGEM RODOVIÁRIA:
 
@@ -550,9 +550,9 @@ Para cada destino, adicione:
     "destino": "Cidade Surpresa Rodoviária",
     "pais": "País",
     "codigoPais": "XX",
-    "distanciaRodoviaria": "XXX km (MÁXIMO 700km)",
-    "tempoViagem": "X horas (MÁXIMO 10h)",
-    "justificativa": "Por que é uma surpresa perfeita de ônibus",
+    "distanciaRodoviaria": "XXX km",
+    "tempoViagem": "X horas",
+    "justificativa": "Por que é uma surpresa perfeita",
     "descricao": "Descrição",
     "porque": "Razões",
     "destaque": "Experiência única",
@@ -570,7 +570,7 @@ Para cada destino, adicione:
     }
   },
   "dicasGeraisOnibus": "Dicas gerais para viagens de ônibus confortáveis de até 10 horas",
-  "resumoIA": "Como foram selecionados os destinos rodoviários próximos (todos ≤ 700km)"
+  "resumoIA": "Como foram selecionados os destinos rodoviários próximos"
 }
 \`\`\`
 
