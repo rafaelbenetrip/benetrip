@@ -1412,7 +1412,7 @@ construirURLBuser(destinoSelecionado) {
     // Fallback para página inicial da Buser
     return 'https://www.buser.com.br/?utm_source=benetrip';
   }
-}
+},
 
 // Funções auxiliares
 normalizarNomeCidade(nome) {
