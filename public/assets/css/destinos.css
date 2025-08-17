@@ -840,3 +840,397 @@ h3 {
   z-index: 9999 !important;
 }
 
+/* Estilos específicos para viagens rodoviárias e aéreas - Adicionar ao destinos.css */
+
+/* ========== INDICADORES DE TIPO DE VIAGEM ========== */
+
+/* Indicador para viagens rodoviárias */
+.tipo-viagem-rodoviario {
+  background: linear-gradient(135deg, #22C55E 0%, #16A34A 100%);
+  color: white;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 10px;
+  font-weight: bold;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.tipo-viagem-rodoviario::before {
+  content: "🚌";
+  font-size: 12px;
+}
+
+/* Indicador para viagens aéreas */
+.tipo-viagem-aereo {
+  background: linear-gradient(135deg, #3B82F6 0%, #2563EB 100%);
+  color: white;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 10px;
+  font-weight: bold;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.tipo-viagem-aereo::before {
+  content: "✈️";
+  font-size: 12px;
+}
+
+/* ========== CARDS ADAPTADOS PARA CADA TIPO ========== */
+
+/* Card principal para viagens rodoviárias */
+.destino-rodoviario {
+  border-left: 4px solid #22C55E;
+}
+
+.destino-rodoviario .card-destino {
+  background: linear-gradient(to bottom, rgba(34, 197, 94, 0.02) 0%, white 100%);
+}
+
+/* Card principal para viagens aéreas */
+.destino-aereo {
+  border-left: 4px solid #3B82F6;
+}
+
+.destino-aereo .card-destino {
+  background: linear-gradient(to bottom, rgba(59, 130, 246, 0.02) 0%, white 100%);
+}
+
+/* ========== INFORMAÇÕES DE TRANSPORTE ========== */
+
+/* Container para informações de terminal rodoviário */
+.info-terminal-rodoviario {
+  background: linear-gradient(135deg, #DCFCE7 0%, #F0FDF4 100%);
+  border: 1px solid #BBF7D0;
+  border-radius: 8px;
+  padding: 12px;
+  position: relative;
+}
+
+.info-terminal-rodoviario::before {
+  content: "🚌";
+  position: absolute;
+  top: -8px;
+  left: 12px;
+  background: white;
+  padding: 0 4px;
+  font-size: 16px;
+}
+
+/* Container para informações de aeroporto */
+.info-aeroporto {
+  background: linear-gradient(135deg, #DBEAFE 0%, #EFF6FF 100%);
+  border: 1px solid #BFDBFE;
+  border-radius: 8px;
+  padding: 12px;
+  position: relative;
+}
+
+.info-aeroporto::before {
+  content: "✈️";
+  position: absolute;
+  top: -8px;
+  left: 12px;
+  background: white;
+  padding: 0 4px;
+  font-size: 16px;
+}
+
+/* ========== BADGES E TAGS ESPECIALIZADAS ========== */
+
+/* Badge para empresas de ônibus */
+.badge-empresa-onibus {
+  background: linear-gradient(135deg, #FEF3C7 0%, #FEF9C3 100%);
+  color: #92400E;
+  border: 1px solid #FCD34D;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 500;
+  display: inline-block;
+  margin: 2px;
+}
+
+/* Badge para códigos IATA */
+.badge-iata {
+  background: linear-gradient(135deg, #E0E7FF 0%, #EDE9FE 100%);
+  color: #5B21B6;
+  border: 1px solid #C4B5FD;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  display: inline-block;
+  margin: 2px;
+}
+
+/* ========== TEMPO E DISTÂNCIA RODOVIÁRIA ========== */
+
+/* Container para informações de viagem de ônibus */
+.info-viagem-onibus {
+  background: linear-gradient(135deg, #FEF7FF 0%, #FAFAFA 100%);
+  border: 2px dashed #D946EF;
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin: 8px 0;
+}
+
+.distancia-tempo-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.distancia-info, .tempo-info {
+  text-align: center;
+  flex: 1;
+}
+
+.distancia-info span, .tempo-info span {
+  display: block;
+  font-weight: 600;
+  color: #7C3AED;
+}
+
+.distancia-info small, .tempo-info small {
+  display: block;
+  font-size: 10px;
+  color: #6B7280;
+  margin-top: 2px;
+}
+
+/* ========== BOTÕES ESPECIALIZADOS ========== */
+
+/* Botão para voos */
+.btn-buscar-voos {
+  background: linear-gradient(135deg, #3B82F6 0%, #1D4ED8 100%);
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-buscar-voos::before {
+  content: "✈️";
+  margin-right: 8px;
+}
+
+.btn-buscar-voos:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 16px rgba(59, 130, 246, 0.3);
+}
+
+/* Botão para ônibus */
+.btn-buscar-onibus {
+  background: linear-gradient(135deg, #22C55E 0%, #15803D 100%);
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-buscar-onibus::before {
+  content: "🚌";
+  margin-right: 8px;
+}
+
+.btn-buscar-onibus:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 16px rgba(34, 197, 94, 0.3);
+}
+
+/* ========== MENSAGENS DA TRIPINHA ADAPTADAS ========== */
+
+/* Container para mensagens sobre viagens rodoviárias */
+.tripinha-msg-rodoviario {
+  background: linear-gradient(135deg, #ECFDF5 0%, #F0FDF4 100%);
+  border-left: 4px solid #22C55E;
+}
+
+/* Container para mensagens sobre viagens aéreas */
+.tripinha-msg-aereo {
+  background: linear-gradient(135deg, #EFF6FF 0%, #F0F9FF 100%);
+  border-left: 4px solid #3B82F6;
+}
+
+/* ========== TABS ESPECIALIZADAS ========== */
+
+/* Tab para informações de transporte rodoviário */
+.tab-transporte-rodoviario {
+  position: relative;
+}
+
+.tab-transporte-rodoviario::after {
+  content: "🚌";
+  position: absolute;
+  top: -2px;
+  right: -8px;
+  font-size: 10px;
+  opacity: 0.7;
+}
+
+/* ========== LAYOUTS RESPONSIVOS ESPECÍFICOS ========== */
+
+/* Layout para cards de destinos rodoviários em mobile */
+@media (max-width: 480px) {
+  .destinos-rodoviarios .grid-cols-2 {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  
+  .info-viagem-onibus {
+    padding: 6px 8px;
+  }
+  
+  .distancia-tempo-container {
+    flex-direction: column;
+    gap: 6px;
+  }
+}
+
+/* ========== ANIMAÇÕES ESPECÍFICAS ========== */
+
+/* Animação para ícone de ônibus */
+@keyframes bounce-bus {
+  0%, 20%, 50%, 80%, 100% {
+    transform: translateX(0);
+  }
+  40% {
+    transform: translateX(-3px);
+  }
+  60% {
+    transform: translateX(3px);
+  }
+}
+
+.bus-icon-animated {
+  animation: bounce-bus 2s infinite;
+}
+
+/* Animação para ícone de avião */
+@keyframes fly-plane {
+  0% {
+    transform: translateX(-5px) translateY(2px);
+  }
+  50% {
+    transform: translateX(5px) translateY(-2px);
+  }
+  100% {
+    transform: translateX(-5px) translateY(2px);
+  }
+}
+
+.plane-icon-animated {
+  animation: fly-plane 3s ease-in-out infinite;
+}
+
+/* ========== MELHORIAS NA ACESSIBILIDADE ========== */
+
+/* Alto contraste para informações importantes */
+.high-contrast-rodoviario {
+  background: #000000;
+  color: #00FF00;
+  border: 2px solid #00FF00;
+}
+
+.high-contrast-aereo {
+  background: #000000;
+  color: #00BFFF;
+  border: 2px solid #00BFFF;
+}
+
+/* ========== ESTADOS DE HOVER ESPECÍFICOS ========== */
+
+/* Hover para cards rodoviários */
+.card-destino.rodoviario:hover {
+  border-left-color: #16A34A;
+  box-shadow: 0 8px 16px rgba(34, 197, 94, 0.15);
+}
+
+/* Hover para cards aéreos */
+.card-destino.aereo:hover {
+  border-left-color: #1D4ED8;
+  box-shadow: 0 8px 16px rgba(59, 130, 246, 0.15);
+}
+
+/* ========== INDICADORES DE ECONOMIA ========== */
+
+/* Badge para indicar economia em viagens rodoviárias */
+.badge-economia {
+  background: linear-gradient(135deg, #FEF3C7 0%, #FBBF24 100%);
+  color: #92400E;
+  padding: 4px 8px;
+  border-radius: 16px;
+  font-size: 10px;
+  font-weight: bold;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid #F59E0B;
+}
+
+.badge-economia::before {
+  content: "💰";
+  font-size: 12px;
+}
+
+/* ========== MELHORIAS PARA MODAIS ========== */
+
+/* Modal específico para destinos rodoviários */
+.modal-rodoviario .modal-surpresa-content {
+  border-top: 4px solid #22C55E;
+}
+
+/* Modal específico para destinos aéreos */
+.modal-aereo .modal-surpresa-content {
+  border-top: 4px solid #3B82F6;
+}
+
+/* ========== UTILITÁRIOS ========== */
+
+/* Classe para ocultar elementos em determinado tipo de viagem */
+.hide-on-rodoviario {
+  display: none;
+}
+
+.show-on-rodoviario {
+  display: block;
+}
+
+.hide-on-aereo {
+  display: none;
+}
+
+.show-on-aereo {
+  display: block;
+}
+
+/* Classes dinâmicas aplicadas via JavaScript baseadas no tipo de viagem */
+body.viagem-rodoviaria .hide-on-rodoviario {
+  display: none !important;
+}
+
+body.viagem-rodoviaria .show-on-rodoviario {
+  display: block !important;
+}
+
+body.viagem-aerea .hide-on-aereo {
+  display: none !important;
+}
+
+body.viagem-aerea .show-on-aereo {
+  display: block !important;
+}
