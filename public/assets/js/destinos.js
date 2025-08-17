@@ -1308,7 +1308,7 @@ const BENETRIP_DESTINOS = {
         // Para viagens rodoviárias, usar domínio de ônibus
               return this.construirURLBuser(destinoSelecionado);
     }
-      } else {
+       else {
         // Para viagens aéreas, usar domínio de voos
         urlWhitelabel = `https://voos.benetrip.com.br/?flightSearch=${searchParam}`;
       }
