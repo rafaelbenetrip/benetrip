@@ -17,7 +17,7 @@ const CONFIG = {
       toolUse: 'llama3-groq-70b-8192-tool-use-preview' // APIs futuras
     },
     timeout: 180000,     // 3 minutos para reasoning
-    maxTokens: 3500,     // Reduzido pois não precisa de preços
+    maxTokens: 5000,     // Reduzido pois não precisa de preços
     temperature: 0.6     // Focado para análise
   },
   retries: 2,
