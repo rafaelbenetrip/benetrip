@@ -1,7 +1,8 @@
 /**
  * BENETRIP - Visualização de Destinos Recomendados 
- * Versão 6.0 - SUPORTE A VIAGENS RODOVIÁRIAS E AÉREAS
+ * Versão 6.1 - SUPORTE A VIAGENS RODOVIÁRIAS E AÉREAS (SIMPLIFICADO)
  * Adaptado para mostrar informações de ônibus (< R$ 401) e avião (>= R$ 401)
+ * ATUALIZAÇÃO: Removidas informações de terminal rodoviário e empresas de ônibus
  */
 
 const BENETRIP_DESTINOS = {
@@ -484,7 +485,7 @@ const BENETRIP_DESTINOS = {
     
     const isRodoviario = this.tipoViagem === 'rodoviario';
     const mensagem = isRodoviario 
-      ? "Farejei umas rotas incríveis de ônibus pra você! 🚌🐾 Achei destinos próximos e econômicos que vão ser uma delícia explorar. Dá uma olhada nas minhas sugestões e, se quiser uma surpresa pertinho de casa, clica em 'Me Surpreenda!' 💫"
+      ? "Farejei umas rotas incríveis de ônibus pra você! 🚌🐾 Encontrei destinos perfeitos para explorar viajando de forma econômica e confortável. Dá uma olhada nas distâncias e tempos de viagem que separei especialmente pra você! Se quiser uma surpresa, clica em 'Me Surpreenda!' 💫"
       : "Dei uma boa farejada por aí e encontrei destinos incríveis pra sua próxima aventura! 🐾 Dá uma olhada na minha escolha TOP e em outras opções cheias de potencial! Quer sair do óbvio? Confia na Tripinha: clica em 'Me Surpreenda!' e deixa que eu te levo pra um lugar especial e inesperado! 💫🐶";
     
     container.innerHTML = `
@@ -501,30 +502,15 @@ const BENETRIP_DESTINOS = {
     `;
   },
   
-  // Renderizar informações de transporte (aeroporto ou rodoviária)
+  // Renderizar informações de transporte simplificadas
   renderizarInfoTransporte(destino) {
     const isRodoviario = this.tipoViagem === 'rodoviario';
     
     if (isRodoviario) {
-  return `
-    <!-- Informações simplificadas para rodoviário -->
-    ${destino.distanciaRodoviaria || destino.tempoViagem ? `
-      <div class="mt-2 bg-blue-50 p-3 rounded-lg">
-        <div class="flex items-center mb-2">
-          <span class="text-lg mr-2">🛣️</span>
-          <span class="font-medium">Informações da Viagem</span>
-        </div>
-        ${destino.distanciaRodoviaria ? `
-          <p class="text-sm"><strong>Distância:</strong> ${destino.distanciaRodoviaria}</p>
-        ` : ''}
-        ${destino.tempoViagem ? `
-          <p class="text-sm"><strong>Tempo de viagem:</strong> ${destino.tempoViagem}</p>
-        ` : ''}
-      </div>
-    ` : ''}
-        
+      // Apenas informações de distância e tempo para rodoviário
+      return `
         ${destino.distanciaRodoviaria || destino.tempoViagem ? `
-          <div class="mt-4 bg-blue-50 p-3 rounded-lg">
+          <div class="mt-2 bg-blue-50 p-3 rounded-lg">
             <div class="flex items-center mb-2">
               <span class="text-lg mr-2">🛣️</span>
               <span class="font-medium">Informações da Viagem</span>
@@ -533,12 +519,13 @@ const BENETRIP_DESTINOS = {
               <p class="text-sm"><strong>Distância:</strong> ${destino.distanciaRodoviaria}</p>
             ` : ''}
             ${destino.tempoViagem ? `
-              <p class="text-sm"><strong>Tempo estimado:</strong> ${destino.tempoViagem}</p>
+              <p class="text-sm"><strong>Tempo de viagem:</strong> ${destino.tempoViagem}</p>
             ` : ''}
           </div>
         ` : ''}
       `;
     } else {
+      // Informações de aeroporto para voos
       return `
         <div class="mt-2 bg-gray-50 p-3 rounded-lg">
           <div class="flex items-center mb-2">
@@ -584,7 +571,7 @@ const BENETRIP_DESTINOS = {
       </div>
     `;
     
-    // Sistema de abas adaptado
+    // Sistema de abas simplificado (sem aba transporte)
     let abasHtml = `
       <div class="flex border-b border-gray-200 overflow-x-auto">
         <button id="aba-visao-geral" class="botao-aba aba-ativa px-4 py-2 text-sm font-medium" onclick="BENETRIP_DESTINOS.trocarAba('visao-geral')">
@@ -752,7 +739,6 @@ const BENETRIP_DESTINOS = {
         ${visaoGeralHtml}
         ${pontosTuristicosHtml}
         ${climaHtml}
-        ${transporteHtml}
         ${comentariosHtml}
         ${botaoSelecaoHtml}
       </div>
@@ -782,7 +768,7 @@ const BENETRIP_DESTINOS = {
       const elementoDestino = document.createElement('div');
       elementoDestino.className = 'card-destino border border-gray-200 rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow duration-200 bg-white';
       
-      // Informações de transporte adaptadas
+      // Informações de transporte simplificadas
       let infoTransporte = '';
       if (isRodoviario) {
         if (destino.distanciaRodoviaria) {
@@ -901,7 +887,7 @@ const BENETRIP_DESTINOS = {
     `;
   },
   
-  // Mostrar destino surpresa adaptado
+  // Mostrar destino surpresa adaptado (simplificado)
   mostrarDestinoSurpresa() {
     if (!this.recomendacoes || !this.recomendacoes.surpresa) {
       console.error('Destino surpresa não disponível');
@@ -917,11 +903,6 @@ const BENETRIP_DESTINOS = {
     modalContainer.id = 'modal-surpresa';
     modalContainer.style.overflowY = 'auto';
     modalContainer.style.padding = '1rem 0';
-    
-    // Abas adaptadas para tipo de viagem
-    let abasTransporteHtml = '';
-    
-    let conteudoTransporteHtml = '';
     
     modalContainer.innerHTML = `
       <div class="bg-white rounded-lg w-full max-w-md relative mx-auto my-4 transform transition-transform duration-500 modal-surpresa-content">
@@ -954,7 +935,7 @@ const BENETRIP_DESTINOS = {
           </div>
         </div>
         
-        <!-- Sistema de abas adaptado -->
+        <!-- Sistema de abas simplificado -->
         <div class="flex border-b border-gray-200 overflow-x-auto">
           <button id="aba-surpresa-info" class="botao-aba aba-ativa px-4 py-2 text-sm font-medium" onclick="BENETRIP_DESTINOS.trocarAbaSurpresa('info')">
             Visão Geral
@@ -967,7 +948,6 @@ const BENETRIP_DESTINOS = {
               Clima
             </button>
           ` : ''}
-          ${abasTransporteHtml}
           <button id="aba-surpresa-comentarios" class="botao-aba aba-inativa px-4 py-2 text-sm font-medium" onclick="BENETRIP_DESTINOS.trocarAbaSurpresa('comentarios')">
             Comentários
           </button>
@@ -1070,8 +1050,6 @@ const BENETRIP_DESTINOS = {
           </div>
         ` : ''}
         
-        ${conteudoTransporteHtml}
-        
         <!-- Conteúdo da aba Comentários -->
         <div id="conteudo-surpresa-comentarios" class="conteudo-aba-surpresa p-4 hidden">
           ${destino.comentario ? `
@@ -1157,7 +1135,7 @@ const BENETRIP_DESTINOS = {
     const destinoPadronizado = {
         ...destinoSelecionado,
         codigo_iata: isRodoviario ? null : (destinoSelecionado.aeroporto?.codigo || 'XXX'),
-        terminal_rodoviario: isRodoviario ? (destinoSelecionado.rodoviaria?.nome || `Terminal de ${destinoSelecionado.destino}`) : null,
+        terminal_rodoviario: isRodoviario ? `Terminal de ${destinoSelecionado.destino}` : null,
         tipo_viagem: this.tipoViagem
     };
     
