@@ -506,17 +506,22 @@ const BENETRIP_DESTINOS = {
     const isRodoviario = this.tipoViagem === 'rodoviario';
     
     if (isRodoviario) {
-      return `
-        <div class="mt-2 bg-gray-50 p-3 rounded-lg">
-          <div class="flex items-center mb-2">
-            <span class="text-lg mr-2">🚌</span>
-            <span class="font-medium">Terminal Rodoviário</span>
-          </div>
-          <p class="font-medium">${destino.rodoviaria?.nome || `Terminal Rodoviário de ${destino.destino}`}</p>
-          ${destino.rodoviaria?.localizacao ? `
-            <p class="text-sm text-gray-600 mt-1">${destino.rodoviaria.localizacao}</p>
-          ` : ''}
+  return `
+    <!-- Informações simplificadas para rodoviário -->
+    ${destino.distanciaRodoviaria || destino.tempoViagem ? `
+      <div class="mt-2 bg-blue-50 p-3 rounded-lg">
+        <div class="flex items-center mb-2">
+          <span class="text-lg mr-2">🛣️</span>
+          <span class="font-medium">Informações da Viagem</span>
         </div>
+        ${destino.distanciaRodoviaria ? `
+          <p class="text-sm"><strong>Distância:</strong> ${destino.distanciaRodoviaria}</p>
+        ` : ''}
+        ${destino.tempoViagem ? `
+          <p class="text-sm"><strong>Tempo de viagem:</strong> ${destino.tempoViagem}</p>
+        ` : ''}
+      </div>
+    ` : ''}
         
         ${destino.distanciaRodoviaria || destino.tempoViagem ? `
           <div class="mt-4 bg-blue-50 p-3 rounded-lg">
@@ -530,16 +535,6 @@ const BENETRIP_DESTINOS = {
             ${destino.tempoViagem ? `
               <p class="text-sm"><strong>Tempo estimado:</strong> ${destino.tempoViagem}</p>
             ` : ''}
-          </div>
-        ` : ''}
-        
-        ${destino.empresasOnibus && destino.empresasOnibus.length > 0 ? `
-          <div class="mt-4 bg-green-50 p-3 rounded-lg">
-            <div class="flex items-center mb-2">
-              <span class="text-lg mr-2">🏢</span>
-              <span class="font-medium">Empresas de Ônibus</span>
-            </div>
-            <p class="text-sm">${destino.empresasOnibus.join(', ')}</p>
           </div>
         ` : ''}
       `;
@@ -601,11 +596,6 @@ const BENETRIP_DESTINOS = {
         ${destino.clima && destino.clima.temperatura ? `
           <button id="aba-clima" class="botao-aba aba-inativa px-4 py-2 text-sm font-medium" onclick="BENETRIP_DESTINOS.trocarAba('clima')">
             Clima
-          </button>
-        ` : ''}
-        ${this.tipoViagem === 'rodoviario' && (destino.dicasTransporte || destino.empresasOnibus) ? `
-          <button id="aba-transporte" class="botao-aba aba-inativa px-4 py-2 text-sm font-medium" onclick="BENETRIP_DESTINOS.trocarAba('transporte')">
-            Transporte
           </button>
         ` : ''}
         <button id="aba-comentarios" class="botao-aba aba-inativa px-4 py-2 text-sm font-medium" onclick="BENETRIP_DESTINOS.trocarAba('comentarios')">
@@ -713,50 +703,6 @@ const BENETRIP_DESTINOS = {
       `;
     }
     
-    // Conteúdo da aba Transporte (apenas para rodoviário)
-    let transporteHtml = '';
-    if (this.tipoViagem === 'rodoviario' && (destino.dicasTransporte || destino.empresasOnibus)) {
-      transporteHtml = `
-        <div id="conteudo-transporte" class="conteudo-aba p-4 hidden">
-          ${destino.empresasOnibus && destino.empresasOnibus.length > 0 ? `
-            <div class="bg-blue-50 p-4 rounded-lg mb-4">
-              <h4 class="font-medium mb-2 flex items-center">
-                <span class="mr-2">🚌</span>
-                Empresas de Ônibus
-              </h4>
-              <div class="space-y-2">
-                ${destino.empresasOnibus.map(empresa => `
-                  <div class="bg-white p-2 rounded border">
-                    <span class="font-medium">${empresa}</span>
-                  </div>
-                `).join('')}
-              </div>
-            </div>
-          ` : ''}
-          
-          ${destino.dicasTransporte ? `
-            <div class="bg-yellow-50 p-4 rounded-lg">
-              <h4 class="font-medium mb-2 flex items-center">
-                <span class="mr-2">💡</span>
-                Dicas de Viagem
-              </h4>
-              <p class="text-sm text-gray-700">${destino.dicasTransporte}</p>
-            </div>
-          ` : ''}
-          
-          ${this.recomendacoes.dicasGeraisOnibus ? `
-            <div class="mt-4 bg-green-50 p-4 rounded-lg">
-              <h4 class="font-medium mb-2 flex items-center">
-                <span class="mr-2">🎒</span>
-                Dicas Gerais para Viagens de Ônibus
-              </h4>
-              <p class="text-sm text-gray-700">${this.recomendacoes.dicasGeraisOnibus}</p>
-            </div>
-          ` : ''}
-        </div>
-      `;
-    }
-    
     // Conteúdo da aba Comentários
     let comentariosHtml = `
       <div id="conteudo-comentarios" class="conteudo-aba p-4 hidden">
@@ -839,17 +785,6 @@ const BENETRIP_DESTINOS = {
       // Informações de transporte adaptadas
       let infoTransporte = '';
       if (isRodoviario) {
-        if (destino.rodoviaria && destino.rodoviaria.nome) {
-          infoTransporte = `
-            <div class="flex justify-between items-center">
-              <span class="text-sm font-medium">
-                <span class="mr-1">🚌</span>
-                Terminal
-              </span>
-              <span class="text-xs text-gray-500">Rodoviário</span>
-            </div>
-          `;
-        }
         if (destino.distanciaRodoviaria) {
           infoTransporte += `
             <div class="flex justify-between items-center mt-1">
@@ -985,47 +920,8 @@ const BENETRIP_DESTINOS = {
     
     // Abas adaptadas para tipo de viagem
     let abasTransporteHtml = '';
-    if (isRodoviario && (destino.dicasTransporte || destino.empresasOnibus)) {
-      abasTransporteHtml = `
-        <button id="aba-surpresa-transporte" class="botao-aba aba-inativa px-4 py-2 text-sm font-medium" onclick="BENETRIP_DESTINOS.trocarAbaSurpresa('transporte')">
-          Transporte
-        </button>
-      `;
-    }
     
     let conteudoTransporteHtml = '';
-    if (isRodoviario && (destino.dicasTransporte || destino.empresasOnibus)) {
-      conteudoTransporteHtml = `
-        <!-- Conteúdo da aba Transporte -->
-        <div id="conteudo-surpresa-transporte" class="conteudo-aba-surpresa p-4 hidden">
-          ${destino.empresasOnibus && destino.empresasOnibus.length > 0 ? `
-            <div class="bg-blue-50 p-4 rounded-lg mb-4">
-              <h4 class="font-medium mb-2 flex items-center">
-                <span class="mr-2">🚌</span>
-                Empresas de Ônibus
-              </h4>
-              <div class="space-y-2">
-                ${destino.empresasOnibus.map(empresa => `
-                  <div class="bg-white p-2 rounded border">
-                    <span class="font-medium">${empresa}</span>
-                  </div>
-                `).join('')}
-              </div>
-            </div>
-          ` : ''}
-          
-          ${destino.dicasTransporte ? `
-            <div class="bg-yellow-50 p-4 rounded-lg">
-              <h4 class="font-medium mb-2 flex items-center">
-                <span class="mr-2">💡</span>
-                Dicas de Viagem
-              </h4>
-              <p class="text-sm text-gray-700">${destino.dicasTransporte}</p>
-            </div>
-          ` : ''}
-        </div>
-      `;
-    }
     
     modalContainer.innerHTML = `
       <div class="bg-white rounded-lg w-full max-w-md relative mx-auto my-4 transform transition-transform duration-500 modal-surpresa-content">
