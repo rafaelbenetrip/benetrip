@@ -55898,25 +55898,25 @@
   {
     "cidade": "Windhoek",
     "sigla_estado": "21",
-    "pais": NaN,
+    "pais": null,
     "iata": "WDH"
   },
   {
     "cidade": "Swakopmund",
     "sigla_estado": "29",
-    "pais": NaN,
+    "pais": null,
     "iata": null
   },
   {
     "cidade": "Rundu",
     "sigla_estado": "40",
-    "pais": NaN,
+    "pais": null,
     "iata": null
   },
   {
     "cidade": "Walvis Bay",
     "sigla_estado": "29",
-    "pais": NaN,
+    "pais": null,
     "iata": null
   },
   {
