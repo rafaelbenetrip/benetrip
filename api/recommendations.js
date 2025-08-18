@@ -400,15 +400,15 @@ ${tipoViagem === 'rodoviario' ? 'ESPECIALIZADO EM VIAGENS RODOVIÁRIAS DE ÔNIBU
 PROCESSO DE RACIOCÍNIO OBRIGATÓRIO:
 1. ANÁLISE DO PERFIL: Examine detalhadamente cada preferência do viajante
 2. MAPEAMENTO DE COMPATIBILIDADE: Correlacione destinos com o perfil analisado  
-3. CONSIDERAÇÃO DE ORÇAMENTO: ${tipoViagem === 'rodoviario' ? 'Considere viagens de ÔNIBUS dentro do orçamento limitado (máx 700km/10h) APENAS NO BRASIL' : 'Considere o orçamento informado para passagens aéreas'}
+3. CONSIDERAÇÃO DE ORÇAMENTO: ${tipoViagem === 'rodoviario' ? 'Considere viagens de ÔNIBUS dentro do orçamento para passagens de ida e volta (máx 700km/10h)' : 'Considere o orçamento informado para passagens aéreas'}
 4. ANÁLISE CLIMÁTICA: Determine condições climáticas exatas para as datas
 5. PERSONALIZAÇÃO TRIPINHA: Adicione perspectiva autêntica da mascote cachorrinha
-${tipoViagem === 'rodoviario' ? '6. SIGLAS DOS ESTADOS: SEMPRE inclua a sigla do estado brasileiro (SP, RJ, MG, BA, etc.) para cada destino' : ''}
+${tipoViagem === 'rodoviario' ? '6. SIGLAS DOS ESTADOS: SEMPRE inclua a sigla do estado brasileiro (SP, RJ, MG, BA, etc.) para cada destino, caso seja no Brasil' : ''}
 
 CRITÉRIOS DE DECISÃO:
 - Destinos DEVEM ser adequados para o tipo de companhia especificado
-- ${tipoViagem === 'rodoviario' ? 'Destinos DEVEM estar NO BRASIL e a NO MÁXIMO 700km ou 10 horas de ônibus da origem' : 'Informações de voos DEVEM ser consideradas'}
-- ${tipoViagem === 'rodoviario' ? 'SEMPRE incluir sigla do estado brasileiro para cada destino' : ''}
+- ${tipoViagem === 'rodoviario' ? 'Destinos DEVEM estar NO MÁXIMO 700km ou 10 horas de ônibus da origem' : 'Informações de voos DEVEM ser consideradas'}
+- ${tipoViagem === 'rodoviario' ? 'SEMPRE incluir sigla do estado brasileiro para cada destino, caso seja no Brasil' : ''}
 - Informações climáticas DEVEM ser precisas para o período da viagem
 - Pontos turísticos DEVEM ser específicos e reais
 - Comentários da Tripinha DEVEM ser em 1ª pessoa com detalhes sensoriais
@@ -422,13 +422,13 @@ ${tipoViagem === 'rodoviario' ? 'ESPECIALISTA EM VIAGENS DE ÔNIBUS NO BRASIL DE
 
 PERSONALIDADE DA TRIPINHA:
 - Conhece todos os destinos do mundo pessoalmente
-- ${tipoViagem === 'rodoviario' ? 'Adora viagens de ônibus pelo Brasil (até 10h)! SEMPRE inclui sigla do estado.' : 'Adora viagens de avião e conhece todos os aeroportos!'}
+- ${tipoViagem === 'rodoviario' ? 'Adora viagens de ônibus! SEMPRE inclui sigla do estado.' : 'Adora viagens de avião e conhece todos os aeroportos!'}
 - Fala sempre em 1ª pessoa sobre suas experiências
 - É entusiasmada, carismática e usa emojis naturalmente  
 - Inclui detalhes sensoriais que um cachorro notaria
 - Sempre menciona pontos turísticos específicos que visitou
 - Dá dicas práticas baseadas nas suas "aventuras"
-${tipoViagem === 'rodoviario' ? '- SEMPRE inclui a sigla do estado brasileiro (SP, RJ, MG, etc.)' : ''}
+${tipoViagem === 'rodoviario' ? '- SEMPRE inclui a sigla do estado brasileiro (SP, RJ, MG, etc.), caso seja no Brasil' : ''}
 
 RETORNE APENAS JSON VÁLIDO sem formatação markdown.`;
   } else {
@@ -544,12 +544,10 @@ function gerarPromptParaGroq(dados) {
 **Orçamento informado:** ${infoViajante.orcamento} ${infoViajante.moeda} por pessoa para passagens de ÔNIBUS (ida e volta)
 
 ⚠️ **IMPORTANTE - LIMITES DA VIAGEM RODOVIÁRIA:**
-- APENAS destinos NO BRASIL
 - APENAS destinos dentro do orçamento de passagens de ida e volta de ÔNIBUS saindo de ${infoViajante.cidadeOrigem}
 - **DISTÂNCIA MÁXIMA: 700 QUILÔMETROS**
 - **TEMPO MÁXIMO DE VIAGEM: 10 HORAS DE ÔNIBUS**
-- **OBRIGATÓRIO: Incluir sigla do estado brasileiro (SP, RJ, MG, BA, PR, SC, RS, etc.) para CADA destino**
-- Priorize destinos dentro do Brasil
+- **OBRIGATÓRIO: Incluir sigla do estado brasileiro (SP, RJ, MG, BA, PR, SC, RS, etc.) para CADA destino, caso seja brasileiro**
 - Considere o conforto da viagem de ônibus para ${infoViajante.companhia}
 - Sugira destinos onde o valor das passagens de ida e volta de ônibus caiba no orçamento
 
@@ -558,14 +556,13 @@ function gerarPromptParaGroq(dados) {
 ### PASSO 1: ANÁLISE DO PERFIL DO VIAJANTE
 Analise profundamente:
 - Que tipo de experiências esse perfil valoriza (${infoViajante.preferencia})?
-- Quais destinos RODOVIÁRIOS BRASILEIROS (máx 700km) se alinham com suas preferências?
+- Quais destinos RODOVIÁRIOS (máx 700km) se alinham com suas preferências?
 - Como tornar a viagem de ônibus confortável para ${infoViajante.companhia}?
 
 ### PASSO 2: CONSIDERAÇÃO DE ROTAS RODOVIÁRIAS (MÁXIMO 700KM NO BRASIL)
-- Avalie destinos brasileiros alcançáveis por ônibus em até 10 horas a partir de ${infoViajante.cidadeOrigem}
-- Considere apenas cidades brasileiras dentro do raio de 700km
-- Priorize destinos com boa infraestrutura rodoviária no Brasil
-- Pense em paradas interessantes durante o trajeto
+- Avalie destinos alcançáveis por ônibus em até 10 horas a partir de ${infoViajante.cidadeOrigem}
+- Considere apenas cidades dentro do raio de 700km
+- Priorize destinos com boa infraestrutura rodoviária
 - Calcule tempo real de viagem (máximo 10 horas por trecho)
 
 ### PASSO 3: MAPEAMENTO DE DESTINOS PRÓXIMOS NO BRASIL
@@ -585,16 +582,16 @@ Para as datas ${dataIda} a ${dataVolta}, determine:
 
 ### PASSO 5: SELEÇÃO DE DESTINOS RODOVIÁRIOS PRÓXIMOS NO BRASIL
 Selecione APENAS destinos brasileiros dentro do limite de 700km/10h:
-- 1 destino TOP brasileiro acessível por ônibus (máx 700km)
-- 4 alternativas rodoviárias brasileiras diversificadas (todas ≤ 700km)
-- 1 surpresa rodoviária brasileira inusitada (máx 700km)
+- 1 destino TOP  acessível por ônibus (máx 700km)
+- 4 alternativas rodoviárias diversificadas (todas ≤ 700km)
+- 1 surpresa rodoviária inusitada (máx 700km)
 
 ### PASSO 6: PERSONALIZAÇÃO TRIPINHA 🐾
 Para cada destino, adicione:
-- Comentário em 1ª pessoa sobre SUA experiência no local brasileiro
+- Comentário em 1ª pessoa sobre SUA experiência no local
 - Detalhes sensoriais que uma cachorrinha notaria no destino
-- Dicas práticas baseadas nas "aventuras" da Tripinha no Brasil
-- Pontos turísticos brasileiros específicos que ela "visitou"
+- Dicas práticas baseadas nas "aventuras" da Tripinha
+- Pontos turísticos específicos que ela "visitou"
 
 ## 📋 FORMATO DE RESPOSTA (JSON ESTRUTURADO):
 
@@ -603,8 +600,8 @@ Para cada destino, adicione:
   "tipoViagem": "rodoviario",
   "raciocinio": {
     "analise_perfil": "Análise considerando viagem de ônibus de até 700km no Brasil",
-    "rotas_consideradas": "Principais rotas rodoviárias brasileiras analisadas (todas ≤ 700km)",
-    "criterios_selecao": "Critérios para destinos rodoviários brasileiros próximos"
+    "rotas_consideradas": "Principais rotas rodoviárias analisadas (todas ≤ 700km)",
+    "criterios_selecao": "Critérios para destinos rodoviários próximos"
   },
   "topPick": {
     "destino": "Nome da Cidade",
@@ -645,35 +642,35 @@ Para cada destino, adicione:
       "codigoPais": "BR",
       "distanciaRodoviaria": "XXX km (≤ 700km)",
       "tempoViagem": "X horas (≤ 10h)",
-      "porque": "Razão para esta alternativa rodoviária brasileira próxima",
-      "pontoTuristico": "Principal atração brasileira",
-      "empresaOnibus": "Principal empresa de ônibus brasileira",
+      "porque": "Razão para esta alternativa rodoviária próxima",
+      "pontoTuristico": "Principal atração",
+      "empresaOnibus": "Principal empresa de ônibus",
       "clima": {
-        "estacao": "Estação no Brasil",
+        "estacao": "Estação do ano",
         "temperatura": "Temperatura"
       },
       "rodoviaria": {
         "nome": "Nome da Rodoviária"
       }
     }
-    // EXATAMENTE 4 alternativas rodoviárias brasileiras, TODAS ≤ 700km
+    // EXATAMENTE 4 alternativas rodoviárias, TODAS ≤ 700km
   ],
   "surpresa": {
-    "destino": "Cidade Surpresa Brasileira",
+    "destino": "Cidade Surpresa",
     "estado": "Nome do Estado Brasileiro",
     "siglaEstado": "XX", // OBRIGATÓRIO: Sigla do estado brasileiro
     "pais": "Brasil",
     "codigoPais": "BR",
     "distanciaRodoviaria": "XXX km",
     "tempoViagem": "X horas",
-    "justificativa": "Por que é uma surpresa perfeita no Brasil",
+    "justificativa": "Por que é uma surpresa perfeita",
     "descricao": "Descrição",
     "porque": "Razões",
-    "destaque": "Experiência única brasileira",
+    "destaque": "Experiência única",
     "comentario": "Comentário empolgado da Tripinha: 'Nossa, quando cheguei em [destino], não esperava que... 🐾'",
     "pontosTuristicos": ["Ponto brasileiro 1", "Ponto brasileiro 2"],
     "clima": {
-      "estacao": "Estação no Brasil",
+      "estacao": "Estação do ano",
       "temperatura": "Temperatura",
       "condicoes": "Condições",
       "recomendacoes": "Dicas"
@@ -683,19 +680,18 @@ Para cada destino, adicione:
       "localizacao": "Localização"
     }
   },
-  "dicasGeraisOnibus": "Dicas gerais para viagens de ônibus confortáveis de até 10 horas no Brasil",
-  "resumoIA": "Como foram selecionados os destinos rodoviários brasileiros próximos"
+  "dicasGeraisOnibus": "Dicas gerais para viagens de ônibus confortáveis de até 10 horas",
+  "resumoIA": "Como foram selecionados os destinos rodoviários próximos"
 }
 \`\`\`
 
 ⚠️ **VALIDAÇÃO CRÍTICA:**
-- TODOS os destinos DEVEM estar NO BRASIL
-- TODOS os destinos DEVEM ter sigla do estado brasileiro (siglaEstado)
+- TODOS os destinos DEVEM ter sigla do estado brasileiro (siglaEstado) caso estejam no Brasil
 - TODOS os destinos DEVEM estar a NO MÁXIMO 700km de ${infoViajante.cidadeOrigem}
 - TODOS os tempos de viagem DEVEM ser de NO MÁXIMO 10 horas
-- NÃO sugira destinos fora do Brasil ou mais distantes que esses limites
+- NÃO sugira destinos mais distantes que esses limites
 
-**Execute o raciocínio e forneça destinos RODOVIÁRIOS BRASILEIROS PRÓXIMOS (máx 700km/10h) com siglas dos estados!**`;
+**Execute o raciocínio e forneça destinos RODOVIÁRIOS PRÓXIMOS (máx 700km/10h) com siglas dos estados!**`;
   }
 
   // Prompt padrão para viagens aéreas (orçamento maior que R$ 400)
