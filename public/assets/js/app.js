@@ -723,9 +723,10 @@ const BENETRIP = {
             const config = {
                 mode: "range",
                 dateFormat: "Y-m-d",
-                // Definição mais forte da data mínima, convertendo para string no formato YYYY-MM-DD
-                minDate: pergunta.calendar ? .min_date || this.formatarDataISO(amanha),
-                maxDate: pergunta.calendar ? .max_date,
+                // << CORREÇÃO APLICADA AQUI >>
+                minDate: (pergunta.calendar && pergunta.calendar.min_date) || this.formatarDataISO(amanha),
+                maxDate: (pergunta.calendar && pergunta.calendar.max_date),
+                // << FIM DA CORREÇÃO >>
                 inline: true,
                 showMonths: 1,
                 disable: [
