@@ -26677,7 +26677,7 @@
   },
   {
     "cidade": "Willemstad",
-    "sigla_estado": NaN,
+    "sigla_estado": null,
     "pais": "CW",
     "iata": "CUR"
   },
@@ -30115,7 +30115,7 @@
   },
   {
     "cidade": "Laayoune",
-    "sigla_estado": NaN,
+    "sigla_estado": null,
     "pais": "EH",
     "iata": "FUE"
   },
@@ -35347,7 +35347,7 @@
   },
   {
     "cidade": "Hong Kong",
-    "sigla_estado": NaN,
+    "sigla_estado": null,
     "pais": "HK",
     "iata": "HKG"
   },
@@ -53371,7 +53371,7 @@
   },
   {
     "cidade": "Nouakchott",
-    "sigla_estado": NaN,
+    "sigla_estado": null,
     "pais": "MR",
     "iata": "NKC"
   },
@@ -65089,7 +65089,7 @@
   },
   {
     "cidade": "Singapore",
-    "sigla_estado": NaN,
+    "sigla_estado": null,
     "pais": "SG",
     "iata": "SIN"
   },
