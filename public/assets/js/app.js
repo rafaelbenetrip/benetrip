@@ -229,7 +229,6 @@ const BENETRIP = {
             code: cidade.iata,
             name: cidade.cidade,
             city_name: cidade.cidade,
-            country_code: "BR", // Assumindo Brasil para cidades sem código
             country_name: cidade.pais,
             state_code: cidade.sigla_estado || null
         }));
