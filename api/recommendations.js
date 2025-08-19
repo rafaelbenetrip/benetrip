@@ -657,8 +657,8 @@ Selecione APENAS destinos em ${regiaoViagem} dentro do limite de 700km/10h:
     ${isBrasil ? '"siglaEstado": "XX",' : ''}
     "pais": "Nome do País",
     "codigoPais": "XX",
-    "distanciaRodoviaria": "XXX km (MÁXIMO 700km)",
-    "tempoViagem": "X horas (MÁXIMO 10h)",
+    "distanciaRodoviaria": "XXX km",
+    "tempoViagem": "X horas",
     "tipoTransporte": "${paisOrigem === 'US' || paisOrigem === 'BR' ? 'ônibus' : 'trem/ônibus'}",
     "justificativa": "Por que este destino é PERFEITO para viagem terrestre",
     "descricao": "Descrição do destino",
