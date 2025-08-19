@@ -1,5 +1,5 @@
 // api/recommendations.js - Endpoint da API Vercel para recomendações de destino
-// Versão 9.0 - GLOBAL ROAD TRIPS - Detecção de País de Origem
+// Versão 10.0 - OTIMIZADA - Usando dados do autocomplete
 const axios = require('axios');
 const http = require('http');
 const https = require('https');
@@ -25,11 +25,7 @@ const CONFIG = {
         enabled: true,
         maxLength: 600
     },
-    budgetThreshold: 401,  // Limite para viagens rodoviárias
-    busTravel: {
-        maxDistance: 700,   // Distância máxima em km
-        maxHours: 10        // Tempo máximo em horas
-    }
+    budgetThreshold: 401  // Limite para viagens rodoviárias
 };
 
 // =======================
@@ -83,54 +79,25 @@ const utils = {
         return valorEmBRL < CONFIG.budgetThreshold ? 'rodoviario' : 'aereo';
     },
 
-    // << AJUSTE 1 INSERIDO AQUI >>
-    detectarPaisOrigem: (cidadeOrigem) => {
-        // Mapeamento de cidades para países
-        const cidadesPorPais = {
-            'BR': ['São Paulo', 'Rio de Janeiro', 'Brasília', 'Salvador', 'Fortaleza', 'Recife',
-                   'Porto Alegre', 'Belém', 'Manaus', 'Belo Horizonte', 'Curitiba', 'Florianópolis'],
-            'FR': ['Paris', 'Lyon', 'Marseille', 'Toulouse', 'Nice', 'Nantes', 'Bordeaux'],
-            'US': ['Nova York', 'New York', 'Los Angeles', 'Chicago', 'Miami', 'Boston', 'San Francisco'],
-            'ES': ['Madri', 'Madrid', 'Barcelona', 'Valencia', 'Sevilha', 'Bilbao'],
-            'IT': ['Roma', 'Rome', 'Milão', 'Milan', 'Nápoles', 'Turim', 'Florença'],
-            'DE': ['Berlim', 'Berlin', 'Munique', 'Munich', 'Hamburgo', 'Frankfurt'],
-            'UK': ['Londres', 'London', 'Manchester', 'Birmingham', 'Liverpool', 'Edinburgh'],
-            'PT': ['Lisboa', 'Lisbon', 'Porto', 'Faro', 'Coimbra'],
-            'AR': ['Buenos Aires', 'Córdoba', 'Rosário', 'Mendoza'],
-            'MX': ['Cidade do México', 'Mexico City', 'Guadalajara', 'Monterrey'],
-            'JP': ['Tóquio', 'Tokyo', 'Osaka', 'Kyoto', 'Yokohama']
-        };
-
-        const cidadeNormalizada = cidadeOrigem?.toLowerCase() || '';
-
-        for (const [pais, cidades] of Object.entries(cidadesPorPais)) {
-            if (cidades.some(cidade => cidadeNormalizada.includes(cidade.toLowerCase()))) {
-                return pais;
-            }
+    // Extrair informações da cidade de partida do autocomplete
+    extrairInfoCidadePartida: (cidadePartida) => {
+        // Caso seja string (compatibilidade com versões antigas)
+        if (typeof cidadePartida === 'string') {
+            return {
+                cidade: cidadePartida,
+                pais: 'Brasil', // Default
+                sigla_estado: 'SP', // Default
+                iata: 'GRU' // Default
+            };
         }
-
-        // Default para Brasil se não identificar
-        return 'BR';
-    },
-    
-    determinarRegiaoViagem: (paisOrigem) => {
-        const regioes = {
-            'BR': 'BRASIL',
-            'AR': 'ARGENTINA',
-            'UY': 'URUGUAI',
-            'PY': 'PARAGUAI',
-            'CL': 'CHILE',
-            'FR': 'FRANÇA E PAÍSES VIZINHOS (Bélgica, Alemanha, Suíça, Espanha, Itália)',
-            'ES': 'ESPANHA E PORTUGAL',
-            'IT': 'ITÁLIA E PAÍSES VIZINHOS (Suíça, França, Áustria)',
-            'DE': 'ALEMANHA E PAÍSES VIZINHOS (França, Holanda, Bélgica, Polônia)',
-            'UK': 'REINO UNIDO E IRLANDA',
-            'US': 'ESTADOS UNIDOS (mesmo estado ou estados vizinhos)',
-            'MX': 'MÉXICO',
-            'JP': 'JAPÃO'
+        
+        // Caso seja objeto estruturado do autocomplete
+        return {
+            cidade: cidadePartida?.cidade || 'São Paulo',
+            pais: cidadePartida?.pais || 'Brasil',
+            sigla_estado: cidadePartida?.sigla_estado || 'SP',
+            iata: cidadePartida?.iata || 'GRU'
         };
-
-        return regioes[paisOrigem] || 'REGIÃO LOCAL';
     },
 
     extrairJSONDaResposta: texto => {
@@ -198,7 +165,7 @@ const utils = {
 };
 
 // =======================
-// Mapeamento de códigos IATA
+// Mapeamento básico de códigos IATA para destinos
 // =======================
 function obterCodigoIATAPadrao(cidade, pais) {
     const mapeamentoIATA = {
@@ -244,190 +211,6 @@ function obterCodigoIATAPadrao(cidade, pais) {
 }
 
 // =======================
-// Mapeamento de Siglas de Estados Brasileiros
-// =======================
-function obterSiglaEstadoBrasileiro(cidade) {
-    const mapeamentoEstados = {
-        // São Paulo
-        'São Paulo': 'SP', 'Campinas': 'SP', 'Santos': 'SP', 'Guarulhos': 'SP',
-        'São José dos Campos': 'SP', 'Ribeirão Preto': 'SP', 'Sorocaba': 'SP',
-        'São Bernardo do Campo': 'SP', 'Campos do Jordão': 'SP', 'Ilhabela': 'SP',
-        'São Carlos': 'SP', 'Bauru': 'SP', 'Presidente Prudente': 'SP',
-        'Águas de Lindóia': 'SP', 'Holambra': 'SP', 'Aparecida': 'SP',
-        
-        // Rio de Janeiro
-        'Rio de Janeiro': 'RJ', 'Niterói': 'RJ', 'Petrópolis': 'RJ', 
-        'Angra dos Reis': 'RJ', 'Búzios': 'RJ', 'Paraty': 'RJ', 'Cabo Frio': 'RJ',
-        'Arraial do Cabo': 'RJ', 'Teresópolis': 'RJ', 'Nova Friburgo': 'RJ',
-        
-        // Minas Gerais
-        'Belo Horizonte': 'MG', 'Ouro Preto': 'MG', 'Tiradentes': 'MG',
-        'Uberlândia': 'MG', 'Juiz de Fora': 'MG', 'Poços de Caldas': 'MG',
-        'São Lourenço': 'MG', 'Diamantina': 'MG', 'Mariana': 'MG',
-        'Capitólio': 'MG', 'São João del Rei': 'MG',
-        
-        // Bahia
-        'Salvador': 'BA', 'Porto Seguro': 'BA', 'Ilhéus': 'BA', 'Feira de Santana': 'BA',
-        'Morro de São Paulo': 'BA', 'Praia do Forte': 'BA', 'Chapada Diamantina': 'BA',
-        'Lençóis': 'BA', 'Itacaré': 'BA', 'Trancoso': 'BA',
-        
-        // Paraná
-        'Curitiba': 'PR', 'Foz do Iguaçu': 'PR', 'Londrina': 'PR', 'Maringá': 'PR',
-        'Ponta Grossa': 'PR', 'Guarapuava': 'PR', 'Cascavel': 'PR',
-        
-        // Santa Catarina
-        'Florianópolis': 'SC', 'Blumenau': 'SC', 'Joinville': 'SC', 
-        'Balneário Camboriú': 'SC', 'Bombinhas': 'SC', 'Garopaba': 'SC',
-        'São Bento do Sul': 'SC', 'Pomerode': 'SC',
-        
-        // Rio Grande do Sul
-        'Porto Alegre': 'RS', 'Gramado': 'RS', 'Canela': 'RS', 'Caxias do Sul': 'RS',
-        'Bento Gonçalves': 'RS', 'Nova Petrópolis': 'RS', 'Pelotas': 'RS',
-        
-        // Distrito Federal
-        'Brasília': 'DF',
-        
-        // Pernambuco
-        'Recife': 'PE', 'Olinda': 'PE', 'Porto de Galinhas': 'PE',
-        'Fernando de Noronha': 'PE', 'Caruaru': 'PE', 'Petrolina': 'PE',
-        
-        // Ceará
-        'Fortaleza': 'CE', 'Jericoacoara': 'CE', 'Canoa Quebrada': 'CE',
-        'Cumbuco': 'CE', 'Juazeiro do Norte': 'CE',
-        
-        // Goiás
-        'Goiânia': 'GO', 'Caldas Novas': 'GO', 'Pirenópolis': 'GO',
-        'Chapada dos Veadeiros': 'GO', 'Alto Paraíso': 'GO',
-        
-        // Mato Grosso do Sul
-        'Campo Grande': 'MS', 'Bonito': 'MS', 'Corumbá': 'MS',
-        'Três Lagoas': 'MS', 'Dourados': 'MS',
-        
-        // Espírito Santo
-        'Vitória': 'ES', 'Guarapari': 'ES', 'Vila Velha': 'ES',
-        'Domingos Martins': 'ES', 'Aracruz': 'ES',
-        
-        // Pará
-        'Belém': 'PA', 'Santarém': 'PA', 'Alter do Chão': 'PA',
-        'Salinópolis': 'PA', 'Marabá': 'PA',
-        
-        // Amazonas
-        'Manaus': 'AM', 'Parintins': 'AM', 'Presidente Figueiredo': 'AM',
-        
-        // Rio Grande do Norte
-        'Natal': 'RN', 'Pipa': 'RN', 'São Miguel do Gostoso': 'RN',
-        
-        // Paraíba
-        'João Pessoa': 'PB', 'Campina Grande': 'PB',
-        
-        // Alagoas
-        'Maceió': 'AL', 'Maragogi': 'AL', 'São Miguel dos Milagres': 'AL',
-        
-        // Sergipe
-        'Aracaju': 'SE',
-        
-        // Maranhão
-        'São Luís': 'MA', 'Barreirinhas': 'MA', 'Lençóis Maranhenses': 'MA',
-        
-        // Piauí
-        'Teresina': 'PI',
-        
-        // Mato Grosso
-        'Cuiabá': 'MT', 'Chapada dos Guimarães': 'MT',
-        
-        // Rondônia
-        'Porto Velho': 'RO',
-        
-        // Acre
-        'Rio Branco': 'AC',
-        
-        // Roraima
-        'Boa Vista': 'RR',
-        
-        // Amapá
-        'Macapá': 'AP',
-        
-        // Tocantins
-        'Palmas': 'TO', 'Jalapão': 'TO'
-    };
-    
-    const nomeLower = cidade.toLowerCase();
-    
-    for (const [cidadeMap, sigla] of Object.entries(mapeamentoEstados)) {
-        if (nomeLower.includes(cidadeMap.toLowerCase())) return sigla;
-    }
-    
-    return 'SP'; // Default para São Paulo se não encontrar
-}
-
-// << AJUSTE 4 INSERIDO AQUI >>
-function obterNomeTerminalPadrao(cidade, pais) {
-    const mapeamentoTerminais = {
-        // França
-        'Paris': 'Gare de Bercy (Ônibus) / Gare du Nord (Trem)',
-        'Lyon': 'Gare de Lyon Part-Dieu',
-        'Marseille': 'Gare Saint-Charles',
-                
-        // Estados Unidos
-        'Nova York': 'Port Authority Bus Terminal',
-        'Los Angeles': 'Union Station',
-        'Chicago': 'Chicago Union Station',
-                
-        // Espanha
-        'Madri': 'Estación Sur de Autobuses',
-        'Barcelona': 'Estació del Nord',
-                
-        // Itália
-        'Roma': 'Roma Termini',
-        'Milão': 'Milano Centrale',
-                
-        // Alemanha
-        'Berlim': 'Berlin Hauptbahnhof',
-        'Munique': 'München Hauptbahnhof',
-                
-        // Reino Unido
-        'Londres': 'Victoria Coach Station',
-                
-        // Default baseado no país
-        'default': {
-            'BR': `Terminal Rodoviário de ${cidade}`,
-            'US': `${cidade} Bus Terminal`,
-            'FR': `Gare Routière de ${cidade}`,
-            'ES': `Estación de Autobuses de ${cidade}`,
-            'IT': `Stazione di ${cidade}`,
-            'DE': `${cidade} Hauptbahnhof`,
-            'UK': `${cidade} Coach Station`
-        }
-    };
-
-    const nomeLower = cidade.toLowerCase();
-    for (const [cidadeMap, terminal] of Object.entries(mapeamentoTerminais)) {
-        if (cidadeMap !== 'default' && nomeLower.includes(cidadeMap.toLowerCase())) {
-            return terminal;
-        }
-    }
-
-    // Fallback baseado no país
-    const paisCode = obterCodigoPais(pais);
-    return mapeamentoTerminais.default[paisCode] || `Terminal de ${cidade}`;
-}
-
-function obterCodigoPais(nomePais) {
-    const mapeamento = {
-        'Brasil': 'BR',
-        'Estados Unidos': 'US',
-        'França': 'FR',
-        'Espanha': 'ES',
-        'Itália': 'IT',
-        'Alemanha': 'DE',
-        'Reino Unido': 'UK'
-        // Adicionar outros países conforme necessário
-    };
-    return mapeamento[nomePais] || 'BR'; // Default para BR
-}
-
-
-// =======================
 // Função para chamada ao Groq
 // =======================
 async function callGroqAPI(prompt, requestData, model = CONFIG.groq.models.reasoning) {
@@ -438,29 +221,25 @@ async function callGroqAPI(prompt, requestData, model = CONFIG.groq.models.reaso
     }
 
     const tipoViagem = utils.determinarTipoViagem(requestData.orcamento_valor, requestData.moeda_escolhida);
-    const paisOrigem = utils.detectarPaisOrigem(requestData.cidade_partida?.name || requestData.cidade_partida);
-    const isBrasil = paisOrigem === 'BR';
-    const regiaoViagem = utils.determinarRegiaoViagem(paisOrigem);
+    const infoCidadePartida = utils.extrairInfoCidadePartida(requestData.cidade_partida);
 
     let systemMessage;
     
     if (model === CONFIG.groq.models.reasoning) {
         // Sistema otimizado para reasoning
         systemMessage = `Você é um sistema especialista em recomendações de viagem que utiliza raciocínio estruturado.
-${tipoViagem === 'rodoviario' ? `ESPECIALIZADO EM VIAGENS RODOVIÁRIAS (ÔNIBUS/TREM) COM LIMITE DE 700KM OU 10 HORAS NA REGIÃO: ${regiaoViagem}.` : ''}
+${tipoViagem === 'rodoviario' ? `ESPECIALIZADO EM VIAGENS RODOVIÁRIAS (ÔNIBUS/TREM) COM LIMITE DE 700KM OU 10 HORAS.` : ''}
 
 PROCESSO DE RACIOCÍNIO OBRIGATÓRIO:
 1. ANÁLISE DO PERFIL: Examine detalhadamente cada preferência do viajante
 2. MAPEAMENTO DE COMPATIBILIDADE: Correlacione destinos com o perfil analisado  
-3. CONSIDERAÇÃO DE ORÇAMENTO: ${tipoViagem === 'rodoviario' ? `Considere viagens de ÔNIBUS/TREM dentro do orçamento para passagens de ida e volta (máx 700km/10h) na região de ${regiaoViagem}` : 'Considere o orçamento informado para passagens aéreas'}
+3. CONSIDERAÇÃO DE ORÇAMENTO: ${tipoViagem === 'rodoviario' ? `Considere viagens de ÔNIBUS/TREM dentro do orçamento para passagens de ida e volta (máx 700km/10h)` : 'Considere o orçamento informado para passagens aéreas'}
 4. ANÁLISE CLIMÁTICA: Determine condições climáticas exatas para as datas
 5. PERSONALIZAÇÃO TRIPINHA: Adicione perspectiva autêntica da mascote cachorrinha
-${tipoViagem === 'rodoviario' && isBrasil ? '6. SIGLAS DOS ESTADOS: SEMPRE inclua a sigla do estado brasileiro (SP, RJ, MG, BA, etc.) para cada destino no Brasil.' : ''}
 
 CRITÉRIOS DE DECISÃO:
 - Destinos DEVEM ser adequados para o tipo de companhia especificado
-- ${tipoViagem === 'rodoviario' ? `Destinos DEVEM estar NO MÁXIMO 700km ou 10 horas de viagem terrestre da origem, DENTRO de ${regiaoViagem}` : 'Informações de voos DEVEM ser consideradas'}
-- ${tipoViagem === 'rodoviario' && isBrasil ? 'SEMPRE incluir sigla do estado brasileiro para cada destino no Brasil.' : ''}
+- ${tipoViagem === 'rodoviario' ? `Destinos DEVEM estar NO MÁXIMO 700km ou 10 horas de viagem terrestre da origem` : 'Informações de voos DEVEM ser consideradas'}
 - Informações climáticas DEVEM ser precisas para o período da viagem
 - Pontos turísticos DEVEM ser específicos e reais
 - Comentários da Tripinha DEVEM ser em 1ª pessoa com detalhes sensoriais
@@ -470,22 +249,21 @@ RESULTADO: JSON estruturado com recomendações fundamentadas no raciocínio aci
     } else if (model === CONFIG.groq.models.personality) {
         // Sistema focado na personalidade da Tripinha
         systemMessage = `Você é a Tripinha, uma vira-lata caramelo especialista em viagens! 🐾
-${tipoViagem === 'rodoviario' ? `ESPECIALISTA EM VIAGENS DE ÔNIBUS/TREM DE ATÉ 700KM em ${regiaoViagem}!` : ''}
+${tipoViagem === 'rodoviario' ? `ESPECIALISTA EM VIAGENS DE ÔNIBUS/TREM DE ATÉ 700KM!` : ''}
 
 PERSONALIDADE DA TRIPINHA:
 - Conhece todos os destinos do mundo pessoalmente
-- ${tipoViagem === 'rodoviario' ? `Adora viagens de ônibus e trem! ${isBrasil ? 'SEMPRE inclui sigla do estado.' : ''}` : 'Adora viagens de avião e conhece todos os aeroportos!'}
+- ${tipoViagem === 'rodoviario' ? `Adora viagens de ônibus e trem!` : 'Adora viagens de avião e conhece todos os aeroportos!'}
 - Fala sempre em 1ª pessoa sobre suas experiências
 - É entusiasmada, carismática e usa emojis naturalmente  
 - Inclui detalhes sensoriais que um cachorro notaria
 - Sempre menciona pontos turísticos específicos que visitou
 - Dá dicas práticas baseadas nas suas "aventuras"
-${tipoViagem === 'rodoviario' && isBrasil ? '- SEMPRE inclui a sigla do estado brasileiro (SP, RJ, MG, etc.), caso seja no Brasil.' : ''}
 
 RETORNE APENAS JSON VÁLIDO sem formatação markdown.`;
     } else {
         // Sistema padrão para modelos rápidos
-        systemMessage = `Especialista em recomendações de viagem ${tipoViagem === 'rodoviario' ? `RODOVIÁRIA em ${regiaoViagem} (máx 700km) ${isBrasil ? 'com siglas de estados' : ''}` : 'AÉREA'}. Retorne apenas JSON válido com destinos personalizados.`;
+        systemMessage = `Especialista em recomendações de viagem ${tipoViagem === 'rodoviario' ? `RODOVIÁRIA (máx 700km)` : 'AÉREA'}. Retorne apenas JSON válido com destinos personalizados.`;
     }
 
     try {
@@ -538,13 +316,18 @@ RETORNE APENAS JSON VÁLIDO sem formatação markdown.`;
 }
 
 // =======================
-// Geração de prompt otimizado para viagens rodoviárias e aéreas
+// Geração de prompt otimizado usando dados do autocomplete
 // =======================
 function gerarPromptParaGroq(dados) {
+    const infoCidadePartida = utils.extrairInfoCidadePartida(dados.cidade_partida);
+    
     const infoViajante = {
         companhia: getCompanhiaText(dados.companhia || 0),
         preferencia: getPreferenciaText(dados.preferencia_viagem || 0),
-        cidadeOrigem: dados.cidade_partida?.name || dados.cidade_partida || 'cidade não especificada',
+        cidadeOrigem: infoCidadePartida.cidade,
+        paisOrigem: infoCidadePartida.pais,
+        siglaEstado: infoCidadePartida.sigla_estado,
+        iataOrigem: infoCidadePartida.iata,
         orcamento: dados.orcamento_valor || 'flexível',
         moeda: dados.moeda_escolhida || 'BRL',
         pessoas: dados.quantidade_familia || dados.quantidade_amigos || 1
@@ -581,21 +364,15 @@ function gerarPromptParaGroq(dados) {
         }
     }
 
-    // << AJUSTE 2 INSERIDO AQUI >>
     // Prompt diferenciado para viagens rodoviárias
     if (isRodoviario) {
-        // NOVO: Detectar país de origem
-        const paisOrigem = utils.detectarPaisOrigem(infoViajante.cidadeOrigem);
-        const regiaoViagem = utils.determinarRegiaoViagem(paisOrigem);
-        const isBrasil = paisOrigem === 'BR';
-
         return `# 🚌 SISTEMA DE RECOMENDAÇÃO INTELIGENTE DE VIAGENS RODOVIÁRIAS
 
 ## 📊 DADOS DO VIAJANTE PARA ANÁLISE:
 **Perfil Básico:**
-- Origem: ${infoViajante.cidadeOrigem}
-- País de Origem: ${paisOrigem}
-- Região de Busca: ${regiaoViagem}
+- Origem: ${infoViajante.cidadeOrigem}, ${infoViajante.paisOrigem}
+- Estado/Região: ${infoViajante.siglaEstado}
+- Código IATA de referência: ${infoViajante.iataOrigem}
 - Composição: ${infoViajante.companhia} (${infoViajante.pessoas} pessoa(s))
 - Período: ${dataIda} a ${dataVolta} (${duracaoViagem})
 - Preferência principal: ${infoViajante.preferencia}
@@ -604,38 +381,25 @@ function gerarPromptParaGroq(dados) {
 **Orçamento informado:** ${infoViajante.orcamento} ${infoViajante.moeda} por pessoa para passagens de ÔNIBUS/TREM (ida e volta)
 
 ⚠️ **IMPORTANTE - LIMITES DA VIAGEM TERRESTRE:**
-- APENAS destinos dentro de ${regiaoViagem}
-- **DISTÂNCIA MÁXIMA: 700 QUILÔMETROS da cidade de origem**
+- **DISTÂNCIA MÁXIMA: 700 QUILÔMETROS da cidade de origem (${infoViajante.cidadeOrigem})**
 - **TEMPO MÁXIMO DE VIAGEM: 10 HORAS**
-${isBrasil ? '- **OBRIGATÓRIO: Incluir sigla do estado brasileiro (SP, RJ, MG, etc.) para cada destino' : ''}
 - Considere o conforto da viagem terrestre para ${infoViajante.companhia}
 - Sugira destinos onde o valor das passagens de ida e volta caiba no orçamento
 
 ## 🎯 PROCESSO DE RACIOCÍNIO PARA VIAGEM TERRESTRE:
 
 ### PASSO 1: ANÁLISE GEOGRÁFICA
-- Identifique corretamente o país/região de ${infoViajante.cidadeOrigem}
-- Liste cidades próximas NO MESMO PAÍS ou países vizinhos (se aplicável)
+- Partir de ${infoViajante.cidadeOrigem}, ${infoViajante.paisOrigem}
+- Liste cidades próximas no mesmo país ou países vizinhos
 - NÃO sugira destinos em outros continentes para viagens rodoviárias
 
 ### PASSO 2: CONSIDERAÇÃO DE ROTAS TERRESTRES (MÁXIMO 700KM)
 - Avalie destinos alcançáveis por ônibus/trem em até 10 horas a partir de ${infoViajante.cidadeOrigem}
-- Considere apenas cidades dentro do raio de 700km NA MESMA REGIÃO
+- Considere apenas cidades dentro do raio de 700km
 - Priorize destinos com boa infraestrutura de transporte terrestre
-- Para Europa: considere trens de alta velocidade
-- Para Américas: considere principalmente ônibus
 
-### PASSO 3: MAPEAMENTO DE DESTINOS REGIONAIS
-Para cada destino considerado em ${regiaoViagem}, avalie:
-- Distância terrestre EXATA a partir de ${infoViajante.cidadeOrigem} (deve ser ≤ 700km)
-- Tempo de viagem EXATO (deve ser ≤ 10 horas)
-${isBrasil ? '- Estado brasileiro onde está localizado (OBRIGATÓRIO)' : '- Região/província onde está localizado'}
-- Qualidade da infraestrutura de transporte terrestre
-- Empresas de transporte que fazem a rota
-- Custo estimado das passagens
-
-### PASSO 4: SELEÇÃO DE DESTINOS REGIONAIS APROPRIADOS
-Selecione APENAS destinos em ${regiaoViagem} dentro do limite de 700km/10h:
+### PASSO 3: SELEÇÃO DE DESTINOS REGIONAIS APROPRIADOS
+Selecione APENAS destinos dentro do limite de 700km/10h:
 - 1 destino TOP acessível por transporte terrestre (máx 700km)
 - 4 alternativas terrestres diversificadas (todas ≤ 700km)
 - 1 surpresa terrestre inusitada (máx 700km)
@@ -644,22 +408,25 @@ Selecione APENAS destinos em ${regiaoViagem} dentro do limite de 700km/10h:
 \`\`\`json
 {
   "tipoViagem": "rodoviario",
-  "paisOrigem": "${paisOrigem}",
-  "regiaoViagem": "${regiaoViagem}",
+  "origem": {
+    "cidade": "${infoViajante.cidadeOrigem}",
+    "pais": "${infoViajante.paisOrigem}",
+    "sigla_estado": "${infoViajante.siglaEstado}",
+    "iata": "${infoViajante.iataOrigem}"
+  },
   "raciocinio": {
-    "analise_perfil": "Análise considerando viagem terrestre de até 700km em ${regiaoViagem}",
+    "analise_perfil": "Análise considerando viagem terrestre de até 700km",
     "rotas_consideradas": "Principais rotas terrestres analisadas (todas ≤ 700km)",
     "criterios_selecao": "Critérios para destinos terrestres próximos"
   },
   "topPick": {
     "destino": "Nome da Cidade",
-    ${isBrasil ? '"estado": "Nome do Estado Brasileiro",' : '"regiao": "Nome da Região/Província",'}
-    ${isBrasil ? '"siglaEstado": "XX",' : ''}
+    "estado": "Nome do Estado/Região",
     "pais": "Nome do País",
     "codigoPais": "XX",
     "distanciaRodoviaria": "XXX km",
     "tempoViagem": "X horas",
-    "tipoTransporte": "${paisOrigem === 'US' || paisOrigem === 'BR' ? 'ônibus' : 'trem/ônibus'}",
+    "tipoTransporte": "ônibus/trem",
     "justificativa": "Por que este destino é PERFEITO para viagem terrestre",
     "descricao": "Descrição do destino",
     "porque": "Razões específicas",
@@ -680,23 +447,21 @@ Selecione APENAS destinos em ${regiaoViagem} dentro do limite de 700km/10h:
     }
   },
   "alternativas": [
-    // 4 alternativas com estrutura similar, respeitando a região
+    // 4 alternativas com estrutura similar
   ],
   "surpresa": {
     // Estrutura similar ao topPick
   },
-  "dicasGeraisTransporte": "Dicas para viagens terrestres confortáveis em ${regiaoViagem}",
+  "dicasGeraisTransporte": "Dicas para viagens terrestres confortáveis",
   "resumoIA": "Como foram selecionados os destinos terrestres próximos"
 }
 \`\`\`
 
 ⚠️ **VALIDAÇÃO CRÍTICA:**
-- TODOS os destinos DEVEM estar em ${regiaoViagem}
 - TODOS os destinos DEVEM estar a NO MÁXIMO 700km de ${infoViajante.cidadeOrigem}
 - NÃO sugira destinos em outros continentes
-${isBrasil ? '- Inclua sigla do estado para destinos brasileiros' : ''}
 
-**Execute o raciocínio e forneça destinos TERRESTRES APROPRIADOS para ${regiaoViagem}!**`;
+**Execute o raciocínio e forneça destinos TERRESTRES APROPRIADOS!**`;
     }
 
     // Prompt padrão para viagens aéreas (orçamento maior que R$ 400)
@@ -704,7 +469,9 @@ ${isBrasil ? '- Inclua sigla do estado para destinos brasileiros' : ''}
 
 ## 📊 DADOS DO VIAJANTE PARA ANÁLISE:
 **Perfil Básico:**
-- Origem: ${infoViajante.cidadeOrigem}
+- Origem: ${infoViajante.cidadeOrigem}, ${infoViajante.paisOrigem}
+- Estado/Região: ${infoViajante.siglaEstado}
+- Aeroporto de referência: ${infoViajante.iataOrigem}
 - Composição: ${infoViajante.companhia} (${infoViajante.pessoas} pessoa(s))
 - Período: ${dataIda} a ${dataVolta} (${duracaoViagem})
 - Preferência principal: ${infoViajante.preferencia}
@@ -731,7 +498,7 @@ Analise profundamente:
 - Como a duração da viagem (${duracaoViagem}) influencia as opções?
 
 ### PASSO 2: CONSIDERAÇÃO GEOGRÁFICA E LOGÍSTICA
-- Avalie a distância a partir de ${infoViajante.cidadeOrigem}
+- Avalie a distância a partir de ${infoViajante.cidadeOrigem}, ${infoViajante.paisOrigem}
 - Considere a facilidade de acesso e conexões disponíveis
 - Pense na relação custo-benefício considerando o orçamento para passagens ${infoViajante.orcamento !== 'flexível' ? `de ${infoViajante.orcamento} ${infoViajante.moeda}` : 'flexível'}
 
@@ -767,6 +534,12 @@ Para cada destino selecionado, adicione:
 \`\`\`json
 {
     "tipoViagem": "aereo",
+    "origem": {
+      "cidade": "${infoViajante.cidadeOrigem}",
+      "pais": "${infoViajante.paisOrigem}",
+      "sigla_estado": "${infoViajante.siglaEstado}",
+      "iata": "${infoViajante.iataOrigem}"
+    },
     "raciocinio": {
         "analise_perfil": "Resumo da análise do perfil do viajante",
         "criterios_selecao": "Principais critérios usados na seleção",
@@ -851,7 +624,7 @@ Antes de responder, confirme que:
 - ✅ Pontos turísticos são específicos e reais
 - ✅ Códigos IATA dos aeroportos estão corretos
 - ✅ Destinos são adequados para ${infoViajante.companhia}
-- ✅ Considerou a cidade de origem ${infoViajante.cidadeOrigem} nas sugestões
+- ✅ Considerou a cidade de origem ${infoViajante.cidadeOrigem}, ${infoViajante.paisOrigem} nas sugestões
 
 **Execute o raciocínio passo-a-passo e forneça recomendações fundamentadas e personalizadas!**`;
 }
@@ -871,16 +644,16 @@ function getCompanhiaText(value) {
 
 function getPreferenciaText(value) {
     const options = {
-        0: "relaxamento e descanso",
-        1: "aventura e atividades ao ar livre",
-        2: "cultura, história e gastronomia", 
-        3: "experiência urbana, compras e vida noturna"
+        0: "Relax total – Descansar, aproveitar sem pressa e recarregar as energias",
+        1: "Aventura e emoção – Trilhar, explorar e sentir a adrenalina",
+        2: "Cultura e história – Mergulhar em tradições, arte e sabores locais", 
+        3: "Agito urbano – Ruas movimentadas, vida noturna e muita energia"
     };
     return options[typeof value === 'string' ? parseInt(value, 10) : value] || "experiências diversificadas";
 }
 
 // =======================
-// Processamento e validação de destinos
+// Processamento e validação de destinos (simplificado)
 // =======================
 function ensureValidDestinationData(jsonString, requestData) {
     try {
@@ -889,34 +662,14 @@ function ensureValidDestinationData(jsonString, requestData) {
         const isRodoviario = tipoViagem === 'rodoviario';
         let modificado = false;
         
-        // << AJUSTE 3 INSERIDO AQUI >>
         // Processar topPick
         if (data.topPick) {
             if (isRodoviario) {
-                // NOVO: Detectar país de origem antes de forçar Brasil
-                const paisOrigem = utils.detectarPaisOrigem(requestData.cidade_partida?.name || requestData.cidade_partida);
-                const isBrasil = paisOrigem === 'BR';
-
-                if (isBrasil) {
-                    // Apenas para viagens brasileiras, garantir sigla do estado
-                    if (!data.topPick.siglaEstado) {
-                        data.topPick.siglaEstado = obterSiglaEstadoBrasileiro(data.topPick.destino);
-                        modificado = true;
-                    }
-                    
-                    // Garantir que o país seja Brasil
-                    if (data.topPick.pais !== 'Brasil') {
-                        data.topPick.pais = 'Brasil';
-                        data.topPick.codigoPais = 'BR';
-                        modificado = true;
-                    }
-                }
-
                 // Garantir terminal de transporte apropriado
                 if (!data.topPick.terminalTransporte?.nome) {
                     data.topPick.terminalTransporte = {
-                        nome: obterNomeTerminalPadrao(data.topPick.destino, data.topPick.pais),
-                        tipo: paisOrigem === 'BR' || paisOrigem === 'US' ? 'rodoviária' : 'estação',
+                        nome: `Terminal Rodoviário de ${data.topPick.destino}`,
+                        tipo: 'rodoviária',
                         localizacao: "Centro"
                     };
                     modificado = true;
@@ -936,23 +689,10 @@ function ensureValidDestinationData(jsonString, requestData) {
         // Processar surpresa
         if (data.surpresa) {
             if (isRodoviario) {
-                const paisOrigem = utils.detectarPaisOrigem(requestData.cidade_partida?.name || requestData.cidade_partida);
-                const isBrasil = paisOrigem === 'BR';
-                if (isBrasil) {
-                    if (!data.surpresa.siglaEstado) {
-                        data.surpresa.siglaEstado = obterSiglaEstadoBrasileiro(data.surpresa.destino);
-                        modificado = true;
-                    }
-                    if (data.surpresa.pais !== 'Brasil') {
-                        data.surpresa.pais = 'Brasil';
-                        data.surpresa.codigoPais = 'BR';
-                        modificado = true;
-                    }
-                }
-                if (!data.surpresa.terminalTransporte?.nome && !data.surpresa.rodoviaria) { // Compatibilidade com a chave antiga
+                if (!data.surpresa.terminalTransporte?.nome) {
                     data.surpresa.terminalTransporte = {
-                        nome: obterNomeTerminalPadrao(data.surpresa.destino, data.surpresa.pais),
-                        tipo: paisOrigem === 'BR' || paisOrigem === 'US' ? 'rodoviária' : 'estação',
+                        nome: `Terminal Rodoviário de ${data.surpresa.destino}`,
+                        tipo: 'rodoviária',
                         localizacao: "Centro"
                     };
                     modificado = true;
@@ -970,24 +710,11 @@ function ensureValidDestinationData(jsonString, requestData) {
         
         // Processar alternativas
         if (data.alternativas && Array.isArray(data.alternativas)) {
-            const paisOrigem = utils.detectarPaisOrigem(requestData.cidade_partida?.name || requestData.cidade_partida);
-            const isBrasil = paisOrigem === 'BR';
             data.alternativas.forEach(alternativa => {
                 if (isRodoviario) {
-                    if (isBrasil) {
-                        if (!alternativa.siglaEstado) {
-                            alternativa.siglaEstado = obterSiglaEstadoBrasileiro(alternativa.destino);
-                            modificado = true;
-                        }
-                        if (alternativa.pais !== 'Brasil') {
-                            alternativa.pais = 'Brasil';
-                            alternativa.codigoPais = 'BR';
-                            modificado = true;
-                        }
-                    }
-                    if (!alternativa.terminalTransporte?.nome && !alternativa.rodoviaria) {
+                    if (!alternativa.terminalTransporte?.nome) {
                         alternativa.terminalTransporte = {
-                            nome: obterNomeTerminalPadrao(alternativa.destino, alternativa.pais)
+                            nome: `Terminal Rodoviário de ${alternativa.destino}`
                         };
                         modificado = true;
                     }
@@ -1015,7 +742,6 @@ function ensureValidDestinationData(jsonString, requestData) {
         return jsonString;
     }
 }
-
 
 // =======================
 // Função de retry com fallback inteligente entre modelos
@@ -1102,7 +828,7 @@ module.exports = async function handler(req, res) {
     }
 
     try {
-        console.log('🚌✈️ === BENETRIP GROQ API v9.0 - GLOBAL ROAD TRIPS ===');
+        console.log('🚌✈️ === BENETRIP GROQ API v10.0 - OTIMIZADA ===');
         
         if (!req.body) {
             isResponseSent = true;
@@ -1127,28 +853,27 @@ module.exports = async function handler(req, res) {
             return;
         }
         
+        // Extrair informações da cidade de partida (do autocomplete)
+        const infoCidadePartida = utils.extrairInfoCidadePartida(requestData.cidade_partida);
+        
         // Determinar tipo de viagem
         const tipoViagem = utils.determinarTipoViagem(requestData.orcamento_valor, requestData.moeda_escolhida);
         const isRodoviario = tipoViagem === 'rodoviario';
-        const paisOrigem = utils.detectarPaisOrigem(requestData.cidade_partida?.name || requestData.cidade_partida);
-        const regiaoViagem = utils.determinarRegiaoViagem(paisOrigem);
         
         // Log dos dados recebidos
         utils.log('📊 Dados da requisição:', {
             companhia: requestData.companhia,
-            cidade_partida: requestData.cidade_partida?.name || requestData.cidade_partida,
-            pais_origem: paisOrigem,
+            cidade_partida: infoCidadePartida,
             datas: requestData.datas,
             orcamento: requestData.orcamento_valor,
             moeda: requestData.moeda_escolhida,
             preferencia: requestData.preferencia_viagem,
-            tipoViagem: tipoViagem,
-            limiteRodoviario: isRodoviario ? `700km/10h em ${regiaoViagem}` : 'N/A'
+            tipoViagem: tipoViagem
         });
         
         console.log(`${isRodoviario ? '🚌' : '✈️'} Tipo de viagem: ${tipoViagem.toUpperCase()}`);
+        console.log(`📍 Origem: ${infoCidadePartida.cidade}, ${infoCidadePartida.pais} (${infoCidadePartida.sigla_estado})`);
         if (isRodoviario) {
-            console.log(`📍 Origem: ${paisOrigem} | Região de Busca: ${regiaoViagem}`);
             console.log('📏 Limite máximo: 700km ou 10 horas');
         }
         
@@ -1185,12 +910,10 @@ module.exports = async function handler(req, res) {
             dados.metadados = {
                 modelo: modeloUsado,
                 provider: 'groq',
-                versao: '9.0-global-road-trips',
+                versao: '10.0-otimizada',
                 timestamp: new Date().toISOString(),
                 reasoning_enabled: modeloUsado === CONFIG.groq.models.reasoning,
-                origem: requestData.cidade_partida?.name || requestData.cidade_partida,
-                paisOrigem: paisOrigem,
-                regiaoViagem: isRodoviario ? regiaoViagem : null,
+                origem: infoCidadePartida,
                 tipoViagem: tipoViagem,
                 orcamento: requestData.orcamento_valor,
                 moeda: requestData.moeda_escolhida,
@@ -1200,21 +923,13 @@ module.exports = async function handler(req, res) {
             console.log('🎉 Recomendações processadas com sucesso!');
             console.log('🧠 Modelo usado:', modeloUsado);
             console.log(`${isRodoviario ? '🚌' : '✈️'} Tipo de viagem:`, tipoViagem);
-            console.log('📍 Origem:', requestData.cidade_partida?.name || requestData.cidade_partida);
+            console.log('📍 Origem:', `${infoCidadePartida.cidade}, ${infoCidadePartida.pais}`);
             
-            if (isRodoviario) {
-                console.log(`🗺️ Destinos em ${regiaoViagem}:`, {
-                    topPick: `${dados.topPick?.destino} (${dados.topPick?.pais})`,
-                    alternativas: dados.alternativas?.map(a => `${a.destino} (${a.pais})`),
-                    surpresa: `${dados.surpresa?.destino} (${dados.surpresa?.pais})`
-                });
-            } else {
-                console.log('📋 Destinos encontrados:', {
-                    topPick: dados.topPick?.destino,
-                    alternativas: dados.alternativas?.length || 0,
-                    surpresa: dados.surpresa?.destino
-                });
-            }
+            console.log('📋 Destinos encontrados:', {
+                topPick: dados.topPick?.destino,
+                alternativas: dados.alternativas?.length || 0,
+                surpresa: dados.surpresa?.destino
+            });
             
             if (!isResponseSent) {
                 isResponseSent = true;
