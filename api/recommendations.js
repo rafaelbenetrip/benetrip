@@ -92,12 +92,12 @@ const utils = {
         }
         
         // Caso seja objeto estruturado do autocomplete
-        return {
-            cidade: cidadePartida?.cidade || 'São Paulo',
-            pais: cidadePartida?.pais || 'Brasil',
-            sigla_estado: cidadePartida?.sigla_estado || 'SP',
-            iata: cidadePartida?.iata || 'GRU'
-        };
+return {
+    cidade: cidadePartida?.cidade || cidadePartida?.name || 'Cidade não especificada',
+    pais: cidadePartida?.pais || cidadePartida?.country || 'País não especificado',
+    sigla_estado: cidadePartida?.sigla_estado || null,
+    iata: cidadePartida?.iata || cidadePartida?.code || null
+};
     },
 
     extrairJSONDaResposta: texto => {
