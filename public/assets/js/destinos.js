@@ -1348,10 +1348,13 @@ const BENETRIP_DESTINOS = {
         
         if (typeof cidadePartida === 'string') {
           cidadeOrigem = this.normalizarNomeCidade(cidadePartida);
-          // Extrair sigla se estiver no formato "Cidade, Estado (XX)"
-          const matchSigla = cidadePartida.match(/\(([A-Z]{2})\)/);
+          // Extrair sigla se estiver no formato "Cidade, Estado (XX)" ou similar
+          const matchSigla = cidadePartida.match(/\(([A-Z]{2})\)/i);
           if (matchSigla && matchSigla[1]) {
             siglaOrigem = matchSigla[1].toLowerCase();
+          } else {
+            // Fallback: tentar extrair da cidade usando mapeamento local
+            siglaOrigem = this.obterSiglaEstadoLocal(cidadePartida);
           }
         } else if (typeof cidadePartida === 'object') {
           if (cidadePartida.name) {
@@ -1359,6 +1362,13 @@ const BENETRIP_DESTINOS = {
           }
           if (cidadePartida.estado) {
             siglaOrigem = cidadePartida.estado.toLowerCase();
+          } else if (cidadePartida.uf) {
+            siglaOrigem = cidadePartida.uf.toLowerCase();
+          } else if (cidadePartida.state) {
+            siglaOrigem = cidadePartida.state.toLowerCase();
+          } else {
+            // Fallback usando o nome da cidade
+            siglaOrigem = this.obterSiglaEstadoLocal(cidadePartida.name || cidadeOrigem);
           }
         }
       }
@@ -1367,14 +1377,26 @@ const BENETRIP_DESTINOS = {
       const cidadeDestino = this.normalizarNomeCidade(destinoSelecionado.destino);
       let siglaDestino = 'sp'; // Default
 
-      // Usar sigla do estado que já vem do destino selecionado
+      // Usar sigla do estado que já vem do destino selecionado (PRIORIDADE ALTA)
       if (destinoSelecionado.siglaEstado) {
-        siglaDestino = destinoSelecionado.siglaEstado.toLowerCase();
+        siglaDestino = this.extrairSiglaValida(destinoSelecionado.siglaEstado);
       } else if (destinoSelecionado.estado) {
-        siglaDestino = destinoSelecionado.estado.toLowerCase();
+        siglaDestino = this.extrairSiglaValida(destinoSelecionado.estado);
       } else if (destinoSelecionado.codigoEstado) {
-        siglaDestino = destinoSelecionado.codigoEstado.toLowerCase();
+        siglaDestino = this.extrairSiglaValida(destinoSelecionado.codigoEstado);
+      } else if (destinoSelecionado.uf) {
+        siglaDestino = this.extrairSiglaValida(destinoSelecionado.uf);
+      } else if (destinoSelecionado.sigla_estado) {
+        siglaDestino = this.extrairSiglaValida(destinoSelecionado.sigla_estado);
+      } else if (destinoSelecionado.state_code) {
+        siglaDestino = this.extrairSiglaValida(destinoSelecionado.state_code);
+      } else {
+        // Fallback: usar mapeamento local baseado no nome da cidade (ÚLTIMO RECURSO)
+        siglaDestino = this.obterSiglaEstadoLocal(destinoSelecionado.destino);
+        console.warn(`⚠️ Usando fallback para sigla do destino ${destinoSelecionado.destino}: ${siglaDestino}`);
       }
+
+      console.log(`📍 Destino processado: ${cidadeDestino}-${siglaDestino} (origem: ${destinoSelecionado.destino})`);
 
       // === DATAS ===
       const datas = respostas.datas;
@@ -1394,6 +1416,19 @@ const BENETRIP_DESTINOS = {
         }
       }
 
+      // === VALIDAÇÕES FINAIS ===
+      // Garantir que as cidades não tenham caracteres problemáticos
+      cidadeOrigem = cidadeOrigem.replace(/[^a-z0-9-]/g, '');
+      cidadeDestino = cidadeDestino.replace(/[^a-z0-9-]/g, '');
+      siglaOrigem = siglaOrigem.replace(/[^a-z]/g, '');
+      siglaDestino = siglaDestino.replace(/[^a-z]/g, '');
+
+      // Verificar se temos dados mínimos
+      if (!cidadeOrigem || !cidadeDestino || !siglaOrigem || !siglaDestino) {
+        console.warn('Dados insuficientes para construir URL específica, usando fallback');
+        return 'https://www.awin1.com/cread.php?awinmid=65292&awinaffid=1977223&clickref=source%3Dbenetrip&clickref2=campaign%3Dpassagens_onibus&clickref3=medium%3Dafiliado&ued=https%3A%2F%2Fdeonibus.com%2F';
+      }
+
       // === CONSTRUIR URL DA DEONIBUS ===
       // Formato: https://deonibus.com/passagens-de-onibus/<origem>-<UF>-todos-para-<destino>-<UF>-todos?departureDate=DD/MM/AAAA&returnDate=DD/MM/AAAA
       let urlDeOnibus = `https://deonibus.com/passagens-de-onibus/${cidadeOrigem}-${siglaOrigem}-todos-para-${cidadeDestino}-${siglaDestino}-todos`;
@@ -1407,6 +1442,8 @@ const BENETRIP_DESTINOS = {
         }
         urlDeOnibus += '?' + params.toString();
       }
+
+      console.log('🔗 URL DeÔnibus construída:', urlDeOnibus);
 
       // === CONSTRUIR LINK DE AFILIADO AWIN ===
       const baseAfiliadoAwin = 'https://www.awin1.com/cread.php?awinmid=65292&awinaffid=1977223';
@@ -1439,6 +1476,44 @@ const BENETRIP_DESTINOS = {
     }
   },
 
+  // Extrair sigla válida de 2 letras
+  extrairSiglaValida(sigla) {
+    if (!sigla) return 'sp';
+    
+    // Converter para string se necessário
+    let siglaStr = String(sigla).trim();
+    
+    // Se já tem 2 letras, usar direto
+    if (/^[a-zA-Z]{2}$/.test(siglaStr)) {
+      return siglaStr.toLowerCase();
+    }
+    
+    // Se tem mais que 2 letras, pegar as primeiras 2
+    if (siglaStr.length > 2 && /^[a-zA-Z]/.test(siglaStr)) {
+      return siglaStr.substring(0, 2).toLowerCase();
+    }
+    
+    // Se é nome completo de estado, tentar extrair sigla
+    const estadosParaSigla = {
+      'acre': 'ac', 'alagoas': 'al', 'amapá': 'ap', 'amazonas': 'am',
+      'bahia': 'ba', 'ceará': 'ce', 'distrito federal': 'df', 'espírito santo': 'es',
+      'goiás': 'go', 'maranhão': 'ma', 'mato grosso': 'mt', 'mato grosso do sul': 'ms',
+      'minas gerais': 'mg', 'pará': 'pa', 'paraíba': 'pb', 'paraná': 'pr',
+      'pernambuco': 'pe', 'piauí': 'pi', 'rio de janeiro': 'rj', 'rio grande do norte': 'rn',
+      'rio grande do sul': 'rs', 'rondônia': 'ro', 'roraima': 'rr', 'santa catarina': 'sc',
+      'são paulo': 'sp', 'sergipe': 'se', 'tocantins': 'to'
+    };
+    
+    const estadoLower = siglaStr.toLowerCase();
+    if (estadosParaSigla[estadoLower]) {
+      return estadosParaSigla[estadoLower];
+    }
+    
+    // Fallback para SP
+    console.warn(`⚠️ Não foi possível extrair sigla válida de: "${sigla}". Usando SP como fallback.`);
+    return 'sp';
+  },
+
   // Funções auxiliares
   normalizarNomeCidade(nome) {
     if (!nome) return 'sao-paulo';
@@ -1467,39 +1542,26 @@ const BENETRIP_DESTINOS = {
   },
 
   obterSiglaEstadoLocal(cidade) {
+    // Esta função é mantida como fallback caso as siglas não venham nos dados
     const mapeamento = {
-      'são paulo': 'sp',
-      'sao paulo': 'sp',
-      'campinas': 'sp',
-      'santos': 'sp',
-      'rio de janeiro': 'rj',
-      'niterói': 'rj',
-      'niteroi': 'rj',
-      'petrópolis': 'rj',
-      'belo horizonte': 'mg',
-      'ouro preto': 'mg',
-      'uberlândia': 'mg',
-      'salvador': 'ba',
-      'porto seguro': 'ba',
-      'curitiba': 'pr',
-      'foz do iguaçu': 'pr',
-      'florianópolis': 'sc',
-      'florianopolis': 'sc',
-      'balneário camboriú': 'sc',
-      'porto alegre': 'rs',
-      'gramado': 'rs',
-      'canela': 'rs',
-      'brasília': 'df',
-      'brasilia': 'df',
-      'recife': 'pe',
-      'olinda': 'pe',
+      'são paulo': 'sp', 'sao paulo': 'sp', 'campinas': 'sp', 'santos': 'sp',
+      'rio de janeiro': 'rj', 'niterói': 'rj', 'niteroi': 'rj', 'petrópolis': 'rj',
+      'belo horizonte': 'mg', 'ouro preto': 'mg', 'uberlândia': 'mg',
+      'salvador': 'ba', 'porto seguro': 'ba',
+      'curitiba': 'pr', 'foz do iguaçu': 'pr',
+      'florianópolis': 'sc', 'florianopolis': 'sc', 'balneário camboriú': 'sc',
+      'porto alegre': 'rs', 'gramado': 'rs', 'canela': 'rs',
+      'brasília': 'df', 'brasilia': 'df',
+      'recife': 'pe', 'olinda': 'pe',
       'fortaleza': 'ce',
-      'goiânia': 'go',
-      'goiania': 'go',
-      'campo grande': 'ms',
-      'bonito': 'ms',
-      'vitória': 'es',
-      'vitoria': 'es'
+      'goiânia': 'go', 'goiania': 'go',
+      'campo grande': 'ms', 'bonito': 'ms',
+      'vitória': 'es', 'vitoria': 'es',
+      'brotas': 'sp', 'aparecida': 'sp', 'campos do jordão': 'sp',
+      'paraty': 'rj', 'buzios': 'rj', 'cabo frio': 'rj',
+      'tiradentes': 'mg', 'diamantina': 'mg',
+      'morro de são paulo': 'ba', 'lençóis': 'ba',
+      'bonito': 'ms', 'pantanal': 'ms'
     };
     const cidadeLower = cidade.toLowerCase();
     for (const [cidadeMap, sigla] of Object.entries(mapeamento)) {
@@ -1537,7 +1599,7 @@ const BENETRIP_DESTINOS = {
               </div>
               <p class="mt-3 text-sm">
                 Você será redirecionado para a DeÔnibus onde poderá consultar preços reais de ${isRodoviario ? 'passagens de ônibus' : 'passagens aéreas'} e finalizar sua reserva com nossos parceiros confiáveis.
-                ${isRodoviario ? '<br><br><strong>💡 Dica:</strong> Na DeÔnibus você poderá filtrar por horário, empresa e tipo de ônibus para encontrar a melhor opção para sua viagem!' : ''}
+                ${isRodoviario ? '<br><br><strong>💡 Dica:</strong> A DeÔnibus já abrirá com sua rota preenchida! Você poderá filtrar por horário, empresa e tipo de ônibus para encontrar a melhor opção.' : ''}
               </p>
             </div>
           </div>
