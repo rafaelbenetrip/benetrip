@@ -1328,28 +1328,81 @@ const BENETRIP_DESTINOS = {
   },
 
   // Nova função para construir URL da DeÔnibus
+  // ESTRATÉGIA: Direcionar para página principal com tracking em vez de URLs específicas
+  // Isso garante que sempre funcionará e o usuário pode fazer a busca manualmente
   construirURLDeOnibus(destinoSelecionado) {
     try {
       console.log('🚌 Construindo link de afiliado DeÔnibus...', destinoSelecionado);
 
-      // Link de afiliado da DeÔnibus que SEMPRE funciona
-      const linkAfiliadoDeOnibus = "https://www.awin1.com/cread.php?awinmid=65292&awinaffid=1977223&clickref=source%3Dbenetrip&clickref2=campaign%3Dpassagens_onibus&clickref3=medium%3Dafiliado&ued=https%3A%2F%2Fdeonibus.com%2F";
+      // Dados do usuário
+      const respostas = this.dadosUsuario?.respostas;
+      if (!respostas) {
+        console.warn('Dados do usuário não encontrados, usando link básico');
+        return 'https://deonibus.com/?utm_source=benetrip&utm_medium=chatbot&utm_campaign=destinos_onibus';
+      }
 
-      console.log('✅ Link afiliado DeÔnibus criado com sucesso:', {
-        destino: destinoSelecionado.destino,
-        linkAfiliado: linkAfiliadoDeOnibus,
-        tracking: {
-          source: 'benetrip',
-          campaign: 'passagens_onibus', 
-          medium: 'afiliado'
+      // === ORIGEM ===
+      let cidadeOrigem = 'sao-paulo';
+      if (respostas.cidade_partida) {
+        const cidadePartida = respostas.cidade_partida;
+        if (typeof cidadePartida === 'string') {
+          cidadeOrigem = this.normalizarNomeCidade(cidadePartida);
+        } else if (typeof cidadePartida === 'object' && cidadePartida.name) {
+          cidadeOrigem = this.normalizarNomeCidade(cidadePartida.name);
         }
+      }
+
+      // === DESTINO ===
+      const cidadeDestino = this.normalizarNomeCidade(destinoSelecionado.destino);
+
+      // === DATAS ===
+      const datas = respostas.datas;
+      let dataIda = '';
+      let dataVolta = '';
+      
+      if (datas && datas.dataIda) {
+        dataIda = datas.dataIda; // Formato: YYYY-MM-DD
+        dataVolta = datas.dataVolta || datas.dataIda;
+      }
+
+      // === CONSTRUIR URL ESPECÍFICA ===
+      // Tentar primeiro com URL específica da rota
+      let urlEspecifica = `https://deonibus.com/passagem-de-onibus/${cidadeOrigem}/${cidadeDestino}`;
+      
+      // Adicionar parâmetros de busca se temos datas
+      const params = new URLSearchParams();
+      if (dataIda) {
+        params.append('ida', dataIda);
+      }
+      if (dataVolta && dataVolta !== dataIda) {
+        params.append('volta', dataVolta);
+      }
+      
+      // Parâmetros de tracking
+      params.append('utm_source', 'benetrip');
+      params.append('utm_medium', 'chatbot');
+      params.append('utm_campaign', 'destinos_onibus');
+      params.append('utm_content', `${cidadeOrigem}_para_${cidadeDestino}`);
+
+      // Adicionar parâmetros à URL
+      if (params.toString()) {
+        urlEspecifica += '?' + params.toString();
+      }
+
+      console.log('✅ URL DeÔnibus específica criada:', {
+        origem: cidadeOrigem,
+        destino: cidadeDestino,
+        dataIda,
+        dataVolta,
+        urlFinal: urlEspecifica
       });
 
-      return linkAfiliadoDeOnibus;
+      return urlEspecifica;
+
     } catch (erro) {
-      console.error('❌ Erro ao construir link DeÔnibus:', erro);
-      // Fallback para página inicial da DeÔnibus
-      return 'https://deonibus.com/?utm_source=benetrip';
+      console.error('❌ Erro ao construir URL DeÔnibus:', erro);
+      // Fallback robusto
+      return 'https://deonibus.com/?utm_source=benetrip&utm_medium=chatbot&utm_campaign=erro_construcao_url';
     }
   },
 
@@ -1450,7 +1503,8 @@ const BENETRIP_DESTINOS = {
                 </label>
               </div>
               <p class="mt-3 text-sm">
-                Você será redirecionado para a DeÔnibus onde poderá consultar preços reais de ${isRodoviario ? 'passagens de ônibus' : 'passagens aéreas'} e finalizar sua reserva com nossos parceiros confiáveis.
+                Você será redirecionado para a DeÔnibus onde poderá ${isRodoviario ? 'buscar passagens de ônibus para ' + destino.destino + ' e outras cidades próximas' : 'consultar preços reais de passagens aéreas'} e finalizar sua reserva com nossos parceiros confiáveis.
+                ${isRodoviario ? '<br><br><strong>💡 Dica:</strong> Na DeÔnibus você poderá pesquisar rotas, comparar horários e empresas para encontrar a melhor opção para sua viagem!' : ''}
               </p>
             </div>
           </div>
@@ -1486,13 +1540,31 @@ const BENETRIP_DESTINOS = {
       try {
         // Construir URL da whitelabel (adaptada)
         const urlWhitelabel = this.construirURLWhitelabel(destino);
+        
+        console.log(`🔗 URL final gerada: ${urlWhitelabel}`);
+        console.log(`📝 Tipo de viagem: ${isRodoviario ? 'RODOVIÁRIA (DeÔnibus)' : 'AÉREA (Whitelabel Voos)'}`);
 
         // Mostrar toast de confirmação
         this.exibirToast(`Redirecionando para ${isRodoviario ? 'DeÔnibus' : 'busca de voos'}...`, 'info');
 
+        // Para rodoviário, dar instruções adicionais
+        if (isRodoviario) {
+          setTimeout(() => {
+            this.exibirToast(`💡 Na DeÔnibus, busque por "${destino.destino}" para encontrar passagens!`, 'info', 5000);
+          }, 2000);
+        }
+
         // Aguardar um pouco e redirecionar
         setTimeout(() => {
-          window.open(urlWhitelabel, '_blank');
+          // Tentar abrir em nova aba
+          const novaAba = window.open(urlWhitelabel, '_blank');
+          
+          // Verificar se conseguiu abrir
+          if (!novaAba || novaAba.closed || typeof novaAba.closed == 'undefined') {
+            // Se não conseguiu abrir nova aba, tentar na mesma janela
+            console.warn('Não foi possível abrir nova aba, redirecionando na mesma janela');
+            window.location.href = urlWhitelabel;
+          }
 
           // Fechar o modal
           document.getElementById('modal-confirmacao').remove();
@@ -1504,6 +1576,15 @@ const BENETRIP_DESTINOS = {
       } catch (erro) {
         console.error('❌ Erro ao redirecionar:', erro);
         this.exibirToast('Erro ao redirecionar. Tente novamente.', 'error');
+        
+        // Em caso de erro, tentar fallback direto
+        if (isRodoviario) {
+          setTimeout(() => {
+            const fallbackUrl = 'https://deonibus.com/?utm_source=benetrip&utm_medium=chatbot&utm_campaign=fallback';
+            console.log('🔄 Tentando URL de fallback:', fallbackUrl);
+            window.open(fallbackUrl, '_blank');
+          }, 2000);
+        }
       }
     });
 
@@ -1520,7 +1601,7 @@ const BENETRIP_DESTINOS = {
   /**
    * Exibe uma mensagem toast
    */
-  exibirToast(mensagem, tipo = 'info') {
+  exibirToast(mensagem, tipo = 'info', duracao = 3000) {
     // Criar container se não existir
     let toastContainer = document.getElementById('toast-container');
     if (!toastContainer) {
@@ -1564,7 +1645,7 @@ const BENETRIP_DESTINOS = {
     setTimeout(() => {
       toast.style.transform = 'translateX(100%)';
       setTimeout(() => toast.remove(), 300);
-    }, 3000);
+    }, duracao);
   },
 
   // Obter período de datas da viagem
