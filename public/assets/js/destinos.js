@@ -3,6 +3,7 @@
  * Versão 6.1 - SUPORTE A VIAGENS RODOVIÁRIAS E AÉREAS (SIMPLIFICADO)
  * Adaptado para mostrar informações de ônibus (< R$ 401) e avião (>= R$ 401)
  * ATUALIZAÇÃO: Removidas informações de terminal rodoviário e empresas de ônibus
+ * PARCEIRO RODOVIÁRIO: DeÔnibus (substituindo Buser)
  */
 
 const BENETRIP_DESTINOS = {
@@ -1187,11 +1188,11 @@ const BENETRIP_DESTINOS = {
   construirURLWhitelabel(destinoSelecionado) {
     try {
       const isRodoviario = this.tipoViagem === 'rodoviario';
-      console.log(`🔧 Construindo URL ${isRodoviario ? 'RODOVIÁRIA com afiliado Buser' : 'AÉREA'}...`);
+      console.log(`🔧 Construindo URL ${isRodoviario ? 'RODOVIÁRIA com afiliado DeÔnibus' : 'AÉREA'}...`);
 
       if (isRodoviario) {
-        // NOVA LÓGICA PARA BUSER
-        return this.construirURLBuser(destinoSelecionado);
+        // NOVA LÓGICA PARA DeÔNIBUS
+        return this.construirURLDeOnibus(destinoSelecionado);
       }
 
       // Manter lógica existente para voos...
@@ -1326,80 +1327,29 @@ const BENETRIP_DESTINOS = {
     }
   },
 
-  // Nova função para construir URL da Buser
-  construirURLBuser(destinoSelecionado) {
+  // Nova função para construir URL da DeÔnibus
+  construirURLDeOnibus(destinoSelecionado) {
     try {
-      console.log('🚌 Construindo link de afiliado Buser...', destinoSelecionado);
+      console.log('🚌 Construindo link de afiliado DeÔnibus...', destinoSelecionado);
 
-      // Dados do usuário
-      const respostas = this.dadosUsuario?.respostas;
-      if (!respostas) throw new Error('Dados do usuário não encontrados');
+      // Link de afiliado da DeÔnibus que SEMPRE funciona
+      const linkAfiliadoDeOnibus = "https://www.awin1.com/cread.php?awinmid=65292&awinaffid=1977223&clickref=source%3Dbenetrip&clickref2=campaign%3Dpassagens_onibus&clickref3=medium%3Dafiliado&ued=https%3A%2F%2Fdeonibus.com%2F";
 
-      // === ORIGEM ===
-      let cidadeOrigem = 'são-paulo';
-      let siglaOrigem = 'sp';
-
-      if (respostas.cidade_partida) {
-        const cidadePartida = respostas.cidade_partida;
-
-        if (typeof cidadePartida === 'string') {
-          cidadeOrigem = this.normalizarNomeCidade(cidadePartida);
-          siglaOrigem = this.obterSiglaEstadoLocal(cidadePartida);
-        } else if (typeof cidadePartida === 'object' && cidadePartida.name) {
-          cidadeOrigem = this.normalizarNomeCidade(cidadePartida.name);
-          siglaOrigem = this.obterSiglaEstadoLocal(cidadePartida.name);
+      console.log('✅ Link afiliado DeÔnibus criado com sucesso:', {
+        destino: destinoSelecionado.destino,
+        linkAfiliado: linkAfiliadoDeOnibus,
+        tracking: {
+          source: 'benetrip',
+          campaign: 'passagens_onibus', 
+          medium: 'afiliado'
         }
-      }
-
-      // === DESTINO ===
-      const cidadeDestino = this.normalizarNomeCidade(destinoSelecionado.destino);
-      const siglaDestino = destinoSelecionado.siglaEstado ||
-        this.obterSiglaEstadoLocal(destinoSelecionado.destino);
-
-      // === DATAS ===
-      const datas = respostas.datas;
-      if (!datas || !datas.dataIda) {
-        throw new Error('Datas de viagem não encontradas');
-      }
-
-      const dataIda = datas.dataIda; // Formato: YYYY-MM-DD
-      const dataVolta = datas.dataVolta || datas.dataIda;
-
-      // === CONSTRUIR URL BUSER ===
-      const baseAfiliado = 'https://dhwnh.com/g/2gm32wfk80315383f785fe12268cba/';
-
-      // SubID para tracking
-      const subid = `benetrip_${this.removerAcentos(cidadeOrigem)}_${this.removerAcentos(cidadeDestino)}_${dataIda.replace(/-/g, '')}`;
-
-      // URL da Buser (será codificada)
-      const urlBuser = `https://www.buser.com.br/onibus/${cidadeOrigem}-${siglaOrigem}/${cidadeDestino}-${siglaDestino}`;
-      const queryParams = new URLSearchParams({
-        ida: dataIda,
-        volta: dataVolta,
-        utm_source: 'benetrip',
-        utm_medium: 'affiliate',
-        utm_campaign: 'chatbot_onibus'
       });
 
-      // Montar URL final
-      const urlCompleta = `${urlBuser}?${queryParams.toString()}`;
-
-      // URL de afiliado final
-      const urlAfiliado = `${baseAfiliado}?subid=${subid}&ulp=${encodeURIComponent(urlCompleta)}`;
-
-      console.log('✅ URL Buser construída:', {
-        origem: `${cidadeOrigem}-${siglaOrigem}`,
-        destino: `${cidadeDestino}-${siglaDestino}`,
-        dataIda,
-        dataVolta,
-        urlFinal: urlAfiliado
-      });
-
-      return urlAfiliado;
+      return linkAfiliadoDeOnibus;
     } catch (erro) {
-      console.error('❌ Erro ao construir URL Buser:', erro);
-      // Fallback para página inicial da Buser
-      return 'https://www.buser.com.br/?utm_source=benetrip';
+      console.error('❌ Erro ao construir link DeÔnibus:', erro);
+      // Fallback para página inicial da DeÔnibus
+      return 'https://deonibus.com/?utm_source=benetrip';
     }
   },
 
@@ -1472,7 +1422,6 @@ const BENETRIP_DESTINOS = {
     return 'sp'; // Default
   },
 
-
   // Mostrar confirmação de seleção (adaptado para ambos os tipos)
   mostrarConfirmacaoSelecao(destino) {
     const isRodoviario = this.tipoViagem === 'rodoviario';
@@ -1501,7 +1450,7 @@ const BENETRIP_DESTINOS = {
                 </label>
               </div>
               <p class="mt-3 text-sm">
-                Você será direcionado para a Benetrip onde poderá consultar preços reais de ${isRodoviario ? 'passagens de ônibus' : 'passagens aéreas'} e finalizar sua reserva com nossos parceiros confiáveis.
+                Você será redirecionado para a DeÔnibus onde poderá consultar preços reais de ${isRodoviario ? 'passagens de ônibus' : 'passagens aéreas'} e finalizar sua reserva com nossos parceiros confiáveis.
               </p>
             </div>
           </div>
@@ -1511,7 +1460,7 @@ const BENETRIP_DESTINOS = {
             Voltar
           </button>
           <button id="btn-confirmar" class="flex-1 py-2 px-4 text-white rounded transition-colors hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed" style="background-color: #E87722;" disabled>
-            ${isRodoviario ? 'Buscar Ônibus 🚌' : 'Buscar Voos ✈️'}
+            ${isRodoviario ? 'Buscar na DeÔnibus 🚌' : 'Buscar Voos ✈️'}
           </button>
         </div>
       </div>
@@ -1530,16 +1479,16 @@ const BENETRIP_DESTINOS = {
       document.getElementById('modal-confirmacao').remove();
     });
 
-    // Redirecionar para whitelabel adaptada
+    // Redirecionar para whitelabel adaptada (agora com DeÔnibus)
     btnConfirmar.addEventListener('click', () => {
-      console.log(`🚀 Redirecionando para a whitelabel Benetrip ${isRodoviario ? 'RODOVIÁRIA' : 'AÉREA'}...`);
+      console.log(`🚀 Redirecionando para a DeÔnibus ${isRodoviario ? 'RODOVIÁRIA' : 'AÉREA'}...`);
 
       try {
         // Construir URL da whitelabel (adaptada)
         const urlWhitelabel = this.construirURLWhitelabel(destino);
 
         // Mostrar toast de confirmação
-        this.exibirToast(`Redirecionando para ${isRodoviario ? 'busca de ônibus' : 'busca de voos'}...`, 'info');
+        this.exibirToast(`Redirecionando para ${isRodoviario ? 'DeÔnibus' : 'busca de voos'}...`, 'info');
 
         // Aguardar um pouco e redirecionar
         setTimeout(() => {
