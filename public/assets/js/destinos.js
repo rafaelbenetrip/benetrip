@@ -1188,25 +1188,11 @@ const BENETRIP_DESTINOS = {
   construirURLWhitelabel(destinoSelecionado) {
     try {
       const isRodoviario = this.tipoViagem === 'rodoviario';
-      console.log(`🔧 CONSTRUINDO URL WHITELABEL - TIPO: ${isRodoviario ? 'RODOVIÁRIO' : 'AÉREO'}`);
-      console.log(`🔧 this.tipoViagem = ${this.tipoViagem}`);
-      console.log(`🔧 isRodoviario = ${isRodoviario}`);
+      console.log(`🔧 Construindo URL ${isRodoviario ? 'RODOVIÁRIA com afiliado DeÔnibus' : 'AÉREA'}...`);
 
       if (isRodoviario) {
-        // LÓGICA PARA DeÔNIBUS - GARANTIR QUE USA A FUNÇÃO CORRETA
-        console.log('🚌 Detectado: viagem rodoviária - usando DeÔnibus');
-        console.log('🚌 Chamando construirURLDeOnibus...');
-        const urlDeOnibus = this.construirURLDeOnibus(destinoSelecionado);
-        console.log('🚌 URL DeÔnibus retornada:', urlDeOnibus);
-        
-        // VERIFICAÇÃO CRÍTICA
-        if (!urlDeOnibus.includes('awin1.com')) {
-          console.error('❌ ERRO CRÍTICO: URL não contém awin1.com!');
-          console.error('❌ URL problemática:', urlDeOnibus);
-          throw new Error('URL de afiliado mal formada');
-        }
-        
-        return urlDeOnibus;
+        // NOVA LÓGICA PARA DeÔNIBUS
+        return this.construirURLDeOnibus(destinoSelecionado);
       }
 
       // Manter lógica existente para voos...
@@ -1342,124 +1328,114 @@ const BENETRIP_DESTINOS = {
   },
 
   // Nova função para construir URL da DeÔnibus
-  // Constrói o link de afiliado seguindo o padrão correto da DeÔnibus:
-  // 1. Monta o slug da rota: origem-uf-todos-para-destino-uf-todos
-  // 2. Adiciona apenas departureDate no formato DD/MM/YYYY (returnDate não é usado)
-  // 3. Encoda corretamente a URL completa no parâmetro 'ued' do link da Awin
   construirURLDeOnibus(destinoSelecionado) {
     try {
-      console.log('🚌 ===== INICIANDO CONSTRUÇÃO URL DEONIBUS =====');
-      console.log('🚌 Destino selecionado:', destinoSelecionado);
-      console.log('🚌 Dados do usuário:', this.dadosUsuario);
+      console.log('🚌 Construindo link de afiliado DeÔnibus...', destinoSelecionado);
 
       // Dados do usuário
       const respostas = this.dadosUsuario?.respostas;
       if (!respostas) {
-        console.warn('❌ Dados do usuário não encontrados, usando link básico');
-        const urlBasica = "https://deonibus.com/?utm_source=benetrip";
-        const linkBasico = `https://www.awin1.com/cread.php?awinmid=65292&awinaffid=1977223&clickref=source%3Dbenetrip&clickref2=campaign%3Dpassagens_onibus&clickref3=medium%3Dafiliado&ued=${encodeURIComponent(urlBasica)}`;
-        return linkBasico;
+        console.warn('Dados do usuário não encontrados, usando link básico');
+        return 'https://www.awin1.com/cread.php?awinmid=65292&awinaffid=1977223&clickref=source%3Dbenetrip&clickref2=campaign%3Dpassagens_onibus&clickref3=medium%3Dafiliado&ued=https%3A%2F%2Fdeonibus.com%2F';
       }
 
       // === ORIGEM ===
       let cidadeOrigem = 'sao-paulo';
       let siglaOrigem = 'sp';
 
-      console.log('🚌 Processando cidade de origem...');
       if (respostas.cidade_partida) {
         const cidadePartida = respostas.cidade_partida;
-        console.log('🚌 Cidade de partida encontrada:', cidadePartida);
         
         if (typeof cidadePartida === 'string') {
-          cidadeOrigem = this.normalizarNomeCidadeDeOnibus(cidadePartida);
-          siglaOrigem = this.obterSiglaEstadoLocal(cidadePartida);
-        } else if (typeof cidadePartida === 'object' && cidadePartida.name) {
-          cidadeOrigem = this.normalizarNomeCidadeDeOnibus(cidadePartida.name);
-          siglaOrigem = this.obterSiglaEstadoLocal(cidadePartida.name);
+          cidadeOrigem = this.normalizarNomeCidade(cidadePartida);
+          // Extrair sigla se estiver no formato "Cidade, Estado (XX)"
+          const matchSigla = cidadePartida.match(/\(([A-Z]{2})\)/);
+          if (matchSigla && matchSigla[1]) {
+            siglaOrigem = matchSigla[1].toLowerCase();
+          }
+        } else if (typeof cidadePartida === 'object') {
+          if (cidadePartida.name) {
+            cidadeOrigem = this.normalizarNomeCidade(cidadePartida.name);
+          }
+          if (cidadePartida.estado) {
+            siglaOrigem = cidadePartida.estado.toLowerCase();
+          }
         }
       }
-      console.log('🚌 Origem processada:', `${cidadeOrigem}-${siglaOrigem}`);
 
       // === DESTINO ===
-      console.log('🚌 Processando destino...');
-      const cidadeDestino = this.normalizarNomeCidadeDeOnibus(destinoSelecionado.destino);
-      const siglaDestino = destinoSelecionado.siglaEstado || 
-                           this.obterSiglaEstadoLocal(destinoSelecionado.destino) ||
-                           'sp'; // fallback
-      console.log('🚌 Destino processado:', `${cidadeDestino}-${siglaDestino}`);
+      const cidadeDestino = this.normalizarNomeCidade(destinoSelecionado.destino);
+      let siglaDestino = 'sp'; // Default
 
-      // === DATA DE IDA ===
+      // Usar sigla do estado que já vem do destino selecionado
+      if (destinoSelecionado.siglaEstado) {
+        siglaDestino = destinoSelecionado.siglaEstado.toLowerCase();
+      } else if (destinoSelecionado.estado) {
+        siglaDestino = destinoSelecionado.estado.toLowerCase();
+      } else if (destinoSelecionado.codigoEstado) {
+        siglaDestino = destinoSelecionado.codigoEstado.toLowerCase();
+      }
+
+      // === DATAS ===
       const datas = respostas.datas;
-      let dataIdaFormatada = '';
+      let departureDate = '';
+      let returnDate = '';
       
-      console.log('🚌 Processando datas:', datas);
       if (datas && datas.dataIda) {
         // Converter de YYYY-MM-DD para DD/MM/YYYY
-        dataIdaFormatada = this.formatarDataDeOnibus(datas.dataIda);
-      } else {
-        // Usar data padrão se não tiver datas (amanhã)
-        const amanha = new Date();
-        amanha.setDate(amanha.getDate() + 1);
-        dataIdaFormatada = this.formatarDataDeOnibus(amanha.toISOString().split('T')[0]);
+        const [anoIda, mesIda, diaIda] = datas.dataIda.split('-');
+        departureDate = `${diaIda}/${mesIda}/${anoIda}`;
+        
+        if (datas.dataVolta) {
+          const [anoVolta, mesVolta, diaVolta] = datas.dataVolta.split('-');
+          returnDate = `${diaVolta}/${mesVolta}/${anoVolta}`;
+        } else {
+          returnDate = departureDate; // Usar mesma data se não tiver volta
+        }
       }
-      console.log('🚌 Data formatada:', dataIdaFormatada);
 
       // === CONSTRUIR URL DA DEONIBUS ===
-      // Padrão CORRETO: https://deonibus.com/passagens-de-onibus/<origem>-<UF>-todos-para-<destino>-<UF>-todos?departureDate=DD/MM/YYYY&utm_params
-      const slugRota = `${cidadeOrigem}-${siglaOrigem}-todos-para-${cidadeDestino}-${siglaDestino}-todos`;
+      // Formato: https://deonibus.com/passagens-de-onibus/<origem>-<UF>-todos-para-<destino>-<UF>-todos?departureDate=DD/MM/AAAA&returnDate=DD/MM/AAAA
+      let urlDeOnibus = `https://deonibus.com/passagens-de-onibus/${cidadeOrigem}-${siglaOrigem}-todos-para-${cidadeDestino}-${siglaDestino}-todos`;
       
-      // IMPORTANTE: usar "passagens-de-onibus" (PLURAL)
-      const urlBase = `https://deonibus.com/passagens-de-onibus/${slugRota}`;
-      
-      // Montar query string (sem usar URLSearchParams para controle total da codificação)
-      const queryParams = [
-        `departureDate=${dataIdaFormatada}`, // DeÔnibus só usa departureDate
-        `utm_source=benetrip`,
-        `utm_medium=afiliado`, 
-        `utm_campaign=chatbot_destinos`
-      ];
-      
-      const urlDeOnibusCompleta = `${urlBase}?${queryParams.join('&')}`;
-      
-      console.log('🔗 URL DeÔnibus construída (DEBUG):', {
-        cidadeOrigem: cidadeOrigem,
-        siglaOrigem: siglaOrigem,
-        cidadeDestino: cidadeDestino, 
-        siglaDestino: siglaDestino,
-        slugCompleto: slugRota,
-        dataIda: dataIdaFormatada,
-        urlBase: urlBase,
-        urlCompleta: urlDeOnibusCompleta,
-        verificacao: `Deve ser: passagens-de-onibus (PLURAL) com formato origem-uf-todos-para-destino-uf-todos`
-      });
-
-      // === CONSTRUIR LINK DE AFILIADO AWIN ===
-      // Usar encodeURIComponent para garantir codificação correta de toda a URL
-      const urlDeOnibusEncodada = encodeURIComponent(urlDeOnibusCompleta);
-      
-      // Construir link da Awin manualmente para garantir codificação correta
-      const linkAfiliado = `https://www.awin1.com/cread.php?awinmid=65292&awinaffid=1977223&clickref=source%3Dbenetrip&clickref2=campaign%3Dpassagens_onibus&clickref3=medium%3Dafiliado&ued=${urlDeOnibusEncodada}`;
-
-      console.log('✅ ===== LINK AFILIADO DEONIBUS CRIADO =====');
-      console.log('✅ Link final:', linkAfiliado);
-      console.log('✅ URL DeÔnibus decodificada:', urlDeOnibusCompleta);
-
-      // VERIFICAÇÃO FINAL
-      if (urlDeOnibusCompleta.includes('passagens-de-onibus') && urlDeOnibusCompleta.includes('-todos-para-')) {
-        console.log('✅ VERIFICAÇÃO PASSOU: URL está no formato correto');
-      } else {
-        console.error('❌ VERIFICAÇÃO FALHOU: URL não está no formato correto!');
-        console.error('❌ URL problemática:', urlDeOnibusCompleta);
+      // Adicionar parâmetros de data se disponíveis
+      if (departureDate) {
+        const params = new URLSearchParams();
+        params.append('departureDate', departureDate);
+        if (returnDate && returnDate !== departureDate) {
+          params.append('returnDate', returnDate);
+        }
+        urlDeOnibus += '?' + params.toString();
       }
 
-      return linkAfiliado;
+      // === CONSTRUIR LINK DE AFILIADO AWIN ===
+      const baseAfiliadoAwin = 'https://www.awin1.com/cread.php?awinmid=65292&awinaffid=1977223';
+      
+      // Parâmetros de tracking
+      const trackingParams = new URLSearchParams({
+        'clickref': 'source=benetrip',
+        'clickref2': 'campaign=passagens_onibus',
+        'clickref3': 'medium=afiliado',
+        'ued': urlDeOnibus
+      });
+
+      const linkFinalAfiliado = `${baseAfiliadoAwin}&${trackingParams.toString()}`;
+
+      console.log('✅ Link afiliado DeÔnibus criado com sucesso:', {
+        origem: `${cidadeOrigem}-${siglaOrigem}`,
+        destino: `${cidadeDestino}-${siglaDestino}`,
+        departureDate,
+        returnDate,
+        urlDeOnibus,
+        linkFinal: linkFinalAfiliado
+      });
+
+      return linkFinalAfiliado;
 
     } catch (erro) {
-      console.error('❌ ERRO CRÍTICO ao construir link DeÔnibus:', erro);
-      // Fallback com link de afiliado básico totalmente codificado
-      const urlFallback = "https://deonibus.com/?utm_source=benetrip&utm_medium=afiliado&utm_campaign=erro_construcao";
-      const linkFallback = `https://www.awin1.com/cread.php?awinmid=65292&awinaffid=1977223&clickref=source%3Dbenetrip&clickref2=campaign%3Derro_construcao&clickref3=medium%3Dafiliado&ued=${encodeURIComponent(urlFallback)}`;
-      return linkFallback;
+      console.error('❌ Erro ao construir link DeÔnibus:', erro);
+      // Fallback para link básico da Awin
+      return 'https://www.awin1.com/cread.php?awinmid=65292&awinaffid=1977223&clickref=source%3Dbenetrip&clickref2=campaign%3Dpassagens_onibus&clickref3=medium%3Dafiliado&ued=https%3A%2F%2Fdeonibus.com%2F';
     }
   },
 
@@ -1478,53 +1454,6 @@ const BENETRIP_DESTINOS = {
       .replace(/[^a-z0-9-]/g, '');
   },
 
-  // Normalizar nome de cidade especificamente para DeÔnibus
-  normalizarNomeCidadeDeOnibus(nome) {
-    if (!nome) return 'sao-paulo';
-    return nome
-      .toLowerCase()
-      .trim()
-      .replace(/\s+/g, '-')           // Espaços para hífens
-      .replace(/[áàãâä]/g, 'a')       // Acentos a
-      .replace(/[éèêë]/g, 'e')        // Acentos e
-      .replace(/[íìîï]/g, 'i')        // Acentos i
-      .replace(/[óòôõö]/g, 'o')       // Acentos o
-      .replace(/[úùûü]/g, 'u')        // Acentos u
-      .replace(/ç/g, 'c')             // Cedilha
-      .replace(/ñ/g, 'n')             // Til no n
-      .replace(/[^a-z0-9-]/g, '')     // Remove caracteres especiais
-      .replace(/-+/g, '-')            // Remove hífens duplicados
-      .replace(/^-|-$/g, '');         // Remove hífens do início e fim
-  },
-
-  // Formatar data para o padrão da DeÔnibus (DD/MM/YYYY)
-  formatarDataDeOnibus(dataISO) {
-    try {
-      // Entrada: YYYY-MM-DD ou objeto Date
-      let data;
-      if (typeof dataISO === 'string') {
-        const [ano, mes, dia] = dataISO.split('-');
-        data = new Date(parseInt(ano), parseInt(mes) - 1, parseInt(dia));
-      } else {
-        data = new Date(dataISO);
-      }
-
-      const dia = data.getDate().toString().padStart(2, '0');
-      const mes = (data.getMonth() + 1).toString().padStart(2, '0');
-      const ano = data.getFullYear();
-
-      return `${dia}/${mes}/${ano}`;
-    } catch (erro) {
-      console.error('Erro ao formatar data:', erro);
-      // Fallback: data de hoje
-      const hoje = new Date();
-      const dia = hoje.getDate().toString().padStart(2, '0');
-      const mes = (hoje.getMonth() + 1).toString().padStart(2, '0');
-      const ano = hoje.getFullYear();
-      return `${dia}/${mes}/${ano}`;
-    }
-  },
-
   removerAcentos(str) {
     return str
       .replace(/[áàãâ]/g, 'a')
@@ -1539,109 +1468,44 @@ const BENETRIP_DESTINOS = {
 
   obterSiglaEstadoLocal(cidade) {
     const mapeamento = {
-      // São Paulo
-      'são paulo': 'sp', 'sao paulo': 'sp', 'campinas': 'sp', 'santos': 'sp', 
-      'ribeirão preto': 'sp', 'ribeirao preto': 'sp', 'sorocaba': 'sp', 
-      'são josé dos campos': 'sp', 'sao jose dos campos': 'sp', 'osasco': 'sp',
-      'bauru': 'sp', 'piracicaba': 'sp', 'jundiaí': 'sp', 'jundiai': 'sp',
-      'taubaté': 'sp', 'taubate': 'sp', 'guarulhos': 'sp', 'araraquara': 'sp',
-      'brotas': 'sp', 'campos do jordão': 'sp', 'campos do jordao': 'sp',
-      
-      // Rio de Janeiro
-      'rio de janeiro': 'rj', 'niterói': 'rj', 'niteroi': 'rj', 'petrópolis': 'rj',
-      'petropolis': 'rj', 'nova iguaçu': 'rj', 'nova iguacu': 'rj', 'duque de caxias': 'rj',
-      'são gonçalo': 'rj', 'sao goncalo': 'rj', 'volta redonda': 'rj', 'magé': 'rj',
-      'mage': 'rj', 'cabo frio': 'rj', 'búzios': 'rj', 'buzios': 'rj',
-      'angra dos reis': 'rj', 'teresópolis': 'rj', 'teresopolis': 'rj',
-      
-      // Minas Gerais
-      'belo horizonte': 'mg', 'uberlândia': 'mg', 'uberlandia': 'mg', 'contagem': 'mg',
-      'juiz de fora': 'mg', 'betim': 'mg', 'montes claros': 'mg', 'ribeirão das neves': 'mg',
-      'ribeirao das neves': 'mg', 'uberaba': 'mg', 'governador valadares': 'mg',
-      'ipatinga': 'mg', 'sete lagoas': 'mg', 'divinópolis': 'mg', 'divinopolis': 'mg',
-      'ouro preto': 'mg', 'tiradentes': 'mg', 'diamantina': 'mg',
-      
-      // Bahia
-      'salvador': 'ba', 'feira de santana': 'ba', 'vitória da conquista': 'ba',
-      'vitoria da conquista': 'ba', 'camaçari': 'ba', 'camacari': 'ba', 'itabuna': 'ba',
-      'juazeiro': 'ba', 'lauro de freitas': 'ba', 'ilhéus': 'ba', 'ilheus': 'ba',
-      'jequié': 'ba', 'jequie': 'ba', 'alagoinhas': 'ba', 'porto seguro': 'ba',
-      'paulo afonso': 'ba', 'simões filho': 'ba', 'simoes filho': 'ba',
-      
-      // Paraná
-      'curitiba': 'pr', 'londrina': 'pr', 'maringá': 'pr', 'maringa': 'pr', 'ponta grossa': 'pr',
-      'cascavel': 'pr', 'são josé dos pinhais': 'pr', 'sao jose dos pinhais': 'pr',
-      'foz do iguaçu': 'pr', 'foz do iguacu': 'pr', 'colombo': 'pr', 'guarapuava': 'pr',
-      'paranaguá': 'pr', 'paranagua': 'pr', 'araucária': 'pr', 'araucaria': 'pr',
-      
-      // Santa Catarina
-      'florianópolis': 'sc', 'florianopolis': 'sc', 'joinville': 'sc', 'blumenau': 'sc',
-      'são josé': 'sc', 'sao jose': 'sc', 'criciúma': 'sc', 'criciuma': 'sc',
-      'chapecó': 'sc', 'chapeco': 'sc', 'itajaí': 'sc', 'itajai': 'sc',
-      'lages': 'sc', 'palhoça': 'sc', 'palhoca': 'sc', 'balneário camboriú': 'sc',
-      'balneario camboriu': 'sc', 'brusque': 'sc', 'tubarão': 'sc', 'tubarao': 'sc',
-      
-      // Rio Grande do Sul
-      'porto alegre': 'rs', 'caxias do sul': 'rs', 'pelotas': 'rs', 'canoas': 'rs',
-      'santa maria': 'rs', 'gravataí': 'rs', 'gravatai': 'rs', 'viamão': 'rs',
-      'viamao': 'rs', 'novo hamburgo': 'rs', 'são leopoldo': 'rs', 'sao leopoldo': 'rs',
-      'rio grande': 'rs', 'alvorada': 'rs', 'passo fundo': 'rs', 'sapucaia do sul': 'rs',
-      'gramado': 'rs', 'canela': 'rs', 'bento gonçalves': 'rs', 'bento goncalves': 'rs',
-      
-      // Distrito Federal
-      'brasília': 'df', 'brasilia': 'df', 'taguatinga': 'df', 'ceilândia': 'df',
-      'ceilandia': 'df', 'samambaia': 'df', 'gama': 'df', 'sobradinho': 'df',
-      
-      // Pernambuco
-      'recife': 'pe', 'jaboatão dos guararapes': 'pe', 'jaboatao dos guararapes': 'pe',
-      'olinda': 'pe', 'caruaru': 'pe', 'petrolina': 'pe', 'paulista': 'pe',
-      'cabo de santo agostinho': 'pe', 'camaragibe': 'pe', 'garanhuns': 'pe',
-      
-      // Ceará
-      'fortaleza': 'ce', 'caucaia': 'ce', 'juazeiro do norte': 'ce', 'maracanaú': 'ce',
-      'maracanau': 'ce', 'sobral': 'ce', 'crato': 'ce', 'itapipoca': 'ce',
-      'maranguape': 'ce', 'iguatu': 'ce', 'canindé': 'ce', 'caninde': 'ce',
-      
-      // Goiás
-      'goiânia': 'go', 'goiania': 'go', 'aparecida de goiânia': 'go', 'aparecida de goiania': 'go',
-      'anápolis': 'go', 'anapolis': 'go', 'rio verde': 'go', 'luziânia': 'go',
-      'luziania': 'go', 'águas lindas de goiás': 'go', 'aguas lindas de goias': 'go',
-      
-      // Mato Grosso do Sul
-      'campo grande': 'ms', 'dourados': 'ms', 'três lagoas': 'ms', 'tres lagoas': 'ms',
-      'corumbá': 'ms', 'corumba': 'ms', 'ponta porã': 'ms', 'ponta pora': 'ms',
-      'bonito': 'ms', 'aquidauana': 'ms', 'naviraí': 'ms', 'navirai': 'ms',
-      
-      // Espírito Santo
-      'vitória': 'es', 'vitoria': 'es', 'vila velha': 'es', 'serra': 'es',
-      'cariacica': 'es', 'viana': 'es', 'guarapari': 'es', 'linhares': 'es',
-      'são mateus': 'es', 'sao mateus': 'es', 'cachoeiro de itapemirim': 'es',
-      
-      // Amazonas
-      'manaus': 'am', 'parintins': 'am', 'itacoatiara': 'am', 'manacapuru': 'am',
-      'coari': 'am', 'tefé': 'am', 'tefe': 'am', 'humaitá': 'am', 'humaita': 'am',
-      
-      // Pará
-      'belém': 'pa', 'belem': 'pa', 'ananindeua': 'pa', 'santarém': 'pa',
-      'santarem': 'pa', 'marabá': 'pa', 'maraba': 'pa', 'parauapebas': 'pa',
-      'castanhal': 'pa', 'abaetetuba': 'pa', 'cametá': 'pa', 'cameta': 'pa'
+      'são paulo': 'sp',
+      'sao paulo': 'sp',
+      'campinas': 'sp',
+      'santos': 'sp',
+      'rio de janeiro': 'rj',
+      'niterói': 'rj',
+      'niteroi': 'rj',
+      'petrópolis': 'rj',
+      'belo horizonte': 'mg',
+      'ouro preto': 'mg',
+      'uberlândia': 'mg',
+      'salvador': 'ba',
+      'porto seguro': 'ba',
+      'curitiba': 'pr',
+      'foz do iguaçu': 'pr',
+      'florianópolis': 'sc',
+      'florianopolis': 'sc',
+      'balneário camboriú': 'sc',
+      'porto alegre': 'rs',
+      'gramado': 'rs',
+      'canela': 'rs',
+      'brasília': 'df',
+      'brasilia': 'df',
+      'recife': 'pe',
+      'olinda': 'pe',
+      'fortaleza': 'ce',
+      'goiânia': 'go',
+      'goiania': 'go',
+      'campo grande': 'ms',
+      'bonito': 'ms',
+      'vitória': 'es',
+      'vitoria': 'es'
     };
-    
     const cidadeLower = cidade.toLowerCase();
-    
-    // Busca exata primeiro
-    if (mapeamento[cidadeLower]) {
-      return mapeamento[cidadeLower];
-    }
-    
-    // Busca parcial
     for (const [cidadeMap, sigla] of Object.entries(mapeamento)) {
-      if (cidadeLower.includes(cidadeMap) || cidadeMap.includes(cidadeLower)) {
-        return sigla;
-      }
+      if (cidadeLower.includes(cidadeMap)) return sigla;
     }
-    
-    return 'sp'; // Default para São Paulo
+    return 'sp'; // Default
   },
 
   // Mostrar confirmação de seleção (adaptado para ambos os tipos)
@@ -1672,7 +1536,7 @@ const BENETRIP_DESTINOS = {
                 </label>
               </div>
               <p class="mt-3 text-sm">
-                Você será redirecionado para a DeÔnibus onde ${isRodoviario ? `a rota <strong>${this.obterNomeOrigemUsuario()} → ${destino.destino}</strong> já estará selecionada com suas datas de viagem. Lá você poderá` : 'poderá'} consultar preços reais de ${isRodoviario ? 'passagens de ônibus' : 'passagens aéreas'} e finalizar sua reserva com nossos parceiros confiáveis.
+                Você será redirecionado para a DeÔnibus onde poderá consultar preços reais de ${isRodoviario ? 'passagens de ônibus' : 'passagens aéreas'} e finalizar sua reserva com nossos parceiros confiáveis.
                 ${isRodoviario ? '<br><br><strong>💡 Dica:</strong> Na DeÔnibus você poderá filtrar por horário, empresa e tipo de ônibus para encontrar a melhor opção para sua viagem!' : ''}
               </p>
             </div>
@@ -1704,26 +1568,13 @@ const BENETRIP_DESTINOS = {
 
     // Redirecionar para whitelabel adaptada (agora com DeÔnibus)
     btnConfirmar.addEventListener('click', () => {
-      console.log(`🚀 INICIANDO REDIRECIONAMENTO ${isRodoviario ? 'RODOVIÁRIO (DeÔnibus)' : 'AÉREO'}...`);
-      console.log('🚀 Destino selecionado:', destino);
-      console.log('🚀 Tipo de viagem detectado:', this.tipoViagem);
+      console.log(`🚀 Redirecionando para a DeÔnibus ${isRodoviario ? 'RODOVIÁRIA' : 'AÉREA'}...`);
 
       try {
         // Construir URL da whitelabel (adaptada)
-        console.log('🔧 Chamando construirURLWhitelabel...');
         const urlWhitelabel = this.construirURLWhitelabel(destino);
         
         console.log(`🔗 URL final gerada: ${urlWhitelabel}`);
-
-        // VERIFICAÇÃO ESPECIAL PARA RODOVIÁRIO
-        if (isRodoviario) {
-          if (urlWhitelabel.includes('awin1.com') && urlWhitelabel.includes('passagens-de-onibus')) {
-            console.log('✅ SUCESSO: Link DeÔnibus construído corretamente');
-          } else {
-            console.error('❌ ERRO: Link DeÔnibus mal formado!');
-            console.error('❌ Link problemático:', urlWhitelabel);
-          }
-        }
 
         // Mostrar toast de confirmação
         this.exibirToast(`Redirecionando para ${isRodoviario ? 'DeÔnibus' : 'busca de voos'}...`, 'info');
@@ -1776,27 +1627,6 @@ const BENETRIP_DESTINOS = {
   },
 
   // ========== UTILITÁRIOS AUXILIARES ==========
-
-  /**
-   * Obter nome da cidade de origem do usuário
-   */
-  obterNomeOrigemUsuario() {
-    try {
-      const respostas = this.dadosUsuario?.respostas;
-      if (respostas && respostas.cidade_partida) {
-        const cidadePartida = respostas.cidade_partida;
-        if (typeof cidadePartida === 'string') {
-          return cidadePartida;
-        } else if (typeof cidadePartida === 'object' && cidadePartida.name) {
-          return cidadePartida.name;
-        }
-      }
-      return 'São Paulo'; // Fallback
-    } catch (erro) {
-      console.error('Erro ao obter nome da origem:', erro);
-      return 'Sua cidade';
-    }
-  },
 
   /**
    * Exibe uma mensagem toast
