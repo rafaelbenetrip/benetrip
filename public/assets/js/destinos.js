@@ -1188,11 +1188,25 @@ const BENETRIP_DESTINOS = {
   construirURLWhitelabel(destinoSelecionado) {
     try {
       const isRodoviario = this.tipoViagem === 'rodoviario';
-      console.log(`🔧 Construindo URL ${isRodoviario ? 'RODOVIÁRIA com afiliado DeÔnibus' : 'AÉREA'}...`);
+      console.log(`🔧 CONSTRUINDO URL WHITELABEL - TIPO: ${isRodoviario ? 'RODOVIÁRIO' : 'AÉREO'}`);
+      console.log(`🔧 this.tipoViagem = ${this.tipoViagem}`);
+      console.log(`🔧 isRodoviario = ${isRodoviario}`);
 
       if (isRodoviario) {
-        // NOVA LÓGICA PARA DeÔNIBUS
-        return this.construirURLDeOnibus(destinoSelecionado);
+        // LÓGICA PARA DeÔNIBUS - GARANTIR QUE USA A FUNÇÃO CORRETA
+        console.log('🚌 Detectado: viagem rodoviária - usando DeÔnibus');
+        console.log('🚌 Chamando construirURLDeOnibus...');
+        const urlDeOnibus = this.construirURLDeOnibus(destinoSelecionado);
+        console.log('🚌 URL DeÔnibus retornada:', urlDeOnibus);
+        
+        // VERIFICAÇÃO CRÍTICA
+        if (!urlDeOnibus.includes('awin1.com')) {
+          console.error('❌ ERRO CRÍTICO: URL não contém awin1.com!');
+          console.error('❌ URL problemática:', urlDeOnibus);
+          throw new Error('URL de afiliado mal formada');
+        }
+        
+        return urlDeOnibus;
       }
 
       // Manter lógica existente para voos...
@@ -1334,12 +1348,14 @@ const BENETRIP_DESTINOS = {
   // 3. Encoda corretamente a URL completa no parâmetro 'ued' do link da Awin
   construirURLDeOnibus(destinoSelecionado) {
     try {
-      console.log('🚌 Construindo link de afiliado DeÔnibus...', destinoSelecionado);
+      console.log('🚌 ===== INICIANDO CONSTRUÇÃO URL DEONIBUS =====');
+      console.log('🚌 Destino selecionado:', destinoSelecionado);
+      console.log('🚌 Dados do usuário:', this.dadosUsuario);
 
       // Dados do usuário
       const respostas = this.dadosUsuario?.respostas;
       if (!respostas) {
-        console.warn('Dados do usuário não encontrados, usando link básico');
+        console.warn('❌ Dados do usuário não encontrados, usando link básico');
         const urlBasica = "https://deonibus.com/?utm_source=benetrip";
         const linkBasico = `https://www.awin1.com/cread.php?awinmid=65292&awinaffid=1977223&clickref=source%3Dbenetrip&clickref2=campaign%3Dpassagens_onibus&clickref3=medium%3Dafiliado&ued=${encodeURIComponent(urlBasica)}`;
         return linkBasico;
@@ -1349,8 +1365,11 @@ const BENETRIP_DESTINOS = {
       let cidadeOrigem = 'sao-paulo';
       let siglaOrigem = 'sp';
 
+      console.log('🚌 Processando cidade de origem...');
       if (respostas.cidade_partida) {
         const cidadePartida = respostas.cidade_partida;
+        console.log('🚌 Cidade de partida encontrada:', cidadePartida);
+        
         if (typeof cidadePartida === 'string') {
           cidadeOrigem = this.normalizarNomeCidadeDeOnibus(cidadePartida);
           siglaOrigem = this.obterSiglaEstadoLocal(cidadePartida);
@@ -1359,17 +1378,21 @@ const BENETRIP_DESTINOS = {
           siglaOrigem = this.obterSiglaEstadoLocal(cidadePartida.name);
         }
       }
+      console.log('🚌 Origem processada:', `${cidadeOrigem}-${siglaOrigem}`);
 
       // === DESTINO ===
+      console.log('🚌 Processando destino...');
       const cidadeDestino = this.normalizarNomeCidadeDeOnibus(destinoSelecionado.destino);
       const siglaDestino = destinoSelecionado.siglaEstado || 
                            this.obterSiglaEstadoLocal(destinoSelecionado.destino) ||
                            'sp'; // fallback
+      console.log('🚌 Destino processado:', `${cidadeDestino}-${siglaDestino}`);
 
       // === DATA DE IDA ===
       const datas = respostas.datas;
       let dataIdaFormatada = '';
       
+      console.log('🚌 Processando datas:', datas);
       if (datas && datas.dataIda) {
         // Converter de YYYY-MM-DD para DD/MM/YYYY
         dataIdaFormatada = this.formatarDataDeOnibus(datas.dataIda);
@@ -1379,12 +1402,13 @@ const BENETRIP_DESTINOS = {
         amanha.setDate(amanha.getDate() + 1);
         dataIdaFormatada = this.formatarDataDeOnibus(amanha.toISOString().split('T')[0]);
       }
+      console.log('🚌 Data formatada:', dataIdaFormatada);
 
       // === CONSTRUIR URL DA DEONIBUS ===
-      // Padrão: https://deonibus.com/passagens-de-onibus/<origem>-<UF>-todos-para-<destino>-<UF>-todos?departureDate=DD/MM/YYYY&utm_params
+      // Padrão CORRETO: https://deonibus.com/passagens-de-onibus/<origem>-<UF>-todos-para-<destino>-<UF>-todos?departureDate=DD/MM/YYYY&utm_params
       const slugRota = `${cidadeOrigem}-${siglaOrigem}-todos-para-${cidadeDestino}-${siglaDestino}-todos`;
       
-      // Montar URL base da DeÔnibus
+      // IMPORTANTE: usar "passagens-de-onibus" (PLURAL)
       const urlBase = `https://deonibus.com/passagens-de-onibus/${slugRota}`;
       
       // Montar query string (sem usar URLSearchParams para controle total da codificação)
@@ -1397,10 +1421,16 @@ const BENETRIP_DESTINOS = {
       
       const urlDeOnibusCompleta = `${urlBase}?${queryParams.join('&')}`;
       
-      console.log('🔗 URL DeÔnibus construída:', {
+      console.log('🔗 URL DeÔnibus construída (DEBUG):', {
+        cidadeOrigem: cidadeOrigem,
+        siglaOrigem: siglaOrigem,
+        cidadeDestino: cidadeDestino, 
+        siglaDestino: siglaDestino,
         slugCompleto: slugRota,
         dataIda: dataIdaFormatada,
-        urlCompleta: urlDeOnibusCompleta
+        urlBase: urlBase,
+        urlCompleta: urlDeOnibusCompleta,
+        verificacao: `Deve ser: passagens-de-onibus (PLURAL) com formato origem-uf-todos-para-destino-uf-todos`
       });
 
       // === CONSTRUIR LINK DE AFILIADO AWIN ===
@@ -1410,22 +1440,22 @@ const BENETRIP_DESTINOS = {
       // Construir link da Awin manualmente para garantir codificação correta
       const linkAfiliado = `https://www.awin1.com/cread.php?awinmid=65292&awinaffid=1977223&clickref=source%3Dbenetrip&clickref2=campaign%3Dpassagens_onibus&clickref3=medium%3Dafiliado&ued=${urlDeOnibusEncodada}`;
 
-      console.log('✅ Link afiliado DeÔnibus criado com sucesso:', {
-        origem: `${cidadeOrigem}-${siglaOrigem}`,
-        destino: `${cidadeDestino}-${siglaDestino}`,
-        dataIda: dataIdaFormatada,
-        slugRota: slugRota,
-        urlDeOnibus: urlDeOnibusCompleta,
-        urlEncodada: urlDeOnibusEncodada,
-        linkAfiliado: linkAfiliado,
-        exemplo: `${this.obterNomeOrigemUsuario()} → ${destinoSelecionado.destino} em ${dataIdaFormatada}`,
-        observacao: 'URL totalmente codificada para Awin. DeÔnibus usa apenas departureDate.'
-      });
+      console.log('✅ ===== LINK AFILIADO DEONIBUS CRIADO =====');
+      console.log('✅ Link final:', linkAfiliado);
+      console.log('✅ URL DeÔnibus decodificada:', urlDeOnibusCompleta);
+
+      // VERIFICAÇÃO FINAL
+      if (urlDeOnibusCompleta.includes('passagens-de-onibus') && urlDeOnibusCompleta.includes('-todos-para-')) {
+        console.log('✅ VERIFICAÇÃO PASSOU: URL está no formato correto');
+      } else {
+        console.error('❌ VERIFICAÇÃO FALHOU: URL não está no formato correto!');
+        console.error('❌ URL problemática:', urlDeOnibusCompleta);
+      }
 
       return linkAfiliado;
 
     } catch (erro) {
-      console.error('❌ Erro ao construir link DeÔnibus:', erro);
+      console.error('❌ ERRO CRÍTICO ao construir link DeÔnibus:', erro);
       // Fallback com link de afiliado básico totalmente codificado
       const urlFallback = "https://deonibus.com/?utm_source=benetrip&utm_medium=afiliado&utm_campaign=erro_construcao";
       const linkFallback = `https://www.awin1.com/cread.php?awinmid=65292&awinaffid=1977223&clickref=source%3Dbenetrip&clickref2=campaign%3Derro_construcao&clickref3=medium%3Dafiliado&ued=${encodeURIComponent(urlFallback)}`;
@@ -1674,13 +1704,26 @@ const BENETRIP_DESTINOS = {
 
     // Redirecionar para whitelabel adaptada (agora com DeÔnibus)
     btnConfirmar.addEventListener('click', () => {
-      console.log(`🚀 Redirecionando para a DeÔnibus ${isRodoviario ? 'RODOVIÁRIA' : 'AÉREA'}...`);
+      console.log(`🚀 INICIANDO REDIRECIONAMENTO ${isRodoviario ? 'RODOVIÁRIO (DeÔnibus)' : 'AÉREO'}...`);
+      console.log('🚀 Destino selecionado:', destino);
+      console.log('🚀 Tipo de viagem detectado:', this.tipoViagem);
 
       try {
         // Construir URL da whitelabel (adaptada)
+        console.log('🔧 Chamando construirURLWhitelabel...');
         const urlWhitelabel = this.construirURLWhitelabel(destino);
         
         console.log(`🔗 URL final gerada: ${urlWhitelabel}`);
+
+        // VERIFICAÇÃO ESPECIAL PARA RODOVIÁRIO
+        if (isRodoviario) {
+          if (urlWhitelabel.includes('awin1.com') && urlWhitelabel.includes('passagens-de-onibus')) {
+            console.log('✅ SUCESSO: Link DeÔnibus construído corretamente');
+          } else {
+            console.error('❌ ERRO: Link DeÔnibus mal formado!');
+            console.error('❌ Link problemático:', urlWhitelabel);
+          }
+        }
 
         // Mostrar toast de confirmação
         this.exibirToast(`Redirecionando para ${isRodoviario ? 'DeÔnibus' : 'busca de voos'}...`, 'info');
