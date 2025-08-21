@@ -1388,11 +1388,17 @@ const BENETRIP_DESTINOS = {
       
       if (datas && datas.dataIda) {
         // Converter de YYYY-MM-DD para DD/MM/YYYY
-        const [anoIda, mesIda, diaIda] = datas.dataIda.split('-');
+        const partesDataIda = datas.dataIda.split('-');
+        const anoIda = partesDataIda[0];
+        const mesIda = partesDataIda[1];
+        const diaIda = partesDataIda[2];
         departureDate = `${diaIda}/${mesIda}/${anoIda}`;
         
         if (datas.dataVolta) {
-          const [anoVolta, mesVolta, diaVolta] = datas.dataVolta.split('-');
+          const partesDataVolta = datas.dataVolta.split('-');
+          const anoVolta = partesDataVolta[0];
+          const mesVolta = partesDataVolta[1];
+          const diaVolta = partesDataVolta[2];
           returnDate = `${diaVolta}/${mesVolta}/${anoVolta}`;
         } else {
           returnDate = departureDate; // Se não tem volta, usa a mesma data
