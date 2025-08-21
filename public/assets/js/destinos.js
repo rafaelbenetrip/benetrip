@@ -1,9 +1,7 @@
 /**
  * BENETRIP - Visualização de Destinos Recomendados 
- * Versão 6.1 - SUPORTE A VIAGENS RODOVIÁRIAS E AÉREAS (SIMPLIFICADO)
- * Adaptado para mostrar informações de ônibus (< R$ 401) e avião (>= R$ 401)
- * ATUALIZAÇÃO: Removidas informações de terminal rodoviário e empresas de ônibus
- * PARCEIRO RODOVIÁRIO: DeÔnibus (substituindo Buser)
+ * Versão 7.0 - REDIRECIONAMENTO SIMPLIFICADO PARA DeÔNIBUS
+ * Solução otimizada para direcionamento de passagens rodoviárias
  */
 
 const BENETRIP_DESTINOS = {
@@ -18,7 +16,7 @@ const BENETRIP_DESTINOS = {
 
   // Inicialização
   init() {
-    console.log('Inicializando sistema de recomendações (rodoviárias + aéreas)...');
+    console.log('Inicializando sistema de recomendações (versão DeÔnibus simplificada)...');
 
     this.configurarEventos();
     this.carregarDados()
@@ -485,7 +483,7 @@ const BENETRIP_DESTINOS = {
 
     const isRodoviario = this.tipoViagem === 'rodoviario';
     const mensagem = isRodoviario ?
-      "Farejei umas rotas incríveis de ônibus pra você! 🚌🐾 Encontrei destinos perfeitos para explorar viajando de forma econômica e confortável. Dá uma olhada nas distâncias e tempos de viagem que separei especialmente pra você! Se quiser uma surpresa, clica em 'Me Surpreenda!' 💫" :
+      "Farejei umas rotas incríveis de ônibus pra você! 🚌🐾 Encontrei destinos perfeitos para explorar viajando de forma econômica e confortável. Quando escolher seu destino, vou te levar para nosso parceiro DeÔnibus onde você poderá comprar suas passagens com segurança! Se quiser uma surpresa, clica em 'Me Surpreenda!' 💫" :
       "Dei uma boa farejada por aí e encontrei destinos incríveis pra sua próxima aventura! 🐾 Dá uma olhada na minha escolha TOP e em outras opções cheias de potencial! Quer sair do óbvio? Confia na Tripinha: clica em 'Me Surpreenda!' e deixa que eu te levo pra um lugar especial e inesperado! 💫🐶";
 
     container.innerHTML = `
@@ -513,7 +511,7 @@ const BENETRIP_DESTINOS = {
           <div class="mt-2 bg-blue-50 p-3 rounded-lg">
             <div class="flex items-center mb-2">
               <span class="text-lg mr-2">🛣️</span>
-              <span class="font-medium">Informações da Viagem</span>
+              <span class="font-medium">Informações da Viagem de Ônibus</span>
             </div>
             ${destino.distanciaRodoviaria ? `
               <p class="text-sm"><strong>Distância:</strong> ${destino.distanciaRodoviaria}</p>
@@ -521,6 +519,7 @@ const BENETRIP_DESTINOS = {
             ${destino.tempoViagem ? `
               <p class="text-sm"><strong>Tempo de viagem:</strong> ${destino.tempoViagem}</p>
             ` : ''}
+            <p class="text-xs text-blue-600 mt-2">✨ Você será direcionado para nosso parceiro DeÔnibus para comprar suas passagens</p>
           </div>
         ` : ''}
       `;
@@ -572,7 +571,7 @@ const BENETRIP_DESTINOS = {
       </div>
     `;
 
-    // Sistema de abas simplificado (sem aba transporte)
+    // Sistema de abas simplificado
     let abasHtml = `
       <div class="flex border-b border-gray-200 overflow-x-auto">
         <button id="aba-visao-geral" class="botao-aba aba-ativa px-4 py-2 text-sm font-medium" onclick="BENETRIP_DESTINOS.trocarAba('visao-geral')">
@@ -592,7 +591,7 @@ const BENETRIP_DESTINOS = {
       </div>
     `;
 
-    // Conteúdo da aba Visão Geral (adaptado)
+    // Conteúdo da aba Visão Geral
     let visaoGeralHtml = `
       <div id="conteudo-visao-geral" class="conteudo-aba p-4">
         ${this.renderizarInfoTransporte(destino)}
@@ -726,7 +725,7 @@ const BENETRIP_DESTINOS = {
         <button class="btn-selecionar-destino w-full font-bold py-3 px-4 rounded-lg text-white transition-colors duration-200 hover:opacity-90" 
           style="background-color: #E87722;" 
           data-destino="${destino.destino}">
-          ${isRodoviario ? 'Escolher Esta Viagem de Ônibus!' : 'Escolher Este Destino!'}
+          ${isRodoviario ? 'Comprar Passagem de Ônibus 🚌' : 'Escolher Este Destino!'}
         </button>
       </div>
     `;
@@ -854,7 +853,7 @@ const BENETRIP_DESTINOS = {
           <button class="btn-selecionar-destino w-full mt-3 py-1.5 px-2 rounded text-white text-sm font-medium transition-colors hover:opacity-90" 
             style="background-color: #E87722;"
             data-destino="${destino.destino}">
-            ${isRodoviario ? 'Escolher Ônibus' : 'Escolher Destino'}
+            ${isRodoviario ? 'Comprar na DeÔnibus' : 'Escolher Destino'}
           </button>
         </div>
       `;
@@ -888,7 +887,7 @@ const BENETRIP_DESTINOS = {
     `;
   },
 
-  // Mostrar destino surpresa adaptado (simplificado)
+  // Mostrar destino surpresa adaptado
   mostrarDestinoSurpresa() {
     if (!this.recomendacoes || !this.recomendacoes.surpresa) {
       console.error('Destino surpresa não disponível');
@@ -1083,7 +1082,7 @@ const BENETRIP_DESTINOS = {
             style="background-color: #00A3E0;" 
             data-destino="${destino.destino}"
             onclick="document.getElementById('modal-surpresa').remove()">
-            ${isRodoviario ? 'Quero Esta Viagem de Ônibus!' : 'Quero Este Destino Surpresa!'}
+            ${isRodoviario ? 'Comprar na DeÔnibus 🚌' : 'Quero Este Destino Surpresa!'}
           </button>
           
           <button class="w-full font-medium py-2.5 px-4 rounded-lg border border-gray-300 transition-colors duration-200 hover:bg-gray-100" 
@@ -1104,7 +1103,7 @@ const BENETRIP_DESTINOS = {
     });
   },
 
-  // Selecionar um destino (adaptado para rodoviário/aéreo)
+  // Selecionar um destino (simplificado)
   selecionarDestino(nomeDestino) {
     console.log(`Destino selecionado: ${nomeDestino}`);
     let destinoSelecionado = null;
@@ -1157,6 +1156,115 @@ const BENETRIP_DESTINOS = {
     this.mostrarConfirmacaoSelecao(destinoPadronizado);
   },
 
+  // Construir URL simplificada para DeÔnibus
+  construirURLDeOnibus() {
+    console.log('🚌 Construindo link de afiliado simplificado para DeÔnibus...');
+    
+    // Link de afiliado direto para a DeÔnibus
+    const linkAfiliado = 'https://www.awin1.com/cread.php?awinmid=65292&awinaffid=1977223&clickref=source%3Dbenetrip&clickref2=campaign%3Dpassagens_onibus&clickref3=medium%3Dafiliado&ued=https%3A%2F%2Fdeonibus.com%2F%3Futm_source%3Dbenetrip%26utm_medium%3Dchatbot%26utm_campaign%3Dafiliado';
+    
+    console.log('✅ Link afiliado DeÔnibus simplificado:', linkAfiliado);
+    return linkAfiliado;
+  },
+
+  // Construir URL para voos (mantém lógica original)
+  construirURLVoos(destinoSelecionado) {
+    try {
+      console.log('✈️ Construindo URL para voos...', destinoSelecionado);
+      
+      const dadosUsuario = this.dadosUsuario;
+      const respostas = dadosUsuario?.respostas;
+
+      if (!respostas) {
+        throw new Error('Dados do usuário não encontrados para voo');
+      }
+
+      // Obter código IATA de origem
+      let codigoOrigem = 'SAO'; // Padrão São Paulo
+
+      if (respostas.cidade_partida) {
+        const cidadePartida = respostas.cidade_partida;
+
+        if (typeof cidadePartida === 'string') {
+          const match = cidadePartida.match(/\(([A-Z]{3})\)/);
+          if (match && match[1]) {
+            codigoOrigem = match[1];
+          } else {
+            const cidadeLower = cidadePartida.toLowerCase();
+            const mapeamentoCidades = {
+              'são paulo': 'SAO', 'sao paulo': 'SAO',
+              'rio de janeiro': 'RIO', 'brasilia': 'BSB',
+              'brasília': 'BSB', 'salvador': 'SSA',
+              'belo horizonte': 'CNF', 'recife': 'REC',
+              'fortaleza': 'FOR', 'porto alegre': 'POA',
+              'curitiba': 'CWB'
+            };
+            codigoOrigem = mapeamentoCidades[cidadeLower] || 'SAO';
+          }
+        } else if (typeof cidadePartida === 'object' && cidadePartida.code) {
+          codigoOrigem = cidadePartida.code;
+        }
+      }
+
+      // Código do destino
+      const codigoDestino = destinoSelecionado.codigo_iata ||
+        destinoSelecionado.aeroporto?.codigo ||
+        'XXX';
+
+      // Processar datas
+      const datas = respostas.datas;
+      if (!datas || !datas.dataIda) {
+        throw new Error('Datas de viagem não encontradas');
+      }
+
+      const [anoIda, mesIda, diaIda] = datas.dataIda.split('-');
+      const diaIdaFormatado = diaIda.padStart(2, '0');
+      const mesIdaFormatado = mesIda.padStart(2, '0');
+
+      let diaVoltaFormatado = diaIdaFormatado;
+      let mesVoltaFormatado = mesIdaFormatado;
+
+      if (datas.dataVolta) {
+        const [anoVolta, mesVolta, diaVolta] = datas.dataVolta.split('-');
+        diaVoltaFormatado = diaVolta.padStart(2, '0');
+        mesVoltaFormatado = mesVolta.padStart(2, '0');
+      }
+
+      // Quantidade de passageiros
+      let quantidadePassageiros = 1;
+
+      if (respostas.passageiros?.adultos) {
+        quantidadePassageiros = parseInt(respostas.passageiros.adultos) || 1;
+      } else if (respostas.quantidade_familia) {
+        quantidadePassageiros = parseInt(respostas.quantidade_familia) || 1;
+      } else if (respostas.quantidade_amigos) {
+        quantidadePassageiros = parseInt(respostas.quantidade_amigos) || 1;
+      } else if (respostas.companhia !== undefined) {
+        const companhia = parseInt(respostas.companhia);
+        switch (companhia) {
+          case 0: quantidadePassageiros = 1; break;
+          case 1: quantidadePassageiros = 2; break;
+          case 2: quantidadePassageiros = 3; break;
+          case 3: quantidadePassageiros = 4; break;
+          default: quantidadePassageiros = 1;
+        }
+      }
+
+      // Construir parâmetro de busca
+      const searchParam = `${codigoOrigem}${diaIdaFormatado}${mesIdaFormatado}${codigoDestino}${diaVoltaFormatado}${mesVoltaFormatado}${quantidadePassageiros}`;
+
+      // URL final para voos
+      const urlWhitelabel = `https://voos.benetrip.com.br/?flightSearch=${searchParam}`;
+
+      console.log('✅ URL de voos construída:', urlWhitelabel);
+      return urlWhitelabel;
+
+    } catch (erro) {
+      console.error('❌ Erro ao construir URL de voos:', erro);
+      return 'https://voos.benetrip.com.br/';
+    }
+  },
+
   // Encontrar imagem para ponto turístico
   encontrarImagemParaPontoTuristico(imagens, pontoTuristico, indice = 0) {
     if (!imagens || imagens.length === 0) return null;
@@ -1183,348 +1291,7 @@ const BENETRIP_DESTINOS = {
     };
   },
 
-  // ========== FUNCIONALIDADE: CONSTRUIR URL WHITELABEL (ADAPTADA) ==========
-
-  construirURLWhitelabel(destinoSelecionado) {
-    try {
-      const isRodoviario = this.tipoViagem === 'rodoviario';
-      console.log(`🔧 Construindo URL ${isRodoviario ? 'RODOVIÁRIA com afiliado DeÔnibus' : 'AÉREA'}...`);
-
-      if (isRodoviario) {
-        // NOVA LÓGICA PARA DeÔNIBUS
-        return this.construirURLDeOnibus(destinoSelecionado);
-      }
-
-      // Manter lógica existente para voos...
-      console.log('📍 Destino selecionado (Aéreo):', destinoSelecionado);
-      console.log('👤 Dados do usuário (Aéreo):', this.dadosUsuario);
-
-      // Obter dados necessários
-      const dadosUsuario = this.dadosUsuario;
-      const respostas = dadosUsuario?.respostas;
-
-      if (!respostas) {
-        throw new Error('Dados do usuário não encontrados para voo');
-      }
-
-      // ===== ORIGEM =====
-      let codigoOrigem = 'SAO'; // Padrão São Paulo
-
-      if (respostas.cidade_partida) {
-        const cidadePartida = respostas.cidade_partida;
-
-        if (typeof cidadePartida === 'string') {
-          // Extrair código IATA se estiver no formato "Cidade (XXX)"
-          const match = cidadePartida.match(/\(([A-Z]{3})\)/);
-          if (match && match[1]) {
-            codigoOrigem = match[1];
-          } else {
-            // Buscar no mapeamento por nome da cidade
-            const cidadeLower = cidadePartida.toLowerCase();
-            const mapeamentoCidades = {
-              'são paulo': 'SAO',
-              'sao paulo': 'SAO',
-              'rio de janeiro': 'RIO',
-              'brasilia': 'BSB',
-              'brasília': 'BSB',
-              'salvador': 'SSA',
-              'belo horizonte': 'CNF',
-              'recife': 'REC',
-              'fortaleza': 'FOR',
-              'porto alegre': 'POA',
-              'curitiba': 'CWB'
-            };
-            codigoOrigem = mapeamentoCidades[cidadeLower] || 'SAO';
-          }
-        } else if (typeof cidadePartida === 'object' && cidadePartida.code) {
-          codigoOrigem = cidadePartida.code;
-        }
-      }
-
-      // ===== DESTINO =====
-      // Para aéreo, usar código IATA do aeroporto
-      const codigoDestino = destinoSelecionado.codigo_iata ||
-        destinoSelecionado.aeroporto?.codigo ||
-        'XXX';
-
-      // ===== DATAS =====
-      const datas = respostas.datas;
-      if (!datas || !datas.dataIda) {
-        throw new Error('Datas de viagem não encontradas');
-      }
-
-      // Processar data de ida (formato YYYY-MM-DD)
-      const [anoIda, mesIda, diaIda] = datas.dataIda.split('-');
-      const diaIdaFormatado = diaIda.padStart(2, '0');
-      const mesIdaFormatado = mesIda.padStart(2, '0');
-
-      // Processar data de volta (se existir)
-      let diaVoltaFormatado = diaIdaFormatado;
-      let mesVoltaFormatado = mesIdaFormatado;
-
-      if (datas.dataVolta) {
-        const [anoVolta, mesVolta, diaVolta] = datas.dataVolta.split('-');
-        diaVoltaFormatado = diaVolta.padStart(2, '0');
-        mesVoltaFormatado = mesVolta.padStart(2, '0');
-      }
-
-      // ===== QUANTIDADE DE PASSAGEIROS =====
-      let quantidadePassageiros = 1;
-
-      // Verificar diferentes campos onde a quantidade pode estar
-      if (respostas.passageiros?.adultos) {
-        quantidadePassageiros = parseInt(respostas.passageiros.adultos) || 1;
-      } else if (respostas.quantidade_familia) {
-        quantidadePassageiros = parseInt(respostas.quantidade_familia) || 1;
-      } else if (respostas.quantidade_amigos) {
-        quantidadePassageiros = parseInt(respostas.quantidade_amigos) || 1;
-      } else if (respostas.companhia !== undefined) {
-        // Mapear tipo de companhia para quantidade
-        const companhia = parseInt(respostas.companhia);
-        switch (companhia) {
-          case 0:
-            quantidadePassageiros = 1;
-            break; // Sozinho
-          case 1:
-            quantidadePassageiros = 2;
-            break; // Casal
-          case 2:
-            quantidadePassageiros = 3;
-            break; // Família (estimativa)
-          case 3:
-            quantidadePassageiros = 4;
-            break; // Amigos (estimativa)
-          default:
-            quantidadePassageiros = 1;
-        }
-      }
-
-      // ===== CONSTRUIR PARÂMETRO DE BUSCA =====
-      const searchParam =
-        `${codigoOrigem}${diaIdaFormatado}${mesIdaFormatado}${codigoDestino}${diaVoltaFormatado}${mesVoltaFormatado}${quantidadePassageiros}`;
-
-      // ===== URL FINAL (AÉREA) =====
-      const urlWhitelabel = `https://voos.benetrip.com.br/?flightSearch=${searchParam}`;
-
-      console.log('✅ URL AÉREA construída com sucesso:');
-      console.log(`🔗 ${urlWhitelabel}`);
-      console.log('📊 Parâmetros utilizados:', {
-        tipoViagem: this.tipoViagem,
-        origem: codigoOrigem,
-        destino: codigoDestino,
-        dataIda: `${diaIdaFormatado}/${mesIdaFormatado}`,
-        dataVolta: `${diaVoltaFormatado}/${mesVoltaFormatado}`,
-        passageiros: quantidadePassageiros,
-        parametroCompleto: searchParam
-      });
-
-      return urlWhitelabel;
-
-    } catch (erro) {
-      console.error('❌ Erro ao construir URL da whitelabel:', erro);
-      // URL de fallback para aéreos, já que a lógica de rodoviário tem seu próprio fallback.
-      return 'https://voos.benetrip.com.br/';
-    }
-  },
-
-  // Nova função para construir URL da DeÔnibus
-  construirURLDeOnibus(destinoSelecionado) {
-    try {
-      console.log('🚌 Construindo link de afiliado DeÔnibus...', destinoSelecionado);
-
-      // Dados do usuário
-      const respostas = this.dadosUsuario?.respostas;
-      if (!respostas) {
-        console.warn('Dados do usuário não encontrados, usando link básico');
-        const linkBasico = "https://www.awin1.com/cread.php?awinmid=65292&awinaffid=1977223&clickref=source%3Dbenetrip&clickref2=campaign%3Dpassagens_onibus&clickref3=medium%3Dafiliado&ued=https%3A%2F%2Fdeonibus.com%2F";
-        return linkBasico;
-      }
-
-      // === ORIGEM ===
-      let cidadeOrigem = 'sao-paulo';
-      let siglaOrigem = 'sp';
-      
-      if (respostas.cidade_partida) {
-        const cidadePartida = respostas.cidade_partida;
-        
-        if (typeof cidadePartida === 'string') {
-          // Se a cidade já vem com sigla no formato "Cidade (XX)" ou "Cidade - XX"
-          const matchSigla = cidadePartida.match(/[-(]\s*([A-Z]{2})\s*[)]/i);
-          if (matchSigla) {
-            siglaOrigem = matchSigla[1].toLowerCase();
-            cidadeOrigem = this.normalizarNomeCidade(cidadePartida.replace(/[-(]\s*[A-Z]{2}\s*[)]/, '').trim());
-          } else {
-            cidadeOrigem = this.normalizarNomeCidade(cidadePartida);
-          }
-        } else if (typeof cidadePartida === 'object') {
-          if (cidadePartida.name) {
-            cidadeOrigem = this.normalizarNomeCidade(cidadePartida.name);
-          }
-          if (cidadePartida.state || cidadePartida.uf) {
-            siglaOrigem = (cidadePartida.state || cidadePartida.uf).toLowerCase();
-          }
-        }
-      }
-
-      // === DESTINO ===
-      const cidadeDestino = this.normalizarNomeCidade(destinoSelecionado.destino);
-      
-      // A sigla do destino deve vir da LLM (no destinoSelecionado)
-      let siglaDestino = 'sp'; // fallback
-      if (destinoSelecionado.siglaEstado) {
-        siglaDestino = destinoSelecionado.siglaEstado.toLowerCase();
-      } else if (destinoSelecionado.estado) {
-        siglaDestino = destinoSelecionado.estado.toLowerCase();
-      } else if (destinoSelecionado.uf) {
-        siglaDestino = destinoSelecionado.uf.toLowerCase();
-      } else if (destinoSelecionado.codigoEstado) {
-        siglaDestino = destinoSelecionado.codigoEstado.toLowerCase();
-      }
-
-      // === DATAS ===
-      const datas = respostas.datas;
-      let departureDate = '';
-      let returnDate = '';
-      
-      if (datas && datas.dataIda) {
-        // Converter de YYYY-MM-DD para DD/MM/YYYY
-        const partesDataIda = datas.dataIda.split('-');
-        const anoIda = partesDataIda[0];
-        const mesIda = partesDataIda[1];
-        const diaIda = partesDataIda[2];
-        departureDate = `${diaIda}/${mesIda}/${anoIda}`;
-        
-        if (datas.dataVolta) {
-          const partesDataVolta = datas.dataVolta.split('-');
-          const anoVolta = partesDataVolta[0];
-          const mesVolta = partesDataVolta[1];
-          const diaVolta = partesDataVolta[2];
-          returnDate = `${diaVolta}/${mesVolta}/${anoVolta}`;
-        } else {
-          returnDate = departureDate; // Se não tem volta, usa a mesma data
-        }
-      }
-
-      // === CONSTRUIR SLUG DA ROTA ===
-      // Padrão: /passagens-de-onibus/<origem>-<UF>-todos-para-<destino>-<UF>-todos
-      const slugRota = `passagens-de-onibus/${cidadeOrigem}-${siglaOrigem}-todos-para-${cidadeDestino}-${siglaDestino}-todos`;
-      
-      // === URL COMPLETA DA DeoNIBUS ===
-      let urlDeOnibus = `https://deonibus.com/${slugRota}`;
-      
-      // Adicionar parâmetros de data se disponíveis
-      if (departureDate) {
-        const params = new URLSearchParams();
-        params.append('departureDate', departureDate);
-        if (returnDate && returnDate !== departureDate) {
-          params.append('returnDate', returnDate);
-        }
-        urlDeOnibus += '?' + params.toString();
-      }
-
-      // === CONSTRUIR LINK DE AFILIADO AWIN ===
-      const baseAwin = 'https://www.awin1.com/cread.php';
-      const paramsAwin = new URLSearchParams({
-        awinmid: '65292',
-        awinaffid: '1977223',
-        clickref: 'source=benetrip',
-        clickref2: 'campaign=passagens_onibus',
-        clickref3: 'medium=afiliado',
-        ued: urlDeOnibus
-      });
-
-      const linkFinalAfiliado = `${baseAwin}?${paramsAwin.toString()}`;
-
-      console.log('✅ Link afiliado DeÔnibus criado com sucesso:', {
-        origem: `${cidadeOrigem}-${siglaOrigem}`,
-        destino: `${cidadeDestino}-${siglaDestino}`,
-        dataIda: departureDate,
-        dataVolta: returnDate,
-        slugRota,
-        urlDeOnibus,
-        linkFinalAfiliado
-      });
-
-      return linkFinalAfiliado;
-
-    } catch (erro) {
-      console.error('❌ Erro ao construir link DeÔnibus:', erro);
-      // Fallback para link básico de afiliado
-      const fallbackLink = "https://www.awin1.com/cread.php?awinmid=65292&awinaffid=1977223&clickref=source%3Dbenetrip&clickref2=campaign%3Dpassagens_onibus&clickref3=medium%3Dfallback&ued=https%3A%2F%2Fdeonibus.com%2F";
-      return fallbackLink;
-    }
-  },
-
-  // Funções auxiliares
-  normalizarNomeCidade(nome) {
-    if (!nome) return 'sao-paulo';
-    return nome
-      .toLowerCase()
-      .replace(/\s+/g, '-')
-      .replace(/[áàãâ]/g, 'a')
-      .replace(/[éèê]/g, 'e')
-      .replace(/[íì]/g, 'i')
-      .replace(/[óòôõ]/g, 'o')
-      .replace(/[úù]/g, 'u')
-      .replace(/ç/g, 'c')
-      .replace(/[^a-z0-9-]/g, '');
-  },
-
-  removerAcentos(str) {
-    return str
-      .replace(/[áàãâ]/g, 'a')
-      .replace(/[éèê]/g, 'e')
-      .replace(/[íì]/g, 'i')
-      .replace(/[óòôõ]/g, 'o')
-      .replace(/[úù]/g, 'u')
-      .replace(/ç/g, 'c')
-      .replace(/\s+/g, '')
-      .replace(/[^a-zA-Z0-9]/g, '');
-  },
-
-  obterSiglaEstadoLocal(cidade) {
-    const mapeamento = {
-      'são paulo': 'sp',
-      'sao paulo': 'sp',
-      'campinas': 'sp',
-      'santos': 'sp',
-      'rio de janeiro': 'rj',
-      'niterói': 'rj',
-      'niteroi': 'rj',
-      'petrópolis': 'rj',
-      'belo horizonte': 'mg',
-      'ouro preto': 'mg',
-      'uberlândia': 'mg',
-      'salvador': 'ba',
-      'porto seguro': 'ba',
-      'curitiba': 'pr',
-      'foz do iguaçu': 'pr',
-      'florianópolis': 'sc',
-      'florianopolis': 'sc',
-      'balneário camboriú': 'sc',
-      'porto alegre': 'rs',
-      'gramado': 'rs',
-      'canela': 'rs',
-      'brasília': 'df',
-      'brasilia': 'df',
-      'recife': 'pe',
-      'olinda': 'pe',
-      'fortaleza': 'ce',
-      'goiânia': 'go',
-      'goiania': 'go',
-      'campo grande': 'ms',
-      'bonito': 'ms',
-      'vitória': 'es',
-      'vitoria': 'es'
-    };
-    const cidadeLower = cidade.toLowerCase();
-    for (const [cidadeMap, sigla] of Object.entries(mapeamento)) {
-      if (cidadeLower.includes(cidadeMap)) return sigla;
-    }
-    return 'sp'; // Default
-  },
-
-  // Mostrar confirmação de seleção (adaptado para ambos os tipos)
+  // Mostrar confirmação de seleção (simplificado)
   mostrarConfirmacaoSelecao(destino) {
     const isRodoviario = this.tipoViagem === 'rodoviario';
 
@@ -1541,7 +1308,7 @@ const BENETRIP_DESTINOS = {
             <div>
               <p class="font-bold">
                 ${isRodoviario 
-                  ? `Ótima escolha, Triper! 🚌🐾 ${destino.destino} é perfeito para uma viagem de ônibus! Tem certeza que quer essa aventura rodoviária?` 
+                  ? `Ótima escolha, Triper! 🚌🐾 ${destino.destino} é perfeito para uma viagem de ônibus! Tem certeza que quer essa aventura?` 
                   : `Ótima escolha, Triper! 🐾 ${destino.destino} é incrível! Tem certeza que este é o destino certo para sua aventura?`
                 }
               </p>
@@ -1552,8 +1319,10 @@ const BENETRIP_DESTINOS = {
                 </label>
               </div>
               <p class="mt-3 text-sm">
-                Você será redirecionado para a DeÔnibus onde poderá consultar preços reais de ${isRodoviario ? 'passagens de ônibus' : 'passagens aéreas'} e finalizar sua reserva com nossos parceiros confiáveis.
-                ${isRodoviario ? '<br><br><strong>💡 Dica:</strong> Na DeÔnibus você poderá filtrar por horário, empresa e tipo de ônibus para encontrar a melhor opção para sua viagem!' : ''}
+                ${isRodoviario 
+                  ? 'Você será redirecionado para a <strong>DeÔnibus</strong>, nosso parceiro confiável, onde poderá consultar preços reais de passagens de ônibus e finalizar sua compra com segurança. 🚌✨<br><br><strong>💡 Dica:</strong> Na DeÔnibus você poderá filtrar por horário, empresa e tipo de ônibus!' 
+                  : 'Você será redirecionado para nossos parceiros onde poderá consultar preços reais de passagens aéreas e finalizar sua reserva com segurança.'
+                }
               </p>
             </div>
           </div>
@@ -1563,7 +1332,7 @@ const BENETRIP_DESTINOS = {
             Voltar
           </button>
           <button id="btn-confirmar" class="flex-1 py-2 px-4 text-white rounded transition-colors hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed" style="background-color: #E87722;" disabled>
-            ${isRodoviario ? 'Buscar na DeÔnibus 🚌' : 'Buscar Voos ✈️'}
+            ${isRodoviario ? 'Ir para DeÔnibus 🚌' : 'Buscar Voos ✈️'}
           </button>
         </div>
       </div>
@@ -1582,40 +1351,32 @@ const BENETRIP_DESTINOS = {
       document.getElementById('modal-confirmacao').remove();
     });
 
-    // Redirecionar para whitelabel adaptada (agora com DeÔnibus)
+    // Redirecionar para parceiro
     btnConfirmar.addEventListener('click', () => {
-      console.log(`🚀 Redirecionando para a DeÔnibus ${isRodoviario ? 'RODOVIÁRIA' : 'AÉREA'}...`);
+      console.log(`🚀 Redirecionando para parceiro ${isRodoviario ? 'DeÔnibus' : 'voos'}...`);
 
       try {
-        // Construir URL da whitelabel (adaptada)
-        const urlWhitelabel = this.construirURLWhitelabel(destino);
-        
-        console.log(`🔗 URL final gerada: ${urlWhitelabel}`);
-
-        // Mostrar toast de confirmação
-        this.exibirToast(`Redirecionando para ${isRodoviario ? 'DeÔnibus' : 'busca de voos'}...`, 'info');
-
-        // Para rodoviário, dar instruções adicionais
+        let url;
         if (isRodoviario) {
-          this.exibirToast('Se a página não carregar, aguarde alguns segundos e tente novamente', 'warning');
+          url = this.construirURLDeOnibus();
+          this.exibirToast('Redirecionando para nosso parceiro DeÔnibus...', 'info');
+        } else {
+          url = this.construirURLVoos(destino);
+          this.exibirToast('Redirecionando para busca de voos...', 'info');
         }
+        
+        console.log(`🔗 URL final: ${url}`);
 
         // Aguardar um pouco e redirecionar
         setTimeout(() => {
-          // Tentar abrir em nova aba
-          const novaAba = window.open(urlWhitelabel, '_blank');
+          const novaAba = window.open(url, '_blank');
           
-          // Verificar se conseguiu abrir
           if (!novaAba || novaAba.closed || typeof novaAba.closed == 'undefined') {
-            // Se não conseguiu abrir nova aba, tentar na mesma janela
             console.warn('Não foi possível abrir nova aba, redirecionando na mesma janela');
-            window.location.href = urlWhitelabel;
+            window.location.href = url;
           }
 
-          // Fechar o modal
           document.getElementById('modal-confirmacao').remove();
-
-          // Mostrar mensagem de sucesso
           this.exibirToast(`Boa viagem! ${isRodoviario ? '🚌' : '🛫'}`, 'success');
         }, 1000);
 
@@ -1623,7 +1384,7 @@ const BENETRIP_DESTINOS = {
         console.error('❌ Erro ao redirecionar:', erro);
         this.exibirToast('Erro ao redirecionar. Tente novamente.', 'error');
         
-        // Em caso de erro, tentar fallback direto
+        // Em caso de erro, usar link de fallback
         if (isRodoviario) {
           setTimeout(() => {
             const fallbackUrl = 'https://deonibus.com/?utm_source=benetrip&utm_medium=chatbot&utm_campaign=fallback';
@@ -1642,13 +1403,8 @@ const BENETRIP_DESTINOS = {
     });
   },
 
-  // ========== UTILITÁRIOS AUXILIARES ==========
-
-  /**
-   * Exibe uma mensagem toast
-   */
+  // Exibe uma mensagem toast
   exibirToast(mensagem, tipo = 'info') {
-    // Criar container se não existir
     let toastContainer = document.getElementById('toast-container');
     if (!toastContainer) {
       toastContainer = document.createElement('div');
@@ -1663,7 +1419,6 @@ const BENETRIP_DESTINOS = {
       document.body.appendChild(toastContainer);
     }
 
-    // Criar toast
     const toast = document.createElement('div');
     toast.className = `toast toast-${tipo}`;
     toast.style.cssText = `
@@ -1682,12 +1437,10 @@ const BENETRIP_DESTINOS = {
 
     toastContainer.appendChild(toast);
 
-    // Animar entrada
     setTimeout(() => {
       toast.style.transform = 'translateX(0)';
     }, 10);
 
-    // Remover após tempo
     setTimeout(() => {
       toast.style.transform = 'translateX(100%)';
       setTimeout(() => toast.remove(), 300);
