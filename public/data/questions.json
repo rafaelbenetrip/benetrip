@@ -92,9 +92,9 @@
             "unit": "km",
             "labels": {
                 "50": "Pertinho",
-                "500": "Região",
-                "1000": "Estado vizinho", 
-                "1500": "Bem longe",
+                "500": "Aqui do lado",
+                "1000": "Bora rodar", 
+                "1500": "Rodar mesmo",
                 "2000": "Qualquer lugar!"
             }
         },
