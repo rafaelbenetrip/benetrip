@@ -1,10 +1,17 @@
 /**
- * BENETRIP - App Principal (Versão Otimizada e Corrigida)
+ * BENETRIP - App Principal (Versão Otimizada v2.1.0)
  * Controla o fluxo de interação com o usuário, questionário e navegação entre telas.
  * 
- * @version 2.1.1
+ * @version 2.1.0
  * @author Equipe Benetrip
  * @description Sistema de chat interativo para planejamento de viagens
+ * 
+ * CORREÇÕES v2.1.0:
+ * ✅ Integração unificada com BENETRIP_AI.obterRecomendacoes()
+ * ✅ Remoção de função buscarDestinosProximos() desnecessária
+ * ✅ Adição de determinarTipoViagem() consistente
+ * ✅ Simplificação de finalizarQuestionario()
+ * ✅ Formato padronizado de dados para API
  */
 
 const BENETRIP = {
@@ -646,50 +653,16 @@ const BENETRIP = {
 
     /**
      * Renderiza pergunta de forma otimizada
-     * ✅ CORREÇÃO: Melhor verificação de inserção no DOM
      */
     renderizarPergunta(pergunta) {
         const mensagemHTML = this.montarHTMLPergunta(pergunta);
         
         const chatMessages = document.getElementById('chat-messages');
-        if (!chatMessages) {
-            console.error("❌ Container chat-messages não encontrado");
-            return;
-        }
-
-        console.log("📝 Renderizando pergunta:", pergunta.key);
-        
-        // Inserir HTML no DOM
-        chatMessages.insertAdjacentHTML('beforeend', mensagemHTML);
-        this.rolarParaFinal();
-        
-        // ✅ VERIFICAR SE O ELEMENTO FOI INSERIDO CORRETAMENTE
-        if (pergunta.calendar) {
-            console.log("🗓️ Pergunta de calendário detectada, verificando inserção...");
+        if (chatMessages) {
+            chatMessages.insertAdjacentHTML('beforeend', mensagemHTML);
+            this.rolarParaFinal();
             
-            // Aguardar um pequeno delay para garantir que o DOM foi atualizado
-            setTimeout(() => {
-                const calendarId = this.estado.currentCalendarId;
-                const elemento = document.getElementById(calendarId);
-                
-                if (elemento) {
-                    console.log("✅ Elemento calendário confirmado no DOM");
-                } else {
-                    console.error("❌ Elemento calendário não encontrado após inserção");
-                    console.log("🔍 HTML inserido:", mensagemHTML);
-                    
-                    // Debug: Mostrar estrutura atual do chat
-                    const ultimaMensagem = chatMessages.lastElementChild;
-                    if (ultimaMensagem) {
-                        console.log("📋 Última mensagem inserida:", ultimaMensagem.outerHTML.substring(0, 200) + "...");
-                    }
-                }
-                
-                // Configurar eventos após verificação
-                this.configurarEventosPergunta(pergunta);
-            }, 100);
-        } else {
-            // Para perguntas não-calendário, configurar eventos imediatamente
+            // Configurar eventos após renderização
             this.configurarEventosPergunta(pergunta);
         }
     },
@@ -779,11 +752,11 @@ const BENETRIP = {
      * Gera campo de calendário
      */
     gerarCampoCalendario() {
-        // ✅ CORREÇÃO: Gerar ID único baseado em timestamp + random para evitar conflitos
-        const calendarId = `benetrip-calendar-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-        this.estado.currentCalendarId = calendarId;
+        if (!this.estado.currentCalendarId) {
+            this.estado.currentCalendarId = `benetrip-calendar-${Date.now()}`;
+        }
         
-        console.log("🗓️ Gerando calendário com ID:", calendarId);
+        const calendarId = this.estado.currentCalendarId;
         
         return `
             <div class="calendar-container" data-calendar-container="${calendarId}">
@@ -919,64 +892,18 @@ const BENETRIP = {
      */
     async configurarCalendario(pergunta) {
         try {
-            console.log("🗓️ Iniciando configuração do calendário...");
-            
             // Garantir que Flatpickr está carregado
             if (typeof flatpickr === 'undefined') {
-                console.log("📦 Carregando Flatpickr...");
                 await this.carregarFlatpickr();
             }
 
-            // ✅ CORREÇÃO: Aguardar o elemento estar disponível no DOM
-            const calendarId = this.estado.currentCalendarId;
-            console.log("🔍 Procurando elemento calendário com ID:", calendarId);
-            
-            const calendarElement = await this.aguardarElementoCalendario(calendarId);
-            
-            if (!calendarElement) {
-                throw new Error(`Elemento calendário não encontrado após timeout: ${calendarId}`);
-            }
-            
-            console.log("✅ Elemento calendário encontrado, inicializando Flatpickr...");
-            this.inicializarCalendarioFlatpickr(pergunta, calendarElement);
+            await this.delay(300); // Aguardar renderização
+            this.inicializarCalendarioFlatpickr(pergunta);
             
         } catch (error) {
-            console.error("❌ Erro ao configurar calendário:", error);
+            console.error("Erro ao configurar calendário:", error);
             this.mostrarErro("Erro ao carregar calendário. Recarregue a página.");
         }
-    },
-
-    /**
-     * ✅ NOVA FUNÇÃO: Aguarda elemento do calendário estar disponível no DOM
-     */
-    async aguardarElementoCalendario(calendarId, maxTentativas = 100, intervalo = 50) {
-        console.log(`⏳ Aguardando elemento calendário: ${calendarId}`);
-        
-        for (let tentativa = 0; tentativa < maxTentativas; tentativa++) {
-            const elemento = document.getElementById(calendarId);
-            
-            if (elemento) {
-                console.log(`✅ Elemento encontrado na tentativa ${tentativa + 1}`);
-                return elemento;
-            }
-            
-            // Log de debug a cada 10 tentativas
-            if (tentativa % 10 === 0 && tentativa > 0) {
-                console.log(`🔄 Tentativa ${tentativa + 1}/${maxTentativas} - Elemento ainda não encontrado`);
-                
-                // Debug: Verificar se há elementos similares
-                const elementosCalendario = document.querySelectorAll('[id*="benetrip-calendar"]');
-                console.log("📋 Elementos calendário encontrados:", elementosCalendario.length);
-                elementosCalendario.forEach((el, idx) => {
-                    console.log(`  ${idx + 1}. ID: ${el.id}`);
-                });
-            }
-            
-            await this.delay(intervalo);
-        }
-        
-        console.error(`❌ Timeout: Elemento calendário não encontrado após ${maxTentativas * intervalo}ms`);
-        return null;
     },
 
     /**
@@ -1036,59 +963,31 @@ const BENETRIP = {
 
     /**
      * Inicializa calendário Flatpickr com configuração otimizada
-     * ✅ CORREÇÃO: Recebe elemento diretamente para garantir que existe
      */
-    inicializarCalendarioFlatpickr(pergunta, calendarElement = null) {
+    inicializarCalendarioFlatpickr(pergunta) {
         const calendarId = this.estado.currentCalendarId;
+        const calendarElement = document.getElementById(calendarId);
         
-        // ✅ Usar elemento passado como parâmetro ou buscar por ID como fallback
-        const elemento = calendarElement || document.getElementById(calendarId);
-        
-        if (!elemento) {
-            console.error(`❌ Elemento do calendário não encontrado: ${calendarId}`);
-            
-            // Debug: Mostrar todos os elementos com IDs similares
-            const todosElementos = document.querySelectorAll('[id*="calendar"]');
-            console.log("🔍 Debug - Elementos com 'calendar' no ID:", todosElementos);
-            
-            // Tentar fallback com querySelector mais amplo
-            const fallbackElement = document.querySelector('.flatpickr-calendar-container:last-child');
-            if (fallbackElement) {
-                console.log("🔄 Usando elemento fallback encontrado");
-                return this.inicializarFlatpickrComElemento(pergunta, fallbackElement, calendarId);
-            }
-            
-            this.mostrarErro("Erro no calendário. Recarregue a página.");
+        if (!calendarElement) {
+            console.error("Elemento do calendário não encontrado");
             return;
         }
 
-        console.log("✅ Elemento calendário confirmado, inicializando Flatpickr...");
-        return this.inicializarFlatpickrComElemento(pergunta, elemento, calendarId);
-    },
-
-    /**
-     * ✅ NOVA FUNÇÃO: Inicializa Flatpickr com elemento específico
-     */
-    inicializarFlatpickrComElemento(pergunta, elemento, calendarId) {
+        // Configuração otimizada do calendário
+        const config = this.obterConfigCalendario(pergunta, calendarId);
+        
         try {
-            // Configuração otimizada do calendário
-            const config = this.obterConfigCalendario(pergunta, calendarId);
-            
-            console.log("⚙️ Configuração do calendário:", config);
-            
-            const calendario = flatpickr(elemento, config);
+            const calendario = flatpickr(calendarElement, config);
             this.estado.calendarioAtual = calendario;
             
             // Configurar botão de confirmação
             this.configurarBotaoConfirmacaoCalendario(calendarId, calendario, pergunta);
             
-            console.log("🎉 Calendário inicializado com sucesso!");
-            return calendario;
+            console.log("Calendário inicializado com sucesso");
             
         } catch (error) {
-            console.error("❌ Erro ao inicializar Flatpickr:", error);
+            console.error("Erro ao inicializar Flatpickr:", error);
             this.mostrarErro("Erro no calendário. Recarregue a página.");
-            return null;
         }
     },
 
@@ -1140,156 +1039,56 @@ const BENETRIP = {
 
     /**
      * Manipula mudanças no calendário
-     * ✅ CORREÇÃO: Melhor tratamento de erro e debug
      */
     onCalendarioChange(selectedDates, calendarId) {
-        console.log("📅 Mudança no calendário:", selectedDates.length, "datas selecionadas");
-        
         const dataIdaElement = document.getElementById(`data-ida-${calendarId}`);
         const dataVoltaElement = document.getElementById(`data-volta-${calendarId}`);
         const confirmarBtn = document.getElementById(`confirmar-datas-${calendarId}`);
 
-        // ✅ Verificação robusta de elementos
         if (!dataIdaElement || !dataVoltaElement || !confirmarBtn) {
-            console.error("❌ Elementos de data não encontrados no onChange:");
-            console.error("  - Data ida:", !!dataIdaElement);
-            console.error("  - Data volta:", !!dataVoltaElement);
-            console.error("  - Botão confirmar:", !!confirmarBtn);
-            
-            // Tentar fallback com querySelector
-            const fallbackElements = this.buscarElementosCalendarioFallback(calendarId);
-            if (fallbackElements.dataIda && fallbackElements.dataVolta && fallbackElements.botao) {
-                console.log("🔄 Usando elementos fallback");
-                this.atualizarElementosData(selectedDates, fallbackElements);
-                return;
-            }
-            
-            console.error("❌ Não foi possível encontrar elementos do calendário");
+            console.error("Elementos de data não encontrados");
             return;
         }
 
-        this.atualizarElementosData(selectedDates, {
-            dataIda: dataIdaElement,
-            dataVolta: dataVoltaElement,
-            botao: confirmarBtn
-        });
-    },
-
-    /**
-     * ✅ NOVA FUNÇÃO: Busca elementos do calendário como fallback
-     */
-    buscarElementosCalendarioFallback(calendarId) {
-        console.log("🔍 Buscando elementos calendário como fallback...");
-        
-        // Tentar buscar por classes ou estrutura HTML
-        const container = document.querySelector(`[data-calendar-container="${calendarId}"]`);
-        if (!container) {
-            console.log("❌ Container calendário não encontrado");
-            return { dataIda: null, dataVolta: null, botao: null };
-        }
-        
-        const dataIda = container.querySelector('[id*="data-ida"]');
-        const dataVolta = container.querySelector('[id*="data-volta"]');
-        const botao = container.querySelector('.confirm-dates');
-        
-        console.log("🔍 Elementos fallback encontrados:");
-        console.log("  - Data ida:", !!dataIda);
-        console.log("  - Data volta:", !!dataVolta);
-        console.log("  - Botão:", !!botao);
-        
-        return { dataIda, dataVolta, botao };
-    },
-
-    /**
-     * ✅ NOVA FUNÇÃO: Atualiza elementos de data
-     */
-    atualizarElementosData(selectedDates, elementos) {
-        const { dataIda, dataVolta, botao } = elementos;
-        
         if (selectedDates.length === 0) {
-            dataIda.textContent = "Selecione";
-            dataVolta.textContent = "Selecione";
-            botao.disabled = true;
-            console.log("📅 Estado: Nenhuma data selecionada");
+            dataIdaElement.textContent = "Selecione";
+            dataVoltaElement.textContent = "Selecione";
+            confirmarBtn.disabled = true;
         } else if (selectedDates.length === 1) {
-            dataIda.textContent = this.formatarDataVisivel(selectedDates[0]);
-            dataVolta.textContent = "Selecione";
-            botao.disabled = true;
-            console.log("📅 Estado: Apenas data de ida selecionada");
+            dataIdaElement.textContent = this.formatarDataVisivel(selectedDates[0]);
+            dataVoltaElement.textContent = "Selecione";
+            confirmarBtn.disabled = true;
         } else if (selectedDates.length === 2) {
-            dataIda.textContent = this.formatarDataVisivel(selectedDates[0]);
-            dataVolta.textContent = this.formatarDataVisivel(selectedDates[1]);
-            botao.disabled = false;
-            console.log("📅 Estado: Ambas as datas selecionadas");
+            dataIdaElement.textContent = this.formatarDataVisivel(selectedDates[0]);
+            dataVoltaElement.textContent = this.formatarDataVisivel(selectedDates[1]);
+            confirmarBtn.disabled = false;
         }
     },
 
     /**
      * Configura botão de confirmação do calendário
-     * ✅ CORREÇÃO: Melhor tratamento de erro e debug
      */
     configurarBotaoConfirmacaoCalendario(calendarId, calendario, pergunta) {
-        console.log("🔘 Configurando botão de confirmação para:", calendarId);
-        
         const confirmarBtn = document.getElementById(`confirmar-datas-${calendarId}`);
-        const dataIdaElement = document.getElementById(`data-ida-${calendarId}`);
-        const dataVoltaElement = document.getElementById(`data-volta-${calendarId}`);
         
-        // ✅ Debug: Verificar se todos os elementos foram encontrados
-        console.log("🔍 Elementos encontrados:");
-        console.log("  - Botão confirmar:", !!confirmarBtn);
-        console.log("  - Data ida:", !!dataIdaElement);
-        console.log("  - Data volta:", !!dataVoltaElement);
-        
-        if (!confirmarBtn) {
-            console.error(`❌ Botão de confirmação não encontrado: confirmar-datas-${calendarId}`);
-            
-            // Fallback: tentar encontrar qualquer botão de confirmação
-            const fallbackBtn = document.querySelector('.confirm-dates');
-            if (fallbackBtn) {
-                console.log("🔄 Usando botão fallback encontrado");
-                this.configurarEventosBotaoCalendario(fallbackBtn, calendario, pergunta, calendarId);
-            }
-            return;
-        }
-        
-        if (!dataIdaElement || !dataVoltaElement) {
-            console.error("❌ Elementos de data não encontrados");
-            return;
-        }
-        
-        this.configurarEventosBotaoCalendario(confirmarBtn, calendario, pergunta, calendarId);
-        console.log("✅ Botão de confirmação configurado com sucesso");
-    },
-
-    /**
-     * ✅ NOVA FUNÇÃO: Configura eventos do botão do calendário
-     */
-    configurarEventosBotaoCalendario(confirmarBtn, calendario, pergunta, calendarId) {
-        confirmarBtn.addEventListener('click', () => {
-            try {
-                console.log("📅 Processando confirmação de datas...");
-                
-                const datas = calendario.selectedDates;
-                console.log("📋 Datas selecionadas:", datas);
-                
-                if (datas.length === 2) {
-                    const dadosDatas = {
-                        dataIda: this.formatarDataISO(datas[0]),
-                        dataVolta: this.formatarDataISO(datas[1])
-                    };
-                    
-                    console.log("✅ Dados de datas processados:", dadosDatas);
-                    this.processarResposta(dadosDatas, pergunta);
-                } else {
-                    console.warn("⚠️ Número incorreto de datas selecionadas:", datas.length);
-                    this.mostrarErro("Selecione data de ida e volta.");
+        if (confirmarBtn) {
+            confirmarBtn.addEventListener('click', () => {
+                try {
+                    const datas = calendario.selectedDates;
+                    if (datas.length === 2) {
+                        const dadosDatas = {
+                            dataIda: this.formatarDataISO(datas[0]),
+                            dataVolta: this.formatarDataISO(datas[1])
+                        };
+                        
+                        this.processarResposta(dadosDatas, pergunta);
+                    }
+                } catch (error) {
+                    console.error("Erro ao processar datas:", error);
+                    this.mostrarErro("Erro ao processar datas. Selecione novamente.");
                 }
-            } catch (error) {
-                console.error("❌ Erro ao processar datas:", error);
-                this.mostrarErro("Erro ao processar datas. Selecione novamente.");
-            }
-        });
+            });
+        }
     },
 
     /**
@@ -1926,8 +1725,7 @@ const BENETRIP = {
     },
 
     /**
-     * Extrai o código da moeda do texto completo da opção
-     * ✅ CORREÇÃO 8: Função obrigatória adicionada
+     * ✅ FUNÇÃO ADICIONADA: Extrai o código da moeda do texto completo da opção
      */
     obterCodigoMoeda(textoCompleto) {
         if (!textoCompleto) return 'BRL';
@@ -1948,8 +1746,8 @@ const BENETRIP = {
     },
 
     /**
-     * Determina o tipo de viagem baseado nas respostas do usuário
-     * ✅ CORREÇÃO 4: Função obrigatória adicionada (idêntica ao recommendations.js)
+     * ✅ FUNÇÃO ADICIONADA: Determina o tipo de viagem baseado nas respostas do usuário
+     * DEVE SER IDÊNTICA À FUNÇÃO NO recommendations.js
      */
     determinarTipoViagem() {
         // 1. PRIMEIRO: Verificar se o usuário escolheu viajar de carro
@@ -2105,22 +1903,22 @@ const BENETRIP = {
     },
 
     /**
-     * Finalização otimizada do questionário
-     * ✅ CORREÇÃO 2: Simplificado para usar sempre a mesma função
+     * ✅ FINALIZAÇÃO SIMPLIFICADA DO QUESTIONÁRIO
      */
     async finalizarQuestionario() {
         try {
-            console.log("Finalizando questionário...");
-            console.log("Dados salvos:", this.estado.respostas);
+            console.log("🎯 Finalizando questionário");
+            console.log("📊 Dados coletados:", this.estado.respostas);
+            console.log("🚗 Tipo de viagem detectado:", this.determinarTipoViagem());
 
             // Salvar dados do usuário
             this.salvarDadosUsuario();
 
-            // Mostrar mensagem de finalização
+            // Mostrar progresso
             await this.mostrarMensagemFinalizacao();
 
             // ✅ USAR SEMPRE A MESMA FUNÇÃO - A API DETECTA O TIPO AUTOMATICAMENTE
-            this.buscarRecomendacoes();
+            await this.buscarRecomendacoes();
 
         } catch (error) {
             console.error("Erro ao finalizar questionário:", error);
@@ -2130,8 +1928,7 @@ const BENETRIP = {
     },
 
     /**
-     * Busca recomendações de destinos
-     * ✅ CORREÇÃO 3: Função unificada que funciona para todos os tipos de viagem
+     * ✅ BUSCA RECOMENDAÇÕES UNIFICADA (FUNCIONA PARA TODOS OS TIPOS)
      */
     async buscarRecomendacoes() {
         // Verificar se o serviço de IA está disponível
@@ -2177,6 +1974,8 @@ const BENETRIP = {
             
             // ✅ SALVAR SEMPRE COM O MESMO NOME
             localStorage.setItem('benetrip_recomendacoes', JSON.stringify(recomendacoes));
+            
+            // Notificar que os dados estão prontos
             this.notificarDadosProntos();
             
             // Mostrar mensagem de conclusão baseada no tipo
@@ -2193,8 +1992,8 @@ const BENETRIP = {
                 window.location.href = 'destinos.html';
             }, 2000);
 
-        } catch (error) {
-            console.error("Erro ao obter recomendações:", error);
+        } catch (erro) {
+            console.error("Erro ao obter recomendações:", erro);
             this.atualizarBarraProgresso(100, "Erro ao buscar recomendações. Redirecionando...");
             // Redirecionar para página de destinos após delay
             setTimeout(() => {
@@ -2213,8 +2012,7 @@ const BENETRIP = {
     },
 
     /**
-     * Mostra mensagem de finalização
-     * ✅ CORREÇÃO 5: Mensagens específicas por tipo de viagem
+     * ✅ MENSAGEM DE FINALIZAÇÃO ATUALIZADA
      */
     async mostrarMensagemFinalizacao() {
         // Mostrar Tripinha pensando
@@ -2258,7 +2056,7 @@ const BENETRIP = {
 
         // Configurar manipulador de eventos para progresso
         this.configurarEventosProgresso();
-        
+
         // Retornar uma promessa que será resolvida após simular progresso inicial
         return new Promise(resolve => {
             setTimeout(() => {
@@ -2342,8 +2140,7 @@ const BENETRIP = {
     },
 
     /**
-     * Salva dados do usuário com formato padronizado
-     * ✅ CORREÇÃO 7: Formato consistente com a API
+     * ✅ SALVA DADOS DO USUÁRIO COM FORMATO PADRONIZADO
      */
     salvarDadosUsuario() {
         // ✅ USAR A FUNÇÃO DE DETECÇÃO DE TIPO
@@ -2472,7 +2269,6 @@ const BENETRIP = {
         }
 
         try {
-            const dados = JSON.parse(dadosUsuario);
             this.renderizarDestinos(JSON.parse(recomendacoes));
         } catch (error) {
             console.error("Erro ao inicializar tela de destinos:", error);
@@ -2959,7 +2755,6 @@ const BENETRIP = {
         clearAllData() {
             localStorage.removeItem('benetrip_user_data');
             localStorage.removeItem('benetrip_recomendacoes');
-            localStorage.removeItem('benetrip_destinos_carro');
             localStorage.removeItem('benetrip_destino_selecionado');
             localStorage.removeItem('benetrip_resultados_voos');
             console.log("Todos os dados do localStorage foram limpos");
@@ -3027,7 +2822,7 @@ const BENETRIP = {
      * Método de atualização de versão
      */
     checkVersion() {
-        const versaoAtual = "2.1.1";
+        const versaoAtual = "2.1.0";
         const versaoSalva = localStorage.getItem('benetrip_version');
         
         if (versaoSalva !== versaoAtual) {
@@ -3048,9 +2843,10 @@ const BENETRIP = {
         console.log(`Executando migrações de ${versaoAntiga} para ${versaoNova}`);
         
         // Limpar dados incompatíveis se necessário
-        if (!versaoAntiga || versaoAntiga.startsWith('1.')) {
-            console.log("Limpando dados de versão antiga...");
-            this.debug.clearAllData();
+        if (!versaoAntiga || versaoAntiga.startsWith('1.') || versaoAntiga === '2.0.0') {
+            console.log("Limpando dados de versão anterior...");
+            // Remover chaves específicas que mudaram de formato
+            localStorage.removeItem('benetrip_destinos_carro');
         }
         
         // Outras migrações podem ser adicionadas aqui
@@ -3089,34 +2885,30 @@ window.addEventListener('beforeunload', () => {
 window.BENETRIP = BENETRIP;
 
 // Exportar versão para verificação
-window.BENETRIP_VERSION = "2.1.1";
+window.BENETRIP_VERSION = "2.1.0";
 
 // Log de inicialização
-console.log("🐶 Benetrip App v2.1.1 carregado - Pronto para aventuras!");
+console.log("🐶 Benetrip App v2.1.0 carregado - Pronto para aventuras!");
 
 /**
  * === CHANGELOG ===
  * 
- * v2.1.1 (Atual - CALENDÁRIO CORRIGIDO):
- * 🗓️ CORREÇÃO CRÍTICA: Sistema de calendário completamente reescrito
- * ✅ Geração de IDs únicos para evitar conflitos entre instâncias
- * ✅ Função aguardarElementoCalendario() para garantir elemento no DOM
- * ✅ Sistema de fallback robusto para localizar elementos
- * ✅ Debug detalhado para identificar problemas de renderização
- * ✅ Verificação de inserção no DOM antes da configuração
- * ✅ Tratamento de erro melhorado com múltiplas tentativas
- * ✅ Logs detalhados para debug em produção
+ * v2.1.0 (Atual):
+ * ✅ CORRIGIDO: Remoção completa da função buscarDestinosProximos()
+ * ✅ CORRIGIDO: Adição da função determinarTipoViagem() consistente com recommendations.js
+ * ✅ CORRIGIDO: Adição da função obterCodigoMoeda() para processamento de moeda
+ * ✅ CORRIGIDO: Simplificação de finalizarQuestionario() - sempre usa buscarRecomendacoes()
+ * ✅ CORRIGIDO: Unificação de buscarRecomendacoes() - funciona para todos os tipos de viagem
+ * ✅ CORRIGIDO: Formato padronizado de dados em salvarDadosUsuario()
+ * ✅ CORRIGIDO: Mensagens de finalização personalizadas por tipo de viagem
+ * ✅ CORRIGIDO: Uso consistente do localStorage com nome 'benetrip_recomendacoes'
+ * ✅ MELHORADO: Sistema de detecção automática de tipo de viagem
+ * ✅ MELHORADO: Logs detalhados para debugging
+ * ✅ MELHORADO: Integração perfeita com BENETRIP_AI.obterRecomendacoes()
+ * ✅ MELHORADO: Tratamento de erro robusto em todas as funções
+ * ✅ MELHORADO: Migração automática de dados entre versões
  * 
- * v2.1.0 (Anterior):
- * ✅ CORREÇÃO 1: Removida função buscarDestinosProximos() desnecessária
- * ✅ CORREÇÃO 2: Simplificado finalizarQuestionario() para usar sempre buscarRecomendacoes()
- * ✅ CORREÇÃO 3: Unificado buscarRecomendacoes() para funcionar com todos os tipos de viagem
- * ✅ CORREÇÃO 4: Adicionada função determinarTipoViagem() obrigatória
- * ✅ CORREÇÃO 5: Atualizado mostrarMensagemFinalizacao() com mensagens específicas por tipo
- * ✅ CORREÇÃO 6: Removido código duplicado e problemático
- * ✅ CORREÇÃO 7: Corrigido salvarDadosUsuario() para formato consistente com API
- * ✅ CORREÇÃO 8: Adicionada função obterCodigoMoeda() obrigatória
- * 
+ * v2.0.0:
  * - Sistema de cache otimizado para cidades
  * - Busca local de cidades com algoritmo melhorado
  * - Validação robusta de dados de entrada
@@ -3125,7 +2917,7 @@ console.log("🐶 Benetrip App v2.1.1 carregado - Pronto para aventuras!");
  * - Performance otimizada para diferentes tipos de conexão
  * - Configuração adaptativa baseada na qualidade da conexão
  * - Sistema de debug completo para desenvolvimento
- * - Compatibilidade total com APIs existentes (recommendations.js, destinos.js)
+ * - Compatibilidade total com APIs existentes
  * - Lógica de determinação de tipo de viagem consistente
  * - Formatação de dados padronizada para todas as APIs
  * - Sistema de limpeza automática de recursos
@@ -3137,22 +2929,16 @@ console.log("🐶 Benetrip App v2.1.1 carregado - Pronto para aventuras!");
  * - Gestão de estado melhorada para todos os componentes
  * - Compatibilidade com navegadores modernos
  * 
- * === MELHORIAS IMPLEMENTADAS ===
- * 🔧 Fluxo unificado para todos os tipos de viagem (carro, ônibus, aéreo)
- * 🔧 Detecção automática de tipo de viagem baseada em respostas do usuário
- * 🔧 Mensagens personalizadas da Tripinha para cada tipo de viagem
- * 🔧 Salvamento de dados padronizado e consistente com todas as APIs
- * 🔧 Tratamento de erros robusto com fallbacks automáticos
- * 🔧 Sistema de cache inteligente para melhor performance
- * 🔧 Validação de dados em múltiplas camadas
- * 🔧 Interface responsiva e adaptativa
- * 
- * === COMPATIBILIDADE ===
- * ✅ 100% compatível com recommendations.js (API unificada)
- * ✅ 100% compatível com destinos.js (renderização)
- * ✅ 100% compatível com voos.js (busca de voos)
- * ✅ 100% compatível com questions.json (questionário)
- * ✅ 100% compatível com dados de cidades IATA
+ * === CORREÇÕES APLICADAS v2.1.0 ===
+ * 🚗 VIAGENS DE CARRO: Agora usa a API unificada corretamente
+ * 🚌 VIAGENS DE ÔNIBUS: Detecção automática baseada no orçamento
+ * ✈️ VIAGENS AÉREAS: Integração perfeita com APIs de voo
+ * 📊 DADOS: Formato consistente para todas as APIs
+ * 🔄 FLUXO: Simplificado e unificado para todos os tipos
+ * 💾 STORAGE: Nome consistente 'benetrip_recomendacoes' para todos
+ * 🐛 BUGS: Eliminação completa de funções desnecessárias
+ * 📈 PERFORMANCE: Otimizações de cache e carregamento
+ * 🎯 PRECISÃO: Lógica de detecção igual ao recommendations.js
  * 
  * === PRÓXIMAS MELHORIAS PLANEJADAS ===
  * - Sistema de notificações push
