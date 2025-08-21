@@ -4272,29 +4272,26 @@ input[type="range"]::-moz-range-thumb {
     font-size: 14px;
 }
 
-/* Slider de Distância */
+/* Estilos para o slider de distância */
 .slider-container {
-    margin: 20px 0;
     padding: 20px;
-    background: #f8f9fa;
+    background: #f9f9f9;
     border-radius: 12px;
-    border: 1px solid #e0e0e0;
+    margin-top: 15px;
 }
 
 .slider-wrapper {
     position: relative;
-    margin-bottom: 20px;
+    margin: 20px 0;
 }
 
 .distance-slider {
-    -webkit-appearance: none;
-    appearance: none;
     width: 100%;
     height: 8px;
     border-radius: 4px;
-    background: linear-gradient(to right, #E87722 0%, #E87722 30%, #ddd 30%, #ddd 100%);
     outline: none;
-    transition: background 0.3s ease;
+    -webkit-appearance: none;
+    background: #ddd;
 }
 
 .distance-slider::-webkit-slider-thumb {
@@ -4305,14 +4302,13 @@ input[type="range"]::-moz-range-thumb {
     border-radius: 50%;
     background: #E87722;
     cursor: pointer;
-    border: 3px solid white;
-    box-shadow: 0 2px 8px rgba(232, 119, 34, 0.3);
-    transition: all 0.2s ease;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+    transition: all 0.2s;
 }
 
 .distance-slider::-webkit-slider-thumb:hover {
     transform: scale(1.2);
-    box-shadow: 0 3px 12px rgba(232, 119, 34, 0.4);
+    box-shadow: 0 3px 8px rgba(232, 119, 34, 0.4);
 }
 
 .distance-slider::-moz-range-thumb {
@@ -4321,83 +4317,64 @@ input[type="range"]::-moz-range-thumb {
     border-radius: 50%;
     background: #E87722;
     cursor: pointer;
-    border: 3px solid white;
-    box-shadow: 0 2px 8px rgba(232, 119, 34, 0.3);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+    transition: all 0.2s;
 }
 
 .slider-labels {
     display: flex;
     justify-content: space-between;
-    margin-top: 15px;
-    padding: 0 12px;
+    margin-top: 10px;
+    font-size: 12px;
+    color: #666;
 }
 
 .slider-label {
-    font-size: 11px;
-    color: #666;
-    text-align: center;
+    position: relative;
     padding: 4px 8px;
-    border-radius: 8px;
-    background: #f0f0f0;
-    transition: all 0.3s ease;
-    flex: 1;
-    margin: 0 2px;
+    border-radius: 4px;
+    transition: all 0.3s;
 }
 
 .slider-label.active {
-    background: rgba(232, 119, 34, 0.1);
     color: #E87722;
-    font-weight: 500;
+    font-weight: bold;
 }
 
 .slider-value {
     text-align: center;
+    margin: 20px 0;
     font-size: 24px;
     font-weight: bold;
     color: #E87722;
-    margin: 15px 0;
-    padding: 10px;
-    background: rgba(232, 119, 34, 0.1);
-    border-radius: 8px;
 }
 
 .confirm-slider {
     width: 100%;
-    padding: 12px 20px;
+    padding: 12px;
     background: #E87722;
     color: white;
     border: none;
     border-radius: 8px;
-    font-size: 16px;
-    font-weight: 500;
+    font-weight: bold;
     cursor: pointer;
-    transition: all 0.3s ease;
+    transition: all 0.3s;
 }
 
 .confirm-slider:hover {
-    background: #d16a1a;
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(232, 119, 34, 0.3);
+    background: #d66b1f;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(232, 119, 34, 0.3);
 }
 
-.slider-placeholder {
-    text-align: center;
-    padding: 20px;
-    color: #666;
-    font-style: italic;
-}
-
-/* Responsividade para mobile */
+/* Responsividade mobile */
 @media (max-width: 480px) {
-    .slider-labels {
-        flex-direction: column;
-        gap: 5px;
-        align-items: center;
+    .slider-container {
+        padding: 15px;
     }
     
-    .slider-label {
-        flex: none;
-        min-width: 100px;
+    .slider-labels {
+        font-size: 10px;
     }
     
     .slider-value {
