@@ -1,5 +1,5 @@
 // api/recommendations.js - Endpoint da API Vercel para recomendações de destino
-// Versão 10.0 - OTIMIZADA - Usando dados do autocomplete
+// Versão 10.1 - Adicionada lógica para viagens de CARRO
 const axios = require('axios');
 const http = require('http');
 const https = require('https');
@@ -92,12 +92,12 @@ const utils = {
         }
         
         // Caso seja objeto estruturado do autocomplete
-return {
-    cidade: cidadePartida?.cidade || cidadePartida?.name || 'Cidade não especificada',
-    pais: cidadePartida?.pais || cidadePartida?.country || 'País não especificado',
-    sigla_estado: cidadePartida?.sigla_estado || null,
-    iata: cidadePartida?.iata || cidadePartida?.code || null
-};
+        return {
+            cidade: cidadePartida?.cidade || cidadePartida?.name || 'Cidade não especificada',
+            pais: cidadePartida?.pais || cidadePartida?.country || 'País não especificado',
+            sigla_estado: cidadePartida?.sigla_estado || null,
+            iata: cidadePartida?.iata || cidadePartida?.code || null
+        };
     },
 
     extrairJSONDaResposta: texto => {
@@ -220,40 +220,40 @@ async function callGroqAPI(prompt, requestData, model = CONFIG.groq.models.reaso
         throw new Error('Chave da API Groq não configurada (GROQ_API_KEY)');
     }
 
-    const tipoViagem = utils.determinarTipoViagem(requestData.orcamento_valor, requestData.moeda_escolhida);
-    const infoCidadePartida = utils.extrairInfoCidadePartida(requestData.cidade_partida);
+    const tipoViagem = requestData.tipoViagem === 'carro' || requestData.viagem_carro === 1 
+        ? 'carro' 
+        : utils.determinarTipoViagem(requestData.orcamento_valor, requestData.moeda_escolhida);
 
     let systemMessage;
     
     if (model === CONFIG.groq.models.reasoning) {
-        // Sistema otimizado para reasoning
         systemMessage = `Você é um sistema especialista em recomendações de viagem que utiliza raciocínio estruturado.
 ${tipoViagem === 'rodoviario' ? `ESPECIALIZADO EM VIAGENS RODOVIÁRIAS (ÔNIBUS/TREM) COM LIMITE DE 700KM OU 10 HORAS.` : ''}
+${tipoViagem === 'carro' ? `ESPECIALIZADO EM VIAGENS DE CARRO (ROAD TRIPS).` : ''}
 
 PROCESSO DE RACIOCÍNIO OBRIGATÓRIO:
 1. ANÁLISE DO PERFIL: Examine detalhadamente cada preferência do viajante
 2. MAPEAMENTO DE COMPATIBILIDADE: Correlacione destinos com o perfil analisado  
-3. CONSIDERAÇÃO DE ORÇAMENTO: ${tipoViagem === 'rodoviario' ? `Considere viagens de ÔNIBUS/TREM dentro do orçamento para passagens de ida e volta (máx 700km/10h)` : 'Considere o orçamento informado para passagens aéreas'}
+3. CONSIDERAÇÃO DE ORÇAMENTO E DISTÂNCIA: Analise o orçamento e a distância máxima informada.
 4. ANÁLISE CLIMÁTICA: Determine condições climáticas exatas para as datas
 5. PERSONALIZAÇÃO TRIPINHA: Adicione perspectiva autêntica da mascote cachorrinha
 
 CRITÉRIOS DE DECISÃO:
-- Destinos DEVEM ser adequados para o tipo de companhia especificado
-- ${tipoViagem === 'rodoviario' ? `Destinos DEVEM estar NO MÁXIMO 700km ou 10 horas de viagem terrestre da origem` : 'Informações de voos DEVEM ser consideradas'}
-- Informações climáticas DEVEM ser precisas para o período da viagem
-- Pontos turísticos DEVEM ser específicos e reais
-- Comentários da Tripinha DEVEM ser em 1ª pessoa com detalhes sensoriais
-- Considere a distância e facilidade de acesso a partir da cidade de origem
+- Destinos DEVEM ser adequados para o tipo de companhia e viagem especificado.
+- Informações climáticas DEVEM ser precisas para o período da viagem.
+- Pontos turísticos DEVEM ser específicos e reais.
+- Comentários da Tripinha DEVEM ser em 1ª pessoa com detalhes sensoriais.
+- Considere a distância e facilidade de acesso a partir da cidade de origem.
 
 RESULTADO: JSON estruturado com recomendações fundamentadas no raciocínio acima.`;
     } else if (model === CONFIG.groq.models.personality) {
-        // Sistema focado na personalidade da Tripinha
         systemMessage = `Você é a Tripinha, uma vira-lata caramelo especialista em viagens! 🐾
 ${tipoViagem === 'rodoviario' ? `ESPECIALISTA EM VIAGENS DE ÔNIBUS/TREM DE ATÉ 700KM!` : ''}
+${tipoViagem === 'carro' ? `ADOOORO uma road trip! O vento na minha cara é tudo de bom!` : ''}
 
 PERSONALIDADE DA TRIPINHA:
 - Conhece todos os destinos do mundo pessoalmente
-- ${tipoViagem === 'rodoviario' ? `Adora viagens de ônibus e trem!` : 'Adora viagens de avião e conhece todos os aeroportos!'}
+- Adora viagens de avião, ônibus, trem e principalmente de carro!
 - Fala sempre em 1ª pessoa sobre suas experiências
 - É entusiasmada, carismática e usa emojis naturalmente  
 - Inclui detalhes sensoriais que um cachorro notaria
@@ -262,8 +262,7 @@ PERSONALIDADE DA TRIPINHA:
 
 RETORNE APENAS JSON VÁLIDO sem formatação markdown.`;
     } else {
-        // Sistema padrão para modelos rápidos
-        systemMessage = `Especialista em recomendações de viagem ${tipoViagem === 'rodoviario' ? `RODOVIÁRIA (máx 700km)` : 'AÉREA'}. Retorne apenas JSON válido com destinos personalizados.`;
+        systemMessage = `Especialista em recomendações de viagem. Retorne apenas JSON válido com destinos personalizados para o tipo de viagem: ${tipoViagem.toUpperCase()}.`;
     }
 
     try {
@@ -272,14 +271,8 @@ RETORNE APENAS JSON VÁLIDO sem formatação markdown.`;
         const requestPayload = {
             model: model,
             messages: [
-                {
-                    role: "system",
-                    content: systemMessage
-                },
-                {
-                    role: "user",
-                    content: prompt
-                }
+                { role: "system", content: systemMessage },
+                { role: "user", content: prompt }
             ],
             temperature: model === CONFIG.groq.models.reasoning ? 0.6 : CONFIG.groq.temperature,
             max_tokens: CONFIG.groq.maxTokens,
@@ -333,8 +326,9 @@ function gerarPromptParaGroq(dados) {
         pessoas: dados.quantidade_familia || dados.quantidade_amigos || 1
     };
     
-    // Determinar tipo de viagem baseado no orçamento
-    const tipoViagem = utils.determinarTipoViagem(infoViajante.orcamento, infoViajante.moeda);
+    // Determinar tipo de viagem, priorizando 'carro'
+    const isCarro = dados.viagem_carro === 1 || dados.tipoViagem === 'carro';
+    const tipoViagem = isCarro ? 'carro' : utils.determinarTipoViagem(infoViajante.orcamento, infoViajante.moeda);
     const isRodoviario = tipoViagem === 'rodoviario';
     
     // Processar datas
@@ -364,7 +358,87 @@ function gerarPromptParaGroq(dados) {
         }
     }
 
-    // Prompt diferenciado para viagens rodoviárias
+    // [NOVO] Prompt para viagens de carro
+    if (isCarro) {
+        const distanciaMaxima = dados.distancia_maxima || 500;
+        const datas = `${dataIda} a ${dataVolta}`;
+
+        return `
+# SISTEMA DE RECOMENDAÇÃO PARA VIAGENS DE CARRO 🚗
+
+## CONTEXTO DA VIAGEM:
+- Origem: ${infoViajante.cidadeOrigem}
+- Distância máxima aceita: ${distanciaMaxima} km
+- Companhia: ${infoViajante.companhia}
+- Preferência: ${infoViajante.preferencia}
+- Período: ${datas}
+
+## INSTRUÇÕES ESPECÍFICAS PARA ROAD TRIPS:
+
+1. **CRITÉRIOS DE SELEÇÃO**:
+   - Todos os destinos DEVEM estar dentro do raio de ${distanciaMaxima}km de ${infoViajante.cidadeOrigem}
+   - Considerar apenas destinos acessíveis por estradas em boas condições
+   - Priorizar destinos com boa infraestrutura para viajantes de carro
+   - Incluir informações sobre tempo estimado de viagem
+   - Considerar pedágios e condições das estradas
+
+2. **INFORMAÇÕES OBRIGATÓRIAS PARA CADA DESTINO**:
+   - Distância exata em quilômetros desde ${infoViajante.cidadeOrigem}
+   - Tempo estimado de viagem (considerando paradas)
+   - Principais rodovias de acesso
+   - Pontos de parada interessantes no caminho
+   - Dicas de onde estacionar no destino
+   - Custo estimado de combustível e pedágios
+
+3. **FORMATO DE RESPOSTA**:
+\`\`\`json
+{
+  "tipoViagem": "carro",
+  "origem": "${infoViajante.cidadeOrigem}",
+  "topPick": {
+    "destino": "Nome da Cidade",
+    "pais": "Brasil",
+    "codigoPais": "BR",
+    "distanciaKm": 250,
+    "tempoViagem": "3h30min",
+    "rodoviasPrincipais": ["BR-116", "SP-280"],
+    "paradasRecomendadas": ["Cidade X - Ponto Y"],
+    "dicasEstacionamento": "Estacione no centro histórico...",
+    "custoEstimado": {
+      "combustivel": "R$ 150",
+      "pedagios": "R$ 45"
+    },
+    "justificativa": "Por que este destino é perfeito para road trip",
+    "pontosTuristicos": ["Ponto 1", "Ponto 2"],
+    "comentario": "Comentário da Tripinha sobre dirigir até lá",
+    "clima": {
+      "estacao": "Verão",
+      "temperatura": "25°C-30°C",
+      "condicoes": "Ensolarado",
+      "recomendacoes": "Leve protetor solar"
+    }
+  },
+  "alternativas": [
+    // 4 alternativas com estrutura similar
+  ],
+  "surpresa": {
+    // Destino surpresa com mesma estrutura
+  },
+  "dicasRoadTrip": "Dicas gerais para viagem de carro"
+}
+\`\`\`
+
+## PERSONALIZAÇÃO DA TRIPINHA 🐾:
+- Mencionar experiências dirigindo até os destinos
+- Dar dicas sobre paradas para pets (se aplicável)
+- Sugerir playlists ou atividades para o caminho
+- Alertar sobre radares e condições específicas das estradas
+
+Retorne APENAS o JSON válido com destinos adequados para road trip!
+`;
+    }
+
+    // Prompt para viagens rodoviárias (ônibus/trem)
     if (isRodoviario) {
         return `# 🚌 SISTEMA DE RECOMENDAÇÃO INTELIGENTE DE VIAGENS RODOVIÁRIAS
 
@@ -464,7 +538,7 @@ Selecione APENAS destinos dentro do limite de 700km/10h:
 **Execute o raciocínio e forneça destinos TERRESTRES APROPRIADOS!**`;
     }
 
-    // Prompt padrão para viagens aéreas (orçamento maior que R$ 400)
+    // Prompt padrão para viagens aéreas
     return `# ✈️ SISTEMA DE RECOMENDAÇÃO INTELIGENTE DE DESTINOS AÉREOS
 
 ## 📊 DADOS DO VIAJANTE PARA ANÁLISE:
@@ -658,7 +732,19 @@ function getPreferenciaText(value) {
 function ensureValidDestinationData(jsonString, requestData) {
     try {
         const data = typeof jsonString === 'string' ? JSON.parse(jsonString) : jsonString;
-        const tipoViagem = utils.determinarTipoViagem(requestData.orcamento_valor, requestData.moeda_escolhida);
+        
+        const tipoViagem = data.tipoViagem 
+            || (requestData.viagem_carro === 1 ? 'carro' : null)
+            || utils.determinarTipoViagem(requestData.orcamento_valor, requestData.moeda_escolhida);
+
+        if (tipoViagem === 'carro') {
+            if (!data.tipoViagem) {
+                data.tipoViagem = 'carro';
+                return JSON.stringify(data);
+            }
+            return jsonString; // Nenhuma modificação necessária para viagens de carro
+        }
+
         const isRodoviario = tipoViagem === 'rodoviario';
         let modificado = false;
         
@@ -828,7 +914,7 @@ module.exports = async function handler(req, res) {
     }
 
     try {
-        console.log('🚌✈️ === BENETRIP GROQ API v10.0 - OTIMIZADA ===');
+        console.log('🚌✈️🚗 === BENETRIP GROQ API v10.1 - OTIMIZADA ===');
         
         if (!req.body) {
             isResponseSent = true;
@@ -857,9 +943,10 @@ module.exports = async function handler(req, res) {
         const infoCidadePartida = utils.extrairInfoCidadePartida(requestData.cidade_partida);
         
         // Determinar tipo de viagem
-        const tipoViagem = utils.determinarTipoViagem(requestData.orcamento_valor, requestData.moeda_escolhida);
+        const isCarro = requestData.viagem_carro === 1 || requestData.tipoViagem === 'carro';
+        const tipoViagem = isCarro ? 'carro' : utils.determinarTipoViagem(requestData.orcamento_valor, requestData.moeda_escolhida);
         const isRodoviario = tipoViagem === 'rodoviario';
-        
+
         // Log dos dados recebidos
         utils.log('📊 Dados da requisição:', {
             companhia: requestData.companhia,
@@ -868,15 +955,16 @@ module.exports = async function handler(req, res) {
             orcamento: requestData.orcamento_valor,
             moeda: requestData.moeda_escolhida,
             preferencia: requestData.preferencia_viagem,
-            tipoViagem: tipoViagem
+            tipoViagem: tipoViagem,
+            distancia_maxima: requestData.distancia_maxima
         });
         
-        console.log(`${isRodoviario ? '🚌' : '✈️'} Tipo de viagem: ${tipoViagem.toUpperCase()}`);
+        const icon = isCarro ? '🚗' : (isRodoviario ? '🚌' : '✈️');
+        console.log(`${icon} Tipo de viagem: ${tipoViagem.toUpperCase()}`);
         console.log(`📍 Origem: ${infoCidadePartida.cidade}, ${infoCidadePartida.pais} (${infoCidadePartida.sigla_estado})`);
-        if (isRodoviario) {
-            console.log('📏 Limite máximo: 700km ou 10 horas');
-        }
-        
+        if (isRodoviario) console.log('📏 Limite máximo: 700km ou 10 horas');
+        if (isCarro) console.log(`📏 Limite máximo: ${requestData.distancia_maxima || 500}km`);
+
         // Gerar prompt otimizado para Groq
         const prompt = gerarPromptParaGroq(requestData);
         console.log(`📝 Prompt gerado para Groq (${tipoViagem})`);
@@ -906,23 +994,24 @@ module.exports = async function handler(req, res) {
             const dados = typeof recomendacoesProcessadas === 'string' ? 
                 JSON.parse(recomendacoesProcessadas) : recomendacoesProcessadas;
             
-            // Adicionar metadados incluindo modelo usado e tipo de viagem
+            // Adicionar metadados
             dados.metadados = {
                 modelo: modeloUsado,
                 provider: 'groq',
-                versao: '10.0-otimizada',
+                versao: '10.1-carro',
                 timestamp: new Date().toISOString(),
                 reasoning_enabled: modeloUsado === CONFIG.groq.models.reasoning,
                 origem: infoCidadePartida,
                 tipoViagem: tipoViagem,
                 orcamento: requestData.orcamento_valor,
                 moeda: requestData.moeda_escolhida,
-                limiteRodoviario: isRodoviario ? '700km/10h' : null
+                limiteRodoviario: isRodoviario ? '700km/10h' : null,
+                limiteCarro: isCarro ? `${requestData.distancia_maxima || 500}km` : null
             };
             
             console.log('🎉 Recomendações processadas com sucesso!');
             console.log('🧠 Modelo usado:', modeloUsado);
-            console.log(`${isRodoviario ? '🚌' : '✈️'} Tipo de viagem:`, tipoViagem);
+            console.log(`${icon} Tipo de viagem:`, tipoViagem);
             console.log('📍 Origem:', `${infoCidadePartida.cidade}, ${infoCidadePartida.pais}`);
             
             console.log('📋 Destinos encontrados:', {
