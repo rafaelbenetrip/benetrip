@@ -1085,6 +1085,65 @@ const BENETRIP = {
     },
 
     /**
+     * Cria o elemento do calendário manualmente como último recurso
+     */
+    criarElementoCalendarioManualmente(pergunta) {
+        console.log("Tentando criar elemento do calendário manualmente");
+
+        // Verificar se a mensagem da pergunta está no DOM
+        const mensagens = document.querySelectorAll('.chat-message.tripinha');
+        if (mensagens.length === 0) {
+            console.error("Nenhuma mensagem encontrada para adicionar o calendário");
+            return;
+        }
+
+        // Pegar a última mensagem da Tripinha
+        const ultimaMensagem = mensagens[mensagens.length - 1];
+        const containerMensagem = ultimaMensagem.querySelector('.message');
+
+        if (!containerMensagem) {
+            console.error("Container de mensagem não encontrado");
+            return;
+        }
+
+        // Verificar se já existe um container de calendário
+        if (containerMensagem.querySelector('.calendar-container')) {
+            console.log("Container de calendário já existe, recriando");
+            containerMensagem.querySelector('.calendar-container').remove();
+        }
+
+        // Gerar ID único para o novo calendário
+        const calendarId = `benetrip-calendar-${Date.now()}`;
+        this.estado.currentCalendarId = calendarId;
+
+        // Criar HTML do calendário
+        const calendarHTML = `
+            <div class="calendar-container" data-calendar-container="${calendarId}">
+                <div id="${calendarId}" class="flatpickr-calendar-container"></div>
+                <div class="date-selection">
+                    <p>Ida: <span id="data-ida-${calendarId}">Selecione</span></p>
+                    <p>Volta: <span id="data-volta-${calendarId}">Selecione</span></p>
+                </div>
+                <button id="confirmar-datas-${calendarId}" class="confirm-button confirm-dates" disabled>Confirmar Datas</button>
+            </div>
+        `;
+
+        // Adicionar ao container da mensagem
+        containerMensagem.insertAdjacentHTML('beforeend', calendarHTML);
+
+        // Tentar inicializar novamente após criar o elemento
+        setTimeout(() => {
+            const calendarElement = document.getElementById(calendarId);
+            if (calendarElement) {
+                console.log("Elemento do calendário criado manually com sucesso");
+                this.inicializarCalendario(pergunta);
+            } else {
+                console.error("Falha ao criar elemento do calendário manualmente");
+            }
+        }, 300);
+    },
+
+    /**
      * Formatação otimizada de data para exibição
      */
     formatarDataVisivel(data) {
