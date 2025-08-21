@@ -1234,3 +1234,65 @@ body.viagem-aerea .hide-on-aereo {
 body.viagem-aerea .show-on-aereo {
   display: block !important;
 }
+
+/* Indicadores específicos para cada tipo de viagem */
+.carro-indicator {
+    background: linear-gradient(45deg, #059669, #10B981);
+    color: white;
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 10px;
+    font-weight: bold;
+}
+
+.carro-indicator::before {
+    content: "🚗 ";
+}
+
+/* Estilo para informações de road trip */
+.road-trip-info {
+    background: linear-gradient(135deg, #ecfdf5, #d1fae5);
+    border-left: 4px solid #10b981;
+    padding: 12px;
+    border-radius: 8px;
+    margin: 8px 0;
+}
+
+.road-trip-info .icon {
+    color: #059669;
+    font-size: 1.2em;
+}
+
+/* Hover effects para cards de destino de carro */
+.card-destino.carro-type:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 20px rgba(16, 185, 129, 0.15);
+}
+
+/* Badges diferenciados por tipo de viagem */
+.badge-carro {
+    background: linear-gradient(45deg, #10B981, #059669);
+    color: white;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.badge-rodoviario {
+    background: linear-gradient(45deg, #3B82F6, #2563EB);
+    color: white;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.badge-aereo {
+    background: linear-gradient(45deg, #8B5CF6, #7C3AED);
+    color: white;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 600;
+}
