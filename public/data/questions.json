@@ -70,7 +70,42 @@
     },
     
     {
-        "question": "5️⃣ Qual moeda você prefere usar para o orçamento?",
+        "question": "5️⃣ Como você prefere fazer essa viagem?",
+        "description": "Escolha o meio de transporte para sua aventura.",
+        "options": [
+            "✈️ Avião ou Ônibus – Quero voar ou viajar de ônibus para destinos mais distantes!",
+            "🚗 Carro – Prefiro a liberdade de uma road trip!"
+        ],
+        "key": "viagem_carro"
+    },
+    
+    {
+        "question": "6️⃣ Até quantos quilômetros você topa dirigir?",
+        "description": "Arraste para definir a distância máxima da sua road trip.",
+        "input_field": true,
+        "slider": true,
+        "slider_config": {
+            "min": 100,
+            "max": 1500,
+            "step": 50,
+            "default": 500,
+            "unit": "km",
+            "labels": {
+                "100": "Pertinho",
+                "500": "Moderado",
+                "1000": "Longe",
+                "1500": "Super longe"
+            }
+        },
+        "conditional": {
+            "depends_on": "viagem_carro",
+            "show_if_value": 1
+        },
+        "key": "distancia_maxima"
+    },
+    
+    {
+        "question": "6️⃣ Qual moeda você prefere usar para o orçamento?",
         "description": "Escolha a moeda para definir seu orçamento de viagem.",
         "options": [
             "💰 Real Brasileiro (BRL)",
@@ -82,14 +117,22 @@
             "💶 Euro (EUR)": "EUR",
             "💰 Real Brasileiro (BRL)": "BRL"
         },
+        "conditional": {
+            "depends_on": "viagem_carro",
+            "show_if_value": 0
+        },
         "key": "moeda_escolhida"
     },
     
     {
-        "question": "6️⃣ Qual é o seu orçamento para passagens por pessoa?",
+        "question": "7️⃣ Qual é o seu orçamento para passagens por pessoa?",
         "description": "Informe o valor que deseja gastar com passagens por pessoa para ida e volta.",
         "input_field": true,
         "currency_format": true,
+        "conditional": {
+            "depends_on": "viagem_carro",
+            "show_if_value": 0
+        },
         "key": "orcamento_valor"
     }
 ]
