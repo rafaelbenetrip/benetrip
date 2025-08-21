@@ -4271,3 +4271,136 @@ input[type="range"]::-moz-range-thumb {
     text-align: center;
     font-size: 14px;
 }
+
+/* Slider de Distância */
+.slider-container {
+    margin: 20px 0;
+    padding: 20px;
+    background: #f8f9fa;
+    border-radius: 12px;
+    border: 1px solid #e0e0e0;
+}
+
+.slider-wrapper {
+    position: relative;
+    margin-bottom: 20px;
+}
+
+.distance-slider {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 8px;
+    border-radius: 4px;
+    background: linear-gradient(to right, #E87722 0%, #E87722 30%, #ddd 30%, #ddd 100%);
+    outline: none;
+    transition: background 0.3s ease;
+}
+
+.distance-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: #E87722;
+    cursor: pointer;
+    border: 3px solid white;
+    box-shadow: 0 2px 8px rgba(232, 119, 34, 0.3);
+    transition: all 0.2s ease;
+}
+
+.distance-slider::-webkit-slider-thumb:hover {
+    transform: scale(1.2);
+    box-shadow: 0 3px 12px rgba(232, 119, 34, 0.4);
+}
+
+.distance-slider::-moz-range-thumb {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: #E87722;
+    cursor: pointer;
+    border: 3px solid white;
+    box-shadow: 0 2px 8px rgba(232, 119, 34, 0.3);
+}
+
+.slider-labels {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 15px;
+    padding: 0 12px;
+}
+
+.slider-label {
+    font-size: 11px;
+    color: #666;
+    text-align: center;
+    padding: 4px 8px;
+    border-radius: 8px;
+    background: #f0f0f0;
+    transition: all 0.3s ease;
+    flex: 1;
+    margin: 0 2px;
+}
+
+.slider-label.active {
+    background: rgba(232, 119, 34, 0.1);
+    color: #E87722;
+    font-weight: 500;
+}
+
+.slider-value {
+    text-align: center;
+    font-size: 24px;
+    font-weight: bold;
+    color: #E87722;
+    margin: 15px 0;
+    padding: 10px;
+    background: rgba(232, 119, 34, 0.1);
+    border-radius: 8px;
+}
+
+.confirm-slider {
+    width: 100%;
+    padding: 12px 20px;
+    background: #E87722;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.confirm-slider:hover {
+    background: #d16a1a;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(232, 119, 34, 0.3);
+}
+
+.slider-placeholder {
+    text-align: center;
+    padding: 20px;
+    color: #666;
+    font-style: italic;
+}
+
+/* Responsividade para mobile */
+@media (max-width: 480px) {
+    .slider-labels {
+        flex-direction: column;
+        gap: 5px;
+        align-items: center;
+    }
+    
+    .slider-label {
+        flex: none;
+        min-width: 100px;
+    }
+    
+    .slider-value {
+        font-size: 20px;
+    }
+}
