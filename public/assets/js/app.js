@@ -1,6 +1,6 @@
 /**
  * BENETRIP - App Principal
- * Versão 2 - Carros
+ * Versão 2 Carros
  * Controla o fluxo de interação com o usuário, questionário e navegação entre telas
  */
 
@@ -666,6 +666,114 @@ const BENETRIP = {
     },
 
     /**
+     * Configura o slider para seleção de distância
+     */
+    configurarSlider(pergunta) {
+        const config = pergunta.slider_config;
+        const sliderId = `slider-${Date.now()}`;
+        this.estado.currentSliderId = sliderId;
+
+        // Substituir o placeholder pelo HTML real do slider
+        setTimeout(() => {
+            const placeholder = document.querySelector('.slider-placeholder');
+            if (placeholder) {
+                placeholder.outerHTML = `
+                    <div class="slider-container" id="${sliderId}-container">
+                        <div class="slider-wrapper">
+                            <input type="range" 
+                                   id="${sliderId}" 
+                                   class="distance-slider"
+                                   min="${config.min}" 
+                                   max="${config.max}" 
+                                   step="${config.step}" 
+                                   value="${config.default}">
+                            <div class="slider-labels">
+                                ${Object.entries(config.labels).map(([value, label]) => 
+                                    `<span class="slider-label" data-value="${value}">${label}</span>`
+                                ).join('')}
+                            </div>
+                        </div>
+                        <div class="slider-value">
+                            <span id="${sliderId}-display">${config.default}</span> ${config.unit}
+                        </div>
+                        <button id="${sliderId}-confirm" class="confirm-slider">Confirmar Distância</button>
+                    </div>
+                `;
+
+                // Configurar eventos do slider após criar o HTML
+                this.configurarEventosSlider(sliderId, config, pergunta);
+            }
+        }, 100);
+    },
+
+    /**
+     * Configura os eventos do slider após ele ser criado
+     */
+    configurarEventosSlider(sliderId, config, pergunta) {
+        setTimeout(() => {
+            const slider = document.getElementById(sliderId);
+            const display = document.getElementById(`${sliderId}-display`);
+            const confirmBtn = document.getElementById(`${sliderId}-confirm`);
+
+            if (!slider || !display || !confirmBtn) {
+                console.error("Elementos do slider não encontrados!");
+                return;
+            }
+
+            // Atualizar display quando slider muda
+            slider.addEventListener('input', (e) => {
+                const valor = parseInt(e.target.value);
+                display.textContent = valor;
+                
+                // Atualizar posição dos labels visuais
+                this.atualizarLabelsSlider(slider, config);
+                
+                // Atualizar gradiente do slider
+                this.atualizarGradienteSlider(slider, config);
+            });
+
+            // Confirmar seleção
+            confirmBtn.addEventListener('click', () => {
+                const valor = parseInt(slider.value);
+                this.processarResposta(valor, pergunta);
+            });
+
+            // Configurar labels e gradiente iniciais
+            this.atualizarLabelsSlider(slider, config);
+            this.atualizarGradienteSlider(slider, config);
+            
+            console.log("Slider configurado com sucesso");
+        }, 200);
+    },
+
+    /**
+     * Atualiza a aparência visual dos labels do slider
+     */
+    atualizarLabelsSlider(slider, config) {
+        const valor = parseInt(slider.value);
+        const labels = slider.closest('.slider-container').querySelectorAll('.slider-label');
+        
+        labels.forEach(label => {
+            const labelValue = parseInt(label.dataset.value);
+            if (labelValue <= valor) {
+                label.classList.add('active');
+            } else {
+                label.classList.remove('active');
+            }
+        });
+    },
+
+    /**
+     * Atualiza o gradiente do slider com base no valor atual
+     */
+    atualizarGradienteSlider(slider, config) {
+        const valor = parseInt(slider.value);
+        const porcentagem = ((valor - config.min) / (config.max - config.min)) * 100;
+        
+        slider.style.background = `linear-gradient(to right, #E87722 0%, #E87722 ${porcentagem}%, #ddd ${porcentagem}%, #ddd 100%)`;
+    },
+    
+    /**
      * Inicializa o calendário com Flatpickr - Versão corrigida
      */
     inicializarCalendario(pergunta) {
@@ -1079,114 +1187,6 @@ const BENETRIP = {
     },
 
     /**
-     * Configura o slider para seleção de distância
-     */
-    configurarSlider(pergunta) {
-        const config = pergunta.slider_config;
-        const sliderId = `slider-${Date.now()}`;
-        this.estado.currentSliderId = sliderId;
-
-        // Substituir o placeholder pelo HTML real do slider
-        setTimeout(() => {
-            const placeholder = document.querySelector('.slider-placeholder');
-            if (placeholder) {
-                placeholder.outerHTML = `
-                    <div class="slider-container" id="${sliderId}-container">
-                        <div class="slider-wrapper">
-                            <input type="range" 
-                                   id="${sliderId}" 
-                                   class="distance-slider"
-                                   min="${config.min}" 
-                                   max="${config.max}" 
-                                   step="${config.step}" 
-                                   value="${config.default}">
-                            <div class="slider-labels">
-                                ${Object.entries(config.labels).map(([value, label]) => 
-                                    `<span class="slider-label" data-value="${value}">${label}</span>`
-                                ).join('')}
-                            </div>
-                        </div>
-                        <div class="slider-value">
-                            <span id="${sliderId}-display">${config.default}</span> ${config.unit}
-                        </div>
-                        <button id="${sliderId}-confirm" class="confirm-slider">Confirmar Distância</button>
-                    </div>
-                `;
-
-                // Configurar eventos do slider após criar o HTML
-                this.configurarEventosSlider(sliderId, config, pergunta);
-            }
-        }, 100);
-    },
-
-    /**
-     * Configura os eventos do slider após ele ser criado
-     */
-    configurarEventosSlider(sliderId, config, pergunta) {
-        setTimeout(() => {
-            const slider = document.getElementById(sliderId);
-            const display = document.getElementById(`${sliderId}-display`);
-            const confirmBtn = document.getElementById(`${sliderId}-confirm`);
-
-            if (!slider || !display || !confirmBtn) {
-                console.error("Elementos do slider não encontrados!");
-                return;
-            }
-
-            // Atualizar display quando slider muda
-            slider.addEventListener('input', (e) => {
-                const valor = parseInt(e.target.value);
-                display.textContent = valor;
-                
-                // Atualizar posição dos labels visuais
-                this.atualizarLabelsSlider(slider, config);
-                
-                // Atualizar gradiente do slider
-                this.atualizarGradienteSlider(slider, config);
-            });
-
-            // Confirmar seleção
-            confirmBtn.addEventListener('click', () => {
-                const valor = parseInt(slider.value);
-                this.processarResposta(valor, pergunta);
-            });
-
-            // Configurar labels e gradiente iniciais
-            this.atualizarLabelsSlider(slider, config);
-            this.atualizarGradienteSlider(slider, config);
-            
-            console.log("Slider configurado com sucesso");
-        }, 200);
-    },
-
-    /**
-     * Atualiza a aparência visual dos labels do slider
-     */
-    atualizarLabelsSlider(slider, config) {
-        const valor = parseInt(slider.value);
-        const labels = slider.closest('.slider-container').querySelectorAll('.slider-label');
-        
-        labels.forEach(label => {
-            const labelValue = parseInt(label.dataset.value);
-            if (labelValue <= valor) {
-                label.classList.add('active');
-            } else {
-                label.classList.remove('active');
-            }
-        });
-    },
-
-    /**
-     * Atualiza o gradiente do slider com base no valor atual
-     */
-    atualizarGradienteSlider(slider, config) {
-        const valor = parseInt(slider.value);
-        const porcentagem = ((valor - config.min) / (config.max - config.min)) * 100;
-        
-        slider.style.background = `linear-gradient(to right, #E87722 0%, #E87722 ${porcentagem}%, #ddd ${porcentagem}%, #ddd 100%)`;
-    },
-
-    /**
      * << IMPLEMENTAÇÃO >>
      * MODIFICAÇÃO da função configurarAutocomplete existente
      * Substituir a parte que chama a API pela busca local
@@ -1405,7 +1405,9 @@ const BENETRIP = {
 
         // Se for pergunta sobre viagem de carro, definir tipo de viagem
         if (pergunta.key === 'viagem_carro') {
-            this.estado.tipoViagem = valor === 0 ? 'carro' : 'aereo_onibus';
+            // CORREÇÃO: Inverte a lógica para corresponder às opções
+            // 0 = Avião/Ônibus, 1 = Carro
+            this.estado.tipoViagem = valor === 0 ? 'aereo_onibus' : 'carro';
             console.log(`Tipo de viagem definido como: ${this.estado.tipoViagem}`);
         }
 
