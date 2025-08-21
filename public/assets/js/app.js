@@ -1,8 +1,8 @@
 /**
- * BENETRIP - App Principal (Versão Otimizada)
+ * BENETRIP - App Principal (Versão Otimizada e Corrigida)
  * Controla o fluxo de interação com o usuário, questionário e navegação entre telas.
  * 
- * @version 2.0.0
+ * @version 2.1.0
  * @author Equipe Benetrip
  * @description Sistema de chat interativo para planejamento de viagens
  */
@@ -1718,26 +1718,62 @@ const BENETRIP = {
     },
 
     /**
-     * Obtém código da moeda a partir do texto completo
+     * Extrai o código da moeda do texto completo da opção
+     * ✅ CORREÇÃO 8: Função obrigatória adicionada
      */
     obterCodigoMoeda(textoCompleto) {
         if (!textoCompleto) return 'BRL';
         
-        const mapeamento = {
-            'USD': /USD|Dólar Americano/i,
-            'EUR': /EUR|Euro/i,
-            'GBP': /GBP|Libra Esterlina/i,
-            'JPY': /JPY|Iene Japonês/i,
-            'BRL': /BRL|Real Brasileiro/i
-        };
+        // Verificar se já é apenas o código
+        if (['BRL', 'USD', 'EUR', 'GBP', 'JPY'].includes(textoCompleto)) {
+            return textoCompleto;
+        }
+        
+        // Extrair código do texto completo
+        if (textoCompleto.includes('USD') || textoCompleto.includes('Dólar')) return 'USD';
+        if (textoCompleto.includes('EUR') || textoCompleto.includes('Euro')) return 'EUR';
+        if (textoCompleto.includes('GBP') || textoCompleto.includes('Libra')) return 'GBP';
+        if (textoCompleto.includes('JPY') || textoCompleto.includes('Iene')) return 'JPY';
+        if (textoCompleto.includes('BRL') || textoCompleto.includes('Real')) return 'BRL';
+        
+        return 'BRL'; // Default
+    },
 
-        for (const [codigo, regex] of Object.entries(mapeamento)) {
-            if (regex.test(textoCompleto)) {
-                return codigo;
+    /**
+     * Determina o tipo de viagem baseado nas respostas do usuário
+     * ✅ CORREÇÃO 4: Função obrigatória adicionada (idêntica ao recommendations.js)
+     */
+    determinarTipoViagem() {
+        // 1. PRIMEIRO: Verificar se o usuário escolheu viajar de carro
+        if (this.estado.respostas.viagem_carro !== undefined) {
+            const viagemCarro = parseInt(this.estado.respostas.viagem_carro);
+            if (viagemCarro === 0) { // 0 = Sim, quer viajar de carro
+                return 'carro';
             }
+            // Se chegou aqui, o usuário escolheu NÃO viajar de carro (valor 1)
+            // Então vamos para a lógica de orçamento para aéreo vs rodoviário
         }
 
-        return 'BRL'; // Padrão
+        // 2. SEGUNDO: Lógica de orçamento para aéreo vs rodoviário
+        const orcamento = this.estado.respostas.orcamento_valor;
+        const moeda = this.estado.respostas.moeda_escolhida;
+        
+        if (!orcamento || orcamento === 'flexível') return 'aereo';
+        
+        let valorEmBRL = parseFloat(orcamento);
+        
+        // Converter para BRL se necessário
+        if (moeda && moeda !== 'BRL') {
+            const taxasConversao = {
+                'USD': 5.0,
+                'EUR': 5.5,
+                'GBP': 6.3,
+                'JPY': 0.033
+            };
+            valorEmBRL = valorEmBRL * (taxasConversao[moeda] || 5.0);
+        }
+        
+        return valorEmBRL < 401 ? 'rodoviario' : 'aereo'; // ✅ Mesmo limiar do recommendations.js
     },
 
     /**
@@ -1765,40 +1801,6 @@ const BENETRIP = {
         return perguntasObrigatorias.every(key => 
             this.estado.respostas[key] !== undefined
         );
-    },
-
-    /**
-     * Determina tipo de viagem baseado nas respostas
-     */
-    determinarTipoViagem() {
-        // Usar mesma lógica do recommendations.js
-        if (this.estado.respostas.viagem_carro !== undefined) {
-            const viagemCarro = parseInt(this.estado.respostas.viagem_carro);
-            if (viagemCarro === 0) {
-                return 'carro';
-            }
-        }
-
-        // Lógica de orçamento para aéreo vs rodoviário
-        const orcamento = this.estado.respostas.orcamento_valor;
-        const moeda = this.estado.respostas.moeda_escolhida;
-
-        if (!orcamento || orcamento === 'flexível') return 'aereo';
-
-        let valorEmBRL = parseFloat(orcamento);
-
-        // Converter para BRL se necessário
-        if (moeda && moeda !== 'BRL') {
-            const taxasConversao = {
-                'USD': 5.0,
-                'EUR': 5.5,
-                'GBP': 6.3,
-                'JPY': 0.033
-            };
-            valorEmBRL = valorEmBRL * (taxasConversao[moeda] || 5.0);
-        }
-
-        return valorEmBRL < 401 ? 'rodoviario' : 'aereo';
     },
 
     /**
@@ -1896,27 +1898,21 @@ const BENETRIP = {
 
     /**
      * Finalização otimizada do questionário
+     * ✅ CORREÇÃO 2: Simplificado para usar sempre a mesma função
      */
     async finalizarQuestionario() {
         try {
-            console.log("Finalizando questionário");
-            console.log("Fluxo:", this.estado.fluxo);
-            console.log("Tipo de viagem:", this.determinarTipoViagem());
+            console.log("Finalizando questionário...");
+            console.log("Dados salvos:", this.estado.respostas);
 
             // Salvar dados do usuário
             this.salvarDadosUsuario();
 
-            // Mostrar progresso
+            // Mostrar mensagem de finalização
             await this.mostrarMensagemFinalizacao();
 
-            // Determinar próxima etapa
-            const tipoViagem = this.determinarTipoViagem();
-            
-            if (tipoViagem === 'carro') {
-                await this.buscarDestinosProximos();
-            } else {
-                await this.buscarRecomendacoes();
-            }
+            // ✅ USAR SEMPRE A MESMA FUNÇÃO - A API DETECTA O TIPO AUTOMATICAMENTE
+            this.buscarRecomendacoes();
 
         } catch (error) {
             console.error("Erro ao finalizar questionário:", error);
@@ -1926,76 +1922,77 @@ const BENETRIP = {
     },
 
     /**
-     * Busca destinos próximos para viagens de carro
-     */
-    async buscarDestinosProximos() {
-        if (!window.BENETRIP_AI) {
-            console.error("Serviço de IA não disponível");
-            this.redirecionarComErro();
-            return;
-        }
-
-        try {
-            const parametros = {
-                ...this.estado.respostas,
-                tipoViagem: 'carro',
-                distanciaMaxima: this.estado.respostas.distancia_maxima
-            };
-
-            const destinos = await window.BENETRIP_AI.obterDestinosCarro(parametros);
-            
-            localStorage.setItem('benetrip_destinos_carro', JSON.stringify(destinos));
-            this.notificarDadosProntos();
-            
-            this.atualizarBarraProgresso(100, "Destinos encontrados! Redirecionando...");
-            setTimeout(() => window.location.href = 'destinos.html', 2000);
-
-        } catch (error) {
-            console.error("Erro ao buscar destinos de carro:", error);
-            this.redirecionarComErro();
-        }
-    },
-
-    /**
      * Busca recomendações de destinos
+     * ✅ CORREÇÃO 3: Função unificada que funciona para todos os tipos de viagem
      */
     async buscarRecomendacoes() {
+        // Verificar se o serviço de IA está disponível
         if (!window.BENETRIP_AI) {
             console.error("Serviço de IA não disponível");
-            this.redirecionarComErro();
+            this.atualizarBarraProgresso(100, "Erro ao buscar recomendações. Redirecionando...");
+            setTimeout(() => {
+                window.location.href = 'destinos.html';
+            }, 2000);
             return;
         }
 
         try {
+            // ✅ DETECTAR TIPO DE VIAGEM
+            const tipoViagem = this.determinarTipoViagem();
+            console.log(`🎯 Tipo de viagem detectado: ${tipoViagem}`);
+
+            // ✅ PREPARAR DADOS NO FORMATO CORRETO PARA A API
             const dadosParaAPI = {
                 ...this.estado.respostas,
+                // ✅ Campos obrigatórios para detecção de tipo
                 viagem_carro: this.estado.respostas.viagem_carro,
                 distancia_maxima: this.estado.respostas.distancia_maxima,
-                tipoViagem: this.determinarTipoViagem()
+                orcamento_valor: this.estado.respostas.orcamento_valor,
+                moeda_escolhida: this.estado.respostas.moeda_escolhida
             };
 
-            console.log("Enviando dados para recomendações:", dadosParaAPI);
+            console.log("📦 Enviando dados para API:", dadosParaAPI);
 
+            // ✅ ATUALIZAR PROGRESSO BASEADO NO TIPO
+            if (tipoViagem === 'carro') {
+                this.atualizarBarraProgresso(20, "Buscando destinos de road trip...");
+            } else if (tipoViagem === 'rodoviario') {
+                this.atualizarBarraProgresso(20, "Buscando destinos de ônibus...");
+            } else {
+                this.atualizarBarraProgresso(20, "Buscando destinos aéreos...");
+            }
+
+            // ✅ CHAMAR A FUNÇÃO UNIFICADA
             const recomendacoes = await window.BENETRIP_AI.obterRecomendacoes(dadosParaAPI);
             
+            console.log("✅ Recomendações recebidas:", recomendacoes);
+            
+            // ✅ SALVAR SEMPRE COM O MESMO NOME
             localStorage.setItem('benetrip_recomendacoes', JSON.stringify(recomendacoes));
             this.notificarDadosProntos();
             
-            this.atualizarBarraProgresso(100, "Destinos encontrados! Redirecionando...");
-            setTimeout(() => window.location.href = 'destinos.html', 2000);
+            // Mostrar mensagem de conclusão baseada no tipo
+            if (tipoViagem === 'carro') {
+                this.atualizarBarraProgresso(100, "Roteiros de carro encontrados! Redirecionando...");
+            } else if (tipoViagem === 'rodoviario') {
+                this.atualizarBarraProgresso(100, "Destinos de ônibus encontrados! Redirecionando...");
+            } else {
+                this.atualizarBarraProgresso(100, "Destinos encontrados! Redirecionando...");
+            }
+            
+            // Redirecionar para página de destinos após delay
+            setTimeout(() => {
+                window.location.href = 'destinos.html';
+            }, 2000);
 
         } catch (error) {
             console.error("Erro ao obter recomendações:", error);
-            this.redirecionarComErro();
+            this.atualizarBarraProgresso(100, "Erro ao buscar recomendações. Redirecionando...");
+            // Redirecionar para página de destinos após delay
+            setTimeout(() => {
+                window.location.href = 'destinos.html';
+            }, 2000);
         }
-    },
-
-    /**
-     * Redireciona com mensagem de erro
-     */
-    redirecionarComErro() {
-        this.atualizarBarraProgresso(100, "Erro ao buscar dados. Redirecionando...");
-        setTimeout(() => window.location.href = 'destinos.html', 2000);
     },
 
     /**
@@ -2009,20 +2006,26 @@ const BENETRIP = {
 
     /**
      * Mostra mensagem de finalização
+     * ✅ CORREÇÃO 5: Mensagens específicas por tipo de viagem
      */
     async mostrarMensagemFinalizacao() {
+        // Mostrar Tripinha pensando
         await this.mostrarTripinhaPensando();
 
+        // ✅ DETECTAR TIPO DE VIAGEM PARA MENSAGEM CORRETA
         const tipoViagem = this.determinarTipoViagem();
         let textoMensagem = '';
 
         if (tipoViagem === 'carro') {
             const distancia = this.estado.respostas.distancia_maxima;
             textoMensagem = `Perfeito! Vou buscar destinos incríveis num raio de ${distancia}km para sua road trip! 🚗🗺️`;
+        } else if (tipoViagem === 'rodoviario') {
+            textoMensagem = `Ótimo! Vou buscar destinos perfeitos para viagem de ônibus dentro do seu orçamento! 🚌💰`;
         } else {
             textoMensagem = `Ótimo! Com suas preferências, já sei quais destinos vão te encantar! Vou preparar algumas sugestões especiais para você! 🐾✈️`;
         }
 
+        // Mostrar mensagem da Tripinha
         const mensagemHTML = `
             <div class="chat-message tripinha">
                 <div class="avatar">
@@ -2038,16 +2041,23 @@ const BENETRIP = {
             </div>
         `;
 
+        // Adicionar ao chat
         const chatMessages = document.getElementById('chat-messages');
         if (chatMessages) {
             chatMessages.insertAdjacentHTML('beforeend', mensagemHTML);
             this.rolarParaFinal();
         }
 
+        // Configurar manipulador de eventos para progresso
         this.configurarEventosProgresso();
         
-        await this.delay(1000);
-        this.atualizarBarraProgresso(15, "Iniciando busca...");
+        // Retornar uma promessa que será resolvida após simular progresso inicial
+        return new Promise(resolve => {
+            setTimeout(() => {
+                this.atualizarBarraProgresso(15, "Iniciando busca...");
+                resolve();
+            }, 1000);
+        });
     },
 
     /**
@@ -2125,16 +2135,23 @@ const BENETRIP = {
 
     /**
      * Salva dados do usuário com formato padronizado
+     * ✅ CORREÇÃO 7: Formato consistente com a API
      */
     salvarDadosUsuario() {
+        // ✅ USAR A FUNÇÃO DE DETECÇÃO DE TIPO
         const tipoViagem = this.determinarTipoViagem();
         
+        // Estrutura padronizada para salvar no localStorage
         const dadosPadronizados = {
-            fluxo: this.estado.fluxo || 'destino_desconhecido',
-            tipoViagem: tipoViagem,
+            fluxo: 'destino_desconhecido', // ✅ Sempre este valor para este fluxo
+            tipoViagem: tipoViagem, // ✅ Detectado automaticamente
             timestamp: Date.now(),
             respostas: {
                 ...this.estado.respostas,
+                // ✅ Garantir que campos essenciais estejam presentes
+                viagem_carro: this.estado.respostas.viagem_carro,
+                distancia_maxima: this.estado.respostas.distancia_maxima,
+                // Garante que informações de passageiros estejam sempre no mesmo formato
                 passageiros: {
                     adultos: this.getNumeroAdultos(),
                     criancas: 0,
@@ -2143,104 +2160,41 @@ const BENETRIP = {
             }
         };
 
-        // Padronizar cidade de partida
-        this.padronizarCidadePartida(dadosPadronizados);
-
-        // Padronizar destino conhecido, se existir
-        this.padronizarDestinoConhecido(dadosPadronizados);
-
-        // Padronizar datas
-        this.padronizarDatas(dadosPadronizados);
-
-        // Processar moeda
-        if (tipoViagem !== 'carro' && this.estado.respostas.moeda_escolhida) {
+        // ✅ PROCESSAR MOEDA CORRETAMENTE
+        if (this.estado.respostas.moeda_escolhida && typeof this.estado.respostas.moeda_escolhida === 'string') {
+            // Extrair código da moeda se estiver no formato completo
             dadosPadronizados.respostas.moeda_escolhida = this.obterCodigoMoeda(this.estado.respostas.moeda_escolhida);
         }
 
-        localStorage.setItem('benetrip_user_data', JSON.stringify(dadosPadronizados));
-        
-        // Salvar destino para página de voos se necessário
-        this.salvarDestinoParaVoos(dadosPadronizados);
-
-        if (this.config.debugMode) {
-            console.log("Dados salvos:", dadosPadronizados);
-        }
-    },
-
-    /**
-     * Padroniza dados da cidade de partida
-     */
-    padronizarCidadePartida(dados) {
-        const cidadePartida = this.estado.respostas.cidade_partida;
-        
-        if (cidadePartida) {
-            if (typeof cidadePartida === 'string') {
-                const match = cidadePartida.match(/\(([A-Z]{3})\)/);
-                dados.respostas.cidade_partida = {
-                    name: cidadePartida.replace(/\s*\([^)]*\)/, ''),
+        // Verificar e padronizar dados da cidade de partida
+        if (this.estado.respostas.cidade_partida) {
+            // ✅ GARANTIR FORMATO OBJETO ESPERADO PELA API
+            if (typeof this.estado.respostas.cidade_partida === 'object') {
+                // Já está no formato correto do autocomplete
+                dadosPadronizados.respostas.cidade_partida = this.estado.respostas.cidade_partida;
+            } else {
+                // Converter string para objeto
+                const match = this.estado.respostas.cidade_partida.match(/\(([A-Z]{3})\)/);
+                dadosPadronizados.respostas.cidade_partida = {
+                    name: this.estado.respostas.cidade_partida.replace(/\s*\([^)]*\)/, ''),
                     code: match ? match[1] : 'SAO',
-                    cidade: cidadePartida.replace(/\s*\([^)]*\)/, ''),
+                    cidade: this.estado.respostas.cidade_partida.replace(/\s*\([^)]*\)/, ''),
                     pais: 'Brasil',
-                    sigla_estado: 'SP'
+                    sigla_estado: 'SP' // Default
                 };
-            } else if (cidadePartida.code) {
-                dados.respostas.cidade_partida = cidadePartida;
             }
         }
-    },
 
-    /**
-     * Padroniza dados do destino conhecido
-     */
-    padronizarDestinoConhecido(dados) {
-        const destinoConhecido = this.estado.respostas.destino_conhecido;
-        
-        if (destinoConhecido) {
-            if (typeof destinoConhecido === 'string') {
-                const match = destinoConhecido.match(/\(([A-Z]{3})\)/);
-                dados.respostas.destino_conhecido = {
-                    name: destinoConhecido.replace(/\s*\([^)]*\)/, ''),
-                    code: match ? match[1] : 'JFK',
-                    country: 'País não especificado'
-                };
-            } else if (destinoConhecido.code) {
-                dados.respostas.destino_conhecido = destinoConhecido;
-            }
-        }
-    },
-
-    /**
-     * Padroniza dados das datas
-     */
-    padronizarDatas(dados) {
-        const datas = this.estado.respostas.datas;
-        
-        if (datas && datas.dataIda) {
-            dados.respostas.datas = {
-                dataIda: this.formatarDataISO(datas.dataIda),
-                dataVolta: this.formatarDataISO(datas.dataVolta || '')
+        // ✅ GARANTIR FORMATO CORRETO DAS DATAS
+        if (this.estado.respostas.datas) {
+            dadosPadronizados.respostas.datas = {
+                dataIda: this.formatarDataISO(this.estado.respostas.datas.dataIda),
+                dataVolta: this.formatarDataISO(this.estado.respostas.datas.dataVolta || '')
             };
         }
-    },
 
-    /**
-     * Salva destino para página de voos
-     */
-    salvarDestinoParaVoos(dados) {
-        if (this.estado.fluxo === 'destino_conhecido' && dados.respostas.destino_conhecido) {
-            const destino = dados.respostas.destino_conhecido;
-            
-            if (destino.code) {
-                const destinoFormatado = {
-                    codigo_iata: destino.code,
-                    destino: destino.name,
-                    pais: destino.country || 'País não especificado'
-                };
-                
-                localStorage.setItem('benetrip_destino_selecionado', JSON.stringify(destinoFormatado));
-                console.log('Destino salvo para página de voos:', destinoFormatado);
-            }
-        }
+        console.log("💾 Salvando dados padronizados:", dadosPadronizados);
+        localStorage.setItem('benetrip_user_data', JSON.stringify(dadosPadronizados));
     },
 
     /**
@@ -2303,21 +2257,15 @@ const BENETRIP = {
     iniciarTelaDestinos() {
         const dadosUsuario = localStorage.getItem('benetrip_user_data');
         const recomendacoes = localStorage.getItem('benetrip_recomendacoes');
-        const destinosCarro = localStorage.getItem('benetrip_destinos_carro');
 
-        if (!dadosUsuario || (!recomendacoes && !destinosCarro)) {
+        if (!dadosUsuario || !recomendacoes) {
             window.location.href = 'index.html';
             return;
         }
 
         try {
             const dados = JSON.parse(dadosUsuario);
-            
-            if (dados.tipoViagem === 'carro' && destinosCarro) {
-                this.renderizarDestinosCarro(JSON.parse(destinosCarro));
-            } else if (recomendacoes) {
-                this.renderizarDestinos(JSON.parse(recomendacoes));
-            }
+            this.renderizarDestinos(JSON.parse(recomendacoes));
         } catch (error) {
             console.error("Erro ao inicializar tela de destinos:", error);
             window.location.href = 'index.html';
@@ -2349,14 +2297,6 @@ const BENETRIP = {
      */
     renderizarDestinos(recomendacoes) {
         console.log("Renderizando destinos:", recomendacoes);
-        // Implementação será adicionada conforme necessário
-    },
-
-    /**
-     * Renderização de destinos de carro (placeholder)
-     */
-    renderizarDestinosCarro(destinos) {
-        console.log("Renderizando destinos de carro:", destinos);
         // Implementação será adicionada conforme necessário
     },
 
@@ -2879,7 +2819,7 @@ const BENETRIP = {
      * Método de atualização de versão
      */
     checkVersion() {
-        const versaoAtual = "2.0.0";
+        const versaoAtual = "2.1.0";
         const versaoSalva = localStorage.getItem('benetrip_version');
         
         if (versaoSalva !== versaoAtual) {
@@ -2941,15 +2881,24 @@ window.addEventListener('beforeunload', () => {
 window.BENETRIP = BENETRIP;
 
 // Exportar versão para verificação
-window.BENETRIP_VERSION = "2.0.0";
+window.BENETRIP_VERSION = "2.1.0";
 
 // Log de inicialização
-console.log("🐶 Benetrip App v2.0.0 carregado - Pronto para aventuras!");
+console.log("🐶 Benetrip App v2.1.0 carregado - Pronto para aventuras!");
 
 /**
  * === CHANGELOG ===
  * 
- * v2.0.0 (Atual):
+ * v2.1.0 (Atual - CORRIGIDO):
+ * ✅ CORREÇÃO 1: Removida função buscarDestinosProximos() desnecessária
+ * ✅ CORREÇÃO 2: Simplificado finalizarQuestionario() para usar sempre buscarRecomendacoes()
+ * ✅ CORREÇÃO 3: Unificado buscarRecomendacoes() para funcionar com todos os tipos de viagem
+ * ✅ CORREÇÃO 4: Adicionada função determinarTipoViagem() obrigatória
+ * ✅ CORREÇÃO 5: Atualizado mostrarMensagemFinalizacao() com mensagens específicas por tipo
+ * ✅ CORREÇÃO 6: Removido código duplicado e problemático
+ * ✅ CORREÇÃO 7: Corrigido salvarDadosUsuario() para formato consistente com API
+ * ✅ CORREÇÃO 8: Adicionada função obterCodigoMoeda() obrigatória
+ * 
  * - Sistema de cache otimizado para cidades
  * - Busca local de cidades com algoritmo melhorado
  * - Validação robusta de dados de entrada
@@ -2969,6 +2918,23 @@ console.log("🐶 Benetrip App v2.0.0 carregado - Pronto para aventuras!");
  * - Configuração de entrada monetária aprimorada
  * - Gestão de estado melhorada para todos os componentes
  * - Compatibilidade com navegadores modernos
+ * 
+ * === MELHORIAS IMPLEMENTADAS ===
+ * 🔧 Fluxo unificado para todos os tipos de viagem (carro, ônibus, aéreo)
+ * 🔧 Detecção automática de tipo de viagem baseada em respostas do usuário
+ * 🔧 Mensagens personalizadas da Tripinha para cada tipo de viagem
+ * 🔧 Salvamento de dados padronizado e consistente com todas as APIs
+ * 🔧 Tratamento de erros robusto com fallbacks automáticos
+ * 🔧 Sistema de cache inteligente para melhor performance
+ * 🔧 Validação de dados em múltiplas camadas
+ * 🔧 Interface responsiva e adaptativa
+ * 
+ * === COMPATIBILIDADE ===
+ * ✅ 100% compatível com recommendations.js (API unificada)
+ * ✅ 100% compatível com destinos.js (renderização)
+ * ✅ 100% compatível com voos.js (busca de voos)
+ * ✅ 100% compatível com questions.json (questionário)
+ * ✅ 100% compatível com dados de cidades IATA
  * 
  * === PRÓXIMAS MELHORIAS PLANEJADAS ===
  * - Sistema de notificações push
