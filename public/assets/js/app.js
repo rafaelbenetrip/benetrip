@@ -1226,9 +1226,9 @@ const BENETRIP = {
                         const estado = item.state_code ? `, ${item.state_code}` : '';
                         return `
                             <div class="autocomplete-item"
-                                 data-code="${item.code}"
-                                 data-name="${item.name}"
-                                 data-country="${item.country_name}">
+                                  data-code="${item.code}"
+                                  data-name="${item.name}"
+                                  data-country="${item.country_name}">
                                 <div class="item-code">${item.code}</div>
                                 <div class="item-details">
                                     <div class="item-name">${item.name}${estado}</div>
@@ -1402,15 +1402,11 @@ const BENETRIP = {
             this.estado.fluxo = valor === 0 ? 'destino_conhecido' : 'destino_desconhecido';
         }
 
-        // AJUSTE 1: Lógica de Determinação do Tipo de Viagem
         // Se for pergunta sobre viagem de carro, definir tipo de viagem
         if (pergunta.key === 'viagem_carro') {
             this.estado.tipoViagem = valor === 0 ? 'carro' : 'aereo_onibus';
             console.log(`Tipo de viagem definido como: ${this.estado.tipoViagem}`);
-            // Salvar no formato esperado pela API
-            this.estado.respostas.viagem_carro = valor;
         }
-
 
         // Avançar para a próxima pergunta
         this.estado.perguntaAtual++;
@@ -1430,11 +1426,10 @@ const BENETRIP = {
     },
 
     /**
-     * AJUSTE 2: Função de Verificação de Limite de Perguntas
      * Verifica se atingimos o limite de perguntas para este fluxo
      */
     verificarLimitePerguntas() {
-        // Usar a mesma lógica do recommendations.js
+        // Verificar se todas as perguntas obrigatórias foram respondidas
         const perguntasObrigatorias = [
             'cidade_partida',
             'companhia',
@@ -1442,72 +1437,25 @@ const BENETRIP = {
             'datas',
             'viagem_carro'
         ];
-        // Verificar tipo de viagem baseado na resposta viagem_carro
-        const tipoViagem = this.determinarTipoViagem();
 
-        if (tipoViagem === 'carro') {
+        // Adicionar perguntas condicionais baseadas no tipo de viagem
+        if (this.estado.tipoViagem === 'carro') {
             perguntasObrigatorias.push('distancia_maxima');
-        } else {
+        } else if (this.estado.tipoViagem === 'aereo_onibus') {
             perguntasObrigatorias.push('moeda_escolhida', 'orcamento_valor');
         }
-        const todasRespondidas = perguntasObrigatorias.every(key =>
+
+        const todasRespondidas = perguntasObrigatorias.every(key => 
             this.estado.respostas[key] !== undefined
         );
+
         if (todasRespondidas) {
             console.log("Todas perguntas obrigatórias respondidas, finalizando questionário");
             return true;
         }
+
         return false;
     },
-
-    /**
-     * AJUSTE 3: Adicionar Função determinarTipoViagem
-     * Esta função precisa ser consistente com a do recommendations.js
-     */
-    determinarTipoViagem() {
-        // Usar a mesma lógica do recommendations.js
-        if (this.estado.respostas.viagem_carro !== undefined) {
-            const viagemCarro = parseInt(this.estado.respostas.viagem_carro);
-            if (viagemCarro === 0) {
-                return 'carro';
-            }
-        }
-        // Lógica de orçamento para aéreo vs rodoviário
-        const orcamento = this.estado.respostas.orcamento_valor;
-        const moeda = this.estado.respostas.moeda_escolhida;
-
-        if (!orcamento || orcamento === 'flexível') return 'aereo';
-
-        let valorEmBRL = parseFloat(orcamento);
-
-        // Converter para BRL se necessário
-        if (moeda && moeda !== 'BRL') {
-            const taxasConversao = {
-                'USD': 5.0,
-                'EUR': 5.5,
-                'GBP': 6.3,
-                'JPY': 0.033
-            };
-            valorEmBRL = valorEmBRL * (taxasConversao[moeda] || 5.0);
-        }
-
-        return valorEmBRL < 401 ? 'rodoviario' : 'aereo';
-    },
-
-
-    /**
-     * AJUSTE 7: Adicionar Função para Extrair Código Moeda
-     */
-    obterCodigoMoeda(textoCompleto) {
-        if (!textoCompleto) return 'BRL';
-
-        if (textoCompleto.includes('USD')) return 'USD';
-        if (textoCompleto.includes('EUR')) return 'EUR';
-        if (textoCompleto.includes('BRL')) return 'BRL';
-
-        return 'BRL'; // Default
-    },
-
 
     /**
      * Mostra a resposta do usuário no chat
@@ -1515,16 +1463,10 @@ const BENETRIP = {
     mostrarRespostaUsuario(valor, pergunta) {
         let mensagemResposta = '';
 
-        // AJUSTE 8: Atualizar mostrarRespostaUsuario para Moedas
         // Formatar a resposta com base no tipo de pergunta
         if (pergunta.options) {
             // Resposta de múltipla escolha
             mensagemResposta = pergunta.options[valor];
-
-            // Se for moeda, extrair e salvar o código
-            if (pergunta.key === 'moeda_escolhida') {
-                this.estado.respostas[pergunta.key] = this.obterCodigoMoeda(pergunta.options[valor]);
-            }
         } else if (pergunta.calendar) {
             // Função simplificada para formatar data de YYYY-MM-DD para DD/MM/YYYY
             const formatarDataVisual = (dataStr) => {
@@ -1801,7 +1743,6 @@ const BENETRIP = {
     },
 
     /**
-     * AJUSTE 6: Corrigir Chamada para Recomendações
      * Busca recomendações de destinos com base nas preferências do usuário
      */
     buscarRecomendacoes() {
@@ -1809,22 +1750,16 @@ const BENETRIP = {
         if (!window.BENETRIP_AI) {
             console.error("Serviço de IA não disponível");
             this.atualizarBarraProgresso(100, "Erro ao buscar recomendações. Redirecionando...");
+
+            // Redirecionar para página de destinos após delay
             setTimeout(() => {
                 window.location.href = 'destinos.html';
             }, 2000);
             return;
         }
-        // Usar dados padronizados consistentes com a API
-        const dadosParaAPI = {
-            ...this.estado.respostas,
-            viagem_carro: this.estado.respostas.viagem_carro,
-            distancia_maxima: this.estado.respostas.distancia_maxima,
-            tipoViagem: this.determinarTipoViagem()
-        };
-        console.log("Enviando dados para recomendações:", dadosParaAPI);
 
         // Chamar serviço de IA para recomendações
-        window.BENETRIP_AI.obterRecomendacoes(dadosParaAPI)
+        window.BENETRIP_AI.obterRecomendacoes(this.estado.respostas)
             .then(recomendacoes => {
                 // Salvar recomendações
                 localStorage.setItem('benetrip_recomendacoes', JSON.stringify(recomendacoes));
@@ -1852,7 +1787,6 @@ const BENETRIP = {
                 }, 2000);
             });
     },
-
 
     /**
      * Busca voos para o destino escolhido pelo usuário
@@ -1948,20 +1882,17 @@ const BENETRIP = {
     },
 
     /**
-     * AJUSTE 5: Atualizar salvarDadosUsuario para Formato Consistente
      * Salva os dados do usuário no localStorage com formato padronizado
      */
     salvarDadosUsuario() {
-        const tipoViagem = this.determinarTipoViagem();
-
         // Estrutura padronizada para salvar no localStorage
         const dadosPadronizados = {
-            fluxo: 'destino_desconhecido', // Sempre destino desconhecido para este fluxo
-            tipoViagem: tipoViagem,
+            fluxo: this.estado.fluxo,
+            tipoViagem: this.estado.tipoViagem || 'aereo_onibus',
             timestamp: Date.now(),
             respostas: {
                 ...this.estado.respostas,
-                // Garantir formato consistente de passageiros
+                // Garante que informações de passageiros estejam sempre no mesmo formato
                 passageiros: {
                     adultos: this.getNumeroAdultos(),
                     criancas: 0,
@@ -1969,35 +1900,70 @@ const BENETRIP = {
                 }
             }
         };
-        // Padronizar cidade de partida para o formato esperado pela API
+
+        // Verificar e padronizar dados da cidade de partida
         if (this.estado.respostas.cidade_partida) {
+            // Garante que cidade_partida seja sempre um objeto com formato padrão
             if (typeof this.estado.respostas.cidade_partida === 'string') {
+                // Tenta extrair código IATA se estiver no formato "Cidade (ABC)"
                 const match = this.estado.respostas.cidade_partida.match(/\(([A-Z]{3})\)/);
                 dadosPadronizados.respostas.cidade_partida = {
-                    name: this.estado.respostas.cidade_partida.replace(/\s*\([^)]*\)/, ''),
-                    code: match ? match[1] : 'SAO',
-                    cidade: this.estado.respostas.cidade_partida.replace(/\s*\([^)]*\)/, ''),
-                    pais: 'Brasil',
-                    sigla_estado: 'SP' // Default, você pode melhorar isso com lógica de detecção
+                    name: this.estado.respostas.cidade_partida,
+                    code: match ? match[1] : 'GRU' // Fallback para GRU se não encontrar
                 };
             }
         }
-        // Garantir formato correto das datas
-        if (this.estado.respostas.datas) {
-            dadosPadronizados.respostas.datas = {
-                dataIda: this.formatarDataISO(this.estado.respostas.datas.dataIda),
-                dataVolta: this.formatarDataISO(this.estado.respostas.datas.dataVolta || '')
-            };
-        }
-        // Processar moeda selecionada
-        if (this.estado.respostas.moeda_escolhida) {
-            // A conversão para código já foi feita em `mostrarRespostaUsuario`, aqui apenas garantimos que está lá
-            // Não é mais necessário chamar `this.obterCodigoMoeda` aqui se a lógica anterior estiver correta.
-        }
-        localStorage.setItem('benetrip_user_data', JSON.stringify(dadosPadronizados));
-        console.log("Dados salvos no formato esperado pela API:", dadosPadronizados);
-    },
 
+        // Padronizar dados de destino conhecido, se existir
+        if (this.estado.respostas.destino_conhecido) {
+            if (typeof this.estado.respostas.destino_conhecido === 'string') {
+                const match = this.estado.respostas.destino_conhecido.match(/\(([A-Z]{3})\)/);
+                dadosPadronizados.respostas.destino_conhecido = {
+                    name: this.estado.respostas.destino_conhecido,
+                    code: match ? match[1] : 'JFK', // Fallback para JFK se não encontrar
+                    country: 'País não especificado'
+                };
+            }
+        }
+
+        // Padronizar dados de datas, se existir
+        if (this.estado.respostas.datas) {
+            // Garantir que datas estejam no formato correto (YYYY-MM-DD)
+            if (this.estado.respostas.datas.dataIda && typeof this.estado.respostas.datas.dataIda === 'string') {
+                dadosPadronizados.respostas.datas = {
+                    ...this.estado.respostas.datas,
+                    dataIda: this.formatarDataISO(this.estado.respostas.datas.dataIda),
+                    dataVolta: this.formatarDataISO(this.estado.respostas.datas.dataVolta || '')
+                };
+            }
+        }
+
+        // Adicionar moeda preferida (apenas para viagens aéreas/ônibus)
+        if (this.estado.tipoViagem === 'aereo_onibus') {
+            dadosPadronizados.respostas.moeda = this.estado.respostas.moeda_escolhida || this.config.defaultCurrency;
+        }
+
+        // Log para debug
+        if (this.config.debugMode) {
+            console.log("Dados padronizados para salvamento:", dadosPadronizados);
+        }
+
+        localStorage.setItem('benetrip_user_data', JSON.stringify(dadosPadronizados));
+
+        // NOVO: Salvar o destino em formato compatível com a página de voos quando fluxo for destino_conhecido
+        if (this.estado.fluxo === 'destino_conhecido' && this.estado.respostas.destino_conhecido) {
+            const destino = this.estado.respostas.destino_conhecido;
+            if (destino) {
+                const destinoFormatado = {
+                    codigo_iata: destino.code,
+                    destino: destino.name,
+                    pais: destino.country || 'País não especificado'
+                };
+                localStorage.setItem('benetrip_destino_selecionado', JSON.stringify(destinoFormatado));
+                console.log('Destino salvo para página de voos:', destinoFormatado);
+            }
+        }
+    },
 
     /**
      * Verifica se existem dados salvos de uma sessão anterior
