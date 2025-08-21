@@ -21,12 +21,14 @@ const BENETRIP = {
      */
     estado: {
         fluxo: null, // 'destino_conhecido' ou 'destino_desconhecido'
+        tipoViagem: null, // 'carro' ou 'aereo_onibus'
         perguntaAtual: 0,
         perguntas: [],
         respostas: {},
         carregando: false,
         currentCalendarId: null, // Armazena o ID do calendário atual
-        calendarioAtual: null // Armazena a instância do calendário
+        calendarioAtual: null, // Armazena a instância do calendário
+        currentSliderId: null // Armazena o ID do slider atual
     },
 
     // --- INÍCIO DA IMPLEMENTAÇÃO DO AUTOCOMPLETE LOCAL ---
@@ -537,6 +539,9 @@ const BENETRIP = {
                         <button class="confirm-number">Confirmar</button>
                     </div>
                 `;
+            } else if (pergunta.slider) {
+                // O HTML do slider será criado na função configurarSlider
+                opcoesHTML = `<div class="slider-placeholder">Configurando slider...</div>`;
             } else if (pergunta.autocomplete) {
                 const autocompleteId = `autocomplete-${Date.now()}`;
                 this.estado.currentAutocompleteId = autocompleteId;
@@ -638,6 +643,11 @@ const BENETRIP = {
             this.configurarEntradaNumerica();
         }
 
+        // Configurar slider
+        if (pergunta.slider) {
+            this.configurarSlider(pergunta);
+        }
+
         // Configurar autocomplete
         if (pergunta.autocomplete) {
             this.configurarAutocomplete(pergunta);
@@ -649,10 +659,119 @@ const BENETRIP = {
         }
 
         // Configurar entrada de texto
-        if (pergunta.input_field && !pergunta.calendar && !pergunta.number_input && !pergunta.autocomplete && !pergunta.currency_format) {
+        if (pergunta.input_field && !pergunta.calendar && !pergunta.number_input && !pergunta.autocomplete && !pergunta.currency_format && !pergunta.slider) {
             this.configurarEntradaTexto();
         }
     },
+
+    /**
+     * Configura o slider para seleção de distância
+     */
+    configurarSlider(pergunta) {
+        const config = pergunta.slider_config;
+        const sliderId = `slider-${Date.now()}`;
+        this.estado.currentSliderId = sliderId;
+
+        // Substituir o placeholder pelo HTML real do slider
+        setTimeout(() => {
+            const placeholder = document.querySelector('.slider-placeholder');
+            if (placeholder) {
+                placeholder.outerHTML = `
+                    <div class="slider-container" id="${sliderId}-container">
+                        <div class="slider-wrapper">
+                            <input type="range" 
+                                   id="${sliderId}" 
+                                   class="distance-slider"
+                                   min="${config.min}" 
+                                   max="${config.max}" 
+                                   step="${config.step}" 
+                                   value="${config.default}">
+                            <div class="slider-labels">
+                                ${Object.entries(config.labels).map(([value, label]) => 
+                                    `<span class="slider-label" data-value="${value}">${label}</span>`
+                                ).join('')}
+                            </div>
+                        </div>
+                        <div class="slider-value">
+                            <span id="${sliderId}-display">${config.default}</span> ${config.unit}
+                        </div>
+                        <button id="${sliderId}-confirm" class="confirm-slider">Confirmar Distância</button>
+                    </div>
+                `;
+
+                // Configurar eventos do slider após criar o HTML
+                this.configurarEventosSlider(sliderId, config, pergunta);
+            }
+        }, 100);
+    },
+
+    /**
+     * Configura os eventos do slider após ele ser criado
+     */
+    configurarEventosSlider(sliderId, config, pergunta) {
+        setTimeout(() => {
+            const slider = document.getElementById(sliderId);
+            const display = document.getElementById(`${sliderId}-display`);
+            const confirmBtn = document.getElementById(`${sliderId}-confirm`);
+
+            if (!slider || !display || !confirmBtn) {
+                console.error("Elementos do slider não encontrados!");
+                return;
+            }
+
+            // Atualizar display quando slider muda
+            slider.addEventListener('input', (e) => {
+                const valor = parseInt(e.target.value);
+                display.textContent = valor;
+                
+                // Atualizar posição dos labels visuais
+                this.atualizarLabelsSlider(slider, config);
+                
+                // Atualizar gradiente do slider
+                this.atualizarGradienteSlider(slider, config);
+            });
+
+            // Confirmar seleção
+            confirmBtn.addEventListener('click', () => {
+                const valor = parseInt(slider.value);
+                this.processarResposta(valor, pergunta);
+            });
+
+            // Configurar labels e gradiente iniciais
+            this.atualizarLabelsSlider(slider, config);
+            this.atualizarGradienteSlider(slider, config);
+            
+            console.log("Slider configurado com sucesso");
+        }, 200);
+    },
+
+    /**
+     * Atualiza a aparência visual dos labels do slider
+     */
+    atualizarLabelsSlider(slider, config) {
+        const valor = parseInt(slider.value);
+        const labels = slider.closest('.slider-container').querySelectorAll('.slider-label');
+        
+        labels.forEach(label => {
+            const labelValue = parseInt(label.dataset.value);
+            if (labelValue <= valor) {
+                label.classList.add('active');
+            } else {
+                label.classList.remove('active');
+            }
+        });
+    },
+
+    /**
+     * Atualiza o gradiente do slider com base no valor atual
+     */
+    atualizarGradienteSlider(slider, config) {
+        const valor = parseInt(slider.value);
+        const porcentagem = ((valor - config.min) / (config.max - config.min)) * 100;
+        
+        slider.style.background = `linear-gradient(to right, #E87722 0%, #E87722 ${porcentagem}%, #ddd ${porcentagem}%, #ddd 100%)`;
+    },
+    
     /**
      * Inicializa o calendário com Flatpickr - Versão corrigida
      */
@@ -1283,6 +1402,12 @@ const BENETRIP = {
             this.estado.fluxo = valor === 0 ? 'destino_conhecido' : 'destino_desconhecido';
         }
 
+        // Se for pergunta sobre viagem de carro, definir tipo de viagem
+        if (pergunta.key === 'viagem_carro') {
+            this.estado.tipoViagem = valor === 0 ? 'carro' : 'aereo_onibus';
+            console.log(`Tipo de viagem definido como: ${this.estado.tipoViagem}`);
+        }
+
         // Avançar para a próxima pergunta
         this.estado.perguntaAtual++;
 
@@ -1304,24 +1429,32 @@ const BENETRIP = {
      * Verifica se atingimos o limite de perguntas para este fluxo
      */
     verificarLimitePerguntas() {
-        // Garantir que o questionário termine se todas as perguntas obrigatórias foram respondidas
-        if (this.estado.fluxo === 'destino_conhecido') {
-            const perguntasObrigatorias = [
-                'conhece_destino',
-                'destino_conhecido',
-                'estilo_viagem_destino', // Nova pergunta adicionada
-                'cidade_partida',
-                'datas'
-            ];
-            const todasRespondidas = perguntasObrigatorias.every(key => this.estado.respostas[key] !== undefined);
+        // Verificar se todas as perguntas obrigatórias foram respondidas
+        const perguntasObrigatorias = [
+            'cidade_partida',
+            'companhia',
+            'preferencia_viagem',
+            'datas',
+            'viagem_carro'
+        ];
 
-            if (todasRespondidas && this.estado.perguntaAtual >= 4) { // Aumentamos de 3 para 4
-                console.log("Todas perguntas obrigatórias respondidas, finalizando questionário");
-                return true;
-            }
+        // Adicionar perguntas condicionais baseadas no tipo de viagem
+        if (this.estado.tipoViagem === 'carro') {
+            perguntasObrigatorias.push('distancia_maxima');
+        } else if (this.estado.tipoViagem === 'aereo_onibus') {
+            perguntasObrigatorias.push('moeda_escolhida', 'orcamento_valor');
         }
 
-        return false; // Mantém comportamento padrão para outros casos
+        const todasRespondidas = perguntasObrigatorias.every(key => 
+            this.estado.respostas[key] !== undefined
+        );
+
+        if (todasRespondidas) {
+            console.log("Todas perguntas obrigatórias respondidas, finalizando questionário");
+            return true;
+        }
+
+        return false;
     },
 
     /**
@@ -1352,6 +1485,14 @@ const BENETRIP = {
         } else if (pergunta.autocomplete) {
             // Resposta de autocomplete
             mensagemResposta = `${valor.name} (${valor.code}), ${valor.country}`;
+        } else if (pergunta.slider) {
+            // Resposta do slider de distância
+            mensagemResposta = `${valor} km`;
+        } else if (pergunta.currency_format) {
+            // Resposta de valor monetário
+            const moeda = this.estado.respostas.moeda_escolhida || 'BRL';
+            const simboloMoeda = this.obterSimboloMoeda(moeda);
+            mensagemResposta = `${simboloMoeda} ${valor.toFixed(2).replace('.', ',')}`;
         } else {
             // Outros tipos de resposta
             mensagemResposta = valor.toString();
@@ -1375,11 +1516,26 @@ const BENETRIP = {
     },
 
     /**
+     * Obtém o símbolo da moeda baseado no código
+     */
+    obterSimboloMoeda(codigoMoeda) {
+        const simbolos = {
+            'BRL': 'R$',
+            'USD': '$',
+            'EUR': '€',
+            'GBP': '£',
+            'JPY': '¥'
+        };
+        return simbolos[codigoMoeda] || codigoMoeda;
+    },
+
+    /**
      * Finaliza o questionário e passa para a próxima etapa
      */
     finalizarQuestionario() {
         // Adicionar logs para depuração
         console.log("Finalizando questionário com fluxo:", this.estado.fluxo);
+        console.log("Tipo de viagem:", this.estado.tipoViagem);
         console.log("Dados salvos:", this.estado.respostas);
 
         // Salvar dados do usuário
@@ -1388,14 +1544,66 @@ const BENETRIP = {
         // Mostrar mensagem de finalização
         this.mostrarMensagemFinalizacao()
             .then(() => {
-                // Determinar próxima etapa com base no fluxo
-                if (this.estado.fluxo === 'destino_conhecido') {
-                    // Se já sabe o destino, ir direto para busca de voos
-                    this.buscarVoos();
+                // Determinar próxima etapa com base no fluxo e tipo de viagem
+                if (this.estado.tipoViagem === 'carro') {
+                    // Para viagens de carro, buscar destinos próximos
+                    this.buscarDestinosProximos();
                 } else {
-                    // Se não sabe o destino, mostrar recomendações
+                    // Para viagens aéreas/ônibus, seguir fluxo original
                     this.buscarRecomendacoes();
                 }
+            });
+    },
+
+    /**
+     * Busca destinos próximos para viagens de carro
+     */
+    buscarDestinosProximos() {
+        // Verificar se o serviço de IA está disponível
+        if (!window.BENETRIP_AI) {
+            console.error("Serviço de IA não disponível");
+            this.atualizarBarraProgresso(100, "Erro ao buscar destinos. Redirecionando...");
+
+            // Redirecionar para página de destinos após delay
+            setTimeout(() => {
+                window.location.href = 'destinos.html';
+            }, 2000);
+            return;
+        }
+
+        // Chamar serviço de IA para destinos de carro
+        const parametros = {
+            ...this.estado.respostas,
+            tipoViagem: 'carro',
+            distanciaMaxima: this.estado.respostas.distancia_maxima
+        };
+
+        window.BENETRIP_AI.obterDestinosCarro(parametros)
+            .then(destinos => {
+                // Salvar destinos de carro
+                localStorage.setItem('benetrip_destinos_carro', JSON.stringify(destinos));
+
+                // Notificar que os dados estão prontos
+                if (window.BENETRIP.notificarDadosProntos) {
+                    window.BENETRIP.notificarDadosProntos();
+                }
+
+                // Mostrar mensagem de conclusão
+                this.atualizarBarraProgresso(100, "Destinos encontrados! Redirecionando...");
+
+                // Redirecionar para página de destinos após delay
+                setTimeout(() => {
+                    window.location.href = 'destinos.html';
+                }, 2000);
+            })
+            .catch(erro => {
+                console.error("Erro ao obter destinos de carro:", erro);
+                this.atualizarBarraProgresso(100, "Erro ao buscar destinos. Redirecionando...");
+
+                // Redirecionar para página de destinos após delay
+                setTimeout(() => {
+                    window.location.href = 'destinos.html';
+                }, 2000);
             });
     },
 
@@ -1406,14 +1614,14 @@ const BENETRIP = {
         // Mostrar Tripinha pensando
         await this.mostrarTripinhaPensando();
 
-        // Texto da mensagem
+        // Texto da mensagem baseado no tipo de viagem
         let textoMensagem = '';
 
-        if (this.estado.fluxo === 'destino_conhecido') {
-            const destino = this.estado.respostas.destino_conhecido;
-            textoMensagem = `Ótimo! Vou buscar as melhores opções de voos para ${destino.name} para você! 🧳✈️`;
+        if (this.estado.tipoViagem === 'carro') {
+            const distancia = this.estado.respostas.distancia_maxima;
+            textoMensagem = `Perfeito! Vou buscar destinos incríveis num raio de ${distancia}km para sua road trip! 🚗🗺️`;
         } else {
-            textoMensagem = `Perfeito! Com suas preferências, já sei quais destinos vão te encantar! Vou preparar algumas sugestões especiais para você! 🐾🗺️`;
+            textoMensagem = `Ótimo! Com suas preferências, já sei quais destinos vão te encantar! Vou preparar algumas sugestões especiais para você! 🐾✈️`;
         }
 
         // Mostrar mensagem da Tripinha
@@ -1680,6 +1888,7 @@ const BENETRIP = {
         // Estrutura padronizada para salvar no localStorage
         const dadosPadronizados = {
             fluxo: this.estado.fluxo,
+            tipoViagem: this.estado.tipoViagem || 'aereo_onibus',
             timestamp: Date.now(),
             respostas: {
                 ...this.estado.respostas,
@@ -1729,8 +1938,10 @@ const BENETRIP = {
             }
         }
 
-        // Adicionar moeda preferida
-        dadosPadronizados.respostas.moeda = this.estado.respostas.moeda_escolhida || this.config.defaultCurrency;
+        // Adicionar moeda preferida (apenas para viagens aéreas/ônibus)
+        if (this.estado.tipoViagem === 'aereo_onibus') {
+            dadosPadronizados.respostas.moeda = this.estado.respostas.moeda_escolhida || this.config.defaultCurrency;
+        }
 
         // Log para debug
         if (this.config.debugMode) {
@@ -1791,15 +2002,21 @@ const BENETRIP = {
         // Carregar dados salvos
         const dadosUsuario = localStorage.getItem('benetrip_user_data');
         const recomendacoes = localStorage.getItem('benetrip_recomendacoes');
+        const destinosCarro = localStorage.getItem('benetrip_destinos_carro');
 
-        if (!dadosUsuario || !recomendacoes) {
+        if (!dadosUsuario || (!recomendacoes && !destinosCarro)) {
             // Redirecionar para a página inicial se não tiver dados
             window.location.href = 'index.html';
             return;
         }
 
-        // Renderizar destinos recomendados
-        this.renderizarDestinos(JSON.parse(recomendacoes));
+        // Renderizar destinos baseado no tipo de viagem
+        const dados = JSON.parse(dadosUsuario);
+        if (dados.tipoViagem === 'carro' && destinosCarro) {
+            this.renderizarDestinosCarro(JSON.parse(destinosCarro));
+        } else if (recomendacoes) {
+            this.renderizarDestinos(JSON.parse(recomendacoes));
+        }
     },
 
     /**
@@ -1810,6 +2027,16 @@ const BENETRIP = {
         console.log("Renderizando destinos:", recomendacoes);
 
         // O código para renderizar destinos será implementado na próxima fase
+    },
+
+    /**
+     * Renderiza os destinos de carro na tela
+     */
+    renderizarDestinosCarro(destinos) {
+        // Implementação a ser completada
+        console.log("Renderizando destinos de carro:", destinos);
+
+        // O código para renderizar destinos de carro será implementado na próxima fase
     },
 
     /**
