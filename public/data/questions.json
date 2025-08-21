@@ -80,31 +80,6 @@
     },
     
     {
-        "question": "6️⃣ Até quantos quilômetros você topa dirigir?",
-        "description": "Arraste para definir a distância máxima da sua road trip.",
-        "input_field": true,
-        "slider": true,
-        "slider_config": {
-            "min": 100,
-            "max": 1500,
-            "step": 50,
-            "default": 500,
-            "unit": "km",
-            "labels": {
-                "100": "Pertinho",
-                "500": "Moderado",
-                "1000": "Longe",
-                "1500": "Super longe"
-            }
-        },
-        "conditional": {
-            "depends_on": "viagem_carro",
-            "show_if_value": 1
-        },
-        "key": "distancia_maxima"
-    },
-    
-    {
         "question": "6️⃣ Qual moeda você prefere usar para o orçamento?",
         "description": "Escolha a moeda para definir seu orçamento de viagem.",
         "options": [
@@ -134,5 +109,31 @@
             "show_if_value": 0
         },
         "key": "orcamento_valor"
+    },
+
+    
+    {
+        "question": "6️⃣ Até quantos quilômetros você topa dirigir?",
+        "description": "Arraste para definir a distância máxima da sua road trip.",
+        "input_field": true,
+        "slider": true,
+        "slider_config": {
+            "min": 100,
+            "max": 1500,
+            "step": 50,
+            "default": 500,
+            "unit": "km",
+            "labels": {
+                "100": "Pertinho",
+                "500": "Moderado",
+                "1000": "Longe",
+                "1500": "Super longe"
+            }
+        },
+        "conditional": {
+            "depends_on": "viagem_carro",
+            "show_if_value": 1
+        },
+        "key": "distancia_maxima"
     }
 ]
