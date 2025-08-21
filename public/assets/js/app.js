@@ -1,6 +1,6 @@
 /**
  * BENETRIP - App Principal (Versão Otimizada)
- * Controla o fluxo de interação com o usuário, questionário e navegação entre telas
+ * Controla o fluxo de interação com o usuário, questionário e navegação entre telas.
  * 
  * @version 2.0.0
  * @author Equipe Benetrip
