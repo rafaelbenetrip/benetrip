@@ -2,7 +2,7 @@
  * BENETRIP - App Principal (Versão Otimizada e Corrigida)
  * Controla o fluxo de interação com o usuário, questionário e navegação entre telas.
  * 
- * @version 2.1.0
+ * @version 2.1.1
  * @author Equipe Benetrip
  * @description Sistema de chat interativo para planejamento de viagens
  */
@@ -646,16 +646,50 @@ const BENETRIP = {
 
     /**
      * Renderiza pergunta de forma otimizada
+     * ✅ CORREÇÃO: Melhor verificação de inserção no DOM
      */
     renderizarPergunta(pergunta) {
         const mensagemHTML = this.montarHTMLPergunta(pergunta);
         
         const chatMessages = document.getElementById('chat-messages');
-        if (chatMessages) {
-            chatMessages.insertAdjacentHTML('beforeend', mensagemHTML);
-            this.rolarParaFinal();
+        if (!chatMessages) {
+            console.error("❌ Container chat-messages não encontrado");
+            return;
+        }
+
+        console.log("📝 Renderizando pergunta:", pergunta.key);
+        
+        // Inserir HTML no DOM
+        chatMessages.insertAdjacentHTML('beforeend', mensagemHTML);
+        this.rolarParaFinal();
+        
+        // ✅ VERIFICAR SE O ELEMENTO FOI INSERIDO CORRETAMENTE
+        if (pergunta.calendar) {
+            console.log("🗓️ Pergunta de calendário detectada, verificando inserção...");
             
-            // Configurar eventos após renderização
+            // Aguardar um pequeno delay para garantir que o DOM foi atualizado
+            setTimeout(() => {
+                const calendarId = this.estado.currentCalendarId;
+                const elemento = document.getElementById(calendarId);
+                
+                if (elemento) {
+                    console.log("✅ Elemento calendário confirmado no DOM");
+                } else {
+                    console.error("❌ Elemento calendário não encontrado após inserção");
+                    console.log("🔍 HTML inserido:", mensagemHTML);
+                    
+                    // Debug: Mostrar estrutura atual do chat
+                    const ultimaMensagem = chatMessages.lastElementChild;
+                    if (ultimaMensagem) {
+                        console.log("📋 Última mensagem inserida:", ultimaMensagem.outerHTML.substring(0, 200) + "...");
+                    }
+                }
+                
+                // Configurar eventos após verificação
+                this.configurarEventosPergunta(pergunta);
+            }, 100);
+        } else {
+            // Para perguntas não-calendário, configurar eventos imediatamente
             this.configurarEventosPergunta(pergunta);
         }
     },
@@ -745,11 +779,11 @@ const BENETRIP = {
      * Gera campo de calendário
      */
     gerarCampoCalendario() {
-        if (!this.estado.currentCalendarId) {
-            this.estado.currentCalendarId = `benetrip-calendar-${Date.now()}`;
-        }
+        // ✅ CORREÇÃO: Gerar ID único baseado em timestamp + random para evitar conflitos
+        const calendarId = `benetrip-calendar-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        this.estado.currentCalendarId = calendarId;
         
-        const calendarId = this.estado.currentCalendarId;
+        console.log("🗓️ Gerando calendário com ID:", calendarId);
         
         return `
             <div class="calendar-container" data-calendar-container="${calendarId}">
@@ -885,18 +919,64 @@ const BENETRIP = {
      */
     async configurarCalendario(pergunta) {
         try {
+            console.log("🗓️ Iniciando configuração do calendário...");
+            
             // Garantir que Flatpickr está carregado
             if (typeof flatpickr === 'undefined') {
+                console.log("📦 Carregando Flatpickr...");
                 await this.carregarFlatpickr();
             }
 
-            await this.delay(300); // Aguardar renderização
-            this.inicializarCalendarioFlatpickr(pergunta);
+            // ✅ CORREÇÃO: Aguardar o elemento estar disponível no DOM
+            const calendarId = this.estado.currentCalendarId;
+            console.log("🔍 Procurando elemento calendário com ID:", calendarId);
+            
+            const calendarElement = await this.aguardarElementoCalendario(calendarId);
+            
+            if (!calendarElement) {
+                throw new Error(`Elemento calendário não encontrado após timeout: ${calendarId}`);
+            }
+            
+            console.log("✅ Elemento calendário encontrado, inicializando Flatpickr...");
+            this.inicializarCalendarioFlatpickr(pergunta, calendarElement);
             
         } catch (error) {
-            console.error("Erro ao configurar calendário:", error);
+            console.error("❌ Erro ao configurar calendário:", error);
             this.mostrarErro("Erro ao carregar calendário. Recarregue a página.");
         }
+    },
+
+    /**
+     * ✅ NOVA FUNÇÃO: Aguarda elemento do calendário estar disponível no DOM
+     */
+    async aguardarElementoCalendario(calendarId, maxTentativas = 100, intervalo = 50) {
+        console.log(`⏳ Aguardando elemento calendário: ${calendarId}`);
+        
+        for (let tentativa = 0; tentativa < maxTentativas; tentativa++) {
+            const elemento = document.getElementById(calendarId);
+            
+            if (elemento) {
+                console.log(`✅ Elemento encontrado na tentativa ${tentativa + 1}`);
+                return elemento;
+            }
+            
+            // Log de debug a cada 10 tentativas
+            if (tentativa % 10 === 0 && tentativa > 0) {
+                console.log(`🔄 Tentativa ${tentativa + 1}/${maxTentativas} - Elemento ainda não encontrado`);
+                
+                // Debug: Verificar se há elementos similares
+                const elementosCalendario = document.querySelectorAll('[id*="benetrip-calendar"]');
+                console.log("📋 Elementos calendário encontrados:", elementosCalendario.length);
+                elementosCalendario.forEach((el, idx) => {
+                    console.log(`  ${idx + 1}. ID: ${el.id}`);
+                });
+            }
+            
+            await this.delay(intervalo);
+        }
+        
+        console.error(`❌ Timeout: Elemento calendário não encontrado após ${maxTentativas * intervalo}ms`);
+        return null;
     },
 
     /**
@@ -956,31 +1036,59 @@ const BENETRIP = {
 
     /**
      * Inicializa calendário Flatpickr com configuração otimizada
+     * ✅ CORREÇÃO: Recebe elemento diretamente para garantir que existe
      */
-    inicializarCalendarioFlatpickr(pergunta) {
+    inicializarCalendarioFlatpickr(pergunta, calendarElement = null) {
         const calendarId = this.estado.currentCalendarId;
-        const calendarElement = document.getElementById(calendarId);
         
-        if (!calendarElement) {
-            console.error("Elemento do calendário não encontrado");
+        // ✅ Usar elemento passado como parâmetro ou buscar por ID como fallback
+        const elemento = calendarElement || document.getElementById(calendarId);
+        
+        if (!elemento) {
+            console.error(`❌ Elemento do calendário não encontrado: ${calendarId}`);
+            
+            // Debug: Mostrar todos os elementos com IDs similares
+            const todosElementos = document.querySelectorAll('[id*="calendar"]');
+            console.log("🔍 Debug - Elementos com 'calendar' no ID:", todosElementos);
+            
+            // Tentar fallback com querySelector mais amplo
+            const fallbackElement = document.querySelector('.flatpickr-calendar-container:last-child');
+            if (fallbackElement) {
+                console.log("🔄 Usando elemento fallback encontrado");
+                return this.inicializarFlatpickrComElemento(pergunta, fallbackElement, calendarId);
+            }
+            
+            this.mostrarErro("Erro no calendário. Recarregue a página.");
             return;
         }
 
-        // Configuração otimizada do calendário
-        const config = this.obterConfigCalendario(pergunta, calendarId);
-        
+        console.log("✅ Elemento calendário confirmado, inicializando Flatpickr...");
+        return this.inicializarFlatpickrComElemento(pergunta, elemento, calendarId);
+    },
+
+    /**
+     * ✅ NOVA FUNÇÃO: Inicializa Flatpickr com elemento específico
+     */
+    inicializarFlatpickrComElemento(pergunta, elemento, calendarId) {
         try {
-            const calendario = flatpickr(calendarElement, config);
+            // Configuração otimizada do calendário
+            const config = this.obterConfigCalendario(pergunta, calendarId);
+            
+            console.log("⚙️ Configuração do calendário:", config);
+            
+            const calendario = flatpickr(elemento, config);
             this.estado.calendarioAtual = calendario;
             
             // Configurar botão de confirmação
             this.configurarBotaoConfirmacaoCalendario(calendarId, calendario, pergunta);
             
-            console.log("Calendário inicializado com sucesso");
+            console.log("🎉 Calendário inicializado com sucesso!");
+            return calendario;
             
         } catch (error) {
-            console.error("Erro ao inicializar Flatpickr:", error);
+            console.error("❌ Erro ao inicializar Flatpickr:", error);
             this.mostrarErro("Erro no calendário. Recarregue a página.");
+            return null;
         }
     },
 
@@ -1032,56 +1140,156 @@ const BENETRIP = {
 
     /**
      * Manipula mudanças no calendário
+     * ✅ CORREÇÃO: Melhor tratamento de erro e debug
      */
     onCalendarioChange(selectedDates, calendarId) {
+        console.log("📅 Mudança no calendário:", selectedDates.length, "datas selecionadas");
+        
         const dataIdaElement = document.getElementById(`data-ida-${calendarId}`);
         const dataVoltaElement = document.getElementById(`data-volta-${calendarId}`);
         const confirmarBtn = document.getElementById(`confirmar-datas-${calendarId}`);
 
+        // ✅ Verificação robusta de elementos
         if (!dataIdaElement || !dataVoltaElement || !confirmarBtn) {
-            console.error("Elementos de data não encontrados");
+            console.error("❌ Elementos de data não encontrados no onChange:");
+            console.error("  - Data ida:", !!dataIdaElement);
+            console.error("  - Data volta:", !!dataVoltaElement);
+            console.error("  - Botão confirmar:", !!confirmarBtn);
+            
+            // Tentar fallback com querySelector
+            const fallbackElements = this.buscarElementosCalendarioFallback(calendarId);
+            if (fallbackElements.dataIda && fallbackElements.dataVolta && fallbackElements.botao) {
+                console.log("🔄 Usando elementos fallback");
+                this.atualizarElementosData(selectedDates, fallbackElements);
+                return;
+            }
+            
+            console.error("❌ Não foi possível encontrar elementos do calendário");
             return;
         }
 
+        this.atualizarElementosData(selectedDates, {
+            dataIda: dataIdaElement,
+            dataVolta: dataVoltaElement,
+            botao: confirmarBtn
+        });
+    },
+
+    /**
+     * ✅ NOVA FUNÇÃO: Busca elementos do calendário como fallback
+     */
+    buscarElementosCalendarioFallback(calendarId) {
+        console.log("🔍 Buscando elementos calendário como fallback...");
+        
+        // Tentar buscar por classes ou estrutura HTML
+        const container = document.querySelector(`[data-calendar-container="${calendarId}"]`);
+        if (!container) {
+            console.log("❌ Container calendário não encontrado");
+            return { dataIda: null, dataVolta: null, botao: null };
+        }
+        
+        const dataIda = container.querySelector('[id*="data-ida"]');
+        const dataVolta = container.querySelector('[id*="data-volta"]');
+        const botao = container.querySelector('.confirm-dates');
+        
+        console.log("🔍 Elementos fallback encontrados:");
+        console.log("  - Data ida:", !!dataIda);
+        console.log("  - Data volta:", !!dataVolta);
+        console.log("  - Botão:", !!botao);
+        
+        return { dataIda, dataVolta, botao };
+    },
+
+    /**
+     * ✅ NOVA FUNÇÃO: Atualiza elementos de data
+     */
+    atualizarElementosData(selectedDates, elementos) {
+        const { dataIda, dataVolta, botao } = elementos;
+        
         if (selectedDates.length === 0) {
-            dataIdaElement.textContent = "Selecione";
-            dataVoltaElement.textContent = "Selecione";
-            confirmarBtn.disabled = true;
+            dataIda.textContent = "Selecione";
+            dataVolta.textContent = "Selecione";
+            botao.disabled = true;
+            console.log("📅 Estado: Nenhuma data selecionada");
         } else if (selectedDates.length === 1) {
-            dataIdaElement.textContent = this.formatarDataVisivel(selectedDates[0]);
-            dataVoltaElement.textContent = "Selecione";
-            confirmarBtn.disabled = true;
+            dataIda.textContent = this.formatarDataVisivel(selectedDates[0]);
+            dataVolta.textContent = "Selecione";
+            botao.disabled = true;
+            console.log("📅 Estado: Apenas data de ida selecionada");
         } else if (selectedDates.length === 2) {
-            dataIdaElement.textContent = this.formatarDataVisivel(selectedDates[0]);
-            dataVoltaElement.textContent = this.formatarDataVisivel(selectedDates[1]);
-            confirmarBtn.disabled = false;
+            dataIda.textContent = this.formatarDataVisivel(selectedDates[0]);
+            dataVolta.textContent = this.formatarDataVisivel(selectedDates[1]);
+            botao.disabled = false;
+            console.log("📅 Estado: Ambas as datas selecionadas");
         }
     },
 
     /**
      * Configura botão de confirmação do calendário
+     * ✅ CORREÇÃO: Melhor tratamento de erro e debug
      */
     configurarBotaoConfirmacaoCalendario(calendarId, calendario, pergunta) {
-        const confirmarBtn = document.getElementById(`confirmar-datas-${calendarId}`);
+        console.log("🔘 Configurando botão de confirmação para:", calendarId);
         
-        if (confirmarBtn) {
-            confirmarBtn.addEventListener('click', () => {
-                try {
-                    const datas = calendario.selectedDates;
-                    if (datas.length === 2) {
-                        const dadosDatas = {
-                            dataIda: this.formatarDataISO(datas[0]),
-                            dataVolta: this.formatarDataISO(datas[1])
-                        };
-                        
-                        this.processarResposta(dadosDatas, pergunta);
-                    }
-                } catch (error) {
-                    console.error("Erro ao processar datas:", error);
-                    this.mostrarErro("Erro ao processar datas. Selecione novamente.");
-                }
-            });
+        const confirmarBtn = document.getElementById(`confirmar-datas-${calendarId}`);
+        const dataIdaElement = document.getElementById(`data-ida-${calendarId}`);
+        const dataVoltaElement = document.getElementById(`data-volta-${calendarId}`);
+        
+        // ✅ Debug: Verificar se todos os elementos foram encontrados
+        console.log("🔍 Elementos encontrados:");
+        console.log("  - Botão confirmar:", !!confirmarBtn);
+        console.log("  - Data ida:", !!dataIdaElement);
+        console.log("  - Data volta:", !!dataVoltaElement);
+        
+        if (!confirmarBtn) {
+            console.error(`❌ Botão de confirmação não encontrado: confirmar-datas-${calendarId}`);
+            
+            // Fallback: tentar encontrar qualquer botão de confirmação
+            const fallbackBtn = document.querySelector('.confirm-dates');
+            if (fallbackBtn) {
+                console.log("🔄 Usando botão fallback encontrado");
+                this.configurarEventosBotaoCalendario(fallbackBtn, calendario, pergunta, calendarId);
+            }
+            return;
         }
+        
+        if (!dataIdaElement || !dataVoltaElement) {
+            console.error("❌ Elementos de data não encontrados");
+            return;
+        }
+        
+        this.configurarEventosBotaoCalendario(confirmarBtn, calendario, pergunta, calendarId);
+        console.log("✅ Botão de confirmação configurado com sucesso");
+    },
+
+    /**
+     * ✅ NOVA FUNÇÃO: Configura eventos do botão do calendário
+     */
+    configurarEventosBotaoCalendario(confirmarBtn, calendario, pergunta, calendarId) {
+        confirmarBtn.addEventListener('click', () => {
+            try {
+                console.log("📅 Processando confirmação de datas...");
+                
+                const datas = calendario.selectedDates;
+                console.log("📋 Datas selecionadas:", datas);
+                
+                if (datas.length === 2) {
+                    const dadosDatas = {
+                        dataIda: this.formatarDataISO(datas[0]),
+                        dataVolta: this.formatarDataISO(datas[1])
+                    };
+                    
+                    console.log("✅ Dados de datas processados:", dadosDatas);
+                    this.processarResposta(dadosDatas, pergunta);
+                } else {
+                    console.warn("⚠️ Número incorreto de datas selecionadas:", datas.length);
+                    this.mostrarErro("Selecione data de ida e volta.");
+                }
+            } catch (error) {
+                console.error("❌ Erro ao processar datas:", error);
+                this.mostrarErro("Erro ao processar datas. Selecione novamente.");
+            }
+        });
     },
 
     /**
@@ -2819,7 +3027,7 @@ const BENETRIP = {
      * Método de atualização de versão
      */
     checkVersion() {
-        const versaoAtual = "2.1.0";
+        const versaoAtual = "2.1.1";
         const versaoSalva = localStorage.getItem('benetrip_version');
         
         if (versaoSalva !== versaoAtual) {
@@ -2881,15 +3089,25 @@ window.addEventListener('beforeunload', () => {
 window.BENETRIP = BENETRIP;
 
 // Exportar versão para verificação
-window.BENETRIP_VERSION = "2.1.0";
+window.BENETRIP_VERSION = "2.1.1";
 
 // Log de inicialização
-console.log("🐶 Benetrip App v2.1.0 carregado - Pronto para aventuras!");
+console.log("🐶 Benetrip App v2.1.1 carregado - Pronto para aventuras!");
 
 /**
  * === CHANGELOG ===
  * 
- * v2.1.0 (Atual - CORRIGIDO):
+ * v2.1.1 (Atual - CALENDÁRIO CORRIGIDO):
+ * 🗓️ CORREÇÃO CRÍTICA: Sistema de calendário completamente reescrito
+ * ✅ Geração de IDs únicos para evitar conflitos entre instâncias
+ * ✅ Função aguardarElementoCalendario() para garantir elemento no DOM
+ * ✅ Sistema de fallback robusto para localizar elementos
+ * ✅ Debug detalhado para identificar problemas de renderização
+ * ✅ Verificação de inserção no DOM antes da configuração
+ * ✅ Tratamento de erro melhorado com múltiplas tentativas
+ * ✅ Logs detalhados para debug em produção
+ * 
+ * v2.1.0 (Anterior):
  * ✅ CORREÇÃO 1: Removida função buscarDestinosProximos() desnecessária
  * ✅ CORREÇÃO 2: Simplificado finalizarQuestionario() para usar sempre buscarRecomendacoes()
  * ✅ CORREÇÃO 3: Unificado buscarRecomendacoes() para funcionar com todos os tipos de viagem
