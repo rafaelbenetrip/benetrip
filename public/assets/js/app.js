@@ -21,7 +21,7 @@ const BENETRIP = {
      */
     estado: {
         fluxo: null, // 'destino_conhecido' ou 'destino_desconhecido'
-        tipoViagem: null, // ADICIONADO: 'carro' ou 'aereo_onibus'
+        tipoViagem: null, // 'carro' ou 'aereo_onibus'
         perguntaAtual: 0,
         perguntas: [],
         respostas: {},
@@ -1888,11 +1888,10 @@ const BENETRIP = {
         // Estrutura padronizada para salvar no localStorage
         const dadosPadronizados = {
             fluxo: this.estado.fluxo,
-            tipoViagem: this.estado.tipoViagem, // MODIFICADO
+            tipoViagem: this.estado.tipoViagem || 'aereo_onibus',
             timestamp: Date.now(),
             respostas: {
                 ...this.estado.respostas,
-                distancia_maxima: this.estado.tipoViagem === 'carro' ? this.estado.respostas.distancia_maxima : null, // ADICIONADO
                 // Garante que informações de passageiros estejam sempre no mesmo formato
                 passageiros: {
                     adultos: this.getNumeroAdultos(),
