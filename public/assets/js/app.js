@@ -1,6 +1,5 @@
 /**
  * BENETRIP - App Principal
- * Versão 2 Carros
  * Controla o fluxo de interação com o usuário, questionário e navegação entre telas
  */
 
@@ -1405,9 +1404,7 @@ const BENETRIP = {
 
         // Se for pergunta sobre viagem de carro, definir tipo de viagem
         if (pergunta.key === 'viagem_carro') {
-            // CORREÇÃO: Inverte a lógica para corresponder às opções
-            // 0 = Avião/Ônibus, 1 = Carro
-            this.estado.tipoViagem = valor === 0 ? 'aereo_onibus' : 'carro';
+            this.estado.tipoViagem = valor === 0 ? 'carro' : 'aereo_onibus';
             console.log(`Tipo de viagem definido como: ${this.estado.tipoViagem}`);
         }
 
