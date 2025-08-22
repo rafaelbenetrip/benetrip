@@ -214,15 +214,19 @@ function obterCodigoIATAPadrao(cidade, pais) {
 // Função para chamada ao Groq
 // =======================
 async function callGroqAPI(prompt, requestData, model = CONFIG.groq.models.reasoning) {
+    // ADICIONAR verificação de tipo
+    const tipoViagem = requestData.viagem_carro === 1 ? 'carro' : 'aereo_onibus';
+
+    // Se for carro, usar prompt específico
+    if (tipoViagem === 'carro') {
+        prompt = gerarPromptParaDestinosCarro(requestData);
+    }
+    
     const apiKey = process.env.GROQ_API_KEY;
     
     if (!apiKey) {
         throw new Error('Chave da API Groq não configurada (GROQ_API_KEY)');
     }
-
-    const tipoViagem = requestData.tipoViagem === 'carro' || requestData.viagem_carro === 1 
-        ? 'carro' 
-        : utils.determinarTipoViagem(requestData.orcamento_valor, requestData.moeda_escolhida);
 
     let systemMessage;
     
@@ -703,6 +707,58 @@ Antes de responder, confirme que:
 **Execute o raciocínio passo-a-passo e forneça recomendações fundamentadas e personalizadas!**`;
 }
 
+// ADICIONAR nova função após gerarPromptParaGroq
+function gerarPromptParaDestinosCarro(dados) {
+    const cidadeOrigem = dados.cidade_partida?.name || "Cidade não especificada";
+    const distanciaMaxima = dados.distancia_maxima || 500;
+    
+    return `
+# SISTEMA DE RECOMENDAÇÃO PARA VIAGENS DE CARRO 🚗
+
+## CONTEXTO:
+- Origem: ${cidadeOrigem}
+- Distância máxima: ${distanciaMaxima} km
+- Tipo de viagem: ROAD TRIP / VIAGEM DE CARRO
+
+## INSTRUÇÕES ESPECÍFICAS:
+
+1. **CRITÉRIOS DE SELEÇÃO**:
+   - Destinos DEVEM estar dentro de ${distanciaMaxima}km de ${cidadeOrigem}
+   - Considerar qualidade das estradas
+   - Priorizar destinos com boa infraestrutura para viajantes de carro
+   - Incluir paradas interessantes no caminho
+
+2. **INFORMAÇÕES OBRIGATÓRIAS**:
+   - Distância exata em quilômetros
+   - Tempo estimado de viagem
+   - Principais rodovias
+   - Pontos de parada recomendados
+   - Dicas de estacionamento
+   - Custo estimado de combustível e pedágios
+
+3. **FORMATO DE RESPOSTA**:
+{
+  "tipoViagem": "carro",
+  "topPick": {
+    "destino": "Nome",
+    "pais": "Brasil",
+    "distanciaKm": 250,
+    "tempoViagem": "3h30min",
+    "rodovias": ["BR-116", "SP-280"],
+    "paradasRecomendadas": ["Cidade X", "Mirante Y"],
+    "custoEstimado": {
+      "combustivel": "R$ 150",
+      "pedagios": "R$ 45"
+    },
+    // ... outros campos
+  },
+  "alternativas": [...],
+  "surpresa": {...}
+}
+
+Retorne APENAS o JSON válido.`;
+}
+
 // =======================
 // Funções auxiliares de texto simplificadas
 // =======================
@@ -923,6 +979,10 @@ module.exports = async function handler(req, res) {
         }
         
         const requestData = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
+
+        // ADICIONAR detecção de tipo
+        const tipoViagem = requestData.viagem_carro === 1 ? 'carro' : 'aereo_onibus';
+        console.log(`Tipo de viagem detectado: ${tipoViagem}`);
         
         // Verificar se a chave do Groq está configurada
         if (!process.env.GROQ_API_KEY) {
@@ -942,9 +1002,7 @@ module.exports = async function handler(req, res) {
         // Extrair informações da cidade de partida (do autocomplete)
         const infoCidadePartida = utils.extrairInfoCidadePartida(requestData.cidade_partida);
         
-        // Determinar tipo de viagem
         const isCarro = requestData.viagem_carro === 1 || requestData.tipoViagem === 'carro';
-        const tipoViagem = isCarro ? 'carro' : utils.determinarTipoViagem(requestData.orcamento_valor, requestData.moeda_escolhida);
         const isRodoviario = tipoViagem === 'rodoviario';
 
         // Log dos dados recebidos
