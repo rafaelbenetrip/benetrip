@@ -579,33 +579,8 @@ const BENETRIP_DESTINOS = {
 
     console.log('Renderizando destino destaque:', destino);
 
-    // MODIFICAR seção de informações de transporte
-    let infoTransporte = '';
-    if (this.tipoViagem === 'carro') {
-        infoTransporte = `
-         <div class="mt-3 space-y-2 text-sm">
-             <p class="flex items-center">
-                 <span class="mr-2">🚗</span>
-                 <span class="font-medium">Distância:</span>
-                 <span class="ml-1">${destino.distanciaKm} km</span>
-             </p>
-             <p class="flex items-center">
-                 <span class="mr-2">⏱️</span>
-                 <span class="font-medium">Tempo de viagem:</span>
-                 <span class="ml-1">${destino.tempoViagem}</span>
-             </p>
-             ${destino.rodovias ? `
-             <p class="flex items-center">
-                 <span class="mr-2">🛣️</span>
-                 <span class="font-medium">Rodovias:</span>
-                 <span class="ml-1">${destino.rodovias.join(', ')}</span>
-             </p>` : ''}
-         </div>
-     `;
-    } else {
-        // Manter código existente para avião/ônibus
-        infoTransporte = this.renderizarInfoTransporte(destino);
-    }
+    // MODIFICADO: A lógica de infoTransporte agora fica dentro da aba de visão geral
+    // e não mais aqui, para garantir a renderização das abas para todos os tipos.
 
     // Imagem de cabeçalho
     let headerHtml = `
@@ -657,7 +632,7 @@ const BENETRIP_DESTINOS = {
     // Conteúdo da aba Visão Geral
     let visaoGeralHtml = `
       <div id="conteudo-visao-geral" class="conteudo-aba p-4">
-        ${infoTransporte}
+        ${this.renderizarInfoTransporte(destino)}
 
         <div class="mt-4 bg-gray-50 p-3 rounded-lg">
           <div class="flex items-center mb-2">
