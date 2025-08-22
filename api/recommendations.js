@@ -1,5 +1,5 @@
 // api/recommendations.js - Endpoint da API Vercel para recomendações de destino
-// Versão 10.2 - Unificada a estrutura de dados para viagens de CARRO
+// Versão 10.1 - Adicionada lógica para viagens de CARRO
 const axios = require('axios');
 const http = require('http');
 const https = require('https');
@@ -214,9 +214,14 @@ function obterCodigoIATAPadrao(cidade, pais) {
 // Função para chamada ao Groq
 // =======================
 async function callGroqAPI(prompt, requestData, model = CONFIG.groq.models.reasoning) {
-    const tipoViagem = requestData.viagem_carro === 1 ? 'carro' : 
-                      (utils.determinarTipoViagem(requestData.orcamento_valor, requestData.moeda_escolhida));
+    // ADICIONAR verificação de tipo
+    const tipoViagem = requestData.viagem_carro === 1 ? 'carro' : 'aereo_onibus';
 
+    // Se for carro, usar prompt específico
+    if (tipoViagem === 'carro') {
+        prompt = gerarPromptParaDestinosCarro(requestData);
+    }
+    
     const apiKey = process.env.GROQ_API_KEY;
     
     if (!apiKey) {
@@ -357,7 +362,7 @@ function gerarPromptParaGroq(dados) {
         }
     }
 
-    // [MODIFICADO] Prompt para viagens de carro com estrutura de dados completa
+    // [NOVO] Prompt para viagens de carro
     if (isCarro) {
         const distanciaMaxima = dados.distancia_maxima || 500;
         const datas = `${dataIda} a ${dataVolta}`;
@@ -367,14 +372,29 @@ function gerarPromptParaGroq(dados) {
 
 ## CONTEXTO DA VIAGEM:
 - Origem: ${infoViajante.cidadeOrigem}
-- Distância máxima: ${distanciaMaxima} km
+- Distância máxima aceita: ${distanciaMaxima} km
 - Companhia: ${infoViajante.companhia}
 - Preferência: ${infoViajante.preferencia}
 - Período: ${datas}
 
-## INSTRUÇÕES E FORMATO DE RESPOSTA (JSON):
-Forneça recomendações detalhadas para uma road trip. O JSON DEVE incluir todos os campos abaixo para cada destino (topPick, alternativas, surpresa) para garantir consistência visual com outras modalidades de viagem.
+## INSTRUÇÕES ESPECÍFICAS PARA ROAD TRIPS:
 
+1. **CRITÉRIOS DE SELEÇÃO**:
+   - Todos os destinos DEVEM estar dentro do raio de ${distanciaMaxima}km de ${infoViajante.cidadeOrigem}
+   - Considerar apenas destinos acessíveis por estradas em boas condições
+   - Priorizar destinos com boa infraestrutura para viajantes de carro
+   - Incluir informações sobre tempo estimado de viagem
+   - Considerar pedágios e condições das estradas
+
+2. **INFORMAÇÕES OBRIGATÓRIAS PARA CADA DESTINO**:
+   - Distância exata em quilômetros desde ${infoViajante.cidadeOrigem}
+   - Tempo estimado de viagem (considerando paradas)
+   - Principais rodovias de acesso
+   - Pontos de parada interessantes no caminho
+   - Dicas de onde estacionar no destino
+   - Custo estimado de combustível e pedágios
+
+3. **FORMATO DE RESPOSTA**:
 \`\`\`json
 {
   "tipoViagem": "carro",
@@ -385,64 +405,40 @@ Forneça recomendações detalhadas para uma road trip. O JSON DEVE incluir todo
     "codigoPais": "BR",
     "distanciaKm": 250,
     "tempoViagem": "3h30min",
-    "rodovias": ["BR-116", "SP-280"],
-    "justificativa": "Por que este destino é perfeito para esta road trip, considerando o perfil do viajante.",
-    "descricao": "Descrição detalhada do que esperar do destino.",
-    "porque": "Razões específicas para visitar, como 'praias tranquilas' ou 'centro histórico charmoso'.",
-    "destaque": "A experiência única e imperdível do destino, ex: 'Pôr do sol no Mirante X'.",
-    "comentario": "Comentário da Tripinha em 1ª pessoa sobre a experiência de dirigir até lá e o que ela mais gostou. Ex: 'A estrada para lá é um tapete! E o cheiro de mato no caminho me deixou doidinha! 🐾'",
-    "pontosTuristicos": ["Nome Específico do Ponto 1", "Nome Específico do Ponto 2", "Nome Específico do Ponto 3"],
+    "rodoviasPrincipais": ["BR-116", "SP-280"],
+    "paradasRecomendadas": ["Cidade X - Ponto Y"],
+    "dicasEstacionamento": "Estacione no centro histórico...",
+    "custoEstimado": {
+      "combustivel": "R$ 150",
+      "pedagios": "R$ 45"
+    },
+    "justificativa": "Por que este destino é perfeito para road trip",
+    "pontosTuristicos": ["Ponto 1", "Ponto 2"],
+    "comentario": "Comentário da Tripinha sobre dirigir até lá",
     "clima": {
-      "estacao": "Estação do ano durante a viagem",
-      "temperatura": "Faixa de temperatura (ex: 18°C-25°C)",
-      "condicoes": "Condições climáticas esperadas (ex: Ensolarado com possíveis chuvas de verão)",
-      "recomendacoes": "Dicas práticas de vestuário para a viagem de carro"
+      "estacao": "Verão",
+      "temperatura": "25°C-30°C",
+      "condicoes": "Ensolarado",
+      "recomendacoes": "Leve protetor solar"
     }
   },
   "alternativas": [
-    {
-      "destino": "Nome da Alternativa 1",
-      "pais": "Brasil",
-      "codigoPais": "BR",
-      "distanciaKm": 180,
-      "tempoViagem": "2h45min",
-      "rodovias": ["SP-070"],
-      "porque": "Razão para ser uma boa alternativa.",
-      "pontoTuristico": "Principal ponto de destaque da alternativa.",
-      "clima": {
-        "temperatura": "Faixa de temperatura"
-      }
-    }
+    // 4 alternativas com estrutura similar
   ],
   "surpresa": {
-     "destino": "Nome do Destino Surpresa",
-    "pais": "Brasil",
-    "codigoPais": "BR",
-    "distanciaKm": 300,
-    "tempoViagem": "4h",
-    "rodovias": ["BR-381"],
-    "justificativa": "Por que é uma surpresa perfeita para este perfil",
-    "descricao": "Descrição do destino surpresa",
-    "porque": "Razões para ser destino surpresa",
-    "destaque": "Experiência única e inesperada",
-    "comentario": "Comentário empolgado da Tripinha: 'Nossa, quando pegamos a estrada para [destino], não esperava que... 🐾'",
-    "pontosTuristicos": ["Ponto 1", "Ponto 2"],
-    "clima": {
-      "estacao": "Estação na data da viagem",
-      "temperatura": "Faixa de temperatura",
-      "condicoes": "Condições climáticas",
-      "recomendacoes": "Dicas de vestuário"
-    }
-  }
+    // Destino surpresa com mesma estrutura
+  },
+  "dicasRoadTrip": "Dicas gerais para viagem de carro"
 }
 \`\`\`
 
-## REQUISITOS OBRIGATÓRIOS:
-- **CONSISTÊNCIA**: Preencha TODOS os campos do JSON (`justificativa`, `descricao`, `porque`, `destaque`, `comentario`, `pontosTuristicos`, `clima`) para CADA destino.
-- **DISTÂNCIA**: Todos os destinos DEVEM estar DENTRO do raio de ${distanciaMaxima}km de ${infoViajante.cidadeOrigem}.
-- **PERSONALIZAÇÃO**: A Tripinha deve dar dicas específicas sobre a viagem de carro.
+## PERSONALIZAÇÃO DA TRIPINHA 🐾:
+- Mencionar experiências dirigindo até os destinos
+- Dar dicas sobre paradas para pets (se aplicável)
+- Sugerir playlists ou atividades para o caminho
+- Alertar sobre radares e condições específicas das estradas
 
-Retorne APENAS o JSON válido!
+Retorne APENAS o JSON válido com destinos adequados para road trip!
 `;
     }
 
@@ -711,6 +707,58 @@ Antes de responder, confirme que:
 **Execute o raciocínio passo-a-passo e forneça recomendações fundamentadas e personalizadas!**`;
 }
 
+// ADICIONAR nova função após gerarPromptParaGroq
+function gerarPromptParaDestinosCarro(dados) {
+    const cidadeOrigem = dados.cidade_partida?.name || "Cidade não especificada";
+    const distanciaMaxima = dados.distancia_maxima || 500;
+    
+    return `
+# SISTEMA DE RECOMENDAÇÃO PARA VIAGENS DE CARRO 🚗
+
+## CONTEXTO:
+- Origem: ${cidadeOrigem}
+- Distância máxima: ${distanciaMaxima} km
+- Tipo de viagem: ROAD TRIP / VIAGEM DE CARRO
+
+## INSTRUÇÕES ESPECÍFICAS:
+
+1. **CRITÉRIOS DE SELEÇÃO**:
+   - Destinos DEVEM estar dentro de ${distanciaMaxima}km de ${cidadeOrigem}
+   - Considerar qualidade das estradas
+   - Priorizar destinos com boa infraestrutura para viajantes de carro
+   - Incluir paradas interessantes no caminho
+
+2. **INFORMAÇÕES OBRIGATÓRIAS**:
+   - Distância exata em quilômetros
+   - Tempo estimado de viagem
+   - Principais rodovias
+   - Pontos de parada recomendados
+   - Dicas de estacionamento
+   - Custo estimado de combustível e pedágios
+
+3. **FORMATO DE RESPOSTA**:
+{
+  "tipoViagem": "carro",
+  "topPick": {
+    "destino": "Nome",
+    "pais": "Brasil",
+    "distanciaKm": 250,
+    "tempoViagem": "3h30min",
+    "rodovias": ["BR-116", "SP-280"],
+    "paradasRecomendadas": ["Cidade X", "Mirante Y"],
+    "custoEstimado": {
+      "combustivel": "R$ 150",
+      "pedagios": "R$ 45"
+    },
+    // ... outros campos
+  },
+  "alternativas": [...],
+  "surpresa": {...}
+}
+
+Retorne APENAS o JSON válido.`;
+}
+
 // =======================
 // Funções auxiliares de texto simplificadas
 // =======================
@@ -745,13 +793,12 @@ function ensureValidDestinationData(jsonString, requestData) {
             || (requestData.viagem_carro === 1 ? 'carro' : null)
             || utils.determinarTipoViagem(requestData.orcamento_valor, requestData.moeda_escolhida);
 
-        // Se o tipoViagem for 'carro', apenas garantir que o campo existe
         if (tipoViagem === 'carro') {
             if (!data.tipoViagem) {
                 data.tipoViagem = 'carro';
                 return JSON.stringify(data);
             }
-            return jsonString; 
+            return jsonString; // Nenhuma modificação necessária para viagens de carro
         }
 
         const isRodoviario = tipoViagem === 'rodoviario';
@@ -923,7 +970,7 @@ module.exports = async function handler(req, res) {
     }
 
     try {
-        console.log('🚌✈️🚗 === BENETRIP GROQ API v10.2 - OTIMIZADA ===');
+        console.log('🚌✈️🚗 === BENETRIP GROQ API v10.1 - OTIMIZADA ===');
         
         if (!req.body) {
             isResponseSent = true;
@@ -933,11 +980,8 @@ module.exports = async function handler(req, res) {
         
         const requestData = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
 
-        // ADICIONADO: Determinar tipo de viagem de forma mais robusta
-        const isCarro = requestData.viagem_carro === 1 || requestData.tipoViagem === 'carro';
-        const tipoViagem = isCarro ? 'carro' : utils.determinarTipoViagem(requestData.orcamento_valor, requestData.moeda_escolhida);
-        const isRodoviario = tipoViagem === 'rodoviario';
-        
+        // ADICIONAR detecção de tipo
+        const tipoViagem = requestData.viagem_carro === 1 ? 'carro' : 'aereo_onibus';
         console.log(`Tipo de viagem detectado: ${tipoViagem}`);
         
         // Verificar se a chave do Groq está configurada
@@ -957,6 +1001,9 @@ module.exports = async function handler(req, res) {
         
         // Extrair informações da cidade de partida (do autocomplete)
         const infoCidadePartida = utils.extrairInfoCidadePartida(requestData.cidade_partida);
+        
+        const isCarro = requestData.viagem_carro === 1 || requestData.tipoViagem === 'carro';
+        const isRodoviario = tipoViagem === 'rodoviario';
 
         // Log dos dados recebidos
         utils.log('📊 Dados da requisição:', {
@@ -1009,7 +1056,7 @@ module.exports = async function handler(req, res) {
             dados.metadados = {
                 modelo: modeloUsado,
                 provider: 'groq',
-                versao: '10.2-carro-unificado',
+                versao: '10.1-carro',
                 timestamp: new Date().toISOString(),
                 reasoning_enabled: modeloUsado === CONFIG.groq.models.reasoning,
                 origem: infoCidadePartida,
