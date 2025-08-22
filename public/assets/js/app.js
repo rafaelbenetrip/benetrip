@@ -21,7 +21,7 @@ const BENETRIP = {
      */
     estado: {
         fluxo: null, // 'destino_conhecido' ou 'destino_desconhecido'
-        tipoViagem: null, // 'carro' ou 'aereo_onibus'
+        tipoViagem: null, // ADICIONADO: 'carro' ou 'aereo_onibus'
         perguntaAtual: 0,
         perguntas: [],
         respostas: {},
@@ -1404,7 +1404,7 @@ const BENETRIP = {
 
         // Se for pergunta sobre viagem de carro, definir tipo de viagem
         if (pergunta.key === 'viagem_carro') {
-            this.estado.tipoViagem = valor === 0 ? 'carro' : 'aereo_onibus';
+            this.estado.tipoViagem = valor === 0 ? 'aereo_onibus' : 'carro';
             console.log(`Tipo de viagem definido como: ${this.estado.tipoViagem}`);
         }
 
@@ -1888,10 +1888,11 @@ const BENETRIP = {
         // Estrutura padronizada para salvar no localStorage
         const dadosPadronizados = {
             fluxo: this.estado.fluxo,
-            tipoViagem: this.estado.tipoViagem || 'aereo_onibus',
+            tipoViagem: this.estado.tipoViagem, // MODIFICADO
             timestamp: Date.now(),
             respostas: {
                 ...this.estado.respostas,
+                distancia_maxima: this.estado.tipoViagem === 'carro' ? this.estado.respostas.distancia_maxima : null, // ADICIONADO
                 // Garante que informações de passageiros estejam sempre no mesmo formato
                 passageiros: {
                     adultos: this.getNumeroAdultos(),
