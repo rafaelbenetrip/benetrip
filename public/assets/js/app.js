@@ -26,7 +26,8 @@ const BENETRIP = {
         respostas: {},
         carregando: false,
         currentCalendarId: null, // Armazena o ID do calendário atual
-        calendarioAtual: null // Armazena a instância do calendário
+        calendarioAtual: null, // Armazena a instância do calendário
+        currentSliderId: null // NOVO: Armazena o ID do slider atual
     },
 
     // --- INÍCIO DA IMPLEMENTAÇÃO DO AUTOCOMPLETE LOCAL ---
@@ -558,6 +559,21 @@ const BENETRIP = {
                         <button id="${currencyId}-confirm" class="confirm-currency" disabled>Confirmar</button>
                     </div>
                 `;
+            } else if (pergunta.slider) { // << NOVO TRECHO
+                const sliderId = `slider-${Date.now()}`;
+                this.estado.currentSliderId = sliderId;
+            
+                opcoesHTML = `
+                    <div class="slider-container">
+                        <input type="range" min="${pergunta.slider_config.min}" max="${pergunta.slider_config.max}" step="${pergunta.slider_config.step}" value="${pergunta.slider_config.default}" id="${sliderId}" class="distance-slider">
+                        <div class="slider-labels">
+                            <span>${pergunta.slider_config.labels["100"]}</span>
+                            <span>${pergunta.slider_config.labels["1500"]}</span>
+                        </div>
+                        <p class="slider-value">Até <span id="${sliderId}-value">${pergunta.slider_config.default}</span> ${pergunta.slider_config.unit}</p>
+                        <button id="${sliderId}-confirm" class="confirm-button">Confirmar</button>
+                    </div>
+                `;
             } else {
                 const textId = `text-input-${Date.now()}`;
                 this.estado.currentTextId = textId;
@@ -648,8 +664,13 @@ const BENETRIP = {
             this.configurarEntradaMoeda();
         }
 
+        // NOVO: Configurar slider de distância
+        if (pergunta.slider) {
+            this.configurarSliderDistancia(pergunta);
+        }
+
         // Configurar entrada de texto
-        if (pergunta.input_field && !pergunta.calendar && !pergunta.number_input && !pergunta.autocomplete && !pergunta.currency_format) {
+        if (pergunta.input_field && !pergunta.calendar && !pergunta.number_input && !pergunta.autocomplete && !pergunta.currency_format && !pergunta.slider) {
             this.configurarEntradaTexto();
         }
     },
@@ -1235,6 +1256,36 @@ const BENETRIP = {
     },
 
     /**
+     * NOVO: Configura o slider de distância
+     */
+    configurarSliderDistancia(pergunta) {
+        const sliderId = this.estado.currentSliderId;
+        if (!sliderId) {
+            console.error("ID do slider não encontrado!");
+            return;
+        }
+
+        const slider = document.getElementById(sliderId);
+        const valueDisplay = document.getElementById(`${sliderId}-value`);
+        const confirmBtn = document.getElementById(`${sliderId}-confirm`);
+
+        if (!slider || !valueDisplay || !confirmBtn) {
+            console.error("Elementos do slider não encontrados!");
+            return;
+        }
+
+        slider.addEventListener('input', () => {
+            valueDisplay.textContent = slider.value;
+        });
+
+        confirmBtn.addEventListener('click', () => {
+            const valor = parseInt(slider.value);
+            const pergunta = this.estado.perguntas[this.estado.perguntaAtual];
+            this.processarResposta(valor, pergunta);
+        });
+    },
+
+    /**
      * Configura a entrada de texto simples
      */
     configurarEntradaTexto() {
@@ -1352,6 +1403,8 @@ const BENETRIP = {
         } else if (pergunta.autocomplete) {
             // Resposta de autocomplete
             mensagemResposta = `${valor.name} (${valor.code}), ${valor.country}`;
+        } else if (pergunta.slider) { // << NOVO: Formatar resposta do slider
+            mensagemResposta = `Até ${valor} km`;
         } else {
             // Outros tipos de resposta
             mensagemResposta = valor.toString();
