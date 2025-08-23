@@ -1,5 +1,5 @@
 // api/recommendations.js - Endpoint da API Vercel para recomendações de destino
-// Versão 10.0 - OTIMIZADA - Usando dados do autocomplete
+// Versão 11.0 - SUPORTE A VIAGENS DE CARRO
 const axios = require('axios');
 const http = require('http');
 const https = require('https');
@@ -59,8 +59,13 @@ const utils = {
         return `${ano}-${mes}-${dia}`;
     },
 
-    // Determinar tipo de viagem baseado no orçamento
-    determinarTipoViagem: (orcamento, moeda) => {
+    // Determinar tipo de viagem baseado no orçamento e preferência
+    determinarTipoViagem: (orcamento, moeda, viagemCarro) => {
+        // Prioridade máxima: se o usuário escolheu viajar de carro
+        if (viagemCarro === 1) {
+            return 'carro';
+        }
+        
         if (!orcamento || orcamento === 'flexível') return 'aereo';
         
         let valorEmBRL = parseFloat(orcamento);
@@ -92,12 +97,12 @@ const utils = {
         }
         
         // Caso seja objeto estruturado do autocomplete
-return {
-    cidade: cidadePartida?.cidade || cidadePartida?.name || 'Cidade não especificada',
-    pais: cidadePartida?.pais || cidadePartida?.country || 'País não especificado',
-    sigla_estado: cidadePartida?.sigla_estado || null,
-    iata: cidadePartida?.iata || cidadePartida?.code || null
-};
+        return {
+            cidade: cidadePartida?.cidade || cidadePartida?.name || 'Cidade não especificada',
+            pais: cidadePartida?.pais || cidadePartida?.country || 'País não especificado',
+            sigla_estado: cidadePartida?.sigla_estado || null,
+            iata: cidadePartida?.iata || cidadePartida?.code || null
+        };
     },
 
     extrairJSONDaResposta: texto => {
@@ -220,7 +225,7 @@ async function callGroqAPI(prompt, requestData, model = CONFIG.groq.models.reaso
         throw new Error('Chave da API Groq não configurada (GROQ_API_KEY)');
     }
 
-    const tipoViagem = utils.determinarTipoViagem(requestData.orcamento_valor, requestData.moeda_escolhida);
+    const tipoViagem = utils.determinarTipoViagem(requestData.orcamento_valor, requestData.moeda_escolhida, requestData.viagem_carro);
     const infoCidadePartida = utils.extrairInfoCidadePartida(requestData.cidade_partida);
 
     let systemMessage;
@@ -229,41 +234,27 @@ async function callGroqAPI(prompt, requestData, model = CONFIG.groq.models.reaso
         // Sistema otimizado para reasoning
         systemMessage = `Você é um sistema especialista em recomendações de viagem que utiliza raciocínio estruturado.
 ${tipoViagem === 'rodoviario' ? `ESPECIALIZADO EM VIAGENS RODOVIÁRIAS (ÔNIBUS/TREM) COM LIMITE DE 700KM OU 10 HORAS.` : ''}
+${tipoViagem === 'carro' ? `ESPECIALIZADO EM VIAGENS DE CARRO (ROAD TRIPS).` : ''}
 
 PROCESSO DE RACIOCÍNIO OBRIGATÓRIO:
 1. ANÁLISE DO PERFIL: Examine detalhadamente cada preferência do viajante
 2. MAPEAMENTO DE COMPATIBILIDADE: Correlacione destinos com o perfil analisado  
-3. CONSIDERAÇÃO DE ORÇAMENTO: ${tipoViagem === 'rodoviario' ? `Considere viagens de ÔNIBUS/TREM dentro do orçamento para passagens de ida e volta (máx 700km/10h)` : 'Considere o orçamento informado para passagens aéreas'}
+3. CONSIDERAÇÃO DE ORÇAMENTO/DISTÂNCIA: ${tipoViagem === 'rodoviario' ? `Considere viagens de ÔNIBUS/TREM dentro do orçamento para passagens de ida e volta (máx 700km/10h)` : tipoViagem === 'carro' ? `Considere a DISTÂNCIA MÁXIMA informada para a road trip.` : 'Considere o orçamento informado para passagens aéreas'}
 4. ANÁLISE CLIMÁTICA: Determine condições climáticas exatas para as datas
 5. PERSONALIZAÇÃO TRIPINHA: Adicione perspectiva autêntica da mascote cachorrinha
 
 CRITÉRIOS DE DECISÃO:
 - Destinos DEVEM ser adequados para o tipo de companhia especificado
-- ${tipoViagem === 'rodoviario' ? `Destinos DEVEM estar NO MÁXIMO 700km ou 10 horas de viagem terrestre da origem` : 'Informações de voos DEVEM ser consideradas'}
+- ${tipoViagem === 'rodoviario' ? `Destinos DEVEM estar NO MÁXIMO 700km ou 10 horas de viagem terrestre da origem` : tipoViagem === 'carro' ? `Destinos DEVEM estar DENTRO DO RAIO DE DISTÂNCIA informado.` : 'Informações de voos DEVEM ser consideradas'}
 - Informações climáticas DEVEM ser precisas para o período da viagem
 - Pontos turísticos DEVEM ser específicos e reais
 - Comentários da Tripinha DEVEM ser em 1ª pessoa com detalhes sensoriais
 - Considere a distância e facilidade de acesso a partir da cidade de origem
 
 RESULTADO: JSON estruturado com recomendações fundamentadas no raciocínio acima.`;
-    } else if (model === CONFIG.groq.models.personality) {
-        // Sistema focado na personalidade da Tripinha
-        systemMessage = `Você é a Tripinha, uma vira-lata caramelo especialista em viagens! 🐾
-${tipoViagem === 'rodoviario' ? `ESPECIALISTA EM VIAGENS DE ÔNIBUS/TREM DE ATÉ 700KM!` : ''}
-
-PERSONALIDADE DA TRIPINHA:
-- Conhece todos os destinos do mundo pessoalmente
-- ${tipoViagem === 'rodoviario' ? `Adora viagens de ônibus e trem!` : 'Adora viagens de avião e conhece todos os aeroportos!'}
-- Fala sempre em 1ª pessoa sobre suas experiências
-- É entusiasmada, carismática e usa emojis naturalmente  
-- Inclui detalhes sensoriais que um cachorro notaria
-- Sempre menciona pontos turísticos específicos que visitou
-- Dá dicas práticas baseadas nas suas "aventuras"
-
-RETORNE APENAS JSON VÁLIDO sem formatação markdown.`;
     } else {
-        // Sistema padrão para modelos rápidos
-        systemMessage = `Especialista em recomendações de viagem ${tipoViagem === 'rodoviario' ? `RODOVIÁRIA (máx 700km)` : 'AÉREA'}. Retorne apenas JSON válido com destinos personalizados.`;
+        // Sistema padrão para outros modelos
+        systemMessage = `Você é um especialista em recomendações de viagem. Retorne apenas JSON válido com destinos personalizados para o tipo de viagem: ${tipoViagem.toUpperCase()}.`;
     }
 
     try {
@@ -333,9 +324,10 @@ function gerarPromptParaGroq(dados) {
         pessoas: dados.quantidade_familia || dados.quantidade_amigos || 1
     };
     
-    // Determinar tipo de viagem baseado no orçamento
-    const tipoViagem = utils.determinarTipoViagem(infoViajante.orcamento, infoViajante.moeda);
+    // Determinar tipo de viagem
+    const tipoViagem = utils.determinarTipoViagem(infoViajante.orcamento, infoViajante.moeda, dados.viagem_carro);
     const isRodoviario = tipoViagem === 'rodoviario';
+    const isCarro = tipoViagem === 'carro';
     
     // Processar datas
     let dataIda = 'não especificada';
@@ -364,269 +356,166 @@ function gerarPromptParaGroq(dados) {
         }
     }
 
-    // Prompt diferenciado para viagens rodoviárias
-    if (isRodoviario) {
-        return `# 🚌 SISTEMA DE RECOMENDAÇÃO INTELIGENTE DE VIAGENS RODOVIÁRIAS
+    // NOVO: Prompt para Viagens de Carro
+    if (isCarro) {
+        const distanciaMaxima = dados.distancia_maxima || 500;
+        return `# 🚗 SISTEMA DE RECOMENDAÇÃO INTELIGENTE DE VIAGENS DE CARRO
 
 ## 📊 DADOS DO VIAJANTE PARA ANÁLISE:
-**Perfil Básico:**
 - Origem: ${infoViajante.cidadeOrigem}, ${infoViajante.paisOrigem}
-- Estado/Região: ${infoViajante.siglaEstado}
-- Código IATA de referência: ${infoViajante.iataOrigem}
 - Composição: ${infoViajante.companhia} (${infoViajante.pessoas} pessoa(s))
 - Período: ${dataIda} a ${dataVolta} (${duracaoViagem})
 - Preferência principal: ${infoViajante.preferencia}
 
-## 💰 ORÇAMENTO PARA VIAGEM RODOVIÁRIA:
-**Orçamento informado:** ${infoViajante.orcamento} ${infoViajante.moeda} por pessoa para passagens de ÔNIBUS/TREM (ida e volta)
+## 🛣️ LIMITES DA ROAD TRIP:
+- **DISTÂNCIA MÁXIMA: ${distanciaMaxima} QUILÔMETROS da cidade de origem (${infoViajante.cidadeOrigem})**
+- Sugira destinos que sejam agradáveis para uma road trip, considerando a infraestrutura rodoviária e atrações no caminho.
 
-⚠️ **IMPORTANTE - LIMITES DA VIAGEM TERRESTRE:**
-- **DISTÂNCIA MÁXIMA: 700 QUILÔMETROS da cidade de origem (${infoViajante.cidadeOrigem})**
-- **TEMPO MÁXIMO DE VIAGEM: 10 HORAS**
-- Considere o conforto da viagem terrestre para ${infoViajante.companhia}
-- Sugira destinos onde o valor das passagens de ida e volta caiba no orçamento
-
-## 🎯 PROCESSO DE RACIOCÍNIO PARA VIAGEM TERRESTRE:
-
-### PASSO 1: ANÁLISE GEOGRÁFICA
-- Partir de ${infoViajante.cidadeOrigem}, ${infoViajante.paisOrigem}
-- Liste cidades próximas no mesmo país ou países vizinhos
-- NÃO sugira destinos em outros continentes para viagens rodoviárias
-
-### PASSO 2: CONSIDERAÇÃO DE ROTAS TERRESTRES (MÁXIMO 700KM)
-- Avalie destinos alcançáveis por ônibus/trem em até 10 horas a partir de ${infoViajante.cidadeOrigem}
-- Considere apenas cidades dentro do raio de 700km
-- Priorize destinos com boa infraestrutura de transporte terrestre
-
-### PASSO 3: SELEÇÃO DE DESTINOS REGIONAIS APROPRIADOS
-Selecione APENAS destinos dentro do limite de 700km/10h:
-- 1 destino TOP acessível por transporte terrestre (máx 700km)
-- 4 alternativas terrestres diversificadas (todas ≤ 700km)
-- 1 surpresa terrestre inusitada (máx 700km)
+## 🎯 PROCESSO DE RACIOCÍNIO PARA VIAGEM DE CARRO:
+- **PASSO 1: ANÁLISE GEOGRÁFICA**: Partir de ${infoViajante.cidadeOrigem} e listar cidades turísticas interessantes dentro do raio de ${distanciaMaxima} km.
+- **PASSO 2: SELEÇÃO DE DESTINOS**: Escolher destinos que combinem com o perfil do viajante (${infoViajante.preferencia}) e sejam bons para chegar de carro (infraestrutura, estacionamento, etc.).
+- **PASSO 3: FORMATO DE RESPOSTA**: Gerar um JSON estruturado com as informações da viagem de carro.
 
 ## 📋 FORMATO DE RESPOSTA (JSON ESTRUTURADO):
 \`\`\`json
 {
-  "tipoViagem": "rodoviario",
-  "origem": {
-    "cidade": "${infoViajante.cidadeOrigem}",
-    "pais": "${infoViajante.paisOrigem}",
-    "sigla_estado": "${infoViajante.siglaEstado}",
-    "iata": "${infoViajante.iataOrigem}"
-  },
+  "tipoViagem": "carro",
+  "origem": { "cidade": "${infoViajante.cidadeOrigem}", "pais": "${infoViajante.paisOrigem}" },
   "raciocinio": {
-    "analise_perfil": "Análise considerando viagem terrestre de até 700km",
-    "rotas_consideradas": "Principais rotas terrestres analisadas (todas ≤ 700km)",
-    "criterios_selecao": "Critérios para destinos terrestres próximos"
+    "analise_perfil": "Análise focada em road trip, considerando a preferência por ${infoViajante.preferencia}.",
+    "rotas_consideradas": "Principais rotas e destinos dentro do limite de ${distanciaMaxima}km de ${infoViajante.cidadeOrigem}.",
+    "criterios_selecao": "Critérios como atratividade, infraestrutura para carros e adequação ao perfil."
   },
   "topPick": {
     "destino": "Nome da Cidade",
     "estado": "Nome do Estado/Região",
     "pais": "Nome do País",
     "codigoPais": "XX",
-    "distanciaRodoviaria": "XXX km",
-    "tempoViagem": "X horas",
-    "tipoTransporte": "ônibus/trem",
-    "justificativa": "Por que este destino é PERFEITO para viagem terrestre",
-    "descricao": "Descrição do destino",
-    "porque": "Razões específicas",
-    "destaque": "Experiência única",
-    "comentario": "Comentário da Tripinha em 1ª pessoa",
-    "pontosTuristicos": ["Ponto 1", "Ponto 2"],
-    "empresasTransporte": ["Empresa 1", "Empresa 2"],
+    "distanciaAproximada": "XXX km",
+    "tempoEstimadoViagem": "X horas",
+    "justificativa": "Por que este destino é perfeito para uma road trip a partir de ${infoViajante.cidadeOrigem}",
+    "descricao": "Descrição do destino focada em viajantes de carro",
+    "porque": "Razões específicas para a recomendação",
+    "destaque": "Uma experiência única no destino ou na estrada",
+    "comentario": "Comentário da Tripinha em 1ª pessoa sobre a viagem de carro para lá",
+    "pontosTuristicos": ["Ponto Turístico 1", "Ponto Turístico 2"],
     "clima": {
       "estacao": "Estação durante a viagem",
       "temperatura": "Faixa de temperatura",
-      "condicoes": "Condições climáticas",
-      "recomendacoes": "O que levar"
-    },
-    "terminalTransporte": {
-      "nome": "Nome do Terminal/Estação",
-      "tipo": "rodoviária/estação ferroviária",
-      "localizacao": "Bairro/Região"
+      "condicoes": "Condições climáticas esperadas",
+      "recomendacoes": "O que levar para uma viagem de carro"
     }
   },
   "alternativas": [
-    // 4 alternativas com estrutura similar
+    {
+      "destino": "Nome da Cidade",
+      "estado": "Nome do Estado/Região",
+      "pais": "Nome do País",
+      "codigoPais": "XX",
+      "distanciaAproximada": "XXX km",
+      "tempoEstimadoViagem": "X horas",
+      "porque": "Razão para esta alternativa de road trip",
+      "pontoTuristico": "Ponto turístico principal",
+      "clima": { "temperatura": "Faixa de temperatura" }
+    }
   ],
   "surpresa": {
-    // Estrutura similar ao topPick
+    "destino": "Nome da Cidade Surpresa",
+    "estado": "Nome do Estado/Região",
+    "pais": "Nome do País",
+    "codigoPais": "XX",
+    "distanciaAproximada": "XXX km",
+    "tempoEstimadoViagem": "X horas",
+    "justificativa": "Por que é uma surpresa perfeita para este perfil de viajante de carro",
+    "comentario": "Comentário da Tripinha sobre esta road trip inesperada",
+    "pontosTuristicos": ["Ponto 1", "Ponto 2"],
+    "clima": { "temperatura": "Faixa de temperatura" }
   },
-  "dicasGeraisTransporte": "Dicas para viagens terrestres confortáveis",
-  "resumoIA": "Como foram selecionados os destinos terrestres próximos"
+  "resumoIA": "Como foram selecionados os destinos de carro dentro do limite de ${distanciaMaxima}km."
 }
 \`\`\`
 
 ⚠️ **VALIDAÇÃO CRÍTICA:**
-- TODOS os destinos DEVEM estar a NO MÁXIMO 700km de ${infoViajante.cidadeOrigem}
-- NÃO sugira destinos em outros continentes
+- TODOS os destinos DEVEM estar a NO MÁXIMO ${distanciaMaxima}km de ${infoViajante.cidadeOrigem}.
+- Forneça estimativas realistas de distância e tempo de viagem.
 
-**Execute o raciocínio e forneça destinos TERRESTRES APROPRIADOS!**`;
+**Execute o raciocínio e forneça destinos de CARRO apropriados!**`;
     }
 
-    // Prompt padrão para viagens aéreas (orçamento maior que R$ 400)
+    // Prompt para viagens rodoviárias (Ônibus/Trem)
+    if (isRodoviario) {
+        return `# 🚌 SISTEMA DE RECOMENDAÇÃO INTELIGENTE DE VIAGENS RODOVIÁRIAS
+
+## 📊 DADOS DO VIAJANTE PARA ANÁLISE:
+- Origem: ${infoViajante.cidadeOrigem}, ${infoViajante.paisOrigem}
+- Orçamento: ${infoViajante.orcamento} ${infoViajante.moeda} por pessoa para passagens de ÔNIBUS/TREM (ida e volta)
+- Perfil: ${infoViajante.companhia}, ${infoViajante.preferencia}
+
+⚠️ **LIMITES DA VIAGEM TERRESTRE:**
+- **DISTÂNCIA MÁXIMA: 700 QUILÔMETROS de ${infoViajante.cidadeOrigem}**
+- **TEMPO MÁXIMO DE VIAGEM: 10 HORAS**
+
+## 📋 FORMATO DE RESPOSTA (JSON ESTRUTURADO):
+\`\`\`json
+{
+  "tipoViagem": "rodoviario",
+  "topPick": {
+    "destino": "Nome da Cidade",
+    "estado": "Nome do Estado",
+    "pais": "Nome do País",
+    "codigoPais": "XX",
+    "distanciaRodoviaria": "XXX km",
+    "tempoViagem": "X horas",
+    "tipoTransporte": "ônibus/trem",
+    "justificativa": "Justificativa da escolha para viagem terrestre",
+    "comentario": "Comentário da Tripinha sobre a viagem de ônibus/trem",
+    "pontosTuristicos": ["Ponto 1", "Ponto 2"],
+    "clima": { /* ... */ }
+  },
+  "alternativas": [ /* 4 alternativas */ ],
+  "surpresa": { /* ... */ }
+}
+\`\`\`
+⚠️ **VALIDAÇÃO CRÍTICA:**
+- TODOS os destinos DEVEM estar a NO MÁXIMO 700km de ${infoViajante.cidadeOrigem}.
+- Forneça estimativas de distância e tempo de viagem terrestre.`;
+    }
+
+    // Prompt padrão para viagens aéreas
     return `# ✈️ SISTEMA DE RECOMENDAÇÃO INTELIGENTE DE DESTINOS AÉREOS
 
 ## 📊 DADOS DO VIAJANTE PARA ANÁLISE:
-**Perfil Básico:**
-- Origem: ${infoViajante.cidadeOrigem}, ${infoViajante.paisOrigem}
-- Estado/Região: ${infoViajante.siglaEstado}
-- Aeroporto de referência: ${infoViajante.iataOrigem}
-- Composição: ${infoViajante.companhia} (${infoViajante.pessoas} pessoa(s))
-- Período: ${dataIda} a ${dataVolta} (${duracaoViagem})
-- Preferência principal: ${infoViajante.preferencia}
+- Origem: ${infoViajante.cidadeOrigem}, ${infoViajante.paisOrigem} (Aeroporto: ${infoViajante.iataOrigem})
+- Orçamento: ${infoViajante.orcamento} ${infoViajante.moeda} por pessoa para passagens aéreas (ida e volta)
+- Perfil: ${infoViajante.companhia}, ${infoViajante.preferencia}
 
 ## 💰 CONSIDERAÇÕES DE ORÇAMENTO:
-**Orçamento informado:** ${infoViajante.orcamento} ${infoViajante.moeda} por pessoa para passagens aéreas (ida e volta)
-
-${infoViajante.orcamento !== 'flexível' ? `
-⚠️ **ORIENTAÇÃO DE ORÇAMENTO:**
-- Considere destinos que sejam acessíveis dentro deste orçamento para passagens de ida e volta
-- NUNCA sugira cidades com orçamento menor que 70% do orçamento para passagens de ida e volta
-- NUNCA sugira cidades com orçamento maior que 120% do orçamento para passagens de ida e volta
-- Leve em conta a cidade de origem (${infoViajante.cidadeOrigem}) ao avaliar distâncias
-` : 
-'**ORÇAMENTO FLEXÍVEL** - Sugira destinos variados considerando diferentes faixas de custo'}
-
-## 🎯 PROCESSO DE RACIOCÍNIO OBRIGATÓRIO:
-
-### PASSO 1: ANÁLISE DO PERFIL DO VIAJANTE
-Analise profundamente:
-- Que tipo de experiências esse perfil de viajante valoriza (${infoViajante.preferencia})?
-- Quais destinos se alinham com suas preferências específicas?
-- Que adaptações são necessárias para ${infoViajante.companhia}?
-- Como a duração da viagem (${duracaoViagem}) influencia as opções?
-
-### PASSO 2: CONSIDERAÇÃO GEOGRÁFICA E LOGÍSTICA
-- Avalie a distância a partir de ${infoViajante.cidadeOrigem}, ${infoViajante.paisOrigem}
-- Considere a facilidade de acesso e conexões disponíveis
-- Pense na relação custo-benefício considerando o orçamento para passagens ${infoViajante.orcamento !== 'flexível' ? `de ${infoViajante.orcamento} ${infoViajante.moeda}` : 'flexível'}
-
-### PASSO 3: MAPEAMENTO DE DESTINOS COMPATÍVEIS
-Para cada destino considerado, avalie:
-- Adequação às preferências declaradas (${infoViajante.preferencia})
-- Conveniência para ${infoViajante.companhia}
-- Atratividade no período ${dataIda} a ${dataVolta}
-- Experiências únicas que o destino oferece
-
-### PASSO 4: VALIDAÇÃO CLIMÁTICA E SAZONAL
-Para as datas ${dataIda} a ${dataVolta}, determine:
-- Estação do ano em cada destino considerado
-- Condições climáticas típicas (temperatura, chuva, etc.)
-- Eventos ou festivais especiais no período
-- Recomendações práticas de vestuário e equipamentos
-
-### PASSO 5: SELEÇÃO E RANQUEAMENTO
-Baseado na análise acima, selecione:
-- 1 destino TOP que melhor combina com TODOS os critérios
-- 4 alternativas diversificadas geograficamente
-- 1 surpresa que pode surpreender positivamente
-
-### PASSO 6: PERSONALIZAÇÃO TRIPINHA 🐾
-Para cada destino selecionado, adicione:
-- Comentário em 1ª pessoa da Tripinha sobre SUA experiência no local
-- Detalhes sensoriais que uma cachorrinha notaria (sons, cheiros, texturas)
-- Dicas práticas baseadas nas "aventuras" da Tripinha
-- Pontos turísticos específicos que ela "visitou"
+${infoViajante.orcamento !== 'flexível' ? `- Considere destinos com passagens aéreas dentro do orçamento de ${infoViajante.orcamento} ${infoViajante.moeda}.` : '- Orçamento flexível, sugira opções variadas.'}
 
 ## 📋 FORMATO DE RESPOSTA (JSON ESTRUTURADO):
-
 \`\`\`json
 {
     "tipoViagem": "aereo",
-    "origem": {
-      "cidade": "${infoViajante.cidadeOrigem}",
-      "pais": "${infoViajante.paisOrigem}",
-      "sigla_estado": "${infoViajante.siglaEstado}",
-      "iata": "${infoViajante.iataOrigem}"
-    },
-    "raciocinio": {
-        "analise_perfil": "Resumo da análise do perfil do viajante",
-        "criterios_selecao": "Principais critérios usados na seleção",
-        "consideracoes_geograficas": "Como a origem ${infoViajante.cidadeOrigem} influenciou as escolhas"
-    },
     "topPick": {
         "destino": "Nome da Cidade",
         "pais": "Nome do País", 
         "codigoPais": "XX",
-        "justificativa": "Por que este é o destino PERFEITO para este viajante específico",
-        "descricao": "Descrição detalhada do destino",
-        "porque": "Razões específicas para esta recomendação",
-        "destaque": "Experiência única do destino",
-        "comentario": "Comentário entusiasmado da Tripinha em 1ª pessoa: 'Eu adorei quando visitei [destino]! O cheiro de... me deixou maluca! 🐾'",
-        "pontosTuristicos": [
-            "Nome específico do primeiro ponto turístico",
-            "Nome específico do segundo ponto turístico"
-        ],
-        "eventos": ["Evento/festival específico no período se houver"],
-        "clima": {
-            "estacao": "Estação exata no destino durante ${dataIda} a ${dataVolta}",
-            "temperatura": "Faixa de temperatura precisa (ex: 18°C-28°C)",
-            "condicoes": "Condições climáticas detalhadas esperadas",
-            "recomendacoes": "Dicas específicas do que levar/vestir"
-        },
+        "justificativa": "Justificativa da escolha para viagem aérea",
+        "comentario": "Comentário da Tripinha sobre a viagem de avião",
+        "pontosTuristicos": ["Ponto 1", "Ponto 2"],
         "aeroporto": {
             "codigo": "XYZ",
-            "nome": "Nome oficial do aeroporto principal"
-        }
-    },
-    "alternativas": [
-        {
-            "destino": "Nome da Cidade",
-            "pais": "Nome do País",
-            "codigoPais": "XX",
-            "porque": "Razão específica para esta alternativa",
-            "pontoTuristico": "Ponto turístico específico de destaque",
-            "clima": {
-                "estacao": "Estação no destino durante a viagem",
-                "temperatura": "Faixa de temperatura"
-            },
-            "aeroporto": {
-                "codigo": "XYZ", 
-                "nome": "Nome do Aeroporto"
-            }
-        }
-        // EXATAMENTE 4 alternativas geograficamente diversas
-    ],
-    "surpresa": {
-        "destino": "Nome da Cidade Inusitada",
-        "pais": "Nome do País",
-        "codigoPais": "XX",
-        "justificativa": "Por que é uma surpresa perfeita para este perfil",
-        "descricao": "Descrição do destino surpresa",
-        "porque": "Razões para ser destino surpresa",
-        "destaque": "Experiência única e inesperada",
-        "comentario": "Comentário empolgado da Tripinha: 'Nossa, quando cheguei em [destino], não esperava que... 🐾'",
-        "pontosTuristicos": [
-            "Primeiro ponto específico", 
-            "Segundo ponto específico"
-        ],
-        "clima": {
-            "estacao": "Estação durante ${dataIda} a ${dataVolta}",
-            "temperatura": "Faixa de temperatura",
-            "condicoes": "Condições climáticas",
-            "recomendacoes": "Dicas de vestuário"
+            "nome": "Nome do aeroporto"
         },
-        "aeroporto": {
-            "codigo": "XYZ", 
-            "nome": "Nome do Aeroporto"
-        }
+        "clima": { /* ... */ }
     },
-    "estacaoViagem": "Estação predominante nos destinos selecionados",
-    "resumoIA": "Resumo de como a IA chegou às recomendações considerando origem, preferências e orçamento"
+    "alternativas": [ /* 4 alternativas com aeroporto */ ],
+    "surpresa": { /* com aeroporto */ }
 }
 \`\`\`
-
 ## 🔍 VALIDAÇÃO FINAL OBRIGATÓRIA:
-Antes de responder, confirme que:
-- ✅ Informações climáticas são precisas para o período da viagem  
-- ✅ Comentários da Tripinha são autênticos e em 1ª pessoa
-- ✅ Pontos turísticos são específicos e reais
-- ✅ Códigos IATA dos aeroportos estão corretos
-- ✅ Destinos são adequados para ${infoViajante.companhia}
-- ✅ Considerou a cidade de origem ${infoViajante.cidadeOrigem}, ${infoViajante.paisOrigem} nas sugestões
-
-**Execute o raciocínio passo-a-passo e forneça recomendações fundamentadas e personalizadas!**`;
+- Códigos IATA dos aeroportos devem estar corretos.
+- Informações climáticas devem ser precisas para o período da viagem.`;
 }
 
 // =======================
@@ -653,81 +542,30 @@ function getPreferenciaText(value) {
 }
 
 // =======================
-// Processamento e validação de destinos (simplificado)
+// Processamento e validação de destinos
 // =======================
 function ensureValidDestinationData(jsonString, requestData) {
     try {
         const data = typeof jsonString === 'string' ? JSON.parse(jsonString) : jsonString;
-        const tipoViagem = utils.determinarTipoViagem(requestData.orcamento_valor, requestData.moeda_escolhida);
-        const isRodoviario = tipoViagem === 'rodoviario';
+        const tipoViagem = utils.determinarTipoViagem(requestData.orcamento_valor, requestData.moeda_escolhida, requestData.viagem_carro);
         let modificado = false;
         
-        // Processar topPick
-        if (data.topPick) {
-            if (isRodoviario) {
-                // Garantir terminal de transporte apropriado
-                if (!data.topPick.terminalTransporte?.nome) {
-                    data.topPick.terminalTransporte = {
-                        nome: `Terminal Rodoviário de ${data.topPick.destino}`,
-                        tipo: 'rodoviária',
-                        localizacao: "Centro"
-                    };
-                    modificado = true;
-                }
-            } else {
-                // Para viagens aéreas, garantir código IATA
-                if (!data.topPick.aeroporto?.codigo) {
-                    data.topPick.aeroporto = {
-                        codigo: obterCodigoIATAPadrao(data.topPick.destino, data.topPick.pais),
-                        nome: `Aeroporto de ${data.topPick.destino}`
-                    };
-                    modificado = true;
-                }
+        const processarDestino = (destino) => {
+            if (!destino) return;
+            
+            if (tipoViagem === 'aereo' && !destino.aeroporto?.codigo) {
+                destino.aeroporto = {
+                    codigo: obterCodigoIATAPadrao(destino.destino, destino.pais),
+                    nome: `Aeroporto de ${destino.destino}`
+                };
+                modificado = true;
             }
-        }
-        
-        // Processar surpresa
-        if (data.surpresa) {
-            if (isRodoviario) {
-                if (!data.surpresa.terminalTransporte?.nome) {
-                    data.surpresa.terminalTransporte = {
-                        nome: `Terminal Rodoviário de ${data.surpresa.destino}`,
-                        tipo: 'rodoviária',
-                        localizacao: "Centro"
-                    };
-                    modificado = true;
-                }
-            } else {
-                if (!data.surpresa.aeroporto?.codigo) {
-                    data.surpresa.aeroporto = {
-                        codigo: obterCodigoIATAPadrao(data.surpresa.destino, data.surpresa.pais),
-                        nome: `Aeroporto de ${data.surpresa.destino}`
-                    };
-                    modificado = true;
-                }
-            }
-        }
-        
-        // Processar alternativas
+        };
+
+        processarDestino(data.topPick);
+        processarDestino(data.surpresa);
         if (data.alternativas && Array.isArray(data.alternativas)) {
-            data.alternativas.forEach(alternativa => {
-                if (isRodoviario) {
-                    if (!alternativa.terminalTransporte?.nome) {
-                        alternativa.terminalTransporte = {
-                            nome: `Terminal Rodoviário de ${alternativa.destino}`
-                        };
-                        modificado = true;
-                    }
-                } else {
-                    if (!alternativa.aeroporto?.codigo) {
-                        alternativa.aeroporto = {
-                            codigo: obterCodigoIATAPadrao(alternativa.destino, alternativa.pais),
-                            nome: `Aeroporto de ${alternativa.destino}`
-                        };
-                        modificado = true;
-                    }
-                }
-            });
+            data.alternativas.forEach(processarDestino);
         }
         
         // Adicionar tipo de viagem se não existir
@@ -828,7 +666,7 @@ module.exports = async function handler(req, res) {
     }
 
     try {
-        console.log('🚌✈️ === BENETRIP GROQ API v10.0 - OTIMIZADA ===');
+        console.log('🚗🚌✈️ === BENETRIP GROQ API v11.0 - SUPORTE A CARRO ===');
         
         if (!req.body) {
             isResponseSent = true;
@@ -838,7 +676,6 @@ module.exports = async function handler(req, res) {
         
         const requestData = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
         
-        // Verificar se a chave do Groq está configurada
         if (!process.env.GROQ_API_KEY) {
             console.error('❌ GROQ_API_KEY não configurada');
             if (!isResponseSent) {
@@ -853,35 +690,24 @@ module.exports = async function handler(req, res) {
             return;
         }
         
-        // Extrair informações da cidade de partida (do autocomplete)
         const infoCidadePartida = utils.extrairInfoCidadePartida(requestData.cidade_partida);
+        const tipoViagem = utils.determinarTipoViagem(requestData.orcamento_valor, requestData.moeda_escolhida, requestData.viagem_carro);
         
-        // Determinar tipo de viagem
-        const tipoViagem = utils.determinarTipoViagem(requestData.orcamento_valor, requestData.moeda_escolhida);
-        const isRodoviario = tipoViagem === 'rodoviario';
-        
-        // Log dos dados recebidos
         utils.log('📊 Dados da requisição:', {
-            companhia: requestData.companhia,
             cidade_partida: infoCidadePartida,
-            datas: requestData.datas,
+            tipoViagem: tipoViagem,
+            distancia_maxima: requestData.distancia_maxima, // Log da nova informação
             orcamento: requestData.orcamento_valor,
             moeda: requestData.moeda_escolhida,
-            preferencia: requestData.preferencia_viagem,
-            tipoViagem: tipoViagem
         });
         
-        console.log(`${isRodoviario ? '🚌' : '✈️'} Tipo de viagem: ${tipoViagem.toUpperCase()}`);
-        console.log(`📍 Origem: ${infoCidadePartida.cidade}, ${infoCidadePartida.pais} (${infoCidadePartida.sigla_estado})`);
-        if (isRodoviario) {
-            console.log('📏 Limite máximo: 700km ou 10 horas');
-        }
+        console.log(`📍 Origem: ${infoCidadePartida.cidade}, ${infoCidadePartida.pais}`);
+        const emoji = tipoViagem === 'carro' ? '🚗' : tipoViagem === 'rodoviario' ? '🚌' : '✈️';
+        console.log(`${emoji} Tipo de viagem: ${tipoViagem.toUpperCase()}`);
         
-        // Gerar prompt otimizado para Groq
         const prompt = gerarPromptParaGroq(requestData);
         console.log(`📝 Prompt gerado para Groq (${tipoViagem})`);
         
-        // Tentar obter recomendações com fallback inteligente entre modelos
         const resultado = await retryWithBackoffAndFallback(prompt, requestData);
         
         if (!resultado) {
@@ -891,7 +717,7 @@ module.exports = async function handler(req, res) {
                 clearTimeout(serverTimeout);
                 return res.status(503).json({
                     tipo: "erro",
-                    message: "Não foi possível obter recomendações no momento. Tente novamente em alguns instantes.",
+                    message: "Não foi possível obter recomendações no momento. Tente novamente.",
                     error: "groq_all_models_failed"
                 });
             }
@@ -900,36 +726,22 @@ module.exports = async function handler(req, res) {
         
         const { result: recomendacoesBrutas, model: modeloUsado } = resultado;
         
-        // Processar e retornar resultado
         try {
             const recomendacoesProcessadas = ensureValidDestinationData(recomendacoesBrutas, requestData);
             const dados = typeof recomendacoesProcessadas === 'string' ? 
                 JSON.parse(recomendacoesProcessadas) : recomendacoesProcessadas;
             
-            // Adicionar metadados incluindo modelo usado e tipo de viagem
             dados.metadados = {
                 modelo: modeloUsado,
                 provider: 'groq',
-                versao: '10.0-otimizada',
+                versao: '11.0-carro',
                 timestamp: new Date().toISOString(),
-                reasoning_enabled: modeloUsado === CONFIG.groq.models.reasoning,
                 origem: infoCidadePartida,
                 tipoViagem: tipoViagem,
-                orcamento: requestData.orcamento_valor,
-                moeda: requestData.moeda_escolhida,
-                limiteRodoviario: isRodoviario ? '700km/10h' : null
             };
             
             console.log('🎉 Recomendações processadas com sucesso!');
             console.log('🧠 Modelo usado:', modeloUsado);
-            console.log(`${isRodoviario ? '🚌' : '✈️'} Tipo de viagem:`, tipoViagem);
-            console.log('📍 Origem:', `${infoCidadePartida.cidade}, ${infoCidadePartida.pais}`);
-            
-            console.log('📋 Destinos encontrados:', {
-                topPick: dados.topPick?.destino,
-                alternativas: dados.alternativas?.length || 0,
-                surpresa: dados.surpresa?.destino
-            });
             
             if (!isResponseSent) {
                 isResponseSent = true;
