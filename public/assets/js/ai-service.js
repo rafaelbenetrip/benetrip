@@ -370,28 +370,6 @@ window.BENETRIP_AI = {
       mensagemOrcamento = `Orçamento confortável de ${orcamento} ${moeda} por pessoa para voos (ida e volta). Pode incluir destinos mais distantes e premium.`;
     }
 
-    // ADICIONAR detecção de tipo de viagem
-    const tipoViagem = dados.viagem_carro === 1 ? 'carro' : 'aereo_onibus';
-    
-    // ADICIONAR condição para viagens de carro
-    if (tipoViagem === 'carro') {
-        const distanciaMaxima = dados.distancia_maxima || 500;
-        const infoViajante = {
-            cidadeOrigem,
-            companhia: companheiroTexto,
-            preferencia: `${preferenciaTexto} e ${atracaoTexto}`
-        };
-        
-        return this.gerarPromptParaDestinosCarro({
-            ...infoViajante,
-            distanciaMaxima,
-            dataIda,
-            dataVolta,
-            duracaoViagem,
-            estacaoViagem
-        });
-    }
-
     return `Crie recomendações de viagem que respeitam ESTRITAMENTE o orçamento do usuário:
 ${mensagemOrcamento}
 PERFIL DO VIAJANTE:
@@ -496,55 +474,6 @@ Forneça no formato JSON exato abaixo, SEM formatação markdown:
   "estacaoViagem": "${estacaoViagem}"
 }`;
   },
-  
-  // ADICIONAR nova função para prompt de carro
-gerarPromptParaDestinosCarro(dados) {
-    return `Crie recomendações de viagem DE CARRO para o usuário:
-    
-PERFIL DO VIAJANTE:
-- Partindo de: ${dados.cidadeOrigem}
-- Distância máxima aceita: ${dados.distanciaMaxima} km
-- Companhia: ${dados.companhia}
-- Preferências: ${dados.preferencia}
-- Período: ${dados.dataIda} a ${dados.dataVolta} (${dados.duracaoViagem})
-- Estação do ano: ${dados.estacaoViagem}
-
-IMPORTANTE PARA VIAGENS DE CARRO:
-1. TODOS os destinos DEVEM estar dentro do raio de ${dados.distanciaMaxima}km
-2. Considere apenas destinos acessíveis por estradas em boas condições
-3. Forneça informações sobre:
-   - Distância exata em km desde ${dados.cidadeOrigem}
-   - Tempo estimado de viagem de carro
-   - Principais rodovias de acesso
-   - Pontos de parada interessantes no caminho
-4. NÃO inclua preços de voos ou hospedagem
-5. Foque em destinos ideais para road trips
-
-Forneça no formato JSON:
-{
-  "topPick": {
-    "destino": "Nome da Cidade",
-    "pais": "Nome do País",
-    "codigoPais": "XX",
-    "distanciaKm": "número",
-    "tempoViagem": "Xh XXmin",
-    "rodovias": ["BR-101", "SP-280"],
-    "pontosParada": ["Cidade X", "Mirante Y"],
-    "descricao": "Descrição do destino",
-    "porque": "Por que é ideal para road trip",
-    "destaque": "Experiência única de carro",
-    "comentario": "Comentário da Tripinha sobre a viagem de carro",
-    "pontosTuristicos": ["Ponto 1", "Ponto 2"],
-    "clima": {
-      "temperatura": "Faixa esperada",
-      "condicoes": "Condições climáticas",
-      "recomendacoes": "Dicas para viagem de carro"
-    }
-  },
-  "alternativas": [...],
-  "surpresa": {...}
-}`;
-},
   
   // NOVA FUNÇÃO: Extrair pontos turísticos do texto
   extrairPontosTuristicos(texto, destino) {
