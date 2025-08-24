@@ -477,7 +477,7 @@ Para as datas ${dataIda} a ${dataVolta}, determine:
     "destaque": "Experiência única",
     "comentario": "Comentário da Tripinha em 1ª pessoa sobre a road trip",
     "pontosTuristicos": ["Ponto 1", "Ponto 2"],
-    "climate": {
+    "clima": {
       "estacao": "Estação durante a viagem",
       "temperatura": "Faixa de temperatura",
       "condicoes": "Condições climáticas",
