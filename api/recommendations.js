@@ -252,20 +252,20 @@ PROCESSO DE RACIOCÍNIO OBRIGATÓRIO:
 1. ANÁLISE DO PERFIL: Examine detalhadamente cada preferência do viajante
 2. MAPEAMENTO DE COMPATIBILIDADE: Correlacione destinos com o perfil analisado  
 3. CONSIDERAÇÃO DE ${tipoViagem.toUpperCase()}: ${
-    tipoViagem === 'carro' ? `Considere viagens de CARRO dentro do limite de ${limiteDistancia}` :
+    tipoViagem === 'carro' ? `Considere viagens de CARRO dentro do limite de ${limiteDistancia} com foco em rotas cênicas e infraestrutura` :
     tipoViagem === 'rodoviario' ? `Considere viagens de ÔNIBUS/TREM dentro do orçamento para passagens de ida e volta (máx 700km/10h)` : 
     'Considere o orçamento informado para passagens aéreas'
 }
-4. ANÁLISE CLIMÁTICA: Determine condições climáticas exatas para as datas
-5. PERSONALIZAÇÃO TRIPINHA: Adicione perspectiva autêntica da mascote cachorrinha
+4. ANÁLISE CLIMÁTICA: Determine condições climáticas exatas para as datas${tipoViagem === 'carro' ? ' - CRÍTICO para road trips' : ''}
+5. PERSONALIZAÇÃO TRIPINHA: Adicione perspectiva autêntica da mascote cachorrinha${tipoViagem === 'carro' ? ' sobre experiências de road trip' : ''}
 
 CRITÉRIOS DE DECISÃO:
 - Destinos DEVEM ser adequados para o tipo de companhia especificado
 - ${isCarroRodoviario ? `Destinos DEVEM estar NO MÁXIMO ${limiteDistancia} da origem` : 'Informações de voos DEVEM ser consideradas'}
-- Informações climáticas DEVEM ser precisas para o período da viagem
+- Informações climáticas DEVEM ser precisas para o período da viagem${tipoViagem === 'carro' ? ' (ESSENCIAL para planejamento de road trips)' : ''}
 - Pontos turísticos DEVEM ser específicos e reais
 - Comentários da Tripinha DEVEM ser em 1ª pessoa com detalhes sensoriais
-- Considere a distância e facilidade de acesso a partir da cidade de origem
+- Considere a distância e facilidade de acesso a partir da cidade de origem${tipoViagem === 'carro' ? ' por estrada' : ''}
 
 RESULTADO: JSON estruturado com recomendações fundamentadas no raciocínio acima.`;
     } else if (model === CONFIG.groq.models.personality) {
@@ -441,6 +441,14 @@ Selecione APENAS destinos dentro do limite de ${infoViajante.distanciaMaxima}:
 - Pontos de interesse durante o trajeto
 - Facilidade de locomoção no destino de carro
 
+### PASSO 4: VALIDAÇÃO CLIMÁTICA E SAZONAL PARA ROAD TRIP
+Para as datas ${dataIda} a ${dataVolta}, determine:
+- Estação do ano em cada destino considerado
+- Condições climáticas típicas (temperatura, chuva, etc.)
+- Impacto do clima na qualidade da viagem de carro
+- Recomendações práticas de vestuário e equipamentos para road trip
+- Condições das estradas em função do clima esperado
+
 ## 📋 FORMATO DE RESPOSTA (JSON ESTRUTURADO):
 \`\`\`json
 {
@@ -496,8 +504,12 @@ Selecione APENAS destinos dentro do limite de ${infoViajante.distanciaMaxima}:
 - TODOS os destinos DEVEM estar a NO MÁXIMO ${infoViajante.distanciaMaxima} de ${infoViajante.cidadeOrigem}
 - NÃO sugira destinos que exijam travessias marítimas obrigatórias
 - Considere apenas destinos acessíveis por estrada
+- ✅ Informações climáticas são OBRIGATÓRIAS e devem ser precisas para o período da viagem
+- ✅ Comentários da Tripinha devem ser autênticos e em 1ª pessoa sobre road trips
+- ✅ Pontos turísticos devem ser específicos e reais
+- ✅ Destinos devem ser adequados para ${infoViajante.companhia}
 
-**Execute o raciocínio e forneça destinos de ROAD TRIP apropriados!**`;
+**Execute o raciocínio e forneça destinos de ROAD TRIP apropriados com informações climáticas completas!**`;
     }
 
     // Prompt para viagens rodoviárias (ônibus)
@@ -827,6 +839,16 @@ function ensureValidDestinationData(jsonString, requestData) {
                     };
                     modificado = true;
                 }
+                // 🌤️ Garantir dados climáticos para viagens de carro
+                if (!data.topPick.clima || !data.topPick.clima.temperatura) {
+                    data.topPick.clima = {
+                        estacao: "Informação climática não disponível",
+                        temperatura: "Consulte previsão local",
+                        condicoes: "Condições variáveis",
+                        recomendacoes: "Verifique previsão do tempo antes da viagem"
+                    };
+                    modificado = true;
+                }
             } else if (isRodoviario) {
                 // Garantir terminal de transporte apropriado
                 if (!data.topPick.terminalTransporte?.nome) {
@@ -865,6 +887,16 @@ function ensureValidDestinationData(jsonString, requestData) {
                     data.surpresa.rotaRecomendada = `Via rodovias principais até ${data.surpresa.destino}`;
                     modificado = true;
                 }
+                // 🌤️ Garantir dados climáticos para surpresa de carro
+                if (!data.surpresa.clima || !data.surpresa.clima.temperatura) {
+                    data.surpresa.clima = {
+                        estacao: "Informação climática não disponível",
+                        temperatura: "Consulte previsão local",
+                        condicoes: "Condições variáveis",
+                        recomendacoes: "Verifique previsão do tempo antes da viagem"
+                    };
+                    modificado = true;
+                }
             } else if (isRodoviario) {
                 if (!data.surpresa.terminalTransporte?.nome) {
                     data.surpresa.terminalTransporte = {
@@ -896,6 +928,15 @@ function ensureValidDestinationData(jsonString, requestData) {
                     }
                     if (!alternativa.tempoEstimadoViagem) {
                         alternativa.tempoEstimadoViagem = "Tempo não especificado";
+                        modificado = true;
+                    }
+                    // 🌤️ Garantir dados climáticos para alternativas de carro
+                    if (!alternativa.clima || !alternativa.clima.temperatura) {
+                        alternativa.clima = {
+                            estacao: "Informação climática não disponível",
+                            temperatura: "Consulte previsão local",
+                            condicoes: "Condições variáveis"
+                        };
                         modificado = true;
                     }
                 } else if (isRodoviario) {
