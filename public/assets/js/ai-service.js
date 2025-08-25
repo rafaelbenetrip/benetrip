@@ -1,4 +1,4 @@
-// Serviço de IA para o Benetrip - Versão Vercel com Perplexity e Suporte a Viagens de Carro
+// Serviço de IA para o Benetrip - Versão Vercel com Perplexity e Suporte a Viagens de Carro 
 window.BENETRIP_AI = {
   // Configurações do serviço
   config: {
