@@ -1,4 +1,4 @@
-// Serviço de IA para o Benetrip - SEM projeções climáticas
+// Serviço de IA para o Benetrip - Versão com DEBUG detalhado
 window.BENETRIP_AI = {
   config: {
     apiEndpoint: '/api/recommendations',
@@ -14,7 +14,7 @@ window.BENETRIP_AI = {
   },
   
   init() {
-    console.log('Inicializando serviço de IA do Benetrip - SEM projeções climáticas');
+    console.log('🚀 Inicializando serviço de IA do Benetrip com DEBUG');
     this.initialized = true;
     this._requestsInProgress = {};
     this._cacheImagens = {};
@@ -105,23 +105,20 @@ window.BENETRIP_AI = {
     return new Promise(resolve => setTimeout(resolve, ms));
   },
   
-  // ❌ REMOVIDO: determinarEstacaoDoAno - deixar LLM decidir
-  // ❌ REMOVIDO: todas as funções de projeção climática
-  
-  // Manter apenas funções auxiliares básicas
+  // Manter funções auxiliares básicas (código omitido por brevidade)
   getTipoDestinoText(tipoDestino) {
     switch(tipoDestino) {
-      case 0: return "Nacional - Prefere viajar dentro do próprio país";
-      case 1: return "Internacional - Prefere viajar para fora do país";
-      default: return "Destinos nacionais ou internacionais";
+      case 0: return "Nacional";
+      case 1: return "Internacional";
+      default: return "Destinos variados";
     }
   },
 
   getFamaDestinoText(famaDestino) {
     switch(famaDestino) {
-      case 0: return "Destinos famosos e populares";
-      case 1: return "Destinos menos conhecidos e alternativos";
-      default: return "Mix de destinos populares e alternativos";
+      case 0: return "Destinos famosos";
+      case 1: return "Destinos alternativos";
+      default: return "Mix de destinos";
     }
   },
 
@@ -133,387 +130,293 @@ window.BENETRIP_AI = {
     return diffDays;
   },
 
-  // ✅ CORRIGIDO: Prompt SEM projeções climáticas
+  // Função gerarPromptParaDestinos simplificada para debug
   gerarPromptParaDestinos(dados) {
-    const {
-      cidade_partida,
-      moeda_escolhida = 'BRL',
-      orcamento_valor,
-      datas = {},
-      companhia = 0,
-      destino_imaginado = 2,
-      tipo_viagem = 1,
-      fama_destino = 2,
-      tipo_destino = 2,
-      item_essencial = 4,
-      quantidade_familia = 0,
-      quantidade_amigos = 0,
-      conhece_destino = 0,
-      viagem_carro = 0,
-      distancia_maxima = '500'
-    } = dados;
+    const cidadeOrigem = dados.cidade_partida?.name || "São Paulo";
+    const dataIda = dados.datas?.dataIda || new Date().toISOString().split('T')[0];
+    const dataVolta = dados.datas?.dataVolta || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    
+    return `Crie recomendações de viagem para:
+- Origem: ${cidadeOrigem}
+- Período: ${dataIda} a ${dataVolta}
 
-    const cidadeOrigem = cidade_partida?.name || "Cidade não especificada";
-    const moeda = moeda_escolhida;
-    const orcamento = orcamento_valor ? parseInt(orcamento_valor, 10) : 2500;
-    const isViagemCarro = parseInt(viagem_carro, 10) === 1;
-    const distanciaMax = distancia_maxima || '500';
-    
-    // ✅ CORRIGIDO: Apenas data, SEM determinar estação
-    const dataIda = datas.dataIda || new Date().toISOString().split('T')[0];
-    const dataVolta = datas.dataVolta || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-    const duracaoViagem = this.calcularDuracaoViagem(dataIda, dataVolta);
-    
-    // ❌ REMOVIDO: const estacaoViagem = this.determinarEstacaoDoAno(dataIda);
-    
-    let quantidadePessoas = 1;
-    if (companhia === 1) quantidadePessoas = 2;
-    else if (companhia === 2) quantidadePessoas = parseInt(quantidade_familia, 10) || 3;
-    else if (companhia === 3) quantidadePessoas = parseInt(quantidade_amigos, 10) || 4;
-    
-    let companheiroTexto;
-    switch(companhia) {
-      case 0: companheiroTexto = "Sozinho"; break;
-      case 1: companheiroTexto = "Em casal"; break;
-      case 2: companheiroTexto = "Em família"; break;
-      case 3: companheiroTexto = "Com amigos"; break;
-      default: companheiroTexto = "Sozinho";
-    }
-    
-    let preferenciaTexto;
-    switch(tipo_viagem) {
-      case 0: preferenciaTexto = "relaxamento e tranquilidade"; break;
-      case 1: preferenciaTexto = "exploração e descoberta"; break;
-      case 2: preferenciaTexto = "aventura e adrenalina"; break;
-      case 3: preferenciaTexto = "cultura, gastronomia e experiências locais"; break;
-      default: preferenciaTexto = "experiências variadas";
-    }
-    
-    let atracaoTexto;
-    switch(item_essencial) {
-      case 0: atracaoTexto = "diversão e entretenimento"; break;
-      case 1: atracaoTexto = "natureza e atividades ao ar livre"; break;
-      case 2: atracaoTexto = "cultura, história e museus"; break;
-      case 3: atracaoTexto = "compras e vida urbana"; break;
-      default: atracaoTexto = "experiências variadas";
-    }
-    
-    let sugestaoDistancia = "";
-    if (tipo_destino === 0) {
-      sugestaoDistancia = "(buscar destinos domésticos)";
-    } else if (tipo_destino === 1) {
-      sugestaoDistancia = "(buscar destinos internacionais)";
-    }
-    
-    let mensagemOrcamento;
-    if (isViagemCarro) {
-      mensagemOrcamento = `🚗 VIAGEM DE CARRO SELECIONADA:
-- O usuário prefere viajar de carro/road trip
-- Distância máxima desejada: ${distanciaMax} quilômetros de ${cidadeOrigem}
-- IMPORTANTE: Todos os destinos DEVEM estar dentro do raio de ${distanciaMax}km
-- Considere estradas em bom estado e infraestrutura adequada
-- Inclua informações sobre rotas, paradas estratégicas e tempo de viagem
-- Destinos DEVEM ser acessíveis por estrada a partir de ${cidadeOrigem}`;
-    } else {
-      if (orcamento < 1000) {
-        mensagemOrcamento = `Orçamento muito restrito de ${orcamento} ${moeda} por pessoa para voos (ida e volta). Priorize destinos próximos e econômicos.`;
-      } else if (orcamento < 2000) {
-        mensagemOrcamento = `Orçamento econômico de ${orcamento} ${moeda} por pessoa para voos (ida e volta). Foque em opções com boa relação custo-benefício.`;
-      } else if (orcamento < 4000) {
-        mensagemOrcamento = `Orçamento moderado de ${orcamento} ${moeda} por pessoa para voos (ida e volta). Pode incluir destinos de médio alcance com preços acessíveis.`;
-      } else {
-        mensagemOrcamento = `Orçamento confortável de ${orcamento} ${moeda} por pessoa para voos (ida e volta). Pode incluir destinos mais distantes e premium.`;
-      }
-    }
-
-    // ✅ CORRIGIDO: Prompt básico SEM projeções climáticas
-    const promptBase = `Crie recomendações de viagem que respeitam ESTRITAMENTE as preferências do usuário:
-${mensagemOrcamento}
-
-PERFIL DO VIAJANTE:
-- Partindo de: ${cidadeOrigem} ${sugestaoDistancia}
-- Tipo de transporte: ${isViagemCarro ? `🚗 CARRO (máx ${distanciaMax}km)` : '✈️ AVIÃO'}
-- Viajando: ${companheiroTexto}
-- Número de pessoas: ${quantidadePessoas}
-- Atividades preferidas: ${preferenciaTexto} e ${atracaoTexto}
-- Período da viagem: ${dataIda} a ${dataVolta} (${duracaoViagem} dias)
-- Experiência como viajante: ${conhece_destino === 1 ? 'Com experiência' : 'Iniciante'} 
-- Preferência por destinos: ${this.getTipoDestinoText(tipo_destino)}
-- Popularidade do destino: ${this.getFamaDestinoText(fama_destino)}`;
-
-    let instrucoesTipoTransporte = "";
-    if (isViagemCarro) {
-      instrucoesTipoTransporte = `
-INSTRUÇÕES ESPECIAIS PARA ROAD TRIP:
-1. TODOS os destinos DEVEM estar dentro do raio de ${distanciaMax}km de ${cidadeOrigem}
-2. Considere apenas destinos acessíveis por estradas em bom estado
-3. Inclua tempo estimado de viagem de carro para cada destino
-4. Mencione rodovias/estradas principais para chegar ao destino
-5. Considere infraestrutura para viajantes (postos, restaurantes, hotéis na rota)
-6. Para CADA destino, inclua: distanciaRodoviaria, tempoViagem, rotaRecomendada
-7. Evite destinos que exijam travessia de fronteiras complexas
-8. Priorize destinos com estacionamento fácil nos pontos turísticos`;
-    } else {
-      instrucoesTipoTransporte = `
-INSTRUÇÕES PARA VIAGENS AÉREAS:
-1. O preço do VOO de CADA destino DEVE ser MENOR que o orçamento máximo de ${orcamento} ${moeda}
-2. Para CADA destino, inclua o código IATA (3 letras) do aeroporto principal
-3. Considere conexões e tempo de voo a partir de ${cidadeOrigem}
-4. Inclua estimativas realistas de preços para voos (ida e volta)`;
-    }
-
-    // ✅ CORRIGIDO: Instruções SEM projeções climáticas específicas
-    const instrucoesFinal = `
-INSTRUÇÕES GERAIS:
-1. INCLUA ESTIMATIVAS REALISTAS de preços para ${isViagemCarro ? 'combustível/pedágios' : 'voos'} e hospedagem por noite para TODOS os destinos
-2. Para as datas ${dataIda} a ${dataVolta}, VOCÊ MESMO determine as condições climáticas apropriadas para cada destino sugerido
-3. Forneça um mix equilibrado: inclua tanto destinos populares quanto alternativas
-4. Forneça EXATAMENTE 4 destinos alternativos diferentes entre si
-5. Considere as datas da viagem para sugerir destinos com clima e condições adequadas
-6. Inclua destinos de diferentes regiões/estados
-7. Para CADA destino, INCLUA PONTOS TURÍSTICOS ESPECÍFICOS E CONHECIDOS
-8. Os comentários da Tripinha DEVEM mencionar pelo menos um dos pontos turísticos do destino e ser escritos em primeira pessoa
-9. IMPORTANTE: Determine VOCÊ MESMO a estação do ano e condições climáticas para cada destino nas datas especificadas
-
-Forneça no formato JSON exato abaixo, SEM formatação markdown:`;
-
-    // Formato JSON mantido, mas sem referências a estações pré-determinadas
-    const formatoJSON = isViagemCarro ? `
+Retorne apenas JSON válido no formato:
 {
-  "tipoTransporte": "carro",
-  "topPick": {
-    "destino": "Nome da Cidade",
-    "estado": "Nome do Estado",
-    "pais": "Nome do País",
-    "codigoPais": "XX",
-    "distanciaRodoviaria": "${distanciaMax}km ou menos",
-    "tempoViagem": "X horas de carro",
-    "rotaRecomendada": "Principal rodovia/estrada para chegar",
-    "descricao": "Breve descrição do destino",
-    "porque": "Razão específica para visitar de carro",
-    "destaque": "Uma experiência única neste destino",
-    "comentario": "Comentário da Tripinha em primeira pessoa sobre a road trip",
-    "pontosTuristicos": ["Nome do Primeiro Ponto Turístico", "Nome do Segundo Ponto Turístico"],
-    "clima": {
-      "temperatura": "Faixa de temperatura que VOCÊ determinou para ${dataIda} a ${dataVolta}",
-      "condicoes": "Condições climáticas que VOCÊ avaliou para o período",
-      "recomendacoes": "Suas recomendações baseadas no clima esperado"
-    },
-    "infraestrutura": {
-      "estacionamento": "Informações sobre estacionamento nos pontos turísticos",
-      "rota": "Detalhes da melhor rota de carro"
-    },
-    "preco": {
-      "combustivel": número_estimado_combustivel_ida_volta,
-      "pedagios": número_estimado_pedagios,
-      "hotel": número_por_noite
-    }
-  },
-  "alternativas": [
-    {
-      "destino": "Nome da Cidade 1",
-      "estado": "Nome do Estado 1",
-      "pais": "Nome do País 1", 
-      "codigoPais": "XX",
-      "distanciaRodoviaria": "XXXkm",
-      "tempoViagem": "X horas",
-      "rotaRecomendada": "Rodovia principal",
-      "porque": "Razão específica para visitar",
-      "pontosTuristicos": ["Ponto 1", "Ponto 2"],
-      "clima": { "temperatura": "Temperatura que VOCÊ determinou para o período" },
-      "preco": { "combustivel": número, "pedagios": número, "hotel": número }
-    }
-  ],
-  "surpresa": {
-    "destino": "Nome da Cidade",
-    "estado": "Nome do Estado",
-    "pais": "Nome do País",
-    "codigoPais": "XX",
-    "distanciaRodoviaria": "XXXkm",
-    "tempoViagem": "X horas",
-    "rotaRecomendada": "Rodovia principal",
-    "descricao": "Breve descrição do destino",
-    "porque": "Razão para visitar, destacando o fator surpresa",
-    "destaque": "Uma experiência única neste destino",
-    "comentario": "Comentário da Tripinha sobre esta road trip surpresa",
-    "pontosTuristicos": ["Ponto 1", "Ponto 2"],
-    "clima": {
-      "temperatura": "Temperatura que VOCÊ avaliou para ${dataIda} a ${dataVolta}",
-      "condicoes": "Condições climáticas que VOCÊ determinou",
-      "recomendacoes": "Suas recomendações climáticas"
-    },
-    "infraestrutura": {
-      "estacionamento": "Informações sobre estacionamento",
-      "rota": "Detalhes da rota"
-    },
-    "preco": {
-      "combustivel": número,
-      "pedagios": número,
-      "hotel": número
-    }
-  },
-  "dicasRoadTrip": "Dicas específicas para esta road trip"
-}` : `
-{
-  "tipoTransporte": "aviao",
   "topPick": {
     "destino": "Nome da Cidade",
     "pais": "Nome do País",
-    "codigoPais": "XX",
-    "descricao": "Breve descrição do destino",
-    "porque": "Razão específica para visitar",
-    "destaque": "Uma experiência única neste destino",
-    "comentario": "Comentário da Tripinha em primeira pessoa",
-    "pontosTuristicos": ["Nome do Primeiro Ponto Turístico", "Nome do Segundo Ponto Turístico"],
-    "clima": {
-      "temperatura": "Temperatura que VOCÊ determinou para ${dataIda} a ${dataVolta}",
-      "condicoes": "Condições climáticas que VOCÊ avaliou para o período",
-      "recomendacoes": "Suas recomendações baseadas no clima"
-    },
-    "aeroporto": {
-      "codigo": "XYZ",
-      "nome": "Nome do Aeroporto Principal"
-    },
-    "preco": {
-      "voo": número,
-      "hotel": número
-    }
+    "descricao": "Descrição do destino",
+    "porque": "Por que visitar",
+    "pontosTuristicos": ["Ponto 1", "Ponto 2"]
   },
   "alternativas": [
     {
-      "destino": "Nome da Cidade 1",
-      "pais": "Nome do País 1", 
-      "codigoPais": "XX",
-      "porque": "Razão específica para visitar",
-      "pontosTuristicos": ["Ponto 1", "Ponto 2"],
-      "clima": { "temperatura": "Temperatura que VOCÊ determinou" },
-      "aeroporto": { "codigo": "XYZ", "nome": "Nome do Aeroporto" },
-      "preco": { "voo": número, "hotel": número }
+      "destino": "Cidade 1",
+      "pais": "País 1", 
+      "porque": "Motivo"
     }
   ],
   "surpresa": {
-    "destino": "Nome da Cidade",
-    "pais": "Nome do País",
-    "codigoPais": "XX",
-    "descricao": "Breve descrição do destino",
-    "porque": "Razão para visitar, destacando o fator surpresa",
-    "destaque": "Uma experiência única neste destino",
-    "comentario": "Comentário da Tripinha em primeira pessoa",
-    "pontosTuristicos": ["Ponto 1", "Ponto 2"],
-    "clima": {
-      "temperatura": "Temperatura que VOCÊ avaliou para ${dataIda} a ${dataVolta}",
-      "condicoes": "Condições climáticas que VOCÊ determinou",
-      "recomendacoes": "Suas recomendações climáticas"
-    },
-    "aeroporto": {
-      "codigo": "XYZ",
-      "nome": "Nome do Aeroporto"
-    },
-    "preco": {
-      "voo": número,
-      "hotel": número
-    }
+    "destino": "Cidade Surpresa",
+    "pais": "País",
+    "porque": "Motivo surpresa"
   }
 }`;
-
-    return promptBase + instrucoesTipoTransporte + instrucoesFinal + formatoJSON;
   },
   
-  // Resto das funções mantidas...
+  // 🔍 VERSÃO COM DEBUG DETALHADO da callVercelAPI
   async callVercelAPI(data, retryCount = 0) {
-    // [Código mantido da versão anterior]
+    try {
+      console.log('🔍 DEBUG: Iniciando callVercelAPI');
+      console.log('📊 DEBUG: Dados recebidos:', {
+        cidade_partida: data.cidade_partida,
+        companhia: data.companhia,
+        datas: data.datas,
+        tipo: typeof data
+      });
+      
+      const apiUrl = this.config.apiEndpoint;
+      const baseUrl = window.location.origin;
+      const fullUrl = apiUrl.startsWith('http') ? apiUrl : baseUrl + apiUrl;
+      
+      console.log('🌐 DEBUG: URL da API:', fullUrl);
+      
+      const prompt = this.gerarPromptParaDestinos(data);
+      console.log('📝 DEBUG: Prompt gerado (primeiros 200 chars):', prompt.substring(0, 200) + '...');
+      
+      const requestData = { ...data, prompt: prompt };
+      console.log('📤 DEBUG: Request data keys:', Object.keys(requestData));
+
+      let retryDelay = this.config.retryDelay;
+      let maxRetries = this.config.maxRetries;
+
+      for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        if (attempt > 0) {
+          console.log(`🔄 DEBUG: Tentativa ${attempt} após ${retryDelay}ms...`);
+          await this.sleep(retryDelay);
+          retryDelay *= 2;
+        }
+
+        try {
+          console.log(`📡 DEBUG: Enviando requisição (tentativa ${attempt + 1})...`);
+          
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => {
+            console.log('⏰ DEBUG: Timeout atingido!');
+            controller.abort();
+          }, this.config.apiTimeout);
+          
+          const response = await fetch(fullUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Connection': 'keep-alive'
+            },
+            body: JSON.stringify(requestData),
+            signal: controller.signal,
+            keepalive: true
+          });
+          
+          clearTimeout(timeoutId);
+          
+          console.log('📥 DEBUG: Response status:', response.status);
+          console.log('📥 DEBUG: Response headers:', Object.fromEntries(response.headers.entries()));
+          
+          if (!response.ok) {
+            console.log('❌ DEBUG: Response não OK');
+            let errorText = '';
+            try {
+              const errorData = await response.json();
+              console.log('📄 DEBUG: Error data:', errorData);
+              errorText = errorData.error || `${response.status} ${response.statusText}`;
+            } catch (e) {
+              console.log('❌ DEBUG: Erro ao ler error data:', e);
+              errorText = `${response.status} ${response.statusText}`;
+            }
+            throw new Error(`Erro na API: ${errorText}`);
+          }
+          
+          // 🔍 DEBUG CRÍTICO: Analisar resposta detalhadamente
+          let responseData;
+          try {
+            const responseText = await response.text();
+            console.log('📄 DEBUG: Response text (primeiros 500 chars):', responseText.substring(0, 500));
+            console.log('📄 DEBUG: Response text length:', responseText.length);
+            console.log('📄 DEBUG: Response text type:', typeof responseText);
+            
+            if (!responseText || responseText.trim() === '') {
+              throw new Error('Response text está vazio');
+            }
+            
+            responseData = JSON.parse(responseText);
+            console.log('📊 DEBUG: Response data parsed:', {
+              tipo: responseData.tipo,
+              hasConteudo: !!responseData.conteudo,
+              conteudoLength: responseData.conteudo ? responseData.conteudo.length : 0,
+              keys: Object.keys(responseData)
+            });
+            
+          } catch (parseError) {
+            console.error('❌ DEBUG: Erro ao fazer parse da resposta:', parseError);
+            throw new Error(`Erro ao fazer parse da resposta: ${parseError.message}`);
+          }
+          
+          console.log('✅ DEBUG: Resposta da API processada com sucesso');
+          return responseData;
+          
+        } catch (fetchError) {
+          console.error(`❌ DEBUG: Tentativa ${attempt + 1} falhou:`, {
+            message: fetchError.message,
+            name: fetchError.name,
+            stack: fetchError.stack
+          });
+          
+          if (attempt === maxRetries) {
+            console.error('🚫 DEBUG: Todas as tentativas esgotadas');
+            throw fetchError;
+          }
+          
+          this.reportarProgresso('retry', 50, `Tentando novamente... (${attempt + 1}/${maxRetries})`);
+        }
+      }
+      
+    } catch (error) {
+      console.error('💥 DEBUG: Erro geral em callVercelAPI:', {
+        message: error.message,
+        name: error.name,
+        stack: error.stack
+      });
+      throw error;
+    }
   },
   
-  // Funções de imagem mantidas...
-  extrairPontosTuristicos(texto, destino) {
-    // [Código mantido]
-  },
-  
+  // Funções de imagem simplificadas para debug
   async buscarImagensParaDestino(destino, pais, descricao = '', porque = '', 
                                pontosTuristicos = [], quantidadeImagens = 2) {
-    // [Código mantido]
+    console.log(`🖼️ DEBUG: Buscando imagens para ${destino}, ${pais}`);
+    // Retornar imagens placeholder para não atrapalhar o debug
+    return [{
+      url: `https://source.unsplash.com/800x600/?${encodeURIComponent(destino)}`,
+      alt: `${destino}, ${pais}`,
+      source: 'unsplash-debug'
+    }];
   },
   
   async enriquecerRecomendacoesComImagens(recomendacoes) {
-    // [Código mantido]
+    console.log('🖼️ DEBUG: Pulando enriquecimento de imagens para debug');
+    return recomendacoes;
   },
   
   reportarProgresso(fase, porcentagem, mensagem) {
+    console.log(`📈 DEBUG: Progresso - ${fase} ${porcentagem}% - ${mensagem}`);
     const evento = new CustomEvent('benetrip_progress', {
       detail: { fase, porcentagem, mensagem }
     });
     window.dispatchEvent(evento);
-    console.log(`Progresso: ${fase} ${porcentagem}% - ${mensagem}`);
   },
   
+  // 🔍 VERSÃO COM DEBUG da função principal
   async obterRecomendacoes(preferenciasUsuario) {
+    console.log('🚀 DEBUG: Iniciando obterRecomendacoes');
+    console.log('📊 DEBUG: Preferências recebidas:', preferenciasUsuario);
+    
     if (!this.isInitialized()) {
+      console.log('🔧 DEBUG: Inicializando serviço...');
       this.init();
     }
     
     if (!preferenciasUsuario) {
+      console.error('❌ DEBUG: Preferências não fornecidas');
       throw new Error('Preferências de usuário não fornecidas');
     }
     
-    console.log('Obtendo recomendações - SEM projeções climáticas:', preferenciasUsuario);
-    
     const requestId = this.generateRequestId(preferenciasUsuario);
+    console.log('🔑 DEBUG: Request ID gerado:', requestId);
     
     if (this._cacheRecomendacoes[requestId]) {
-      console.log('Usando recomendações do cache para:', requestId);
+      console.log('💾 DEBUG: Encontrou no cache');
       this.reportarProgresso('cache', 100, 'Recomendações encontradas no cache!');
       return this._cacheRecomendacoes[requestId];
     }
     
     if (this._requestsInProgress[requestId]) {
-      console.log('Aguardando requisição em andamento...');
+      console.log('⏳ DEBUG: Requisição já em andamento');
       return await this._requestsInProgress[requestId];
     }
     
     const requestPromise = (async () => {
       try {
+        console.log('🎯 DEBUG: Iniciando processo de obtenção...');
         this.reportarProgresso('inicializando', 10, 'Preparando recomendações personalizadas...');
         this.reportarProgresso('processando', 30, 'Analisando suas preferências...');
         
+        console.log('📞 DEBUG: Chamando API Vercel...');
         const resposta = await this.callVercelAPI(preferenciasUsuario);
         
-        if (!resposta || !resposta.conteudo) {
-          throw new Error('API retornou resposta vazia ou inválida');
+        console.log('📥 DEBUG: Resposta recebida:', {
+          resposta_exists: !!resposta,
+          resposta_type: typeof resposta,
+          has_conteudo: resposta && !!resposta.conteudo,
+          conteudo_type: resposta && typeof resposta.conteudo,
+          resposta_keys: resposta ? Object.keys(resposta) : 'N/A'
+        });
+        
+        // 🔍 VERIFICAÇÃO DETALHADA DA RESPOSTA
+        if (!resposta) {
+          console.error('❌ DEBUG: Resposta é null/undefined');
+          throw new Error('API retornou resposta null/undefined');
         }
         
+        if (typeof resposta !== 'object') {
+          console.error('❌ DEBUG: Resposta não é um objeto:', typeof resposta);
+          throw new Error(`API retornou tipo inválido: ${typeof resposta}`);
+        }
+        
+        if (!resposta.conteudo) {
+          console.error('❌ DEBUG: Resposta não tem propriedade conteudo');
+          console.log('📊 DEBUG: Propriedades disponíveis:', Object.keys(resposta));
+          console.log('📄 DEBUG: Resposta completa:', resposta);
+          throw new Error(`API retornou resposta sem conteúdo. Propriedades: ${Object.keys(resposta).join(', ')}`);
+        }
+        
+        console.log('✅ DEBUG: Resposta válida encontrada');
         this.reportarProgresso('processando', 70, 'Processando destinos encontrados...');
         
         let recomendacoes;
         try {
+          console.log('🔄 DEBUG: Extraindo JSON...');
           recomendacoes = this.extrairJSON(resposta.conteudo);
+          console.log('✅ DEBUG: JSON extraído com sucesso');
         } catch (extractError) {
-          console.error('Falha ao extrair JSON da LLM:', extractError);
+          console.error('❌ DEBUG: Falha ao extrair JSON:', extractError);
+          console.log('📄 DEBUG: Conteudo que falhou:', resposta.conteudo);
           throw new Error(`LLM retornou dados inválidos: ${extractError.message}`);
         }
         
         if (!recomendacoes.topPick && !recomendacoes.alternativas) {
+          console.error('❌ DEBUG: Dados extraídos não têm estrutura válida');
+          console.log('📊 DEBUG: Recomendações recebidas:', recomendacoes);
           throw new Error('LLM não retornou destinos válidos');
         }
         
-        this.reportarProgresso('imagens', 85, 'Buscando imagens para os destinos...');
-        
-        try {
-          recomendacoes = await this.enriquecerRecomendacoesComImagens(recomendacoes);
-        } catch (imageError) {
-          console.warn('Erro ao adicionar imagens:', imageError);
-        }
-        
+        console.log('✅ DEBUG: Recomendações válidas encontradas');
         this.reportarProgresso('concluido', 100, 'Destinos encontrados!');
         
         this._cacheRecomendacoes[requestId] = recomendacoes;
+        console.log('💾 DEBUG: Salvo no cache');
         
         return recomendacoes;
         
       } catch (erro) {
-        console.error('Erro ao obter recomendações:', erro);
+        console.error('💥 DEBUG: Erro no processo:', {
+          message: erro.message,
+          name: erro.name,
+          stack: erro.stack
+        });
         throw erro;
       } finally {
         delete this._requestsInProgress[requestId];
+        console.log('🧹 DEBUG: Limpeza concluída');
       }
     })();
     
@@ -522,4 +425,5 @@ Forneça no formato JSON exato abaixo, SEM formatação markdown:`;
   }
 };
 
+console.log('🚀 DEBUG: Inicializando serviço AI...');
 window.BENETRIP_AI.init();
