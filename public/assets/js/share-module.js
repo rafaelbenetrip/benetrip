@@ -1,6 +1,6 @@
 /**
  * BENETRIP SHARE 2.0 - Compartilhamento Inteligente
- * Aproveita TODAS as informações ricas vindas das LLMs
+ * Aproveita TODAS as informações ricas vindas das LLMs 
  * Versão que cria narrativas envolventes baseadas nas respostas da IA
  */
 
