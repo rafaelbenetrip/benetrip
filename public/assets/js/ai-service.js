@@ -1,4 +1,4 @@
-// Serviço de IA para o Benetrip - Versão Vercel com Perplexity e Suporte a Viagens de Carro 
+// Serviço de IA para o Benetrip - Versão Vercel com Perplexity e Suporte a Viagens de Carro - CORRIGIDA
 window.BENETRIP_AI = {
   // Configurações do serviço
   config: {
@@ -241,40 +241,6 @@ window.BENETRIP_AI = {
     return new Promise(resolve => setTimeout(resolve, ms));
   },
   
-  // Funções auxiliares para formatação do prompt
-  getTipoDestinoText(tipoDestino) {
-    switch(tipoDestino) {
-      case 0: return "Nacional - Prefere viajar dentro do próprio país";
-      case 1: return "Internacional - Prefere viajar para fora do país";
-      default: return "Destinos nacionais ou internacionais";
-    }
-  },
-
-  getFamaDestinoText(famaDestino) {
-    switch(famaDestino) {
-      case 0: return "Destinos famosos e populares";
-      case 1: return "Destinos menos conhecidos e alternativos";
-      default: return "Mix de destinos populares e alternativos";
-    }
-  },
-
-  // Função para determinar a estação do ano em uma data
-  determinarEstacaoDoAno(data, hemisferio = 'sul') {
-    const mes = new Date(data).getMonth();
-    
-    if (hemisferio === 'sul') {
-      if (mes >= 2 && mes <= 4) return 'Outono';
-      if (mes >= 5 && mes <= 7) return 'Inverno';
-      if (mes >= 8 && mes <= 10) return 'Primavera';
-      return 'Verão';
-    } else {
-      if (mes >= 2 && mes <= 4) return 'Primavera';
-      if (mes >= 5 && mes <= 7) return 'Verão';
-      if (mes >= 8 && mes <= 10) return 'Outono';
-      return 'Inverno';
-    }
-  },
-
   // Função para calcular a duração da viagem em dias
   calcularDuracaoViagem(dataIda, dataVolta) {
     const ida = new Date(dataIda);
@@ -284,31 +250,36 @@ window.BENETRIP_AI = {
     return diffDays;
   },
 
-  // FUNÇÃO ATUALIZADA: Gerar prompt aprimorado para recomendações de destinos com suporte a viagens de carro
+  // FUNÇÃO CORRIGIDA: Gerar prompt aprimorado usando apenas dados realmente coletados
   gerarPromptParaDestinos(dados) {
-    // Extrair dados relevantes das preferências (ATUALIZADO com campos de carro)
+    console.log('Gerando prompt com dados reais coletados:', dados);
+    
+    // Extrair apenas os dados que realmente existem no questions.json
     const {
-      cidade_partida,
-      moeda_escolhida = 'BRL',
-      orcamento_valor,
-      datas = {},
-      companhia = 0,
-      destino_imaginado = 2,
-      tipo_viagem = 1,
-      fama_destino = 2,
-      tipo_destino = 2,
-      item_essencial = 4,
-      quantidade_familia = 0,
-      quantidade_amigos = 0,
-      conhece_destino = 0,
-      viagem_carro = 0, // << NOVO: 0 = não, 1 = sim
-      distancia_maxima = '500' // << NOVO: distância em km
+      cidade_partida,           // Existe nas questions
+      companhia = 0,           // Existe nas questions
+      preferencia_viagem = 0,  // Existe nas questions (NÃO tipo_viagem!)
+      datas = {},              // Existe nas questions
+      viagem_carro = 0,        // Existe nas questions
+      moeda_escolhida,         // Existe nas questions (condicional)
+      orcamento_valor,         // Existe nas questions (condicional)
+      distancia_maxima = '500',// Existe nas questions (condicional)
+      quantidade_familia = 0,  // Existe nas questions (condicional)
+      quantidade_amigos = 0    // Existe nas questions (condicional)
     } = dados;
+
+    console.log('Dados extraídos para o prompt:', {
+      cidade_partida,
+      companhia,
+      preferencia_viagem, // Note: preferencia_viagem, não tipo_viagem
+      viagem_carro,
+      moeda_escolhida,
+      orcamento_valor,
+      distancia_maxima
+    });
 
     // Valores formatados para uso no prompt
     const cidadeOrigem = cidade_partida?.name || "Cidade não especificada";
-    const moeda = moeda_escolhida;
-    const orcamento = orcamento_valor ? parseInt(orcamento_valor, 10) : 2500;
     const isViagemCarro = parseInt(viagem_carro, 10) === 1;
     const distanciaMax = distancia_maxima || '500';
     
@@ -316,9 +287,6 @@ window.BENETRIP_AI = {
     const dataIda = datas.dataIda || new Date().toISOString().split('T')[0];
     const dataVolta = datas.dataVolta || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
     const duracaoViagem = this.calcularDuracaoViagem(dataIda, dataVolta);
-    
-    // Determinar estação do ano
-    const estacaoViagem = this.determinarEstacaoDoAno(dataIda);
     
     // Calcular número de pessoas
     let quantidadePessoas = 1;
@@ -328,7 +296,7 @@ window.BENETRIP_AI = {
     
     // Formatar preferência de companhia
     let companheiroTexto;
-    switch(companhia) {
+    switch(parseInt(companhia)) {
       case 0: companheiroTexto = "Sozinho"; break;
       case 1: companheiroTexto = "Em casal"; break;
       case 2: companheiroTexto = "Em família"; break;
@@ -336,39 +304,20 @@ window.BENETRIP_AI = {
       default: companheiroTexto = "Sozinho";
     }
     
-    // Formatar preferência de viagem
+    // CORRIGIDO: Usar preferencia_viagem (que existe) ao invés de tipo_viagem (que não existe)
     let preferenciaTexto;
-    switch(tipo_viagem) {
+    switch(parseInt(preferencia_viagem)) {
       case 0: preferenciaTexto = "relaxamento e tranquilidade"; break;
-      case 1: preferenciaTexto = "exploração e descoberta"; break;
-      case 2: preferenciaTexto = "aventura e adrenalina"; break;
-      case 3: preferenciaTexto = "cultura, gastronomia e experiências locais"; break;
+      case 1: preferenciaTexto = "aventura e emoção"; break;
+      case 2: preferenciaTexto = "cultura e história"; break;
+      case 3: preferenciaTexto = "agito urbano"; break;
       default: preferenciaTexto = "experiências variadas";
     }
     
-    // Formatar preferência de atrações
-    let atracaoTexto;
-    switch(item_essencial) {
-      case 0: atracaoTexto = "diversão e entretenimento"; break;
-      case 1: atracaoTexto = "natureza e atividades ao ar livre"; break;
-      case 2: atracaoTexto = "cultura, história e museus"; break;
-      case 3: atracaoTexto = "compras e vida urbana"; break;
-      default: atracaoTexto = "experiências variadas";
-    }
-    
-    // Sugestão de distância baseada no tipo de destino
-    let sugestaoDistancia = "";
-    if (tipo_destino === 0) {
-      sugestaoDistancia = "(buscar destinos domésticos)";
-    } else if (tipo_destino === 1) {
-      sugestaoDistancia = "(buscar destinos internacionais)";
-    }
-    
-    // ATUALIZADO: Mensagem específica para orçamento ou viagem de carro
-    let mensagemOrcamento;
+    // REMOVIDO: Não fazer classificação automática de orçamento - deixar para a LLM decidir
+    let informacaoOrcamento = '';
     if (isViagemCarro) {
-      // << NOVO: Lógica específica para viagens de carro
-      mensagemOrcamento = `🚗 VIAGEM DE CARRO SELECIONADA:
+      informacaoOrcamento = `🚗 VIAGEM DE CARRO SELECIONADA:
 - O usuário prefere viajar de carro/road trip
 - Distância máxima desejada: ${distanciaMax} quilômetros de ${cidadeOrigem}
 - IMPORTANTE: Todos os destinos DEVEM estar dentro do raio de ${distanciaMax}km
@@ -376,39 +325,36 @@ window.BENETRIP_AI = {
 - Inclua informações sobre rotas, paradas estratégicas e tempo de viagem
 - Destinos DEVEM ser acessíveis por estrada a partir de ${cidadeOrigem}`;
     } else {
-      // Lógica original para viagens de avião
-      if (orcamento < 1000) {
-        mensagemOrcamento = `Orçamento muito restrito de ${orcamento} ${moeda} por pessoa para voos (ida e volta). Priorize destinos próximos e econômicos.`;
-      } else if (orcamento < 2000) {
-        mensagemOrcamento = `Orçamento econômico de ${orcamento} ${moeda} por pessoa para voos (ida e volta). Foque em opções com boa relação custo-benefício.`;
-      } else if (orcamento < 4000) {
-        mensagemOrcamento = `Orçamento moderado de ${orcamento} ${moeda} por pessoa para voos (ida e volta). Pode incluir destinos de médio alcance com preços acessíveis.`;
+      // CORRIGIDO: Não classificar automaticamente por orçamento, apenas informar
+      if (orcamento_valor && moeda_escolhida) {
+        informacaoOrcamento = `💰 ORÇAMENTO INFORMADO: ${orcamento_valor} ${moeda_escolhida} por pessoa para passagens (ida e volta).
+- Considere este orçamento ao sugerir destinos, mas a decisão final de adequação fica com você (IA)
+- Não se limite apenas por este valor, pode sugerir opções variadas`;
       } else {
-        mensagemOrcamento = `Orçamento confortável de ${orcamento} ${moeda} por pessoa para voos (ida e volta). Pode incluir destinos mais distantes e premium.`;
+        informacaoOrcamento = `💰 ORÇAMENTO: Não especificado - sugira opções variadas de diferentes faixas de preço`;
       }
     }
 
-    // ATUALIZADO: Prompt com seção específica para viagens de carro
-    const promptBase = `Crie recomendações de viagem que respeitam ESTRITAMENTE as preferências do usuário:
-${mensagemOrcamento}
+    // Prompt base usando apenas dados realmente coletados
+    const promptBase = `Crie recomendações de viagem baseadas ESTRITAMENTE nas preferências reais do usuário:
 
-PERFIL DO VIAJANTE:
-- Partindo de: ${cidadeOrigem} ${sugestaoDistancia}
-- Tipo de transporte: ${isViagemCarro ? `🚗 CARRO (máx ${distanciaMax}km)` : '✈️ AVIÃO'}
+## 📊 DADOS REAIS DO VIAJANTE:
+**Perfil Básico:**
+- Partindo de: ${cidadeOrigem}
+- Tipo de transporte: ${isViagemCarro ? `🚗 CARRO (máx ${distanciaMax}km)` : '✈️ AVIÃO/ÔNIBUS'}
 - Viajando: ${companheiroTexto}
 - Número de pessoas: ${quantidadePessoas}
-- Atividades preferidas: ${preferenciaTexto} e ${atracaoTexto}
+- Preferência principal: ${preferenciaTexto}
 - Período da viagem: ${dataIda} a ${dataVolta} (${duracaoViagem} dias)
-- Estação do ano na viagem: ${estacaoViagem}
-- Experiência como viajante: ${conhece_destino === 1 ? 'Com experiência' : 'Iniciante'} 
-- Preferência por destinos: ${this.getTipoDestinoText(tipo_destino)}
-- Popularidade do destino: ${this.getFamaDestinoText(fama_destino)}`;
 
-    // NOVO: Instruções específicas baseadas no tipo de transporte
+## 💰 INFORMAÇÕES DE ORÇAMENTO/TRANSPORTE:
+${informacaoOrcamento}`;
+
+    // Instruções específicas baseadas no tipo de transporte
     let instrucoesTipoTransporte = "";
     if (isViagemCarro) {
       instrucoesTipoTransporte = `
-INSTRUÇÕES ESPECIAIS PARA ROAD TRIP:
+## 🚗 INSTRUÇÕES ESPECIAIS PARA ROAD TRIP:
 1. TODOS os destinos DEVEM estar dentro do raio de ${distanciaMax}km de ${cidadeOrigem}
 2. Considere apenas destinos acessíveis por estradas em bom estado
 3. Inclua tempo estimado de viagem de carro para cada destino
@@ -419,27 +365,26 @@ INSTRUÇÕES ESPECIAIS PARA ROAD TRIP:
 8. Priorize destinos com estacionamento fácil nos pontos turísticos`;
     } else {
       instrucoesTipoTransporte = `
-INSTRUÇÕES PARA VIAGENS AÉREAS:
-1. O preço do VOO de CADA destino DEVE ser MENOR que o orçamento máximo de ${orcamento} ${moeda}
-2. Para CADA destino, inclua o código IATA (3 letras) do aeroporto principal
-3. Considere conexões e tempo de voo a partir de ${cidadeOrigem}
-4. Inclua estimativas realistas de preços para voos (ida e volta)`;
+## ✈️🚌 INSTRUÇÕES PARA VIAGENS AÉREAS/RODOVIÁRIAS:
+1. Considere o orçamento informado, mas não se limite rigidamente a ele
+2. Para CADA destino, inclua o código IATA (3 letras) do aeroporto principal (se aéreo)
+3. Considere conexões e acessibilidade a partir de ${cidadeOrigem}
+4. Inclua estimativas realistas de preços para passagens e hospedagem
+5. Para orçamentos menores, considere também destinos acessíveis por ônibus`;
     }
 
     const instrucoesFinal = `
-INSTRUÇÕES GERAIS:
-1. INCLUA ESTIMATIVAS REALISTAS de preços para ${isViagemCarro ? 'combustível/pedágios' : 'voos'} e hospedagem por noite para TODOS os destinos
-2. FORNEÇA INFORMAÇÕES CLIMÁTICAS detalhadas para o destino na época da viagem (temperatura, condições e recomendações)
-3. Forneça um mix equilibrado: inclua tanto destinos populares quanto alternativas
-4. Forneça EXATAMENTE 4 destinos alternativos diferentes entre si
-5. Considere a ÉPOCA DO ANO (${estacaoViagem}) para sugerir destinos com clima adequado
-6. Inclua destinos de diferentes regiões/estados
-7. Para CADA destino, INCLUA PONTOS TURÍSTICOS ESPECÍFICOS E CONHECIDOS
-8. Os comentários da Tripinha DEVEM mencionar pelo menos um dos pontos turísticos do destino e ser escritos em primeira pessoa, como se ela tivesse visitado o local
+## 🎯 INSTRUÇÕES GERAIS IMPORTANTES:
+1. **INFORMAÇÕES CLIMÁTICAS:** VOCÊ DEVE determinar a estação do ano e clima para cada destino no período ${dataIda} a ${dataVolta}
+2. **PONTOS TURÍSTICOS:** Inclua pontos turísticos ESPECÍFICOS e reais para cada destino
+3. **COMENTÁRIOS DA TRIPINHA:** Escreva em primeira pessoa como se ela tivesse visitado o local
+4. **VARIEDADE:** Forneça destinos diversificados geograficamente
+5. **ADEQUAÇÃO:** Considere a preferência "${preferenciaTexto}" e adequação para "${companheiroTexto}"
+6. **QUANTIDADE:** Forneça EXATAMENTE 1 destino top + 4 alternativas + 1 surpresa
 
-Forneça no formato JSON exato abaixo, SEM formatação markdown:`;
+## 📋 FORMATO DE RESPOSTA (JSON ESTRUTURADO):`;
 
-    // Formato JSON atualizado para incluir campos de viagem de carro
+    // Formato JSON adaptado para o tipo de viagem
     const formatoJSON = isViagemCarro ? `
 {
   "tipoTransporte": "carro",
@@ -448,7 +393,7 @@ Forneça no formato JSON exato abaixo, SEM formatação markdown:`;
     "estado": "Nome do Estado",
     "pais": "Nome do País",
     "codigoPais": "XX",
-    "distanciaRodoviaria": "${distanciaMax}km ou menos",
+    "distanciaRodoviaria": "XXX km (deve ser ≤ ${distanciaMax}km)",
     "tempoViagem": "X horas de carro",
     "rotaRecomendada": "Principal rodovia/estrada para chegar",
     "descricao": "Breve descrição do destino",
@@ -457,64 +402,27 @@ Forneça no formato JSON exato abaixo, SEM formatação markdown:`;
     "comentario": "Comentário da Tripinha em primeira pessoa sobre a road trip",
     "pontosTuristicos": ["Nome do Primeiro Ponto Turístico", "Nome do Segundo Ponto Turístico"],
     "clima": {
-      "temperatura": "Faixa de temperatura média esperada",
-      "condicoes": "Descrição das condições climáticas esperadas",
-      "recomendacoes": "Dicas relacionadas ao clima"
+      "estacao": "Estação do ano durante ${dataIda} a ${dataVolta} (você deve determinar)",
+      "temperatura": "Faixa de temperatura esperada no período da viagem",
+      "condicoes": "Condições climáticas detalhadas esperadas",
+      "recomendacoes": "Dicas específicas do que levar/vestir"
     },
     "infraestrutura": {
       "estacionamento": "Informações sobre estacionamento nos pontos turísticos",
       "rota": "Detalhes da melhor rota de carro"
     },
     "preco": {
-      "combustivel": número_estimado_combustivel_ida_volta,
-      "pedagios": número_estimado_pedagios,
-      "hotel": número_por_noite
+      "combustivel": "Estimativa de combustível ida e volta",
+      "pedagios": "Estimativa de pedágios se houver",
+      "hotel": "Preço estimado por noite"
     }
   },
   "alternativas": [
-    {
-      "destino": "Nome da Cidade 1",
-      "estado": "Nome do Estado 1",
-      "pais": "Nome do País 1", 
-      "codigoPais": "XX",
-      "distanciaRodoviaria": "XXXkm",
-      "tempoViagem": "X horas",
-      "rotaRecomendada": "Rodovia principal",
-      "porque": "Razão específica para visitar",
-      "pontosTuristicos": ["Ponto 1", "Ponto 2"],
-      "clima": { "temperatura": "Faixa de temperatura" },
-      "preco": { "combustivel": número, "pedagios": número, "hotel": número }
-    }
+    // 4 alternativas com estrutura similar, todas ≤ ${distanciaMax}km
   ],
   "surpresa": {
-    "destino": "Nome da Cidade",
-    "estado": "Nome do Estado",
-    "pais": "Nome do País",
-    "codigoPais": "XX",
-    "distanciaRodoviaria": "XXXkm",
-    "tempoViagem": "X horas",
-    "rotaRecomendada": "Rodovia principal",
-    "descricao": "Breve descrição do destino",
-    "porque": "Razão para visitar, destacando o fator surpresa",
-    "destaque": "Uma experiência única neste destino",
-    "comentario": "Comentário da Tripinha sobre esta road trip surpresa",
-    "pontosTuristicos": ["Ponto 1", "Ponto 2"],
-    "clima": {
-      "temperatura": "Faixa de temperatura",
-      "condicoes": "Condições climáticas",
-      "recomendacoes": "Dicas relacionadas ao clima"
-    },
-    "infraestrutura": {
-      "estacionamento": "Informações sobre estacionamento",
-      "rota": "Detalhes da rota"
-    },
-    "preco": {
-      "combustivel": número,
-      "pedagios": número,
-      "hotel": número
-    }
+    // Estrutura similar ao topPick, também ≤ ${distanciaMax}km
   },
-  "estacaoViagem": "${estacaoViagem}",
   "dicasRoadTrip": "Dicas específicas para esta road trip"
 }` : `
 {
@@ -529,55 +437,26 @@ Forneça no formato JSON exato abaixo, SEM formatação markdown:`;
     "comentario": "Comentário da Tripinha em primeira pessoa",
     "pontosTuristicos": ["Nome do Primeiro Ponto Turístico", "Nome do Segundo Ponto Turístico"],
     "clima": {
-      "temperatura": "Faixa de temperatura média esperada",
-      "condicoes": "Descrição das condições climáticas esperadas",
-      "recomendacoes": "Dicas relacionadas ao clima"
+      "estacao": "Estação do ano durante ${dataIda} a ${dataVolta} (você deve determinar)",
+      "temperatura": "Faixa de temperatura esperada no período da viagem",
+      "condicoes": "Condições climáticas detalhadas esperadas",
+      "recomendacoes": "Dicas específicas do que levar/vestir"
     },
     "aeroporto": {
       "codigo": "XYZ",
       "nome": "Nome do Aeroporto Principal"
     },
     "preco": {
-      "voo": número,
-      "hotel": número
+      "voo": "Estimativa baseada no orçamento informado ou pesquisa",
+      "hotel": "Preço estimado por noite"
     }
   },
   "alternativas": [
-    {
-      "destino": "Nome da Cidade 1",
-      "pais": "Nome do País 1", 
-      "codigoPais": "XX",
-      "porque": "Razão específica para visitar",
-      "pontosTuristicos": ["Nome do Primeiro Ponto Turístico", "Nome do Segundo Ponto Turístico"],
-      "clima": { "temperatura": "Faixa de temperatura média esperada" },
-      "aeroporto": { "codigo": "XYZ", "nome": "Nome do Aeroporto Principal" },
-      "preco": { "voo": número, "hotel": número }
-    }
+    // 4 alternativas com estrutura similar
   ],
   "surpresa": {
-    "destino": "Nome da Cidade",
-    "pais": "Nome do País",
-    "codigoPais": "XX",
-    "descricao": "Breve descrição do destino",
-    "porque": "Razão para visitar, destacando o fator surpresa",
-    "destaque": "Uma experiência única neste destino",
-    "comentario": "Comentário da Tripinha em primeira pessoa",
-    "pontosTuristicos": ["Nome do Primeiro Ponto Turístico", "Nome do Segundo Ponto Turístico"],
-    "clima": {
-      "temperatura": "Faixa de temperatura média esperada",
-      "condicoes": "Descrição das condições climáticas esperadas",
-      "recomendacoes": "Dicas relacionadas ao clima"
-    },
-    "aeroporto": {
-      "codigo": "XYZ",
-      "nome": "Nome do Aeroporto Principal"
-    },
-    "preco": {
-      "voo": número,
-      "hotel": número
-    }
-  },
-  "estacaoViagem": "${estacaoViagem}"
+    // Estrutura similar ao topPick
+  }
 }`;
 
     return promptBase + instrucoesTipoTransporte + instrucoesFinal + formatoJSON;
@@ -1212,7 +1091,7 @@ Forneça no formato JSON exato abaixo, SEM formatação markdown:`;
       throw new Error('Preferências de usuário não fornecidas');
     }
     
-    console.log('Recebendo pedido de recomendações com preferências:', preferenciasUsuario);
+    console.log('Recebendo pedido de recomendações com preferências REAIS:', preferenciasUsuario);
     
     // Gerar ID para rastrear requisições duplicadas
     const requestId = this.generateRequestId(preferenciasUsuario);
