@@ -1,0 +1,554 @@
+/**
+ * BENETRIP - Estilos do Módulo de Compartilhamento
+ * Versão 1.0
+ * 
+ * Cores da identidade visual:
+ * - Laranja: #E87722
+ * - Azul: #00A3E0
+ * - Branco: #FFFFFF
+ * - Cinza Escuro: #21272A
+ */
+
+/* ========== BOTÃO FLUTUANTE ========== */
+.share-floating-button {
+    position: fixed;
+    bottom: 80px;
+    right: 20px;
+    z-index: 999;
+    animation: fadeInUp 0.5s ease-out;
+}
+
+.share-fab {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #E87722 0%, #FF8C42 100%);
+    color: white;
+    border: none;
+    box-shadow: 0 4px 12px rgba(232, 119, 34, 0.4);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.share-fab:hover {
+    transform: scale(1.1);
+    box-shadow: 0 6px 20px rgba(232, 119, 34, 0.5);
+}
+
+.share-fab:active {
+    transform: scale(0.95);
+}
+
+.share-fab::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.3);
+    transform: translate(-50%, -50%);
+    transition: width 0.5s, height 0.5s;
+}
+
+.share-fab:hover::before {
+    width: 100px;
+    height: 100px;
+}
+
+/* Animação de pulso para chamar atenção */
+@keyframes pulse {
+    0% {
+        box-shadow: 0 4px 12px rgba(232, 119, 34, 0.4);
+    }
+    50% {
+        box-shadow: 0 4px 20px rgba(232, 119, 34, 0.8);
+    }
+    100% {
+        box-shadow: 0 4px 12px rgba(232, 119, 34, 0.4);
+    }
+}
+
+.share-fab.pulse {
+    animation: pulse 2s infinite;
+}
+
+/* ========== MODAL DE COMPARTILHAMENTO ========== */
+.share-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(33, 39, 42, 0.8);
+    backdrop-filter: blur(5px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+    padding: 20px;
+    animation: fadeIn 0.3s ease-out;
+}
+
+.share-modal.hidden {
+    display: none;
+}
+
+.share-modal-content {
+    background: white;
+    border-radius: 16px;
+    max-width: 500px;
+    width: 100%;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    animation: slideUp 0.4s ease-out;
+}
+
+/* ========== HEADER DO MODAL ========== */
+.share-modal-header {
+    padding: 20px;
+    border-bottom: 1px solid #E5E7EB;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: linear-gradient(135deg, #FFF7ED 0%, #FFEDD5 100%);
+    border-radius: 16px 16px 0 0;
+}
+
+.share-modal-header h3 {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #21272A;
+    font-family: 'Poppins', sans-serif;
+}
+
+.share-modal-close {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 4px;
+    color: #6B7280;
+    transition: all 0.2s;
+    border-radius: 8px;
+}
+
+.share-modal-close:hover {
+    background: rgba(232, 119, 34, 0.1);
+    color: #E87722;
+}
+
+/* ========== CORPO DO MODAL ========== */
+.share-modal-body {
+    padding: 20px;
+}
+
+.share-options {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+/* ========== CARDS DE OPÇÕES ========== */
+.share-option-card {
+    border: 2px solid #E5E7EB;
+    border-radius: 12px;
+    padding: 16px;
+    transition: all 0.3s ease;
+    background: white;
+    position: relative;
+    overflow: hidden;
+}
+
+.share-option-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, #E87722, #00A3E0);
+    transform: scaleX(0);
+    transition: transform 0.3s ease;
+}
+
+.share-option-card:hover {
+    border-color: #E87722;
+    box-shadow: 0 4px 12px rgba(232, 119, 34, 0.15);
+}
+
+.share-option-card:hover::before {
+    transform: scaleX(1);
+}
+
+.share-option-card.highlighted {
+    border-color: #E87722;
+    background: linear-gradient(135deg, #FFF7ED 0%, white 100%);
+    box-shadow: 0 4px 12px rgba(232, 119, 34, 0.2);
+}
+
+.share-option-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 8px;
+}
+
+.share-option-icon {
+    font-size: 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    background: linear-gradient(135deg, #FFF7ED, #FFEDD5);
+    border-radius: 10px;
+}
+
+.share-option-header h4 {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 600;
+    color: #21272A;
+    font-family: 'Poppins', sans-serif;
+}
+
+.share-option-description {
+    color: #6B7280;
+    font-size: 0.875rem;
+    margin: 0 0 12px 0;
+    line-height: 1.4;
+}
+
+/* ========== BOTÕES DE COMPARTILHAMENTO ========== */
+.share-buttons {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+    gap: 8px;
+}
+
+.share-btn {
+    padding: 8px 12px;
+    border: 1px solid #E5E7EB;
+    border-radius: 8px;
+    background: white;
+    cursor: pointer;
+    font-size: 0.75rem;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    color: #4B5563;
+    position: relative;
+    overflow: hidden;
+}
+
+.share-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.share-btn svg {
+    width: 16px;
+    height: 16px;
+}
+
+/* Cores específicas por plataforma */
+.share-btn.whatsapp:hover {
+    background: #25D366;
+    color: white;
+    border-color: #25D366;
+}
+
+.share-btn.twitter:hover {
+    background: #000000;
+    color: white;
+    border-color: #000000;
+}
+
+.share-btn.facebook:hover {
+    background: #1877F2;
+    color: white;
+    border-color: #1877F2;
+}
+
+.share-btn.copy:hover {
+    background: linear-gradient(135deg, #E87722, #FF8C42);
+    color: white;
+    border-color: #E87722;
+}
+
+/* ========== BOTÕES INLINE NAS CARDS ========== */
+.inline-share-button {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    background: white;
+    border: 1px solid rgba(232, 119, 34, 0.3);
+    border-radius: 8px;
+    padding: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    z-index: 10;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.inline-share-button:hover {
+    background: #E87722;
+    border-color: #E87722;
+    transform: scale(1.1);
+    box-shadow: 0 4px 8px rgba(232, 119, 34, 0.3);
+}
+
+.inline-share-button:hover svg {
+    stroke: white;
+}
+
+.inline-share-button svg {
+    width: 16px;
+    height: 16px;
+    stroke: #E87722;
+    transition: stroke 0.2s ease;
+}
+
+/* ========== PREVIEW DA MENSAGEM ========== */
+.share-preview {
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid #E5E7EB;
+}
+
+.share-preview h4 {
+    margin: 0 0 12px 0;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #4B5563;
+}
+
+.share-preview-content {
+    background: #F9FAFB;
+    border: 1px solid #E5E7EB;
+    border-radius: 8px;
+    padding: 12px;
+    font-size: 0.875rem;
+    line-height: 1.5;
+    color: #374151;
+    max-height: 150px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+/* ========== TOAST DE NOTIFICAÇÃO ========== */
+.share-toast {
+    position: fixed;
+    bottom: 100px;
+    left: 50%;
+    transform: translateX(-50%) translateY(100px);
+    background: linear-gradient(135deg, #21272A, #374151);
+    color: white;
+    padding: 12px 24px;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    z-index: 10001;
+    font-size: 0.875rem;
+    font-weight: 500;
+    opacity: 0;
+    transition: all 0.3s ease;
+}
+
+.share-toast.show {
+    transform: translateX(-50%) translateY(0);
+    opacity: 1;
+}
+
+/* ========== ANIMAÇÕES ========== */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* ========== RESPONSIVIDADE ========== */
+@media (max-width: 640px) {
+    .share-modal {
+        padding: 0;
+        align-items: flex-end;
+    }
+    
+    .share-modal-content {
+        border-radius: 16px 16px 0 0;
+        max-height: 80vh;
+        animation: slideUpMobile 0.4s ease-out;
+    }
+    
+    .share-floating-button {
+        bottom: 70px;
+        right: 16px;
+    }
+    
+    .share-fab {
+        width: 48px;
+        height: 48px;
+    }
+    
+    .share-buttons {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    
+    .share-option-card {
+        padding: 12px;
+    }
+    
+    .share-toast {
+        bottom: 20px;
+        font-size: 0.8rem;
+        padding: 10px 20px;
+    }
+}
+
+@keyframes slideUpMobile {
+    from {
+        transform: translateY(100%);
+    }
+    to {
+        transform: translateY(0);
+    }
+}
+
+/* ========== MODO ESCURO (FUTURO) ========== */
+@media (prefers-color-scheme: dark) {
+    /* Preparado para implementação futura de modo escuro */
+    .share-modal-content {
+        /* background: #1F2937; */
+        /* color: #F3F4F6; */
+    }
+}
+
+/* ========== ESTADOS DE FOCO PARA ACESSIBILIDADE ========== */
+.share-btn:focus,
+.share-fab:focus,
+.share-modal-close:focus,
+.inline-share-button:focus {
+    outline: 2px solid #E87722;
+    outline-offset: 2px;
+}
+
+/* ========== INDICADORES DE TIPO DE VIAGEM ========== */
+.share-travel-type-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    margin-left: 8px;
+}
+
+.share-travel-type-badge.solo {
+    background: linear-gradient(135deg, #F59E0B, #F97316);
+    color: white;
+}
+
+.share-travel-type-badge.romantic {
+    background: linear-gradient(135deg, #EC4899, #F43F5E);
+    color: white;
+}
+
+.share-travel-type-badge.family {
+    background: linear-gradient(135deg, #10B981, #059669);
+    color: white;
+}
+
+.share-travel-type-badge.friends {
+    background: linear-gradient(135deg, #8B5CF6, #7C3AED);
+    color: white;
+}
+
+/* ========== LOADING STATE ========== */
+.share-loading {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    border: 2px solid #E5E7EB;
+    border-top-color: #E87722;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* ========== CONTADOR DE COMPARTILHAMENTOS ========== */
+.share-counter {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    background: #E87722;
+    color: white;
+    font-size: 0.65rem;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 10px;
+    min-width: 20px;
+    text-align: center;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+/* ========== INTEGRAÇÃO COM TEMA BENETRIP ========== */
+.benetrip-share-theme {
+    --share-primary: #E87722;
+    --share-secondary: #00A3E0;
+    --share-white: #FFFFFF;
+    --share-dark: #21272A;
+    --share-gray-light: #F5F5F5;
+    --share-gray-medium: #E0E0E0;
+}
+
+/* Garantir que fontes da Benetrip sejam aplicadas */
+.share-modal-content * {
+    font-family: 'Montserrat', sans-serif;
+}
+
+.share-modal-content h3,
+.share-modal-content h4 {
+    font-family: 'Poppins', sans-serif;
+}
