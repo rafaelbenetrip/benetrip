@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🧪 Teste Amadeus - Benetrip</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        body {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        
+        h1 {
+            color: #E87722;
+            text-align: center;
+        }
+        
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        label {
+            display: block;
+            font-weight: bold;
+            margin-bottom: 5px;
+            color: #333;
+        }
+        
+        input, select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+        }
+        
+        input:focus, select:focus {
+            border-color: #00A3E0;
+            outline: none;
+        }
+        
+        .row {
+            display: flex;
+            gap: 15px;
+        }
+        
+        .row .form-group {
+            flex: 1;
+        }
+        
+        button {
+            width: 100%;
+            padding: 15px;
+            background: #E87722;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        
+        button:hover {
+            background: #d16a1f;
+        }
+        
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        
+        #loading {
+            display: none;
+            text-align: center;
+            padding: 40px;
+        }
+        
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #E87722;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        #results {
+            display: none;
+        }
+        
+        .stats {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .stat-box {
+            flex: 1;
+            background: #00A3E0;
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        
+        .stat-box .number {
+            font-size: 32px;
+            font-weight: bold;
+        }
+        
+        .stat-box .label {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+        
+        .destination-list {
+            max-height: 500px;
+            overflow-y: auto;
+        }
+        
+        .destination {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px;
+            border-bottom: 1px solid #eee;
+            transition: background 0.2s;
+        }
+        
+        .destination:hover {
+            background: #f9f9f9;
+        }
+        
+        .destination:last-child {
+            border-bottom: none;
+        }
+        
+        .dest-info {
+            flex: 1;
+        }
+        
+        .dest-code {
+            font-size: 24px;
+            font-weight: bold;
+            color: #E87722;
+        }
+        
+        .dest-name {
+            color: #666;
+            font-size: 14px;
+        }
+        
+        .dest-dates {
+            color: #999;
+            font-size: 12px;
+            margin-top: 4px;
+        }
+        
+        .dest-price {
+            text-align: right;
+        }
+        
+        .price-eur {
+            font-size: 24px;
+            font-weight: bold;
+            color: #00A3E0;
+        }
+        
+        .price-brl {
+            font-size: 14px;
+            color: #666;
+        }
+        
+        .error {
+            background: #ffebee;
+            color: #c62828;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+        }
+        
+        .info {
+            background: #e3f2fd;
+            color: #1565c0;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            font-size: 14px;
+        }
+        
+        .raw-json {
+            background: #263238;
+            color: #aed581;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow: auto;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+        
+        .toggle-json {
+            background: #607d8b;
+            margin-top: 15px;
+            font-size: 14px;
+        }
+        
+        #rawJson {
+            display: none;
+            margin-top: 15px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 Teste API Amadeus</h1>
+    
+    <div class="card">
+        <div class="info">
+            ℹ️ Esta página testa a API Flight Inspiration Search da Amadeus, que retorna destinos com preços reais de passagens.
+        </div>
+        
+        <div class="form-group">
+            <label>✈️ Aeroporto de Origem (código IATA)</label>
+            <input type="text" id="origin" value="GRU" maxlength="3" placeholder="Ex: GRU, CGH, SDU, GIG" style="text-transform: uppercase;">
+            <small style="color: #666;">GRU=Guarulhos, CGH=Congonhas, GIG=Galeão, BSB=Brasília</small>
+        </div>
+        
+        <div class="row">
+            <div class="form-group">
+                <label>📅 Data de Ida</label>
+                <input type="date" id="departureDate">
+            </div>
+            <div class="form-group">
+                <label>📅 Data de Volta</label>
+                <input type="date" id="returnDate">
+            </div>
+        </div>
+        
+        <div class="row">
+            <div class="form-group">
+                <label>💰 Orçamento Máximo (opcional)</label>
+                <input type="number" id="maxPrice" placeholder="Ex: 500" min="0">
+            </div>
+            <div class="form-group">
+                <label>💱 Moeda do Orçamento</label>
+                <select id="currency">
+                    <option value="BRL">🇧🇷 Real (BRL)</option>
+                    <option value="USD">🇺🇸 Dólar (USD)</option>
+                    <option value="EUR">🇪🇺 Euro (EUR)</option>
+                </select>
+            </div>
+        </div>
+        
+        <button id="searchBtn" onclick="buscarDestinos()">
+            🔍 Buscar Destinos
+        </button>
+    </div>
+    
+    <div id="loading" class="card">
+        <div class="spinner"></div>
+        <p>Buscando destinos na Amadeus...</p>
+    </div>
+    
+    <div id="results">
+        <div class="card">
+            <h2>📊 Resultados</h2>
+            
+            <div class="stats">
+                <div class="stat-box">
+                    <div class="number" id="totalCount">0</div>
+                    <div class="label">Destinos</div>
+                </div>
+                <div class="stat-box" style="background: #E87722;">
+                    <div class="number" id="cheapestPrice">-</div>
+                    <div class="label">Mais Barato</div>
+                </div>
+                <div class="stat-box" style="background: #4caf50;">
+                    <div class="number" id="avgPrice">-</div>
+                    <div class="label">Preço Médio</div>
+                </div>
+            </div>
+            
+            <h3>🌍 Destinos Encontrados</h3>
+            <div class="destination-list" id="destinationList">
+                <!-- Destinos serão inseridos aqui -->
+            </div>
+            
+            <button class="toggle-json" onclick="toggleJson()">
+                📋 Ver/Ocultar JSON Bruto
+            </button>
+            
+            <div id="rawJson">
+                <pre class="raw-json" id="jsonContent"></pre>
+            </div>
+        </div>
+    </div>
+    
+    <div id="errorBox" class="card error" style="display: none;">
+        <strong>❌ Erro:</strong> <span id="errorMessage"></span>
+    </div>
+
+    <script>
+        // Configurar datas padrão (próximo mês)
+        const hoje = new Date();
+        const ida = new Date(hoje);
+        ida.setMonth(ida.getMonth() + 1);
+        ida.setDate(15);
+        
+        const volta = new Date(ida);
+        volta.setDate(volta.getDate() + 7);
+        
+        document.getElementById('departureDate').value = ida.toISOString().split('T')[0];
+        document.getElementById('returnDate').value = volta.toISOString().split('T')[0];
+        
+        // Taxas de conversão aproximadas
+        const TAXAS = {
+            'BRL': 0.17,  // BRL para EUR
+            'USD': 0.92,  // USD para EUR
+            'EUR': 1
+        };
+        
+        const TAXA_EUR_BRL = 6.0;
+        
+        async function buscarDestinos() {
+            const origin = document.getElementById('origin').value.toUpperCase().trim();
+            const departureDate = document.getElementById('departureDate').value;
+            const returnDate = document.getElementById('returnDate').value;
+            const maxPrice = document.getElementById('maxPrice').value;
+            const currency = document.getElementById('currency').value;
+            
+            // Validações
+            if (!origin || origin.length !== 3) {
+                alert('Por favor, insira um código IATA válido (3 letras)');
+                return;
+            }
+            
+            if (!departureDate || !returnDate) {
+                alert('Por favor, selecione as datas');
+                return;
+            }
+            
+            // Converter orçamento para EUR se necessário
+            let maxPriceEUR = null;
+            if (maxPrice && parseFloat(maxPrice) > 0) {
+                maxPriceEUR = Math.floor(parseFloat(maxPrice) * TAXAS[currency]);
+            }
+            
+            // Mostrar loading
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('results').style.display = 'none';
+            document.getElementById('errorBox').style.display = 'none';
+            document.getElementById('searchBtn').disabled = true;
+            
+            try {
+                const response = await fetch('/api/amadeus/test', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        origin,
+                        departureDate,
+                        returnDate,
+                        maxPrice: maxPriceEUR
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(data.error || data.message || 'Erro na API');
+                }
+                
+                exibirResultados(data, currency);
+                
+            } catch (error) {
+                console.error('Erro:', error);
+                document.getElementById('errorMessage').textContent = error.message;
+                document.getElementById('errorBox').style.display = 'block';
+            } finally {
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('searchBtn').disabled = false;
+            }
+        }
+        
+        function exibirResultados(data, userCurrency) {
+            const destinations = data.destinations || [];
+            
+            // Stats
+            document.getElementById('totalCount').textContent = destinations.length;
+            
+            if (destinations.length > 0) {
+                const prices = destinations.map(d => d.price);
+                const cheapest = Math.min(...prices);
+                const avg = Math.round(prices.reduce((a, b) => a + b, 0) / prices.length);
+                
+                document.getElementById('cheapestPrice').textContent = `€${cheapest}`;
+                document.getElementById('avgPrice').textContent = `€${avg}`;
+            } else {
+                document.getElementById('cheapestPrice').textContent = '-';
+                document.getElementById('avgPrice').textContent = '-';
+            }
+            
+            // Lista de destinos
+            const listHtml = destinations.map(dest => {
+                const priceBRL = Math.round(dest.price * TAXA_EUR_BRL);
+                return `
+                    <div class="destination">
+                        <div class="dest-info">
+                            <div class="dest-code">${dest.iataCode}</div>
+                            <div class="dest-name">${dest.cityName || 'Nome não disponível'}</div>
+                            <div class="dest-dates">📅 ${dest.departureDate} → ${dest.returnDate}</div>
+                        </div>
+                        <div class="dest-price">
+                            <div class="price-eur">€${dest.price}</div>
+                            <div class="price-brl">≈ R$ ${priceBRL.toLocaleString('pt-BR')}</div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            
+            document.getElementById('destinationList').innerHTML = listHtml || '<p style="text-align:center;color:#999;">Nenhum destino encontrado</p>';
+            
+            // JSON bruto
+            document.getElementById('jsonContent').textContent = JSON.stringify(data, null, 2);
+            
+            // Mostrar resultados
+            document.getElementById('results').style.display = 'block';
+        }
+        
+        function toggleJson() {
+            const jsonDiv = document.getElementById('rawJson');
+            jsonDiv.style.display = jsonDiv.style.display === 'none' ? 'block' : 'none';
+        }
+    </script>
+</body>
+</html>
