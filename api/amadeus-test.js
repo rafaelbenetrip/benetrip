@@ -53,11 +53,11 @@ async function getToken() {
         return cachedToken;
     }
 
-    const apiKey = process.env.AMADEUS_API_KEY;
-    const apiSecret = process.env.AMADEUS_API_SECRET;
+    const apiKey = process.env.Amadeus_test_apikey;
+    const apiSecret = process.env.Amadeus_test_apisecret;
 
     if (!apiKey || !apiSecret) {
-        throw new Error('AMADEUS_API_KEY ou AMADEUS_API_SECRET não configurados. Configure no Vercel: Settings → Environment Variables');
+        throw new Error('Amadeus_test_apikey ou Amadeus_test_apisecret não configurados. Configure no Vercel: Settings → Environment Variables');
     }
 
     console.log('🔑 Obtendo novo token Amadeus...');
