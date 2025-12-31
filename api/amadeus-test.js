@@ -87,14 +87,28 @@ async function getToken() {
 async function buscarDestinos(origin, departureDate, returnDate, maxPrice = null) {
     const token = await getToken();
 
-    // Montar query string
-    let queryParams = `origin=${origin}&departureDate=${departureDate},${returnDate}&oneWay=false&nonStop=false&viewBy=DESTINATION`;
+    // Calcular duração da viagem em dias
+    const dataIda = new Date(departureDate);
+    const dataVolta = new Date(returnDate);
+    const duracaoDias = Math.ceil((dataVolta - dataIda) / (1000 * 60 * 60 * 24));
+
+    // Montar query string - formato correto da Amadeus
+    let queryParams = `origin=${origin}&oneWay=false&nonStop=false&viewBy=DESTINATION`;
+    
+    // Amadeus espera apenas departureDate com range ou data única
+    // e duration para round-trip
+    queryParams += `&departureDate=${departureDate}`;
+    
+    if (duracaoDias > 0 && duracaoDias <= 15) {
+        queryParams += `&duration=${duracaoDias}`;
+    }
     
     if (maxPrice && maxPrice > 0) {
         queryParams += `&maxPrice=${Math.floor(maxPrice)}`;
     }
 
-    console.log(`🔍 Buscando: ${origin}, ${departureDate}-${returnDate}, max: ${maxPrice || 'sem limite'}`);
+    console.log(`🔍 Buscando: ${origin}, partida: ${departureDate}, duração: ${duracaoDias} dias, max: ${maxPrice || 'sem limite'}`);
+    console.log(`📡 URL: /v1/shopping/flight-destinations?${queryParams}`);
 
     const response = await httpsRequest({
         hostname: BASE_URL,
@@ -181,21 +195,23 @@ module.exports = async function handler(req, res) {
         });
 
     } catch (error) {
-        console.error('❌ Erro:', error);
+        console.error('❌ Erro completo:', JSON.stringify(error, null, 2));
 
         // Erros específicos da Amadeus
         if (error.data?.errors) {
             const amadeusError = error.data.errors[0];
+            console.error('❌ Erro Amadeus:', JSON.stringify(amadeusError, null, 2));
             return res.status(error.status || 400).json({
                 error: amadeusError.detail || amadeusError.title || 'Erro na API Amadeus',
                 code: amadeusError.code,
-                source: amadeusError.source
+                source: amadeusError.source,
+                fullError: amadeusError
             });
         }
 
         return res.status(500).json({
             error: error.message || 'Erro interno do servidor',
-            details: String(error)
+            details: JSON.stringify(error)
         });
     }
 };
