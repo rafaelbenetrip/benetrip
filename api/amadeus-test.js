@@ -1,9 +1,12 @@
 // api/amadeus-test.js - Endpoint de TESTE para Amadeus API
-// Rota: /api/amadeus-test
+// Baseado na documentação oficial: Flight Inspiration Search
 
 const https = require('https');
 
-// Configuração
+// O ambiente TEST só tem dados para certas origens!
+// Ver: https://github.com/amadeus4dev/data-collection
+const ORIGENS_TESTE_CONHECIDAS = ['MAD', 'NYC', 'LON', 'PAR', 'BCN', 'FCO', 'MIA', 'LAX', 'SFO'];
+
 const BASE_URL = process.env.AMADEUS_ENV === 'production' 
     ? 'api.amadeus.com' 
     : 'test.api.amadeus.com';
@@ -13,7 +16,7 @@ let cachedToken = null;
 let tokenExpiry = null;
 
 /**
- * Fazer requisição HTTPS (sem axios)
+ * Fazer requisição HTTPS
  */
 function httpsRequest(options, postData = null) {
     return new Promise((resolve, reject) => {
@@ -44,12 +47,11 @@ function httpsRequest(options, postData = null) {
 }
 
 /**
- * Obter token de acesso da Amadeus
+ * Obter token OAuth2
  */
 async function getToken() {
-    // Usar cache se válido
     if (cachedToken && tokenExpiry && Date.now() < tokenExpiry) {
-        console.log('♻️ Usando token em cache');
+        console.log('♻️ Token em cache');
         return cachedToken;
     }
 
@@ -57,11 +59,10 @@ async function getToken() {
     const apiSecret = process.env.Amadeus_test_apisecret;
 
     if (!apiKey || !apiSecret) {
-        throw new Error('Amadeus_test_apikey ou Amadeus_test_apisecret não configurados. Configure no Vercel: Settings → Environment Variables');
+        throw new Error('Credenciais Amadeus não configuradas');
     }
 
-    console.log('🔑 Obtendo novo token Amadeus...');
-
+    console.log('🔑 Obtendo token...');
     const postData = `grant_type=client_credentials&client_id=${apiKey}&client_secret=${apiSecret}`;
 
     const response = await httpsRequest({
@@ -75,51 +76,57 @@ async function getToken() {
     }, postData);
 
     cachedToken = response.access_token;
-    tokenExpiry = Date.now() + (response.expires_in * 1000) - 60000; // 1 min margem
-
-    console.log('✅ Token obtido com sucesso');
+    tokenExpiry = Date.now() + (response.expires_in * 1000) - 60000;
+    console.log('✅ Token OK');
     return cachedToken;
 }
 
 /**
- * Buscar destinos na API Flight Inspiration Search
+ * Buscar destinos - formato SIMPLIFICADO seguindo documentação
+ * 
+ * Documentação: GET /v1/shopping/flight-destinations
+ * - origin: OBRIGATÓRIO (IATA 3 letras)
+ * - departureDate: OPCIONAL (YYYY-MM-DD ou range YYYY-MM-DD,YYYY-MM-DD)
+ * - duration: OPCIONAL (1-15 dias, ou range 2,8)
+ * - maxPrice: OPCIONAL (inteiro positivo)
+ * - viewBy: OPCIONAL (DESTINATION, DATE, DURATION, WEEK, COUNTRY)
  */
-async function buscarDestinos(origin, departureDate, returnDate, maxPrice = null) {
+async function buscarDestinos(params) {
     const token = await getToken();
-
-    // Calcular duração da viagem em dias
-    const dataIda = new Date(departureDate);
-    const dataVolta = new Date(returnDate);
-    const duracaoDias = Math.ceil((dataVolta - dataIda) / (1000 * 60 * 60 * 24));
-
-    // Montar query string - formato correto da Amadeus
-    let queryParams = `origin=${origin}&oneWay=false&nonStop=false&viewBy=DESTINATION`;
     
-    // Amadeus espera apenas departureDate com range ou data única
-    // e duration para round-trip
-    queryParams += `&departureDate=${departureDate}`;
+    // Montar query - começando só com o obrigatório
+    const queryParts = [`origin=${params.origin}`];
     
-    if (duracaoDias > 0 && duracaoDias <= 15) {
-        queryParams += `&duration=${duracaoDias}`;
+    // Adicionar opcionais se informados
+    if (params.departureDate) {
+        queryParts.push(`departureDate=${params.departureDate}`);
     }
     
-    if (maxPrice && maxPrice > 0) {
-        queryParams += `&maxPrice=${Math.floor(maxPrice)}`;
+    if (params.duration) {
+        queryParts.push(`duration=${params.duration}`);
     }
+    
+    if (params.maxPrice && params.maxPrice > 0) {
+        queryParts.push(`maxPrice=${Math.floor(params.maxPrice)}`);
+    }
+    
+    // viewBy=DESTINATION agrupa por destino (mais útil para nós)
+    queryParts.push('viewBy=DESTINATION');
+    
+    const queryString = queryParts.join('&');
+    const path = `/v1/shopping/flight-destinations?${queryString}`;
+    
+    console.log(`📡 GET ${path}`);
 
-    console.log(`🔍 Buscando: ${origin}, partida: ${departureDate}, duração: ${duracaoDias} dias, max: ${maxPrice || 'sem limite'}`);
-    console.log(`📡 URL: /v1/shopping/flight-destinations?${queryParams}`);
-
-    const response = await httpsRequest({
+    return await httpsRequest({
         hostname: BASE_URL,
-        path: `/v1/shopping/flight-destinations?${queryParams}`,
+        path: path,
         method: 'GET',
         headers: {
-            'Authorization': `Bearer ${token}`
+            'Authorization': `Bearer ${token}`,
+            'Accept': 'application/json'
         }
     });
-
-    return response;
 }
 
 /**
@@ -132,86 +139,111 @@ module.exports = async function handler(req, res) {
     res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,POST');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-    if (req.method === 'OPTIONS') {
-        return res.status(200).end();
-    }
-
-    if (req.method !== 'POST') {
-        return res.status(405).json({ error: 'Use POST' });
-    }
+    if (req.method === 'OPTIONS') return res.status(200).end();
+    if (req.method !== 'POST') return res.status(405).json({ error: 'Use POST' });
 
     try {
-        console.log('🚀 === TESTE AMADEUS API ===');
-        console.log('Body recebido:', JSON.stringify(req.body));
-
-        const { origin, departureDate, returnDate, maxPrice } = req.body || {};
-
-        // Validações
-        if (!origin || !departureDate || !returnDate) {
+        console.log('\n🚀 === TESTE AMADEUS ===');
+        
+        const body = req.body || {};
+        const origin = (body.origin || '').toUpperCase().trim();
+        
+        // Validação básica
+        if (!origin || !/^[A-Z]{3}$/.test(origin)) {
             return res.status(400).json({ 
-                error: 'Parâmetros obrigatórios: origin, departureDate, returnDate',
-                received: { origin, departureDate, returnDate }
+                error: 'Origin inválido. Use código IATA de 3 letras.',
+                exemplo: 'MAD, NYC, LON, PAR'
             });
         }
-
-        const originCode = origin.toUpperCase().trim();
-        if (!/^[A-Z]{3}$/.test(originCode)) {
-            return res.status(400).json({ 
-                error: 'Código IATA inválido. Use 3 letras (ex: GRU, JFK)',
-                received: origin
-            });
+        
+        // Aviso sobre ambiente de teste
+        const isOrigemConhecida = ORIGENS_TESTE_CONHECIDAS.includes(origin);
+        if (!isOrigemConhecida) {
+            console.log(`⚠️ AVISO: ${origin} pode não ter dados no ambiente TEST`);
         }
-
-        // Buscar destinos
-        const rawData = await buscarDestinos(originCode, departureDate, returnDate, maxPrice);
-
+        
+        // Montar parâmetros
+        const params = { origin };
+        
+        // Se informou datas, criar range de departureDate
+        if (body.departureDate) {
+            if (body.returnDate) {
+                // Range: ida,volta
+                params.departureDate = `${body.departureDate},${body.returnDate}`;
+            } else {
+                params.departureDate = body.departureDate;
+            }
+        }
+        
+        // Duration (1-15 dias)
+        if (body.duration) {
+            params.duration = body.duration;
+        }
+        
+        // Max price
+        if (body.maxPrice) {
+            params.maxPrice = body.maxPrice;
+        }
+        
+        console.log('📋 Params:', JSON.stringify(params));
+        
+        // Buscar
+        const rawData = await buscarDestinos(params);
+        
         // Processar resposta
         const destinations = (rawData.data || []).map(d => ({
             iataCode: d.destination,
             cityName: rawData.dictionaries?.locations?.[d.destination]?.detailedName || d.destination,
+            subType: rawData.dictionaries?.locations?.[d.destination]?.subType,
             price: parseFloat(d.price.total),
-            currency: rawData.meta?.currency || 'EUR',
             departureDate: d.departureDate,
-            returnDate: d.returnDate
+            returnDate: d.returnDate,
+            links: d.links
         }));
 
-        // Ordenar por preço
         destinations.sort((a, b) => a.price - b.price);
 
-        console.log(`✅ Encontrados ${destinations.length} destinos`);
+        console.log(`✅ ${destinations.length} destinos encontrados`);
 
         return res.status(200).json({
             success: true,
+            ambiente: process.env.AMADEUS_ENV || 'test',
+            avisoTeste: !isOrigemConhecida ? 
+                `⚠️ ${origin} pode ter dados limitados no ambiente TEST. Origens conhecidas: ${ORIGENS_TESTE_CONHECIDAS.join(', ')}` : 
+                null,
+            origin,
             count: destinations.length,
             currency: rawData.meta?.currency || 'EUR',
-            origin: originCode,
-            searchDates: `${departureDate} - ${returnDate}`,
-            maxPriceUsed: maxPrice || null,
-            destinations: destinations,
-            raw: {
-                meta: rawData.meta,
-                dictionaries: rawData.dictionaries
-            }
+            destinations,
+            meta: rawData.meta,
+            dictionaries: rawData.dictionaries
         });
 
     } catch (error) {
-        console.error('❌ Erro completo:', JSON.stringify(error, null, 2));
-
-        // Erros específicos da Amadeus
-        if (error.data?.errors) {
-            const amadeusError = error.data.errors[0];
-            console.error('❌ Erro Amadeus:', JSON.stringify(amadeusError, null, 2));
+        console.error('❌ ERRO:', JSON.stringify(error, null, 2));
+        
+        const amadeusError = error.data?.errors?.[0];
+        
+        if (amadeusError) {
+            // Erro 500 da Amadeus geralmente = origem sem dados no teste
+            if (amadeusError.code === 141) {
+                return res.status(400).json({
+                    error: 'Erro no servidor Amadeus. Provável causa: origem sem dados no ambiente TEST.',
+                    sugestao: `Tente com origens conhecidas: ${ORIGENS_TESTE_CONHECIDAS.join(', ')}`,
+                    detalhes: amadeusError
+                });
+            }
+            
             return res.status(error.status || 400).json({
-                error: amadeusError.detail || amadeusError.title || 'Erro na API Amadeus',
+                error: amadeusError.detail || amadeusError.title,
                 code: amadeusError.code,
-                source: amadeusError.source,
-                fullError: amadeusError
+                detalhes: amadeusError
             });
         }
 
         return res.status(500).json({
-            error: error.message || 'Erro interno do servidor',
-            details: JSON.stringify(error)
+            error: error.message || 'Erro interno',
+            detalhes: JSON.stringify(error)
         });
     }
 };
