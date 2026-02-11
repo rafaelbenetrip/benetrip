@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#E87722">
+    <title>Descubra seu Destino Perfeito - Benetrip</title>
+
+    <!-- Favicons -->
+    <link rel="icon" type="image/svg+xml" href="assets/images/favicon/favicon.svg">
+    <link rel="apple-touch-icon" sizes="180x180" href="assets/images/favicon/apple-touch-icon.png">
+    
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Montserrat:wght@400;500&display=swap" rel="stylesheet">
+    
+    <!-- Flatpickr para calendário -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    
+    <!-- Styles -->
+    <link rel="stylesheet" href="assets/css/descobrir-destinos.css">
+
+    <!-- Vercel Analytics -->
+    <script>
+        window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
+    </script>
+    <script defer src="/_vercel/insights/script.js"></script>
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="container">
+            <img src="assets/images/logo.png" alt="Benetrip" class="logo">
+            <p class="tagline">Descubra seu próximo destino! 🐕</p>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <div class="container">
+            
+            <!-- Formulário -->
+            <div id="form-container">
+                <form id="descobrir-form" class="descobrir-form">
+                    
+                    <!-- 1. Origem -->
+                    <div class="form-group">
+                        <label for="origem">📍 De onde você vai sair?</label>
+                        <p class="hint">Digite apenas o nome da cidade</p>
+                        <div class="autocomplete-wrapper">
+                            <input 
+                                type="text" 
+                                id="origem" 
+                                placeholder="Ex: São Paulo, Rio de Janeiro..."
+                                autocomplete="off"
+                                required
+                            >
+                            <div id="origem-results" class="autocomplete-results"></div>
+                        </div>
+                        <input type="hidden" id="origem-data">
+                    </div>
+
+                    <!-- 2. Com quem vai viajar -->
+                    <div class="form-group">
+                        <label>👥 Com quem você vai viajar?</label>
+                        <p class="hint">Escolha quem estará com você nessa aventura</p>
+                        <div class="button-group" data-field="companhia">
+                            <button type="button" class="btn-option" data-value="0">
+                                <span class="emoji">🧳</span>
+                                <span class="text">Sozinho(a)</span>
+                            </button>
+                            <button type="button" class="btn-option" data-value="1">
+                                <span class="emoji">❤️</span>
+                                <span class="text">Romântico</span>
+                            </button>
+                            <button type="button" class="btn-option" data-value="2">
+                                <span class="emoji">👨‍👩‍👧‍👦</span>
+                                <span class="text">Família</span>
+                            </button>
+                            <button type="button" class="btn-option" data-value="3">
+                                <span class="emoji">🎉</span>
+                                <span class="text">Amigos</span>
+                            </button>
+                        </div>
+                        <input type="hidden" id="companhia" required>
+                    </div>
+
+                    <!-- 2.1 Número de pessoas (condicional para família/amigos) -->
+                    <div class="form-group conditional" id="num-pessoas-group" style="display: none;">
+                        <label for="num-pessoas">Quantas pessoas?</label>
+                        <p class="hint">Inclua todos, inclusive você!</p>
+                        <div class="number-input">
+                            <button type="button" class="btn-number" data-action="decrement">−</button>
+                            <input type="number" id="num-pessoas" value="2" min="2" max="20" readonly>
+                            <button type="button" class="btn-number" data-action="increment">+</button>
+                        </div>
+                    </div>
+
+                    <!-- 3. Preferências de viagem -->
+                    <div class="form-group">
+                        <label>🎯 O que você mais busca nessa viagem?</label>
+                        <p class="hint">Escolha o que é mais importante para você</p>
+                        <div class="button-group" data-field="preferencias">
+                            <button type="button" class="btn-option" data-value="relax">
+                                <span class="emoji">🌊</span>
+                                <span class="text">Relax total</span>
+                            </button>
+                            <button type="button" class="btn-option" data-value="aventura">
+                                <span class="emoji">🏔️</span>
+                                <span class="text">Aventura</span>
+                            </button>
+                            <button type="button" class="btn-option" data-value="cultura">
+                                <span class="emoji">🏛️</span>
+                                <span class="text">Cultura</span>
+                            </button>
+                            <button type="button" class="btn-option" data-value="urbano">
+                                <span class="emoji">🏙️</span>
+                                <span class="text">Agito urbano</span>
+                            </button>
+                        </div>
+                        <input type="hidden" id="preferencias" required>
+                    </div>
+
+                    <!-- 4. Datas -->
+                    <div class="form-group">
+                        <label for="datas">📅 Quando será a sua viagem?</label>
+                        <p class="hint">Selecione a data de ida e volta</p>
+                        <input 
+                            type="text" 
+                            id="datas" 
+                            placeholder="Clique para selecionar datas"
+                            readonly
+                            required
+                        >
+                        <input type="hidden" id="data-ida">
+                        <input type="hidden" id="data-volta">
+                    </div>
+
+                    <!-- 5. Tipo de transporte -->
+                    <div class="form-group">
+                        <label>🚗 Como você prefere fazer essa viagem?</label>
+                        <p class="hint">Escolha o meio de transporte</p>
+                        <div class="button-group button-group-full" data-field="tipo-viagem">
+                            <button type="button" class="btn-option btn-full" data-value="0">
+                                <span class="emoji">✈️</span>
+                                <span class="text">Avião ou Ônibus</span>
+                            </button>
+                            <button type="button" class="btn-option btn-full" data-value="1">
+                                <span class="emoji">🚗</span>
+                                <span class="text">Carro (Road Trip)</span>
+                            </button>
+                        </div>
+                        <input type="hidden" id="tipo-viagem" required>
+                    </div>
+
+                    <!-- 6. Moeda (condicional - só para avião/ônibus) -->
+                    <div class="form-group conditional" id="moeda-group" style="display: none;">
+                        <label>💰 Qual moeda você prefere usar?</label>
+                        <p class="hint">Escolha a moeda para definir seu orçamento</p>
+                        <div class="button-group" data-field="moeda">
+                            <button type="button" class="btn-option" data-value="BRL">
+                                <span class="emoji">💰</span>
+                                <span class="text">Real (BRL)</span>
+                            </button>
+                            <button type="button" class="btn-option" data-value="USD">
+                                <span class="emoji">💵</span>
+                                <span class="text">Dólar (USD)</span>
+                            </button>
+                            <button type="button" class="btn-option" data-value="EUR">
+                                <span class="emoji">💶</span>
+                                <span class="text">Euro (EUR)</span>
+                            </button>
+                        </div>
+                        <input type="hidden" id="moeda">
+                    </div>
+
+                    <!-- 7. Orçamento (condicional - só para avião/ônibus) -->
+                    <div class="form-group conditional" id="orcamento-group" style="display: none;">
+                        <label for="orcamento">💸 Qual é o seu orçamento para passagens por pessoa?</label>
+                        <p class="hint">Valor para ida e volta</p>
+                        <div class="currency-input-wrapper">
+                            <span class="currency-symbol">R$</span>
+                            <input 
+                                type="text" 
+                                id="orcamento" 
+                                placeholder="0,00"
+                                inputmode="numeric"
+                            >
+                        </div>
+                    </div>
+
+                    <!-- 6. Distância máxima (condicional - só para carro) -->
+                    <div class="form-group conditional" id="distancia-group" style="display: none;">
+                        <label for="distancia">🛣️ Até quantos quilômetros você topa dirigir?</label>
+                        <p class="hint">Arraste para definir a distância máxima</p>
+                        <div class="slider-container">
+                            <input 
+                                type="range" 
+                                id="distancia" 
+                                min="100" 
+                                max="1500" 
+                                step="50" 
+                                value="500"
+                            >
+                            <div class="slider-labels">
+                                <span>100 km</span>
+                                <span>1500 km</span>
+                            </div>
+                            <div class="slider-value">
+                                Até <strong id="distancia-value">500</strong> km
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Botão Submit -->
+                    <button type="submit" class="btn-submit" id="btn-submit">
+                        🔍 Descobrir Destinos Perfeitos
+                    </button>
+                </form>
+            </div>
+
+            <!-- Loading State -->
+            <div id="loading-container" style="display: none;">
+                <div class="loading-card">
+                    <img src="assets/images/tripinha/avatar-pensando.png" alt="Tripinha pensando" class="tripinha-loading">
+                    <h2>🐕 Tripinha está procurando...</h2>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progress-fill"></div>
+                    </div>
+                    <p id="loading-message">Buscando os melhores destinos para você...</p>
+                </div>
+            </div>
+
+            <!-- Resultados -->
+            <div id="resultados-container" style="display: none;">
+                <!-- JavaScript irá preencher aqui -->
+            </div>
+
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <p>🐕 Feito com amor pela Tripinha | Benetrip © 2026</p>
+    </footer>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/pt.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/lodash@4.17.21/lodash.min.js"></script>
+    <script src="assets/js/descobrir-destinos.js"></script>
+</body>
+</html>
