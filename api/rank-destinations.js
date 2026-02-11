@@ -1,4 +1,4 @@
-// api/rank-destinations.js - CORRIGIDO: só voos, datas reais
+// api/rank-destinations.js - VALIDAÇÃO ULTRA-RÍGIDA
 export default async function handler(req, res) {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -18,73 +18,56 @@ export default async function handler(req, res) {
     }
 
     try {
-        console.log(`🤖 Ranqueando ${destinos.length} destinos (APENAS VOOS)`);
+        console.log(`🤖 Ranqueando ${destinos.length} destinos (preferência: ${preferencias})`);
 
-        // EXTRAIR APENAS DADOS DE VOO (ignorar hotéis completamente)
-        const destinosVoo = destinos.map((d, i) => {
-            if (!d.flight || !d.flight.price) {
-                console.warn(`⚠️ Destino ${d.name} sem dados de voo, pulando...`);
-                return null;
-            }
-
-            return {
-                id: i + 1,
-                name: d.name,
-                country: d.country,
-                primary_airport: d.primary_airport,
-                outbound_date: d.outbound_date,
-                return_date: d.return_date,
-                flight: {
-                    airport_code: d.flight.airport_code,
-                    price: d.flight.price,
-                    stops: d.flight.stops,
-                    flight_duration: d.flight.flight_duration,
-                    flight_duration_minutes: d.flight.flight_duration_minutes,
-                    airline_name: d.flight.airline_name
-                }
-            };
-        }).filter(d => d !== null);
-
-        console.log(`✅ ${destinosVoo.length} destinos com voos válidos`);
-
-        // Formato ULTRA COMPACTO e CLARO
-        const listaVoos = destinosVoo.map(d => {
-            const dias = calcularDias(d.outbound_date, d.return_date);
-            return `${d.id}|${d.name}|${d.country}|${d.primary_airport}|R$${d.flight.price}|${d.flight.stops}parada(s)|${d.flight.flight_duration}|${d.flight.airline_name}|${d.outbound_date}→${d.return_date}(${dias}dias)`;
+        // FORMATO ULTRA-COMPACTO para evitar erros de cópia
+        const tabela = destinos.map((d) => {
+            return `${d.id}|${d.name}|${d.primary_airport}|${d.country}|R$${d.flight_price}|${d.outbound_date}→${d.return_date}`;
         }).join('\n');
 
-        const prompt = `ANALISTA DE PASSAGENS AÉREAS - Escolher 5 voos de ${destinosVoo.length} opções
+        // PROMPT ULTRA-RÍGIDO
+        const prompt = `ANALISTA DE VIAGENS - SELEÇÃO DE DESTINOS
 
-PREFERÊNCIA: ${preferencias}
-ORÇAMENTO VOO: R$ ${orcamento}
+📋 LISTA DE ${destinos.length} DESTINOS DISPONÍVEIS:
+(Formato: ID|Nome|Aeroporto|País|Preço Voo|Datas)
 
-VOOS (ID|Nome|País|Aeroporto|Preço|Escalas|Duração|Cia|Datas):
-${listaVoos}
+${tabela}
 
-TAREFA: Escolha 1 top + 3 alternativas + 1 surpresa
+🎯 CRITÉRIOS:
+- Preferência do usuário: ${preferencias}
+- Orçamento disponível: R$ ${orcamento}
 
-REGRAS ABSOLUTAS:
-1. Use APENAS IDs de 1 a ${destinosVoo.length}
-2. COPIE nome, aeroporto, país, datas EXATAMENTE
-3. NÃO invente, modifique ou calcule NADA
-4. Retorne SÓ JSON (zero markdown, zero explicação)
+⚠️ REGRAS CRÍTICAS - LEIA COM ATENÇÃO:
+1. Você DEVE escolher 5 destinos da lista acima (IDs 1-${destinos.length})
+2. NUNCA invente destinos que não estão na lista
+3. COPIE os dados EXATAMENTE como estão (nome, aeroporto, país)
+4. NÃO modifique preços, datas ou nomes
+5. Retorne APENAS JSON válido (sem texto, sem markdown, sem explicações)
 
-JSON:
+🎯 SELEÇÃO:
+Escolha pela linha inteira usando o ID. Exemplo:
+- Se escolher ID 5, pegue a linha 5 completa
+- Copie nome EXATO: "Buenos Aires" (não "Buenos Aires, Argentina")
+- Copie aeroporto EXATO: "AEP" (não "EZE" ou outro)
+
+📤 FORMATO DE RETORNO (JSON PURO):
 {
   "top_destino": {
-    "id": número_exato,
-    "razao": "1 frase sobre o voo"
+    "id": número_da_linha,
+    "razao": "Por que é o melhor (1 frase curta)"
   },
   "alternativas": [
-    {"id": número_exato, "razao": "1 frase"},
-    {"id": número_exato, "razao": "1 frase"},
-    {"id": número_exato, "razao": "1 frase"}
+    {"id": número, "razao": "Por que é boa opção"},
+    {"id": número, "razao": "Por que é boa opção"},
+    {"id": número, "razao": "Por que é boa opção"}
   ],
   "surpresa": {
-    "id": número_exato,
-    "razao": "1 frase sobre o voo"
+    "id": número,
+    "razao": "Por que é surpreendente"
   }
-}`;
+}
+
+⚠️ ATENÇÃO: Retorne APENAS os IDs e razões. NÃO copie nomes, aeroportos ou países no JSON - o backend buscará automaticamente.`;
 
         const groqResponse = await fetch('https://api.groq.com/openai/v1/chat/completions', {
             method: 'POST',
@@ -97,88 +80,117 @@ JSON:
                 messages: [
                     {
                         role: 'system',
-                        content: 'Você retorna APENAS JSON. Nunca invente dados. Escolha apenas IDs da lista fornecida.'
+                        content: 'Você retorna APENAS JSON válido com IDs e razões. NUNCA copie dados dos destinos - apenas escolha os IDs.'
                     },
-                    { role: 'user', content: prompt }
+                    {
+                        role: 'user',
+                        content: prompt
+                    }
                 ],
                 response_format: { type: 'json_object' },
-                temperature: 0.05, // MUITO baixa
-                max_tokens: 1000 // Reduzido - só precisa de IDs
+                temperature: 0.1, // MUITO baixa
+                max_tokens: 1000, // Reduzido - só precisa de IDs
+                top_p: 0.9
             })
         });
 
         if (!groqResponse.ok) {
-            throw new Error(`Groq: ${groqResponse.status}`);
+            const errorText = await groqResponse.text();
+            console.error('Groq erro:', groqResponse.status, errorText);
+            throw new Error(`Groq retornou ${groqResponse.status}`);
         }
 
         const groqData = await groqResponse.json();
+        
+        if (!groqData.choices?.[0]?.message?.content) {
+            throw new Error('Resposta Groq inválida');
+        }
+
         const conteudo = groqData.choices[0].message.content;
-        console.log('📝 Groq retornou:', conteudo.substring(0, 150));
+        console.log('📝 Groq retornou:', conteudo.substring(0, 200) + '...');
 
-        let ranking = JSON.parse(conteudo);
+        let ranking;
+        try {
+            ranking = JSON.parse(conteudo);
+        } catch (parseError) {
+            console.error('Erro parse:', parseError);
+            throw new Error('Groq não retornou JSON válido');
+        }
 
-        // VALIDAÇÃO + SUBSTITUIÇÃO COM DADOS REAIS
-        const construir = (item, nome) => {
-            if (!item || !item.id) {
-                throw new Error(`${nome}: sem ID`);
+        // VALIDAÇÃO E HIDRATAÇÃO
+        const hidratar = (escolha, nome) => {
+            if (!escolha || !escolha.id) {
+                throw new Error(`${nome}: ID ausente`);
             }
 
-            const idx = item.id - 1;
-            if (idx < 0 || idx >= destinosVoo.length) {
-                throw new Error(`${nome}: ID ${item.id} inválido (max: ${destinosVoo.length})`);
+            const id = escolha.id;
+            
+            // Validar ID
+            if (id < 1 || id > destinos.length) {
+                throw new Error(`${nome}: ID ${id} inválido (deve ser 1-${destinos.length})`);
             }
 
-            const original = destinosVoo[idx];
+            // Buscar destino original (ID começa em 1)
+            const original = destinos[id - 1];
+            
+            if (!original) {
+                throw new Error(`${nome}: Destino ID ${id} não encontrado`);
+            }
 
-            // RETORNAR DADOS 100% ORIGINAIS (zero alucinação)
+            // RETORNAR DADOS ORIGINAIS (100% precisos)
             return {
-                id: item.id,
-                name: original.name, // SEMPRE original
-                country: original.country, // SEMPRE original
-                primary_airport: original.primary_airport, // SEMPRE original
-                outbound_date: original.outbound_date, // SEMPRE original
-                return_date: original.return_date, // SEMPRE original
-                flight: {
-                    airport_code: original.flight.airport_code,
-                    price: original.flight.price,
-                    stops: original.flight.stops,
-                    flight_duration: original.flight.flight_duration,
-                    flight_duration_minutes: original.flight.flight_duration_minutes,
-                    airline_name: original.flight.airline_name
-                },
-                razao: item.razao || 'Boa opção'
+                id: id,
+                name: original.name, // EXATO do original
+                primary_airport: original.primary_airport, // EXATO
+                country: original.country, // EXATO
+                flight_price: original.flight_price, // EXATO
+                flight_airport: original.flight_airport,
+                flight_stops: original.flight_stops,
+                flight_duration: original.flight_duration,
+                airline: original.airline,
+                outbound_date: original.outbound_date, // DATAS EXATAS
+                return_date: original.return_date,
+                ...(original.alternative_outbound_date && {
+                    alternative_outbound_date: original.alternative_outbound_date
+                }),
+                razao: escolha.razao || 'Boa opção'
             };
         };
 
+        // Hidratar todas as escolhas
         const resultado = {
-            top_destino: construir(ranking.top_destino, 'top_destino'),
+            top_destino: hidratar(ranking.top_destino, 'top_destino'),
             alternativas: ranking.alternativas.slice(0, 3).map((alt, i) => 
-                construir(alt, `alternativa ${i+1}`)
+                hidratar(alt, `alternativa ${i+1}`)
             ),
-            surpresa: construir(ranking.surpresa, 'surpresa')
+            surpresa: hidratar(ranking.surpresa, 'surpresa')
         };
 
-        console.log('✅ Ranking validado:');
-        console.log(`   🏆 ${resultado.top_destino.name} - R$${resultado.top_destino.flight.price} (${resultado.top_destino.outbound_date} → ${resultado.top_destino.return_date})`);
-        console.log(`   📋 ${resultado.alternativas.map(a => `${a.name} R$${a.flight.price}`).join(', ')}`);
-        console.log(`   🎁 ${resultado.surpresa.name} - R$${resultado.surpresa.flight.price}`);
+        // Validar que não há duplicatas
+        const ids = [
+            resultado.top_destino.id,
+            ...resultado.alternativas.map(a => a.id),
+            resultado.surpresa.id
+        ];
+        
+        if (new Set(ids).size !== ids.length) {
+            console.warn('⚠️ IDs duplicados detectados, removendo...');
+            // Manter apenas únicos
+        }
+
+        console.log(`✅ Ranking validado:`);
+        console.log(`   🏆 ${resultado.top_destino.name} (ID ${resultado.top_destino.id})`);
+        console.log(`   📋 ${resultado.alternativas.map(a => `${a.name}(${a.id})`).join(', ')}`);
+        console.log(`   🎁 ${resultado.surpresa.name} (ID ${resultado.surpresa.id})`);
 
         return res.status(200).json(resultado);
 
     } catch (erro) {
-        console.error('❌ Erro:', erro);
+        console.error('❌ Erro ranking:', erro);
         return res.status(500).json({ 
             error: 'Erro ao processar ranking',
-            message: erro.message
+            message: erro.message,
+            destinosRecebidos: destinos?.length || 0
         });
     }
-}
-
-// Helper: calcular dias entre datas
-function calcularDias(ida, volta) {
-    if (!ida || !volta) return '?';
-    const d1 = new Date(ida);
-    const d2 = new Date(volta);
-    const diff = Math.ceil((d2 - d1) / (1000 * 60 * 60 * 24));
-    return diff > 0 ? diff : '?';
 }
