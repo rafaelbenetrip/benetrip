@@ -1,110 +1,97 @@
-/**
- * Vercel Function - Ranquear Destinos com IA
- * Endpoint: /api/rank-destinations
- */
-
+// api/rank-destinations.js - VERSÃO FULL (sem limites)
 export default async function handler(req, res) {
-    // CORS
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-    if (req.method === 'OPTIONS') {
-        return res.status(200).end();
-    }
-
-    if (req.method !== 'POST') {
-        return res.status(405).json({ error: 'Method not allowed' });
-    }
+    if (req.method === 'OPTIONS') return res.status(200).end();
+    if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
     const { destinos, preferencias, orcamento } = req.body;
 
-    // Validação
     if (!destinos || !Array.isArray(destinos) || destinos.length === 0) {
         return res.status(400).json({ 
-            error: 'Lista de destinos inválida',
-            received: typeof destinos
+            error: 'Lista de destinos obrigatória',
+            received: { destinos, preferencias, orcamento }
         });
     }
 
-    if (!preferencias) {
-        return res.status(400).json({ error: 'Preferências não fornecidas' });
-    }
-
-    // Verificar API key
     if (!process.env.GROQ_API_KEY) {
-        console.error('❌ GROQ_API_KEY não configurada');
-        return res.status(500).json({ 
-            error: 'Groq AI não configurada',
-            message: 'Configure GROQ_API_KEY nas variáveis de ambiente do Vercel'
-        });
+        return res.status(500).json({ error: 'GROQ_API_KEY não configurada' });
     }
 
     try {
-        console.log(`🤖 Ranqueando ${destinos.length} destinos - preferência: ${preferencias}`);
+        console.log(`🤖 Ranqueando ${destinos.length} destinos para: ${preferencias}`);
 
-        // Mapear preferências para descrições
-        const preferenciaDescricao = {
-            'relax': 'relaxamento, praias tranquilas, descanso, spa, tranquilidade',
-            'aventura': 'adrenalina, esportes radicais, trilhas, atividades ao ar livre',
-            'cultura': 'história, museus, gastronomia, tradições, patrimônio',
-            'urbano': 'vida noturna, restaurantes, bares, compras, cosmopolita'
-        }[preferencias] || preferencias;
+        // USAR TODOS OS DESTINOS (sem limite)
+        // Formato compacto para economizar tokens
+        const listaCompacta = destinos.map((d, i) => {
+            const v = d.flight?.price || 0;
+            const h = d.avg_cost_per_night || 0;
+            const total = v + (h * 7); // Estimativa 7 dias
+            return `${i+1}|${d.name}|${d.country}|${d.primary_airport}|R$${v}|R$${h}/n|Total:R$${total}`;
+        }).join('\n');
 
-        // Construir prompt
-        const prompt = `Você é especialista em turismo brasileiro.
+        // Prompt otimizado para processar TODOS os destinos
+        const prompt = `ESPECIALISTA EM TURISMO - Análise de ${destinos.length} destinos
 
-PREFERÊNCIA DO USUÁRIO: ${preferenciaDescricao}
-ORÇAMENTO TOTAL: R$ ${orcamento || 'flexível'}
+CONTEXTO:
+- Preferência: ${preferencias}
+- Orçamento: R$ ${orcamento} (total viagem)
 
-DESTINOS DISPONÍVEIS:
-${destinos.map((d, i) => `${i + 1}. ${d.name} - Voo: R$${d.flight?.price}, Hospedagem/noite: R$${d.avg_cost_per_night}`).join('\n')}
+DESTINOS (formato: ID|Nome|País|Aeroporto|Voo|Hospedagem/noite|Total 7 dias):
+${listaCompacta}
 
-TAREFA:
-Selecione e retorne JSON com esta estrutura EXATA:
+TAREFA: Analise TODOS os destinos acima e escolha:
+1. MELHOR destino geral (melhor custo-benefício + preferência)
+2. 3 ALTERNATIVAS variadas (diferentes perfis)
+3. 1 SURPRESA (destino inesperado e interessante)
 
+REGRAS CRÍTICAS:
+✓ Use APENAS destinos da lista (ID 1-${destinos.length})
+✓ Copie nome, aeroporto e país EXATAMENTE
+✓ Retorne APENAS JSON (sem explicações, markdown ou texto extra)
+✓ Cada destino deve ter razão ÚNICA de 1 frase
+
+JSON FORMAT:
 {
   "top_destino": {
-    "name": "nome do destino",
-    "primary_airport": "código IATA",
-    "flight": { "price": número, "airport_code": "código" },
+    "id": número,
+    "name": "nome exato",
+    "primary_airport": "código exato",
+    "country": "país exato",
+    "flight": {"price": número, "airport_code": "código"},
     "avg_cost_per_night": número,
-    "razao": "Por que é perfeito para ${preferencias} (1 frase)"
+    "razao": "Por que é o melhor"
   },
   "alternativas": [
-    { ...mesmo formato acima... },
-    { ...mesmo formato... },
-    { ...mesmo formato... }
+    {id, name, primary_airport, country, flight, avg_cost_per_night, razao},
+    {id, name, primary_airport, country, flight, avg_cost_per_night, razao},
+    {id, name, primary_airport, country, flight, avg_cost_per_night, razao}
   ],
   "surpresa": {
-    ...mesmo formato...
+    "id": número,
+    "name": "nome exato",
+    "primary_airport": "código exato",
+    "country": "país exato",
+    "flight": {"price": número, "airport_code": "código"},
+    "avg_cost_per_night": número,
+    "razao": "Por que é surpreendente"
   }
-}
+}`;
 
-REGRAS:
-- top_destino: Melhor match com preferências + custo-benefício
-- alternativas: 3 opções diferentes e variadas
-- surpresa: Destino inesperado mas interessante
-- Use APENAS destinos da lista fornecida
-- Copie os dados EXATAMENTE (primary_airport, flight.price, etc)
-- NÃO invente dados
-
-RETORNE APENAS JSON VÁLIDO, SEM TEXTO ADICIONAL.`;
-
-        console.log('📡 Chamando Groq AI...');
-
-        const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        const groqResponse = await fetch('https://api.groq.com/openai/v1/chat/completions', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${process.env.GROQ_API_KEY}`
             },
             body: JSON.stringify({
-                model: 'llama-3.3-70b-versatile',
+                model: 'llama-3.3-70b-versatile', // Modelo mais poderoso
                 messages: [
                     {
                         role: 'system',
-                        content: 'Você é um assistente que retorna APENAS JSON válido, sem texto adicional.'
+                        content: 'Você retorna APENAS JSON válido. Zero texto extra. Copie dados exatamente como fornecidos.'
                     },
                     {
                         role: 'user',
@@ -112,74 +99,89 @@ RETORNE APENAS JSON VÁLIDO, SEM TEXTO ADICIONAL.`;
                     }
                 ],
                 response_format: { type: 'json_object' },
-                temperature: 0.5,
-                max_tokens: 2000
+                temperature: 0.2, // Muito baixa para consistência
+                max_tokens: 8000, // Aumentado para processar todos
+                top_p: 0.9
             })
         });
 
-        if (!response.ok) {
-            const errorText = await response.text();
-            console.error('❌ Groq erro:', response.status, errorText);
-            throw new Error(`Groq retornou ${response.status}`);
+        if (!groqResponse.ok) {
+            const errorText = await groqResponse.text();
+            console.error('Groq erro:', groqResponse.status, errorText);
+            throw new Error(`Groq retornou ${groqResponse.status}`);
         }
 
-        const data = await response.json();
+        const groqData = await groqResponse.json();
         
-        // Extrair JSON
-        const content = data.choices[0].message.content;
-        console.log('📄 Resposta Groq:', content.substring(0, 200) + '...');
+        if (!groqData.choices?.[0]?.message?.content) {
+            throw new Error('Resposta Groq inválida');
+        }
+
+        const conteudo = groqData.choices[0].message.content;
+        console.log('📝 Groq retornou:', conteudo.substring(0, 100) + '...');
 
         let ranking;
         try {
-            ranking = JSON.parse(content);
-        } catch (e) {
-            console.error('❌ JSON inválido:', content);
-            throw new Error('IA retornou JSON inválido');
+            ranking = JSON.parse(conteudo);
+        } catch (parseError) {
+            console.error('Erro parse:', parseError);
+            console.error('Conteúdo:', conteudo);
+            throw new Error('Groq não retornou JSON válido');
         }
 
-        // Validar estrutura
-        if (!ranking.top_destino || !ranking.top_destino.name) {
-            throw new Error('Ranking sem top_destino válido');
-        }
-
-        if (!Array.isArray(ranking.alternativas) || ranking.alternativas.length === 0) {
-            throw new Error('Ranking sem alternativas válidas');
-        }
-
-        if (!ranking.surpresa || !ranking.surpresa.name) {
-            throw new Error('Ranking sem surpresa válida');
-        }
-
-        // Garantir que todos os destinos têm os campos necessários
-        const validarDestino = (d) => ({
-            name: d.name,
-            primary_airport: d.primary_airport || d.flight?.airport_code || 'XXX',
-            flight: {
-                airport_code: d.flight?.airport_code || d.primary_airport || 'XXX',
-                price: d.flight?.price || 0,
-                stops: d.flight?.stops || 0,
-                flight_duration_minutes: d.flight?.flight_duration_minutes || 0
-            },
-            avg_cost_per_night: d.avg_cost_per_night || 150,
-            razao: d.razao || 'Destino recomendado para você.'
-        });
-
-        const resultado = {
-            success: true,
-            top_destino: validarDestino(ranking.top_destino),
-            alternativas: ranking.alternativas.slice(0, 3).map(validarDestino),
-            surpresa: validarDestino(ranking.surpresa)
+        // Validação: verificar se os IDs existem
+        const validarPorID = (destino, nome) => {
+            if (!destino) throw new Error(`${nome} ausente`);
+            
+            const id = destino.id - 1; // IDs começam em 1
+            if (id < 0 || id >= destinos.length) {
+                throw new Error(`${nome}: ID ${destino.id} inválido (máx: ${destinos.length})`);
+            }
+            
+            const original = destinos[id];
+            
+            // Garantir que os dados batem
+            if (destino.name !== original.name || destino.primary_airport !== original.primary_airport) {
+                console.warn(`⚠️ ${nome} diverge do original, corrigindo...`);
+                // Corrigir com dados originais
+                return {
+                    ...destino,
+                    name: original.name,
+                    primary_airport: original.primary_airport,
+                    country: original.country,
+                    flight: original.flight,
+                    avg_cost_per_night: original.avg_cost_per_night
+                };
+            }
+            
+            return destino;
         };
 
-        console.log(`✅ Ranking gerado: ${resultado.top_destino.name}, ${resultado.alternativas.map(a => a.name).join(', ')}, ${resultado.surpresa.name}`);
+        // Validar e corrigir se necessário
+        ranking.top_destino = validarPorID(ranking.top_destino, 'top_destino');
+        ranking.surpresa = validarPorID(ranking.surpresa, 'surpresa');
+        
+        if (!Array.isArray(ranking.alternativas) || ranking.alternativas.length < 3) {
+            throw new Error('Mínimo 3 alternativas necessárias');
+        }
+        
+        ranking.alternativas = ranking.alternativas.slice(0, 3).map((alt, i) => 
+            validarPorID(alt, `alternativa ${i+1}`)
+        );
 
-        return res.status(200).json(resultado);
+        console.log(`✅ Ranking de ${destinos.length} destinos:`);
+        console.log(`   🏆 ${ranking.top_destino.name}`);
+        console.log(`   📋 ${ranking.alternativas.map(a => a.name).join(', ')}`);
+        console.log(`   🎁 ${ranking.surpresa.name}`);
 
-    } catch (error) {
-        console.error('❌ Erro ao ranquear:', error);
+        return res.status(200).json(ranking);
+
+    } catch (erro) {
+        console.error('❌ Erro ranking:', erro);
         return res.status(500).json({ 
-            error: 'Erro ao ranquear destinos',
-            message: error.message
+            error: 'Erro ao processar ranking',
+            message: erro.message,
+            destinosRecebidos: destinos?.length || 0
         });
     }
 }
