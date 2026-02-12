@@ -433,14 +433,15 @@ const BenetripDiscovery = {
         return data.destinations;
     },
 
+    // ✅ CORREÇÃO: Filtrar apenas pelo preço da passagem (ida e volta)
     filtrarDestinos(destinos) {
-        const { tipoViagem, orcamento, dataIda, dataVolta } = this.state.formData;
-        const noites = this.calcularNoites(dataIda, dataVolta);
+        const { tipoViagem, orcamento } = this.state.formData;
         
         return destinos.filter(d => {
             if (tipoViagem === 0) {
-                const total = (d.flight?.price || 0) + ((d.avg_cost_per_night || 0) * noites);
-                return total <= orcamento;
+                // Orçamento é para passagens (ida e volta) por pessoa
+                const precoPassagem = d.flight?.price || 0;
+                return precoPassagem > 0 && precoPassagem <= orcamento;
             }
             return true;
         });
@@ -508,22 +509,45 @@ const BenetripDiscovery = {
         return new Promise(r => setTimeout(r, ms));
     },
 
+    // Helper para formatar moeda
+    formatarPreco(valor, moeda) {
+        const simbolos = { 'BRL': 'R$', 'USD': '$', 'EUR': '€' };
+        const simbolo = simbolos[moeda] || 'R$';
+        return `${simbolo} ${Math.round(valor).toLocaleString('pt-BR')}`;
+    },
+
+    // ✅ CORREÇÃO: Mostrar apenas preço das passagens (ida e volta)
     mostrarResultados(destinos) {
         const container = document.getElementById('resultados-container');
-        const { dataIda, dataVolta, preferencias } = this.state.formData;
+        const { dataIda, dataVolta, preferencias, moeda } = this.state.formData;
         const noites = this.calcularNoites(dataIda, dataVolta);
         
+        // Formatar datas para exibição
+        const dataIdaBR = new Date(dataIda + 'T12:00:00').toLocaleDateString('pt-BR');
+        const dataVoltaBR = new Date(dataVolta + 'T12:00:00').toLocaleDateString('pt-BR');
+        
+        const formatPreco = (d) => this.formatarPreco(d.flight?.price || 0, moeda);
+        
+        const formatParadas = (d) => {
+            const stops = d.flight?.stops || 0;
+            if (stops === 0) return 'Direto';
+            if (stops === 1) return '1 parada';
+            return `${stops} paradas`;
+        };
+
         const html = `
             <div class="resultado-header">
                 <h1>🎉 Destinos Perfeitos!</h1>
-                <p>Baseado em ${preferencias}</p>
+                <p>Baseado em: ${preferencias} | ${dataIdaBR} - ${dataVoltaBR} (${noites} noites)</p>
             </div>
 
             <div class="top-destino">
-                <div class="badge">🏆 MELHOR</div>
-                <h2>${destinos.top_destino.name}</h2>
-                <div class="preco">R$ ${(destinos.top_destino.flight?.price || 0) + ((destinos.top_destino.avg_cost_per_night || 0) * noites)}</div>
-                <div class="descricao">${destinos.top_destino.razao || 'Perfeito!'}</div>
+                <div class="badge">🏆 MELHOR DESTINO</div>
+                <h2>${destinos.top_destino.name}, ${destinos.top_destino.country || ''}</h2>
+                <div class="preco">${formatPreco(destinos.top_destino)}</div>
+                <div class="preco-label">Passagem ida e volta por pessoa</div>
+                <div class="flight-info">${formatParadas(destinos.top_destino)}</div>
+                <div class="descricao">${destinos.top_destino.razao || 'Perfeito para você!'}</div>
                 <a href="${destinos.top_destino.link}" target="_blank" class="btn-ver-voos">Ver Passagens ✈️</a>
             </div>
 
@@ -532,10 +556,12 @@ const BenetripDiscovery = {
                 <div class="alternativas-grid">
                     ${destinos.alternativas.map(d => `
                         <div class="destino-card">
-                            <h4>${d.name}</h4>
-                            <div class="preco">R$ ${(d.flight?.price || 0) + ((d.avg_cost_per_night || 0) * noites)}</div>
+                            <h4>${d.name}${d.country ? ', ' + d.country : ''}</h4>
+                            <div class="preco">${formatPreco(d)}</div>
+                            <div class="preco-label">ida e volta</div>
+                            <div class="flight-info">${formatParadas(d)}</div>
                             <div class="descricao">${d.razao || 'Boa opção!'}</div>
-                            <a href="${d.link}" target="_blank" class="btn-ver-voos">Ver →</a>
+                            <a href="${d.link}" target="_blank" class="btn-ver-voos">Ver Passagens →</a>
                         </div>
                     `).join('')}
                 </div>
@@ -543,8 +569,10 @@ const BenetripDiscovery = {
 
             <div class="surpresa-card">
                 <div class="badge">🎁 SURPRESA</div>
-                <h3>${destinos.surpresa.name}</h3>
-                <div class="preco">R$ ${(destinos.surpresa.flight?.price || 0) + ((destinos.surpresa.avg_cost_per_night || 0) * noites)}</div>
+                <h3>${destinos.surpresa.name}${destinos.surpresa.country ? ', ' + destinos.surpresa.country : ''}</h3>
+                <div class="preco">${formatPreco(destinos.surpresa)}</div>
+                <div class="preco-label">ida e volta por pessoa</div>
+                <div class="flight-info">${formatParadas(destinos.surpresa)}</div>
                 <div class="descricao">${destinos.surpresa.razao || 'Descubra!'}</div>
                 <a href="${destinos.surpresa.link}" target="_blank" class="btn-ver-voos">Descobrir ✈️</a>
             </div>
