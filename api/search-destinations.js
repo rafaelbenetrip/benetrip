@@ -14,13 +14,13 @@ export default async function handler(req, res) {
     }
 
     try {
-        const { origem } = req.body;
+        const { origem, dataIda, dataVolta } = req.body;
 
         // Validar origem
         if (!origem || typeof origem !== 'string') {
             return res.status(400).json({ 
                 error: 'Origem obrigatória',
-                exemplo: { origem: 'GRU' }
+                exemplo: { origem: 'GRU', dataIda: '2026-03-15', dataVolta: '2026-03-22' }
             });
         }
 
@@ -44,7 +44,7 @@ export default async function handler(req, res) {
 
         console.log(`🔍 Buscando destinos de ${origemCode}`);
 
-        // Chamar SearchAPI
+        // Montar parâmetros da SearchAPI
         const params = new URLSearchParams({
             engine: 'google_travel_explore',
             departure_id: origemCode,
@@ -53,6 +53,18 @@ export default async function handler(req, res) {
             currency: 'BRL',
             api_key: process.env.SEARCHAPI_KEY
         });
+
+        // ✅ CORREÇÃO: Adicionar datas se fornecidas
+        // Formato para round-trip: YYYY-MM-DD..YYYY-MM-DD
+        if (dataIda && dataVolta) {
+            const dateParam = `${dataIda}..${dataVolta}`;
+            params.append('date', dateParam);
+            console.log(`📅 Datas: ${dateParam}`);
+        } else if (dataIda) {
+            // Se só tem ida, envia como one-way
+            params.append('date', dataIda);
+            console.log(`📅 Data ida: ${dataIda}`);
+        }
 
         const url = `https://www.searchapi.io/api/v1/search?${params}`;
         
@@ -76,14 +88,14 @@ export default async function handler(req, res) {
             console.error('Resposta inválida:', data);
             return res.status(404).json({ 
                 error: 'Nenhum destino encontrado',
-                message: 'Tente outra cidade de origem'
+                message: 'Tente outra cidade de origem ou datas diferentes'
             });
         }
 
         if (data.destinations.length === 0) {
             return res.status(404).json({ 
                 error: 'Nenhum destino disponível',
-                message: 'Nenhum voo encontrado para esta origem'
+                message: 'Nenhum voo encontrado para esta origem nas datas selecionadas'
             });
         }
 
@@ -111,6 +123,8 @@ export default async function handler(req, res) {
         return res.status(200).json({ 
             success: true,
             origem: origemCode,
+            dataIda: dataIda || null,
+            dataVolta: dataVolta || null,
             total: destinos.length,
             destinations: destinos
         });
