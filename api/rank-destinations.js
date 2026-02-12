@@ -26,24 +26,23 @@ export default async function handler(req, res) {
         // USAR TODOS OS DESTINOS (sem limite)
         // Formato compacto para economizar tokens
         const listaCompacta = destinos.map((d, i) => {
-            const v = d.flight?.price || 0;
-            const h = d.avg_cost_per_night || 0;
-            const total = v + (h * 7); // Estimativa 7 dias
-            return `${i+1}|${d.name}|${d.country}|${d.primary_airport}|R$${v}|R$${h}/n|Total:R$${total}`;
+            const passagem = d.flight?.price || 0;
+            const paradas = d.flight?.stops || 0;
+            return `${i+1}|${d.name}|${d.country}|${d.primary_airport}|Passagem:R$${passagem}|Paradas:${paradas}`;
         }).join('\n');
 
-        // Prompt otimizado para processar TODOS os destinos
+        // Prompt otimizado - foco em PASSAGENS
         const prompt = `ESPECIALISTA EM TURISMO - Análise de ${destinos.length} destinos
 
 CONTEXTO:
 - Preferência: ${preferencias}
-- Orçamento: R$ ${orcamento} (total viagem)
+- Orçamento para PASSAGENS (ida e volta por pessoa): R$ ${orcamento}
 
-DESTINOS (formato: ID|Nome|País|Aeroporto|Voo|Hospedagem/noite|Total 7 dias):
+DESTINOS (formato: ID|Nome|País|Aeroporto|Passagem ida+volta|Paradas):
 ${listaCompacta}
 
 TAREFA: Analise TODOS os destinos acima e escolha:
-1. MELHOR destino geral (melhor custo-benefício + preferência)
+1. MELHOR destino geral (melhor custo-benefício de passagem + preferência)
 2. 3 ALTERNATIVAS variadas (diferentes perfis)
 3. 1 SURPRESA (destino inesperado e interessante)
 
@@ -52,6 +51,7 @@ REGRAS CRÍTICAS:
 ✓ Copie nome, aeroporto e país EXATAMENTE
 ✓ Retorne APENAS JSON (sem explicações, markdown ou texto extra)
 ✓ Cada destino deve ter razão ÚNICA de 1 frase
+✓ Preço mostrado = preço da PASSAGEM (ida e volta)
 
 JSON FORMAT:
 {
@@ -60,7 +60,7 @@ JSON FORMAT:
     "name": "nome exato",
     "primary_airport": "código exato",
     "country": "país exato",
-    "flight": {"price": número, "airport_code": "código"},
+    "flight": {"price": número, "airport_code": "código", "stops": número},
     "avg_cost_per_night": número,
     "razao": "Por que é o melhor"
   },
@@ -74,7 +74,7 @@ JSON FORMAT:
     "name": "nome exato",
     "primary_airport": "código exato",
     "country": "país exato",
-    "flight": {"price": número, "airport_code": "código"},
+    "flight": {"price": número, "airport_code": "código", "stops": número},
     "avg_cost_per_night": número,
     "razao": "Por que é surpreendente"
   }
@@ -87,7 +87,7 @@ JSON FORMAT:
                 'Authorization': `Bearer ${process.env.GROQ_API_KEY}`
             },
             body: JSON.stringify({
-                model: 'llama-3.3-70b-versatile', // Modelo mais poderoso
+                model: 'llama-3.3-70b-versatile',
                 messages: [
                     {
                         role: 'system',
@@ -99,8 +99,8 @@ JSON FORMAT:
                     }
                 ],
                 response_format: { type: 'json_object' },
-                temperature: 0.2, // Muito baixa para consistência
-                max_tokens: 8000, // Aumentado para processar todos
+                temperature: 0.2,
+                max_tokens: 8000,
                 top_p: 0.9
             })
         });
@@ -140,21 +140,17 @@ JSON FORMAT:
             
             const original = destinos[id];
             
-            // Garantir que os dados batem
-            if (destino.name !== original.name || destino.primary_airport !== original.primary_airport) {
-                console.warn(`⚠️ ${nome} diverge do original, corrigindo...`);
-                // Corrigir com dados originais
-                return {
-                    ...destino,
-                    name: original.name,
-                    primary_airport: original.primary_airport,
-                    country: original.country,
-                    flight: original.flight,
-                    avg_cost_per_night: original.avg_cost_per_night
-                };
-            }
-            
-            return destino;
+            // Garantir que os dados batem - SEMPRE corrigir com dados originais
+            return {
+                ...destino,
+                name: original.name,
+                primary_airport: original.primary_airport,
+                country: original.country,
+                flight: original.flight,
+                avg_cost_per_night: original.avg_cost_per_night,
+                // Manter a razão da IA
+                razao: destino.razao
+            };
         };
 
         // Validar e corrigir se necessário
@@ -170,9 +166,9 @@ JSON FORMAT:
         );
 
         console.log(`✅ Ranking de ${destinos.length} destinos:`);
-        console.log(`   🏆 ${ranking.top_destino.name}`);
-        console.log(`   📋 ${ranking.alternativas.map(a => a.name).join(', ')}`);
-        console.log(`   🎁 ${ranking.surpresa.name}`);
+        console.log(`   🏆 ${ranking.top_destino.name} (R$${ranking.top_destino.flight?.price})`);
+        console.log(`   📋 ${ranking.alternativas.map(a => `${a.name}(R$${a.flight?.price})`).join(', ')}`);
+        console.log(`   🎁 ${ranking.surpresa.name} (R$${ranking.surpresa.flight?.price})`);
 
         return res.status(200).json(ranking);
 
