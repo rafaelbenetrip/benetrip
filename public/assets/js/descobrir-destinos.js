@@ -454,6 +454,7 @@ const BenetripDiscovery = {
                 dataIda: this.state.formData.dataIda,
                 dataVolta: this.state.formData.dataVolta,
                 preferencias: this.state.formData.preferencias
+                moeda: this.state.formData.moeda
             })
         });
         
