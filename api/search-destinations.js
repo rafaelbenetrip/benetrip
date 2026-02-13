@@ -94,7 +94,7 @@ export default async function handler(req, res) {
     if (req.method !== 'POST') return res.status(405).json({ error: 'Apenas POST' });
 
     try {
-        const { origem, dataIda, dataVolta } = req.body;
+        const { origem, dataIda, dataVolta, preferencias } = req.body;
 
         // Validar origem
         if (!origem || typeof origem !== 'string') {
@@ -128,10 +128,24 @@ export default async function handler(req, res) {
         console.log(`🔍 Triple Search de ${origemCode} | País: ${geo?.pais || '?'} | Continente: ${geo?.continente || '?'}`);
 
         // ============================================================
+        // MAPEAR PREFERÊNCIAS → interests do SearchAPI
+        // Valores aceitos: popular, outdoors, beaches, museums, history, skiing
+        // NOTA: incompatível com travel_mode=flights_only
+        // ============================================================
+        const INTERESTS_MAP = {
+            'relax':     'beaches',
+            'aventura':  'outdoors',
+            'cultura':   'museums',
+            'urbano':    'popular',
+        };
+        const interests = INTERESTS_MAP[preferencias] || 'popular';
+
+        // ============================================================
         // PARÂMETROS BASE (compartilhados pelas 3 buscas)
         // ============================================================
         const baseParams = {
             departure_id: origemCode,
+            interests,
         };
 
         // Datas → parâmetro correto é time_period
