@@ -1,6 +1,6 @@
 /**
  * BENETRIP - DESCOBRIR DESTINOS
- * Versão TRIPLE SEARCH v2 - Sem opção de transporte (apenas voos)
+ * Versão TRIPLE SEARCH v2 - 3 buscas paralelas + LLM ranking
  * APENAS APIs reais, SEM fallbacks de dados
  */
 
@@ -15,6 +15,7 @@ const BenetripDiscovery = {
     config: {
         travelpayoutsMarker: 'benetrip',
         debug: true,
+        // MUDANÇA v2: usar cidades_global_iata_v4.json (com kgmid)
         cidadesJsonPath: 'data/cidades_global_iata_v4.json'
     },
 
@@ -33,14 +34,18 @@ const BenetripDiscovery = {
         this.setupFormEvents();
         this.setupAutocomplete();
         this.setupCalendar();
-        this.setupCompanhiaConditional();
+        this.setupConditionalFields();
         this.setupOptionButtons();
         this.setupNumberInput();
+        this.setupDistanceSlider();
         this.setupCurrencyInput();
         
         this.log('✅ Inicialização completa');
     },
 
+    // ================================================================
+    // MUDANÇA v2: Carregar JSON v4 (com campos de país/continente)
+    // ================================================================
     async carregarCidades() {
         try {
             const response = await fetch(this.config.cidadesJsonPath);
@@ -64,6 +69,9 @@ const BenetripDiscovery = {
         return texto.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
     },
 
+    // ================================================================
+    // MUDANÇA v2: buscarCidades usa campo 'pais' (agora nome completo)
+    // ================================================================
     buscarCidades(termo) {
         if (!this.state.cidadesData || termo.length < 2) return [];
         
@@ -80,7 +88,9 @@ const BenetripDiscovery = {
                 code: cidade.iata,
                 name: cidade.cidade,
                 state: cidade.sigla_estado,
+                // MUDANÇA v2: 'pais' agora é nome completo ("Brasil" em vez de "BR")
                 country: cidade.pais,
+                // NOVO v2: código ISO do país
                 countryCode: cidade.codigo_pais
             }));
     },
@@ -190,8 +200,7 @@ const BenetripDiscovery = {
         return data.toLocaleDateString('pt-BR');
     },
 
-    // Apenas condicional do número de pessoas (família/amigos)
-    setupCompanhiaConditional() {
+    setupConditionalFields() {
         const companhiaInput = document.getElementById('companhia');
         const numPessoasGroup = document.getElementById('num-pessoas-group');
         
@@ -200,6 +209,25 @@ const BenetripDiscovery = {
             numPessoasGroup.style.display = (value === 2 || value === 3) ? 'block' : 'none';
         });
         observer.observe(companhiaInput, { attributes: true });
+        
+        const tipoViagemInput = document.getElementById('tipo-viagem');
+        const moedaGroup = document.getElementById('moeda-group');
+        const orcamentoGroup = document.getElementById('orcamento-group');
+        const distanciaGroup = document.getElementById('distancia-group');
+        
+        const observerTipo = new MutationObserver(() => {
+            const value = parseInt(tipoViagemInput.value);
+            if (value === 0) {
+                moedaGroup.style.display = 'block';
+                orcamentoGroup.style.display = 'block';
+                distanciaGroup.style.display = 'none';
+            } else if (value === 1) {
+                moedaGroup.style.display = 'none';
+                orcamentoGroup.style.display = 'none';
+                distanciaGroup.style.display = 'block';
+            }
+        });
+        observerTipo.observe(tipoViagemInput, { attributes: true });
     },
 
     setupOptionButtons() {
@@ -237,6 +265,17 @@ const BenetripDiscovery = {
             incrementBtn.addEventListener('click', () => {
                 const value = parseInt(input.value);
                 if (value < 20) input.value = value + 1;
+            });
+        }
+    },
+
+    setupDistanceSlider() {
+        const slider = document.getElementById('distancia');
+        const valueDisplay = document.getElementById('distancia-value');
+        
+        if (slider && valueDisplay) {
+            slider.addEventListener('input', () => {
+                valueDisplay.textContent = slider.value;
             });
         }
     },
@@ -281,7 +320,6 @@ const BenetripDiscovery = {
         });
     },
 
-    // Validação simplificada (sem transporte)
     validarFormulario() {
         if (!this.state.origemSelecionada) {
             alert('Por favor, selecione uma cidade de origem');
@@ -304,38 +342,50 @@ const BenetripDiscovery = {
             document.getElementById('datas').focus();
             return false;
         }
-
-        if (!document.getElementById('moeda').value) {
-            alert('Por favor, escolha a moeda');
+        
+        if (!document.getElementById('tipo-viagem').value) {
+            alert('Por favor, escolha como prefere viajar');
             return false;
         }
         
-        const orcamento = document.getElementById('orcamento').value;
-        if (!orcamento || parseFloat(orcamento.replace(',', '.')) <= 0) {
-            alert('Por favor, informe o orçamento');
-            document.getElementById('orcamento').focus();
-            return false;
+        const tipoViagem = parseInt(document.getElementById('tipo-viagem').value);
+        if (tipoViagem === 0) {
+            if (!document.getElementById('moeda').value) {
+                alert('Por favor, escolha a moeda');
+                return false;
+            }
+            
+            const orcamento = document.getElementById('orcamento').value;
+            if (!orcamento || parseFloat(orcamento.replace(',', '.')) <= 0) {
+                alert('Por favor, informe o orçamento');
+                document.getElementById('orcamento').focus();
+                return false;
+            }
         }
         
         return true;
     },
 
-    // Coleta simplificada (sem tipoViagem/distância)
     coletarDadosFormulario() {
         const companhia = parseInt(document.getElementById('companhia').value);
+        const tipoViagem = parseInt(document.getElementById('tipo-viagem').value);
         
         this.state.formData = {
             origem: this.state.origemSelecionada,
             companhia: companhia,
-            numPessoas: (companhia === 2 || companhia === 3) 
-                ? parseInt(document.getElementById('num-pessoas').value) 
-                : (companhia === 1 ? 2 : 1),
+            numPessoas: (companhia === 2 || companhia === 3) ? parseInt(document.getElementById('num-pessoas').value) : (companhia === 1 ? 2 : 1),
             preferencias: document.getElementById('preferencias').value,
             dataIda: document.getElementById('data-ida').value,
             dataVolta: document.getElementById('data-volta').value,
-            moeda: document.getElementById('moeda').value,
-            orcamento: parseFloat(document.getElementById('orcamento').value.replace(',', '.'))
+            tipoViagem: tipoViagem
         };
+        
+        if (tipoViagem === 0) {
+            this.state.formData.moeda = document.getElementById('moeda').value;
+            this.state.formData.orcamento = parseFloat(document.getElementById('orcamento').value.replace(',', '.'));
+        } else {
+            this.state.formData.distanciaMaxima = parseInt(document.getElementById('distancia').value);
+        }
         
         this.log('📝 Dados:', this.state.formData);
     },
@@ -355,26 +405,28 @@ const BenetripDiscovery = {
                 throw new Error('Nenhum destino encontrado');
             }
             
-            // PASSO 2: Filtrar por orçamento (faixa 80-100%)
+            // PASSO 2: Filtrar por orçamento
             this.atualizarProgresso(40, '💰 Filtrando pelo seu orçamento...');
             const destinosFiltrados = this.filtrarDestinos(destinosDisponiveis);
             
-            // Se poucos destinos após filtro, enviar todos para o LLM
-            const destinosParaRanking = destinosFiltrados.length >= 5 
-                ? destinosFiltrados 
-                : destinosDisponiveis.filter(d => d.flight?.price > 0);
-
-            if (destinosParaRanking.length === 0) {
-                throw new Error('Nenhum destino com preço disponível');
-            }
-
-            if (destinosFiltrados.length < 5) {
-                this.log('⚠️ Poucos destinos na faixa ideal, enviando todos para o LLM');
+            if (destinosFiltrados.length === 0) {
+                // MUDANÇA v2: Se nenhum no orçamento, usar todos (LLM pode sugerir aspiracionais)
+                this.log('⚠️ Nenhum destino no orçamento exato, enviando todos para o LLM');
+                this.atualizarProgresso(60, '🤖 Tripinha analisando opções...');
+                const ranking = await this.ranquearDestinosAPI(destinosDisponiveis);
+                
+                this.atualizarProgresso(80, '✈️ Gerando links de reserva...');
+                const destinosComLinks = this.gerarLinksTravelpayouts(ranking);
+                
+                this.atualizarProgresso(100, '🎉 Pronto!');
+                await this.delay(500);
+                this.mostrarResultados(destinosComLinks);
+                return;
             }
             
             // PASSO 3: LLM ranqueia
             this.atualizarProgresso(60, '🤖 Tripinha selecionando os melhores...');
-            const ranking = await this.ranquearDestinosAPI(destinosParaRanking);
+            const ranking = await this.ranquearDestinosAPI(destinosFiltrados);
             
             // PASSO 4: Gerar links de afiliado
             this.atualizarProgresso(80, '✈️ Gerando links de reserva...');
@@ -392,7 +444,7 @@ const BenetripDiscovery = {
     },
 
     // ================================================================
-    // CHAMADA API: search-destinations (triple search)
+    // CHAMADA API: search-destinations (agora faz triple search)
     // ================================================================
     async buscarDestinosAPI() {
         const response = await fetch('/api/search-destinations', {
@@ -402,6 +454,7 @@ const BenetripDiscovery = {
                 origem: this.state.formData.origem.code,
                 dataIda: this.state.formData.dataIda,
                 dataVolta: this.state.formData.dataVolta,
+                // NOVO: enviar preferencia para mapear interests na API
                 preferencias: this.state.formData.preferencias
             })
         });
@@ -413,7 +466,7 @@ const BenetripDiscovery = {
         
         const data = await response.json();
 
-        // Log metadados do triple search
+        // MUDANÇA v2: Logar metadados do triple search
         if (data._meta) {
             this.log('📊 Triple Search:', {
                 global: data._meta.sources.global,
@@ -427,29 +480,32 @@ const BenetripDiscovery = {
         return data.destinations;
     },
 
-    // Filtrar: faixa 80-100% do orçamento, com fallback para 60-100%
+    // Filtrar pelo preço da passagem: entre 80% e 100% do orçamento
+    // Destinos muito baratos provavelmente não são o que o viajante quer
+    // e destinos acima do orçamento não cabem no bolso
     filtrarDestinos(destinos) {
-        const { orcamento } = this.state.formData;
-        if (!orcamento) return destinos;
+        const { tipoViagem, orcamento } = this.state.formData;
+        
+        if (tipoViagem !== 0 || !orcamento) return destinos;
 
-        const minPreco = orcamento * 0.8;
-        const maxPreco = orcamento;
+        const minPreco = orcamento * 0.8;  // 80% do orçamento
+        const maxPreco = orcamento;         // 100% do orçamento
 
         const dentroFaixa = destinos.filter(d => {
             const preco = d.flight?.price || 0;
             return preco > 0 && preco >= minPreco && preco <= maxPreco;
         });
 
-        this.log(`💰 Filtro 80-100%: R$${minPreco.toFixed(0)} - R$${maxPreco.toFixed(0)} → ${dentroFaixa.length} destinos`);
+        this.log(`💰 Filtro orçamento: R$${minPreco.toFixed(0)} - R$${maxPreco.toFixed(0)} → ${dentroFaixa.length} destinos`);
 
-        // Se poucos destinos na faixa ideal, expandir para 60-100%
+        // Se poucos destinos na faixa 80-100%, expandir para 60-100%
         if (dentroFaixa.length < 5) {
             const minExpandido = orcamento * 0.6;
             const expandido = destinos.filter(d => {
                 const preco = d.flight?.price || 0;
                 return preco > 0 && preco >= minExpandido && preco <= maxPreco;
             });
-            this.log(`💰 Faixa expandida 60-100%: R$${minExpandido.toFixed(0)} - R$${maxPreco.toFixed(0)} → ${expandido.length} destinos`);
+            this.log(`💰 Faixa expandida 60-100%: ${expandido.length} destinos`);
             return expandido;
         }
 
@@ -463,9 +519,10 @@ const BenetripDiscovery = {
     },
 
     // ================================================================
-    // CHAMADA API: rank-destinations (contexto rico)
+    // CHAMADA API: rank-destinations (com fallback integrado)
     // ================================================================
     async ranquearDestinosAPI(destinos) {
+        // Mapear valores numéricos para texto legível
         const COMPANHIA_MAP = {
             0: 'Viajando sozinho(a)',
             1: 'Viagem romântica (casal)',
@@ -486,6 +543,7 @@ const BenetripDiscovery = {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 destinos: destinos,
+                // NOVO: contexto rico para o LLM
                 preferencias: PREFERENCIAS_MAP[this.state.formData.preferencias] || this.state.formData.preferencias,
                 companhia: COMPANHIA_MAP[this.state.formData.companhia] || 'Não informado',
                 numPessoas: this.state.formData.numPessoas,
@@ -501,6 +559,7 @@ const BenetripDiscovery = {
         
         const ranking = await response.json();
 
+        // MUDANÇA v2: Logar modelo usado
         if (ranking._model) {
             this.log(`🤖 Modelo: ${ranking._model} | Analisados: ${ranking._totalAnalisados}`);
         }
@@ -552,7 +611,7 @@ const BenetripDiscovery = {
     },
 
     // ================================================================
-    // RESULTADOS com badges de confiabilidade
+    // MUDANÇA v2: Mostrar badge de confiabilidade (multi-fonte)
     // ================================================================
     mostrarResultados(destinos) {
         const container = document.getElementById('resultados-container');
@@ -571,6 +630,7 @@ const BenetripDiscovery = {
             return `${stops} paradas`;
         };
 
+        // NOVO v2: Badge de confiabilidade
         const fonteBadge = (d) => {
             const count = d._source_count || 1;
             if (count >= 3) return '<span class="fonte-badge fonte-alta" title="Encontrado em 3 buscas diferentes">⭐ Alta confiança</span>';
