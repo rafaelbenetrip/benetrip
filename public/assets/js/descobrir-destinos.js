@@ -1,6 +1,7 @@
 /**
  * BENETRIP - DESCOBRIR DESTINOS
- * Versão TRIPLE SEARCH v2.1 - Resultados enriquecidos
+ * Versão TRIPLE SEARCH v2.2 - Links Benetrip Voos
+ * - Redirecionamento para voos.benetrip.com.br (não mais Aviasales)
  * - Comentários contextuais sobre destinos (clima, estação, atividades)
  * - Moeda escolhida pelo usuário em todos os preços
  * - Resumo detalhado dos critérios na tela de resultados
@@ -18,7 +19,6 @@ const BenetripDiscovery = {
     },
 
     config: {
-        travelpayoutsMarker: 'benetrip',
         debug: true,
         cidadesJsonPath: 'data/cidades_global_iata_v5.json'
     },
@@ -32,7 +32,7 @@ const BenetripDiscovery = {
     },
 
     init() {
-        this.log('🐕 Benetrip Discovery v2.1 (Resultados Enriquecidos) inicializando...');
+        this.log('🐕 Benetrip Discovery v2.2 (Links Benetrip Voos) inicializando...');
         
         this.carregarCidades();
         this.setupFormEvents();
@@ -424,9 +424,9 @@ const BenetripDiscovery = {
             this.atualizarProgresso(60, '🤖 Tripinha analisando destinos...');
             const ranking = await this.ranquearDestinosAPI(destinosParaRanking, filtro.cenario);
             
-            // PASSO 4: Gerar links de afiliado
+            // PASSO 4: Gerar links para voos.benetrip.com.br
             this.atualizarProgresso(80, '✈️ Gerando links de reserva...');
-            const destinosComLinks = this.gerarLinksTravelpayouts(ranking);
+            const destinosComLinks = this.gerarLinksBenetrip(ranking);
             
             // Salvar resultados no state para referência
             this.state.resultados = destinosComLinks;
@@ -444,7 +444,6 @@ const BenetripDiscovery = {
 
     // ================================================================
     // CHAMADA API: search-destinations (triple search)
-    // ✅ CORREÇÃO: Agora envia moeda para a API usar na busca SearchAPI
     // ================================================================
     async buscarDestinosAPI() {
         const response = await fetch('/api/search-destinations', {
@@ -455,7 +454,7 @@ const BenetripDiscovery = {
                 dataIda: this.state.formData.dataIda,
                 dataVolta: this.state.formData.dataVolta,
                 preferencias: this.state.formData.preferencias,
-                moeda: this.state.formData.moeda  // ✅ ADICIONADO: envia moeda do usuário
+                moeda: this.state.formData.moeda
             })
         });
         
@@ -473,7 +472,7 @@ const BenetripDiscovery = {
                 pais: data._meta.sources.pais,
                 total: data.total,
                 tempo: `${data._meta.totalTime}ms`,
-                moeda: data._meta.currency || 'BRL'  // ✅ Log da moeda usada
+                moeda: data._meta.currency || 'BRL'
             });
         }
 
@@ -574,14 +573,25 @@ const BenetripDiscovery = {
         return ranking;
     },
 
-    gerarLinksTravelpayouts(ranking) {
+    // ================================================================
+    // GERAR LINKS PARA voos.benetrip.com.br
+    // Formato: ?flightSearch={IATA_origem}{DDMM_ida}{IATA_destino}{DDMM_volta}{numPessoas}
+    // Exemplo: ?flightSearch=GRU1003NAT16034&destination_airports=1&origin_airports=0
+    // ================================================================
+    gerarLinksBenetrip(ranking) {
         const { origem, dataIda, dataVolta, numPessoas } = this.state.formData;
+        
+        // Converte "YYYY-MM-DD" → "DDMM"
+        const formatDDMM = (isoDate) => {
+            const [, mes, dia] = isoDate.split('-');
+            return `${dia}${mes}`;
+        };
         
         const gerarLink = (d) => {
             if (!d?.primary_airport) return '#';
-            const base = 'https://www.aviasales.com/search/';
-            const params = `${origem.code}${dataIda.replace(/-/g, '')}${d.primary_airport}${dataVolta.replace(/-/g, '')}${numPessoas}`;
-            return `${base}${params}?marker=${this.config.travelpayoutsMarker}`;
+            // Formato: {IATA_origem}{DDMM_ida}{IATA_destino}{DDMM_volta}{numPessoas}
+            const flightSearch = `${origem.code}${formatDDMM(dataIda)}${d.primary_airport}${formatDDMM(dataVolta)}${numPessoas}`;
+            return `https://voos.benetrip.com.br/?flightSearch=${flightSearch}&destination_airports=1&origin_airports=0`;
         };
         
         return {
