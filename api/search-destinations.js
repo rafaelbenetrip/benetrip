@@ -44,7 +44,7 @@ async function searchTravelExplore(params, label) {
     const fullParams = {
         engine: 'google_travel_explore',
         api_key: process.env.SEARCHAPI_KEY,
-        currency: moeda || 'BRL',
+        // ✅ currency agora vem via params (passado pelo handler)
         gl: 'br',
         hl: 'pt-BR',
         ...params,
@@ -94,6 +94,7 @@ export default async function handler(req, res) {
     if (req.method !== 'POST') return res.status(405).json({ error: 'Apenas POST' });
 
     try {
+        // ✅ CORREÇÃO: Extrair moeda do body enviado pelo frontend
         const { origem, dataIda, dataVolta, preferencias, moeda } = req.body;
 
         // Validar origem
@@ -118,6 +119,10 @@ export default async function handler(req, res) {
                 message: 'Configure em Vercel → Settings → Environment Variables'
             });
         }
+
+        // ✅ CORREÇÃO: Usar moeda do usuário, fallback para BRL
+        const currencyCode = (moeda && /^[A-Z]{3}$/.test(moeda)) ? moeda : 'BRL';
+        console.log(`💱 Moeda da busca: ${currencyCode}`);
 
         // ============================================================
         // RESOLVER GEO DO AEROPORTO
@@ -146,6 +151,7 @@ export default async function handler(req, res) {
         const baseParams = {
             departure_id: origemCode,
             interests,
+            currency: currencyCode, // ✅ CORREÇÃO: Moeda dinâmica do usuário
         };
 
         // Datas → parâmetro correto é time_period
@@ -272,7 +278,7 @@ export default async function handler(req, res) {
             `Global=${globalResult.destinations.length} ` +
             `${geo?.continente || 'Continente'}=${continenteResult.destinations.length} ` +
             `${geo?.pais || 'País'}=${paisResult.destinations.length} ` +
-            `→ ${consolidated.length} únicos`
+            `→ ${consolidated.length} únicos | Moeda: ${currencyCode}`
         );
 
         return res.status(200).json({
@@ -285,10 +291,12 @@ export default async function handler(req, res) {
             } : null,
             dataIda: dataIda || null,
             dataVolta: dataVolta || null,
+            moeda: currencyCode, // ✅ Retornar moeda usada na busca
             total: consolidated.length,
             destinations: consolidated,
             _meta: {
                 totalTime,
+                currency: currencyCode,
                 sources: {
                     global: globalResult.destinations.length,
                     continente: continenteResult.destinations.length,
