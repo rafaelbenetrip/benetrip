@@ -44,7 +44,7 @@ async function searchTravelExplore(params, label) {
     const fullParams = {
         engine: 'google_travel_explore',
         api_key: process.env.SEARCHAPI_KEY,
-        currency: 'BRL',
+        currency: moeda || 'BRL',
         gl: 'br',
         hl: 'pt-BR',
         ...params,
