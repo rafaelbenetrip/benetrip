@@ -453,7 +453,9 @@ const BenetripDiscovery = {
             body: JSON.stringify({
                 origem: this.state.formData.origem.code,
                 dataIda: this.state.formData.dataIda,
-                dataVolta: this.state.formData.dataVolta
+                dataVolta: this.state.formData.dataVolta,
+                // NOVO: enviar preferencia para mapear interests na API
+                preferencias: this.state.formData.preferencias
             })
         });
         
@@ -478,17 +480,36 @@ const BenetripDiscovery = {
         return data.destinations;
     },
 
-    // Filtrar pelo preço da passagem (ida e volta)
+    // Filtrar pelo preço da passagem: entre 80% e 100% do orçamento
+    // Destinos muito baratos provavelmente não são o que o viajante quer
+    // e destinos acima do orçamento não cabem no bolso
     filtrarDestinos(destinos) {
         const { tipoViagem, orcamento } = this.state.formData;
         
-        return destinos.filter(d => {
-            if (tipoViagem === 0) {
-                const precoPassagem = d.flight?.price || 0;
-                return precoPassagem > 0 && precoPassagem <= orcamento;
-            }
-            return true;
+        if (tipoViagem !== 0 || !orcamento) return destinos;
+
+        const minPreco = orcamento * 0.8;  // 80% do orçamento
+        const maxPreco = orcamento;         // 100% do orçamento
+
+        const dentroFaixa = destinos.filter(d => {
+            const preco = d.flight?.price || 0;
+            return preco > 0 && preco >= minPreco && preco <= maxPreco;
         });
+
+        this.log(`💰 Filtro orçamento: R$${minPreco.toFixed(0)} - R$${maxPreco.toFixed(0)} → ${dentroFaixa.length} destinos`);
+
+        // Se poucos destinos na faixa 80-100%, expandir para 60-100%
+        if (dentroFaixa.length < 5) {
+            const minExpandido = orcamento * 0.6;
+            const expandido = destinos.filter(d => {
+                const preco = d.flight?.price || 0;
+                return preco > 0 && preco >= minExpandido && preco <= maxPreco;
+            });
+            this.log(`💰 Faixa expandida 60-100%: ${expandido.length} destinos`);
+            return expandido;
+        }
+
+        return dentroFaixa;
     },
 
     calcularNoites(dataIda, dataVolta) {
@@ -501,12 +522,32 @@ const BenetripDiscovery = {
     // CHAMADA API: rank-destinations (com fallback integrado)
     // ================================================================
     async ranquearDestinosAPI(destinos) {
+        // Mapear valores numéricos para texto legível
+        const COMPANHIA_MAP = {
+            0: 'Viajando sozinho(a)',
+            1: 'Viagem romântica (casal)',
+            2: 'Viagem em família',
+            3: 'Viagem com amigos'
+        };
+        const PREFERENCIAS_MAP = {
+            'relax': 'Relaxamento, praias, descanso e natureza tranquila',
+            'aventura': 'Aventura, trilhas, esportes radicais e natureza selvagem',
+            'cultura': 'Cultura, museus, história, gastronomia e arquitetura',
+            'urbano': 'Agito urbano, vida noturna, compras e experiências cosmopolitas'
+        };
+
+        const noites = this.calcularNoites(this.state.formData.dataIda, this.state.formData.dataVolta);
+
         const response = await fetch('/api/rank-destinations', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 destinos: destinos,
-                preferencias: this.state.formData.preferencias,
+                // NOVO: contexto rico para o LLM
+                preferencias: PREFERENCIAS_MAP[this.state.formData.preferencias] || this.state.formData.preferencias,
+                companhia: COMPANHIA_MAP[this.state.formData.companhia] || 'Não informado',
+                numPessoas: this.state.formData.numPessoas,
+                noites: noites,
                 orcamento: this.state.formData.orcamento
             })
         });
