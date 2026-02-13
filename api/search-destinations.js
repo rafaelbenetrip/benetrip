@@ -134,13 +134,17 @@ export default async function handler(req, res) {
             departure_id: origemCode,
         };
 
-        // Datas
+        // Datas → parâmetro correto é time_period
+        // Round-trip: "YYYY-MM-DD..YYYY-MM-DD"
+        // One-way:    "YYYY-MM-DD"
         if (dataIda && dataVolta) {
-            baseParams.outbound_date = dataIda;
-            baseParams.return_date = dataVolta;
+            baseParams.time_period = `${dataIda}..${dataVolta}`;
+            console.log(`📅 Datas: ${dataIda} → ${dataVolta} (time_period: ${baseParams.time_period})`);
         } else if (dataIda) {
-            baseParams.outbound_date = dataIda;
+            baseParams.time_period = dataIda;
+            console.log(`📅 Data ida: ${dataIda} (one-way)`);
         }
+        // Se nenhuma data: API usa default "one_week_trip_in_the_next_six_months"
 
         // ============================================================
         // 3 BUSCAS EM PARALELO
