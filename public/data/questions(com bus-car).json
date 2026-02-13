@@ -1,0 +1,139 @@
+[
+    {
+        "question": "1️⃣ De onde você partirá?",
+        "description": "Digite apenas o nome da cidade de onde você vai sair.",
+        "options": null,
+        "input_field": true,
+        "autocomplete": true,
+        "key": "cidade_partida"
+    },
+    
+    {
+        "question": "2️⃣ Com quem você vai viajar?",
+        "description": "Escolha quem estará com você nessa aventura.",
+        "options": [
+            "🧳 Sozinho(a) – Estou pronto para qualquer parada!",
+            "❤️ Romântico – Viajando a dois, quero momentos especiais.",
+            "👨‍👩‍👧‍👦 Família – Tem que ser divertido para todo mundo.",
+            "🎉 Amigos – O plano é curtir ao máximo juntos!"
+        ],
+        "key": "companhia"
+    },
+    
+    {
+        "question": "2️⃣.1️⃣ Quantas pessoas estão na sua família para esta viagem?",
+        "description": "Inclua todos, inclusive você!",
+        "input_field": true,
+        "numeric_only": true,
+        "number_input": true,
+        "conditional": {
+            "depends_on": "companhia",
+            "show_if_value": 2
+        },
+        "key": "quantidade_familia"
+    },
+    
+    {
+        "question": "2️⃣.1️⃣ Quantos amigos vão nessa aventura, incluindo você?",
+        "description": "Me diga o número total de pessoas da turma! 🐶🎒",
+        "input_field": true,
+        "numeric_only": true,
+        "number_input": true,
+        "conditional": {
+            "depends_on": "companhia",
+            "show_if_value": 3
+        },
+        "key": "quantidade_amigos"
+    },
+    
+    {
+        "question": "3️⃣ O que você mais busca nessa viagem?",
+        "description": "Escolha o que é mais importante para você.",
+        "options": [
+            "🌊 Relax total – Descansar, aproveitar sem pressa e recarregar as energias",
+            "🏔️ Aventura e emoção – Trilhar, explorar e sentir a adrenalina.",
+            "🏛️ Cultura e história – Mergulhar em tradições, arte e sabores locais.",
+            "🏙️ Agito urbano – Ruas movimentadas, vida noturna e muita energia."
+        ],
+        "key": "preferencia_viagem"
+    },
+    
+    {
+        "question": "4️⃣ Quando será a sua viagem?",
+        "description": "Selecione a data de ida e volta.",
+        "calendar": {
+            "min_date": "2025-03-23",
+            "max_date": "2026-12-31"
+        },
+        "date_format": "YYYY-MM-DD",
+        "key": "datas"
+    },
+    
+    {
+        "question": "5️⃣ Como você prefere fazer essa viagem?",
+        "description": "Escolha o meio de transporte para sua aventura.",
+        "options": [
+            "✈️ Avião ou Ônibus – Quero voar ou viajar de ônibus para destinos mais distantes!",
+            "🚗 Carro – Prefiro a liberdade de uma road trip!"
+        ],
+        "key": "viagem_carro"
+    },
+    
+    {
+        "question": "6️⃣ Qual moeda você prefere usar para o orçamento?",
+        "description": "Escolha a moeda para definir seu orçamento de viagem.",
+        "options": [
+            "💰 Real Brasileiro (BRL)",
+            "💵 Dólar Americano (USD)",
+            "💶 Euro (EUR)"
+        ],
+        "currency_map": {
+            "💵 Dólar Americano (USD)": "USD",
+            "💶 Euro (EUR)": "EUR",
+            "💰 Real Brasileiro (BRL)": "BRL"
+        },
+        "conditional": {
+            "depends_on": "viagem_carro",
+            "show_if_value": 0
+        },
+        "key": "moeda_escolhida"
+    },
+    
+    {
+        "question": "7️⃣ Qual é o seu orçamento para passagens por pessoa?",
+        "description": "Informe o valor que deseja gastar com passagens por pessoa para ida e volta.",
+        "input_field": true,
+        "currency_format": true,
+        "conditional": {
+            "depends_on": "viagem_carro",
+            "show_if_value": 0
+        },
+        "key": "orcamento_valor"
+    },
+
+    
+    {
+        "question": "6️⃣ Até quantos quilômetros você topa dirigir?",
+        "description": "Arraste para definir a distância máxima da sua road trip.",
+        "input_field": true,
+        "slider": true,
+        "slider_config": {
+            "min": 100,
+            "max": 1500,
+            "step": 50,
+            "default": 500,
+            "unit": "km",
+            "labels": {
+                "100": "Pertinho",
+                "500": "Moderado",
+                "1000": "Longe",
+                "1500": "Super longe"
+            }
+        },
+        "conditional": {
+            "depends_on": "viagem_carro",
+            "show_if_value": 1
+        },
+        "key": "distancia_maxima"
+    }
+]
