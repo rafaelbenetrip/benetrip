@@ -371,9 +371,9 @@ const BenetripDiscovery = {
             const destinosParaRanking = filtro.destinos;
             this.log(`📋 Cenário: ${filtro.cenario} | ${destinosParaRanking.length} destinos para ranking`);
             
-            // PASSO 3: LLM ranqueia (com contexto de cenário)
+            // PASSO 3: LLM ranqueia
             this.atualizarProgresso(60, '🤖 Tripinha selecionando os melhores...');
-            const ranking = await this.ranquearDestinosAPI(destinosParaRanking, filtro.cenario);
+            const ranking = await this.ranquearDestinosAPI(destinosParaRanking);
             
             // PASSO 4: Gerar links de afiliado
             this.atualizarProgresso(80, '✈️ Gerando links de reserva...');
@@ -506,7 +506,7 @@ const BenetripDiscovery = {
     // ================================================================
     // CHAMADA API: rank-destinations (contexto rico)
     // ================================================================
-    async ranquearDestinosAPI(destinos, cenario) {
+    async ranquearDestinosAPI(destinos) {
         const COMPANHIA_MAP = {
             0: 'Viajando sozinho(a)',
             1: 'Viagem romântica (casal)',
@@ -531,8 +531,7 @@ const BenetripDiscovery = {
                 companhia: COMPANHIA_MAP[this.state.formData.companhia] || 'Não informado',
                 numPessoas: this.state.formData.numPessoas,
                 noites: noites,
-                orcamento: this.state.formData.orcamento,
-                cenario: cenario || 'ideal'
+                orcamento: this.state.formData.orcamento
             })
         });
         
