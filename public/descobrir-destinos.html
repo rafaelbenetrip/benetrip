@@ -135,25 +135,8 @@
                         <input type="hidden" id="data-volta">
                     </div>
 
-                    <!-- 5. Tipo de transporte -->
-                    <div class="form-group">
-                        <label>🚗 Como você prefere fazer essa viagem?</label>
-                        <p class="hint">Escolha o meio de transporte</p>
-                        <div class="button-group button-group-full" data-field="tipo-viagem">
-                            <button type="button" class="btn-option btn-full" data-value="0">
-                                <span class="emoji">✈️</span>
-                                <span class="text">Avião ou Ônibus</span>
-                            </button>
-                            <button type="button" class="btn-option btn-full" data-value="1">
-                                <span class="emoji">🚗</span>
-                                <span class="text">Carro (Road Trip)</span>
-                            </button>
-                        </div>
-                        <input type="hidden" id="tipo-viagem" required>
-                    </div>
-
-                    <!-- 6. Moeda (condicional - só para avião/ônibus) -->
-                    <div class="form-group conditional" id="moeda-group" style="display: none;">
+                    <!-- 5. Moeda (sempre visível) -->
+                    <div class="form-group" id="moeda-group">
                         <label>💰 Qual moeda você prefere usar?</label>
                         <p class="hint">Escolha a moeda para definir seu orçamento</p>
                         <div class="button-group" data-field="moeda">
@@ -170,11 +153,11 @@
                                 <span class="text">Euro (EUR)</span>
                             </button>
                         </div>
-                        <input type="hidden" id="moeda">
+                        <input type="hidden" id="moeda" required>
                     </div>
 
-                    <!-- 7. Orçamento (condicional - só para avião/ônibus) -->
-                    <div class="form-group conditional" id="orcamento-group" style="display: none;">
+                    <!-- 6. Orçamento (sempre visível) -->
+                    <div class="form-group" id="orcamento-group">
                         <label for="orcamento">💸 Qual é o seu orçamento para passagens por pessoa?</label>
                         <p class="hint">Valor para ida e volta</p>
                         <div class="currency-input-wrapper">
@@ -184,30 +167,8 @@
                                 id="orcamento" 
                                 placeholder="0,00"
                                 inputmode="numeric"
+                                required
                             >
-                        </div>
-                    </div>
-
-                    <!-- 6. Distância máxima (condicional - só para carro) -->
-                    <div class="form-group conditional" id="distancia-group" style="display: none;">
-                        <label for="distancia">🛣️ Até quantos quilômetros você topa dirigir?</label>
-                        <p class="hint">Arraste para definir a distância máxima</p>
-                        <div class="slider-container">
-                            <input 
-                                type="range" 
-                                id="distancia" 
-                                min="100" 
-                                max="1500" 
-                                step="50" 
-                                value="500"
-                            >
-                            <div class="slider-labels">
-                                <span>100 km</span>
-                                <span>1500 km</span>
-                            </div>
-                            <div class="slider-value">
-                                Até <strong id="distancia-value">500</strong> km
-                            </div>
                         </div>
                     </div>
 
@@ -232,7 +193,6 @@
 
             <!-- Resultados -->
             <div id="resultados-container" style="display: none;">
-                <!-- JavaScript irá preencher aqui -->
             </div>
 
         </div>
