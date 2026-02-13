@@ -5,6 +5,7 @@
  * - Moeda escolhida pelo usuário em todos os preços
  * - Resumo detalhado dos critérios na tela de resultados
  * - Botão "tentar novamente" preservando dados do formulário
+ * - Suporte a múltiplos aeroportos por cidade (v5)
  * APENAS APIs reais, SEM fallbacks de dados
  */
 
@@ -19,7 +20,7 @@ const BenetripDiscovery = {
     config: {
         travelpayoutsMarker: 'benetrip',
         debug: true,
-        cidadesJsonPath: 'data/cidades_global_iata_v4.json'
+        cidadesJsonPath: 'data/cidades_global_iata_v5.json'
     },
 
     log(...args) {
@@ -53,12 +54,15 @@ const BenetripDiscovery = {
             const dados = await response.json();
             this.state.cidadesData = dados.filter(c => c.iata);
             
-            this.log(`✅ ${this.state.cidadesData.length} cidades carregadas (v4 com kgmid)`);
+            this.log(`✅ ${this.state.cidadesData.length} cidades carregadas (v5 com aeroportos reais)`);
         } catch (erro) {
             this.error('Erro ao carregar cidades:', erro);
             this.state.cidadesData = [
-                { cidade: "São Paulo", sigla_estado: "SP", pais: "Brasil", codigo_pais: "BR", iata: "GRU" },
-                { cidade: "Rio de Janeiro", sigla_estado: "RJ", pais: "Brasil", codigo_pais: "BR", iata: "GIG" },
+                { cidade: "São Paulo", sigla_estado: "SP", pais: "Brasil", codigo_pais: "BR", iata: "GRU", aeroporto: "Aeroporto de Guarulhos" },
+                { cidade: "São Paulo", sigla_estado: "SP", pais: "Brasil", codigo_pais: "BR", iata: "CGH", aeroporto: "Aeroporto de Congonhas" },
+                { cidade: "São Paulo", sigla_estado: "SP", pais: "Brasil", codigo_pais: "BR", iata: "VCP", aeroporto: "Aeroporto de Viracopos" },
+                { cidade: "Rio de Janeiro", sigla_estado: "RJ", pais: "Brasil", codigo_pais: "BR", iata: "GIG", aeroporto: "Aeroporto do Galeão" },
+                { cidade: "Rio de Janeiro", sigla_estado: "RJ", pais: "Brasil", codigo_pais: "BR", iata: "SDU", aeroporto: "Aeroporto Santos Dumont" },
                 { cidade: "Salvador", sigla_estado: "BA", pais: "Brasil", codigo_pais: "BR", iata: "SSA" }
             ];
         }
@@ -77,7 +81,8 @@ const BenetripDiscovery = {
             .filter(cidade => {
                 const nomeNorm = this.normalizarTexto(cidade.cidade);
                 const iataNorm = cidade.iata.toLowerCase();
-                return nomeNorm.includes(termoNorm) || iataNorm.includes(termoNorm);
+                const aeroNorm = cidade.aeroporto ? this.normalizarTexto(cidade.aeroporto) : '';
+                return nomeNorm.includes(termoNorm) || iataNorm.includes(termoNorm) || aeroNorm.includes(termoNorm);
             })
             .slice(0, 8)
             .map(cidade => ({
@@ -85,7 +90,8 @@ const BenetripDiscovery = {
                 name: cidade.cidade,
                 state: cidade.sigla_estado,
                 country: cidade.pais,
-                countryCode: cidade.codigo_pais
+                countryCode: cidade.codigo_pais,
+                airport: cidade.aeroporto || null
             }));
     },
 
@@ -122,7 +128,7 @@ const BenetripDiscovery = {
                     <div class="autocomplete-item" data-city='${JSON.stringify(cidade)}'>
                         <div class="item-code">${cidade.code}</div>
                         <div class="item-details">
-                            <div class="item-name">${cidade.name}${cidade.state ? ', ' + cidade.state : ''}</div>
+                            <div class="item-name">${cidade.name}${cidade.state ? ', ' + cidade.state : ''}${cidade.airport ? ' — ' + cidade.airport : ''}</div>
                             <div class="item-country">${cidade.country}</div>
                         </div>
                     </div>
@@ -152,7 +158,9 @@ const BenetripDiscovery = {
         const hiddenInput = document.getElementById('origem-data');
         
         this.state.origemSelecionada = cidade;
-        input.value = `${cidade.name} (${cidade.code})`;
+        input.value = cidade.airport 
+            ? `${cidade.name} — ${cidade.airport} (${cidade.code})`
+            : `${cidade.name} (${cidade.code})`;
         hiddenInput.value = JSON.stringify(cidade);
         results.style.display = 'none';
         
@@ -639,6 +647,11 @@ const BenetripDiscovery = {
         else if (companhia === 1) pessoasInfo = '2 pessoas';
         else pessoasInfo = `${numPessoas} pessoas`;
 
+        // Info de aeroporto (mostrar nome se disponível)
+        const origemDisplay = origem.airport 
+            ? `${origem.name} — ${origem.airport} (${origem.code})`
+            : `${origem.name} (${origem.code})`;
+
         return `
             <div class="criterios-resumo">
                 <div class="criterios-titulo">
@@ -648,7 +661,7 @@ const BenetripDiscovery = {
                 <div class="criterios-grid">
                     <div class="criterio-item">
                         <span class="criterio-label">Saindo de</span>
-                        <span class="criterio-valor">📍 ${origem.name} (${origem.code})</span>
+                        <span class="criterio-valor">📍 ${origemDisplay}</span>
                     </div>
                     <div class="criterio-item">
                         <span class="criterio-label">Companhia</span>
@@ -709,12 +722,6 @@ const BenetripDiscovery = {
 
     // ================================================================
     // RESULTADOS ENRIQUECIDOS
-    // - Resumo detalhado dos critérios
-    // - Comentários contextuais sobre cada destino
-    // - Dicas práticas
-    // - Moeda correta em todos os preços
-    // - Custo estimado total (passagem + hotel)
-    // - Botão "buscar novamente" preservando dados
     // ================================================================
     mostrarResultados(destinos, cenario, mensagem) {
         const container = document.getElementById('resultados-container');
