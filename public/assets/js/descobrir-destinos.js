@@ -371,9 +371,9 @@ const BenetripDiscovery = {
             const destinosParaRanking = filtro.destinos;
             this.log(`📋 Cenário: ${filtro.cenario} | ${destinosParaRanking.length} destinos para ranking`);
             
-            // PASSO 3: LLM ranqueia
+            // PASSO 3: LLM ranqueia (com contexto de cenário)
             this.atualizarProgresso(60, '🤖 Tripinha selecionando os melhores...');
-            const ranking = await this.ranquearDestinosAPI(destinosParaRanking);
+            const ranking = await this.ranquearDestinosAPI(destinosParaRanking, filtro.cenario);
             
             // PASSO 4: Gerar links de afiliado
             this.atualizarProgresso(80, '✈️ Gerando links de reserva...');
@@ -482,18 +482,9 @@ const BenetripDiscovery = {
             };
         }
 
-        // Último recurso: qualquer destino com preço (pode estar acima)
-        if (comPreco.length >= 3) {
-            this.log(`⚠️ FORA: destinos disponíveis mas fora do orçamento`);
-            return {
-                cenario: 'abaixo',
-                destinos: comPreco.slice(0, 30), // limitar para não sobrecarregar LLM
-                mensagem: `🐕 Os destinos disponíveis estão fora da faixa de ${simbolo} ${orcamento.toLocaleString('pt-BR')}. Mostrando as opções mais próximas do seu orçamento.`
-            };
-        }
-
-        // Realmente nenhum destino viável
-        this.log('❌ Pouquíssimos destinos disponíveis');
+        // Se chegou aqui, não há destinos suficientes dentro do orçamento
+        // Mostrar tela de "sem resultados" para o usuário ajustar
+        this.log('❌ Destinos disponíveis mas fora do orçamento');
         return { cenario: 'nenhum', destinos: [], mensagem: '' };
     },
 
@@ -506,7 +497,7 @@ const BenetripDiscovery = {
     // ================================================================
     // CHAMADA API: rank-destinations (contexto rico)
     // ================================================================
-    async ranquearDestinosAPI(destinos) {
+    async ranquearDestinosAPI(destinos, cenario) {
         const COMPANHIA_MAP = {
             0: 'Viajando sozinho(a)',
             1: 'Viagem romântica (casal)',
@@ -531,7 +522,8 @@ const BenetripDiscovery = {
                 companhia: COMPANHIA_MAP[this.state.formData.companhia] || 'Não informado',
                 numPessoas: this.state.formData.numPessoas,
                 noites: noites,
-                orcamento: this.state.formData.orcamento
+                orcamento: this.state.formData.orcamento,
+                cenario: cenario || 'ideal'
             })
         });
         
