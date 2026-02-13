@@ -444,6 +444,7 @@ const BenetripDiscovery = {
 
     // ================================================================
     // CHAMADA API: search-destinations (triple search)
+    // ✅ CORREÇÃO: Agora envia moeda para a API usar na busca SearchAPI
     // ================================================================
     async buscarDestinosAPI() {
         const response = await fetch('/api/search-destinations', {
@@ -453,8 +454,8 @@ const BenetripDiscovery = {
                 origem: this.state.formData.origem.code,
                 dataIda: this.state.formData.dataIda,
                 dataVolta: this.state.formData.dataVolta,
-                preferencias: this.state.formData.preferencias
-                moeda: this.state.formData.moeda
+                preferencias: this.state.formData.preferencias,
+                moeda: this.state.formData.moeda  // ✅ ADICIONADO: envia moeda do usuário
             })
         });
         
@@ -471,7 +472,8 @@ const BenetripDiscovery = {
                 continente: data._meta.sources.continente,
                 pais: data._meta.sources.pais,
                 total: data.total,
-                tempo: `${data._meta.totalTime}ms`
+                tempo: `${data._meta.totalTime}ms`,
+                moeda: data._meta.currency || 'BRL'  // ✅ Log da moeda usada
             });
         }
 
