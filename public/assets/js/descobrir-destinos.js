@@ -356,22 +356,20 @@ const BenetripDiscovery = {
                 throw new Error('Nenhum destino encontrado');
             }
             
-            // PASSO 2: Filtrar por orçamento (faixa 80-100%)
+            // PASSO 2: Filtrar por orçamento (com cenários)
             this.atualizarProgresso(40, '💰 Filtrando pelo seu orçamento...');
-            const destinosFiltrados = this.filtrarDestinos(destinosDisponiveis);
+            const filtro = this.filtrarDestinos(destinosDisponiveis);
             
-            // Se poucos destinos após filtro, enviar todos para o LLM
-            const destinosParaRanking = destinosFiltrados.length >= 5 
-                ? destinosFiltrados 
-                : destinosDisponiveis.filter(d => d.flight?.price > 0);
-
-            if (destinosParaRanking.length === 0) {
-                throw new Error('Nenhum destino com preço disponível');
+            // CENÁRIO 4: Nenhum destino encontrado
+            if (filtro.cenario === 'nenhum') {
+                this.atualizarProgresso(100, '😕 Nenhum destino encontrado...');
+                await this.delay(500);
+                this.mostrarSemResultados();
+                return;
             }
 
-            if (destinosFiltrados.length < 5) {
-                this.log('⚠️ Poucos destinos na faixa ideal, enviando todos para o LLM');
-            }
+            const destinosParaRanking = filtro.destinos;
+            this.log(`📋 Cenário: ${filtro.cenario} | ${destinosParaRanking.length} destinos para ranking`);
             
             // PASSO 3: LLM ranqueia
             this.atualizarProgresso(60, '🤖 Tripinha selecionando os melhores...');
@@ -383,7 +381,7 @@ const BenetripDiscovery = {
             
             this.atualizarProgresso(100, '🎉 Pronto!');
             await this.delay(500);
-            this.mostrarResultados(destinosComLinks);
+            this.mostrarResultados(destinosComLinks, filtro.cenario, filtro.mensagem);
             
         } catch (erro) {
             this.error('Erro:', erro);
@@ -428,33 +426,75 @@ const BenetripDiscovery = {
         return data.destinations;
     },
 
-    // Filtrar: faixa 80-100% do orçamento, com fallback para 60-100%
+    // ================================================================
+    // FILTRO DE ORÇAMENTO - 4 CENÁRIOS
+    // ================================================================
+    // 1. IDEAL:  5+ destinos na faixa 80-100% → sem mensagem
+    // 2. BOM:    destinos na faixa 60-100%    → mensagem suave
+    // 3. ABAIXO: só destinos abaixo de 60%    → mensagem sobre opções baratas
+    // 4. NENHUM: 0 destinos com preço         → tela de erro
+    // ================================================================
     filtrarDestinos(destinos) {
-        const { orcamento } = this.state.formData;
-        if (!orcamento) return destinos;
+        const { orcamento, moeda } = this.state.formData;
+        const simbolo = { 'BRL': 'R$', 'USD': '$', 'EUR': '€' }[moeda] || 'R$';
 
-        const minPreco = orcamento * 0.8;
-        const maxPreco = orcamento;
-
-        const dentroFaixa = destinos.filter(d => {
-            const preco = d.flight?.price || 0;
-            return preco > 0 && preco >= minPreco && preco <= maxPreco;
-        });
-
-        this.log(`💰 Filtro 80-100%: R$${minPreco.toFixed(0)} - R$${maxPreco.toFixed(0)} → ${dentroFaixa.length} destinos`);
-
-        // Se poucos destinos na faixa ideal, expandir para 60-100%
-        if (dentroFaixa.length < 5) {
-            const minExpandido = orcamento * 0.6;
-            const expandido = destinos.filter(d => {
-                const preco = d.flight?.price || 0;
-                return preco > 0 && preco >= minExpandido && preco <= maxPreco;
-            });
-            this.log(`💰 Faixa expandida 60-100%: R$${minExpandido.toFixed(0)} - R$${maxPreco.toFixed(0)} → ${expandido.length} destinos`);
-            return expandido;
+        // Todos os destinos com preço válido
+        const comPreco = destinos.filter(d => (d.flight?.price || 0) > 0);
+        
+        if (comPreco.length === 0) {
+            this.log('❌ Nenhum destino com preço disponível');
+            return { cenario: 'nenhum', destinos: [], mensagem: '' };
         }
 
-        return dentroFaixa;
+        if (!orcamento) {
+            return { cenario: 'ideal', destinos: comPreco, mensagem: '' };
+        }
+
+        // Faixa ideal: 80-100% do orçamento
+        const faixa80 = comPreco.filter(d => d.flight.price >= orcamento * 0.8 && d.flight.price <= orcamento);
+        
+        if (faixa80.length >= 5) {
+            this.log(`✅ IDEAL: ${faixa80.length} destinos na faixa 80-100%`);
+            return { cenario: 'ideal', destinos: faixa80, mensagem: '' };
+        }
+
+        // Faixa expandida: 60-100% do orçamento
+        const faixa60 = comPreco.filter(d => d.flight.price >= orcamento * 0.6 && d.flight.price <= orcamento);
+        
+        if (faixa60.length >= 3) {
+            this.log(`👍 BOM: ${faixa60.length} destinos na faixa 60-100%`);
+            return {
+                cenario: 'bom',
+                destinos: faixa60,
+                mensagem: `🐕 A Tripinha encontrou os melhores destinos dentro do seu orçamento de ${simbolo} ${orcamento.toLocaleString('pt-BR')}. Confira as opções!`
+            };
+        }
+
+        // Abaixo do orçamento: destinos até 100% mas abaixo de 60%
+        const abaixo = comPreco.filter(d => d.flight.price <= orcamento);
+        
+        if (abaixo.length >= 3) {
+            this.log(`💡 ABAIXO: ${abaixo.length} destinos abaixo do orçamento`);
+            return {
+                cenario: 'abaixo',
+                destinos: abaixo,
+                mensagem: `🐕 Não encontrei muitas opções próximas ao seu orçamento de ${simbolo} ${orcamento.toLocaleString('pt-BR')}, mas achei destinos mais em conta que podem te interessar!`
+            };
+        }
+
+        // Último recurso: qualquer destino com preço (pode estar acima)
+        if (comPreco.length >= 3) {
+            this.log(`⚠️ FORA: destinos disponíveis mas fora do orçamento`);
+            return {
+                cenario: 'abaixo',
+                destinos: comPreco.slice(0, 30), // limitar para não sobrecarregar LLM
+                mensagem: `🐕 Os destinos disponíveis estão fora da faixa de ${simbolo} ${orcamento.toLocaleString('pt-BR')}. Mostrando as opções mais próximas do seu orçamento.`
+            };
+        }
+
+        // Realmente nenhum destino viável
+        this.log('❌ Pouquíssimos destinos disponíveis');
+        return { cenario: 'nenhum', destinos: [], mensagem: '' };
     },
 
     calcularNoites(dataIda, dataVolta) {
@@ -553,9 +593,45 @@ const BenetripDiscovery = {
     },
 
     // ================================================================
-    // RESULTADOS com badges de confiabilidade
+    // TELA: Nenhum destino encontrado
     // ================================================================
-    mostrarResultados(destinos) {
+    mostrarSemResultados() {
+        const container = document.getElementById('resultados-container');
+        const { orcamento, moeda, origem } = this.state.formData;
+        const simbolo = { 'BRL': 'R$', 'USD': '$', 'EUR': '€' }[moeda] || 'R$';
+
+        container.innerHTML = `
+            <div class="sem-resultados">
+                <img src="assets/images/tripinha/avatar-triste.png" alt="Tripinha triste" class="tripinha-triste" 
+                     onerror="this.style.display='none'">
+                <h2>😕 Puxa, não encontrei destinos...</h2>
+                <p class="sem-resultados-msg">
+                    A Tripinha procurou por todo canto, mas não encontrou passagens saindo de 
+                    <strong>${origem.name} (${origem.code})</strong> dentro do orçamento de 
+                    <strong>${simbolo} ${orcamento?.toLocaleString('pt-BR') || '?'}</strong> para essas datas.
+                </p>
+                <div class="sem-resultados-dicas">
+                    <h3>🐕 Dicas da Tripinha:</h3>
+                    <div class="dica">💰 <strong>Aumente o orçamento</strong> — às vezes um pouco mais abre muitas opções!</div>
+                    <div class="dica">📅 <strong>Tente outras datas</strong> — viajar em dias da semana costuma ser mais barato.</div>
+                    <div class="dica">📍 <strong>Mude a cidade de origem</strong> — aeroportos maiores têm mais rotas e preços melhores.</div>
+                    <div class="dica">🌍 <strong>Experimente "Aventura" ou "Cultura"</strong> — pode revelar destinos menos óbvios!</div>
+                </div>
+                <button class="btn-submit btn-tentar-novamente" onclick="location.reload()">
+                    🔄 Tentar Novamente
+                </button>
+            </div>
+        `;
+
+        document.getElementById('loading-container').style.display = 'none';
+        container.style.display = 'block';
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    },
+
+    // ================================================================
+    // RESULTADOS com badges de confiabilidade + banner de cenário
+    // ================================================================
+    mostrarResultados(destinos, cenario, mensagem) {
         const container = document.getElementById('resultados-container');
         const { dataIda, dataVolta, preferencias, moeda } = this.state.formData;
         const noites = this.calcularNoites(dataIda, dataVolta);
@@ -581,9 +657,15 @@ const BenetripDiscovery = {
 
         const html = `
             <div class="resultado-header">
-                <h1>🎉 Destinos Perfeitos!</h1>
+                <h1>${cenario === 'ideal' ? '🎉 Destinos Perfeitos!' : '✈️ Destinos Encontrados!'}</h1>
                 <p>Baseado em: ${preferencias} | ${dataIdaBR} - ${dataVoltaBR} (${noites} noites)</p>
             </div>
+
+            ${mensagem ? `
+            <div class="resultado-banner ${cenario === 'abaixo' ? 'banner-aviso' : 'banner-info'}">
+                <p>${mensagem}</p>
+            </div>
+            ` : ''}
 
             <div class="top-destino">
                 <div class="badge">🏆 MELHOR DESTINO</div>
