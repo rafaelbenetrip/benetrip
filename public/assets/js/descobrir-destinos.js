@@ -1,6 +1,10 @@
 /**
  * BENETRIP - DESCOBRIR DESTINOS
- * Versão TRIPLE SEARCH v2 - Sem opção de transporte (apenas voos)
+ * Versão TRIPLE SEARCH v2.1 - Resultados enriquecidos
+ * - Comentários contextuais sobre destinos (clima, estação, atividades)
+ * - Moeda escolhida pelo usuário em todos os preços
+ * - Resumo detalhado dos critérios na tela de resultados
+ * - Botão "tentar novamente" preservando dados do formulário
  * APENAS APIs reais, SEM fallbacks de dados
  */
 
@@ -27,7 +31,7 @@ const BenetripDiscovery = {
     },
 
     init() {
-        this.log('🐕 Benetrip Discovery v2 (Triple Search) inicializando...');
+        this.log('🐕 Benetrip Discovery v2.1 (Resultados Enriquecidos) inicializando...');
         
         this.carregarCidades();
         this.setupFormEvents();
@@ -190,7 +194,6 @@ const BenetripDiscovery = {
         return data.toLocaleDateString('pt-BR');
     },
 
-    // Apenas condicional do número de pessoas (família/amigos)
     setupCompanhiaConditional() {
         const companhiaInput = document.getElementById('companhia');
         const numPessoasGroup = document.getElementById('num-pessoas-group');
@@ -282,7 +285,6 @@ const BenetripDiscovery = {
         });
     },
 
-    // Validação simplificada (sem transporte)
     validarFormulario() {
         if (!this.state.origemSelecionada) {
             alert('Por favor, selecione uma cidade de origem');
@@ -321,7 +323,6 @@ const BenetripDiscovery = {
         return true;
     },
 
-    // Coleta simplificada (sem tipoViagem/distância)
     coletarDadosFormulario() {
         const companhia = parseInt(document.getElementById('companhia').value);
         
@@ -342,13 +343,54 @@ const BenetripDiscovery = {
     },
 
     // ================================================================
+    // HELPERS DE MOEDA E FORMATAÇÃO
+    // ================================================================
+    getSimbolo(moeda) {
+        return { 'BRL': 'R$', 'USD': 'US$', 'EUR': '€' }[moeda] || 'R$';
+    },
+
+    formatarPreco(valor, moeda) {
+        const simbolo = this.getSimbolo(moeda || this.state.formData.moeda);
+        return `${simbolo} ${Math.round(valor).toLocaleString('pt-BR')}`;
+    },
+
+    // Labels legíveis para companhia e preferências
+    COMPANHIA_LABELS: {
+        0: { emoji: '🧳', texto: 'Sozinho(a)' },
+        1: { emoji: '❤️', texto: 'Viagem romântica' },
+        2: { emoji: '👨‍👩‍👧‍👦', texto: 'Em família' },
+        3: { emoji: '🎉', texto: 'Com amigos' }
+    },
+
+    PREFERENCIAS_LABELS: {
+        'relax':    { emoji: '🌊', texto: 'Relax total' },
+        'aventura': { emoji: '🏔️', texto: 'Aventura e emoção' },
+        'cultura':  { emoji: '🏛️', texto: 'Cultura e história' },
+        'urbano':   { emoji: '🏙️', texto: 'Agito urbano' }
+    },
+
+    COMPANHIA_API_MAP: {
+        0: 'Viajando sozinho(a)',
+        1: 'Viagem romântica (casal)',
+        2: 'Viagem em família',
+        3: 'Viagem com amigos'
+    },
+
+    PREFERENCIAS_API_MAP: {
+        'relax': 'Relaxamento, praias, descanso e natureza tranquila',
+        'aventura': 'Aventura, trilhas, esportes radicais e natureza selvagem',
+        'cultura': 'Cultura, museus, história, gastronomia e arquitetura',
+        'urbano': 'Agito urbano, vida noturna, compras e experiências cosmopolitas'
+    },
+
+    // ================================================================
     // FLUXO PRINCIPAL DE BUSCA
     // ================================================================
     async buscarDestinos() {
         try {
             this.mostrarLoading();
             
-            // PASSO 1: Triple Search (3 buscas paralelas no backend)
+            // PASSO 1: Triple Search
             this.atualizarProgresso(15, '🔍 Buscando destinos pelo mundo...');
             const destinosDisponiveis = await this.buscarDestinosAPI();
             
@@ -356,11 +398,10 @@ const BenetripDiscovery = {
                 throw new Error('Nenhum destino encontrado');
             }
             
-            // PASSO 2: Filtrar por orçamento (com cenários)
+            // PASSO 2: Filtrar por orçamento
             this.atualizarProgresso(40, '💰 Filtrando pelo seu orçamento...');
             const filtro = this.filtrarDestinos(destinosDisponiveis);
             
-            // CENÁRIO 4: Nenhum destino encontrado
             if (filtro.cenario === 'nenhum') {
                 this.atualizarProgresso(100, '😕 Nenhum destino encontrado...');
                 await this.delay(500);
@@ -371,13 +412,16 @@ const BenetripDiscovery = {
             const destinosParaRanking = filtro.destinos;
             this.log(`📋 Cenário: ${filtro.cenario} | ${destinosParaRanking.length} destinos para ranking`);
             
-            // PASSO 3: LLM ranqueia (com contexto de cenário)
-            this.atualizarProgresso(60, '🤖 Tripinha selecionando os melhores...');
+            // PASSO 3: LLM ranqueia com contexto enriquecido
+            this.atualizarProgresso(60, '🤖 Tripinha analisando destinos...');
             const ranking = await this.ranquearDestinosAPI(destinosParaRanking, filtro.cenario);
             
             // PASSO 4: Gerar links de afiliado
             this.atualizarProgresso(80, '✈️ Gerando links de reserva...');
             const destinosComLinks = this.gerarLinksTravelpayouts(ranking);
+            
+            // Salvar resultados no state para referência
+            this.state.resultados = destinosComLinks;
             
             this.atualizarProgresso(100, '🎉 Pronto!');
             await this.delay(500);
@@ -412,7 +456,6 @@ const BenetripDiscovery = {
         
         const data = await response.json();
 
-        // Log metadados do triple search
         if (data._meta) {
             this.log('📊 Triple Search:', {
                 global: data._meta.sources.global,
@@ -429,16 +472,10 @@ const BenetripDiscovery = {
     // ================================================================
     // FILTRO DE ORÇAMENTO - 4 CENÁRIOS
     // ================================================================
-    // 1. IDEAL:  5+ destinos na faixa 80-100% → sem mensagem
-    // 2. BOM:    destinos na faixa 60-100%    → mensagem suave
-    // 3. ABAIXO: só destinos abaixo de 60%    → mensagem sobre opções baratas
-    // 4. NENHUM: 0 destinos com preço         → tela de erro
-    // ================================================================
     filtrarDestinos(destinos) {
         const { orcamento, moeda } = this.state.formData;
-        const simbolo = { 'BRL': 'R$', 'USD': '$', 'EUR': '€' }[moeda] || 'R$';
+        const simbolo = this.getSimbolo(moeda);
 
-        // Todos os destinos com preço válido
         const comPreco = destinos.filter(d => (d.flight?.price || 0) > 0);
         
         if (comPreco.length === 0) {
@@ -450,7 +487,6 @@ const BenetripDiscovery = {
             return { cenario: 'ideal', destinos: comPreco, mensagem: '' };
         }
 
-        // Faixa ideal: 80-100% do orçamento
         const faixa80 = comPreco.filter(d => d.flight.price >= orcamento * 0.8 && d.flight.price <= orcamento);
         
         if (faixa80.length >= 5) {
@@ -458,7 +494,6 @@ const BenetripDiscovery = {
             return { cenario: 'ideal', destinos: faixa80, mensagem: '' };
         }
 
-        // Faixa expandida: 60-100% do orçamento
         const faixa60 = comPreco.filter(d => d.flight.price >= orcamento * 0.6 && d.flight.price <= orcamento);
         
         if (faixa60.length >= 3) {
@@ -470,7 +505,6 @@ const BenetripDiscovery = {
             };
         }
 
-        // Abaixo do orçamento: destinos até 100% mas abaixo de 60%
         const abaixo = comPreco.filter(d => d.flight.price <= orcamento);
         
         if (abaixo.length >= 3) {
@@ -482,8 +516,6 @@ const BenetripDiscovery = {
             };
         }
 
-        // Se chegou aqui, não há destinos suficientes dentro do orçamento
-        // Mostrar tela de "sem resultados" para o usuário ajustar
         this.log('❌ Destinos disponíveis mas fora do orçamento');
         return { cenario: 'nenhum', destinos: [], mensagem: '' };
     },
@@ -495,22 +527,9 @@ const BenetripDiscovery = {
     },
 
     // ================================================================
-    // CHAMADA API: rank-destinations (contexto rico)
+    // CHAMADA API: rank-destinations (contexto enriquecido)
     // ================================================================
     async ranquearDestinosAPI(destinos, cenario) {
-        const COMPANHIA_MAP = {
-            0: 'Viajando sozinho(a)',
-            1: 'Viagem romântica (casal)',
-            2: 'Viagem em família',
-            3: 'Viagem com amigos'
-        };
-        const PREFERENCIAS_MAP = {
-            'relax': 'Relaxamento, praias, descanso e natureza tranquila',
-            'aventura': 'Aventura, trilhas, esportes radicais e natureza selvagem',
-            'cultura': 'Cultura, museus, história, gastronomia e arquitetura',
-            'urbano': 'Agito urbano, vida noturna, compras e experiências cosmopolitas'
-        };
-
         const noites = this.calcularNoites(this.state.formData.dataIda, this.state.formData.dataVolta);
 
         const response = await fetch('/api/rank-destinations', {
@@ -518,11 +537,14 @@ const BenetripDiscovery = {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 destinos: destinos,
-                preferencias: PREFERENCIAS_MAP[this.state.formData.preferencias] || this.state.formData.preferencias,
-                companhia: COMPANHIA_MAP[this.state.formData.companhia] || 'Não informado',
+                preferencias: this.PREFERENCIAS_API_MAP[this.state.formData.preferencias] || this.state.formData.preferencias,
+                companhia: this.COMPANHIA_API_MAP[this.state.formData.companhia] || 'Não informado',
                 numPessoas: this.state.formData.numPessoas,
                 noites: noites,
                 orcamento: this.state.formData.orcamento,
+                moeda: this.state.formData.moeda,
+                dataIda: this.state.formData.dataIda,
+                dataVolta: this.state.formData.dataVolta,
                 cenario: cenario || 'ideal'
             })
         });
@@ -554,13 +576,16 @@ const BenetripDiscovery = {
         return {
             top_destino: { ...ranking.top_destino, link: gerarLink(ranking.top_destino) },
             alternativas: ranking.alternativas.map(d => ({ ...d, link: gerarLink(d) })),
-            surpresa: { ...ranking.surpresa, link: gerarLink(ranking.surpresa) }
+            surpresa: { ...ranking.surpresa, link: gerarLink(ranking.surpresa) },
+            _model: ranking._model,
+            _totalAnalisados: ranking._totalAnalisados
         };
     },
 
     mostrarLoading() {
         document.getElementById('form-container').style.display = 'none';
         document.getElementById('loading-container').style.display = 'block';
+        document.getElementById('resultados-container').style.display = 'none';
         window.scrollTo({ top: 0, behavior: 'smooth' });
     },
 
@@ -578,19 +603,81 @@ const BenetripDiscovery = {
         return new Promise(r => setTimeout(r, ms));
     },
 
-    formatarPreco(valor, moeda) {
-        const simbolos = { 'BRL': 'R$', 'USD': '$', 'EUR': '€' };
-        const simbolo = simbolos[moeda] || 'R$';
-        return `${simbolo} ${Math.round(valor).toLocaleString('pt-BR')}`;
+    // ================================================================
+    // VOLTAR AO FORMULÁRIO preservando dados preenchidos
+    // ================================================================
+    voltarAoFormulario() {
+        document.getElementById('resultados-container').style.display = 'none';
+        document.getElementById('resultados-container').innerHTML = '';
+        document.getElementById('form-container').style.display = 'block';
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+
+        // Os dados do formulário já estão preservados no DOM
+        // (botões active, inputs com valor, etc.)
+        // Apenas resetar o loading
+        document.getElementById('progress-fill').style.width = '0%';
+        this.log('🔄 Voltou ao formulário com dados preservados');
     },
 
     // ================================================================
-    // TELA: Nenhum destino encontrado
+    // GERAR CARD DE RESUMO DOS CRITÉRIOS
+    // ================================================================
+    gerarResumoCriterios() {
+        const { origem, companhia, numPessoas, preferencias, dataIda, dataVolta, moeda, orcamento } = this.state.formData;
+        const noites = this.calcularNoites(dataIda, dataVolta);
+        const simbolo = this.getSimbolo(moeda);
+        
+        const comp = this.COMPANHIA_LABELS[companhia] || { emoji: '👤', texto: 'Não informado' };
+        const pref = this.PREFERENCIAS_LABELS[preferencias] || { emoji: '🎯', texto: preferencias };
+        
+        const dataIdaBR = new Date(dataIda + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
+        const dataVoltaBR = new Date(dataVolta + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' });
+
+        // Info de pessoas
+        let pessoasInfo = '';
+        if (companhia === 0) pessoasInfo = '1 pessoa';
+        else if (companhia === 1) pessoasInfo = '2 pessoas';
+        else pessoasInfo = `${numPessoas} pessoas`;
+
+        return `
+            <div class="criterios-resumo">
+                <div class="criterios-titulo">
+                    <span class="criterios-icon">🐕</span>
+                    <span>A Tripinha buscou com base no seu perfil:</span>
+                </div>
+                <div class="criterios-grid">
+                    <div class="criterio-item">
+                        <span class="criterio-label">Saindo de</span>
+                        <span class="criterio-valor">📍 ${origem.name} (${origem.code})</span>
+                    </div>
+                    <div class="criterio-item">
+                        <span class="criterio-label">Companhia</span>
+                        <span class="criterio-valor">${comp.emoji} ${comp.texto} · ${pessoasInfo}</span>
+                    </div>
+                    <div class="criterio-item">
+                        <span class="criterio-label">Estilo</span>
+                        <span class="criterio-valor">${pref.emoji} ${pref.texto}</span>
+                    </div>
+                    <div class="criterio-item">
+                        <span class="criterio-label">Período</span>
+                        <span class="criterio-valor">📅 ${dataIdaBR} → ${dataVoltaBR} · ${noites} noites</span>
+                    </div>
+                    <div class="criterio-item">
+                        <span class="criterio-label">Orçamento</span>
+                        <span class="criterio-valor">💰 Até ${simbolo} ${orcamento.toLocaleString('pt-BR')} por pessoa (ida+volta)</span>
+                    </div>
+                </div>
+            </div>
+        `;
+    },
+
+    // ================================================================
+    // TELA: Nenhum destino encontrado (com botão preservando dados)
     // ================================================================
     mostrarSemResultados() {
         const container = document.getElementById('resultados-container');
         const { orcamento, moeda, origem } = this.state.formData;
-        const simbolo = { 'BRL': 'R$', 'USD': '$', 'EUR': '€' }[moeda] || 'R$';
+        const simbolo = this.getSimbolo(moeda);
 
         container.innerHTML = `
             <div class="sem-resultados">
@@ -609,8 +696,8 @@ const BenetripDiscovery = {
                     <div class="dica">📍 <strong>Mude a cidade de origem</strong> — aeroportos maiores têm mais rotas e preços melhores.</div>
                     <div class="dica">🌍 <strong>Experimente "Aventura" ou "Cultura"</strong> — pode revelar destinos menos óbvios!</div>
                 </div>
-                <button class="btn-submit btn-tentar-novamente" onclick="location.reload()">
-                    🔄 Tentar Novamente
+                <button class="btn-submit btn-tentar-novamente" onclick="BenetripDiscovery.voltarAoFormulario()">
+                    ✏️ Ajustar Busca
                 </button>
             </div>
         `;
@@ -621,23 +708,26 @@ const BenetripDiscovery = {
     },
 
     // ================================================================
-    // RESULTADOS com badges de confiabilidade + banner de cenário
+    // RESULTADOS ENRIQUECIDOS
+    // - Resumo detalhado dos critérios
+    // - Comentários contextuais sobre cada destino
+    // - Dicas práticas
+    // - Moeda correta em todos os preços
+    // - Custo estimado total (passagem + hotel)
+    // - Botão "buscar novamente" preservando dados
     // ================================================================
     mostrarResultados(destinos, cenario, mensagem) {
         const container = document.getElementById('resultados-container');
-        const { dataIda, dataVolta, preferencias, moeda } = this.state.formData;
+        const { dataIda, dataVolta, moeda } = this.state.formData;
         const noites = this.calcularNoites(dataIda, dataVolta);
-        
-        const dataIdaBR = new Date(dataIda + 'T12:00:00').toLocaleDateString('pt-BR');
-        const dataVoltaBR = new Date(dataVolta + 'T12:00:00').toLocaleDateString('pt-BR');
         
         const formatPreco = (d) => this.formatarPreco(d.flight?.price || 0, moeda);
         
         const formatParadas = (d) => {
             const stops = d.flight?.stops || 0;
-            if (stops === 0) return 'Direto';
-            if (stops === 1) return '1 parada';
-            return `${stops} paradas`;
+            if (stops === 0) return '✈️ Voo direto';
+            if (stops === 1) return '✈️ 1 parada';
+            return `✈️ ${stops} paradas`;
         };
 
         const fonteBadge = (d) => {
@@ -647,10 +737,42 @@ const BenetripDiscovery = {
             return '';
         };
 
+        // Custo estimado total (passagem + hotel × noites)
+        const custoEstimado = (d) => {
+            const passagem = d.flight?.price || 0;
+            const hotelTotal = (d.avg_cost_per_night || 0) * noites;
+            if (hotelTotal > 0) {
+                return `<div class="custo-estimado">
+                    <span class="custo-label">Estimativa total/pessoa:</span>
+                    <span class="custo-valor">${this.formatarPreco(passagem + hotelTotal, moeda)}</span>
+                    <span class="custo-detalhe">(voo + ${noites} noites hotel)</span>
+                </div>`;
+            }
+            return '';
+        };
+
+        // Comentário contextual do LLM
+        const comentarioHtml = (d) => {
+            if (!d.comentario) return '';
+            return `<div class="destino-comentario">${d.comentario}</div>`;
+        };
+
+        // Dica prática do LLM
+        const dicaHtml = (d) => {
+            if (!d.dica) return '';
+            return `<div class="destino-dica"><span class="dica-icon">💡</span> ${d.dica}</div>`;
+        };
+
         const html = `
+            <!-- RESUMO DOS CRITÉRIOS -->
+            ${this.gerarResumoCriterios()}
+
             <div class="resultado-header">
                 <h1>${cenario === 'ideal' ? '🎉 Destinos Perfeitos!' : '✈️ Destinos Encontrados!'}</h1>
-                <p>Baseado em: ${preferencias} | ${dataIdaBR} - ${dataVoltaBR} (${noites} noites)</p>
+                <p class="resultado-subtitulo">
+                    ${destinos._totalAnalisados ? `${destinos._totalAnalisados} destinos analisados` : ''}
+                    ${destinos._model && destinos._model !== 'fallback_price' ? ' · Curadoria da Tripinha 🐶' : ''}
+                </p>
             </div>
 
             ${mensagem ? `
@@ -659,17 +781,22 @@ const BenetripDiscovery = {
             </div>
             ` : ''}
 
+            <!-- TOP DESTINO -->
             <div class="top-destino">
-                <div class="badge">🏆 MELHOR DESTINO</div>
+                <div class="badge">🏆 MELHOR DESTINO PARA VOCÊ</div>
                 ${fonteBadge(destinos.top_destino)}
                 <h2>${destinos.top_destino.name}, ${destinos.top_destino.country || ''}</h2>
                 <div class="preco">${formatPreco(destinos.top_destino)}</div>
                 <div class="preco-label">Passagem ida e volta por pessoa</div>
                 <div class="flight-info">${formatParadas(destinos.top_destino)}</div>
+                ${custoEstimado(destinos.top_destino)}
                 <div class="descricao">${destinos.top_destino.razao || 'Perfeito para você!'}</div>
+                ${comentarioHtml(destinos.top_destino)}
+                ${dicaHtml(destinos.top_destino)}
                 <a href="${destinos.top_destino.link}" target="_blank" class="btn-ver-voos">Ver Passagens ✈️</a>
             </div>
 
+            <!-- ALTERNATIVAS -->
             <div class="alternativas-section">
                 <h3>📋 Outras Opções</h3>
                 <div class="alternativas-grid">
@@ -678,24 +805,39 @@ const BenetripDiscovery = {
                             ${fonteBadge(d)}
                             <h4>${d.name}${d.country ? ', ' + d.country : ''}</h4>
                             <div class="preco">${formatPreco(d)}</div>
-                            <div class="preco-label">ida e volta</div>
+                            <div class="preco-label">ida e volta por pessoa</div>
                             <div class="flight-info">${formatParadas(d)}</div>
+                            ${custoEstimado(d)}
                             <div class="descricao">${d.razao || 'Boa opção!'}</div>
+                            ${comentarioHtml(d)}
+                            ${dicaHtml(d)}
                             <a href="${d.link}" target="_blank" class="btn-ver-voos">Ver Passagens →</a>
                         </div>
                     `).join('')}
                 </div>
             </div>
 
+            <!-- SURPRESA -->
             <div class="surpresa-card">
-                <div class="badge">🎁 SURPRESA</div>
+                <div class="badge">🎁 DESTINO SURPRESA</div>
                 ${fonteBadge(destinos.surpresa)}
                 <h3>${destinos.surpresa.name}${destinos.surpresa.country ? ', ' + destinos.surpresa.country : ''}</h3>
                 <div class="preco">${formatPreco(destinos.surpresa)}</div>
                 <div class="preco-label">ida e volta por pessoa</div>
                 <div class="flight-info">${formatParadas(destinos.surpresa)}</div>
+                ${custoEstimado(destinos.surpresa)}
                 <div class="descricao">${destinos.surpresa.razao || 'Descubra!'}</div>
+                ${comentarioHtml(destinos.surpresa)}
+                ${dicaHtml(destinos.surpresa)}
                 <a href="${destinos.surpresa.link}" target="_blank" class="btn-ver-voos">Descobrir ✈️</a>
+            </div>
+
+            <!-- BOTÃO BUSCAR NOVAMENTE -->
+            <div class="buscar-novamente-section">
+                <p class="buscar-novamente-texto">Quer explorar outras opções? Ajuste seus critérios e descubra mais!</p>
+                <button class="btn-buscar-novamente" onclick="BenetripDiscovery.voltarAoFormulario()">
+                    ✏️ Ajustar Busca e Descobrir Mais
+                </button>
             </div>
         `;
         
@@ -706,4 +848,5 @@ const BenetripDiscovery = {
     }
 };
 
+// Inicializar quando DOM estiver pronto
 document.addEventListener('DOMContentLoaded', () => BenetripDiscovery.init());
