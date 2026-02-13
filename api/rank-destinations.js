@@ -1,5 +1,6 @@
-// api/rank-destinations.js - VERSÃO TRIPLE SEARCH v2
+// api/rank-destinations.js - VERSÃO TRIPLE SEARCH v2.1
 // Recebe destinos consolidados das 3 buscas e ranqueia com LLM
+// NOVO: Comentários ricos com contexto de datas/estação, dicas práticas
 // Fallback: Groq llama-3.3-70b → llama-3.1-8b → ranking por preço
 
 export default async function handler(req, res) {
@@ -10,7 +11,7 @@ export default async function handler(req, res) {
     if (req.method === 'OPTIONS') return res.status(200).end();
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-    const { destinos, preferencias, companhia, numPessoas, noites, orcamento } = req.body;
+    const { destinos, preferencias, companhia, numPessoas, noites, orcamento, moeda, dataIda, dataVolta } = req.body;
 
     if (!destinos || !Array.isArray(destinos) || destinos.length === 0) {
         return res.status(400).json({
@@ -25,7 +26,19 @@ export default async function handler(req, res) {
     }
 
     try {
-        console.log(`🤖 Ranqueando ${destinos.length} destinos | ${companhia} | ${preferencias} | R$${orcamento}`);
+        console.log(`🤖 Ranqueando ${destinos.length} destinos | ${companhia} | ${preferencias} | ${moeda || 'BRL'} ${orcamento}`);
+
+        // ============================================================
+        // DETECTAR ESTAÇÃO DO ANO no destino (baseado no hemisfério)
+        // ============================================================
+        const mesViagem = dataIda ? new Date(dataIda + 'T12:00:00').getMonth() + 1 : null;
+        const estacaoInfo = mesViagem ? getSeasonContext(mesViagem) : '';
+
+        // ============================================================
+        // SÍMBOLO DA MOEDA
+        // ============================================================
+        const simboloMoeda = { 'BRL': 'R$', 'USD': 'US$', 'EUR': '€' }[moeda] || 'R$';
+        const nomeMoeda = { 'BRL': 'reais', 'USD': 'dólares', 'EUR': 'euros' }[moeda] || 'reais';
 
         // ============================================================
         // FORMATO COMPACTO PARA O LLM
@@ -35,11 +48,11 @@ export default async function handler(req, res) {
             const paradas = d.flight?.stops || 0;
             const fontes = d._source_count || 1;
             const hotel = d.avg_cost_per_night || 0;
-            return `${i + 1}|${d.name}|${d.country}|${d.primary_airport}|R$${passagem}|${paradas}paradas|${fontes}fontes|Hotel:R$${hotel}/noite`;
+            return `${i + 1}|${d.name}|${d.country}|${d.primary_airport}|${simboloMoeda}${passagem}|${paradas}paradas|${fontes}fontes|Hotel:${simboloMoeda}${hotel}/noite`;
         }).join('\n');
 
         // ============================================================
-        // PROMPT COM CONTEXTO RICO DO VIAJANTE
+        // PROMPT ENRIQUECIDO COM CONTEXTO DE DATAS E ESTAÇÃO
         // ============================================================
         const prompt = `ESPECIALISTA EM TURISMO - Seleção personalizada de destinos
 
@@ -48,13 +61,28 @@ PERFIL DO VIAJANTE:
 - Número de pessoas: ${numPessoas || 1}
 - O que busca: ${preferencias || 'Não informado'}
 - Duração: ${noites || '?'} noites
-- Orçamento PASSAGENS (ida+volta/pessoa): R$ ${orcamento}
+- Orçamento PASSAGENS (ida+volta/pessoa): ${simboloMoeda} ${orcamento}
+- Moeda: ${nomeMoeda}
+${dataIda ? `- Período: ${dataIda} a ${dataVolta || '?'}` : ''}
+${estacaoInfo ? `- Contexto sazonal: ${estacaoInfo}` : ''}
 
 DESTINOS PRÉ-FILTRADOS (já dentro do orçamento):
 Formato: ID|Nome|País|Aeroporto|Passagem ida+volta|Paradas|Fontes|Hotel/noite
 ${listaCompacta}
 
-TAREFA: Com base no PERFIL, escolha os 5 que MAIS combinam com este viajante:
+TAREFA: Com base no PERFIL, escolha os 5 que MAIS combinam com este viajante.
+
+Para CADA destino selecionado, gere:
+1. "razao": frase curta (1 linha) explicando POR QUE combina com este viajante
+2. "comentario": texto de 2-3 frases descrevendo o destino considerando:
+   - A estação do ano / clima esperado no período da viagem
+   - Atividades e experiências alinhadas com "${preferencias}"
+   - Adequação para ${companhia}
+   - Use tom amigável e entusiasmado (estilo guia de viagens descolado)
+3. "dica": uma dica prática e útil para quem vai viajar para lá nesse período
+   (ex: "Reserve ingressos online com antecedência" ou "O bairro X tem os melhores restaurantes")
+
+ESTRUTURA DE SELEÇÃO:
 1. MELHOR DESTINO - melhor match com perfil + custo-benefício
 2. 3 ALTERNATIVAS - diversifique países e experiências
 3. 1 SURPRESA - destino inesperado que encantaria este viajante
@@ -65,20 +93,25 @@ CRITÉRIOS (ordem de prioridade):
    - Casal → romance, gastronomia, cenários bonitos
    - Amigos → diversão, vida noturna, aventuras em grupo
    - Sozinho → segurança, facilidade, experiências culturais
-2. FONTES: Destinos com 2-3 fontes são mais confiáveis
-3. CUSTO TOTAL: passagem + hotel × ${noites || 7} noites
-4. DIVERSIDADE: Não repita países
+2. CLIMA NO PERÍODO: O destino é bom para visitar nessas datas?
+3. FONTES: Destinos com 2-3 fontes são mais confiáveis
+4. CUSTO TOTAL: passagem + hotel × ${noites || 7} noites
+5. DIVERSIDADE: Não repita países
 
 REGRAS:
 ✓ Use APENAS IDs da lista (1-${destinos.length})
-✓ "razao" = frase curta explicando POR QUE combina com este viajante
+✓ Escreva "comentario" e "dica" em português brasileiro
 ✓ Retorne APENAS JSON válido
 
 JSON:
 {
-  "top_destino": {"id":1,"razao":"frase personalizada"},
-  "alternativas": [{"id":2,"razao":"frase"},{"id":3,"razao":"frase"},{"id":4,"razao":"frase"}],
-  "surpresa": {"id":5,"razao":"frase surpreendente"}
+  "top_destino": {"id":1,"razao":"frase curta","comentario":"2-3 frases descritivas","dica":"dica prática"},
+  "alternativas": [
+    {"id":2,"razao":"frase","comentario":"descrição","dica":"dica"},
+    {"id":3,"razao":"frase","comentario":"descrição","dica":"dica"},
+    {"id":4,"razao":"frase","comentario":"descrição","dica":"dica"}
+  ],
+  "surpresa": {"id":5,"razao":"frase surpreendente","comentario":"descrição","dica":"dica"}
 }`;
 
         // ============================================================
@@ -101,13 +134,13 @@ JSON:
                         messages: [
                             {
                                 role: 'system',
-                                content: 'Você retorna APENAS JSON válido. Zero texto extra. IDs referem a destinos da lista fornecida.'
+                                content: 'Você é um especialista em turismo brasileiro. Retorna APENAS JSON válido em português do Brasil. Zero texto extra. IDs referem a destinos da lista fornecida. Seus comentários são entusiasmados mas informativos, como um guia de viagens descolado.'
                             },
                             { role: 'user', content: prompt }
                         ],
                         response_format: { type: 'json_object' },
-                        temperature: 0.2,
-                        max_tokens: 2000,
+                        temperature: 0.3,
+                        max_tokens: 3000,
                     })
                 });
 
@@ -146,12 +179,13 @@ JSON:
         // ============================================================
         // VALIDAR E HIDRATAR COM DADOS ORIGINAIS
         // Os IDs do LLM apontam para destinos na lista original.
-        // SEMPRE sobrescrever dados com os originais (evita alucinação).
+        // SEMPRE sobrescrever dados numéricos com os originais (evita alucinação).
+        // Manter textos gerados pelo LLM (razao, comentario, dica).
         // ============================================================
         const hydrateById = (item, label) => {
             if (!item || !item.id) throw new Error(`${label}: sem ID`);
 
-            const idx = item.id - 1; // IDs começam em 1
+            const idx = item.id - 1;
             if (idx < 0 || idx >= destinos.length) {
                 throw new Error(`${label}: ID ${item.id} fora do range (máx: ${destinos.length})`);
             }
@@ -170,7 +204,10 @@ JSON:
                 return_date: original.return_date,
                 _sources: original._sources,
                 _source_count: original._source_count,
+                // Textos do LLM (não são dados numéricos, OK manter)
                 razao: item.razao || 'Selecionado pela Tripinha 🐶',
+                comentario: item.comentario || '',
+                dica: item.dica || '',
             };
         };
 
@@ -193,46 +230,61 @@ JSON:
         ranking._model = usedModel;
         ranking._totalAnalisados = destinos.length;
 
-        console.log(`🏆 ${ranking.top_destino.name} (R$${ranking.top_destino.flight?.price}) [${ranking.top_destino._source_count} fontes]`);
-        console.log(`📋 ${ranking.alternativas.map(a => `${a.name}(R$${a.flight?.price})`).join(', ')}`);
-        console.log(`🎁 ${ranking.surpresa.name} (R$${ranking.surpresa.flight?.price})`);
+        console.log(`🏆 ${ranking.top_destino.name} (${simboloMoeda}${ranking.top_destino.flight?.price}) [${ranking.top_destino._source_count} fontes]`);
+        console.log(`📋 ${ranking.alternativas.map(a => `${a.name}(${simboloMoeda}${a.flight?.price})`).join(', ')}`);
+        console.log(`🎁 ${ranking.surpresa.name} (${simboloMoeda}${ranking.surpresa.flight?.price})`);
 
         return res.status(200).json(ranking);
 
     } catch (erro) {
         console.error('❌ Erro ranking:', erro);
-        // Em caso de erro total, retornar fallback por preço
         return res.status(200).json(rankByPrice(destinos, orcamento));
     }
+}
+
+// ============================================================
+// CONTEXTO SAZONAL: Gera info sobre a estação para o LLM
+// ============================================================
+function getSeasonContext(mes) {
+    // Meses e estações (considerando ambos hemisférios)
+    const info = {
+        1:  'Janeiro: verão no hemisfério sul (praias lotadas, férias escolares), inverno rigoroso no hemisfério norte (neve, esportes de inverno)',
+        2:  'Fevereiro: verão/carnaval no hemisfério sul, inverno no hemisfério norte (ainda frio, bom para neve)',
+        3:  'Março: final do verão no sul (menos turistas, bom preço), início da primavera no norte (temperaturas amenas)',
+        4:  'Abril: outono no hemisfério sul (clima agradável), primavera no norte (floração, eventos culturais)',
+        5:  'Maio: outono no sul (temperaturas caindo), primavera plena no norte (excelente para turismo)',
+        6:  'Junho: início do inverno no sul (festas juninas), início do verão no norte (dias longos, festivais)',
+        7:  'Julho: inverno/férias escolares no sul, auge do verão no norte (alta temporada, praias)',
+        8:  'Agosto: inverno no sul (seco em muitas regiões), verão no norte (calor, festivais)',
+        9:  'Setembro: início da primavera no sul (flores, temperaturas subindo), início do outono no norte (folhagem)',
+        10: 'Outubro: primavera no sul (bom clima), outono no norte (folhagem colorida, Oktoberfest)',
+        11: 'Novembro: primavera/pré-verão no sul, outono tardio no norte (pré-inverno, Black Friday)',
+        12: 'Dezembro: verão/festas no sul (alta temporada), inverno no norte (natal, mercados natalinos, neve)',
+    };
+    return info[mes] || '';
 }
 
 // ============================================================
 // FALLBACK: Ranking simples por preço (sem LLM)
 // ============================================================
 function rankByPrice(destinos, orcamento) {
-    // Filtrar destinos com preço válido e dentro/perto do orçamento
     const comPreco = destinos.filter(d => d.flight?.price > 0);
 
     if (comPreco.length === 0) {
-        // Se nada tem preço, pegar os primeiros 5
         const top5 = destinos.slice(0, 5);
         return buildFallbackResult(top5, orcamento);
     }
 
-    // Separar: dentro do orçamento vs fora
     const dentroOrcamento = comPreco.filter(d => d.flight.price <= orcamento);
     const pool = dentroOrcamento.length >= 5 ? dentroOrcamento : comPreco;
 
-    // Ordenar por preço
     pool.sort((a, b) => a.flight.price - b.flight.price);
 
-    // Pegar top 5 tentando diversificar países
     const selected = [];
     const usedCountries = new Set();
 
     for (const d of pool) {
         if (selected.length >= 5) break;
-        // Permitir até 2 do mesmo país
         const countryCount = selected.filter(s => s.country === d.country).length;
         if (countryCount < 2) {
             selected.push(d);
@@ -240,7 +292,6 @@ function rankByPrice(destinos, orcamento) {
         }
     }
 
-    // Se não conseguiu 5, completar sem restrição de país
     if (selected.length < 5) {
         for (const d of pool) {
             if (selected.length >= 5) break;
@@ -266,6 +317,8 @@ function buildFallbackResult(selected, orcamento) {
         _sources: d._sources,
         _source_count: d._source_count,
         razao,
+        comentario: '',
+        dica: '',
     });
 
     return {
