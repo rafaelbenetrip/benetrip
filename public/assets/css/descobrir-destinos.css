@@ -843,3 +843,324 @@ body {
     display: inline-block;
     margin-top: 8px;
 }
+
+/* ================================================================
+   BENETRIP - CSS ADICIONAIS v2.1
+   Estilos para resultados enriquecidos
+   Adicionar ao FINAL do descobrir-destinos.css existente
+   ================================================================ */
+
+/* ========================================
+   RESUMO DE CRITÉRIOS
+   ======================================== */
+.criterios-resumo {
+    background: var(--white);
+    border-radius: var(--border-radius-lg);
+    padding: 20px 24px;
+    margin-bottom: 20px;
+    box-shadow: var(--shadow);
+    border-left: 4px solid var(--orange-primary);
+}
+
+.criterios-titulo {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: 'Poppins', sans-serif;
+    font-weight: 600;
+    font-size: 15px;
+    color: var(--gray-dark);
+    margin-bottom: 16px;
+}
+
+.criterios-icon {
+    font-size: 20px;
+}
+
+.criterios-grid {
+    display: grid;
+    gap: 10px;
+}
+
+.criterio-item {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 8px 12px;
+    background: var(--gray-light);
+    border-radius: 10px;
+}
+
+.criterio-label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #999;
+}
+
+.criterio-valor {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--gray-dark);
+}
+
+/* Layout 2 colunas em telas maiores */
+@media (min-width: 480px) {
+    .criterios-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    /* Orçamento ocupa linha inteira */
+    .criterio-item:last-child {
+        grid-column: 1 / -1;
+    }
+}
+
+/* ========================================
+   SUBTÍTULO DOS RESULTADOS
+   ======================================== */
+.resultado-subtitulo {
+    font-size: 13px;
+    color: #999;
+    margin-top: 4px;
+}
+
+/* ========================================
+   COMENTÁRIO CONTEXTUAL DO DESTINO
+   ======================================== */
+.destino-comentario {
+    font-family: 'Montserrat', sans-serif;
+    font-size: 14px;
+    line-height: 1.7;
+    color: rgba(255, 255, 255, 0.92);
+    margin: 12px 0;
+    padding: 12px 16px;
+    background: rgba(255, 255, 255, 0.12);
+    border-radius: 12px;
+    border-left: 3px solid rgba(255, 255, 255, 0.4);
+}
+
+/* Comentário em cards brancos (alternativas) */
+.destino-card .destino-comentario {
+    color: #444;
+    background: var(--gray-light);
+    border-left-color: var(--orange-primary);
+}
+
+/* ========================================
+   DICA PRÁTICA
+   ======================================== */
+.destino-dica {
+    font-family: 'Montserrat', sans-serif;
+    font-size: 13px;
+    line-height: 1.5;
+    color: rgba(255, 255, 255, 0.88);
+    margin: 8px 0 16px;
+    padding: 10px 14px;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+}
+
+.destino-dica .dica-icon {
+    flex-shrink: 0;
+    font-size: 16px;
+}
+
+/* Dica em cards brancos (alternativas) */
+.destino-card .destino-dica {
+    color: #555;
+    background: #FFF8F0;
+    border: 1px solid #FFE8D0;
+}
+
+/* ========================================
+   CUSTO ESTIMADO TOTAL
+   ======================================== */
+.custo-estimado {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 6px;
+    margin: 8px 0 4px;
+    padding: 8px 12px;
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 8px;
+    font-size: 13px;
+}
+
+.custo-label {
+    opacity: 0.8;
+}
+
+.custo-valor {
+    font-weight: 700;
+    font-size: 15px;
+}
+
+.custo-detalhe {
+    font-size: 11px;
+    opacity: 0.7;
+}
+
+/* Custo em cards brancos */
+.destino-card .custo-estimado {
+    background: #F0F7FF;
+    color: var(--gray-dark);
+    border: 1px solid #D0E8FF;
+}
+
+.destino-card .custo-label {
+    color: #666;
+}
+
+.destino-card .custo-valor {
+    color: var(--blue-secondary);
+}
+
+.destino-card .custo-detalhe {
+    color: #888;
+}
+
+/* ========================================
+   BADGES DE CONFIABILIDADE
+   ======================================== */
+.fonte-badge {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3px 10px;
+    border-radius: 12px;
+    margin-bottom: 8px;
+}
+
+.fonte-alta {
+    background: rgba(255, 215, 0, 0.25);
+    color: #FFF;
+}
+
+.fonte-media {
+    background: rgba(255, 255, 255, 0.2);
+    color: rgba(255, 255, 255, 0.9);
+}
+
+/* Badges em cards brancos */
+.destino-card .fonte-alta {
+    background: #FFF8E1;
+    color: #B8860B;
+}
+
+.destino-card .fonte-media {
+    background: #E8F5E9;
+    color: #2E7D32;
+}
+
+/* ========================================
+   PRECO LABEL (ida e volta por pessoa)
+   ======================================== */
+.preco-label {
+    font-size: 12px;
+    opacity: 0.75;
+    margin-top: -4px;
+    margin-bottom: 8px;
+}
+
+.destino-card .preco-label {
+    color: #888;
+}
+
+/* ========================================
+   FLIGHT INFO
+   ======================================== */
+.flight-info {
+    font-size: 13px;
+    opacity: 0.85;
+    margin-bottom: 8px;
+}
+
+.destino-card .flight-info {
+    color: #666;
+}
+
+/* ========================================
+   BOTÃO BUSCAR NOVAMENTE
+   ======================================== */
+.buscar-novamente-section {
+    text-align: center;
+    margin-top: 32px;
+    padding: 28px 24px;
+    background: var(--white);
+    border-radius: var(--border-radius-lg);
+    box-shadow: var(--shadow);
+}
+
+.buscar-novamente-texto {
+    font-family: 'Montserrat', sans-serif;
+    font-size: 15px;
+    color: #666;
+    margin-bottom: 16px;
+}
+
+.btn-buscar-novamente {
+    display: inline-block;
+    padding: 14px 32px;
+    background: transparent;
+    color: var(--orange-primary);
+    border: 2px solid var(--orange-primary);
+    border-radius: var(--border-radius-lg);
+    font-family: 'Poppins', sans-serif;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.btn-buscar-novamente:hover {
+    background: var(--orange-primary);
+    color: var(--white);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-hover);
+}
+
+.btn-buscar-novamente:active {
+    transform: translateY(0);
+}
+
+/* ========================================
+   RESPONSIVE ADJUSTMENTS
+   ======================================== */
+@media (max-width: 480px) {
+    .criterios-resumo {
+        padding: 16px 18px;
+    }
+
+    .criterio-item {
+        padding: 6px 10px;
+    }
+
+    .criterio-valor {
+        font-size: 13px;
+    }
+
+    .destino-comentario {
+        font-size: 13px;
+        padding: 10px 12px;
+    }
+
+    .destino-dica {
+        font-size: 12px;
+        padding: 8px 12px;
+    }
+
+    .custo-estimado {
+        flex-direction: column;
+        gap: 2px;
+    }
+
+    .btn-buscar-novamente {
+        width: 100%;
+        padding: 14px 20px;
+    }
+}
