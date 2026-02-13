@@ -10,7 +10,7 @@ export default async function handler(req, res) {
     if (req.method === 'OPTIONS') return res.status(200).end();
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-    const { destinos, preferencias, orcamento } = req.body;
+    const { destinos, preferencias, companhia, numPessoas, noites, orcamento } = req.body;
 
     if (!destinos || !Array.isArray(destinos) || destinos.length === 0) {
         return res.status(400).json({
@@ -25,11 +25,10 @@ export default async function handler(req, res) {
     }
 
     try {
-        console.log(`🤖 Ranqueando ${destinos.length} destinos | Preferência: ${preferencias} | Orçamento: R$${orcamento}`);
+        console.log(`🤖 Ranqueando ${destinos.length} destinos | ${companhia} | ${preferencias} | R$${orcamento}`);
 
         // ============================================================
         // FORMATO COMPACTO PARA O LLM
-        // Inclui _source_count para o LLM priorizar destinos mais confiáveis
         // ============================================================
         const listaCompacta = destinos.map((d, i) => {
             const passagem = d.flight?.price || 0;
@@ -40,32 +39,46 @@ export default async function handler(req, res) {
         }).join('\n');
 
         // ============================================================
-        // PROMPT OTIMIZADO
+        // PROMPT COM CONTEXTO RICO DO VIAJANTE
         // ============================================================
-        const prompt = `ESPECIALISTA EM TURISMO - Análise de ${destinos.length} destinos
+        const prompt = `ESPECIALISTA EM TURISMO - Seleção personalizada de destinos
 
-CONTEXTO DO VIAJANTE:
-- Preferência: ${preferencias}
+PERFIL DO VIAJANTE:
+- Companhia: ${companhia || 'Não informado'}
+- Número de pessoas: ${numPessoas || 1}
+- O que busca: ${preferencias || 'Não informado'}
+- Duração: ${noites || '?'} noites
 - Orçamento PASSAGENS (ida+volta/pessoa): R$ ${orcamento}
 
-DESTINOS (ID|Nome|País|Aeroporto|Passagem|Paradas|Fontes|Hotel):
+DESTINOS PRÉ-FILTRADOS (já dentro do orçamento):
+Formato: ID|Nome|País|Aeroporto|Passagem ida+volta|Paradas|Fontes|Hotel/noite
 ${listaCompacta}
 
-TAREFA: Escolha os 5 melhores destinos:
-1. MELHOR DESTINO (melhor match com preferência entre todas as opções)
-2. 3 ALTERNATIVAS variadas (diferentes perfis/países)
-3. 1 SURPRESA (inesperado e interessante)
+TAREFA: Com base no PERFIL, escolha os 5 que MAIS combinam com este viajante:
+1. MELHOR DESTINO - melhor match com perfil + custo-benefício
+2. 3 ALTERNATIVAS - diversifique países e experiências
+3. 1 SURPRESA - destino inesperado que encantaria este viajante
+
+CRITÉRIOS (ordem de prioridade):
+1. MATCH COM PERFIL: Combina com "${preferencias}"? Adequado para ${companhia}?
+   - Família → segurança, infraestrutura, atividades para crianças
+   - Casal → romance, gastronomia, cenários bonitos
+   - Amigos → diversão, vida noturna, aventuras em grupo
+   - Sozinho → segurança, facilidade, experiências culturais
+2. FONTES: Destinos com 2-3 fontes são mais confiáveis
+3. CUSTO TOTAL: passagem + hotel × ${noites || 7} noites
+4. DIVERSIDADE: Não repita países
 
 REGRAS:
 ✓ Use APENAS IDs da lista (1-${destinos.length})
-✓ Destinos DENTRO do orçamento, entre 80% e 105% do orçamento (1 aspiracional até 15% acima é OK)
-✓ Retorne APENAS JSON válido, sem markdown
+✓ "razao" = frase curta explicando POR QUE combina com este viajante
+✓ Retorne APENAS JSON válido
 
 JSON:
 {
-  "top_destino": {"id":1,"razao baseado nas preferencias":"frase sobre o lugar"},
+  "top_destino": {"id":1,"razao":"frase personalizada"},
   "alternativas": [{"id":2,"razao":"frase"},{"id":3,"razao":"frase"},{"id":4,"razao":"frase"}],
-  "surpresa": {"id":5,"razao":"frase que mostre porque o destino é surpreendente"}
+  "surpresa": {"id":5,"razao":"frase surpreendente"}
 }`;
 
         // ============================================================
