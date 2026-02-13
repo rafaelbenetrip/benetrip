@@ -1,4 +1,7 @@
-// api/rank-destinations.js - VERSÃO FULL (sem limites)
+// api/rank-destinations.js - VERSÃO TRIPLE SEARCH v2
+// Recebe destinos consolidados das 3 buscas e ranqueia com LLM
+// Fallback: Groq llama-3.3-70b → llama-3.1-8b → ranking por preço
+
 export default async function handler(req, res) {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -10,174 +13,255 @@ export default async function handler(req, res) {
     const { destinos, preferencias, orcamento } = req.body;
 
     if (!destinos || !Array.isArray(destinos) || destinos.length === 0) {
-        return res.status(400).json({ 
+        return res.status(400).json({
             error: 'Lista de destinos obrigatória',
-            received: { destinos, preferencias, orcamento }
+            received: { destinos: destinos?.length, preferencias, orcamento }
         });
     }
 
     if (!process.env.GROQ_API_KEY) {
-        return res.status(500).json({ error: 'GROQ_API_KEY não configurada' });
+        console.warn('⚠️ GROQ_API_KEY não configurada, usando fallback por preço');
+        return res.status(200).json(rankByPrice(destinos, orcamento));
     }
 
     try {
-        console.log(`🤖 Ranqueando ${destinos.length} destinos para: ${preferencias}`);
+        console.log(`🤖 Ranqueando ${destinos.length} destinos | Preferência: ${preferencias} | Orçamento: R$${orcamento}`);
 
-        // USAR TODOS OS DESTINOS (sem limite)
-        // Formato compacto para economizar tokens
+        // ============================================================
+        // FORMATO COMPACTO PARA O LLM
+        // Inclui _source_count para o LLM priorizar destinos mais confiáveis
+        // ============================================================
         const listaCompacta = destinos.map((d, i) => {
             const passagem = d.flight?.price || 0;
             const paradas = d.flight?.stops || 0;
-            return `${i+1}|${d.name}|${d.country}|${d.primary_airport}|Passagem:R$${passagem}|Paradas:${paradas}`;
+            const fontes = d._source_count || 1;
+            const hotel = d.avg_cost_per_night || 0;
+            return `${i + 1}|${d.name}|${d.country}|${d.primary_airport}|R$${passagem}|${paradas}paradas|${fontes}fontes|Hotel:R$${hotel}/noite`;
         }).join('\n');
 
-        // Prompt otimizado - foco em PASSAGENS
+        // ============================================================
+        // PROMPT OTIMIZADO
+        // ============================================================
         const prompt = `ESPECIALISTA EM TURISMO - Análise de ${destinos.length} destinos
 
-CONTEXTO:
+CONTEXTO DO VIAJANTE:
 - Preferência: ${preferencias}
-- Orçamento para PASSAGENS (ida e volta por pessoa): R$ ${orcamento}
+- Orçamento PASSAGENS (ida+volta/pessoa): R$ ${orcamento}
 
-DESTINOS (formato: ID|Nome|País|Aeroporto|Passagem ida+volta|Paradas):
+DESTINOS (ID|Nome|País|Aeroporto|Passagem|Paradas|Fontes|Hotel):
 ${listaCompacta}
 
-TAREFA: Analise TODOS os destinos acima e escolha:
-1. MELHOR destino geral (melhor custo-benefício de passagem + preferência)
-2. 3 ALTERNATIVAS variadas (diferentes perfis)
-3. 1 SURPRESA (destino inesperado e interessante)
+TAREFA: Escolha os 5 melhores destinos:
+1. MELHOR DESTINO (melhor custo-benefício + match com preferência)
+2. 3 ALTERNATIVAS variadas (diferentes perfis/países)
+3. 1 SURPRESA (inesperado e interessante)
 
-REGRAS CRÍTICAS:
-✓ Use APENAS destinos da lista (ID 1-${destinos.length})
-✓ Copie nome, aeroporto e país EXATAMENTE
-✓ Retorne APENAS JSON (sem explicações, markdown ou texto extra)
-✓ Cada destino deve ter razão ÚNICA de 1 frase
-✓ Preço mostrado = preço da PASSAGEM (ida e volta)
+REGRAS:
+✓ Use APENAS IDs da lista (1-${destinos.length})
+✓ Priorize destinos com mais "fontes" (aparecem em múltiplas buscas = mais confiáveis)
+✓ Destinos DENTRO do orçamento primeiro (1 aspiracional até 15% acima é OK)
+✓ Diversifique países - NÃO sugira 5 destinos no mesmo país
+✓ Retorne APENAS JSON válido, sem markdown
 
-JSON FORMAT:
+JSON:
 {
-  "top_destino": {
-    "id": número,
-    "name": "nome exato",
-    "primary_airport": "código exato",
-    "country": "país exato",
-    "flight": {"price": número, "airport_code": "código", "stops": número},
-    "avg_cost_per_night": número,
-    "razao": "Por que é o melhor"
-  },
-  "alternativas": [
-    {id, name, primary_airport, country, flight, avg_cost_per_night, razao},
-    {id, name, primary_airport, country, flight, avg_cost_per_night, razao},
-    {id, name, primary_airport, country, flight, avg_cost_per_night, razao}
-  ],
-  "surpresa": {
-    "id": número,
-    "name": "nome exato",
-    "primary_airport": "código exato",
-    "country": "país exato",
-    "flight": {"price": número, "airport_code": "código", "stops": número},
-    "avg_cost_per_night": número,
-    "razao": "Por que é surpreendente"
-  }
+  "top_destino": {"id":1,"razao":"frase curta"},
+  "alternativas": [{"id":2,"razao":"frase"},{"id":3,"razao":"frase"},{"id":4,"razao":"frase"}],
+  "surpresa": {"id":5,"razao":"frase surpreendente"}
 }`;
 
-        const groqResponse = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${process.env.GROQ_API_KEY}`
-            },
-            body: JSON.stringify({
-                model: 'llama-3.3-70b-versatile',
-                messages: [
-                    {
-                        role: 'system',
-                        content: 'Você retorna APENAS JSON válido. Zero texto extra. Copie dados exatamente como fornecidos.'
+        // ============================================================
+        // TENTAR MODELOS EM CASCATA
+        // ============================================================
+        const models = ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant'];
+        let ranking = null;
+        let usedModel = null;
+
+        for (const model of models) {
+            try {
+                const groqResponse = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${process.env.GROQ_API_KEY}`
                     },
-                    {
-                        role: 'user',
-                        content: prompt
-                    }
-                ],
-                response_format: { type: 'json_object' },
-                temperature: 0.2,
-                max_tokens: 8000,
-                top_p: 0.9
-            })
-        });
+                    body: JSON.stringify({
+                        model,
+                        messages: [
+                            {
+                                role: 'system',
+                                content: 'Você retorna APENAS JSON válido. Zero texto extra. IDs referem a destinos da lista fornecida.'
+                            },
+                            { role: 'user', content: prompt }
+                        ],
+                        response_format: { type: 'json_object' },
+                        temperature: 0.2,
+                        max_tokens: 2000,
+                    })
+                });
 
-        if (!groqResponse.ok) {
-            const errorText = await groqResponse.text();
-            console.error('Groq erro:', groqResponse.status, errorText);
-            throw new Error(`Groq retornou ${groqResponse.status}`);
-        }
+                if (!groqResponse.ok) {
+                    console.error(`[Groq][${model}] HTTP ${groqResponse.status}`);
+                    continue;
+                }
 
-        const groqData = await groqResponse.json();
-        
-        if (!groqData.choices?.[0]?.message?.content) {
-            throw new Error('Resposta Groq inválida');
-        }
+                const groqData = await groqResponse.json();
+                const content = groqData.choices?.[0]?.message?.content;
 
-        const conteudo = groqData.choices[0].message.content;
-        console.log('📝 Groq retornou:', conteudo.substring(0, 100) + '...');
+                if (!content) {
+                    console.error(`[Groq][${model}] Resposta vazia`);
+                    continue;
+                }
 
-        let ranking;
-        try {
-            ranking = JSON.parse(conteudo);
-        } catch (parseError) {
-            console.error('Erro parse:', parseError);
-            console.error('Conteúdo:', conteudo);
-            throw new Error('Groq não retornou JSON válido');
-        }
+                ranking = JSON.parse(content);
+                usedModel = model;
+                console.log(`✅ [Groq][${model}] Ranking gerado com sucesso`);
+                break;
 
-        // Validação: verificar se os IDs existem
-        const validarPorID = (destino, nome) => {
-            if (!destino) throw new Error(`${nome} ausente`);
-            
-            const id = destino.id - 1; // IDs começam em 1
-            if (id < 0 || id >= destinos.length) {
-                throw new Error(`${nome}: ID ${destino.id} inválido (máx: ${destinos.length})`);
+            } catch (err) {
+                console.error(`[Groq][${model}] Erro:`, err.message);
+                continue;
             }
-            
-            const original = destinos[id];
-            
-            // Garantir que os dados batem - SEMPRE corrigir com dados originais
+        }
+
+        // ============================================================
+        // FALLBACK: ranking por preço se LLM falhou
+        // ============================================================
+        if (!ranking) {
+            console.warn('⚠️ Todos os modelos falharam, usando fallback por preço');
+            return res.status(200).json(rankByPrice(destinos, orcamento));
+        }
+
+        // ============================================================
+        // VALIDAR E HIDRATAR COM DADOS ORIGINAIS
+        // Os IDs do LLM apontam para destinos na lista original.
+        // SEMPRE sobrescrever dados com os originais (evita alucinação).
+        // ============================================================
+        const hydrateById = (item, label) => {
+            if (!item || !item.id) throw new Error(`${label}: sem ID`);
+
+            const idx = item.id - 1; // IDs começam em 1
+            if (idx < 0 || idx >= destinos.length) {
+                throw new Error(`${label}: ID ${item.id} fora do range (máx: ${destinos.length})`);
+            }
+
+            const original = destinos[idx];
             return {
-                ...destino,
+                id: item.id,
                 name: original.name,
                 primary_airport: original.primary_airport,
                 country: original.country,
+                coordinates: original.coordinates,
+                image: original.image,
                 flight: original.flight,
                 avg_cost_per_night: original.avg_cost_per_night,
-                // Manter a razão da IA
-                razao: destino.razao
+                outbound_date: original.outbound_date,
+                return_date: original.return_date,
+                _sources: original._sources,
+                _source_count: original._source_count,
+                razao: item.razao || 'Selecionado pela Tripinha 🐶',
             };
         };
 
-        // Validar e corrigir se necessário
-        ranking.top_destino = validarPorID(ranking.top_destino, 'top_destino');
-        ranking.surpresa = validarPorID(ranking.surpresa, 'surpresa');
-        
-        if (!Array.isArray(ranking.alternativas) || ranking.alternativas.length < 3) {
-            throw new Error('Mínimo 3 alternativas necessárias');
-        }
-        
-        ranking.alternativas = ranking.alternativas.slice(0, 3).map((alt, i) => 
-            validarPorID(alt, `alternativa ${i+1}`)
-        );
+        try {
+            ranking.top_destino = hydrateById(ranking.top_destino, 'top_destino');
+            ranking.surpresa = hydrateById(ranking.surpresa, 'surpresa');
 
-        console.log(`✅ Ranking de ${destinos.length} destinos:`);
-        console.log(`   🏆 ${ranking.top_destino.name} (R$${ranking.top_destino.flight?.price})`);
-        console.log(`   📋 ${ranking.alternativas.map(a => `${a.name}(R$${a.flight?.price})`).join(', ')}`);
-        console.log(`   🎁 ${ranking.surpresa.name} (R$${ranking.surpresa.flight?.price})`);
+            if (!Array.isArray(ranking.alternativas) || ranking.alternativas.length < 3) {
+                throw new Error('Mínimo 3 alternativas');
+            }
+            ranking.alternativas = ranking.alternativas.slice(0, 3).map((alt, i) =>
+                hydrateById(alt, `alternativa ${i + 1}`)
+            );
+        } catch (validationError) {
+            console.error('❌ Validação falhou:', validationError.message);
+            return res.status(200).json(rankByPrice(destinos, orcamento));
+        }
+
+        // Adicionar metadados
+        ranking._model = usedModel;
+        ranking._totalAnalisados = destinos.length;
+
+        console.log(`🏆 ${ranking.top_destino.name} (R$${ranking.top_destino.flight?.price}) [${ranking.top_destino._source_count} fontes]`);
+        console.log(`📋 ${ranking.alternativas.map(a => `${a.name}(R$${a.flight?.price})`).join(', ')}`);
+        console.log(`🎁 ${ranking.surpresa.name} (R$${ranking.surpresa.flight?.price})`);
 
         return res.status(200).json(ranking);
 
     } catch (erro) {
         console.error('❌ Erro ranking:', erro);
-        return res.status(500).json({ 
-            error: 'Erro ao processar ranking',
-            message: erro.message,
-            destinosRecebidos: destinos?.length || 0
-        });
+        // Em caso de erro total, retornar fallback por preço
+        return res.status(200).json(rankByPrice(destinos, orcamento));
     }
+}
+
+// ============================================================
+// FALLBACK: Ranking simples por preço (sem LLM)
+// ============================================================
+function rankByPrice(destinos, orcamento) {
+    // Filtrar destinos com preço válido e dentro/perto do orçamento
+    const comPreco = destinos.filter(d => d.flight?.price > 0);
+
+    if (comPreco.length === 0) {
+        // Se nada tem preço, pegar os primeiros 5
+        const top5 = destinos.slice(0, 5);
+        return buildFallbackResult(top5, orcamento);
+    }
+
+    // Separar: dentro do orçamento vs fora
+    const dentroOrcamento = comPreco.filter(d => d.flight.price <= orcamento);
+    const pool = dentroOrcamento.length >= 5 ? dentroOrcamento : comPreco;
+
+    // Ordenar por preço
+    pool.sort((a, b) => a.flight.price - b.flight.price);
+
+    // Pegar top 5 tentando diversificar países
+    const selected = [];
+    const usedCountries = new Set();
+
+    for (const d of pool) {
+        if (selected.length >= 5) break;
+        // Permitir até 2 do mesmo país
+        const countryCount = selected.filter(s => s.country === d.country).length;
+        if (countryCount < 2) {
+            selected.push(d);
+            usedCountries.add(d.country);
+        }
+    }
+
+    // Se não conseguiu 5, completar sem restrição de país
+    if (selected.length < 5) {
+        for (const d of pool) {
+            if (selected.length >= 5) break;
+            if (!selected.includes(d)) selected.push(d);
+        }
+    }
+
+    return buildFallbackResult(selected, orcamento);
+}
+
+function buildFallbackResult(selected, orcamento) {
+    const wrap = (d, razao) => ({
+        id: 0,
+        name: d.name,
+        primary_airport: d.primary_airport,
+        country: d.country,
+        coordinates: d.coordinates,
+        image: d.image,
+        flight: d.flight,
+        avg_cost_per_night: d.avg_cost_per_night,
+        outbound_date: d.outbound_date,
+        return_date: d.return_date,
+        _sources: d._sources,
+        _source_count: d._source_count,
+        razao,
+    });
+
+    return {
+        top_destino: selected[0] ? wrap(selected[0], 'Melhor preço encontrado! 🐶') : null,
+        alternativas: selected.slice(1, 4).map(d => wrap(d, 'Boa opção de preço')),
+        surpresa: selected[4] ? wrap(selected[4], 'Uma opção diferente para explorar! 🎁') : (selected[0] ? wrap(selected[0], 'Única opção disponível') : null),
+        _model: 'fallback_price',
+        _totalAnalisados: selected.length,
+    };
 }
