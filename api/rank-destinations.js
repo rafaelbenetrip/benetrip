@@ -52,15 +52,13 @@ DESTINOS (ID|Nome|País|Aeroporto|Passagem|Paradas|Fontes|Hotel):
 ${listaCompacta}
 
 TAREFA: Escolha os 5 melhores destinos:
-1. MELHOR DESTINO (melhor custo-benefício + match com preferência)
+1. MELHOR DESTINO (melhor match com preferência entre todas as opções)
 2. 3 ALTERNATIVAS variadas (diferentes perfis/países)
 3. 1 SURPRESA (inesperado e interessante)
 
 REGRAS:
 ✓ Use APENAS IDs da lista (1-${destinos.length})
-✓ Priorize destinos com mais "fontes" (aparecem em múltiplas buscas = mais confiáveis)
-✓ Destinos DENTRO do orçamento, sendo entre 80% e 105% do valor (1 aspiracional até 15% acima é OK)
-✓ Diversifique países - NÃO sugira 5 destinos no mesmo país
+✓ Destinos DENTRO do orçamento, entre 80% e 105% do orçamento (1 aspiracional até 15% acima é OK)
 ✓ Retorne APENAS JSON válido, sem markdown
 
 JSON:
