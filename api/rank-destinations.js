@@ -59,15 +59,15 @@ TAREFA: Escolha os 5 melhores destinos:
 REGRAS:
 ✓ Use APENAS IDs da lista (1-${destinos.length})
 ✓ Priorize destinos com mais "fontes" (aparecem em múltiplas buscas = mais confiáveis)
-✓ Destinos DENTRO do orçamento primeiro (1 aspiracional até 15% acima é OK)
+✓ Destinos DENTRO do orçamento, sendo entre 80% e 105% do valor (1 aspiracional até 15% acima é OK)
 ✓ Diversifique países - NÃO sugira 5 destinos no mesmo país
 ✓ Retorne APENAS JSON válido, sem markdown
 
 JSON:
 {
-  "top_destino": {"id":1,"razao":"frase curta"},
+  "top_destino": {"id":1,"razao baseado nas preferencias":"frase sobre o lugar"},
   "alternativas": [{"id":2,"razao":"frase"},{"id":3,"razao":"frase"},{"id":4,"razao":"frase"}],
-  "surpresa": {"id":5,"razao":"frase surpreendente"}
+  "surpresa": {"id":5,"razao":"frase que mostre porque o destino é surpreendente"}
 }`;
 
         // ============================================================
