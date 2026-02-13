@@ -33,7 +33,7 @@ const BenetripDiscovery = {
         this.setupFormEvents();
         this.setupAutocomplete();
         this.setupCalendar();
-        this.setupCompanhiaConditional(); // <--- Corrigido aqui
+        this.setupCompanhiaConditional();
         this.setupOptionButtons();
         this.setupNumberInput();
         this.setupCurrencyInput();
@@ -52,7 +52,6 @@ const BenetripDiscovery = {
             this.log(`✅ ${this.state.cidadesData.length} cidades carregadas (v4 com kgmid)`);
         } catch (erro) {
             this.error('Erro ao carregar cidades:', erro);
-            // Fallback mínimo para não quebrar a UI
             this.state.cidadesData = [
                 { cidade: "São Paulo", sigla_estado: "SP", pais: "Brasil", codigo_pais: "BR", iata: "GRU" },
                 { cidade: "Rio de Janeiro", sigla_estado: "RJ", pais: "Brasil", codigo_pais: "BR", iata: "GIG" },
@@ -93,8 +92,6 @@ const BenetripDiscovery = {
         
         let debounceTimer;
         
-        if (!input) return; // Segurança
-
         input.addEventListener('input', (e) => {
             clearTimeout(debounceTimer);
             
@@ -163,30 +160,23 @@ const BenetripDiscovery = {
         const dataIda = document.getElementById('data-ida');
         const dataVolta = document.getElementById('data-volta');
         
-        if (!input) return;
-
         const amanha = new Date();
         amanha.setDate(amanha.getDate() + 1);
         
-        // Verifica se flatpickr está carregado
-        if (typeof flatpickr !== 'undefined') {
-            flatpickr(input, {
-                mode: 'range',
-                minDate: amanha,
-                dateFormat: 'Y-m-d',
-                locale: 'pt',
-                onChange: (selectedDates) => {
-                    if (selectedDates.length === 2) {
-                        dataIda.value = this.formatarDataISO(selectedDates[0]);
-                        dataVolta.value = this.formatarDataISO(selectedDates[1]);
-                        input.value = `${this.formatarDataBR(selectedDates[0])} - ${this.formatarDataBR(selectedDates[1])}`;
-                        this.log('📅 Datas:', dataIda.value, 'até', dataVolta.value);
-                    }
+        flatpickr(input, {
+            mode: 'range',
+            minDate: amanha,
+            dateFormat: 'Y-m-d',
+            locale: 'pt',
+            onChange: (selectedDates) => {
+                if (selectedDates.length === 2) {
+                    dataIda.value = this.formatarDataISO(selectedDates[0]);
+                    dataVolta.value = this.formatarDataISO(selectedDates[1]);
+                    input.value = `${this.formatarDataBR(selectedDates[0])} - ${this.formatarDataBR(selectedDates[1])}`;
+                    this.log('📅 Datas:', dataIda.value, 'até', dataVolta.value);
                 }
-            });
-        } else {
-            this.error('Biblioteca flatpickr não encontrada.');
-        }
+            }
+        });
     },
 
     formatarDataISO(data) {
@@ -200,31 +190,17 @@ const BenetripDiscovery = {
         return data.toLocaleDateString('pt-BR');
     },
 
-    // ================================================================
-    // CORREÇÃO APLICADA AQUI
-    // ================================================================
+    // Apenas condicional do número de pessoas (família/amigos)
     setupCompanhiaConditional() {
         const companhiaInput = document.getElementById('companhia');
         const numPessoasGroup = document.getElementById('num-pessoas-group');
         
-        // Verificação de segurança para evitar o erro "not of type Node"
         if (!companhiaInput || !numPessoasGroup) return;
-
-        const updateVisibility = () => {
-            const value = parseInt(companhiaInput.value);
-            // 2: Família, 3: Amigos (exibe seletor de pessoas)
-            if (value === 2 || value === 3) {
-                numPessoasGroup.style.display = 'block';
-            } else {
-                numPessoasGroup.style.display = 'none';
-            }
-        };
-
-        // Escuta o evento 'change' disparado manualmente em setupOptionButtons
-        companhiaInput.addEventListener('change', updateVisibility);
         
-        // Executa uma vez para garantir estado inicial correto
-        updateVisibility();
+        companhiaInput.addEventListener('change', () => {
+            const value = parseInt(companhiaInput.value);
+            numPessoasGroup.style.display = (value === 2 || value === 3) ? 'block' : 'none';
+        });
     },
 
     setupOptionButtons() {
@@ -233,17 +209,13 @@ const BenetripDiscovery = {
             if (!field) return;
             
             const hiddenInput = document.getElementById(field);
-            if (!hiddenInput) return;
             
             group.querySelectorAll('.btn-option').forEach(btn => {
                 btn.addEventListener('click', () => {
                     group.querySelectorAll('.btn-option').forEach(b => b.classList.remove('active'));
                     btn.classList.add('active');
                     hiddenInput.value = btn.dataset.value;
-                    
-                    // IMPORTANTE: Dispara o evento change para que setupCompanhiaConditional funcione
                     hiddenInput.dispatchEvent(new Event('change'));
-                    
                     this.log(`✅ ${field}:`, btn.dataset.value);
                 });
             });
@@ -255,14 +227,14 @@ const BenetripDiscovery = {
         const decrementBtn = document.querySelector('.btn-number[data-action="decrement"]');
         const incrementBtn = document.querySelector('.btn-number[data-action="increment"]');
         
-        if (input && decrementBtn) {
+        if (decrementBtn) {
             decrementBtn.addEventListener('click', () => {
                 const value = parseInt(input.value);
                 if (value > 2) input.value = value - 1;
             });
         }
         
-        if (input && incrementBtn) {
+        if (incrementBtn) {
             incrementBtn.addEventListener('click', () => {
                 const value = parseInt(input.value);
                 if (value < 20) input.value = value + 1;
@@ -298,8 +270,6 @@ const BenetripDiscovery = {
     setupFormEvents() {
         const form = document.getElementById('descobrir-form');
         
-        if (!form) return;
-
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
             
@@ -316,27 +286,23 @@ const BenetripDiscovery = {
     validarFormulario() {
         if (!this.state.origemSelecionada) {
             alert('Por favor, selecione uma cidade de origem');
-            const origemInput = document.getElementById('origem');
-            if(origemInput) origemInput.focus();
+            document.getElementById('origem').focus();
             return false;
         }
         
-        const companhiaVal = document.getElementById('companhia').value;
-        if (!companhiaVal) {
+        if (!document.getElementById('companhia').value) {
             alert('Por favor, escolha com quem você vai viajar');
             return false;
         }
         
-        const prefVal = document.getElementById('preferencias').value;
-        if (!prefVal) {
+        if (!document.getElementById('preferencias').value) {
             alert('Por favor, escolha o que você busca nessa viagem');
             return false;
         }
         
         if (!document.getElementById('data-ida').value || !document.getElementById('data-volta').value) {
             alert('Por favor, selecione as datas da viagem');
-            const datasInput = document.getElementById('datas');
-            if(datasInput) datasInput.focus();
+            document.getElementById('datas').focus();
             return false;
         }
 
@@ -345,18 +311,17 @@ const BenetripDiscovery = {
             return false;
         }
         
-        const orcamentoInput = document.getElementById('orcamento');
-        const orcamento = orcamentoInput.value;
+        const orcamento = document.getElementById('orcamento').value;
         if (!orcamento || parseFloat(orcamento.replace(',', '.')) <= 0) {
             alert('Por favor, informe o orçamento');
-            orcamentoInput.focus();
+            document.getElementById('orcamento').focus();
             return false;
         }
         
         return true;
     },
 
-    // Coleta simplificada
+    // Coleta simplificada (sem tipoViagem/distância)
     coletarDadosFormulario() {
         const companhia = parseInt(document.getElementById('companhia').value);
         
@@ -562,29 +527,19 @@ const BenetripDiscovery = {
     },
 
     mostrarLoading() {
-        const formContainer = document.getElementById('form-container');
-        const loadingContainer = document.getElementById('loading-container');
-        
-        if(formContainer) formContainer.style.display = 'none';
-        if(loadingContainer) loadingContainer.style.display = 'block';
-        
+        document.getElementById('form-container').style.display = 'none';
+        document.getElementById('loading-container').style.display = 'block';
         window.scrollTo({ top: 0, behavior: 'smooth' });
     },
 
     esconderLoading() {
-        const formContainer = document.getElementById('form-container');
-        const loadingContainer = document.getElementById('loading-container');
-
-        if(loadingContainer) loadingContainer.style.display = 'none';
-        if(formContainer) formContainer.style.display = 'block';
+        document.getElementById('loading-container').style.display = 'none';
+        document.getElementById('form-container').style.display = 'block';
     },
 
     atualizarProgresso(pct, msg) {
-        const progressFill = document.getElementById('progress-fill');
-        const loadingMessage = document.getElementById('loading-message');
-        
-        if(progressFill) progressFill.style.width = `${pct}%`;
-        if(loadingMessage) loadingMessage.textContent = msg;
+        document.getElementById('progress-fill').style.width = `${pct}%`;
+        document.getElementById('loading-message').textContent = msg;
     },
 
     delay(ms) {
@@ -602,16 +557,11 @@ const BenetripDiscovery = {
     // ================================================================
     mostrarResultados(destinos) {
         const container = document.getElementById('resultados-container');
-        if (!container) return;
-
         const { dataIda, dataVolta, preferencias, moeda } = this.state.formData;
         const noites = this.calcularNoites(dataIda, dataVolta);
         
-        // Conversão segura de datas
-        const partsIda = dataIda.split('-');
-        const partsVolta = dataVolta.split('-');
-        const dataIdaBR = `${partsIda[2]}/${partsIda[1]}/${partsIda[0]}`;
-        const dataVoltaBR = `${partsVolta[2]}/${partsVolta[1]}/${partsVolta[0]}`;
+        const dataIdaBR = new Date(dataIda + 'T12:00:00').toLocaleDateString('pt-BR');
+        const dataVoltaBR = new Date(dataVolta + 'T12:00:00').toLocaleDateString('pt-BR');
         
         const formatPreco = (d) => this.formatarPreco(d.flight?.price || 0, moeda);
         
