@@ -1,6 +1,7 @@
 /**
  * BENETRIP - DESCOBRIR DESTINOS
- * Versão PRODUCTION - APENAS APIs reais, SEM fallbacks
+ * Versão TRIPLE SEARCH v2 - 3 buscas paralelas + LLM ranking
+ * APENAS APIs reais, SEM fallbacks de dados
  */
 
 const BenetripDiscovery = {
@@ -13,7 +14,9 @@ const BenetripDiscovery = {
 
     config: {
         travelpayoutsMarker: 'benetrip',
-        debug: true
+        debug: true,
+        // MUDANÇA v2: usar cidades_global_iata_v4.json (com kgmid)
+        cidadesJsonPath: 'data/cidades_global_iata_v4.json'
     },
 
     log(...args) {
@@ -25,7 +28,7 @@ const BenetripDiscovery = {
     },
 
     init() {
-        this.log('🐕 Benetrip Discovery inicializando...');
+        this.log('🐕 Benetrip Discovery v2 (Triple Search) inicializando...');
         
         this.carregarCidades();
         this.setupFormEvents();
@@ -40,21 +43,24 @@ const BenetripDiscovery = {
         this.log('✅ Inicialização completa');
     },
 
+    // ================================================================
+    // MUDANÇA v2: Carregar JSON v4 (com campos de país/continente)
+    // ================================================================
     async carregarCidades() {
         try {
-            const response = await fetch('data/cidades_global_iata_v3.json');
+            const response = await fetch(this.config.cidadesJsonPath);
             if (!response.ok) throw new Error('Erro ao carregar cidades');
             
             const dados = await response.json();
             this.state.cidadesData = dados.filter(c => c.iata);
             
-            this.log(`✅ ${this.state.cidadesData.length} cidades carregadas`);
+            this.log(`✅ ${this.state.cidadesData.length} cidades carregadas (v4 com kgmid)`);
         } catch (erro) {
             this.error('Erro ao carregar cidades:', erro);
             this.state.cidadesData = [
-                { cidade: "São Paulo", sigla_estado: "SP", pais: "Brasil", iata: "GRU" },
-                { cidade: "Rio de Janeiro", sigla_estado: "RJ", pais: "Brasil", iata: "GIG" },
-                { cidade: "Salvador", sigla_estado: "BA", pais: "Brasil", iata: "SSA" }
+                { cidade: "São Paulo", sigla_estado: "SP", pais: "Brasil", codigo_pais: "BR", iata: "GRU" },
+                { cidade: "Rio de Janeiro", sigla_estado: "RJ", pais: "Brasil", codigo_pais: "BR", iata: "GIG" },
+                { cidade: "Salvador", sigla_estado: "BA", pais: "Brasil", codigo_pais: "BR", iata: "SSA" }
             ];
         }
     },
@@ -63,6 +69,9 @@ const BenetripDiscovery = {
         return texto.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
     },
 
+    // ================================================================
+    // MUDANÇA v2: buscarCidades usa campo 'pais' (agora nome completo)
+    // ================================================================
     buscarCidades(termo) {
         if (!this.state.cidadesData || termo.length < 2) return [];
         
@@ -79,7 +88,10 @@ const BenetripDiscovery = {
                 code: cidade.iata,
                 name: cidade.cidade,
                 state: cidade.sigla_estado,
-                country: cidade.pais
+                // MUDANÇA v2: 'pais' agora é nome completo ("Brasil" em vez de "BR")
+                country: cidade.pais,
+                // NOVO v2: código ISO do país
+                countryCode: cidade.codigo_pais
             }));
     },
 
@@ -378,31 +390,49 @@ const BenetripDiscovery = {
         this.log('📝 Dados:', this.state.formData);
     },
 
+    // ================================================================
+    // FLUXO PRINCIPAL DE BUSCA
+    // ================================================================
     async buscarDestinos() {
         try {
             this.mostrarLoading();
             
-            this.atualizarProgresso(20, 'Buscando destinos...');
+            // PASSO 1: Triple Search (3 buscas paralelas no backend)
+            this.atualizarProgresso(15, '🔍 Buscando destinos pelo mundo...');
             const destinosDisponiveis = await this.buscarDestinosAPI();
             
             if (!destinosDisponiveis || destinosDisponiveis.length === 0) {
                 throw new Error('Nenhum destino encontrado');
             }
             
-            this.atualizarProgresso(40, 'Filtrando...');
+            // PASSO 2: Filtrar por orçamento
+            this.atualizarProgresso(40, '💰 Filtrando pelo seu orçamento...');
             const destinosFiltrados = this.filtrarDestinos(destinosDisponiveis);
             
             if (destinosFiltrados.length === 0) {
-                throw new Error('Nenhum destino no orçamento');
+                // MUDANÇA v2: Se nenhum no orçamento, usar todos (LLM pode sugerir aspiracionais)
+                this.log('⚠️ Nenhum destino no orçamento exato, enviando todos para o LLM');
+                this.atualizarProgresso(60, '🤖 Tripinha analisando opções...');
+                const ranking = await this.ranquearDestinosAPI(destinosDisponiveis);
+                
+                this.atualizarProgresso(80, '✈️ Gerando links de reserva...');
+                const destinosComLinks = this.gerarLinksTravelpayouts(ranking);
+                
+                this.atualizarProgresso(100, '🎉 Pronto!');
+                await this.delay(500);
+                this.mostrarResultados(destinosComLinks);
+                return;
             }
             
-            this.atualizarProgresso(60, 'IA selecionando...');
+            // PASSO 3: LLM ranqueia
+            this.atualizarProgresso(60, '🤖 Tripinha selecionando os melhores...');
             const ranking = await this.ranquearDestinosAPI(destinosFiltrados);
             
-            this.atualizarProgresso(80, 'Gerando links...');
+            // PASSO 4: Gerar links de afiliado
+            this.atualizarProgresso(80, '✈️ Gerando links de reserva...');
             const destinosComLinks = this.gerarLinksTravelpayouts(ranking);
             
-            this.atualizarProgresso(100, 'Pronto!');
+            this.atualizarProgresso(100, '🎉 Pronto!');
             await this.delay(500);
             this.mostrarResultados(destinosComLinks);
             
@@ -413,6 +443,9 @@ const BenetripDiscovery = {
         }
     },
 
+    // ================================================================
+    // CHAMADA API: search-destinations (agora faz triple search)
+    // ================================================================
     async buscarDestinosAPI() {
         const response = await fetch('/api/search-destinations', {
             method: 'POST',
@@ -430,16 +463,27 @@ const BenetripDiscovery = {
         }
         
         const data = await response.json();
+
+        // MUDANÇA v2: Logar metadados do triple search
+        if (data._meta) {
+            this.log('📊 Triple Search:', {
+                global: data._meta.sources.global,
+                continente: data._meta.sources.continente,
+                pais: data._meta.sources.pais,
+                total: data.total,
+                tempo: `${data._meta.totalTime}ms`
+            });
+        }
+
         return data.destinations;
     },
 
-    // ✅ CORREÇÃO: Filtrar apenas pelo preço da passagem (ida e volta)
+    // Filtrar pelo preço da passagem (ida e volta)
     filtrarDestinos(destinos) {
         const { tipoViagem, orcamento } = this.state.formData;
         
         return destinos.filter(d => {
             if (tipoViagem === 0) {
-                // Orçamento é para passagens (ida e volta) por pessoa
                 const precoPassagem = d.flight?.price || 0;
                 return precoPassagem > 0 && precoPassagem <= orcamento;
             }
@@ -453,6 +497,9 @@ const BenetripDiscovery = {
         return Math.ceil((volta - ida) / (1000 * 60 * 60 * 24));
     },
 
+    // ================================================================
+    // CHAMADA API: rank-destinations (com fallback integrado)
+    // ================================================================
     async ranquearDestinosAPI(destinos) {
         const response = await fetch('/api/rank-destinations', {
             method: 'POST',
@@ -469,7 +516,14 @@ const BenetripDiscovery = {
             throw new Error(err.message || 'Erro no ranking');
         }
         
-        return await response.json();
+        const ranking = await response.json();
+
+        // MUDANÇA v2: Logar modelo usado
+        if (ranking._model) {
+            this.log(`🤖 Modelo: ${ranking._model} | Analisados: ${ranking._totalAnalisados}`);
+        }
+
+        return ranking;
     },
 
     gerarLinksTravelpayouts(ranking) {
@@ -509,20 +563,20 @@ const BenetripDiscovery = {
         return new Promise(r => setTimeout(r, ms));
     },
 
-    // Helper para formatar moeda
     formatarPreco(valor, moeda) {
         const simbolos = { 'BRL': 'R$', 'USD': '$', 'EUR': '€' };
         const simbolo = simbolos[moeda] || 'R$';
         return `${simbolo} ${Math.round(valor).toLocaleString('pt-BR')}`;
     },
 
-    // ✅ CORREÇÃO: Mostrar apenas preço das passagens (ida e volta)
+    // ================================================================
+    // MUDANÇA v2: Mostrar badge de confiabilidade (multi-fonte)
+    // ================================================================
     mostrarResultados(destinos) {
         const container = document.getElementById('resultados-container');
         const { dataIda, dataVolta, preferencias, moeda } = this.state.formData;
         const noites = this.calcularNoites(dataIda, dataVolta);
         
-        // Formatar datas para exibição
         const dataIdaBR = new Date(dataIda + 'T12:00:00').toLocaleDateString('pt-BR');
         const dataVoltaBR = new Date(dataVolta + 'T12:00:00').toLocaleDateString('pt-BR');
         
@@ -535,6 +589,14 @@ const BenetripDiscovery = {
             return `${stops} paradas`;
         };
 
+        // NOVO v2: Badge de confiabilidade
+        const fonteBadge = (d) => {
+            const count = d._source_count || 1;
+            if (count >= 3) return '<span class="fonte-badge fonte-alta" title="Encontrado em 3 buscas diferentes">⭐ Alta confiança</span>';
+            if (count >= 2) return '<span class="fonte-badge fonte-media" title="Encontrado em 2 buscas diferentes">✓ Confirmado</span>';
+            return '';
+        };
+
         const html = `
             <div class="resultado-header">
                 <h1>🎉 Destinos Perfeitos!</h1>
@@ -543,6 +605,7 @@ const BenetripDiscovery = {
 
             <div class="top-destino">
                 <div class="badge">🏆 MELHOR DESTINO</div>
+                ${fonteBadge(destinos.top_destino)}
                 <h2>${destinos.top_destino.name}, ${destinos.top_destino.country || ''}</h2>
                 <div class="preco">${formatPreco(destinos.top_destino)}</div>
                 <div class="preco-label">Passagem ida e volta por pessoa</div>
@@ -556,6 +619,7 @@ const BenetripDiscovery = {
                 <div class="alternativas-grid">
                     ${destinos.alternativas.map(d => `
                         <div class="destino-card">
+                            ${fonteBadge(d)}
                             <h4>${d.name}${d.country ? ', ' + d.country : ''}</h4>
                             <div class="preco">${formatPreco(d)}</div>
                             <div class="preco-label">ida e volta</div>
@@ -569,6 +633,7 @@ const BenetripDiscovery = {
 
             <div class="surpresa-card">
                 <div class="badge">🎁 SURPRESA</div>
+                ${fonteBadge(destinos.surpresa)}
                 <h3>${destinos.surpresa.name}${destinos.surpresa.country ? ', ' + destinos.surpresa.country : ''}</h3>
                 <div class="preco">${formatPreco(destinos.surpresa)}</div>
                 <div class="preco-label">ida e volta por pessoa</div>
