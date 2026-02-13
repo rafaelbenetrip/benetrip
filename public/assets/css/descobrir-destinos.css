@@ -747,3 +747,99 @@ body {
 .hidden {
     display: none !important;
 }
+
+/* ================================================================
+   BENETRIP - CSS ADICIONAIS para cenários de orçamento
+   Adicionar ao final do descobrir-destinos.css existente
+   ================================================================ */
+
+/* Banner de mensagem nos resultados */
+.resultado-banner {
+    border-radius: 12px;
+    padding: 16px 20px;
+    margin-bottom: 24px;
+    font-family: 'Montserrat', sans-serif;
+    font-size: 0.95rem;
+    line-height: 1.5;
+}
+
+.resultado-banner p {
+    margin: 0;
+}
+
+.banner-info {
+    background: #E8F4FD;
+    border-left: 4px solid #00A3E0;
+    color: #1a5276;
+}
+
+.banner-aviso {
+    background: #FFF3E0;
+    border-left: 4px solid #E87722;
+    color: #7d4e00;
+}
+
+/* Tela "Sem Resultados" */
+.sem-resultados {
+    text-align: center;
+    padding: 40px 20px;
+    max-width: 560px;
+    margin: 0 auto;
+}
+
+.sem-resultados .tripinha-triste {
+    width: 120px;
+    height: auto;
+    margin-bottom: 20px;
+    opacity: 0.9;
+}
+
+.sem-resultados h2 {
+    font-family: 'Poppins', sans-serif;
+    font-weight: 700;
+    font-size: 1.5rem;
+    color: #21272A;
+    margin-bottom: 12px;
+}
+
+.sem-resultados-msg {
+    font-family: 'Montserrat', sans-serif;
+    font-size: 1rem;
+    color: #555;
+    line-height: 1.6;
+    margin-bottom: 28px;
+}
+
+.sem-resultados-dicas {
+    background: #F8F9FA;
+    border-radius: 12px;
+    padding: 20px 24px;
+    text-align: left;
+    margin-bottom: 28px;
+}
+
+.sem-resultados-dicas h3 {
+    font-family: 'Poppins', sans-serif;
+    font-weight: 600;
+    font-size: 1.05rem;
+    color: #21272A;
+    margin: 0 0 14px 0;
+}
+
+.sem-resultados-dicas .dica {
+    font-family: 'Montserrat', sans-serif;
+    font-size: 0.9rem;
+    color: #444;
+    padding: 8px 0;
+    line-height: 1.5;
+    border-bottom: 1px solid #eee;
+}
+
+.sem-resultados-dicas .dica:last-child {
+    border-bottom: none;
+}
+
+.btn-tentar-novamente {
+    display: inline-block;
+    margin-top: 8px;
+}
