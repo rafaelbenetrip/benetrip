@@ -66,19 +66,18 @@ CRITÉRIOS (ordem de prioridade):
    - Amigos → diversão, vida noturna, aventuras em grupo
    - Sozinho → segurança, facilidade, experiências culturais
 2. FONTES: Destinos com 2-3 fontes são mais confiáveis
-3. CUSTO TOTAL: passagem + hotel × ${noites || 7} noites
-4. DIVERSIDADE: Não repita países
 
 REGRAS:
 ✓ Use APENAS IDs da lista (1-${destinos.length})
-✓ "razao" = frase curta explicando POR QUE combina com este viajante
+✓ "razao" = frase explicando POR QUE combina com este viajante
+✓ Nunca repita locais/cidades entre as opções
 ✓ Retorne APENAS JSON válido
 
 JSON:
 {
-  "top_destino": {"id":1,"razao":"frase personalizada"},
-  "alternativas": [{"id":2,"razao":"frase"},{"id":3,"razao":"frase"},{"id":4,"razao":"frase"}],
-  "surpresa": {"id":5,"razao":"frase surpreendente"}
+  "top_destino": {"id":1,"razões da escolha com base nas preferencias":"frase personalizada"},
+  "alternativas": [{"id":2,"razões principais":"frase"},{"id":3,"razões principais":"frase"},{"id":4,"razões principais":"frase"}],
+  "surpresa": {"id":5,"razões da escolha com base nas preferencias":"frase surpreendente"}
 }`;
 
         // ============================================================
