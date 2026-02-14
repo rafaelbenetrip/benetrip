@@ -88,7 +88,7 @@
                         <input type="hidden" id="companhia" required>
                     </div>
 
-                    <!-- 2.1 Número de pessoas (condicional para família/amigos) -->
+                    <!-- 2.1 Número de pessoas (condicional para amigos) -->
                     <div class="form-group conditional" id="num-pessoas-group" style="display: none;">
                         <label for="num-pessoas">Quantas pessoas?</label>
                         <p class="hint">Inclua todos, inclusive você!</p>
@@ -99,11 +99,69 @@
                         </div>
                     </div>
 
-                    <!-- 3. Preferências de viagem -->
+                    <!-- 2.2 Detalhes família (condicional para família) -->
+                    <div class="form-group conditional" id="familia-group" style="display: none;">
+                        <label>👨‍👩‍👧‍👦 Detalhes da família</label>
+                        <p class="hint">Informe a composição da família para encontrarmos os melhores destinos e preços</p>
+                        
+                        <div class="familia-grid">
+                            <!-- Adultos -->
+                            <div class="familia-item">
+                                <div class="familia-label">
+                                    <span class="familia-emoji">🧑</span>
+                                    <div>
+                                        <strong>Adultos</strong>
+                                        <small>12+ anos</small>
+                                    </div>
+                                </div>
+                                <div class="number-input-compact">
+                                    <button type="button" class="btn-number-sm" data-target="familia-adultos" data-action="decrement">−</button>
+                                    <input type="number" id="familia-adultos" value="2" min="1" max="9" readonly>
+                                    <button type="button" class="btn-number-sm" data-target="familia-adultos" data-action="increment">+</button>
+                                </div>
+                            </div>
+
+                            <!-- Crianças -->
+                            <div class="familia-item">
+                                <div class="familia-label">
+                                    <span class="familia-emoji">👧</span>
+                                    <div>
+                                        <strong>Crianças</strong>
+                                        <small>2–11 anos</small>
+                                    </div>
+                                </div>
+                                <div class="number-input-compact">
+                                    <button type="button" class="btn-number-sm" data-target="familia-criancas" data-action="decrement">−</button>
+                                    <input type="number" id="familia-criancas" value="0" min="0" max="6" readonly>
+                                    <button type="button" class="btn-number-sm" data-target="familia-criancas" data-action="increment">+</button>
+                                </div>
+                            </div>
+
+                            <!-- Bebês -->
+                            <div class="familia-item">
+                                <div class="familia-label">
+                                    <span class="familia-emoji">👶</span>
+                                    <div>
+                                        <strong>Bebês</strong>
+                                        <small>0–1 ano (no colo)</small>
+                                    </div>
+                                </div>
+                                <div class="number-input-compact">
+                                    <button type="button" class="btn-number-sm" data-target="familia-bebes" data-action="decrement">−</button>
+                                    <input type="number" id="familia-bebes" value="0" min="0" max="4" readonly>
+                                    <button type="button" class="btn-number-sm" data-target="familia-bebes" data-action="increment">+</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <p class="hint familia-hint" id="familia-total-hint">Total: 2 passageiros</p>
+                    </div>
+
+                    <!-- 3. Preferências de viagem (MULTI-SELECT) -->
                     <div class="form-group">
                         <label>🎯 O que você mais busca nessa viagem?</label>
-                        <p class="hint">Escolha o que é mais importante para você</p>
-                        <div class="button-group" data-field="preferencias">
+                        <p class="hint">Escolha uma ou mais opções</p>
+                        <div class="button-group multi-select" data-field="preferencias" data-multi="true">
                             <button type="button" class="btn-option" data-value="relax">
                                 <span class="emoji">🌊</span>
                                 <span class="text">Relax total</span>
@@ -128,6 +186,23 @@
                         <input type="hidden" id="preferencias" required>
                     </div>
 
+                    <!-- 3.1 Destinos internacionais ou tanto faz? -->
+                    <div class="form-group">
+                        <label>🌍 Destinos internacionais ou nacionais?</label>
+                        <p class="hint">Prefere sair do país ou tanto faz?</p>
+                        <div class="button-group button-group-full" data-field="escopo-destino">
+                            <button type="button" class="btn-option btn-full" data-value="tanto_faz">
+                                <span class="emoji">🗺️</span>
+                                <span class="text">Tanto faz — surpreenda-me!</span>
+                            </button>
+                            <button type="button" class="btn-option btn-full" data-value="internacional">
+                                <span class="emoji">✈️</span>
+                                <span class="text">Apenas destinos internacionais</span>
+                            </button>
+                        </div>
+                        <input type="hidden" id="escopo-destino" value="tanto_faz">
+                    </div>
+
                     <!-- 4. Datas -->
                     <div class="form-group">
                         <label for="datas">📅 Quando será a sua viagem?</label>
@@ -143,7 +218,7 @@
                         <input type="hidden" id="data-volta">
                     </div>
 
-                    <!-- 5. Moeda (sempre visível) -->
+                    <!-- 5. Moeda -->
                     <div class="form-group" id="moeda-group">
                         <label>💰 Qual moeda você prefere usar?</label>
                         <p class="hint">Escolha a moeda para definir seu orçamento</p>
@@ -164,10 +239,10 @@
                         <input type="hidden" id="moeda" required>
                     </div>
 
-                    <!-- 6. Orçamento (sempre visível) -->
+                    <!-- 6. Orçamento -->
                     <div class="form-group" id="orcamento-group">
                         <label for="orcamento">💸 Qual é o seu orçamento para passagens por pessoa?</label>
-                        <p class="hint">Valor para ida e volta</p>
+                        <p class="hint">Valor para ida e volta (por adulto)</p>
                         <div class="currency-input-wrapper">
                             <span class="currency-symbol">R$</span>
                             <input 
