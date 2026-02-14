@@ -1,13 +1,13 @@
 [
     {
-        "question": "1️⃣ De onde você partirá?",
-        "description": "Digite apenas o nome da cidade de onde você vai sair.",
+        "question": "1️⃣ De onde você vai sair?",
+        "description": "Digite o nome da cidade e selecione o aeroporto.",
         "options": null,
         "input_field": true,
         "autocomplete": true,
         "key": "cidade_partida"
     },
-    
+
     {
         "question": "2️⃣ Com quem você vai viajar?",
         "description": "Escolha quem estará com você nessa aventura.",
@@ -19,20 +19,24 @@
         ],
         "key": "companhia"
     },
-    
+
     {
-        "question": "2️⃣.1️⃣ Quantas pessoas estão na sua família para esta viagem?",
-        "description": "Inclua todos, inclusive você!",
-        "input_field": true,
-        "numeric_only": true,
-        "number_input": true,
+        "question": "2️⃣.1️⃣ Detalhes da família",
+        "description": "Informe a composição da família para encontrarmos os melhores destinos e preços.",
+        "family_input": true,
+        "fields": {
+            "adultos": { "label": "Adultos (12+ anos)", "min": 1, "max": 9, "default": 2 },
+            "criancas": { "label": "Crianças (2–11 anos)", "min": 0, "max": 6, "default": 0 },
+            "bebes": { "label": "Bebês (0–1 ano, no colo)", "min": 0, "max": 4, "default": 0 }
+        },
+        "validation": "bebes <= adultos",
         "conditional": {
             "depends_on": "companhia",
             "show_if_value": 2
         },
-        "key": "quantidade_familia"
+        "key": "composicao_familia"
     },
-    
+
     {
         "question": "2️⃣.1️⃣ Quantos amigos vão nessa aventura, incluindo você?",
         "description": "Me diga o número total de pessoas da turma! 🐶🎒",
@@ -45,19 +49,40 @@
         },
         "key": "quantidade_amigos"
     },
-    
+
     {
         "question": "3️⃣ O que você mais busca nessa viagem?",
-        "description": "Escolha o que é mais importante para você.",
+        "description": "Escolha uma ou mais opções que combinam com você.",
+        "multi_select": true,
         "options": [
             "🌊 Relax total – Descansar, aproveitar sem pressa e recarregar as energias",
             "🏔️ Aventura e emoção – Trilhar, explorar e sentir a adrenalina.",
             "🏛️ Cultura e história – Mergulhar em tradições, arte e sabores locais.",
             "🏙️ Agito urbano – Ruas movimentadas, vida noturna e muita energia."
         ],
+        "value_map": {
+            "🌊 Relax total – Descansar, aproveitar sem pressa e recarregar as energias": "relax",
+            "🏔️ Aventura e emoção – Trilhar, explorar e sentir a adrenalina.": "aventura",
+            "🏛️ Cultura e história – Mergulhar em tradições, arte e sabores locais.": "cultura",
+            "🏙️ Agito urbano – Ruas movimentadas, vida noturna e muita energia.": "urbano"
+        },
         "key": "preferencia_viagem"
     },
-    
+
+    {
+        "question": "3️⃣.1️⃣ Destinos internacionais ou nacionais?",
+        "description": "Prefere sair do país ou tanto faz?",
+        "options": [
+            "🗺️ Tanto faz — surpreenda-me!",
+            "✈️ Apenas destinos internacionais"
+        ],
+        "value_map": {
+            "🗺️ Tanto faz — surpreenda-me!": "tanto_faz",
+            "✈️ Apenas destinos internacionais": "internacional"
+        },
+        "key": "escopo_destino"
+    },
+
     {
         "question": "4️⃣ Quando será a sua viagem?",
         "description": "Selecione a data de ida e volta.",
@@ -68,7 +93,7 @@
         "date_format": "YYYY-MM-DD",
         "key": "datas"
     },
-    
+
     {
         "question": "5️⃣ Qual moeda você prefere usar para o orçamento?",
         "description": "Escolha a moeda para definir seu orçamento de viagem.",
@@ -78,16 +103,16 @@
             "💶 Euro (EUR)"
         ],
         "currency_map": {
+            "💰 Real Brasileiro (BRL)": "BRL",
             "💵 Dólar Americano (USD)": "USD",
-            "💶 Euro (EUR)": "EUR",
-            "💰 Real Brasileiro (BRL)": "BRL"
+            "💶 Euro (EUR)": "EUR"
         },
         "key": "moeda_escolhida"
     },
-    
+
     {
-        "question": "6️⃣ Qual é o seu orçamento para passagens por pessoa?",
-        "description": "Informe o valor que deseja gastar com passagens por pessoa para ida e volta.",
+        "question": "6️⃣ Qual é o seu orçamento para passagens por adulto?",
+        "description": "Informe o valor que deseja gastar com passagens por adulto para ida e volta.",
         "input_field": true,
         "currency_format": true,
         "key": "orcamento_valor"
