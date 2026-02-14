@@ -1,6 +1,9 @@
-// api/rank-destinations.js - VERSÃO TRIPLE SEARCH v2.1
-// Recebe destinos consolidados das 3 buscas e ranqueia com LLM
-// NOVO: Comentários ricos com contexto de datas/estação, dicas práticas
+// api/rank-destinations.js - VERSÃO TRIPLE SEARCH v3.0
+// Recebe destinos consolidados e ranqueia com LLM
+// NOVO v3.0:
+// - Recebe adultos/crianças/bebês separados → prompt adaptado para famílias
+// - Preferências múltiplas → prompt combina estilos de viagem
+// - Comentários ricos com contexto de datas/estação, dicas práticas
 // Fallback: Groq llama-3.3-70b → llama-3.1-8b → ranking por preço
 
 export default async function handler(req, res) {
@@ -11,7 +14,11 @@ export default async function handler(req, res) {
     if (req.method === 'OPTIONS') return res.status(200).end();
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-    const { destinos, preferencias, companhia, numPessoas, noites, orcamento, moeda, dataIda, dataVolta } = req.body;
+    const { 
+        destinos, preferencias, companhia, numPessoas, 
+        adultos, criancas, bebes,
+        noites, orcamento, moeda, dataIda, dataVolta 
+    } = req.body;
 
     if (!destinos || !Array.isArray(destinos) || destinos.length === 0) {
         return res.status(400).json({
@@ -27,9 +34,12 @@ export default async function handler(req, res) {
 
     try {
         console.log(`🤖 Ranqueando ${destinos.length} destinos | ${companhia} | ${preferencias} | ${moeda || 'BRL'} ${orcamento}`);
+        if (criancas > 0 || bebes > 0) {
+            console.log(`👨‍👩‍👧‍👦 Família: ${adultos} adultos, ${criancas} crianças, ${bebes} bebês`);
+        }
 
         // ============================================================
-        // DETECTAR ESTAÇÃO DO ANO no destino (baseado no hemisfério)
+        // DETECTAR ESTAÇÃO DO ANO
         // ============================================================
         const mesViagem = dataIda ? new Date(dataIda + 'T12:00:00').getMonth() + 1 : null;
         const estacaoInfo = mesViagem ? getSeasonContext(mesViagem) : '';
@@ -52,19 +62,42 @@ export default async function handler(req, res) {
         }).join('\n');
 
         // ============================================================
-        // PROMPT ENRIQUECIDO COM CONTEXTO DE DATAS E ESTAÇÃO
+        // CONTEXTO DE PASSAGEIROS (famílias com crianças/bebês)
+        // ============================================================
+        let passageirosInfo = `${numPessoas || 1} pessoa(s)`;
+        let restricoesFamilia = '';
+        
+        if ((criancas || 0) > 0 || (bebes || 0) > 0) {
+            const parts = [`${adultos || 1} adulto(s)`];
+            if (criancas > 0) parts.push(`${criancas} criança(s) de 2-11 anos`);
+            if (bebes > 0) parts.push(`${bebes} bebê(s) de 0-1 ano`);
+            passageirosInfo = parts.join(', ');
+            
+            restricoesFamilia = `
+ATENÇÃO ESPECIAL - VIAGEM COM CRIANÇAS/BEBÊS:
+- Priorize destinos com BOA INFRAESTRUTURA para famílias com crianças pequenas
+- Evite destinos que exigem longas caminhadas ou acesso difícil com carrinhos
+- Considere destinos com hospitais/clínicas acessíveis
+- Voos diretos ou com poucas paradas são PREFERÍVEIS (viagem longa com crianças é cansativa)
+${bebes > 0 ? '- BEBÊ(S) NO COLO: priorize destinos com boa estrutura de saúde e clima ameno' : ''}
+${criancas > 0 ? '- CRIANÇAS: considere destinos com atividades interativas e parques' : ''}`;
+        }
+
+        // ============================================================
+        // PROMPT ENRIQUECIDO
         // ============================================================
         const prompt = `ESPECIALISTA EM TURISMO - Seleção personalizada de destinos
 
 PERFIL DO VIAJANTE:
 - Companhia: ${companhia || 'Não informado'}
-- Número de pessoas: ${numPessoas || 1}
+- Passageiros: ${passageirosInfo}
 - O que busca: ${preferencias || 'Não informado'}
 - Duração: ${noites || '?'} noites
-- Orçamento PASSAGENS (ida+volta/pessoa): ${simboloMoeda} ${orcamento}
+- Orçamento PASSAGENS (ida+volta/adulto): ${simboloMoeda} ${orcamento}
 - Moeda: ${nomeMoeda}
 ${dataIda ? `- Período: ${dataIda} a ${dataVolta || '?'}` : ''}
 ${estacaoInfo ? `- Contexto sazonal: ${estacaoInfo}` : ''}
+${restricoesFamilia}
 
 DESTINOS PRÉ-FILTRADOS (já dentro do orçamento):
 Formato: ID|Nome|País|Aeroporto|Passagem ida+volta|Paradas|Fontes|Hotel/noite
@@ -77,10 +110,10 @@ Para CADA destino selecionado, gere:
 2. "comentario": texto de 2-3 frases descrevendo o destino considerando:
    - A estação do ano / clima esperado no período da viagem
    - Atividades e experiências alinhadas com "${preferencias}"
-   - Adequação para ${companhia}
+   - Adequação para ${companhia}${(criancas > 0 || bebes > 0) ? ' (com crianças/bebês!)' : ''}
    - Use tom amigável e entusiasmado (estilo guia de viagens descolado)
 3. "dica": uma dica prática e útil para quem vai viajar para lá nesse período
-   (ex: "Reserve ingressos online com antecedência" ou "O bairro X tem os melhores restaurantes")
+   ${(criancas > 0 || bebes > 0) ? '(inclua dicas relevantes para viagem com crianças quando pertinente)' : ''}
 
 ESTRUTURA DE SELEÇÃO:
 1. MELHOR DESTINO - melhor match com perfil + custo-benefício
@@ -89,7 +122,8 @@ ESTRUTURA DE SELEÇÃO:
 
 CRITÉRIOS (ordem de prioridade):
 1. MATCH COM PERFIL: Combina com "${preferencias}"? Adequado para ${companhia}?
-   - Família → segurança, infraestrutura, atividades para crianças
+   - Família com crianças → segurança, infraestrutura, atividades para crianças, voos curtos
+   - Família com bebês → infraestrutura de saúde, clima ameno, facilidade de acesso
    - Casal → romance, gastronomia, cenários bonitos
    - Amigos → diversão, vida noturna, aventuras em grupo
    - Sozinho → segurança, facilidade, experiências culturais
@@ -97,6 +131,7 @@ CRITÉRIOS (ordem de prioridade):
 3. FONTES: Destinos com 2-3 fontes são mais confiáveis
 4. CUSTO TOTAL: passagem + hotel × ${noites || 7} noites
 5. DIVERSIDADE: Não repita países
+${(criancas > 0 || bebes > 0) ? '6. LOGÍSTICA FAMILIAR: Prefira voos diretos ou com menos paradas' : ''}
 
 REGRAS:
 ✓ Use APENAS IDs da lista (1-${destinos.length})
@@ -134,7 +169,7 @@ JSON:
                         messages: [
                             {
                                 role: 'system',
-                                content: 'Você é um especialista em turismo brasileiro. Retorna APENAS JSON válido em português do Brasil. Zero texto extra. IDs referem a destinos da lista fornecida. Seus comentários são entusiasmados mas informativos, como um guia de viagens descolado.'
+                                content: 'Você é um especialista em turismo brasileiro. Retorna APENAS JSON válido em português do Brasil. Zero texto extra. IDs referem a destinos da lista fornecida. Seus comentários são entusiasmados mas informativos, como um guia de viagens descolado. Quando a viagem inclui crianças ou bebês, sempre considere segurança e praticidade nas recomendações.'
                             },
                             { role: 'user', content: prompt }
                         ],
@@ -178,9 +213,6 @@ JSON:
 
         // ============================================================
         // VALIDAR E HIDRATAR COM DADOS ORIGINAIS
-        // Os IDs do LLM apontam para destinos na lista original.
-        // SEMPRE sobrescrever dados numéricos com os originais (evita alucinação).
-        // Manter textos gerados pelo LLM (razao, comentario, dica).
         // ============================================================
         const hydrateById = (item, label) => {
             if (!item || !item.id) throw new Error(`${label}: sem ID`);
@@ -204,7 +236,6 @@ JSON:
                 return_date: original.return_date,
                 _sources: original._sources,
                 _source_count: original._source_count,
-                // Textos do LLM (não são dados numéricos, OK manter)
                 razao: item.razao || 'Selecionado pela Tripinha 🐶',
                 comentario: item.comentario || '',
                 dica: item.dica || '',
@@ -226,7 +257,6 @@ JSON:
             return res.status(200).json(rankByPrice(destinos, orcamento));
         }
 
-        // Adicionar metadados
         ranking._model = usedModel;
         ranking._totalAnalisados = destinos.length;
 
@@ -243,10 +273,9 @@ JSON:
 }
 
 // ============================================================
-// CONTEXTO SAZONAL: Gera info sobre a estação para o LLM
+// CONTEXTO SAZONAL
 // ============================================================
 function getSeasonContext(mes) {
-    // Meses e estações (considerando ambos hemisférios)
     const info = {
         1:  'Janeiro: verão no hemisfério sul (praias lotadas, férias escolares), inverno rigoroso no hemisfério norte (neve, esportes de inverno)',
         2:  'Fevereiro: verão/carnaval no hemisfério sul, inverno no hemisfério norte (ainda frio, bom para neve)',
