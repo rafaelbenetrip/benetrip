@@ -1,6 +1,10 @@
-// api/rank-destinations.js - VERSÃO TRIPLE SEARCH v3.0
+// api/rank-destinations.js - VERSÃO TRIPLE SEARCH v3.1
 // Recebe destinos consolidados e ranqueia com LLM
-// NOVO v3.0:
+// v3.1:
+// - NUNCA repete destinos (deduplicação pós-LLM)
+// - Adapta estrutura ao número de destinos disponíveis (<5)
+// - Mensagem de "poucos resultados" quando aplicável
+// v3.0:
 // - Recebe adultos/crianças/bebês separados → prompt adaptado para famílias
 // - Preferências múltiplas → prompt combina estilos de viagem
 // - Comentários ricos com contexto de datas/estação, dicas práticas
@@ -33,10 +37,25 @@ export default async function handler(req, res) {
     }
 
     try {
-        console.log(`🤖 Ranqueando ${destinos.length} destinos | ${companhia} | ${preferencias} | ${moeda || 'BRL'} ${orcamento}`);
+        const totalDestinos = destinos.length;
+        console.log(`🤖 Ranqueando ${totalDestinos} destinos | ${companhia} | ${preferencias} | ${moeda || 'BRL'} ${orcamento}`);
         if (criancas > 0 || bebes > 0) {
             console.log(`👨‍👩‍👧‍👦 Família: ${adultos} adultos, ${criancas} crianças, ${bebes} bebês`);
         }
+
+        // ============================================================
+        // DETERMINAR ESTRUTURA BASEADA NO NÚMERO DE DESTINOS
+        // 1 destino  → só top_destino
+        // 2 destinos → top_destino + 1 alternativa
+        // 3 destinos → top_destino + 2 alternativas
+        // 4 destinos → top_destino + 3 alternativas
+        // 5+ destinos → top_destino + 3 alternativas + surpresa
+        // ============================================================
+        const numAlternativas = Math.min(3, totalDestinos - 1);
+        const temSurpresa = totalDestinos >= 5;
+        const totalSelecionados = 1 + numAlternativas + (temSurpresa ? 1 : 0);
+        
+        console.log(`📊 Estrutura: top(1) + alt(${numAlternativas}) + surpresa(${temSurpresa ? 1 : 0}) = ${totalSelecionados} de ${totalDestinos} disponíveis`);
 
         // ============================================================
         // DETECTAR ESTAÇÃO DO ANO
@@ -84,6 +103,62 @@ ${criancas > 0 ? '- CRIANÇAS: considere destinos com atividades interativas e p
         }
 
         // ============================================================
+        // ESTRUTURA JSON DINÂMICA PARA O PROMPT
+        // ============================================================
+        let estruturaJSON = '';
+        let estruturaInstrucao = '';
+
+        if (totalDestinos === 1) {
+            estruturaInstrucao = `Há APENAS 1 destino disponível. Retorne só o top_destino.`;
+            estruturaJSON = `{
+  "top_destino": {"id":1,"razao":"frase curta","comentario":"2-3 frases descritivas","dica":"dica prática"},
+  "alternativas": [],
+  "surpresa": null
+}`;
+        } else if (totalDestinos === 2) {
+            estruturaInstrucao = `Há APENAS 2 destinos disponíveis. Retorne top_destino + 1 alternativa. SEM surpresa.`;
+            estruturaJSON = `{
+  "top_destino": {"id":?,"razao":"frase curta","comentario":"2-3 frases descritivas","dica":"dica prática"},
+  "alternativas": [
+    {"id":?,"razao":"frase","comentario":"descrição","dica":"dica"}
+  ],
+  "surpresa": null
+}`;
+        } else if (totalDestinos === 3) {
+            estruturaInstrucao = `Há APENAS 3 destinos disponíveis. Retorne top_destino + 2 alternativas. SEM surpresa.`;
+            estruturaJSON = `{
+  "top_destino": {"id":?,"razao":"frase curta","comentario":"2-3 frases descritivas","dica":"dica prática"},
+  "alternativas": [
+    {"id":?,"razao":"frase","comentario":"descrição","dica":"dica"},
+    {"id":?,"razao":"frase","comentario":"descrição","dica":"dica"}
+  ],
+  "surpresa": null
+}`;
+        } else if (totalDestinos === 4) {
+            estruturaInstrucao = `Há APENAS 4 destinos disponíveis. Retorne top_destino + 3 alternativas. SEM surpresa.`;
+            estruturaJSON = `{
+  "top_destino": {"id":?,"razao":"frase curta","comentario":"2-3 frases descritivas","dica":"dica prática"},
+  "alternativas": [
+    {"id":?,"razao":"frase","comentario":"descrição","dica":"dica"},
+    {"id":?,"razao":"frase","comentario":"descrição","dica":"dica"},
+    {"id":?,"razao":"frase","comentario":"descrição","dica":"dica"}
+  ],
+  "surpresa": null
+}`;
+        } else {
+            estruturaInstrucao = `Selecione os 5 melhores destinos: 1 top + 3 alternativas + 1 surpresa.`;
+            estruturaJSON = `{
+  "top_destino": {"id":1,"razao":"frase curta","comentario":"2-3 frases descritivas","dica":"dica prática"},
+  "alternativas": [
+    {"id":2,"razao":"frase","comentario":"descrição","dica":"dica"},
+    {"id":3,"razao":"frase","comentario":"descrição","dica":"dica"},
+    {"id":4,"razao":"frase","comentario":"descrição","dica":"dica"}
+  ],
+  "surpresa": {"id":5,"razao":"frase surpreendente","comentario":"descrição","dica":"dica"}
+}`;
+        }
+
+        // ============================================================
         // PROMPT ENRIQUECIDO
         // ============================================================
         const prompt = `ESPECIALISTA EM TURISMO - Seleção personalizada de destinos
@@ -103,7 +178,7 @@ DESTINOS PRÉ-FILTRADOS (já dentro do orçamento):
 Formato: ID|Nome|País|Aeroporto|Passagem ida+volta|Paradas|Fontes|Hotel/noite
 ${listaCompacta}
 
-TAREFA: Com base no PERFIL, escolha os 5 que MAIS combinam com este viajante.
+TAREFA: ${estruturaInstrucao}
 
 Para CADA destino selecionado, gere:
 1. "razao": frase curta (1 linha) explicando POR QUE combina com este viajante
@@ -115,10 +190,10 @@ Para CADA destino selecionado, gere:
 3. "dica": uma dica prática e útil para quem vai viajar para lá nesse período
    ${(criancas > 0 || bebes > 0) ? '(inclua dicas relevantes para viagem com crianças quando pertinente)' : ''}
 
-ESTRUTURA DE SELEÇÃO:
+${totalDestinos >= 5 ? `ESTRUTURA DE SELEÇÃO:
 1. MELHOR DESTINO - melhor match com perfil + custo-benefício
 2. 3 ALTERNATIVAS - diversifique países e experiências
-3. 1 SURPRESA - destino inesperado que encantaria este viajante
+3. 1 SURPRESA - destino inesperado que encantaria este viajante` : ''}
 
 CRITÉRIOS (ordem de prioridade):
 1. MATCH COM PERFIL: Combina com "${preferencias}"? Adequado para ${companhia}?
@@ -134,20 +209,15 @@ CRITÉRIOS (ordem de prioridade):
 ${(criancas > 0 || bebes > 0) ? '6. LOGÍSTICA FAMILIAR: Prefira voos diretos ou com menos paradas' : ''}
 
 REGRAS:
-✓ Use APENAS IDs da lista (1-${destinos.length})
+✓ Use APENAS IDs da lista (1-${totalDestinos})
+✓ ⚠️ REGRA ABSOLUTA: NUNCA repita o mesmo ID. Cada destino só pode aparecer UMA VEZ. TODOS os IDs devem ser DIFERENTES entre si.
 ✓ Escreva "comentario" e "dica" em português brasileiro
 ✓ Retorne APENAS JSON válido
+${totalDestinos < 5 ? `✓ São apenas ${totalDestinos} destinos disponíveis — use TODOS eles, sem repetir.` : ''}
+${!temSurpresa ? '✓ "surpresa" deve ser null (poucos destinos disponíveis)' : ''}
 
 JSON:
-{
-  "top_destino": {"id":1,"razao":"frase curta","comentario":"2-3 frases descritivas","dica":"dica prática"},
-  "alternativas": [
-    {"id":2,"razao":"frase","comentario":"descrição","dica":"dica"},
-    {"id":3,"razao":"frase","comentario":"descrição","dica":"dica"},
-    {"id":4,"razao":"frase","comentario":"descrição","dica":"dica"}
-  ],
-  "surpresa": {"id":5,"razao":"frase surpreendente","comentario":"descrição","dica":"dica"}
-}`;
+${estruturaJSON}`;
 
         // ============================================================
         // TENTAR MODELOS EM CASCATA
@@ -169,7 +239,7 @@ JSON:
                         messages: [
                             {
                                 role: 'system',
-                                content: 'Você é um especialista em turismo brasileiro. Retorna APENAS JSON válido em português do Brasil. Zero texto extra. IDs referem a destinos da lista fornecida. Seus comentários são entusiasmados mas informativos, como um guia de viagens descolado. Quando a viagem inclui crianças ou bebês, sempre considere segurança e praticidade nas recomendações.'
+                                content: 'Você é um especialista em turismo brasileiro. Retorna APENAS JSON válido em português do Brasil. Zero texto extra. IDs referem a destinos da lista fornecida. NUNCA repita o mesmo ID — cada destino deve aparecer apenas uma vez no resultado. Se "surpresa" deve ser null, retorne null. Seus comentários são entusiasmados mas informativos, como um guia de viagens descolado. Quando a viagem inclui crianças ou bebês, sempre considere segurança e praticidade nas recomendações.'
                             },
                             { role: 'user', content: prompt }
                         ],
@@ -212,7 +282,7 @@ JSON:
         }
 
         // ============================================================
-        // VALIDAR E HIDRATAR COM DADOS ORIGINAIS
+        // VALIDAR, DEDUPLICAR E HIDRATAR COM DADOS ORIGINAIS
         // ============================================================
         const hydrateById = (item, label) => {
             if (!item || !item.id) throw new Error(`${label}: sem ID`);
@@ -243,15 +313,79 @@ JSON:
         };
 
         try {
-            ranking.top_destino = hydrateById(ranking.top_destino, 'top_destino');
-            ranking.surpresa = hydrateById(ranking.surpresa, 'surpresa');
+            // ============================================================
+            // DEDUPLICAÇÃO PÓS-LLM
+            // Se o LLM repetiu IDs, removemos duplicatas
+            // ============================================================
+            const usedIds = new Set();
 
-            if (!Array.isArray(ranking.alternativas) || ranking.alternativas.length < 3) {
-                throw new Error('Mínimo 3 alternativas');
+            // 1. Top destino (sempre tem)
+            ranking.top_destino = hydrateById(ranking.top_destino, 'top_destino');
+            usedIds.add(ranking.top_destino.id);
+
+            // 2. Alternativas (remover duplicatas)
+            const rawAlternativas = Array.isArray(ranking.alternativas) ? ranking.alternativas : [];
+            const dedupedAlternativas = [];
+            for (const alt of rawAlternativas) {
+                if (!alt || !alt.id || usedIds.has(alt.id)) {
+                    console.warn(`⚠️ Alternativa duplicada ou inválida removida: ID ${alt?.id}`);
+                    continue;
+                }
+                try {
+                    const hydrated = hydrateById(alt, `alternativa`);
+                    dedupedAlternativas.push(hydrated);
+                    usedIds.add(alt.id);
+                } catch (e) {
+                    console.warn(`⚠️ Alternativa ID ${alt.id} inválida:`, e.message);
+                }
             }
-            ranking.alternativas = ranking.alternativas.slice(0, 3).map((alt, i) =>
-                hydrateById(alt, `alternativa ${i + 1}`)
-            );
+            ranking.alternativas = dedupedAlternativas.slice(0, 3);
+
+            // 3. Surpresa (remover se duplicata ou null)
+            if (ranking.surpresa && ranking.surpresa.id && !usedIds.has(ranking.surpresa.id)) {
+                try {
+                    ranking.surpresa = hydrateById(ranking.surpresa, 'surpresa');
+                    usedIds.add(ranking.surpresa.id);
+                } catch (e) {
+                    console.warn(`⚠️ Surpresa ID ${ranking.surpresa.id} inválida:`, e.message);
+                    ranking.surpresa = null;
+                }
+            } else {
+                if (ranking.surpresa?.id && usedIds.has(ranking.surpresa.id)) {
+                    console.warn(`⚠️ Surpresa duplicada removida: ID ${ranking.surpresa.id}`);
+                }
+                ranking.surpresa = null;
+            }
+
+            // ============================================================
+            // TENTAR PREENCHER SLOTS VAZIOS com destinos não usados
+            // (caso o LLM tenha repetido e perdemos slots)
+            // ============================================================
+            const maxAlternativas = Math.min(3, totalDestinos - 1);
+            if (ranking.alternativas.length < maxAlternativas || (temSurpresa && !ranking.surpresa)) {
+                const unusedDestinos = destinos
+                    .map((d, i) => ({ ...d, _idx: i + 1 }))
+                    .filter(d => !usedIds.has(d._idx))
+                    .sort((a, b) => (a.flight?.price || Infinity) - (b.flight?.price || Infinity));
+
+                // Preencher alternativas faltantes
+                while (ranking.alternativas.length < maxAlternativas && unusedDestinos.length > 0) {
+                    const next = unusedDestinos.shift();
+                    const hydrated = hydrateById({ id: next._idx, razao: 'Opção dentro do orçamento', comentario: '', dica: '' }, 'alternativa_fill');
+                    ranking.alternativas.push(hydrated);
+                    usedIds.add(next._idx);
+                    console.log(`🔄 Alternativa preenchida com ID ${next._idx} (${next.name})`);
+                }
+
+                // Preencher surpresa se necessário e possível
+                if (temSurpresa && !ranking.surpresa && unusedDestinos.length > 0) {
+                    const next = unusedDestinos.shift();
+                    ranking.surpresa = hydrateById({ id: next._idx, razao: 'Uma opção diferente para explorar! 🎁', comentario: '', dica: '' }, 'surpresa_fill');
+                    usedIds.add(next._idx);
+                    console.log(`🔄 Surpresa preenchida com ID ${next._idx} (${next.name})`);
+                }
+            }
+
         } catch (validationError) {
             console.error('❌ Validação falhou:', validationError.message);
             return res.status(200).json(rankByPrice(destinos, orcamento));
@@ -259,10 +393,18 @@ JSON:
 
         ranking._model = usedModel;
         ranking._totalAnalisados = destinos.length;
+        ranking._poucosResultados = totalDestinos < 5;
 
         console.log(`🏆 ${ranking.top_destino.name} (${simboloMoeda}${ranking.top_destino.flight?.price}) [${ranking.top_destino._source_count} fontes]`);
-        console.log(`📋 ${ranking.alternativas.map(a => `${a.name}(${simboloMoeda}${a.flight?.price})`).join(', ')}`);
-        console.log(`🎁 ${ranking.surpresa.name} (${simboloMoeda}${ranking.surpresa.flight?.price})`);
+        if (ranking.alternativas.length > 0) {
+            console.log(`📋 ${ranking.alternativas.map(a => `${a.name}(${simboloMoeda}${a.flight?.price})`).join(', ')}`);
+        }
+        if (ranking.surpresa) {
+            console.log(`🎁 ${ranking.surpresa.name} (${simboloMoeda}${ranking.surpresa.flight?.price})`);
+        }
+        if (totalDestinos < 5) {
+            console.log(`⚠️ Poucos destinos disponíveis (${totalDestinos}): estrutura reduzida`);
+        }
 
         return res.status(200).json(ranking);
 
@@ -295,6 +437,7 @@ function getSeasonContext(mes) {
 
 // ============================================================
 // FALLBACK: Ranking simples por preço (sem LLM)
+// Agora também respeita limite de destinos disponíveis
 // ============================================================
 function rankByPrice(destinos, orcamento) {
     const comPreco = destinos.filter(d => d.flight?.price > 0);
@@ -309,22 +452,31 @@ function rankByPrice(destinos, orcamento) {
 
     pool.sort((a, b) => a.flight.price - b.flight.price);
 
+    // Deduplicação: não repetir destinos
     const selected = [];
-    const usedCountries = new Set();
+    const usedNames = new Set();
 
     for (const d of pool) {
         if (selected.length >= 5) break;
+        const key = `${(d.name || '').toLowerCase()}_${(d.country || '').toLowerCase()}`;
+        if (usedNames.has(key)) continue;
+        
         const countryCount = selected.filter(s => s.country === d.country).length;
         if (countryCount < 2) {
             selected.push(d);
-            usedCountries.add(d.country);
+            usedNames.add(key);
         }
     }
 
+    // Se não completou 5, preencher sem repetir
     if (selected.length < 5) {
         for (const d of pool) {
             if (selected.length >= 5) break;
-            if (!selected.includes(d)) selected.push(d);
+            const key = `${(d.name || '').toLowerCase()}_${(d.country || '').toLowerCase()}`;
+            if (!usedNames.has(key)) {
+                selected.push(d);
+                usedNames.add(key);
+            }
         }
     }
 
@@ -350,12 +502,15 @@ function buildFallbackResult(selected, orcamento) {
         dica: '',
     });
 
+    const totalDisponivel = selected.length;
+    const poucosResultados = totalDisponivel < 5;
+
     return {
         top_destino: selected[0] ? wrap(selected[0], 'Melhor preço encontrado! 🐶') : null,
-        alternativas: selected.slice(1, 4).map(d => wrap(d, 'Boa opção de preço')),
-        surpresa: selected[4] ? wrap(selected[4], 'Uma opção diferente para explorar! 🎁') : (selected[0] ? wrap(selected[0], 'Única opção disponível') : null),
+        alternativas: selected.slice(1, Math.min(4, totalDisponivel)).map(d => wrap(d, 'Boa opção de preço')),
+        surpresa: (totalDisponivel >= 5 && selected[4]) ? wrap(selected[4], 'Uma opção diferente para explorar! 🎁') : null,
         _model: 'fallback_price',
-        _totalAnalisados: selected.length,
+        _totalAnalisados: totalDisponivel,
+        _poucosResultados: poucosResultados,
     };
 }
-
