@@ -1058,7 +1058,7 @@ const BenetripDiscovery = {
 
             ${bannerPoucosResultados}
 
-            ${mensagem ? `
+            ${mensagem && !poucosResultados ? `
             <div class="resultado-banner ${cenario === 'abaixo' ? 'banner-aviso' : 'banner-info'}">
                 <p>${mensagem}</p>
             </div>
