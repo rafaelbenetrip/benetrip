@@ -358,3 +358,4 @@ function buildFallbackResult(selected, orcamento) {
         _totalAnalisados: selected.length,
     };
 }
+
