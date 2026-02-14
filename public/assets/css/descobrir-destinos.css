@@ -1268,3 +1268,19 @@ body {
         font-size: 14px;
     }
 }
+
+.banner-poucos-resultados {
+    background: linear-gradient(135deg, #FFF3E0 0%, #FFF8E1 100%);
+    border: 1px solid #FFB74D;
+    border-left: 4px solid #E87722;
+    border-radius: 12px;
+    padding: 16px 20px;
+    margin-bottom: 24px;
+}
+
+.banner-poucos-resultados p {
+    color: #4E342E;
+    font-size: 0.95rem;
+    line-height: 1.6;
+    margin: 0;
+}
