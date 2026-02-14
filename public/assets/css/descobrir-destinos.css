@@ -1,6 +1,7 @@
 /* ========================================
    DESCOBRIR DESTINOS - BENETRIP
    Cores: Laranja #E87722, Azul #00A3E0
+   v3.0 - Família detalhada + Multi-select
    ======================================== */
 
 :root {
@@ -227,10 +228,40 @@ body {
     font-weight: 600;
 }
 
+.btn-option.active small {
+    color: rgba(255, 255, 255, 0.85);
+}
+
 .btn-full {
     flex-direction: row;
     justify-content: center;
     gap: 12px;
+}
+
+/* ========================================
+   MULTI-SELECT HINT
+   ======================================== */
+.multi-select .btn-option.active {
+    background-color: var(--orange-primary);
+    border-color: var(--orange-primary);
+    position: relative;
+}
+
+.multi-select .btn-option.active::after {
+    content: '✓';
+    position: absolute;
+    top: 8px;
+    right: 10px;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--white);
+    background: rgba(0, 0, 0, 0.15);
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 /* ========================================
@@ -283,6 +314,97 @@ body {
 }
 
 /* ========================================
+   FAMÍLIA: GRID ADULTOS/CRIANÇAS/BEBÊS
+   ======================================== */
+.familia-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.familia-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--gray-light);
+    border-radius: var(--border-radius-sm);
+    padding: 14px 16px;
+}
+
+.familia-label {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.familia-emoji {
+    font-size: 28px;
+}
+
+.familia-label strong {
+    font-family: 'Poppins', sans-serif;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--gray-dark);
+    display: block;
+}
+
+.familia-label small {
+    font-size: 12px;
+    color: #888;
+}
+
+/* Compact number input for family rows */
+.number-input-compact {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.btn-number-sm {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: none;
+    background: var(--orange-primary);
+    color: var(--white);
+    font-size: 20px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: var(--transition);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.btn-number-sm:hover {
+    background: #D66A1A;
+    transform: scale(1.1);
+}
+
+.btn-number-sm:active {
+    transform: scale(0.95);
+}
+
+.number-input-compact input {
+    width: 44px;
+    text-align: center;
+    font-size: 22px;
+    font-weight: 700;
+    font-family: 'Poppins', sans-serif;
+    border: none;
+    background: transparent;
+    color: var(--gray-dark);
+}
+
+.familia-hint {
+    text-align: center;
+    font-weight: 500;
+    color: var(--orange-primary) !important;
+    margin-top: 8px;
+}
+
+/* ========================================
    DATAS INPUT (Flatpickr)
    ======================================== */
 #datas {
@@ -302,7 +424,6 @@ body {
     border-color: var(--orange-primary);
 }
 
-/* Flatpickr customization */
 .flatpickr-day.selected,
 .flatpickr-day.startRange,
 .flatpickr-day.endRange {
@@ -750,10 +871,7 @@ body {
 
 /* ================================================================
    BENETRIP - CSS ADICIONAIS para cenários de orçamento
-   Adicionar ao final do descobrir-destinos.css existente
    ================================================================ */
-
-/* Banner de mensagem nos resultados */
 .resultado-banner {
     border-radius: 12px;
     padding: 16px 20px;
@@ -845,14 +963,10 @@ body {
 }
 
 /* ================================================================
-   BENETRIP - CSS ADICIONAIS v2.1
-   Estilos para resultados enriquecidos
-   Adicionar ao FINAL do descobrir-destinos.css existente
+   ESTILOS ENRIQUECIDOS v2.1+
    ================================================================ */
 
-/* ========================================
-   RESUMO DE CRITÉRIOS
-   ======================================== */
+/* Resumo de critérios */
 .criterios-resumo {
     background: var(--white);
     border-radius: var(--border-radius-lg);
@@ -905,29 +1019,23 @@ body {
     color: var(--gray-dark);
 }
 
-/* Layout 2 colunas em telas maiores */
 @media (min-width: 480px) {
     .criterios-grid {
         grid-template-columns: repeat(2, 1fr);
     }
-    /* Orçamento ocupa linha inteira */
     .criterio-item:last-child {
         grid-column: 1 / -1;
     }
 }
 
-/* ========================================
-   SUBTÍTULO DOS RESULTADOS
-   ======================================== */
+/* Subtítulo dos resultados */
 .resultado-subtitulo {
     font-size: 13px;
     color: #999;
     margin-top: 4px;
 }
 
-/* ========================================
-   COMENTÁRIO CONTEXTUAL DO DESTINO
-   ======================================== */
+/* Comentário contextual */
 .destino-comentario {
     font-family: 'Montserrat', sans-serif;
     font-size: 14px;
@@ -940,16 +1048,13 @@ body {
     border-left: 3px solid rgba(255, 255, 255, 0.4);
 }
 
-/* Comentário em cards brancos (alternativas) */
 .destino-card .destino-comentario {
     color: #444;
     background: var(--gray-light);
     border-left-color: var(--orange-primary);
 }
 
-/* ========================================
-   DICA PRÁTICA
-   ======================================== */
+/* Dica prática */
 .destino-dica {
     font-family: 'Montserrat', sans-serif;
     font-size: 13px;
@@ -969,16 +1074,13 @@ body {
     font-size: 16px;
 }
 
-/* Dica em cards brancos (alternativas) */
 .destino-card .destino-dica {
     color: #555;
     background: #FFF8F0;
     border: 1px solid #FFE8D0;
 }
 
-/* ========================================
-   CUSTO ESTIMADO TOTAL
-   ======================================== */
+/* Custo estimado total */
 .custo-estimado {
     display: flex;
     flex-wrap: wrap;
@@ -1005,7 +1107,6 @@ body {
     opacity: 0.7;
 }
 
-/* Custo em cards brancos */
 .destino-card .custo-estimado {
     background: #F0F7FF;
     color: var(--gray-dark);
@@ -1024,9 +1125,7 @@ body {
     color: #888;
 }
 
-/* ========================================
-   BADGES DE CONFIABILIDADE
-   ======================================== */
+/* Badges de confiabilidade */
 .fonte-badge {
     display: inline-block;
     font-size: 11px;
@@ -1046,7 +1145,6 @@ body {
     color: rgba(255, 255, 255, 0.9);
 }
 
-/* Badges em cards brancos */
 .destino-card .fonte-alta {
     background: #FFF8E1;
     color: #B8860B;
@@ -1057,9 +1155,7 @@ body {
     color: #2E7D32;
 }
 
-/* ========================================
-   PRECO LABEL (ida e volta por pessoa)
-   ======================================== */
+/* Preço label */
 .preco-label {
     font-size: 12px;
     opacity: 0.75;
@@ -1071,9 +1167,7 @@ body {
     color: #888;
 }
 
-/* ========================================
-   FLIGHT INFO
-   ======================================== */
+/* Flight info */
 .flight-info {
     font-size: 13px;
     opacity: 0.85;
@@ -1084,9 +1178,7 @@ body {
     color: #666;
 }
 
-/* ========================================
-   BOTÃO BUSCAR NOVAMENTE
-   ======================================== */
+/* Botão buscar novamente */
 .buscar-novamente-section {
     text-align: center;
     margin-top: 32px;
@@ -1162,5 +1254,17 @@ body {
     .btn-buscar-novamente {
         width: 100%;
         padding: 14px 20px;
+    }
+
+    .familia-item {
+        padding: 10px 12px;
+    }
+
+    .familia-emoji {
+        font-size: 24px;
+    }
+
+    .familia-label strong {
+        font-size: 14px;
     }
 }
