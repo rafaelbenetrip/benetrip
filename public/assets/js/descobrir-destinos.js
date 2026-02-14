@@ -1,6 +1,10 @@
 /**
  * BENETRIP - DESCOBRIR DESTINOS
- * Versão TRIPLE SEARCH v3.1.1
+ * Versão TRIPLE SEARCH v3.1.2
+ * NOVIDADES v3.1.2:
+ * - Campo de orçamento agora aceita valores inteiros com separador de milhar
+ * - Sem centavos (,00) — mais intuitivo para o usuário
+ * - Placeholder atualizado para "2.000"
  * NOVIDADES v3.1.1:
  * - Custo de hotel dividido pelo número de pessoas (quarto compartilhado)
  * - Texto explicativo mostra divisão quando viagem em grupo
@@ -40,7 +44,7 @@ const BenetripDiscovery = {
     },
 
     init() {
-        this.log('🐕 Benetrip Discovery v3.1.1 inicializando...');
+        this.log('🐕 Benetrip Discovery v3.1.2 inicializando...');
         
         this.carregarCidades();
         this.setupFormEvents();
@@ -347,6 +351,9 @@ const BenetripDiscovery = {
         }
     },
 
+    // ================================================================
+    // CURRENCY INPUT — v3.1.2: Valores inteiros com separador de milhar
+    // ================================================================
     setupCurrencyInput() {
         const input = document.getElementById('orcamento');
         const moedaInput = document.getElementById('moeda');
@@ -363,8 +370,9 @@ const BenetripDiscovery = {
             input.addEventListener('input', (e) => {
                 let valor = e.target.value.replace(/\D/g, '');
                 if (valor) {
-                    valor = (parseInt(valor) / 100).toFixed(2);
-                    e.target.value = valor.replace('.', ',');
+                    // Remover zeros à esquerda e formatar com pontos de milhar
+                    valor = parseInt(valor).toString();
+                    e.target.value = parseInt(valor).toLocaleString('pt-BR');
                 } else {
                     e.target.value = '';
                 }
@@ -387,6 +395,9 @@ const BenetripDiscovery = {
         });
     },
 
+    // ================================================================
+    // VALIDAÇÃO — v3.1.2: Parsing corrigido para formato sem centavos
+    // ================================================================
     validarFormulario() {
         if (!this.state.origemSelecionada) {
             alert('Por favor, selecione uma cidade de origem');
@@ -416,7 +427,7 @@ const BenetripDiscovery = {
         }
         
         const orcamento = document.getElementById('orcamento').value;
-        if (!orcamento || parseFloat(orcamento.replace(',', '.')) <= 0) {
+        if (!orcamento || parseFloat(orcamento.replace(/\./g, '')) <= 0) {
             alert('Por favor, informe o orçamento');
             document.getElementById('orcamento').focus();
             return false;
@@ -426,7 +437,8 @@ const BenetripDiscovery = {
     },
 
     // ================================================================
-    // COLETA DE DADOS - inclui adultos/crianças/bebês e multi-prefs
+    // COLETA DE DADOS — v3.1.2: Parsing corrigido para formato sem centavos
+    // Inclui adultos/crianças/bebês e multi-prefs
     // ================================================================
     coletarDadosFormulario() {
         const companhia = parseInt(document.getElementById('companhia').value);
@@ -478,7 +490,7 @@ const BenetripDiscovery = {
             dataIda: document.getElementById('data-ida').value,
             dataVolta: document.getElementById('data-volta').value,
             moeda: document.getElementById('moeda').value,
-            orcamento: parseFloat(document.getElementById('orcamento').value.replace(',', '.'))
+            orcamento: parseFloat(document.getElementById('orcamento').value.replace(/\./g, ''))
         };
         
         this.log('📝 Dados:', this.state.formData);
