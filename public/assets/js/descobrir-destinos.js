@@ -1,6 +1,9 @@
 /**
  * BENETRIP - DESCOBRIR DESTINOS
- * Versão TRIPLE SEARCH v3.1
+ * Versão TRIPLE SEARCH v3.1.1
+ * NOVIDADES v3.1.1:
+ * - Custo de hotel dividido pelo número de pessoas (quarto compartilhado)
+ * - Texto explicativo mostra divisão quando viagem em grupo
  * NOVIDADES v3.1:
  * - Não repete destinos nos resultados
  * - Degrada graciosamente quando menos de 5 destinos disponíveis
@@ -37,7 +40,7 @@ const BenetripDiscovery = {
     },
 
     init() {
-        this.log('🐕 Benetrip Discovery v3.1 inicializando...');
+        this.log('🐕 Benetrip Discovery v3.1.1 inicializando...');
         
         this.carregarCidades();
         this.setupFormEvents();
@@ -921,6 +924,7 @@ const BenetripDiscovery = {
 
     // ================================================================
     // RESULTADOS ENRIQUECIDOS
+    // v3.1.1: Custo de hotel dividido pelo número de pessoas
     // v3.1: Degrada graciosamente quando poucos destinos
     // - Sem surpresa se não houver
     // - Sem alternativas se não houver
@@ -928,7 +932,7 @@ const BenetripDiscovery = {
     // ================================================================
     mostrarResultados(destinos, cenario, mensagem) {
         const container = document.getElementById('resultados-container');
-        const { dataIda, dataVolta, moeda } = this.state.formData;
+        const { dataIda, dataVolta, moeda, numPessoas } = this.state.formData;
         const noites = this.calcularNoites(dataIda, dataVolta);
         
         const formatPreco = (d) => this.formatarPreco(d.flight?.price || 0, moeda);
@@ -949,12 +953,27 @@ const BenetripDiscovery = {
 
         const custoEstimado = (d) => {
             const passagem = d.flight?.price || 0;
-            const hotelTotal = (d.avg_cost_per_night || 0) * noites;
-            if (hotelTotal > 0) {
+            const hotelTotalQuarto = (d.avg_cost_per_night || 0) * noites; // Custo total do quarto
+            
+            if (hotelTotalQuarto > 0) {
+                // Dividir custo do hotel pelo número de pessoas (quarto compartilhado)
+                const hotelPorPessoa = numPessoas > 1 
+                    ? hotelTotalQuarto / numPessoas 
+                    : hotelTotalQuarto;
+                
+                const custoTotal = passagem + hotelPorPessoa;
+                
+                // Texto adaptado para grupos
+                let detalheTexto = `(voo + ${noites} noites hotel`;
+                if (numPessoas > 1) {
+                    detalheTexto += ` ÷ ${numPessoas} pessoas`;
+                }
+                detalheTexto += ')';
+                
                 return `<div class="custo-estimado">
                     <span class="custo-label">Estimativa total/pessoa:</span>
-                    <span class="custo-valor">${this.formatarPreco(passagem + hotelTotal, moeda)}</span>
-                    <span class="custo-detalhe">(voo + ${noites} noites hotel)</span>
+                    <span class="custo-valor">${this.formatarPreco(custoTotal, moeda)}</span>
+                    <span class="custo-detalhe">${detalheTexto}</span>
                 </div>`;
             }
             return '';
