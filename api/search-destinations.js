@@ -1,5 +1,8 @@
-// api/search-destinations.js - VERSÃO TRIPLE SEARCH v2
+// api/search-destinations.js - VERSÃO TRIPLE SEARCH v3.0
 // 3 buscas paralelas: Global + Continente + País
+// NOVO v3.0:
+// - escopoDestino: "internacional" pula busca doméstica e filtra resultados
+// - preferencias: aceita array de preferências para interests combinados
 // Usa iata_geo_lookup.json para resolver aeroporto → país/continente
 
 import { readFileSync } from 'fs';
@@ -13,13 +16,11 @@ let IATA_LOOKUP = null;
 function getIataLookup() {
     if (IATA_LOOKUP) return IATA_LOOKUP;
     try {
-        // Em Vercel, arquivos em /public/data/ são acessíveis via process.cwd()
         const filePath = join(process.cwd(), 'public', 'data', 'iata_geo_lookup.json');
         IATA_LOOKUP = JSON.parse(readFileSync(filePath, 'utf-8'));
         console.log(`[Lookup] ${Object.keys(IATA_LOOKUP).length} aeroportos carregados`);
     } catch (err) {
         console.error('[Lookup] Erro ao carregar iata_geo_lookup.json:', err.message);
-        // Fallback mínimo para aeroportos brasileiros mais comuns
         IATA_LOOKUP = {
             "GRU": { "codigo_pais": "BR", "pais": "Brasil", "kgmid_pais": "/m/015fr", "continente": "América do Sul", "kgmid_continente": "/m/0dg3n1" },
             "GIG": { "codigo_pais": "BR", "pais": "Brasil", "kgmid_pais": "/m/015fr", "continente": "América do Sul", "kgmid_continente": "/m/0dg3n1" },
@@ -44,7 +45,6 @@ async function searchTravelExplore(params, label) {
     const fullParams = {
         engine: 'google_travel_explore',
         api_key: process.env.SEARCHAPI_KEY,
-        // ✅ currency agora vem via params (passado pelo handler)
         gl: 'br',
         hl: 'pt-BR',
         ...params,
@@ -94,8 +94,7 @@ export default async function handler(req, res) {
     if (req.method !== 'POST') return res.status(405).json({ error: 'Apenas POST' });
 
     try {
-        // ✅ CORREÇÃO: Extrair moeda do body enviado pelo frontend
-        const { origem, dataIda, dataVolta, preferencias, moeda } = req.body;
+        const { origem, dataIda, dataVolta, preferencias, moeda, escopoDestino } = req.body;
 
         // Validar origem
         if (!origem || typeof origem !== 'string') {
@@ -120,9 +119,9 @@ export default async function handler(req, res) {
             });
         }
 
-        // ✅ CORREÇÃO: Usar moeda do usuário, fallback para BRL
         const currencyCode = (moeda && /^[A-Z]{3}$/.test(moeda)) ? moeda : 'BRL';
-        console.log(`💱 Moeda da busca: ${currencyCode}`);
+        const apenasInternacional = escopoDestino === 'internacional';
+        console.log(`💱 Moeda: ${currencyCode} | Escopo: ${apenasInternacional ? 'INTERNACIONAL' : 'TODOS'}`);
 
         // ============================================================
         // RESOLVER GEO DO AEROPORTO
@@ -130,12 +129,13 @@ export default async function handler(req, res) {
         const lookup = getIataLookup();
         const geo = lookup[origemCode] || null;
 
-        console.log(`🔍 Triple Search de ${origemCode} | País: ${geo?.pais || '?'} | Continente: ${geo?.continente || '?'}`);
+        console.log(`🔍 Triple Search de ${origemCode} | País: ${geo?.pais || '?'} | Continente: ${geo?.continente || '?'} | Internacional: ${apenasInternacional}`);
 
         // ============================================================
         // MAPEAR PREFERÊNCIAS → interests do SearchAPI
-        // Valores aceitos: popular, outdoors, beaches, museums, history, skiing
-        // NOTA: incompatível com travel_mode=flights_only
+        // v3.0: preferencias pode ser array ["relax", "cultura"]
+        // SearchAPI aceita apenas UM interest, então usamos o primeiro
+        // Para buscas com múltiplas preferências, usamos 'popular' como fallback
         // ============================================================
         const INTERESTS_MAP = {
             'relax':     'beaches',
@@ -143,42 +143,53 @@ export default async function handler(req, res) {
             'cultura':   'museums',
             'urbano':    'popular',
         };
-        const interests = INTERESTS_MAP[preferencias] || 'popular';
+
+        // preferencias pode ser string "relax" ou array ["relax","cultura"]
+        let prefArray = [];
+        if (Array.isArray(preferencias)) {
+            prefArray = preferencias;
+        } else if (typeof preferencias === 'string') {
+            prefArray = preferencias.split(',').filter(Boolean);
+        }
+
+        // Se múltiplas preferências, usamos 'popular' para busca mais ampla
+        // Se apenas uma, usamos o mapeamento direto
+        const interests = prefArray.length === 1 
+            ? (INTERESTS_MAP[prefArray[0]] || 'popular')
+            : 'popular';
+        
+        console.log(`🎯 Preferências: [${prefArray.join(', ')}] → interests: ${interests}`);
 
         // ============================================================
-        // PARÂMETROS BASE (compartilhados pelas 3 buscas)
+        // PARÂMETROS BASE
         // ============================================================
         const baseParams = {
             departure_id: origemCode,
             interests,
-            currency: currencyCode, // ✅ CORREÇÃO: Moeda dinâmica do usuário
+            currency: currencyCode,
         };
 
-        // Datas → parâmetro correto é time_period
-        // Round-trip: "YYYY-MM-DD..YYYY-MM-DD"
-        // One-way:    "YYYY-MM-DD"
         if (dataIda && dataVolta) {
             baseParams.time_period = `${dataIda}..${dataVolta}`;
-            console.log(`📅 Datas: ${dataIda} → ${dataVolta} (time_period: ${baseParams.time_period})`);
+            console.log(`📅 Datas: ${dataIda} → ${dataVolta}`);
         } else if (dataIda) {
             baseParams.time_period = dataIda;
-            console.log(`📅 Data ida: ${dataIda} (one-way)`);
         }
-        // Se nenhuma data: API usa default "one_week_trip_in_the_next_six_months"
 
         // ============================================================
-        // 3 BUSCAS EM PARALELO
+        // BUSCAS EM PARALELO
+        // Se apenasInternacional → NÃO busca no país de origem
         // ============================================================
         const startTime = Date.now();
 
-        const [globalResult, continenteResult, paisResult] = await Promise.all([
-            // BUSCA 1: GLOBAL (sem arrival_id → mundo inteiro)
+        const searchPromises = [
+            // BUSCA 1: GLOBAL (sempre)
             searchTravelExplore(
                 { ...baseParams },
                 `GLOBAL desde ${origemCode}`
             ),
 
-            // BUSCA 2: CONTINENTE
+            // BUSCA 2: CONTINENTE (sempre, se disponível)
             geo?.kgmid_continente
                 ? searchTravelExplore(
                     { ...baseParams, arrival_id: geo.kgmid_continente },
@@ -186,25 +197,41 @@ export default async function handler(req, res) {
                 )
                 : Promise.resolve({ destinations: [], error: 'Continente não mapeado', elapsed: 0 }),
 
-            // BUSCA 3: PAÍS (doméstico)
-            geo?.kgmid_pais
+            // BUSCA 3: PAÍS (doméstico) — PULAR se apenasInternacional
+            (!apenasInternacional && geo?.kgmid_pais)
                 ? searchTravelExplore(
                     { ...baseParams, arrival_id: geo.kgmid_pais },
                     `${geo.pais} desde ${origemCode}`
                 )
-                : Promise.resolve({ destinations: [], error: 'País não mapeado', elapsed: 0 }),
-        ]);
+                : Promise.resolve({ 
+                    destinations: [], 
+                    error: apenasInternacional ? 'Busca doméstica pulada (apenas internacional)' : 'País não mapeado', 
+                    elapsed: 0 
+                }),
+        ];
+
+        const [globalResult, continenteResult, paisResult] = await Promise.all(searchPromises);
 
         const totalTime = Date.now() - startTime;
 
         // ============================================================
         // CONSOLIDAÇÃO: Deduplicar, manter menor preço
+        // Se apenasInternacional → filtrar destinos do país de origem
         // ============================================================
         const allDestinations = new Map();
+        const paisOrigem = geo?.pais?.toLowerCase() || '';
+        const codigoPaisOrigem = geo?.codigo_pais?.toUpperCase() || '';
 
         function addDestinations(destinations, source) {
             for (const dest of destinations) {
-                // Chave de deduplicação: nome + país (mais confiável que kgmid que pode não existir)
+                // Se apenas internacional, pular destinos do mesmo país
+                if (apenasInternacional && paisOrigem) {
+                    const destCountry = (dest.country || '').toLowerCase();
+                    if (destCountry === paisOrigem) {
+                        continue; // Pula destinos domésticos
+                    }
+                }
+
                 const key = `${(dest.name || '').toLowerCase()}_${(dest.country || '').toLowerCase()}`;
                 const flightPrice = dest.flight?.price ?? 0;
 
@@ -225,7 +252,6 @@ export default async function handler(req, res) {
                         avg_cost_per_night: dest.avg_cost_per_night || 0,
                         outbound_date: dest.outbound_date,
                         return_date: dest.return_date,
-                        // Metadados do triple search
                         _sources: [source],
                         _source_count: 1,
                     });
@@ -233,7 +259,6 @@ export default async function handler(req, res) {
                     const existing = allDestinations.get(key);
                     existing._sources.push(source);
                     existing._source_count++;
-                    // Manter menor preço de voo
                     if (flightPrice > 0 && (existing.flight.price === 0 || flightPrice < existing.flight.price)) {
                         existing.flight = {
                             airport_code: dest.flight?.airport_code || dest.primary_airport,
@@ -249,9 +274,11 @@ export default async function handler(req, res) {
 
         addDestinations(globalResult.destinations, 'global');
         addDestinations(continenteResult.destinations, 'continente');
-        addDestinations(paisResult.destinations, 'pais');
+        if (!apenasInternacional) {
+            addDestinations(paisResult.destinations, 'pais');
+        }
 
-        // Ordenar por preço (destinos com preço 0 vão pro final)
+        // Ordenar por preço
         const consolidated = Array.from(allDestinations.values()).sort((a, b) => {
             if (a.flight.price === 0 && b.flight.price === 0) return 0;
             if (a.flight.price === 0) return 1;
@@ -265,19 +292,22 @@ export default async function handler(req, res) {
         if (consolidated.length === 0) {
             return res.status(404).json({
                 error: 'Nenhum destino encontrado',
-                message: 'Nenhum voo encontrado nas 3 buscas. Tente outra origem ou datas.',
+                message: apenasInternacional 
+                    ? 'Nenhum voo internacional encontrado nas buscas. Tente incluir destinos nacionais ou ajuste datas/orçamento.'
+                    : 'Nenhum voo encontrado nas 3 buscas. Tente outra origem ou datas.',
                 _debug: {
                     global: { count: globalResult.destinations.length, error: globalResult.error },
                     continente: { count: continenteResult.destinations.length, error: continenteResult.error },
                     pais: { count: paisResult.destinations.length, error: paisResult.error },
+                    apenasInternacional,
                 }
             });
         }
 
-        console.log(`✅ Triple Search completo em ${totalTime}ms | ` +
+        console.log(`✅ Search completo em ${totalTime}ms | ` +
             `Global=${globalResult.destinations.length} ` +
             `${geo?.continente || 'Continente'}=${continenteResult.destinations.length} ` +
-            `${geo?.pais || 'País'}=${paisResult.destinations.length} ` +
+            `${apenasInternacional ? '(doméstico pulado)' : `${geo?.pais || 'País'}=${paisResult.destinations.length}`} ` +
             `→ ${consolidated.length} únicos | Moeda: ${currencyCode}`
         );
 
@@ -291,16 +321,18 @@ export default async function handler(req, res) {
             } : null,
             dataIda: dataIda || null,
             dataVolta: dataVolta || null,
-            moeda: currencyCode, // ✅ Retornar moeda usada na busca
+            moeda: currencyCode,
             total: consolidated.length,
             destinations: consolidated,
             _meta: {
                 totalTime,
                 currency: currencyCode,
+                escopoDestino: apenasInternacional ? 'internacional' : 'tanto_faz',
+                preferencias: prefArray,
                 sources: {
                     global: globalResult.destinations.length,
                     continente: continenteResult.destinations.length,
-                    pais: paisResult.destinations.length,
+                    pais: apenasInternacional ? 0 : paisResult.destinations.length,
                 },
                 timing: {
                     global: globalResult.elapsed,
