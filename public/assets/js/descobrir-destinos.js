@@ -1,6 +1,11 @@
 /**
  * BENETRIP - DESCOBRIR DESTINOS
- * Versão TRIPLE SEARCH v3.0
+ * Versão TRIPLE SEARCH v3.1
+ * NOVIDADES v3.1:
+ * - Não repete destinos nos resultados
+ * - Degrada graciosamente quando menos de 5 destinos disponíveis
+ * - Mensagem informativa quando poucos resultados encontrados
+ * - Esconde seção surpresa/alternativas quando não há dados
  * NOVIDADES v3.0:
  * - Família: adultos, crianças (2-11) e bebês (0-1) separados
  * - Links Benetrip Voos com passageiros detalhados (adultos/crianças/bebês)
@@ -32,7 +37,7 @@ const BenetripDiscovery = {
     },
 
     init() {
-        this.log('🐕 Benetrip Discovery v3.0 inicializando...');
+        this.log('🐕 Benetrip Discovery v3.1 inicializando...');
         
         this.carregarCidades();
         this.setupFormEvents();
@@ -737,9 +742,7 @@ const BenetripDiscovery = {
 
     // ================================================================
     // GERAR LINKS PARA voos.benetrip.com.br
-    // Formato passageiros: {adultos}{crianças}{bebês}
-    // Ex: 2 adultos + 1 criança + 0 bebês = "210"
-    // Ex: 1 adulto + 0 crianças + 0 bebês = "1"
+    // Agora trata surpresa null e alternativas variáveis
     // ================================================================
     gerarLinksBenetrip(ranking) {
         const { origem, dataIda, dataVolta, adultos, criancas, bebes } = this.state.formData;
@@ -750,8 +753,6 @@ const BenetripDiscovery = {
         };
 
         // Construir string de passageiros
-        // Se não tem crianças nem bebês, só número de adultos
-        // Se tem, formato: adultos + crianças + bebês
         let passageirosStr;
         if (criancas > 0 || bebes > 0) {
             passageirosStr = `${adultos}${criancas}${bebes}`;
@@ -767,10 +768,11 @@ const BenetripDiscovery = {
         
         return {
             top_destino: { ...ranking.top_destino, link: gerarLink(ranking.top_destino) },
-            alternativas: ranking.alternativas.map(d => ({ ...d, link: gerarLink(d) })),
-            surpresa: { ...ranking.surpresa, link: gerarLink(ranking.surpresa) },
+            alternativas: (ranking.alternativas || []).map(d => ({ ...d, link: gerarLink(d) })),
+            surpresa: ranking.surpresa ? { ...ranking.surpresa, link: gerarLink(ranking.surpresa) } : null,
             _model: ranking._model,
-            _totalAnalisados: ranking._totalAnalisados
+            _totalAnalisados: ranking._totalAnalisados,
+            _poucosResultados: ranking._poucosResultados || false,
         };
     },
 
@@ -879,7 +881,6 @@ const BenetripDiscovery = {
 
     // ================================================================
     // TELA: Nenhum destino encontrado
-    // Mensagem adaptada para internacional
     // ================================================================
     mostrarSemResultados() {
         const container = document.getElementById('resultados-container');
@@ -920,6 +921,10 @@ const BenetripDiscovery = {
 
     // ================================================================
     // RESULTADOS ENRIQUECIDOS
+    // v3.1: Degrada graciosamente quando poucos destinos
+    // - Sem surpresa se não houver
+    // - Sem alternativas se não houver
+    // - Mensagem informativa sobre poucos resultados
     // ================================================================
     mostrarResultados(destinos, cenario, mensagem) {
         const container = document.getElementById('resultados-container');
@@ -965,16 +970,93 @@ const BenetripDiscovery = {
             return `<div class="destino-dica"><span class="dica-icon">💡</span> ${d.dica}</div>`;
         };
 
+        // ============================================================
+        // CONTAR TOTAL DE DESTINOS ÚNICOS EXIBIDOS
+        // ============================================================
+        const totalExibidos = 1 
+            + (destinos.alternativas?.length || 0) 
+            + (destinos.surpresa ? 1 : 0);
+        const poucosResultados = destinos._poucosResultados || totalExibidos < 5;
+
+        // ============================================================
+        // MENSAGEM DE POUCOS RESULTADOS
+        // ============================================================
+        let bannerPoucosResultados = '';
+        if (poucosResultados) {
+            bannerPoucosResultados = `
+                <div class="resultado-banner banner-poucos-resultados">
+                    <p>🐕 A Tripinha encontrou ${totalExibidos === 1 ? 'apenas 1 destino que se encaixa' : `apenas ${totalExibidos} destinos que se encaixam`} no seu perfil e orçamento. 
+                    ${totalExibidos === 1 ? 'Mas é uma ótima opção!' : 'São poucas opções, mas todas combinam com o que você busca!'}
+                    Experimente ajustar datas ou orçamento para mais resultados.</p>
+                </div>
+            `;
+        }
+
+        // ============================================================
+        // SEÇÃO DE ALTERNATIVAS (condicional)
+        // ============================================================
+        let alternativasHtml = '';
+        if (destinos.alternativas && destinos.alternativas.length > 0) {
+            alternativasHtml = `
+                <div class="alternativas-section">
+                    <h3>📋 Outras Opções</h3>
+                    <div class="alternativas-grid">
+                        ${destinos.alternativas.map(d => `
+                            <div class="destino-card">
+                                ${fonteBadge(d)}
+                                <h4>${d.name}${d.country ? ', ' + d.country : ''}</h4>
+                                <div class="preco">${formatPreco(d)}</div>
+                                <div class="preco-label">ida e volta por adulto</div>
+                                <div class="flight-info">${formatParadas(d)}</div>
+                                ${custoEstimado(d)}
+                                <div class="descricao">${d.razao || 'Boa opção!'}</div>
+                                ${comentarioHtml(d)}
+                                ${dicaHtml(d)}
+                                <a href="${d.link}" target="_blank" class="btn-ver-voos">Ver Passagens →</a>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        }
+
+        // ============================================================
+        // SEÇÃO SURPRESA (condicional)
+        // ============================================================
+        let surpresaHtml = '';
+        if (destinos.surpresa) {
+            surpresaHtml = `
+                <div class="surpresa-card">
+                    <div class="badge">🎁 DESTINO SURPRESA</div>
+                    ${fonteBadge(destinos.surpresa)}
+                    <h3>${destinos.surpresa.name}${destinos.surpresa.country ? ', ' + destinos.surpresa.country : ''}</h3>
+                    <div class="preco">${formatPreco(destinos.surpresa)}</div>
+                    <div class="preco-label">ida e volta por adulto</div>
+                    <div class="flight-info">${formatParadas(destinos.surpresa)}</div>
+                    ${custoEstimado(destinos.surpresa)}
+                    <div class="descricao">${destinos.surpresa.razao || 'Descubra!'}</div>
+                    ${comentarioHtml(destinos.surpresa)}
+                    ${dicaHtml(destinos.surpresa)}
+                    <a href="${destinos.surpresa.link}" target="_blank" class="btn-ver-voos">Descobrir ✈️</a>
+                </div>
+            `;
+        }
+
+        // ============================================================
+        // MONTAR HTML FINAL
+        // ============================================================
         const html = `
             ${this.gerarResumoCriterios()}
 
             <div class="resultado-header">
-                <h1>${cenario === 'ideal' ? '🎉 Destinos Perfeitos!' : '✈️ Destinos Encontrados!'}</h1>
+                <h1>${cenario === 'ideal' && !poucosResultados ? '🎉 Destinos Perfeitos!' : poucosResultados ? '✈️ Destinos Encontrados' : '✈️ Destinos Encontrados!'}</h1>
                 <p class="resultado-subtitulo">
                     ${destinos._totalAnalisados ? `${destinos._totalAnalisados} destinos analisados` : ''}
                     ${destinos._model && destinos._model !== 'fallback_price' ? ' · Curadoria da Tripinha 🐶' : ''}
                 </p>
             </div>
+
+            ${bannerPoucosResultados}
 
             ${mensagem ? `
             <div class="resultado-banner ${cenario === 'abaixo' ? 'banner-aviso' : 'banner-info'}">
@@ -983,7 +1065,7 @@ const BenetripDiscovery = {
             ` : ''}
 
             <div class="top-destino">
-                <div class="badge">🏆 MELHOR DESTINO PARA VOCÊ</div>
+                <div class="badge">🏆 ${totalExibidos === 1 ? 'DESTINO ENCONTRADO' : 'MELHOR DESTINO PARA VOCÊ'}</div>
                 ${fonteBadge(destinos.top_destino)}
                 <h2>${destinos.top_destino.name}, ${destinos.top_destino.country || ''}</h2>
                 <div class="preco">${formatPreco(destinos.top_destino)}</div>
@@ -996,42 +1078,16 @@ const BenetripDiscovery = {
                 <a href="${destinos.top_destino.link}" target="_blank" class="btn-ver-voos">Ver Passagens ✈️</a>
             </div>
 
-            <div class="alternativas-section">
-                <h3>📋 Outras Opções</h3>
-                <div class="alternativas-grid">
-                    ${destinos.alternativas.map(d => `
-                        <div class="destino-card">
-                            ${fonteBadge(d)}
-                            <h4>${d.name}${d.country ? ', ' + d.country : ''}</h4>
-                            <div class="preco">${formatPreco(d)}</div>
-                            <div class="preco-label">ida e volta por adulto</div>
-                            <div class="flight-info">${formatParadas(d)}</div>
-                            ${custoEstimado(d)}
-                            <div class="descricao">${d.razao || 'Boa opção!'}</div>
-                            ${comentarioHtml(d)}
-                            ${dicaHtml(d)}
-                            <a href="${d.link}" target="_blank" class="btn-ver-voos">Ver Passagens →</a>
-                        </div>
-                    `).join('')}
-                </div>
-            </div>
+            ${alternativasHtml}
 
-            <div class="surpresa-card">
-                <div class="badge">🎁 DESTINO SURPRESA</div>
-                ${fonteBadge(destinos.surpresa)}
-                <h3>${destinos.surpresa.name}${destinos.surpresa.country ? ', ' + destinos.surpresa.country : ''}</h3>
-                <div class="preco">${formatPreco(destinos.surpresa)}</div>
-                <div class="preco-label">ida e volta por adulto</div>
-                <div class="flight-info">${formatParadas(destinos.surpresa)}</div>
-                ${custoEstimado(destinos.surpresa)}
-                <div class="descricao">${destinos.surpresa.razao || 'Descubra!'}</div>
-                ${comentarioHtml(destinos.surpresa)}
-                ${dicaHtml(destinos.surpresa)}
-                <a href="${destinos.surpresa.link}" target="_blank" class="btn-ver-voos">Descobrir ✈️</a>
-            </div>
+            ${surpresaHtml}
 
             <div class="buscar-novamente-section">
-                <p class="buscar-novamente-texto">Quer explorar outras opções? Ajuste seus critérios e descubra mais!</p>
+                <p class="buscar-novamente-texto">
+                    ${poucosResultados 
+                        ? 'Quer ver mais opções? Ajuste datas, orçamento ou estilo de viagem para descobrir mais destinos!' 
+                        : 'Quer explorar outras opções? Ajuste seus critérios e descubra mais!'}
+                </p>
                 <button class="btn-buscar-novamente" onclick="BenetripDiscovery.voltarAoFormulario()">
                     ✏️ Ajustar Busca e Descobrir Mais
                 </button>
