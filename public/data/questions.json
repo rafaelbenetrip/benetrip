@@ -112,7 +112,7 @@
 
     {
         "question": "6️⃣ Qual é o seu orçamento para passagens por pessoa?",
-        "description": "Informe o valor que deseja gastar com passagens por pessoa (12 anos+) para ida e volta.",
+        "description": "Informe o valor que deseja gastar com passagens por pessoa (2 anos+) para ida e volta.",
         "input_field": true,
         "currency_format": true,
         "key": "orcamento_valor"
