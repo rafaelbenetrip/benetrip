@@ -435,7 +435,8 @@ body{font-family:'Montserrat',-apple-system,sans-serif;background:var(--g50);col
 .flight-card:hover{box-shadow:var(--shadow-md);border-color:var(--g300)}
 .fc-main{display:grid;grid-template-columns:1fr auto}
 .fc-segments{padding:16px 20px}
-.fc-seg{display:grid;grid-template-columns:90px 1fr 90px auto;gap:8px;align-items:center;padding:6px 0}
+.fc-seg{display:grid;grid-template-columns:80px 1fr 80px auto;gap:8px;align-items:center;padding:6px 0}
+.fc-seg-time{min-width:0}
 .fc-seg+.fc-seg{border-top:1px dashed var(--g200);margin-top:6px;padding-top:12px}
 .fc-time{font-family:'Poppins',sans-serif;font-size:17px;font-weight:700;color:var(--g900);line-height:1.2}
 .fc-airport{font-size:11px;color:var(--g500);font-weight:500}
@@ -455,6 +456,7 @@ body{font-family:'Montserrat',-apple-system,sans-serif;background:var(--g50);col
 .fc-price{font-family:'Poppins',sans-serif;font-size:22px;font-weight:800;color:var(--g900)}
 .fc-price-lbl{font-size:10px;color:var(--g400);text-align:center}
 .fc-gate{font-size:10px;color:var(--g500)}
+.fc-gate-more{display:inline-flex;align-items:center;justify-content:center;background:var(--blue-lt);color:var(--blue);font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px}
 .fc-book{display:inline-flex;align-items:center;padding:9px 22px;background:var(--orange);color:var(--white);border:none;border-radius:22px;font-family:'Poppins',sans-serif;font-size:13px;font-weight:600;cursor:pointer;transition:all .2s;margin-top:8px}
 .fc-book:hover{background:var(--orange-dk);transform:translateY(-1px);box-shadow:0 4px 12px rgba(232,119,34,.3)}
 .fc-book.loading{opacity:.6;pointer-events:none}
@@ -507,18 +509,21 @@ body{font-family:'Montserrat',-apple-system,sans-serif;background:var(--g50);col
     .fc-time{font-size:15px}
     .sort-bar{top:52px}
     .filter-bar{top:101px}
-    .filter-panel{left:10px;right:10px;max-width:none}
+    /* Mobile: filter panels as bottom sheets */
+    .filter-panel{position:fixed;top:auto;bottom:0;left:0;right:0;max-width:none;max-height:70vh;overflow-y:auto;border-radius:var(--radius-lg) var(--radius-lg) 0 0;animation:slideUp .2s ease;z-index:55}
     .filter-panel-wide{max-width:none}
+    @keyframes slideUp{from{transform:translateY(100%);opacity:0}to{transform:translateY(0);opacity:1}}
     .filter-bar-inner{flex-wrap:nowrap}
 }
 @media(max-width:480px){
     .sf-row-cities .sf-field{flex-basis:100%}
     .sf-swap{align-self:center}
     .sf-row-details .sf-field{flex-basis:100%}
-    .fc-seg{grid-template-columns:1fr;text-align:center;gap:6px}
-    .fc-airline{flex-direction:row;justify-content:center;gap:6px}
+    .fc-seg{grid-template-columns:60px 1fr 60px;gap:4px}
+    .fc-airline{display:none}
     .fc-segments{padding:12px 14px}
     .fc-price-panel{padding:10px 14px}
     .fc-price{font-size:18px}
     .fc-book{padding:8px 18px;font-size:12px}
+    .fc-time{font-size:14px}
 }
