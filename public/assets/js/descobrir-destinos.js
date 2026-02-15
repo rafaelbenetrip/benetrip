@@ -1,11 +1,12 @@
 /**
  * BENETRIP - DESCOBRIR DESTINOS
- * Versão TRIPLE SEARCH v3.2
- * NOVIDADES v3.2:
- * - Links agora direcionam para página local voos.html (não mais voos.benetrip.com.br)
- * - Parâmetros completos: origin, destination, departure_date, return_date,
- *   adults, children, infants, currency, origin_name, destination_name
- * - Auto-search ao abrir a página de voos
+ * Versão GOOGLE FLIGHTS v4.0
+ * NOVIDADES v4.0:
+ * - Links agora direcionam para Google Flights com todos os parâmetros
+ * - Protobuf encoding para construir URLs compatíveis com Google Flights
+ * - Suporte completo: origem, destino, datas, adultos, crianças, bebês, moeda
+ * - Classe de cabine: econômica (padrão)
+ * - Auto-search ao abrir Google Flights com os parâmetros pré-preenchidos
  * NOVIDADES v3.1.2:
  * - Campo de orçamento aceita valores inteiros com separador de milhar
  * NOVIDADES v3.1.1:
@@ -31,8 +32,7 @@ const BenetripDiscovery = {
 
     config: {
         debug: true,
-        cidadesJsonPath: 'data/cidades_global_iata_v5.json',
-        voosPagePath: 'voos.html'
+        cidadesJsonPath: 'data/cidades_global_iata_v5.json'
     },
 
     log(...args) {
@@ -44,7 +44,7 @@ const BenetripDiscovery = {
     },
 
     init() {
-        this.log('🐕 Benetrip Discovery v3.2 inicializando...');
+        this.log('🐕 Benetrip Discovery v4.0 (Google Flights) inicializando...');
         
         this.carregarCidades();
         this.setupFormEvents();
@@ -512,6 +512,201 @@ const BenetripDiscovery = {
     },
 
     // ================================================================
+    // GOOGLE FLIGHTS - PROTOBUF URL BUILDER
+    // ================================================================
+
+    /**
+     * Codifica um número inteiro como Protobuf varint (base 128)
+     */
+    _protoVarint(n) {
+        const bytes = [];
+        let v = n >>> 0; // unsigned 32-bit
+        while (v > 127) {
+            bytes.push((v & 0x7f) | 0x80);
+            v >>>= 7;
+        }
+        bytes.push(v & 0x7f);
+        return bytes;
+    },
+
+    /**
+     * Codifica tag + wire type para um campo protobuf
+     * Wire types: 0 = varint, 2 = length-delimited
+     */
+    _protoTag(fieldNumber, wireType) {
+        return this._protoVarint((fieldNumber << 3) | wireType);
+    },
+
+    /**
+     * Codifica um campo varint (inteiro)
+     */
+    _protoVarintField(fieldNumber, value) {
+        return [...this._protoTag(fieldNumber, 0), ...this._protoVarint(value)];
+    },
+
+    /**
+     * Codifica um campo string (length-delimited)
+     */
+    _protoStringField(fieldNumber, str) {
+        const encoded = new TextEncoder().encode(str);
+        return [
+            ...this._protoTag(fieldNumber, 2),
+            ...this._protoVarint(encoded.length),
+            ...encoded
+        ];
+    },
+
+    /**
+     * Codifica uma mensagem aninhada (length-delimited)
+     */
+    _protoMessageField(fieldNumber, messageBytes) {
+        return [
+            ...this._protoTag(fieldNumber, 2),
+            ...this._protoVarint(messageBytes.length),
+            ...messageBytes
+        ];
+    },
+
+    /**
+     * Codifica bytes para base64url (sem padding, URL-safe)
+     */
+    _toBase64Url(bytes) {
+        const binary = String.fromCharCode(...bytes);
+        return btoa(binary)
+            .replace(/\+/g, '-')
+            .replace(/\//g, '_')
+            .replace(/=+$/, '');
+    },
+
+    /**
+     * Constrói o bloco protobuf de um aeroporto
+     * Estrutura: { field1: 1 (tipo IATA), field2: "CÓDIGO" }
+     */
+    _buildAirport(iataCode) {
+        return [
+            ...this._protoVarintField(1, 1),        // tipo = IATA
+            ...this._protoStringField(2, iataCode)   // código
+        ];
+    },
+
+    /**
+     * Constrói o bloco protobuf de um trecho de voo
+     * Estrutura: { field2: "YYYY-MM-DD", field13: airport_origin, field14: airport_dest }
+     */
+    _buildFlightLeg(date, originIata, destIata) {
+        return [
+            ...this._protoStringField(2, date),
+            ...this._protoMessageField(13, this._buildAirport(originIata)),
+            ...this._protoMessageField(14, this._buildAirport(destIata))
+        ];
+    },
+
+    /**
+     * Constrói o parâmetro 'tfs' (flight search) para Google Flights
+     * Estrutura do TFS:
+     *   field 1 (varint): 28 — modo de busca
+     *   field 2 (varint): 2  — ida e volta (round trip)
+     *   field 3 (message): trecho de ida
+     *   field 3 (message): trecho de volta
+     *   field 14 (varint): 1 — flag (classe econômica)
+     */
+    _buildTfsParam(originIata, destIata, departDate, returnDate) {
+        const tfsBytes = [
+            ...this._protoVarintField(1, 28),       // modo
+            ...this._protoVarintField(2, 2),         // round trip
+            ...this._protoMessageField(3, this._buildFlightLeg(departDate, originIata, destIata)),
+            ...this._protoMessageField(3, this._buildFlightLeg(returnDate, destIata, originIata)),
+            ...this._protoVarintField(14, 1)         // flag
+        ];
+
+        return this._toBase64Url(tfsBytes);
+    },
+
+    /**
+     * Constrói o parâmetro 'tfu' (travelers/passengers) para Google Flights
+     * Estrutura do TFU:
+     *   field 2 (message):
+     *     field 1 (varint): adultos
+     *     field 2 (varint): crianças (2-11 anos)
+     *     field 3 (varint): bebês no colo (0-1 ano)
+     */
+    _buildTfuParam(adults, children, infantsOnLap) {
+        const innerBytes = [
+            ...this._protoVarintField(1, adults),
+            ...this._protoVarintField(2, children),
+            ...this._protoVarintField(3, infantsOnLap)
+        ];
+
+        const outerBytes = this._protoMessageField(2, innerBytes);
+        return this._toBase64Url(outerBytes);
+    },
+
+    /**
+     * Mapeia código de moeda para código Google Flights
+     */
+    _getGoogleCurrency(moeda) {
+        // Google Flights aceita códigos ISO 4217 padrão
+        const map = { 'BRL': 'BRL', 'USD': 'USD', 'EUR': 'EUR' };
+        return map[moeda] || 'BRL';
+    },
+
+    /**
+     * Mapeia moeda para locale/idioma do Google Flights
+     */
+    _getGoogleLocale(moeda) {
+        const map = { 'BRL': 'pt-BR', 'USD': 'en', 'EUR': 'en' };
+        return map[moeda] || 'pt-BR';
+    },
+
+    /**
+     * Mapeia moeda para país (gl param) do Google Flights
+     */
+    _getGoogleGl(moeda) {
+        const map = { 'BRL': 'br', 'USD': 'us', 'EUR': 'de' };
+        return map[moeda] || 'br';
+    },
+
+    /**
+     * Constrói a URL completa do Google Flights com todos os parâmetros
+     * @param {string} originIata - Código IATA de origem (ex: "GRU")
+     * @param {string} destIata - Código IATA de destino (ex: "LIS")
+     * @param {string} departDate - Data de ida "YYYY-MM-DD"
+     * @param {string} returnDate - Data de volta "YYYY-MM-DD"
+     * @param {number} adults - Número de adultos
+     * @param {number} children - Número de crianças (2-11)
+     * @param {number} infants - Número de bebês (0-1)
+     * @param {string} currency - Código da moeda ("BRL", "USD", "EUR")
+     * @returns {string} URL do Google Flights
+     */
+    buildGoogleFlightsUrl(originIata, destIata, departDate, returnDate, adults, children, infants, currency) {
+        const tfs = this._buildTfsParam(originIata, destIata, departDate, returnDate);
+        const tfu = this._buildTfuParam(adults, children, infants);
+        const curr = this._getGoogleCurrency(currency);
+        const hl = this._getGoogleLocale(currency);
+        const gl = this._getGoogleGl(currency);
+
+        const params = new URLSearchParams();
+        params.set('tfs', tfs);
+        params.set('tfu', tfu);
+        params.set('curr', curr);
+        params.set('hl', hl);
+        params.set('gl', gl);
+
+        const url = `https://www.google.com/travel/flights/search?${params.toString()}`;
+
+        this.log('✈️ Google Flights URL:', {
+            origin: originIata,
+            destination: destIata,
+            dates: `${departDate} → ${returnDate}`,
+            passengers: `${adults}A ${children}C ${infants}I`,
+            currency: curr,
+            url: url
+        });
+
+        return url;
+    },
+
+    // ================================================================
     // FLUXO PRINCIPAL DE BUSCA
     // ================================================================
     async buscarDestinos() {
@@ -541,8 +736,8 @@ const BenetripDiscovery = {
             this.atualizarProgresso(60, '🤖 Tripinha analisando destinos...');
             const ranking = await this.ranquearDestinosAPI(destinosParaRanking, filtro.cenario);
             
-            this.atualizarProgresso(80, '✈️ Gerando links de reserva...');
-            const destinosComLinks = this.gerarLinksVoos(ranking);
+            this.atualizarProgresso(80, '✈️ Gerando links do Google Flights...');
+            const destinosComLinks = this.gerarLinksGoogleFlights(ranking);
             
             this.state.resultados = destinosComLinks;
             
@@ -697,30 +892,30 @@ const BenetripDiscovery = {
     },
 
     // ================================================================
-    // v3.2: GERAR LINKS PARA PÁGINA LOCAL voos.html
-    // Usa URLSearchParams com parâmetros explícitos compatíveis
-    // com BenetripVoos.parseUrlParams() — auto-search ao abrir
+    // v4.0: GERAR LINKS PARA GOOGLE FLIGHTS
+    // Constrói URLs com protobuf encoding incluindo:
+    // - Origem e destino (IATA)
+    // - Datas de ida e volta
+    // - Número de adultos, crianças e bebês
+    // - Moeda selecionada pelo usuário
+    // - Idioma e região (hl, gl)
     // ================================================================
-    gerarLinksVoos(ranking) {
+    gerarLinksGoogleFlights(ranking) {
         const { origem, dataIda, dataVolta, adultos, criancas, bebes, moeda } = this.state.formData;
 
         const gerarLink = (d) => {
             if (!d?.primary_airport) return '#';
 
-            const params = new URLSearchParams({
-                origin: origem.code,
-                destination: d.primary_airport,
-                departure_date: dataIda,
-                return_date: dataVolta || '',
-                adults: String(adultos),
-                children: String(criancas),
-                infants: String(bebes),
-                currency: moeda,
-                origin_name: origem.name,
-                destination_name: d.name || d.primary_airport
-            });
-
-            return `${this.config.voosPagePath}?${params.toString()}`;
+            return this.buildGoogleFlightsUrl(
+                origem.code,           // IATA origem
+                d.primary_airport,     // IATA destino
+                dataIda,               // data ida YYYY-MM-DD
+                dataVolta,             // data volta YYYY-MM-DD
+                adultos,               // adultos
+                criancas,              // crianças 2-11
+                bebes,                 // bebês 0-1
+                moeda                  // moeda
+            );
         };
         
         return {
@@ -948,6 +1143,10 @@ const BenetripDiscovery = {
             `;
         }
 
+        // Badge Google Flights nos botões
+        const googleFlightsBtnLabel = 'Buscar no Google Flights';
+        const googleFlightsBtnIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 4px;"><path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/></svg>`;
+
         let alternativasHtml = '';
         if (destinos.alternativas && destinos.alternativas.length > 0) {
             alternativasHtml = `
@@ -965,7 +1164,7 @@ const BenetripDiscovery = {
                                 <div class="descricao">${d.razao || 'Boa opção!'}</div>
                                 ${comentarioHtml(d)}
                                 ${dicaHtml(d)}
-                                <a href="${d.link}" target="_blank" class="btn-ver-voos">Ver Passagens →</a>
+                                <a href="${d.link}" target="_blank" rel="noopener" class="btn-ver-voos btn-google-flights">${googleFlightsBtnIcon} ${googleFlightsBtnLabel} →</a>
                             </div>
                         `).join('')}
                     </div>
@@ -987,7 +1186,7 @@ const BenetripDiscovery = {
                     <div class="descricao">${destinos.surpresa.razao || 'Descubra!'}</div>
                     ${comentarioHtml(destinos.surpresa)}
                     ${dicaHtml(destinos.surpresa)}
-                    <a href="${destinos.surpresa.link}" target="_blank" class="btn-ver-voos">Descobrir ✈️</a>
+                    <a href="${destinos.surpresa.link}" target="_blank" rel="noopener" class="btn-ver-voos btn-google-flights">${googleFlightsBtnIcon} Descobrir no Google Flights ✈️</a>
                 </div>
             `;
         }
@@ -1000,6 +1199,9 @@ const BenetripDiscovery = {
                 <p class="resultado-subtitulo">
                     ${destinos._totalAnalisados ? `${destinos._totalAnalisados} destinos analisados` : ''}
                     ${destinos._model && destinos._model !== 'fallback_price' ? ' · Curadoria da Tripinha 🐶' : ''}
+                </p>
+                <p class="resultado-google-flights-info">
+                    🔗 Os links abrem diretamente no <strong>Google Flights</strong> com suas preferências pré-preenchidas
                 </p>
             </div>
 
@@ -1022,7 +1224,7 @@ const BenetripDiscovery = {
                 <div class="descricao">${destinos.top_destino.razao || 'Perfeito para você!'}</div>
                 ${comentarioHtml(destinos.top_destino)}
                 ${dicaHtml(destinos.top_destino)}
-                <a href="${destinos.top_destino.link}" target="_blank" class="btn-ver-voos">Ver Passagens ✈️</a>
+                <a href="${destinos.top_destino.link}" target="_blank" rel="noopener" class="btn-ver-voos btn-google-flights btn-google-flights-destaque">${googleFlightsBtnIcon} ${googleFlightsBtnLabel} ✈️</a>
             </div>
 
             ${alternativasHtml}
