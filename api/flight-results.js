@@ -1,196 +1,140 @@
-// api/flight-results.js - Benetrip Flight Results v2.0
-// Polling endpoint para buscar resultados de voos
-// Converte preços de RUB para moeda selecionada via currency_rates
-// CommonJS (compatível com Vercel)
+// api/flight-results.js - Benetrip Flight Results v2.1
+// FORMULA: currency_rates values < 1 → MULTIPLY, values > 1 → DIVIDE
+// Case-insensitive key lookup for currency_rates
 
 module.exports = async function handler(req, res) {
-  // CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   const { uuid, currency = 'BRL' } = req.query;
-
-  if (!uuid) {
-    return res.status(400).json({ error: 'Parâmetro uuid obrigatório' });
-  }
+  if (!uuid) return res.status(400).json({ error: 'Parâmetro uuid obrigatório' });
 
   try {
-    const url = `https://api.travelpayouts.com/v1/flight_search_results?uuid=${uuid}`;
-
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: {
-        'Accept-Encoding': 'gzip,deflate',
-        'Accept': 'application/json'
-      }
+    const response = await fetch(`https://api.travelpayouts.com/v1/flight_search_results?uuid=${uuid}`, {
+      headers: { 'Accept-Encoding': 'gzip,deflate', 'Accept': 'application/json' }
     });
 
-    if (!response.ok) {
-      return res.status(response.status).json({
-        error: `API retornou ${response.status}`,
-        search_id: uuid
-      });
-    }
+    if (!response.ok) return res.status(response.status).json({ error: `API retornou ${response.status}` });
 
     const rawData = await response.json();
-
-    // A API retorna um array. O último elemento pode ter apenas search_id
-    // (indicando que a busca terminou)
     if (!Array.isArray(rawData)) {
-      return res.status(200).json({
-        search_id: uuid,
-        completed: false,
-        proposals: [],
-        total: 0,
-        message: 'Aguardando resultados...'
-      });
+      return res.status(200).json({ search_id: uuid, completed: false, proposals: [], total: 0 });
     }
 
-    // Processar chunks
     let allProposals = [];
     let currencyRates = {};
     let gatesInfo = {};
     let airlines = {};
-    let flightInfo = {};
     let searchComplete = false;
     let segments = [];
 
     for (const chunk of rawData) {
       if (!chunk || typeof chunk !== 'object') continue;
-
-      // Chunk com apenas search_id = busca completa
-      if (chunk.search_id && Object.keys(chunk).length <= 2) {
-        searchComplete = true;
-        continue;
-      }
-
-      // Extrair dados de referência
-      if (chunk.currency_rates) {
-        currencyRates = { ...currencyRates, ...chunk.currency_rates };
-      }
-      if (chunk.gates_info) {
-        gatesInfo = { ...gatesInfo, ...chunk.gates_info };
-      }
-      if (chunk.airlines) {
-        Object.assign(airlines, chunk.airlines);
-      }
-      if (chunk.flight_info) {
-        Object.assign(flightInfo, chunk.flight_info);
-      }
-      if (chunk.segments && chunk.segments.length > 0) {
-        segments = chunk.segments;
-      }
-      if (chunk.proposals && Array.isArray(chunk.proposals)) {
-        allProposals = allProposals.concat(chunk.proposals);
-      }
+      if (chunk.search_id && Object.keys(chunk).length <= 2) { searchComplete = true; continue; }
+      if (chunk.currency_rates) currencyRates = { ...currencyRates, ...chunk.currency_rates };
+      if (chunk.gates_info) gatesInfo = { ...gatesInfo, ...chunk.gates_info };
+      if (chunk.airlines) Object.assign(airlines, chunk.airlines);
+      if (chunk.segments?.length > 0) segments = chunk.segments;
+      if (Array.isArray(chunk.proposals)) allProposals = allProposals.concat(chunk.proposals);
     }
 
     // ============================================================
-    // CONVERTER PREÇOS para a moeda desejada
-    // Preços vêm em RUB. currency_rates contém: 1 RUB = X moeda
-    // ATENÇÃO: a API retorna rates como DIVISOR (RUB / rate = moeda)
-    // Exemplo: se rate BRL = 18.5, então 1850 RUB / 18.5 = 100 BRL
-    // Mas na verdade, a API diz "para converter de RUB para BRL,
-    // multiplique por currency_rates.brl"
-    // Vamos testar ambas as abordagens e usar a que faz sentido
+    // CURRENCY CONVERSION - case-insensitive key lookup
     // ============================================================
-    const targetCurrency = currency.toLowerCase();
-    const rate = currencyRates[targetCurrency] || currencyRates['brl'] || 1;
+    const target = currency.toUpperCase();
 
-    // Formatar proposals
-    const formattedProposals = allProposals.map((proposal, idx) => {
-      try {
-        return formatProposal(proposal, rate, targetCurrency, gatesInfo, airlines, idx);
-      } catch (e) {
-        console.warn(`⚠️ Erro formatando proposal ${idx}:`, e.message);
-        return null;
+    // Find rate (case-insensitive)
+    let rate = null;
+    for (const [key, val] of Object.entries(currencyRates)) {
+      if (key.toUpperCase() === target) { rate = val; break; }
+    }
+    if (rate === null || rate === 0) {
+      for (const [key, val] of Object.entries(currencyRates)) {
+        if (key.toUpperCase() === 'BRL') { rate = val; break; }
       }
+    }
+    if (rate === null || rate === 0) rate = 1;
+
+    // Auto-detect: rate < 1 means "1 RUB = X moeda" → MULTIPLY
+    // rate > 1 means "1 moeda = X RUB" → DIVIDE
+    const multiply = (rate < 1);
+    const convert = (rub) => multiply ? rub * rate : rub / rate;
+
+    console.log(`💱 [Currency] ${target} rate=${rate} method=${multiply ? 'MUL' : 'DIV'} rates=${JSON.stringify(currencyRates).substring(0, 200)}`);
+
+    // Format proposals
+    const formatted = allProposals.map((p, i) => {
+      try { return fmtProposal(p, convert, target, gatesInfo, airlines, i); }
+      catch (e) { return null; }
     }).filter(Boolean);
 
-    // Ordenar por preço (menor primeiro)
-    formattedProposals.sort((a, b) => a.price - b.price);
+    formatted.sort((a, b) => a.price - b.price);
+    const deduped = dedup(formatted);
 
-    // Deduplicar
-    const deduped = deduplicateProposals(formattedProposals);
-
-    console.log(`📋 [FlightResults] uuid=${uuid.substring(0, 8)}... | ${allProposals.length} raw → ${deduped.length} unique | complete=${searchComplete} | rate(${targetCurrency})=${rate}`);
+    console.log(`📋 [Results] ${allProposals.length} raw → ${deduped.length} grouped | done=${searchComplete}`);
 
     return res.status(200).json({
       search_id: uuid,
       completed: searchComplete,
-      currency: currency.toUpperCase(),
+      currency: target,
       currency_rate: rate,
       total_raw: allProposals.length,
       total: deduped.length,
       proposals: deduped,
       gates_info: gatesInfo,
       airlines_info: airlines,
-      segments,
-      flight_info: flightInfo
+      segments
     });
-
   } catch (error) {
-    console.error('❌ [FlightResults] Erro:', error.message);
-    return res.status(500).json({
-      error: 'Erro ao buscar resultados',
-      message: error.message,
-      search_id: uuid
-    });
+    console.error('❌ [Results]', error.message);
+    return res.status(500).json({ error: 'Erro ao buscar resultados', message: error.message });
   }
 };
 
-// ============================================================
-// FORMATAR PROPOSAL
-// ============================================================
-function formatProposal(proposal, rate, currency, gatesInfo, airlines, index) {
-  // Encontrar o melhor preço (menor) entre todos os terms/gates
-  let bestPrice = Infinity;
-  let bestGateId = null;
-  let bestTermsUrl = null;
+function fmtProposal(proposal, convert, currency, gatesInfo, airlines, index) {
+  const allTerms = [];
+  let bestRub = Infinity, bestGateId = null, bestUrl = null;
 
   if (proposal.terms) {
-    for (const [gateId, termData] of Object.entries(proposal.terms)) {
-      const priceRub = termData.unified_price || termData.price || Infinity;
-      if (priceRub < bestPrice) {
-        bestPrice = priceRub;
-        bestGateId = gateId;
-        bestTermsUrl = termData.url;
-      }
+    for (const [gateId, term] of Object.entries(proposal.terms)) {
+      const rub = term.unified_price || term.price || Infinity;
+      const converted = Math.round(convert(rub));
+      const gi = gatesInfo[gateId] || {};
+      allTerms.push({
+        gate_id: gateId,
+        gate_name: gi.label || `Agência ${gateId}`,
+        gate_is_airline: gi.is_airline || false,
+        price: converted,
+        price_rub: rub,
+        currency,
+        url: term.url,
+      });
+      if (rub < bestRub) { bestRub = rub; bestGateId = gateId; bestUrl = term.url; }
     }
   }
+  allTerms.sort((a, b) => a.price - b.price);
 
-  // Converter de RUB para moeda desejada
-  // A API retorna rates como multiplicadores: preço_RUB * rate = preço_moeda
-  const convertedPrice = bestPrice * rate;
-
-  // Extrair informações dos segmentos (ida e volta)
-  const segmentsData = (proposal.segment || []).map((seg, segIdx) => {
-    const flights = (seg.flight || []).map(flight => ({
-      airline: flight.marketing_carrier || flight.operating_carrier || '',
-      airline_name: airlines[flight.marketing_carrier]?.name || flight.marketing_carrier || '',
-      flight_number: `${flight.marketing_carrier || ''}${flight.number || ''}`,
-      departure_airport: flight.departure,
-      arrival_airport: flight.arrival,
-      departure_date: flight.departure_date,
-      departure_time: flight.departure_time,
-      arrival_date: flight.arrival_date,
-      arrival_time: flight.arrival_time,
-      duration: flight.duration,
-      aircraft: flight.aircraft || '',
-      delay: flight.delay || 0,
-      operating_carrier: flight.operating_carrier || flight.marketing_carrier || '',
+  const segs = (proposal.segment || []).map((seg, si) => {
+    const flights = (seg.flight || []).map(f => ({
+      airline: f.marketing_carrier || f.operating_carrier || '',
+      airline_name: airlines[f.marketing_carrier]?.name || airlines[f.operating_carrier]?.name || f.marketing_carrier || '',
+      flight_number: `${f.marketing_carrier || f.operating_carrier || ''}${f.number || ''}`,
+      departure_airport: f.departure,
+      arrival_airport: f.arrival,
+      departure_date: f.departure_date,
+      departure_time: f.departure_time,
+      arrival_date: f.arrival_date,
+      arrival_time: f.arrival_time,
+      duration: f.duration,
+      delay: f.delay || 0,
+      operating_carrier: f.operating_carrier || f.marketing_carrier || '',
     }));
-
-    const totalDuration = flights.reduce((sum, f) => sum + (f.duration || 0) + (f.delay || 0), 0);
-    const stops = flights.length - 1;
-
+    const dur = flights.reduce((s, f) => s + (f.duration || 0) + (f.delay || 0), 0);
     return {
-      type: segIdx === 0 ? 'ida' : 'volta',
-      flights,
-      stops,
-      total_duration: totalDuration,
+      type: si === 0 ? 'ida' : 'volta',
+      flights, stops: flights.length - 1, total_duration: dur,
       departure_airport: flights[0]?.departure_airport || '',
       arrival_airport: flights[flights.length - 1]?.arrival_airport || '',
       departure_time: flights[0]?.departure_time || '',
@@ -200,83 +144,67 @@ function formatProposal(proposal, rate, currency, gatesInfo, airlines, index) {
     };
   });
 
-  const gateInfo = gatesInfo[bestGateId] || {};
+  const carriers = new Set();
+  for (const s of segs) for (const f of s.flights) if (f.airline) carriers.add(f.airline);
 
-  // Bagagem
   let baggage = null;
   if (proposal.terms?.[bestGateId]) {
-    const term = proposal.terms[bestGateId];
-    baggage = {
-      handbags: term.flights_handbags || null,
-      baggage: term.flights_baggage || null,
-    };
+    const t = proposal.terms[bestGateId];
+    baggage = { handbags: t.flights_handbags || null, baggage: t.flights_baggage || null };
   }
 
-  const totalDuration = proposal.total_duration ||
-    segmentsData.reduce((sum, s) => sum + s.total_duration, 0);
+  const totalDur = proposal.total_duration || segs.reduce((s, seg) => s + seg.total_duration, 0);
+  const gi = gatesInfo[bestGateId] || {};
 
   return {
     id: index,
-    price: Math.round(convertedPrice),
-    price_raw_rub: bestPrice,
-    currency: currency.toUpperCase(),
+    price: allTerms.length > 0 ? allTerms[0].price : Math.round(convert(bestRub)),
+    price_raw_rub: bestRub,
+    currency,
     gate_id: bestGateId,
-    gate_name: gateInfo.label || `Agência ${bestGateId}`,
-    gate_is_airline: gateInfo.is_airline || false,
-    gate_rating: gateInfo.average_rate || 0,
-    terms_url: bestTermsUrl,
+    gate_name: gi.label || `Agência ${bestGateId}`,
+    terms_url: bestUrl,
     is_direct: proposal.is_direct || false,
     max_stops: proposal.max_stops || 0,
-    total_duration: totalDuration,
+    total_duration: totalDur,
     segment_durations: proposal.segment_durations || [],
-    segments: segmentsData,
+    segments: segs,
+    carriers: Array.from(carriers),
     baggage,
-    validating_carrier: proposal.validating_carrier || '',
-    all_terms: Object.entries(proposal.terms || {}).map(([gateId, term]) => ({
-      gate_id: gateId,
-      gate_name: (gatesInfo[gateId] || {}).label || `Agência ${gateId}`,
-      price: Math.round((term.unified_price || term.price || 0) * rate),
-      currency: currency.toUpperCase(),
-      url: term.url,
-    })).sort((a, b) => a.price - b.price)
+    sign: proposal.sign || '',
+    all_terms: allTerms
   };
 }
 
-// ============================================================
-// DEDUPLICAR: mesmo itinerário, manter menor preço
-// ============================================================
-function deduplicateProposals(proposals) {
+// Dedup: group same flight from different operators using sign or flight key
+function dedup(proposals) {
   const seen = new Map();
-
   for (const p of proposals) {
-    const key = p.segments.map(seg =>
-      seg.flights.map(f => `${f.flight_number}_${f.departure_time}_${f.arrival_time}`).join('|')
+    const key = p.sign || p.segments.map(s =>
+      s.flights.map(f => `${f.flight_number}_${f.departure_time}_${f.arrival_time}`).join('|')
     ).join('→');
 
-    if (!seen.has(key) || p.price < seen.get(key).price) {
-      if (seen.has(key)) {
-        const existing = seen.get(key);
-        const existingGates = new Set(existing.all_terms.map(t => t.gate_id));
-        for (const term of p.all_terms) {
-          if (!existingGates.has(term.gate_id)) {
-            existing.all_terms.push(term);
-          }
-        }
-        existing.all_terms.sort((a, b) => a.price - b.price);
-        p.all_terms = existing.all_terms;
-      }
-      seen.set(key, p);
+    if (!seen.has(key)) {
+      seen.set(key, { ...p });
     } else {
-      const existing = seen.get(key);
-      const existingGates = new Set(existing.all_terms.map(t => t.gate_id));
-      for (const term of p.all_terms) {
-        if (!existingGates.has(term.gate_id)) {
-          existing.all_terms.push(term);
+      const ex = seen.get(key);
+      const exGates = new Set(ex.all_terms.map(t => t.gate_id));
+      for (const t of p.all_terms) {
+        if (!exGates.has(t.gate_id)) { ex.all_terms.push(t); exGates.add(t.gate_id); }
+        else {
+          const idx = ex.all_terms.findIndex(x => x.gate_id === t.gate_id);
+          if (idx >= 0 && t.price < ex.all_terms[idx].price) ex.all_terms[idx] = t;
         }
       }
-      existing.all_terms.sort((a, b) => a.price - b.price);
+      ex.all_terms.sort((a, b) => a.price - b.price);
+      if (ex.all_terms[0].price < ex.price) {
+        ex.price = ex.all_terms[0].price;
+        ex.price_raw_rub = ex.all_terms[0].price_rub;
+        ex.gate_id = ex.all_terms[0].gate_id;
+        ex.gate_name = ex.all_terms[0].gate_name;
+        ex.terms_url = ex.all_terms[0].url;
+      }
     }
   }
-
   return Array.from(seen.values());
 }
