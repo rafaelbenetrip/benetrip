@@ -292,3 +292,4 @@ function deduplicateProposals(proposals) {
 
     return Array.from(seen.values());
 }
+
