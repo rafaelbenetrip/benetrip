@@ -1,23 +1,15 @@
 /**
- * BENETRIP VOOS v2.0 — Página completa de busca de voos
+ * BENETRIP VOOS v2.1 — Busca de voos com filtros avançados
  *
- * Funciona de duas formas:
- * A) Acesso direto: Mostra formulário completo para busca manual
- * B) Via URL params (vindo do "Descobrir Destinos"): Auto-preenche e busca
- *
- * Fluxo:
- * 1. Carrega cidades para autocomplete
- * 2. Se tem params na URL → preenche form e busca automaticamente
- * 3. Se não → mostra form vazio para busca manual
- * 4. Busca: /api/flight-search → polling /api/flight-results → exibe
- * 5. Clique "Reservar" → /api/flight-click → redirect
+ * Features:
+ * - Busca via formulário ou URL params
+ * - Filtros: paradas, companhias, horários, preço, duração
+ * - Agrupamento de mesmo voo por diferentes operadoras
+ * - Conversão de moeda correta (RUB → moeda escolhida)
  */
 
 const BenetripVoos = {
 
-    // ================================================================
-    // STATE
-    // ================================================================
     state: {
         cidadesData: null,
         params: {},
@@ -31,9 +23,22 @@ const BenetripVoos = {
         displayedCount: 0,
         perPage: 10,
         sortBy: 'cheapest',
-        filterStops: 'all',
         resultsShown: false,
         tipInterval: null,
+        filters: {
+            stops: 'all',
+            airlines: 'all',
+            depGoMin: 0, depGoMax: 1439,
+            arrGoMin: 0, arrGoMax: 1439,
+            depRetMin: 0, depRetMax: 1439,
+            arrRetMin: 0, arrRetMax: 1439,
+            priceMax: Infinity,
+            durationMax: Infinity,
+        },
+        allAirlines: {},
+        priceBounds: { min: 0, max: 10000 },
+        durationBounds: { min: 60, max: 2880 },
+        activePanel: null,
     },
 
     CURRENCY: {
@@ -46,110 +51,79 @@ const BenetripVoos = {
     // INIT
     // ================================================================
     async init() {
-        console.log('✈️ BenetripVoos v2.0');
+        console.log('✈️ BenetripVoos v2.1');
         await this.loadCities();
         this.setupSearchForm();
-        this.setupSortAndFilters();
+        this.setupSortTabs();
+        this.setupFilterChips();
+        this.setupFilterPanels();
 
-        // Checar se tem params na URL → auto-buscar
         const urlParams = this.parseUrlParams();
         if (urlParams.origin && urlParams.destination && urlParams.departure_date) {
             this.prefillForm(urlParams);
-            // Pequeno delay pra o form renderizar
             setTimeout(() => this.submitSearch(), 300);
         }
     },
 
     // ================================================================
-    // CARREGAR CIDADES (mesmo JSON do descobrir-destinos)
+    // CIDADES
     // ================================================================
     async loadCities() {
         try {
             const r = await fetch('data/cidades_global_iata_v5.json');
-            if (!r.ok) throw new Error('Erro');
+            if (!r.ok) throw new Error('Err');
             const data = await r.json();
             this.state.cidadesData = data.filter(c => c.iata);
-            console.log(`✅ ${this.state.cidadesData.length} cidades carregadas`);
         } catch (e) {
-            console.warn('⚠️ Fallback cidades');
             this.state.cidadesData = [
-                { cidade:'São Paulo', sigla_estado:'SP', pais:'Brasil', codigo_pais:'BR', iata:'GRU', aeroporto:'Guarulhos' },
-                { cidade:'São Paulo', sigla_estado:'SP', pais:'Brasil', codigo_pais:'BR', iata:'CGH', aeroporto:'Congonhas' },
-                { cidade:'Rio de Janeiro', sigla_estado:'RJ', pais:'Brasil', codigo_pais:'BR', iata:'GIG', aeroporto:'Galeão' },
-                { cidade:'Salvador', sigla_estado:'BA', pais:'Brasil', codigo_pais:'BR', iata:'SSA' },
-                { cidade:'Brasília', sigla_estado:'DF', pais:'Brasil', codigo_pais:'BR', iata:'BSB' },
+                {cidade:'São Paulo',sigla_estado:'SP',pais:'Brasil',codigo_pais:'BR',iata:'GRU',aeroporto:'Guarulhos'},
+                {cidade:'São Paulo',sigla_estado:'SP',pais:'Brasil',codigo_pais:'BR',iata:'CGH',aeroporto:'Congonhas'},
+                {cidade:'Rio de Janeiro',sigla_estado:'RJ',pais:'Brasil',codigo_pais:'BR',iata:'GIG',aeroporto:'Galeão'},
+                {cidade:'Salvador',sigla_estado:'BA',pais:'Brasil',codigo_pais:'BR',iata:'SSA'},
+                {cidade:'Brasília',sigla_estado:'DF',pais:'Brasil',codigo_pais:'BR',iata:'BSB'},
             ];
         }
     },
 
-    normalize(t) { return t.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''); },
+    normalize(t) { return t.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''); },
 
     searchCities(term) {
         if (!this.state.cidadesData || term.length < 2) return [];
         const n = this.normalize(term);
         return this.state.cidadesData
-            .filter(c => {
-                const cn = this.normalize(c.cidade);
-                const an = c.aeroporto ? this.normalize(c.aeroporto) : '';
-                return cn.includes(n) || c.iata.toLowerCase().includes(n) || an.includes(n);
-            })
+            .filter(c => this.normalize(c.cidade).includes(n) || c.iata.toLowerCase().includes(n) || (c.aeroporto && this.normalize(c.aeroporto).includes(n)))
             .slice(0, 8)
-            .map(c => ({
-                code: c.iata,
-                name: c.cidade,
-                state: c.sigla_estado,
-                country: c.pais,
-                airport: c.aeroporto || null,
-            }));
+            .map(c => ({code:c.iata,name:c.cidade,state:c.sigla_estado,country:c.pais,airport:c.aeroporto||null}));
     },
 
-    // ================================================================
-    // PARSE URL PARAMS
-    // ================================================================
     parseUrlParams() {
-        const u = new URL(window.location.href);
-        const p = u.searchParams;
+        const p = new URL(window.location.href).searchParams;
         return {
-            origin: (p.get('origin') || '').toUpperCase(),
-            destination: (p.get('destination') || '').toUpperCase(),
-            departure_date: p.get('departure_date') || '',
-            return_date: p.get('return_date') || '',
-            adults: parseInt(p.get('adults') || '1'),
-            children: parseInt(p.get('children') || '0'),
-            infants: parseInt(p.get('infants') || '0'),
-            currency: (p.get('currency') || 'BRL').toUpperCase(),
-            origin_name: p.get('origin_name') || '',
-            destination_name: p.get('destination_name') || '',
+            origin:(p.get('origin')||'').toUpperCase(), destination:(p.get('destination')||'').toUpperCase(),
+            departure_date:p.get('departure_date')||'', return_date:p.get('return_date')||'',
+            adults:parseInt(p.get('adults')||'1'), children:parseInt(p.get('children')||'0'), infants:parseInt(p.get('infants')||'0'),
+            currency:(p.get('currency')||'BRL').toUpperCase(),
+            origin_name:p.get('origin_name')||'', destination_name:p.get('destination_name')||'',
         };
     },
 
-    // ================================================================
-    // PREFILL FORM FROM URL
-    // ================================================================
     prefillForm(p) {
-        // Origin
         document.getElementById('sf-input-origin').value = p.origin_name ? `${p.origin_name} (${p.origin})` : p.origin;
         document.getElementById('sf-origin-code').value = p.origin;
         document.getElementById('sf-origin-name').value = p.origin_name || p.origin;
-        // Destination
         document.getElementById('sf-input-dest').value = p.destination_name ? `${p.destination_name} (${p.destination})` : p.destination;
         document.getElementById('sf-dest-code').value = p.destination;
         document.getElementById('sf-dest-name').value = p.destination_name || p.destination;
-        // Dates
         if (p.departure_date) {
             document.getElementById('sf-departure').value = p.departure_date;
             document.getElementById('sf-return').value = p.return_date;
-            const fmt = (d) => d ? new Date(d + 'T12:00:00').toLocaleDateString('pt-BR') : '';
-            document.getElementById('sf-input-dates').value = p.return_date
-                ? `${fmt(p.departure_date)} — ${fmt(p.return_date)}`
-                : fmt(p.departure_date);
+            const fmt = d => d ? new Date(d+'T12:00:00').toLocaleDateString('pt-BR') : '';
+            document.getElementById('sf-input-dates').value = p.return_date ? `${fmt(p.departure_date)} — ${fmt(p.return_date)}` : fmt(p.departure_date);
         }
-        // Passengers
         document.getElementById('pax-adults').value = p.adults;
         document.getElementById('pax-children').value = p.children;
         document.getElementById('pax-infants').value = p.infants;
         this.updatePaxSummary();
-        // Currency
         document.getElementById('sf-currency').value = p.currency;
     },
 
@@ -157,583 +131,418 @@ const BenetripVoos = {
     // SETUP SEARCH FORM
     // ================================================================
     setupSearchForm() {
-        // Autocomplete for origin
-        this.setupAutocomplete('sf-input-origin', 'sf-dropdown-origin', 'sf-origin-code', 'sf-origin-name');
-        // Autocomplete for destination
-        this.setupAutocomplete('sf-input-dest', 'sf-dropdown-dest', 'sf-dest-code', 'sf-dest-name');
-
-        // Swap button
+        this.setupAutocomplete('sf-input-origin','sf-dropdown-origin','sf-origin-code','sf-origin-name');
+        this.setupAutocomplete('sf-input-dest','sf-dropdown-dest','sf-dest-code','sf-dest-name');
         document.getElementById('sf-swap').addEventListener('click', () => {
-            const oi = document.getElementById('sf-input-origin');
-            const di = document.getElementById('sf-input-dest');
-            const oc = document.getElementById('sf-origin-code');
-            const dc = document.getElementById('sf-dest-code');
-            const on = document.getElementById('sf-origin-name');
-            const dn = document.getElementById('sf-dest-name');
-            [oi.value, di.value] = [di.value, oi.value];
-            [oc.value, dc.value] = [dc.value, oc.value];
-            [on.value, dn.value] = [dn.value, on.value];
+            const ids = [['sf-input-origin','sf-input-dest'],['sf-origin-code','sf-dest-code'],['sf-origin-name','sf-dest-name']];
+            ids.forEach(([a,b]) => { const ea=document.getElementById(a),eb=document.getElementById(b); [ea.value,eb.value]=[eb.value,ea.value]; });
         });
-
-        // Calendar
-        const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1);
+        const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate()+1);
         flatpickr('#sf-input-dates', {
-            mode: 'range', minDate: tomorrow, dateFormat: 'Y-m-d', locale: 'pt',
-            onChange: (sel) => {
-                if (sel.length === 2) {
+            mode:'range', minDate:tomorrow, dateFormat:'Y-m-d', locale:'pt',
+            onChange: sel => {
+                if (sel.length===2) {
                     document.getElementById('sf-departure').value = this.isoDate(sel[0]);
                     document.getElementById('sf-return').value = this.isoDate(sel[1]);
-                    document.getElementById('sf-input-dates').value =
-                        `${this.brDate(sel[0])} — ${this.brDate(sel[1])}`;
-                } else if (sel.length === 1) {
+                    document.getElementById('sf-input-dates').value = `${this.brDate(sel[0])} — ${this.brDate(sel[1])}`;
+                } else if (sel.length===1) {
                     document.getElementById('sf-departure').value = this.isoDate(sel[0]);
                     document.getElementById('sf-return').value = '';
                 }
             }
         });
-
-        // Passengers dropdown
-        const trigger = document.getElementById('sf-pax-trigger');
-        const dropdown = document.getElementById('sf-pax-dropdown');
-        trigger.addEventListener('click', (e) => {
-            e.stopPropagation();
-            dropdown.classList.toggle('open');
-        });
-        document.getElementById('sf-pax-done').addEventListener('click', () => {
-            dropdown.classList.remove('open');
-        });
-        document.addEventListener('click', (e) => {
-            if (!dropdown.contains(e.target) && e.target !== trigger) dropdown.classList.remove('open');
-        });
+        const trigger=document.getElementById('sf-pax-trigger'), dd=document.getElementById('sf-pax-dropdown');
+        trigger.addEventListener('click', e => { e.stopPropagation(); dd.classList.toggle('open'); });
+        document.getElementById('sf-pax-done').addEventListener('click', () => dd.classList.remove('open'));
+        document.addEventListener('click', e => { if(!dd.contains(e.target)&&e.target!==trigger) dd.classList.remove('open'); });
         document.querySelectorAll('.pax-btn').forEach(btn => {
             btn.addEventListener('click', () => {
-                const inp = document.getElementById(btn.dataset.t);
-                const v = parseInt(inp.value);
-                const min = parseInt(inp.min), max = parseInt(inp.max);
-                if (btn.dataset.a === 'inc' && v < max) inp.value = v + 1;
-                if (btn.dataset.a === 'dec' && v > min) inp.value = v - 1;
-                // Bebês <= adultos
-                const a = parseInt(document.getElementById('pax-adults').value);
-                const i = parseInt(document.getElementById('pax-infants').value);
-                if (i > a) document.getElementById('pax-infants').value = a;
+                const inp=document.getElementById(btn.dataset.t), v=parseInt(inp.value), mn=parseInt(inp.min), mx=parseInt(inp.max);
+                if(btn.dataset.a==='inc'&&v<mx) inp.value=v+1;
+                if(btn.dataset.a==='dec'&&v>mn) inp.value=v-1;
+                const a=parseInt(document.getElementById('pax-adults').value), i=parseInt(document.getElementById('pax-infants').value);
+                if(i>a) document.getElementById('pax-infants').value=a;
                 this.updatePaxSummary();
             });
         });
-
-        // Form submit
-        document.getElementById('search-form').addEventListener('submit', (e) => {
-            e.preventDefault();
-            this.submitSearch();
-        });
-
-        // Route bar edit
+        document.getElementById('search-form').addEventListener('submit', e => { e.preventDefault(); this.submitSearch(); });
         document.getElementById('route-edit').addEventListener('click', () => this.showSearchForm());
     },
 
-    setupAutocomplete(inputId, dropdownId, hiddenCodeId, hiddenNameId) {
-        const input = document.getElementById(inputId);
-        const dropdown = document.getElementById(dropdownId);
-        const hiddenCode = document.getElementById(hiddenCodeId);
-        const hiddenName = document.getElementById(hiddenNameId);
+    setupAutocomplete(inputId, dropdownId, codeId, nameId) {
+        const input=document.getElementById(inputId), dd=document.getElementById(dropdownId);
+        const hCode=document.getElementById(codeId), hName=document.getElementById(nameId);
         let timer;
-
         input.addEventListener('input', () => {
             clearTimeout(timer);
-            const term = input.value.trim();
-            if (term.length < 2) { dropdown.classList.remove('open'); hiddenCode.value = ''; return; }
-            timer = setTimeout(() => {
-                const results = this.searchCities(term);
-                if (results.length === 0) {
-                    dropdown.innerHTML = '<div style="padding:12px;color:#999;font-size:13px">Nenhum resultado</div>';
-                } else {
-                    dropdown.innerHTML = results.map(c => `
-                        <div class="sf-dd-item" data-code="${c.code}" data-name="${c.name}" data-full="${c.name}${c.airport ? ' — ' + c.airport : ''} (${c.code})">
-                            <span class="sf-dd-code">${c.code}</span>
-                            <div class="sf-dd-info">
-                                <div class="sf-dd-name">${c.name}${c.state ? ', ' + c.state : ''}${c.airport ? ' — ' + c.airport : ''}</div>
-                                <div class="sf-dd-sub">${c.country}</div>
-                            </div>
-                        </div>
-                    `).join('');
-                }
-                dropdown.classList.add('open');
-                dropdown.querySelectorAll('.sf-dd-item').forEach(item => {
-                    item.addEventListener('click', () => {
-                        input.value = item.dataset.full;
-                        hiddenCode.value = item.dataset.code;
-                        hiddenName.value = item.dataset.name;
-                        dropdown.classList.remove('open');
-                    });
+            const term=input.value.trim();
+            if(term.length<2){dd.classList.remove('open');hCode.value='';return;}
+            timer=setTimeout(()=>{
+                const res=this.searchCities(term);
+                dd.innerHTML = res.length===0 ? '<div style="padding:12px;color:#999;font-size:13px">Nenhum resultado</div>'
+                    : res.map(c=>`<div class="sf-dd-item" data-code="${c.code}" data-name="${c.name}" data-full="${c.name}${c.airport?' — '+c.airport:''} (${c.code})"><span class="sf-dd-code">${c.code}</span><div class="sf-dd-info"><div class="sf-dd-name">${c.name}${c.state?', '+c.state:''}${c.airport?' — '+c.airport:''}</div><div class="sf-dd-sub">${c.country}</div></div></div>`).join('');
+                dd.classList.add('open');
+                dd.querySelectorAll('.sf-dd-item').forEach(item => {
+                    item.addEventListener('click', () => { input.value=item.dataset.full; hCode.value=item.dataset.code; hName.value=item.dataset.name; dd.classList.remove('open'); });
                 });
-            }, 250);
+            },250);
         });
-
-        input.addEventListener('focus', () => {
-            if (dropdown.children.length > 0 && input.value.length >= 2) dropdown.classList.add('open');
-        });
-
-        document.addEventListener('click', (e) => {
-            if (!input.contains(e.target) && !dropdown.contains(e.target)) dropdown.classList.remove('open');
-        });
+        input.addEventListener('focus', () => { if(dd.children.length>0&&input.value.length>=2) dd.classList.add('open'); });
+        document.addEventListener('click', e => { if(!input.contains(e.target)&&!dd.contains(e.target)) dd.classList.remove('open'); });
     },
 
     updatePaxSummary() {
-        const a = parseInt(document.getElementById('pax-adults').value);
-        const c = parseInt(document.getElementById('pax-children').value);
-        const i = parseInt(document.getElementById('pax-infants').value);
-        const parts = [];
-        parts.push(`${a} adulto${a > 1 ? 's' : ''}`);
-        if (c > 0) parts.push(`${c} criança${c > 1 ? 's' : ''}`);
-        if (i > 0) parts.push(`${i} bebê${i > 1 ? 's' : ''}`);
-        document.getElementById('sf-pax-summary').textContent = parts.join(', ');
+        const a=parseInt(document.getElementById('pax-adults').value), c=parseInt(document.getElementById('pax-children').value), i=parseInt(document.getElementById('pax-infants').value);
+        const parts=[`${a} adulto${a>1?'s':''}`];
+        if(c>0)parts.push(`${c} criança${c>1?'s':''}`);
+        if(i>0)parts.push(`${i} bebê${i>1?'s':''}`);
+        document.getElementById('sf-pax-summary').textContent=parts.join(', ');
     },
 
-    isoDate(d) { return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; },
-    brDate(d) { return d.toLocaleDateString('pt-BR'); },
+    isoDate(d){return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`},
+    brDate(d){return d.toLocaleDateString('pt-BR')},
 
     // ================================================================
-    // SUBMIT SEARCH (from form or URL)
+    // SUBMIT SEARCH
     // ================================================================
     submitSearch() {
-        // Collect form data
-        const originCode = document.getElementById('sf-origin-code').value;
-        const destCode = document.getElementById('sf-dest-code').value;
-        const dep = document.getElementById('sf-departure').value;
-        const ret = document.getElementById('sf-return').value;
-
-        if (!originCode) { alert('Selecione a cidade de origem'); return; }
-        if (!destCode) { alert('Selecione o destino'); return; }
-        if (!dep) { alert('Selecione as datas'); return; }
-
-        this.state.params = {
-            origin: originCode,
-            destination: destCode,
-            departure_date: dep,
-            return_date: ret,
-            adults: parseInt(document.getElementById('pax-adults').value),
-            children: parseInt(document.getElementById('pax-children').value),
-            infants: parseInt(document.getElementById('pax-infants').value),
-            currency: document.getElementById('sf-currency').value,
-            origin_name: document.getElementById('sf-origin-name').value || originCode,
-            destination_name: document.getElementById('sf-dest-name').value || destCode,
-        };
-
-        // Update URL (sem recarregar)
-        const sp = new URLSearchParams(this.state.params);
-        history.replaceState(null, '', `?${sp.toString()}`);
-
-        // Update route bar
-        this.updateRouteBar();
-
-        // Show loading, hide form
-        this.hideSearchForm();
-        this.showPanel('loading');
-        this.resetSearchState();
-        this.startSearch();
+        const oc=document.getElementById('sf-origin-code').value, dc=document.getElementById('sf-dest-code').value;
+        const dep=document.getElementById('sf-departure').value, ret=document.getElementById('sf-return').value;
+        if(!oc){alert('Selecione a cidade de origem');return;}
+        if(!dc){alert('Selecione o destino');return;}
+        if(!dep){alert('Selecione as datas');return;}
+        this.state.params = {origin:oc,destination:dc,departure_date:dep,return_date:ret,
+            adults:parseInt(document.getElementById('pax-adults').value),
+            children:parseInt(document.getElementById('pax-children').value),
+            infants:parseInt(document.getElementById('pax-infants').value),
+            currency:document.getElementById('sf-currency').value,
+            origin_name:document.getElementById('sf-origin-name').value||oc,
+            destination_name:document.getElementById('sf-dest-name').value||dc};
+        history.replaceState(null,'',`?${new URLSearchParams(this.state.params)}`);
+        this.updateRouteBar(); this.hideSearchForm(); this.showPanel('loading');
+        this.resetSearchState(); this.resetFilters(); this.startSearch();
     },
 
     // ================================================================
-    // UI VISIBILITY
+    // UI
     // ================================================================
-    showSearchForm() {
-        document.getElementById('search-section').style.display = 'block';
-        document.getElementById('search-section').classList.remove('compact');
-        document.getElementById('route-bar').style.display = 'none';
-        this.hideAllPanels();
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-    },
-
-    hideSearchForm() {
-        document.getElementById('search-section').style.display = 'none';
-        document.getElementById('route-bar').style.display = 'block';
-    },
-
-    showPanel(name) {
-        this.hideAllPanels();
-        const el = document.getElementById(`state-${name}`);
-        if (el) el.style.display = 'block';
-    },
-
-    hideAllPanels() {
-        ['loading', 'error', 'empty', 'results'].forEach(n => {
-            const el = document.getElementById(`state-${n}`);
-            if (el) el.style.display = 'none';
-        });
-    },
-
-    updateRouteBar() {
-        const p = this.state.params;
-        document.getElementById('rb-origin').textContent = p.origin_name || p.origin;
-        document.getElementById('rb-dest').textContent = p.destination_name || p.destination;
-
-        const fmt = (iso) => iso ? new Date(iso+'T12:00:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'short'}) : '';
-        document.getElementById('rb-dates').textContent = p.return_date
-            ? `${fmt(p.departure_date)} → ${fmt(p.return_date)}`
-            : `${fmt(p.departure_date)} (só ida)`;
-
-        const parts = [];
-        if (p.adults) parts.push(`${p.adults} ad`);
-        if (p.children) parts.push(`${p.children} cri`);
-        if (p.infants) parts.push(`${p.infants} bb`);
-        document.getElementById('rb-pax').textContent = parts.join(', ');
-        document.getElementById('rb-currency').textContent = p.currency;
+    showSearchForm(){document.getElementById('search-section').style.display='block';document.getElementById('search-section').classList.remove('compact');document.getElementById('route-bar').style.display='none';this.hideAllPanels();window.scrollTo({top:0,behavior:'smooth'})},
+    hideSearchForm(){document.getElementById('search-section').style.display='none';document.getElementById('route-bar').style.display='block'},
+    showPanel(n){this.hideAllPanels();const el=document.getElementById(`state-${n}`);if(el)el.style.display='block'},
+    hideAllPanels(){['loading','error','empty','results'].forEach(n=>{const el=document.getElementById(`state-${n}`);if(el)el.style.display='none'})},
+    updateRouteBar(){
+        const p=this.state.params;
+        document.getElementById('rb-origin').textContent=p.origin_name||p.origin;
+        document.getElementById('rb-dest').textContent=p.destination_name||p.destination;
+        const fmt=iso=>iso?new Date(iso+'T12:00:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'short'}):'';
+        document.getElementById('rb-dates').textContent=p.return_date?`${fmt(p.departure_date)} → ${fmt(p.return_date)}`:`${fmt(p.departure_date)} (só ida)`;
+        const parts=[];if(p.adults)parts.push(`${p.adults} ad`);if(p.children)parts.push(`${p.children} cri`);if(p.infants)parts.push(`${p.infants} bb`);
+        document.getElementById('rb-pax').textContent=parts.join(', ');
+        document.getElementById('rb-currency').textContent=p.currency;
     },
 
     // ================================================================
     // SEARCH FLOW
     // ================================================================
-    resetSearchState() {
-        this.state.searchId = null;
-        this.state.proposals = [];
-        this.state.searchComplete = false;
-        this.state.resultsShown = false;
-        this.state.displayedCount = 0;
-        this.state.pollCount = 0;
-        if (this.state.pollTimer) clearTimeout(this.state.pollTimer);
-        if (this.state.tipInterval) clearInterval(this.state.tipInterval);
-    },
+    resetSearchState(){this.state.searchId=null;this.state.proposals=[];this.state.searchComplete=false;this.state.resultsShown=false;this.state.displayedCount=0;this.state.pollCount=0;this.state.allAirlines={};if(this.state.pollTimer)clearTimeout(this.state.pollTimer);if(this.state.tipInterval)clearInterval(this.state.tipInterval)},
 
-    async startSearch() {
-        this.setProgress(10, 'Iniciando busca de voos...');
-        this.startTips();
-
-        try {
-            const r = await fetch('/api/flight-search', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(this.state.params)
-            });
-            if (!r.ok) {
-                const err = await r.json().catch(() => ({}));
-                throw new Error(err.error || err.message || err.detail || `Erro ${r.status}`);
-            }
-            const data = await r.json();
-            if (!data.search_id) throw new Error('Sem search_id');
-
-            this.state.searchId = data.search_id;
-            this.state.currencyRates = data.currency_rates || {};
-            this.setProgress(20, 'Consultando companhias aéreas...');
+    async startSearch(){
+        this.setProgress(10,'Iniciando busca...');this.startTips();
+        try{
+            const r=await fetch('/api/flight-search',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(this.state.params)});
+            if(!r.ok){const err=await r.json().catch(()=>({}));throw new Error(err.error||err.message||err.detail||`Erro ${r.status}`);}
+            const data=await r.json();
+            if(!data.search_id)throw new Error('Sem search_id');
+            this.state.searchId=data.search_id;
+            this.state.currencyRates=data.currency_rates||{};
+            this.setProgress(20,'Consultando companhias...');
             this.poll();
-        } catch (err) {
-            console.error('❌', err);
-            this.showError(err.message);
-        }
+        }catch(err){console.error('❌',err);this.showError(err.message);}
     },
 
-    async poll() {
-        if (this.state.searchComplete || this.state.pollCount >= this.state.maxPolls) {
-            this.finishSearch();
-            return;
-        }
+    async poll(){
+        if(this.state.searchComplete||this.state.pollCount>=this.state.maxPolls){this.finishSearch();return;}
         this.state.pollCount++;
-        try {
-            const r = await fetch(`/api/flight-results?uuid=${this.state.searchId}&currency=${this.state.params.currency}`);
-            if (!r.ok) throw new Error(`HTTP ${r.status}`);
-            const data = await r.json();
-
-            const pct = Math.min(90, 20 + (this.state.pollCount / this.state.maxPolls) * 70);
-            this.setProgress(pct, data.total > 0 ? `${data.total} ofertas encontradas...` : 'Consultando agências...');
-
-            if (data.proposals?.length > 0) {
-                this.state.proposals = data.proposals;
-                if (data.total >= 3 && !this.state.resultsShown) {
-                    this.state.resultsShown = true;
-                    this.showResults();
-                }
+        try{
+            const r=await fetch(`/api/flight-results?uuid=${this.state.searchId}&currency=${this.state.params.currency}`);
+            if(!r.ok)throw new Error(`HTTP ${r.status}`);
+            const data=await r.json();
+            const pct=Math.min(90,20+(this.state.pollCount/this.state.maxPolls)*70);
+            this.setProgress(pct,data.total>0?`${data.total} ofertas encontradas...`:'Consultando agências...');
+            if(data.proposals?.length>0){
+                this.state.proposals=data.proposals;
+                this.updateFilterBounds();
+                if(data.total>=3&&!this.state.resultsShown){this.state.resultsShown=true;this.showResults();}
             }
-            if (data.completed) {
-                this.state.searchComplete = true;
-                this.finishSearch();
-                return;
-            }
-            this.state.pollTimer = setTimeout(() => this.poll(), this.state.pollCount < 5 ? 2000 : 1500);
-        } catch (e) {
-            console.warn('Poll error:', e.message);
-            this.state.pollTimer = setTimeout(() => this.poll(), 2000);
-        }
+            if(data.completed){this.state.searchComplete=true;this.finishSearch();return;}
+            this.state.pollTimer=setTimeout(()=>this.poll(),this.state.pollCount<5?2000:1500);
+        }catch(e){console.warn('Poll:',e.message);this.state.pollTimer=setTimeout(()=>this.poll(),2000);}
     },
 
-    finishSearch() {
-        if (this.state.pollTimer) clearTimeout(this.state.pollTimer);
-        if (this.state.tipInterval) clearInterval(this.state.tipInterval);
-        this.setProgress(100, 'Busca concluída!');
-
-        if (this.state.proposals.length === 0) {
-            this.showPanel('empty');
-            return;
-        }
-        if (!this.state.resultsShown) this.showResults();
-        else this.renderCards();
+    finishSearch(){
+        if(this.state.pollTimer)clearTimeout(this.state.pollTimer);
+        if(this.state.tipInterval)clearInterval(this.state.tipInterval);
+        this.setProgress(100,'Busca concluída!');
+        if(this.state.proposals.length===0){this.showPanel('empty');return;}
+        this.updateFilterBounds();this.populateAirlinesFilter();
+        if(!this.state.resultsShown)this.showResults();else this.renderCards();
     },
 
-    retrySearch() {
-        this.resetSearchState();
-        this.showPanel('loading');
-        this.startSearch();
-    },
-
-    showError(msg) {
-        document.getElementById('error-msg').textContent = msg;
-        this.showPanel('error');
-    },
-
-    showResults() {
-        this.showPanel('results');
-        this.renderCards();
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-    },
-
-    setProgress(pct, msg) {
-        const bar = document.getElementById('progress-fill');
-        if (bar) bar.style.width = `${pct}%`;
-        const m = document.getElementById('loading-msg');
-        if (m) m.textContent = msg;
-    },
-
-    startTips() {
-        const tips = [
-            '💡 Os preços são por pessoa, ida e volta',
-            '✈️ Comparando dezenas de companhias aéreas',
-            '🔍 Buscando as melhores tarifas',
-            '💰 Preços na moeda que você escolheu',
-            '🐕 A Tripinha está farejando ofertas!',
-            '⏰ A busca leva até 60 segundos',
-        ];
-        let i = 0;
-        this.state.tipInterval = setInterval(() => {
-            i = (i + 1) % tips.length;
-            const el = document.getElementById('loading-tip');
-            if (el) el.textContent = tips[i];
-        }, 4000);
-    },
+    retrySearch(){this.resetSearchState();this.showPanel('loading');this.startSearch()},
+    showError(msg){document.getElementById('error-msg').textContent=msg;this.showPanel('error')},
+    showResults(){this.showPanel('results');this.populateAirlinesFilter();this.updateTimeReturnVisibility();this.renderCards();window.scrollTo({top:0,behavior:'smooth'})},
+    setProgress(pct,msg){const b=document.getElementById('progress-fill');if(b)b.style.width=`${pct}%`;const m=document.getElementById('loading-msg');if(m)m.textContent=msg},
+    startTips(){const tips=['💡 Preços por pessoa, ida e volta','✈️ Comparando dezenas de companhias','🔍 Buscando as melhores tarifas','💰 Preços na moeda escolhida','🐕 A Tripinha farejando ofertas!','⏰ Busca leva até 60 segundos'];let i=0;this.state.tipInterval=setInterval(()=>{i=(i+1)%tips.length;const el=document.getElementById('loading-tip');if(el)el.textContent=tips[i]},4000)},
 
     // ================================================================
     // FORMAT HELPERS
     // ================================================================
-    fmtPrice(v) {
-        const c = this.CURRENCY[this.state.params.currency] || this.CURRENCY.BRL;
-        return `${c.sym} ${Math.round(v).toLocaleString('pt-BR')}`;
-    },
-    fmtDuration(min) {
-        if (!min || min <= 0) return '--';
-        const h = Math.floor(min / 60), m = min % 60;
-        if (h === 0) return `${m}min`;
-        if (m === 0) return `${h}h`;
-        return `${h}h${String(m).padStart(2, '0')}`;
-    },
-    fmtTime(t) { return (t || '--:--').substring(0, 5); },
-    stopsClass(s) { return s === 0 ? 's0' : s === 1 ? 's1' : 's2'; },
-    stopsText(s) { return s === 0 ? 'Direto' : s === 1 ? '1 parada' : `${s} paradas`; },
-    airlineLogo(iata) { return iata ? `https://pics.avs.io/60/60/${iata}.png` : ''; },
+    fmtPrice(v){const c=this.CURRENCY[this.state.params.currency]||this.CURRENCY.BRL;return`${c.sym} ${Math.round(v).toLocaleString('pt-BR')}`},
+    fmtDuration(min){if(!min||min<=0)return'--';const h=Math.floor(min/60),m=min%60;return h===0?`${m}min`:m===0?`${h}h`:`${h}h${String(m).padStart(2,'0')}`},
+    fmtTime(t){return(t||'--:--').substring(0,5)},
+    fmtMinToTime(m){return`${String(Math.floor(m/60)).padStart(2,'0')}:${String(m%60).padStart(2,'0')}`},
+    timeToMin(t){if(!t)return 0;const[h,m]=t.substring(0,5).split(':').map(Number);return(h||0)*60+(m||0)},
+    stopsClass(s){return s===0?'s0':s===1?'s1':'s2'},
+    stopsText(s){return s===0?'Direto':s===1?'1 parada':`${s} paradas`},
+    airlineLogo(iata){return iata?`https://pics.avs.io/60/60/${iata}.png`:''},
+    pricePerPerson(total){const{adults,children}=this.state.params;const p=(adults||1)+(children||0);return p>0?Math.round(total/p):total},
 
-    pricePerPerson(total) {
-        const { adults, children } = this.state.params;
-        const paying = (adults || 1) + (children || 0);
-        return paying > 0 ? Math.round(total / paying) : total;
+    // ================================================================
+    // FILTER BOUNDS
+    // ================================================================
+    updateFilterBounds(){
+        const pp=this.state.proposals;if(!pp.length)return;
+        const prices=pp.map(p=>this.pricePerPerson(p.price)).filter(v=>v>0&&isFinite(v));
+        if(prices.length){this.state.priceBounds={min:Math.min(...prices),max:Math.max(...prices)};}
+        const durs=pp.map(p=>p.segments?.[0]?.total_duration||p.total_duration).filter(v=>v>0);
+        if(durs.length){this.state.durationBounds={min:Math.min(...durs),max:Math.max(...durs)};}
+        const airlines={};
+        for(const p of pp){const ppp=this.pricePerPerson(p.price);for(const seg of(p.segments||[]))for(const f of(seg.flights||[])){const c=f.airline;if(c&&(!airlines[c]||ppp<airlines[c].minPrice))airlines[c]={name:f.airline_name||c,minPrice:ppp};}}
+        this.state.allAirlines=airlines;
+        // Update slider ranges
+        const ps=document.getElementById('fr-price-max');
+        if(ps){ps.min=Math.floor(this.state.priceBounds.min);ps.max=Math.ceil(this.state.priceBounds.max);if(this.state.filters.priceMax===Infinity)ps.value=ps.max;document.getElementById('fv-price-min').textContent=this.fmtPrice(this.state.priceBounds.min);document.getElementById('fv-price-max').textContent=this.fmtPrice(this.state.filters.priceMax===Infinity?this.state.priceBounds.max:this.state.filters.priceMax);}
+        const ds=document.getElementById('fr-duration-max');
+        if(ds){ds.min=Math.floor(this.state.durationBounds.min);ds.max=Math.ceil(this.state.durationBounds.max);if(this.state.filters.durationMax===Infinity)ds.value=ds.max;document.getElementById('fv-dur-val').textContent=this.fmtDuration(this.state.filters.durationMax===Infinity?this.state.durationBounds.max:this.state.filters.durationMax);}
+    },
+
+    updateTimeReturnVisibility(){
+        const has=!!this.state.params.return_date;
+        document.querySelectorAll('#fp-times-return,#fp-times-return-arr').forEach(el=>el.style.display=has?'block':'none');
     },
 
     // ================================================================
-    // SORT & FILTER
+    // AIRLINES FILTER
     // ================================================================
-    setupSortAndFilters() {
-        document.querySelectorAll('.sort-tab').forEach(tab => {
-            tab.addEventListener('click', () => {
-                document.querySelectorAll('.sort-tab').forEach(t => t.classList.remove('active'));
-                tab.classList.add('active');
-                this.state.sortBy = tab.dataset.sort;
-                this.state.displayedCount = 0;
-                this.renderCards();
-            });
-        });
+    populateAirlinesFilter(){
+        const list=document.getElementById('fp-airline-list');
+        const entries=Object.entries(this.state.allAirlines).sort((a,b)=>a[1].minPrice-b[1].minPrice);
+        if(!entries.length){list.innerHTML='<p class="fp-empty">Nenhuma companhia</p>';return;}
+        list.innerHTML=entries.map(([code,info])=>`<label class="fp-opt"><input type="checkbox" name="airline" value="${code}" checked><img class="fp-airline-logo" src="${this.airlineLogo(code)}" alt="${code}" onerror="this.style.display='none'"><span class="fp-airline-name">${info.name}</span><span class="fp-airline-price">a partir de ${this.fmtPrice(info.minPrice)}</span></label>`).join('');
+        list.querySelectorAll('input[name="airline"]').forEach(cb=>cb.addEventListener('change',()=>this.onAirlineChange()));
+    },
 
-        const stopsBtn = document.getElementById('fc-stops');
-        const stopsDd = document.getElementById('fd-stops');
-        if (stopsBtn && stopsDd) {
-            stopsBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                const open = stopsDd.style.display !== 'none';
-                stopsDd.style.display = open ? 'none' : 'block';
-                stopsBtn.classList.toggle('active', !open);
-            });
-            stopsDd.querySelectorAll('input').forEach(cb => {
-                cb.addEventListener('change', () => {
-                    if (cb.value === 'all') {
-                        stopsDd.querySelectorAll('input').forEach(i => i.checked = cb.checked);
-                        this.state.filterStops = 'all';
-                    } else {
-                        stopsDd.querySelector('input[value="all"]').checked = false;
-                        const checked = [...stopsDd.querySelectorAll('input:checked:not([value="all"])')].map(i => i.value);
-                        this.state.filterStops = checked.length === 0 ? 'all' : checked;
-                    }
-                    this.state.displayedCount = 0;
-                    this.renderCards();
-                });
-            });
-            document.addEventListener('click', () => { stopsDd.style.display = 'none'; stopsBtn.classList.remove('active'); });
-        }
+    onAirlineChange(){
+        const checked=[...document.querySelectorAll('#fp-airline-list input:checked')].map(i=>i.value);
+        const total=document.querySelectorAll('#fp-airline-list input').length;
+        this.state.filters.airlines=checked.length===total?'all':new Set(checked);
+        this.applyFilters();
+    },
 
-        document.getElementById('btn-load-more')?.addEventListener('click', () => {
-            this.state.displayedCount += this.state.perPage;
-            this.renderCards(true);
+    // ================================================================
+    // SETUP SORT + FILTER UI
+    // ================================================================
+    setupSortTabs(){
+        document.querySelectorAll('.sort-tab').forEach(tab=>{
+            tab.addEventListener('click',()=>{
+                document.querySelectorAll('.sort-tab').forEach(t=>t.classList.remove('active'));
+                tab.classList.add('active');this.state.sortBy=tab.dataset.sort;this.state.displayedCount=0;this.renderCards();
+            });
         });
     },
 
-    getFiltered() {
-        let list = [...this.state.proposals];
-        // Filter stops
-        if (this.state.filterStops !== 'all') {
-            const allow = (Array.isArray(this.state.filterStops) ? this.state.filterStops : [this.state.filterStops]).map(Number);
-            list = list.filter(p => {
-                const ms = p.max_stops || Math.max(...(p.segments || []).map(s => s.stops));
-                return allow.some(a => a === 2 ? ms >= 2 : ms === a);
+    setupFilterChips(){
+        const map={'fc-stops':'fp-stops','fc-airlines':'fp-airlines','fc-times':'fp-times','fc-price':'fp-price','fc-duration':'fp-duration'};
+        for(const[cid,pid]of Object.entries(map)){document.getElementById(cid)?.addEventListener('click',e=>{e.stopPropagation();this.togglePanel(pid);});}
+        document.getElementById('fc-clear')?.addEventListener('click',()=>{this.resetFilters();this.populateAirlinesFilter();this.applyFilters();});
+        document.addEventListener('click',e=>{if(this.state.activePanel){const p=document.getElementById(this.state.activePanel);if(p&&!p.contains(e.target))this.closePanel();}});
+        document.getElementById('filter-overlay')?.addEventListener('click',()=>this.closePanel());
+    },
+
+    setupFilterPanels(){
+        document.querySelectorAll('.fp-close').forEach(b=>b.addEventListener('click',()=>this.closePanel()));
+        // Stops
+        document.querySelectorAll('#fp-stops input[name="stops"]').forEach(cb=>{
+            cb.addEventListener('change',()=>{
+                if(cb.value==='all'){document.querySelectorAll('#fp-stops input').forEach(i=>i.checked=cb.checked);this.state.filters.stops='all';}
+                else{document.querySelector('#fp-stops input[value="all"]').checked=false;const c=[...document.querySelectorAll('#fp-stops input:checked:not([value="all"])')].map(i=>parseInt(i.value));this.state.filters.stops=c.length===0||c.length===3?'all':c;if(this.state.filters.stops==='all')document.querySelector('#fp-stops input[value="all"]').checked=true;}
+                this.applyFilters();
             });
+        });
+        // Airlines actions
+        document.getElementById('fp-airlines-all')?.addEventListener('click',()=>{document.querySelectorAll('#fp-airline-list input').forEach(i=>i.checked=true);this.state.filters.airlines='all';this.applyFilters();});
+        document.getElementById('fp-airlines-none')?.addEventListener('click',()=>{document.querySelectorAll('#fp-airline-list input').forEach(i=>i.checked=false);this.state.filters.airlines=new Set();this.applyFilters();});
+        // Time sliders
+        const ts=[['fr-dep-go-min','fr-dep-go-max','fv-dep-go-min','fv-dep-go-max','depGoMin','depGoMax'],['fr-arr-go-min','fr-arr-go-max','fv-arr-go-min','fv-arr-go-max','arrGoMin','arrGoMax'],['fr-dep-ret-min','fr-dep-ret-max','fv-dep-ret-min','fv-dep-ret-max','depRetMin','depRetMax'],['fr-arr-ret-min','fr-arr-ret-max','fv-arr-ret-min','fv-arr-ret-max','arrRetMin','arrRetMax']];
+        for(const[minId,maxId,minL,maxL,minK,maxK]of ts){
+            const mn=document.getElementById(minId),mx=document.getElementById(maxId);if(!mn||!mx)continue;
+            const upd=()=>{document.getElementById(minL).textContent=this.fmtMinToTime(parseInt(mn.value));document.getElementById(maxL).textContent=this.fmtMinToTime(parseInt(mx.value));};
+            mn.addEventListener('input',()=>{if(parseInt(mn.value)>parseInt(mx.value))mn.value=mx.value;this.state.filters[minK]=parseInt(mn.value);upd();});
+            mx.addEventListener('input',()=>{if(parseInt(mx.value)<parseInt(mn.value))mx.value=mn.value;this.state.filters[maxK]=parseInt(mx.value);upd();});
+            mn.addEventListener('change',()=>this.applyFilters());
+            mx.addEventListener('change',()=>this.applyFilters());
         }
-        // Sort
-        switch (this.state.sortBy) {
-            case 'cheapest': list.sort((a, b) => a.price - b.price); break;
-            case 'fastest': list.sort((a, b) => (a.total_duration || Infinity) - (b.total_duration || Infinity)); break;
-            case 'best': list.sort((a, b) => (a.price/1000 + (a.total_duration||0)/60) - (b.price/1000 + (b.total_duration||0)/60)); break;
+        // Price slider
+        const ps=document.getElementById('fr-price-max');
+        if(ps){ps.addEventListener('input',()=>{this.state.filters.priceMax=parseInt(ps.value);document.getElementById('fv-price-max').textContent=this.fmtPrice(parseInt(ps.value));});ps.addEventListener('change',()=>this.applyFilters());}
+        // Duration slider
+        const ds=document.getElementById('fr-duration-max');
+        if(ds){ds.addEventListener('input',()=>{this.state.filters.durationMax=parseInt(ds.value);document.getElementById('fv-dur-val').textContent=this.fmtDuration(parseInt(ds.value));});ds.addEventListener('change',()=>this.applyFilters());}
+        // Load more
+        document.getElementById('btn-load-more')?.addEventListener('click',()=>{this.state.displayedCount+=this.state.perPage;this.renderCards(true);});
+    },
+
+    togglePanel(pid){
+        if(this.state.activePanel===pid){this.closePanel();return;}
+        this.closePanel();
+        const p=document.getElementById(pid);
+        if(p){p.style.display='block';this.state.activePanel=pid;document.getElementById('filter-overlay').classList.add('open');
+        const cm={'fp-stops':'fc-stops','fp-airlines':'fc-airlines','fp-times':'fc-times','fp-price':'fc-price','fp-duration':'fc-duration'};
+        document.getElementById(cm[pid])?.classList.add('active');}
+    },
+
+    closePanel(){
+        if(this.state.activePanel){document.getElementById(this.state.activePanel).style.display='none';}
+        document.querySelectorAll('.filter-chip').forEach(c=>c.classList.remove('active'));
+        this.updateChipStates();this.state.activePanel=null;
+        document.getElementById('filter-overlay').classList.remove('open');
+    },
+
+    // ================================================================
+    // FILTERS
+    // ================================================================
+    resetFilters(){
+        this.state.filters={stops:'all',airlines:'all',depGoMin:0,depGoMax:1439,arrGoMin:0,arrGoMax:1439,depRetMin:0,depRetMax:1439,arrRetMin:0,arrRetMax:1439,priceMax:Infinity,durationMax:Infinity};
+        document.querySelectorAll('#fp-stops input').forEach(i=>i.checked=true);
+        document.querySelectorAll('#fp-airline-list input').forEach(i=>i.checked=true);
+        document.querySelectorAll('.fp-dual-range input').forEach(r=>{r.value=r.id.includes('min')?r.min:r.max;});
+        const ps=document.getElementById('fr-price-max');if(ps)ps.value=ps.max;
+        const ds=document.getElementById('fr-duration-max');if(ds)ds.value=ds.max;
+        document.querySelectorAll('[id^="fv-dep-"],[id^="fv-arr-"]').forEach(el=>{el.textContent=el.id.includes('min')?'00:00':'23:59';});
+        this.updateChipStates();
+        document.getElementById('active-filters').style.display='none';
+        document.getElementById('fc-clear').style.display='none';
+    },
+
+    applyFilters(){this.state.displayedCount=0;this.updateChipStates();this.updateActiveTags();this.renderCards();},
+
+    updateChipStates(){
+        const f=this.state.filters;
+        const s=(id,c)=>{const el=document.getElementById(id);if(el)el.classList.toggle('has-filter',c);};
+        s('fc-stops',f.stops!=='all');
+        s('fc-airlines',f.airlines!=='all');
+        s('fc-times',f.depGoMin>0||f.depGoMax<1439||f.arrGoMin>0||f.arrGoMax<1439||f.depRetMin>0||f.depRetMax<1439||f.arrRetMin>0||f.arrRetMax<1439);
+        s('fc-price',f.priceMax!==Infinity&&f.priceMax<this.state.priceBounds.max);
+        s('fc-duration',f.durationMax!==Infinity&&f.durationMax<this.state.durationBounds.max);
+        document.getElementById('fc-clear').style.display=document.querySelector('.filter-chip.has-filter')?'inline-flex':'none';
+    },
+
+    updateActiveTags(){
+        const f=this.state.filters, tags=[];
+        if(f.stops!=='all')tags.push({label:`Paradas: ${f.stops.map(s=>s===0?'Direto':s===1?'1':'+2').join(', ')}`,clear:()=>{f.stops='all';document.querySelectorAll('#fp-stops input').forEach(i=>i.checked=true);}});
+        if(f.airlines!=='all'){const n=f.airlines.size,t=Object.keys(this.state.allAirlines).length;tags.push({label:`${n}/${t} cias`,clear:()=>{f.airlines='all';document.querySelectorAll('#fp-airline-list input').forEach(i=>i.checked=true);}});}
+        if(f.priceMax!==Infinity&&f.priceMax<this.state.priceBounds.max)tags.push({label:`Até ${this.fmtPrice(f.priceMax)}`,clear:()=>{f.priceMax=Infinity;const s=document.getElementById('fr-price-max');if(s)s.value=s.max;}});
+        if(f.durationMax!==Infinity&&f.durationMax<this.state.durationBounds.max)tags.push({label:`Até ${this.fmtDuration(f.durationMax)}`,clear:()=>{f.durationMax=Infinity;const s=document.getElementById('fr-duration-max');if(s)s.value=s.max;}});
+        const c=document.getElementById('active-filters'),l=document.getElementById('active-filters-list');
+        if(!tags.length){c.style.display='none';return;}
+        c.style.display='block';
+        l.innerHTML=tags.map((t,i)=>`<span class="af-tag">${t.label}<button data-i="${i}">✕</button></span>`).join('');
+        l.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{tags[parseInt(b.dataset.i)].clear();this.applyFilters();}));
+    },
+
+    // ================================================================
+    // GET FILTERED + SORTED
+    // ================================================================
+    getFiltered(){
+        const f=this.state.filters;
+        let list=[...this.state.proposals];
+        if(f.stops!=='all'){const a=f.stops.map(Number);list=list.filter(p=>{const ms=p.max_stops||Math.max(...(p.segments||[]).map(s=>s.stops));return a.some(v=>v===2?ms>=2:ms===v);});}
+        if(f.airlines!=='all'&&f.airlines.size>0)list=list.filter(p=>(p.carriers||[]).some(c=>f.airlines.has(c)));
+        else if(f.airlines!=='all'&&f.airlines.size===0)list=[];
+        list=list.filter(p=>{
+            const segs=p.segments||[];const ida=segs[0],volta=segs[1];
+            if(ida){const d=this.timeToMin(ida.departure_time),a=this.timeToMin(ida.arrival_time);if(d<f.depGoMin||d>f.depGoMax||a<f.arrGoMin||a>f.arrGoMax)return false;}
+            if(volta){const d=this.timeToMin(volta.departure_time),a=this.timeToMin(volta.arrival_time);if(d<f.depRetMin||d>f.depRetMax||a<f.arrRetMin||a>f.arrRetMax)return false;}
+            return true;
+        });
+        if(f.priceMax!==Infinity)list=list.filter(p=>this.pricePerPerson(p.price)<=f.priceMax);
+        if(f.durationMax!==Infinity)list=list.filter(p=>{const d=p.segments?.[0]?.total_duration||p.total_duration;return d<=f.durationMax;});
+        switch(this.state.sortBy){
+            case'cheapest':list.sort((a,b)=>a.price-b.price);break;
+            case'fastest':list.sort((a,b)=>(a.total_duration||Infinity)-(b.total_duration||Infinity));break;
+            case'best':list.sort((a,b)=>(a.price/1000+(a.total_duration||0)/60)-(b.price/1000+(b.total_duration||0)/60));break;
         }
         return list;
     },
 
     // ================================================================
-    // RENDER CARDS
+    // RENDER
     // ================================================================
-    renderCards(append = false) {
-        const sorted = this.getFiltered();
-
-        // Update sort tab values
-        if (sorted.length > 0) {
-            const cheap = [...sorted].sort((a,b) => a.price - b.price)[0];
-            const fast = [...sorted].sort((a,b) => (a.total_duration||Infinity) - (b.total_duration||Infinity))[0];
-            const best = [...sorted].sort((a,b) => (a.price/1000+(a.total_duration||0)/60) - (b.price/1000+(b.total_duration||0)/60))[0];
-            document.getElementById('sv-cheap').textContent = this.fmtPrice(this.pricePerPerson(cheap.price));
-            document.getElementById('sv-fast').textContent = this.fmtDuration(fast.total_duration);
-            document.getElementById('sv-best').textContent = this.fmtPrice(this.pricePerPerson(best.price));
+    renderCards(append=false){
+        const sorted=this.getFiltered();
+        if(sorted.length>0){
+            const ch=[...sorted].sort((a,b)=>a.price-b.price)[0];
+            const fa=[...sorted].sort((a,b)=>(a.total_duration||Infinity)-(b.total_duration||Infinity))[0];
+            const be=[...sorted].sort((a,b)=>(a.price/1000+(a.total_duration||0)/60)-(b.price/1000+(b.total_duration||0)/60))[0];
+            document.getElementById('sv-cheap').textContent=this.fmtPrice(this.pricePerPerson(ch.price));
+            document.getElementById('sv-fast').textContent=this.fmtDuration(fa.total_duration);
+            document.getElementById('sv-best').textContent=this.fmtPrice(this.pricePerPerson(be.price));
         }
-
-        // Info
-        document.getElementById('r-count').textContent = `${sorted.length} resultado${sorted.length !== 1 ? 's' : ''}`;
-        const cur = this.CURRENCY[this.state.params.currency] || this.CURRENCY.BRL;
-        document.getElementById('r-currency').textContent = `Preços por pessoa em ${cur.name} (${this.state.params.currency})`;
-
-        // Render
-        const container = document.getElementById('results-list');
-        if (!append) {
-            this.state.displayedCount = Math.min(this.state.perPage, sorted.length);
-            container.innerHTML = sorted.slice(0, this.state.displayedCount).map(p => this.cardHtml(p)).join('');
-        } else {
-            this.state.displayedCount = Math.min(this.state.displayedCount, sorted.length);
-            const curr = container.children.length;
-            const newOnes = sorted.slice(curr, this.state.displayedCount);
-            container.insertAdjacentHTML('beforeend', newOnes.map(p => this.cardHtml(p)).join(''));
-        }
-
-        // Load more
-        const lm = document.getElementById('load-more-wrap');
-        if (lm) lm.style.display = this.state.displayedCount < sorted.length ? 'block' : 'none';
+        document.getElementById('r-count').textContent=`${sorted.length} resultado${sorted.length!==1?'s':''}`;
+        const cur=this.CURRENCY[this.state.params.currency]||this.CURRENCY.BRL;
+        document.getElementById('r-currency').textContent=`Preços por pessoa em ${cur.name} (${this.state.params.currency})`;
+        const container=document.getElementById('results-list');
+        if(!append){this.state.displayedCount=Math.min(this.state.perPage,sorted.length);container.innerHTML=sorted.slice(0,this.state.displayedCount).map(p=>this.cardHtml(p)).join('');}
+        else{this.state.displayedCount=Math.min(this.state.displayedCount,sorted.length);container.insertAdjacentHTML('beforeend',sorted.slice(container.children.length,this.state.displayedCount).map(p=>this.cardHtml(p)).join(''));}
+        const lm=document.getElementById('load-more-wrap');if(lm)lm.style.display=this.state.displayedCount<sorted.length?'block':'none';
     },
 
-    cardHtml(p) {
-        const pp = this.pricePerPerson(p.price);
-        const segs = (p.segments || []).map(seg => {
-            const al = seg.flights[0]?.airline || '';
-            const aln = seg.flights[0]?.airline_name || al;
-            const via = seg.flights.length > 1 ? seg.flights.slice(0,-1).map(f => f.arrival_airport).join(', ') : '';
-            return `
-            <div class="fc-seg">
-                <div><div class="fc-time">${this.fmtTime(seg.departure_time)}</div><div class="fc-airport">${seg.departure_airport}</div></div>
-                <div class="fc-line">
-                    <span class="fc-dur">${this.fmtDuration(seg.total_duration)}</span>
-                    <div class="fc-line-bar"></div>
-                    <span class="fc-stops ${this.stopsClass(seg.stops)}">${this.stopsText(seg.stops)}</span>
-                    ${via ? `<span class="fc-stop-via">${via}</span>` : ''}
-                </div>
-                <div><div class="fc-time">${this.fmtTime(seg.arrival_time)}</div><div class="fc-airport">${seg.arrival_airport}</div></div>
-                <div class="fc-airline">
-                    <img class="fc-al-logo" src="${this.airlineLogo(al)}" alt="${aln}" onerror="this.style.display='none'">
-                    <span class="fc-al-name">${aln}</span>
-                </div>
-            </div>`;
+    cardHtml(p){
+        const pp=this.pricePerPerson(p.price);
+        const isRet=p.segments?.length>1;
+        const segs=(p.segments||[]).map(seg=>{
+            const al=seg.flights[0]?.airline||'',aln=seg.flights[0]?.airline_name||al;
+            const via=seg.flights.length>1?seg.flights.slice(0,-1).map(f=>f.arrival_airport).join(', '):'';
+            return`<div class="fc-seg"><div><div class="fc-time">${this.fmtTime(seg.departure_time)}</div><div class="fc-airport">${seg.departure_airport}</div></div><div class="fc-line"><span class="fc-dur">${this.fmtDuration(seg.total_duration)}</span><div class="fc-line-bar"></div><span class="fc-stops ${this.stopsClass(seg.stops)}">${this.stopsText(seg.stops)}</span>${via?`<span class="fc-stop-via">${via}</span>`:''}</div><div><div class="fc-time">${this.fmtTime(seg.arrival_time)}</div><div class="fc-airport">${seg.arrival_airport}</div></div><div class="fc-airline"><img class="fc-al-logo" src="${this.airlineLogo(al)}" alt="${aln}" onerror="this.style.display='none'"><span class="fc-al-name">${aln}</span></div></div>`;
         }).join('');
-
-        const others = (p.all_terms || []).slice(1, 6);
-        const moreHtml = others.length > 0 ? `
-            <div class="fc-more-toggle">
-                <button class="fc-more-btn" onclick="BenetripVoos.toggleMore(this)">+${others.length} oferta${others.length > 1 ? 's' : ''}</button>
-            </div>
-            <div class="fc-more-list">
-                ${others.map(t => `
-                <div class="fc-mo-row">
-                    <span class="fc-mo-gate">${t.gate_name}</span>
-                    <span class="fc-mo-price">${this.fmtPrice(this.pricePerPerson(t.price))}</span>
-                    <button class="fc-mo-book" onclick="BenetripVoos.book('${this.state.searchId}','${t.url}',this)">Reservar</button>
-                </div>`).join('')}
-            </div>` : '';
-
-        return `
-        <div class="flight-card">
-            <div class="fc-main">
-                <div class="fc-segments">${segs}</div>
-                <div class="fc-price-panel">
-                    <div>
-                        <div class="fc-price">${this.fmtPrice(pp)}</div>
-                        <div class="fc-price-lbl">por pessoa · ida e volta</div>
-                        <div class="fc-gate">${p.gate_name}</div>
-                    </div>
-                    <button class="fc-book" onclick="BenetripVoos.book('${this.state.searchId}','${p.terms_url}',this)">Reservar →</button>
-                </div>
-            </div>
-            ${moreHtml}
-        </div>`;
+        const others=(p.all_terms||[]).slice(1,8);
+        const more=others.length>0?`<div class="fc-more-toggle"><button class="fc-more-btn" onclick="BenetripVoos.toggleMore(this)">+${others.length} oferta${others.length>1?'s':''} de outr${others.length>1?'as agências':'a agência'}</button></div><div class="fc-more-list">${others.map(t=>`<div class="fc-mo-row"><span class="fc-mo-gate">${t.gate_name}</span><span class="fc-mo-price">${this.fmtPrice(this.pricePerPerson(t.price))}</span><button class="fc-mo-book" onclick="BenetripVoos.book('${this.state.searchId}','${t.url}',this)">Reservar</button></div>`).join('')}</div>`:'';
+        return`<div class="flight-card"><div class="fc-main"><div class="fc-segments">${segs}</div><div class="fc-price-panel"><div><div class="fc-price">${this.fmtPrice(pp)}</div><div class="fc-price-lbl">por pessoa · ${isRet?'ida e volta':'só ida'}</div><div class="fc-gate">${p.gate_name}</div></div><button class="fc-book" onclick="BenetripVoos.book('${this.state.searchId}','${p.terms_url}',this)">Reservar →</button></div></div>${more}</div>`;
     },
 
-    toggleMore(btn) {
-        const list = btn.closest('.flight-card').querySelector('.fc-more-list');
-        if (list) { list.classList.toggle('open'); btn.textContent = list.classList.contains('open') ? 'Menos' : btn.textContent; }
-    },
+    toggleMore(btn){const l=btn.closest('.flight-card').querySelector('.fc-more-list');if(l){l.classList.toggle('open');btn.textContent=l.classList.contains('open')?'Menos ofertas':btn.textContent;}},
 
     // ================================================================
-    // BOOKING CLICK
+    // BOOKING
     // ================================================================
-    async book(searchId, termsUrl, btn) {
-        if (!searchId || !termsUrl) { alert('Dados indisponíveis. Tente buscar novamente.'); return; }
-        const orig = btn.textContent;
-        btn.textContent = 'Abrindo...';
-        btn.classList.add('loading');
-        try {
-            const r = await fetch('/api/flight-click', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ search_id: searchId, terms_url: termsUrl })
-            });
-            if (!r.ok) throw new Error(`Erro ${r.status}`);
-            const data = await r.json();
-            if (data.method === 'POST' && data.params && Object.keys(data.params).length > 0) {
-                this.postRedirect(data.url, data.params);
-            } else {
-                window.open(data.url, '_blank');
-            }
-        } catch (e) {
-            console.error('❌', e);
-            alert('Não foi possível gerar o link. Os resultados expiram em 15 minutos. Tente buscar novamente.');
-        } finally {
-            btn.textContent = orig;
-            btn.classList.remove('loading');
-        }
+    async book(searchId,termsUrl,btn){
+        if(!searchId||!termsUrl){alert('Dados indisponíveis. Busque novamente.');return;}
+        const orig=btn.textContent;btn.textContent='Abrindo...';btn.classList.add('loading');
+        try{
+            const r=await fetch('/api/flight-click',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({search_id:searchId,terms_url:termsUrl})});
+            if(!r.ok)throw new Error(`Erro ${r.status}`);
+            const data=await r.json();
+            if(data.method==='POST'&&data.params&&Object.keys(data.params).length>0)this.postRedirect(data.url,data.params);
+            else window.open(data.url,'_blank');
+        }catch(e){console.error('❌',e);alert('Link indisponível. Resultados expiram em 15 min.');}
+        finally{btn.textContent=orig;btn.classList.remove('loading');}
     },
 
-    postRedirect(url, params) {
-        const form = document.getElementById('redirect-form');
-        form.action = url; form.target = '_blank'; form.innerHTML = '';
-        for (const [k, v] of Object.entries(params)) {
-            const inp = document.createElement('input');
-            inp.type = 'hidden'; inp.name = k; inp.value = v;
-            form.appendChild(inp);
-        }
+    postRedirect(url,params){
+        const form=document.getElementById('redirect-form');form.action=url;form.target='_blank';form.innerHTML='';
+        for(const[k,v]of Object.entries(params)){const i=document.createElement('input');i.type='hidden';i.name=k;i.value=v;form.appendChild(i);}
         form.submit();
     },
 };
 
-document.addEventListener('DOMContentLoaded', () => BenetripVoos.init());
+document.addEventListener('DOMContentLoaded',()=>BenetripVoos.init());
