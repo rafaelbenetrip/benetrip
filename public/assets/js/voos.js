@@ -1,11 +1,12 @@
 /**
- * BENETRIP VOOS v3.0 — Busca de voos com filtros completos
+ * BENETRIP VOOS v3.1 — Busca de voos com filtros completos
  *
- * Fixes from v2.1:
- * - Currency: forwards initial currency_rates to results endpoint
- * - Filters: all element IDs aligned with HTML
- * - Times: full 4-section time filter (dep/arr for ida + volta)
- * - Grouping: verified sign-based dedup with multi-operator display
+ * Fixes from v3.0:
+ * - CRITICAL: Re-render cards on every poll with new data (not just first time)
+ * - Increased minimum results threshold from 3 to 5 before showing
+ * - Added "search in progress" visual indicator while polling continues
+ * - Live result count update during search
+ * - Smoother transition from loading to results
  */
 
 const BenetripVoos = {
@@ -25,6 +26,7 @@ const BenetripVoos = {
         sortBy: 'cheapest',
         resultsShown: false,
         tipInterval: null,
+        previousBestPrice: Infinity, // Track price changes for visual feedback
         filters: {
             stops: 'all',
             airlines: 'all',
@@ -51,7 +53,7 @@ const BenetripVoos = {
     // INIT
     // ================================================================
     async init() {
-        console.log('✈️ BenetripVoos v3.0');
+        console.log('✈️ BenetripVoos v3.1');
         await this.loadCities();
         this.setupSearchForm();
         this.setupSortTabs();
@@ -244,7 +246,7 @@ const BenetripVoos = {
     // ================================================================
     // SEARCH FLOW
     // ================================================================
-    resetSearchState(){this.state.searchId=null;this.state.proposals=[];this.state.searchComplete=false;this.state.resultsShown=false;this.state.displayedCount=0;this.state.pollCount=0;this.state.allAirlines={};this.state.currencyRates={};if(this.state.pollTimer)clearTimeout(this.state.pollTimer);if(this.state.tipInterval)clearInterval(this.state.tipInterval)},
+    resetSearchState(){this.state.searchId=null;this.state.proposals=[];this.state.searchComplete=false;this.state.resultsShown=false;this.state.displayedCount=0;this.state.pollCount=0;this.state.allAirlines={};this.state.currencyRates={};this.state.previousBestPrice=Infinity;if(this.state.pollTimer)clearTimeout(this.state.pollTimer);if(this.state.tipInterval)clearInterval(this.state.tipInterval)},
 
     async startSearch(){
         this.setProgress(10,'Iniciando busca...');this.startTips();
@@ -284,10 +286,31 @@ const BenetripVoos = {
 
             const pct=Math.min(90,20+(this.state.pollCount/this.state.maxPolls)*70);
             this.setProgress(pct,data.total>0?`${data.total} ofertas encontradas...`:'Consultando agências...');
+
             if(data.proposals?.length>0){
+                const prevCount = this.state.proposals.length;
                 this.state.proposals=data.proposals;
                 this.updateFilterBounds();
-                if(data.total>=3&&!this.state.resultsShown){this.state.resultsShown=true;this.showResults();}
+
+                if(data.total >= 5 && !this.state.resultsShown){
+                    // ——————————————————————————————————————————————
+                    // FIRST RENDER: show results panel with search-in-progress banner
+                    // ——————————————————————————————————————————————
+                    this.state.resultsShown=true;
+                    this.showResults();
+                    this.showSearchingBanner(true);
+                    console.log(`📋 [Poll ${this.state.pollCount}] First render with ${data.total} results`);
+                } else if(this.state.resultsShown) {
+                    // ——————————————————————————————————————————————
+                    // SUBSEQUENT POLLS: re-render cards with updated data
+                    // Only re-render if we actually got new/different proposals
+                    // ——————————————————————————————————————————————
+                    if (data.proposals.length !== prevCount) {
+                        this.renderCards();
+                        this.checkForBetterPrice(data.proposals);
+                        console.log(`📋 [Poll ${this.state.pollCount}] Re-rendered: ${prevCount} → ${data.total} results`);
+                    }
+                }
             }
             if(data.completed){this.state.searchComplete=true;this.finishSearch();return;}
             this.state.pollTimer=setTimeout(()=>this.poll(),this.state.pollCount<5?2000:1500);
@@ -300,7 +323,72 @@ const BenetripVoos = {
         this.setProgress(100,'Busca concluída!');
         if(this.state.proposals.length===0){this.showPanel('empty');return;}
         this.updateFilterBounds();this.populateAirlinesFilter();
-        if(!this.state.resultsShown)this.showResults();else this.renderCards();
+        // Hide the "still searching" banner
+        this.showSearchingBanner(false);
+        if(!this.state.resultsShown) this.showResults();
+        else this.renderCards();
+    },
+
+    /**
+     * Show/hide a banner indicating that more results are still being loaded.
+     * This reassures users that cheaper options may still appear.
+     */
+    showSearchingBanner(show) {
+        let banner = document.getElementById('searching-banner');
+        if (show) {
+            if (!banner) {
+                banner = document.createElement('div');
+                banner.id = 'searching-banner';
+                banner.className = 'searching-banner';
+                banner.innerHTML = `
+                    <div class="searching-banner-inner">
+                        <div class="searching-banner-pulse"></div>
+                        <span>🔍 Ainda buscando ofertas melhores...</span>
+                    </div>
+                `;
+                // Insert before results list
+                const resultsInfo = document.querySelector('.results-info');
+                if (resultsInfo) {
+                    resultsInfo.parentNode.insertBefore(banner, resultsInfo);
+                }
+            }
+            banner.style.display = 'block';
+        } else {
+            if (banner) {
+                // Fade out nicely
+                banner.style.transition = 'opacity 0.5s ease';
+                banner.style.opacity = '0';
+                setTimeout(() => {
+                    if (banner.parentNode) banner.parentNode.removeChild(banner);
+                }, 500);
+            }
+        }
+    },
+
+    /**
+     * Check if a new best price appeared and briefly highlight it
+     */
+    checkForBetterPrice(proposals) {
+        if (!proposals.length) return;
+        const sorted = [...proposals].sort((a, b) => a.price - b.price);
+        const currentBest = this.pricePerPerson(sorted[0].price);
+
+        if (currentBest < this.state.previousBestPrice && this.state.previousBestPrice !== Infinity) {
+            console.log(`💰 Better price found: ${this.fmtPrice(this.state.previousBestPrice)} → ${this.fmtPrice(currentBest)}`);
+            // Flash the cheapest sort tab to draw attention
+            const cheapTab = document.querySelector('.sort-tab[data-sort="cheapest"] .sort-val');
+            if (cheapTab) {
+                cheapTab.classList.add('price-improved');
+                setTimeout(() => cheapTab.classList.remove('price-improved'), 2000);
+            }
+            // Flash the first card
+            const firstCard = document.querySelector('.flight-card');
+            if (firstCard) {
+                firstCard.classList.add('card-new-best');
+                setTimeout(() => firstCard.classList.remove('card-new-best'), 2500);
+            }
+        }
+        this.state.previousBestPrice = currentBest;
     },
 
     retrySearch(){this.resetSearchState();this.showPanel('loading');this.startSearch()},
