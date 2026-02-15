@@ -271,7 +271,7 @@ const BenetripDiscovery = {
         const adultos = parseInt(document.getElementById('familia-adultos').value);
         const bebes = parseInt(document.getElementById('familia-bebes').value);
         
-        // Regra: máximo 1 bebê por adulto (no colo)
+        // Regra: máximo 1 bebê por pessoa (no colo)
         if (bebes > adultos) {
             document.getElementById('familia-bebes').value = adultos;
         }
@@ -887,7 +887,7 @@ const BenetripDiscovery = {
                     </div>
                     <div class="criterio-item">
                         <span class="criterio-label">Orçamento</span>
-                        <span class="criterio-valor">💰 Até ${simbolo} ${orcamento.toLocaleString('pt-BR')} por adulto (ida+volta)</span>
+                        <span class="criterio-valor">💰 Até ${simbolo} ${orcamento.toLocaleString('pt-BR')} por pessoa (ida+volta)</span>
                     </div>
                 </div>
             </div>
@@ -1037,7 +1037,7 @@ const BenetripDiscovery = {
                                 ${fonteBadge(d)}
                                 <h4>${d.name}${d.country ? ', ' + d.country : ''}</h4>
                                 <div class="preco">${formatPreco(d)}</div>
-                                <div class="preco-label">ida e volta por adulto</div>
+                                <div class="preco-label">ida e volta por pessoa</div>
                                 <div class="flight-info">${formatParadas(d)}</div>
                                 ${custoEstimado(d)}
                                 <div class="descricao">${d.razao || 'Boa opção!'}</div>
@@ -1062,7 +1062,7 @@ const BenetripDiscovery = {
                     ${fonteBadge(destinos.surpresa)}
                     <h3>${destinos.surpresa.name}${destinos.surpresa.country ? ', ' + destinos.surpresa.country : ''}</h3>
                     <div class="preco">${formatPreco(destinos.surpresa)}</div>
-                    <div class="preco-label">ida e volta por adulto</div>
+                    <div class="preco-label">ida e volta por pessoa</div>
                     <div class="flight-info">${formatParadas(destinos.surpresa)}</div>
                     ${custoEstimado(destinos.surpresa)}
                     <div class="descricao">${destinos.surpresa.razao || 'Descubra!'}</div>
@@ -1100,7 +1100,7 @@ const BenetripDiscovery = {
                 ${fonteBadge(destinos.top_destino)}
                 <h2>${destinos.top_destino.name}, ${destinos.top_destino.country || ''}</h2>
                 <div class="preco">${formatPreco(destinos.top_destino)}</div>
-                <div class="preco-label">Passagem ida e volta por adulto</div>
+                <div class="preco-label">Passagem ida e volta por pessoa</div>
                 <div class="flight-info">${formatParadas(destinos.top_destino)}</div>
                 ${custoEstimado(destinos.top_destino)}
                 <div class="descricao">${destinos.top_destino.razao || 'Perfeito para você!'}</div>
