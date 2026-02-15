@@ -405,7 +405,7 @@ const BenetripVoos = {
             });
             if (!r.ok) {
                 const err = await r.json().catch(() => ({}));
-                throw new Error(err.message || err.detail || `Erro ${r.status}`);
+                throw new Error(err.error || err.message || err.detail || `Erro ${r.status}`);
             }
             const data = await r.json();
             if (!data.search_id) throw new Error('Sem search_id');
