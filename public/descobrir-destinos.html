@@ -4,331 +4,292 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="theme-color" content="#E87722">
-    <title>Passagens Aéreas - Benetrip</title>
+    <title>Descubra seu Destino Perfeito - Benetrip</title>
+
+    <!-- Favicons -->
     <link rel="icon" type="image/svg+xml" href="assets/images/favicon/favicon.svg">
     <link rel="apple-touch-icon" sizes="180x180" href="assets/images/favicon/apple-touch-icon.png">
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=Montserrat:wght@400;500;600&display=swap" rel="stylesheet">
+    
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Montserrat:wght@400;500&display=swap" rel="stylesheet">
+    
+    <!-- Flatpickr para calendário -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
-    <link rel="stylesheet" href="assets/css/voos.css">
-    <script>window.va=window.va||function(){(window.vaq=window.vaq||[]).push(arguments)};</script>
+    
+    <!-- Styles -->
+    <link rel="stylesheet" href="assets/css/descobrir-destinos.css">
+
+    <!-- Vercel Analytics -->
+    <script>
+        window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
+    </script>
     <script defer src="/_vercel/insights/script.js"></script>
 </head>
 <body>
-
-    <!-- HEADER -->
+    <!-- Header -->
     <header class="header">
-        <div class="header-inner">
-            <a href="/" class="header-logo"><img src="logo1.png" alt="Benetrip" class="logo-img"></a>
-            <nav class="header-nav">
-                <a href="/descobrir-destinos.html" class="nav-link">🐕 Descobrir destinos</a>
-                <span class="nav-link active">✈️ Passagens</span>
-            </nav>
+        <div class="container">
+            <img src="logo1.png" alt="Benetrip" class="logo">
+            <p class="tagline">Descubra seu destino perfeito! 🐕</p>
         </div>
     </header>
 
-    <!-- ============================
-         SEARCH SECTION
-         ============================ -->
-    <section class="search-section" id="search-section">
-        <div class="search-container">
-            <div class="search-hero" id="search-hero">
-                <h1>Encontre passagens aéreas</h1>
-                <p>Compare preços de centenas de companhias e agências</p>
-            </div>
-
-            <form class="search-form" id="search-form" autocomplete="off">
-                <!-- Origem / Destino -->
-                <div class="sf-row sf-row-cities">
-                    <div class="sf-field sf-origin">
-                        <label for="sf-input-origin">De onde</label>
-                        <input type="text" id="sf-input-origin" placeholder="Cidade ou aeroporto" required>
-                        <input type="hidden" id="sf-origin-code">
-                        <input type="hidden" id="sf-origin-name">
-                        <div class="sf-dropdown" id="sf-dropdown-origin"></div>
+    <!-- Main Content -->
+    <main class="main-content">
+        <div class="container">
+            
+            <!-- Formulário -->
+            <div id="form-container">
+                <form id="descobrir-form" class="descobrir-form">
+                    
+                    <!-- 1. Origem -->
+                    <div class="form-group">
+                        <label for="origem">📍 De onde você vai sair?</label>
+                        <p class="hint">Digite o nome da cidade e selecione o aeroporto</p>
+                        <div class="autocomplete-wrapper">
+                            <input 
+                                type="text" 
+                                id="origem" 
+                                placeholder="Ex: São Paulo, Rio de Janeiro..."
+                                autocomplete="off"
+                                required
+                            >
+                            <div id="origem-results" class="autocomplete-results"></div>
+                        </div>
+                        <input type="hidden" id="origem-data">
                     </div>
-                    <button type="button" class="sf-swap" id="sf-swap" title="Trocar">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 16l-4-4 4-4"/><path d="M17 8l4 4-4 4"/><path d="M3 12h18"/></svg>
+
+                    <!-- 2. Com quem vai viajar -->
+                    <div class="form-group">
+                        <label>👥 Com quem você vai viajar?</label>
+                        <p class="hint">Escolha quem estará com você nessa aventura</p>
+                        <div class="button-group" data-field="companhia">
+                            <button type="button" class="btn-option" data-value="0">
+                                <span class="emoji">🧳</span>
+                                <span class="text">Sozinho(a)</span>
+                                <small>Aventura solo</small>
+                            </button>
+                            <button type="button" class="btn-option" data-value="1">
+                                <span class="emoji">❤️</span>
+                                <span class="text">Casal</span>
+                                <small>Viagem romântica</small>                                
+                            </button>
+                            <button type="button" class="btn-option" data-value="2">
+                                <span class="emoji">👨‍👩‍👧‍👦</span>
+                                <span class="text">Família</span>
+                                <small>Diversão para todos</small>
+                            </button>
+                            <button type="button" class="btn-option" data-value="3">
+                                <span class="emoji">🎉</span>
+                                <span class="text">Amigos</span>
+                                <small>Turma da diversão</small>
+                            </button>
+                        </div>
+                        <input type="hidden" id="companhia" required>
+                    </div>
+
+                    <!-- 2.1 Número de pessoas (condicional para amigos) -->
+                    <div class="form-group conditional" id="num-pessoas-group" style="display: none;">
+                        <label for="num-pessoas">Quantas pessoas?</label>
+                        <p class="hint">Inclua todos, inclusive você!</p>
+                        <div class="number-input">
+                            <button type="button" class="btn-number" data-action="decrement">−</button>
+                            <input type="number" id="num-pessoas" value="2" min="2" max="20" readonly>
+                            <button type="button" class="btn-number" data-action="increment">+</button>
+                        </div>
+                    </div>
+
+                    <!-- 2.2 Detalhes família (condicional para família) -->
+                    <div class="form-group conditional" id="familia-group" style="display: none;">
+                        <label>👨‍👩‍👧‍👦 Detalhes da família</label>
+                        <p class="hint">Informe a composição da família para encontrarmos os melhores destinos e preços</p>
+                        
+                        <div class="familia-grid">
+                            <!-- Adultos -->
+                            <div class="familia-item">
+                                <div class="familia-label">
+                                    <span class="familia-emoji">🧑</span>
+                                    <div>
+                                        <strong>Adultos</strong>
+                                        <small>12+ anos</small>
+                                    </div>
+                                </div>
+                                <div class="number-input-compact">
+                                    <button type="button" class="btn-number-sm" data-target="familia-adultos" data-action="decrement">−</button>
+                                    <input type="number" id="familia-adultos" value="2" min="1" max="9" readonly>
+                                    <button type="button" class="btn-number-sm" data-target="familia-adultos" data-action="increment">+</button>
+                                </div>
+                            </div>
+
+                            <!-- Crianças -->
+                            <div class="familia-item">
+                                <div class="familia-label">
+                                    <span class="familia-emoji">👧</span>
+                                    <div>
+                                        <strong>Crianças</strong>
+                                        <small>2–11 anos</small>
+                                    </div>
+                                </div>
+                                <div class="number-input-compact">
+                                    <button type="button" class="btn-number-sm" data-target="familia-criancas" data-action="decrement">−</button>
+                                    <input type="number" id="familia-criancas" value="0" min="0" max="6" readonly>
+                                    <button type="button" class="btn-number-sm" data-target="familia-criancas" data-action="increment">+</button>
+                                </div>
+                            </div>
+
+                            <!-- Bebês -->
+                            <div class="familia-item">
+                                <div class="familia-label">
+                                    <span class="familia-emoji">👶</span>
+                                    <div>
+                                        <strong>Bebês</strong>
+                                        <small>0–1 ano (no colo)</small>
+                                    </div>
+                                </div>
+                                <div class="number-input-compact">
+                                    <button type="button" class="btn-number-sm" data-target="familia-bebes" data-action="decrement">−</button>
+                                    <input type="number" id="familia-bebes" value="0" min="0" max="4" readonly>
+                                    <button type="button" class="btn-number-sm" data-target="familia-bebes" data-action="increment">+</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <p class="hint familia-hint" id="familia-total-hint">Total: 2 passageiros</p>
+                    </div>
+
+                    <!-- 3. Preferências de viagem (MULTI-SELECT) -->
+                    <div class="form-group">
+                        <label>🎯 O que você mais busca nessa viagem?</label>
+                        <p class="hint">Escolha uma ou mais opções</p>
+                        <div class="button-group multi-select" data-field="preferencias" data-multi="true">
+                            <button type="button" class="btn-option" data-value="relax">
+                                <span class="emoji">🌊</span>
+                                <span class="text">Relax total</span>
+                                <small>Descansar, aproveitar sem pressa e recarregar as energias</small>
+                            </button>
+                            <button type="button" class="btn-option" data-value="aventura">
+                                <span class="emoji">🏔️</span>
+                                <span class="text">Aventura e emoção</span>
+                                <small>Trilhar, explorar e sentir a adrenalina</small>
+                            </button>
+                            <button type="button" class="btn-option" data-value="cultura">
+                                <span class="emoji">🏛️</span>
+                                <span class="text">Cultura e história</span>
+                                <small>Mergulhar em tradições, arte e sabores locais</small>
+                            </button>
+                            <button type="button" class="btn-option" data-value="urbano">
+                                <span class="emoji">🏙️</span>
+                                <span class="text">Agito urbano</span>
+                                <small>Ruas movimentadas, vida noturna e muita energia</small>
+                            </button>
+                        </div>
+                        <input type="hidden" id="preferencias" required>
+                    </div>
+
+                    <!-- 3.1 Destinos internacionais ou tanto faz? -->
+                    <div class="form-group">
+                        <label>🌍 Destinos internacionais ou nacionais?</label>
+                        <p class="hint">Prefere sair do país ou tanto faz?</p>
+                        <div class="button-group button-group-full" data-field="escopo-destino">
+                            <button type="button" class="btn-option btn-full" data-value="tanto_faz">
+                                <span class="emoji">🗺️</span>
+                                <span class="text">Tanto faz — surpreenda-me!</span>
+                            </button>
+                            <button type="button" class="btn-option btn-full" data-value="internacional">
+                                <span class="emoji">✈️</span>
+                                <span class="text">Apenas destinos internacionais</span>
+                            </button>
+                        </div>
+                        <input type="hidden" id="escopo-destino" value="tanto_faz">
+                    </div>
+
+                    <!-- 4. Datas -->
+                    <div class="form-group">
+                        <label for="datas">📅 Quando será a sua viagem?</label>
+                        <p class="hint">Selecione a data de ida e volta</p>
+                        <input 
+                            type="text" 
+                            id="datas" 
+                            placeholder="Clique para selecionar datas"
+                            readonly
+                            required
+                        >
+                        <input type="hidden" id="data-ida">
+                        <input type="hidden" id="data-volta">
+                    </div>
+
+                    <!-- 5. Moeda -->
+                    <div class="form-group" id="moeda-group">
+                        <label>💰 Qual moeda você prefere usar?</label>
+                        <p class="hint">Escolha a moeda para definir seu orçamento</p>
+                        <div class="button-group" data-field="moeda">
+                            <button type="button" class="btn-option" data-value="BRL">
+                                <span class="emoji">💰</span>
+                                <span class="text">Real (BRL)</span>
+                            </button>
+                            <button type="button" class="btn-option" data-value="USD">
+                                <span class="emoji">💵</span>
+                                <span class="text">Dólar (USD)</span>
+                            </button>
+                            <button type="button" class="btn-option" data-value="EUR">
+                                <span class="emoji">💶</span>
+                                <span class="text">Euro (EUR)</span>
+                            </button>
+                        </div>
+                        <input type="hidden" id="moeda" required>
+                    </div>
+
+                    <!-- 6. Orçamento — v3.1.2: placeholder atualizado -->
+                    <div class="form-group" id="orcamento-group">
+                        <label for="orcamento">💸 Qual é o seu orçamento para passagens por pessoa?</label>
+                        <p class="hint">Valor para ida e volta (por adulto)</p>
+                        <div class="currency-input-wrapper">
+                            <span class="currency-symbol">R$</span>
+                            <input 
+                                type="text" 
+                                id="orcamento" 
+                                placeholder="2.000"
+                                inputmode="numeric"
+                                required
+                            >
+                        </div>
+                    </div>
+
+                    <!-- Botão Submit -->
+                    <button type="submit" class="btn-submit" id="btn-submit">
+                        🔍 Descobrir Destinos Perfeitos
                     </button>
-                    <div class="sf-field sf-destination">
-                        <label for="sf-input-dest">Para onde</label>
-                        <input type="text" id="sf-input-dest" placeholder="Cidade ou aeroporto" required>
-                        <input type="hidden" id="sf-dest-code">
-                        <input type="hidden" id="sf-dest-name">
-                        <div class="sf-dropdown" id="sf-dropdown-dest"></div>
-                    </div>
-                </div>
-
-                <!-- Datas / Passageiros / Moeda -->
-                <div class="sf-row sf-row-details">
-                    <div class="sf-field sf-dates">
-                        <label for="sf-input-dates">Datas</label>
-                        <input type="text" id="sf-input-dates" placeholder="Ida — Volta" required readonly>
-                        <input type="hidden" id="sf-departure">
-                        <input type="hidden" id="sf-return">
-                    </div>
-                    <div class="sf-field sf-pax">
-                        <label>Passageiros</label>
-                        <button type="button" class="sf-pax-trigger" id="sf-pax-trigger">
-                            <span id="sf-pax-summary">1 adulto</span>
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M7 10l5 5 5-5z"/></svg>
-                        </button>
-                        <div class="sf-pax-dropdown" id="sf-pax-dropdown">
-                            <div class="pax-row">
-                                <div><strong>Adultos</strong><br><small>12+ anos</small></div>
-                                <div class="pax-ctrl">
-                                    <button type="button" class="pax-btn" data-t="pax-adults" data-a="dec">−</button>
-                                    <input type="number" id="pax-adults" value="1" min="1" max="9" readonly>
-                                    <button type="button" class="pax-btn" data-t="pax-adults" data-a="inc">+</button>
-                                </div>
-                            </div>
-                            <div class="pax-row">
-                                <div><strong>Crianças</strong><br><small>2–11 anos</small></div>
-                                <div class="pax-ctrl">
-                                    <button type="button" class="pax-btn" data-t="pax-children" data-a="dec">−</button>
-                                    <input type="number" id="pax-children" value="0" min="0" max="6" readonly>
-                                    <button type="button" class="pax-btn" data-t="pax-children" data-a="inc">+</button>
-                                </div>
-                            </div>
-                            <div class="pax-row">
-                                <div><strong>Bebês</strong><br><small>0–1 (no colo)</small></div>
-                                <div class="pax-ctrl">
-                                    <button type="button" class="pax-btn" data-t="pax-infants" data-a="dec">−</button>
-                                    <input type="number" id="pax-infants" value="0" min="0" max="4" readonly>
-                                    <button type="button" class="pax-btn" data-t="pax-infants" data-a="inc">+</button>
-                                </div>
-                            </div>
-                            <button type="button" class="pax-done" id="sf-pax-done">Pronto</button>
-                        </div>
-                    </div>
-                    <div class="sf-field sf-currency">
-                        <label for="sf-currency">Moeda</label>
-                        <select id="sf-currency">
-                            <option value="BRL">R$ Real</option>
-                            <option value="USD">US$ Dólar</option>
-                            <option value="EUR">€ Euro</option>
-                        </select>
-                    </div>
-                </div>
-
-                <!-- Submit -->
-                <div class="sf-row sf-row-submit">
-                    <button type="submit" class="sf-btn-search" id="sf-btn-search">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-                        Buscar passagens
-                    </button>
-                </div>
-            </form>
-        </div>
-    </section>
-
-    <!-- ============================
-         ROUTE BAR (compact, after search)
-         ============================ -->
-    <section class="route-bar" id="route-bar" style="display:none">
-        <div class="route-bar-inner">
-            <div class="route-cities">
-                <span class="route-city" id="rb-origin">---</span>
-                <svg class="route-arrow" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#E87722" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-                <span class="route-city" id="rb-dest">---</span>
+                </form>
             </div>
-            <div class="route-meta">
-                <span id="rb-dates"></span>
-                <span class="dot">·</span>
-                <span id="rb-pax"></span>
-                <span class="dot">·</span>
-                <span id="rb-currency"></span>
-            </div>
-            <button class="route-edit" id="route-edit">✏️ Editar</button>
-        </div>
-    </section>
 
-    <!-- ============================
-         MAIN CONTENT AREA
-         ============================ -->
-    <main class="main-content" id="main-content">
-
-        <!-- LOADING -->
-        <div id="state-loading" class="state-panel" style="display:none">
-            <div class="state-card">
-                <div class="loader-wrap">
-                    <svg class="loader-plane" width="48" height="48" viewBox="0 0 24 24" fill="#E87722"><path d="M21 16v-2l-8-5V3.5a1.5 1.5 0 00-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/></svg>
-                </div>
-                <h2>Buscando as melhores ofertas...</h2>
-                <div class="progress-track"><div class="progress-fill" id="progress-fill"></div></div>
-                <p class="state-msg" id="loading-msg">Consultando companhias aéreas</p>
-                <p class="state-tip" id="loading-tip">💡 Preços por pessoa, ida e volta</p>
-            </div>
-        </div>
-
-        <!-- ERROR -->
-        <div id="state-error" class="state-panel" style="display:none">
-            <div class="state-card">
-                <div class="state-emoji">😕</div>
-                <h2>Ops, algo deu errado</h2>
-                <p id="error-msg">Não foi possível buscar os voos.</p>
-                <div class="state-btns">
-                    <button class="btn-primary" onclick="BenetripVoos.retrySearch()">Tentar novamente</button>
-                    <button class="btn-outline" onclick="BenetripVoos.showSearchForm()">Editar busca</button>
-                </div>
-            </div>
-        </div>
-
-        <!-- EMPTY -->
-        <div id="state-empty" class="state-panel" style="display:none">
-            <div class="state-card">
-                <div class="state-emoji">✈️</div>
-                <h2>Nenhum voo encontrado</h2>
-                <p>Não encontramos voos para esta rota e datas.</p>
-                <div class="empty-tips">
-                    <p>💡 Tente datas mais flexíveis ou verifique os aeroportos</p>
-                </div>
-                <div class="state-btns">
-                    <button class="btn-primary" onclick="BenetripVoos.showSearchForm()">Editar busca</button>
-                </div>
-            </div>
-        </div>
-
-        <!-- RESULTS -->
-        <div id="state-results" style="display:none">
-            <!-- SORT BAR -->
-            <div class="sort-bar" id="sort-bar">
-                <div class="sort-bar-inner">
-                    <div class="sort-tabs">
-                        <button class="sort-tab active" data-sort="cheapest"><span class="sort-label">Mais barato</span><span class="sort-val" id="sv-cheap">—</span></button>
-                        <button class="sort-tab" data-sort="fastest"><span class="sort-label">Mais rápido</span><span class="sort-val" id="sv-fast">—</span></button>
-                        <button class="sort-tab" data-sort="best"><span class="sort-label">Melhor</span><span class="sort-val" id="sv-best">—</span></button>
+            <!-- Loading State -->
+            <div id="loading-container" style="display: none;">
+                <div class="loading-card">
+                    <img src="assets/images/tripinha/avatar-pensando.png" alt="Tripinha pensando" class="tripinha-loading">
+                    <h2>🐕 Tripinha está procurando...</h2>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progress-fill"></div>
                     </div>
+                    <p id="loading-message">Buscando os melhores destinos para você...</p>
                 </div>
             </div>
 
-            <!-- FILTER BAR -->
-            <div class="filter-bar" id="filter-bar">
-                <div class="filter-bar-inner">
-                    <button type="button" class="filter-chip" id="fc-stops">Paradas ▾</button>
-                    <button type="button" class="filter-chip" id="fc-times">Horários ▾</button>
-                    <button type="button" class="filter-chip" id="fc-airlines">Companhias ▾</button>
-                    <button type="button" class="filter-chip" id="fc-price">Preço ▾</button>
-                    <button type="button" class="filter-chip" id="fc-duration">Duração ▾</button>
-                    <button type="button" class="filter-chip fc-clear" id="fc-clear" style="display:none">✕ Limpar</button>
-                </div>
+            <!-- Resultados -->
+            <div id="resultados-container" style="display: none;">
             </div>
 
-            <!-- FILTER PANELS -->
-            <div class="filter-panels-anchor" id="filter-panels-anchor">
-
-                <!-- STOPS -->
-                <div class="filter-panel" id="fp-stops" style="display:none">
-                    <div class="fp-header"><span>Paradas</span><button class="fp-close">✕</button></div>
-                    <label class="fp-opt"><input type="checkbox" name="stops" value="all" checked> Todas</label>
-                    <label class="fp-opt"><input type="checkbox" name="stops" value="0"> Direto</label>
-                    <label class="fp-opt"><input type="checkbox" name="stops" value="1"> 1 parada</label>
-                    <label class="fp-opt"><input type="checkbox" name="stops" value="2"> 2+ paradas</label>
-                </div>
-
-                <!-- TIMES -->
-                <div class="filter-panel filter-panel-wide" id="fp-times" style="display:none">
-                    <div class="fp-header"><span>Horários</span><button class="fp-close">✕</button></div>
-                    <!-- Departure outbound -->
-                    <div class="fp-section">
-                        <div class="fp-section-title">🛫 Partida (ida)</div>
-                        <div class="fp-range-row"><span class="fp-range-val" id="fv-dep-go-min">00:00</span><span class="fp-range-val" id="fv-dep-go-max">23:59</span></div>
-                        <div class="fp-dual-range">
-                            <input type="range" id="fr-dep-go-min" min="0" max="1439" value="0" step="30">
-                            <input type="range" id="fr-dep-go-max" min="0" max="1439" value="1439" step="30">
-                        </div>
-                    </div>
-                    <!-- Arrival outbound -->
-                    <div class="fp-section">
-                        <div class="fp-section-title">🛬 Chegada (ida)</div>
-                        <div class="fp-range-row"><span class="fp-range-val" id="fv-arr-go-min">00:00</span><span class="fp-range-val" id="fv-arr-go-max">23:59</span></div>
-                        <div class="fp-dual-range">
-                            <input type="range" id="fr-arr-go-min" min="0" max="1439" value="0" step="30">
-                            <input type="range" id="fr-arr-go-max" min="0" max="1439" value="1439" step="30">
-                        </div>
-                    </div>
-                    <!-- Departure return -->
-                    <div class="fp-section" id="fp-times-return" style="display:none">
-                        <div class="fp-section-title">🛫 Partida (volta)</div>
-                        <div class="fp-range-row"><span class="fp-range-val" id="fv-dep-ret-min">00:00</span><span class="fp-range-val" id="fv-dep-ret-max">23:59</span></div>
-                        <div class="fp-dual-range">
-                            <input type="range" id="fr-dep-ret-min" min="0" max="1439" value="0" step="30">
-                            <input type="range" id="fr-dep-ret-max" min="0" max="1439" value="1439" step="30">
-                        </div>
-                    </div>
-                    <!-- Arrival return -->
-                    <div class="fp-section" id="fp-times-return-arr" style="display:none">
-                        <div class="fp-section-title">🛬 Chegada (volta)</div>
-                        <div class="fp-range-row"><span class="fp-range-val" id="fv-arr-ret-min">00:00</span><span class="fp-range-val" id="fv-arr-ret-max">23:59</span></div>
-                        <div class="fp-dual-range">
-                            <input type="range" id="fr-arr-ret-min" min="0" max="1439" value="0" step="30">
-                            <input type="range" id="fr-arr-ret-max" min="0" max="1439" value="1439" step="30">
-                        </div>
-                    </div>
-                </div>
-
-                <!-- AIRLINES -->
-                <div class="filter-panel filter-panel-wide" id="fp-airlines" style="display:none">
-                    <div class="fp-header"><span>Companhias Aéreas</span><button class="fp-close">✕</button></div>
-                    <div class="fp-airline-actions">
-                        <button class="fp-link" id="fp-airlines-all">Selecionar todas</button>
-                        <button class="fp-link" id="fp-airlines-none">Desmarcar todas</button>
-                    </div>
-                    <div class="fp-airline-list" id="fp-airline-list">
-                        <div class="fp-empty">Carregando companhias...</div>
-                    </div>
-                </div>
-
-                <!-- PRICE -->
-                <div class="filter-panel" id="fp-price" style="display:none">
-                    <div class="fp-header"><span>Faixa de preço</span><button class="fp-close">✕</button></div>
-                    <div class="fp-section">
-                        <div class="fp-range-row"><span class="fp-range-val" id="fv-price-min">—</span><span class="fp-range-val" id="fv-price-max">—</span></div>
-                        <div class="fp-single-range">
-                            <input type="range" id="fr-price-max" min="0" max="100000" value="100000" step="50">
-                        </div>
-                        <div class="fp-price-label">Preço máximo por pessoa</div>
-                    </div>
-                </div>
-
-                <!-- DURATION -->
-                <div class="filter-panel" id="fp-duration" style="display:none">
-                    <div class="fp-header"><span>Duração máxima</span><button class="fp-close">✕</button></div>
-                    <div class="fp-section">
-                        <div class="fp-range-row"><span class="fp-range-val" id="fv-dur-val">Qualquer</span></div>
-                        <div class="fp-single-range">
-                            <input type="range" id="fr-duration-max" min="0" max="2880" value="2880" step="30">
-                        </div>
-                        <div class="fp-price-label">Duração total do trecho mais longo</div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- ACTIVE FILTERS TAGS -->
-            <div class="active-filters" id="active-filters" style="display:none">
-                <div class="active-filters-inner" id="active-filters-list"></div>
-            </div>
-
-            <!-- FILTER OVERLAY (mobile) -->
-            <div class="filter-overlay" id="filter-overlay"></div>
-
-            <div class="results-info"><span id="r-count"></span><span id="r-currency"></span></div>
-            <div class="results-list" id="results-list"></div>
-            <div class="load-more-wrap" id="load-more-wrap" style="display:none">
-                <button class="btn-load-more" id="btn-load-more">Mostrar mais resultados</button>
-            </div>
-            <div class="back-cta">
-                <p>Não encontrou o que queria?</p>
-                <button class="btn-outline" onclick="BenetripVoos.showSearchForm()">✏️ Editar busca</button>
-                <a href="/descobrir-destinos.html" class="btn-outline">🐕 Deixe a Tripinha ajudar</a>
-            </div>
         </div>
     </main>
 
-    <footer class="footer"><p>🐕 Benetrip © 2026 · Preços sujeitos a alteração · Valores por pessoa</p></footer>
-    <form id="redirect-form" method="POST" style="display:none"></form>
+    <!-- Footer -->
+    <footer class="footer">
+        <p>🐕 Feito com amor pela Tripinha | Benetrip © 2026</p>
+    </footer>
 
+    <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
     <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/pt.js"></script>
-    <script src="assets/js/voos.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/lodash@4.17.21/lodash.min.js"></script>
+    <script src="assets/js/descobrir-destinos.js"></script>
 </body>
 </html>
