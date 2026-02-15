@@ -190,24 +190,113 @@
 
         <!-- RESULTS -->
         <div id="state-results" style="display:none">
-            <div class="filters-bar">
-                <div class="filters-inner">
+            <!-- SORT BAR -->
+            <div class="sort-bar" id="sort-bar">
+                <div class="sort-bar-inner">
                     <div class="sort-tabs">
                         <button class="sort-tab active" data-sort="cheapest"><span class="sort-label">Mais barato</span><span class="sort-val" id="sv-cheap">—</span></button>
                         <button class="sort-tab" data-sort="fastest"><span class="sort-label">Mais rápido</span><span class="sort-val" id="sv-fast">—</span></button>
                         <button class="sort-tab" data-sort="best"><span class="sort-label">Melhor</span><span class="sort-val" id="sv-best">—</span></button>
                     </div>
-                    <div class="filter-chips">
-                        <button type="button" class="filter-chip" id="fc-stops">Paradas ▾</button>
-                    </div>
-                </div>
-                <div class="filter-dropdown" id="fd-stops" style="display:none">
-                    <label class="fd-opt"><input type="checkbox" value="all" checked> Todas</label>
-                    <label class="fd-opt"><input type="checkbox" value="0"> Direto</label>
-                    <label class="fd-opt"><input type="checkbox" value="1"> 1 parada</label>
-                    <label class="fd-opt"><input type="checkbox" value="2"> 2+ paradas</label>
                 </div>
             </div>
+
+            <!-- FILTER BAR -->
+            <div class="filter-bar" id="filter-bar">
+                <div class="filter-bar-inner">
+                    <button type="button" class="filter-chip" id="fc-stops">Paradas ▾</button>
+                    <button type="button" class="filter-chip" id="fc-times">Horários ▾</button>
+                    <button type="button" class="filter-chip" id="fc-airlines">Companhias ▾</button>
+                    <button type="button" class="filter-chip" id="fc-price">Preço ▾</button>
+                    <button type="button" class="filter-chip" id="fc-duration">Duração ▾</button>
+                    <button type="button" class="filter-chip fc-clear" id="fc-clear-all" style="display:none">✕ Limpar filtros</button>
+                </div>
+            </div>
+
+            <!-- FILTER PANELS (positioned under filter bar) -->
+            <div class="filter-panels-anchor" id="filter-panels-anchor">
+                <!-- STOPS -->
+                <div class="filter-panel" id="fp-stops" style="display:none">
+                    <div class="fp-header"><span>Paradas</span><button class="fp-close" data-panel="fp-stops">✕</button></div>
+                    <label class="fp-opt"><input type="checkbox" name="stops" value="all" checked> Todas</label>
+                    <label class="fp-opt"><input type="checkbox" name="stops" value="0"> Direto <span class="fp-airline-price" id="fp-stops-0-price"></span></label>
+                    <label class="fp-opt"><input type="checkbox" name="stops" value="1"> 1 parada <span class="fp-airline-price" id="fp-stops-1-price"></span></label>
+                    <label class="fp-opt"><input type="checkbox" name="stops" value="2"> 2+ paradas <span class="fp-airline-price" id="fp-stops-2-price"></span></label>
+                </div>
+
+                <!-- TIMES -->
+                <div class="filter-panel filter-panel-wide" id="fp-times" style="display:none">
+                    <div class="fp-header"><span>Horários</span><button class="fp-close" data-panel="fp-times">✕</button></div>
+                    <div class="fp-section">
+                        <div class="fp-section-title">🛫 Partida (ida)</div>
+                        <div class="fp-range-row"><span class="fp-range-val" id="ft-dep-min">00:00</span><span class="fp-range-val" id="ft-dep-max">23:59</span></div>
+                        <div class="fp-dual-range">
+                            <input type="range" id="ft-dep-from" min="0" max="1439" value="0" step="30">
+                            <input type="range" id="ft-dep-to" min="0" max="1439" value="1439" step="30">
+                        </div>
+                    </div>
+                    <div class="fp-section">
+                        <div class="fp-section-title">🛬 Chegada (ida)</div>
+                        <div class="fp-range-row"><span class="fp-range-val" id="ft-arr-min">00:00</span><span class="fp-range-val" id="ft-arr-max">23:59</span></div>
+                        <div class="fp-dual-range">
+                            <input type="range" id="ft-arr-from" min="0" max="1439" value="0" step="30">
+                            <input type="range" id="ft-arr-to" min="0" max="1439" value="1439" step="30">
+                        </div>
+                    </div>
+                    <div class="fp-section" id="fp-times-return" style="display:none">
+                        <div class="fp-section-title">🛫 Partida (volta)</div>
+                        <div class="fp-range-row"><span class="fp-range-val" id="ft-ret-dep-min">00:00</span><span class="fp-range-val" id="ft-ret-dep-max">23:59</span></div>
+                        <div class="fp-dual-range">
+                            <input type="range" id="ft-ret-dep-from" min="0" max="1439" value="0" step="30">
+                            <input type="range" id="ft-ret-dep-to" min="0" max="1439" value="1439" step="30">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- AIRLINES -->
+                <div class="filter-panel filter-panel-wide" id="fp-airlines" style="display:none">
+                    <div class="fp-header"><span>Companhias Aéreas</span><button class="fp-close" data-panel="fp-airlines">✕</button></div>
+                    <div class="fp-airline-actions">
+                        <button class="fp-link" id="fp-al-all">Selecionar todas</button>
+                        <button class="fp-link" id="fp-al-none">Desmarcar todas</button>
+                    </div>
+                    <div class="fp-airline-list" id="fp-airline-list">
+                        <div class="fp-empty">Carregando companhias...</div>
+                    </div>
+                </div>
+
+                <!-- PRICE -->
+                <div class="filter-panel" id="fp-price" style="display:none">
+                    <div class="fp-header"><span>Faixa de preço</span><button class="fp-close" data-panel="fp-price">✕</button></div>
+                    <div class="fp-section">
+                        <div class="fp-range-row"><span class="fp-range-val" id="fprice-min">—</span><span class="fp-range-val" id="fprice-max">—</span></div>
+                        <div class="fp-single-range">
+                            <input type="range" id="fprice-slider" min="0" max="100000" value="100000" step="50">
+                        </div>
+                        <div class="fp-price-label">Preço máximo por pessoa</div>
+                    </div>
+                </div>
+
+                <!-- DURATION -->
+                <div class="filter-panel" id="fp-duration" style="display:none">
+                    <div class="fp-header"><span>Duração máxima</span><button class="fp-close" data-panel="fp-duration">✕</button></div>
+                    <div class="fp-section">
+                        <div class="fp-range-row"><span class="fp-range-val" id="fdur-val">Qualquer</span></div>
+                        <div class="fp-single-range">
+                            <input type="range" id="fdur-slider" min="0" max="2880" value="2880" step="30">
+                        </div>
+                        <div class="fp-price-label">Duração total do trecho mais longo</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ACTIVE FILTERS TAGS -->
+            <div class="active-filters" id="active-filters" style="display:none">
+                <div class="active-filters-inner" id="active-filters-inner"></div>
+            </div>
+
+            <!-- FILTER OVERLAY (mobile) -->
+            <div class="filter-overlay" id="filter-overlay"></div>
 
             <div class="results-info"><span id="r-count"></span><span id="r-currency"></span></div>
             <div class="results-list" id="results-list"></div>
