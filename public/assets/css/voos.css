@@ -528,3 +528,65 @@ body{font-family:'Montserrat',-apple-system,sans-serif;background:var(--g50);col
     .fc-time{font-size:14px}
 }
 
+
+/* ============================================================
+   BENETRIP VOOS v3.1 — CSS Additions
+   Adicionar ao final do voos.css existente
+   ============================================================ */
+
+/* Banner "Ainda buscando ofertas melhores..." */
+.searching-banner {
+    padding: 0 16px;
+    margin-bottom: 8px;
+}
+
+.searching-banner-inner {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 16px;
+    background: linear-gradient(135deg, #FFF3E0, #FFF8E1);
+    border: 1px solid #FFE0B2;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 500;
+    color: #E65100;
+    max-width: 900px;
+    margin: 0 auto 8px;
+}
+
+.searching-banner-pulse {
+    width: 10px;
+    height: 10px;
+    min-width: 10px;
+    border-radius: 50%;
+    background: #E87722;
+    animation: searchPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes searchPulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.4; transform: scale(0.8); }
+}
+
+/* Flash animation when a better price is found */
+.price-improved {
+    animation: priceFlash 0.6s ease-out 3;
+}
+
+@keyframes priceFlash {
+    0% { color: inherit; }
+    50% { color: #2E7D32; transform: scale(1.1); }
+    100% { color: inherit; }
+}
+
+/* Flash on the card that became the new best */
+.card-new-best {
+    animation: cardHighlight 0.8s ease-out;
+}
+
+@keyframes cardHighlight {
+    0% { box-shadow: 0 0 0 0 rgba(232, 119, 34, 0.5); }
+    40% { box-shadow: 0 0 0 4px rgba(232, 119, 34, 0.3); }
+    100% { box-shadow: none; }
+}
