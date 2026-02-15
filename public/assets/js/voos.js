@@ -1,11 +1,11 @@
 /**
- * BENETRIP VOOS v2.1 — Busca de voos com filtros avançados
+ * BENETRIP VOOS v3.0 — Busca de voos com filtros completos
  *
- * Features:
- * - Busca via formulário ou URL params
- * - Filtros: paradas, companhias, horários, preço, duração
- * - Agrupamento de mesmo voo por diferentes operadoras
- * - Conversão de moeda correta (RUB → moeda escolhida)
+ * Fixes from v2.1:
+ * - Currency: forwards initial currency_rates to results endpoint
+ * - Filters: all element IDs aligned with HTML
+ * - Times: full 4-section time filter (dep/arr for ida + volta)
+ * - Grouping: verified sign-based dedup with multi-operator display
  */
 
 const BenetripVoos = {
@@ -51,7 +51,7 @@ const BenetripVoos = {
     // INIT
     // ================================================================
     async init() {
-        console.log('✈️ BenetripVoos v2.1');
+        console.log('✈️ BenetripVoos v3.0');
         await this.loadCities();
         this.setupSearchForm();
         this.setupSortTabs();
@@ -194,7 +194,7 @@ const BenetripVoos = {
     updatePaxSummary() {
         const a=parseInt(document.getElementById('pax-adults').value), c=parseInt(document.getElementById('pax-children').value), i=parseInt(document.getElementById('pax-infants').value);
         const parts=[`${a} adulto${a>1?'s':''}`];
-        if(c>0)parts.push(`${c} criança${c>1?'s':''}`);
+        if(c>0)parts.push(`${c} criança${c>1?'s':''}`)
         if(i>0)parts.push(`${i} bebê${i>1?'s':''}`);
         document.getElementById('sf-pax-summary').textContent=parts.join(', ');
     },
@@ -234,7 +234,7 @@ const BenetripVoos = {
         const p=this.state.params;
         document.getElementById('rb-origin').textContent=p.origin_name||p.origin;
         document.getElementById('rb-dest').textContent=p.destination_name||p.destination;
-        const fmt=iso=>iso?new Date(iso+'T12:00:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'short'}):'';
+        const fmt=iso=>iso?new Date(iso+'T12:00:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'short'}):''
         document.getElementById('rb-dates').textContent=p.return_date?`${fmt(p.departure_date)} → ${fmt(p.return_date)}`:`${fmt(p.departure_date)} (só ida)`;
         const parts=[];if(p.adults)parts.push(`${p.adults} ad`);if(p.children)parts.push(`${p.children} cri`);if(p.infants)parts.push(`${p.infants} bb`);
         document.getElementById('rb-pax').textContent=parts.join(', ');
@@ -244,7 +244,7 @@ const BenetripVoos = {
     // ================================================================
     // SEARCH FLOW
     // ================================================================
-    resetSearchState(){this.state.searchId=null;this.state.proposals=[];this.state.searchComplete=false;this.state.resultsShown=false;this.state.displayedCount=0;this.state.pollCount=0;this.state.allAirlines={};if(this.state.pollTimer)clearTimeout(this.state.pollTimer);if(this.state.tipInterval)clearInterval(this.state.tipInterval)},
+    resetSearchState(){this.state.searchId=null;this.state.proposals=[];this.state.searchComplete=false;this.state.resultsShown=false;this.state.displayedCount=0;this.state.pollCount=0;this.state.allAirlines={};this.state.currencyRates={};if(this.state.pollTimer)clearTimeout(this.state.pollTimer);if(this.state.tipInterval)clearInterval(this.state.tipInterval)},
 
     async startSearch(){
         this.setProgress(10,'Iniciando busca...');this.startTips();
@@ -254,7 +254,11 @@ const BenetripVoos = {
             const data=await r.json();
             if(!data.search_id)throw new Error('Sem search_id');
             this.state.searchId=data.search_id;
-            this.state.currencyRates=data.currency_rates||{};
+            // Store currency_rates from initial search to forward to results endpoint
+            if(data.currency_rates) {
+                this.state.currencyRates=data.currency_rates;
+                console.log('💱 Initial currency_rates received:', Object.keys(data.currency_rates).join(', '));
+            }
             this.setProgress(20,'Consultando companhias...');
             this.poll();
         }catch(err){console.error('❌',err);this.showError(err.message);}
@@ -264,9 +268,20 @@ const BenetripVoos = {
         if(this.state.searchComplete||this.state.pollCount>=this.state.maxPolls){this.finishSearch();return;}
         this.state.pollCount++;
         try{
-            const r=await fetch(`/api/flight-results?uuid=${this.state.searchId}&currency=${this.state.params.currency}`);
+            // Build URL with currency_rates forwarding
+            let url = `/api/flight-results?uuid=${this.state.searchId}&currency=${this.state.params.currency}`;
+            if (Object.keys(this.state.currencyRates).length > 0) {
+                url += `&rates=${encodeURIComponent(JSON.stringify(this.state.currencyRates))}`;
+            }
+            const r=await fetch(url);
             if(!r.ok)throw new Error(`HTTP ${r.status}`);
             const data=await r.json();
+
+            // Update currency_rates if returned from backend
+            if (data.currency_rates) {
+                this.state.currencyRates = { ...this.state.currencyRates, ...data.currency_rates };
+            }
+
             const pct=Math.min(90,20+(this.state.pollCount/this.state.maxPolls)*70);
             this.setProgress(pct,data.total>0?`${data.total} ofertas encontradas...`:'Consultando agências...');
             if(data.proposals?.length>0){
@@ -328,7 +343,7 @@ const BenetripVoos = {
 
     updateTimeReturnVisibility(){
         const has=!!this.state.params.return_date;
-        document.querySelectorAll('#fp-times-return,#fp-times-return-arr').forEach(el=>el.style.display=has?'block':'none');
+        document.querySelectorAll('#fp-times-return,#fp-times-return-arr').forEach(el=>{if(el)el.style.display=has?'block':'none'});
     },
 
     // ================================================================
@@ -363,9 +378,12 @@ const BenetripVoos = {
 
     setupFilterChips(){
         const map={'fc-stops':'fp-stops','fc-airlines':'fp-airlines','fc-times':'fp-times','fc-price':'fp-price','fc-duration':'fp-duration'};
-        for(const[cid,pid]of Object.entries(map)){document.getElementById(cid)?.addEventListener('click',e=>{e.stopPropagation();this.togglePanel(pid);});}
+        for(const[cid,pid]of Object.entries(map)){
+            const el = document.getElementById(cid);
+            if(el) el.addEventListener('click',e=>{e.stopPropagation();this.togglePanel(pid);});
+        }
         document.getElementById('fc-clear')?.addEventListener('click',()=>{this.resetFilters();this.populateAirlinesFilter();this.applyFilters();});
-        document.addEventListener('click',e=>{if(this.state.activePanel){const p=document.getElementById(this.state.activePanel);if(p&&!p.contains(e.target))this.closePanel();}});
+        document.addEventListener('click',e=>{if(this.state.activePanel){const p=document.getElementById(this.state.activePanel);if(p&&!p.contains(e.target)&&!e.target.closest('.filter-chip'))this.closePanel();}});
         document.getElementById('filter-overlay')?.addEventListener('click',()=>this.closePanel());
     },
 
@@ -382,11 +400,20 @@ const BenetripVoos = {
         // Airlines actions
         document.getElementById('fp-airlines-all')?.addEventListener('click',()=>{document.querySelectorAll('#fp-airline-list input').forEach(i=>i.checked=true);this.state.filters.airlines='all';this.applyFilters();});
         document.getElementById('fp-airlines-none')?.addEventListener('click',()=>{document.querySelectorAll('#fp-airline-list input').forEach(i=>i.checked=false);this.state.filters.airlines=new Set();this.applyFilters();});
-        // Time sliders
-        const ts=[['fr-dep-go-min','fr-dep-go-max','fv-dep-go-min','fv-dep-go-max','depGoMin','depGoMax'],['fr-arr-go-min','fr-arr-go-max','fv-arr-go-min','fv-arr-go-max','arrGoMin','arrGoMax'],['fr-dep-ret-min','fr-dep-ret-max','fv-dep-ret-min','fv-dep-ret-max','depRetMin','depRetMax'],['fr-arr-ret-min','fr-arr-ret-max','fv-arr-ret-min','fv-arr-ret-max','arrRetMin','arrRetMax']];
+        // Time sliders — 4 sections: depGo, arrGo, depRet, arrRet
+        const ts=[
+            ['fr-dep-go-min','fr-dep-go-max','fv-dep-go-min','fv-dep-go-max','depGoMin','depGoMax'],
+            ['fr-arr-go-min','fr-arr-go-max','fv-arr-go-min','fv-arr-go-max','arrGoMin','arrGoMax'],
+            ['fr-dep-ret-min','fr-dep-ret-max','fv-dep-ret-min','fv-dep-ret-max','depRetMin','depRetMax'],
+            ['fr-arr-ret-min','fr-arr-ret-max','fv-arr-ret-min','fv-arr-ret-max','arrRetMin','arrRetMax']
+        ];
         for(const[minId,maxId,minL,maxL,minK,maxK]of ts){
             const mn=document.getElementById(minId),mx=document.getElementById(maxId);if(!mn||!mx)continue;
-            const upd=()=>{document.getElementById(minL).textContent=this.fmtMinToTime(parseInt(mn.value));document.getElementById(maxL).textContent=this.fmtMinToTime(parseInt(mx.value));};
+            const upd=()=>{
+                const mnEl=document.getElementById(minL), mxEl=document.getElementById(maxL);
+                if(mnEl) mnEl.textContent=this.fmtMinToTime(parseInt(mn.value));
+                if(mxEl) mxEl.textContent=this.fmtMinToTime(parseInt(mx.value));
+            };
             mn.addEventListener('input',()=>{if(parseInt(mn.value)>parseInt(mx.value))mn.value=mx.value;this.state.filters[minK]=parseInt(mn.value);upd();});
             mx.addEventListener('input',()=>{if(parseInt(mx.value)<parseInt(mn.value))mx.value=mn.value;this.state.filters[maxK]=parseInt(mx.value);upd();});
             mn.addEventListener('change',()=>this.applyFilters());
@@ -412,7 +439,7 @@ const BenetripVoos = {
     },
 
     closePanel(){
-        if(this.state.activePanel){document.getElementById(this.state.activePanel).style.display='none';}
+        if(this.state.activePanel){const el=document.getElementById(this.state.activePanel);if(el)el.style.display='none';}
         document.querySelectorAll('.filter-chip').forEach(c=>c.classList.remove('active'));
         this.updateChipStates();this.state.activePanel=null;
         document.getElementById('filter-overlay').classList.remove('open');
@@ -425,13 +452,17 @@ const BenetripVoos = {
         this.state.filters={stops:'all',airlines:'all',depGoMin:0,depGoMax:1439,arrGoMin:0,arrGoMax:1439,depRetMin:0,depRetMax:1439,arrRetMin:0,arrRetMax:1439,priceMax:Infinity,durationMax:Infinity};
         document.querySelectorAll('#fp-stops input').forEach(i=>i.checked=true);
         document.querySelectorAll('#fp-airline-list input').forEach(i=>i.checked=true);
-        document.querySelectorAll('.fp-dual-range input').forEach(r=>{r.value=r.id.includes('min')?r.min:r.max;});
+        // Reset all time sliders
+        ['fr-dep-go-min','fr-arr-go-min','fr-dep-ret-min','fr-arr-ret-min'].forEach(id=>{const el=document.getElementById(id);if(el)el.value=0;});
+        ['fr-dep-go-max','fr-arr-go-max','fr-dep-ret-max','fr-arr-ret-max'].forEach(id=>{const el=document.getElementById(id);if(el)el.value=1439;});
+        ['fv-dep-go-min','fv-arr-go-min','fv-dep-ret-min','fv-arr-ret-min'].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent='00:00';});
+        ['fv-dep-go-max','fv-arr-go-max','fv-dep-ret-max','fv-arr-ret-max'].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent='23:59';});
         const ps=document.getElementById('fr-price-max');if(ps)ps.value=ps.max;
         const ds=document.getElementById('fr-duration-max');if(ds)ds.value=ds.max;
-        document.querySelectorAll('[id^="fv-dep-"],[id^="fv-arr-"]').forEach(el=>{el.textContent=el.id.includes('min')?'00:00':'23:59';});
         this.updateChipStates();
         document.getElementById('active-filters').style.display='none';
-        document.getElementById('fc-clear').style.display='none';
+        const fcClear = document.getElementById('fc-clear');
+        if(fcClear) fcClear.style.display='none';
     },
 
     applyFilters(){this.state.displayedCount=0;this.updateChipStates();this.updateActiveTags();this.renderCards();},
@@ -444,7 +475,8 @@ const BenetripVoos = {
         s('fc-times',f.depGoMin>0||f.depGoMax<1439||f.arrGoMin>0||f.arrGoMax<1439||f.depRetMin>0||f.depRetMax<1439||f.arrRetMin>0||f.arrRetMax<1439);
         s('fc-price',f.priceMax!==Infinity&&f.priceMax<this.state.priceBounds.max);
         s('fc-duration',f.durationMax!==Infinity&&f.durationMax<this.state.durationBounds.max);
-        document.getElementById('fc-clear').style.display=document.querySelector('.filter-chip.has-filter')?'inline-flex':'none';
+        const fcClear = document.getElementById('fc-clear');
+        if(fcClear) fcClear.style.display=document.querySelector('.filter-chip.has-filter')?'inline-flex':'none';
     },
 
     updateActiveTags(){
@@ -453,6 +485,9 @@ const BenetripVoos = {
         if(f.airlines!=='all'){const n=f.airlines.size,t=Object.keys(this.state.allAirlines).length;tags.push({label:`${n}/${t} cias`,clear:()=>{f.airlines='all';document.querySelectorAll('#fp-airline-list input').forEach(i=>i.checked=true);}});}
         if(f.priceMax!==Infinity&&f.priceMax<this.state.priceBounds.max)tags.push({label:`Até ${this.fmtPrice(f.priceMax)}`,clear:()=>{f.priceMax=Infinity;const s=document.getElementById('fr-price-max');if(s)s.value=s.max;}});
         if(f.durationMax!==Infinity&&f.durationMax<this.state.durationBounds.max)tags.push({label:`Até ${this.fmtDuration(f.durationMax)}`,clear:()=>{f.durationMax=Infinity;const s=document.getElementById('fr-duration-max');if(s)s.value=s.max;}});
+        // Time filters
+        if(f.depGoMin>0||f.depGoMax<1439)tags.push({label:`Partida ida: ${this.fmtMinToTime(f.depGoMin)}–${this.fmtMinToTime(f.depGoMax)}`,clear:()=>{f.depGoMin=0;f.depGoMax=1439;const mn=document.getElementById('fr-dep-go-min'),mx=document.getElementById('fr-dep-go-max');if(mn)mn.value=0;if(mx)mx.value=1439;}});
+        if(f.arrGoMin>0||f.arrGoMax<1439)tags.push({label:`Chegada ida: ${this.fmtMinToTime(f.arrGoMin)}–${this.fmtMinToTime(f.arrGoMax)}`,clear:()=>{f.arrGoMin=0;f.arrGoMax=1439;const mn=document.getElementById('fr-arr-go-min'),mx=document.getElementById('fr-arr-go-max');if(mn)mn.value=0;if(mx)mx.value=1439;}});
         const c=document.getElementById('active-filters'),l=document.getElementById('active-filters-list');
         if(!tags.length){c.style.display='none';return;}
         c.style.display='block';
@@ -510,14 +545,15 @@ const BenetripVoos = {
     cardHtml(p){
         const pp=this.pricePerPerson(p.price);
         const isRet=p.segments?.length>1;
+        const operatorCount = (p.all_terms || []).length;
         const segs=(p.segments||[]).map(seg=>{
             const al=seg.flights[0]?.airline||'',aln=seg.flights[0]?.airline_name||al;
             const via=seg.flights.length>1?seg.flights.slice(0,-1).map(f=>f.arrival_airport).join(', '):'';
-            return`<div class="fc-seg"><div><div class="fc-time">${this.fmtTime(seg.departure_time)}</div><div class="fc-airport">${seg.departure_airport}</div></div><div class="fc-line"><span class="fc-dur">${this.fmtDuration(seg.total_duration)}</span><div class="fc-line-bar"></div><span class="fc-stops ${this.stopsClass(seg.stops)}">${this.stopsText(seg.stops)}</span>${via?`<span class="fc-stop-via">${via}</span>`:''}</div><div><div class="fc-time">${this.fmtTime(seg.arrival_time)}</div><div class="fc-airport">${seg.arrival_airport}</div></div><div class="fc-airline"><img class="fc-al-logo" src="${this.airlineLogo(al)}" alt="${aln}" onerror="this.style.display='none'"><span class="fc-al-name">${aln}</span></div></div>`;
+            return`<div class="fc-seg"><div class="fc-seg-time"><div class="fc-time">${this.fmtTime(seg.departure_time)}</div><div class="fc-airport">${seg.departure_airport}</div></div><div class="fc-line"><span class="fc-dur">${this.fmtDuration(seg.total_duration)}</span><div class="fc-line-bar"></div><span class="fc-stops ${this.stopsClass(seg.stops)}">${this.stopsText(seg.stops)}</span>${via?`<span class="fc-stop-via">${via}</span>`:''}</div><div class="fc-seg-time"><div class="fc-time">${this.fmtTime(seg.arrival_time)}</div><div class="fc-airport">${seg.arrival_airport}</div></div><div class="fc-airline"><img class="fc-al-logo" src="${this.airlineLogo(al)}" alt="${aln}" onerror="this.style.display='none'"><span class="fc-al-name">${aln}</span></div></div>`;
         }).join('');
         const others=(p.all_terms||[]).slice(1,8);
         const more=others.length>0?`<div class="fc-more-toggle"><button class="fc-more-btn" onclick="BenetripVoos.toggleMore(this)">+${others.length} oferta${others.length>1?'s':''} de outr${others.length>1?'as agências':'a agência'}</button></div><div class="fc-more-list">${others.map(t=>`<div class="fc-mo-row"><span class="fc-mo-gate">${t.gate_name}</span><span class="fc-mo-price">${this.fmtPrice(this.pricePerPerson(t.price))}</span><button class="fc-mo-book" onclick="BenetripVoos.book('${this.state.searchId}','${t.url}',this)">Reservar</button></div>`).join('')}</div>`:'';
-        return`<div class="flight-card"><div class="fc-main"><div class="fc-segments">${segs}</div><div class="fc-price-panel"><div><div class="fc-price">${this.fmtPrice(pp)}</div><div class="fc-price-lbl">por pessoa · ${isRet?'ida e volta':'só ida'}</div><div class="fc-gate">${p.gate_name}</div></div><button class="fc-book" onclick="BenetripVoos.book('${this.state.searchId}','${p.terms_url}',this)">Reservar →</button></div></div>${more}</div>`;
+        return`<div class="flight-card"><div class="fc-main"><div class="fc-segments">${segs}</div><div class="fc-price-panel"><div><div class="fc-price">${this.fmtPrice(pp)}</div><div class="fc-price-lbl">por pessoa · ${isRet?'ida e volta':'só ida'}</div><div class="fc-gate">${p.gate_name}${operatorCount>1?` <span class="fc-gate-more">+${operatorCount-1}</span>`:''}</div></div><button class="fc-book" onclick="BenetripVoos.book('${this.state.searchId}','${p.terms_url}',this)">Reservar →</button></div></div>${more}</div>`;
     },
 
     toggleMore(btn){const l=btn.closest('.flight-card').querySelector('.fc-more-list');if(l){l.classList.toggle('open');btn.textContent=l.classList.contains('open')?'Menos ofertas':btn.textContent;}},
