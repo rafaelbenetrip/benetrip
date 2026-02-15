@@ -1,24 +1,23 @@
 /**
  * BENETRIP - DESCOBRIR DESTINOS
- * Versão TRIPLE SEARCH v3.1.2
+ * Versão TRIPLE SEARCH v3.2
+ * NOVIDADES v3.2:
+ * - Links agora direcionam para página local voos.html (não mais voos.benetrip.com.br)
+ * - Parâmetros completos: origin, destination, departure_date, return_date,
+ *   adults, children, infants, currency, origin_name, destination_name
+ * - Auto-search ao abrir a página de voos
  * NOVIDADES v3.1.2:
- * - Campo de orçamento agora aceita valores inteiros com separador de milhar
- * - Sem centavos (,00) — mais intuitivo para o usuário
- * - Placeholder atualizado para "2.000"
+ * - Campo de orçamento aceita valores inteiros com separador de milhar
  * NOVIDADES v3.1.1:
  * - Custo de hotel dividido pelo número de pessoas (quarto compartilhado)
- * - Texto explicativo mostra divisão quando viagem em grupo
  * NOVIDADES v3.1:
  * - Não repete destinos nos resultados
  * - Degrada graciosamente quando menos de 5 destinos disponíveis
- * - Mensagem informativa quando poucos resultados encontrados
- * - Esconde seção surpresa/alternativas quando não há dados
  * NOVIDADES v3.0:
  * - Família: adultos, crianças (2-11) e bebês (0-1) separados
- * - Links Benetrip Voos com passageiros detalhados (adultos/crianças/bebês)
- * - Filtro internacional: busca apenas destinos internacionais se solicitado
- * - Multi-select de preferências (1 ou mais estilos de viagem)
- * - Ranking LLM recebe info de crianças/bebês para sugestões adequadas
+ * - Filtro internacional
+ * - Multi-select de preferências
+ * - Ranking LLM recebe info de crianças/bebês
  * APENAS APIs reais, SEM fallbacks de dados
  */
 
@@ -32,7 +31,8 @@ const BenetripDiscovery = {
 
     config: {
         debug: true,
-        cidadesJsonPath: 'data/cidades_global_iata_v5.json'
+        cidadesJsonPath: 'data/cidades_global_iata_v5.json',
+        voosPagePath: 'voos.html'
     },
 
     log(...args) {
@@ -44,7 +44,7 @@ const BenetripDiscovery = {
     },
 
     init() {
-        this.log('🐕 Benetrip Discovery v3.1.2 inicializando...');
+        this.log('🐕 Benetrip Discovery v3.2 inicializando...');
         
         this.carregarCidades();
         this.setupFormEvents();
@@ -215,9 +215,6 @@ const BenetripDiscovery = {
         return data.toLocaleDateString('pt-BR');
     },
 
-    // ================================================================
-    // CONDICIONAL: Mostrar campos corretos por tipo de companhia
-    // ================================================================
     setupCompanhiaConditional() {
         const companhiaInput = document.getElementById('companhia');
         const numPessoasGroup = document.getElementById('num-pessoas-group');
@@ -227,18 +224,11 @@ const BenetripDiscovery = {
         
         companhiaInput.addEventListener('change', () => {
             const value = parseInt(companhiaInput.value);
-            
-            // Amigos → mostra contador simples
             numPessoasGroup.style.display = (value === 3) ? 'block' : 'none';
-            
-            // Família → mostra adultos/crianças/bebês
             familiaGroup.style.display = (value === 2) ? 'block' : 'none';
         });
     },
 
-    // ================================================================
-    // FAMÍLIA: Inputs de adultos, crianças e bebês
-    // ================================================================
     setupFamiliaInputs() {
         document.querySelectorAll('.btn-number-sm').forEach(btn => {
             btn.addEventListener('click', () => {
@@ -257,13 +247,11 @@ const BenetripDiscovery = {
                     input.value = value - 1;
                 }
 
-                // Validar: bebês não podem exceder adultos
                 this.validarFamilia();
                 this.atualizarTotalFamilia();
             });
         });
 
-        // Inicializar o total
         this.atualizarTotalFamilia();
     },
 
@@ -271,7 +259,6 @@ const BenetripDiscovery = {
         const adultos = parseInt(document.getElementById('familia-adultos').value);
         const bebes = parseInt(document.getElementById('familia-bebes').value);
         
-        // Regra: máximo 1 bebê por pessoa (no colo)
         if (bebes > adultos) {
             document.getElementById('familia-bebes').value = adultos;
         }
@@ -293,9 +280,6 @@ const BenetripDiscovery = {
         }
     },
 
-    // ================================================================
-    // BOTÕES DE OPÇÃO (single-select e multi-select)
-    // ================================================================
     setupOptionButtons() {
         document.querySelectorAll('.button-group').forEach(group => {
             const field = group.dataset.field;
@@ -307,10 +291,7 @@ const BenetripDiscovery = {
             group.querySelectorAll('.btn-option').forEach(btn => {
                 btn.addEventListener('click', () => {
                     if (isMulti) {
-                        // MULTI-SELECT: toggle individual
                         btn.classList.toggle('active');
-                        
-                        // Coletar todos os valores selecionados
                         const selected = [];
                         group.querySelectorAll('.btn-option.active').forEach(b => {
                             selected.push(b.dataset.value);
@@ -318,7 +299,6 @@ const BenetripDiscovery = {
                         hiddenInput.value = selected.join(',');
                         this.log(`✅ ${field} (multi):`, selected);
                     } else {
-                        // SINGLE-SELECT: limpa outros
                         group.querySelectorAll('.btn-option').forEach(b => b.classList.remove('active'));
                         btn.classList.add('active');
                         hiddenInput.value = btn.dataset.value;
@@ -351,9 +331,6 @@ const BenetripDiscovery = {
         }
     },
 
-    // ================================================================
-    // CURRENCY INPUT — v3.1.2: Valores inteiros com separador de milhar
-    // ================================================================
     setupCurrencyInput() {
         const input = document.getElementById('orcamento');
         const moedaInput = document.getElementById('moeda');
@@ -370,7 +347,6 @@ const BenetripDiscovery = {
             input.addEventListener('input', (e) => {
                 let valor = e.target.value.replace(/\D/g, '');
                 if (valor) {
-                    // Remover zeros à esquerda e formatar com pontos de milhar
                     valor = parseInt(valor).toString();
                     e.target.value = parseInt(valor).toLocaleString('pt-BR');
                 } else {
@@ -395,9 +371,6 @@ const BenetripDiscovery = {
         });
     },
 
-    // ================================================================
-    // VALIDAÇÃO — v3.1.2: Parsing corrigido para formato sem centavos
-    // ================================================================
     validarFormulario() {
         if (!this.state.origemSelecionada) {
             alert('Por favor, selecione uma cidade de origem');
@@ -436,45 +409,31 @@ const BenetripDiscovery = {
         return true;
     },
 
-    // ================================================================
-    // COLETA DE DADOS — v3.1.2: Parsing corrigido para formato sem centavos
-    // Inclui adultos/crianças/bebês e multi-prefs
-    // ================================================================
     coletarDadosFormulario() {
         const companhia = parseInt(document.getElementById('companhia').value);
         
-        // Calcular passageiros baseado no tipo de companhia
         let adultos = 1;
         let criancas = 0;
         let bebes = 0;
         let numPessoas = 1;
 
         switch (companhia) {
-            case 0: // Sozinho
-                adultos = 1;
-                numPessoas = 1;
-                break;
-            case 1: // Casal
-                adultos = 2;
-                numPessoas = 2;
-                break;
-            case 2: // Família
+            case 0: adultos = 1; numPessoas = 1; break;
+            case 1: adultos = 2; numPessoas = 2; break;
+            case 2:
                 adultos = parseInt(document.getElementById('familia-adultos').value) || 2;
                 criancas = parseInt(document.getElementById('familia-criancas').value) || 0;
                 bebes = parseInt(document.getElementById('familia-bebes').value) || 0;
                 numPessoas = adultos + criancas + bebes;
                 break;
-            case 3: // Amigos
+            case 3:
                 adultos = parseInt(document.getElementById('num-pessoas').value) || 2;
                 numPessoas = adultos;
                 break;
         }
 
-        // Multi-select de preferências: pode ser "relax,cultura" etc.
         const prefString = document.getElementById('preferencias').value;
         const preferenciasArray = prefString.split(',').filter(Boolean);
-
-        // Escopo de destino (internacional ou tanto faz)
         const escopoDestino = document.getElementById('escopo-destino').value || 'tanto_faz';
 
         this.state.formData = {
@@ -484,9 +443,9 @@ const BenetripDiscovery = {
             criancas: criancas,
             bebes: bebes,
             numPessoas: numPessoas,
-            preferencias: prefString,           // string "relax,cultura"
-            preferenciasArray: preferenciasArray, // array ["relax", "cultura"]
-            escopoDestino: escopoDestino,        // "tanto_faz" ou "internacional"
+            preferencias: prefString,
+            preferenciasArray: preferenciasArray,
+            escopoDestino: escopoDestino,
             dataIda: document.getElementById('data-ida').value,
             dataVolta: document.getElementById('data-volta').value,
             moeda: document.getElementById('moeda').value,
@@ -508,7 +467,6 @@ const BenetripDiscovery = {
         return `${simbolo} ${Math.round(valor).toLocaleString('pt-BR')}`;
     },
 
-    // Labels legíveis para companhia e preferências
     COMPANHIA_LABELS: {
         0: { emoji: '🧳', texto: 'Sozinho(a)' },
         1: { emoji: '❤️', texto: 'Viagem romântica' },
@@ -537,9 +495,6 @@ const BenetripDiscovery = {
         'urbano': 'Agito urbano, vida noturna, compras e experiências cosmopolitas'
     },
 
-    // ================================================================
-    // GERAR DESCRIÇÃO DE PREFERÊNCIAS (multi-select)
-    // ================================================================
     getPreferenciasDescricao(prefArray) {
         if (!prefArray || prefArray.length === 0) return 'Não informado';
         return prefArray
@@ -563,7 +518,6 @@ const BenetripDiscovery = {
         try {
             this.mostrarLoading();
             
-            // PASSO 1: Triple Search (ou Double se internacional only)
             this.atualizarProgresso(15, '🔍 Buscando destinos pelo mundo...');
             const destinosDisponiveis = await this.buscarDestinosAPI();
             
@@ -571,7 +525,6 @@ const BenetripDiscovery = {
                 throw new Error('Nenhum destino encontrado');
             }
             
-            // PASSO 2: Filtrar por orçamento
             this.atualizarProgresso(40, '💰 Filtrando pelo seu orçamento...');
             const filtro = this.filtrarDestinos(destinosDisponiveis);
             
@@ -585,13 +538,11 @@ const BenetripDiscovery = {
             const destinosParaRanking = filtro.destinos;
             this.log(`📋 Cenário: ${filtro.cenario} | ${destinosParaRanking.length} destinos para ranking`);
             
-            // PASSO 3: LLM ranqueia com contexto enriquecido
             this.atualizarProgresso(60, '🤖 Tripinha analisando destinos...');
             const ranking = await this.ranquearDestinosAPI(destinosParaRanking, filtro.cenario);
             
-            // PASSO 4: Gerar links para voos.benetrip.com.br
             this.atualizarProgresso(80, '✈️ Gerando links de reserva...');
-            const destinosComLinks = this.gerarLinksBenetrip(ranking);
+            const destinosComLinks = this.gerarLinksVoos(ranking);
             
             this.state.resultados = destinosComLinks;
             
@@ -606,11 +557,6 @@ const BenetripDiscovery = {
         }
     },
 
-    // ================================================================
-    // CHAMADA API: search-destinations (triple search)
-    // Passa escopoDestino para filtrar internacional
-    // Passa preferências como array para interests combinados
-    // ================================================================
     async buscarDestinosAPI() {
         const response = await fetch('/api/search-destinations', {
             method: 'POST',
@@ -619,9 +565,9 @@ const BenetripDiscovery = {
                 origem: this.state.formData.origem.code,
                 dataIda: this.state.formData.dataIda,
                 dataVolta: this.state.formData.dataVolta,
-                preferencias: this.state.formData.preferenciasArray, // array agora
+                preferencias: this.state.formData.preferenciasArray,
                 moeda: this.state.formData.moeda,
-                escopoDestino: this.state.formData.escopoDestino    // "tanto_faz" ou "internacional"
+                escopoDestino: this.state.formData.escopoDestino
             })
         });
         
@@ -704,15 +650,10 @@ const BenetripDiscovery = {
         return Math.ceil((volta - ida) / (1000 * 60 * 60 * 24));
     },
 
-    // ================================================================
-    // CHAMADA API: rank-destinations
-    // Agora inclui adultos/crianças/bebês + preferências múltiplas
-    // ================================================================
     async ranquearDestinosAPI(destinos, cenario) {
         const { formData } = this.state;
         const noites = this.calcularNoites(formData.dataIda, formData.dataVolta);
 
-        // Descrição de companhia enriquecida para família
         let companhiaDesc = this.COMPANHIA_API_MAP[formData.companhia] || 'Não informado';
         if (formData.companhia === 2) {
             const parts = [`${formData.adultos} adulto(s)`];
@@ -756,29 +697,30 @@ const BenetripDiscovery = {
     },
 
     // ================================================================
-    // GERAR LINKS PARA voos.benetrip.com.br
-    // Agora trata surpresa null e alternativas variáveis
+    // v3.2: GERAR LINKS PARA PÁGINA LOCAL voos.html
+    // Usa URLSearchParams com parâmetros explícitos compatíveis
+    // com BenetripVoos.parseUrlParams() — auto-search ao abrir
     // ================================================================
-    gerarLinksBenetrip(ranking) {
-        const { origem, dataIda, dataVolta, adultos, criancas, bebes } = this.state.formData;
-        
-        const formatDDMM = (isoDate) => {
-            const [, mes, dia] = isoDate.split('-');
-            return `${dia}${mes}`;
-        };
+    gerarLinksVoos(ranking) {
+        const { origem, dataIda, dataVolta, adultos, criancas, bebes, moeda } = this.state.formData;
 
-        // Construir string de passageiros
-        let passageirosStr;
-        if (criancas > 0 || bebes > 0) {
-            passageirosStr = `${adultos}${criancas}${bebes}`;
-        } else {
-            passageirosStr = `${adultos}`;
-        }
-        
         const gerarLink = (d) => {
             if (!d?.primary_airport) return '#';
-            const flightSearch = `${origem.code}${formatDDMM(dataIda)}${d.primary_airport}${formatDDMM(dataVolta)}${passageirosStr}`;
-            return `https://voos.benetrip.com.br/?flightSearch=${flightSearch}&destination_airports=1&origin_airports=0`;
+
+            const params = new URLSearchParams({
+                origin: origem.code,
+                destination: d.primary_airport,
+                departure_date: dataIda,
+                return_date: dataVolta || '',
+                adults: String(adultos),
+                children: String(criancas),
+                infants: String(bebes),
+                currency: moeda,
+                origin_name: origem.name,
+                destination_name: d.name || d.primary_airport
+            });
+
+            return `${this.config.voosPagePath}?${params.toString()}`;
         };
         
         return {
@@ -822,7 +764,7 @@ const BenetripDiscovery = {
     },
 
     // ================================================================
-    // RESUMO DOS CRITÉRIOS (atualizado para família detalhada + multi-pref)
+    // RESUMO DOS CRITÉRIOS
     // ================================================================
     gerarResumoCriterios() {
         const { origem, companhia, adultos, criancas, bebes, numPessoas, preferenciasArray, escopoDestino, dataIda, dataVolta, moeda, orcamento } = this.state.formData;
@@ -835,7 +777,6 @@ const BenetripDiscovery = {
         const dataIdaBR = new Date(dataIda + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
         const dataVoltaBR = new Date(dataVolta + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' });
 
-        // Info de pessoas detalhada
         let pessoasInfo = '';
         if (companhia === 0) {
             pessoasInfo = '1 adulto';
@@ -894,9 +835,6 @@ const BenetripDiscovery = {
         `;
     },
 
-    // ================================================================
-    // TELA: Nenhum destino encontrado
-    // ================================================================
     mostrarSemResultados() {
         const container = document.getElementById('resultados-container');
         const { orcamento, moeda, origem, escopoDestino } = this.state.formData;
@@ -936,11 +874,6 @@ const BenetripDiscovery = {
 
     // ================================================================
     // RESULTADOS ENRIQUECIDOS
-    // v3.1.1: Custo de hotel dividido pelo número de pessoas
-    // v3.1: Degrada graciosamente quando poucos destinos
-    // - Sem surpresa se não houver
-    // - Sem alternativas se não houver
-    // - Mensagem informativa sobre poucos resultados
     // ================================================================
     mostrarResultados(destinos, cenario, mensagem) {
         const container = document.getElementById('resultados-container');
@@ -965,17 +898,15 @@ const BenetripDiscovery = {
 
         const custoEstimado = (d) => {
             const passagem = d.flight?.price || 0;
-            const hotelTotalQuarto = (d.avg_cost_per_night || 0) * noites; // Custo total do quarto
+            const hotelTotalQuarto = (d.avg_cost_per_night || 0) * noites;
             
             if (hotelTotalQuarto > 0) {
-                // Dividir custo do hotel pelo número de pessoas (quarto compartilhado)
                 const hotelPorPessoa = numPessoas > 1 
                     ? hotelTotalQuarto / numPessoas 
                     : hotelTotalQuarto;
                 
                 const custoTotal = passagem + hotelPorPessoa;
                 
-                // Texto adaptado para grupos
                 let detalheTexto = `(voo + ${noites} noites hotel`;
                 if (numPessoas > 1) {
                     detalheTexto += ` ÷ ${numPessoas} pessoas`;
@@ -1001,17 +932,11 @@ const BenetripDiscovery = {
             return `<div class="destino-dica"><span class="dica-icon">💡</span> ${d.dica}</div>`;
         };
 
-        // ============================================================
-        // CONTAR TOTAL DE DESTINOS ÚNICOS EXIBIDOS
-        // ============================================================
         const totalExibidos = 1 
             + (destinos.alternativas?.length || 0) 
             + (destinos.surpresa ? 1 : 0);
         const poucosResultados = destinos._poucosResultados || totalExibidos < 5;
 
-        // ============================================================
-        // MENSAGEM DE POUCOS RESULTADOS
-        // ============================================================
         let bannerPoucosResultados = '';
         if (poucosResultados) {
             bannerPoucosResultados = `
@@ -1023,9 +948,6 @@ const BenetripDiscovery = {
             `;
         }
 
-        // ============================================================
-        // SEÇÃO DE ALTERNATIVAS (condicional)
-        // ============================================================
         let alternativasHtml = '';
         if (destinos.alternativas && destinos.alternativas.length > 0) {
             alternativasHtml = `
@@ -1051,9 +973,6 @@ const BenetripDiscovery = {
             `;
         }
 
-        // ============================================================
-        // SEÇÃO SURPRESA (condicional)
-        // ============================================================
         let surpresaHtml = '';
         if (destinos.surpresa) {
             surpresaHtml = `
@@ -1073,9 +992,6 @@ const BenetripDiscovery = {
             `;
         }
 
-        // ============================================================
-        // MONTAR HTML FINAL
-        // ============================================================
         const html = `
             ${this.gerarResumoCriterios()}
 
