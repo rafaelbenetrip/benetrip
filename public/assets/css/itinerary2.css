@@ -3210,3 +3210,260 @@ body.mobile-optimized {
     font-size: 16px;
   }
 }
+
+/* ===========================================
+ * BENETRIP - CSS ADICIONAIS v10.0
+ * Adicionar ao final do arquivo itinerary2.css
+ * =========================================== */
+
+/* ✅ NOVO: Resumo Final do Roteiro */
+.resumo-final-roteiro {
+  background: linear-gradient(135deg, #fff8f0 0%, #f0f8ff 100%);
+  border-radius: 16px;
+  padding: 28px 20px;
+  margin: 24px 0 16px;
+  border: 2px solid #E87722;
+  position: relative;
+  overflow: hidden;
+}
+
+.resumo-final-roteiro::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, #E87722, #00A3E0, #E87722);
+}
+
+.resumo-final-header {
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.resumo-final-icon {
+  display: inline-block;
+  margin-bottom: 12px;
+}
+
+.resumo-final-avatar {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  border: 3px solid #E87722;
+  box-shadow: 0 4px 12px rgba(232, 119, 34, 0.25);
+}
+
+.resumo-final-emoji {
+  font-size: 48px;
+}
+
+.resumo-final-header h3 {
+  font-family: 'Poppins', sans-serif;
+  font-weight: 700;
+  font-size: 1.3rem;
+  color: #21272A;
+  margin: 0 0 6px 0;
+}
+
+.resumo-final-subtitle {
+  font-family: 'Montserrat', sans-serif;
+  color: #666;
+  font-size: 0.9rem;
+  margin: 0;
+  line-height: 1.4;
+}
+
+/* Stats */
+.resumo-final-stats {
+  display: flex;
+  justify-content: center;
+  gap: 24px;
+  margin: 20px 0;
+  padding: 16px 0;
+  border-top: 1px solid rgba(232, 119, 34, 0.15);
+  border-bottom: 1px solid rgba(232, 119, 34, 0.15);
+}
+
+.stat-item {
+  text-align: center;
+}
+
+.stat-numero {
+  display: block;
+  font-family: 'Poppins', sans-serif;
+  font-weight: 700;
+  font-size: 1.8rem;
+  color: #E87722;
+  line-height: 1;
+}
+
+.stat-label {
+  display: block;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 0.75rem;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-top: 4px;
+}
+
+/* Texto narrativo */
+.resumo-final-texto {
+  margin: 16px 0;
+}
+
+.resumo-final-texto p {
+  font-family: 'Montserrat', sans-serif;
+  font-size: 0.95rem;
+  color: #444;
+  line-height: 1.6;
+  margin: 0;
+  font-style: italic;
+}
+
+/* Destaques */
+.resumo-final-destaques {
+  margin: 16px 0;
+}
+
+.resumo-final-destaques h4 {
+  font-family: 'Poppins', sans-serif;
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: #21272A;
+  margin: 0 0 10px 0;
+}
+
+.destaques-lista {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.destaques-lista li {
+  font-family: 'Montserrat', sans-serif;
+  font-size: 0.88rem;
+  color: #555;
+  padding: 6px 0 6px 20px;
+  position: relative;
+  line-height: 1.4;
+}
+
+.destaques-lista li::before {
+  content: '📍';
+  position: absolute;
+  left: 0;
+  top: 6px;
+  font-size: 0.8rem;
+}
+
+.destaques-lista li em {
+  color: #888;
+  font-size: 0.85rem;
+}
+
+.destaques-lista li em::before {
+  content: '✨';
+}
+
+/* Ações do resumo final */
+.resumo-final-acoes {
+  display: flex;
+  gap: 12px;
+  margin: 20px 0 16px;
+  flex-wrap: wrap;
+}
+
+.btn-copiar-resumo,
+.btn-novo-roteiro {
+  flex: 1;
+  min-width: 140px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  font-family: 'Poppins', sans-serif;
+  font-weight: 600;
+  font-size: 0.88rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: none;
+}
+
+.btn-copiar-resumo {
+  background: #E87722;
+  color: white;
+  box-shadow: 0 2px 8px rgba(232, 119, 34, 0.3);
+}
+
+.btn-copiar-resumo:hover {
+  background: #d06a1d;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(232, 119, 34, 0.4);
+}
+
+.btn-copiar-resumo:active {
+  transform: translateY(0);
+}
+
+.btn-novo-roteiro {
+  background: white;
+  color: #00A3E0;
+  border: 2px solid #00A3E0;
+}
+
+.btn-novo-roteiro:hover {
+  background: #f0f8ff;
+  transform: translateY(-1px);
+}
+
+.btn-novo-roteiro:active {
+  transform: translateY(0);
+}
+
+/* Footer */
+.resumo-final-footer {
+  text-align: center;
+  padding-top: 12px;
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.resumo-final-footer p {
+  font-family: 'Montserrat', sans-serif;
+  font-size: 0.8rem;
+  color: #999;
+  margin: 0;
+}
+
+.resumo-final-footer strong {
+  color: #E87722;
+}
+
+/* Responsividade */
+@media (max-width: 480px) {
+  .resumo-final-roteiro {
+    padding: 20px 16px;
+    margin: 16px 0 12px;
+  }
+  
+  .resumo-final-stats {
+    gap: 16px;
+  }
+  
+  .stat-numero {
+    font-size: 1.5rem;
+  }
+  
+  .resumo-final-acoes {
+    flex-direction: column;
+  }
+  
+  .btn-copiar-resumo,
+  .btn-novo-roteiro {
+    min-width: auto;
+  }
+}
