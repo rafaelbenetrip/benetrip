@@ -19,6 +19,38 @@
     <!-- Styles -->
     <link rel="stylesheet" href="assets/css/descobrir-destinos.css">
 
+    <!-- Estilos do botão voltar nos resultados -->
+    <style>
+        .btn-voltar-topo {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 10px 20px;
+            background: #fff;
+            color: #E87722;
+            border: 2px solid #E87722;
+            border-radius: 50px;
+            font-family: 'Poppins', sans-serif;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            margin-bottom: 16px;
+        }
+        .btn-voltar-topo:hover {
+            background: #E87722;
+            color: #fff;
+        }
+        .btn-voltar-topo svg {
+            width: 16px;
+            height: 16px;
+            transition: transform 0.2s ease;
+        }
+        .btn-voltar-topo:hover svg {
+            transform: translateX(-3px);
+        }
+    </style>
+
     <!-- Vercel Analytics -->
     <script>
         window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
@@ -29,7 +61,7 @@
     <!-- Header -->
     <header class="header">
         <div class="container">
-            <img src="logo1.png" alt="Benetrip" class="logo">
+            <a href="https://www.benetrip.com.br"><img src="logo1.png" alt="Benetrip" class="logo"></a>
             <p class="tagline">Descubra seu destino perfeito! 🐕</p>
         </div>
     </header>
@@ -293,4 +325,3 @@
     <script src="assets/js/descobrir-destinos.js"></script>
 </body>
 </html>
-
