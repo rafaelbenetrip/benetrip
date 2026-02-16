@@ -13,7 +13,7 @@ import { join } from 'path';
 const CONTINENTES_KGMID = {
     'america_sul': '/m/0dg3n1',
     'america_norte': '/m/059g4',
-    'america_central': '/m/01_d4',  // América Central + Caribe
+    'america_central': '/m/0261m',  // América Central + Caribe
     'europa': '/m/02j9z',
     'asia': '/m/0j0k',
     'africa': '/m/0dv5r',
