@@ -1,13 +1,7 @@
-// api/rank-destinations.js - VERSÃO TRIPLE SEARCH v3.1
-// Recebe destinos consolidados e ranqueia com LLM
-// v3.1:
-// - NUNCA repete destinos (deduplicação pós-LLM)
-// - Adapta estrutura ao número de destinos disponíveis (<5)
-// - Mensagem de "poucos resultados" quando aplicável
-// v3.0:
-// - Recebe adultos/crianças/bebês separados → prompt adaptado para famílias
-// - Preferências múltiplas → prompt combina estilos de viagem
-// - Comentários ricos com contexto de datas/estação, dicas práticas
+// api/rank-destinations.js - VERSÃO TRIPLE SEARCH v3.2
+// v3.2: Tom da Tripinha nos comentários e dicas (personalidade canina próxima)
+// v3.1: Deduplicação pós-LLM, adapta estrutura ao número de destinos
+// v3.0: Adultos/crianças/bebês, preferências múltiplas, contexto sazonal
 // Fallback: Groq llama-3.3-70b → llama-3.1-8b → ranking por preço
 
 export default async function handler(req, res) {
@@ -45,11 +39,6 @@ export default async function handler(req, res) {
 
         // ============================================================
         // DETERMINAR ESTRUTURA BASEADA NO NÚMERO DE DESTINOS
-        // 1 destino  → só top_destino
-        // 2 destinos → top_destino + 1 alternativa
-        // 3 destinos → top_destino + 2 alternativas
-        // 4 destinos → top_destino + 3 alternativas
-        // 5+ destinos → top_destino + 3 alternativas + surpresa
         // ============================================================
         const numAlternativas = Math.min(3, totalDestinos - 1);
         const temSurpresa = totalDestinos >= 5;
@@ -181,13 +170,14 @@ ${listaCompacta}
 TAREFA: ${estruturaInstrucao}
 
 Para CADA destino selecionado, gere:
-1. "razao": frase curta (1 linha) explicando POR QUE combina com este viajante
-2. "comentario": texto de 2-3 frases descrevendo o destino considerando:
+1. "razao": frase curta (1 linha) da Tripinha explicando POR QUE combina com este viajante. Fale direto com o viajante (ex: "Perfeito pra vocês curtirem praia e sossego!")
+2. "comentario": texto de 2-3 frases escritas pela Tripinha (cachorra vira-lata caramelo) falando DIRETO com o viajante, como uma amiga animada dando dica. Considere:
    - A estação do ano / clima esperado no período da viagem
    - Atividades e experiências alinhadas com "${preferencias}"
    - Adequação para ${companhia}${(criancas > 0 || bebes > 0) ? ' (com crianças/bebês!)' : ''}
-   - Use tom amigável e entusiasmado (estilo guia de viagens descolado)
-3. "dica": uma dica prática e útil para quem vai viajar para lá nesse período
+   - Tom: 1ª pessoa, descontraído, caloroso. Pode usar referência canina sutil (farejar, explorar, abanar o rabo) mas SEM exagerar — no máximo 1 por comentário.
+   - Exemplos de tom: "Esse lugar é demais!", "Farejei umas praias incríveis aí...", "Vocês vão amar!"
+3. "dica": uma dica prática e útil no tom da Tripinha (ex: "Fica a dica da Tripinha: ..." ou "Olha, eu levaria...")
    ${(criancas > 0 || bebes > 0) ? '(inclua dicas relevantes para viagem com crianças quando pertinente)' : ''}
 
 ${totalDestinos >= 5 ? `ESTRUTURA DE SELEÇÃO:
@@ -213,6 +203,7 @@ REGRAS:
 ✓ ⚠️ REGRA ABSOLUTA: NUNCA repita o mesmo ID. Cada destino só pode aparecer UMA VEZ. TODOS os IDs devem ser DIFERENTES entre si.
 ✓ Escreva "comentario" e "dica" em português brasileiro
 ✓ Retorne APENAS JSON válido
+✓ NÃO use emoji nos textos (o frontend já cuida disso)
 ${totalDestinos < 5 ? `✓ São apenas ${totalDestinos} destinos disponíveis — use TODOS eles, sem repetir.` : ''}
 ${!temSurpresa ? '✓ "surpresa" deve ser null (poucos destinos disponíveis)' : ''}
 
@@ -239,12 +230,12 @@ ${estruturaJSON}`;
                         messages: [
                             {
                                 role: 'system',
-                                content: 'Você é um especialista em turismo brasileiro. Retorna APENAS JSON válido em português do Brasil. Zero texto extra. IDs referem a destinos da lista fornecida. NUNCA repita o mesmo ID — cada destino deve aparecer apenas uma vez no resultado. Se "surpresa" deve ser null, retorne null. Seus comentários são entusiasmados mas informativos, como um guia de viagens descolado. Quando a viagem inclui crianças ou bebês, sempre considere segurança e praticidade nas recomendações.'
+                                content: 'Você é a Tripinha, uma cachorra vira-lata caramelo brasileira que adora viajar e ajudar viajantes. Fale em 1ª pessoa, com tom de amiga animada dando dica. Use expressões leves e descontraídas. Pode soltar uma referência canina sutil de vez em quando (farejar, explorar, abanar o rabo), mas sem exagerar — no máximo 1 por destino. Retorna APENAS JSON válido em português do Brasil. Zero texto extra. IDs referem a destinos da lista fornecida. NUNCA repita o mesmo ID — cada destino deve aparecer apenas uma vez no resultado. Se "surpresa" deve ser null, retorne null. Quando a viagem inclui crianças ou bebês, sempre considere segurança e praticidade nas recomendações.'
                             },
                             { role: 'user', content: prompt }
                         ],
                         response_format: { type: 'json_object' },
-                        temperature: 0.3,
+                        temperature: 0.4,
                         max_tokens: 3000,
                     })
                 });
@@ -306,7 +297,7 @@ ${estruturaJSON}`;
                 return_date: original.return_date,
                 _sources: original._sources,
                 _source_count: original._source_count,
-                razao: item.razao || 'Selecionado pela Tripinha 🐶',
+                razao: item.razao || 'A Tripinha farejou esse destino pra você! 🐶',
                 comentario: item.comentario || '',
                 dica: item.dica || '',
             };
@@ -315,7 +306,6 @@ ${estruturaJSON}`;
         try {
             // ============================================================
             // DEDUPLICAÇÃO PÓS-LLM
-            // Se o LLM repetiu IDs, removemos duplicatas
             // ============================================================
             const usedIds = new Set();
 
@@ -359,7 +349,6 @@ ${estruturaJSON}`;
 
             // ============================================================
             // TENTAR PREENCHER SLOTS VAZIOS com destinos não usados
-            // (caso o LLM tenha repetido e perdemos slots)
             // ============================================================
             const maxAlternativas = Math.min(3, totalDestinos - 1);
             if (ranking.alternativas.length < maxAlternativas || (temSurpresa && !ranking.surpresa)) {
@@ -380,7 +369,7 @@ ${estruturaJSON}`;
                 // Preencher surpresa se necessário e possível
                 if (temSurpresa && !ranking.surpresa && unusedDestinos.length > 0) {
                     const next = unusedDestinos.shift();
-                    ranking.surpresa = hydrateById({ id: next._idx, razao: 'Uma opção diferente para explorar! 🎁', comentario: '', dica: '' }, 'surpresa_fill');
+                    ranking.surpresa = hydrateById({ id: next._idx, razao: 'A Tripinha farejou um lugar diferente pra você explorar! 🎁', comentario: '', dica: '' }, 'surpresa_fill');
                     usedIds.add(next._idx);
                     console.log(`🔄 Surpresa preenchida com ID ${next._idx} (${next.name})`);
                 }
@@ -437,7 +426,7 @@ function getSeasonContext(mes) {
 
 // ============================================================
 // FALLBACK: Ranking simples por preço (sem LLM)
-// Agora também respeita limite de destinos disponíveis
+// Agora com tom da Tripinha nos textos padrão
 // ============================================================
 function rankByPrice(destinos, orcamento) {
     const comPreco = destinos.filter(d => d.flight?.price > 0);
@@ -506,9 +495,9 @@ function buildFallbackResult(selected, orcamento) {
     const poucosResultados = totalDisponivel < 5;
 
     return {
-        top_destino: selected[0] ? wrap(selected[0], 'Melhor preço encontrado! 🐶') : null,
-        alternativas: selected.slice(1, Math.min(4, totalDisponivel)).map(d => wrap(d, 'Boa opção de preço')),
-        surpresa: (totalDisponivel >= 5 && selected[4]) ? wrap(selected[4], 'Uma opção diferente para explorar! 🎁') : null,
+        top_destino: selected[0] ? wrap(selected[0], 'A Tripinha farejou o melhor preço pra você! 🐶') : null,
+        alternativas: selected.slice(1, Math.min(4, totalDisponivel)).map(d => wrap(d, 'Outra opção bacana que encontrei!')),
+        surpresa: (totalDisponivel >= 5 && selected[4]) ? wrap(selected[4], 'A Tripinha farejou um lugar diferente pra você explorar! 🎁') : null,
         _model: 'fallback_price',
         _totalAnalisados: totalDisponivel,
         _poucosResultados: poucosResultados,
