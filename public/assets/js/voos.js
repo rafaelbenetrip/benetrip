@@ -72,7 +72,7 @@ const BenetripVoos = {
     // ================================================================
     async loadCities() {
         try {
-            const r = await fetch('data/cidades_global_iata_v5.json');
+            const r = await fetch('data/cidades_global_iata_v4.json');
             if (!r.ok) throw new Error('Err');
             const data = await r.json();
             this.state.cidadesData = data.filter(c => c.iata);
