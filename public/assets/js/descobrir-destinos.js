@@ -1,6 +1,11 @@
 /**
  * BENETRIP - DESCOBRIR DESTINOS
- * Versão GOOGLE FLIGHTS v4.1
+ * Versão GOOGLE FLIGHTS v4.2 - BUGFIX CRÍTICO
+ * 
+ * CORREÇÃO v4.2:
+ * ❌ BUG CORRIGIDO: Destinos dentro do orçamento não apareciam quando havia poucos resultados
+ * ✅ SOLUÇÃO: Sempre mostra destinos válidos, independente da quantidade mínima
+ * 
  * NOVIDADES v4.1:
  * - Botão "← Nova busca" no topo dos resultados para fácil retorno
  * - Gerenciamento de histórico do navegador (pushState/popstate)
@@ -12,19 +17,6 @@
  * - Suporte completo: origem, destino, datas, adultos, crianças, bebês, moeda
  * - Classe de cabine: econômica (padrão)
  * - Auto-search ao abrir Google Flights com os parâmetros pré-preenchidos
- * NOVIDADES v3.1.2:
- * - Campo de orçamento aceita valores inteiros com separador de milhar
- * NOVIDADES v3.1.1:
- * - Custo de hotel dividido pelo número de pessoas (quarto compartilhado)
- * NOVIDADES v3.1:
- * - Não repete destinos nos resultados
- * - Degrada graciosamente quando menos de 5 destinos disponíveis
- * NOVIDADES v3.0:
- * - Família: adultos, crianças (2-11) e bebês (0-1) separados
- * - Filtro internacional
- * - Multi-select de preferências
- * - Ranking LLM recebe info de crianças/bebês
- * APENAS APIs reais, SEM fallbacks de dados
  */
 
 const BenetripDiscovery = {
@@ -33,7 +25,7 @@ const BenetripDiscovery = {
         origemSelecionada: null,
         formData: {},
         resultados: null,
-        viewingResults: false  // v4.1: track if we're on results view
+        viewingResults: false
     },
 
     config: {
@@ -50,7 +42,7 @@ const BenetripDiscovery = {
     },
 
     init() {
-        this.log('🐕 Benetrip Discovery v4.1 (Google Flights + Back Button) inicializando...');
+        this.log('🐕 Benetrip Discovery v4.2 (Bugfix Orçamento) inicializando...');
         
         this.carregarCidades();
         this.setupFormEvents();
@@ -61,28 +53,21 @@ const BenetripDiscovery = {
         this.setupNumberInput();
         this.setupFamiliaInputs();
         this.setupCurrencyInput();
-        this.setupHistoryNavigation();  // v4.1
+        this.setupHistoryNavigation();
         
         this.log('✅ Inicialização completa');
     },
 
-    // ================================================================
-    // v4.1: GERENCIAMENTO DE HISTÓRICO DO NAVEGADOR
-    // Impede que o botão "voltar" do celular saia da página
-    // quando o usuário está vendo os resultados
-    // ================================================================
     setupHistoryNavigation() {
         window.addEventListener('popstate', (event) => {
             if (this.state.viewingResults) {
                 this.log('🔙 Botão voltar interceptado — retornando ao formulário');
-                this.voltarAoFormulario(true); // true = skip pushState
+                this.voltarAoFormulario(true);
             }
         });
     },
 
     pushResultsState() {
-        // Adiciona um estado ao histórico quando mostramos resultados
-        // Assim o "voltar" do navegador volta pro formulário em vez de sair da página
         history.pushState({ benetripView: 'results' }, '', '');
         this.state.viewingResults = true;
         this.log('📌 History state pushed (results)');
@@ -484,9 +469,6 @@ const BenetripDiscovery = {
         this.log('📝 Dados:', this.state.formData);
     },
 
-    // ================================================================
-    // HELPERS DE MOEDA E FORMATAÇÃO
-    // ================================================================
     getSimbolo(moeda) {
         return { 'BRL': 'R$', 'USD': 'US$', 'EUR': '€' }[moeda] || 'R$';
     },
@@ -539,10 +521,6 @@ const BenetripDiscovery = {
             texto: partes.map(p => p.texto).join(' + ')
         };
     },
-
-    // ================================================================
-    // GOOGLE FLIGHTS - PROTOBUF URL BUILDER
-    // ================================================================
 
     _protoVarint(n) {
         const bytes = [];
@@ -669,9 +647,6 @@ const BenetripDiscovery = {
         return url;
     },
 
-    // ================================================================
-    // FLUXO PRINCIPAL DE BUSCA
-    // ================================================================
     async buscarDestinos() {
         try {
             this.mostrarLoading();
@@ -752,7 +727,8 @@ const BenetripDiscovery = {
     },
 
     // ================================================================
-    // FILTRO DE ORÇAMENTO - 4 CENÁRIOS
+    // v4.2: FILTRO DE ORÇAMENTO CORRIGIDO
+    // SEMPRE MOSTRA DESTINOS VÁLIDOS, independente da quantidade mínima
     // ================================================================
     filtrarDestinos(destinos) {
         const { orcamento, moeda } = this.state.formData;
@@ -765,19 +741,40 @@ const BenetripDiscovery = {
             return { cenario: 'nenhum', destinos: [], mensagem: '' };
         }
 
+        // Sem orçamento definido → mostra tudo
         if (!orcamento) {
             return { cenario: 'ideal', destinos: comPreco, mensagem: '' };
         }
 
+        // ============================================================
+        // NOVA LÓGICA: Sempre mostra destinos dentro do orçamento
+        // A quantidade define apenas a mensagem/cenário, não se mostra
+        // ============================================================
+
+        // 1. Faixa ideal: 80-100% do orçamento
         const faixa80 = comPreco.filter(d => d.flight.price >= orcamento * 0.8 && d.flight.price <= orcamento);
         
-        if (faixa80.length >= 5) {
-            this.log(`✅ IDEAL: ${faixa80.length} destinos na faixa 80-100%`);
-            return { cenario: 'ideal', destinos: faixa80, mensagem: '' };
-        }
-
+        // 2. Faixa boa: 60-100% do orçamento
         const faixa60 = comPreco.filter(d => d.flight.price >= orcamento * 0.6 && d.flight.price <= orcamento);
         
+        // 3. Qualquer coisa abaixo do orçamento
+        const abaixo = comPreco.filter(d => d.flight.price <= orcamento);
+
+        // ============================================================
+        // DECISÃO DE CENÁRIO (mas sempre mostra se tiver destinos!)
+        // ============================================================
+
+        // CENÁRIO IDEAL: 5+ destinos na faixa 80-100%
+        if (faixa80.length >= 5) {
+            this.log(`✅ IDEAL: ${faixa80.length} destinos na faixa 80-100%`);
+            return { 
+                cenario: 'ideal', 
+                destinos: faixa80, 
+                mensagem: '' 
+            };
+        }
+
+        // CENÁRIO BOM: 3+ destinos na faixa 60-100%
         if (faixa60.length >= 3) {
             this.log(`👍 BOM: ${faixa60.length} destinos na faixa 60-100%`);
             return {
@@ -787,19 +784,43 @@ const BenetripDiscovery = {
             };
         }
 
-        const abaixo = comPreco.filter(d => d.flight.price <= orcamento);
-        
-        if (abaixo.length >= 3) {
-            this.log(`💡 ABAIXO: ${abaixo.length} destinos abaixo do orçamento`);
+        // ✅ CORREÇÃO v4.2: SEMPRE mostra se tiver destinos dentro do orçamento
+        // (mesmo que seja 1 ou 2 destinos apenas)
+        if (abaixo.length > 0) {
+            this.log(`💡 DENTRO DO ORÇAMENTO: ${abaixo.length} destino(s) de até ${simbolo} ${orcamento.toLocaleString('pt-BR')}`);
+            
+            // Mensagem adaptada à quantidade
+            let mensagem = '';
+            if (abaixo.length === 1) {
+                mensagem = `🐕 A Tripinha encontrou 1 destino dentro do seu orçamento de ${simbolo} ${orcamento.toLocaleString('pt-BR')}. É uma ótima opção!`;
+            } else if (abaixo.length === 2) {
+                mensagem = `🐕 A Tripinha encontrou 2 destinos dentro do seu orçamento de ${simbolo} ${orcamento.toLocaleString('pt-BR')}. Confira!`;
+            } else {
+                mensagem = `🐕 Não encontrei muitas opções próximas ao orçamento ideal, mas achei ${abaixo.length} destinos dentro de ${simbolo} ${orcamento.toLocaleString('pt-BR')} que podem te interessar!`;
+            }
+
             return {
                 cenario: 'abaixo',
                 destinos: abaixo,
-                mensagem: `🐕 Não encontrei muitas opções próximas ao seu orçamento de ${simbolo} ${orcamento.toLocaleString('pt-BR')}, mas achei destinos mais em conta que podem te interessar!`
+                mensagem: mensagem
             };
         }
 
-        this.log('❌ Destinos disponíveis mas fora do orçamento');
-        return { cenario: 'nenhum', destinos: [], mensagem: '' };
+        // SÓ RETORNA "NENHUM" se REALMENTE não tiver nada dentro do orçamento
+        this.log(`❌ Nenhum destino dentro do orçamento de ${simbolo} ${orcamento.toLocaleString('pt-BR')}`);
+        
+        // Debug adicional para investigação
+        const maisBarato = comPreco.reduce((min, d) => 
+            d.flight.price < min ? d.flight.price : min, 
+            Infinity
+        );
+        this.log(`💰 Destino mais barato disponível: ${simbolo} ${maisBarato.toLocaleString('pt-BR')}`);
+        
+        return { 
+            cenario: 'nenhum', 
+            destinos: [], 
+            mensagem: '' 
+        };
     },
 
     calcularNoites(dataIda, dataVolta) {
@@ -854,9 +875,6 @@ const BenetripDiscovery = {
         return ranking;
     },
 
-    // ================================================================
-    // v4.0: GERAR LINKS PARA GOOGLE FLIGHTS
-    // ================================================================
     gerarLinksGoogleFlights(ranking) {
         const { origem, dataIda, dataVolta, adultos, criancas, bebes, moeda } = this.state.formData;
 
@@ -906,9 +924,6 @@ const BenetripDiscovery = {
         return new Promise(r => setTimeout(r, ms));
     },
 
-    // ================================================================
-    // v4.1: VOLTAR AO FORMULÁRIO (atualizado com history management)
-    // ================================================================
     voltarAoFormulario(fromPopstate) {
         document.getElementById('resultados-container').style.display = 'none';
         document.getElementById('resultados-container').innerHTML = '';
@@ -918,10 +933,7 @@ const BenetripDiscovery = {
         
         this.state.viewingResults = false;
         
-        // Se NÃO veio do popstate, precisamos voltar o history state
-        // Se veio do popstate, o navegador já cuidou do history
         if (!fromPopstate) {
-            // Verifica se o state atual é de resultados antes de voltar
             if (history.state && history.state.benetripView === 'results') {
                 history.back();
             }
@@ -930,9 +942,6 @@ const BenetripDiscovery = {
         this.log('🔄 Voltou ao formulário com dados preservados');
     },
 
-    // ================================================================
-    // v4.1: HTML DO BOTÃO VOLTAR (topo dos resultados)
-    // ================================================================
     gerarBotaoVoltarTopo() {
         return `
             <button class="btn-voltar-topo" onclick="BenetripDiscovery.voltarAoFormulario()">
@@ -945,9 +954,6 @@ const BenetripDiscovery = {
         `;
     },
 
-    // ================================================================
-    // RESUMO DOS CRITÉRIOS
-    // ================================================================
     gerarResumoCriterios() {
         const { origem, companhia, adultos, criancas, bebes, numPessoas, preferenciasArray, escopoDestino, dataIda, dataVolta, moeda, orcamento } = this.state.formData;
         const noites = this.calcularNoites(dataIda, dataVolta);
@@ -1024,7 +1030,6 @@ const BenetripDiscovery = {
 
         const isInternacional = escopoDestino === 'internacional';
 
-        // v4.1: Push history state para interceptar botão voltar
         this.pushResultsState();
 
         container.innerHTML = `
@@ -1059,15 +1064,11 @@ const BenetripDiscovery = {
         window.scrollTo({ top: 0, behavior: 'smooth' });
     },
 
-    // ================================================================
-    // RESULTADOS ENRIQUECIDOS
-    // ================================================================
     mostrarResultados(destinos, cenario, mensagem) {
         const container = document.getElementById('resultados-container');
         const { dataIda, dataVolta, moeda, numPessoas } = this.state.formData;
         const noites = this.calcularNoites(dataIda, dataVolta);
         
-        // v4.1: Push history state para interceptar botão voltar
         this.pushResultsState();
 
         const formatPreco = (d) => this.formatarPreco(d.flight?.price || 0, moeda);
