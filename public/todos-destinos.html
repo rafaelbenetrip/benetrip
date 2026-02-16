@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#E87722">
+    <title>Todos os Destinos - Compare Preços | Benetrip</title>
+
+    <!-- Favicons -->
+    <link rel="icon" type="image/svg+xml" href="assets/images/favicon/favicon.svg">
+    <link rel="apple-touch-icon" sizes="180x180" href="assets/images/favicon/apple-touch-icon.png">
+    
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Montserrat:wght@400;500&display=swap" rel="stylesheet">
+    
+    <!-- Flatpickr para calendário -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    
+    <!-- Styles -->
+    <link rel="stylesheet" href="assets/css/todos-destinos.css">
+
+    <!-- Vercel Analytics -->
+    <script>
+        window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
+    </script>
+    <script defer src="/_vercel/insights/script.js"></script>
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="container">
+            <a href="https://www.benetrip.com.br"><img src="logo1.png" alt="Benetrip" class="logo"></a>
+            <p class="tagline">Compare todos os destinos! 🌍</p>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <div class="container">
+            
+            <!-- Formulário Simplificado -->
+            <div id="form-container">
+                <div class="intro-card">
+                    <img src="assets/images/tripinha/avatar-pensando.png" alt="Tripinha" class="intro-avatar" 
+                         onerror="this.style.display='none'">
+                    <h1>🌍 Descubra Todos os Destinos Disponíveis</h1>
+                    <p>A Tripinha vai buscar TODOS os destinos possíveis para suas datas e mostrar os preços do menor para o maior. Simples assim! 🐕</p>
+                </div>
+
+                <form id="busca-form" class="busca-form">
+                    
+                    <!-- Origem -->
+                    <div class="form-group">
+                        <label for="origem">📍 De onde você vai sair?</label>
+                        <div class="autocomplete-wrapper">
+                            <input 
+                                type="text" 
+                                id="origem" 
+                                placeholder="Ex: São Paulo, Rio de Janeiro..."
+                                autocomplete="off"
+                                required
+                            >
+                            <div id="origem-results" class="autocomplete-results"></div>
+                        </div>
+                        <input type="hidden" id="origem-data">
+                    </div>
+
+                    <!-- Datas -->
+                    <div class="form-group">
+                        <label for="datas">📅 Quando será a viagem?</label>
+                        <input 
+                            type="text" 
+                            id="datas" 
+                            placeholder="Selecione ida e volta"
+                            readonly
+                            required
+                        >
+                        <input type="hidden" id="data-ida">
+                        <input type="hidden" id="data-volta">
+                    </div>
+
+                    <!-- Grid Moeda + Orçamento -->
+                    <div class="form-grid">
+                        <!-- Moeda -->
+                        <div class="form-group">
+                            <label>💰 Moeda</label>
+                            <div class="button-group-vertical" data-field="moeda">
+                                <button type="button" class="btn-option" data-value="BRL">
+                                    <span class="text">R$ Real</span>
+                                </button>
+                                <button type="button" class="btn-option" data-value="USD">
+                                    <span class="text">$ Dólar</span>
+                                </button>
+                                <button type="button" class="btn-option" data-value="EUR">
+                                    <span class="text">€ Euro</span>
+                                </button>
+                            </div>
+                            <input type="hidden" id="moeda" required>
+                        </div>
+
+                        <!-- Orçamento -->
+                        <div class="form-group">
+                            <label for="orcamento">💸 Orçamento por pessoa</label>
+                            <p class="hint">Ida e volta</p>
+                            <div class="currency-input-wrapper">
+                                <span class="currency-symbol">R$</span>
+                                <input 
+                                    type="text" 
+                                    id="orcamento" 
+                                    placeholder="2.000"
+                                    inputmode="numeric"
+                                    required
+                                >
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Submit -->
+                    <button type="submit" class="btn-submit">
+                        🔍 Buscar Todos os Destinos
+                    </button>
+                </form>
+            </div>
+
+            <!-- Loading -->
+            <div id="loading-container" style="display: none;">
+                <div class="loading-card">
+                    <img src="assets/images/tripinha/avatar-pensando.png" alt="Tripinha buscando" class="tripinha-loading">
+                    <h2>🐕 Tripinha está vasculhando o mundo...</h2>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progress-fill"></div>
+                    </div>
+                    <p id="loading-message">Buscando destinos disponíveis...</p>
+                </div>
+            </div>
+
+            <!-- Resultados -->
+            <div id="resultados-container" style="display: none;">
+                <!-- Será preenchido dinamicamente -->
+            </div>
+
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <p>🐕 Feito com amor pela Tripinha | Benetrip © 2026</p>
+    </footer>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/pt.js"></script>
+    <script src="assets/js/todos-destinos.js"></script>
+</body>
+</html>
