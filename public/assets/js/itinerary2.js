@@ -29,7 +29,14 @@ const BENETRIP_ROTEIRO = {
    * ✅ INICIALIZAÇÃO v10 - Com History API e recuperação de estado
    */
   init() {
-    console.log('🚀 Benetrip Roteiro v10.0 - Com Resumo Final + Navegação Inteligente');
+    console.log('🚀 Benetrip Roteiro v10.1 - Fixes: re-search, destaques, prompt, editar');
+    
+    // ✅ FIX v10.1: Renomear botão "Personalizar" → "Editar"
+    const btnEditar = document.getElementById('btn-editar-roteiro');
+    if (btnEditar) {
+      const spanTexto = btnEditar.querySelector('span:last-child');
+      if (spanTexto) spanTexto.textContent = 'Editar';
+    }
     
     // ✅ NOVO: Configurar History API
     this.configurarHistoryAPI();
@@ -88,13 +95,15 @@ const BENETRIP_ROTEIRO = {
    * ✅ NOVO: Voltar para formulário sem alterar histórico (chamado pelo popstate)
    */
   voltarParaFormularioSemHistorico() {
-    // NÃO fazer history.back() aqui para evitar loop
     this.estadoAtual = 'formulario';
     
-    // Manter dados do formulário preenchidos
+    // ✅ FIX v10.1: Reset completo
     this.roteiroPronto = null;
     this.estaCarregando = false;
     this.imagensCache.clear();
+    this.progressoAtual = 10;
+    clearInterval(this.intervalId);
+    this.intervalId = null;
     
     // Mostrar formulário mantendo os dados
     this.mostrarFormulario();
@@ -362,10 +371,18 @@ const BENETRIP_ROTEIRO = {
       this.dadosFormulario = this.capturarDadosFormulario();
       console.log('📋 Dados capturados:', this.dadosFormulario);
       
-      // ✅ NOVO: Limpar roteiro anterior salvo
+      // ✅ FIX v10.1: Reset COMPLETO do estado antes de nova pesquisa
       this.limparRoteiroSalvo();
+      this.roteiroPronto = null;
+      this.imagensCache.clear();
+      this.progressoAtual = 10;
+      clearInterval(this.intervalId);
+      this.intervalId = null;
       
       this.mostrarRoteiro();
+      
+      // ✅ FIX v10.1: Re-exibir e resetar o loading container
+      this.resetarLoadingContainer();
       
       setTimeout(() => {
         this.iniciarAnimacaoProgresso();
@@ -647,6 +664,11 @@ const BENETRIP_ROTEIRO = {
     this.estaCarregando = false;
     this.imagensCache.clear();
     
+    // ✅ FIX v10.1: Reset completo do progresso
+    this.progressoAtual = 10;
+    clearInterval(this.intervalId);
+    this.intervalId = null;
+    
     this.mostrarFormulario();
     
     const btnGerar = document.getElementById('btn-gerar');
@@ -681,6 +703,11 @@ const BENETRIP_ROTEIRO = {
     this.imagensCache.clear();
     this.limparRoteiroSalvo();
     
+    // ✅ FIX v10.1: Reset completo do progresso
+    this.progressoAtual = 10;
+    clearInterval(this.intervalId);
+    this.intervalId = null;
+    
     this.mostrarFormulario();
     
     const btnGerar = document.getElementById('btn-gerar');
@@ -705,13 +732,16 @@ const BENETRIP_ROTEIRO = {
     this.imagensCache.clear();
     this.estadoAtual = 'formulario';
     
+    // ✅ FIX v10.1: Reset completo do progresso
+    this.progressoAtual = 10;
+    clearInterval(this.intervalId);
+    this.intervalId = null;
+    
     this.mostrarFormulario();
     
-    // Limpar campos do formulário
     const form = document.getElementById('form-viagem');
     if (form) form.reset();
     
-    // Esconder campos condicionais
     const grupoQuantidade = document.getElementById('grupo-quantidade');
     const grupoFamilia = document.getElementById('grupo-familia');
     if (grupoQuantidade) grupoQuantidade.style.display = 'none';
@@ -724,10 +754,42 @@ const BENETRIP_ROTEIRO = {
       btnGerar.innerHTML = '<span class="btn-icon">✨</span><span class="btn-text">Criar Meu Roteiro!</span>';
     }
     
-    // Scroll para o topo
     window.scrollTo({ top: 0, behavior: 'smooth' });
-    
     this.exibirToast('Pronto para uma nova aventura! 🐾', 'success');
+  },
+
+  /**
+   * ✅ FIX v10.1: Resetar loading container para nova pesquisa
+   */
+  resetarLoadingContainer() {
+    const loading = document.getElementById('loading-inicial');
+    if (loading) {
+      loading.style.display = '';
+      loading.classList.remove('fade-out');
+    }
+    
+    // Resetar barra de progresso
+    const barra = document.querySelector('.progress-bar');
+    if (barra) {
+      barra.style.width = '10%';
+      barra.setAttribute('aria-valuenow', '10');
+    }
+    
+    const texto = document.querySelector('.loading-text');
+    if (texto) {
+      texto.textContent = 'Preparando seu roteiro personalizado...';
+    }
+    
+    // Limpar conteúdo anterior do roteiro (manter só o loading)
+    const container = document.querySelector('.roteiro-content');
+    if (container) {
+      // Remover tudo exceto o loading container
+      Array.from(container.children).forEach(child => {
+        if (child.id !== 'loading-inicial') {
+          child.remove();
+        }
+      });
+    }
   },
 
   /**
@@ -1394,9 +1456,10 @@ const BENETRIP_ROTEIRO = {
    */
   gerarDestaquesRoteiro() {
     const destaques = [];
+    const totalDias = this.roteiroPronto.dias.length;
     
-    // Pegar 1 atividade destaque por dia (máximo 5)
-    this.roteiroPronto.dias.slice(0, 5).forEach((dia, index) => {
+    // ✅ FIX v10.1: Mostrar TODOS os dias, não apenas 5
+    this.roteiroPronto.dias.forEach((dia, index) => {
       if (dia.atividades && dia.atividades.length > 0) {
         const destaque = dia.atividades.find(a => !a.isEspecial) || dia.atividades[0];
         if (destaque && destaque.local) {
@@ -1404,10 +1467,6 @@ const BENETRIP_ROTEIRO = {
         }
       }
     });
-    
-    if (this.roteiroPronto.dias.length > 5) {
-      destaques.push(`<li><em>...e mais ${this.roteiroPronto.dias.length - 5} dias de aventuras!</em></li>`);
-    }
     
     return destaques.join('');
   },
@@ -1873,9 +1932,32 @@ const BENETRIP_ROTEIRO = {
     window.open(link, '_blank', 'noopener,noreferrer');
   },
 
+  /**
+   * ✅ FIX v10.1: Editar roteiro - volta ao formulário mantendo dados preenchidos
+   */
   editarRoteiro() {
-    if (confirm('Deseja voltar ao formulário para editar suas preferências?')) {
-      this.voltarParaFormulario();
+    if (confirm('Deseja voltar ao formulário para editar suas preferências? Ao gerar novamente, o roteiro atual será substituído.')) {
+      // Reset do estado de execução mas MANTER dadosFormulario
+      this.roteiroPronto = null;
+      this.estaCarregando = false;
+      this.imagensCache.clear();
+      this.progressoAtual = 10;
+      clearInterval(this.intervalId);
+      this.intervalId = null;
+      this.limparRoteiroSalvo();
+      this.estadoAtual = 'formulario';
+      
+      this.mostrarFormulario();
+      
+      // Restaurar botão
+      const btnGerar = document.getElementById('btn-gerar');
+      if (btnGerar) {
+        btnGerar.classList.remove('loading');
+        btnGerar.disabled = false;
+        btnGerar.innerHTML = '<span class="btn-icon">✨</span><span class="btn-text">Criar Meu Roteiro!</span>';
+      }
+      
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   },
 
