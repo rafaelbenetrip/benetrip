@@ -1,6 +1,11 @@
 /**
  * BENETRIP - DESCOBRIR DESTINOS
- * Versão GOOGLE FLIGHTS v4.0
+ * Versão GOOGLE FLIGHTS v4.1
+ * NOVIDADES v4.1:
+ * - Botão "← Nova busca" no topo dos resultados para fácil retorno
+ * - Gerenciamento de histórico do navegador (pushState/popstate)
+ *   para que o botão "voltar" do celular retorne ao formulário
+ *   em vez de sair da página e perder a simulação
  * NOVIDADES v4.0:
  * - Links agora direcionam para Google Flights com todos os parâmetros
  * - Protobuf encoding para construir URLs compatíveis com Google Flights
@@ -27,7 +32,8 @@ const BenetripDiscovery = {
         cidadesData: null,
         origemSelecionada: null,
         formData: {},
-        resultados: null
+        resultados: null,
+        viewingResults: false  // v4.1: track if we're on results view
     },
 
     config: {
@@ -44,7 +50,7 @@ const BenetripDiscovery = {
     },
 
     init() {
-        this.log('🐕 Benetrip Discovery v4.0 (Google Flights) inicializando...');
+        this.log('🐕 Benetrip Discovery v4.1 (Google Flights + Back Button) inicializando...');
         
         this.carregarCidades();
         this.setupFormEvents();
@@ -55,8 +61,31 @@ const BenetripDiscovery = {
         this.setupNumberInput();
         this.setupFamiliaInputs();
         this.setupCurrencyInput();
+        this.setupHistoryNavigation();  // v4.1
         
         this.log('✅ Inicialização completa');
+    },
+
+    // ================================================================
+    // v4.1: GERENCIAMENTO DE HISTÓRICO DO NAVEGADOR
+    // Impede que o botão "voltar" do celular saia da página
+    // quando o usuário está vendo os resultados
+    // ================================================================
+    setupHistoryNavigation() {
+        window.addEventListener('popstate', (event) => {
+            if (this.state.viewingResults) {
+                this.log('🔙 Botão voltar interceptado — retornando ao formulário');
+                this.voltarAoFormulario(true); // true = skip pushState
+            }
+        });
+    },
+
+    pushResultsState() {
+        // Adiciona um estado ao histórico quando mostramos resultados
+        // Assim o "voltar" do navegador volta pro formulário em vez de sair da página
+        history.pushState({ benetripView: 'results' }, '', '');
+        this.state.viewingResults = true;
+        this.log('📌 History state pushed (results)');
     },
 
     async carregarCidades() {
@@ -515,12 +544,9 @@ const BenetripDiscovery = {
     // GOOGLE FLIGHTS - PROTOBUF URL BUILDER
     // ================================================================
 
-    /**
-     * Codifica um número inteiro como Protobuf varint (base 128)
-     */
     _protoVarint(n) {
         const bytes = [];
-        let v = n >>> 0; // unsigned 32-bit
+        let v = n >>> 0;
         while (v > 127) {
             bytes.push((v & 0x7f) | 0x80);
             v >>>= 7;
@@ -529,24 +555,14 @@ const BenetripDiscovery = {
         return bytes;
     },
 
-    /**
-     * Codifica tag + wire type para um campo protobuf
-     * Wire types: 0 = varint, 2 = length-delimited
-     */
     _protoTag(fieldNumber, wireType) {
         return this._protoVarint((fieldNumber << 3) | wireType);
     },
 
-    /**
-     * Codifica um campo varint (inteiro)
-     */
     _protoVarintField(fieldNumber, value) {
         return [...this._protoTag(fieldNumber, 0), ...this._protoVarint(value)];
     },
 
-    /**
-     * Codifica um campo string (length-delimited)
-     */
     _protoStringField(fieldNumber, str) {
         const encoded = new TextEncoder().encode(str);
         return [
@@ -556,9 +572,6 @@ const BenetripDiscovery = {
         ];
     },
 
-    /**
-     * Codifica uma mensagem aninhada (length-delimited)
-     */
     _protoMessageField(fieldNumber, messageBytes) {
         return [
             ...this._protoTag(fieldNumber, 2),
@@ -567,9 +580,6 @@ const BenetripDiscovery = {
         ];
     },
 
-    /**
-     * Codifica bytes para base64url (sem padding, URL-safe)
-     */
     _toBase64Url(bytes) {
         const binary = String.fromCharCode(...bytes);
         return btoa(binary)
@@ -578,21 +588,13 @@ const BenetripDiscovery = {
             .replace(/=+$/, '');
     },
 
-    /**
-     * Constrói o bloco protobuf de um aeroporto
-     * Estrutura: { field1: 1 (tipo IATA), field2: "CÓDIGO" }
-     */
     _buildAirport(iataCode) {
         return [
-            ...this._protoVarintField(1, 1),        // tipo = IATA
-            ...this._protoStringField(2, iataCode)   // código
+            ...this._protoVarintField(1, 1),
+            ...this._protoStringField(2, iataCode)
         ];
     },
 
-    /**
-     * Constrói o bloco protobuf de um trecho de voo
-     * Estrutura: { field2: "YYYY-MM-DD", field13: airport_origin, field14: airport_dest }
-     */
     _buildFlightLeg(date, originIata, destIata) {
         return [
             ...this._protoStringField(2, date),
@@ -601,35 +603,18 @@ const BenetripDiscovery = {
         ];
     },
 
-    /**
-     * Constrói o parâmetro 'tfs' (flight search) para Google Flights
-     * Estrutura do TFS:
-     *   field 1 (varint): 28 — modo de busca
-     *   field 2 (varint): 2  — ida e volta (round trip)
-     *   field 3 (message): trecho de ida
-     *   field 3 (message): trecho de volta
-     *   field 14 (varint): 1 — flag (classe econômica)
-     */
     _buildTfsParam(originIata, destIata, departDate, returnDate) {
         const tfsBytes = [
-            ...this._protoVarintField(1, 28),       // modo
-            ...this._protoVarintField(2, 2),         // round trip
+            ...this._protoVarintField(1, 28),
+            ...this._protoVarintField(2, 2),
             ...this._protoMessageField(3, this._buildFlightLeg(departDate, originIata, destIata)),
             ...this._protoMessageField(3, this._buildFlightLeg(returnDate, destIata, originIata)),
-            ...this._protoVarintField(14, 1)         // flag
+            ...this._protoVarintField(14, 1)
         ];
 
         return this._toBase64Url(tfsBytes);
     },
 
-    /**
-     * Constrói o parâmetro 'tfu' (travelers/passengers) para Google Flights
-     * Estrutura do TFU:
-     *   field 2 (message):
-     *     field 1 (varint): adultos
-     *     field 2 (varint): crianças (2-11 anos)
-     *     field 3 (varint): bebês no colo (0-1 ano)
-     */
     _buildTfuParam(adults, children, infantsOnLap) {
         const innerBytes = [
             ...this._protoVarintField(1, adults),
@@ -641,43 +626,21 @@ const BenetripDiscovery = {
         return this._toBase64Url(outerBytes);
     },
 
-    /**
-     * Mapeia código de moeda para código Google Flights
-     */
     _getGoogleCurrency(moeda) {
-        // Google Flights aceita códigos ISO 4217 padrão
         const map = { 'BRL': 'BRL', 'USD': 'USD', 'EUR': 'EUR' };
         return map[moeda] || 'BRL';
     },
 
-    /**
-     * Mapeia moeda para locale/idioma do Google Flights
-     */
     _getGoogleLocale(moeda) {
         const map = { 'BRL': 'pt-BR', 'USD': 'en', 'EUR': 'en' };
         return map[moeda] || 'pt-BR';
     },
 
-    /**
-     * Mapeia moeda para país (gl param) do Google Flights
-     */
     _getGoogleGl(moeda) {
         const map = { 'BRL': 'br', 'USD': 'us', 'EUR': 'de' };
         return map[moeda] || 'br';
     },
 
-    /**
-     * Constrói a URL completa do Google Flights com todos os parâmetros
-     * @param {string} originIata - Código IATA de origem (ex: "GRU")
-     * @param {string} destIata - Código IATA de destino (ex: "LIS")
-     * @param {string} departDate - Data de ida "YYYY-MM-DD"
-     * @param {string} returnDate - Data de volta "YYYY-MM-DD"
-     * @param {number} adults - Número de adultos
-     * @param {number} children - Número de crianças (2-11)
-     * @param {number} infants - Número de bebês (0-1)
-     * @param {string} currency - Código da moeda ("BRL", "USD", "EUR")
-     * @returns {string} URL do Google Flights
-     */
     buildGoogleFlightsUrl(originIata, destIata, departDate, returnDate, adults, children, infants, currency) {
         const tfs = this._buildTfsParam(originIata, destIata, departDate, returnDate);
         const tfu = this._buildTfuParam(adults, children, infants);
@@ -893,12 +856,6 @@ const BenetripDiscovery = {
 
     // ================================================================
     // v4.0: GERAR LINKS PARA GOOGLE FLIGHTS
-    // Constrói URLs com protobuf encoding incluindo:
-    // - Origem e destino (IATA)
-    // - Datas de ida e volta
-    // - Número de adultos, crianças e bebês
-    // - Moeda selecionada pelo usuário
-    // - Idioma e região (hl, gl)
     // ================================================================
     gerarLinksGoogleFlights(ranking) {
         const { origem, dataIda, dataVolta, adultos, criancas, bebes, moeda } = this.state.formData;
@@ -907,14 +864,14 @@ const BenetripDiscovery = {
             if (!d?.primary_airport) return '#';
 
             return this.buildGoogleFlightsUrl(
-                origem.code,           // IATA origem
-                d.primary_airport,     // IATA destino
-                dataIda,               // data ida YYYY-MM-DD
-                dataVolta,             // data volta YYYY-MM-DD
-                adultos,               // adultos
-                criancas,              // crianças 2-11
-                bebes,                 // bebês 0-1
-                moeda                  // moeda
+                origem.code,
+                d.primary_airport,
+                dataIda,
+                dataVolta,
+                adultos,
+                criancas,
+                bebes,
+                moeda
             );
         };
         
@@ -949,13 +906,43 @@ const BenetripDiscovery = {
         return new Promise(r => setTimeout(r, ms));
     },
 
-    voltarAoFormulario() {
+    // ================================================================
+    // v4.1: VOLTAR AO FORMULÁRIO (atualizado com history management)
+    // ================================================================
+    voltarAoFormulario(fromPopstate) {
         document.getElementById('resultados-container').style.display = 'none';
         document.getElementById('resultados-container').innerHTML = '';
         document.getElementById('form-container').style.display = 'block';
         window.scrollTo({ top: 0, behavior: 'smooth' });
         document.getElementById('progress-fill').style.width = '0%';
+        
+        this.state.viewingResults = false;
+        
+        // Se NÃO veio do popstate, precisamos voltar o history state
+        // Se veio do popstate, o navegador já cuidou do history
+        if (!fromPopstate) {
+            // Verifica se o state atual é de resultados antes de voltar
+            if (history.state && history.state.benetripView === 'results') {
+                history.back();
+            }
+        }
+        
         this.log('🔄 Voltou ao formulário com dados preservados');
+    },
+
+    // ================================================================
+    // v4.1: HTML DO BOTÃO VOLTAR (topo dos resultados)
+    // ================================================================
+    gerarBotaoVoltarTopo() {
+        return `
+            <button class="btn-voltar-topo" onclick="BenetripDiscovery.voltarAoFormulario()">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M19 12H5"/>
+                    <path d="M12 19l-7-7 7-7"/>
+                </svg>
+                Nova busca
+            </button>
+        `;
     },
 
     // ================================================================
@@ -1037,7 +1024,12 @@ const BenetripDiscovery = {
 
         const isInternacional = escopoDestino === 'internacional';
 
+        // v4.1: Push history state para interceptar botão voltar
+        this.pushResultsState();
+
         container.innerHTML = `
+            ${this.gerarBotaoVoltarTopo()}
+
             <div class="sem-resultados">
                 <img src="assets/images/tripinha/avatar-triste.png" alt="Tripinha triste" class="tripinha-triste" 
                      onerror="this.style.display='none'">
@@ -1075,6 +1067,9 @@ const BenetripDiscovery = {
         const { dataIda, dataVolta, moeda, numPessoas } = this.state.formData;
         const noites = this.calcularNoites(dataIda, dataVolta);
         
+        // v4.1: Push history state para interceptar botão voltar
+        this.pushResultsState();
+
         const formatPreco = (d) => this.formatarPreco(d.flight?.price || 0, moeda);
         
         const formatParadas = (d) => {
@@ -1143,7 +1138,6 @@ const BenetripDiscovery = {
             `;
         }
 
-        // Badge Google Flights nos botões
         const googleFlightsBtnLabel = 'Buscar no Google Flights';
         const googleFlightsBtnIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 4px;"><path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/></svg>`;
 
@@ -1192,6 +1186,8 @@ const BenetripDiscovery = {
         }
 
         const html = `
+            ${this.gerarBotaoVoltarTopo()}
+
             ${this.gerarResumoCriterios()}
 
             <div class="resultado-header">
