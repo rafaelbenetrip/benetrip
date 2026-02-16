@@ -11,14 +11,13 @@ import { join } from 'path';
 // MAPEAMENTO DE CONTINENTES/REGIÕES PARA BUSCA
 // ============================================================
 const CONTINENTES_KGMID = {
-    'africa': '/m/02j71',          // África (Continente)
-    'antartida': '/m/097_r',       // Antártida
-    'asia': '/m/0j0k',             // Ásia (Continente)
-    'europa': '/m/02j9z',          // Europa (Continente)
-    'america_norte': '/m/059g6',    // América do Norte
-    'america_sul': '/m/06rpc',      // América do Sul
-    'oceania': '/m/05m21',          // Oceania
-    'america_central': '/m/016dx',  // América Central (Região)
+    'america_sul': '/m/0dg3n1',
+    'america_norte': '/m/059g4',
+    'america_central': '/m/01_d4',  // América Central + Caribe
+    'europa': '/m/02j9z',
+    'asia': '/m/0j0k',
+    'africa': '/m/0dv5r',
+    'oceania': '/m/05nrg',
 };
 
 // ============================================================
