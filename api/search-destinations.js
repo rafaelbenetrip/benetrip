@@ -319,7 +319,19 @@ export default async function handler(req, res) {
         }
 
         console.log(`📡 Fazendo ${searchPromises.length} buscas paralelas...`);
-        const results = await Promise.all(searchPromises);
+        
+        let results = [];
+        try {
+            results = await Promise.all(searchPromises);
+        } catch (err) {
+            console.error('❌ Erro nas buscas paralelas:', err);
+            // Se Promise.all falhar, inicializa results vazio
+            results = searchPromises.map(() => ({ destinations: [], error: 'Falha na busca', elapsed: 0 }));
+        }
+        
+        // Garantir que results sempre tem estrutura válida
+        results = results.map(r => r || { destinations: [], error: 'Resposta inválida', elapsed: 0 });
+        
         const totalTime = Date.now() - startTime;
 
         // ============================================================
@@ -331,7 +343,19 @@ export default async function handler(req, res) {
         const codigoPaisOrigem = geo?.codigo_pais?.toUpperCase() || '';
 
         function addDestinations(destinations, source) {
+            // Validação defensiva
+            if (!destinations || !Array.isArray(destinations)) {
+                console.warn(`[Consolidação] Destinos inválidos de ${source}:`, destinations);
+                return;
+            }
+            
             for (const dest of destinations) {
+                // Validar dados mínimos do destino
+                if (!dest || !dest.name || !dest.country) {
+                    console.warn(`[Consolidação] Destino inválido ignorado:`, dest);
+                    continue;
+                }
+                
                 // Se apenas internacional, pular destinos do mesmo país
                 if (apenasInternacional && paisOrigem) {
                     const destCountry = (dest.country || '').toLowerCase();
@@ -346,20 +370,20 @@ export default async function handler(req, res) {
                 if (!allDestinations.has(key)) {
                     allDestinations.set(key, {
                         name: dest.name,
-                        primary_airport: dest.primary_airport,
+                        primary_airport: dest.primary_airport || '',
                         country: dest.country,
-                        coordinates: dest.coordinates,
-                        image: dest.image,
+                        coordinates: dest.coordinates || null,
+                        image: dest.image || '',
                         flight: {
-                            airport_code: dest.flight?.airport_code || dest.primary_airport,
+                            airport_code: dest.flight?.airport_code || dest.primary_airport || '',
                             price: dest.flight?.price || 0,
                             stops: dest.flight?.stops || 0,
                             flight_duration_minutes: dest.flight?.flight_duration_minutes || 0,
                             airline_name: dest.flight?.airline_name || ''
                         },
                         avg_cost_per_night: dest.avg_cost_per_night || 0,
-                        outbound_date: dest.outbound_date,
-                        return_date: dest.return_date,
+                        outbound_date: dest.outbound_date || null,
+                        return_date: dest.return_date || null,
                         _sources: [source],
                         _source_count: 1,
                     });
@@ -369,7 +393,7 @@ export default async function handler(req, res) {
                     existing._source_count++;
                     if (flightPrice > 0 && (existing.flight.price === 0 || flightPrice < existing.flight.price)) {
                         existing.flight = {
-                            airport_code: dest.flight?.airport_code || dest.primary_airport,
+                            airport_code: dest.flight?.airport_code || dest.primary_airport || '',
                             price: dest.flight?.price || 0,
                             stops: dest.flight?.stops || 0,
                             flight_duration_minutes: dest.flight?.flight_duration_minutes || 0,
@@ -414,6 +438,33 @@ export default async function handler(req, res) {
             `${searchPromises.length} buscas → ${consolidated.length} destinos únicos | Moeda: ${currencyCode}`
         );
 
+        // Preparar estatísticas compatíveis com v3.0
+        const sources = {
+            global: results[0]?.destinations?.length || 0,
+            continente: 0,
+            pais: 0,
+        };
+
+        // Se tem múltiplos continentes (modo internacional)
+        if (results.length > 1) {
+            // Somar destinos de todos os continentes buscados
+            for (let i = 1; i < results.length; i++) {
+                sources.continente += results[i]?.destinations?.length || 0;
+            }
+        }
+
+        const timing = {
+            global: results[0]?.elapsed || 0,
+            continente: results.length > 1 ? Math.max(...results.slice(1).map(r => r.elapsed || 0)) : 0,
+            pais: 0,
+        };
+
+        const errors = {
+            global: results[0]?.error || null,
+            continente: results.length > 1 ? (results.slice(1).find(r => r.error)?.error || null) : null,
+            pais: null,
+        };
+
         return res.status(200).json({
             success: true,
             origem: origemCode,
@@ -432,12 +483,16 @@ export default async function handler(req, res) {
                 currency: currencyCode,
                 escopoDestino: apenasInternacional ? 'internacional' : 'tanto_faz',
                 preferencias: prefArray,
+                sources,      // Compatível com v3.0
+                timing,       // Compatível com v3.0
+                errors,       // Compatível com v3.0
                 totalBuscas: searchPromises.length,
-                buscasRealizadas: results.map((r, i) => ({
+                buscasDetalhadas: results.map((r, i) => ({
                     ordem: i + 1,
-                    resultados: r.destinations.length,
-                    tempo: r.elapsed,
-                    erro: r.error
+                    tipo: i === 0 ? 'global' : `continente_${i}`,
+                    resultados: r?.destinations?.length || 0,
+                    tempo: r?.elapsed || 0,
+                    erro: r?.error || null
                 }))
             }
         });
