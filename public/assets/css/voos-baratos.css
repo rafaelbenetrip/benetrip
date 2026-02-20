@@ -1073,6 +1073,190 @@ body {
 }
 
 /* ========================================
+   TRIP SUMMARY (header dos resultados)
+   ======================================== */
+.trip-summary {
+    background: var(--white);
+    border-radius: var(--radius);
+    padding: 24px;
+    margin-bottom: 20px;
+    box-shadow: var(--shadow);
+    text-align: center;
+}
+
+.trip-summary-route {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    margin-bottom: 16px;
+}
+
+.trip-summary-city {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+}
+
+.trip-summary-code {
+    font-family: 'Poppins', sans-serif;
+    font-size: 28px;
+    font-weight: 800;
+    color: var(--gray-dark);
+    letter-spacing: 2px;
+}
+
+.trip-summary-name {
+    font-size: 13px;
+    color: var(--gray-medium);
+    max-width: 140px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.trip-summary-arrow {
+    color: var(--orange);
+    flex-shrink: 0;
+}
+
+.trip-summary-arrow svg {
+    display: block;
+}
+
+.trip-summary-meta {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+}
+
+.trip-meta-chip {
+    font-size: 12px;
+    color: var(--gray-medium);
+    background: var(--gray-light);
+    padding: 4px 12px;
+    border-radius: 20px;
+    white-space: nowrap;
+}
+
+@media (max-width: 480px) {
+    .trip-summary-code {
+        font-size: 22px;
+    }
+    .trip-summary-name {
+        font-size: 11px;
+        max-width: 100px;
+    }
+    .trip-summary-route {
+        gap: 10px;
+    }
+}
+
+/* ========================================
+   WINNER CARD: Flight details
+   ======================================== */
+.winner-flight-details {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin: 12px 0 16px;
+}
+
+.winner-detail-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(255, 255, 255, 0.2);
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(4px);
+}
+
+.winner-detail-chip img {
+    width: 22px;
+    height: 22px;
+    border-radius: 4px;
+    background: #fff;
+}
+
+/* ========================================
+   TOP LIST: Flight detail chips
+   ======================================== */
+.top-item-details {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 6px;
+}
+
+.detail-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: var(--gray-light);
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 11px;
+    color: var(--gray-medium);
+    white-space: nowrap;
+}
+
+.detail-chip .detail-icon {
+    font-size: 12px;
+}
+
+.detail-airline-logo {
+    width: 16px;
+    height: 16px;
+    border-radius: 3px;
+    vertical-align: middle;
+}
+
+.insight-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.insight-low {
+    background: var(--green-light);
+    color: var(--green-dark);
+}
+
+.insight-typical {
+    background: var(--blue-light);
+    color: var(--blue-dark);
+}
+
+.insight-high {
+    background: var(--orange-light);
+    color: var(--orange-dark);
+}
+
+@media (max-width: 768px) {
+    .winner-flight-details {
+        gap: 6px;
+    }
+    .winner-detail-chip {
+        font-size: 12px;
+        padding: 4px 10px;
+    }
+    .top-item-details {
+        gap: 4px;
+    }
+}
+
+/* ========================================
    SHARE SECTION
    ======================================== */
 .share-section {
