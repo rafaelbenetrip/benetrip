@@ -17,7 +17,7 @@ const BenetripVoosBaratos = {
 
     config: {
         debug: true,
-        cidadesJsonPath: 'data/cidades_global_iata_v6.json',
+        cidadesJsonPath: 'data/cidades_global_iata_v5.json',
     },
 
     log(...args) {
@@ -253,6 +253,7 @@ const BenetripVoosBaratos = {
 
             this.state.resultados = data;
             this.log('✅ Resultados:', data.stats);
+            this.log('✈️ Voos enriquecidos:', data._meta?.enrichedCount || 0);
 
             this.updateProgress(100, '🎉 Pronto!');
             await this.delay(400);
@@ -290,11 +291,35 @@ const BenetripVoosBaratos = {
                 ← Nova busca
             </button>
 
+            <!-- RESUMO DA VIAGEM -->
+            <div class="trip-summary fade-in">
+                <div class="trip-summary-route">
+                    <div class="trip-summary-city">
+                        <span class="trip-summary-code">${origemSelecionada.code}</span>
+                        <span class="trip-summary-name">${origemSelecionada.name}</span>
+                    </div>
+                    <div class="trip-summary-arrow">
+                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5l7 7-7 7"/></svg>
+                    </div>
+                    <div class="trip-summary-city">
+                        <span class="trip-summary-code">${destinoSelecionado.code}</span>
+                        <span class="trip-summary-name">${destinoSelecionado.name}</span>
+                    </div>
+                </div>
+                <div class="trip-summary-meta">
+                    <span class="trip-meta-chip">📅 ${duracaoSelecionada} dias</span>
+                    <span class="trip-meta-chip">💱 ${moedaSelecionada}</span>
+                    <span class="trip-meta-chip">🔍 ${data.stats.totalDates} períodos analisados</span>
+                    <span class="trip-meta-chip">📆 Próximos 6 meses</span>
+                </div>
+            </div>
+
             <!-- WINNER CARD -->
-            <div class="winner-card fade-in">
+            <div class="winner-card fade-in" style="animation-delay: 0.05s">
                 <div class="winner-badge">🏆 PERÍODO MAIS BARATO</div>
                 <div class="winner-price">${simbolo} ${cheapest.price.toLocaleString('pt-BR')}</div>
                 <div class="winner-price-label">ida e volta por pessoa</div>
+                ${this._renderWinnerFlightDetails(cheapest)}
                 <div class="winner-dates">
                     <div class="winner-date-item">
                         <div class="winner-date-label">Ida</div>
@@ -385,6 +410,32 @@ const BenetripVoosBaratos = {
     },
 
     // ================================================================
+    // RENDER: Winner flight details (inside green card)
+    // ================================================================
+    _renderWinnerFlightDetails(cheapest) {
+        const fd = cheapest.flight_details;
+        if (!fd) return '';
+
+        const durationH = Math.floor(fd.total_duration / 60);
+        const durationM = fd.total_duration % 60;
+        const durationStr = durationM > 0 ? `${durationH}h${durationM}min` : `${durationH}h`;
+        const stopsStr = fd.stops === 0 ? 'Direto' : fd.stops === 1 ? '1 parada' : `${fd.stops} paradas`;
+        const airlinesStr = fd.airlines.join(', ');
+
+        const logosHtml = fd.airline_logos.slice(0, 2).map(logo =>
+            `<img src="${logo}" alt="" style="width:24px;height:24px;border-radius:4px;background:#fff;" onerror="this.style.display='none'">`
+        ).join('');
+
+        return `
+            <div class="winner-flight-details">
+                <div class="winner-detail-chip">${logosHtml} ${airlinesStr}</div>
+                <div class="winner-detail-chip">⏱️ ${durationStr}</div>
+                <div class="winner-detail-chip">${fd.stops === 0 ? '✅' : '🔄'} ${stopsStr}</div>
+            </div>
+        `;
+    },
+
+    // ================================================================
     // RENDER: Gráfico de barras
     // ================================================================
     renderChart(monthlyData, simbolo) {
@@ -452,6 +503,54 @@ const BenetripVoosBaratos = {
 
         const svgArrow = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17l9.2-9.2M17 17V7H7"/></svg>`;
 
+        // Flight details (when enriched)
+        let detailsHtml = '';
+        const fd = item.flight_details;
+        if (fd) {
+            const durationH = Math.floor(fd.total_duration / 60);
+            const durationM = fd.total_duration % 60;
+            const durationStr = durationM > 0 ? `${durationH}h${durationM}min` : `${durationH}h`;
+            const stopsStr = fd.stops === 0 ? 'Direto' : fd.stops === 1 ? '1 parada' : `${fd.stops} paradas`;
+            const airlinesStr = fd.airlines.join(', ');
+
+            // Airline logos
+            const logosHtml = fd.airline_logos.slice(0, 2).map(logo =>
+                `<img src="${logo}" alt="" class="detail-airline-logo" onerror="this.style.display='none'">`
+            ).join('');
+
+            // Price insights badge
+            let insightBadge = '';
+            if (fd.price_insights && fd.price_insights.price_level) {
+                const levelMap = {
+                    'low': { text: 'Preço baixo', cls: 'insight-low' },
+                    'typical': { text: 'Preço típico', cls: 'insight-typical' },
+                    'high': { text: 'Preço alto', cls: 'insight-high' },
+                };
+                const lvl = levelMap[fd.price_insights.price_level];
+                if (lvl) {
+                    insightBadge = `<span class="insight-badge ${lvl.cls}">${lvl.text}</span>`;
+                }
+            }
+
+            detailsHtml = `
+                <div class="top-item-details">
+                    <div class="detail-chip">
+                        ${logosHtml}
+                        <span>${airlinesStr}</span>
+                    </div>
+                    <div class="detail-chip">
+                        <span class="detail-icon">⏱️</span>
+                        <span>${durationStr}</span>
+                    </div>
+                    <div class="detail-chip">
+                        <span class="detail-icon">${fd.stops === 0 ? '✅' : '🔄'}</span>
+                        <span>${stopsStr}</span>
+                    </div>
+                    ${insightBadge}
+                </div>
+            `;
+        }
+
         return `
             <div class="top-item ${idx === 0 ? 'rank-1' : ''}">
                 <div class="top-rank">${idx + 1}</div>
@@ -460,6 +559,7 @@ const BenetripVoosBaratos = {
                         ${this.formatDateBR(item.departure)} → ${this.formatDateBR(item.return)}
                     </div>
                     <div class="top-weekday">${depWeekday} a ${retWeekday}</div>
+                    ${detailsHtml}
                 </div>
                 <div class="top-price">${simbolo} ${item.price.toLocaleString('pt-BR')}</div>
                 <a href="${url}" target="_blank" rel="noopener" class="top-link" title="Ver no Google Flights">
@@ -572,7 +672,19 @@ const BenetripVoosBaratos = {
         text += `📅 ${duracaoSelecionada} dias de viagem\n\n`;
         text += `🏆 *Período mais barato:*\n`;
         text += `💰 *${simbolo} ${cheapest.price.toLocaleString('pt-BR')}* ida e volta\n`;
-        text += `📆 ${this.formatDateBR(cheapest.departure)} → ${this.formatDateBR(cheapest.return)}\n\n`;
+        text += `📆 ${this.formatDateBR(cheapest.departure)} → ${this.formatDateBR(cheapest.return)}\n`;
+
+        // Flight details if available
+        if (cheapest.flight_details) {
+            const fd = cheapest.flight_details;
+            const dH = Math.floor(fd.total_duration / 60);
+            const dM = fd.total_duration % 60;
+            const durStr = dM > 0 ? `${dH}h${dM}min` : `${dH}h`;
+            const stopsStr = fd.stops === 0 ? 'Direto' : fd.stops === 1 ? '1 parada' : `${fd.stops} paradas`;
+            text += `🛫 ${fd.airlines.join(', ')} · ${durStr} · ${stopsStr}\n`;
+        }
+
+        text += '\n';
 
         // Top 3
         if (data.top10 && data.top10.length > 1) {
