@@ -17,7 +17,7 @@ const BenetripVoosBaratos = {
 
     config: {
         debug: true,
-        cidadesJsonPath: 'data/cidades_global_iata_v7.json',
+        cidadesJsonPath: 'data/cidades_global_iata_v6.json',
     },
 
     log(...args) {
