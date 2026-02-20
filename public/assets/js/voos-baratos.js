@@ -12,6 +12,7 @@ const BenetripVoosBaratos = {
         duracaoSelecionada: 7,
         moedaSelecionada: 'BRL',
         resultados: null,
+        mesSelecionado: null, // mês clicado no gráfico (YYYY-MM)
     },
 
     config: {
@@ -337,9 +338,15 @@ const BenetripVoosBaratos = {
             <!-- GRÁFICO MENSAL -->
             <div class="chart-section fade-in" style="animation-delay: 0.2s">
                 <h3 class="chart-title">📊 Preço mais barato por mês</h3>
+                <p class="chart-hint">👆 Clique em um mês para ver todos os períodos disponíveis</p>
                 <div class="chart-bars" id="chart-bars">
                     ${this.renderChart(data.monthlyData, simbolo)}
                 </div>
+            </div>
+
+            <!-- DETALHE DO MÊS SELECIONADO (aparece ao clicar na barra) -->
+            <div class="month-detail-section" id="month-detail" style="display:none">
+                <!-- Preenchido dinamicamente por selectMonth() -->
             </div>
 
             <!-- TOP 10 -->
@@ -347,6 +354,22 @@ const BenetripVoosBaratos = {
                 <h3 class="top-list-title">🏅 Top 10 Períodos Mais Baratos</h3>
                 <div class="top-list">
                     ${data.top10.map((item, idx) => this.renderTopItem(item, idx, simbolo)).join('')}
+                </div>
+            </div>
+
+            <!-- COMPARTILHAR -->
+            <div class="share-section fade-in" style="animation-delay: 0.3s">
+                <h3 class="share-title">📤 Compartilhar resultado</h3>
+                <p class="share-subtitle">Envie pra quem vai viajar com você!</p>
+                <div class="share-buttons">
+                    <button class="btn-share btn-share-whatsapp" onclick="BenetripVoosBaratos.shareWhatsApp()">
+                        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+                        WhatsApp
+                    </button>
+                    <button class="btn-share btn-share-copy" onclick="BenetripVoosBaratos.copyShareText()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+                        Copiar texto
+                    </button>
                 </div>
             </div>
         `;
@@ -388,8 +411,10 @@ const BenetripVoosBaratos = {
                 <div class="chart-bar-wrapper">
                     <div class="chart-bar ${barClass}" 
                          data-height="${heightPct}"
+                         data-month="${m.month}"
                          style="height: 0%"
-                         title="${simbolo} ${m.cheapest.toLocaleString('pt-BR')} - ${monthLabel}">
+                         onclick="BenetripVoosBaratos.selectMonth('${m.month}')"
+                         title="Clique para ver todas as opções de ${monthLabel}">
                         <span class="chart-bar-price">${simbolo} ${m.cheapest.toLocaleString('pt-BR')}</span>
                     </div>
                     <span class="chart-bar-month">${monthLabel}</span>
@@ -442,6 +467,159 @@ const BenetripVoosBaratos = {
                 </a>
             </div>
         `;
+    },
+
+    // ================================================================
+    // SELECIONAR MÊS NO GRÁFICO
+    // ================================================================
+    selectMonth(monthKey) {
+        const data = this.state.resultados;
+        if (!data || !data.prices) return;
+
+        const { origemSelecionada, destinoSelecionado, moedaSelecionada } = this.state;
+        const simbolo = this.getSimbolo(moedaSelecionada);
+        this.state.mesSelecionado = monthKey;
+
+        // Filtrar preços deste mês e ordenar
+        const monthPrices = data.prices
+            .filter(p => p.departure && p.departure.startsWith(monthKey))
+            .sort((a, b) => a.price - b.price);
+
+        // Highlight visual na barra selecionada
+        document.querySelectorAll('.chart-bar').forEach(bar => {
+            bar.classList.remove('selected');
+            if (bar.dataset.month === monthKey) bar.classList.add('selected');
+        });
+
+        const monthNames = {
+            '01': 'Janeiro', '02': 'Fevereiro', '03': 'Março', '04': 'Abril',
+            '05': 'Maio', '06': 'Junho', '07': 'Julho', '08': 'Agosto',
+            '09': 'Setembro', '10': 'Outubro', '11': 'Novembro', '12': 'Dezembro',
+        };
+        const monthNum = monthKey.split('-')[1];
+        const monthLabel = monthNames[monthNum] || monthKey;
+
+        const container = document.getElementById('month-detail');
+
+        if (monthPrices.length === 0) {
+            container.innerHTML = `
+                <div class="month-detail-header">
+                    <h3>📅 ${monthLabel}</h3>
+                    <button class="btn-close-month" onclick="BenetripVoosBaratos.closeMonthDetail()">✕</button>
+                </div>
+                <p style="text-align:center;color:#666;padding:20px;">Nenhum período disponível neste mês.</p>
+            `;
+            container.style.display = 'block';
+            container.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            return;
+        }
+
+        const cheapestInMonth = monthPrices[0].price;
+        const avgInMonth = Math.round(monthPrices.reduce((s, p) => s + p.price, 0) / monthPrices.length);
+
+        container.innerHTML = `
+            <div class="month-detail-header">
+                <div>
+                    <h3>📅 ${monthLabel} — ${monthPrices.length} período${monthPrices.length > 1 ? 's' : ''}</h3>
+                    <span class="month-detail-stats">
+                        Mais barato: <strong style="color:var(--green)">${simbolo} ${cheapestInMonth.toLocaleString('pt-BR')}</strong>
+                        · Média: <strong style="color:var(--blue)">${simbolo} ${avgInMonth.toLocaleString('pt-BR')}</strong>
+                    </span>
+                </div>
+                <button class="btn-close-month" onclick="BenetripVoosBaratos.closeMonthDetail()">✕</button>
+            </div>
+            <div class="month-detail-list">
+                ${monthPrices.map((item, idx) => this.renderTopItem(item, idx, simbolo)).join('')}
+            </div>
+        `;
+
+        container.style.display = 'block';
+        container.classList.add('fade-in');
+        container.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+        this.log(`📅 Mês selecionado: ${monthLabel} (${monthPrices.length} opções)`);
+    },
+
+    closeMonthDetail() {
+        const container = document.getElementById('month-detail');
+        container.style.display = 'none';
+        this.state.mesSelecionado = null;
+        // Remove highlight de barras
+        document.querySelectorAll('.chart-bar').forEach(bar => bar.classList.remove('selected'));
+    },
+
+    // ================================================================
+    // COMPARTILHAR VIA WHATSAPP
+    // ================================================================
+    _buildShareText() {
+        const data = this.state.resultados;
+        if (!data || !data.stats) return null;
+
+        const { origemSelecionada, destinoSelecionado, duracaoSelecionada, moedaSelecionada } = this.state;
+        const simbolo = this.getSimbolo(moedaSelecionada);
+        const cheapest = data.stats.cheapest;
+
+        const googleUrl = this.buildGoogleFlightsUrl(
+            origemSelecionada.code,
+            destinoSelecionado.code,
+            cheapest.departure,
+            cheapest.return,
+            moedaSelecionada
+        );
+
+        let text = `✈️ *Voos baratos encontrados pela Benetrip!*\n\n`;
+        text += `📍 ${origemSelecionada.name} (${origemSelecionada.code}) → ${destinoSelecionado.name} (${destinoSelecionado.code})\n`;
+        text += `📅 ${duracaoSelecionada} dias de viagem\n\n`;
+        text += `🏆 *Período mais barato:*\n`;
+        text += `💰 *${simbolo} ${cheapest.price.toLocaleString('pt-BR')}* ida e volta\n`;
+        text += `📆 ${this.formatDateBR(cheapest.departure)} → ${this.formatDateBR(cheapest.return)}\n\n`;
+
+        // Top 3
+        if (data.top10 && data.top10.length > 1) {
+            text += `🥈 2º melhor: ${simbolo} ${data.top10[1].price.toLocaleString('pt-BR')} (${this.formatDateBR(data.top10[1].departure)})\n`;
+        }
+        if (data.top10 && data.top10.length > 2) {
+            text += `🥉 3º melhor: ${simbolo} ${data.top10[2].price.toLocaleString('pt-BR')} (${this.formatDateBR(data.top10[2].departure)})\n`;
+        }
+
+        text += `\n🔗 Ver no Google Flights:\n${googleUrl}\n`;
+        text += `\n🐕 Pesquisado em benetrip.com.br`;
+
+        return text;
+    },
+
+    shareWhatsApp() {
+        const text = this._buildShareText();
+        if (!text) return;
+
+        const encoded = encodeURIComponent(text);
+        const url = `https://api.whatsapp.com/send?text=${encoded}`;
+        window.open(url, '_blank');
+
+        this.log('📤 Compartilhado via WhatsApp');
+    },
+
+    copyShareText() {
+        const text = this._buildShareText();
+        if (!text) return;
+
+        navigator.clipboard.writeText(text).then(() => {
+            // Feedback visual
+            const btn = document.querySelector('.btn-share-copy');
+            if (btn) {
+                const original = btn.innerHTML;
+                btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Copiado!`;
+                btn.classList.add('copied');
+                setTimeout(() => {
+                    btn.innerHTML = original;
+                    btn.classList.remove('copied');
+                }, 2000);
+            }
+            this.log('📋 Texto copiado');
+        }).catch(() => {
+            // Fallback: selecionar texto em prompt
+            prompt('Copie o texto abaixo:', text);
+        });
     },
 
     // ================================================================
