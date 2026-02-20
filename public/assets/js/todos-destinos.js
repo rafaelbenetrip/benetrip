@@ -17,7 +17,7 @@ const BenetripTodosDestinos = {
 
     config: {
         debug: true,
-        cidadesJsonPath: 'data/cidades_global_iata_v5.json'
+        cidadesJsonPath: 'data/cidades_global_iata_v7.json'
     },
 
     log(...args) {
