@@ -28,6 +28,14 @@
     "api/weather.js": {
       "memory": 1024,
       "maxDuration": 180
+    },
+    "api/cheapest-flights.js": {
+      "memory": 1024,
+      "maxDuration": 90
+    },
+    "api/search-destinations.js": {
+      "memory": 1024,
+      "maxDuration": 90
     }
   },
   "routes": [
