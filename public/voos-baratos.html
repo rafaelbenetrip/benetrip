@@ -1,147 +1,149 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="Descubra quando viajar mais barato! A Tripinha farejas os melhores preços de voos nos próximos 6 meses para você." />
-  <title>Benetrip — Quando Viajar Mais Barato?</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#E87722">
+    <title>Voos Baratos - Quando é Mais Barato Viajar? | Benetrip</title>
+    <meta name="description" content="Descubra o período mais barato para viajar nos próximos 6 meses. Compare preços de passagens aéreas e economize!">
 
-  <!-- Fonts -->
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;800&family=Montserrat:wght@400;500;600&display=swap" rel="stylesheet" />
+    <!-- Favicons -->
+    <link rel="icon" type="image/svg+xml" href="assets/images/favicon/favicon.svg">
+    <link rel="apple-touch-icon" sizes="180x180" href="assets/images/favicon/apple-touch-icon.png">
 
-  <!-- Styles -->
-  <link rel="stylesheet" href="/assets/css/voos-baratos.css" />
+    <!-- Styles -->
+    <link rel="stylesheet" href="assets/css/voos-baratos.css">
+
+    <!-- Vercel Analytics -->
+    <script>
+        window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
+    </script>
+    <script defer src="/_vercel/insights/script.js"></script>
 </head>
 <body>
 
-  <!-- ═══ HEADER ═══ -->
-  <header>
-    <a class="logo-wrap" href="https://benetrip.com.br">
-      <div class="logo-icon">🐾</div>
-      <span class="logo-text">Bene<span>trip</span></span>
-    </a>
-    <span class="header-tagline">Sua companheira de viagens ✈️</span>
-  </header>
-
-  <!-- ═══ HERO ═══ -->
-  <div class="hero">
-    <span class="hero-tripinha">🐕</span>
-    <h1>Quando viajar mais barato?</h1>
-    <p>Diga a origem, o destino e o tempo de viagem — a Tripinha farejas os melhores preços dos próximos 6 meses pra você! 🔍</p>
-  </div>
-
-  <!-- ═══ SEARCH CARD ═══ -->
-  <div class="search-wrap">
-    <div class="search-card">
-
-      <div class="search-card-title">🗺️ Configure sua busca</div>
-
-      <!-- Aeroportos -->
-      <div class="fields-grid">
-        <div class="field">
-          <label for="origin-input">Origem</label>
-          <div class="field-input-wrap">
-            <span class="field-icon">🛫</span>
-            <input
-              type="text"
-              id="origin-input"
-              placeholder="Ex: GRU — São Paulo"
-              maxlength="40"
-              autocomplete="off"
-            />
-            <div class="autocomplete-list" id="origin-list"></div>
-          </div>
+    <!-- HEADER -->
+    <header class="header">
+        <div class="container">
+            <a href="https://www.benetrip.com.br">
+                <img src="logo1.png" alt="Benetrip" class="logo">
+            </a>
+            <p class="tagline">Voos Baratos ✈️</p>
         </div>
+    </header>
 
-        <div class="field">
-          <label for="dest-input">Destino</label>
-          <div class="field-input-wrap">
-            <span class="field-icon">🛬</span>
-            <input
-              type="text"
-              id="dest-input"
-              placeholder="Ex: LIS — Lisboa"
-              maxlength="40"
-              autocomplete="off"
-            />
-            <div class="autocomplete-list" id="dest-list"></div>
-          </div>
+    <!-- HERO -->
+    <section class="hero-section" id="hero-section">
+        <div class="container hero-content">
+            <img src="assets/images/tripinha/avatar-pensando.png" alt="Tripinha" class="hero-avatar"
+                 onerror="this.style.display='none'">
+            <h1>Quando é Mais Barato Viajar? ✈️</h1>
+            <p>A Tripinha pesquisa os próximos 6 meses e encontra o período mais barato para o seu destino!</p>
         </div>
-      </div>
+    </section>
 
-      <!-- Duração -->
-      <div class="duration-section">
-        <span class="duration-label">⏱ Duração da viagem</span>
-        <div class="duration-pills">
-          <button class="pill" data-days="7">7 dias</button>
-          <button class="pill" data-days="14">14 dias</button>
-          <button class="pill" data-days="21">21 dias</button>
-          <button class="pill" data-days="flex">Flexível</button>
+    <!-- FORMULÁRIO -->
+    <section class="form-section" id="form-section">
+        <div class="container">
+            <div class="form-card">
+                <form id="search-form">
+
+                    <!-- Origem + Destino -->
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="origem">📍 Origem</label>
+                            <div class="autocomplete-wrapper">
+                                <input type="text" id="origem" class="form-input"
+                                       placeholder="De onde você sai?"
+                                       autocomplete="off" required>
+                                <div id="origem-results" class="autocomplete-results"></div>
+                            </div>
+                            <input type="hidden" id="origem-data">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="destino">🎯 Destino</label>
+                            <div class="autocomplete-wrapper">
+                                <input type="text" id="destino" class="form-input"
+                                       placeholder="Para onde quer ir?"
+                                       autocomplete="off" required>
+                                <div id="destino-results" class="autocomplete-results"></div>
+                            </div>
+                            <input type="hidden" id="destino-data">
+                        </div>
+                    </div>
+
+                    <!-- Duração -->
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>📅 Duração da viagem</label>
+                            <div class="duration-chips">
+                                <div class="chip" data-days="7">
+                                    <span class="chip-days">7</span>
+                                    <span class="chip-label">dias</span>
+                                </div>
+                                <div class="chip" data-days="14">
+                                    <span class="chip-days">14</span>
+                                    <span class="chip-label">dias</span>
+                                </div>
+                                <div class="chip" data-days="21">
+                                    <span class="chip-days">21</span>
+                                    <span class="chip-label">dias</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>💱 Moeda</label>
+                            <div class="currency-chips">
+                                <div class="currency-chip" data-currency="BRL">R$</div>
+                                <div class="currency-chip" data-currency="USD">US$</div>
+                                <div class="currency-chip" data-currency="EUR">€</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Submit -->
+                    <button type="submit" class="btn-submit" id="btn-submit">
+                        🔍 Encontrar Período Mais Barato
+                    </button>
+
+                </form>
+            </div>
         </div>
+    </section>
 
-        <!-- Range flexível (oculto até selecionar "Flexível") -->
-        <div class="flexible-wrap" id="flexible-wrap">
-          <label>De</label>
-          <input type="range" id="flex-min" min="3" max="30" value="5" step="1" />
-          <label>a</label>
-          <input type="range" id="flex-max" min="3" max="30" value="12" step="1" />
-          <span class="flexible-val" id="flex-label">5–12 dias</span>
+    <!-- LOADING -->
+    <section class="loading-section" id="loading-section">
+        <div class="container">
+            <div class="loading-card">
+                <img src="assets/images/tripinha/avatar-pensando.png" alt="Tripinha buscando" class="loading-avatar"
+                     onerror="this.style.display='none'">
+                <h2>🐕 Farejando os melhores preços...</h2>
+                <div class="progress-container">
+                    <div class="progress-track">
+                        <div class="progress-bar" id="progress-bar"></div>
+                    </div>
+                </div>
+                <p class="loading-msg" id="loading-msg">Iniciando busca...</p>
+                <p class="loading-tip">A Tripinha está pesquisando preços para cada semana dos próximos 6 meses. Isso pode levar alguns segundos...</p>
+            </div>
         </div>
-      </div>
+    </section>
 
-      <!-- Botão -->
-      <button class="btn-search" id="btn-search" disabled>
-        🐾 Farejar preços!
-      </button>
+    <!-- RESULTADOS -->
+    <section class="results-section" id="results-section">
+        <div class="container" id="results-content">
+            <!-- Preenchido dinamicamente -->
+        </div>
+    </section>
 
-    </div>
-  </div>
+    <!-- FOOTER -->
+    <footer class="footer">
+        <p>🐕 Feito com amor pela Tripinha | Benetrip © 2026</p>
+    </footer>
 
-  <!-- ═══ RESULTS ═══ -->
-  <div class="results-area">
-
-    <!-- Loading -->
-    <div class="loading-box" id="loading-box">
-      <div class="paw-loader">
-        <span class="paw">🐾</span>
-        <span class="paw">🐾</span>
-        <span class="paw">🐾</span>
-        <span class="paw">🐾</span>
-      </div>
-      <div class="loading-msg">A Tripinha está farejando os preços...</div>
-      <div class="loading-sub" id="loading-sub">Consultando os próximos 6 meses de tarifas ✈️</div>
-    </div>
-
-    <!-- Erro -->
-    <div class="error-box" id="error-box">
-      <p id="error-msg">😕 Ocorreu um erro na busca. Tente novamente.</p>
-    </div>
-
-    <!-- Cabeçalho dos resultados -->
-    <div class="results-header" id="results-header">
-      <div class="results-title">🏆 Melhores períodos encontrados</div>
-      <span class="results-route" id="results-route"></span>
-    </div>
-
-    <!-- Cards -->
-    <div class="result-cards" id="result-cards"></div>
-
-    <!-- Dica da Tripinha -->
-    <div class="tripinha-tip" id="tripinha-tip">
-      <span class="tip-icon">🐕</span>
-      <div class="tip-text" id="tip-text"></div>
-    </div>
-
-  </div>
-
-  <!-- ═══ FOOTER ═══ -->
-  <footer>
-    Feito com 🧡 pela <a href="https://benetrip.com.br">Benetrip</a> — Sua companheira de viagens
-  </footer>
-
-  <!-- Scripts -->
-  <script src="/assets/js/voos-baratos.js"></script>
+    <!-- SCRIPT -->
+    <script src="assets/js/voos-baratos.js"></script>
 </body>
 </html>
