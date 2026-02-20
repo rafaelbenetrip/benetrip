@@ -7,6 +7,9 @@
 import { readFileSync } from 'fs';
 import { join } from 'path';
 
+// ---> ADICIONE ESTA LINHA AQUI <---
+export const maxDuration = 60; // Aumenta o limite da Vercel para 60 segundos
+
 // ============================================================
 // MAPEAMENTO DE CONTINENTES/REGIÕES PARA BUSCA
 // ============================================================
