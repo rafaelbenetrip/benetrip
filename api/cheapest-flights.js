@@ -3,15 +3,13 @@
 // Usa SearchAPI google_flights_calendar engine
 // Estratégia: divide 6 meses em janelas de ~14 dias (max 200 combos por request)
 
-// ---> ADICIONE ESTA LINHA AQUI <---
-export const maxDuration = 60; // Aumenta o limite da Vercel para 60 segundos
-
 // ============================================================
 // CONFIGURAÇÃO
 // ============================================================
 const MAX_COMBOS_PER_REQUEST = 200;
 const WINDOW_SIZE_DAYS = 14; // 14 x 14 = 196 combos (< 200)
 const MONTHS_AHEAD = 6;
+const ENRICH_TOP_N = 5; // Enriquecer os top N com detalhes do voo
 
 // ============================================================
 // HELPER: Formatar data como YYYY-MM-DD
@@ -116,6 +114,103 @@ function generateSearchWindows(startDate, months, duration) {
     }
 
     return windows;
+}
+
+// ============================================================
+// ENRIQUECIMENTO: Buscar detalhes do voo (duração, paradas, cia)
+// Usa engine google_flights para uma data específica
+// ============================================================
+async function enrichFlightDetails(origemCode, destinoCode, departDate, returnDate, currencyCode, locale, label) {
+    const url = new URL('https://www.searchapi.io/api/v1/search');
+
+    const params = {
+        engine: 'google_flights',
+        api_key: process.env.SEARCHAPI_KEY,
+        departure_id: origemCode,
+        arrival_id: destinoCode,
+        outbound_date: departDate,
+        return_date: returnDate,
+        flight_type: 'round_trip',
+        currency: currencyCode,
+        gl: locale.gl,
+        hl: locale.hl,
+        adults: '1',
+    };
+
+    Object.entries(params).forEach(([k, v]) => {
+        if (v !== undefined && v !== null) url.searchParams.set(k, String(v));
+    });
+
+    const startTime = Date.now();
+
+    try {
+        const response = await fetch(url.toString(), {
+            method: 'GET',
+            headers: { 'Accept': 'application/json' }
+        });
+        const elapsed = Date.now() - startTime;
+
+        if (!response.ok) {
+            console.error(`[Enrich][${label}] HTTP ${response.status} (${elapsed}ms)`);
+            return null;
+        }
+
+        const data = await response.json();
+        console.log(`[Enrich][${label}] OK (${elapsed}ms)`);
+
+        // Extrair o melhor voo (best_flights[0] ou other_flights[0])
+        const bestFlight = (data.best_flights && data.best_flights[0])
+            || (data.other_flights && data.other_flights[0]);
+
+        if (!bestFlight) return null;
+
+        // Extrair detalhes
+        const flights = bestFlight.flights || [];
+        const outboundLegs = [];
+        let totalDuration = bestFlight.total_duration || 0;
+        let stops = (bestFlight.layovers || []).length;
+        let price = bestFlight.price || 0;
+
+        // Companhias aéreas (dedup)
+        const airlines = new Set();
+        const airlineLogos = new Set();
+
+        flights.forEach(leg => {
+            if (leg.airline) airlines.add(leg.airline);
+            if (leg.airline_logo) airlineLogos.add(leg.airline_logo);
+            outboundLegs.push({
+                from: leg.departure_airport?.id || '',
+                to: leg.arrival_airport?.id || '',
+                airline: leg.airline || '',
+                airline_logo: leg.airline_logo || '',
+                flight_number: leg.flight_number || '',
+                duration: leg.duration || 0,
+                airplane: leg.airplane || '',
+            });
+        });
+
+        // Price insights
+        const priceInsights = data.price_insights ? {
+            lowest_price: data.price_insights.lowest_price || null,
+            price_level: data.price_insights.price_level || null,
+            typical_price_range: data.price_insights.typical_price_range || null,
+        } : null;
+
+        return {
+            total_duration: totalDuration,
+            stops,
+            airlines: Array.from(airlines),
+            airline_logos: Array.from(airlineLogos),
+            legs: outboundLegs,
+            price: price,
+            price_insights: priceInsights,
+        };
+
+    } catch (err) {
+        const elapsed = Date.now() - startTime;
+        console.error(`[Enrich][${label}] Erro (${elapsed}ms):`, err.message);
+        return null;
+    }
 }
 
 // ============================================================
@@ -326,6 +421,51 @@ export default async function handler(req, res) {
         }));
 
         // ============================================================
+        // ENRIQUECIMENTO: Buscar detalhes dos top N voos
+        // ============================================================
+        const top10 = sorted.slice(0, 10);
+        const toEnrich = sorted.slice(0, ENRICH_TOP_N);
+
+        console.log(`🔍 Enriquecendo top ${toEnrich.length} com detalhes de voo...`);
+
+        const enrichStartTime = Date.now();
+        const enrichPromises = toEnrich.map((entry, idx) =>
+            enrichFlightDetails(
+                origemCode,
+                destinoCode,
+                entry.departure,
+                entry.return,
+                currencyCode,
+                locale,
+                `#${idx + 1} ${entry.departure}`
+            )
+        );
+
+        let enrichResults;
+        try {
+            enrichResults = await Promise.all(enrichPromises);
+        } catch (err) {
+            console.error('⚠️ Erro no enriquecimento:', err.message);
+            enrichResults = toEnrich.map(() => null);
+        }
+
+        const enrichTime = Date.now() - enrichStartTime;
+        console.log(`🔍 Enriquecimento completo em ${enrichTime}ms`);
+
+        // Merge detalhes nos top entries
+        toEnrich.forEach((entry, idx) => {
+            const details = enrichResults[idx];
+            if (details) {
+                entry.flight_details = details;
+            }
+        });
+
+        // Se o cheapest foi enriquecido, atualizar stats
+        if (sorted[0].flight_details) {
+            stats.cheapest = sorted[0];
+        }
+
+        // ============================================================
         // RESPOSTA
         // ============================================================
         if (sorted.length === 0) {
@@ -341,7 +481,7 @@ export default async function handler(req, res) {
             });
         }
 
-        console.log(`✅ Cheapest Flights completo em ${totalTime}ms | ${sorted.length} datas válidas | Mais barato: ${stats.cheapest.price} ${currencyCode}`);
+        console.log(`✅ Cheapest Flights completo em ${totalTime + enrichTime}ms | ${sorted.length} datas válidas | Mais barato: ${stats.cheapest.price} ${currencyCode}`);
 
         return res.status(200).json({
             success: true,
@@ -352,9 +492,12 @@ export default async function handler(req, res) {
             stats,
             monthlyData,
             prices: sorted, // Todas as datas ordenadas por preço
-            top10: sorted.slice(0, 10), // Top 10 mais baratas
+            top10,           // Top 10 (top N enriquecidas com detalhes)
             _meta: {
-                totalTime,
+                totalTime: totalTime + enrichTime,
+                calendarTime: totalTime,
+                enrichTime,
+                enrichedCount: enrichResults.filter(r => r !== null).length,
                 windows: windows.length,
                 totalCalendarEntries,
                 validEntries,
