@@ -30,7 +30,7 @@ const BenetripDiscovery = {
 
     config: {
         debug: true,
-        cidadesJsonPath: 'data/cidades_global_iata_v5.json'
+        cidadesJsonPath: 'data/cidades_global_iata_v6.json'
     },
 
     log(...args) {
@@ -81,7 +81,7 @@ const BenetripDiscovery = {
             const dados = await response.json();
             this.state.cidadesData = dados.filter(c => c.iata);
             
-            this.log(`✅ ${this.state.cidadesData.length} cidades carregadas (v5 com aeroportos reais)`);
+            this.log(`✅ ${this.state.cidadesData.length} cidades carregadas (v6 com aeroportos reais)`);
         } catch (erro) {
             this.error('Erro ao carregar cidades:', erro);
             this.state.cidadesData = [
