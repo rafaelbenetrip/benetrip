@@ -3,6 +3,9 @@
 // Usa SearchAPI google_flights_calendar engine
 // Estratégia: divide 6 meses em janelas de ~14 dias (max 200 combos por request)
 
+// ---> ADICIONE ESTA LINHA AQUI <---
+export const maxDuration = 60; // Aumenta o limite da Vercel para 60 segundos
+
 // ============================================================
 // CONFIGURAÇÃO
 // ============================================================
