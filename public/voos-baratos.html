@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Descubra quando viajar mais barato! A Tripinha farejas os melhores preços de voos nos próximos 6 meses para você." />
+  <title>Benetrip — Quando Viajar Mais Barato?</title>
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;800&family=Montserrat:wght@400;500;600&display=swap" rel="stylesheet" />
+
+  <!-- Styles -->
+  <link rel="stylesheet" href="/assets/css/voos-baratos.css" />
+</head>
+<body>
+
+  <!-- ═══ HEADER ═══ -->
+  <header>
+    <a class="logo-wrap" href="https://benetrip.com.br">
+      <div class="logo-icon">🐾</div>
+      <span class="logo-text">Bene<span>trip</span></span>
+    </a>
+    <span class="header-tagline">Sua companheira de viagens ✈️</span>
+  </header>
+
+  <!-- ═══ HERO ═══ -->
+  <div class="hero">
+    <span class="hero-tripinha">🐕</span>
+    <h1>Quando viajar mais barato?</h1>
+    <p>Diga a origem, o destino e o tempo de viagem — a Tripinha farejas os melhores preços dos próximos 6 meses pra você! 🔍</p>
+  </div>
+
+  <!-- ═══ SEARCH CARD ═══ -->
+  <div class="search-wrap">
+    <div class="search-card">
+
+      <div class="search-card-title">🗺️ Configure sua busca</div>
+
+      <!-- Aeroportos -->
+      <div class="fields-grid">
+        <div class="field">
+          <label for="origin-input">Origem</label>
+          <div class="field-input-wrap">
+            <span class="field-icon">🛫</span>
+            <input
+              type="text"
+              id="origin-input"
+              placeholder="Ex: GRU — São Paulo"
+              maxlength="40"
+              autocomplete="off"
+            />
+            <div class="autocomplete-list" id="origin-list"></div>
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="dest-input">Destino</label>
+          <div class="field-input-wrap">
+            <span class="field-icon">🛬</span>
+            <input
+              type="text"
+              id="dest-input"
+              placeholder="Ex: LIS — Lisboa"
+              maxlength="40"
+              autocomplete="off"
+            />
+            <div class="autocomplete-list" id="dest-list"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Duração -->
+      <div class="duration-section">
+        <span class="duration-label">⏱ Duração da viagem</span>
+        <div class="duration-pills">
+          <button class="pill" data-days="7">7 dias</button>
+          <button class="pill" data-days="14">14 dias</button>
+          <button class="pill" data-days="21">21 dias</button>
+          <button class="pill" data-days="flex">Flexível</button>
+        </div>
+
+        <!-- Range flexível (oculto até selecionar "Flexível") -->
+        <div class="flexible-wrap" id="flexible-wrap">
+          <label>De</label>
+          <input type="range" id="flex-min" min="3" max="30" value="5" step="1" />
+          <label>a</label>
+          <input type="range" id="flex-max" min="3" max="30" value="12" step="1" />
+          <span class="flexible-val" id="flex-label">5–12 dias</span>
+        </div>
+      </div>
+
+      <!-- Botão -->
+      <button class="btn-search" id="btn-search" disabled>
+        🐾 Farejar preços!
+      </button>
+
+    </div>
+  </div>
+
+  <!-- ═══ RESULTS ═══ -->
+  <div class="results-area">
+
+    <!-- Loading -->
+    <div class="loading-box" id="loading-box">
+      <div class="paw-loader">
+        <span class="paw">🐾</span>
+        <span class="paw">🐾</span>
+        <span class="paw">🐾</span>
+        <span class="paw">🐾</span>
+      </div>
+      <div class="loading-msg">A Tripinha está farejando os preços...</div>
+      <div class="loading-sub" id="loading-sub">Consultando os próximos 6 meses de tarifas ✈️</div>
+    </div>
+
+    <!-- Erro -->
+    <div class="error-box" id="error-box">
+      <p id="error-msg">😕 Ocorreu um erro na busca. Tente novamente.</p>
+    </div>
+
+    <!-- Cabeçalho dos resultados -->
+    <div class="results-header" id="results-header">
+      <div class="results-title">🏆 Melhores períodos encontrados</div>
+      <span class="results-route" id="results-route"></span>
+    </div>
+
+    <!-- Cards -->
+    <div class="result-cards" id="result-cards"></div>
+
+    <!-- Dica da Tripinha -->
+    <div class="tripinha-tip" id="tripinha-tip">
+      <span class="tip-icon">🐕</span>
+      <div class="tip-text" id="tip-text"></div>
+    </div>
+
+  </div>
+
+  <!-- ═══ FOOTER ═══ -->
+  <footer>
+    Feito com 🧡 pela <a href="https://benetrip.com.br">Benetrip</a> — Sua companheira de viagens
+  </footer>
+
+  <!-- Scripts -->
+  <script src="/assets/js/voos-baratos.js"></script>
+</body>
+</html>
