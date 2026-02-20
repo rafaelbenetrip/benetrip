@@ -977,3 +977,197 @@ body {
     from { opacity: 0; transform: translateY(16px); }
     to { opacity: 1; transform: translateY(0); }
 }
+
+/* ========================================
+   CHART: Click hint + Selected state
+   ======================================== */
+.chart-hint {
+    font-size: 13px;
+    color: var(--gray-medium);
+    margin-bottom: 16px;
+    text-align: center;
+}
+
+.chart-bar {
+    cursor: pointer;
+}
+
+.chart-bar.selected {
+    outline: 3px solid var(--gray-dark);
+    outline-offset: 2px;
+    box-shadow: 0 0 0 6px rgba(33, 39, 42, 0.12);
+}
+
+.chart-bar.selected::after {
+    content: '▼';
+    position: absolute;
+    bottom: -14px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 10px;
+    color: var(--gray-dark);
+}
+
+/* ========================================
+   MÊS DETAIL (lista ao clicar no gráfico)
+   ======================================== */
+.month-detail-section {
+    background: var(--white);
+    border-radius: var(--radius);
+    padding: 24px;
+    margin-bottom: 24px;
+    box-shadow: var(--shadow);
+    border-top: 4px solid var(--blue);
+}
+
+.month-detail-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 16px;
+    gap: 12px;
+}
+
+.month-detail-header h3 {
+    font-family: 'Poppins', sans-serif;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--gray-dark);
+}
+
+.month-detail-stats {
+    display: block;
+    font-size: 13px;
+    color: var(--gray-medium);
+    margin-top: 4px;
+}
+
+.btn-close-month {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: 2px solid var(--gray-border);
+    background: var(--white);
+    font-size: 16px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: var(--transition);
+    color: var(--gray-medium);
+}
+
+.btn-close-month:hover {
+    background: var(--gray-light);
+    border-color: var(--gray-medium);
+    color: var(--gray-dark);
+}
+
+.month-detail-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-height: 480px;
+    overflow-y: auto;
+}
+
+/* ========================================
+   SHARE SECTION
+   ======================================== */
+.share-section {
+    background: var(--white);
+    border-radius: var(--radius);
+    padding: 28px 24px;
+    margin-top: 24px;
+    box-shadow: var(--shadow);
+    text-align: center;
+}
+
+.share-title {
+    font-family: 'Poppins', sans-serif;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--gray-dark);
+    margin-bottom: 4px;
+}
+
+.share-subtitle {
+    font-size: 14px;
+    color: var(--gray-medium);
+    margin-bottom: 20px;
+}
+
+.share-buttons {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.btn-share {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 14px 28px;
+    border: none;
+    border-radius: var(--radius-xs);
+    font-family: 'Poppins', sans-serif;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.btn-share svg {
+    width: 20px;
+    height: 20px;
+}
+
+.btn-share-whatsapp {
+    background: #25D366;
+    color: var(--white);
+}
+
+.btn-share-whatsapp:hover {
+    background: #1FB855;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(37, 211, 102, 0.4);
+}
+
+.btn-share-copy {
+    background: var(--gray-light);
+    color: var(--gray-dark);
+    border: 2px solid var(--gray-border);
+}
+
+.btn-share-copy:hover {
+    background: var(--blue-light);
+    border-color: var(--blue);
+    color: var(--blue-dark);
+}
+
+.btn-share-copy.copied {
+    background: var(--green-light);
+    border-color: var(--green);
+    color: var(--green-dark);
+}
+
+@media (max-width: 768px) {
+    .share-buttons {
+        flex-direction: column;
+    }
+
+    .btn-share {
+        justify-content: center;
+        width: 100%;
+    }
+
+    .month-detail-header {
+        flex-wrap: wrap;
+    }
+
+    .month-detail-list {
+        max-height: 400px;
+    }
+}
