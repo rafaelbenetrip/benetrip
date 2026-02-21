@@ -205,6 +205,7 @@
             <div class="filter-bar" id="filter-bar">
                 <div class="filter-bar-inner">
                     <button type="button" class="filter-chip" id="fc-stops">Paradas ▾</button>
+                    <button type="button" class="filter-chip" id="fc-airports" style="display:none">Aeroportos ▾</button>
                     <button type="button" class="filter-chip" id="fc-times">Horários ▾</button>
                     <button type="button" class="filter-chip" id="fc-airlines">Companhias ▾</button>
                     <button type="button" class="filter-chip" id="fc-price">Preço ▾</button>
@@ -225,10 +226,21 @@
                     <label class="fp-opt"><input type="checkbox" name="stops" value="2"> 2+ paradas</label>
                 </div>
 
+                <!-- AIRPORTS (NEW) -->
+                <div class="filter-panel filter-panel-wide" id="fp-airports" style="display:none">
+                    <div class="fp-header"><span>Aeroportos</span><button class="fp-close">✕</button></div>
+                    <div class="fp-airline-actions">
+                        <button class="fp-link" id="fp-airports-all">Selecionar todos</button>
+                        <button class="fp-link" id="fp-airports-none">Desmarcar todos</button>
+                    </div>
+                    <div class="fp-airport-list" id="fp-airport-list">
+                        <div class="fp-empty">Carregando aeroportos...</div>
+                    </div>
+                </div>
+
                 <!-- TIMES -->
                 <div class="filter-panel filter-panel-wide" id="fp-times" style="display:none">
                     <div class="fp-header"><span>Horários</span><button class="fp-close">✕</button></div>
-                    <!-- Departure outbound -->
                     <div class="fp-section">
                         <div class="fp-section-title">🛫 Partida (ida)</div>
                         <div class="fp-range-row"><span class="fp-range-val" id="fv-dep-go-min">00:00</span><span class="fp-range-val" id="fv-dep-go-max">23:59</span></div>
@@ -237,7 +249,6 @@
                             <input type="range" id="fr-dep-go-max" min="0" max="1439" value="1439" step="30">
                         </div>
                     </div>
-                    <!-- Arrival outbound -->
                     <div class="fp-section">
                         <div class="fp-section-title">🛬 Chegada (ida)</div>
                         <div class="fp-range-row"><span class="fp-range-val" id="fv-arr-go-min">00:00</span><span class="fp-range-val" id="fv-arr-go-max">23:59</span></div>
@@ -246,7 +257,6 @@
                             <input type="range" id="fr-arr-go-max" min="0" max="1439" value="1439" step="30">
                         </div>
                     </div>
-                    <!-- Departure return -->
                     <div class="fp-section" id="fp-times-return" style="display:none">
                         <div class="fp-section-title">🛫 Partida (volta)</div>
                         <div class="fp-range-row"><span class="fp-range-val" id="fv-dep-ret-min">00:00</span><span class="fp-range-val" id="fv-dep-ret-max">23:59</span></div>
@@ -255,7 +265,6 @@
                             <input type="range" id="fr-dep-ret-max" min="0" max="1439" value="1439" step="30">
                         </div>
                     </div>
-                    <!-- Arrival return -->
                     <div class="fp-section" id="fp-times-return-arr" style="display:none">
                         <div class="fp-section-title">🛬 Chegada (volta)</div>
                         <div class="fp-range-row"><span class="fp-range-val" id="fv-arr-ret-min">00:00</span><span class="fp-range-val" id="fv-arr-ret-max">23:59</span></div>
