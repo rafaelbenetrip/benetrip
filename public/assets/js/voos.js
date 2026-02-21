@@ -1,7 +1,7 @@
 /**
  * BENETRIP VOOS v4.0 — Busca de voos completa
  *
- * Changelog v4.0: 
+ * Changelog v4.0:
  * - NEW: Airport filter (for multi-airport city codes like SAO, LON, NYC)
  * - NEW: +1 day arrival indicator on overnight flights
  * - NEW: Baggage info displayed on flight cards
