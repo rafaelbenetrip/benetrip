@@ -1,8 +1,13 @@
-// api/flight-results.js - Benetrip Flight Results v3.0
-// ROBUST CURRENCY CONVERSION: 3-strategy approach
-//   1. Derive rate from terms.price / terms.unified_price (most reliable)
-//   2. Use currency_rates from API response chunks
-//   3. Use currency_rates forwarded from frontend (from initial search)
+// api/flight-results.js - Benetrip Flight Results v4.0
+// ROBUST CURRENCY CONVERSION with safer heuristics
+//
+// Changelog v4.0:
+// - FIX: Removed fragile < 1 / > 1 heuristic for rate direction detection
+// - NEW: Always prefer Strategy 1 (derived from terms) — most reliable
+// - NEW: Strategy 2 now validates rate direction using a cross-check term
+// - NEW: Each proposal exposes `term_currency` and each term exposes `original_currency`
+//        so the frontend can warn users about currency mismatches
+// - NEW: All terms include original currency info for transparency
 
 module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -49,97 +54,125 @@ module.exports = async function handler(req, res) {
     }
 
     // ============================================================
-    // CURRENCY CONVERSION - Multi-strategy approach
+    // CURRENCY CONVERSION - Improved multi-strategy approach
     // ============================================================
     const target = currency.toUpperCase();
-    const targetLower = currency.toLowerCase();
-
-    // Merge all available rates (chunk + frontend)
     const allRates = { ...frontendRates, ...chunkCurrencyRates };
 
-    // Strategy 1: Derive rate from terms data (most reliable)
-    // Find a term whose currency matches our target and compute the ratio
+    // ---- Strategy 1: Derive rate from terms data (MOST RELIABLE) ----
+    // Find a term whose currency matches our target currency.
+    // The ratio term.price / term.unified_price gives us the exact conversion factor.
+    // unified_price is ALWAYS in RUB (Travelpayouts base currency).
     let derivedRate = null;
+    let derivedSamples = 0;
+    
     for (const p of allProposals) {
-      if (derivedRate !== null) break;
+      if (derivedRate !== null && derivedSamples >= 3) break; // Enough samples
       if (!p.terms) continue;
       for (const [, term] of Object.entries(p.terms)) {
         if (term.unified_price && term.unified_price > 0 && term.price && term.price > 0 && term.currency) {
           const termCur = term.currency.toUpperCase();
           if (termCur === target) {
-            derivedRate = term.price / term.unified_price;
-            console.log(`💱 [Strategy 1] Derived ${target} rate from terms: ${derivedRate.toFixed(8)} (${term.price}/${term.unified_price})`);
+            const rate = term.price / term.unified_price;
+            if (derivedRate === null) {
+              derivedRate = rate;
+            } else {
+              // Average with previous to smooth out rounding differences
+              derivedRate = (derivedRate * derivedSamples + rate) / (derivedSamples + 1);
+            }
+            derivedSamples++;
             break;
           }
         }
       }
     }
-
-    // Strategy 2: Look up in merged rates (case-insensitive)
-    let lookupRate = null;
-    for (const [key, val] of Object.entries(allRates)) {
-      if (key.toUpperCase() === target || key.toLowerCase() === targetLower) {
-        lookupRate = val;
-        console.log(`💱 [Strategy 2] Rates lookup [${key}] = ${val}`);
-        break;
-      }
+    
+    if (derivedRate !== null) {
+      console.log(`💱 [Strategy 1] Derived ${target} rate from ${derivedSamples} terms: ${derivedRate.toFixed(8)}`);
     }
 
-    // Strategy 3: Cross-convert using any available term + rates
-    // If target isn't directly in rates, derive from another currency
-    let crossRate = null;
-    if (derivedRate === null && lookupRate === null) {
-      for (const p of allProposals) {
-        if (crossRate !== null) break;
-        if (!p.terms) continue;
-        for (const [, term] of Object.entries(p.terms)) {
-          if (term.unified_price > 0 && term.price > 0 && term.currency) {
-            // We know: term.price / term.unified_price = rate_for_term_currency
-            // So 1 RUB = (term.price / term.unified_price) in term.currency
-            const termRate = term.price / term.unified_price; // RUB → term.currency
-            const termCur = term.currency.toUpperCase();
+    // ---- Strategy 2: Use currency_rates with cross-validation ----
+    // The rates object from Travelpayouts is inconsistent about direction.
+    // We validate by checking against a known term conversion.
+    let validatedLookupRate = null;
+    
+    if (derivedRate === null) {
+      // Find any rate for our target currency
+      let rawRate = null;
+      for (const [key, val] of Object.entries(allRates)) {
+        if (key.toUpperCase() === target || key.toLowerCase() === target.toLowerCase()) {
+          rawRate = val;
+          break;
+        }
+      }
 
-            // Now find target in rates relative to term currency or RUB
-            // If we have currency_rates for target, we can use them
-            for (const [rk, rv] of Object.entries(allRates)) {
-              if (rk.toUpperCase() === target) {
-                // Found target rate; now determine direction
-                // If rv is similar magnitude to termRate, it's also RUB→target multiplier
-                crossRate = rv < 1 ? rv : 1 / rv;
-                console.log(`💱 [Strategy 3] Cross-convert via ${termCur}: target rate = ${crossRate}`);
-                break;
-              }
+      if (rawRate !== null && rawRate > 0) {
+        // Cross-validate: find ANY term to check if multiply or divide is correct
+        let testTerm = null;
+        for (const p of allProposals) {
+          if (testTerm) break;
+          if (!p.terms) continue;
+          for (const [, term] of Object.entries(p.terms)) {
+            if (term.unified_price > 0 && term.price > 0 && term.currency) {
+              testTerm = term;
+              break;
             }
-            if (crossRate !== null) break;
           }
+        }
+
+        if (testTerm) {
+          const termCur = testTerm.currency.toUpperCase();
+          const termRatio = testTerm.price / testTerm.unified_price; // RUB → termCurrency
+
+          // Find the rate for the term's currency to compare
+          let termRate = null;
+          for (const [key, val] of Object.entries(allRates)) {
+            if (key.toUpperCase() === termCur) { termRate = val; break; }
+          }
+
+          if (termRate !== null && termRate > 0) {
+            // If rates are in "RUB → X" direction: rate * unified_price ≈ price
+            const testMultiply = testTerm.unified_price * termRate;
+            const testDivide = testTerm.unified_price / termRate;
+            
+            const errMultiply = Math.abs(testMultiply - testTerm.price) / testTerm.price;
+            const errDivide = Math.abs(testDivide - testTerm.price) / testTerm.price;
+
+            // Determine which direction is correct
+            if (errMultiply < errDivide && errMultiply < 0.05) {
+              // Rates are "multiply" direction (RUB * rate = local)
+              validatedLookupRate = rawRate;
+              console.log(`💱 [Strategy 2] Validated MULTIPLY: rate=${rawRate} (err=${(errMultiply*100).toFixed(1)}%)`);
+            } else if (errDivide < errMultiply && errDivide < 0.05) {
+              // Rates are "divide" direction (RUB / rate = local)
+              validatedLookupRate = 1 / rawRate;
+              console.log(`💱 [Strategy 2] Validated DIVIDE→inverted: rate=${(1/rawRate).toFixed(8)} (err=${(errDivide*100).toFixed(1)}%)`);
+            } else {
+              console.warn(`⚠️ [Strategy 2] Cannot validate direction: errMul=${(errMultiply*100).toFixed(1)}% errDiv=${(errDivide*100).toFixed(1)}%`);
+            }
+          }
+        }
+        
+        // If we couldn't cross-validate, skip this rate entirely — don't guess
+        if (validatedLookupRate === null && rawRate !== null) {
+          console.warn(`⚠️ [Strategy 2] Raw rate ${rawRate} for ${target} found but NOT validated. Skipping.`);
         }
       }
     }
 
-    // Select best rate and determine conversion
+    // ---- Select best rate ----
     let convertFn;
     if (derivedRate !== null && derivedRate > 0) {
-      // Derived from terms: price_target / price_rub = always MULTIPLY
       convertFn = (rub) => Math.round(rub * derivedRate);
-      console.log(`💱 [FINAL] Using derived rate: ${derivedRate.toFixed(8)} (MULTIPLY)`);
-    } else if (lookupRate !== null && lookupRate > 0) {
-      // From rates: detect direction
-      if (lookupRate < 1) {
-        // Small number like 0.055 → "1 RUB = 0.055 BRL" → MULTIPLY
-        convertFn = (rub) => Math.round(rub * lookupRate);
-        console.log(`💱 [FINAL] Using lookup rate: ${lookupRate} (MULTIPLY, rate < 1)`);
-      } else {
-        // Large number like 18.2 → "1 BRL = 18.2 RUB" → DIVIDE
-        convertFn = (rub) => Math.round(rub / lookupRate);
-        console.log(`💱 [FINAL] Using lookup rate: ${lookupRate} (DIVIDE, rate > 1)`);
-      }
-    } else if (crossRate !== null && crossRate > 0) {
-      convertFn = (rub) => Math.round(rub * crossRate);
-      console.log(`💱 [FINAL] Using cross rate: ${crossRate}`);
+      console.log(`💱 [FINAL] Using derived rate: ×${derivedRate.toFixed(8)}`);
+    } else if (validatedLookupRate !== null && validatedLookupRate > 0) {
+      convertFn = (rub) => Math.round(rub * validatedLookupRate);
+      console.log(`💱 [FINAL] Using validated lookup rate: ×${validatedLookupRate.toFixed(8)}`);
     } else {
-      // ABSOLUTE FALLBACK: no conversion possible
+      // ABSOLUTE FALLBACK: use term prices directly when they match target currency
+      // or return RUB values (which will look wrong but at least won't crash)
       convertFn = (rub) => rub;
-      console.warn(`⚠️ [FINAL] NO RATE for ${target}! chunk_keys=${JSON.stringify(Object.keys(chunkCurrencyRates))} fe_keys=${JSON.stringify(Object.keys(frontendRates))}`);
+      console.warn(`⚠️ [FINAL] NO VALID RATE for ${target}! Returning raw values. chunk_keys=${JSON.stringify(Object.keys(chunkCurrencyRates))}`);
     }
 
     // Format proposals
@@ -174,11 +207,21 @@ module.exports = async function handler(req, res) {
 function fmtProposal(proposal, convert, currency, gatesInfo, airlines, index) {
   const allTerms = [];
   let bestConverted = Infinity, bestGateId = null, bestUrl = null;
+  let bestTermCurrency = null; // Track what currency the best gate actually sells in
 
   if (proposal.terms) {
     for (const [gateId, term] of Object.entries(proposal.terms)) {
       const rub = term.unified_price || term.price || Infinity;
-      const converted = convert(rub);
+      
+      // If this term already has the target currency price, use it directly
+      let converted;
+      const termCur = (term.currency || '').toUpperCase();
+      if (termCur === currency && term.price > 0) {
+        converted = Math.round(term.price);
+      } else {
+        converted = convert(rub);
+      }
+      
       const gi = gatesInfo[gateId] || {};
       allTerms.push({
         gate_id: gateId,
@@ -187,9 +230,15 @@ function fmtProposal(proposal, convert, currency, gatesInfo, airlines, index) {
         price: converted,
         price_rub: rub,
         currency,
+        original_currency: termCur || 'RUB', // NEW: what currency the gate actually charges in
         url: term.url,
       });
-      if (converted < bestConverted) { bestConverted = converted; bestGateId = gateId; bestUrl = term.url; }
+      if (converted < bestConverted) {
+        bestConverted = converted;
+        bestGateId = gateId;
+        bestUrl = term.url;
+        bestTermCurrency = termCur || 'RUB';
+      }
     }
   }
   allTerms.sort((a, b) => a.price - b.price);
@@ -239,6 +288,7 @@ function fmtProposal(proposal, convert, currency, gatesInfo, airlines, index) {
     price: allTerms.length > 0 ? allTerms[0].price : bestConverted,
     price_raw_rub: allTerms.length > 0 ? allTerms[0].price_rub : (proposal.terms?.[bestGateId]?.unified_price || 0),
     currency,
+    term_currency: bestTermCurrency, // NEW: actual currency of the best gate
     gate_id: bestGateId,
     gate_name: gi.label || `Agência ${bestGateId}`,
     terms_url: bestUrl,
@@ -280,9 +330,9 @@ function dedup(proposals) {
         ex.gate_id = ex.all_terms[0].gate_id;
         ex.gate_name = ex.all_terms[0].gate_name;
         ex.terms_url = ex.all_terms[0].url;
+        ex.term_currency = ex.all_terms[0].original_currency; // Update currency info too
       }
     }
   }
   return Array.from(seen.values());
 }
-
