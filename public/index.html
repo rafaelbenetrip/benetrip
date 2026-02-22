@@ -25,7 +25,14 @@
         window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
     </script>
     <script defer src="/_vercel/insights/script.js"></script>
+    
+    <!-- Supabase SDK -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
+<!-- Benetrip Auth (ANTES dos outros scripts da página) -->
+<script src="/js/benetrip-auth.js"></script>
+<script src="/js/benetrip-login-modal.js"></script>
+    
     <style>
         :root {
             --orange: #E87722;
