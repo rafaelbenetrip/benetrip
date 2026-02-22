@@ -11,7 +11,7 @@
  *    - NEXT_PUBLIC_SUPABASE_URL
  *    - NEXT_PUBLIC_SUPABASE_ANON_KEY
  * 3. No HTML: <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
- *             <script src="/js/benetrip-auth.js"></script>
+ *             <script src="assets/js/benetrip-auth.js"></script>
  * 
  * API PÚBLICA:
  * - BenetripAuth.init() — inicializa (chamado automaticamente)
@@ -68,7 +68,7 @@ const BenetripAuth = (function () {
 
         try {
             // Buscar configuração do servidor (seguro)
-            const configResponse = await fetch('/api/auth/config');
+            const configResponse = await fetch('/api/auth/config.js');
             if (configResponse.ok) {
                 const config = await configResponse.json();
                 CONFIG.supabaseUrl = config.supabaseUrl;
