@@ -1,6 +1,6 @@
 /**
  * API Route: /api/auth/config
- * Retorna configuração pública do Supabase
+ * Retorna configuração pública do Supabase 
  * (anon key é projetada para ser pública, mas servir via API é mais limpo)
  */
 export default function handler(req, res) {
