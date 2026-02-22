@@ -26,13 +26,6 @@
     </script>
     <script defer src="/_vercel/insights/script.js"></script>
     
-    <!-- Supabase SDK -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
-<!-- Benetrip Auth (ANTES dos outros scripts da página) -->
-<script src="/js/benetrip-auth.js"></script>
-<script src="/js/benetrip-login-modal.js"></script>
-    
     <style>
         :root {
             --orange: #E87722;
@@ -797,6 +790,14 @@
         }
     </style>
 </head>
+
+    <!-- Supabase SDK -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<!-- Benetrip Auth (ANTES dos outros scripts da página) -->
+<script src="/js/benetrip-auth.js"></script>
+<script src="/js/benetrip-login-modal.js"></script>
+    
 <body>
     <!-- Overlay -->
     <div class="overlay" id="overlay"></div>
@@ -878,28 +879,50 @@
 
     <!-- Header -->
     <header class="header">
-        <div class="header-inner">
-            <div class="header-left">
-                <button class="menu-btn" id="menuBtn" onclick="toggleNav()" aria-label="Menu">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-                        <line x1="3" y1="6" x2="21" y2="6"/>
-                        <line x1="3" y1="12" x2="21" y2="12"/>
-                        <line x1="3" y1="18" x2="21" y2="18"/>
-                    </svg>
-                </button>
-                <a href="/" class="logo-link">
-                    <img src="logo1.png" alt="Benetrip">
-                </a>
-            </div>
-            <nav class="header-nav">
-                <a href="descobrir-destinos.html">🎯 Descobrir</a>
-                <a href="todos-destinos.html">🌍 Destinos</a>
-                <a href="itinerary2.html">📋 Roteiro</a>
-                <a href="voos.html">✈️ Voos</a>
-            </nav>
+    <div class="header-inner">
+        <div class="header-left">
+            <button class="menu-btn" id="menuBtn" onclick="toggleNav()" aria-label="Menu">
+                <!-- ... svg ... -->
+            </button>
+            <a href="/" class="logo-link">
+                <img src="logo1.png" alt="Benetrip">
+            </a>
         </div>
-    </header>
-
+        <nav class="header-nav">
+            <a href="descobrir-destinos.html">🎯 Descobrir</a>
+            <a href="todos-destinos.html">🌍 Destinos</a>
+            <a href="itinerary2.html">📋 Roteiro</a>
+            <a href="voos.html">✈️ Voos</a>
+        </nav>
+        
+        <!-- ADICIONAR AQUI: Auth no header -->
+        <div class="benetrip-header-auth">
+            <!-- Não logado -->
+            <button class="benetrip-header-login-btn" data-auth="login-btn" onclick="BenetripLoginModal.open()">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                    <circle cx="12" cy="7" r="4"></circle>
+                </svg>
+                <span>Entrar</span>
+            </button>
+            <!-- Logado -->
+            <div class="benetrip-header-user-menu" data-auth="user-menu" id="benetrip-user-menu-container">
+                <span class="benetrip-header-user-name" data-auth="user-name"></span>
+                <img class="benetrip-header-avatar" data-auth="user-avatar" alt="Avatar"
+                     onclick="document.getElementById('benetrip-user-dropdown').classList.toggle('active')" />
+                <div class="benetrip-header-initials" data-auth="user-initials"
+                     onclick="document.getElementById('benetrip-user-dropdown').classList.toggle('active')"></div>
+                <div class="benetrip-header-dropdown" id="benetrip-user-dropdown">
+                    <a href="/minha-conta.html">👤 Minha Conta</a>
+                    <a href="/minha-conta.html#historico">🕐 Histórico</a>
+                    <a href="/minha-conta.html#destinos">🔖 Destinos Salvos</a>
+                    <div class="divider" style="height:1px;background:#E0E0E0;margin:4px 0;"></div>
+                    <button class="logout-btn" data-auth="logout-btn" style="color:#E53935;">🚪 Sair</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</header>
     <!-- Hero -->
     <section class="hero" id="hero">
         <div class="hero-container">
