@@ -1,729 +1,172 @@
-/**
- * ============================================
- * BENETRIP AUTH MODULE - benetrip-auth.js
- * ============================================
- * Módulo global de autenticação para todas as páginas da Benetrip.
- * Utiliza Supabase Auth com suporte a Email/Senha, Google e Facebook.
- * 
- * COMO USAR:
- * 1. Incluir este script em todas as páginas ANTES dos outros scripts
- * 2. No HTML, adicionar meta tags:
- *    <meta name="supabase-url" content="https://dlccjeazkpxtijevusbp.supabase.co">
- *    <meta name="supabase-anon-key" content="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRsY2NqZWF6a3B4dGlqZXZ1c2JwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE3Mjg3MDYsImV4cCI6MjA4NzMwNDcwNn0.lwKwqF74JrHOaghkcbysZQN8jWErVVwPnxzLG7t07QU">
- * 3. No HTML: <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
- *             <script src="assets/js/benetrip-auth.js"></script>
- * 
- * API PÚBLICA:
- * - BenetripAuth.init() — inicializa (chamado automaticamente)
- * - BenetripAuth.getUser() — retorna usuário atual ou null
- * - BenetripAuth.isLoggedIn() — boolean
- * - BenetripAuth.signInWithEmail(email, password)
- * - BenetripAuth.signUpWithEmail(email, password, nome)
- * - BenetripAuth.signInWithGoogle()
- * - BenetripAuth.signInWithFacebook()
- * - BenetripAuth.signOut()
- * - BenetripAuth.getProfile() — dados do perfil
- * - BenetripAuth.updateProfile(dados)
- * - BenetripAuth.saveSearch(tipo, parametros, resultados)
- * - BenetripAuth.getSearchHistory(limit, offset)
- * - BenetripAuth.saveDestination(dados)
- * - BenetripAuth.getSavedDestinations()
- * - BenetripAuth.removeDestination(id)
- * - BenetripAuth.saveItinerary(dados)
- * - BenetripAuth.getSavedItineraries()
- * - BenetripAuth.onAuthChange(callback)
- */
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Autenticação - Benetrip</title>
 
-const BenetripAuth = (function () {
-    'use strict';
+    <!-- ⚠️ COLE SEUS VALORES AQUI (mesmos do index.html) -->
+    <meta name="supabase-url" content="COLE_SUA_SUPABASE_URL_AQUI">
+    <meta name="supabase-anon-key" content="COLE_SUA_ANON_KEY_AQUI">
 
-    // ==========================================
-    // CONFIGURAÇÃO
-    // ==========================================
-
-    const CONFIG = {
-        supabaseUrl: '',
-        supabaseAnonKey: '',
-        redirectUrl: window.location.origin,
-        maxSearchHistory: 100,
-    };
-
-    let supabase = null;
-    let currentUser = null;
-    let currentProfile = null;
-    let authChangeCallbacks = [];
-    let initialized = false;
-
-    // ==========================================
-    // INICIALIZAÇÃO
-    // ==========================================
-
-    /**
-     * Inicializa o módulo de autenticação.
-     * Lê config de meta tags no HTML (anon key é segura para expor — RLS protege os dados).
-     */
-    async function init() {
-        if (initialized) return;
-
-        try {
-            // ── Ler configuração de meta tags no HTML ──
-            // A anon key do Supabase é projetada para ser pública.
-            // A segurança vem das Row Level Security policies, não de esconder a key.
-            const metaUrl = document.querySelector('meta[name="supabase-url"]');
-            const metaKey = document.querySelector('meta[name="supabase-anon-key"]');
-
-            if (metaUrl && metaKey) {
-                CONFIG.supabaseUrl = metaUrl.content.trim();
-                CONFIG.supabaseAnonKey = metaKey.content.trim();
-            }
-
-            // Fallback: tentar API route (caso exista)
-            if (!CONFIG.supabaseUrl || !CONFIG.supabaseAnonKey) {
-                try {
-                    const configResponse = await fetch('/api/auth/config');
-                    if (configResponse.ok) {
-                        const config = await configResponse.json();
-                        CONFIG.supabaseUrl = config.supabaseUrl || '';
-                        CONFIG.supabaseAnonKey = config.supabaseAnonKey || '';
-                    }
-                } catch (e) {
-                    // API route não disponível — sem problema
-                }
-            }
-
-            if (!CONFIG.supabaseUrl || !CONFIG.supabaseAnonKey) {
-                console.warn('[BenetripAuth] Supabase não configurado. Adicione as meta tags supabase-url e supabase-anon-key. Auth desabilitado.');
-                initialized = true;
-                _updateUI(null);
-                return;
-            }
-
-            // Verificar se o SDK do Supabase está carregado
-            if (typeof window.supabase === 'undefined' || typeof window.supabase.createClient !== 'function') {
-                console.error('[BenetripAuth] Supabase JS SDK não encontrado. Adicione: <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>');
-                initialized = true;
-                _updateUI(null);
-                return;
-            }
-
-            // Inicializar Supabase client
-            supabase = window.supabase.createClient(CONFIG.supabaseUrl, CONFIG.supabaseAnonKey, {
-                auth: {
-                    autoRefreshToken: true,
-                    persistSession: true,
-                    detectSessionInUrl: true,
-                    flowType: 'pkce'
-                }
-            });
-
-            // Escutar mudanças de autenticação
-            supabase.auth.onAuthStateChange(async (event, session) => {
-                console.log('[BenetripAuth] Auth event:', event);
-
-                if (session?.user) {
-                    currentUser = session.user;
-                    await _loadProfile();
-                } else {
-                    currentUser = null;
-                    currentProfile = null;
-                }
-
-                _updateUI(currentUser);
-                _notifyCallbacks(event, currentUser);
-            });
-
-            // Verificar sessão existente
-            const { data: { session } } = await supabase.auth.getSession();
-            if (session?.user) {
-                currentUser = session.user;
-                await _loadProfile();
-            }
-
-            initialized = true;
-            _updateUI(currentUser);
-            console.log('[BenetripAuth] Inicializado com sucesso.', currentUser ? `Usuário: ${currentUser.email}` : 'Sem sessão ativa.');
-
-        } catch (error) {
-            console.error('[BenetripAuth] Erro na inicialização:', error);
-            initialized = true;
-            _updateUI(null);
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;700&family=Montserrat:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Montserrat', sans-serif;
+            background: linear-gradient(135deg, #E87722 0%, #00A3E0 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
         }
-    }
-
-    // ==========================================
-    // AUTENTICAÇÃO
-    // ==========================================
-
-    async function signInWithEmail(email, password) {
-        _ensureInitialized();
-        
-        const { data, error } = await supabase.auth.signInWithPassword({
-            email: email.trim().toLowerCase(),
-            password
-        });
-
-        if (error) {
-            throw _translateError(error);
+        .callback-card {
+            background: white;
+            border-radius: 16px;
+            padding: 40px;
+            max-width: 400px;
+            width: 100%;
+            text-align: center;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
         }
-
-        return data;
-    }
-
-    async function signUpWithEmail(email, password, nome) {
-        _ensureInitialized();
-
-        const { data, error } = await supabase.auth.signUp({
-            email: email.trim().toLowerCase(),
-            password,
-            options: {
-                data: {
-                    full_name: nome,
-                    name: nome
-                },
-                emailRedirectTo: `${CONFIG.redirectUrl}/auth-callback.html`
-            }
-        });
-
-        if (error) {
-            throw _translateError(error);
+        .callback-mascot {
+            font-size: 48px;
+            margin-bottom: 16px;
         }
-
-        return data;
-    }
-
-    async function signInWithGoogle() {
-        _ensureInitialized();
-
-        const { data, error } = await supabase.auth.signInWithOAuth({
-            provider: 'google',
-            options: {
-                redirectTo: `${CONFIG.redirectUrl}/auth-callback.html`,
-                queryParams: {
-                    access_type: 'offline',
-                    prompt: 'consent'
-                }
-            }
-        });
-
-        if (error) {
-            throw _translateError(error);
+        .callback-title {
+            font-family: 'Poppins', sans-serif;
+            font-size: 20px;
+            font-weight: 700;
+            color: #21272A;
+            margin-bottom: 8px;
         }
-
-        return data;
-    }
-
-    async function signInWithFacebook() {
-        _ensureInitialized();
-
-        const { data, error } = await supabase.auth.signInWithOAuth({
-            provider: 'facebook',
-            options: {
-                redirectTo: `${CONFIG.redirectUrl}/auth-callback.html`,
-                scopes: 'email,public_profile'
-            }
-        });
-
-        if (error) {
-            throw _translateError(error);
+        .callback-message {
+            color: #666;
+            font-size: 14px;
+            line-height: 1.6;
+            margin-bottom: 20px;
         }
-
-        return data;
-    }
-
-    async function signOut() {
-        _ensureInitialized();
-
-        const { error } = await supabase.auth.signOut();
-        if (error) {
-            throw _translateError(error);
+        .callback-spinner {
+            width: 32px;
+            height: 32px;
+            border: 3px solid #E0E0E0;
+            border-top: 3px solid #E87722;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin: 0 auto 16px;
         }
-
-        currentUser = null;
-        currentProfile = null;
-        _updateUI(null);
-    }
-
-    async function resetPassword(email) {
-        _ensureInitialized();
-
-        const { error } = await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
-            redirectTo: `${CONFIG.redirectUrl}/auth-callback.html?type=recovery`
-        });
-
-        if (error) {
-            throw _translateError(error);
+        @keyframes spin {
+            to { transform: rotate(360deg); }
         }
-    }
-
-    // ==========================================
-    // PERFIL DO USUÁRIO
-    // ==========================================
-
-    async function getProfile() {
-        if (!currentUser) return null;
-        if (currentProfile) return currentProfile;
-        await _loadProfile();
-        return currentProfile;
-    }
-
-    async function updateProfile(dados) {
-        _ensureInitialized();
-        if (!currentUser) throw new Error('Usuário não logado');
-
-        const { data, error } = await supabase
-            .from('user_profiles')
-            .update({
-                nome_exibicao: dados.nome_exibicao,
-                moeda_preferida: dados.moeda_preferida,
-                cidade_origem_padrao: dados.cidade_origem_padrao,
-                cidade_origem_nome: dados.cidade_origem_nome,
-                pais: dados.pais,
-                preferencias_viagem: dados.preferencias_viagem
-            })
-            .eq('user_id', currentUser.id)
-            .select()
-            .single();
-
-        if (error) throw error;
-
-        currentProfile = data;
-        return data;
-    }
-
-    // ==========================================
-    // HISTÓRICO DE BUSCAS
-    // ==========================================
-
-    async function saveSearch(tipo, parametros, resultados) {
-        if (!currentUser || !supabase) return null;
-
-        try {
-            const { data, error } = await supabase
-                .from('search_history')
-                .insert({
-                    user_id: currentUser.id,
-                    tipo_busca: tipo,
-                    parametros: parametros || {},
-                    resultados_resumo: resultados || {}
-                })
-                .select()
-                .single();
-
-            if (error) {
-                console.warn('[BenetripAuth] Erro ao salvar busca:', error.message);
-                return null;
-            }
-
-            _cleanOldSearches();
-            return data;
-        } catch (e) {
-            console.warn('[BenetripAuth] Erro ao salvar busca:', e);
-            return null;
+        .callback-error {
+            color: #E53935;
+            background: #FFEBEE;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 13px;
+            margin-bottom: 16px;
+            display: none;
         }
-    }
-
-    async function getSearchHistory(limit = 20, offset = 0, tipo = null) {
-        _ensureInitialized();
-        if (!currentUser) return [];
-
-        let query = supabase
-            .from('search_history')
-            .select('*')
-            .eq('user_id', currentUser.id)
-            .order('created_at', { ascending: false })
-            .range(offset, offset + limit - 1);
-
-        if (tipo) {
-            query = query.eq('tipo_busca', tipo);
+        .callback-btn {
+            display: inline-block;
+            padding: 12px 32px;
+            background: #E87722;
+            color: white;
+            text-decoration: none;
+            border-radius: 10px;
+            font-weight: 600;
+            font-size: 14px;
+            transition: background 0.2s;
         }
+        .callback-btn:hover { background: #D06A1D; }
+    </style>
+</head>
+<body>
+    <div class="callback-card">
+        <div class="callback-mascot">🐕</div>
+        <div id="loading-state">
+            <div class="callback-spinner"></div>
+            <h1 class="callback-title">Quase lá!</h1>
+            <p class="callback-message">A Tripinha está confirmando seus dados...</p>
+        </div>
+        <div id="success-state" style="display:none;">
+            <h1 class="callback-title">Tudo certo! 🎉</h1>
+            <p class="callback-message">Sua conta foi confirmada. Redirecionando...</p>
+        </div>
+        <div id="error-state" style="display:none;">
+            <h1 class="callback-title">Ops! Algo deu errado 😅</h1>
+            <div class="callback-error" id="error-message"></div>
+            <a href="/" class="callback-btn">Voltar para a Benetrip</a>
+        </div>
+    </div>
 
-        const { data, error } = await query;
-        if (error) throw error;
-
-        return data || [];
-    }
-
-    async function deleteSearch(searchId) {
-        _ensureInitialized();
-        if (!currentUser) return;
-
-        const { error } = await supabase
-            .from('search_history')
-            .delete()
-            .eq('id', searchId)
-            .eq('user_id', currentUser.id);
-
-        if (error) throw error;
-    }
-
-    async function clearSearchHistory() {
-        _ensureInitialized();
-        if (!currentUser) return;
-
-        const { error } = await supabase
-            .from('search_history')
-            .delete()
-            .eq('user_id', currentUser.id);
-
-        if (error) throw error;
-    }
-
-    // ==========================================
-    // DESTINOS SALVOS
-    // ==========================================
-
-    async function saveDestination(dados) {
-        _ensureInitialized();
-        if (!currentUser) throw new Error('Faça login para salvar destinos');
-
-        const { data, error } = await supabase
-            .from('saved_destinations')
-            .insert({
-                user_id: currentUser.id,
-                destino_nome: dados.destino_nome,
-                destino_pais: dados.destino_pais,
-                iata_code: dados.iata_code,
-                preco_encontrado: dados.preco_encontrado,
-                moeda_preco: dados.moeda_preco || 'BRL',
-                imagem_url: dados.imagem_url,
-                dados_busca: dados.dados_busca || {},
-                notas: dados.notas
-            })
-            .select()
-            .single();
-
-        if (error) throw error;
-        return data;
-    }
-
-    async function getSavedDestinations() {
-        _ensureInitialized();
-        if (!currentUser) return [];
-
-        const { data, error } = await supabase
-            .from('saved_destinations')
-            .select('*')
-            .eq('user_id', currentUser.id)
-            .order('created_at', { ascending: false });
-
-        if (error) throw error;
-        return data || [];
-    }
-
-    async function removeDestination(id) {
-        _ensureInitialized();
-        if (!currentUser) return;
-
-        const { error } = await supabase
-            .from('saved_destinations')
-            .delete()
-            .eq('id', id)
-            .eq('user_id', currentUser.id);
-
-        if (error) throw error;
-    }
-
-    // ==========================================
-    // ROTEIROS SALVOS
-    // ==========================================
-
-    async function saveItinerary(dados) {
-        _ensureInitialized();
-        if (!currentUser) throw new Error('Faça login para salvar roteiros');
-
-        const { data, error } = await supabase
-            .from('saved_itineraries')
-            .insert({
-                user_id: currentUser.id,
-                destino_nome: dados.destino_nome,
-                destino_pais: dados.destino_pais,
-                data_ida: dados.data_ida,
-                data_volta: dados.data_volta,
-                num_dias: dados.num_dias,
-                dados_roteiro: dados.dados_roteiro || {}
-            })
-            .select()
-            .single();
-
-        if (error) throw error;
-        return data;
-    }
-
-    async function getSavedItineraries() {
-        _ensureInitialized();
-        if (!currentUser) return [];
-
-        const { data, error } = await supabase
-            .from('saved_itineraries')
-            .select('*')
-            .eq('user_id', currentUser.id)
-            .order('created_at', { ascending: false });
-
-        if (error) throw error;
-        return data || [];
-    }
-
-    async function shareItinerary(itineraryId) {
-        _ensureInitialized();
-        if (!currentUser) throw new Error('Faça login para compartilhar');
-
-        const shareToken = Array.from(crypto.getRandomValues(new Uint8Array(16)))
-            .map(b => b.toString(16).padStart(2, '0')).join('');
-
-        const { data, error } = await supabase
-            .from('saved_itineraries')
-            .update({
-                compartilhado: true,
-                share_token: shareToken
-            })
-            .eq('id', itineraryId)
-            .eq('user_id', currentUser.id)
-            .select()
-            .single();
-
-        if (error) throw error;
-        return `${CONFIG.redirectUrl}/roteiro-compartilhado.html?t=${shareToken}`;
-    }
-
-    async function getSharedItinerary(shareToken) {
-        _ensureInitialized();
-
-        const { data, error } = await supabase
-            .from('saved_itineraries')
-            .select('destino_nome, destino_pais, data_ida, data_volta, num_dias, dados_roteiro, created_at')
-            .eq('share_token', shareToken)
-            .eq('compartilhado', true)
-            .single();
-
-        if (error) throw error;
-        return data;
-    }
-
-    async function removeItinerary(id) {
-        _ensureInitialized();
-        if (!currentUser) return;
-
-        const { error } = await supabase
-            .from('saved_itineraries')
-            .delete()
-            .eq('id', id)
-            .eq('user_id', currentUser.id);
-
-        if (error) throw error;
-    }
-
-    // ==========================================
-    // UTILIDADES / GETTERS
-    // ==========================================
-
-    function getUser() {
-        return currentUser;
-    }
-
-    function isLoggedIn() {
-        return currentUser !== null;
-    }
-
-    function getUserDisplayName() {
-        if (currentProfile?.nome_exibicao) return currentProfile.nome_exibicao;
-        if (currentUser?.user_metadata?.full_name) return currentUser.user_metadata.full_name;
-        if (currentUser?.user_metadata?.name) return currentUser.user_metadata.name;
-        if (currentUser?.email) return currentUser.email.split('@')[0];
-        return 'Viajante';
-    }
-
-    function getUserAvatar() {
-        if (currentProfile?.avatar_url) return currentProfile.avatar_url;
-        if (currentUser?.user_metadata?.avatar_url) return currentUser.user_metadata.avatar_url;
-        if (currentUser?.user_metadata?.picture) return currentUser.user_metadata.picture;
-        return null;
-    }
-
-    function onAuthChange(callback) {
-        if (typeof callback === 'function') {
-            authChangeCallbacks.push(callback);
-        }
-    }
-
-    // ==========================================
-    // FUNÇÕES INTERNAS
-    // ==========================================
-
-    function _ensureInitialized() {
-        if (!supabase) {
-            throw new Error('BenetripAuth não inicializado ou Supabase não configurado.');
-        }
-    }
-
-    async function _loadProfile() {
-        if (!currentUser || !supabase) return;
-
-        try {
-            const { data, error } = await supabase
-                .from('user_profiles')
-                .select('*')
-                .eq('user_id', currentUser.id)
-                .single();
-
-            if (error) {
-                console.warn('[BenetripAuth] Perfil não encontrado, será criado automaticamente.');
-                return;
-            }
-
-            currentProfile = data;
-        } catch (e) {
-            console.warn('[BenetripAuth] Erro ao carregar perfil:', e);
-        }
-    }
-
-    async function _cleanOldSearches() {
-        if (!currentUser || !supabase) return;
-
-        try {
-            const { count } = await supabase
-                .from('search_history')
-                .select('*', { count: 'exact', head: true })
-                .eq('user_id', currentUser.id);
-
-            if (count > CONFIG.maxSearchHistory) {
-                const excess = count - CONFIG.maxSearchHistory;
-                const { data: oldSearches } = await supabase
-                    .from('search_history')
-                    .select('id')
-                    .eq('user_id', currentUser.id)
-                    .order('created_at', { ascending: true })
-                    .limit(excess);
-
-                if (oldSearches?.length) {
-                    const idsToDelete = oldSearches.map(s => s.id);
-                    await supabase
-                        .from('search_history')
-                        .delete()
-                        .in('id', idsToDelete);
-                }
-            }
-        } catch (e) {
-            // Silencioso
-        }
-    }
-
-    function _notifyCallbacks(event, user) {
-        authChangeCallbacks.forEach(cb => {
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script>
+        (async function() {
             try {
-                cb(event, user);
-            } catch (e) {
-                console.error('[BenetripAuth] Erro em callback:', e);
-            }
-        });
-    }
+                // Ler config das meta tags (mesmo approach do benetrip-auth.js)
+                const supabaseUrl = document.querySelector('meta[name="supabase-url"]')?.content?.trim();
+                const supabaseAnonKey = document.querySelector('meta[name="supabase-anon-key"]')?.content?.trim();
 
-    function _translateError(error) {
-        const messages = {
-            'Invalid login credentials': 'Email ou senha incorretos.',
-            'Email not confirmed': 'Confirme seu email antes de fazer login. Verifique sua caixa de entrada.',
-            'User already registered': 'Este email já está cadastrado. Tente fazer login.',
-            'Password should be at least 6 characters': 'A senha deve ter pelo menos 6 caracteres.',
-            'Unable to validate email address: invalid format': 'Formato de email inválido.',
-            'Email rate limit exceeded': 'Muitas tentativas. Aguarde alguns minutos.',
-            'Signup requires a valid password': 'Digite uma senha válida.',
-            'To signup, please provide your email': 'Digite um email válido.',
-        };
+                if (!supabaseUrl || !supabaseAnonKey || supabaseUrl.includes('COLE_SUA')) {
+                    throw new Error('Supabase não configurado. Edite as meta tags neste arquivo.');
+                }
 
-        const translatedMessage = messages[error.message] || error.message;
+                const supabaseClient = window.supabase.createClient(supabaseUrl, supabaseAnonKey);
 
-        const translatedError = new Error(translatedMessage);
-        translatedError.originalError = error;
-        translatedError.status = error.status;
-        return translatedError;
-    }
+                // Verificar tipo de callback
+                const params = new URLSearchParams(window.location.search);
+                const hashParams = new URLSearchParams(window.location.hash.substring(1));
+                const type = params.get('type') || hashParams.get('type');
 
-    function _updateUI(user) {
-        const loginBtn = document.querySelector('[data-auth="login-btn"]');
-        const userMenu = document.querySelector('[data-auth="user-menu"]');
-        const userName = document.querySelector('[data-auth="user-name"]');
-        const userAvatar = document.querySelector('[data-auth="user-avatar"]');
-        const logoutBtn = document.querySelector('[data-auth="logout-btn"]');
+                // Trocar código por sessão (PKCE flow)
+                const { data, error } = await supabaseClient.auth.getSession();
 
-        if (user) {
-            if (loginBtn) loginBtn.style.display = 'none';
-            if (userMenu) userMenu.style.display = 'flex';
-            if (userName) userName.textContent = getUserDisplayName();
-            if (userAvatar) {
-                const avatarUrl = getUserAvatar();
-                if (avatarUrl) {
-                    userAvatar.src = avatarUrl;
-                    userAvatar.style.display = 'block';
+                if (error) throw error;
+
+                if (data?.session) {
+                    // Sucesso!
+                    document.getElementById('loading-state').style.display = 'none';
+                    document.getElementById('success-state').style.display = 'block';
+
+                    const redirectTo = type === 'recovery' ? '/redefinir-senha.html' : '/';
+                    setTimeout(() => {
+                        window.location.href = redirectTo;
+                    }, 1500);
                 } else {
-                    userAvatar.style.display = 'none';
-                    const initialsEl = document.querySelector('[data-auth="user-initials"]');
-                    if (initialsEl) {
-                        initialsEl.textContent = getUserDisplayName().charAt(0).toUpperCase();
-                        initialsEl.style.display = 'flex';
+                    // Pode ser confirmação de email - tentar extrair tokens da URL
+                    const accessToken = hashParams.get('access_token');
+                    const refreshToken = hashParams.get('refresh_token');
+
+                    if (accessToken) {
+                        const { error: sessionError } = await supabaseClient.auth.setSession({
+                            access_token: accessToken,
+                            refresh_token: refreshToken
+                        });
+
+                        if (sessionError) throw sessionError;
+
+                        document.getElementById('loading-state').style.display = 'none';
+                        document.getElementById('success-state').style.display = 'block';
+
+                        setTimeout(() => {
+                            window.location.href = '/';
+                        }, 1500);
+                    } else {
+                        throw new Error('Nenhuma sessão encontrada');
                     }
                 }
+
+            } catch (error) {
+                console.error('Auth callback error:', error);
+                document.getElementById('loading-state').style.display = 'none';
+                document.getElementById('error-state').style.display = 'block';
+                document.getElementById('error-message').textContent = error.message || 'Erro ao processar autenticação.';
+                document.getElementById('error-message').style.display = 'block';
             }
-            if (logoutBtn) {
-                logoutBtn.addEventListener('click', async (e) => {
-                    e.preventDefault();
-                    await signOut();
-                });
-            }
-        } else {
-            if (loginBtn) loginBtn.style.display = 'flex';
-            if (userMenu) userMenu.style.display = 'none';
-        }
-
-        document.querySelectorAll('[data-auth-show="logged-in"]').forEach(el => {
-            el.style.display = user ? '' : 'none';
-        });
-        document.querySelectorAll('[data-auth-show="logged-out"]').forEach(el => {
-            el.style.display = user ? 'none' : '';
-        });
-    }
-
-    // ==========================================
-    // AUTO-INICIALIZAÇÃO
-    // ==========================================
-
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', init);
-    } else {
-        init();
-    }
-
-    // ==========================================
-    // API PÚBLICA
-    // ==========================================
-
-    return {
-        init,
-        signInWithEmail,
-        signUpWithEmail,
-        signInWithGoogle,
-        signInWithFacebook,
-        signOut,
-        resetPassword,
-        getUser,
-        isLoggedIn,
-        getProfile,
-        updateProfile,
-        getUserDisplayName,
-        getUserAvatar,
-        onAuthChange,
-        saveSearch,
-        getSearchHistory,
-        deleteSearch,
-        clearSearchHistory,
-        saveDestination,
-        getSavedDestinations,
-        removeDestination,
-        saveItinerary,
-        getSavedItineraries,
-        shareItinerary,
-        getSharedItinerary,
-        removeItinerary,
-    };
-
-})();
-
-window.BenetripAuth = BenetripAuth;
+        })();
+    </script>
+</body>
+</html>
