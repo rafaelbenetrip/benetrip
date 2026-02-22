@@ -17,10 +17,6 @@
 const BenetripAuth = (function () {
     'use strict';
 
-    // ==========================================
-    // CONFIGURAÇÃO
-    // ==========================================
-
     const CONFIG = {
         supabaseUrl: '',
         supabaseAnonKey: '',
@@ -35,45 +31,49 @@ const BenetripAuth = (function () {
     let initialized = false;
 
     // ==========================================
-    // LIMPEZA DE DADOS PKCE ANTIGOS
+    // CUSTOM LOCK — RESOLVE NAVIGATOR.LOCKS BUG
     // ==========================================
 
     /**
-     * Remove dados Supabase antigos do localStorage que podem causar
-     * travamentos de Navigator Lock (resquícios de tentativas PKCE).
-     * Executado UMA VEZ — depois marca como feito.
+     * O Supabase JS v2 usa navigator.locks.request() internamente para
+     * coordenar acesso à sessão entre abas. Porém, locks "fantasma" de
+     * sessões anteriores ficam presos e causam timeout de 10s.
+     *
+     * Esta função substitui o lock nativo por um mecanismo simples baseado
+     * em Promises. É seguro para uso em aba única (caso predominante).
+     * Em múltiplas abas, o pior caso é um refresh de token redundante.
      */
-    function _cleanupStalePKCEData() {
-        const CLEANUP_KEY = 'benetrip-auth-v2-cleanup';
-        
-        // Já limpou? Pular.
-        if (localStorage.getItem(CLEANUP_KEY)) return false;
+    const _activeLocks = new Map();
 
-        console.log('[BenetripAuth] Limpando dados de autenticação antigos (migração única)...');
-        
-        // Remover todos os itens sb-* do localStorage
-        const keysToRemove = [];
-        for (let i = 0; i < localStorage.length; i++) {
-            const key = localStorage.key(i);
-            if (key && (key.startsWith('sb-') || key.includes('supabase'))) {
-                keysToRemove.push(key);
+    async function _customLock(name, acquireTimeout, fn) {
+        // Se já existe um lock ativo com este nome, esperar ele terminar
+        // (com timeout para não travar)
+        const existing = _activeLocks.get(name);
+        if (existing) {
+            try {
+                await Promise.race([
+                    existing,
+                    new Promise((_, reject) =>
+                        setTimeout(() => reject(new Error('lock timeout')), acquireTimeout)
+                    )
+                ]);
+            } catch (e) {
+                // Timeout ou erro — prosseguir mesmo assim
             }
         }
-        
-        keysToRemove.forEach(key => {
-            localStorage.removeItem(key);
-            console.log('[BenetripAuth] Removido:', key);
-        });
 
-        // Marcar como feito
-        localStorage.setItem(CLEANUP_KEY, Date.now().toString());
-        
-        if (keysToRemove.length > 0) {
-            console.log(`[BenetripAuth] ${keysToRemove.length} itens removidos. Sessão anterior limpa.`);
-            return true; // Indicar que houve limpeza
+        // Executar a função e registrar como lock ativo
+        const promise = fn();
+        _activeLocks.set(name, promise);
+
+        try {
+            return await promise;
+        } finally {
+            // Liberar lock quando terminar
+            if (_activeLocks.get(name) === promise) {
+                _activeLocks.delete(name);
+            }
         }
-        
-        return false;
     }
 
     // ==========================================
@@ -84,9 +84,6 @@ const BenetripAuth = (function () {
         if (initialized) return;
 
         try {
-            // ── Migração: limpar dados PKCE antigos (executa 1x) ──
-            _cleanupStalePKCEData();
-
             // ── Ler configuração de meta tags no HTML ──
             const metaUrl = document.querySelector('meta[name="supabase-url"]');
             const metaKey = document.querySelector('meta[name="supabase-anon-key"]');
@@ -105,9 +102,7 @@ const BenetripAuth = (function () {
                         CONFIG.supabaseUrl = config.supabaseUrl || '';
                         CONFIG.supabaseAnonKey = config.supabaseAnonKey || '';
                     }
-                } catch (e) {
-                    // API route não disponível
-                }
+                } catch (e) { /* sem problema */ }
             }
 
             if (!CONFIG.supabaseUrl || !CONFIG.supabaseAnonKey) {
@@ -117,7 +112,6 @@ const BenetripAuth = (function () {
                 return;
             }
 
-            // Verificar SDK
             if (typeof window.supabase === 'undefined' || typeof window.supabase.createClient !== 'function') {
                 console.error('[BenetripAuth] Supabase JS SDK não encontrado.');
                 initialized = true;
@@ -126,14 +120,15 @@ const BenetripAuth = (function () {
             }
 
             // ── Inicializar Supabase client ──
-            // flowType: 'implicit' evita o bug de Navigator Lock do PKCE.
-            // detectSessionInUrl: true permite ler tokens do hash automaticamente.
+            // lock: _customLock → bypassa navigator.locks para evitar timeout
+            // flowType: 'implicit' → tokens vêm no hash, sem code exchange
             supabase = window.supabase.createClient(CONFIG.supabaseUrl, CONFIG.supabaseAnonKey, {
                 auth: {
                     autoRefreshToken: true,
                     persistSession: true,
                     detectSessionInUrl: true,
-                    flowType: 'implicit'
+                    flowType: 'implicit',
+                    lock: _customLock
                 }
             });
 
@@ -154,17 +149,10 @@ const BenetripAuth = (function () {
             });
 
             // Verificar sessão existente
-            try {
-                const { data: { session } } = await supabase.auth.getSession();
-                if (session?.user) {
-                    currentUser = session.user;
-                    await _loadProfile();
-                }
-            } catch (sessionError) {
-                // Se getSession falhar (ex: lock residual), logar mas não travar
-                console.warn('[BenetripAuth] getSession falhou (pode ser lock residual):', sessionError.message);
-                // Forçar limpeza novamente para a próxima vez
-                localStorage.removeItem('benetrip-auth-v2-cleanup');
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session?.user) {
+                currentUser = session.user;
+                await _loadProfile();
             }
 
             initialized = true;
@@ -173,20 +161,6 @@ const BenetripAuth = (function () {
 
         } catch (error) {
             console.error('[BenetripAuth] Erro na inicialização:', error);
-            
-            // Se o erro for de Navigator Lock, forçar limpeza na próxima visita
-            if (error.message && error.message.includes('LockManager')) {
-                console.warn('[BenetripAuth] Lock detectado. Limpando dados para próxima tentativa...');
-                localStorage.removeItem('benetrip-auth-v2-cleanup');
-                // Limpar dados Supabase imediatamente
-                for (let i = localStorage.length - 1; i >= 0; i--) {
-                    const key = localStorage.key(i);
-                    if (key && (key.startsWith('sb-') || key.includes('supabase'))) {
-                        localStorage.removeItem(key);
-                    }
-                }
-            }
-            
             initialized = true;
             _updateUI(null);
         }
@@ -198,53 +172,41 @@ const BenetripAuth = (function () {
 
     async function signInWithEmail(email, password) {
         _ensureInitialized();
-        
         const { data, error } = await supabase.auth.signInWithPassword({
-            email: email.trim().toLowerCase(),
-            password
+            email: email.trim().toLowerCase(), password
         });
-
         if (error) throw _translateError(error);
         return data;
     }
 
     async function signUpWithEmail(email, password, nome) {
         _ensureInitialized();
-
         const { data, error } = await supabase.auth.signUp({
-            email: email.trim().toLowerCase(),
-            password,
+            email: email.trim().toLowerCase(), password,
             options: {
                 data: { full_name: nome, name: nome },
                 emailRedirectTo: `${CONFIG.redirectUrl}/auth-callback.html`
             }
         });
-
         if (error) throw _translateError(error);
         return data;
     }
 
     async function signInWithGoogle() {
         _ensureInitialized();
-
         const { data, error } = await supabase.auth.signInWithOAuth({
             provider: 'google',
             options: {
                 redirectTo: `${CONFIG.redirectUrl}/auth-callback.html`,
-                queryParams: {
-                    access_type: 'offline',
-                    prompt: 'consent'
-                }
+                queryParams: { access_type: 'offline', prompt: 'consent' }
             }
         });
-
         if (error) throw _translateError(error);
         return data;
     }
 
     async function signInWithFacebook() {
         _ensureInitialized();
-
         const { data, error } = await supabase.auth.signInWithOAuth({
             provider: 'facebook',
             options: {
@@ -252,17 +214,14 @@ const BenetripAuth = (function () {
                 scopes: 'email,public_profile'
             }
         });
-
         if (error) throw _translateError(error);
         return data;
     }
 
     async function signOut() {
         _ensureInitialized();
-
         const { error } = await supabase.auth.signOut();
         if (error) throw _translateError(error);
-
         currentUser = null;
         currentProfile = null;
         _updateUI(null);
@@ -270,11 +229,9 @@ const BenetripAuth = (function () {
 
     async function resetPassword(email) {
         _ensureInitialized();
-
         const { error } = await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
             redirectTo: `${CONFIG.redirectUrl}/auth-callback.html?type=recovery`
         });
-
         if (error) throw _translateError(error);
     }
 
@@ -292,7 +249,6 @@ const BenetripAuth = (function () {
     async function updateProfile(dados) {
         _ensureInitialized();
         if (!currentUser) throw new Error('Usuário não logado');
-
         const { data, error } = await supabase
             .from('user_profiles')
             .update({
@@ -304,9 +260,7 @@ const BenetripAuth = (function () {
                 preferencias_viagem: dados.preferencias_viagem
             })
             .eq('user_id', currentUser.id)
-            .select()
-            .single();
-
+            .select().single();
         if (error) throw error;
         currentProfile = data;
         return data;
@@ -318,7 +272,6 @@ const BenetripAuth = (function () {
 
     async function saveSearch(tipo, parametros, resultados) {
         if (!currentUser || !supabase) return null;
-
         try {
             const { data, error } = await supabase
                 .from('search_history')
@@ -328,35 +281,21 @@ const BenetripAuth = (function () {
                     parametros: parametros || {},
                     resultados_resumo: resultados || {}
                 })
-                .select()
-                .single();
-
-            if (error) {
-                console.warn('[BenetripAuth] Erro ao salvar busca:', error.message);
-                return null;
-            }
-
+                .select().single();
+            if (error) { console.warn('[BenetripAuth] Erro ao salvar busca:', error.message); return null; }
             _cleanOldSearches();
             return data;
-        } catch (e) {
-            console.warn('[BenetripAuth] Erro ao salvar busca:', e);
-            return null;
-        }
+        } catch (e) { console.warn('[BenetripAuth] Erro ao salvar busca:', e); return null; }
     }
 
     async function getSearchHistory(limit = 20, offset = 0, tipo = null) {
         _ensureInitialized();
         if (!currentUser) return [];
-
-        let query = supabase
-            .from('search_history')
-            .select('*')
+        let query = supabase.from('search_history').select('*')
             .eq('user_id', currentUser.id)
             .order('created_at', { ascending: false })
             .range(offset, offset + limit - 1);
-
         if (tipo) query = query.eq('tipo_busca', tipo);
-
         const { data, error } = await query;
         if (error) throw error;
         return data || [];
@@ -365,25 +304,16 @@ const BenetripAuth = (function () {
     async function deleteSearch(searchId) {
         _ensureInitialized();
         if (!currentUser) return;
-
-        const { error } = await supabase
-            .from('search_history')
-            .delete()
-            .eq('id', searchId)
-            .eq('user_id', currentUser.id);
-
+        const { error } = await supabase.from('search_history').delete()
+            .eq('id', searchId).eq('user_id', currentUser.id);
         if (error) throw error;
     }
 
     async function clearSearchHistory() {
         _ensureInitialized();
         if (!currentUser) return;
-
-        const { error } = await supabase
-            .from('search_history')
-            .delete()
+        const { error } = await supabase.from('search_history').delete()
             .eq('user_id', currentUser.id);
-
         if (error) throw error;
     }
 
@@ -394,7 +324,6 @@ const BenetripAuth = (function () {
     async function saveDestination(dados) {
         _ensureInitialized();
         if (!currentUser) throw new Error('Faça login para salvar destinos');
-
         const { data, error } = await supabase
             .from('saved_destinations')
             .insert({
@@ -408,9 +337,7 @@ const BenetripAuth = (function () {
                 dados_busca: dados.dados_busca || {},
                 notas: dados.notas
             })
-            .select()
-            .single();
-
+            .select().single();
         if (error) throw error;
         return data;
     }
@@ -418,13 +345,8 @@ const BenetripAuth = (function () {
     async function getSavedDestinations() {
         _ensureInitialized();
         if (!currentUser) return [];
-
-        const { data, error } = await supabase
-            .from('saved_destinations')
-            .select('*')
-            .eq('user_id', currentUser.id)
-            .order('created_at', { ascending: false });
-
+        const { data, error } = await supabase.from('saved_destinations').select('*')
+            .eq('user_id', currentUser.id).order('created_at', { ascending: false });
         if (error) throw error;
         return data || [];
     }
@@ -432,13 +354,8 @@ const BenetripAuth = (function () {
     async function removeDestination(id) {
         _ensureInitialized();
         if (!currentUser) return;
-
-        const { error } = await supabase
-            .from('saved_destinations')
-            .delete()
-            .eq('id', id)
-            .eq('user_id', currentUser.id);
-
+        const { error } = await supabase.from('saved_destinations').delete()
+            .eq('id', id).eq('user_id', currentUser.id);
         if (error) throw error;
     }
 
@@ -449,7 +366,6 @@ const BenetripAuth = (function () {
     async function saveItinerary(dados) {
         _ensureInitialized();
         if (!currentUser) throw new Error('Faça login para salvar roteiros');
-
         const { data, error } = await supabase
             .from('saved_itineraries')
             .insert({
@@ -461,9 +377,7 @@ const BenetripAuth = (function () {
                 num_dias: dados.num_dias,
                 dados_roteiro: dados.dados_roteiro || {}
             })
-            .select()
-            .single();
-
+            .select().single();
         if (error) throw error;
         return data;
     }
@@ -471,13 +385,8 @@ const BenetripAuth = (function () {
     async function getSavedItineraries() {
         _ensureInitialized();
         if (!currentUser) return [];
-
-        const { data, error } = await supabase
-            .from('saved_itineraries')
-            .select('*')
-            .eq('user_id', currentUser.id)
-            .order('created_at', { ascending: false });
-
+        const { data, error } = await supabase.from('saved_itineraries').select('*')
+            .eq('user_id', currentUser.id).order('created_at', { ascending: false });
         if (error) throw error;
         return data || [];
     }
@@ -485,32 +394,21 @@ const BenetripAuth = (function () {
     async function shareItinerary(itineraryId) {
         _ensureInitialized();
         if (!currentUser) throw new Error('Faça login para compartilhar');
-
         const shareToken = Array.from(crypto.getRandomValues(new Uint8Array(16)))
             .map(b => b.toString(16).padStart(2, '0')).join('');
-
-        const { data, error } = await supabase
-            .from('saved_itineraries')
+        const { data, error } = await supabase.from('saved_itineraries')
             .update({ compartilhado: true, share_token: shareToken })
-            .eq('id', itineraryId)
-            .eq('user_id', currentUser.id)
-            .select()
-            .single();
-
+            .eq('id', itineraryId).eq('user_id', currentUser.id)
+            .select().single();
         if (error) throw error;
         return `${CONFIG.redirectUrl}/roteiro-compartilhado.html?t=${shareToken}`;
     }
 
     async function getSharedItinerary(shareToken) {
         _ensureInitialized();
-
-        const { data, error } = await supabase
-            .from('saved_itineraries')
+        const { data, error } = await supabase.from('saved_itineraries')
             .select('destino_nome, destino_pais, data_ida, data_volta, num_dias, dados_roteiro, created_at')
-            .eq('share_token', shareToken)
-            .eq('compartilhado', true)
-            .single();
-
+            .eq('share_token', shareToken).eq('compartilhado', true).single();
         if (error) throw error;
         return data;
     }
@@ -518,13 +416,8 @@ const BenetripAuth = (function () {
     async function removeItinerary(id) {
         _ensureInitialized();
         if (!currentUser) return;
-
-        const { error } = await supabase
-            .from('saved_itineraries')
-            .delete()
-            .eq('id', id)
-            .eq('user_id', currentUser.id);
-
+        const { error } = await supabase.from('saved_itineraries').delete()
+            .eq('id', id).eq('user_id', currentUser.id);
         if (error) throw error;
     }
 
@@ -559,58 +452,33 @@ const BenetripAuth = (function () {
     // ==========================================
 
     function _ensureInitialized() {
-        if (!supabase) {
-            throw new Error('BenetripAuth não inicializado ou Supabase não configurado.');
-        }
+        if (!supabase) throw new Error('BenetripAuth não inicializado ou Supabase não configurado.');
     }
 
     async function _loadProfile() {
         if (!currentUser || !supabase) return;
-
         try {
-            const { data, error } = await supabase
-                .from('user_profiles')
-                .select('*')
-                .eq('user_id', currentUser.id)
-                .single();
-
-            if (error) {
-                console.warn('[BenetripAuth] Perfil não encontrado, será criado automaticamente.');
-                return;
-            }
-
+            const { data, error } = await supabase.from('user_profiles').select('*')
+                .eq('user_id', currentUser.id).single();
+            if (error) { console.warn('[BenetripAuth] Perfil não encontrado.'); return; }
             currentProfile = data;
-        } catch (e) {
-            console.warn('[BenetripAuth] Erro ao carregar perfil:', e);
-        }
+        } catch (e) { console.warn('[BenetripAuth] Erro ao carregar perfil:', e); }
     }
 
     async function _cleanOldSearches() {
         if (!currentUser || !supabase) return;
-
         try {
-            const { count } = await supabase
-                .from('search_history')
-                .select('*', { count: 'exact', head: true })
-                .eq('user_id', currentUser.id);
-
+            const { count } = await supabase.from('search_history')
+                .select('*', { count: 'exact', head: true }).eq('user_id', currentUser.id);
             if (count > CONFIG.maxSearchHistory) {
                 const excess = count - CONFIG.maxSearchHistory;
-                const { data: oldSearches } = await supabase
-                    .from('search_history')
-                    .select('id')
-                    .eq('user_id', currentUser.id)
-                    .order('created_at', { ascending: true })
-                    .limit(excess);
-
-                if (oldSearches?.length) {
-                    await supabase
-                        .from('search_history')
-                        .delete()
-                        .in('id', oldSearches.map(s => s.id));
+                const { data: old } = await supabase.from('search_history').select('id')
+                    .eq('user_id', currentUser.id).order('created_at', { ascending: true }).limit(excess);
+                if (old?.length) {
+                    await supabase.from('search_history').delete().in('id', old.map(s => s.id));
                 }
             }
-        } catch (e) { /* Silencioso */ }
+        } catch (e) { /* silencioso */ }
     }
 
     function _notifyCallbacks(event, user) {
@@ -630,11 +498,10 @@ const BenetripAuth = (function () {
             'Signup requires a valid password': 'Digite uma senha válida.',
             'To signup, please provide your email': 'Digite um email válido.',
         };
-
-        const translatedError = new Error(messages[error.message] || error.message);
-        translatedError.originalError = error;
-        translatedError.status = error.status;
-        return translatedError;
+        const translated = new Error(messages[error.message] || error.message);
+        translated.originalError = error;
+        translated.status = error.status;
+        return translated;
     }
 
     function _updateUI(user) {
