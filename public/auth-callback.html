@@ -99,14 +99,64 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script>
         /**
-         * Auth Callback — Implicit Flow + Custom Lock
+         * Auth Callback — Implicit Flow
          * 
          * Com implicit flow, tokens vêm no hash da URL:
          *   /auth-callback.html#access_token=xxx&refresh_token=yyy
          * 
-         * Custom lock bypassa navigator.locks para evitar timeout.
+         * Monkey-patch em navigator.locks para evitar timeout de 10s.
          */
         (function() {
+
+            // ── MONKEY-PATCH: navigator.locks ──
+            // Mesmo patch usado no benetrip-auth.js
+            const _activeLocks = new Map();
+
+            function _simpleLockRequest(name, optionsOrFn, maybeFn) {
+                let fn;
+                const acquireTimeout = 10000;
+
+                if (typeof optionsOrFn === 'function') {
+                    fn = optionsOrFn;
+                } else {
+                    fn = maybeFn;
+                }
+
+                if (typeof fn !== 'function') return Promise.resolve(undefined);
+
+                const run = async () => {
+                    const existing = _activeLocks.get(name);
+                    if (existing) {
+                        try {
+                            await Promise.race([
+                                existing,
+                                new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), acquireTimeout))
+                            ]);
+                        } catch (_) { /* prosseguir */ }
+                    }
+
+                    const promise = (async () => {
+                        try { return await fn({ name, mode: 'exclusive' }); }
+                        catch (e) { return undefined; }
+                    })();
+                    _activeLocks.set(name, promise);
+
+                    try { return await promise; }
+                    finally { if (_activeLocks.get(name) === promise) _activeLocks.delete(name); }
+                };
+
+                return run();
+            }
+
+            if (typeof navigator !== 'undefined') {
+                navigator.locks = {
+                    request: _simpleLockRequest,
+                    query: async () => ({ held: [], pending: [] })
+                };
+            }
+            // ── FIM MONKEY-PATCH ──
+
+
             const supabaseUrl = document.querySelector('meta[name="supabase-url"]')?.content?.trim();
             const supabaseAnonKey = document.querySelector('meta[name="supabase-anon-key"]')?.content?.trim();
 
@@ -115,37 +165,13 @@
                 return;
             }
 
-            // Custom lock — mesmo do benetrip-auth.js
-            const activeLocks = new Map();
-            async function customLock(name, acquireTimeout, fn) {
-                const existing = activeLocks.get(name);
-                if (existing) {
-                    try {
-                        await Promise.race([
-                            existing,
-                            new Promise((_, reject) =>
-                                setTimeout(() => reject(new Error('lock timeout')), acquireTimeout)
-                            )
-                        ]);
-                    } catch (e) { /* prosseguir */ }
-                }
-                const promise = fn();
-                activeLocks.set(name, promise);
-                try {
-                    return await promise;
-                } finally {
-                    if (activeLocks.get(name) === promise) activeLocks.delete(name);
-                }
-            }
-
-            // Criar client com custom lock + implicit flow
+            // Criar client — navigator.locks já foi substituído acima
             const supabaseClient = window.supabase.createClient(supabaseUrl, supabaseAnonKey, {
                 auth: {
                     autoRefreshToken: true,
                     persistSession: true,
                     detectSessionInUrl: true,
-                    flowType: 'implicit',
-                    lock: customLock
+                    flowType: 'implicit'
                 }
             });
 
