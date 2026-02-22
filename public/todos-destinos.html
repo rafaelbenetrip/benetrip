@@ -38,13 +38,13 @@
     <main class="main-content">
         <div class="container">
             
-            <!-- Formulário Simplificado -->
+            <!-- Formulário -->
             <div id="form-container">
                 <div class="intro-card">
                     <img src="assets/images/tripinha/avatar-pensando.png" alt="Tripinha" class="intro-avatar" 
                          onerror="this.style.display='none'">
                     <h1>🌍 Descubra Todos os Destinos Disponíveis</h1>
-                    <p>A Tripinha vai buscar TODOS os destinos possíveis para suas datas e mostrar os preços do menor para o maior. Simples assim! 🐕</p>
+                    <p>A Tripinha busca TODOS os destinos possíveis e mostra os preços do menor ao maior. Agora com <strong>datas flexíveis</strong> — escolha várias opções de ida e volta para encontrar a combinação mais barata! 🐕</p>
                 </div>
 
                 <form id="busca-form" class="busca-form">
@@ -65,18 +65,80 @@
                         <input type="hidden" id="origem-data">
                     </div>
 
-                    <!-- Datas -->
+                    <!-- MODO DE DATA -->
                     <div class="form-group">
-                        <label for="datas">📅 Quando será a viagem?</label>
+                        <label>📅 Modo de datas</label>
+                        <div class="button-group-horizontal" data-field="modo-data">
+                            <button type="button" class="btn-option active" data-value="fixas" id="btn-modo-fixas">
+                                <span class="text">📅 Datas fixas</span>
+                            </button>
+                            <button type="button" class="btn-option" data-value="flexiveis" id="btn-modo-flexiveis">
+                                <span class="text">🔄 Datas flexíveis</span>
+                            </button>
+                        </div>
+                        <p class="hint" id="hint-modo-data">Selecione ida e volta exatas</p>
+                    </div>
+
+                    <!-- DATAS FIXAS (modo padrão) -->
+                    <div class="form-group" id="datas-fixas-container">
+                        <label for="datas-fixas">📅 Quando será a viagem?</label>
                         <input 
                             type="text" 
-                            id="datas" 
+                            id="datas-fixas" 
                             placeholder="Selecione ida e volta"
                             readonly
                             required
                         >
-                        <input type="hidden" id="data-ida">
-                        <input type="hidden" id="data-volta">
+                    </div>
+
+                    <!-- DATAS FLEXÍVEIS -->
+                    <div id="datas-flexiveis-container" style="display: none;">
+                        <div class="form-group">
+                            <label for="datas-ida-flex">🛫 Possíveis datas de ida <span class="badge-info">até 3 datas</span></label>
+                            <input 
+                                type="text" 
+                                id="datas-ida-flex" 
+                                placeholder="Clique para selecionar até 3 datas de ida"
+                                readonly
+                            >
+                            <div class="selected-dates" id="selected-idas"></div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="datas-volta-flex">🛬 Possíveis datas de volta <span class="badge-info">até 3 datas</span></label>
+                            <input 
+                                type="text" 
+                                id="datas-volta-flex" 
+                                placeholder="Clique para selecionar até 3 datas de volta"
+                                readonly
+                            >
+                            <div class="selected-dates" id="selected-voltas"></div>
+                        </div>
+
+                        <div class="combinacoes-info" id="combinacoes-info" style="display: none;">
+                            <span class="combinacoes-icon">🔀</span>
+                            <span id="combinacoes-texto">0 combinações serão pesquisadas</span>
+                        </div>
+                    </div>
+
+                    <input type="hidden" id="data-ida">
+                    <input type="hidden" id="data-volta">
+
+                    <!-- Escopo de destinos -->
+                    <div class="form-group">
+                        <label>🌎 Onde buscar?</label>
+                        <div class="button-group-horizontal three-cols" data-field="escopo">
+                            <button type="button" class="btn-option active" data-value="todos">
+                                <span class="text">🌍 Todos</span>
+                            </button>
+                            <button type="button" class="btn-option" data-value="brasil">
+                                <span class="text">🇧🇷 Brasil</span>
+                            </button>
+                            <button type="button" class="btn-option" data-value="internacional">
+                                <span class="text">✈️ Internacional</span>
+                            </button>
+                        </div>
+                        <input type="hidden" id="escopo" value="todos">
                     </div>
 
                     <!-- Grid Moeda + Orçamento -->
@@ -116,7 +178,7 @@
                     </div>
 
                     <!-- Submit -->
-                    <button type="submit" class="btn-submit">
+                    <button type="submit" class="btn-submit" id="btn-buscar">
                         🔍 Buscar Todos os Destinos
                     </button>
                 </form>
@@ -126,11 +188,12 @@
             <div id="loading-container" style="display: none;">
                 <div class="loading-card">
                     <img src="assets/images/tripinha/avatar-pensando.png" alt="Tripinha buscando" class="tripinha-loading">
-                    <h2>🐕 Tripinha está vasculhando o mundo...</h2>
+                    <h2 id="loading-title">🐕 Tripinha está vasculhando o mundo...</h2>
                     <div class="progress-bar">
                         <div class="progress-fill" id="progress-fill"></div>
                     </div>
                     <p id="loading-message">Buscando destinos disponíveis...</p>
+                    <p id="loading-combinacao" class="loading-sub" style="display: none;"></p>
                 </div>
             </div>
 
