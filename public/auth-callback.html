@@ -31,10 +31,7 @@
             text-align: center;
             box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
         }
-        .callback-mascot {
-            font-size: 48px;
-            margin-bottom: 16px;
-        }
+        .callback-mascot { font-size: 48px; margin-bottom: 16px; }
         .callback-title {
             font-family: 'Poppins', sans-serif;
             font-size: 20px;
@@ -49,17 +46,14 @@
             margin-bottom: 20px;
         }
         .callback-spinner {
-            width: 32px;
-            height: 32px;
+            width: 32px; height: 32px;
             border: 3px solid #E0E0E0;
             border-top: 3px solid #E87722;
             border-radius: 50%;
             animation: spin 0.8s linear infinite;
             margin: 0 auto 16px;
         }
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
+        @keyframes spin { to { transform: rotate(360deg); } }
         .callback-error {
             color: #E53935;
             background: #FFEBEE;
@@ -104,51 +98,47 @@
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script>
-        (async function() {
-            try {
-                // Ler config das meta tags
-                const supabaseUrl = document.querySelector('meta[name="supabase-url"]')?.content?.trim();
-                const supabaseAnonKey = document.querySelector('meta[name="supabase-anon-key"]')?.content?.trim();
+        (function() {
+            const supabaseUrl = document.querySelector('meta[name="supabase-url"]')?.content?.trim();
+            const supabaseAnonKey = document.querySelector('meta[name="supabase-anon-key"]')?.content?.trim();
 
-                if (!supabaseUrl || !supabaseAnonKey || supabaseUrl.includes('COLE_SUA')) {
-                    throw new Error('Supabase não configurado. Edite as meta tags neste arquivo.');
+            if (!supabaseUrl || !supabaseAnonKey) {
+                showError('Supabase não configurado.');
+                return;
+            }
+
+            // Criar client com detectSessionInUrl: true
+            // O SDK automaticamente detecta o ?code= na URL e faz o exchange (PKCE)
+            // NÃO chamar exchangeCodeForSession manualmente — causa conflito de lock
+            const supabaseClient = window.supabase.createClient(supabaseUrl, supabaseAnonKey, {
+                auth: {
+                    autoRefreshToken: true,
+                    persistSession: true,
+                    detectSessionInUrl: true,  // <-- isso faz o exchange automaticamente
+                    flowType: 'pkce'
                 }
+            });
 
-                const supabaseClient = window.supabase.createClient(supabaseUrl, supabaseAnonKey);
+            const params = new URLSearchParams(window.location.search);
+            const type = params.get('type');
+            let handled = false;
+            
+            // Timeout de segurança: se nada acontecer em 15s, mostrar erro
+            const timeout = setTimeout(() => {
+                if (!handled) {
+                    showError('Tempo esgotado. Tente fazer login novamente.');
+                }
+            }, 15000);
 
-                // Extrair parâmetros da URL
-                const params = new URLSearchParams(window.location.search);
-                const hashParams = new URLSearchParams(window.location.hash.substring(1));
-                const type = params.get('type') || hashParams.get('type');
-                const code = params.get('code');
+            // Escutar o evento de auth — quando o SDK trocar o code por sessão,
+            // ele dispara SIGNED_IN automaticamente
+            supabaseClient.auth.onAuthStateChange((event, session) => {
+                console.log('[AuthCallback] Auth event:', event);
 
-                // ── PKCE Flow: trocar code por sessão ──
-                // Quando usamos flowType: 'pkce', o OAuth retorna um ?code= na URL
-                // que precisa ser trocado por uma sessão via exchangeCodeForSession()
-                if (code) {
-                    console.log('[AuthCallback] Code detectado, trocando por sessão...');
-                    const { data: sessionData, error: codeError } = await supabaseClient.auth.exchangeCodeForSession(code);
+                if (event === 'SIGNED_IN' && session) {
+                    handled = true;
+                    clearTimeout(timeout);
                     
-                    if (codeError) throw codeError;
-
-                    if (sessionData?.session) {
-                        console.log('[AuthCallback] Sessão criada com sucesso!');
-                        document.getElementById('loading-state').style.display = 'none';
-                        document.getElementById('success-state').style.display = 'block';
-
-                        const redirectTo = type === 'recovery' ? '/redefinir-senha.html' : '/';
-                        setTimeout(() => {
-                            window.location.href = redirectTo;
-                        }, 1500);
-                        return;
-                    }
-                }
-
-                // ── Fallback: verificar sessão existente ──
-                const { data, error } = await supabaseClient.auth.getSession();
-                if (error) throw error;
-
-                if (data?.session) {
                     document.getElementById('loading-state').style.display = 'none';
                     document.getElementById('success-state').style.display = 'block';
 
@@ -156,35 +146,50 @@
                     setTimeout(() => {
                         window.location.href = redirectTo;
                     }, 1500);
-                } else {
-                    // Último fallback: tokens no hash (implicit flow)
-                    const accessToken = hashParams.get('access_token');
-                    const refreshToken = hashParams.get('refresh_token');
+                }
 
-                    if (accessToken) {
-                        const { error: sessionError } = await supabaseClient.auth.setSession({
-                            access_token: accessToken,
-                            refresh_token: refreshToken
-                        });
-
-                        if (sessionError) throw sessionError;
-
+                if (event === 'TOKEN_REFRESHED' && session) {
+                    // Também pode acontecer — tratar como sucesso
+                    if (!handled) {
+                        handled = true;
+                        clearTimeout(timeout);
+                        
                         document.getElementById('loading-state').style.display = 'none';
                         document.getElementById('success-state').style.display = 'block';
 
                         setTimeout(() => {
                             window.location.href = '/';
                         }, 1500);
-                    } else {
-                        throw new Error('Nenhuma sessão encontrada. Tente fazer login novamente.');
                     }
                 }
+            });
 
-            } catch (error) {
-                console.error('Auth callback error:', error);
+            // Fallback: verificar se já existe sessão (ex: voltou de outra aba)
+            supabaseClient.auth.getSession().then(({ data, error }) => {
+                if (error) {
+                    // Não mostrar erro aqui — pode ser que o onAuthStateChange ainda vá resolver
+                    console.warn('[AuthCallback] getSession error (pode ser normal durante PKCE):', error.message);
+                    return;
+                }
+
+                if (data?.session && !handled) {
+                    handled = true;
+                    clearTimeout(timeout);
+
+                    document.getElementById('loading-state').style.display = 'none';
+                    document.getElementById('success-state').style.display = 'block';
+
+                    const redirectTo = type === 'recovery' ? '/redefinir-senha.html' : '/';
+                    setTimeout(() => {
+                        window.location.href = redirectTo;
+                    }, 1500);
+                }
+            });
+
+            function showError(msg) {
                 document.getElementById('loading-state').style.display = 'none';
                 document.getElementById('error-state').style.display = 'block';
-                document.getElementById('error-message').textContent = error.message || 'Erro ao processar autenticação.';
+                document.getElementById('error-message').textContent = msg;
                 document.getElementById('error-message').style.display = 'block';
             }
         })();
