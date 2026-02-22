@@ -52,7 +52,7 @@ const BenetripLoginModal = (function () {
                             </svg>
                         </button>
                         <div class="benetrip-modal-mascot">
-                            <img src="/images/tripinha-icon.png" alt="Tripinha" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />
+                            <img src="assets/tripinha-avatar.png" alt="Tripinha" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />
                             <div class="benetrip-modal-mascot-fallback" style="display:none;">🐕</div>
                         </div>
                         <h2 class="benetrip-modal-title" id="benetrip-modal-title">Bem-vindo de volta!</h2>
