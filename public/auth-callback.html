@@ -101,13 +101,26 @@
         /**
          * Auth Callback - Implicit Flow
          * 
-         * Com flowType: 'implicit', o OAuth retorna tokens diretamente no hash da URL:
-         *   /auth-callback.html#access_token=xxx&refresh_token=yyy&...
+         * Com implicit flow, o OAuth retorna tokens no hash:
+         *   /auth-callback.html#access_token=xxx&refresh_token=yyy
          * 
-         * O SDK com detectSessionInUrl: true lê esses tokens automaticamente
-         * e dispara o evento SIGNED_IN. Sem code exchange, sem Navigator Locks.
+         * O SDK com detectSessionInUrl: true lê automaticamente.
+         * Sem code exchange, sem Navigator Locks.
          */
         (function() {
+            // ── Limpar dados PKCE antigos que causam lock timeout ──
+            const CLEANUP_KEY = 'benetrip-auth-v2-cleanup';
+            if (!localStorage.getItem(CLEANUP_KEY)) {
+                for (let i = localStorage.length - 1; i >= 0; i--) {
+                    const key = localStorage.key(i);
+                    if (key && (key.startsWith('sb-') || key.includes('supabase'))) {
+                        localStorage.removeItem(key);
+                    }
+                }
+                localStorage.setItem(CLEANUP_KEY, Date.now().toString());
+                console.log('[AuthCallback] Dados antigos limpos (migração única).');
+            }
+
             const supabaseUrl = document.querySelector('meta[name="supabase-url"]')?.content?.trim();
             const supabaseAnonKey = document.querySelector('meta[name="supabase-anon-key"]')?.content?.trim();
 
@@ -116,7 +129,7 @@
                 return;
             }
 
-            // Criar client — detectSessionInUrl lê os tokens do hash automaticamente
+            // Criar client com implicit flow
             const supabaseClient = window.supabase.createClient(supabaseUrl, supabaseAnonKey, {
                 auth: {
                     autoRefreshToken: true,
@@ -156,7 +169,9 @@
                     clearTimeout(timeout);
                     showSuccess(type);
                 }
-                // Se não há sessão e não há hash tokens, vai cair no timeout
+            }).catch(err => {
+                console.warn('[AuthCallback] getSession error:', err.message);
+                // Não mostrar erro — o onAuthStateChange pode resolver
             });
 
             function showSuccess(callbackType) {
@@ -164,9 +179,7 @@
                 document.getElementById('success-state').style.display = 'block';
 
                 const redirectTo = callbackType === 'recovery' ? '/redefinir-senha.html' : '/';
-                setTimeout(() => {
-                    window.location.href = redirectTo;
-                }, 1500);
+                setTimeout(() => { window.location.href = redirectTo; }, 1500);
             }
 
             function showError(msg) {
