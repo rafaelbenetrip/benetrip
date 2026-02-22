@@ -7,9 +7,9 @@
  * 
  * COMO USAR:
  * 1. Incluir este script em todas as páginas ANTES dos outros scripts
- * 2. Configurar as variáveis de ambiente no Vercel:
- *    - NEXT_PUBLIC_SUPABASE_URL
- *    - NEXT_PUBLIC_SUPABASE_ANON_KEY
+ * 2. No HTML, adicionar meta tags:
+ *    <meta name="supabase-url" content="https://SEU-PROJETO.supabase.co">
+ *    <meta name="supabase-anon-key" content="SUA_ANON_KEY">
  * 3. No HTML: <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
  *             <script src="assets/js/benetrip-auth.js"></script>
  * 
@@ -41,12 +41,11 @@ const BenetripAuth = (function () {
     // CONFIGURAÇÃO
     // ==========================================
 
-    // As variáveis são injetadas pelo build ou lidas de meta tags
     const CONFIG = {
         supabaseUrl: '',
         supabaseAnonKey: '',
         redirectUrl: window.location.origin,
-        maxSearchHistory: 100, // máximo de buscas no histórico
+        maxSearchHistory: 100,
     };
 
     let supabase = null;
@@ -60,31 +59,48 @@ const BenetripAuth = (function () {
     // ==========================================
 
     /**
-     * Inicializa o módulo de autenticação
-     * Busca config do servidor e configura o Supabase client
+     * Inicializa o módulo de autenticação.
+     * Lê config de meta tags no HTML (anon key é segura para expor — RLS protege os dados).
      */
     async function init() {
         if (initialized) return;
 
         try {
-            // Buscar configuração do servidor (seguro)
-            const configResponse = await fetch('/api/auth/config');
-            if (configResponse.ok) {
-                const config = await configResponse.json();
-                CONFIG.supabaseUrl = config.supabaseUrl;
-                CONFIG.supabaseAnonKey = config.supabaseAnonKey;
-            } else {
-                // Fallback: ler de meta tags no HTML
-                const metaUrl = document.querySelector('meta[name="supabase-url"]');
-                const metaKey = document.querySelector('meta[name="supabase-anon-key"]');
-                if (metaUrl && metaKey) {
-                    CONFIG.supabaseUrl = metaUrl.content;
-                    CONFIG.supabaseAnonKey = metaKey.content;
+            // ── Ler configuração de meta tags no HTML ──
+            // A anon key do Supabase é projetada para ser pública.
+            // A segurança vem das Row Level Security policies, não de esconder a key.
+            const metaUrl = document.querySelector('meta[name="supabase-url"]');
+            const metaKey = document.querySelector('meta[name="supabase-anon-key"]');
+
+            if (metaUrl && metaKey) {
+                CONFIG.supabaseUrl = metaUrl.content.trim();
+                CONFIG.supabaseAnonKey = metaKey.content.trim();
+            }
+
+            // Fallback: tentar API route (caso exista)
+            if (!CONFIG.supabaseUrl || !CONFIG.supabaseAnonKey) {
+                try {
+                    const configResponse = await fetch('/api/auth/config');
+                    if (configResponse.ok) {
+                        const config = await configResponse.json();
+                        CONFIG.supabaseUrl = config.supabaseUrl || '';
+                        CONFIG.supabaseAnonKey = config.supabaseAnonKey || '';
+                    }
+                } catch (e) {
+                    // API route não disponível — sem problema
                 }
             }
 
             if (!CONFIG.supabaseUrl || !CONFIG.supabaseAnonKey) {
-                console.warn('[BenetripAuth] Supabase não configurado. Auth desabilitado.');
+                console.warn('[BenetripAuth] Supabase não configurado. Adicione as meta tags supabase-url e supabase-anon-key. Auth desabilitado.');
+                initialized = true;
+                _updateUI(null);
+                return;
+            }
+
+            // Verificar se o SDK do Supabase está carregado
+            if (typeof window.supabase === 'undefined' || typeof window.supabase.createClient !== 'function') {
+                console.error('[BenetripAuth] Supabase JS SDK não encontrado. Adicione: <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>');
                 initialized = true;
                 _updateUI(null);
                 return;
@@ -96,7 +112,7 @@ const BenetripAuth = (function () {
                     autoRefreshToken: true,
                     persistSession: true,
                     detectSessionInUrl: true,
-                    flowType: 'pkce' // mais seguro para SPA
+                    flowType: 'pkce'
                 }
             });
 
@@ -125,7 +141,7 @@ const BenetripAuth = (function () {
 
             initialized = true;
             _updateUI(currentUser);
-            console.log('[BenetripAuth] Inicializado.', currentUser ? `Usuário: ${currentUser.email}` : 'Sem sessão.');
+            console.log('[BenetripAuth] Inicializado com sucesso.', currentUser ? `Usuário: ${currentUser.email}` : 'Sem sessão ativa.');
 
         } catch (error) {
             console.error('[BenetripAuth] Erro na inicialização:', error);
@@ -138,9 +154,6 @@ const BenetripAuth = (function () {
     // AUTENTICAÇÃO
     // ==========================================
 
-    /**
-     * Login com email e senha
-     */
     async function signInWithEmail(email, password) {
         _ensureInitialized();
         
@@ -156,9 +169,6 @@ const BenetripAuth = (function () {
         return data;
     }
 
-    /**
-     * Cadastro com email, senha e nome
-     */
     async function signUpWithEmail(email, password, nome) {
         _ensureInitialized();
 
@@ -181,9 +191,6 @@ const BenetripAuth = (function () {
         return data;
     }
 
-    /**
-     * Login com Google (OAuth)
-     */
     async function signInWithGoogle() {
         _ensureInitialized();
 
@@ -205,9 +212,6 @@ const BenetripAuth = (function () {
         return data;
     }
 
-    /**
-     * Login com Facebook (OAuth)
-     */
     async function signInWithFacebook() {
         _ensureInitialized();
 
@@ -226,9 +230,6 @@ const BenetripAuth = (function () {
         return data;
     }
 
-    /**
-     * Logout
-     */
     async function signOut() {
         _ensureInitialized();
 
@@ -242,9 +243,6 @@ const BenetripAuth = (function () {
         _updateUI(null);
     }
 
-    /**
-     * Recuperação de senha
-     */
     async function resetPassword(email) {
         _ensureInitialized();
 
@@ -261,9 +259,6 @@ const BenetripAuth = (function () {
     // PERFIL DO USUÁRIO
     // ==========================================
 
-    /**
-     * Retorna o perfil completo do usuário
-     */
     async function getProfile() {
         if (!currentUser) return null;
         if (currentProfile) return currentProfile;
@@ -271,9 +266,6 @@ const BenetripAuth = (function () {
         return currentProfile;
     }
 
-    /**
-     * Atualiza dados do perfil
-     */
     async function updateProfile(dados) {
         _ensureInitialized();
         if (!currentUser) throw new Error('Usuário não logado');
@@ -302,14 +294,8 @@ const BenetripAuth = (function () {
     // HISTÓRICO DE BUSCAS
     // ==========================================
 
-    /**
-     * Salva uma busca no histórico (chamado automaticamente pelas páginas)
-     * @param {string} tipo - tipo da busca (descobrir_destinos, voos, etc.)
-     * @param {object} parametros - dados do formulário de busca
-     * @param {object} resultados - resumo dos resultados
-     */
     async function saveSearch(tipo, parametros, resultados) {
-        if (!currentUser || !supabase) return null; // silencioso se não logado
+        if (!currentUser || !supabase) return null;
 
         try {
             const { data, error } = await supabase
@@ -328,9 +314,7 @@ const BenetripAuth = (function () {
                 return null;
             }
 
-            // Limpar histórico antigo se excedeu o limite
             _cleanOldSearches();
-
             return data;
         } catch (e) {
             console.warn('[BenetripAuth] Erro ao salvar busca:', e);
@@ -338,9 +322,6 @@ const BenetripAuth = (function () {
         }
     }
 
-    /**
-     * Retorna histórico de buscas do usuário
-     */
     async function getSearchHistory(limit = 20, offset = 0, tipo = null) {
         _ensureInitialized();
         if (!currentUser) return [];
@@ -362,9 +343,6 @@ const BenetripAuth = (function () {
         return data || [];
     }
 
-    /**
-     * Deleta uma busca do histórico
-     */
     async function deleteSearch(searchId) {
         _ensureInitialized();
         if (!currentUser) return;
@@ -378,9 +356,6 @@ const BenetripAuth = (function () {
         if (error) throw error;
     }
 
-    /**
-     * Limpa todo o histórico de buscas
-     */
     async function clearSearchHistory() {
         _ensureInitialized();
         if (!currentUser) return;
@@ -397,9 +372,6 @@ const BenetripAuth = (function () {
     // DESTINOS SALVOS
     // ==========================================
 
-    /**
-     * Salva um destino como favorito
-     */
     async function saveDestination(dados) {
         _ensureInitialized();
         if (!currentUser) throw new Error('Faça login para salvar destinos');
@@ -424,9 +396,6 @@ const BenetripAuth = (function () {
         return data;
     }
 
-    /**
-     * Lista destinos salvos
-     */
     async function getSavedDestinations() {
         _ensureInitialized();
         if (!currentUser) return [];
@@ -441,9 +410,6 @@ const BenetripAuth = (function () {
         return data || [];
     }
 
-    /**
-     * Remove um destino salvo
-     */
     async function removeDestination(id) {
         _ensureInitialized();
         if (!currentUser) return;
@@ -461,9 +427,6 @@ const BenetripAuth = (function () {
     // ROTEIROS SALVOS
     // ==========================================
 
-    /**
-     * Salva um roteiro completo
-     */
     async function saveItinerary(dados) {
         _ensureInitialized();
         if (!currentUser) throw new Error('Faça login para salvar roteiros');
@@ -486,9 +449,6 @@ const BenetripAuth = (function () {
         return data;
     }
 
-    /**
-     * Lista roteiros salvos
-     */
     async function getSavedItineraries() {
         _ensureInitialized();
         if (!currentUser) return [];
@@ -503,14 +463,10 @@ const BenetripAuth = (function () {
         return data || [];
     }
 
-    /**
-     * Compartilha um roteiro (gera link público)
-     */
     async function shareItinerary(itineraryId) {
         _ensureInitialized();
         if (!currentUser) throw new Error('Faça login para compartilhar');
 
-        // Gerar token único
         const shareToken = Array.from(crypto.getRandomValues(new Uint8Array(16)))
             .map(b => b.toString(16).padStart(2, '0')).join('');
 
@@ -529,9 +485,6 @@ const BenetripAuth = (function () {
         return `${CONFIG.redirectUrl}/roteiro-compartilhado.html?t=${shareToken}`;
     }
 
-    /**
-     * Busca roteiro compartilhado por token (público)
-     */
     async function getSharedItinerary(shareToken) {
         _ensureInitialized();
 
@@ -546,9 +499,6 @@ const BenetripAuth = (function () {
         return data;
     }
 
-    /**
-     * Remove um roteiro salvo
-     */
     async function removeItinerary(id) {
         _ensureInitialized();
         if (!currentUser) return;
@@ -589,10 +539,6 @@ const BenetripAuth = (function () {
         return null;
     }
 
-    /**
-     * Registra callback para mudanças de autenticação
-     * @param {function} callback - function(event, user)
-     */
     function onAuthChange(callback) {
         if (typeof callback === 'function') {
             authChangeCallbacks.push(callback);
@@ -620,7 +566,6 @@ const BenetripAuth = (function () {
                 .single();
 
             if (error) {
-                // Perfil pode não existir ainda (race condition com trigger)
                 console.warn('[BenetripAuth] Perfil não encontrado, será criado automaticamente.');
                 return;
             }
@@ -635,14 +580,12 @@ const BenetripAuth = (function () {
         if (!currentUser || !supabase) return;
 
         try {
-            // Contar buscas
             const { count } = await supabase
                 .from('search_history')
                 .select('*', { count: 'exact', head: true })
                 .eq('user_id', currentUser.id);
 
             if (count > CONFIG.maxSearchHistory) {
-                // Buscar IDs das buscas mais antigas para deletar
                 const excess = count - CONFIG.maxSearchHistory;
                 const { data: oldSearches } = await supabase
                     .from('search_history')
@@ -660,7 +603,7 @@ const BenetripAuth = (function () {
                 }
             }
         } catch (e) {
-            // Silencioso - limpeza é não-crítica
+            // Silencioso
         }
     }
 
@@ -674,9 +617,6 @@ const BenetripAuth = (function () {
         });
     }
 
-    /**
-     * Traduz erros do Supabase para mensagens em português
-     */
     function _translateError(error) {
         const messages = {
             'Invalid login credentials': 'Email ou senha incorretos.',
@@ -697,12 +637,7 @@ const BenetripAuth = (function () {
         return translatedError;
     }
 
-    /**
-     * Atualiza elementos de UI em todas as páginas
-     * Procura elementos com data-attributes específicos
-     */
     function _updateUI(user) {
-        // Elementos do header
         const loginBtn = document.querySelector('[data-auth="login-btn"]');
         const userMenu = document.querySelector('[data-auth="user-menu"]');
         const userName = document.querySelector('[data-auth="user-name"]');
@@ -710,7 +645,6 @@ const BenetripAuth = (function () {
         const logoutBtn = document.querySelector('[data-auth="logout-btn"]');
 
         if (user) {
-            // Logado
             if (loginBtn) loginBtn.style.display = 'none';
             if (userMenu) userMenu.style.display = 'flex';
             if (userName) userName.textContent = getUserDisplayName();
@@ -720,7 +654,6 @@ const BenetripAuth = (function () {
                     userAvatar.src = avatarUrl;
                     userAvatar.style.display = 'block';
                 } else {
-                    // Avatar padrão com iniciais
                     userAvatar.style.display = 'none';
                     const initialsEl = document.querySelector('[data-auth="user-initials"]');
                     if (initialsEl) {
@@ -736,12 +669,10 @@ const BenetripAuth = (function () {
                 });
             }
         } else {
-            // Não logado
             if (loginBtn) loginBtn.style.display = 'flex';
             if (userMenu) userMenu.style.display = 'none';
         }
 
-        // Atualizar elementos condicionais
         document.querySelectorAll('[data-auth-show="logged-in"]').forEach(el => {
             el.style.display = user ? '' : 'none';
         });
@@ -754,7 +685,6 @@ const BenetripAuth = (function () {
     // AUTO-INICIALIZAÇÃO
     // ==========================================
 
-    // Inicializar quando o DOM estiver pronto
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', init);
     } else {
@@ -767,14 +697,12 @@ const BenetripAuth = (function () {
 
     return {
         init,
-        // Auth
         signInWithEmail,
         signUpWithEmail,
         signInWithGoogle,
         signInWithFacebook,
         signOut,
         resetPassword,
-        // User
         getUser,
         isLoggedIn,
         getProfile,
@@ -782,16 +710,13 @@ const BenetripAuth = (function () {
         getUserDisplayName,
         getUserAvatar,
         onAuthChange,
-        // Search History
         saveSearch,
         getSearchHistory,
         deleteSearch,
         clearSearchHistory,
-        // Destinations
         saveDestination,
         getSavedDestinations,
         removeDestination,
-        // Itineraries
         saveItinerary,
         getSavedItineraries,
         shareItinerary,
@@ -801,5 +726,4 @@ const BenetripAuth = (function () {
 
 })();
 
-// Exportar globalmente
 window.BenetripAuth = BenetripAuth;
