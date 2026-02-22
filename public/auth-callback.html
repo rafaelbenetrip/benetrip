@@ -130,12 +130,15 @@
             }
 
             // Criar client com implicit flow
+            const nonBlockingLock = async (_name, _acquireTimeout, fn) => await fn();
+
             const supabaseClient = window.supabase.createClient(supabaseUrl, supabaseAnonKey, {
                 auth: {
                     autoRefreshToken: true,
                     persistSession: true,
                     detectSessionInUrl: true,
-                    flowType: 'implicit'
+                    flowType: 'implicit',
+                    lock: nonBlockingLock
                 }
             });
 
