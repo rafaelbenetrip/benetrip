@@ -99,28 +99,14 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script>
         /**
-         * Auth Callback - Implicit Flow
+         * Auth Callback — Implicit Flow + Custom Lock
          * 
-         * Com implicit flow, o OAuth retorna tokens no hash:
+         * Com implicit flow, tokens vêm no hash da URL:
          *   /auth-callback.html#access_token=xxx&refresh_token=yyy
          * 
-         * O SDK com detectSessionInUrl: true lê automaticamente.
-         * Sem code exchange, sem Navigator Locks.
+         * Custom lock bypassa navigator.locks para evitar timeout.
          */
         (function() {
-            // ── Limpar dados PKCE antigos que causam lock timeout ──
-            const CLEANUP_KEY = 'benetrip-auth-v2-cleanup';
-            if (!localStorage.getItem(CLEANUP_KEY)) {
-                for (let i = localStorage.length - 1; i >= 0; i--) {
-                    const key = localStorage.key(i);
-                    if (key && (key.startsWith('sb-') || key.includes('supabase'))) {
-                        localStorage.removeItem(key);
-                    }
-                }
-                localStorage.setItem(CLEANUP_KEY, Date.now().toString());
-                console.log('[AuthCallback] Dados antigos limpos (migração única).');
-            }
-
             const supabaseUrl = document.querySelector('meta[name="supabase-url"]')?.content?.trim();
             const supabaseAnonKey = document.querySelector('meta[name="supabase-anon-key"]')?.content?.trim();
 
@@ -129,13 +115,37 @@
                 return;
             }
 
-            // Criar client com implicit flow
+            // Custom lock — mesmo do benetrip-auth.js
+            const activeLocks = new Map();
+            async function customLock(name, acquireTimeout, fn) {
+                const existing = activeLocks.get(name);
+                if (existing) {
+                    try {
+                        await Promise.race([
+                            existing,
+                            new Promise((_, reject) =>
+                                setTimeout(() => reject(new Error('lock timeout')), acquireTimeout)
+                            )
+                        ]);
+                    } catch (e) { /* prosseguir */ }
+                }
+                const promise = fn();
+                activeLocks.set(name, promise);
+                try {
+                    return await promise;
+                } finally {
+                    if (activeLocks.get(name) === promise) activeLocks.delete(name);
+                }
+            }
+
+            // Criar client com custom lock + implicit flow
             const supabaseClient = window.supabase.createClient(supabaseUrl, supabaseAnonKey, {
                 auth: {
                     autoRefreshToken: true,
                     persistSession: true,
                     detectSessionInUrl: true,
-                    flowType: 'implicit'
+                    flowType: 'implicit',
+                    lock: customLock
                 }
             });
 
@@ -146,9 +156,7 @@
 
             // Timeout de segurança
             const timeout = setTimeout(() => {
-                if (!handled) {
-                    showError('Tempo esgotado. Tente fazer login novamente.');
-                }
+                if (!handled) showError('Tempo esgotado. Tente fazer login novamente.');
             }, 12000);
 
             // Escutar evento de auth
@@ -171,13 +179,11 @@
                 }
             }).catch(err => {
                 console.warn('[AuthCallback] getSession error:', err.message);
-                // Não mostrar erro — o onAuthStateChange pode resolver
             });
 
             function showSuccess(callbackType) {
                 document.getElementById('loading-state').style.display = 'none';
                 document.getElementById('success-state').style.display = 'block';
-
                 const redirectTo = callbackType === 'recovery' ? '/redefinir-senha.html' : '/';
                 setTimeout(() => { window.location.href = redirectTo; }, 1500);
             }
