@@ -149,10 +149,18 @@
             }
 
             if (typeof navigator !== 'undefined') {
-                navigator.locks = {
-                    request: _simpleLockRequest,
-                    query: async () => ({ held: [], pending: [] })
-                };
+                try {
+                    Object.defineProperty(navigator, 'locks', {
+                        value: {
+                            request: _simpleLockRequest,
+                            query: async () => ({ held: [], pending: [] })
+                        },
+                        writable: true,
+                        configurable: true
+                    });
+                } catch (e) {
+                    console.warn('[AuthCallback] Não foi possível substituir navigator.locks:', e.message);
+                }
             }
             // ── FIM MONKEY-PATCH ──
 
