@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Autenticação - Benetrip</title>
 
-    <!-- ⚠️ COLE SEUS VALORES AQUI (mesmos do index.html) -->
+    <!-- Supabase Config -->
     <meta name="supabase-url" content="https://dlccjeazkpxtijevusbp.supabase.co">
     <meta name="supabase-anon-key" content="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRsY2NqZWF6a3B4dGlqZXZ1c2JwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE3Mjg3MDYsImV4cCI6MjA4NzMwNDcwNn0.lwKwqF74JrHOaghkcbysZQN8jWErVVwPnxzLG7t07QU">
 
@@ -106,7 +106,7 @@
     <script>
         (async function() {
             try {
-                // Ler config das meta tags (mesmo approach do benetrip-auth.js)
+                // Ler config das meta tags
                 const supabaseUrl = document.querySelector('meta[name="supabase-url"]')?.content?.trim();
                 const supabaseAnonKey = document.querySelector('meta[name="supabase-anon-key"]')?.content?.trim();
 
@@ -116,18 +116,39 @@
 
                 const supabaseClient = window.supabase.createClient(supabaseUrl, supabaseAnonKey);
 
-                // Verificar tipo de callback
+                // Extrair parâmetros da URL
                 const params = new URLSearchParams(window.location.search);
                 const hashParams = new URLSearchParams(window.location.hash.substring(1));
                 const type = params.get('type') || hashParams.get('type');
+                const code = params.get('code');
 
-                // Trocar código por sessão (PKCE flow)
+                // ── PKCE Flow: trocar code por sessão ──
+                // Quando usamos flowType: 'pkce', o OAuth retorna um ?code= na URL
+                // que precisa ser trocado por uma sessão via exchangeCodeForSession()
+                if (code) {
+                    console.log('[AuthCallback] Code detectado, trocando por sessão...');
+                    const { data: sessionData, error: codeError } = await supabaseClient.auth.exchangeCodeForSession(code);
+                    
+                    if (codeError) throw codeError;
+
+                    if (sessionData?.session) {
+                        console.log('[AuthCallback] Sessão criada com sucesso!');
+                        document.getElementById('loading-state').style.display = 'none';
+                        document.getElementById('success-state').style.display = 'block';
+
+                        const redirectTo = type === 'recovery' ? '/redefinir-senha.html' : '/';
+                        setTimeout(() => {
+                            window.location.href = redirectTo;
+                        }, 1500);
+                        return;
+                    }
+                }
+
+                // ── Fallback: verificar sessão existente ──
                 const { data, error } = await supabaseClient.auth.getSession();
-
                 if (error) throw error;
 
                 if (data?.session) {
-                    // Sucesso!
                     document.getElementById('loading-state').style.display = 'none';
                     document.getElementById('success-state').style.display = 'block';
 
@@ -136,7 +157,7 @@
                         window.location.href = redirectTo;
                     }, 1500);
                 } else {
-                    // Pode ser confirmação de email - tentar extrair tokens da URL
+                    // Último fallback: tokens no hash (implicit flow)
                     const accessToken = hashParams.get('access_token');
                     const refreshToken = hashParams.get('refresh_token');
 
@@ -155,7 +176,7 @@
                             window.location.href = '/';
                         }, 1500);
                     } else {
-                        throw new Error('Nenhuma sessão encontrada');
+                        throw new Error('Nenhuma sessão encontrada. Tente fazer login novamente.');
                     }
                 }
 
