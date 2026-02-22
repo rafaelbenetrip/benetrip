@@ -68,7 +68,7 @@ const BenetripAuth = (function () {
 
         try {
             // Buscar configuração do servidor (seguro)
-            const configResponse = await fetch('/api/auth/config.js');
+            const configResponse = await fetch('/api/auth/config');
             if (configResponse.ok) {
                 const config = await configResponse.json();
                 CONFIG.supabaseUrl = config.supabaseUrl;
