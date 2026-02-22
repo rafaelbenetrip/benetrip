@@ -3,7 +3,7 @@
  * Retorna configuração pública do Supabase 
  * (anon key é projetada para ser pública, mas servir via API é mais limpo)
  */
-export default function handler(req, res) {
+module.exports = function handler(req, res) {
     // CORS
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET');
