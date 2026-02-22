@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Autenticação - Benetrip</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;700&family=Montserrat:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Montserrat', sans-serif;
+            background: linear-gradient(135deg, #E87722 0%, #00A3E0 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+        }
+        .callback-card {
+            background: white;
+            border-radius: 16px;
+            padding: 40px;
+            max-width: 400px;
+            width: 100%;
+            text-align: center;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+        }
+        .callback-mascot {
+            font-size: 48px;
+            margin-bottom: 16px;
+        }
+        .callback-title {
+            font-family: 'Poppins', sans-serif;
+            font-size: 20px;
+            font-weight: 700;
+            color: #21272A;
+            margin-bottom: 8px;
+        }
+        .callback-message {
+            color: #666;
+            font-size: 14px;
+            line-height: 1.6;
+            margin-bottom: 20px;
+        }
+        .callback-spinner {
+            width: 32px;
+            height: 32px;
+            border: 3px solid #E0E0E0;
+            border-top: 3px solid #E87722;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin: 0 auto 16px;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        .callback-error {
+            color: #E53935;
+            background: #FFEBEE;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 13px;
+            margin-bottom: 16px;
+            display: none;
+        }
+        .callback-btn {
+            display: inline-block;
+            padding: 12px 32px;
+            background: #E87722;
+            color: white;
+            text-decoration: none;
+            border-radius: 10px;
+            font-weight: 600;
+            font-size: 14px;
+            transition: background 0.2s;
+        }
+        .callback-btn:hover { background: #D06A1D; }
+    </style>
+</head>
+<body>
+    <div class="callback-card">
+        <div class="callback-mascot">🐕</div>
+        <div id="loading-state">
+            <div class="callback-spinner"></div>
+            <h1 class="callback-title">Quase lá!</h1>
+            <p class="callback-message">A Tripinha está confirmando seus dados...</p>
+        </div>
+        <div id="success-state" style="display:none;">
+            <h1 class="callback-title">Tudo certo! 🎉</h1>
+            <p class="callback-message">Sua conta foi confirmada. Redirecionando...</p>
+        </div>
+        <div id="error-state" style="display:none;">
+            <h1 class="callback-title">Ops! Algo deu errado 😅</h1>
+            <div class="callback-error" id="error-message"></div>
+            <a href="/" class="callback-btn">Voltar para a Benetrip</a>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script>
+        (async function() {
+            try {
+                // Buscar config
+                const configRes = await fetch('/api/auth/config');
+                const config = await configRes.json();
+
+                if (!config.supabaseUrl) throw new Error('Auth não configurado');
+
+                const supabaseClient = window.supabase.createClient(
+                    config.supabaseUrl, 
+                    config.supabaseAnonKey
+                );
+
+                // Verificar tipo de callback
+                const params = new URLSearchParams(window.location.search);
+                const hashParams = new URLSearchParams(window.location.hash.substring(1));
+                const type = params.get('type') || hashParams.get('type');
+
+                // Trocar código por sessão (PKCE flow)
+                const { data, error } = await supabaseClient.auth.getSession();
+
+                if (error) throw error;
+
+                if (data?.session) {
+                    // Sucesso!
+                    document.getElementById('loading-state').style.display = 'none';
+                    document.getElementById('success-state').style.display = 'block';
+
+                    // Redirecionar após 1.5s
+                    const redirectTo = type === 'recovery' ? '/redefinir-senha.html' : '/';
+                    setTimeout(() => {
+                        window.location.href = redirectTo;
+                    }, 1500);
+                } else {
+                    // Pode ser confirmação de email - tentar extrair tokens da URL
+                    const accessToken = hashParams.get('access_token');
+                    const refreshToken = hashParams.get('refresh_token');
+
+                    if (accessToken) {
+                        const { error: sessionError } = await supabaseClient.auth.setSession({
+                            access_token: accessToken,
+                            refresh_token: refreshToken
+                        });
+
+                        if (sessionError) throw sessionError;
+
+                        document.getElementById('loading-state').style.display = 'none';
+                        document.getElementById('success-state').style.display = 'block';
+
+                        setTimeout(() => {
+                            window.location.href = '/';
+                        }, 1500);
+                    } else {
+                        throw new Error('Nenhuma sessão encontrada');
+                    }
+                }
+
+            } catch (error) {
+                console.error('Auth callback error:', error);
+                document.getElementById('loading-state').style.display = 'none';
+                document.getElementById('error-state').style.display = 'block';
+                document.getElementById('error-message').textContent = error.message || 'Erro ao processar autenticação.';
+                document.getElementById('error-message').style.display = 'block';
+            }
+        })();
+    </script>
+</body>
+</html>
