@@ -14,6 +14,103 @@
  *             <script src="assets/js/benetrip-auth.js"></script>
  */
 
+// ============================================================
+// MONKEY-PATCH: navigator.locks
+// ============================================================
+// O Supabase JS v2 usa navigator.locks.request() internamente
+// para coordenar acesso à sessão entre abas. Porém, locks
+// "fantasma" de sessões anteriores ficam presos e causam
+// timeout de 10 s — mesmo quando a opção `lock` é passada no
+// config (várias versões do SDK ignoram essa opção).
+//
+// A solução mais robusta é substituir navigator.locks.request()
+// GLOBALMENTE, antes que qualquer client Supabase seja criado.
+// Em aba única (caso predominante) o pior cenário é um refresh
+// de token redundante; em múltiplas abas o risco é mínimo.
+// ============================================================
+(function _patchNavigatorLocks() {
+    'use strict';
+
+    const _activeLocks = new Map();
+
+    /**
+     * Implementação simplificada de lock baseada em Promises.
+     * Aceita a mesma assinatura que navigator.locks.request().
+     */
+    async function _simpleLockRequest(name, optionsOrFn, maybeFn) {
+        // navigator.locks.request(name, fn)  OU
+        // navigator.locks.request(name, options, fn)
+        let fn;
+        let acquireTimeout = 10000; // fallback
+
+        if (typeof optionsOrFn === 'function') {
+            fn = optionsOrFn;
+        } else {
+            fn = maybeFn;
+            // Se o Supabase passar { mode, ifAvailable, ... } ignoramos — não precisamos
+        }
+
+        if (typeof fn !== 'function') {
+            // Fallback: se por algum motivo fn não for função, resolve vazio
+            return undefined;
+        }
+
+        // Se já existe lock ativo com este nome, esperar (com timeout)
+        const existing = _activeLocks.get(name);
+        if (existing) {
+            try {
+                await Promise.race([
+                    existing,
+                    new Promise((_, reject) =>
+                        setTimeout(() => reject(new Error('lock timeout')), acquireTimeout)
+                    )
+                ]);
+            } catch (_e) {
+                // Timeout ou erro do lock anterior — prosseguir mesmo assim
+            }
+        }
+
+        // Executar a função e registrar como lock ativo
+        const promise = (async () => {
+            try {
+                return await fn({ name, mode: 'exclusive' });
+            } catch (err) {
+                // Supabase às vezes lança dentro do callback; não travar
+                console.warn('[BenetripAuth][Lock] Erro dentro do lock callback:', err?.message || err);
+                return undefined;
+            }
+        })();
+
+        _activeLocks.set(name, promise);
+
+        try {
+            return await promise;
+        } finally {
+            if (_activeLocks.get(name) === promise) {
+                _activeLocks.delete(name);
+            }
+        }
+    }
+
+    // Substituir globalmente
+    if (typeof navigator !== 'undefined') {
+        // Preservar referência original (pode ser útil para debug)
+        const _originalLocks = navigator.locks;
+
+        navigator.locks = {
+            request: _simpleLockRequest,
+            // query() é usado raramente, mas manter stub para não quebrar nada
+            query: async () => ({ held: [], pending: [] })
+        };
+
+        console.log('[BenetripAuth] navigator.locks substituído por lock customizado.');
+    }
+})();
+
+
+// ============================================================
+// MÓDULO PRINCIPAL
+// ============================================================
 const BenetripAuth = (function () {
     'use strict';
 
@@ -29,52 +126,6 @@ const BenetripAuth = (function () {
     let currentProfile = null;
     let authChangeCallbacks = [];
     let initialized = false;
-
-    // ==========================================
-    // CUSTOM LOCK — RESOLVE NAVIGATOR.LOCKS BUG
-    // ==========================================
-
-    /**
-     * O Supabase JS v2 usa navigator.locks.request() internamente para
-     * coordenar acesso à sessão entre abas. Porém, locks "fantasma" de
-     * sessões anteriores ficam presos e causam timeout de 10s.
-     *
-     * Esta função substitui o lock nativo por um mecanismo simples baseado
-     * em Promises. É seguro para uso em aba única (caso predominante).
-     * Em múltiplas abas, o pior caso é um refresh de token redundante.
-     */
-    const _activeLocks = new Map();
-
-    async function _customLock(name, acquireTimeout, fn) {
-        // Se já existe um lock ativo com este nome, esperar ele terminar
-        // (com timeout para não travar)
-        const existing = _activeLocks.get(name);
-        if (existing) {
-            try {
-                await Promise.race([
-                    existing,
-                    new Promise((_, reject) =>
-                        setTimeout(() => reject(new Error('lock timeout')), acquireTimeout)
-                    )
-                ]);
-            } catch (e) {
-                // Timeout ou erro — prosseguir mesmo assim
-            }
-        }
-
-        // Executar a função e registrar como lock ativo
-        const promise = fn();
-        _activeLocks.set(name, promise);
-
-        try {
-            return await promise;
-        } finally {
-            // Liberar lock quando terminar
-            if (_activeLocks.get(name) === promise) {
-                _activeLocks.delete(name);
-            }
-        }
-    }
 
     // ==========================================
     // INICIALIZAÇÃO
@@ -120,15 +171,15 @@ const BenetripAuth = (function () {
             }
 
             // ── Inicializar Supabase client ──
-            // lock: _customLock → bypassa navigator.locks para evitar timeout
+            // navigator.locks já foi substituído globalmente acima,
+            // então NÃO precisamos mais da opção `lock` aqui.
             // flowType: 'implicit' → tokens vêm no hash, sem code exchange
             supabase = window.supabase.createClient(CONFIG.supabaseUrl, CONFIG.supabaseAnonKey, {
                 auth: {
                     autoRefreshToken: true,
                     persistSession: true,
                     detectSessionInUrl: true,
-                    flowType: 'implicit',
-                    lock: _customLock
+                    flowType: 'implicit'
                 }
             });
 
@@ -148,11 +199,23 @@ const BenetripAuth = (function () {
                 _notifyCallbacks(event, currentUser);
             });
 
-            // Verificar sessão existente
-            const { data: { session } } = await supabase.auth.getSession();
-            if (session?.user) {
-                currentUser = session.user;
-                await _loadProfile();
+            // Verificar sessão existente (com timeout de segurança)
+            try {
+                const sessionResult = await Promise.race([
+                    supabase.auth.getSession(),
+                    new Promise((_, reject) =>
+                        setTimeout(() => reject(new Error('getSession timeout')), 5000)
+                    )
+                ]);
+
+                if (sessionResult?.data?.session?.user) {
+                    currentUser = sessionResult.data.session.user;
+                    await _loadProfile();
+                }
+            } catch (sessionError) {
+                console.warn('[BenetripAuth] getSession falhou (prosseguindo sem sessão):', sessionError.message);
+                // Não bloquear a inicialização — o onAuthStateChange
+                // vai capturar a sessão quando/se ela estiver disponível
             }
 
             initialized = true;
