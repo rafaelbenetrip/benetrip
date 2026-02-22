@@ -1,9 +1,12 @@
 /**
  * BENETRIP - TODOS OS DESTINOS
- * Versão: Comparação de Preços v1.0
+ * Versão: Datas Flexíveis v2.0
  * 
- * Busca TODOS os destinos disponíveis e ordena por preço
- * Sem ranking por LLM - foco em transparência de preços
+ * Novidades:
+ * - Datas flexíveis: até 3 idas × 3 voltas = 9 combinações
+ * - Busca paralela por combinação de datas
+ * - Ranking por menor preço entre todas as combinações
+ * - Escopo: Todos / Brasil / Internacional
  */
 
 const BenetripTodosDestinos = {
@@ -12,12 +15,22 @@ const BenetripTodosDestinos = {
         origemSelecionada: null,
         formData: {},
         todosDestinos: [],
-        filtroAtivo: 'todos' // 'todos', 'dentro', 'fora'
+        filtroAtivo: 'todos',
+        // Datas flexíveis
+        modoData: 'fixas', // 'fixas' ou 'flexiveis'
+        datasIda: [],      // Array de datas ISO (máx 3)
+        datasVolta: [],    // Array de datas ISO (máx 3)
+        // Flatpickr instances
+        fpFixas: null,
+        fpIda: null,
+        fpVolta: null,
     },
 
     config: {
         debug: true,
-        cidadesJsonPath: 'data/cidades_global_iata_v6.json'
+        cidadesJsonPath: 'data/cidades_global_iata_v6.json',
+        maxDatasIda: 3,
+        maxDatasVolta: 3,
     },
 
     log(...args) {
@@ -29,12 +42,14 @@ const BenetripTodosDestinos = {
     },
 
     init() {
-        this.log('🐕 Benetrip Todos os Destinos v1.0 inicializando...');
+        this.log('🐕 Benetrip Todos os Destinos v2.0 (Datas Flexíveis) inicializando...');
         
         this.carregarCidades();
         this.setupFormEvents();
         this.setupAutocomplete();
-        this.setupCalendar();
+        this.setupCalendarFixas();
+        this.setupCalendarFlexiveis();
+        this.setupModoData();
         this.setupOptionButtons();
         this.setupCurrencyInput();
         
@@ -42,7 +57,7 @@ const BenetripTodosDestinos = {
     },
 
     // ================================================================
-    // CARREGAR CIDADES (mesma lógica do descobrir-destinos)
+    // CARREGAR CIDADES
     // ================================================================
     async carregarCidades() {
         try {
@@ -166,52 +181,202 @@ const BenetripTodosDestinos = {
     },
 
     // ================================================================
-    // CALENDÁRIO
+    // MODO DE DATA (fixas / flexíveis)
     // ================================================================
-    setupCalendar() {
-        const input = document.getElementById('datas');
-        const dataIda = document.getElementById('data-ida');
-        const dataVolta = document.getElementById('data-volta');
+    setupModoData() {
+        const btnFixas = document.getElementById('btn-modo-fixas');
+        const btnFlexiveis = document.getElementById('btn-modo-flexiveis');
+        const hint = document.getElementById('hint-modo-data');
+
+        btnFixas.addEventListener('click', () => {
+            this.state.modoData = 'fixas';
+            btnFixas.classList.add('active');
+            btnFlexiveis.classList.remove('active');
+            document.getElementById('datas-fixas-container').style.display = 'block';
+            document.getElementById('datas-flexiveis-container').style.display = 'none';
+            hint.textContent = 'Selecione ida e volta exatas';
+            this.log('📅 Modo: Datas fixas');
+        });
+
+        btnFlexiveis.addEventListener('click', () => {
+            this.state.modoData = 'flexiveis';
+            btnFlexiveis.classList.add('active');
+            btnFixas.classList.remove('active');
+            document.getElementById('datas-fixas-container').style.display = 'none';
+            document.getElementById('datas-flexiveis-container').style.display = 'block';
+            hint.textContent = 'Selecione várias opções de ida e volta para encontrar o melhor preço';
+            this.log('📅 Modo: Datas flexíveis');
+        });
+    },
+
+    // ================================================================
+    // CALENDÁRIO FIXAS (range como antes)
+    // ================================================================
+    setupCalendarFixas() {
+        const input = document.getElementById('datas-fixas');
         
         const amanha = new Date();
         amanha.setDate(amanha.getDate() + 1);
         
-        flatpickr(input, {
+        this.state.fpFixas = flatpickr(input, {
             mode: 'range',
             minDate: amanha,
             dateFormat: 'Y-m-d',
             locale: 'pt',
             onChange: (selectedDates) => {
                 if (selectedDates.length === 2) {
-                    dataIda.value = this.formatarDataISO(selectedDates[0]);
-                    dataVolta.value = this.formatarDataISO(selectedDates[1]);
+                    document.getElementById('data-ida').value = this.formatarDataISO(selectedDates[0]);
+                    document.getElementById('data-volta').value = this.formatarDataISO(selectedDates[1]);
                     input.value = `${this.formatarDataBR(selectedDates[0])} - ${this.formatarDataBR(selectedDates[1])}`;
-                    this.log('📅 Datas:', dataIda.value, 'até', dataVolta.value);
+                    this.log('📅 Fixas:', document.getElementById('data-ida').value, '→', document.getElementById('data-volta').value);
                 }
             }
         });
     },
 
-    formatarDataISO(data) {
-        const ano = data.getFullYear();
-        const mes = String(data.getMonth() + 1).padStart(2, '0');
-        const dia = String(data.getDate()).padStart(2, '0');
-        return `${ano}-${mes}-${dia}`;
+    // ================================================================
+    // CALENDÁRIOS FLEXÍVEIS (multiple mode)
+    // ================================================================
+    setupCalendarFlexiveis() {
+        const inputIda = document.getElementById('datas-ida-flex');
+        const inputVolta = document.getElementById('datas-volta-flex');
+        
+        const amanha = new Date();
+        amanha.setDate(amanha.getDate() + 1);
+
+        // Flatpickr de IDA (múltiplas datas)
+        this.state.fpIda = flatpickr(inputIda, {
+            mode: 'multiple',
+            minDate: amanha,
+            dateFormat: 'Y-m-d',
+            locale: 'pt',
+            conjunction: ', ',
+            onChange: (selectedDates) => {
+                if (selectedDates.length > this.config.maxDatasIda) {
+                    // Limitar a 3
+                    selectedDates.splice(this.config.maxDatasIda);
+                    this.state.fpIda.setDate(selectedDates);
+                }
+                this.state.datasIda = selectedDates.map(d => this.formatarDataISO(d)).sort();
+                this.renderDateChips('selected-idas', this.state.datasIda, 'ida');
+                this.atualizarCombinacoes();
+                // Atualizar data mínima da volta
+                if (this.state.datasIda.length > 0) {
+                    const minVolta = new Date(Math.min(...selectedDates));
+                    minVolta.setDate(minVolta.getDate() + 1);
+                    this.state.fpVolta.set('minDate', minVolta);
+                }
+                inputIda.value = selectedDates.length > 0 
+                    ? selectedDates.map(d => this.formatarDataBR(d)).join(', ')
+                    : '';
+                this.log('🛫 Idas:', this.state.datasIda);
+            }
+        });
+
+        // Flatpickr de VOLTA (múltiplas datas)
+        this.state.fpVolta = flatpickr(inputVolta, {
+            mode: 'multiple',
+            minDate: amanha,
+            dateFormat: 'Y-m-d',
+            locale: 'pt',
+            conjunction: ', ',
+            onChange: (selectedDates) => {
+                if (selectedDates.length > this.config.maxDatasVolta) {
+                    selectedDates.splice(this.config.maxDatasVolta);
+                    this.state.fpVolta.setDate(selectedDates);
+                }
+                this.state.datasVolta = selectedDates.map(d => this.formatarDataISO(d)).sort();
+                this.renderDateChips('selected-voltas', this.state.datasVolta, 'volta');
+                this.atualizarCombinacoes();
+                inputVolta.value = selectedDates.length > 0 
+                    ? selectedDates.map(d => this.formatarDataBR(d)).join(', ')
+                    : '';
+                this.log('🛬 Voltas:', this.state.datasVolta);
+            }
+        });
     },
 
-    formatarDataBR(data) {
-        return data.toLocaleDateString('pt-BR');
+    renderDateChips(containerId, datas, tipo) {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+
+        container.innerHTML = datas.map((data, idx) => {
+            const dataBR = new Date(data + 'T12:00:00').toLocaleDateString('pt-BR', { 
+                day: '2-digit', month: 'short', year: 'numeric' 
+            });
+            return `
+                <span class="date-chip">
+                    ${tipo === 'ida' ? '🛫' : '🛬'} ${dataBR}
+                    <span class="remove-date" onclick="BenetripTodosDestinos.removerData('${tipo}', ${idx})">✕</span>
+                </span>
+            `;
+        }).join('');
+    },
+
+    removerData(tipo, idx) {
+        if (tipo === 'ida') {
+            this.state.datasIda.splice(idx, 1);
+            const dates = this.state.datasIda.map(d => new Date(d + 'T12:00:00'));
+            this.state.fpIda.setDate(dates);
+            this.renderDateChips('selected-idas', this.state.datasIda, 'ida');
+            document.getElementById('datas-ida-flex').value = dates.length > 0
+                ? dates.map(d => this.formatarDataBR(d)).join(', ')
+                : '';
+        } else {
+            this.state.datasVolta.splice(idx, 1);
+            const dates = this.state.datasVolta.map(d => new Date(d + 'T12:00:00'));
+            this.state.fpVolta.setDate(dates);
+            this.renderDateChips('selected-voltas', this.state.datasVolta, 'volta');
+            document.getElementById('datas-volta-flex').value = dates.length > 0
+                ? dates.map(d => this.formatarDataBR(d)).join(', ')
+                : '';
+        }
+        this.atualizarCombinacoes();
+    },
+
+    atualizarCombinacoes() {
+        const info = document.getElementById('combinacoes-info');
+        const texto = document.getElementById('combinacoes-texto');
+        const nIda = this.state.datasIda.length;
+        const nVolta = this.state.datasVolta.length;
+        
+        // Filtrar combinações válidas (volta > ida)
+        const combos = this.gerarCombinacoes();
+        const total = combos.length;
+        
+        if (nIda > 0 && nVolta > 0) {
+            info.style.display = 'flex';
+            texto.textContent = total === 1 
+                ? '1 combinação será pesquisada'
+                : `${total} combinações serão pesquisadas`;
+        } else {
+            info.style.display = 'none';
+        }
+    },
+
+    gerarCombinacoes() {
+        const combos = [];
+        for (const ida of this.state.datasIda) {
+            for (const volta of this.state.datasVolta) {
+                // Volta deve ser depois da ida
+                if (volta > ida) {
+                    combos.push({ dataIda: ida, dataVolta: volta });
+                }
+            }
+        }
+        return combos;
     },
 
     // ================================================================
-    // BOTÕES DE OPÇÃO (Moeda)
+    // BOTÕES DE OPÇÃO (Moeda + Escopo)
     // ================================================================
     setupOptionButtons() {
-        document.querySelectorAll('.button-group-vertical').forEach(group => {
+        document.querySelectorAll('.button-group-vertical, .button-group-horizontal').forEach(group => {
             const field = group.dataset.field;
-            if (!field) return;
+            if (!field || field === 'modo-data') return; // modo-data tem handler próprio
             
             const hiddenInput = document.getElementById(field);
+            if (!hiddenInput) return;
             
             group.querySelectorAll('.btn-option').forEach(btn => {
                 btn.addEventListener('click', () => {
@@ -264,9 +429,7 @@ const BenetripTodosDestinos = {
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
             
-            if (!this.validarFormulario()) {
-                return;
-            }
+            if (!this.validarFormulario()) return;
             
             this.coletarDadosFormulario();
             await this.buscarTodosDestinos();
@@ -280,10 +443,29 @@ const BenetripTodosDestinos = {
             return false;
         }
         
-        if (!document.getElementById('data-ida').value || !document.getElementById('data-volta').value) {
-            alert('Por favor, selecione as datas da viagem');
-            document.getElementById('datas').focus();
-            return false;
+        if (this.state.modoData === 'fixas') {
+            if (!document.getElementById('data-ida').value || !document.getElementById('data-volta').value) {
+                alert('Por favor, selecione as datas da viagem');
+                document.getElementById('datas-fixas').focus();
+                return false;
+            }
+        } else {
+            // Flexíveis
+            if (this.state.datasIda.length === 0) {
+                alert('Por favor, selecione pelo menos uma data de ida');
+                document.getElementById('datas-ida-flex').focus();
+                return false;
+            }
+            if (this.state.datasVolta.length === 0) {
+                alert('Por favor, selecione pelo menos uma data de volta');
+                document.getElementById('datas-volta-flex').focus();
+                return false;
+            }
+            const combos = this.gerarCombinacoes();
+            if (combos.length === 0) {
+                alert('Nenhuma combinação válida encontrada. As datas de volta devem ser posteriores às de ida.');
+                return false;
+            }
         }
 
         if (!document.getElementById('moeda').value) {
@@ -302,60 +484,167 @@ const BenetripTodosDestinos = {
     },
 
     coletarDadosFormulario() {
-        this.state.formData = {
-            origem: this.state.origemSelecionada,
-            dataIda: document.getElementById('data-ida').value,
-            dataVolta: document.getElementById('data-volta').value,
-            moeda: document.getElementById('moeda').value,
-            orcamento: parseFloat(document.getElementById('orcamento').value.replace(/\./g, ''))
-        };
+        const moeda = document.getElementById('moeda').value;
+        const escopo = document.getElementById('escopo').value || 'todos';
+
+        if (this.state.modoData === 'fixas') {
+            this.state.formData = {
+                origem: this.state.origemSelecionada,
+                modoData: 'fixas',
+                dataIda: document.getElementById('data-ida').value,
+                dataVolta: document.getElementById('data-volta').value,
+                combinacoes: [{ 
+                    dataIda: document.getElementById('data-ida').value, 
+                    dataVolta: document.getElementById('data-volta').value 
+                }],
+                moeda,
+                escopo,
+                orcamento: parseFloat(document.getElementById('orcamento').value.replace(/\./g, ''))
+            };
+        } else {
+            const combos = this.gerarCombinacoes();
+            this.state.formData = {
+                origem: this.state.origemSelecionada,
+                modoData: 'flexiveis',
+                dataIda: combos[0]?.dataIda || this.state.datasIda[0],
+                dataVolta: combos[combos.length - 1]?.dataVolta || this.state.datasVolta[this.state.datasVolta.length - 1],
+                combinacoes: combos,
+                moeda,
+                escopo,
+                orcamento: parseFloat(document.getElementById('orcamento').value.replace(/\./g, ''))
+            };
+        }
         
         this.log('📝 Dados:', this.state.formData);
+        this.log(`🔀 ${this.state.formData.combinacoes.length} combinação(ões) de datas`);
     },
 
     // ================================================================
-    // BUSCA DE DESTINOS
+    // BUSCA DE DESTINOS (com suporte a múltiplas combinações)
     // ================================================================
     async buscarTodosDestinos() {
         try {
             this.mostrarLoading();
             
-            this.atualizarProgresso(20, '🌍 Buscando destinos pelo mundo todo...');
-            
-            const response = await fetch('/api/search-destinations', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    origem: this.state.formData.origem.code,
-                    dataIda: this.state.formData.dataIda,
-                    dataVolta: this.state.formData.dataVolta,
-                    moeda: this.state.formData.moeda
-                })
-            });
-            
-            this.atualizarProgresso(60, '💰 Organizando preços...');
-            
-            if (!response.ok) {
-                const err = await response.json();
-                throw new Error(err.message || 'Erro na API');
-            }
-            
-            const data = await response.json();
-            
-            if (!data.destinations || data.destinations.length === 0) {
-                throw new Error('Nenhum destino encontrado');
+            const { origem, combinacoes, moeda, escopo } = this.state.formData;
+            const totalCombos = combinacoes.length;
+            const isFlexivel = totalCombos > 1;
+
+            if (isFlexivel) {
+                document.getElementById('loading-title').textContent = `🐕 Tripinha está comparando ${totalCombos} combinações de datas...`;
+                document.getElementById('loading-combinacao').style.display = 'block';
+            } else {
+                document.getElementById('loading-title').textContent = '🐕 Tripinha está vasculhando o mundo...';
+                document.getElementById('loading-combinacao').style.display = 'none';
             }
 
-            this.log(`✅ ${data.destinations.length} destinos encontrados`);
+            this.atualizarProgresso(10, '🌍 Preparando buscas...');
+
+            // Mapear escopo para o parâmetro da API
+            let escopoDestino = undefined;
+            if (escopo === 'brasil') escopoDestino = 'brasil';
+            else if (escopo === 'internacional') escopoDestino = 'internacional';
+            // 'todos' = não enviar (default)
+
+            // ============================================================
+            // BUSCA PARALELA POR COMBINAÇÃO DE DATAS
+            // ============================================================
+            const allResults = new Map(); // chave = destino, valor = melhor info
+
+            const batchSize = 3; // buscar 3 combinações por vez para não sobrecarregar
+            let completedCombos = 0;
+
+            for (let i = 0; i < totalCombos; i += batchSize) {
+                const batch = combinacoes.slice(i, i + batchSize);
+                
+                const promises = batch.map(combo => {
+                    const comboLabel = `${this.formatarDataCurta(combo.dataIda)} → ${this.formatarDataCurta(combo.dataVolta)}`;
+                    
+                    if (isFlexivel) {
+                        document.getElementById('loading-combinacao').textContent = 
+                            `Pesquisando: ${comboLabel}`;
+                    }
+                    
+                    return fetch('/api/search-destinations', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            origem: origem.code,
+                            dataIda: combo.dataIda,
+                            dataVolta: combo.dataVolta,
+                            moeda,
+                            escopoDestino,
+                        })
+                    })
+                    .then(async (res) => {
+                        if (!res.ok) {
+                            const err = await res.json().catch(() => ({}));
+                            this.log(`⚠️ Combo ${comboLabel}: ${err.message || res.status}`);
+                            return { combo, destinations: [], error: err.message };
+                        }
+                        const data = await res.json();
+                        this.log(`✅ Combo ${comboLabel}: ${data.destinations?.length || 0} destinos`);
+                        return { combo, destinations: data.destinations || [], error: null };
+                    })
+                    .catch(err => {
+                        this.error(`Erro combo ${comboLabel}:`, err);
+                        return { combo, destinations: [], error: err.message };
+                    });
+                });
+
+                const batchResults = await Promise.all(promises);
+                
+                // Consolidar resultados deste batch
+                for (const result of batchResults) {
+                    if (!result.destinations || result.destinations.length === 0) continue;
+                    
+                    for (const dest of result.destinations) {
+                        if (!dest.name || !dest.flight?.price || dest.flight.price <= 0) continue;
+                        
+                        const key = `${dest.name.toLowerCase()}_${(dest.country || '').toLowerCase()}`;
+                        const existing = allResults.get(key);
+                        
+                        const noites = this.calcularNoites(result.combo.dataIda, result.combo.dataVolta);
+                        
+                        if (!existing || dest.flight.price < existing.flight.price) {
+                            allResults.set(key, {
+                                ...dest,
+                                _melhorCombo: result.combo,
+                                _melhorNoites: noites,
+                                _totalCombos: existing ? existing._totalCombos + 1 : 1,
+                                _todasOpcoes: existing 
+                                    ? [...existing._todasOpcoes, { combo: result.combo, price: dest.flight.price, noites }]
+                                    : [{ combo: result.combo, price: dest.flight.price, noites }],
+                            });
+                        } else {
+                            existing._totalCombos++;
+                            existing._todasOpcoes.push({ 
+                                combo: result.combo, 
+                                price: dest.flight.price, 
+                                noites 
+                            });
+                        }
+                    }
+                }
+
+                completedCombos += batch.length;
+                const pct = 20 + Math.floor((completedCombos / totalCombos) * 60);
+                this.atualizarProgresso(pct, `💰 ${completedCombos}/${totalCombos} combinações pesquisadas...`);
+            }
+
+            this.atualizarProgresso(85, '✈️ Organizando resultados...');
             
-            this.atualizarProgresso(80, '✈️ Gerando links do Google Flights...');
-            
-            // Ordenar por preço (menor para maior)
-            const destinosOrdenados = data.destinations
-                .filter(d => d.flight?.price > 0)
+            // Converter Map em array ordenado por preço
+            const destinosOrdenados = Array.from(allResults.values())
                 .sort((a, b) => a.flight.price - b.flight.price);
-            
+
+            if (destinosOrdenados.length === 0) {
+                throw new Error('Nenhum destino encontrado para as combinações de datas selecionadas');
+            }
+
             this.state.todosDestinos = destinosOrdenados;
+            
+            this.log(`✅ Total consolidado: ${destinosOrdenados.length} destinos únicos de ${totalCombos} combinação(ões)`);
             
             this.atualizarProgresso(100, '🎉 Pronto!');
             await this.delay(300);
@@ -370,7 +659,7 @@ const BenetripTodosDestinos = {
     },
 
     // ================================================================
-    // GOOGLE FLIGHTS - PROTOBUF (mesma implementação)
+    // GOOGLE FLIGHTS - PROTOBUF
     // ================================================================
     _protoVarint(n) {
         const bytes = [];
@@ -439,7 +728,6 @@ const BenetripTodosDestinos = {
             ...this._protoMessageField(3, this._buildFlightLeg(returnDate, destIata, originIata)),
             ...this._protoVarintField(14, 1)
         ];
-
         return this._toBase64Url(tfsBytes);
     },
 
@@ -449,29 +737,25 @@ const BenetripTodosDestinos = {
             ...this._protoVarintField(2, children),
             ...this._protoVarintField(3, infantsOnLap)
         ];
-
         const outerBytes = this._protoMessageField(2, innerBytes);
         return this._toBase64Url(outerBytes);
     },
 
     _getGoogleCurrency(moeda) {
-        const map = { 'BRL': 'BRL', 'USD': 'USD', 'EUR': 'EUR' };
-        return map[moeda] || 'BRL';
+        return { 'BRL': 'BRL', 'USD': 'USD', 'EUR': 'EUR' }[moeda] || 'BRL';
     },
 
     _getGoogleLocale(moeda) {
-        const map = { 'BRL': 'pt-BR', 'USD': 'en', 'EUR': 'en' };
-        return map[moeda] || 'pt-BR';
+        return { 'BRL': 'pt-BR', 'USD': 'en', 'EUR': 'en' }[moeda] || 'pt-BR';
     },
 
     _getGoogleGl(moeda) {
-        const map = { 'BRL': 'br', 'USD': 'us', 'EUR': 'de' };
-        return map[moeda] || 'br';
+        return { 'BRL': 'br', 'USD': 'us', 'EUR': 'de' }[moeda] || 'br';
     },
 
     buildGoogleFlightsUrl(originIata, destIata, departDate, returnDate, currency) {
         const tfs = this._buildTfsParam(originIata, destIata, departDate, returnDate);
-        const tfu = this._buildTfuParam(1, 0, 0); // 1 adulto, sem crianças
+        const tfu = this._buildTfuParam(1, 0, 0);
         const curr = this._getGoogleCurrency(currency);
         const hl = this._getGoogleLocale(currency);
         const gl = this._getGoogleGl(currency);
@@ -502,6 +786,29 @@ const BenetripTodosDestinos = {
         const ida = new Date(dataIda);
         const volta = new Date(dataVolta);
         return Math.ceil((volta - ida) / (1000 * 60 * 60 * 24));
+    },
+
+    formatarDataISO(data) {
+        const ano = data.getFullYear();
+        const mes = String(data.getMonth() + 1).padStart(2, '0');
+        const dia = String(data.getDate()).padStart(2, '0');
+        return `${ano}-${mes}-${dia}`;
+    },
+
+    formatarDataBR(data) {
+        return data.toLocaleDateString('pt-BR');
+    },
+
+    formatarDataCurta(dataISO) {
+        return new Date(dataISO + 'T12:00:00').toLocaleDateString('pt-BR', { 
+            day: '2-digit', month: 'short' 
+        });
+    },
+
+    formatarDataCompletaBR(dataISO) {
+        return new Date(dataISO + 'T12:00:00').toLocaleDateString('pt-BR', { 
+            day: '2-digit', month: 'short', year: 'numeric' 
+        });
     },
 
     mostrarLoading() {
@@ -538,8 +845,8 @@ const BenetripTodosDestinos = {
     // ================================================================
     mostrarResultados(destinos) {
         const container = document.getElementById('resultados-container');
-        const { origem, dataIda, dataVolta, moeda, orcamento } = this.state.formData;
-        const noites = this.calcularNoites(dataIda, dataVolta);
+        const { origem, moeda, orcamento, combinacoes, modoData, escopo } = this.state.formData;
+        const isFlexivel = combinacoes.length > 1;
         
         if (destinos.length === 0) {
             this.mostrarSemResultados();
@@ -556,20 +863,57 @@ const BenetripTodosDestinos = {
 
         // Mensagem da Tripinha
         let tripinhaMsg = '';
+        const flexMsg = isFlexivel 
+            ? ` Pesquisei ${combinacoes.length} combinações de datas para encontrar os melhores preços!` 
+            : '';
+
+        const escopoEmoji = escopo === 'brasil' ? '🇧🇷' : escopo === 'internacional' ? '✈️' : '🌍';
+        const escopoLabel = escopo === 'brasil' ? 'no Brasil' : escopo === 'internacional' ? 'internacionais' : '';
+
         if (dentroOrcamento.length === 0) {
-            tripinhaMsg = `🐕 Opa! Não encontrei nenhum destino dentro do seu orçamento de ${this.formatarPreco(orcamento, moeda)}. Mas listei TODOS os ${destinos.length} destinos disponíveis do mais barato ao mais caro. O mais em conta custa ${this.formatarPreco(maisBarato.flight.price, moeda)} — que tal aumentar um pouquinho o orçamento?`;
+            tripinhaMsg = `🐕 Opa! Não encontrei nenhum destino ${escopoLabel} dentro do seu orçamento de ${this.formatarPreco(orcamento, moeda)}.${flexMsg} Mas listei TODOS os ${destinos.length} destinos do mais barato ao mais caro. O mais em conta custa ${this.formatarPreco(maisBarato.flight.price, moeda)} — que tal aumentar um pouquinho o orçamento?`;
         } else if (dentroOrcamento.length === destinos.length) {
-            tripinhaMsg = `🐕 Que beleza! TODOS os ${destinos.length} destinos encontrados cabem no seu orçamento de ${this.formatarPreco(orcamento, moeda)}! Você tem muitas opções, do mais barato (${this.formatarPreco(maisBarato.flight.price, moeda)}) ao mais caro (${this.formatarPreco(maisCaro.flight.price, moeda)}).`;
+            tripinhaMsg = `🐕 Que beleza! TODOS os ${destinos.length} destinos ${escopoLabel} cabem no seu orçamento de ${this.formatarPreco(orcamento, moeda)}!${flexMsg} Os preços vão de ${this.formatarPreco(maisBarato.flight.price, moeda)} a ${this.formatarPreco(maisCaro.flight.price, moeda)}.`;
         } else {
-            tripinhaMsg = `🐕 Achei ${dentroOrcamento.length} destinos dentro do seu orçamento de ${this.formatarPreco(orcamento, moeda)} e mais ${foraOrcamento.length} opções um pouco acima. Os preços vão de ${this.formatarPreco(maisBarato.flight.price, moeda)} até ${this.formatarPreco(maisCaro.flight.price, moeda)}. Confira as opções!`;
+            tripinhaMsg = `🐕 Achei ${dentroOrcamento.length} destinos ${escopoLabel} dentro do seu orçamento de ${this.formatarPreco(orcamento, moeda)} e mais ${foraOrcamento.length} opções acima.${flexMsg} Os preços vão de ${this.formatarPreco(maisBarato.flight.price, moeda)} até ${this.formatarPreco(maisCaro.flight.price, moeda)}.`;
         }
 
         const origemDisplay = origem.airport 
             ? `${origem.name} — ${origem.airport} (${origem.code})`
             : `${origem.name} (${origem.code})`;
 
-        const dataIdaBR = new Date(dataIda + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
-        const dataVoltaBR = new Date(dataVolta + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' });
+        // Período exibido
+        let periodoHtml = '';
+        if (isFlexivel) {
+            const todasIdas = [...new Set(combinacoes.map(c => c.dataIda))].sort();
+            const todasVoltas = [...new Set(combinacoes.map(c => c.dataVolta))].sort();
+            periodoHtml = `
+                <div class="stat-item">
+                    <span class="stat-label">Idas pesquisadas</span>
+                    <span class="stat-value">🛫 ${todasIdas.map(d => this.formatarDataCurta(d)).join(' · ')}</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Voltas pesquisadas</span>
+                    <span class="stat-value">🛬 ${todasVoltas.map(d => this.formatarDataCurta(d)).join(' · ')}</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Combinações</span>
+                    <span class="stat-value blue">🔀 ${combinacoes.length} pesquisadas</span>
+                </div>
+            `;
+        } else {
+            const dataIdaBR = this.formatarDataCurta(this.state.formData.dataIda);
+            const dataVoltaBR = this.formatarDataCompletaBR(this.state.formData.dataVolta);
+            const noites = this.calcularNoites(this.state.formData.dataIda, this.state.formData.dataVolta);
+            periodoHtml = `
+                <div class="stat-item">
+                    <span class="stat-label">Período</span>
+                    <span class="stat-value">📅 ${dataIdaBR} → ${dataVoltaBR} (${noites} noites)</span>
+                </div>
+            `;
+        }
+
+        const escopoDisplay = escopo === 'brasil' ? '🇧🇷 Brasil' : escopo === 'internacional' ? '✈️ Internacional' : '🌍 Todos';
 
         const html = `
             <button class="btn-voltar-topo" onclick="BenetripTodosDestinos.voltarAoFormulario()">
@@ -580,15 +924,16 @@ const BenetripTodosDestinos = {
             </button>
 
             <div class="resultados-header">
-                <h1>🌍 Todos os Destinos Disponíveis</h1>
+                <h1>${escopoEmoji} Todos os Destinos Disponíveis</h1>
                 <div class="resultados-stats">
                     <div class="stat-item">
                         <span class="stat-label">De</span>
                         <span class="stat-value">📍 ${origemDisplay}</span>
                     </div>
+                    ${periodoHtml}
                     <div class="stat-item">
-                        <span class="stat-label">Período</span>
-                        <span class="stat-value">📅 ${dataIdaBR} → ${dataVoltaBR} (${noites} noites)</span>
+                        <span class="stat-label">Escopo</span>
+                        <span class="stat-value">${escopoDisplay}</span>
                     </div>
                     <div class="stat-item">
                         <span class="stat-label">Total encontrado</span>
@@ -626,7 +971,7 @@ const BenetripTodosDestinos = {
             </div>
 
             <div class="destinos-lista" id="destinos-lista">
-                ${destinos.map(d => this.renderDestinoCard(d, orcamento, noites)).join('')}
+                ${destinos.map(d => this.renderDestinoCard(d, orcamento, isFlexivel)).join('')}
             </div>
         `;
 
@@ -636,8 +981,8 @@ const BenetripTodosDestinos = {
         window.scrollTo({ top: 0, behavior: 'smooth' });
     },
 
-    renderDestinoCard(destino, orcamento, noites) {
-        const { origem, dataIda, dataVolta, moeda } = this.state.formData;
+    renderDestinoCard(destino, orcamento, isFlexivel) {
+        const { origem, moeda } = this.state.formData;
         
         const dentroOrcamento = destino.flight.price <= orcamento;
         const preco = this.formatarPreco(destino.flight.price, moeda);
@@ -648,15 +993,34 @@ const BenetripTodosDestinos = {
         const duracao = destino.flight.flight_duration_minutes || 0;
         const duracaoTexto = duracao > 0 ? `${Math.floor(duracao / 60)}h${duracao % 60}min` : '—';
 
+        // Usar as melhores datas para o Google Flights link
+        const melhorCombo = destino._melhorCombo || { 
+            dataIda: this.state.formData.dataIda, 
+            dataVolta: this.state.formData.dataVolta 
+        };
+        const noites = destino._melhorNoites || this.calcularNoites(melhorCombo.dataIda, melhorCombo.dataVolta);
+
         const googleFlightsUrl = this.buildGoogleFlightsUrl(
             origem.code,
-            destino.primary_airport,
-            dataIda,
-            dataVolta,
+            destino.primary_airport || destino.flight?.airport_code || '',
+            melhorCombo.dataIda,
+            melhorCombo.dataVolta,
             moeda
         );
 
-        // Custo estimado com hotel (se disponível)
+        // Badge de melhor data (só em modo flexível)
+        let bestDatesHtml = '';
+        if (isFlexivel && destino._melhorCombo) {
+            const idaCurta = this.formatarDataCurta(destino._melhorCombo.dataIda);
+            const voltaCurta = this.formatarDataCurta(destino._melhorCombo.dataVolta);
+            bestDatesHtml = `
+                <div class="best-dates-badge">
+                    📅 Melhor preço: ${idaCurta} → ${voltaCurta} (${noites} noites)
+                </div>
+            `;
+        }
+
+        // Custo estimado com hotel
         let custoEstimadoHtml = '';
         if (destino.avg_cost_per_night && destino.avg_cost_per_night > 0) {
             const hotelTotal = destino.avg_cost_per_night * noites;
@@ -671,6 +1035,17 @@ const BenetripTodosDestinos = {
 
         const googleFlightsIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/></svg>`;
 
+        // Info de outras opções de datas
+        let outrasOpcoesHtml = '';
+        if (isFlexivel && destino._todasOpcoes && destino._todasOpcoes.length > 1) {
+            outrasOpcoesHtml = `
+                <div class="detalhe-item">
+                    <span class="detalhe-icon">🔀</span>
+                    <span>Encontrado em ${destino._todasOpcoes.length} combinações</span>
+                </div>
+            `;
+        }
+
         return `
             <div class="destino-item ${dentroOrcamento ? 'dentro-orcamento' : 'fora-orcamento'}" data-filtro="${dentroOrcamento ? 'dentro' : 'fora'}">
                 <span class="status-badge ${dentroOrcamento ? 'dentro' : 'fora'}">
@@ -680,7 +1055,8 @@ const BenetripTodosDestinos = {
                 <div class="destino-header">
                     <div class="destino-info">
                         <h3 class="destino-nome">${destino.name}</h3>
-                        <p class="destino-pais">${destino.country || '—'} · ${destino.primary_airport}</p>
+                        <p class="destino-pais">${destino.country || '—'} · ${destino.primary_airport || destino.flight?.airport_code || ''}</p>
+                        ${bestDatesHtml}
                     </div>
                     <div class="destino-preco-wrapper">
                         <div class="destino-preco">${preco}</div>
@@ -705,6 +1081,7 @@ const BenetripTodosDestinos = {
                         <span>${destino.flight.airline_name}</span>
                     </div>
                     ` : ''}
+                    ${outrasOpcoesHtml}
                     ${destino._source_count > 1 ? `
                     <div class="detalhe-item">
                         <span class="detalhe-icon">🔍</span>
@@ -730,12 +1107,10 @@ const BenetripTodosDestinos = {
     aplicarFiltro(filtro) {
         this.state.filtroAtivo = filtro;
         
-        // Atualizar botões
         document.querySelectorAll('.btn-filtro').forEach(btn => {
             btn.classList.toggle('active', btn.dataset.filtro === filtro);
         });
 
-        // Filtrar cards
         const cards = document.querySelectorAll('.destino-item');
         cards.forEach(card => {
             if (filtro === 'todos') {
