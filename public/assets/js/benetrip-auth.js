@@ -67,8 +67,6 @@ const BenetripAuth = (function () {
 
         try {
             // ── Ler configuração de meta tags no HTML ──
-            // A anon key do Supabase é projetada para ser pública.
-            // A segurança vem das Row Level Security policies, não de esconder a key.
             const metaUrl = document.querySelector('meta[name="supabase-url"]');
             const metaKey = document.querySelector('meta[name="supabase-anon-key"]');
 
@@ -92,7 +90,7 @@ const BenetripAuth = (function () {
             }
 
             if (!CONFIG.supabaseUrl || !CONFIG.supabaseAnonKey) {
-                console.warn('[BenetripAuth] Supabase não configurado. Adicione as meta tags supabase-url e supabase-anon-key. Auth desabilitado.');
+                console.warn('[BenetripAuth] Supabase não configurado. Auth desabilitado.');
                 initialized = true;
                 _updateUI(null);
                 return;
@@ -100,19 +98,23 @@ const BenetripAuth = (function () {
 
             // Verificar se o SDK do Supabase está carregado
             if (typeof window.supabase === 'undefined' || typeof window.supabase.createClient !== 'function') {
-                console.error('[BenetripAuth] Supabase JS SDK não encontrado. Adicione: <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>');
+                console.error('[BenetripAuth] Supabase JS SDK não encontrado.');
                 initialized = true;
                 _updateUI(null);
                 return;
             }
 
-            // Inicializar Supabase client
+            // ── Inicializar Supabase client ──
+            // Usando flowType: 'implicit' em vez de 'pkce' para evitar
+            // o bug de Navigator LockManager timeout no Supabase JS v2.
+            // Para apps web client-side com anon key pública, implicit flow
+            // é seguro — a proteção vem das RLS policies, não do flow type.
             supabase = window.supabase.createClient(CONFIG.supabaseUrl, CONFIG.supabaseAnonKey, {
                 auth: {
                     autoRefreshToken: true,
                     persistSession: true,
                     detectSessionInUrl: true,
-                    flowType: 'pkce'
+                    flowType: 'implicit'
                 }
             });
 
