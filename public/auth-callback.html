@@ -98,6 +98,15 @@
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script>
+        /**
+         * Auth Callback - Implicit Flow
+         * 
+         * Com flowType: 'implicit', o OAuth retorna tokens diretamente no hash da URL:
+         *   /auth-callback.html#access_token=xxx&refresh_token=yyy&...
+         * 
+         * O SDK com detectSessionInUrl: true lê esses tokens automaticamente
+         * e dispara o evento SIGNED_IN. Sem code exchange, sem Navigator Locks.
+         */
         (function() {
             const supabaseUrl = document.querySelector('meta[name="supabase-url"]')?.content?.trim();
             const supabaseAnonKey = document.querySelector('meta[name="supabase-anon-key"]')?.content?.trim();
@@ -107,84 +116,58 @@
                 return;
             }
 
-            // Criar client com detectSessionInUrl: true
-            // O SDK automaticamente detecta o ?code= na URL e faz o exchange (PKCE)
-            // NÃO chamar exchangeCodeForSession manualmente — causa conflito de lock
+            // Criar client — detectSessionInUrl lê os tokens do hash automaticamente
             const supabaseClient = window.supabase.createClient(supabaseUrl, supabaseAnonKey, {
                 auth: {
                     autoRefreshToken: true,
                     persistSession: true,
-                    detectSessionInUrl: true,  // <-- isso faz o exchange automaticamente
-                    flowType: 'pkce'
+                    detectSessionInUrl: true,
+                    flowType: 'implicit'
                 }
             });
 
             const params = new URLSearchParams(window.location.search);
-            const type = params.get('type');
+            const hashParams = new URLSearchParams(window.location.hash.substring(1));
+            const type = params.get('type') || hashParams.get('type');
             let handled = false;
-            
-            // Timeout de segurança: se nada acontecer em 15s, mostrar erro
+
+            // Timeout de segurança
             const timeout = setTimeout(() => {
                 if (!handled) {
                     showError('Tempo esgotado. Tente fazer login novamente.');
                 }
-            }, 15000);
+            }, 12000);
 
-            // Escutar o evento de auth — quando o SDK trocar o code por sessão,
-            // ele dispara SIGNED_IN automaticamente
+            // Escutar evento de auth
             supabaseClient.auth.onAuthStateChange((event, session) => {
                 console.log('[AuthCallback] Auth event:', event);
 
-                if (event === 'SIGNED_IN' && session) {
+                if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && session && !handled) {
                     handled = true;
                     clearTimeout(timeout);
-                    
-                    document.getElementById('loading-state').style.display = 'none';
-                    document.getElementById('success-state').style.display = 'block';
-
-                    const redirectTo = type === 'recovery' ? '/redefinir-senha.html' : '/';
-                    setTimeout(() => {
-                        window.location.href = redirectTo;
-                    }, 1500);
-                }
-
-                if (event === 'TOKEN_REFRESHED' && session) {
-                    // Também pode acontecer — tratar como sucesso
-                    if (!handled) {
-                        handled = true;
-                        clearTimeout(timeout);
-                        
-                        document.getElementById('loading-state').style.display = 'none';
-                        document.getElementById('success-state').style.display = 'block';
-
-                        setTimeout(() => {
-                            window.location.href = '/';
-                        }, 1500);
-                    }
+                    showSuccess(type);
                 }
             });
 
-            // Fallback: verificar se já existe sessão (ex: voltou de outra aba)
+            // Fallback: verificar sessão existente
             supabaseClient.auth.getSession().then(({ data, error }) => {
-                if (error) {
-                    // Não mostrar erro aqui — pode ser que o onAuthStateChange ainda vá resolver
-                    console.warn('[AuthCallback] getSession error (pode ser normal durante PKCE):', error.message);
-                    return;
-                }
-
                 if (data?.session && !handled) {
                     handled = true;
                     clearTimeout(timeout);
-
-                    document.getElementById('loading-state').style.display = 'none';
-                    document.getElementById('success-state').style.display = 'block';
-
-                    const redirectTo = type === 'recovery' ? '/redefinir-senha.html' : '/';
-                    setTimeout(() => {
-                        window.location.href = redirectTo;
-                    }, 1500);
+                    showSuccess(type);
                 }
+                // Se não há sessão e não há hash tokens, vai cair no timeout
             });
+
+            function showSuccess(callbackType) {
+                document.getElementById('loading-state').style.display = 'none';
+                document.getElementById('success-state').style.display = 'block';
+
+                const redirectTo = callbackType === 'recovery' ? '/redefinir-senha.html' : '/';
+                setTimeout(() => {
+                    window.location.href = redirectTo;
+                }, 1500);
+            }
 
             function showError(msg) {
                 document.getElementById('loading-state').style.display = 'none';
