@@ -92,18 +92,22 @@
         }
     }
 
-    // Substituir globalmente
+    // Substituir globalmente via Object.defineProperty
+    // (navigator.locks é read-only getter, não aceita atribuição direta)
     if (typeof navigator !== 'undefined') {
-        // Preservar referência original (pode ser útil para debug)
-        const _originalLocks = navigator.locks;
-
-        navigator.locks = {
-            request: _simpleLockRequest,
-            // query() é usado raramente, mas manter stub para não quebrar nada
-            query: async () => ({ held: [], pending: [] })
-        };
-
-        console.log('[BenetripAuth] navigator.locks substituído por lock customizado.');
+        try {
+            Object.defineProperty(navigator, 'locks', {
+                value: {
+                    request: _simpleLockRequest,
+                    query: async () => ({ held: [], pending: [] })
+                },
+                writable: true,
+                configurable: true
+            });
+            console.log('[BenetripAuth] navigator.locks substituído por lock customizado.');
+        } catch (e) {
+            console.warn('[BenetripAuth] Não foi possível substituir navigator.locks:', e.message);
+        }
     }
 })();
 
