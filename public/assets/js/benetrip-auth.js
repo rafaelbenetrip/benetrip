@@ -204,22 +204,23 @@ const BenetripAuth = (function () {
             });
 
             // Verificar sessão existente (com timeout de segurança)
-            try {
-                const sessionResult = await Promise.race([
-                    supabase.auth.getSession(),
-                    new Promise((_, reject) =>
-                        setTimeout(() => reject(new Error('getSession timeout')), 5000)
-                    )
-                ]);
+            // Pula se onAuthStateChange já capturou o usuário
+            if (!currentUser) {
+                try {
+                    const sessionResult = await Promise.race([
+                        supabase.auth.getSession(),
+                        new Promise((_, reject) =>
+                            setTimeout(() => reject(new Error('getSession timeout')), 5000)
+                        )
+                    ]);
 
-                if (sessionResult?.data?.session?.user) {
-                    currentUser = sessionResult.data.session.user;
-                    await _loadProfile();
+                    if (sessionResult?.data?.session?.user) {
+                        currentUser = sessionResult.data.session.user;
+                        await _loadProfile();
+                    }
+                } catch (sessionError) {
+                    console.warn('[BenetripAuth] getSession falhou (prosseguindo sem sessão):', sessionError.message);
                 }
-            } catch (sessionError) {
-                console.warn('[BenetripAuth] getSession falhou (prosseguindo sem sessão):', sessionError.message);
-                // Não bloquear a inicialização — o onAuthStateChange
-                // vai capturar a sessão quando/se ela estiver disponível
             }
 
             initialized = true;
