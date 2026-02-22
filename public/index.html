@@ -25,7 +25,7 @@
         window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
     </script>
     <script defer src="/_vercel/insights/script.js"></script>
-    
+
     <style>
         :root {
             --orange: #E87722;
@@ -114,6 +114,12 @@
         }
         .logo-link img:hover { transform: scale(1.04); }
 
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
         .header-nav {
             display: flex;
             gap: 6px;
@@ -133,6 +139,133 @@
         .header-nav a:hover {
             background: rgba(255,255,255,0.18);
             color: white;
+        }
+
+        /* ═══════════════════════════════════
+           AUTH NO HEADER
+           ═══════════════════════════════════ */
+        .benetrip-header-auth {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-left: 8px;
+        }
+
+        .benetrip-header-login-btn {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 16px;
+            background: rgba(255,255,255,0.22);
+            color: #FFFFFF;
+            border: 1.5px solid rgba(255,255,255,0.35);
+            border-radius: 20px;
+            font-family: 'Poppins', sans-serif;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            white-space: nowrap;
+            backdrop-filter: blur(8px);
+        }
+        .benetrip-header-login-btn:hover {
+            background: rgba(255,255,255,0.35);
+            transform: scale(1.02);
+        }
+        .benetrip-header-login-btn svg {
+            width: 16px;
+            height: 16px;
+        }
+
+        .benetrip-header-user-menu {
+            display: none;
+            align-items: center;
+            gap: 8px;
+            position: relative;
+        }
+        .benetrip-header-avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 2px solid rgba(255,255,255,0.6);
+            cursor: pointer;
+            transition: border-color 0.2s;
+        }
+        .benetrip-header-avatar:hover {
+            border-color: white;
+        }
+        .benetrip-header-initials {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.25);
+            color: white;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Poppins', sans-serif;
+            font-size: 14px;
+            font-weight: 700;
+            cursor: pointer;
+            border: 2px solid rgba(255,255,255,0.5);
+            backdrop-filter: blur(8px);
+        }
+        .benetrip-header-user-name {
+            font-family: 'Montserrat', sans-serif;
+            font-size: 13px;
+            font-weight: 500;
+            color: white;
+            max-width: 100px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        /* Dropdown do usuário */
+        .benetrip-header-dropdown {
+            display: none;
+            position: absolute;
+            top: 100%;
+            right: 0;
+            margin-top: 10px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.18);
+            min-width: 210px;
+            z-index: 1000;
+            overflow: hidden;
+        }
+        .benetrip-header-dropdown.active {
+            display: block;
+        }
+        .benetrip-header-dropdown a,
+        .benetrip-header-dropdown button {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            width: 100%;
+            padding: 12px 16px;
+            border: none;
+            background: none;
+            font-family: 'Montserrat', sans-serif;
+            font-size: 13px;
+            color: #21272A;
+            text-decoration: none;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+        .benetrip-header-dropdown a:hover,
+        .benetrip-header-dropdown button:hover {
+            background: #F5F5F5;
+        }
+        .benetrip-header-dropdown .dropdown-divider {
+            height: 1px;
+            background: #E0E0E0;
+            margin: 4px 0;
+        }
+        .benetrip-header-dropdown .logout-btn {
+            color: #E53935;
         }
 
         /* ═══════════════════════════════════
@@ -202,6 +335,20 @@
             line-height: 1.6;
             max-width: 520px;
             margin: 0 auto;
+        }
+
+        /* Mensagem personalizada para usuário logado */
+        .hero-welcome {
+            display: none;
+            background: linear-gradient(135deg, #FFF3E6, #FFE8D6);
+            border: 1.5px solid var(--orange);
+            border-radius: var(--radius-sm);
+            padding: 12px 18px;
+            margin: 16px auto 0;
+            max-width: 420px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            color: var(--dark);
         }
 
         .speech-bubble {
@@ -293,7 +440,6 @@
             transform: translateY(-2px) scale(0.99);
         }
 
-        /* Card accent colors */
         .card-discover::before { background: linear-gradient(90deg, var(--orange), var(--orange-light)); }
         .card-discover:hover { border-color: var(--orange); }
 
@@ -759,6 +905,11 @@
             .features-section h2 { font-size: 1.35rem; }
             .about-text h2 { font-size: 1.4rem; }
             .sidenav { width: 280px; left: -280px; }
+
+            /* Mobile: esconder texto do botão login, só ícone */
+            .benetrip-header-login-btn span { display: none; }
+            .benetrip-header-login-btn { padding: 8px 12px; }
+            .benetrip-header-user-name { display: none; }
         }
 
         /* Focus / Accessibility */
@@ -790,14 +941,6 @@
         }
     </style>
 </head>
-
-    <!-- Supabase SDK -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
-<!-- Benetrip Auth (ANTES dos outros scripts da página) -->
-<script src="/js/benetrip-auth.js"></script>
-<script src="/js/benetrip-login-modal.js"></script>
-    
 <body>
     <!-- Overlay -->
     <div class="overlay" id="overlay"></div>
@@ -830,6 +973,23 @@
             <a href="voos.html" class="nav-item">
                 <span class="nav-item-icon">✈️</span>
                 Busca de Voos
+            </a>
+        </div>
+
+        <!-- NOVO: Link para Minha Conta (só aparece logado) -->
+        <div class="nav-group" data-auth-show="logged-in" style="display:none;">
+            <div class="nav-group-title">👤 Minha Conta</div>
+            <a href="minha-conta.html" class="nav-item">
+                <span class="nav-item-icon">📊</span>
+                Histórico de Buscas
+            </a>
+            <a href="minha-conta.html#destinos" class="nav-item">
+                <span class="nav-item-icon">💾</span>
+                Destinos Salvos
+            </a>
+            <a href="minha-conta.html#roteiros" class="nav-item">
+                <span class="nav-item-icon">🗺️</span>
+                Roteiros Salvos
             </a>
         </div>
 
@@ -877,52 +1037,83 @@
         </div>
     </nav>
 
-    <!-- Header -->
+    <!-- ═══════════════════════════════════
+         HEADER (COM AUTH)
+         ═══════════════════════════════════ -->
     <header class="header">
-    <div class="header-inner">
-        <div class="header-left">
-            <button class="menu-btn" id="menuBtn" onclick="toggleNav()" aria-label="Menu">
-                <!-- ... svg ... -->
-            </button>
-            <a href="/" class="logo-link">
-                <img src="logo1.png" alt="Benetrip">
-            </a>
-        </div>
-        <nav class="header-nav">
-            <a href="descobrir-destinos.html">🎯 Descobrir</a>
-            <a href="todos-destinos.html">🌍 Destinos</a>
-            <a href="itinerary2.html">📋 Roteiro</a>
-            <a href="voos.html">✈️ Voos</a>
-        </nav>
-        
-        <!-- ADICIONAR AQUI: Auth no header -->
-        <div class="benetrip-header-auth">
-            <!-- Não logado -->
-            <button class="benetrip-header-login-btn" data-auth="login-btn" onclick="BenetripLoginModal.open()">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-                    <circle cx="12" cy="7" r="4"></circle>
-                </svg>
-                <span>Entrar</span>
-            </button>
-            <!-- Logado -->
-            <div class="benetrip-header-user-menu" data-auth="user-menu" id="benetrip-user-menu-container">
-                <span class="benetrip-header-user-name" data-auth="user-name"></span>
-                <img class="benetrip-header-avatar" data-auth="user-avatar" alt="Avatar"
-                     onclick="document.getElementById('benetrip-user-dropdown').classList.toggle('active')" />
-                <div class="benetrip-header-initials" data-auth="user-initials"
-                     onclick="document.getElementById('benetrip-user-dropdown').classList.toggle('active')"></div>
-                <div class="benetrip-header-dropdown" id="benetrip-user-dropdown">
-                    <a href="/minha-conta.html">👤 Minha Conta</a>
-                    <a href="/minha-conta.html#historico">🕐 Histórico</a>
-                    <a href="/minha-conta.html#destinos">🔖 Destinos Salvos</a>
-                    <div class="divider" style="height:1px;background:#E0E0E0;margin:4px 0;"></div>
-                    <button class="logout-btn" data-auth="logout-btn" style="color:#E53935;">🚪 Sair</button>
+        <div class="header-inner">
+            <div class="header-left">
+                <button class="menu-btn" id="menuBtn" onclick="toggleNav()" aria-label="Menu">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                        <line x1="3" y1="6" x2="21" y2="6"/>
+                        <line x1="3" y1="12" x2="21" y2="12"/>
+                        <line x1="3" y1="18" x2="21" y2="18"/>
+                    </svg>
+                </button>
+                <a href="/" class="logo-link">
+                    <img src="logo1.png" alt="Benetrip">
+                </a>
+            </div>
+
+            <!-- HEADER RIGHT: Nav + Auth -->
+            <div class="header-right">
+                <nav class="header-nav">
+                    <a href="descobrir-destinos.html">🎯 Descobrir</a>
+                    <a href="todos-destinos.html">🌍 Destinos</a>
+                    <a href="itinerary2.html">📋 Roteiro</a>
+                    <a href="voos.html">✈️ Voos</a>
+                </nav>
+
+                <!-- ====== AUTH NO HEADER ====== -->
+                <div class="benetrip-header-auth">
+                    <!-- Não logado: botão Entrar -->
+                    <button class="benetrip-header-login-btn" data-auth="login-btn" onclick="BenetripLoginModal.open()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                            <circle cx="12" cy="7" r="4"></circle>
+                        </svg>
+                        <span>Entrar</span>
+                    </button>
+
+                    <!-- Logado: avatar + dropdown -->
+                    <div class="benetrip-header-user-menu" data-auth="user-menu" id="benetrip-user-menu-container">
+                        <span class="benetrip-header-user-name" data-auth="user-name"></span>
+                        <img class="benetrip-header-avatar" data-auth="user-avatar" alt="Avatar"
+                             onclick="document.getElementById('benetrip-user-dropdown').classList.toggle('active')" />
+                        <div class="benetrip-header-initials" data-auth="user-initials"
+                             onclick="document.getElementById('benetrip-user-dropdown').classList.toggle('active')"></div>
+
+                        <!-- Dropdown -->
+                        <div class="benetrip-header-dropdown" id="benetrip-user-dropdown">
+                            <a href="minha-conta.html">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                                Minha Conta
+                            </a>
+                            <a href="minha-conta.html#historico">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                                Histórico de Buscas
+                            </a>
+                            <a href="minha-conta.html#destinos">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path></svg>
+                                Destinos Salvos
+                            </a>
+                            <a href="minha-conta.html#roteiros">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+                                Roteiros Salvos
+                            </a>
+                            <div class="dropdown-divider"></div>
+                            <button class="logout-btn" data-auth="logout-btn">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+                                Sair
+                            </button>
+                        </div>
+                    </div>
                 </div>
+                <!-- ====== FIM AUTH ====== -->
             </div>
         </div>
-    </div>
-</header>
+    </header>
+
     <!-- Hero -->
     <section class="hero" id="hero">
         <div class="hero-container">
@@ -932,7 +1123,13 @@
             <p class="hero-sub">
                 A Tripinha é sua vira-lata caramelo parceira de viagem. Ela fareja os melhores destinos, preços e experiências — tudo do jeitinho que você gosta!
             </p>
-            <div class="speech-bubble">
+
+            <!-- Mensagem personalizada para logados -->
+            <div class="hero-welcome" id="hero-welcome" data-auth-show="logged-in">
+                🐾 Oi, <strong id="hero-user-name">viajante</strong>! Que bom te ver de volta! Bora planejar a próxima aventura?
+            </div>
+
+            <div class="speech-bubble" data-auth-show="logged-out">
                 <strong>Oi, eu sou a Tripinha! 🐾</strong><br>
                 Pronta pra te ajudar a planejar a viagem dos sonhos? Escolha uma das opções abaixo e vamos juntos!
             </div>
@@ -944,7 +1141,6 @@
         <h2>Como posso te ajudar hoje? 🐾</h2>
 
         <div class="features-grid">
-            <!-- 1. Descobrir Destino -->
             <a href="descobrir-destinos.html" class="feature-card card-discover" onclick="cardClick(this)">
                 <div class="card-top-row">
                     <div class="card-icon">🎯</div>
@@ -960,7 +1156,6 @@
                 </span>
             </a>
 
-            <!-- 2. Todos os Destinos (NOVO!) -->
             <a href="todos-destinos.html" class="feature-card card-all-dest" onclick="cardClick(this)">
                 <div class="card-top-row">
                     <div class="card-icon">🌍</div>
@@ -976,7 +1171,6 @@
                 </span>
             </a>
 
-            <!-- 3. Roteiro -->
             <a href="itinerary2.html" class="feature-card card-itinerary" onclick="cardClick(this)">
                 <div class="card-top-row">
                     <div class="card-icon">📋</div>
@@ -992,7 +1186,6 @@
                 </span>
             </a>
 
-            <!-- 4. Busca de Voos -->
             <a href="voos.html" class="feature-card card-flights" onclick="cardClick(this)">
                 <div class="card-top-row">
                     <div class="card-icon">✈️</div>
@@ -1085,6 +1278,18 @@
         </div>
     </footer>
 
+    <!-- ═══════════════════════════════════
+         SCRIPTS (sempre antes de </body>)
+         ═══════════════════════════════════ -->
+
+    <!-- 1. Supabase SDK (carrega primeiro) -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <!-- 2. Auth da Benetrip (antes dos scripts da página) -->
+    <script src="/js/benetrip-auth.js"></script>
+    <script src="/js/benetrip-login-modal.js"></script>
+
+    <!-- 3. Scripts da página -->
     <script>
         // ═══════════════ NAVIGATION ═══════════════
         function toggleNav() {
@@ -1140,6 +1345,26 @@
                 const img = new Image();
                 img.src = src;
             });
+        });
+
+        // ═══════════════ AUTH: PERSONALIZAÇÃO DA HOME ═══════════════
+        // Quando o usuário faz login, personaliza a saudação
+        if (typeof BenetripAuth !== 'undefined') {
+            BenetripAuth.onAuthChange(function(event, user) {
+                const welcomeEl = document.getElementById('hero-user-name');
+                if (user && welcomeEl) {
+                    welcomeEl.textContent = BenetripAuth.getUserDisplayName();
+                }
+            });
+        }
+
+        // ═══════════════ DROPDOWN: FECHAR AO CLICAR FORA ═══════════════
+        document.addEventListener('click', function(e) {
+            const dropdown = document.getElementById('benetrip-user-dropdown');
+            const menuContainer = document.getElementById('benetrip-user-menu-container');
+            if (dropdown && !menuContainer?.contains(e.target)) {
+                dropdown.classList.remove('active');
+            }
         });
 
         // ═══════════════ IMAGE FALLBACKS ═══════════════
