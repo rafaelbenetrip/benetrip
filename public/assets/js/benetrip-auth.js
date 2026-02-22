@@ -12,26 +12,6 @@
  *    <meta name="supabase-anon-key" content="SUA_ANON_KEY">
  * 3. No HTML: <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
  *             <script src="assets/js/benetrip-auth.js"></script>
- * 
- * API PÚBLICA:
- * - BenetripAuth.init() — inicializa (chamado automaticamente)
- * - BenetripAuth.getUser() — retorna usuário atual ou null
- * - BenetripAuth.isLoggedIn() — boolean
- * - BenetripAuth.signInWithEmail(email, password)
- * - BenetripAuth.signUpWithEmail(email, password, nome)
- * - BenetripAuth.signInWithGoogle()
- * - BenetripAuth.signInWithFacebook()
- * - BenetripAuth.signOut()
- * - BenetripAuth.getProfile() — dados do perfil
- * - BenetripAuth.updateProfile(dados)
- * - BenetripAuth.saveSearch(tipo, parametros, resultados)
- * - BenetripAuth.getSearchHistory(limit, offset)
- * - BenetripAuth.saveDestination(dados)
- * - BenetripAuth.getSavedDestinations()
- * - BenetripAuth.removeDestination(id)
- * - BenetripAuth.saveItinerary(dados)
- * - BenetripAuth.getSavedItineraries()
- * - BenetripAuth.onAuthChange(callback)
  */
 
 const BenetripAuth = (function () {
@@ -55,17 +35,58 @@ const BenetripAuth = (function () {
     let initialized = false;
 
     // ==========================================
-    // INICIALIZAÇÃO
+    // LIMPEZA DE DADOS PKCE ANTIGOS
     // ==========================================
 
     /**
-     * Inicializa o módulo de autenticação.
-     * Lê config de meta tags no HTML (anon key é segura para expor — RLS protege os dados).
+     * Remove dados Supabase antigos do localStorage que podem causar
+     * travamentos de Navigator Lock (resquícios de tentativas PKCE).
+     * Executado UMA VEZ — depois marca como feito.
      */
+    function _cleanupStalePKCEData() {
+        const CLEANUP_KEY = 'benetrip-auth-v2-cleanup';
+        
+        // Já limpou? Pular.
+        if (localStorage.getItem(CLEANUP_KEY)) return false;
+
+        console.log('[BenetripAuth] Limpando dados de autenticação antigos (migração única)...');
+        
+        // Remover todos os itens sb-* do localStorage
+        const keysToRemove = [];
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key && (key.startsWith('sb-') || key.includes('supabase'))) {
+                keysToRemove.push(key);
+            }
+        }
+        
+        keysToRemove.forEach(key => {
+            localStorage.removeItem(key);
+            console.log('[BenetripAuth] Removido:', key);
+        });
+
+        // Marcar como feito
+        localStorage.setItem(CLEANUP_KEY, Date.now().toString());
+        
+        if (keysToRemove.length > 0) {
+            console.log(`[BenetripAuth] ${keysToRemove.length} itens removidos. Sessão anterior limpa.`);
+            return true; // Indicar que houve limpeza
+        }
+        
+        return false;
+    }
+
+    // ==========================================
+    // INICIALIZAÇÃO
+    // ==========================================
+
     async function init() {
         if (initialized) return;
 
         try {
+            // ── Migração: limpar dados PKCE antigos (executa 1x) ──
+            _cleanupStalePKCEData();
+
             // ── Ler configuração de meta tags no HTML ──
             const metaUrl = document.querySelector('meta[name="supabase-url"]');
             const metaKey = document.querySelector('meta[name="supabase-anon-key"]');
@@ -75,7 +96,7 @@ const BenetripAuth = (function () {
                 CONFIG.supabaseAnonKey = metaKey.content.trim();
             }
 
-            // Fallback: tentar API route (caso exista)
+            // Fallback: tentar API route
             if (!CONFIG.supabaseUrl || !CONFIG.supabaseAnonKey) {
                 try {
                     const configResponse = await fetch('/api/auth/config');
@@ -85,7 +106,7 @@ const BenetripAuth = (function () {
                         CONFIG.supabaseAnonKey = config.supabaseAnonKey || '';
                     }
                 } catch (e) {
-                    // API route não disponível — sem problema
+                    // API route não disponível
                 }
             }
 
@@ -96,7 +117,7 @@ const BenetripAuth = (function () {
                 return;
             }
 
-            // Verificar se o SDK do Supabase está carregado
+            // Verificar SDK
             if (typeof window.supabase === 'undefined' || typeof window.supabase.createClient !== 'function') {
                 console.error('[BenetripAuth] Supabase JS SDK não encontrado.');
                 initialized = true;
@@ -105,10 +126,8 @@ const BenetripAuth = (function () {
             }
 
             // ── Inicializar Supabase client ──
-            // Usando flowType: 'implicit' em vez de 'pkce' para evitar
-            // o bug de Navigator LockManager timeout no Supabase JS v2.
-            // Para apps web client-side com anon key pública, implicit flow
-            // é seguro — a proteção vem das RLS policies, não do flow type.
+            // flowType: 'implicit' evita o bug de Navigator Lock do PKCE.
+            // detectSessionInUrl: true permite ler tokens do hash automaticamente.
             supabase = window.supabase.createClient(CONFIG.supabaseUrl, CONFIG.supabaseAnonKey, {
                 auth: {
                     autoRefreshToken: true,
@@ -135,10 +154,17 @@ const BenetripAuth = (function () {
             });
 
             // Verificar sessão existente
-            const { data: { session } } = await supabase.auth.getSession();
-            if (session?.user) {
-                currentUser = session.user;
-                await _loadProfile();
+            try {
+                const { data: { session } } = await supabase.auth.getSession();
+                if (session?.user) {
+                    currentUser = session.user;
+                    await _loadProfile();
+                }
+            } catch (sessionError) {
+                // Se getSession falhar (ex: lock residual), logar mas não travar
+                console.warn('[BenetripAuth] getSession falhou (pode ser lock residual):', sessionError.message);
+                // Forçar limpeza novamente para a próxima vez
+                localStorage.removeItem('benetrip-auth-v2-cleanup');
             }
 
             initialized = true;
@@ -147,6 +173,20 @@ const BenetripAuth = (function () {
 
         } catch (error) {
             console.error('[BenetripAuth] Erro na inicialização:', error);
+            
+            // Se o erro for de Navigator Lock, forçar limpeza na próxima visita
+            if (error.message && error.message.includes('LockManager')) {
+                console.warn('[BenetripAuth] Lock detectado. Limpando dados para próxima tentativa...');
+                localStorage.removeItem('benetrip-auth-v2-cleanup');
+                // Limpar dados Supabase imediatamente
+                for (let i = localStorage.length - 1; i >= 0; i--) {
+                    const key = localStorage.key(i);
+                    if (key && (key.startsWith('sb-') || key.includes('supabase'))) {
+                        localStorage.removeItem(key);
+                    }
+                }
+            }
+            
             initialized = true;
             _updateUI(null);
         }
@@ -164,10 +204,7 @@ const BenetripAuth = (function () {
             password
         });
 
-        if (error) {
-            throw _translateError(error);
-        }
-
+        if (error) throw _translateError(error);
         return data;
     }
 
@@ -178,18 +215,12 @@ const BenetripAuth = (function () {
             email: email.trim().toLowerCase(),
             password,
             options: {
-                data: {
-                    full_name: nome,
-                    name: nome
-                },
+                data: { full_name: nome, name: nome },
                 emailRedirectTo: `${CONFIG.redirectUrl}/auth-callback.html`
             }
         });
 
-        if (error) {
-            throw _translateError(error);
-        }
-
+        if (error) throw _translateError(error);
         return data;
     }
 
@@ -207,10 +238,7 @@ const BenetripAuth = (function () {
             }
         });
 
-        if (error) {
-            throw _translateError(error);
-        }
-
+        if (error) throw _translateError(error);
         return data;
     }
 
@@ -225,10 +253,7 @@ const BenetripAuth = (function () {
             }
         });
 
-        if (error) {
-            throw _translateError(error);
-        }
-
+        if (error) throw _translateError(error);
         return data;
     }
 
@@ -236,9 +261,7 @@ const BenetripAuth = (function () {
         _ensureInitialized();
 
         const { error } = await supabase.auth.signOut();
-        if (error) {
-            throw _translateError(error);
-        }
+        if (error) throw _translateError(error);
 
         currentUser = null;
         currentProfile = null;
@@ -252,9 +275,7 @@ const BenetripAuth = (function () {
             redirectTo: `${CONFIG.redirectUrl}/auth-callback.html?type=recovery`
         });
 
-        if (error) {
-            throw _translateError(error);
-        }
+        if (error) throw _translateError(error);
     }
 
     // ==========================================
@@ -287,7 +308,6 @@ const BenetripAuth = (function () {
             .single();
 
         if (error) throw error;
-
         currentProfile = data;
         return data;
     }
@@ -335,13 +355,10 @@ const BenetripAuth = (function () {
             .order('created_at', { ascending: false })
             .range(offset, offset + limit - 1);
 
-        if (tipo) {
-            query = query.eq('tipo_busca', tipo);
-        }
+        if (tipo) query = query.eq('tipo_busca', tipo);
 
         const { data, error } = await query;
         if (error) throw error;
-
         return data || [];
     }
 
@@ -474,10 +491,7 @@ const BenetripAuth = (function () {
 
         const { data, error } = await supabase
             .from('saved_itineraries')
-            .update({
-                compartilhado: true,
-                share_token: shareToken
-            })
+            .update({ compartilhado: true, share_token: shareToken })
             .eq('id', itineraryId)
             .eq('user_id', currentUser.id)
             .select()
@@ -518,13 +532,8 @@ const BenetripAuth = (function () {
     // UTILIDADES / GETTERS
     // ==========================================
 
-    function getUser() {
-        return currentUser;
-    }
-
-    function isLoggedIn() {
-        return currentUser !== null;
-    }
+    function getUser() { return currentUser; }
+    function isLoggedIn() { return currentUser !== null; }
 
     function getUserDisplayName() {
         if (currentProfile?.nome_exibicao) return currentProfile.nome_exibicao;
@@ -542,9 +551,7 @@ const BenetripAuth = (function () {
     }
 
     function onAuthChange(callback) {
-        if (typeof callback === 'function') {
-            authChangeCallbacks.push(callback);
-        }
+        if (typeof callback === 'function') authChangeCallbacks.push(callback);
     }
 
     // ==========================================
@@ -597,25 +604,18 @@ const BenetripAuth = (function () {
                     .limit(excess);
 
                 if (oldSearches?.length) {
-                    const idsToDelete = oldSearches.map(s => s.id);
                     await supabase
                         .from('search_history')
                         .delete()
-                        .in('id', idsToDelete);
+                        .in('id', oldSearches.map(s => s.id));
                 }
             }
-        } catch (e) {
-            // Silencioso
-        }
+        } catch (e) { /* Silencioso */ }
     }
 
     function _notifyCallbacks(event, user) {
         authChangeCallbacks.forEach(cb => {
-            try {
-                cb(event, user);
-            } catch (e) {
-                console.error('[BenetripAuth] Erro em callback:', e);
-            }
+            try { cb(event, user); } catch (e) { console.error('[BenetripAuth] Erro em callback:', e); }
         });
     }
 
@@ -631,9 +631,7 @@ const BenetripAuth = (function () {
             'To signup, please provide your email': 'Digite um email válido.',
         };
 
-        const translatedMessage = messages[error.message] || error.message;
-
-        const translatedError = new Error(translatedMessage);
+        const translatedError = new Error(messages[error.message] || error.message);
         translatedError.originalError = error;
         translatedError.status = error.status;
         return translatedError;
@@ -698,32 +696,12 @@ const BenetripAuth = (function () {
     // ==========================================
 
     return {
-        init,
-        signInWithEmail,
-        signUpWithEmail,
-        signInWithGoogle,
-        signInWithFacebook,
-        signOut,
-        resetPassword,
-        getUser,
-        isLoggedIn,
-        getProfile,
-        updateProfile,
-        getUserDisplayName,
-        getUserAvatar,
-        onAuthChange,
-        saveSearch,
-        getSearchHistory,
-        deleteSearch,
-        clearSearchHistory,
-        saveDestination,
-        getSavedDestinations,
-        removeDestination,
-        saveItinerary,
-        getSavedItineraries,
-        shareItinerary,
-        getSharedItinerary,
-        removeItinerary,
+        init, signInWithEmail, signUpWithEmail, signInWithGoogle, signInWithFacebook,
+        signOut, resetPassword, getUser, isLoggedIn, getProfile, updateProfile,
+        getUserDisplayName, getUserAvatar, onAuthChange, saveSearch, getSearchHistory,
+        deleteSearch, clearSearchHistory, saveDestination, getSavedDestinations,
+        removeDestination, saveItinerary, getSavedItineraries, shareItinerary,
+        getSharedItinerary, removeItinerary,
     };
 
 })();
