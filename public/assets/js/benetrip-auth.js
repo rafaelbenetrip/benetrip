@@ -34,6 +34,14 @@ const BenetripAuth = (function () {
     let authChangeCallbacks = [];
     let initialized = false;
 
+    /**
+     * Fallback de lock para evitar timeout do Navigator LockManager
+     * em navegadores/abas onde o lock exclusivo pode ficar preso.
+     */
+    async function _nonBlockingLock(_name, _acquireTimeout, fn) {
+        return await fn();
+    }
+
     // ==========================================
     // LIMPEZA DE DADOS PKCE ANTIGOS
     // ==========================================
@@ -133,7 +141,8 @@ const BenetripAuth = (function () {
                     autoRefreshToken: true,
                     persistSession: true,
                     detectSessionInUrl: true,
-                    flowType: 'implicit'
+                    flowType: 'implicit',
+                    lock: _nonBlockingLock
                 }
             });
 
