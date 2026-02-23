@@ -363,16 +363,30 @@ const BenetripVoos = {
     },
 
     finishSearch(){
-        if(this.state.pollTimer)clearTimeout(this.state.pollTimer);
-        if(this.state.tipInterval)clearInterval(this.state.tipInterval);
-        if(this.state.renderDebounceTimer){clearTimeout(this.state.renderDebounceTimer);this.state.renderDebounceTimer=null;}
-        this.setProgress(100,'Busca concluída!');
-        if(this.state.proposals.length===0){this.showPanel('empty');return;}
-        this.updateFilterBounds();this.populateAirlinesFilter();this.populateAirportsFilter();
-        this.showSearchingBanner(false);
-        if(!this.state.resultsShown) this.showResults();
-        else this.renderCards();
-    },
+        if(this.state.pollTimer)clearTimeout(this.state.pollTimer);
+        if(this.state.tipInterval)clearInterval(this.state.tipInterval);
+        if(this.state.renderDebounceTimer){clearTimeout(this.state.renderDebounceTimer);this.state.renderDebounceTimer=null;}
+        this.setProgress(100,'Busca concluída!');
+        if(this.state.proposals.length===0){this.showPanel('empty');return;}
+        this.updateFilterBounds();this.populateAirlinesFilter();this.populateAirportsFilter();
+        this.showSearchingBanner(false);
+        if(!this.state.resultsShown) this.showResults();
+        else this.renderCards();
+
+        // ══ AUTO-SAVE ══
+        // Adicionado um try/catch ou verificação de typeof para evitar que 
+        // a tela quebre caso o BenetripAutoSave demore a carregar.
+        if (typeof BenetripAutoSave !== 'undefined') {
+            BenetripAutoSave.salvarBuscaVoos({ 
+                origem: this.state.params.origin, 
+                destino: this.state.params.destination, 
+                dataIda: this.state.params.departure_date, 
+                dataVolta: this.state.params.return_date, 
+                adultos: this.state.params.adults, 
+                moeda: this.state.params.currency 
+            }, this.state.proposals);
+        }
+    },
 
     showSearchingBanner(show) {
         let banner = document.getElementById('searching-banner');
