@@ -20,75 +20,39 @@
 // O Supabase JS v2 usa navigator.locks.request() internamente
 // para coordenar acesso à sessão entre abas. Porém, locks
 // "fantasma" de sessões anteriores ficam presos e causam
-// timeout de 10 s — mesmo quando a opção `lock` é passada no
-// config (várias versões do SDK ignoram essa opção).
+// timeout de 10 s.
 //
-// A solução mais robusta é substituir navigator.locks.request()
-// GLOBALMENTE, antes que qualquer client Supabase seja criado.
-// Em aba única (caso predominante) o pior cenário é um refresh
-// de token redundante; em múltiplas abas o risco é mínimo.
+// Substituímos por uma implementação NON-BLOCKING que executa
+// o callback imediatamente sem fila de espera. Isso elimina
+// qualquer possibilidade de deadlock entre getSession() e
+// onAuthStateChange() que disputam o mesmo lock internamente.
+//
+// Em aba única (caso predominante) não há risco. Em múltiplas
+// abas, o pior caso é um refresh de token redundante.
 // ============================================================
 (function _patchNavigatorLocks() {
     'use strict';
 
-    const _activeLocks = new Map();
-
     /**
-     * Implementação simplificada de lock baseada em Promises.
+     * Lock não-bloqueante: executa o callback imediatamente.
      * Aceita a mesma assinatura que navigator.locks.request().
      */
-    async function _simpleLockRequest(name, optionsOrFn, maybeFn) {
+    async function _noopLockRequest(name, optionsOrFn, maybeFn) {
         // navigator.locks.request(name, fn)  OU
         // navigator.locks.request(name, options, fn)
-        let fn;
-        let acquireTimeout = 10000; // fallback
-
-        if (typeof optionsOrFn === 'function') {
-            fn = optionsOrFn;
-        } else {
-            fn = maybeFn;
-            // Se o Supabase passar { mode, ifAvailable, ... } ignoramos — não precisamos
-        }
+        const fn = typeof optionsOrFn === 'function' ? optionsOrFn : maybeFn;
 
         if (typeof fn !== 'function') {
-            // Fallback: se por algum motivo fn não for função, resolve vazio
             return undefined;
         }
 
-        // Se já existe lock ativo com este nome, esperar (com timeout)
-        const existing = _activeLocks.get(name);
-        if (existing) {
-            try {
-                await Promise.race([
-                    existing,
-                    new Promise((_, reject) =>
-                        setTimeout(() => reject(new Error('lock timeout')), acquireTimeout)
-                    )
-                ]);
-            } catch (_e) {
-                // Timeout ou erro do lock anterior — prosseguir mesmo assim
-            }
-        }
-
-        // Executar a função e registrar como lock ativo
-        const promise = (async () => {
-            try {
-                return await fn({ name, mode: 'exclusive' });
-            } catch (err) {
-                // Supabase às vezes lança dentro do callback; não travar
-                console.warn('[BenetripAuth][Lock] Erro dentro do lock callback:', err?.message || err);
-                return undefined;
-            }
-        })();
-
-        _activeLocks.set(name, promise);
-
+        // Executar imediatamente — sem fila, sem espera, sem deadlock
         try {
-            return await promise;
-        } finally {
-            if (_activeLocks.get(name) === promise) {
-                _activeLocks.delete(name);
-            }
+            return await fn({ name, mode: 'exclusive' });
+        } catch (err) {
+            // Supabase às vezes lança dentro do callback; não travar
+            console.warn('[BenetripAuth][Lock] Erro no callback:', err?.message || err);
+            return undefined;
         }
     }
 
@@ -98,13 +62,13 @@
         try {
             Object.defineProperty(navigator, 'locks', {
                 value: {
-                    request: _simpleLockRequest,
+                    request: _noopLockRequest,
                     query: async () => ({ held: [], pending: [] })
                 },
                 writable: true,
                 configurable: true
             });
-            console.log('[BenetripAuth] navigator.locks substituído por lock customizado.');
+            console.log('[BenetripAuth] navigator.locks substituído (non-blocking).');
         } catch (e) {
             console.warn('[BenetripAuth] Não foi possível substituir navigator.locks:', e.message);
         }
@@ -203,23 +167,17 @@ const BenetripAuth = (function () {
                 _notifyCallbacks(event, currentUser);
             });
 
-            // Verificar sessão existente (com timeout de segurança)
-            // Pula se onAuthStateChange já capturou o usuário
+            // Verificar sessão existente
+            // (com lock non-blocking, getSession resolve rápido)
             if (!currentUser) {
                 try {
-                    const sessionResult = await Promise.race([
-                        supabase.auth.getSession(),
-                        new Promise((_, reject) =>
-                            setTimeout(() => reject(new Error('getSession timeout')), 5000)
-                        )
-                    ]);
-
-                    if (sessionResult?.data?.session?.user) {
-                        currentUser = sessionResult.data.session.user;
+                    const { data: { session } } = await supabase.auth.getSession();
+                    if (session?.user) {
+                        currentUser = session.user;
                         await _loadProfile();
                     }
                 } catch (sessionError) {
-                    console.warn('[BenetripAuth] getSession falhou (prosseguindo sem sessão):', sessionError.message);
+                    console.warn('[BenetripAuth] getSession falhou:', sessionError.message);
                 }
             }
 
