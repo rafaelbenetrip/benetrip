@@ -1065,6 +1065,7 @@ const BenetripDiscovery = {
     },
 
     mostrarResultados(destinos, cenario, mensagem) {
+        BenetripAutoSave.salvarBuscaDestinos(this.state.formData, destinos);
         const container = document.getElementById('resultados-container');
         const { dataIda, dataVolta, moeda, numPessoas } = this.state.formData;
         const noites = this.calcularNoites(dataIda, dataVolta);
