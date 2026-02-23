@@ -1,0 +1,1507 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Minha Conta - Benetrip</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&family=Montserrat:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #E87722;
+            --primary-hover: #D06A1D;
+            --secondary: #00A3E0;
+            --secondary-hover: #008FC4;
+            --dark: #21272A;
+            --white: #FFFFFF;
+            --light-gray: #F5F5F5;
+            --medium-gray: #E0E0E0;
+            --error: #E53935;
+            --success: #43A047;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Montserrat', sans-serif;
+            background: var(--light-gray);
+            color: var(--dark);
+            min-height: 100vh;
+        }
+
+        /* ===== HEADER ===== */
+        .page-header {
+            background: var(--white);
+            border-bottom: 1px solid var(--medium-gray);
+            padding: 12px 16px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        .header-inner {
+            max-width: 600px;
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .header-back {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            text-decoration: none;
+            color: var(--dark);
+            font-weight: 600;
+            font-size: 14px;
+        }
+        .header-back svg { width: 20px; height: 20px; }
+        .header-logo {
+            font-family: 'Poppins', sans-serif;
+            font-weight: 700;
+            font-size: 18px;
+            color: var(--primary);
+        }
+
+        /* ===== PROFILE CARD ===== */
+        .profile-card {
+            max-width: 600px;
+            margin: 16px auto;
+            padding: 0 16px;
+        }
+        .profile-card-inner {
+            background: linear-gradient(135deg, var(--primary) 0%, #F59E42 100%);
+            border-radius: 16px;
+            padding: 24px;
+            color: white;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+        .profile-avatar {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            border: 3px solid rgba(255,255,255,0.4);
+            object-fit: cover;
+            flex-shrink: 0;
+        }
+        .profile-avatar-initials {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            border: 3px solid rgba(255,255,255,0.4);
+            background: rgba(255,255,255,0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Poppins', sans-serif;
+            font-size: 24px;
+            font-weight: 700;
+            flex-shrink: 0;
+        }
+        .profile-info h2 {
+            font-family: 'Poppins', sans-serif;
+            font-size: 18px;
+            font-weight: 700;
+        }
+        .profile-info p {
+            font-size: 13px;
+            opacity: 0.85;
+            margin-top: 2px;
+        }
+        .profile-stats {
+            display: flex;
+            gap: 20px;
+            margin-top: 8px;
+        }
+        .profile-stat {
+            text-align: center;
+        }
+        .profile-stat-num {
+            font-family: 'Poppins', sans-serif;
+            font-size: 18px;
+            font-weight: 700;
+        }
+        .profile-stat-label {
+            font-size: 11px;
+            opacity: 0.8;
+        }
+
+        /* ===== TABS ===== */
+        .tabs-container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 0 16px;
+        }
+        .tabs-nav {
+            display: flex;
+            background: var(--white);
+            border-radius: 12px;
+            padding: 4px;
+            gap: 2px;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
+        }
+        .tabs-nav::-webkit-scrollbar { display: none; }
+        .tab-btn {
+            flex: 1;
+            min-width: 0;
+            padding: 10px 8px;
+            border: none;
+            background: none;
+            border-radius: 10px;
+            font-family: 'Montserrat', sans-serif;
+            font-size: 12px;
+            font-weight: 600;
+            color: #888;
+            cursor: pointer;
+            transition: all 0.2s;
+            white-space: nowrap;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+        }
+        .tab-btn.active {
+            background: var(--primary);
+            color: white;
+        }
+        .tab-btn:not(.active):hover {
+            background: var(--light-gray);
+            color: var(--dark);
+        }
+        .tab-icon { font-size: 18px; }
+        .tab-badge {
+            background: var(--primary);
+            color: white;
+            font-size: 10px;
+            padding: 1px 6px;
+            border-radius: 10px;
+            margin-left: 4px;
+        }
+        .tab-btn.active .tab-badge {
+            background: rgba(255,255,255,0.3);
+        }
+
+        /* ===== TAB CONTENT ===== */
+        .tabs-content {
+            max-width: 600px;
+            margin: 16px auto;
+            padding: 0 16px 100px;
+        }
+        .tab-panel { display: none; }
+        .tab-panel.active { display: block; }
+
+        /* ===== CARDS GENÉRICOS ===== */
+        .card-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 48px 24px;
+            background: var(--white);
+            border-radius: 16px;
+        }
+        .empty-state-icon { font-size: 48px; margin-bottom: 12px; }
+        .empty-state h3 {
+            font-family: 'Poppins', sans-serif;
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+        .empty-state p {
+            font-size: 13px;
+            color: #888;
+            line-height: 1.5;
+        }
+        .empty-state-btn {
+            display: inline-block;
+            margin-top: 16px;
+            padding: 10px 24px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-weight: 600;
+            font-size: 13px;
+            text-decoration: none;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .empty-state-btn:hover { background: var(--primary-hover); }
+
+        /* ===== SEARCH HISTORY CARD ===== */
+        .history-card {
+            background: var(--white);
+            border-radius: 12px;
+            padding: 14px;
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            position: relative;
+            transition: transform 0.15s;
+        }
+        .history-card:active { transform: scale(0.98); }
+        .history-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            flex-shrink: 0;
+        }
+        .history-icon.descobrir { background: #FFF3E0; }
+        .history-icon.voos { background: #E3F2FD; }
+        .history-icon.roteiro { background: #E8F5E9; }
+        .history-icon.onibus { background: #F3E5F5; }
+        .history-icon.carro { background: #FFF8E1; }
+        .history-info { flex: 1; min-width: 0; }
+        .history-title {
+            font-weight: 600;
+            font-size: 14px;
+            margin-bottom: 2px;
+        }
+        .history-detail {
+            font-size: 12px;
+            color: #888;
+            line-height: 1.4;
+        }
+        .history-date {
+            font-size: 11px;
+            color: #aaa;
+            margin-top: 4px;
+        }
+        .history-actions {
+            display: flex;
+            gap: 6px;
+            flex-shrink: 0;
+        }
+        .btn-icon {
+            width: 32px;
+            height: 32px;
+            border: none;
+            background: var(--light-gray);
+            border-radius: 8px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #888;
+            transition: all 0.15s;
+        }
+        .btn-icon:hover { background: var(--medium-gray); color: var(--dark); }
+        .btn-icon.danger:hover { background: #FFEBEE; color: var(--error); }
+
+        /* ===== DESTINATION CARD ===== */
+        .destination-card {
+            background: var(--white);
+            border-radius: 12px;
+            overflow: hidden;
+            transition: transform 0.15s;
+        }
+        .destination-card:active { transform: scale(0.98); }
+        .destination-img {
+            width: 100%;
+            height: 120px;
+            object-fit: cover;
+            background: var(--medium-gray);
+        }
+        .destination-body {
+            padding: 12px 14px;
+        }
+        .destination-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+        .destination-name {
+            font-family: 'Poppins', sans-serif;
+            font-size: 15px;
+            font-weight: 600;
+        }
+        .destination-price {
+            font-family: 'Poppins', sans-serif;
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--primary);
+            white-space: nowrap;
+        }
+        .destination-meta {
+            display: flex;
+            gap: 12px;
+            margin-top: 6px;
+            font-size: 12px;
+            color: #888;
+        }
+        .destination-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid var(--light-gray);
+        }
+
+        /* ===== ITINERARY CARD ===== */
+        .itinerary-card {
+            background: var(--white);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+        .itinerary-card-header {
+            background: linear-gradient(135deg, var(--secondary) 0%, #4FC3F7 100%);
+            padding: 14px;
+            color: white;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .itinerary-dest {
+            font-family: 'Poppins', sans-serif;
+            font-size: 16px;
+            font-weight: 700;
+        }
+        .itinerary-days {
+            font-size: 12px;
+            background: rgba(255,255,255,0.2);
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-weight: 600;
+        }
+        .itinerary-body {
+            padding: 14px;
+        }
+        .itinerary-dates {
+            font-size: 13px;
+            color: #888;
+            margin-bottom: 10px;
+        }
+        .itinerary-preview {
+            font-size: 12px;
+            color: #666;
+            line-height: 1.5;
+            max-height: 60px;
+            overflow: hidden;
+        }
+        .itinerary-footer {
+            display: flex;
+            gap: 8px;
+            padding: 0 14px 14px;
+        }
+        .btn-sm {
+            padding: 8px 14px;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+            transition: all 0.15s;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .btn-sm-primary {
+            background: var(--secondary);
+            color: white;
+        }
+        .btn-sm-primary:hover { background: var(--secondary-hover); }
+        .btn-sm-outline {
+            background: none;
+            border: 1.5px solid var(--medium-gray);
+            color: var(--dark);
+        }
+        .btn-sm-outline:hover { border-color: #bbb; }
+
+        /* ===== PROFILE FORM ===== */
+        .profile-form {
+            background: var(--white);
+            border-radius: 16px;
+            padding: 20px;
+        }
+        .form-section {
+            margin-bottom: 20px;
+        }
+        .form-section-title {
+            font-family: 'Poppins', sans-serif;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--dark);
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .form-group {
+            margin-bottom: 14px;
+        }
+        .form-label {
+            display: block;
+            font-size: 12px;
+            font-weight: 600;
+            color: #666;
+            margin-bottom: 4px;
+        }
+        .form-input, .form-select {
+            width: 100%;
+            padding: 10px 14px;
+            border: 1.5px solid var(--medium-gray);
+            border-radius: 10px;
+            font-family: 'Montserrat', sans-serif;
+            font-size: 14px;
+            color: var(--dark);
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        .form-input:focus, .form-select:focus {
+            border-color: var(--secondary);
+        }
+        .form-select {
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 12px center;
+            padding-right: 36px;
+        }
+
+        /* Interest chips */
+        .chips-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .chip {
+            padding: 7px 14px;
+            border-radius: 20px;
+            border: 1.5px solid var(--medium-gray);
+            background: none;
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.15s;
+            color: #666;
+        }
+        .chip.active {
+            background: var(--primary);
+            border-color: var(--primary);
+            color: white;
+        }
+        .chip:not(.active):hover {
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+
+        .btn-save-profile {
+            width: 100%;
+            padding: 13px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-family: 'Poppins', sans-serif;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .btn-save-profile:hover { background: var(--primary-hover); }
+        .btn-save-profile:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        /* ===== SECTION HEADER ===== */
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+        .section-title {
+            font-family: 'Poppins', sans-serif;
+            font-size: 15px;
+            font-weight: 600;
+        }
+        .section-action {
+            font-size: 12px;
+            color: var(--error);
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+        }
+        .section-action:hover { text-decoration: underline; }
+
+        /* ===== FILTER PILLS ===== */
+        .filter-pills {
+            display: flex;
+            gap: 6px;
+            margin-bottom: 14px;
+            overflow-x: auto;
+            padding-bottom: 4px;
+            -webkit-overflow-scrolling: touch;
+        }
+        .filter-pills::-webkit-scrollbar { display: none; }
+        .filter-pill {
+            padding: 6px 14px;
+            border-radius: 20px;
+            border: 1.5px solid var(--medium-gray);
+            background: var(--white);
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: all 0.15s;
+            color: #888;
+        }
+        .filter-pill.active {
+            background: var(--dark);
+            border-color: var(--dark);
+            color: white;
+        }
+
+        /* ===== LOADING ===== */
+        .loading-container {
+            text-align: center;
+            padding: 40px;
+        }
+        .loading-spinner {
+            width: 32px;
+            height: 32px;
+            border: 3px solid var(--medium-gray);
+            border-top: 3px solid var(--primary);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin: 0 auto 12px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* ===== NOT LOGGED IN STATE ===== */
+        .not-logged-in {
+            text-align: center;
+            padding: 60px 24px;
+            max-width: 400px;
+            margin: 40px auto;
+        }
+        .not-logged-in-icon { font-size: 64px; margin-bottom: 16px; }
+        .not-logged-in h2 {
+            font-family: 'Poppins', sans-serif;
+            font-size: 20px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+        .not-logged-in p {
+            color: #888;
+            font-size: 14px;
+            line-height: 1.6;
+            margin-bottom: 24px;
+        }
+        .btn-login-big {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 14px 32px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-family: 'Poppins', sans-serif;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .btn-login-big:hover { background: var(--primary-hover); }
+
+        /* ===== TOAST ===== */
+        .toast {
+            position: fixed;
+            bottom: 80px;
+            left: 50%;
+            transform: translateX(-50%) translateY(20px);
+            padding: 12px 20px;
+            border-radius: 10px;
+            font-size: 13px;
+            font-weight: 500;
+            color: white;
+            z-index: 10001;
+            opacity: 0;
+            transition: all 0.3s ease;
+            max-width: 90%;
+            text-align: center;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+        .toast.success { background: var(--success); }
+        .toast.error { background: var(--error); }
+        .toast.visible {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+
+        /* ===== CONFIRM DIALOG ===== */
+        .confirm-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 10000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+        }
+        .confirm-dialog {
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            max-width: 340px;
+            width: 100%;
+            text-align: center;
+        }
+        .confirm-dialog h3 {
+            font-family: 'Poppins', sans-serif;
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+        .confirm-dialog p {
+            font-size: 13px;
+            color: #888;
+            margin-bottom: 20px;
+        }
+        .confirm-buttons {
+            display: flex;
+            gap: 10px;
+        }
+        .confirm-buttons button {
+            flex: 1;
+            padding: 10px;
+            border-radius: 10px;
+            font-weight: 600;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .btn-cancel {
+            background: var(--light-gray);
+            border: none;
+            color: var(--dark);
+        }
+        .btn-confirm-delete {
+            background: var(--error);
+            border: none;
+            color: white;
+        }
+
+        /* Shared link copy */
+        .share-link-container {
+            display: flex;
+            gap: 8px;
+            margin-top: 10px;
+        }
+        .share-link-input {
+            flex: 1;
+            padding: 8px 12px;
+            border: 1.5px solid var(--medium-gray);
+            border-radius: 8px;
+            font-size: 12px;
+            color: var(--dark);
+            background: var(--light-gray);
+        }
+        .btn-copy {
+            padding: 8px 14px;
+            background: var(--secondary);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- ===== HEADER ===== -->
+    <header class="page-header">
+        <div class="header-inner">
+            <a href="/" class="header-back">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="15 18 9 12 15 6"></polyline>
+                </svg>
+                Voltar
+            </a>
+            <span class="header-logo">Benetrip</span>
+            <div style="width:60px;"></div>
+        </div>
+    </header>
+
+    <!-- ===== NOT LOGGED IN (shown when no auth) ===== -->
+    <div id="not-logged-in" class="not-logged-in" style="display:none;">
+        <div class="not-logged-in-icon">🐕</div>
+        <h2>A Tripinha quer te conhecer!</h2>
+        <p>Faça login para salvar automaticamente suas buscas, destinos favoritos e roteiros. Tudo guardado pra quando você precisar!</p>
+        <button class="btn-login-big" onclick="BenetripLoginModal.open()">
+            Entrar na minha conta
+        </button>
+    </div>
+
+    <!-- ===== LOGGED IN CONTENT ===== -->
+    <div id="logged-in-content" style="display:none;">
+
+        <!-- Profile Card -->
+        <div class="profile-card">
+            <div class="profile-card-inner">
+                <img class="profile-avatar" id="profile-avatar" src="" alt="Avatar" style="display:none;" />
+                <div class="profile-avatar-initials" id="profile-initials"></div>
+                <div class="profile-info">
+                    <h2 id="profile-name">Carregando...</h2>
+                    <p id="profile-email"></p>
+                    <div class="profile-stats">
+                        <div class="profile-stat">
+                            <div class="profile-stat-num" id="stat-searches">-</div>
+                            <div class="profile-stat-label">Buscas</div>
+                        </div>
+                        <div class="profile-stat">
+                            <div class="profile-stat-num" id="stat-destinations">-</div>
+                            <div class="profile-stat-label">Destinos</div>
+                        </div>
+                        <div class="profile-stat">
+                            <div class="profile-stat-num" id="stat-itineraries">-</div>
+                            <div class="profile-stat-label">Roteiros</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tabs Nav -->
+        <div class="tabs-container">
+            <nav class="tabs-nav" id="tabs-nav">
+                <button class="tab-btn active" data-tab="historico">
+                    <span class="tab-icon">🕐</span>
+                    Histórico
+                </button>
+                <button class="tab-btn" data-tab="destinos">
+                    <span class="tab-icon">📍</span>
+                    Destinos
+                </button>
+                <button class="tab-btn" data-tab="roteiros">
+                    <span class="tab-icon">🗺️</span>
+                    Roteiros
+                </button>
+                <button class="tab-btn" data-tab="perfil">
+                    <span class="tab-icon">⚙️</span>
+                    Perfil
+                </button>
+            </nav>
+        </div>
+
+        <!-- Tab Panels -->
+        <div class="tabs-content">
+
+            <!-- ===== TAB: HISTÓRICO ===== -->
+            <div class="tab-panel active" id="panel-historico">
+                <div class="section-header">
+                    <span class="section-title">Suas buscas recentes</span>
+                    <button class="section-action" id="btn-clear-history" style="display:none;">Limpar tudo</button>
+                </div>
+                <div class="filter-pills" id="history-filters">
+                    <button class="filter-pill active" data-filter="all">Todas</button>
+                    <button class="filter-pill" data-filter="descobrir_destinos">Destinos</button>
+                    <button class="filter-pill" data-filter="voos">Voos</button>
+                    <button class="filter-pill" data-filter="roteiro">Roteiros</button>
+                    <button class="filter-pill" data-filter="onibus">Ônibus</button>
+                </div>
+                <div id="history-loading" class="loading-container">
+                    <div class="loading-spinner"></div>
+                    <p style="font-size:13px;color:#888;">Carregando histórico...</p>
+                </div>
+                <div class="card-list" id="history-list"></div>
+                <div id="history-empty" class="empty-state" style="display:none;">
+                    <div class="empty-state-icon">🔍</div>
+                    <h3>Nenhuma busca ainda</h3>
+                    <p>Quando você pesquisar destinos, voos ou roteiros, tudo aparece aqui automaticamente!</p>
+                    <a href="/" class="empty-state-btn">Começar a explorar</a>
+                </div>
+            </div>
+
+            <!-- ===== TAB: DESTINOS ===== -->
+            <div class="tab-panel" id="panel-destinos">
+                <div class="section-header">
+                    <span class="section-title">Destinos salvos</span>
+                </div>
+                <div id="destinations-loading" class="loading-container">
+                    <div class="loading-spinner"></div>
+                    <p style="font-size:13px;color:#888;">Carregando destinos...</p>
+                </div>
+                <div class="card-list" id="destinations-list"></div>
+                <div id="destinations-empty" class="empty-state" style="display:none;">
+                    <div class="empty-state-icon">✈️</div>
+                    <h3>Nenhum destino salvo</h3>
+                    <p>Quando a Tripinha recomendar destinos pra você, eles serão salvos automaticamente aqui!</p>
+                    <a href="/descobrir-destinos.html" class="empty-state-btn">Descobrir destinos</a>
+                </div>
+            </div>
+
+            <!-- ===== TAB: ROTEIROS ===== -->
+            <div class="tab-panel" id="panel-roteiros">
+                <div class="section-header">
+                    <span class="section-title">Roteiros gerados</span>
+                </div>
+                <div id="itineraries-loading" class="loading-container">
+                    <div class="loading-spinner"></div>
+                    <p style="font-size:13px;color:#888;">Carregando roteiros...</p>
+                </div>
+                <div class="card-list" id="itineraries-list"></div>
+                <div id="itineraries-empty" class="empty-state" style="display:none;">
+                    <div class="empty-state-icon">🗺️</div>
+                    <h3>Nenhum roteiro salvo</h3>
+                    <p>Roteiros gerados pela Tripinha serão salvos automaticamente aqui para você consultar quando quiser!</p>
+                    <a href="/" class="empty-state-btn">Planejar uma viagem</a>
+                </div>
+            </div>
+
+            <!-- ===== TAB: PERFIL ===== -->
+            <div class="tab-panel" id="panel-perfil">
+                <div class="profile-form">
+                    <div class="form-section">
+                        <div class="form-section-title">👤 Dados Pessoais</div>
+                        <div class="form-group">
+                            <label class="form-label">Nome de exibição</label>
+                            <input type="text" class="form-input" id="pref-nome" placeholder="Como quer ser chamado(a)?" />
+                        </div>
+                    </div>
+
+                    <div class="form-section">
+                        <div class="form-section-title">🌍 Preferências de Viagem</div>
+                        <div class="form-group">
+                            <label class="form-label">Moeda preferida</label>
+                            <select class="form-select" id="pref-moeda">
+                                <option value="BRL">R$ Real Brasileiro</option>
+                                <option value="USD">$ Dólar Americano</option>
+                                <option value="EUR">€ Euro</option>
+                                <option value="GBP">£ Libra Esterlina</option>
+                                <option value="ARS">$ Peso Argentino</option>
+                                <option value="CLP">$ Peso Chileno</option>
+                                <option value="COP">$ Peso Colombiano</option>
+                                <option value="MXN">$ Peso Mexicano</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Cidade de origem padrão (IATA)</label>
+                            <input type="text" class="form-input" id="pref-origem-iata" placeholder="Ex: GRU, CGH, GIG" maxlength="3" style="text-transform: uppercase;" />
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Nome da cidade de origem</label>
+                            <input type="text" class="form-input" id="pref-origem-nome" placeholder="Ex: São Paulo, Rio de Janeiro" />
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Tipo de viajante</label>
+                            <select class="form-select" id="pref-tipo-viajante">
+                                <option value="">Selecione...</option>
+                                <option value="sozinho">Viajo sozinho(a)</option>
+                                <option value="casal">Em casal</option>
+                                <option value="familia">Família</option>
+                                <option value="amigos">Com amigos</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-section">
+                        <div class="form-section-title">❤️ Interesses (selecione vários)</div>
+                        <div class="chips-container" id="interest-chips">
+                            <button class="chip" data-interest="praia">🏖️ Praia</button>
+                            <button class="chip" data-interest="cultura">🏛️ Cultura</button>
+                            <button class="chip" data-interest="gastronomia">🍽️ Gastronomia</button>
+                            <button class="chip" data-interest="aventura">⛰️ Aventura</button>
+                            <button class="chip" data-interest="natureza">🌿 Natureza</button>
+                            <button class="chip" data-interest="noite">🌃 Vida Noturna</button>
+                            <button class="chip" data-interest="compras">🛍️ Compras</button>
+                            <button class="chip" data-interest="historia">📜 História</button>
+                            <button class="chip" data-interest="relaxamento">🧘 Relaxamento</button>
+                            <button class="chip" data-interest="esportes">⚽ Esportes</button>
+                        </div>
+                    </div>
+
+                    <button class="btn-save-profile" id="btn-save-profile" onclick="saveProfile()">
+                        Salvar Preferências
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div class="toast" id="toast"></div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="/js/benetrip-auth.js"></script>
+    <script src="/js/benetrip-login-modal.js"></script>
+
+    <script>
+        // ==========================================
+        // MINHA CONTA - Controller
+        // ==========================================
+
+        let allSearchHistory = [];
+        let currentFilter = 'all';
+
+        // ===== INICIALIZAÇÃO =====
+        document.addEventListener('DOMContentLoaded', () => {
+            // Esperar auth inicializar
+            BenetripAuth.onAuthChange((event, user) => {
+                if (user) {
+                    showLoggedInContent();
+                } else {
+                    showNotLoggedIn();
+                }
+            });
+
+            // Verificar se já está logado
+            setTimeout(() => {
+                if (BenetripAuth.isLoggedIn()) {
+                    showLoggedInContent();
+                } else {
+                    showNotLoggedIn();
+                }
+            }, 500);
+
+            // Tab navigation
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.addEventListener('click', () => switchTab(btn.dataset.tab));
+            });
+
+            // History filter pills
+            document.querySelectorAll('.filter-pill').forEach(pill => {
+                pill.addEventListener('click', () => filterHistory(pill.dataset.filter));
+            });
+
+            // Interest chips toggle
+            document.querySelectorAll('.chip').forEach(chip => {
+                chip.addEventListener('click', () => chip.classList.toggle('active'));
+            });
+
+            // Clear history button
+            document.getElementById('btn-clear-history').addEventListener('click', confirmClearHistory);
+
+            // Check URL hash for initial tab
+            const hash = window.location.hash.substring(1);
+            if (['historico', 'destinos', 'roteiros', 'perfil'].includes(hash)) {
+                switchTab(hash);
+            }
+        });
+
+        function showNotLoggedIn() {
+            document.getElementById('not-logged-in').style.display = 'block';
+            document.getElementById('logged-in-content').style.display = 'none';
+        }
+
+        function showLoggedInContent() {
+            document.getElementById('not-logged-in').style.display = 'none';
+            document.getElementById('logged-in-content').style.display = 'block';
+            loadProfileCard();
+            loadSearchHistory();
+            loadSavedDestinations();
+            loadSavedItineraries();
+            loadProfileForm();
+        }
+
+        // ===== TAB SWITCHING =====
+        function switchTab(tab) {
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.tab === tab);
+            });
+            document.querySelectorAll('.tab-panel').forEach(panel => {
+                panel.classList.toggle('active', panel.id === `panel-${tab}`);
+            });
+            window.location.hash = tab;
+        }
+
+        // ===== PROFILE CARD =====
+        function loadProfileCard() {
+            const user = BenetripAuth.getUser();
+            const name = BenetripAuth.getUserDisplayName();
+            const avatar = BenetripAuth.getUserAvatar();
+
+            document.getElementById('profile-name').textContent = name;
+            document.getElementById('profile-email').textContent = user?.email || '';
+
+            if (avatar) {
+                document.getElementById('profile-avatar').src = avatar;
+                document.getElementById('profile-avatar').style.display = 'block';
+                document.getElementById('profile-initials').style.display = 'none';
+            } else {
+                document.getElementById('profile-avatar').style.display = 'none';
+                document.getElementById('profile-initials').style.display = 'flex';
+                document.getElementById('profile-initials').textContent = name.charAt(0).toUpperCase();
+            }
+        }
+
+        // ===== SEARCH HISTORY =====
+        async function loadSearchHistory() {
+            const loading = document.getElementById('history-loading');
+            const list = document.getElementById('history-list');
+            const empty = document.getElementById('history-empty');
+            const clearBtn = document.getElementById('btn-clear-history');
+
+            loading.style.display = 'block';
+            list.innerHTML = '';
+            empty.style.display = 'none';
+
+            try {
+                allSearchHistory = await BenetripAuth.getSearchHistory(50);
+                loading.style.display = 'none';
+
+                document.getElementById('stat-searches').textContent = allSearchHistory.length;
+                clearBtn.style.display = allSearchHistory.length > 0 ? '' : 'none';
+
+                renderHistory();
+            } catch (e) {
+                loading.style.display = 'none';
+                empty.style.display = 'block';
+                console.error('Erro ao carregar histórico:', e);
+            }
+        }
+
+        function filterHistory(filter) {
+            currentFilter = filter;
+            document.querySelectorAll('.filter-pill').forEach(pill => {
+                pill.classList.toggle('active', pill.dataset.filter === filter);
+            });
+            renderHistory();
+        }
+
+        function renderHistory() {
+            const list = document.getElementById('history-list');
+            const empty = document.getElementById('history-empty');
+
+            const filtered = currentFilter === 'all'
+                ? allSearchHistory
+                : allSearchHistory.filter(s => s.tipo_busca === currentFilter);
+
+            if (filtered.length === 0) {
+                list.innerHTML = '';
+                empty.style.display = 'block';
+                return;
+            }
+
+            empty.style.display = 'none';
+            list.innerHTML = filtered.map(search => {
+                const icon = getSearchIcon(search.tipo_busca);
+                const title = getSearchTitle(search);
+                const detail = getSearchDetail(search);
+                const date = formatDate(search.created_at);
+
+                return `
+                    <div class="history-card">
+                        <div class="history-icon ${search.tipo_busca.replace('_', '-')}">${icon}</div>
+                        <div class="history-info">
+                            <div class="history-title">${title}</div>
+                            <div class="history-detail">${detail}</div>
+                            <div class="history-date">${date}</div>
+                        </div>
+                        <div class="history-actions">
+                            <button class="btn-icon danger" onclick="deleteSearchItem('${search.id}')" title="Remover">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="3 6 5 6 21 6"></polyline>
+                                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function getSearchIcon(tipo) {
+            const icons = {
+                'descobrir_destinos': '🌍',
+                'todos_destinos': '🗺️',
+                'voos': '✈️',
+                'voos_baratos': '💰',
+                'roteiro': '📋',
+                'onibus': '🚌',
+                'carro': '🚗'
+            };
+            return icons[tipo] || '🔍';
+        }
+
+        function getSearchTitle(search) {
+            const p = search.parametros || {};
+            const r = search.resultados_resumo || {};
+
+            switch (search.tipo_busca) {
+                case 'descobrir_destinos':
+                    return r.destino_top ? `Descobrir: ${r.destino_top} e mais ${(r.total_destinos || 1) - 1}` : 'Descobrir Destinos';
+                case 'voos':
+                case 'voos_baratos':
+                    return p.destino ? `Voo: ${p.origem || '?'} → ${p.destino}` : 'Busca de Voos';
+                case 'roteiro':
+                    return p.destino_nome ? `Roteiro: ${p.destino_nome}` : 'Gerar Roteiro';
+                case 'onibus':
+                    return p.destino_nome ? `Ônibus: ${p.origem_nome || '?'} → ${p.destino_nome}` : 'Busca de Ônibus';
+                case 'carro':
+                    return p.destino_nome ? `Carro: ${p.destino_nome}` : 'Viagem de Carro';
+                default:
+                    return 'Busca';
+            }
+        }
+
+        function getSearchDetail(search) {
+            const p = search.parametros || {};
+            const parts = [];
+
+            if (p.data_ida) parts.push(formatDateShort(p.data_ida));
+            if (p.data_volta) parts.push(`→ ${formatDateShort(p.data_volta)}`);
+            if (p.orcamento) parts.push(`Orçamento: ${formatCurrency(p.orcamento, p.moeda)}`);
+            if (p.tipo_viajante) parts.push(capitalize(p.tipo_viajante));
+
+            return parts.join(' • ') || 'Sem detalhes';
+        }
+
+        async function deleteSearchItem(id) {
+            try {
+                await BenetripAuth.deleteSearch(id);
+                allSearchHistory = allSearchHistory.filter(s => s.id !== id);
+                document.getElementById('stat-searches').textContent = allSearchHistory.length;
+                renderHistory();
+                showToast('Busca removida');
+            } catch (e) {
+                showToast('Erro ao remover', 'error');
+            }
+        }
+
+        function confirmClearHistory() {
+            showConfirm(
+                'Limpar histórico?',
+                'Todas as suas buscas serão removidas permanentemente.',
+                async () => {
+                    try {
+                        await BenetripAuth.clearSearchHistory();
+                        allSearchHistory = [];
+                        document.getElementById('stat-searches').textContent = '0';
+                        renderHistory();
+                        showToast('Histórico limpo');
+                    } catch (e) {
+                        showToast('Erro ao limpar histórico', 'error');
+                    }
+                }
+            );
+        }
+
+        // ===== SAVED DESTINATIONS =====
+        async function loadSavedDestinations() {
+            const loading = document.getElementById('destinations-loading');
+            const list = document.getElementById('destinations-list');
+            const empty = document.getElementById('destinations-empty');
+
+            loading.style.display = 'block';
+            list.innerHTML = '';
+            empty.style.display = 'none';
+
+            try {
+                const destinations = await BenetripAuth.getSavedDestinations();
+                loading.style.display = 'none';
+
+                document.getElementById('stat-destinations').textContent = destinations.length;
+
+                if (destinations.length === 0) {
+                    empty.style.display = 'block';
+                    return;
+                }
+
+                list.innerHTML = destinations.map(dest => `
+                    <div class="destination-card">
+                        ${dest.imagem_url ? `<img class="destination-img" src="${dest.imagem_url}" alt="${dest.destino_nome}" onerror="this.style.display='none'"/>` : ''}
+                        <div class="destination-body">
+                            <div class="destination-header">
+                                <span class="destination-name">${dest.destino_nome}${dest.destino_pais ? `, ${dest.destino_pais}` : ''}</span>
+                                ${dest.preco_encontrado ? `<span class="destination-price">${formatCurrency(dest.preco_encontrado, dest.moeda_preco)}</span>` : ''}
+                            </div>
+                            <div class="destination-meta">
+                                ${dest.iata_code ? `<span>✈️ ${dest.iata_code}</span>` : ''}
+                                <span>📅 Salvo em ${formatDate(dest.created_at)}</span>
+                            </div>
+                            ${dest.notas ? `<p style="font-size:12px;color:#666;margin-top:8px;font-style:italic;">"${dest.notas}"</p>` : ''}
+                            <div class="destination-footer">
+                                <a href="/descobrir-destinos.html?destino=${encodeURIComponent(dest.destino_nome)}" class="btn-sm btn-sm-primary">
+                                    🔍 Pesquisar novamente
+                                </a>
+                                <button class="btn-icon danger" onclick="removeDestinationItem('${dest.id}')" title="Remover">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <polyline points="3 6 5 6 21 6"></polyline>
+                                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (e) {
+                loading.style.display = 'none';
+                empty.style.display = 'block';
+                console.error('Erro ao carregar destinos:', e);
+            }
+        }
+
+        async function removeDestinationItem(id) {
+            showConfirm('Remover destino?', 'Este destino será removido dos salvos.', async () => {
+                try {
+                    await BenetripAuth.removeDestination(id);
+                    loadSavedDestinations();
+                    showToast('Destino removido');
+                } catch (e) {
+                    showToast('Erro ao remover', 'error');
+                }
+            });
+        }
+
+        // ===== SAVED ITINERARIES =====
+        async function loadSavedItineraries() {
+            const loading = document.getElementById('itineraries-loading');
+            const list = document.getElementById('itineraries-list');
+            const empty = document.getElementById('itineraries-empty');
+
+            loading.style.display = 'block';
+            list.innerHTML = '';
+            empty.style.display = 'none';
+
+            try {
+                const itineraries = await BenetripAuth.getSavedItineraries();
+                loading.style.display = 'none';
+
+                document.getElementById('stat-itineraries').textContent = itineraries.length;
+
+                if (itineraries.length === 0) {
+                    empty.style.display = 'block';
+                    return;
+                }
+
+                list.innerHTML = itineraries.map(it => {
+                    const roteiro = it.dados_roteiro || {};
+                    const preview = roteiro.resumo || (roteiro.dias?.[0]?.atividades?.[0]?.descricao) || 'Roteiro personalizado pela Tripinha';
+                    const dates = it.data_ida && it.data_volta
+                        ? `${formatDateShort(it.data_ida)} → ${formatDateShort(it.data_volta)}`
+                        : formatDate(it.created_at);
+
+                    return `
+                        <div class="itinerary-card">
+                            <div class="itinerary-card-header">
+                                <span class="itinerary-dest">🗺️ ${it.destino_nome}${it.destino_pais ? `, ${it.destino_pais}` : ''}</span>
+                                ${it.num_dias ? `<span class="itinerary-days">${it.num_dias} dias</span>` : ''}
+                            </div>
+                            <div class="itinerary-body">
+                                <div class="itinerary-dates">📅 ${dates}</div>
+                                <div class="itinerary-preview">${preview}</div>
+                            </div>
+                            <div class="itinerary-footer">
+                                <button class="btn-sm btn-sm-primary" onclick="viewItinerary('${it.id}')">
+                                    📖 Ver roteiro
+                                </button>
+                                <button class="btn-sm btn-sm-outline" onclick="shareItineraryItem('${it.id}')">
+                                    🔗 Compartilhar
+                                </button>
+                                <button class="btn-icon danger" onclick="removeItineraryItem('${it.id}')" title="Remover" style="margin-left:auto;">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <polyline points="3 6 5 6 21 6"></polyline>
+                                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                    </svg>
+                                </button>
+                            </div>
+                            <div id="share-${it.id}" style="display:none;padding:0 14px 14px;">
+                                <div class="share-link-container">
+                                    <input class="share-link-input" id="share-link-${it.id}" readonly />
+                                    <button class="btn-copy" onclick="copyShareLink('${it.id}')">Copiar</button>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            } catch (e) {
+                loading.style.display = 'none';
+                empty.style.display = 'block';
+                console.error('Erro ao carregar roteiros:', e);
+            }
+        }
+
+        function viewItinerary(id) {
+            // TODO: abrir roteiro completo em nova página ou modal
+            showToast('Funcionalidade em desenvolvimento');
+        }
+
+        async function shareItineraryItem(id) {
+            const shareDiv = document.getElementById(`share-${id}`);
+            const linkInput = document.getElementById(`share-link-${id}`);
+
+            if (shareDiv.style.display !== 'none') {
+                shareDiv.style.display = 'none';
+                return;
+            }
+
+            try {
+                const link = await BenetripAuth.shareItinerary(id);
+                linkInput.value = link;
+                shareDiv.style.display = 'block';
+                showToast('Link de compartilhamento gerado!');
+            } catch (e) {
+                showToast('Erro ao gerar link', 'error');
+            }
+        }
+
+        function copyShareLink(id) {
+            const input = document.getElementById(`share-link-${id}`);
+            input.select();
+            navigator.clipboard.writeText(input.value).then(() => {
+                showToast('Link copiado!');
+            }).catch(() => {
+                document.execCommand('copy');
+                showToast('Link copiado!');
+            });
+        }
+
+        async function removeItineraryItem(id) {
+            showConfirm('Remover roteiro?', 'Este roteiro será removido permanentemente.', async () => {
+                try {
+                    await BenetripAuth.removeItinerary(id);
+                    loadSavedItineraries();
+                    showToast('Roteiro removido');
+                } catch (e) {
+                    showToast('Erro ao remover', 'error');
+                }
+            });
+        }
+
+        // ===== PROFILE FORM =====
+        async function loadProfileForm() {
+            try {
+                const profile = await BenetripAuth.getProfile();
+                if (!profile) return;
+
+                document.getElementById('pref-nome').value = profile.nome_exibicao || '';
+                document.getElementById('pref-moeda').value = profile.moeda_preferida || 'BRL';
+                document.getElementById('pref-origem-iata').value = profile.cidade_origem_padrao || '';
+                document.getElementById('pref-origem-nome').value = profile.cidade_origem_nome || '';
+
+                const prefs = profile.preferencias_viagem || {};
+                if (prefs.tipo_viajante) {
+                    document.getElementById('pref-tipo-viajante').value = prefs.tipo_viajante;
+                }
+                if (prefs.interesses?.length) {
+                    prefs.interesses.forEach(interest => {
+                        const chip = document.querySelector(`.chip[data-interest="${interest}"]`);
+                        if (chip) chip.classList.add('active');
+                    });
+                }
+            } catch (e) {
+                console.error('Erro ao carregar perfil:', e);
+            }
+        }
+
+        async function saveProfile() {
+            const btn = document.getElementById('btn-save-profile');
+            btn.disabled = true;
+            btn.textContent = 'Salvando...';
+
+            const interesses = Array.from(document.querySelectorAll('.chip.active'))
+                .map(chip => chip.dataset.interest);
+
+            try {
+                await BenetripAuth.updateProfile({
+                    nome_exibicao: document.getElementById('pref-nome').value.trim(),
+                    moeda_preferida: document.getElementById('pref-moeda').value,
+                    cidade_origem_padrao: document.getElementById('pref-origem-iata').value.trim().toUpperCase(),
+                    cidade_origem_nome: document.getElementById('pref-origem-nome').value.trim(),
+                    preferencias_viagem: {
+                        tipo_viajante: document.getElementById('pref-tipo-viajante').value,
+                        interesses: interesses
+                    }
+                });
+
+                showToast('Preferências salvas! 🐾');
+                loadProfileCard(); // atualizar nome no card
+            } catch (e) {
+                showToast('Erro ao salvar preferências', 'error');
+                console.error(e);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Salvar Preferências';
+            }
+        }
+
+        // ===== UTILITÁRIOS =====
+        function formatDate(dateStr) {
+            if (!dateStr) return '';
+            const d = new Date(dateStr);
+            const now = new Date();
+            const diffMs = now - d;
+            const diffMin = Math.floor(diffMs / 60000);
+            const diffHrs = Math.floor(diffMs / 3600000);
+            const diffDays = Math.floor(diffMs / 86400000);
+
+            if (diffMin < 1) return 'Agora';
+            if (diffMin < 60) return `${diffMin}min atrás`;
+            if (diffHrs < 24) return `${diffHrs}h atrás`;
+            if (diffDays < 7) return `${diffDays} dia${diffDays > 1 ? 's' : ''} atrás`;
+
+            return d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' });
+        }
+
+        function formatDateShort(dateStr) {
+            if (!dateStr) return '';
+            const d = new Date(dateStr + 'T00:00:00');
+            return d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
+        }
+
+        function formatCurrency(value, currency = 'BRL') {
+            const symbols = { BRL: 'R$', USD: '$', EUR: '€', GBP: '£', ARS: '$', CLP: '$', COP: '$', MXN: '$' };
+            const symbol = symbols[currency] || currency;
+            return `${symbol} ${Number(value).toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+        }
+
+        function capitalize(str) {
+            return str ? str.charAt(0).toUpperCase() + str.slice(1) : '';
+        }
+
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.className = `toast ${type}`;
+            requestAnimationFrame(() => toast.classList.add('visible'));
+            setTimeout(() => toast.classList.remove('visible'), 3000);
+        }
+
+        function showConfirm(title, message, onConfirm) {
+            const overlay = document.createElement('div');
+            overlay.className = 'confirm-overlay';
+            overlay.innerHTML = `
+                <div class="confirm-dialog">
+                    <h3>${title}</h3>
+                    <p>${message}</p>
+                    <div class="confirm-buttons">
+                        <button class="btn-cancel" id="confirm-cancel">Cancelar</button>
+                        <button class="btn-confirm-delete" id="confirm-ok">Confirmar</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(overlay);
+
+            overlay.querySelector('#confirm-cancel').addEventListener('click', () => overlay.remove());
+            overlay.querySelector('#confirm-ok').addEventListener('click', () => {
+                overlay.remove();
+                onConfirm();
+            });
+            overlay.addEventListener('click', (e) => {
+                if (e.target === overlay) overlay.remove();
+            });
+        }
+    </script>
+</body>
+</html>
