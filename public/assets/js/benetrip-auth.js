@@ -152,29 +152,37 @@ const BenetripAuth = (function () {
             });
 
             // Escutar mudanças de autenticação
-            supabase.auth.onAuthStateChange(async (event, session) => {
+            // IMPORTANTE: callback NÃO é async — atualiza UI imediatamente
+            // _loadProfile() roda em background (fire-and-forget)
+            supabase.auth.onAuthStateChange((event, session) => {
                 console.log('[BenetripAuth] Auth event:', event);
 
                 if (session?.user) {
                     currentUser = session.user;
-                    await _loadProfile();
+                    _updateUI(currentUser);
+                    _notifyCallbacks(event, currentUser);
+                    // Carregar perfil em background (não bloqueia UI)
+                    _loadProfile().catch(() => {});
                 } else {
                     currentUser = null;
                     currentProfile = null;
+                    _updateUI(null);
+                    _notifyCallbacks(event, null);
                 }
-
-                _updateUI(currentUser);
-                _notifyCallbacks(event, currentUser);
             });
 
-            // Verificar sessão existente
-            // (com lock non-blocking, getSession resolve rápido)
+            // Verificar sessão existente (fallback caso onAuthStateChange não tenha disparado)
             if (!currentUser) {
                 try {
-                    const { data: { session } } = await supabase.auth.getSession();
-                    if (session?.user) {
-                        currentUser = session.user;
-                        await _loadProfile();
+                    const sessionResult = await Promise.race([
+                        supabase.auth.getSession(),
+                        new Promise((_, reject) =>
+                            setTimeout(() => reject(new Error('getSession timeout')), 4000)
+                        )
+                    ]);
+                    if (sessionResult?.data?.session?.user) {
+                        currentUser = sessionResult.data.session.user;
+                        _loadProfile().catch(() => {}); // background
                     }
                 } catch (sessionError) {
                     console.warn('[BenetripAuth] getSession falhou:', sessionError.message);
@@ -567,10 +575,10 @@ const BenetripAuth = (function () {
         }
 
         document.querySelectorAll('[data-auth-show="logged-in"]').forEach(el => {
-            el.style.display = user ? '' : 'none';
+            el.style.display = user ? 'block' : 'none';
         });
         document.querySelectorAll('[data-auth-show="logged-out"]').forEach(el => {
-            el.style.display = user ? 'none' : '';
+            el.style.display = user ? 'none' : 'block';
         });
     }
 
