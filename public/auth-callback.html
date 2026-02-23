@@ -108,51 +108,19 @@
          */
         (function() {
 
-            // ── MONKEY-PATCH: navigator.locks ──
-            // Mesmo patch usado no benetrip-auth.js
-            const _activeLocks = new Map();
-
-            function _simpleLockRequest(name, optionsOrFn, maybeFn) {
-                let fn;
-                const acquireTimeout = 10000;
-
-                if (typeof optionsOrFn === 'function') {
-                    fn = optionsOrFn;
-                } else {
-                    fn = maybeFn;
-                }
-
+            // ── MONKEY-PATCH: navigator.locks (non-blocking) ──
+            function _noopLockRequest(name, optionsOrFn, maybeFn) {
+                const fn = typeof optionsOrFn === 'function' ? optionsOrFn : maybeFn;
                 if (typeof fn !== 'function') return Promise.resolve(undefined);
-
-                const run = async () => {
-                    const existing = _activeLocks.get(name);
-                    if (existing) {
-                        try {
-                            await Promise.race([
-                                existing,
-                                new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), acquireTimeout))
-                            ]);
-                        } catch (_) { /* prosseguir */ }
-                    }
-
-                    const promise = (async () => {
-                        try { return await fn({ name, mode: 'exclusive' }); }
-                        catch (e) { return undefined; }
-                    })();
-                    _activeLocks.set(name, promise);
-
-                    try { return await promise; }
-                    finally { if (_activeLocks.get(name) === promise) _activeLocks.delete(name); }
-                };
-
-                return run();
+                try { return fn({ name, mode: 'exclusive' }); }
+                catch (e) { return Promise.resolve(undefined); }
             }
 
             if (typeof navigator !== 'undefined') {
                 try {
                     Object.defineProperty(navigator, 'locks', {
                         value: {
-                            request: _simpleLockRequest,
+                            request: _noopLockRequest,
                             query: async () => ({ held: [], pending: [] })
                         },
                         writable: true,
