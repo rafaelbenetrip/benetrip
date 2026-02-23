@@ -377,6 +377,7 @@ const BenetripTodosDestinos = {
             if (!sorted.length) throw new Error('Nenhum destino encontrado');
 
             this.state.todosDestinos = sorted;
+            BenetripAutoSave.salvarBuscaTodosDestinos(this.state.formData, sorted);
             this.prepararDadosFiltros(sorted);
             this.resetFiltros();
             this.aplicarFiltrosEMostrar();
