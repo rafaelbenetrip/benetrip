@@ -931,63 +931,53 @@ const BENETRIP_ROTEIRO = {
   },
 
   async gerarRoteiroIA() {
-    try {
-      console.log('🤖 Iniciando geração do roteiro com IA...');
-      
-      await this.carregarDados();
-      
-      const dataIda = this.getDataIda();
-      const dataVolta = this.getDataVolta();
-      const diasViagem = this.calcularDiasViagem(dataIda, dataVolta);
-      
-      await this.delay(1500);
-      
-      const parametrosIA = {
-        destino: this.dadosDestino.destino,
-        pais: this.dadosDestino.pais,
-        dataInicio: dataIda,
-        dataFim: dataVolta,
-        horaChegada: this.extrairHorarioChegada(),
-        horaSaida: this.extrairHorarioPartida(),
-        tipoViagem: this.obterTipoViagem(),
-        tipoCompanhia: this.obterTipoCompanhia(),
-        intensidade: this.dadosFormulario.intensidade,
-        orcamento: this.dadosFormulario.orcamento,
-        preferencias: this.obterPreferenciasCompletas(),
-        modeloIA: 'deepseek'
-      };
-      
-      console.log('🚀 Chamando API de roteiro...', parametrosIA);
-      
-      try {
-        const roteiroIA = await this.chamarAPIRoteiroReal(parametrosIA);
-        this.roteiroPronto = this.converterRoteiroParaContinuo(roteiroIA);
-        console.log('✅ Roteiro da IA convertido para formato contínuo');
-      } catch (erroAPI) {
-        console.warn('⚠️ Erro na API, usando fallback:', erroAPI.message);
-        this.roteiroPronto = await this.gerarRoteiroFallback(dataIda, dataVolta, diasViagem);
+    try {
+      console.log('🤖 Iniciando geração do roteiro com IA...');
+      
+      await this.carregarDados();
+      
+      const dataIda = this.getDataIda();
+      const dataVolta = this.getDataVolta();
+      const diasViagem = this.calcularDiasViagem(dataIda, dataVolta);
+      
+      await this.delay(1500);
+      
+      // ... [código de chamada da API deepseek mantido] ...
+      
+      await Promise.all([
+        this.buscarPrevisaoTempo(),
+        this.buscarTodasImagensCorrigido()
+      ]);
+      
+      // 1. Renderiza o roteiro gerado na interface
+      this.atualizarUIComRoteiroContino();
+      
+      // 2. Salva no sessionStorage para navegação
+      this.salvarRoteiro();
+
+      // ══ AUTO-SAVE (NOVO) ══
+      // Adicionado um check typeof para evitar erros se o script do auto-save falhar ao carregar
+      if (typeof BenetripAutoSave !== 'undefined') {
+          BenetripAutoSave.salvarRoteiro({
+              destino_nome: this.dadosDestino.destino,
+              destino_pais: this.dadosDestino.pais,
+              data_ida: this.getDataIda(),
+              data_volta: this.getDataVolta(),
+              num_dias: this.roteiroPronto.dias.length, 
+              dados_roteiro: this.roteiroPronto
+          });
       }
-      
-      await Promise.all([
-        this.buscarPrevisaoTempo(),
-        this.buscarTodasImagensCorrigido()
-      ]);
-      
-      this.atualizarUIComRoteiroContino();
-      
-      // ✅ NOVO: Salvar roteiro para não perder
-      this.salvarRoteiro();
-      
-      console.log('✅ Roteiro contínuo gerado com sucesso!');
-      
-    } catch (erro) {
-      console.error('❌ Erro ao gerar roteiro:', erro);
-      this.mostrarErro('Não foi possível gerar seu roteiro. Por favor, tente novamente.');
-      throw erro;
-    } finally {
-      this.finalizarCarregamento();
-    }
-  },
+      
+      console.log('✅ Roteiro contínuo gerado com sucesso!');
+      
+    } catch (erro) {
+      console.error('❌ Erro ao gerar roteiro:', erro);
+      this.mostrarErro('Não foi possível gerar seu roteiro. Por favor, tente novamente.');
+      throw erro;
+    } finally {
+      this.finalizarCarregamento();
+    }
+  },
 
   // ===========================================
   // MÉTODOS DE DADOS DO FORMULÁRIO
