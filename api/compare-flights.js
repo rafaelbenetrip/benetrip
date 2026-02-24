@@ -1,21 +1,22 @@
-// api/compare-flights.js - BENETRIP COMPARAR VOOS v2.0
+// api/compare-flights.js - BENETRIP COMPARAR VOOS v3.0
 // Compara voos para destino específico em múltiplas combinações de datas
 // Suporta adultos, crianças e bebês
 // Traduz ALL extensions EN→PT robusto
 // Sanitiza priceInsights rigoroso
 // Extrai horários de partida para filtros frontend
+// v3: tradução ampliada, priceInsights mais defensivo, número de paradas traduzido
 
-export const maxDuration = 120;
+export const maxDuration = 60;
 
 const MAX_IDAS = 4;
 const MAX_VOLTAS = 4;
-const BATCH_SIZE = 8; // Processar mais em paralelo para evitar timeout
-const PER_REQUEST_TIMEOUT = 20000; // 20s por request individual
+const BATCH_SIZE = 4;
 
 // ============================================================
-// TRADUÇÃO de extensions EN → PT (abrangente)
+// TRADUÇÃO de extensions EN → PT (abrangente v3)
 // ============================================================
 const TRADUCOES_EXT = {
+    // Bagagem
     'Free change, possible fare difference': 'Alteração gratuita, possível diferença tarifária',
     'Full refund for cancellations': 'Reembolso total em cancelamentos',
     'Checked baggage not included in price': 'Bagagem despachada não incluída no preço',
@@ -30,8 +31,22 @@ const TRADUCOES_EXT = {
     '2 checked bags included': '2 bagagens despachadas incluídas',
     'First checked bag free': 'Primeira bagagem despachada gratuita',
     'No bags included': 'Sem bagagem incluída',
+    'Checked baggage included': 'Bagagem despachada incluída',
+    'Carry-on bag': 'Bagagem de mão',
+    'Personal item': 'Item pessoal',
+    'Checked bag': 'Bagagem despachada',
+    '1 carry-on bag': '1 bagagem de mão',
+    '2 carry-on bags': '2 bagagens de mão',
+    'Carry-on bag and personal item included': 'Bagagem de mão e item pessoal incluídos',
+    'No personal item': 'Sem item pessoal',
+
+    // Alterações
     'No change fee': 'Sem taxa de alteração',
     'Change for a fee': 'Alteração com taxa',
+    'Free change': 'Alteração gratuita',
+    'Change not allowed': 'Alteração não permitida',
+
+    // Reembolso e cancelamento
     'Non-refundable': 'Não reembolsável',
     'Partial refund': 'Reembolso parcial',
     'No refund': 'Sem reembolso',
@@ -41,6 +56,9 @@ const TRADUCOES_EXT = {
     'Free cancellation': 'Cancelamento gratuito',
     'No cancellation': 'Sem cancelamento',
     'Possible fare difference': 'Possível diferença tarifária',
+    'Cancellation not allowed': 'Cancelamento não permitido',
+
+    // Entretenimento e conforto
     'Wi-Fi available': 'Wi-Fi disponível',
     'In-seat power outlet': 'Tomada no assento',
     'In-seat USB outlet': 'USB no assento',
@@ -50,36 +68,77 @@ const TRADUCOES_EXT = {
     'On-demand video': 'Vídeo sob demanda',
     'Streaming entertainment': 'Entretenimento via streaming',
     'Power & USB outlets': 'Tomada e USB',
+    'In-seat power & USB outlets': 'Tomada e USB no assento',
+
+    // Classe
     'Economy': 'Econômica',
     'Premium Economy': 'Premium Economy',
     'Business': 'Executiva',
     'First': 'Primeira Classe',
     'Basic Economy': 'Econômica Básica',
+    'Economy Basic': 'Econômica Básica',
+    'Economy Standard': 'Econômica Padrão',
+    'Economy Flex': 'Econômica Flexível',
+
+    // Assento
     'Standard seat': 'Assento padrão',
     'Extra legroom': 'Espaço extra para pernas',
     'Average legroom': 'Espaço médio para pernas',
     'Below average legroom': 'Espaço abaixo da média',
     'Above average legroom': 'Espaço acima da média',
+
+    // Atrasos
     'Often delayed by 30+ min': 'Frequentemente atrasado 30+ min',
     'Often delayed': 'Frequentemente atrasado',
+
+    // Emissões
     'Carbon emissions estimate': 'Estimativa de emissão de carbono',
     'Lower emissions': 'Menores emissões',
     'Higher emissions': 'Maiores emissões',
     'Average emissions': 'Emissões médias',
+    'Typical CO2 emissions': 'Emissões típicas de CO2',
+
+    // Voo
     'Overnight flight': 'Voo noturno',
     'Red-eye flight': 'Voo madrugada',
     'Self transfer': 'Conexão por conta própria',
     'Multi-airline itinerary': 'Itinerário com múltiplas companhias',
+    'Separate tickets': 'Passagens separadas',
+    'Separate ticket required': 'Passagem separada necessária',
+    'Protected self transfer': 'Conexão protegida por conta própria',
+    'Different airport': 'Aeroporto diferente',
+    'Airport change': 'Troca de aeroporto',
+
+    // Stops
+    'Nonstop': 'Direto',
+    'nonstop': 'direto',
+    '1 stop': '1 parada',
+    '2 stops': '2 paradas',
+    '3 stops': '3 paradas',
+
+    // Misc
+    'Ticket also sold by': 'Passagem também vendida por',
+    'Book on airline website': 'Reserve no site da companhia',
+    'Price may change': 'Preço pode mudar',
+    'Prices include required taxes + fees': 'Preços incluem impostos e taxas',
 };
 
 const TRADUCOES_PARCIAIS = [
     { en: 'Operated by', pt: 'Operado por' },
     { en: 'Ticket also valid on', pt: 'Passagem válida também em' },
+    { en: 'Ticket also sold by', pt: 'Passagem também vendida por' },
+    { en: 'Book with', pt: 'Reserve com' },
+    { en: 'Sold by', pt: 'Vendido por' },
+    { en: 'checked bags', pt: 'bagagens despachadas' },
     { en: 'checked bag', pt: 'bagagem despachada' },
+    { en: 'carry-on bags', pt: 'bagagens de mão' },
+    { en: 'carry-on bag', pt: 'bagagem de mão' },
     { en: 'carry-on', pt: 'bagagem de mão' },
+    { en: 'personal items', pt: 'itens pessoais' },
     { en: 'personal item', pt: 'item pessoal' },
     { en: 'change fee', pt: 'taxa de alteração' },
     { en: 'cancellation', pt: 'cancelamento' },
+    { en: 'refundable', pt: 'reembolsável' },
     { en: 'refund', pt: 'reembolso' },
     { en: 'baggage', pt: 'bagagem' },
     { en: 'luggage', pt: 'bagagem' },
@@ -93,15 +152,30 @@ const TRADUCOES_PARCIAIS = [
     { en: 'not included', pt: 'não incluído' },
     { en: 'included', pt: 'incluído' },
     { en: 'for a fee', pt: 'pago' },
+    { en: 'Free ', pt: 'Gratuito ' },
+    { en: 'free ', pt: 'gratuito ' },
+    { en: ' allowed', pt: ' permitido' },
+    { en: 'not allowed', pt: 'não permitido' },
+    { en: ' available', pt: ' disponível' },
+    { en: 'Nonstop', pt: 'Direto' },
+    { en: 'nonstop', pt: 'direto' },
+    { en: ' stop', pt: ' parada' },
+    { en: ' stops', pt: ' paradas' },
+    { en: 'separate ticket', pt: 'passagem separada' },
+    { en: 'self transfer', pt: 'conexão por conta própria' },
+    { en: 'airport change', pt: 'troca de aeroporto' },
 ];
 
 function traduzirExt(ext) {
     if (!ext || typeof ext !== 'string') return '';
+    // Exact match
     if (TRADUCOES_EXT[ext]) return TRADUCOES_EXT[ext];
+    // Case-insensitive exact match
     const extLower = ext.toLowerCase();
     for (const [en, pt] of Object.entries(TRADUCOES_EXT)) {
         if (en.toLowerCase() === extLower) return pt;
     }
+    // Partial replacement
     let resultado = ext;
     let traduzido = false;
     for (const { en, pt } of TRADUCOES_PARCIAIS) {
@@ -130,16 +204,8 @@ async function searchFlights(params, label) {
     Object.entries(fullParams).forEach(([k, v]) => { if (v !== undefined && v !== null) url.searchParams.set(k, String(v)); });
 
     const t0 = Date.now();
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), PER_REQUEST_TIMEOUT);
-
     try {
-        const resp = await fetch(url.toString(), {
-            method: 'GET',
-            headers: { 'Accept': 'application/json' },
-            signal: controller.signal,
-        });
-        clearTimeout(timeout);
+        const resp = await fetch(url.toString(), { method: 'GET', headers: { 'Accept': 'application/json' } });
         const elapsed = Date.now() - t0;
         if (!resp.ok) { console.error(`[${label}] HTTP ${resp.status}`); return { flights: [], error: `HTTP ${resp.status}`, elapsed }; }
         const data = await resp.json();
@@ -148,11 +214,7 @@ async function searchFlights(params, label) {
         console.log(`[${label}] ${best.length + other.length} voos (${elapsed}ms)`);
         return { flights: [...best, ...other], priceInsights: data.price_insights || null, airports: data.airports || null, error: null, elapsed, isBest: best.length };
     } catch (err) {
-        clearTimeout(timeout);
-        const elapsed = Date.now() - t0;
-        const msg = err.name === 'AbortError' ? `Timeout (${PER_REQUEST_TIMEOUT / 1000}s)` : err.message;
-        console.warn(`[${label}] ⚠️ ${msg} (${elapsed}ms)`);
-        return { flights: [], error: msg, elapsed };
+        return { flights: [], error: err.message, elapsed: Date.now() - t0 };
     }
 }
 
@@ -194,12 +256,14 @@ function extractFlight(flight, isBestFlight, origemCode, destinoCode) {
             departureHourVolta = extractHour(flightLegs[i].departure_airport.time);
             break;
         }
-        // Fallback: se o leg anterior chega no destino
         if (i > 0 && flightLegs[i - 1].arrival_airport.id === destinoCode) {
             departureHourVolta = extractHour(flightLegs[i].departure_airport.time);
             break;
         }
     }
+
+    // Traduzir extensions no nível do voo
+    const translatedExtensions = (flight.extensions || []).map(traduzirExt).filter(Boolean);
 
     return {
         price: flight.price || 0,
@@ -209,7 +273,7 @@ function extractFlight(flight, isBestFlight, origemCode, destinoCode) {
         legs: flightLegs, layovers: layoverDetails,
         is_best: isBestFlight,
         carbon_emissions: flight.carbon_emissions?.this_flight ? Math.round(flight.carbon_emissions.this_flight / 1000) : null,
-        extensions: (flight.extensions || []).map(traduzirExt).filter(Boolean),
+        extensions: translatedExtensions,
         departureHourIda,
         departureHourVolta,
     };
@@ -308,23 +372,24 @@ export default async function handler(req, res) {
             const melhorPrecoPP = voosDetalhados[0]?.pricePP || null;
             if (melhorPreco && melhorPreco < globalCheapest) { globalCheapest = melhorPreco; globalCheapestCombo = combo; }
 
-            // Sanitizar priceInsights de forma rigorosa
+            // Sanitizar priceInsights de forma rigorosa v3
             let sanePI = null;
             if (priceInsights && typeof priceInsights === 'object') {
                 sanePI = {};
-                if (typeof priceInsights.lowest_price === 'number' && priceInsights.lowest_price > 0) {
+                if (typeof priceInsights.lowest_price === 'number' && priceInsights.lowest_price > 0 && isFinite(priceInsights.lowest_price)) {
                     sanePI.lowest_price = priceInsights.lowest_price;
                 }
                 if (priceInsights.price_level && typeof priceInsights.price_level === 'string') {
                     sanePI.price_level = priceInsights.price_level;
                 }
                 if (Array.isArray(priceInsights.typical_price_range) && priceInsights.typical_price_range.length >= 2) {
-                    const lo = priceInsights.typical_price_range[0];
-                    const hi = priceInsights.typical_price_range[1];
-                    if (typeof lo === 'number' && typeof hi === 'number' && lo > 0 && hi > 0 && hi >= lo) {
+                    const lo = Number(priceInsights.typical_price_range[0]);
+                    const hi = Number(priceInsights.typical_price_range[1]);
+                    if (isFinite(lo) && isFinite(hi) && lo > 0 && hi > 0 && hi >= lo) {
                         sanePI.typical_price_range = [lo, hi];
                     }
                 }
+                // Only keep sanePI if it has useful data
                 if (Object.keys(sanePI).length === 0) sanePI = null;
             }
 
