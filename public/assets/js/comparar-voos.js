@@ -63,30 +63,37 @@ const BenetripCompararVoos = {
         try {
             const resp = await fetch('data/cidades_global_iata_v6.json');
             if (resp.ok) {
-                this.state.cidadesData = await resp.json();
-                this.log(`✅ ${this.state.cidadesData.length} cidades`);
+                const raw = await resp.json();
+                // Deduplica por IATA (pega a primeira cidade de cada código)
+                const seen = new Map();
+                raw.forEach(c => {
+                    if (c.iata && !seen.has(c.iata)) seen.set(c.iata, c);
+                });
+                this.state.cidadesData = Array.from(seen.values());
+                this.log(`✅ ${this.state.cidadesData.length} cidades (${raw.length} raw)`);
             }
         } catch (e) {
             this.log('⚠️ Cidades fallback');
+            // Fallback usa mesma estrutura do JSON: cidade, sigla_estado, pais, codigo_pais, iata
             this.state.cidadesData = [
-                { city: 'São Paulo', iata: 'GRU', airport: 'Guarulhos', state: 'SP', country: 'Brasil' },
-                { city: 'São Paulo', iata: 'CGH', airport: 'Congonhas', state: 'SP', country: 'Brasil' },
-                { city: 'Rio de Janeiro', iata: 'GIG', airport: 'Galeão', state: 'RJ', country: 'Brasil' },
-                { city: 'Brasília', iata: 'BSB', airport: 'Juscelino Kubitschek', state: 'DF', country: 'Brasil' },
-                { city: 'Salvador', iata: 'SSA', airport: 'Dep. L. E. Magalhães', state: 'BA', country: 'Brasil' },
-                { city: 'Recife', iata: 'REC', airport: 'Guararapes', state: 'PE', country: 'Brasil' },
-                { city: 'Belo Horizonte', iata: 'CNF', airport: 'Confins', state: 'MG', country: 'Brasil' },
-                { city: 'Fortaleza', iata: 'FOR', airport: 'Pinto Martins', state: 'CE', country: 'Brasil' },
-                { city: 'Porto Alegre', iata: 'POA', airport: 'Salgado Filho', state: 'RS', country: 'Brasil' },
-                { city: 'Curitiba', iata: 'CWB', airport: 'Afonso Pena', state: 'PR', country: 'Brasil' },
-                { city: 'Buenos Aires', iata: 'EZE', airport: 'Ezeiza', state: '', country: 'Argentina' },
-                { city: 'Santiago', iata: 'SCL', airport: 'A. M. Benítez', state: '', country: 'Chile' },
-                { city: 'Lima', iata: 'LIM', airport: 'Jorge Chávez', state: '', country: 'Peru' },
-                { city: 'Lisboa', iata: 'LIS', airport: 'Humberto Delgado', state: '', country: 'Portugal' },
-                { city: 'Miami', iata: 'MIA', airport: 'Miami Intl', state: 'FL', country: 'EUA' },
-                { city: 'Nova York', iata: 'JFK', airport: 'John F. Kennedy', state: 'NY', country: 'EUA' },
-                { city: 'Paris', iata: 'CDG', airport: 'Charles de Gaulle', state: '', country: 'França' },
-                { city: 'Londres', iata: 'LHR', airport: 'Heathrow', state: '', country: 'Reino Unido' },
+                { cidade: 'São Paulo', iata: 'GRU', sigla_estado: 'SP', pais: 'Brasil', codigo_pais: 'BR' },
+                { cidade: 'São Paulo', iata: 'CGH', sigla_estado: 'SP', pais: 'Brasil', codigo_pais: 'BR' },
+                { cidade: 'Rio de Janeiro', iata: 'GIG', sigla_estado: 'RJ', pais: 'Brasil', codigo_pais: 'BR' },
+                { cidade: 'Brasília', iata: 'BSB', sigla_estado: 'DF', pais: 'Brasil', codigo_pais: 'BR' },
+                { cidade: 'Salvador', iata: 'SSA', sigla_estado: 'BA', pais: 'Brasil', codigo_pais: 'BR' },
+                { cidade: 'Recife', iata: 'REC', sigla_estado: 'PE', pais: 'Brasil', codigo_pais: 'BR' },
+                { cidade: 'Belo Horizonte', iata: 'CNF', sigla_estado: 'MG', pais: 'Brasil', codigo_pais: 'BR' },
+                { cidade: 'Fortaleza', iata: 'FOR', sigla_estado: 'CE', pais: 'Brasil', codigo_pais: 'BR' },
+                { cidade: 'Porto Alegre', iata: 'POA', sigla_estado: 'RS', pais: 'Brasil', codigo_pais: 'BR' },
+                { cidade: 'Curitiba', iata: 'CWB', sigla_estado: 'PR', pais: 'Brasil', codigo_pais: 'BR' },
+                { cidade: 'Buenos Aires', iata: 'EZE', sigla_estado: '', pais: 'Argentina', codigo_pais: 'AR' },
+                { cidade: 'Santiago', iata: 'SCL', sigla_estado: '', pais: 'Chile', codigo_pais: 'CL' },
+                { cidade: 'Lima', iata: 'LIM', sigla_estado: '', pais: 'Peru', codigo_pais: 'PE' },
+                { cidade: 'Lisboa', iata: 'LIS', sigla_estado: '', pais: 'Portugal', codigo_pais: 'PT' },
+                { cidade: 'Miami', iata: 'MIA', sigla_estado: 'FL', pais: 'Estados Unidos', codigo_pais: 'US' },
+                { cidade: 'Nova York', iata: 'JFK', sigla_estado: 'NY', pais: 'Estados Unidos', codigo_pais: 'US' },
+                { cidade: 'Paris', iata: 'CDG', sigla_estado: '', pais: 'França', codigo_pais: 'FR' },
+                { cidade: 'Londres', iata: 'LHR', sigla_estado: '', pais: 'Reino Unido', codigo_pais: 'GB' },
             ];
         }
     },
@@ -107,17 +114,17 @@ const BenetripCompararVoos = {
 
             const matches = this.state.cidadesData.filter(c => {
                 const n = this.normalize;
-                return n(c.city).includes(q) || n(c.iata).includes(q) || n(c.airport || '').includes(q);
+                return n(c.cidade).includes(q) || n(c.iata).includes(q) || n(c.pais || '').includes(q);
             }).slice(0, 8);
 
             if (!matches.length) { results.classList.remove('show'); return; }
 
             results.innerHTML = matches.map(c => `
-                <div class="autocomplete-item" data-code="${c.iata}" data-name="${c.city}" data-airport="${c.airport || ''}">
+                <div class="autocomplete-item" data-code="${c.iata}" data-name="${c.cidade}">
                     <span class="iata-badge">${c.iata}</span>
                     <div class="city-info">
-                        <div class="city-name">${c.city}</div>
-                        <div class="city-sub">${c.airport || ''} ${c.state ? '· ' + c.state : ''} · ${c.country || ''}</div>
+                        <div class="city-name">${c.cidade}</div>
+                        <div class="city-sub">${c.sigla_estado ? c.sigla_estado + ' · ' : ''}${c.pais || ''}</div>
                     </div>
                 </div>
             `).join('');
@@ -126,7 +133,7 @@ const BenetripCompararVoos = {
 
             results.querySelectorAll('.autocomplete-item').forEach(item => {
                 item.addEventListener('click', () => {
-                    const obj = { code: item.dataset.code, name: item.dataset.name, airport: item.dataset.airport };
+                    const obj = { code: item.dataset.code, name: item.dataset.name };
                     if (field === 'origem') this.state.origemSelecionada = obj;
                     else this.state.destinoSelecionado = obj;
                     input.value = `${obj.code} – ${obj.name}`;
@@ -303,16 +310,24 @@ const BenetripCompararVoos = {
 
             this.updateProgress(30, '🐕 Tripinha está comparando preços...');
 
+            const fetchController = new AbortController();
+            const fetchTimeout = setTimeout(() => fetchController.abort(), 115000); // 115s (API has 120s)
+
             const resp = await fetch('/api/compare-flights', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(body),
+                signal: fetchController.signal,
             });
+            clearTimeout(fetchTimeout);
 
             this.updateProgress(70, '📊 Processando resultados...');
 
             if (!resp.ok) {
                 const err = await resp.json().catch(() => ({}));
+                if (resp.status === 504) {
+                    throw new Error('A busca demorou muito (timeout do servidor). Tente com menos combinações de datas.');
+                }
                 throw new Error(err.message || err.error || `Erro ${resp.status}`);
             }
 
@@ -343,7 +358,11 @@ const BenetripCompararVoos = {
 
         } catch (err) {
             this.log('❌', err.message);
-            alert(`Ops! ${err.message}`);
+            let msg = err.message;
+            if (err.name === 'AbortError') {
+                msg = 'A busca demorou muito. Tente com menos datas (2 de ida e 2 de volta) para resultados mais rápidos.';
+            }
+            alert(`Ops! ${msg}`);
             this.showForm();
         }
     },
