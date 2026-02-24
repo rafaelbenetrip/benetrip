@@ -1,5 +1,6 @@
 /* ============================================================
-   COMPARAR VOOS - BENETRIP v2.0
+   COMPARAR VOOS - BENETRIP v3.0
+   Fixes: cards layout, filter panel, price display, responsive
    ============================================================ */
 
 /* ---------- VARIABLES ---------- */
@@ -157,9 +158,12 @@ button { cursor: pointer; border: none; outline: none; font-family: var(--font-s
 .winner-price-label { font-size: 13px; opacity: .85; }
 .winner-price-total { font-size: 14px; opacity: .95; margin-top: 4px; }
 .winner-price-note { font-size: 11px; opacity: .75; margin-top: 2px; font-style: italic; }
-.winner-dates-box { text-align: center; background: rgba(255,255,255,.15); border-radius: var(--radius-sm); padding: 6px 12px; }
+.winner-dates-group { display: flex; align-items: center; gap: 8px; }
+.winner-dates-arrow { display: flex; align-items: center; opacity: .6; font-size: 18px; }
+.winner-dates-box { text-align: center; background: rgba(255,255,255,.15); border-radius: var(--radius-sm); padding: 6px 12px; min-width: 60px; }
 .winner-date-lbl { font-size: 11px; opacity: .8; text-transform: uppercase; }
 .winner-date-val { font-family: var(--font-primary); font-weight: 700; font-size: 14px; }
+.winner-date-weekday { font-size: 10px; opacity: .7; }
 .winner-cta { display: block; text-align: center; margin-top: 14px; padding: 12px; background: rgba(255,255,255,.2); border: 2px solid rgba(255,255,255,.4); border-radius: var(--radius-sm); color: var(--white); font-weight: 700; font-size: 14px; transition: var(--transition); }
 .winner-cta:hover { background: rgba(255,255,255,.3); }
 
@@ -217,7 +221,7 @@ button { cursor: pointer; border: none; outline: none; font-family: var(--font-s
 
 .filter-range { display: flex; align-items: center; gap: 8px; }
 .filter-range input[type="range"] { flex: 1; accent-color: var(--blue); height: 6px; }
-.filter-range-label { font-size: 12px; font-weight: 600; color: var(--blue); min-width: 80px; text-align: right; }
+.filter-range-label { font-size: 12px; font-weight: 600; color: var(--blue); min-width: 100px; text-align: right; }
 .filters-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--gray-200); }
 .btn-filter-clear { padding: 6px 14px; border: 1px solid var(--gray-300); border-radius: var(--radius-sm); font-size: 12px; font-weight: 600; color: var(--gray-600); background: var(--white); transition: var(--transition); }
 .btn-filter-clear:hover { border-color: var(--red); color: var(--red); }
@@ -242,20 +246,21 @@ button { cursor: pointer; border: none; outline: none; font-family: var(--font-s
 .flight-card.best-flight { border-color: var(--green); border-width: 2px; }
 .flight-card.best-flight::before { content: '⭐ Melhor opção'; display: block; background: var(--green-light); color: var(--green-dark); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; padding: 4px 14px; }
 
-.flight-top { display: flex; align-items: center; justify-content: space-between; padding: 14px; gap: 12px; }
+.flight-top { display: flex; align-items: flex-start; justify-content: space-between; padding: 14px; gap: 12px; }
 .flight-airlines { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; }
 .airline-logo { width: 28px; height: 28px; border-radius: 4px; object-fit: contain; flex-shrink: 0; }
 .airline-names { font-size: 13px; font-weight: 600; color: var(--gray-800); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 .flight-price-box { text-align: right; flex-shrink: 0; }
-.flight-price { font-family: var(--font-primary); font-size: 22px; font-weight: 800; color: var(--green-dark); }
-.flight-price-pp { font-size: 11px; color: var(--gray-600); }
-.flight-price-total { font-size: 12px; color: var(--gray-700); font-weight: 600; margin-top: 2px; background: var(--gray-100); display: inline-block; padding: 2px 8px; border-radius: 4px; }
+.flight-price { font-family: var(--font-primary); font-size: 22px; font-weight: 800; color: var(--green-dark); line-height: 1.2; }
+.flight-price-pp { font-size: 11px; color: var(--gray-600); margin-top: 1px; }
+.flight-price-total { font-size: 12px; color: var(--gray-700); font-weight: 600; margin-top: 4px; background: var(--gray-100); display: inline-block; padding: 2px 8px; border-radius: 4px; }
+.flight-price-total strong { color: var(--gray-800); }
 .flight-price-note { font-size: 10px; color: var(--gray-500); margin-top: 2px; font-style: italic; }
 
 /* summary tags */
 .flight-summary { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 14px 12px; }
-.flight-tag { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; padding: 3px 8px; background: var(--gray-100); border-radius: 6px; color: var(--gray-700); }
+.flight-tag { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; padding: 3px 8px; background: var(--gray-100); border-radius: 6px; color: var(--gray-700); line-height: 1.4; }
 .flight-tag-icon { font-size: 11px; }
 .flight-tag.tag-direct { background: var(--green-light); color: var(--green-dark); font-weight: 600; }
 .flight-tag.tag-warn { background: var(--red-light); color: var(--red); }
@@ -275,7 +280,7 @@ button { cursor: pointer; border: none; outline: none; font-family: var(--font-s
 .leg-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--blue); border: 2px solid var(--white); box-shadow: 0 0 0 1px var(--blue); }
 .leg-details { font-size: 12px; color: var(--gray-600); }
 .leg-details .leg-airline { font-weight: 600; color: var(--gray-800); }
-.leg-details .leg-extra { font-size: 11px; color: var(--gray-500); margin-top: 2px; }
+.leg-details .leg-extra { font-size: 11px; color: var(--gray-500); margin-top: 2px; word-break: break-word; }
 .leg-duration-badge { font-size: 11px; color: var(--blue); font-weight: 600; }
 
 /* layover */
@@ -308,13 +313,18 @@ button { cursor: pointer; border: none; outline: none; font-family: var(--font-s
     .stats-row { grid-template-columns: 1fr; gap: 8px; }
     .winner-row { flex-direction: column; align-items: flex-start; }
     .winner-price { font-size: 24px; }
+    .winner-dates-group { flex-wrap: wrap; }
     .trip-code { font-size: 22px; }
     .flight-top { flex-direction: column; align-items: flex-start; }
-    .flight-price-box { text-align: left; }
+    .flight-price-box { text-align: left; width: 100%; }
+    .flight-price { font-size: 20px; }
     .share-buttons { flex-direction: column; }
     .btn-share { justify-content: center; }
     .matrix-cell { font-size: 12px; padding: 8px 4px; }
     .filter-chips { gap: 4px; }
     .filter-chips-horario { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
     .filter-chip-horario { min-width: auto; }
+    .sort-inline { gap: 4px; }
+    .sort-chip { font-size: 11px; padding: 5px 10px; }
+    .filter-range-label { min-width: 80px; font-size: 11px; }
 }
