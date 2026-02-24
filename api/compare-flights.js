@@ -1,7 +1,9 @@
-// api/compare-flights.js - BENETRIP COMPARAR VOOS v1.1
+// api/compare-flights.js - BENETRIP COMPARAR VOOS v2.0
 // Compara voos para destino específico em múltiplas combinações de datas
 // Suporta adultos, crianças e bebês
-// Traduz extensions EN→PT, sanitiza priceInsights
+// Traduz ALL extensions EN→PT robusto
+// Sanitiza priceInsights rigoroso
+// Extrai horários de partida para filtros frontend
 
 export const maxDuration = 60;
 
@@ -10,7 +12,7 @@ const MAX_VOLTAS = 4;
 const BATCH_SIZE = 4;
 
 // ============================================================
-// TRADUÇÃO de extensions EN → PT
+// TRADUÇÃO de extensions EN → PT (abrangente)
 // ============================================================
 const TRADUCOES_EXT = {
     'Free change, possible fare difference': 'Alteração gratuita, possível diferença tarifária',
@@ -20,26 +22,102 @@ const TRADUCOES_EXT = {
     'Checked baggage for a fee': 'Bagagem despachada paga',
     'No checked baggage included': 'Sem bagagem despachada incluída',
     'Free checked baggage': 'Bagagem despachada gratuita',
+    'Carry-on bag included': 'Bagagem de mão incluída',
+    'No carry-on bag': 'Sem bagagem de mão',
+    'Personal item only': 'Apenas item pessoal',
+    '1 checked bag included': '1 bagagem despachada incluída',
+    '2 checked bags included': '2 bagagens despachadas incluídas',
+    'First checked bag free': 'Primeira bagagem despachada gratuita',
+    'No bags included': 'Sem bagagem incluída',
     'No change fee': 'Sem taxa de alteração',
     'Change for a fee': 'Alteração com taxa',
     'Non-refundable': 'Não reembolsável',
     'Partial refund': 'Reembolso parcial',
     'No refund': 'Sem reembolso',
     'Refundable': 'Reembolsável',
+    'Refundable ticket': 'Passagem reembolsável',
+    'Cancellation for a fee': 'Cancelamento com taxa',
+    'Free cancellation': 'Cancelamento gratuito',
+    'No cancellation': 'Sem cancelamento',
+    'Possible fare difference': 'Possível diferença tarifária',
     'Wi-Fi available': 'Wi-Fi disponível',
     'In-seat power outlet': 'Tomada no assento',
+    'In-seat USB outlet': 'USB no assento',
     'Personal device entertainment': 'Entretenimento no dispositivo pessoal',
     'Seatback screen': 'Tela no encosto',
+    'Live TV': 'TV ao vivo',
+    'On-demand video': 'Vídeo sob demanda',
+    'Streaming entertainment': 'Entretenimento via streaming',
+    'Power & USB outlets': 'Tomada e USB',
+    'Economy': 'Econômica',
+    'Premium Economy': 'Premium Economy',
+    'Business': 'Executiva',
+    'First': 'Primeira Classe',
+    'Basic Economy': 'Econômica Básica',
+    'Standard seat': 'Assento padrão',
+    'Extra legroom': 'Espaço extra para pernas',
+    'Average legroom': 'Espaço médio para pernas',
+    'Below average legroom': 'Espaço abaixo da média',
+    'Above average legroom': 'Espaço acima da média',
     'Often delayed by 30+ min': 'Frequentemente atrasado 30+ min',
+    'Often delayed': 'Frequentemente atrasado',
+    'Carbon emissions estimate': 'Estimativa de emissão de carbono',
+    'Lower emissions': 'Menores emissões',
+    'Higher emissions': 'Maiores emissões',
+    'Average emissions': 'Emissões médias',
+    'Overnight flight': 'Voo noturno',
+    'Red-eye flight': 'Voo madrugada',
+    'Self transfer': 'Conexão por conta própria',
+    'Multi-airline itinerary': 'Itinerário com múltiplas companhias',
 };
+
+const TRADUCOES_PARCIAIS = [
+    { en: 'Operated by', pt: 'Operado por' },
+    { en: 'Ticket also valid on', pt: 'Passagem válida também em' },
+    { en: 'checked bag', pt: 'bagagem despachada' },
+    { en: 'carry-on', pt: 'bagagem de mão' },
+    { en: 'personal item', pt: 'item pessoal' },
+    { en: 'change fee', pt: 'taxa de alteração' },
+    { en: 'cancellation', pt: 'cancelamento' },
+    { en: 'refund', pt: 'reembolso' },
+    { en: 'baggage', pt: 'bagagem' },
+    { en: 'luggage', pt: 'bagagem' },
+    { en: 'legroom', pt: 'espaço para pernas' },
+    { en: 'in-seat', pt: 'no assento' },
+    { en: 'Wi-Fi', pt: 'Wi-Fi' },
+    { en: 'entertainment', pt: 'entretenimento' },
+    { en: 'delayed', pt: 'atrasado' },
+    { en: 'overnight', pt: 'pernoite' },
+    { en: 'emissions', pt: 'emissões' },
+    { en: 'not included', pt: 'não incluído' },
+    { en: 'included', pt: 'incluído' },
+    { en: 'for a fee', pt: 'pago' },
+];
 
 function traduzirExt(ext) {
     if (!ext || typeof ext !== 'string') return '';
     if (TRADUCOES_EXT[ext]) return TRADUCOES_EXT[ext];
+    const extLower = ext.toLowerCase();
     for (const [en, pt] of Object.entries(TRADUCOES_EXT)) {
-        if (ext.toLowerCase().includes(en.toLowerCase())) return ext.replace(new RegExp(en, 'i'), pt);
+        if (en.toLowerCase() === extLower) return pt;
     }
+    let resultado = ext;
+    let traduzido = false;
+    for (const { en, pt } of TRADUCOES_PARCIAIS) {
+        if (resultado.toLowerCase().includes(en.toLowerCase())) {
+            resultado = resultado.replace(new RegExp(en, 'gi'), pt);
+            traduzido = true;
+        }
+    }
+    if (traduzido) return resultado;
     return ext;
+}
+
+function extractHour(timeStr) {
+    if (!timeStr) return null;
+    const match = timeStr.match(/(\d{1,2}):(\d{2})/);
+    if (match) return parseInt(match[1]);
+    return null;
 }
 
 // ============================================================
@@ -68,7 +146,7 @@ async function searchFlights(params, label) {
 // ============================================================
 // EXTRAIR DETALHES
 // ============================================================
-function extractFlight(flight, isBestFlight) {
+function extractFlight(flight, isBestFlight, origemCode, destinoCode) {
     const legs = flight.flights || [];
     const layovers = flight.layovers || [];
 
@@ -79,7 +157,7 @@ function extractFlight(flight, isBestFlight) {
         departure_airport: { id: l.departure_airport?.id || '', name: l.departure_airport?.name || '', time: l.departure_airport?.time || '' },
         arrival_airport: { id: l.arrival_airport?.id || '', name: l.arrival_airport?.name || '', time: l.arrival_airport?.time || '' },
         airline: l.airline || '', airline_logo: l.airline_logo || '', flight_number: l.flight_number || '',
-        duration: l.duration || 0, airplane: l.airplane || '', travel_class: l.travel_class || 'Economy',
+        duration: l.duration || 0, airplane: l.airplane || '', travel_class: traduzirExt(l.travel_class || 'Economy'),
         legroom: l.legroom || '', extensions: (l.extensions || []).map(traduzirExt).filter(Boolean),
         often_delayed_by_over_30_min: l.often_delayed_by_over_30_min || false,
     }));
@@ -87,6 +165,28 @@ function extractFlight(flight, isBestFlight) {
     const layoverDetails = layovers.map(l => ({
         airport: l.name || '', airport_id: l.id || '', duration: l.duration || 0, overnight: l.overnight || false,
     }));
+
+    // Extrair horários para filtros de horário de ida e volta
+    let departureHourIda = null;
+    let departureHourVolta = null;
+
+    if (flightLegs.length > 0) {
+        departureHourIda = extractHour(flightLegs[0].departure_airport.time);
+    }
+
+    // Detectar onde começa a volta: leg que parte do destino
+    for (let i = 0; i < flightLegs.length; i++) {
+        const depId = flightLegs[i].departure_airport.id;
+        if (depId === destinoCode && i > 0) {
+            departureHourVolta = extractHour(flightLegs[i].departure_airport.time);
+            break;
+        }
+        // Fallback: se o leg anterior chega no destino
+        if (i > 0 && flightLegs[i - 1].arrival_airport.id === destinoCode) {
+            departureHourVolta = extractHour(flightLegs[i].departure_airport.time);
+            break;
+        }
+    }
 
     return {
         price: flight.price || 0,
@@ -97,6 +197,8 @@ function extractFlight(flight, isBestFlight) {
         is_best: isBestFlight,
         carbon_emissions: flight.carbon_emissions?.this_flight ? Math.round(flight.carbon_emissions.this_flight / 1000) : null,
         extensions: (flight.extensions || []).map(traduzirExt).filter(Boolean),
+        departureHourIda,
+        departureHourVolta,
     };
 }
 
@@ -143,7 +245,7 @@ export default async function handler(req, res) {
 
         for (let i = 0; i < combinacoes.length; i += BATCH_SIZE) {
             const batch = combinacoes.slice(i, i + BATCH_SIZE);
-            const promises = batch.map((combo, idx) => {
+            const promises = batch.map((combo) => {
                 const params = {
                     departure_id: origemCode, arrival_id: destinoCode,
                     outbound_date: combo.dataIda, return_date: combo.dataVolta,
@@ -174,14 +276,17 @@ export default async function handler(req, res) {
             }
 
             const voosDetalhados = flights.map((f, idx) => {
-                const d = extractFlight(f, idx < result.isBest);
+                const d = extractFlight(f, idx < result.isBest, origemCode, destinoCode);
                 d.airlines.forEach(a => { if (!todasCompanhias.has(a.name)) todasCompanhias.set(a.name, a); });
                 if (d.legs.length > 0) {
                     aeroportosOrigem.add(d.legs[0].departure_airport.id);
-                    d.legs.forEach(l => { aeroportosDestino.add(l.arrival_airport.id); aeroportosOrigem.add(l.departure_airport.id); });
+                    d.legs.forEach(l => {
+                        aeroportosDestino.add(l.arrival_airport.id);
+                        aeroportosOrigem.add(l.departure_airport.id);
+                    });
                 }
-                // Preço por pessoa pagante
                 d.pricePP = passageirosPagantes > 0 ? Math.round(d.price / passageirosPagantes) : d.price;
+                d.priceTotal = d.price;
                 return d;
             });
             voosDetalhados.sort((a, b) => a.price - b.price);
@@ -190,21 +295,42 @@ export default async function handler(req, res) {
             const melhorPrecoPP = voosDetalhados[0]?.pricePP || null;
             if (melhorPreco && melhorPreco < globalCheapest) { globalCheapest = melhorPreco; globalCheapestCombo = combo; }
 
-            // Sanitizar priceInsights
+            // Sanitizar priceInsights de forma rigorosa
             let sanePI = null;
-            if (priceInsights) {
-                sanePI = { lowest_price: priceInsights.lowest_price ?? null, price_level: priceInsights.price_level ?? null };
-                if (Array.isArray(priceInsights.typical_price_range) && priceInsights.typical_price_range.length === 2) {
-                    const [lo, hi] = priceInsights.typical_price_range;
-                    if (typeof lo === 'number' && typeof hi === 'number') sanePI.typical_price_range = [lo, hi];
+            if (priceInsights && typeof priceInsights === 'object') {
+                sanePI = {};
+                if (typeof priceInsights.lowest_price === 'number' && priceInsights.lowest_price > 0) {
+                    sanePI.lowest_price = priceInsights.lowest_price;
                 }
+                if (priceInsights.price_level && typeof priceInsights.price_level === 'string') {
+                    sanePI.price_level = priceInsights.price_level;
+                }
+                if (Array.isArray(priceInsights.typical_price_range) && priceInsights.typical_price_range.length >= 2) {
+                    const lo = priceInsights.typical_price_range[0];
+                    const hi = priceInsights.typical_price_range[1];
+                    if (typeof lo === 'number' && typeof hi === 'number' && lo > 0 && hi > 0 && hi >= lo) {
+                        sanePI.typical_price_range = [lo, hi];
+                    }
+                }
+                if (Object.keys(sanePI).length === 0) sanePI = null;
             }
 
-            combinacoesResult.push({ dataIda: combo.dataIda, dataVolta: combo.dataVolta, noites, voos: voosDetalhados, melhorPreco, melhorPrecoPP, totalVoos: voosDetalhados.length, priceInsights: sanePI, error: null, elapsed });
+            combinacoesResult.push({
+                dataIda: combo.dataIda, dataVolta: combo.dataVolta, noites,
+                voos: voosDetalhados, melhorPreco, melhorPrecoPP,
+                totalVoos: voosDetalhados.length, priceInsights: sanePI,
+                error: null, elapsed
+            });
         }
 
         const matrizPrecos = {};
-        combinacoesResult.forEach(c => { matrizPrecos[`${c.dataIda}_${c.dataVolta}`] = { dataIda: c.dataIda, dataVolta: c.dataVolta, noites: c.noites, melhorPreco: c.melhorPreco, melhorPrecoPP: c.melhorPrecoPP, totalVoos: c.totalVoos || 0, error: c.error }; });
+        combinacoesResult.forEach(c => {
+            matrizPrecos[`${c.dataIda}_${c.dataVolta}`] = {
+                dataIda: c.dataIda, dataVolta: c.dataVolta, noites: c.noites,
+                melhorPreco: c.melhorPreco, melhorPrecoPP: c.melhorPrecoPP,
+                totalVoos: c.totalVoos || 0, error: c.error
+            };
+        });
 
         const precosValidos = combinacoesResult.filter(c => c.melhorPreco).map(c => c.melhorPreco);
         if (!precosValidos.length) return res.status(404).json({ error: 'Nenhum voo encontrado', message: `Sem voos ${origemCode}→${destinoCode}` });
