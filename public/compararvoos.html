@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#E87722">
+    <title>Comparar Voos - Encontre a Melhor Combinação | Benetrip</title>
+    <meta name="description" content="Compare voos para seu destino em diferentes datas. Encontre a combinação perfeita de preço, duração e conforto!">
+
+    <meta name="supabase-url" content="https://dlccjeazkpxtijevusbp.supabase.co">
+    <meta name="supabase-anon-key" content="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRsY2NqZWF6a3B4dGlqZXZ1c2JwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE3Mjg3MDYsImV4cCI6MjA4NzMwNDcwNn0.lwKwqF74JrHOaghkcbysZQN8jWErVVwPnxzLG7t07QU">
+
+    <link rel="icon" type="image/svg+xml" href="assets/images/favicon/favicon.svg">
+    <link rel="apple-touch-icon" sizes="180x180" href="assets/images/favicon/apple-touch-icon.png">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=Montserrat:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <link rel="stylesheet" href="assets/css/comparar-voos.css">
+
+    <script>window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };</script>
+    <script defer src="/_vercel/insights/script.js"></script>
+</head>
+<body>
+
+    <header class="header">
+        <div class="container">
+            <a href="https://www.benetrip.com.br"><img src="logo1.png" alt="Benetrip" class="logo"></a>
+            <p class="tagline">Comparar Voos ✈️</p>
+        </div>
+    </header>
+
+    <section class="hero-section" id="hero-section">
+        <div class="container hero-content">
+            <img src="assets/images/tripinha/avatar-pensando.png" alt="Tripinha" class="hero-avatar" onerror="this.style.display='none'">
+            <h1>Compare Voos nas Suas Datas ✈️</h1>
+            <p>Escolha até 4 datas de ida e 4 de volta — a Tripinha encontra a melhor combinação de preço, duração e conforto!</p>
+        </div>
+    </section>
+
+    <section class="form-section" id="form-section">
+        <div class="container">
+            <div class="form-card">
+                <form id="search-form">
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="origem">📍 Origem</label>
+                            <div class="autocomplete-wrapper">
+                                <input type="text" id="origem" class="form-input" placeholder="De onde você sai?" autocomplete="off" required>
+                                <div id="origem-results" class="autocomplete-results"></div>
+                            </div>
+                            <input type="hidden" id="origem-data">
+                        </div>
+                        <div class="form-group">
+                            <label for="destino">🎯 Destino</label>
+                            <div class="autocomplete-wrapper">
+                                <input type="text" id="destino" class="form-input" placeholder="Para onde quer ir?" autocomplete="off" required>
+                                <div id="destino-results" class="autocomplete-results"></div>
+                            </div>
+                            <input type="hidden" id="destino-data">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>🛫 Datas de ida <span class="badge-limit">até 4 datas</span></label>
+                        <input type="text" id="datas-ida" class="form-input" placeholder="Selecione até 4 datas de ida" readonly>
+                        <div class="selected-dates" id="chips-ida"></div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>🛬 Datas de volta <span class="badge-limit">até 4 datas</span></label>
+                        <input type="text" id="datas-volta" class="form-input" placeholder="Selecione até 4 datas de volta" readonly>
+                        <div class="selected-dates" id="chips-volta"></div>
+                    </div>
+
+                    <div class="combo-info" id="combo-info" style="display:none">
+                        <span class="combo-icon">🔀</span>
+                        <span id="combo-text">0 combinações</span>
+                    </div>
+
+                    <!-- PASSAGEIROS -->
+                    <div class="form-group">
+                        <label>👥 Passageiros</label>
+                        <div class="passengers-grid">
+                            <div class="pax-row">
+                                <div class="pax-info">
+                                    <span class="pax-label">Adultos</span>
+                                    <span class="pax-hint">12+ anos</span>
+                                </div>
+                                <div class="stepper">
+                                    <button type="button" class="stepper-btn" onclick="BenetripCompararVoos.ajustarPax('adultos',-1)">−</button>
+                                    <span class="stepper-value" id="pax-adultos">1</span>
+                                    <button type="button" class="stepper-btn" onclick="BenetripCompararVoos.ajustarPax('adultos',1)">+</button>
+                                </div>
+                            </div>
+                            <div class="pax-row">
+                                <div class="pax-info">
+                                    <span class="pax-label">Crianças</span>
+                                    <span class="pax-hint">2–11 anos</span>
+                                </div>
+                                <div class="stepper">
+                                    <button type="button" class="stepper-btn" onclick="BenetripCompararVoos.ajustarPax('criancas',-1)">−</button>
+                                    <span class="stepper-value" id="pax-criancas">0</span>
+                                    <button type="button" class="stepper-btn" onclick="BenetripCompararVoos.ajustarPax('criancas',1)">+</button>
+                                </div>
+                            </div>
+                            <div class="pax-row">
+                                <div class="pax-info">
+                                    <span class="pax-label">Bebês</span>
+                                    <span class="pax-hint">0–1 ano (no colo)</span>
+                                </div>
+                                <div class="stepper">
+                                    <button type="button" class="stepper-btn" onclick="BenetripCompararVoos.ajustarPax('bebes',-1)">−</button>
+                                    <span class="stepper-value" id="pax-bebes">0</span>
+                                    <button type="button" class="stepper-btn" onclick="BenetripCompararVoos.ajustarPax('bebes',1)">+</button>
+                                </div>
+                            </div>
+                        </div>
+                        <p class="hint-pass" id="hint-pass">Preços exibidos por pessoa (adulto/criança)</p>
+                    </div>
+
+                    <!-- MOEDA -->
+                    <div class="form-group">
+                        <label>💱 Moeda</label>
+                        <div class="currency-chips">
+                            <div class="currency-chip active" data-currency="BRL">R$ Real</div>
+                            <div class="currency-chip" data-currency="USD">US$ Dólar</div>
+                            <div class="currency-chip" data-currency="EUR">€ Euro</div>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn-submit" id="btn-submit">🔍 Comparar Voos</button>
+                </form>
+            </div>
+        </div>
+    </section>
+
+    <section class="loading-section" id="loading-section">
+        <div class="container">
+            <div class="loading-card">
+                <img src="assets/images/tripinha/avatar-pensando.png" alt="Tripinha" class="loading-avatar" onerror="this.style.display='none'">
+                <h2 id="loading-title">🐕 Tripinha compara as opções...</h2>
+                <div class="progress-container"><div class="progress-track"><div class="progress-bar" id="progress-bar"></div></div></div>
+                <p class="loading-msg" id="loading-msg">Iniciando busca...</p>
+                <p class="loading-sub" id="loading-sub"></p>
+            </div>
+        </div>
+    </section>
+
+    <section class="results-section" id="results-section">
+        <div class="container" id="results-content"></div>
+    </section>
+
+    <footer class="footer"><p>🐕 Feito com amor pela Tripinha | Benetrip © 2026</p></footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/pt.js"></script>
+    <script src="assets/js/comparar-voos.js"></script>
+</body>
+</html>
