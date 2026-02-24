@@ -118,31 +118,56 @@ const BenetripCompararVoos = {
             if (q.length < 2) { results.classList.remove('show'); return; }
 
             const matches = this.state.cidadesData.filter(c => {
-                // Usa this.normalize diretamente para evitar perda de contexto
-                return this.normalize(c.city).includes(q) || 
-                       this.normalize(c.iata).includes(q) || 
-                       this.normalize(c.airport || '').includes(q);
+                // Tenta buscar por várias chaves possíveis que seu JSON possa ter
+                const cityName = c.city || c.name || c.cidade || '';
+                const iataCode = c.iata || c.code || '';
+                const airportName = c.airport || c.aeroporto || '';
+
+                return this.normalize(cityName).includes(q) || 
+                       this.normalize(iataCode).includes(q) || 
+                       this.normalize(airportName).includes(q);
             }).slice(0, 8);
 
             if (!matches.length) { results.classList.remove('show'); return; }
 
-            results.innerHTML = matches.map(c => `
-                <div class="autocomplete-item" data-code="${c.iata}" data-name="${c.city}" data-airport="${c.airport || ''}">
-                    <span class="iata-badge">${c.iata}</span>
+            results.innerHTML = matches.map(c => {
+                // Extrai os dados lidando com as possíveis variações do JSON
+                const cityName = c.city || c.name || c.cidade || '';
+                const iataCode = c.iata || c.code || '';
+                const airportName = c.airport || c.aeroporto || '';
+                const stateName = c.state || c.estado || '';
+                const countryName = c.country || c.pais || '';
+
+                // Monta os subtítulos evitando "undefined"
+                let subItems = [];
+                if (airportName) subItems.push(airportName);
+                if (stateName) subItems.push(stateName);
+                if (countryName) subItems.push(countryName);
+
+                return `
+                <div class="autocomplete-item" data-code="${iataCode}" data-name="${cityName}" data-airport="${airportName}">
+                    <span class="iata-badge">${iataCode}</span>
                     <div class="city-info">
-                        <div class="city-name">${c.city}</div>
-                        <div class="city-sub">${c.airport || ''} ${c.state ? '· ' + c.state : ''} · ${c.country || ''}</div>
+                        <div class="city-name">${cityName}</div>
+                        <div class="city-sub">${subItems.join(' · ')}</div>
                     </div>
                 </div>
-            `).join('');
+                `;
+            }).join('');
 
             results.classList.add('show');
 
             results.querySelectorAll('.autocomplete-item').forEach(item => {
                 item.addEventListener('click', () => {
-                    const obj = { code: item.dataset.code, name: item.dataset.name, airport: item.dataset.airport };
+                    const obj = { 
+                        code: item.dataset.code, 
+                        name: item.dataset.name, 
+                        airport: item.dataset.airport 
+                    };
                     if (field === 'origem') this.state.origemSelecionada = obj;
                     else this.state.destinoSelecionado = obj;
+                    
+                    // Atualiza o input com o código e o nome da cidade, sem 'undefined'
                     input.value = `${obj.code} – ${obj.name}`;
                     results.classList.remove('show');
                 });
