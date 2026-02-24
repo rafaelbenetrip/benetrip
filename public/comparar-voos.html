@@ -12,18 +12,25 @@
 
     <link rel="icon" type="image/svg+xml" href="assets/images/favicon/favicon.svg">
     <link rel="apple-touch-icon" sizes="180x180" href="assets/images/favicon/apple-touch-icon.png">
+
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=Montserrat:wght@400;500;600&display=swap" rel="stylesheet">
+
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+
     <link rel="stylesheet" href="assets/css/comparar-voos.css">
 
-    <script>window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };</script>
+    <script>
+        window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
+    </script>
     <script defer src="/_vercel/insights/script.js"></script>
 </head>
 <body>
 
     <header class="header">
         <div class="container">
-            <a href="https://www.benetrip.com.br"><img src="logo1.png" alt="Benetrip" class="logo"></a>
+            <a href="https://www.benetrip.com.br">
+                <img src="logo1.png" alt="Benetrip" class="logo">
+            </a>
             <p class="tagline">Comparar Voos ✈️</p>
         </div>
     </header>
@@ -50,6 +57,7 @@
                             </div>
                             <input type="hidden" id="origem-data">
                         </div>
+                        
                         <div class="form-group">
                             <label for="destino">🎯 Destino</label>
                             <div class="autocomplete-wrapper">
@@ -77,7 +85,6 @@
                         <span id="combo-text">0 combinações</span>
                     </div>
 
-                    <!-- PASSAGEIROS -->
                     <div class="form-group">
                         <label>👥 Passageiros</label>
                         <div class="passengers-grid">
@@ -118,7 +125,6 @@
                         <p class="hint-pass" id="hint-pass">Preços exibidos por pessoa (adulto/criança)</p>
                     </div>
 
-                    <!-- MOEDA -->
                     <div class="form-group">
                         <label>💱 Moeda</label>
                         <div class="currency-chips">
@@ -139,7 +145,11 @@
             <div class="loading-card">
                 <img src="assets/images/tripinha/avatar-pensando.png" alt="Tripinha" class="loading-avatar" onerror="this.style.display='none'">
                 <h2 id="loading-title">🐕 Tripinha compara as opções...</h2>
-                <div class="progress-container"><div class="progress-track"><div class="progress-bar" id="progress-bar"></div></div></div>
+                <div class="progress-container">
+                    <div class="progress-track">
+                        <div class="progress-bar" id="progress-bar"></div>
+                    </div>
+                </div>
                 <p class="loading-msg" id="loading-msg">Iniciando busca...</p>
                 <p class="loading-sub" id="loading-sub"></p>
             </div>
@@ -147,10 +157,13 @@
     </section>
 
     <section class="results-section" id="results-section">
-        <div class="container" id="results-content"></div>
+        <div class="container" id="results-content">
+            </div>
     </section>
 
-    <footer class="footer"><p>🐕 Feito com amor pela Tripinha | Benetrip © 2026</p></footer>
+    <footer class="footer">
+        <p>🐕 Feito com amor pela Tripinha | Benetrip © 2026</p>
+    </footer>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
