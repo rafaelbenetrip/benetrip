@@ -2,7 +2,8 @@
 // BENETRIP COMPARAR VOOS v3.0 - JavaScript
 // Fixes: preço por pessoa correto (excluindo bebês),
 //        priceInsights undefined fix, tradução 100% PT-BR,
-//        filtros completos, cards bem formatados
+//        filtros completos, cards bem formatados,
+//        correção no carregamento e autocomplete de cidades
 // ============================================================
 
 const BenetripCompararVoos = {
@@ -64,12 +65,17 @@ const BenetripCompararVoos = {
     async loadCidades() {
         try {
             const resp = await fetch('data/cidades_global_iata_v6.json');
-            if (resp.ok) {
-                this.state.cidadesData = await resp.json();
-                this.log(`✅ ${this.state.cidadesData.length} cidades`);
+            
+            // Lança erro se a resposta HTTP não for bem-sucedida (ex: 404)
+            if (!resp.ok) {
+                throw new Error(`HTTP Error: ${resp.status}`);
             }
+
+            this.state.cidadesData = await resp.json();
+            this.log(`✅ ${this.state.cidadesData.length} cidades`);
+            
         } catch (e) {
-            this.log('⚠️ Cidades fallback');
+            this.log('⚠️ Cidades fallback ativado. Motivo:', e.message);
             this.state.cidadesData = [
                 { city: 'São Paulo', iata: 'GRU', airport: 'Guarulhos', state: 'SP', country: 'Brasil' },
                 { city: 'São Paulo', iata: 'CGH', airport: 'Congonhas', state: 'SP', country: 'Brasil' },
@@ -96,7 +102,11 @@ const BenetripCompararVoos = {
     // ================================================================
     // AUTOCOMPLETE
     // ================================================================
-    normalize(str) { return (str || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase(); },
+    
+    // Força a conversão para String antes de normalizar
+    normalize(str) { 
+        return String(str || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase(); 
+    },
 
     setupAutocomplete(field) {
         const input = document.getElementById(field);
@@ -108,8 +118,10 @@ const BenetripCompararVoos = {
             if (q.length < 2) { results.classList.remove('show'); return; }
 
             const matches = this.state.cidadesData.filter(c => {
-                const n = this.normalize;
-                return n(c.city).includes(q) || n(c.iata).includes(q) || n(c.airport || '').includes(q);
+                // Usa this.normalize diretamente para evitar perda de contexto
+                return this.normalize(c.city).includes(q) || 
+                       this.normalize(c.iata).includes(q) || 
+                       this.normalize(c.airport || '').includes(q);
             }).slice(0, 8);
 
             if (!matches.length) { results.classList.remove('show'); return; }
@@ -436,7 +448,6 @@ const BenetripCompararVoos = {
         container.innerHTML = `
             <button class="btn-back" onclick="BenetripCompararVoos.showForm()">← Nova busca</button>
 
-            <!-- ROUTE SUMMARY -->
             <div class="trip-summary fade-in">
                 <div class="trip-route">
                     <div class="trip-city">
@@ -459,7 +470,6 @@ const BenetripCompararVoos = {
                 </div>
             </div>
 
-            <!-- WINNER -->
             <div class="winner-card fade-in" style="animation-delay:.05s">
                 <div class="winner-badge">🏆 MELHOR COMBINAÇÃO</div>
                 <div class="winner-row">
@@ -491,7 +501,6 @@ const BenetripCompararVoos = {
                    target="_blank" rel="noopener" class="winner-cta">✈️ Ver no Google Flights</a>
             </div>
 
-            <!-- STATS -->
             <div class="stats-row fade-in" style="animation-delay:.1s">
                 <div class="stat-card">
                     <div class="stat-label">Mais barato</div>
@@ -510,25 +519,21 @@ const BenetripCompararVoos = {
                 </div>
             </div>
 
-            <!-- TIP -->
             <div class="tripinha-tip fade-in" style="animation-delay:.15s">
                 <img src="assets/images/tripinha/avatar-pensando.png" alt="Tripinha" class="tripinha-tip-avatar" onerror="this.style.display='none'">
                 <div class="tripinha-tip-text">${tipText}</div>
             </div>
 
-            <!-- PRICE MATRIX -->
             <div class="matrix-section fade-in" style="animation-delay:.2s">
                 <h3 class="matrix-title">📊 Matriz de Preços</h3>
                 <p class="matrix-subtitle">Clique em uma combinação para ver os voos detalhados</p>
                 ${this._renderMatrix(data)}
             </div>
 
-            <!-- COMBO DETAIL -->
             <div id="combo-detail" class="fade-in" style="animation-delay:.25s">
                 ${this._renderComboDetail(data)}
             </div>
 
-            <!-- SHARE -->
             <div class="share-section fade-in" style="animation-delay:.3s">
                 <h3 class="share-title">📤 Compartilhar</h3>
                 <p class="share-subtitle">Envie para quem vai viajar com você!</p>
@@ -943,7 +948,6 @@ const BenetripCompararVoos = {
                     <span class="toggle-btn" onclick="BenetripCompararVoos.toggleFilterPanel()">${isOpen ? '▲ Recolher' : '▼ Expandir'}</span>
                 </div>
                 <div id="filters-body" style="${isOpen ? '' : 'display:none'}">
-                    <!-- PARADAS -->
                     <div class="filter-group">
                         <span class="filter-group-label">Número de paradas</span>
                         <div class="filter-chips">
@@ -951,7 +955,6 @@ const BenetripCompararVoos = {
                         </div>
                     </div>
 
-                    <!-- PREÇO -->
                     <div class="filter-group">
                         <span class="filter-group-label">Preço máximo por pessoa</span>
                         <div class="filter-range">
@@ -960,7 +963,6 @@ const BenetripCompararVoos = {
                         </div>
                     </div>
 
-                    <!-- DURAÇÃO -->
                     <div class="filter-group">
                         <span class="filter-group-label">Duração máxima do voo</span>
                         <div class="filter-range">
@@ -969,40 +971,34 @@ const BenetripCompararVoos = {
                         </div>
                     </div>
 
-                    <!-- HORÁRIO IDA -->
                     <div class="filter-group">
                         <span class="filter-group-label">🛫 Horário de partida da ida</span>
                         <div class="filter-chips filter-chips-horario">${horarioChips('horarioIda')}</div>
                     </div>
 
-                    <!-- HORÁRIO VOLTA -->
                     <div class="filter-group">
                         <span class="filter-group-label">🛬 Horário de partida da volta</span>
                         <div class="filter-chips filter-chips-horario">${horarioChips('horarioVolta')}</div>
                     </div>
 
-                    <!-- COMPANHIAS -->
                     ${compArr.length > 1 ? `
                     <div class="filter-group">
                         <span class="filter-group-label">Companhias aéreas</span>
                         <div class="filter-chips">${airlinesChips}</div>
                     </div>` : ''}
 
-                    <!-- AEROPORTO ORIGEM -->
                     ${origArr.length > 1 ? `
                     <div class="filter-group">
                         <span class="filter-group-label">Aeroporto de origem</span>
                         <div class="filter-chips">${origChips}</div>
                     </div>` : ''}
 
-                    <!-- AEROPORTO DESTINO -->
                     ${destArr.length > 1 ? `
                     <div class="filter-group">
                         <span class="filter-group-label">Aeroporto de destino</span>
                         <div class="filter-chips">${destChips}</div>
                     </div>` : ''}
 
-                    <!-- ACTIONS -->
                     ${hasActiveFilter ? `
                     <div class="filters-actions">
                         <button class="btn-filter-clear" onclick="BenetripCompararVoos.limparFiltros()">✕ Limpar filtros</button>
