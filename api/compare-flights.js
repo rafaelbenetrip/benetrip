@@ -1,6 +1,6 @@
 // api/compare-flights.js - BENETRIP COMPARAR VOOS v2.0
 // Compara voos para destino específico em múltiplas combinações de datas
-// Suporta adultos, crianças e bebês
+// Suporta adultos, crianças e bebês 
 // Traduz ALL extensions EN→PT robusto
 // Sanitiza priceInsights rigoroso
 // Extrai horários de partida para filtros frontend
