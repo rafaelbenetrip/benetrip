@@ -1,7 +1,8 @@
 // ============================================================
-// BENETRIP COMPARAR VOOS v2.0 - JavaScript
-// Fixes: preço por pessoa correto, priceInsights undefined, 
-//        filtros horário ida/volta, texto 100% PT-BR
+// BENETRIP COMPARAR VOOS v1.1 - JavaScript
+// Passageiros: adultos/crianças/bebês
+// Preço por pessoa = total ÷ (adultos + crianças)
+// Filtros avançados + texto 100% PT-BR
 // ============================================================
 
 const BenetripCompararVoos = {
@@ -23,17 +24,19 @@ const BenetripCompararVoos = {
         flatpickrVolta: null,
         resultados: null,
         comboSelecionada: null,
+        // Sorting
         sortAtivo: 'todos',
+        // Advanced filters
         filtros: {
             precoMax: null,
             duracaoMax: null,
-            companhias: [],
-            aeroportoOrigem: [],
-            aeroportoDestino: [],
+            companhias: [],      // empty = all
+            aeroportoOrigem: [], // empty = all
+            aeroportoDestino: [], // empty = all
             apenasDirecto: false,
-            horarioIda: null,    // 'manha','tarde','noite','madrugada' ou null
-            horarioVolta: null,
+            apenasReembolsavel: false,
         },
+        // Filter options from data
         opcoesCompanhias: [],
         opcoesAeroportoOrigem: [],
         opcoesAeroportoDestino: [],
@@ -44,7 +47,7 @@ const BenetripCompararVoos = {
     // INIT
     // ================================================================
     init() {
-        this.log('🚀 Init v2.0');
+        this.log('🚀 Init v1.1');
         this.loadCidades();
         this.setupAutocomplete('origem');
         this.setupAutocomplete('destino');
@@ -63,37 +66,30 @@ const BenetripCompararVoos = {
         try {
             const resp = await fetch('data/cidades_global_iata_v6.json');
             if (resp.ok) {
-                const raw = await resp.json();
-                // Deduplica por IATA (pega a primeira cidade de cada código)
-                const seen = new Map();
-                raw.forEach(c => {
-                    if (c.iata && !seen.has(c.iata)) seen.set(c.iata, c);
-                });
-                this.state.cidadesData = Array.from(seen.values());
-                this.log(`✅ ${this.state.cidadesData.length} cidades (${raw.length} raw)`);
+                this.state.cidadesData = await resp.json();
+                this.log(`✅ ${this.state.cidadesData.length} cidades`);
             }
         } catch (e) {
             this.log('⚠️ Cidades fallback');
-            // Fallback usa mesma estrutura do JSON: cidade, sigla_estado, pais, codigo_pais, iata
             this.state.cidadesData = [
-                { cidade: 'São Paulo', iata: 'GRU', sigla_estado: 'SP', pais: 'Brasil', codigo_pais: 'BR' },
-                { cidade: 'São Paulo', iata: 'CGH', sigla_estado: 'SP', pais: 'Brasil', codigo_pais: 'BR' },
-                { cidade: 'Rio de Janeiro', iata: 'GIG', sigla_estado: 'RJ', pais: 'Brasil', codigo_pais: 'BR' },
-                { cidade: 'Brasília', iata: 'BSB', sigla_estado: 'DF', pais: 'Brasil', codigo_pais: 'BR' },
-                { cidade: 'Salvador', iata: 'SSA', sigla_estado: 'BA', pais: 'Brasil', codigo_pais: 'BR' },
-                { cidade: 'Recife', iata: 'REC', sigla_estado: 'PE', pais: 'Brasil', codigo_pais: 'BR' },
-                { cidade: 'Belo Horizonte', iata: 'CNF', sigla_estado: 'MG', pais: 'Brasil', codigo_pais: 'BR' },
-                { cidade: 'Fortaleza', iata: 'FOR', sigla_estado: 'CE', pais: 'Brasil', codigo_pais: 'BR' },
-                { cidade: 'Porto Alegre', iata: 'POA', sigla_estado: 'RS', pais: 'Brasil', codigo_pais: 'BR' },
-                { cidade: 'Curitiba', iata: 'CWB', sigla_estado: 'PR', pais: 'Brasil', codigo_pais: 'BR' },
-                { cidade: 'Buenos Aires', iata: 'EZE', sigla_estado: '', pais: 'Argentina', codigo_pais: 'AR' },
-                { cidade: 'Santiago', iata: 'SCL', sigla_estado: '', pais: 'Chile', codigo_pais: 'CL' },
-                { cidade: 'Lima', iata: 'LIM', sigla_estado: '', pais: 'Peru', codigo_pais: 'PE' },
-                { cidade: 'Lisboa', iata: 'LIS', sigla_estado: '', pais: 'Portugal', codigo_pais: 'PT' },
-                { cidade: 'Miami', iata: 'MIA', sigla_estado: 'FL', pais: 'Estados Unidos', codigo_pais: 'US' },
-                { cidade: 'Nova York', iata: 'JFK', sigla_estado: 'NY', pais: 'Estados Unidos', codigo_pais: 'US' },
-                { cidade: 'Paris', iata: 'CDG', sigla_estado: '', pais: 'França', codigo_pais: 'FR' },
-                { cidade: 'Londres', iata: 'LHR', sigla_estado: '', pais: 'Reino Unido', codigo_pais: 'GB' },
+                { city: 'São Paulo', iata: 'GRU', airport: 'Guarulhos', state: 'SP', country: 'Brasil' },
+                { city: 'São Paulo', iata: 'CGH', airport: 'Congonhas', state: 'SP', country: 'Brasil' },
+                { city: 'Rio de Janeiro', iata: 'GIG', airport: 'Galeão', state: 'RJ', country: 'Brasil' },
+                { city: 'Brasília', iata: 'BSB', airport: 'Juscelino Kubitschek', state: 'DF', country: 'Brasil' },
+                { city: 'Salvador', iata: 'SSA', airport: 'Dep. L. E. Magalhães', state: 'BA', country: 'Brasil' },
+                { city: 'Recife', iata: 'REC', airport: 'Guararapes', state: 'PE', country: 'Brasil' },
+                { city: 'Belo Horizonte', iata: 'CNF', airport: 'Confins', state: 'MG', country: 'Brasil' },
+                { city: 'Fortaleza', iata: 'FOR', airport: 'Pinto Martins', state: 'CE', country: 'Brasil' },
+                { city: 'Porto Alegre', iata: 'POA', airport: 'Salgado Filho', state: 'RS', country: 'Brasil' },
+                { city: 'Curitiba', iata: 'CWB', airport: 'Afonso Pena', state: 'PR', country: 'Brasil' },
+                { city: 'Buenos Aires', iata: 'EZE', airport: 'Ezeiza', state: '', country: 'Argentina' },
+                { city: 'Santiago', iata: 'SCL', airport: 'A. M. Benítez', state: '', country: 'Chile' },
+                { city: 'Lima', iata: 'LIM', airport: 'Jorge Chávez', state: '', country: 'Peru' },
+                { city: 'Lisboa', iata: 'LIS', airport: 'Humberto Delgado', state: '', country: 'Portugal' },
+                { city: 'Miami', iata: 'MIA', airport: 'Miami Intl', state: 'FL', country: 'EUA' },
+                { city: 'Nova York', iata: 'JFK', airport: 'John F. Kennedy', state: 'NY', country: 'EUA' },
+                { city: 'Paris', iata: 'CDG', airport: 'Charles de Gaulle', state: '', country: 'França' },
+                { city: 'Londres', iata: 'LHR', airport: 'Heathrow', state: '', country: 'Reino Unido' },
             ];
         }
     },
@@ -114,17 +110,17 @@ const BenetripCompararVoos = {
 
             const matches = this.state.cidadesData.filter(c => {
                 const n = this.normalize;
-                return n(c.cidade).includes(q) || n(c.iata).includes(q) || n(c.pais || '').includes(q);
+                return n(c.city).includes(q) || n(c.iata).includes(q) || n(c.airport || '').includes(q);
             }).slice(0, 8);
 
             if (!matches.length) { results.classList.remove('show'); return; }
 
             results.innerHTML = matches.map(c => `
-                <div class="autocomplete-item" data-code="${c.iata}" data-name="${c.cidade}">
+                <div class="autocomplete-item" data-code="${c.iata}" data-name="${c.city}" data-airport="${c.airport || ''}">
                     <span class="iata-badge">${c.iata}</span>
                     <div class="city-info">
-                        <div class="city-name">${c.cidade}</div>
-                        <div class="city-sub">${c.sigla_estado ? c.sigla_estado + ' · ' : ''}${c.pais || ''}</div>
+                        <div class="city-name">${c.city}</div>
+                        <div class="city-sub">${c.airport || ''} ${c.state ? '· ' + c.state : ''} · ${c.country || ''}</div>
                     </div>
                 </div>
             `).join('');
@@ -133,7 +129,7 @@ const BenetripCompararVoos = {
 
             results.querySelectorAll('.autocomplete-item').forEach(item => {
                 item.addEventListener('click', () => {
-                    const obj = { code: item.dataset.code, name: item.dataset.name };
+                    const obj = { code: item.dataset.code, name: item.dataset.name, airport: item.dataset.airport };
                     if (field === 'origem') this.state.origemSelecionada = obj;
                     else this.state.destinoSelecionado = obj;
                     input.value = `${obj.code} – ${obj.name}`;
@@ -236,6 +232,7 @@ const BenetripCompararVoos = {
         const s = this.state;
         if (tipo === 'adultos') {
             s.adultos = Math.min(Math.max(s.adultos + delta, 1), 9);
+            // Bebê máx = adultos
             if (s.bebes > s.adultos) s.bebes = s.adultos;
         } else if (tipo === 'criancas') {
             s.criancas = Math.min(Math.max(s.criancas + delta, 0), 8);
@@ -246,6 +243,8 @@ const BenetripCompararVoos = {
         document.getElementById('pax-criancas').textContent = s.criancas;
         document.getElementById('pax-bebes').textContent = s.bebes;
 
+        const total = s.adultos + s.criancas + s.bebes;
+        const pag = s.adultos + s.criancas;
         let hint = `Preços exibidos por pessoa (adulto/criança)`;
         if (s.bebes > 0) hint += ` · Bebês no colo podem ter tarifa reduzida ou gratuita`;
         document.getElementById('hint-pass').textContent = hint;
@@ -310,24 +309,16 @@ const BenetripCompararVoos = {
 
             this.updateProgress(30, '🐕 Tripinha está comparando preços...');
 
-            const fetchController = new AbortController();
-            const fetchTimeout = setTimeout(() => fetchController.abort(), 115000); // 115s (API has 120s)
-
             const resp = await fetch('/api/compare-flights', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(body),
-                signal: fetchController.signal,
             });
-            clearTimeout(fetchTimeout);
 
             this.updateProgress(70, '📊 Processando resultados...');
 
             if (!resp.ok) {
                 const err = await resp.json().catch(() => ({}));
-                if (resp.status === 504) {
-                    throw new Error('A busca demorou muito (timeout do servidor). Tente com menos combinações de datas.');
-                }
                 throw new Error(err.message || err.error || `Erro ${resp.status}`);
             }
 
@@ -347,6 +338,7 @@ const BenetripCompararVoos = {
             this.state.sortAtivo = 'todos';
             this.resetFiltros();
 
+            // Collect filter options from data
             this.state.opcoesCompanhias = (data.companhias || []).map(c => c.name).sort();
             this.state.opcoesAeroportoOrigem = (data.aeroportosOrigem || []).sort();
             this.state.opcoesAeroportoDestino = (data.aeroportosDestino || []).sort();
@@ -358,11 +350,7 @@ const BenetripCompararVoos = {
 
         } catch (err) {
             this.log('❌', err.message);
-            let msg = err.message;
-            if (err.name === 'AbortError') {
-                msg = 'A busca demorou muito. Tente com menos datas (2 de ida e 2 de volta) para resultados mais rápidos.';
-            }
-            alert(`Ops! ${msg}`);
+            alert(`Ops! ${err.message}`);
             this.showForm();
         }
     },
@@ -375,8 +363,7 @@ const BenetripCompararVoos = {
             aeroportoOrigem: [],
             aeroportoDestino: [],
             apenasDirecto: false,
-            horarioIda: null,
-            horarioVolta: null,
+            apenasReembolsavel: false,
         };
     },
 
@@ -416,13 +403,14 @@ const BenetripCompararVoos = {
         const container = document.getElementById('results-content');
         const { origemSelecionada: orig, destinoSelecionado: dest, moedaSelecionada: moeda } = this.state;
         const paxPag = this.passageirosPagantes;
+        const paxTotal = this.totalPassageiros;
         const s = this.getSimbolo(moeda);
         const stats = data.stats;
 
-        // Per-person prices (total API / passageiros pagantes)
-        const cheapPP = stats.cheapestPP || (paxPag > 0 ? Math.round(stats.cheapest / paxPag) : stats.cheapest);
-        const avgPP = stats.averagePP || (paxPag > 0 ? Math.round(stats.average / paxPag) : stats.average);
-        const expPP = stats.mostExpensivePP || (paxPag > 0 ? Math.round(stats.mostExpensive / paxPag) : stats.mostExpensive);
+        // Per-person prices
+        const cheapPP = paxPag > 0 ? Math.round(stats.cheapest / paxPag) : stats.cheapest;
+        const avgPP = paxPag > 0 ? Math.round(stats.average / paxPag) : stats.average;
+        const expPP = paxPag > 0 ? Math.round(stats.mostExpensive / paxPag) : stats.mostExpensive;
 
         // Winner combo info
         const winnerCombo = data.combinacoes.find(c => c.dataIda === stats.cheapestCombo.dataIda && c.dataVolta === stats.cheapestCombo.dataVolta);
@@ -477,8 +465,8 @@ const BenetripCompararVoos = {
                     <div>
                         <div class="winner-price">${s} ${cheapPP.toLocaleString('pt-BR')}</div>
                         <div class="winner-price-label">por pessoa · ida e volta</div>
-                        ${paxPag > 1 ? `<div class="winner-price-total">Total ${paxPag} passageiro${paxPag > 1 ? 's' : ''}: <strong>${s} ${stats.cheapest.toLocaleString('pt-BR')}</strong></div>` : ''}
-                        ${this.state.bebes > 0 ? `<div class="winner-price-note">+ ${this.state.bebes} bebê${this.state.bebes > 1 ? 's' : ''} (tarifa pode variar)</div>` : ''}
+                        ${paxPag > 1 ? `<div class="winner-price-total">Total ${paxPag} passageiro${paxPag > 1 ? 's' : ''}: ${s} ${stats.cheapest.toLocaleString('pt-BR')}</div>` : ''}
+                        ${this.state.bebes > 0 ? `<div class="winner-price-label" style="font-size:11px">+ ${this.state.bebes} bebê${this.state.bebes > 1 ? 's' : ''} (tarifa pode variar)</div>` : ''}
                     </div>
                     <div style="display:flex;gap:8px;">
                         <div class="winner-dates-box">
@@ -564,6 +552,7 @@ const BenetripCompararVoos = {
         const idas = data.datasIda.sort();
         const voltas = data.datasVolta.sort();
 
+        // Collect valid prices for color coding
         const prices = [];
         Object.values(data.matrizPrecos).forEach(v => { if (v.melhorPreco) prices.push(v.melhorPreco); });
         const minP = Math.min(...prices);
@@ -660,18 +649,13 @@ const BenetripCompararVoos = {
             if (idx >= 0) f.aeroportoDestino.splice(idx, 1); else f.aeroportoDestino.push(valor);
         } else if (tipo === 'direto') {
             f.apenasDirecto = !f.apenasDirecto;
-        } else if (tipo === 'horarioIda') {
-            f.horarioIda = f.horarioIda === valor ? null : valor;
-        } else if (tipo === 'horarioVolta') {
-            f.horarioVolta = f.horarioVolta === valor ? null : valor;
         }
         this.refreshComboDetail();
     },
 
     updateFilterPreco(val) {
         this.state.filtros.precoMax = val ? parseInt(val) : null;
-        const el = document.getElementById('filtro-preco-label');
-        if (el) el.textContent = val ? `Até ${this.getSimbolo(this.state.moedaSelecionada)} ${parseInt(val).toLocaleString('pt-BR')}` : 'Sem limite';
+        document.getElementById('filtro-preco-label').textContent = val ? `Até ${this.getSimbolo(this.state.moedaSelecionada)} ${parseInt(val).toLocaleString('pt-BR')}` : 'Sem limite';
         this.refreshComboDetail();
     },
 
@@ -679,8 +663,7 @@ const BenetripCompararVoos = {
         this.state.filtros.duracaoMax = val ? parseInt(val) : null;
         const h = Math.floor(parseInt(val) / 60);
         const m = parseInt(val) % 60;
-        const el = document.getElementById('filtro-duracao-label');
-        if (el) el.textContent = val ? `Até ${h}h${m > 0 ? String(m).padStart(2, '0') : ''}` : 'Sem limite';
+        document.getElementById('filtro-duracao-label').textContent = val ? `Até ${h}h${m > 0 ? String(m).padStart(2, '0') : ''}` : 'Sem limite';
         this.refreshComboDetail();
     },
 
@@ -695,18 +678,6 @@ const BenetripCompararVoos = {
     },
 
     // ================================================================
-    // HORARIO HELPER
-    // ================================================================
-    _hourInRange(hour, periodo) {
-        if (hour === null || hour === undefined) return true; // sem info = passa
-        if (periodo === 'madrugada') return hour >= 0 && hour < 6;
-        if (periodo === 'manha') return hour >= 6 && hour < 12;
-        if (periodo === 'tarde') return hour >= 12 && hour < 18;
-        if (periodo === 'noite') return hour >= 18 && hour <= 23;
-        return true;
-    },
-
-    // ================================================================
     // APPLY FILTERS TO FLIGHTS
     // ================================================================
     _applyFilters(voos) {
@@ -714,8 +685,10 @@ const BenetripCompararVoos = {
         const paxPag = this.passageirosPagantes;
         let filtered = [...voos];
 
+        // Direct only
         if (f.apenasDirecto) filtered = filtered.filter(v => v.stops === 0);
 
+        // Price max (per person)
         if (f.precoMax) {
             filtered = filtered.filter(v => {
                 const pp = paxPag > 0 ? Math.round(v.price / paxPag) : v.price;
@@ -723,12 +696,15 @@ const BenetripCompararVoos = {
             });
         }
 
+        // Duration max
         if (f.duracaoMax) filtered = filtered.filter(v => v.total_duration <= f.duracaoMax);
 
+        // Airlines
         if (f.companhias.length > 0) {
             filtered = filtered.filter(v => v.airlines.some(a => f.companhias.includes(a.name)));
         }
 
+        // Origin airport
         if (f.aeroportoOrigem.length > 0) {
             filtered = filtered.filter(v => {
                 if (!v.legs.length) return false;
@@ -736,21 +712,13 @@ const BenetripCompararVoos = {
             });
         }
 
+        // Destination airport
         if (f.aeroportoDestino.length > 0) {
             filtered = filtered.filter(v => {
                 if (!v.legs.length) return false;
+                // Find the last leg that arrives at destination area
                 return v.legs.some(l => f.aeroportoDestino.includes(l.arrival_airport.id));
             });
-        }
-
-        // Filtro horário de ida
-        if (f.horarioIda) {
-            filtered = filtered.filter(v => this._hourInRange(v.departureHourIda, f.horarioIda));
-        }
-
-        // Filtro horário de volta
-        if (f.horarioVolta) {
-            filtered = filtered.filter(v => this._hourInRange(v.departureHourVolta, f.horarioVolta));
         }
 
         return filtered;
@@ -758,6 +726,7 @@ const BenetripCompararVoos = {
 
     _applySorting(voos) {
         const sort = this.state.sortAtivo;
+        const paxPag = this.passageirosPagantes;
         if (sort === 'barato') return voos.sort((a, b) => a.price - b.price);
         if (sort === 'rapido') return voos.sort((a, b) => a.total_duration - b.total_duration);
         if (sort === 'direto') return voos.filter(v => v.stops === 0);
@@ -784,11 +753,14 @@ const BenetripCompararVoos = {
         const paxPag = this.passageirosPagantes;
         const sort = this.state.sortAtivo;
 
+        // Apply filters then sorting
         let voos = this._applyFilters(combo.voos);
         voos = this._applySorting(voos);
 
+        // Counts for sort badges
         const totalDiretos = combo.voos.filter(v => v.stops === 0).length;
 
+        // Collect unique airlines/airports in THIS combo for filter panel
         const comboCompanhias = new Map();
         const comboAerOrigem = new Set();
         const comboAerDestino = new Set();
@@ -806,13 +778,13 @@ const BenetripCompararVoos = {
             if (v.total_duration > comboMaxDuration) comboMaxDuration = v.total_duration;
         });
 
-        // Price insights - safe rendering
+        // Price insights
         let insightsHtml = '';
         if (combo.priceInsights) {
             const pi = combo.priceInsights;
             if (pi.typical_price_range && Array.isArray(pi.typical_price_range) && pi.typical_price_range.length === 2) {
                 const [lo, hi] = pi.typical_price_range;
-                if (typeof lo === 'number' && typeof hi === 'number' && lo > 0 && hi > 0) {
+                if (typeof lo === 'number' && typeof hi === 'number') {
                     const loPP = paxPag > 0 ? Math.round(lo / paxPag) : lo;
                     const hiPP = paxPag > 0 ? Math.round(hi / paxPag) : hi;
                     insightsHtml = ` · Faixa típica: ${s} ${loPP.toLocaleString('pt-BR')} – ${s} ${hiPP.toLocaleString('pt-BR')}`;
@@ -820,6 +792,7 @@ const BenetripCompararVoos = {
             }
         }
 
+        // Sort buttons
         const sortHtml = `
             <div class="sort-inline">
                 <button class="sort-chip ${sort === 'todos' ? 'active' : ''}" onclick="BenetripCompararVoos.setSort('todos')">Todos (${combo.voos.length})</button>
@@ -829,8 +802,11 @@ const BenetripCompararVoos = {
             </div>
         `;
 
+        // Advanced filters panel
+        const f = this.state.filtros;
         const filtersHtml = this._renderFiltersPanel(comboCompanhias, comboAerOrigem, comboAerDestino, comboMaxPrice, comboMaxDuration);
 
+        // Flight cards
         const cardsHtml = voos.length > 0
             ? voos.slice(0, 20).map((v, idx) => this._renderFlightCard(v, idx, sel)).join('')
             : '<div class="no-flights-msg">😕 Nenhum voo com esses filtros. <button class="btn-filter-clear" style="margin-left:8px" onclick="BenetripCompararVoos.limparFiltros()">Limpar filtros</button></div>';
@@ -844,7 +820,7 @@ const BenetripCompararVoos = {
                 <div class="combo-detail-header">
                     <div>
                         <h3>📅 ${this.fmtDateFull(sel.dataIda)} → ${this.fmtDateFull(sel.dataVolta)}</h3>
-                        <div class="combo-detail-sub">${combo.noites} noite${combo.noites !== 1 ? 's' : ''} · ${combo.voos.length} opç${combo.voos.length !== 1 ? 'ões' : 'ão'} de voo${insightsHtml}</div>
+                        <div class="combo-detail-sub">${combo.noites} noites · ${combo.voos.length} opções de voo${insightsHtml}</div>
                     </div>
                 </div>
                 ${sortHtml}
@@ -863,50 +839,41 @@ const BenetripCompararVoos = {
         const s = this.getSimbolo(this.state.moedaSelecionada);
         const isOpen = this.state.filtroPainelAberto;
 
+        // Airlines chips
         const compArr = Array.from(companhias.entries()).sort((a, b) => a[0].localeCompare(b[0]));
         const airlinesChips = compArr.map(([name, obj]) => {
             const isActive = f.companhias.includes(name);
-            const safeName = name.replace(/'/g, "\\'");
-            return `<button class="filter-chip ${isActive ? 'active' : ''}" onclick="BenetripCompararVoos.toggleFilter('companhia','${safeName}')">${obj.logo ? `<img src="${obj.logo}" class="filter-airline-logo" onerror="this.style.display='none'">` : ''}${name}</button>`;
+            return `<button class="filter-chip ${isActive ? 'active' : ''}" onclick="BenetripCompararVoos.toggleFilter('companhia','${name.replace(/'/g, "\\'")}')">${name}</button>`;
         }).join('');
 
+        // Origin airports
         const origArr = Array.from(aerOrigem).sort();
         const origChips = origArr.map(code => {
             const isActive = f.aeroportoOrigem.includes(code);
             return `<button class="filter-chip ${isActive ? 'active' : ''}" onclick="BenetripCompararVoos.toggleFilter('aeroportoOrigem','${code}')">${code}</button>`;
         }).join('');
 
+        // Destination airports
         const destArr = Array.from(aerDestino).sort();
         const destChips = destArr.map(code => {
             const isActive = f.aeroportoDestino.includes(code);
             return `<button class="filter-chip ${isActive ? 'active' : ''}" onclick="BenetripCompararVoos.toggleFilter('aeroportoDestino','${code}')">${code}</button>`;
         }).join('');
 
-        const hasActiveFilter = f.companhias.length > 0 || f.aeroportoOrigem.length > 0 || f.aeroportoDestino.length > 0 || f.precoMax || f.duracaoMax || f.apenasDirecto || f.horarioIda || f.horarioVolta;
+        // Check if any filter is active
+        const hasActiveFilter = f.companhias.length > 0 || f.aeroportoOrigem.length > 0 || f.aeroportoDestino.length > 0 || f.precoMax || f.duracaoMax || f.apenasDirecto;
 
+        // Price range
         const precoAtual = f.precoMax || maxPreco;
         const precoLabel = f.precoMax ? `Até ${s} ${f.precoMax.toLocaleString('pt-BR')}` : 'Sem limite';
 
-        const duracaoMaxMin = maxDuracao || 1800;
+        // Duration range
+        const duracaoMaxMin = maxDuracao || 1800; // 30h default
         const duracaoRounded = Math.ceil(duracaoMaxMin / 60) * 60;
         const duracaoAtual = f.duracaoMax || duracaoRounded;
         const dH = Math.floor(duracaoAtual / 60);
         const dM = duracaoAtual % 60;
         const duracaoLabel = f.duracaoMax ? `Até ${dH}h${dM > 0 ? String(dM).padStart(2, '0') : ''}` : 'Sem limite';
-
-        // Horário chips helper
-        const horarioChips = (tipo) => {
-            const current = tipo === 'horarioIda' ? f.horarioIda : f.horarioVolta;
-            const periodos = [
-                { val: 'madrugada', label: '🌙 Madrugada', sub: '00h–06h' },
-                { val: 'manha', label: '🌅 Manhã', sub: '06h–12h' },
-                { val: 'tarde', label: '☀️ Tarde', sub: '12h–18h' },
-                { val: 'noite', label: '🌆 Noite', sub: '18h–00h' },
-            ];
-            return periodos.map(p =>
-                `<button class="filter-chip filter-chip-horario ${current === p.val ? 'active' : ''}" onclick="BenetripCompararVoos.toggleFilter('${tipo}','${p.val}')">${p.label}<span class="filter-chip-sub">${p.sub}</span></button>`
-            ).join('');
-        };
 
         return `
             <div class="filters-panel">
@@ -939,18 +906,6 @@ const BenetripCompararVoos = {
                             <input type="range" min="60" max="${duracaoRounded}" step="30" value="${duracaoAtual}" oninput="BenetripCompararVoos.updateFilterDuracao(this.value)">
                             <span class="filter-range-label" id="filtro-duracao-label">${duracaoLabel}</span>
                         </div>
-                    </div>
-
-                    <!-- HORÁRIO IDA -->
-                    <div class="filter-group">
-                        <span class="filter-group-label">🛫 Horário de partida da ida</span>
-                        <div class="filter-chips filter-chips-horario">${horarioChips('horarioIda')}</div>
-                    </div>
-
-                    <!-- HORÁRIO VOLTA -->
-                    <div class="filter-group">
-                        <span class="filter-group-label">🛬 Horário de partida da volta</span>
-                        <div class="filter-chips filter-chips-horario">${horarioChips('horarioVolta')}</div>
                     </div>
 
                     <!-- COMPANHIAS -->
@@ -988,6 +943,7 @@ const BenetripCompararVoos = {
         this.state.filtroPainelAberto = !this.state.filtroPainelAberto;
         const body = document.getElementById('filters-body');
         if (body) body.style.display = this.state.filtroPainelAberto ? '' : 'none';
+        // Update toggle text
         const btn = document.querySelector('.filters-panel .toggle-btn');
         if (btn) btn.textContent = this.state.filtroPainelAberto ? '▲ Recolher' : '▼ Expandir';
     },
@@ -1001,7 +957,7 @@ const BenetripCompararVoos = {
         const paxPag = this.passageirosPagantes;
         const isBest = idx === 0 && voo.is_best;
 
-        // Preço por pessoa (adulto+criança): total API / passageiros pagantes
+        // Price per person (adulto+criança)
         const pricePP = paxPag > 0 ? Math.round(voo.price / paxPag) : voo.price;
 
         // Airlines
@@ -1022,16 +978,15 @@ const BenetripCompararVoos = {
         // Google Flights URL
         const gfUrl = this.buildGoogleFlightsUrl(orig.code, dest.code, combo.dataIda, combo.dataVolta, moeda);
 
-        // Carbon (PT-BR)
+        // Carbon
         const carbonHtml = voo.carbon_emissions
             ? `<span class="flight-tag"><span class="flight-tag-icon">🌱</span>${voo.carbon_emissions} kg CO₂</span>`
             : '';
 
-        // Extensions (already translated by API, but double-check with client-side)
-        const extHtml = (voo.extensions || []).map(ext => {
-            const translated = this._traduzirClientSide(ext);
-            return `<span class="flight-tag flight-tag-ext"><span class="flight-tag-icon">📋</span>${translated}</span>`;
-        }).join('');
+        // Extensions (already translated by API)
+        const extHtml = (voo.extensions || []).map(ext =>
+            `<span class="flight-tag"><span class="flight-tag-icon">📋</span>${ext}</span>`
+        ).join('');
 
         // Legs detail
         const legsHtml = this._renderFlightLegs(voo);
@@ -1046,8 +1001,7 @@ const BenetripCompararVoos = {
                     <div class="flight-price-box">
                         <div class="flight-price">${s} ${pricePP.toLocaleString('pt-BR')}</div>
                         <div class="flight-price-pp">por pessoa · ida e volta</div>
-                        ${paxPag > 1 ? `<div class="flight-price-total">Total ${paxPag} passageiros: ${s} ${voo.price.toLocaleString('pt-BR')}</div>` : ''}
-                        ${this.state.bebes > 0 ? `<div class="flight-price-note">+ ${this.state.bebes} bebê${this.state.bebes > 1 ? 's' : ''}</div>` : ''}
+                        ${paxPag > 1 ? `<div class="flight-price-total">Total ${paxPag}p: ${s} ${voo.price.toLocaleString('pt-BR')}</div>` : ''}
                     </div>
                 </div>
 
@@ -1065,57 +1019,6 @@ const BenetripCompararVoos = {
         `;
     },
 
-    // Client-side translation fallback
-    _traduzirClientSide(text) {
-        if (!text) return '';
-        const map = {
-            'Free change, possible fare difference': 'Alteração gratuita, possível diferença tarifária',
-            'Full refund for cancellations': 'Reembolso total em cancelamentos',
-            'Checked baggage not included in price': 'Bagagem despachada não incluída no preço',
-            'Bag and fare conditions depend on the return flight': 'Condições de bagagem dependem do voo de volta',
-            'Checked baggage for a fee': 'Bagagem despachada paga',
-            'No checked baggage included': 'Sem bagagem despachada incluída',
-            'Free checked baggage': 'Bagagem despachada gratuita',
-            'No change fee': 'Sem taxa de alteração',
-            'Change for a fee': 'Alteração com taxa',
-            'Non-refundable': 'Não reembolsável',
-            'Partial refund': 'Reembolso parcial',
-            'No refund': 'Sem reembolso',
-            'Refundable': 'Reembolsável',
-            'Wi-Fi available': 'Wi-Fi disponível',
-            'In-seat power outlet': 'Tomada no assento',
-            'Personal device entertainment': 'Entretenimento no dispositivo pessoal',
-            'Seatback screen': 'Tela no encosto',
-            'Often delayed by 30+ min': 'Frequentemente atrasado 30+ min',
-            'Carry-on bag included': 'Bagagem de mão incluída',
-            'Self transfer': 'Conexão por conta própria',
-            'Overnight flight': 'Voo noturno',
-        };
-        if (map[text]) return map[text];
-        // Partial match
-        let result = text;
-        const partials = [
-            ['Operated by', 'Operado por'],
-            ['checked bag', 'bagagem despachada'],
-            ['carry-on', 'bagagem de mão'],
-            ['personal item', 'item pessoal'],
-            ['change fee', 'taxa de alteração'],
-            ['cancellation', 'cancelamento'],
-            ['refund', 'reembolso'],
-            ['baggage', 'bagagem'],
-            ['legroom', 'espaço para pernas'],
-            ['delayed', 'atrasado'],
-            ['included', 'incluído'],
-            ['not included', 'não incluído'],
-        ];
-        for (const [en, pt] of partials) {
-            if (result.toLowerCase().includes(en.toLowerCase())) {
-                result = result.replace(new RegExp(en, 'gi'), pt);
-            }
-        }
-        return result;
-    },
-
     // ================================================================
     // FLIGHT LEGS
     // ================================================================
@@ -1124,15 +1027,19 @@ const BenetripCompararVoos = {
 
         const { origemSelecionada: orig, destinoSelecionado: dest } = this.state;
 
+        // Split legs into outbound and return
+        // Heuristic: once we see a leg departing from dest area, it's the return
         let splitIdx = voo.legs.length;
         for (let i = 1; i < voo.legs.length; i++) {
             const depId = voo.legs[i].departure_airport.id;
+            // If departs from destination city area, consider it's return
             if (depId === dest.code || (voo.layovers[i - 1] && i > 0 && voo.legs[i - 1].arrival_airport.id === dest.code)) {
                 splitIdx = i;
                 break;
             }
         }
 
+        // Better: check layovers for the boundary
         if (splitIdx === voo.legs.length && voo.legs.length > 1) {
             for (let i = 0; i < voo.legs.length; i++) {
                 if (voo.legs[i].arrival_airport.id === dest.code && i < voo.legs.length - 1) {
@@ -1147,6 +1054,7 @@ const BenetripCompararVoos = {
 
         let html = '<div class="flight-legs">';
 
+        // Outbound
         if (outLegs.length) {
             html += '<div class="flight-leg-section">';
             html += `<div class="flight-leg-section-title">🛫 Ida · ${orig.code} → ${dest.code}</div>`;
@@ -1159,7 +1067,13 @@ const BenetripCompararVoos = {
             html += '</div>';
         }
 
+        // Return
         if (retLegs.length) {
+            const retLayoverOffset = splitIdx - 1;
+            // Connection layover between outbound and return
+            if (voo.layovers[retLayoverOffset]) {
+                // Don't show this as it's the turnaround
+            }
             html += '<div class="flight-leg-section">';
             html += `<div class="flight-leg-section-title">🛬 Volta · ${dest.code} → ${orig.code}</div>`;
             retLegs.forEach((leg, i) => {
@@ -1183,13 +1097,15 @@ const BenetripCompararVoos = {
         const durM = leg.duration % 60;
         const durStr = `${durH}h${durM > 0 ? String(durM).padStart(2, '0') : ''}`;
 
+        // Airplane / class
         let extraParts = [];
         if (leg.airplane) extraParts.push(leg.airplane);
-        if (leg.travel_class && leg.travel_class !== 'Econômica' && leg.travel_class !== 'Economy') extraParts.push(leg.travel_class);
+        if (leg.travel_class && leg.travel_class !== 'Economy') extraParts.push(leg.travel_class);
         if (leg.legroom) extraParts.push(leg.legroom);
         if (leg.often_delayed_by_over_30_min) extraParts.push('⚠️ Frequentemente atrasado');
 
-        const legExtras = (leg.extensions || []).map(e => this._traduzirClientSide(e)).join(' · ');
+        // Leg extensions (already translated)
+        const legExtras = (leg.extensions || []).join(' · ');
         if (legExtras) extraParts.push(legExtras);
 
         return `
@@ -1203,7 +1119,7 @@ const BenetripCompararVoos = {
                 </div>
                 <div class="leg-details">
                     <div class="leg-airline">${leg.airline} ${leg.flight_number} <span class="leg-duration-badge">· ${durStr}</span></div>
-                    ${extraParts.length ? `<div class="leg-extra">${extraParts.join(' · ')}</div>` : ''}
+                    <div class="leg-extra">${extraParts.join(' · ')}</div>
                 </div>
             </div>
         `;
