@@ -7,16 +7,24 @@
     <title>Comparar Voos - Encontre a Melhor Combinação | Benetrip</title>
     <meta name="description" content="Compare voos para seu destino em diferentes datas. Encontre a combinação perfeita de preço, duração e conforto!">
 
+    <!-- Supabase Config -->
     <meta name="supabase-url" content="https://dlccjeazkpxtijevusbp.supabase.co">
     <meta name="supabase-anon-key" content="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRsY2NqZWF6a3B4dGlqZXZ1c2JwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE3Mjg3MDYsImV4cCI6MjA4NzMwNDcwNn0.lwKwqF74JrHOaghkcbysZQN8jWErVVwPnxzLG7t07QU">
 
+    <!-- Favicons -->
     <link rel="icon" type="image/svg+xml" href="assets/images/favicon/favicon.svg">
     <link rel="apple-touch-icon" sizes="180x180" href="assets/images/favicon/apple-touch-icon.png">
 
+    <!-- Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=Montserrat:wght@400;500;600&display=swap" rel="stylesheet">
+
+    <!-- Flatpickr -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+
+    <!-- Styles -->
     <link rel="stylesheet" href="assets/css/comparar-voos.css">
 
+    <!-- Vercel Analytics -->
     <script>
         window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
     </script>
@@ -24,6 +32,7 @@
 </head>
 <body>
 
+    <!-- HEADER -->
     <header class="header">
         <div class="container">
             <a href="https://www.benetrip.com.br">
@@ -33,6 +42,7 @@
         </div>
     </header>
 
+    <!-- HERO -->
     <section class="hero-section" id="hero-section">
         <div class="container hero-content">
             <img src="assets/images/tripinha/avatar-pensando.png" alt="Tripinha" class="hero-avatar"
@@ -42,16 +52,20 @@
         </div>
     </section>
 
+    <!-- FORMULÁRIO -->
     <section class="form-section" id="form-section">
         <div class="container">
             <div class="form-card">
                 <form id="search-form">
 
+                    <!-- Origem + Destino -->
                     <div class="form-row">
                         <div class="form-group">
                             <label for="origem">📍 Origem</label>
                             <div class="autocomplete-wrapper">
-                                <input type="text" id="origem" class="form-input" placeholder="De onde você sai?" autocomplete="off" required>
+                                <input type="text" id="origem" class="form-input"
+                                       placeholder="De onde você sai?"
+                                       autocomplete="off" required>
                                 <div id="origem-results" class="autocomplete-results"></div>
                             </div>
                             <input type="hidden" id="origem-data">
@@ -60,64 +74,49 @@
                         <div class="form-group">
                             <label for="destino">🎯 Destino</label>
                             <div class="autocomplete-wrapper">
-                                <input type="text" id="destino" class="form-input" placeholder="Para onde quer ir?" autocomplete="off" required>
+                                <input type="text" id="destino" class="form-input"
+                                       placeholder="Para onde quer ir?"
+                                       autocomplete="off" required>
                                 <div id="destino-results" class="autocomplete-results"></div>
                             </div>
                             <input type="hidden" id="destino-data">
                         </div>
                     </div>
 
+                    <!-- Datas de Ida -->
                     <div class="form-group">
                         <label>🛫 Datas de ida <span class="badge-limit">até 4 datas</span></label>
-                        <input type="text" id="datas-ida" class="form-input" placeholder="Selecione até 4 datas de ida" readonly>
+                        <input type="text" id="datas-ida" class="form-input"
+                               placeholder="Selecione até 4 datas de ida"
+                               readonly>
                         <div class="selected-dates" id="chips-ida"></div>
                     </div>
 
+                    <!-- Datas de Volta -->
                     <div class="form-group">
                         <label>🛬 Datas de volta <span class="badge-limit">até 4 datas</span></label>
-                        <input type="text" id="datas-volta" class="form-input" placeholder="Selecione até 4 datas de volta" readonly>
+                        <input type="text" id="datas-volta" class="form-input"
+                               placeholder="Selecione até 4 datas de volta"
+                               readonly>
                         <div class="selected-dates" id="chips-volta"></div>
                     </div>
 
+                    <!-- Info combinações -->
                     <div class="combo-info" id="combo-info" style="display:none">
                         <span class="combo-icon">🔀</span>
                         <span id="combo-text">0 combinações serão pesquisadas</span>
                     </div>
 
+                    <!-- Passageiros + Moeda -->
                     <div class="form-row">
-                        <div class="form-group" style="position: relative;">
+                        <div class="form-group">
                             <label>👥 Passageiros</label>
-                            <div class="form-input" id="passengers-display" style="cursor:pointer;" onclick="BenetripCompararVoos.togglePassengers()">
-                                1 Passageiro
+                            <div class="stepper">
+                                <button type="button" class="stepper-btn" id="btn-menos" onclick="BenetripCompararVoos.ajustarPassageiros(-1)">−</button>
+                                <span class="stepper-value" id="num-passageiros">1</span>
+                                <button type="button" class="stepper-btn" id="btn-mais" onclick="BenetripCompararVoos.ajustarPassageiros(1)">+</button>
                             </div>
-                            
-                            <div class="passenger-popover" id="passenger-popover">
-                                <div class="passenger-row">
-                                    <div class="passenger-info"><strong>Adultos</strong><small>12+ anos</small></div>
-                                    <div class="stepper">
-                                        <button type="button" class="stepper-btn" onclick="BenetripCompararVoos.ajustarPassageiros('adultos', -1)">−</button>
-                                        <span class="stepper-value" id="num-adultos">1</span>
-                                        <button type="button" class="stepper-btn" onclick="BenetripCompararVoos.ajustarPassageiros('adultos', 1)">+</button>
-                                    </div>
-                                </div>
-                                <div class="passenger-row">
-                                    <div class="passenger-info"><strong>Crianças</strong><small>2 a 11 anos</small></div>
-                                    <div class="stepper">
-                                        <button type="button" class="stepper-btn" onclick="BenetripCompararVoos.ajustarPassageiros('criancas', -1)">−</button>
-                                        <span class="stepper-value" id="num-criancas">0</span>
-                                        <button type="button" class="stepper-btn" onclick="BenetripCompararVoos.ajustarPassageiros('criancas', 1)">+</button>
-                                    </div>
-                                </div>
-                                <div class="passenger-row">
-                                    <div class="passenger-info"><strong>Bebês no colo</strong><small>0 a 2 anos</small></div>
-                                    <div class="stepper">
-                                        <button type="button" class="stepper-btn" onclick="BenetripCompararVoos.ajustarPassageiros('bebes', -1)">−</button>
-                                        <span class="stepper-value" id="num-bebes">0</span>
-                                        <button type="button" class="stepper-btn" onclick="BenetripCompararVoos.ajustarPassageiros('bebes', 1)">+</button>
-                                    </div>
-                                </div>
-                                <button type="button" class="btn-fechar-popover" onclick="BenetripCompararVoos.togglePassengers()">Pronto</button>
-                            </div>
+                            <p class="hint-pass">Preços mostrados por pessoa</p>
                         </div>
 
                         <div class="form-group">
@@ -130,19 +129,26 @@
                         </div>
                     </div>
 
-                    <button type="submit" class="btn-submit" id="btn-submit">🔍 Comparar Voos</button>
+                    <!-- Submit -->
+                    <button type="submit" class="btn-submit" id="btn-submit">
+                        🔍 Comparar Voos
+                    </button>
                 </form>
             </div>
         </div>
     </section>
 
+    <!-- LOADING -->
     <section class="loading-section" id="loading-section">
         <div class="container">
             <div class="loading-card">
-                <img src="assets/images/tripinha/avatar-pensando.png" alt="Tripinha" class="loading-avatar" onerror="this.style.display='none'">
+                <img src="assets/images/tripinha/avatar-pensando.png" alt="Tripinha" class="loading-avatar"
+                     onerror="this.style.display='none'">
                 <h2 id="loading-title">🐕 Tripinha compara as opções...</h2>
                 <div class="progress-container">
-                    <div class="progress-track"><div class="progress-bar" id="progress-bar"></div></div>
+                    <div class="progress-track">
+                        <div class="progress-bar" id="progress-bar"></div>
+                    </div>
                 </div>
                 <p class="loading-msg" id="loading-msg">Iniciando busca...</p>
                 <p class="loading-sub" id="loading-sub"></p>
@@ -150,15 +156,19 @@
         </div>
     </section>
 
+    <!-- RESULTADOS -->
     <section class="results-section" id="results-section">
         <div class="container" id="results-content">
-            </div>
+            <!-- Preenchido dinamicamente -->
+        </div>
     </section>
 
+    <!-- FOOTER -->
     <footer class="footer">
         <p>🐕 Feito com amor pela Tripinha | Benetrip © 2026</p>
     </footer>
 
+    <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
     <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/pt.js"></script>
