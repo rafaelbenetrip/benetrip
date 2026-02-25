@@ -5,11 +5,12 @@
 // Sanitiza priceInsights rigoroso
 // Extrai horários de partida para filtros frontend
 
-export const maxDuration = 60;
+export const maxDuration = 120;
 
 const MAX_IDAS = 4;
 const MAX_VOLTAS = 4;
-const BATCH_SIZE = 4;
+const BATCH_SIZE = 8; // Processar mais em paralelo para evitar timeout
+const PER_REQUEST_TIMEOUT = 20000; // 20s por request individual
 
 // ============================================================
 // TRADUÇÃO de extensions EN → PT (abrangente)
@@ -129,8 +130,16 @@ async function searchFlights(params, label) {
     Object.entries(fullParams).forEach(([k, v]) => { if (v !== undefined && v !== null) url.searchParams.set(k, String(v)); });
 
     const t0 = Date.now();
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), PER_REQUEST_TIMEOUT);
+
     try {
-        const resp = await fetch(url.toString(), { method: 'GET', headers: { 'Accept': 'application/json' } });
+        const resp = await fetch(url.toString(), {
+            method: 'GET',
+            headers: { 'Accept': 'application/json' },
+            signal: controller.signal,
+        });
+        clearTimeout(timeout);
         const elapsed = Date.now() - t0;
         if (!resp.ok) { console.error(`[${label}] HTTP ${resp.status}`); return { flights: [], error: `HTTP ${resp.status}`, elapsed }; }
         const data = await resp.json();
@@ -139,7 +148,11 @@ async function searchFlights(params, label) {
         console.log(`[${label}] ${best.length + other.length} voos (${elapsed}ms)`);
         return { flights: [...best, ...other], priceInsights: data.price_insights || null, airports: data.airports || null, error: null, elapsed, isBest: best.length };
     } catch (err) {
-        return { flights: [], error: err.message, elapsed: Date.now() - t0 };
+        clearTimeout(timeout);
+        const elapsed = Date.now() - t0;
+        const msg = err.name === 'AbortError' ? `Timeout (${PER_REQUEST_TIMEOUT / 1000}s)` : err.message;
+        console.warn(`[${label}] ⚠️ ${msg} (${elapsed}ms)`);
+        return { flights: [], error: msg, elapsed };
     }
 }
 
