@@ -34,7 +34,7 @@ const BenetripCompararVoos = {
     // INICIALIZAÇÃO
     // ================================================================
     init() {
-        this.log('🐕 Comparar Voos v1.0 inicializando...');
+        this.log('🐕 Comparar Voos v1.1 inicializando...');
         this.carregarCidades();
         this.setupAutocomplete('origem', 'origem-results', 'origem-data', 'origemSelecionada');
         this.setupAutocomplete('destino', 'destino-results', 'destino-data', 'destinoSelecionado');
@@ -842,7 +842,9 @@ const BenetripCompararVoos = {
         p.set('curr',{BRL:'BRL',USD:'USD',EUR:'EUR'}[cur]||'BRL');
         p.set('hl',{BRL:'pt-BR',USD:'en',EUR:'en'}[cur]||'pt-BR');
         p.set('gl',{BRL:'br',USD:'us',EUR:'de'}[cur]||'br');
-        return`https://www.google.com/travel/flights/search?$${p.toString()}`;
+        
+        // CORREÇÃO: Usando a URL oficial do Google Flights com a formatação (template string) correta
+        return `https://www.google.com/travel/flights?${p.toString()}`;
     },
 
     // ================================================================
