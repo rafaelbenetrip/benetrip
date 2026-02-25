@@ -1,7 +1,7 @@
 /**
  * BENETRIP - COMPARAR VOOS v1.0
  * Compare voos para um destino específico em múltiplas datas
- * Até 4 idas × 4 voltas = 16 combinações
+ * Até 4 idas × 4 voltas = 16 combinações 
  * Exibe: Matriz de preços, detalhes de voo, filtros
  */
 
