@@ -1012,3 +1012,30 @@ body {
 .hidden { display: none !important; }
 .fade-in { animation: fadeIn 0.5s ease-out forwards; }
 @keyframes fadeIn { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+
+/* ========================================
+   GRID DE IDA E VOLTA (LADO A LADO)
+   ======================================== */
+.flight-legs-container {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px dashed var(--gray-border);
+}
+.leg-column {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+@media (max-width: 768px) {
+    .flight-legs-container {
+        grid-template-columns: 1fr;
+        gap: 16px;
+    }
+    .leg-column + .leg-column {
+        border-top: 1px solid var(--gray-light);
+        padding-top: 16px;
+    }
+}
