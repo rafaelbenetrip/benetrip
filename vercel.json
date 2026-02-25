@@ -36,6 +36,14 @@
     "api/search-destinations.js": {
       "memory": 1024,
       "maxDuration": 90
+    },
+    "api/compare-flights.js.js": {
+      "memory": 1024,
+      "maxDuration": 90
+    },
+    "api/multidatas.js.js": {
+      "memory": 1024,
+      "maxDuration": 90
     }
   },
   "routes": [
