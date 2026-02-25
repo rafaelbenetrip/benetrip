@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#E87722">
+    <title>Busca Multidatas | Benetrip</title>
+    <meta name="description" content="Encontre as datas mais baratas cruzando diferentes dias de ida e volta na matriz flexível da Benetrip.">
+
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "TravelAction",
+      "name": "Busca de Voos Multidatas",
+      "target": "https://benetrip.com.br/multidatas.html"
+    }
+    </script>
+
+    <link rel="icon" type="image/svg+xml" href="assets/images/favicon/favicon.svg">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Montserrat:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    
+    <link rel="stylesheet" href="assets/css/todos-destinos.css">
+    <link rel="stylesheet" href="assets/css/multidatas.css">
+</head>
+<body>
+    <header class="header">
+        <div class="container">
+            <a href="/"><img src="logo1.png" alt="Benetrip" class="logo"></a>
+            <p class="tagline">Busca Multidatas 📅</p>
+        </div>
+    </header>
+
+    <main class="main-content">
+        <div class="container">
+            <div id="form-container" class="form-card">
+                <div class="intro-card" style="box-shadow: none; padding-top: 0;">
+                    <img src="assets/images/tripinha/avatar-farejando.png" alt="Tripinha" class="intro-avatar">
+                    <h1>Matriz de Preços Flexível</h1>
+                    <p>Cruze até 4 datas de ida e 4 de volta para o mesmo destino e ache a melhor combinação! 🐕</p>
+                </div>
+
+                <form id="multi-form">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>📍 Origem</label>
+                            <input type="text" id="origem" class="form-input" placeholder="De onde?" autocomplete="off" required>
+                            <input type="hidden" id="origem-data">
+                            <div id="origem-results" class="autocomplete-results"></div>
+                        </div>
+                        <div class="form-group">
+                            <label>🎯 Destino</label>
+                            <input type="text" id="destino" class="form-input" placeholder="Para onde?" autocomplete="off" required>
+                            <input type="hidden" id="destino-data">
+                            <div id="destino-results" class="autocomplete-results"></div>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>🛫 Idas (Até 4)</label>
+                            <input type="text" id="datas-ida" class="form-input" placeholder="Selecione as datas" readonly required>
+                        </div>
+                        <div class="form-group">
+                            <label>🛬 Voltas (Até 4)</label>
+                            <input type="text" id="datas-volta" class="form-input" placeholder="Selecione as datas" readonly required>
+                        </div>
+                    </div>
+
+                    <div class="form-group pax-group">
+                        <label>👥 Passageiros</label>
+                        <div class="pax-selectors">
+                            <div class="pax-item">
+                                <span>Adultos (+12)</span>
+                                <input type="number" id="pax-adultos" min="1" max="9" value="1" class="form-input pax-input">
+                            </div>
+                            <div class="pax-item">
+                                <span>Crianças (2-12)</span>
+                                <input type="number" id="pax-criancas" min="0" max="9" value="0" class="form-input pax-input">
+                            </div>
+                            <div class="pax-item">
+                                <span>Bebês no colo (0-2)</span>
+                                <input type="number" id="pax-bebes" min="0" max="9" value="0" class="form-input pax-input">
+                            </div>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn-submit">🔍 Montar Matriz de Preços</button>
+                </form>
+            </div>
+
+            <div id="loading-container" style="display: none;" class="loading-card">
+                <img src="assets/images/tripinha/avatar-pensando.png" class="tripinha-loading">
+                <h2>🐕 Farejando todas as combinações...</h2>
+                <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+                <p id="loading-message">Cruzando datas...</p>
+            </div>
+
+            <div id="resultados-container" style="display: none;">
+                <button class="btn-back" onclick="BenetripMultiDatas.voltar()">← Nova Busca</button>
+                
+                <div class="resumo-busca">
+                    <h2 id="titulo-rota">GRU ➔ LIS</h2>
+                    <p id="subtitulo-pax">1 Adulto</p>
+                </div>
+
+                <div class="matriz-container fade-in">
+                    <h3>📊 Matriz de Preços</h3>
+                    <p class="hint">Preço por passageiro pagante. A célula destacada é a mais barata!</p>
+                    <div class="table-responsive">
+                        <table id="matriz-table" class="matriz-table">
+                            </table>
+                    </div>
+                </div>
+
+                <div class="voos-container fade-in" style="animation-delay: 0.2s;">
+                    <h3>✈️ Melhores Combinações</h3>
+                    <div id="voos-lista" class="voos-lista">
+                        </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/pt.js"></script>
+    <script src="assets/js/multidatas.js"></script>
+</body>
+</html>
