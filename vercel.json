@@ -118,6 +118,16 @@
       "dest": "/api/multidatas.js"
     },
     {
+      "src": "/api/compare-flights",
+      "headers": {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
+        "Content-Type": "application/json; charset=utf-8",
+        "X-Content-Type-Options": "nosniff"
+      },
+      "dest": "/api/compare-flights.js"
+    },
+    {
       "src": "/api/recommendations",
       "dest": "/api/recommendations.js"
     },
