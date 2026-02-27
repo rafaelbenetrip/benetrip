@@ -1,7 +1,6 @@
 /* ========================================
-   COMPARAR VOOS - BENETRIP
-   Versão: v1.0 — Comparação detalhada
-   Cores: Laranja #E87722, Azul #00A3E0
+   COMPARAR VOOS - BENETRIP v2.0
+   Cores: Laranja #E87722 · Azul #00A3E0
    ======================================== */
 
 @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=Montserrat:wght@400;500;600&display=swap');
@@ -20,6 +19,8 @@
     --red-light: #FDEDEC;
     --yellow: #F39C12;
     --yellow-light: #FEF9E7;
+    --purple: #9B59B6;
+    --purple-light: #F5EEF8;
     --gray-dark: #21272A;
     --gray-medium: #666;
     --gray-light: #F5F7FA;
@@ -28,10 +29,10 @@
     --radius: 16px;
     --radius-sm: 12px;
     --radius-xs: 8px;
-    --shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
-    --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.12);
-    --shadow-hover: 0 6px 24px rgba(0, 0, 0, 0.15);
-    --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --shadow: 0 2px 12px rgba(0,0,0,0.08);
+    --shadow-lg: 0 8px 32px rgba(0,0,0,0.12);
+    --shadow-hover: 0 6px 24px rgba(0,0,0,0.15);
+    --transition: all 0.3s cubic-bezier(0.4,0,0.2,1);
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -47,9 +48,7 @@ body {
 
 .container { max-width: 1000px; margin: 0 auto; padding: 0 20px; }
 
-/* ========================================
-   HEADER
-   ======================================== */
+/* ── HEADER ─────────────────────────────── */
 .header {
     background: var(--white);
     padding: 20px 0;
@@ -70,12 +69,9 @@ body {
     font-size: 16px;
     font-weight: 600;
     color: var(--orange);
-    margin: 0;
 }
 
-/* ========================================
-   HERO
-   ======================================== */
+/* ── HERO ────────────────────────────────── */
 .hero-section {
     background: linear-gradient(135deg, var(--orange) 0%, #F59E42 100%);
     padding: 40px 0 48px;
@@ -86,24 +82,20 @@ body {
 .hero-section::before {
     content: '';
     position: absolute;
-    top: -50%;
-    right: -20%;
-    width: 400px;
-    height: 400px;
+    top: -50%; right: -20%;
+    width: 400px; height: 400px;
     background: rgba(255,255,255,0.08);
     border-radius: 50%;
 }
 .hero-content { position: relative; z-index: 2; }
 .hero-avatar {
-    width: 80px;
-    height: 80px;
+    width: 80px; height: 80px;
     margin-bottom: 16px;
     filter: drop-shadow(0 4px 8px rgba(0,0,0,0.2));
 }
 .hero-section h1 {
     font-family: 'Poppins', sans-serif;
-    font-size: 28px;
-    font-weight: 800;
+    font-size: 28px; font-weight: 800;
     color: var(--white);
     margin-bottom: 8px;
 }
@@ -114,13 +106,10 @@ body {
     margin: 0 auto;
 }
 
-/* ========================================
-   FORMULÁRIO
-   ======================================== */
+/* ── FORMULÁRIO ──────────────────────────── */
 .form-section {
     margin-top: -32px;
-    position: relative;
-    z-index: 10;
+    position: relative; z-index: 10;
     padding-bottom: 32px;
 }
 .form-card {
@@ -139,8 +128,7 @@ body {
 .form-group label {
     display: block;
     font-family: 'Poppins', sans-serif;
-    font-size: 13px;
-    font-weight: 600;
+    font-size: 13px; font-weight: 600;
     color: var(--gray-dark);
     margin-bottom: 6px;
     text-transform: uppercase;
@@ -150,8 +138,7 @@ body {
     display: inline-block;
     background: rgba(232,119,34,.12);
     color: var(--orange);
-    font-size: 10px;
-    font-weight: 700;
+    font-size: 10px; font-weight: 700;
     padding: 2px 8px;
     border-radius: 10px;
     text-transform: none;
@@ -159,9 +146,7 @@ body {
     vertical-align: middle;
 }
 
-/* ========================================
-   AUTOCOMPLETE
-   ======================================== */
+/* ── AUTOCOMPLETE ─────────────────────────── */
 .autocomplete-wrapper { position: relative; }
 .form-input {
     width: 100%;
@@ -176,13 +161,11 @@ body {
 .form-input:focus {
     outline: none;
     border-color: var(--orange);
-    box-shadow: 0 0 0 3px rgba(232, 119, 34, 0.15);
+    box-shadow: 0 0 0 3px rgba(232,119,34,0.15);
 }
 .autocomplete-results {
     position: absolute;
-    top: 100%;
-    left: 0;
-    right: 0;
+    top: 100%; left: 0; right: 0;
     background: var(--white);
     border: 2px solid var(--orange);
     border-top: none;
@@ -209,131 +192,138 @@ body {
     color: var(--white);
     padding: 4px 8px;
     border-radius: 6px;
-    font-weight: 700;
-    font-size: 11px;
-    min-width: 42px;
-    text-align: center;
+    font-weight: 700; font-size: 11px;
+    min-width: 42px; text-align: center;
     font-family: 'Poppins', sans-serif;
 }
 .item-details { flex: 1; min-width: 0; }
 .item-name {
-    font-weight: 600;
-    font-size: 14px;
+    font-weight: 600; font-size: 14px;
     color: var(--gray-dark);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .item-country { font-size: 12px; color: var(--gray-medium); }
 
-/* ========================================
-   DATE CHIPS
-   ======================================== */
+/* ── DATE CHIPS ──────────────────────────── */
 .selected-dates {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-    margin-top: 8px;
+    display: flex; flex-wrap: wrap;
+    gap: 6px; margin-top: 8px;
 }
 .date-chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
+    display: inline-flex; align-items: center; gap: 6px;
     background: linear-gradient(135deg, var(--orange-light), #FFF3E0);
     border: 1px solid var(--orange);
     color: var(--gray-dark);
-    padding: 6px 12px;
-    border-radius: 20px;
-    font-size: 13px;
-    font-weight: 500;
+    padding: 6px 12px; border-radius: 20px;
+    font-size: 13px; font-weight: 500;
     font-family: 'Poppins', sans-serif;
     animation: chipIn .2s ease;
 }
 @keyframes chipIn { from { transform: scale(.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 .date-chip .remove-chip {
-    cursor: pointer;
-    color: var(--orange);
-    font-weight: 700;
-    font-size: 14px;
-    line-height: 1;
-    opacity: .7;
+    cursor: pointer; color: var(--orange);
+    font-weight: 700; font-size: 14px;
+    line-height: 1; opacity: .7;
     transition: opacity .2s;
 }
 .date-chip .remove-chip:hover { opacity: 1; }
-
 .flatpickr-day.selected, .flatpickr-day.startRange, .flatpickr-day.endRange {
     background: var(--orange) !important;
     border-color: var(--orange) !important;
     color: var(--white) !important;
 }
 
-/* ========================================
-   COMBO INFO
-   ======================================== */
+/* ── COMBO INFO ──────────────────────────── */
 .combo-info {
-    display: flex;
-    align-items: center;
-    gap: 8px;
+    display: flex; align-items: center; gap: 8px;
     background: linear-gradient(135deg, #E3F2FD, #F0F8FF);
     border: 1px solid var(--blue);
     border-radius: var(--radius-xs);
-    padding: 12px 16px;
-    margin-bottom: 20px;
-    font-size: 14px;
-    color: var(--gray-dark);
-    font-family: 'Poppins', sans-serif;
-    font-weight: 500;
+    padding: 12px 16px; margin-bottom: 20px;
+    font-size: 14px; color: var(--gray-dark);
+    font-family: 'Poppins', sans-serif; font-weight: 500;
 }
 .combo-icon { font-size: 18px; }
 
-/* ========================================
-   STEPPER (passageiros)
-   ======================================== */
-.stepper {
-    display: flex;
-    align-items: center;
-    gap: 0;
+/* ═══════════════════════════════════════════
+   PASSAGEIROS — Seletor por Tipo
+   ═══════════════════════════════════════════ */
+.pax-selector {
     border: 2px solid var(--gray-border);
     border-radius: var(--radius-xs);
     overflow: hidden;
-    width: fit-content;
 }
-.stepper-btn {
-    width: 48px;
-    height: 48px;
+.pax-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    transition: background .2s;
+}
+.pax-row + .pax-row {
+    border-top: 1px solid var(--gray-border);
+}
+.pax-row:first-child { background: rgba(232,119,34,.04); }
+.pax-info { flex: 1; }
+.pax-label {
+    font-family: 'Poppins', sans-serif;
+    font-size: 14px; font-weight: 600;
+    color: var(--gray-dark);
+    display: flex; align-items: center; gap: 6px;
+}
+.pax-label .pax-icon { font-size: 16px; }
+.pax-desc {
+    font-size: 11px; color: var(--gray-medium);
+    margin-top: 2px;
+}
+.pax-desc.free-tag {
+    color: var(--green-dark);
+    font-weight: 600;
+}
+.pax-stepper {
+    display: flex; align-items: center;
+    gap: 0;
+    border: 1.5px solid var(--gray-border);
+    border-radius: 8px;
+    overflow: hidden;
+    background: var(--white);
+}
+.pax-btn {
+    width: 36px; height: 36px;
     border: none;
-    background: var(--gray-light);
-    font-size: 22px;
-    font-weight: 700;
+    background: transparent;
+    font-size: 20px; font-weight: 700;
     cursor: pointer;
     transition: var(--transition);
     color: var(--gray-dark);
+    display: flex; align-items: center; justify-content: center;
     font-family: 'Poppins', sans-serif;
+    line-height: 1;
 }
-.stepper-btn:hover { background: var(--orange-light); color: var(--orange); }
-.stepper-btn:active { background: var(--orange); color: var(--white); }
-.stepper-value {
-    width: 56px;
-    text-align: center;
+.pax-btn:hover:not(:disabled) { background: var(--orange-light); color: var(--orange); }
+.pax-btn:active:not(:disabled) { background: var(--orange); color: var(--white); }
+.pax-btn:disabled { opacity: .3; cursor: not-allowed; }
+.pax-count {
+    min-width: 42px; text-align: center;
     font-family: 'Poppins', sans-serif;
-    font-size: 22px;
-    font-weight: 700;
+    font-size: 18px; font-weight: 700;
     color: var(--gray-dark);
+    border-left: 1.5px solid var(--gray-border);
+    border-right: 1.5px solid var(--gray-border);
+    padding: 0 6px; line-height: 36px;
     user-select: none;
 }
-.hint-pass {
-    font-size: 11px;
-    color: var(--gray-medium);
-    margin-top: 6px;
+.pax-count.has-value { color: var(--orange); }
+.pax-total-hint {
+    font-size: 11px; color: var(--gray-medium);
+    margin-top: 8px; text-align: center;
 }
+.pax-total-hint strong { color: var(--orange); }
 
-/* ========================================
-   CURRENCY CHIPS
-   ======================================== */
+/* ── CURRENCY CHIPS ──────────────────────── */
 .currency-chips { display: flex; gap: 8px; }
 .currency-chip {
-    flex: 1;
-    padding: 14px 8px;
+    flex: 1; padding: 14px 8px;
     border: 2px solid var(--gray-border);
     border-radius: var(--radius-xs);
     background: var(--white);
@@ -341,48 +331,36 @@ body {
     transition: var(--transition);
     text-align: center;
     font-family: 'Poppins', sans-serif;
-    font-size: 15px;
-    font-weight: 600;
+    font-size: 15px; font-weight: 600;
     color: var(--gray-dark);
 }
 .currency-chip:hover { border-color: var(--blue); background: var(--blue-light); }
 .currency-chip.active { border-color: var(--blue); background: var(--blue); color: var(--white); }
 
-/* ========================================
-   SUBMIT
-   ======================================== */
+/* ── SUBMIT ──────────────────────────────── */
 .btn-submit {
-    width: 100%;
-    padding: 18px;
+    width: 100%; padding: 18px;
     background: linear-gradient(135deg, var(--orange) 0%, var(--orange-dark) 100%);
-    color: var(--white);
-    border: none;
+    color: var(--white); border: none;
     border-radius: var(--radius-sm);
     font-family: 'Poppins', sans-serif;
-    font-size: 17px;
-    font-weight: 700;
-    cursor: pointer;
-    transition: var(--transition);
-    box-shadow: 0 4px 16px rgba(232, 119, 34, 0.35);
+    font-size: 17px; font-weight: 700;
+    cursor: pointer; transition: var(--transition);
+    box-shadow: 0 4px 16px rgba(232,119,34,0.35);
     margin-top: 8px;
 }
-.btn-submit:hover { transform: translateY(-2px); box-shadow: 0 6px 24px rgba(232, 119, 34, 0.45); }
+.btn-submit:hover { transform: translateY(-2px); box-shadow: 0 6px 24px rgba(232,119,34,0.45); }
 .btn-submit:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
 
-/* ========================================
-   LOADING
-   ======================================== */
+/* ── LOADING ─────────────────────────────── */
 .loading-section { display: none; padding: 40px 0; }
 .loading-card {
     background: var(--white);
-    border-radius: var(--radius);
-    padding: 48px 32px;
-    text-align: center;
-    box-shadow: var(--shadow);
+    border-radius: var(--radius); padding: 48px 32px;
+    text-align: center; box-shadow: var(--shadow);
 }
 .loading-avatar {
-    width: 100px;
-    height: 100px;
+    width: 100px; height: 100px;
     margin-bottom: 20px;
     animation: float 2.5s ease-in-out infinite;
 }
@@ -393,589 +371,667 @@ body {
 }
 .loading-card h2 {
     font-family: 'Poppins', sans-serif;
-    color: var(--orange);
-    font-size: 20px;
+    color: var(--orange); font-size: 20px;
     margin-bottom: 24px;
 }
 .progress-container { max-width: 400px; margin: 0 auto 16px; }
-.progress-track { width: 100%; height: 8px; background: var(--gray-light); border-radius: 4px; overflow: hidden; }
+.progress-track {
+    width: 100%; height: 8px;
+    background: var(--gray-light);
+    border-radius: 4px; overflow: hidden;
+}
 .progress-bar {
     height: 100%;
     background: linear-gradient(90deg, var(--orange), var(--blue), var(--orange));
     background-size: 200% 100%;
-    width: 0%;
-    transition: width 0.5s ease;
+    width: 0%; transition: width 0.5s ease;
     animation: shimmer 2s linear infinite;
 }
 @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
 .loading-msg { font-size: 14px; color: var(--gray-medium); margin-top: 12px; }
 .loading-sub { font-size: 12px; color: var(--blue); margin-top: 8px; font-weight: 500; }
 
-/* ========================================
-   RESULTADOS
-   ======================================== */
+/* ── RESULTADOS ──────────────────────────── */
 .results-section { display: none; padding: 32px 0 80px; }
 
 .btn-back {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
+    display: inline-flex; align-items: center; gap: 6px;
     padding: 10px 20px;
-    background: var(--white);
-    color: var(--orange);
+    background: var(--white); color: var(--orange);
     border: 2px solid var(--orange);
     border-radius: 50px;
     font-family: 'Poppins', sans-serif;
-    font-size: 13px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: var(--transition);
+    font-size: 13px; font-weight: 600;
+    cursor: pointer; transition: var(--transition);
     margin-bottom: 20px;
 }
 .btn-back:hover { background: var(--orange); color: var(--white); }
 
-/* ========================================
-   TRIP SUMMARY (route header)
-   ======================================== */
+/* ── TRIP SUMMARY ────────────────────────── */
 .trip-summary {
     background: var(--white);
-    border-radius: var(--radius);
-    padding: 24px;
-    margin-bottom: 20px;
-    box-shadow: var(--shadow);
+    border-radius: var(--radius); padding: 24px;
+    margin-bottom: 20px; box-shadow: var(--shadow);
     text-align: center;
 }
 .trip-route {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 16px;
+    display: flex; align-items: center;
+    justify-content: center; gap: 16px;
     margin-bottom: 16px;
 }
 .trip-city { display: flex; flex-direction: column; align-items: center; gap: 2px; }
 .trip-code {
     font-family: 'Poppins', sans-serif;
-    font-size: 28px;
-    font-weight: 800;
-    color: var(--gray-dark);
-    letter-spacing: 2px;
+    font-size: 28px; font-weight: 800;
+    color: var(--gray-dark); letter-spacing: 2px;
 }
 .trip-name {
-    font-size: 13px;
-    color: var(--gray-medium);
-    max-width: 140px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    font-size: 13px; color: var(--gray-medium);
+    max-width: 140px; overflow: hidden;
+    text-overflow: ellipsis; white-space: nowrap;
 }
 .trip-arrow { color: var(--orange); flex-shrink: 0; }
 .trip-meta {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: 8px;
+    display: flex; flex-wrap: wrap;
+    justify-content: center; gap: 8px;
 }
 .meta-chip {
-    font-size: 12px;
-    color: var(--gray-medium);
+    font-size: 12px; color: var(--gray-medium);
     background: var(--gray-light);
-    padding: 4px 12px;
-    border-radius: 20px;
+    padding: 4px 12px; border-radius: 20px;
     white-space: nowrap;
 }
 
-/* ========================================
-   PRICE MATRIX
-   ======================================== */
+/* ── PRICE MATRIX ────────────────────────── */
 .matrix-section {
     background: var(--white);
-    border-radius: var(--radius);
-    padding: 24px;
-    margin-bottom: 20px;
-    box-shadow: var(--shadow);
+    border-radius: var(--radius); padding: 24px;
+    margin-bottom: 20px; box-shadow: var(--shadow);
     overflow-x: auto;
 }
 .matrix-title {
     font-family: 'Poppins', sans-serif;
-    font-size: 18px;
-    font-weight: 700;
-    color: var(--gray-dark);
-    margin-bottom: 4px;
+    font-size: 18px; font-weight: 700;
+    color: var(--gray-dark); margin-bottom: 4px;
 }
-.matrix-subtitle {
-    font-size: 13px;
-    color: var(--gray-medium);
-    margin-bottom: 16px;
-}
+.matrix-subtitle { font-size: 13px; color: var(--gray-medium); margin-bottom: 16px; }
 .price-matrix {
-    width: 100%;
-    border-collapse: separate;
-    border-spacing: 4px;
-    min-width: 400px;
+    width: 100%; border-collapse: separate;
+    border-spacing: 4px; min-width: 400px;
 }
 .price-matrix th {
     font-family: 'Poppins', sans-serif;
-    font-size: 12px;
-    font-weight: 600;
+    font-size: 12px; font-weight: 600;
     color: var(--gray-medium);
-    padding: 8px 6px;
-    text-align: center;
+    padding: 8px 6px; text-align: center;
     white-space: nowrap;
 }
-.price-matrix th.col-header {
-    background: var(--blue-light);
-    color: var(--blue-dark);
-    border-radius: var(--radius-xs);
-}
-.price-matrix th.row-header {
-    background: var(--orange-light);
-    color: var(--orange-dark);
-    border-radius: var(--radius-xs);
-    text-align: right;
-    padding-right: 12px;
-}
-.price-matrix th.corner-cell {
-    position: relative;
-}
-.corner-labels {
-    font-size: 10px;
-    color: var(--gray-medium);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
+.price-matrix th.col-header { background: var(--blue-light); color: var(--blue-dark); border-radius: var(--radius-xs); }
+.price-matrix th.row-header { background: var(--orange-light); color: var(--orange-dark); border-radius: var(--radius-xs); text-align: right; padding-right: 12px; }
+.price-matrix th.corner-cell { position: relative; }
+.corner-labels { font-size: 10px; color: var(--gray-medium); text-transform: uppercase; letter-spacing: 0.5px; }
 .corner-ida { position: absolute; bottom: 4px; right: 8px; }
 .corner-volta { position: absolute; top: 4px; left: 8px; }
 
 .matrix-cell {
-    text-align: center;
-    padding: 10px 8px;
-    border-radius: var(--radius-xs);
-    cursor: pointer;
+    text-align: center; padding: 10px 8px;
+    border-radius: var(--radius-xs); cursor: pointer;
     transition: var(--transition);
     font-family: 'Poppins', sans-serif;
-    font-size: 14px;
-    font-weight: 600;
-    position: relative;
-    border: 2px solid transparent;
+    font-size: 14px; font-weight: 600;
+    position: relative; border: 2px solid transparent;
 }
 .matrix-cell:hover { transform: scale(1.05); z-index: 2; }
-.matrix-cell.cheapest {
-    background: var(--green-light);
-    color: var(--green-dark);
-    border-color: var(--green);
-}
+.matrix-cell.cheapest { background: var(--green-light); color: var(--green-dark); border-color: var(--green); }
 .matrix-cell.mid { background: var(--blue-light); color: var(--blue-dark); }
 .matrix-cell.expensive { background: var(--orange-light); color: var(--orange-dark); }
 .matrix-cell.no-data { background: var(--gray-light); color: var(--gray-medium); opacity: .6; cursor: default; }
-.matrix-cell.selected {
-    border-color: var(--gray-dark);
-    box-shadow: 0 0 0 3px rgba(33, 39, 42, 0.2);
-    transform: scale(1.05);
-    z-index: 3;
-}
-.matrix-noites {
-    display: block;
-    font-size: 10px;
-    font-weight: 400;
-    opacity: .7;
-    margin-top: 2px;
-}
+.matrix-cell.selected { border-color: var(--gray-dark); box-shadow: 0 0 0 3px rgba(33,39,42,0.2); transform: scale(1.05); z-index: 3; }
+.matrix-noites { display: block; font-size: 10px; font-weight: 400; opacity: .7; margin-top: 2px; }
 
-/* ========================================
-   WINNER CARD
-   ======================================== */
+/* ── WINNER CARD ─────────────────────────── */
 .winner-card {
     background: linear-gradient(135deg, var(--green) 0%, var(--green-dark) 100%);
-    border-radius: var(--radius);
-    padding: 28px 24px;
-    color: var(--white);
-    margin-bottom: 20px;
-    position: relative;
-    overflow: hidden;
-    box-shadow: 0 8px 32px rgba(46, 204, 113, 0.3);
+    border-radius: var(--radius); padding: 28px 24px;
+    color: var(--white); margin-bottom: 20px;
+    position: relative; overflow: hidden;
+    box-shadow: 0 8px 32px rgba(46,204,113,0.3);
 }
 .winner-card::before {
-    content: '';
-    position: absolute;
-    top: -30%;
-    right: -15%;
-    width: 200px;
-    height: 200px;
+    content: ''; position: absolute;
+    top: -30%; right: -15%;
+    width: 200px; height: 200px;
     background: rgba(255,255,255,0.1);
     border-radius: 50%;
 }
 .winner-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
+    display: inline-flex; align-items: center; gap: 6px;
     background: rgba(255,255,255,0.2);
-    padding: 6px 16px;
-    border-radius: 50px;
+    padding: 6px 16px; border-radius: 50px;
     font-family: 'Poppins', sans-serif;
-    font-size: 12px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 1px;
+    font-size: 12px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 1px;
     margin-bottom: 12px;
 }
 .winner-row {
-    display: flex;
-    align-items: center;
+    display: flex; align-items: center;
     justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 16px;
+    flex-wrap: wrap; gap: 16px;
 }
 .winner-price {
     font-family: 'Poppins', sans-serif;
-    font-size: 42px;
-    font-weight: 800;
-    line-height: 1.1;
+    font-size: 42px; font-weight: 800; line-height: 1.1;
 }
 .winner-price-label { font-size: 13px; opacity: .85; margin-top: 4px; }
 .winner-dates-box {
     background: rgba(255,255,255,0.15);
-    padding: 12px 18px;
-    border-radius: var(--radius-xs);
+    padding: 12px 18px; border-radius: var(--radius-xs);
     text-align: center;
 }
 .winner-date-lbl { font-size: 10px; opacity: .7; text-transform: uppercase; }
 .winner-date-val { font-family: 'Poppins', sans-serif; font-size: 16px; font-weight: 700; }
 .winner-cta {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
+    display: inline-flex; align-items: center; gap: 8px;
     padding: 12px 24px;
-    background: var(--white);
-    color: var(--green-dark);
-    border: none;
-    border-radius: var(--radius-xs);
+    background: var(--white); color: var(--green-dark);
+    border: none; border-radius: var(--radius-xs);
     font-family: 'Poppins', sans-serif;
-    font-size: 14px;
-    font-weight: 700;
-    text-decoration: none;
-    transition: var(--transition);
-    cursor: pointer;
-    margin-top: 16px;
+    font-size: 14px; font-weight: 700;
+    text-decoration: none; transition: var(--transition);
+    cursor: pointer; margin-top: 16px;
 }
 .winner-cta:hover { transform: translateY(-2px); box-shadow: 0 4px 16px rgba(0,0,0,0.2); }
 
-/* ========================================
-   STATS ROW
-   ======================================== */
+/* ── STATS ROW ───────────────────────────── */
 .stats-row {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 12px;
-    margin-bottom: 20px;
+    display: grid; grid-template-columns: repeat(3, 1fr);
+    gap: 12px; margin-bottom: 20px;
 }
 .stat-card {
-    background: var(--white);
-    border-radius: var(--radius-sm);
-    padding: 18px 14px;
-    text-align: center;
+    background: var(--white); border-radius: var(--radius-sm);
+    padding: 18px 14px; text-align: center;
     box-shadow: var(--shadow);
 }
-.stat-label {
-    font-size: 11px;
-    color: var(--gray-medium);
-    text-transform: uppercase;
-    letter-spacing: .5px;
-    margin-bottom: 4px;
-}
-.stat-value {
-    font-family: 'Poppins', sans-serif;
-    font-size: 20px;
-    font-weight: 700;
-    color: var(--gray-dark);
-}
+.stat-label { font-size: 11px; color: var(--gray-medium); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 4px; }
+.stat-value { font-family: 'Poppins', sans-serif; font-size: 20px; font-weight: 700; color: var(--gray-dark); }
 .stat-value.green { color: var(--green-dark); }
 .stat-value.blue { color: var(--blue); }
 .stat-value.orange { color: var(--orange); }
 
-/* ========================================
-   TRIPINHA TIP
-   ======================================== */
+/* ── TRIPINHA TIP ────────────────────────── */
 .tripinha-tip {
     background: var(--orange-light);
     border-left: 4px solid var(--orange);
     border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
-    padding: 16px 20px;
-    margin-bottom: 20px;
-    display: flex;
-    align-items: flex-start;
-    gap: 14px;
+    padding: 16px 20px; margin-bottom: 20px;
+    display: flex; align-items: flex-start; gap: 14px;
 }
 .tripinha-tip-avatar { width: 48px; height: 48px; flex-shrink: 0; }
 .tripinha-tip-text { font-size: 14px; color: var(--gray-dark); line-height: 1.6; }
 .tripinha-tip-text strong { color: var(--orange); }
 
-/* ========================================
-   COMBO DETAIL SECTION
-   ======================================== */
+/* ── COMBO DETAIL ────────────────────────── */
 .combo-detail-section {
     background: var(--white);
-    border-radius: var(--radius);
-    padding: 24px;
-    margin-bottom: 20px;
-    box-shadow: var(--shadow);
+    border-radius: var(--radius); padding: 24px;
+    margin-bottom: 20px; box-shadow: var(--shadow);
     border-top: 4px solid var(--blue);
 }
 .combo-detail-header {
-    display: flex;
-    justify-content: space-between;
+    display: flex; justify-content: space-between;
     align-items: flex-start;
-    margin-bottom: 16px;
-    gap: 12px;
+    margin-bottom: 16px; gap: 12px;
 }
 .combo-detail-header h3 {
     font-family: 'Poppins', sans-serif;
-    font-size: 18px;
-    font-weight: 700;
-    color: var(--gray-dark);
+    font-size: 18px; font-weight: 700; color: var(--gray-dark);
 }
-.combo-detail-sub {
-    font-size: 13px;
-    color: var(--gray-medium);
-    margin-top: 2px;
-}
+.combo-detail-sub { font-size: 13px; color: var(--gray-medium); margin-top: 2px; }
 
-/* ========================================
-   FILTROS INLINE
-   ======================================== */
-.filters-inline {
+/* ── SORT CHIPS ──────────────────────────── */
+.sort-filter-row {
     display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    margin-bottom: 16px;
-    padding-bottom: 16px;
-    border-bottom: 1px solid var(--gray-border);
-}
-.filter-chip {
-    display: inline-flex;
     align-items: center;
-    gap: 4px;
-    padding: 6px 14px;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 12px;
+}
+.sort-label {
+    font-family: 'Poppins', sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--gray-medium);
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    white-space: nowrap;
+}
+.sort-chips {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+.sort-chip {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 7px 14px;
     border: 2px solid var(--gray-border);
     background: var(--white);
     border-radius: 20px;
     font-family: 'Poppins', sans-serif;
-    font-size: 12px;
-    font-weight: 500;
+    font-size: 12px; font-weight: 500;
     color: var(--gray-dark);
-    cursor: pointer;
-    transition: var(--transition);
+    cursor: pointer; transition: var(--transition);
     white-space: nowrap;
 }
-.filter-chip:hover { border-color: var(--blue); background: var(--blue-light); }
-.filter-chip.active { border-color: var(--blue); background: var(--blue); color: var(--white); }
+.sort-chip:hover { border-color: var(--blue); background: var(--blue-light); }
+.sort-chip.active { border-color: var(--blue); background: var(--blue); color: var(--white); }
 
-/* ========================================
-   FLIGHT CARDS
-   ======================================== */
+/* ═══════════════════════════════════════════
+   PAINEL DE FILTROS
+   ═══════════════════════════════════════════ */
+.filter-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 10px 14px;
+    background: var(--gray-light);
+    border: 1.5px solid var(--gray-border);
+    border-radius: var(--radius-xs);
+    margin-bottom: 4px;
+    cursor: pointer;
+    transition: var(--transition);
+    user-select: none;
+}
+.filter-bar:hover { background: #edf0f3; border-color: #c5cdd5; }
+.filter-bar.has-active { border-color: var(--orange); background: var(--orange-light); }
+
+.filter-bar-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.filter-bar-icon { font-size: 16px; }
+.filter-bar-title {
+    font-family: 'Poppins', sans-serif;
+    font-size: 13px; font-weight: 600;
+    color: var(--gray-dark);
+}
+.filter-active-badge {
+    background: var(--orange);
+    color: var(--white);
+    font-family: 'Poppins', sans-serif;
+    font-size: 10px; font-weight: 700;
+    padding: 2px 7px;
+    border-radius: 10px;
+    display: none;
+}
+.filter-active-badge.visible { display: inline; }
+.filter-results-count {
+    font-size: 12px; color: var(--gray-medium);
+}
+.filter-bar-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.filter-toggle-icon {
+    font-size: 14px; color: var(--gray-medium);
+    transition: transform .3s;
+}
+.filter-toggle-icon.open { transform: rotate(180deg); }
+.btn-clear-all {
+    font-family: 'Poppins', sans-serif;
+    font-size: 11px; font-weight: 600;
+    color: var(--orange);
+    background: none; border: none;
+    cursor: pointer; padding: 0;
+    display: none;
+    text-decoration: underline;
+}
+.btn-clear-all.visible { display: block; }
+
+/* Painel expansível */
+.filter-panel {
+    background: var(--white);
+    border: 1.5px solid var(--gray-border);
+    border-top: none;
+    border-radius: 0 0 var(--radius-xs) var(--radius-xs);
+    padding: 0;
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height .4s cubic-bezier(0.4,0,0.2,1), padding .4s;
+    margin-bottom: 12px;
+}
+.filter-panel.open {
+    max-height: 1200px;
+    padding: 16px 18px;
+    border-color: var(--orange);
+}
+
+/* Seções do painel */
+.filter-section {
+    margin-bottom: 18px;
+    padding-bottom: 18px;
+    border-bottom: 1px solid var(--gray-border);
+}
+.filter-section:last-child { margin-bottom: 0; padding-bottom: 0; border-bottom: none; }
+.filter-section-title {
+    font-family: 'Poppins', sans-serif;
+    font-size: 12px; font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    color: var(--gray-medium);
+    margin-bottom: 10px;
+    display: flex; align-items: center; gap: 6px;
+}
+.filter-section-title-icon { font-size: 14px; }
+
+/* Checkboxes de filtro */
+.filter-checks {
+    display: flex; flex-wrap: wrap; gap: 8px;
+}
+.filter-check-item {
+    display: flex; align-items: center; gap: 7px;
+    padding: 6px 12px;
+    border: 1.5px solid var(--gray-border);
+    border-radius: 20px;
+    cursor: pointer;
+    transition: var(--transition);
+    font-family: 'Poppins', sans-serif;
+    font-size: 12px; font-weight: 500;
+    color: var(--gray-dark);
+    user-select: none;
+    white-space: nowrap;
+}
+.filter-check-item:hover { border-color: var(--blue); background: var(--blue-light); }
+.filter-check-item.checked { border-color: var(--blue); background: var(--blue); color: var(--white); }
+.filter-check-item.checked .fci-check { background: rgba(255,255,255,0.25); }
+.fci-check {
+    width: 14px; height: 14px;
+    border: 1.5px solid currentColor;
+    border-radius: 3px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 9px; flex-shrink: 0;
+}
+.filter-check-item.checked .fci-check::after { content: '✓'; }
+.fci-count {
+    font-size: 10px; opacity: .7;
+}
+
+/* Time blocks */
+.time-blocks {
+    display: flex; gap: 6px; flex-wrap: wrap;
+}
+.time-block {
+    display: flex; flex-direction: column; align-items: center;
+    padding: 8px 14px;
+    border: 1.5px solid var(--gray-border);
+    border-radius: var(--radius-xs);
+    cursor: pointer;
+    transition: var(--transition);
+    background: var(--white);
+    min-width: 80px;
+    user-select: none;
+}
+.time-block:hover { border-color: var(--blue); background: var(--blue-light); }
+.time-block.checked { border-color: var(--orange); background: var(--orange-light); }
+.time-block .tb-icon { font-size: 18px; margin-bottom: 2px; }
+.time-block .tb-label {
+    font-family: 'Poppins', sans-serif;
+    font-size: 11px; font-weight: 600;
+    color: var(--gray-dark);
+}
+.time-block .tb-range { font-size: 10px; color: var(--gray-medium); }
+.time-block.checked .tb-label,
+.time-block.checked .tb-range { color: var(--orange-dark); }
+
+/* Range slider */
+.filter-range-group { margin-top: 6px; }
+.range-row {
+    display: flex; align-items: center; gap: 10px;
+}
+.range-input {
+    flex: 1;
+    -webkit-appearance: none;
+    height: 5px; border-radius: 3px;
+    background: var(--gray-border);
+    outline: none;
+    cursor: pointer;
+    transition: background .2s;
+}
+.range-input::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    background: var(--orange);
+    box-shadow: 0 1px 4px rgba(232,119,34,.4);
+    cursor: pointer;
+    transition: transform .2s;
+}
+.range-input::-webkit-slider-thumb:hover { transform: scale(1.2); }
+.range-input::-moz-range-thumb {
+    width: 18px; height: 18px; border: none;
+    border-radius: 50%;
+    background: var(--orange);
+    cursor: pointer;
+}
+.range-value {
+    font-family: 'Poppins', sans-serif;
+    font-size: 13px; font-weight: 700;
+    color: var(--orange);
+    min-width: 64px; text-align: right;
+    white-space: nowrap;
+}
+.range-limits {
+    display: flex; justify-content: space-between;
+    font-size: 10px; color: var(--gray-medium);
+    margin-top: 4px;
+}
+
+/* Paradas especial */
+.stops-options {
+    display: flex; gap: 8px; flex-wrap: wrap;
+}
+.stops-opt {
+    display: flex; flex-direction: column; align-items: center;
+    padding: 10px 18px;
+    border: 2px solid var(--gray-border);
+    border-radius: var(--radius-xs);
+    cursor: pointer; transition: var(--transition);
+    background: var(--white);
+    min-width: 80px;
+    user-select: none;
+}
+.stops-opt:hover { border-color: var(--green); background: var(--green-light); }
+.stops-opt.checked { border-color: var(--green); background: var(--green-light); }
+.stops-opt-icon { font-size: 20px; margin-bottom: 4px; }
+.stops-opt-label {
+    font-family: 'Poppins', sans-serif;
+    font-size: 12px; font-weight: 600;
+    color: var(--gray-dark);
+}
+.stops-opt-count { font-size: 10px; color: var(--gray-medium); margin-top: 2px; }
+.stops-opt.checked .stops-opt-label { color: var(--green-dark); }
+
+/* Tags dos filtros ativos */
+.active-filter-tags {
+    display: flex; flex-wrap: wrap; gap: 6px;
+    margin-bottom: 10px;
+}
+.active-tag {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 4px 10px;
+    background: var(--blue-light);
+    border: 1px solid var(--blue);
+    border-radius: 12px;
+    font-family: 'Poppins', sans-serif;
+    font-size: 11px; font-weight: 600;
+    color: var(--blue-dark);
+    animation: chipIn .15s ease;
+}
+.active-tag .tag-remove {
+    cursor: pointer; font-weight: 700;
+    font-size: 12px; line-height: 1;
+    opacity: .7; transition: opacity .15s;
+    margin-left: 2px;
+}
+.active-tag .tag-remove:hover { opacity: 1; }
+
+/* No results after filter */
+.no-filter-results {
+    text-align: center; padding: 32px 16px;
+    color: var(--gray-medium);
+}
+.no-filter-results .nfr-icon { font-size: 40px; margin-bottom: 12px; }
+.no-filter-results p { font-size: 14px; margin-bottom: 12px; }
+.btn-reset-filters {
+    padding: 10px 20px;
+    background: var(--orange); color: var(--white);
+    border: none; border-radius: var(--radius-xs);
+    font-family: 'Poppins', sans-serif;
+    font-size: 13px; font-weight: 600;
+    cursor: pointer; transition: var(--transition);
+}
+.btn-reset-filters:hover { background: var(--orange-dark); }
+
+/* ── FLIGHT CARDS ────────────────────────── */
 .flights-list { display: flex; flex-direction: column; gap: 12px; }
 
 .flight-card {
     border: 2px solid var(--gray-border);
-    border-radius: var(--radius-sm);
-    padding: 20px;
-    transition: var(--transition);
-    position: relative;
+    border-radius: var(--radius-sm); padding: 20px;
+    transition: var(--transition); position: relative;
 }
 .flight-card:hover { border-color: var(--blue); box-shadow: var(--shadow-hover); }
 .flight-card.best-flight { border-color: var(--green); background: var(--green-light); }
 .flight-card.best-flight::after {
     content: '⭐ Melhor opção';
-    position: absolute;
-    top: -10px;
-    right: 16px;
-    background: var(--green);
-    color: var(--white);
+    position: absolute; top: -10px; right: 16px;
+    background: var(--green); color: var(--white);
     font-family: 'Poppins', sans-serif;
-    font-size: 11px;
-    font-weight: 700;
-    padding: 2px 10px;
-    border-radius: 10px;
+    font-size: 11px; font-weight: 700;
+    padding: 2px 10px; border-radius: 10px;
 }
 
 .flight-top {
-    display: flex;
-    align-items: center;
+    display: flex; align-items: center;
     justify-content: space-between;
-    gap: 16px;
-    margin-bottom: 12px;
+    gap: 16px; margin-bottom: 12px;
 }
-.flight-airlines {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
+.flight-airlines { display: flex; align-items: center; gap: 8px; }
 .airline-logo {
-    width: 32px;
-    height: 32px;
-    border-radius: 6px;
-    object-fit: contain;
+    width: 32px; height: 32px;
+    border-radius: 6px; object-fit: contain;
     background: var(--gray-light);
 }
 .airline-names {
     font-family: 'Poppins', sans-serif;
-    font-size: 14px;
-    font-weight: 600;
-    color: var(--gray-dark);
+    font-size: 14px; font-weight: 600; color: var(--gray-dark);
 }
 .flight-price-box { text-align: right; }
 .flight-price {
     font-family: 'Poppins', sans-serif;
-    font-size: 24px;
-    font-weight: 800;
-    color: var(--gray-dark);
+    font-size: 24px; font-weight: 800; color: var(--gray-dark);
 }
 .flight-card.best-flight .flight-price { color: var(--green-dark); }
 .flight-price-pp { font-size: 11px; color: var(--gray-medium); }
-.flight-price-total {
-    font-size: 12px;
-    color: var(--blue);
-    font-weight: 600;
+.flight-price-detail {
+    font-size: 11px; color: var(--gray-medium);
+    margin-top: 2px;
+}
+.flight-price-detail .price-pax {
+    display: inline-block;
+    background: var(--blue-light);
+    color: var(--blue-dark);
+    padding: 1px 6px; border-radius: 4px;
+    font-weight: 600; font-size: 11px;
 }
 
 .flight-summary {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 12px;
-    margin-bottom: 12px;
-    padding-bottom: 12px;
+    display: flex; flex-wrap: wrap; gap: 12px;
+    margin-bottom: 12px; padding-bottom: 12px;
     border-bottom: 1px solid var(--gray-border);
 }
 .flight-tag {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    font-size: 13px;
-    color: var(--gray-dark);
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 13px; color: var(--gray-dark);
 }
 .flight-tag-icon { font-size: 14px; }
 .tag-direct { color: var(--green-dark); font-weight: 600; }
 .tag-warn { color: var(--orange); }
 
-/* ========================================
-   FLIGHT LEGS (IDA / VOLTA)
-   ======================================== */
-.flight-legs { display: flex; flex-direction: column; gap: 12px; }
-.leg-section { }
+/* ── FLIGHT LEGS GRID ─────────────────────── */
+.flight-legs-container {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 24px; margin-top: 16px; padding-top: 16px;
+    border-top: 1px dashed var(--gray-border);
+}
+.leg-column { display: flex; flex-direction: column; gap: 12px; }
 .leg-label {
     font-family: 'Poppins', sans-serif;
-    font-size: 11px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: .5px;
-    color: var(--gray-medium);
-    margin-bottom: 8px;
+    font-size: 11px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: .5px;
+    color: var(--gray-medium); margin-bottom: 8px;
 }
 .leg-row {
-    display: flex;
-    align-items: center;
-    gap: 12px;
+    display: flex; align-items: center; gap: 12px;
     padding: 8px 0;
 }
 .leg-row + .leg-row { border-top: 1px dashed var(--gray-border); }
 .leg-airline-logo { width: 24px; height: 24px; border-radius: 4px; background: var(--gray-light); flex-shrink: 0; }
 .leg-info { flex: 1; min-width: 0; }
-.leg-times {
-    font-family: 'Poppins', sans-serif;
-    font-size: 14px;
-    font-weight: 600;
-    color: var(--gray-dark);
-}
+.leg-times { font-family: 'Poppins', sans-serif; font-size: 14px; font-weight: 600; color: var(--gray-dark); }
 .leg-route { font-size: 12px; color: var(--gray-medium); }
-.leg-details {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-    margin-top: 4px;
-}
+.leg-details { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
 .leg-detail-chip {
-    font-size: 11px;
-    color: var(--gray-medium);
+    font-size: 11px; color: var(--gray-medium);
     background: var(--gray-light);
-    padding: 2px 8px;
-    border-radius: 8px;
+    padding: 2px 8px; border-radius: 8px;
 }
 .leg-layover {
-    display: flex;
-    align-items: center;
-    gap: 8px;
+    display: flex; align-items: center; gap: 8px;
     padding: 6px 12px;
     background: var(--yellow-light);
     border-radius: var(--radius-xs);
-    font-size: 12px;
-    color: var(--yellow);
-    font-weight: 500;
+    font-size: 12px; color: var(--yellow); font-weight: 500;
     margin: 4px 0;
 }
 .leg-layover.overnight { background: var(--red-light); color: var(--red); }
 
-/* ========================================
-   FLIGHT CARD: ACTION
-   ======================================== */
-.flight-action {
-    display: flex;
-    justify-content: flex-end;
-    margin-top: 12px;
-}
+/* ── FLIGHT ACTION ───────────────────────── */
+.flight-action { display: flex; justify-content: flex-end; margin-top: 12px; }
 .btn-google-flights {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
+    display: inline-flex; align-items: center; gap: 6px;
     padding: 10px 20px;
-    background: var(--blue);
-    color: var(--white);
-    border: none;
-    border-radius: var(--radius-xs);
+    background: var(--blue); color: var(--white);
+    border: none; border-radius: var(--radius-xs);
     font-family: 'Poppins', sans-serif;
-    font-size: 13px;
-    font-weight: 600;
-    text-decoration: none;
-    transition: var(--transition);
-    cursor: pointer;
-    white-space: nowrap;
+    font-size: 13px; font-weight: 600;
+    text-decoration: none; transition: var(--transition);
+    cursor: pointer; white-space: nowrap;
 }
 .btn-google-flights:hover { background: var(--blue-dark); transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,163,224,.3); }
 
-/* ========================================
-   NO RESULTS
-   ======================================== */
-.no-flights-msg {
-    text-align: center;
-    padding: 32px 16px;
-    color: var(--gray-medium);
-    font-size: 15px;
-}
+/* ── NO RESULTS ──────────────────────────── */
+.no-flights-msg { text-align: center; padding: 32px 16px; color: var(--gray-medium); font-size: 15px; }
 
-/* ========================================
-   SHARE SECTION
-   ======================================== */
+/* ── SHARE SECTION ───────────────────────── */
 .share-section {
-    background: var(--white);
-    border-radius: var(--radius);
-    padding: 28px 24px;
-    margin-top: 20px;
-    box-shadow: var(--shadow);
-    text-align: center;
+    background: var(--white); border-radius: var(--radius);
+    padding: 28px 24px; margin-top: 20px;
+    box-shadow: var(--shadow); text-align: center;
 }
 .share-title { font-family: 'Poppins', sans-serif; font-size: 18px; font-weight: 700; color: var(--gray-dark); margin-bottom: 4px; }
 .share-subtitle { font-size: 14px; color: var(--gray-medium); margin-bottom: 20px; }
 .share-buttons { display: flex; justify-content: center; gap: 12px; flex-wrap: wrap; }
 .btn-share {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    padding: 14px 28px;
-    border: none;
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 14px 28px; border: none;
     border-radius: var(--radius-xs);
     font-family: 'Poppins', sans-serif;
-    font-size: 15px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: var(--transition);
+    font-size: 15px; font-weight: 600;
+    cursor: pointer; transition: var(--transition);
 }
 .btn-share svg { width: 20px; height: 20px; }
 .btn-share-whatsapp { background: #25D366; color: var(--white); }
@@ -984,9 +1040,15 @@ body {
 .btn-share-copy:hover { background: var(--blue-light); border-color: var(--blue); }
 .btn-share-copy.copied { background: var(--green-light); border-color: var(--green); color: var(--green-dark); }
 
-/* ========================================
-   RESPONSIVE
-   ======================================== */
+/* ── FOOTER ──────────────────────────────── */
+.footer { text-align: center; padding: 24px; color: var(--gray-medium); font-size: 13px; }
+
+/* ── UTILITIES ───────────────────────────── */
+.hidden { display: none !important; }
+.fade-in { animation: fadeIn 0.5s ease-out forwards; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+
+/* ── RESPONSIVE ──────────────────────────── */
 @media (max-width: 768px) {
     .container { padding: 0 16px; }
     .hero-section h1 { font-size: 22px; }
@@ -1004,38 +1066,11 @@ body {
     .share-buttons { flex-direction: column; }
     .btn-share { justify-content: center; width: 100%; }
     .combo-detail-header { flex-wrap: wrap; }
-}
-
-/* ========================================
-   UTILITIES
-   ======================================== */
-.hidden { display: none !important; }
-.fade-in { animation: fadeIn 0.5s ease-out forwards; }
-@keyframes fadeIn { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
-
-/* ========================================
-   GRID DE IDA E VOLTA (LADO A LADO)
-   ======================================== */
-.flight-legs-container {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 24px;
-    margin-top: 16px;
-    padding-top: 16px;
-    border-top: 1px dashed var(--gray-border);
-}
-.leg-column {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-}
-@media (max-width: 768px) {
-    .flight-legs-container {
-        grid-template-columns: 1fr;
-        gap: 16px;
-    }
-    .leg-column + .leg-column {
-        border-top: 1px solid var(--gray-light);
-        padding-top: 16px;
-    }
+    .flight-legs-container { grid-template-columns: 1fr; gap: 16px; }
+    .leg-column + .leg-column { border-top: 1px solid var(--gray-light); padding-top: 16px; }
+    .sort-filter-row { flex-direction: column; align-items: flex-start; }
+    .time-blocks { gap: 6px; }
+    .time-block { min-width: 70px; padding: 7px 10px; }
+    .stops-options { gap: 6px; }
+    .filter-panel.open { padding: 14px 14px; }
 }
