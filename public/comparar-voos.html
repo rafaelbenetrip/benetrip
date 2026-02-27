@@ -109,16 +109,70 @@
 
                     <!-- Passageiros + Moeda -->
                     <div class="form-row">
+
+                        <!-- Passageiros por tipo -->
                         <div class="form-group">
                             <label>👥 Passageiros</label>
-                            <div class="stepper">
-                                <button type="button" class="stepper-btn" id="btn-menos" onclick="BenetripCompararVoos.ajustarPassageiros(-1)">−</button>
-                                <span class="stepper-value" id="num-passageiros">1</span>
-                                <button type="button" class="stepper-btn" id="btn-mais" onclick="BenetripCompararVoos.ajustarPassageiros(1)">+</button>
+                            <div class="pax-selector">
+
+                                <!-- Adultos -->
+                                <div class="pax-row">
+                                    <div class="pax-info">
+                                        <div class="pax-label">
+                                            <span class="pax-icon">🧑</span> Adultos
+                                        </div>
+                                        <div class="pax-desc">A partir de 12 anos</div>
+                                    </div>
+                                    <div class="pax-stepper">
+                                        <button type="button" class="pax-btn" id="btn-adultos-menos"
+                                                onclick="BenetripCompararVoos.ajustarPax('adultos',-1)" disabled>−</button>
+                                        <span class="pax-count has-value" id="pax-adultos-count">1</span>
+                                        <button type="button" class="pax-btn" id="btn-adultos-mais"
+                                                onclick="BenetripCompararVoos.ajustarPax('adultos',1)">+</button>
+                                    </div>
+                                </div>
+
+                                <!-- Crianças -->
+                                <div class="pax-row">
+                                    <div class="pax-info">
+                                        <div class="pax-label">
+                                            <span class="pax-icon">🧒</span> Crianças
+                                        </div>
+                                        <div class="pax-desc">De 2 a 11 anos</div>
+                                    </div>
+                                    <div class="pax-stepper">
+                                        <button type="button" class="pax-btn" id="btn-criancas-menos"
+                                                onclick="BenetripCompararVoos.ajustarPax('criancas',-1)" disabled>−</button>
+                                        <span class="pax-count" id="pax-criancas-count">0</span>
+                                        <button type="button" class="pax-btn" id="btn-criancas-mais"
+                                                onclick="BenetripCompararVoos.ajustarPax('criancas',1)">+</button>
+                                    </div>
+                                </div>
+
+                                <!-- Bebês -->
+                                <div class="pax-row">
+                                    <div class="pax-info">
+                                        <div class="pax-label">
+                                            <span class="pax-icon">👶</span> Bebês
+                                        </div>
+                                        <div class="pax-desc free-tag">Até 2 anos · no colo · grátis</div>
+                                    </div>
+                                    <div class="pax-stepper">
+                                        <button type="button" class="pax-btn" id="btn-bebes-menos"
+                                                onclick="BenetripCompararVoos.ajustarPax('bebes',-1)" disabled>−</button>
+                                        <span class="pax-count" id="pax-bebes-count">0</span>
+                                        <button type="button" class="pax-btn" id="btn-bebes-mais"
+                                                onclick="BenetripCompararVoos.ajustarPax('bebes',1)">+</button>
+                                    </div>
+                                </div>
+
                             </div>
-                            <p class="hint-pass">Preços mostrados por pessoa</p>
+                            <p class="pax-total-hint" id="pax-total-hint">
+                                Preço dividido por <strong>1</strong> passageiro
+                            </p>
                         </div>
 
+                        <!-- Moeda -->
                         <div class="form-group">
                             <label>💱 Moeda</label>
                             <div class="currency-chips">
@@ -133,6 +187,7 @@
                     <button type="submit" class="btn-submit" id="btn-submit">
                         🔍 Comparar Voos
                     </button>
+
                 </form>
             </div>
         </div>
