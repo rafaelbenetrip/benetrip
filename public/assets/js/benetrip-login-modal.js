@@ -55,7 +55,7 @@ const BenetripLoginModal = (function () {
                             <img src="assets/tripinha-avatar.png" alt="Tripinha" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />
                             <div class="benetrip-modal-mascot-fallback" style="display:none;">🐕</div>
                         </div>
-                        <h2 class="benetrip-modal-title" id="benetrip-modal-title">Bem-vindo de volta!</h2>
+                        <h2 class="benetrip-modal-title" id="benetrip-modal-title">Bem-vindo!!!</h2>
                         <p class="benetrip-modal-subtitle" id="benetrip-modal-subtitle">
                             A Tripinha guardou seu lugar! 🐾
                         </p>
@@ -806,7 +806,7 @@ const BenetripLoginModal = (function () {
 
         switch (view) {
             case 'login':
-                titleEl.textContent = 'Bem-vindo de volta!';
+                titleEl.textContent = 'Bem-vindo!!';
                 subtitleEl.textContent = 'A Tripinha guardou seu lugar! 🐾';
                 break;
             case 'signup':
