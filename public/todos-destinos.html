@@ -32,26 +32,26 @@
 </head>
 <body>
     <!-- Header -->
-    <header class="header">
-        <div class="container">
-            <a href="https://www.benetrip.com.br"><img src="logo1.png" alt="Benetrip" class="logo"></a>
-            <p class="tagline">Compare todos os destinos! 🌍</p>
-        </div>
+<div id="benetrip-header-root"></div>
+<script src="assets/js/benetrip-header.js"></script>
     </header>
 
+    <!-- Hero -->
+    <section class="hero-section" id="hero-section">
+        <div class="container hero-content">
+            <img src="assets/images/tripinha/avatar-pensando.png" alt="Tripinha" class="hero-avatar"
+                 onerror="this.style.display='none'">
+            <h1>🌍 Descubra Todos os Destinos Disponíveis</h1>
+            <p>A Tripinha busca TODOS os destinos possíveis e mostra os preços do menor ao maior. Selecione <strong>uma ou mais datas</strong> de ida e volta para encontrar a combinação mais barata!</p>
+        </div>
+    </section>
+    
     <!-- Main Content -->
     <main class="main-content">
         <div class="container">
             
             <!-- Formulário -->
             <div id="form-container">
-                <div class="intro-card">
-                    <img src="assets/images/tripinha/avatar-pensando.png" alt="Tripinha" class="intro-avatar" 
-                         onerror="this.style.display='none'">
-                    <h1>🌍 Descubra Todos os Destinos Disponíveis</h1>
-                    <p>A Tripinha busca TODOS os destinos possíveis e mostra os preços do menor ao maior. Selecione <strong>uma ou mais datas</strong> de ida e volta para encontrar a combinação mais barata! 🐕</p>
-                </div>
-
                 <form id="busca-form" class="busca-form">
                     
                     <!-- Origem -->
