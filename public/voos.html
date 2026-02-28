@@ -21,27 +21,26 @@
 </head>
 <body>
 
-    <!-- HEADER -->
-    <header class="header">
-        <div class="header-inner">
-            <a href="/" class="header-logo"><img src="logo1.png" alt="Benetrip" class="logo-img"></a>
-            <nav class="header-nav">
-                <a href="/descobrir-destinos.html" class="nav-link">🐕 Descobrir destinos</a>
-                <span class="nav-link active">✈️ Passagens</span>
-            </nav>
-        </div>
-    </header>
+    <!-- Header -->
+<div id="benetrip-header-root"></div>
+<script src="assets/js/benetrip-header.js"></script>
+    </header></header>
 
+    <!-- Hero -->
+    <section class="hero-section" id="hero-section">
+        <div class="container hero-content">
+            <img src="assets/images/tripinha/avatar-pensando.png" alt="Tripinha" class="hero-avatar"
+                 onerror="this.style.display='none'">
+            <h1>Busca clássica de voos! ✈️</h1>
+            <p>Origem, destino, datas e pronto. A Tripinha compara <strong>centenas de companhias e agências<strong> em tempo real pra achar o melhor preço.</p>
+        </div>
+    </section>
+    
     <!-- ============================
          SEARCH SECTION
          ============================ -->
     <section class="search-section" id="search-section">
         <div class="search-container">
-            <div class="search-hero" id="search-hero">
-                <h1>Sua próxima aventura começa aqui!</h1>
-                <p>A Tripinha irá farejar a melhor opção em centenas de companhias e agências</p>
-            </div>
-
             <form class="search-form" id="search-form" autocomplete="off">
                 <!-- Origem / Destino -->
                 <div class="sf-row sf-row-cities">
