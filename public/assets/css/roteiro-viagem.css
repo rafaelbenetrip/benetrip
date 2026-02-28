@@ -1,0 +1,986 @@
+/* ========================================
+   ROTEIRO DE VIAGEM - BENETRIP
+   Cores: Laranja #E87722, Azul #00A3E0
+   v1.0 - Página de criação de roteiro
+   ======================================== */
+
+:root {
+    --orange-primary: #E87722;
+    --blue-secondary: #00A3E0;
+    --gray-dark: #21272A;
+    --gray-light: #F5F5F5;
+    --gray-medium: #E0E0E0;
+    --white: #FFFFFF;
+    --border-radius: 16px;
+    --border-radius-sm: 12px;
+    --border-radius-lg: 20px;
+    --shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    --shadow-hover: 0 4px 16px rgba(0, 0, 0, 0.15);
+    --transition: all 0.3s ease;
+    --green-tag: #43A047;
+    --purple-tag: #7E57C2;
+    --red-tag: #E53935;
+    --teal-tag: #00897B;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Montserrat', sans-serif;
+    background-color: var(--gray-light);
+    color: var(--gray-dark);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+}
+
+.container {
+    max-width: 600px;
+    margin: 0 auto;
+    padding: 0 20px;
+}
+
+/* ========================================
+   HERO SECTION
+   ======================================== */
+.hero-section {
+    background: linear-gradient(135deg, var(--blue-secondary) 0%, #33B5E5 100%);
+    padding: 40px 0 48px;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+}
+
+.hero-section::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    right: -20%;
+    width: 400px;
+    height: 400px;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 50%;
+}
+
+.hero-content {
+    position: relative;
+    z-index: 2;
+}
+
+.hero-avatar {
+    width: 80px;
+    height: 80px;
+    margin-bottom: 16px;
+    filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.2));
+}
+
+.hero-section h1 {
+    font-family: 'Poppins', sans-serif;
+    font-size: 28px;
+    font-weight: 800;
+    color: var(--white);
+    margin-bottom: 8px;
+}
+
+.hero-section p {
+    font-size: 15px;
+    color: rgba(255, 255, 255, 0.9);
+    max-width: 540px;
+    margin: 0 auto;
+}
+
+/* ========================================
+   MAIN CONTENT
+   ======================================== */
+.main-content {
+    padding: 0 0 80px;
+}
+
+#form-container {
+    margin-top: -32px;
+    position: relative;
+    z-index: 10;
+}
+
+/* ========================================
+   FORMULÁRIO
+   ======================================== */
+.roteiro-form {
+    background: var(--white);
+    border-radius: var(--border-radius-lg);
+    padding: 32px 24px;
+    box-shadow: var(--shadow);
+}
+
+.form-group {
+    margin-bottom: 32px;
+}
+
+.form-group label {
+    display: block;
+    font-family: 'Poppins', sans-serif;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--gray-dark);
+    margin-bottom: 8px;
+}
+
+.hint {
+    font-size: 13px;
+    color: #666;
+    margin-bottom: 12px;
+}
+
+/* ========================================
+   INPUTS
+   ======================================== */
+.text-input,
+.time-input {
+    width: 100%;
+    padding: 14px 18px;
+    border: 2px solid var(--gray-medium);
+    border-radius: var(--border-radius-sm);
+    font-size: 15px;
+    font-family: 'Montserrat', sans-serif;
+    transition: var(--transition);
+    background: var(--white);
+}
+
+.text-input:focus,
+.time-input:focus {
+    outline: none;
+    border-color: var(--blue-secondary);
+    box-shadow: 0 0 0 3px rgba(0, 163, 224, 0.12);
+}
+
+.time-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+
+.time-field label {
+    font-size: 13px;
+    font-weight: 500;
+    color: #555;
+    margin-bottom: 6px;
+    display: block;
+}
+
+/* ========================================
+   BUTTON GROUPS (copiar do descobrir-destinos)
+   ======================================== */
+.button-group {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+}
+
+.button-group-3 {
+    grid-template-columns: repeat(3, 1fr);
+}
+
+.button-group-full {
+    grid-template-columns: 1fr;
+}
+
+.btn-option {
+    background: var(--white);
+    border: 2px solid var(--gray-medium);
+    border-radius: var(--border-radius-sm);
+    padding: 16px 12px;
+    cursor: pointer;
+    transition: var(--transition);
+    font-family: 'Poppins', sans-serif;
+    font-size: 14px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    text-align: center;
+}
+
+.btn-option .emoji {
+    font-size: 28px;
+}
+
+.btn-option .text {
+    font-weight: 500;
+    color: var(--gray-dark);
+}
+
+.btn-option small {
+    font-size: 11px;
+    color: #888;
+}
+
+.btn-option:hover {
+    border-color: var(--blue-secondary);
+    background-color: #F0FAFF;
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-hover);
+}
+
+.btn-option.active {
+    border-color: var(--blue-secondary);
+    background-color: var(--blue-secondary);
+}
+
+.btn-option.active .text {
+    color: var(--white);
+    font-weight: 600;
+}
+
+.btn-option.active small {
+    color: rgba(255, 255, 255, 0.85);
+}
+
+.btn-full {
+    flex-direction: row;
+    justify-content: center;
+    gap: 12px;
+}
+
+/* ========================================
+   MULTI-SELECT
+   ======================================== */
+.multi-select .btn-option.active {
+    position: relative;
+}
+
+.multi-select .btn-option.active::after {
+    content: '✓';
+    position: absolute;
+    top: 8px;
+    right: 10px;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--white);
+    background: rgba(0, 0, 0, 0.15);
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* ========================================
+   FAMÍLIA / NÚMERO INPUTS
+   ======================================== */
+.familia-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.familia-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--gray-light);
+    border-radius: var(--border-radius-sm);
+    padding: 14px 16px;
+}
+
+.familia-label {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.familia-emoji { font-size: 28px; }
+
+.familia-label strong {
+    font-family: 'Poppins', sans-serif;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--gray-dark);
+    display: block;
+}
+
+.familia-label small {
+    font-size: 12px;
+    color: #888;
+}
+
+.number-input-compact {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.btn-number-sm {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: none;
+    background: var(--blue-secondary);
+    color: var(--white);
+    font-size: 20px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: var(--transition);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.btn-number-sm:hover {
+    background: #0090C7;
+    transform: scale(1.1);
+}
+
+.number-input-compact input {
+    width: 44px;
+    text-align: center;
+    font-size: 22px;
+    font-weight: 700;
+    font-family: 'Poppins', sans-serif;
+    border: none;
+    background: transparent;
+    color: var(--gray-dark);
+}
+
+.number-input {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    background: var(--gray-light);
+    padding: 16px;
+    border-radius: var(--border-radius-sm);
+}
+
+.btn-number {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    border: none;
+    background: var(--blue-secondary);
+    color: var(--white);
+    font-size: 24px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: var(--transition);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.btn-number:hover { background: #0090C7; transform: scale(1.1); }
+
+#num-pessoas-roteiro {
+    width: 80px;
+    text-align: center;
+    font-size: 28px;
+    font-weight: 700;
+    font-family: 'Poppins', sans-serif;
+    border: none;
+    background: transparent;
+    color: var(--gray-dark);
+}
+
+.familia-hint {
+    text-align: center;
+    font-weight: 500;
+    color: var(--blue-secondary) !important;
+    margin-top: 8px;
+}
+
+/* ========================================
+   CALENDÁRIO (Flatpickr)
+   ======================================== */
+#datas-roteiro {
+    width: 100%;
+    padding: 14px 18px;
+    border: 2px solid var(--gray-medium);
+    border-radius: var(--border-radius-sm);
+    font-size: 15px;
+    font-family: 'Montserrat', sans-serif;
+    background: var(--white);
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+#datas-roteiro:focus {
+    outline: none;
+    border-color: var(--blue-secondary);
+}
+
+.flatpickr-day.selected,
+.flatpickr-day.startRange,
+.flatpickr-day.endRange {
+    background: var(--blue-secondary) !important;
+    border-color: var(--blue-secondary) !important;
+    color: var(--white) !important;
+}
+
+.flatpickr-day.inRange {
+    background: rgba(0, 163, 224, 0.1) !important;
+    border-color: rgba(0, 163, 224, 0.1) !important;
+}
+
+/* ========================================
+   SUBMIT BUTTON
+   ======================================== */
+.btn-submit {
+    width: 100%;
+    padding: 18px;
+    background: var(--blue-secondary);
+    color: var(--white);
+    border: none;
+    border-radius: var(--border-radius-lg);
+    font-family: 'Poppins', sans-serif;
+    font-size: 18px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: var(--transition);
+    box-shadow: var(--shadow);
+    margin-top: 16px;
+}
+
+.btn-submit:hover {
+    background: #0090C7;
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-hover);
+}
+
+.btn-submit:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* ========================================
+   LOADING
+   ======================================== */
+.loading-card {
+    background: var(--white);
+    border-radius: var(--border-radius-lg);
+    padding: 48px 24px;
+    text-align: center;
+    box-shadow: var(--shadow);
+}
+
+.tripinha-loading {
+    width: 120px;
+    height: 120px;
+    margin-bottom: 24px;
+    animation: bounce 2s infinite;
+}
+
+@keyframes bounce {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-20px); }
+}
+
+.loading-card h2 {
+    font-family: 'Poppins', sans-serif;
+    color: var(--blue-secondary);
+    font-size: 22px;
+    margin-bottom: 24px;
+}
+
+.progress-bar {
+    width: 100%;
+    height: 12px;
+    background: var(--gray-medium);
+    border-radius: 6px;
+    overflow: hidden;
+    margin-bottom: 16px;
+}
+
+.progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--blue-secondary), var(--orange-primary));
+    width: 0%;
+    transition: width 0.5s ease;
+}
+
+#loading-message {
+    font-size: 15px;
+    color: #666;
+}
+
+/* ========================================
+   RESULTADOS - ROTEIRO
+   ======================================== */
+.btn-voltar-topo {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 20px;
+    background: var(--white);
+    color: var(--blue-secondary);
+    border: 2px solid var(--blue-secondary);
+    border-radius: 50px;
+    font-family: 'Poppins', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition);
+    margin-bottom: 16px;
+}
+
+.btn-voltar-topo:hover {
+    background: var(--blue-secondary);
+    color: var(--white);
+}
+
+.btn-voltar-topo svg {
+    width: 16px;
+    height: 16px;
+    transition: transform 0.2s ease;
+}
+
+.btn-voltar-topo:hover svg {
+    transform: translateX(-3px);
+}
+
+/* Resumo da viagem */
+.roteiro-resumo {
+    background: var(--white);
+    border-radius: var(--border-radius-lg);
+    padding: 24px;
+    margin-bottom: 20px;
+    box-shadow: var(--shadow);
+    border-left: 4px solid var(--blue-secondary);
+}
+
+.roteiro-resumo-titulo {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: 'Poppins', sans-serif;
+    font-weight: 600;
+    font-size: 15px;
+    color: var(--gray-dark);
+    margin-bottom: 12px;
+}
+
+.roteiro-resumo-texto {
+    font-size: 15px;
+    color: #444;
+    line-height: 1.7;
+    padding: 12px 16px;
+    background: rgba(0, 163, 224, 0.06);
+    border-radius: 12px;
+}
+
+/* Header do roteiro */
+.roteiro-header {
+    background: var(--white);
+    border-radius: var(--border-radius-lg);
+    padding: 24px;
+    margin-bottom: 24px;
+    box-shadow: var(--shadow);
+    text-align: center;
+}
+
+.roteiro-header h1 {
+    font-family: 'Poppins', sans-serif;
+    font-size: 24px;
+    color: var(--blue-secondary);
+    margin-bottom: 4px;
+}
+
+.roteiro-header .subtitulo {
+    font-size: 14px;
+    color: #888;
+}
+
+/* ========================================
+   CARD DO DIA
+   ======================================== */
+.dia-card {
+    margin-bottom: 24px;
+}
+
+.dia-header {
+    display: flex;
+    align-items: center;
+    border-radius: var(--border-radius) var(--border-radius) 0 0;
+    padding: 14px 16px;
+    color: var(--white);
+    font-family: 'Poppins', sans-serif;
+    font-weight: 700;
+    font-size: 15px;
+    background: var(--blue-secondary);
+}
+
+.dia-numero {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--white);
+    color: var(--blue-secondary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    font-weight: 800;
+    margin-right: 12px;
+    flex-shrink: 0;
+}
+
+.dia-header-info {
+    flex: 1;
+}
+
+.dia-header-data {
+    font-size: 12px;
+    font-weight: 500;
+    opacity: 0.85;
+}
+
+.dia-body {
+    border: 2px solid var(--gray-medium);
+    border-top: none;
+    border-radius: 0 0 var(--border-radius) var(--border-radius);
+    padding: 20px 16px;
+    background: var(--white);
+}
+
+/* Resumo do dia pela Tripinha */
+.dia-resumo-tripinha {
+    display: flex;
+    gap: 12px;
+    padding: 14px;
+    background: rgba(0, 163, 224, 0.06);
+    border-radius: var(--border-radius-sm);
+    margin-bottom: 20px;
+    border-left: 3px solid var(--blue-secondary);
+}
+
+.dia-resumo-tripinha .avatar-mini {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.dia-resumo-tripinha p {
+    font-size: 14px;
+    color: #444;
+    line-height: 1.6;
+}
+
+/* ========================================
+   PERÍODO (manhã, tarde, noite)
+   ======================================== */
+.periodo-section {
+    margin-bottom: 20px;
+}
+
+.periodo-section:last-child {
+    margin-bottom: 0;
+}
+
+.periodo-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-family: 'Poppins', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--blue-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 12px;
+    padding: 4px 12px;
+    background: rgba(0, 163, 224, 0.08);
+    border-radius: 20px;
+}
+
+/* ========================================
+   CARD DE ATIVIDADE
+   ======================================== */
+.atividade-card {
+    background: var(--gray-light);
+    border-radius: var(--border-radius-sm);
+    padding: 16px;
+    margin-bottom: 12px;
+    transition: var(--transition);
+    border: 1px solid transparent;
+}
+
+.atividade-card:hover {
+    border-color: var(--gray-medium);
+    box-shadow: var(--shadow);
+}
+
+.atividade-card:last-child {
+    margin-bottom: 0;
+}
+
+.atividade-nome {
+    font-family: 'Poppins', sans-serif;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--gray-dark);
+    margin-bottom: 6px;
+}
+
+.atividade-desc {
+    font-size: 14px;
+    color: #555;
+    line-height: 1.6;
+    margin-bottom: 10px;
+}
+
+/* Tags */
+.atividade-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 10px;
+}
+
+.tag {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3px 10px;
+    border-radius: 20px;
+    color: var(--white);
+}
+
+.tag-imperdivel { background: var(--orange-primary); }
+.tag-familia { background: var(--green-tag); }
+.tag-historico { background: #5D4037; }
+.tag-gastronomico { background: #F57C00; }
+.tag-compras { background: var(--purple-tag); }
+.tag-relaxante { background: var(--teal-tag); }
+.tag-aventura { background: var(--red-tag); }
+.tag-cultural { background: #1565C0; }
+.tag-gratuito { background: #2E7D32; }
+.tag-noturna { background: #6A1B9A; }
+.tag-natureza { background: #33691E; }
+.tag-romantico { background: #C62828; }
+.tag-default { background: #757575; }
+
+/* Meta info */
+.atividade-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+    font-size: 12px;
+    color: #777;
+    margin-bottom: 10px;
+}
+
+.atividade-meta span {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+/* Dica da Tripinha */
+.atividade-dica {
+    display: flex;
+    gap: 8px;
+    padding: 10px 12px;
+    background: rgba(232, 119, 34, 0.08);
+    border-radius: 10px;
+    margin-bottom: 10px;
+    border: 1px solid rgba(232, 119, 34, 0.15);
+}
+
+.atividade-dica .dica-icon {
+    flex-shrink: 0;
+    font-size: 14px;
+}
+
+.atividade-dica p {
+    font-size: 13px;
+    color: #555;
+    line-height: 1.5;
+}
+
+/* Link Google Maps */
+.btn-maps {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    background: var(--white);
+    color: var(--blue-secondary);
+    border: 1.5px solid var(--blue-secondary);
+    border-radius: 8px;
+    font-family: 'Poppins', sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    text-decoration: none;
+    transition: var(--transition);
+}
+
+.btn-maps:hover {
+    background: var(--blue-secondary);
+    color: var(--white);
+}
+
+.btn-maps svg {
+    width: 14px;
+    height: 14px;
+}
+
+/* ========================================
+   SEÇÃO DE COMPARTILHAMENTO
+   ======================================== */
+.compartilhar-section {
+    background: var(--white);
+    border-radius: var(--border-radius-lg);
+    padding: 28px 24px;
+    box-shadow: var(--shadow);
+    text-align: center;
+    margin-top: 24px;
+}
+
+.compartilhar-section h3 {
+    font-family: 'Poppins', sans-serif;
+    font-size: 18px;
+    color: var(--gray-dark);
+    margin-bottom: 8px;
+}
+
+.compartilhar-section p {
+    font-size: 14px;
+    color: #666;
+    margin-bottom: 20px;
+}
+
+.compartilhar-btns {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.btn-compartilhar {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 24px;
+    border-radius: var(--border-radius-sm);
+    font-family: 'Poppins', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition);
+    border: none;
+    text-decoration: none;
+}
+
+.btn-whatsapp {
+    background: #25D366;
+    color: var(--white);
+}
+
+.btn-whatsapp:hover {
+    background: #1DA851;
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-hover);
+}
+
+.btn-copiar {
+    background: var(--gray-light);
+    color: var(--gray-dark);
+    border: 2px solid var(--gray-medium);
+}
+
+.btn-copiar:hover {
+    border-color: var(--blue-secondary);
+    color: var(--blue-secondary);
+    transform: translateY(-2px);
+}
+
+/* Botão ajustar roteiro */
+.btn-ajustar {
+    display: inline-block;
+    padding: 14px 32px;
+    background: transparent;
+    color: var(--blue-secondary);
+    border: 2px solid var(--blue-secondary);
+    border-radius: var(--border-radius-lg);
+    font-family: 'Poppins', sans-serif;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition);
+    margin-top: 16px;
+}
+
+.btn-ajustar:hover {
+    background: var(--blue-secondary);
+    color: var(--white);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-hover);
+}
+
+/* ========================================
+   SEM RESULTADOS
+   ======================================== */
+.sem-resultados {
+    text-align: center;
+    padding: 40px 20px;
+    max-width: 560px;
+    margin: 0 auto;
+}
+
+.sem-resultados h2 {
+    font-family: 'Poppins', sans-serif;
+    font-weight: 700;
+    font-size: 1.5rem;
+    color: var(--gray-dark);
+    margin-bottom: 12px;
+}
+
+.sem-resultados p {
+    font-size: 1rem;
+    color: #555;
+    line-height: 1.6;
+    margin-bottom: 28px;
+}
+
+/* ========================================
+   FOOTER
+   ======================================== */
+.footer {
+    background: var(--white);
+    padding: 24px 0;
+    text-align: center;
+    border-top: 1px solid var(--gray-medium);
+}
+
+.footer p {
+    font-size: 14px;
+    color: #666;
+}
+
+/* ========================================
+   HIDDEN / CONDITIONAL
+   ======================================== */
+.conditional { transition: var(--transition); }
+.hidden { display: none !important; }
+
+/* ========================================
+   RESPONSIVE
+   ======================================== */
+@media (max-width: 768px) {
+    .container { padding: 0 16px; }
+    .roteiro-form { padding: 24px 16px; }
+    .hero-section h1 { font-size: 24px; }
+    .btn-option .emoji { font-size: 24px; }
+    .btn-option .text { font-size: 13px; }
+    .button-group-3 { grid-template-columns: 1fr; }
+    .time-row { grid-template-columns: 1fr; }
+    .compartilhar-btns { flex-direction: column; }
+    .btn-compartilhar { justify-content: center; }
+}
+
+@media (max-width: 380px) {
+    .button-group { grid-template-columns: 1fr; }
+}
