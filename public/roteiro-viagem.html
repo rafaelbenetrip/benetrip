@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#00A3E0">
+    <title>Crie seu Roteiro de Viagem - Benetrip</title>
+
+    <!-- Supabase Config -->
+    <meta name="supabase-url" content="https://dlccjeazkpxtijevusbp.supabase.co">
+    <meta name="supabase-anon-key" content="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRsY2NqZWF6a3B4dGlqZXZ1c2JwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE3Mjg3MDYsImV4cCI6MjA4NzMwNDcwNn0.lwKwqF74JrHOaghkcbysZQN8jWErVVwPnxzLG7t07QU">
+
+    <!-- Favicons -->
+    <link rel="icon" type="image/svg+xml" href="assets/images/favicon/favicon.svg">
+    <link rel="apple-touch-icon" sizes="180x180" href="assets/images/favicon/apple-touch-icon.png">
+
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=Montserrat:wght@400;500&display=swap" rel="stylesheet">
+
+    <!-- Flatpickr -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+
+    <!-- Styles -->
+    <link rel="stylesheet" href="assets/css/roteiro-viagem.css">
+
+    <!-- Vercel Analytics -->
+    <script>
+        window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
+    </script>
+    <script defer src="/_vercel/insights/script.js"></script>
+</head>
+<body>
+
+    <!-- Header -->
+    <div id="benetrip-header-root"></div>
+    <script src="assets/js/benetrip-header.js"></script>
+
+    <!-- Hero -->
+    <section class="hero-section" id="hero-section">
+        <div class="container hero-content">
+            <img src="assets/images/tripinha/avatar-pensando.png" alt="Tripinha" class="hero-avatar"
+                 onerror="this.style.display='none'">
+            <h1>Monte seu roteiro perfeito! 🗺️</h1>
+            <p>Conte pra Tripinha sobre sua viagem e ela cria um <strong>roteiro dia a dia personalizado</strong>, com dicas e links para cada lugar!</p>
+        </div>
+    </section>
+
+    <main class="main-content">
+        <div class="container">
+
+            <!-- Formulário -->
+            <div id="form-container">
+                <form id="roteiro-form" class="roteiro-form">
+
+                    <!-- 1. Destino -->
+                    <div class="form-group">
+                        <label for="destino">📍 Qual é o destino da viagem?</label>
+                        <p class="hint">Digite a cidade e o país (ex: Lisboa, Portugal)</p>
+                        <input type="text" id="destino" class="text-input" placeholder="Ex: Lisboa, Portugal" required autocomplete="off">
+                    </div>
+
+                    <!-- 2. Datas -->
+                    <div class="form-group">
+                        <label for="datas-roteiro">📅 Quando será a viagem?</label>
+                        <p class="hint">Selecione a data de ida e volta</p>
+                        <input type="text" id="datas-roteiro" placeholder="Clique para selecionar datas" readonly required>
+                        <input type="hidden" id="data-ida">
+                        <input type="hidden" id="data-volta">
+                    </div>
+
+                    <!-- 3. Horários -->
+                    <div class="form-group">
+                        <label>🕐 Horários no destino</label>
+                        <p class="hint">A que horas você chega e parte do destino? (aproximado)</p>
+                        <div class="time-row">
+                            <div class="time-field">
+                                <label for="horario-chegada">Chegada</label>
+                                <input type="time" id="horario-chegada" class="time-input" value="14:00">
+                            </div>
+                            <div class="time-field">
+                                <label for="horario-partida">Partida</label>
+                                <input type="time" id="horario-partida" class="time-input" value="18:00">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 4. Com quem viaja -->
+                    <div class="form-group">
+                        <label>👥 Com quem você vai viajar?</label>
+                        <p class="hint">Escolha quem estará com você</p>
+                        <div class="button-group" data-field="companhia-roteiro">
+                            <button type="button" class="btn-option" data-value="0">
+                                <span class="emoji">🧳</span>
+                                <span class="text">Sozinho(a)</span>
+                                <small>Aventura solo</small>
+                            </button>
+                            <button type="button" class="btn-option" data-value="1">
+                                <span class="emoji">❤️</span>
+                                <span class="text">Casal</span>
+                                <small>Viagem romântica</small>
+                            </button>
+                            <button type="button" class="btn-option" data-value="2">
+                                <span class="emoji">👨‍👩‍👧‍👦</span>
+                                <span class="text">Família</span>
+                                <small>Diversão para todos</small>
+                            </button>
+                            <button type="button" class="btn-option" data-value="3">
+                                <span class="emoji">🎉</span>
+                                <span class="text">Amigos</span>
+                                <small>Turma da diversão</small>
+                            </button>
+                        </div>
+                        <input type="hidden" id="companhia-roteiro" required>
+                    </div>
+
+                    <!-- 4.1 Número de amigos (condicional) -->
+                    <div class="form-group conditional" id="num-pessoas-roteiro-group" style="display: none;">
+                        <label>Quantas pessoas na turma?</label>
+                        <p class="hint">Inclua todos, inclusive você!</p>
+                        <div class="number-input">
+                            <button type="button" class="btn-number" data-action="decrement" data-target-num="num-pessoas-roteiro">−</button>
+                            <input type="number" id="num-pessoas-roteiro" value="2" min="2" max="20" readonly>
+                            <button type="button" class="btn-number" data-action="increment" data-target-num="num-pessoas-roteiro">+</button>
+                        </div>
+                    </div>
+
+                    <!-- 4.2 Detalhes família (condicional) -->
+                    <div class="form-group conditional" id="familia-roteiro-group" style="display: none;">
+                        <label>👨‍👩‍👧‍👦 Detalhes da família</label>
+                        <p class="hint">Informe a composição para personalizar o roteiro</p>
+                        <div class="familia-grid">
+                            <div class="familia-item">
+                                <div class="familia-label">
+                                    <span class="familia-emoji">🧑</span>
+                                    <div><strong>Adultos</strong><small>12+ anos</small></div>
+                                </div>
+                                <div class="number-input-compact">
+                                    <button type="button" class="btn-number-sm" data-target="rot-adultos" data-action="decrement">−</button>
+                                    <input type="number" id="rot-adultos" value="2" min="1" max="9" readonly>
+                                    <button type="button" class="btn-number-sm" data-target="rot-adultos" data-action="increment">+</button>
+                                </div>
+                            </div>
+                            <div class="familia-item">
+                                <div class="familia-label">
+                                    <span class="familia-emoji">👧</span>
+                                    <div><strong>Crianças</strong><small>2–11 anos</small></div>
+                                </div>
+                                <div class="number-input-compact">
+                                    <button type="button" class="btn-number-sm" data-target="rot-criancas" data-action="decrement">−</button>
+                                    <input type="number" id="rot-criancas" value="0" min="0" max="6" readonly>
+                                    <button type="button" class="btn-number-sm" data-target="rot-criancas" data-action="increment">+</button>
+                                </div>
+                            </div>
+                            <div class="familia-item">
+                                <div class="familia-label">
+                                    <span class="familia-emoji">👶</span>
+                                    <div><strong>Bebês</strong><small>0–1 ano (no colo)</small></div>
+                                </div>
+                                <div class="number-input-compact">
+                                    <button type="button" class="btn-number-sm" data-target="rot-bebes" data-action="decrement">−</button>
+                                    <input type="number" id="rot-bebes" value="0" min="0" max="4" readonly>
+                                    <button type="button" class="btn-number-sm" data-target="rot-bebes" data-action="increment">+</button>
+                                </div>
+                            </div>
+                        </div>
+                        <p class="hint familia-hint" id="rot-familia-total-hint">Total: 2 passageiros</p>
+                    </div>
+
+                    <!-- 5. Tipo de experiência (multi-select) -->
+                    <div class="form-group">
+                        <label>🎯 Que tipo de experiência você busca?</label>
+                        <p class="hint">Escolha uma ou mais opções</p>
+                        <div class="button-group multi-select" data-field="preferencias-roteiro" data-multi="true">
+                            <button type="button" class="btn-option" data-value="relax">
+                                <span class="emoji">🌊</span>
+                                <span class="text">Relax total</span>
+                            </button>
+                            <button type="button" class="btn-option" data-value="aventura">
+                                <span class="emoji">🏔️</span>
+                                <span class="text">Aventura</span>
+                            </button>
+                            <button type="button" class="btn-option" data-value="cultura">
+                                <span class="emoji">🏛️</span>
+                                <span class="text">Cultura</span>
+                            </button>
+                            <button type="button" class="btn-option" data-value="urbano">
+                                <span class="emoji">🏙️</span>
+                                <span class="text">Agito urbano</span>
+                            </button>
+                        </div>
+                        <input type="hidden" id="preferencias-roteiro" required>
+                    </div>
+
+                    <!-- 6. Intensidade -->
+                    <div class="form-group">
+                        <label>⚡ Qual o ritmo do seu roteiro?</label>
+                        <p class="hint">Escolha a intensidade das atividades por dia</p>
+                        <div class="button-group button-group-3" data-field="intensidade-roteiro">
+                            <button type="button" class="btn-option" data-value="leve">
+                                <span class="emoji">🧘</span>
+                                <span class="text">Leve</span>
+                                <small>Sem pressa</small>
+                            </button>
+                            <button type="button" class="btn-option" data-value="moderado">
+                                <span class="emoji">🚶</span>
+                                <span class="text">Moderado</span>
+                                <small>Equilibrado</small>
+                            </button>
+                            <button type="button" class="btn-option" data-value="intenso">
+                                <span class="emoji">🏃</span>
+                                <span class="text">Intenso</span>
+                                <small>Tudo ao máximo</small>
+                            </button>
+                        </div>
+                        <input type="hidden" id="intensidade-roteiro" required>
+                    </div>
+
+                    <!-- 7. Orçamento atividades -->
+                    <div class="form-group">
+                        <label>💰 Orçamento para atividades</label>
+                        <p class="hint">Qual o nível de gasto com passeios e experiências?</p>
+                        <div class="button-group button-group-3" data-field="orcamento-roteiro">
+                            <button type="button" class="btn-option" data-value="economico">
+                                <span class="emoji">🪙</span>
+                                <span class="text">Econômico</span>
+                                <small>Gratuito e barato</small>
+                            </button>
+                            <button type="button" class="btn-option" data-value="medio">
+                                <span class="emoji">💵</span>
+                                <span class="text">Médio</span>
+                                <small>Mix equilibrado</small>
+                            </button>
+                            <button type="button" class="btn-option" data-value="alto">
+                                <span class="emoji">💎</span>
+                                <span class="text">Alto</span>
+                                <small>Experiências premium</small>
+                            </button>
+                        </div>
+                        <input type="hidden" id="orcamento-roteiro" required>
+                    </div>
+
+                    <!-- Submit -->
+                    <button type="submit" class="btn-submit" id="btn-submit">
+                        🗺️ Gerar Meu Roteiro Personalizado
+                    </button>
+                </form>
+            </div>
+
+            <!-- Loading -->
+            <div id="loading-container" style="display: none;">
+                <div class="loading-card">
+                    <img src="assets/images/tripinha/avatar-pensando.png" alt="Tripinha pensando" class="tripinha-loading"
+                         onerror="this.style.display='none'">
+                    <h2>🗺️ Tripinha montando seu roteiro...</h2>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progress-fill"></div>
+                    </div>
+                    <p id="loading-message">Pesquisando os melhores lugares...</p>
+                </div>
+            </div>
+
+            <!-- Resultados -->
+            <div id="resultados-container" style="display: none;"></div>
+
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <p>🐕 Feito com amor pela Tripinha | Benetrip © 2026</p>
+    </footer>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="assets/js/benetrip-auth.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/pt.js"></script>
+    <script src="assets/js/roteiro-viagem.js"></script>
+</body>
+</html>
