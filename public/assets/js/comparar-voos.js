@@ -26,7 +26,7 @@ const BenetripCompararVoos = {
         // Painel de filtros
         filtrosPanelAberto: false,
         filtros: {
-            paradas: new Set(),           // Set<number> — 0=direto,1=1p,2=2+p
+            paradas: new Set(),            // Set<number> — 0=direto,1=1p,2=2+p
             companhias: new Set(),         // Set<string>
             aeroportosSaida: new Set(),    // Set<string> — aeroporto partida na ida
             aeroportosChegada: new Set(),  // Set<string> — aeroporto chegada na ida
@@ -1286,7 +1286,6 @@ const BenetripCompararVoos = {
                     </div>
                 </div>
 
-                <!-- Ordenação -->
                 <div class="sort-filter-row">
                     <span class="sort-label">Ordenar:</span>
                     <div class="sort-chips">
@@ -1296,7 +1295,6 @@ const BenetripCompararVoos = {
                     </div>
                 </div>
 
-                <!-- Barra de filtros -->
                 <div class="filter-bar ${filtrosAtivos > 0 ? 'has-active' : ''}" id="filter-bar" onclick="BenetripCompararVoos.toggleFiltros()">
                     <div class="filter-bar-left">
                         <span class="filter-bar-icon">🎛️</span>
@@ -1311,17 +1309,14 @@ const BenetripCompararVoos = {
                     </div>
                 </div>
 
-                <!-- Painel de filtros expansível -->
                 <div class="filter-panel ${this.state.filtrosPanelAberto ? 'open' : ''}" id="filter-panel">
                     ${this._renderFilterPanel(combo)}
                 </div>
 
-                <!-- Tags de filtros ativos -->
                 <div class="active-filter-tags" id="active-filter-tags">
                     ${this._buildActiveFilterTags()}
                 </div>
 
-                <!-- Lista de voos -->
                 <div class="flights-list" id="flights-list-container">
                     ${cardsHtml}
                 </div>
@@ -1545,7 +1540,7 @@ const BenetripCompararVoos = {
     },
 
     // ════════════════════════════════════════
-    // HELPERS
+    // HELPERS E CONTROLES DE UI
     // ════════════════════════════════════════
     getSimbolo(m) { return { BRL:'R$', USD:'US$', EUR:'€' }[m] || 'R$'; },
     fmtISO(d) { return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; },
@@ -1567,6 +1562,7 @@ const BenetripCompararVoos = {
         document.getElementById('results-section').style.display = 'none';
         window.scrollTo({ top: 0, behavior: 'smooth' });
     },
+
     showForm() {
         document.getElementById('form-section').style.display = 'block';
         document.getElementById('hero-section').style.display = 'block';
@@ -1574,19 +1570,48 @@ const BenetripCompararVoos = {
         document.getElementById('results-section').style.display = 'none';
         window.scrollTo({ top: 0, behavior: 'smooth' });
     },
+
     showResults() {
         document.getElementById('form-section').style.display = 'none';
         document.getElementById('hero-section').style.display = 'none';
         document.getElementById('loading-section').style.display = 'none';
         document.getElementById('results-section').style.display = 'block';
         window.scrollTo({ top: 0, behavior: 'smooth' });
+        
+        // Chamada do fade scroll na matriz após exibir a tela
+        this.initMatrixScrollFade();
     },
+
     updateProgress(pct, msg) {
         const bar = document.getElementById('progress-bar');
         const msgEl = document.getElementById('loading-msg');
         if (bar) bar.style.width = `${pct}%`;
         if (msgEl) msgEl.textContent = msg;
     },
+
+    // ════════════════════════════════════════
+    // FADE SCROLL DA MATRIZ
+    // ════════════════════════════════════════
+    initMatrixScrollFade() {
+        const section = document.querySelector('.matrix-section');
+        if (!section) return;
+
+        // Encontra o elemento scrollável (wrapper ou tabela direta)
+        const scrollEl = section.querySelector('.matrix-scroll-wrapper')
+                      || section.querySelector('table')
+                      || section;
+
+        if (!scrollEl || scrollEl === section) return;
+
+        const checkScroll = () => {
+            const atEnd = scrollEl.scrollLeft + scrollEl.clientWidth >= scrollEl.scrollWidth - 4;
+            section.classList.toggle('scrolled-end', atEnd);
+        };
+
+        scrollEl.addEventListener('scroll', checkScroll, { passive: true });
+        // Verifica na primeira renderização (pode já caber na tela)
+        setTimeout(checkScroll, 100);
+    }
 };
 
 document.addEventListener('DOMContentLoaded', () => BenetripCompararVoos.init());
