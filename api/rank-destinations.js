@@ -1,8 +1,6 @@
-// api/rank-destinations.js - VERSÃO TRIPLE SEARCH v3.2
-// v3.2: Tom da Tripinha nos comentários e dicas (personalidade canina próxima)
-// v3.1: Deduplicação pós-LLM, adapta estrutura ao número de destinos
-// v3.0: Adultos/crianças/bebês, preferências múltiplas, contexto sazonal
-// Fallback: Groq llama-3.3-70b → llama-3.1-8b → ranking por preço
+// api/rank-destinations.js - v4.3 (Observações Livres)
+// Vercel Serverless Function
+// Recebe destinos pré-filtrados e usa LLM para ranquear com base no perfil do viajante
 
 export default async function handler(req, res) {
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -12,10 +10,12 @@ export default async function handler(req, res) {
     if (req.method === 'OPTIONS') return res.status(200).end();
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-    const { 
-        destinos, preferencias, companhia, numPessoas, 
+    const {
+        destinos, preferencias, companhia, numPessoas,
         adultos, criancas, bebes,
-        noites, orcamento, moeda, dataIda, dataVolta 
+        noites, orcamento, moeda, dataIda, dataVolta,
+        cenario,
+        observacoes
     } = req.body;
 
     if (!destinos || !Array.isArray(destinos) || destinos.length === 0) {
@@ -31,19 +31,18 @@ export default async function handler(req, res) {
     }
 
     try {
-        const totalDestinos = destinos.length;
-        console.log(`🤖 Ranqueando ${totalDestinos} destinos | ${companhia} | ${preferencias} | ${moeda || 'BRL'} ${orcamento}`);
-        if (criancas > 0 || bebes > 0) {
-            console.log(`👨‍👩‍👧‍👦 Família: ${adultos} adultos, ${criancas} crianças, ${bebes} bebês`);
-        }
+        console.log(`🤖 Ranqueando ${destinos.length} destinos | ${companhia} | ${preferencias} | ${moeda} ${orcamento}`);
+        if (observacoes) console.log(`💬 Observações do viajante: "${observacoes}"`);
 
         // ============================================================
-        // DETERMINAR ESTRUTURA BASEADA NO NÚMERO DE DESTINOS
+        // CALCULAR ESTRUTURA DE RESULTADOS
         // ============================================================
-        const numAlternativas = Math.min(3, totalDestinos - 1);
-        const temSurpresa = totalDestinos >= 5;
+        const totalDestinos = destinos.length;
+        const numAlternativas = Math.min(3, Math.max(0, totalDestinos - 2));
+        const temSurpresa = totalDestinos >= 3 ? 1 : 0;
         const totalSelecionados = 1 + numAlternativas + (temSurpresa ? 1 : 0);
-        
+        const poucosResultados = totalDestinos < 5;
+
         console.log(`📊 Estrutura: top(1) + alt(${numAlternativas}) + surpresa(${temSurpresa ? 1 : 0}) = ${totalSelecionados} de ${totalDestinos} disponíveis`);
 
         // ============================================================
@@ -74,13 +73,13 @@ export default async function handler(req, res) {
         // ============================================================
         let passageirosInfo = `${numPessoas || 1} pessoa(s)`;
         let restricoesFamilia = '';
-        
+
         if ((criancas || 0) > 0 || (bebes || 0) > 0) {
             const parts = [`${adultos || 1} adulto(s)`];
             if (criancas > 0) parts.push(`${criancas} criança(s) de 2-11 anos`);
             if (bebes > 0) parts.push(`${bebes} bebê(s) de 0-1 ano`);
             passageirosInfo = parts.join(', ');
-            
+
             restricoesFamilia = `
 ATENÇÃO ESPECIAL - VIAGEM COM CRIANÇAS/BEBÊS:
 - Priorize destinos com BOA INFRAESTRUTURA para famílias com crianças pequenas
@@ -88,67 +87,20 @@ ATENÇÃO ESPECIAL - VIAGEM COM CRIANÇAS/BEBÊS:
 - Considere destinos com hospitais/clínicas acessíveis
 - Voos diretos ou com poucas paradas são PREFERÍVEIS (viagem longa com crianças é cansativa)
 ${bebes > 0 ? '- BEBÊ(S) NO COLO: priorize destinos com boa estrutura de saúde e clima ameno' : ''}
-${criancas > 0 ? '- CRIANÇAS: considere destinos com atividades interativas e parques' : ''}`;
+${criancas > 0 ? '- CRIANÇAS: considere destinos com atividades infantis, parques, praias calmas' : ''}`;
         }
 
         // ============================================================
-        // ESTRUTURA JSON DINÂMICA PARA O PROMPT
+        // v4.3: BLOCO DE OBSERVAÇÕES DO VIAJANTE
         // ============================================================
-        let estruturaJSON = '';
-        let estruturaInstrucao = '';
-
-        if (totalDestinos === 1) {
-            estruturaInstrucao = `Há APENAS 1 destino disponível. Retorne só o top_destino.`;
-            estruturaJSON = `{
-  "top_destino": {"id":1,"razao":"frase curta","comentario":"2-3 frases descritivas","dica":"dica prática"},
-  "alternativas": [],
-  "surpresa": null
-}`;
-        } else if (totalDestinos === 2) {
-            estruturaInstrucao = `Há APENAS 2 destinos disponíveis. Retorne top_destino + 1 alternativa. SEM surpresa.`;
-            estruturaJSON = `{
-  "top_destino": {"id":?,"razao":"frase curta","comentario":"2-3 frases descritivas","dica":"dica prática"},
-  "alternativas": [
-    {"id":?,"razao":"frase","comentario":"descrição","dica":"dica"}
-  ],
-  "surpresa": null
-}`;
-        } else if (totalDestinos === 3) {
-            estruturaInstrucao = `Há APENAS 3 destinos disponíveis. Retorne top_destino + 2 alternativas. SEM surpresa.`;
-            estruturaJSON = `{
-  "top_destino": {"id":?,"razao":"frase curta","comentario":"2-3 frases descritivas","dica":"dica prática"},
-  "alternativas": [
-    {"id":?,"razao":"frase","comentario":"descrição","dica":"dica"},
-    {"id":?,"razao":"frase","comentario":"descrição","dica":"dica"}
-  ],
-  "surpresa": null
-}`;
-        } else if (totalDestinos === 4) {
-            estruturaInstrucao = `Há APENAS 4 destinos disponíveis. Retorne top_destino + 3 alternativas. SEM surpresa.`;
-            estruturaJSON = `{
-  "top_destino": {"id":?,"razao":"frase curta","comentario":"2-3 frases descritivas","dica":"dica prática"},
-  "alternativas": [
-    {"id":?,"razao":"frase","comentario":"descrição","dica":"dica"},
-    {"id":?,"razao":"frase","comentario":"descrição","dica":"dica"},
-    {"id":?,"razao":"frase","comentario":"descrição","dica":"dica"}
-  ],
-  "surpresa": null
-}`;
-        } else {
-            estruturaInstrucao = `Selecione os 5 melhores destinos: 1 top + 3 alternativas + 1 surpresa.`;
-            estruturaJSON = `{
-  "top_destino": {"id":1,"razao":"frase curta","comentario":"2-3 frases descritivas","dica":"dica prática"},
-  "alternativas": [
-    {"id":2,"razao":"frase","comentario":"descrição","dica":"dica"},
-    {"id":3,"razao":"frase","comentario":"descrição","dica":"dica"},
-    {"id":4,"razao":"frase","comentario":"descrição","dica":"dica"}
-  ],
-  "surpresa": {"id":5,"razao":"frase surpreendente","comentario":"descrição","dica":"dica"}
-}`;
-        }
+        const observacoesBloco = observacoes
+            ? `\nOBSERVAÇÕES PESSOAIS DO VIAJANTE (MUITO IMPORTANTE — leve em conta na seleção e nos comentários):
+"${observacoes}"
+`
+            : '';
 
         // ============================================================
-        // PROMPT ENRIQUECIDO
+        // PROMPT COMPLETO
         // ============================================================
         const prompt = `ESPECIALISTA EM TURISMO - Seleção personalizada de destinos
 
@@ -157,36 +109,23 @@ PERFIL DO VIAJANTE:
 - Passageiros: ${passageirosInfo}
 - O que busca: ${preferencias || 'Não informado'}
 - Duração: ${noites || '?'} noites
-- Orçamento PASSAGENS (ida+volta/adulto): ${simboloMoeda} ${orcamento}
-- Moeda: ${nomeMoeda}
-${dataIda ? `- Período: ${dataIda} a ${dataVolta || '?'}` : ''}
+- Período: ${dataIda || '?'} a ${dataVolta || '?'}
 ${estacaoInfo ? `- Contexto sazonal: ${estacaoInfo}` : ''}
+- Orçamento PASSAGENS (ida+volta/pessoa): ${simboloMoeda} ${orcamento} ${nomeMoeda}
+${cenario === 'abaixo' ? `- NOTA: Poucos destinos dentro do orçamento — valorize os disponíveis` : ''}
 ${restricoesFamilia}
-
+${observacoesBloco}
 DESTINOS PRÉ-FILTRADOS (já dentro do orçamento):
-Formato: ID|Nome|País|Aeroporto|Passagem ida+volta|Paradas|Fontes|Hotel/noite
+Formato: ID|Nome|País|Aeroporto|Passagem ida+volta|Paradas|Fontes de confirmação|Hotel/noite
 ${listaCompacta}
 
-TAREFA: ${estruturaInstrucao}
+TAREFA: Com base no PERFIL acima, escolha os melhores destinos:
+1. MELHOR DESTINO - o que mais combina com o perfil + melhor custo-benefício
+${numAlternativas > 0 ? `2. ${numAlternativas} ALTERNATIVA${numAlternativas > 1 ? 'S' : ''} variada${numAlternativas > 1 ? 's' : ''} (diferentes perfis/países)` : ''}
+${temSurpresa ? `3. 1 SURPRESA (inesperado e interessante)` : ''}
 
-Para CADA destino selecionado, gere:
-1. "razao": frase curta (1 linha) da Tripinha explicando POR QUE combina com este viajante. Fale direto com o viajante (ex: "Perfeito pra vocês curtirem praia e sossego!")
-2. "comentario": texto de 2-3 frases escritas pela Tripinha (cachorra vira-lata caramelo) falando DIRETO com o viajante, como uma amiga animada dando dica. Considere:
-   - A estação do ano / clima esperado no período da viagem
-   - Atividades e experiências alinhadas com "${preferencias}"
-   - Adequação para ${companhia}${(criancas > 0 || bebes > 0) ? ' (com crianças/bebês!)' : ''}
-   - Tom: 1ª pessoa, descontraído, caloroso. Pode usar referência canina sutil (farejar, explorar, abanar o rabo) mas SEM exagerar — no máximo 1 por comentário.
-   - Exemplos de tom: "Esse lugar é demais!", "Farejei umas praias incríveis aí...", "Vocês vão amar!"
-3. "dica": uma dica prática e útil no tom da Tripinha (ex: "Fica a dica da Tripinha: ..." ou "Olha, eu levaria...")
-   ${(criancas > 0 || bebes > 0) ? '(inclua dicas relevantes para viagem com crianças quando pertinente)' : ''}
-
-${totalDestinos >= 5 ? `ESTRUTURA DE SELEÇÃO:
-1. MELHOR DESTINO - melhor match com perfil + custo-benefício
-2. 3 ALTERNATIVAS - diversifique países e experiências
-3. 1 SURPRESA - destino inesperado que encantaria este viajante` : ''}
-
-CRITÉRIOS (ordem de prioridade):
-1. MATCH COM PERFIL: Combina com "${preferencias}"? Adequado para ${companhia}?
+CRITÉRIOS DE SELEÇÃO (em ordem de prioridade):
+1. MATCH COM PERFIL: O destino combina com "${preferencias}"? É adequado para ${companhia}?
    - Família com crianças → segurança, infraestrutura, atividades para crianças, voos curtos
    - Família com bebês → infraestrutura de saúde, clima ameno, facilidade de acesso
    - Casal → romance, gastronomia, cenários bonitos
@@ -199,16 +138,21 @@ CRITÉRIOS (ordem de prioridade):
 ${(criancas > 0 || bebes > 0) ? '6. LOGÍSTICA FAMILIAR: Prefira voos diretos ou com menos paradas' : ''}
 
 REGRAS:
-✓ Use APENAS IDs da lista (1-${totalDestinos})
-✓ ⚠️ REGRA ABSOLUTA: NUNCA repita o mesmo ID. Cada destino só pode aparecer UMA VEZ. TODOS os IDs devem ser DIFERENTES entre si.
+✓ Use APENAS IDs da lista (1-${destinos.length})
 ✓ Escreva "comentario" e "dica" em português brasileiro
-✓ Retorne APENAS JSON válido
+✓ O "comentario" deve ser da Tripinha (cachorrinha mascote) falando DIRETAMENTE com o viajante, como amiga animada (ex: "Esse lugar é incrível! Você vai amar as praias de lá...")
+✓ A "dica" também deve ter tom da Tripinha (ex: "Fica a dica da Tripinha: reserve o passeio X com antecedência!")
+✓ Use no máximo 1 referência canina por destino para não saturar
 ✓ NÃO use emoji nos textos (o frontend já cuida disso)
-${totalDestinos < 5 ? `✓ São apenas ${totalDestinos} destinos disponíveis — use TODOS eles, sem repetir.` : ''}
-${!temSurpresa ? '✓ "surpresa" deve ser null (poucos destinos disponíveis)' : ''}
+${observacoes ? '✓ O viajante deixou OBSERVAÇÕES PESSOAIS — faça referência a elas nos comentários e dicas, mostrando que a Tripinha levou em conta o pedido específico dele' : ''}
+✓ Retorne APENAS JSON válido, sem markdown
 
 JSON:
-${estruturaJSON}`;
+{
+  "top_destino": {"id":1,"razao":"frase curta","comentario":"2-3 frases descritivas da Tripinha","dica":"dica prática da Tripinha"},
+  "alternativas": [${numAlternativas > 0 ? '\n    {"id":2,"razao":"frase","comentario":"descrição","dica":"dica"}' : ''}${numAlternativas > 1 ? ',\n    {"id":3,"razao":"frase","comentario":"descrição","dica":"dica"}' : ''}${numAlternativas > 2 ? ',\n    {"id":4,"razao":"frase","comentario":"descrição","dica":"dica"}' : ''}\n  ],
+  "surpresa": ${temSurpresa ? '{"id":5,"razao":"frase surpreendente","comentario":"descrição","dica":"dica"}' : 'null'}
+}`;
 
         // ============================================================
         // TENTAR MODELOS EM CASCATA
@@ -230,18 +174,19 @@ ${estruturaJSON}`;
                         messages: [
                             {
                                 role: 'system',
-                                content: 'Você é a Tripinha, uma cachorra vira-lata caramelo brasileira que adora viajar e ajudar viajantes. Fale em 1ª pessoa, com tom de amiga animada dando dica. Use expressões leves e descontraídas. Pode soltar uma referência canina sutil de vez em quando (farejar, explorar, abanar o rabo), mas sem exagerar — no máximo 1 por destino. Retorna APENAS JSON válido em português do Brasil. Zero texto extra. IDs referem a destinos da lista fornecida. NUNCA repita o mesmo ID — cada destino deve aparecer apenas uma vez no resultado. Se "surpresa" deve ser null, retorne null. Quando a viagem inclui crianças ou bebês, sempre considere segurança e praticidade nas recomendações.'
+                                content: 'Você é a Tripinha, uma cachorrinha vira-lata caramelo que é especialista em turismo. Retorna APENAS JSON válido em português do Brasil. Zero texto extra. IDs referem a destinos da lista fornecida. Seus comentários são entusiasmados mas informativos, como uma amiga animada dando dicas de viagem. Quando a viagem inclui crianças ou bebês, sempre considere segurança e praticidade nas recomendações.'
                             },
                             { role: 'user', content: prompt }
                         ],
-                        response_format: { type: 'json_object' },
                         temperature: 0.4,
-                        max_tokens: 3000,
+                        max_tokens: 2000,
+                        response_format: { type: 'json_object' }
                     })
                 });
 
                 if (!groqResponse.ok) {
-                    console.error(`[Groq][${model}] HTTP ${groqResponse.status}`);
+                    const errText = await groqResponse.text();
+                    console.warn(`⚠️ Modelo ${model} falhou: ${groqResponse.status} - ${errText}`);
                     continue;
                 }
 
@@ -249,23 +194,30 @@ ${estruturaJSON}`;
                 const content = groqData.choices?.[0]?.message?.content;
 
                 if (!content) {
-                    console.error(`[Groq][${model}] Resposta vazia`);
+                    console.warn(`⚠️ Modelo ${model}: resposta vazia`);
                     continue;
                 }
 
-                ranking = JSON.parse(content);
+                const parsed = JSON.parse(content);
+
+                if (!parsed.top_destino || typeof parsed.top_destino.id !== 'number') {
+                    console.warn(`⚠️ Modelo ${model}: JSON inválido`);
+                    continue;
+                }
+
+                ranking = parsed;
                 usedModel = model;
-                console.log(`✅ [Groq][${model}] Ranking gerado com sucesso`);
+                console.log(`✅ Sucesso com ${model}`);
                 break;
 
-            } catch (err) {
-                console.error(`[Groq][${model}] Erro:`, err.message);
+            } catch (modelErr) {
+                console.warn(`⚠️ Erro no modelo ${model}:`, modelErr.message);
                 continue;
             }
         }
 
         // ============================================================
-        // FALLBACK: ranking por preço se LLM falhou
+        // FALLBACK: Ranking por preço (sem LLM)
         // ============================================================
         if (!ranking) {
             console.warn('⚠️ Todos os modelos falharam, usando fallback por preço');
@@ -273,148 +225,74 @@ ${estruturaJSON}`;
         }
 
         // ============================================================
-        // VALIDAR, DEDUPLICAR E HIDRATAR COM DADOS ORIGINAIS
+        // MAPEAR IDs → DADOS REAIS
         // ============================================================
-        const hydrateById = (item, label) => {
-            if (!item || !item.id) throw new Error(`${label}: sem ID`);
-
+        const mapDestino = (item) => {
+            if (!item || typeof item.id !== 'number') return null;
             const idx = item.id - 1;
-            if (idx < 0 || idx >= destinos.length) {
-                throw new Error(`${label}: ID ${item.id} fora do range (máx: ${destinos.length})`);
-            }
-
-            const original = destinos[idx];
+            if (idx < 0 || idx >= destinos.length) return null;
+            const d = destinos[idx];
             return {
                 id: item.id,
-                name: original.name,
-                primary_airport: original.primary_airport,
-                country: original.country,
-                coordinates: original.coordinates,
-                image: original.image,
-                flight: original.flight,
-                avg_cost_per_night: original.avg_cost_per_night,
-                outbound_date: original.outbound_date,
-                return_date: original.return_date,
-                _sources: original._sources,
-                _source_count: original._source_count,
-                razao: item.razao || 'A Tripinha farejou esse destino pra você! 🐶',
+                name: d.name,
+                primary_airport: d.primary_airport,
+                country: d.country,
+                coordinates: d.coordinates,
+                image: d.image,
+                flight: d.flight,
+                avg_cost_per_night: d.avg_cost_per_night,
+                outbound_date: d.outbound_date,
+                return_date: d.return_date,
+                _sources: d._sources,
+                _source_count: d._source_count,
+                razao: item.razao || '',
                 comentario: item.comentario || '',
                 dica: item.dica || '',
             };
         };
 
-        try {
-            // ============================================================
-            // DEDUPLICAÇÃO PÓS-LLM
-            // ============================================================
-            const usedIds = new Set();
+        const resultado = {
+            top_destino: mapDestino(ranking.top_destino),
+            alternativas: (ranking.alternativas || []).map(mapDestino).filter(Boolean),
+            surpresa: mapDestino(ranking.surpresa),
+            _model: usedModel,
+            _totalAnalisados: destinos.length,
+            _poucosResultados: poucosResultados,
+        };
 
-            // 1. Top destino (sempre tem)
-            ranking.top_destino = hydrateById(ranking.top_destino, 'top_destino');
-            usedIds.add(ranking.top_destino.id);
-
-            // 2. Alternativas (remover duplicatas)
-            const rawAlternativas = Array.isArray(ranking.alternativas) ? ranking.alternativas : [];
-            const dedupedAlternativas = [];
-            for (const alt of rawAlternativas) {
-                if (!alt || !alt.id || usedIds.has(alt.id)) {
-                    console.warn(`⚠️ Alternativa duplicada ou inválida removida: ID ${alt?.id}`);
-                    continue;
-                }
-                try {
-                    const hydrated = hydrateById(alt, `alternativa`);
-                    dedupedAlternativas.push(hydrated);
-                    usedIds.add(alt.id);
-                } catch (e) {
-                    console.warn(`⚠️ Alternativa ID ${alt.id} inválida:`, e.message);
-                }
-            }
-            ranking.alternativas = dedupedAlternativas.slice(0, 3);
-
-            // 3. Surpresa (remover se duplicata ou null)
-            if (ranking.surpresa && ranking.surpresa.id && !usedIds.has(ranking.surpresa.id)) {
-                try {
-                    ranking.surpresa = hydrateById(ranking.surpresa, 'surpresa');
-                    usedIds.add(ranking.surpresa.id);
-                } catch (e) {
-                    console.warn(`⚠️ Surpresa ID ${ranking.surpresa.id} inválida:`, e.message);
-                    ranking.surpresa = null;
-                }
-            } else {
-                if (ranking.surpresa?.id && usedIds.has(ranking.surpresa.id)) {
-                    console.warn(`⚠️ Surpresa duplicada removida: ID ${ranking.surpresa.id}`);
-                }
-                ranking.surpresa = null;
-            }
-
-            // ============================================================
-            // TENTAR PREENCHER SLOTS VAZIOS com destinos não usados
-            // ============================================================
-            const maxAlternativas = Math.min(3, totalDestinos - 1);
-            if (ranking.alternativas.length < maxAlternativas || (temSurpresa && !ranking.surpresa)) {
-                const unusedDestinos = destinos
-                    .map((d, i) => ({ ...d, _idx: i + 1 }))
-                    .filter(d => !usedIds.has(d._idx))
-                    .sort((a, b) => (a.flight?.price || Infinity) - (b.flight?.price || Infinity));
-
-                // Preencher alternativas faltantes
-                while (ranking.alternativas.length < maxAlternativas && unusedDestinos.length > 0) {
-                    const next = unusedDestinos.shift();
-                    const hydrated = hydrateById({ id: next._idx, razao: 'Opção dentro do orçamento', comentario: '', dica: '' }, 'alternativa_fill');
-                    ranking.alternativas.push(hydrated);
-                    usedIds.add(next._idx);
-                    console.log(`🔄 Alternativa preenchida com ID ${next._idx} (${next.name})`);
-                }
-
-                // Preencher surpresa se necessário e possível
-                if (temSurpresa && !ranking.surpresa && unusedDestinos.length > 0) {
-                    const next = unusedDestinos.shift();
-                    ranking.surpresa = hydrateById({ id: next._idx, razao: 'A Tripinha farejou um lugar diferente pra você explorar! 🎁', comentario: '', dica: '' }, 'surpresa_fill');
-                    usedIds.add(next._idx);
-                    console.log(`🔄 Surpresa preenchida com ID ${next._idx} (${next.name})`);
-                }
-            }
-
-        } catch (validationError) {
-            console.error('❌ Validação falhou:', validationError.message);
+        if (!resultado.top_destino) {
+            console.warn('⚠️ top_destino inválido após mapeamento, usando fallback');
             return res.status(200).json(rankByPrice(destinos, orcamento));
         }
 
-        ranking._model = usedModel;
-        ranking._totalAnalisados = destinos.length;
-        ranking._poucosResultados = totalDestinos < 5;
-
-        console.log(`🏆 ${ranking.top_destino.name} (${simboloMoeda}${ranking.top_destino.flight?.price}) [${ranking.top_destino._source_count} fontes]`);
-        if (ranking.alternativas.length > 0) {
-            console.log(`📋 ${ranking.alternativas.map(a => `${a.name}(${simboloMoeda}${a.flight?.price})`).join(', ')}`);
-        }
-        if (ranking.surpresa) {
-            console.log(`🎁 ${ranking.surpresa.name} (${simboloMoeda}${ranking.surpresa.flight?.price})`);
-        }
-        if (totalDestinos < 5) {
-            console.log(`⚠️ Poucos destinos disponíveis (${totalDestinos}): estrutura reduzida`);
-        }
-
-        return res.status(200).json(ranking);
+        return res.status(200).json(resultado);
 
     } catch (erro) {
-        console.error('❌ Erro ranking:', erro);
-        return res.status(200).json(rankByPrice(destinos, orcamento));
+        console.error('❌ Erro no ranking:', erro);
+
+        try {
+            return res.status(200).json(rankByPrice(destinos, orcamento));
+        } catch (fallbackErr) {
+            return res.status(500).json({
+                error: 'Erro interno no ranking',
+                message: erro.message
+            });
+        }
     }
 }
 
 // ============================================================
-// CONTEXTO SAZONAL
+// UTILIDADE: Contexto sazonal por mês
 // ============================================================
 function getSeasonContext(mes) {
     const info = {
-        1:  'Janeiro: verão no hemisfério sul (praias lotadas, férias escolares), inverno rigoroso no hemisfério norte (neve, esportes de inverno)',
-        2:  'Fevereiro: verão/carnaval no hemisfério sul, inverno no hemisfério norte (ainda frio, bom para neve)',
-        3:  'Março: final do verão no sul (menos turistas, bom preço), início da primavera no norte (temperaturas amenas)',
-        4:  'Abril: outono no hemisfério sul (clima agradável), primavera no norte (floração, eventos culturais)',
-        5:  'Maio: outono no sul (temperaturas caindo), primavera plena no norte (excelente para turismo)',
-        6:  'Junho: início do inverno no sul (festas juninas), início do verão no norte (dias longos, festivais)',
-        7:  'Julho: inverno/férias escolares no sul, auge do verão no norte (alta temporada, praias)',
+        1:  'Janeiro: verão no sul (alta temporada, praias), inverno no norte (neve, frio)',
+        2:  'Fevereiro: verão no sul (carnaval, calor), inverno no norte (esqui, frio)',
+        3:  'Março: fim do verão no sul, início da primavera no norte',
+        4:  'Abril: outono no sul, primavera no norte (flores, clima ameno)',
+        5:  'Maio: outono no sul (temperaturas caindo), primavera no norte (agradável)',
+        6:  'Junho: início inverno no sul (festas juninas), verão no norte (calor, festivais)',
+        7:  'Julho: inverno no sul (férias escolares), verão no norte (alta temporada, praias)',
         8:  'Agosto: inverno no sul (seco em muitas regiões), verão no norte (calor, festivais)',
         9:  'Setembro: início da primavera no sul (flores, temperaturas subindo), início do outono no norte (folhagem)',
         10: 'Outubro: primavera no sul (bom clima), outono no norte (folhagem colorida, Oktoberfest)',
@@ -426,7 +304,6 @@ function getSeasonContext(mes) {
 
 // ============================================================
 // FALLBACK: Ranking simples por preço (sem LLM)
-// Agora com tom da Tripinha nos textos padrão
 // ============================================================
 function rankByPrice(destinos, orcamento) {
     const comPreco = destinos.filter(d => d.flight?.price > 0);
@@ -441,7 +318,6 @@ function rankByPrice(destinos, orcamento) {
 
     pool.sort((a, b) => a.flight.price - b.flight.price);
 
-    // Deduplicação: não repetir destinos
     const selected = [];
     const usedNames = new Set();
 
@@ -449,7 +325,7 @@ function rankByPrice(destinos, orcamento) {
         if (selected.length >= 5) break;
         const key = `${(d.name || '').toLowerCase()}_${(d.country || '').toLowerCase()}`;
         if (usedNames.has(key)) continue;
-        
+
         const countryCount = selected.filter(s => s.country === d.country).length;
         if (countryCount < 2) {
             selected.push(d);
@@ -457,7 +333,6 @@ function rankByPrice(destinos, orcamento) {
         }
     }
 
-    // Se não completou 5, preencher sem repetir
     if (selected.length < 5) {
         for (const d of pool) {
             if (selected.length >= 5) break;
