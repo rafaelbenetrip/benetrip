@@ -239,6 +239,37 @@
                         <input type="hidden" id="orcamento-roteiro" required>
                     </div>
 
+                    <!-- ================================================
+                         8. NOVO: Observações livres do usuário
+                         ================================================ -->
+                    <div class="form-group">
+                        <label for="observacoes-roteiro">📝 Algum pedido especial pra Tripinha?</label>
+                        <div class="observacoes-briefing">
+                            <div class="briefing-item briefing-incluir">
+                                <span class="briefing-icon">✅</span>
+                                <span>O que <strong>não pode faltar</strong> no roteiro</span>
+                            </div>
+                            <div class="briefing-item briefing-excluir">
+                                <span class="briefing-icon">🚫</span>
+                                <span>O que <strong>não pode ter de jeito nenhum</strong></span>
+                            </div>
+                            <div class="briefing-item briefing-outros">
+                                <span class="briefing-icon">💡</span>
+                                <span>Restrições, necessidades ou desejos especiais</span>
+                            </div>
+                        </div>
+                        <textarea
+                            id="observacoes-roteiro"
+                            class="observacoes-textarea"
+                            rows="4"
+                            maxlength="800"
+                            placeholder="Ex: Minha esposa é vegetariana, queremos pelo menos um dia de praia, não gostamos de museus longos, gostaríamos de assistir um jogo de futebol local..."
+                        ></textarea>
+                        <div class="observacoes-counter">
+                            <span id="observacoes-count">0</span>/800
+                        </div>
+                    </div>
+
                     <!-- Submit -->
                     <button type="submit" class="btn-submit" id="btn-submit">
                         🗺️ Gerar Meu Roteiro Personalizado
