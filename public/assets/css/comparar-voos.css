@@ -485,59 +485,130 @@ body {
     padding: 4px 12px; border-radius: 20px; white-space: nowrap;
 }
 
-/* ── PRICE MATRIX — scroll horizontal com hint ── */
+/* ══════════════════════════════════════════
+   PRICE MATRIX — scroll nativo + fade visual
+   ══════════════════════════════════════════ */
+
+/* O card em si não rola — só expõe o título */
 .matrix-section {
     background: var(--white);
-    border-radius: var(--radius); padding: 20px 16px;
-    margin-bottom: 16px; box-shadow: var(--shadow);
+    border-radius: var(--radius);
+    padding: 20px 0 20px;   /* sem padding lateral — o scroll vai até a borda */
+    margin-bottom: 16px;
+    box-shadow: var(--shadow);
+    overflow: hidden;       /* corta a sombra do fade nas pontas */
+    position: relative;
 }
+
+/* Título e subtítulo com padding lateral */
 .matrix-title {
     font-family: 'Poppins', sans-serif;
     font-size: 16px; font-weight: 700;
-    color: var(--gray-dark); margin-bottom: 4px;
+    color: var(--gray-dark);
+    margin-bottom: 4px;
+    padding: 0 16px;
 }
-.matrix-subtitle { font-size: 13px; color: var(--gray-medium); margin-bottom: 4px; }
+.matrix-subtitle {
+    font-size: 13px; color: var(--gray-medium);
+    margin-bottom: 4px;
+    padding: 0 16px;
+}
+
+/* Dica de scroll — só aparece em telas pequenas */
 .matrix-scroll-hint {
     font-size: 11px; color: var(--blue);
-    margin-bottom: 12px; font-style: italic;
+    margin-bottom: 8px; font-style: italic;
+    padding: 0 16px;
+    display: flex; align-items: center; gap: 4px;
 }
-.matrix-scroll-wrapper {
+.matrix-scroll-hint::before { content: '👉'; font-style: normal; }
+
+/* A ÁREA QUE ROLA — cobre toda a largura do card */
+.matrix-scroll-wrapper,
+.matrix-section > .price-matrix,   /* caso o JS coloque diretamente */
+.matrix-section > table {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
+    scroll-snap-type: x proximity;
+    display: block;
+    width: 100%;
+    padding: 8px 16px 12px; /* espaço interno para não cortar sombra da célula */
 }
+
+/* Fade gradiente na borda direita para indicar que tem mais conteúdo */
+.matrix-section::after {
+    content: '';
+    position: absolute;
+    top: 60px; right: 0; bottom: 0;   /* começa abaixo do título */
+    width: 40px;
+    background: linear-gradient(to left, rgba(255,255,255,0.95) 0%, transparent 100%);
+    pointer-events: none;
+    border-radius: 0 var(--radius) var(--radius) 0;
+}
+
+/* Quando scrollado até o fim, esconde o fade */
+.matrix-section.scrolled-end::after { display: none; }
+
+/* A tabela em si: min-width garante scroll quando necessário */
 .price-matrix {
-    width: 100%; border-collapse: separate;
-    border-spacing: 4px; min-width: 340px;
+    border-collapse: separate;
+    border-spacing: 3px;
+    /* mobile: colunas compactas */
+    min-width: 0;
+    width: max-content;   /* cresce conforme o conteúdo, não além */
 }
+
+/* Cabeçalhos compactos */
 .price-matrix th {
     font-family: 'Poppins', sans-serif;
-    font-size: 12px; font-weight: 600;
+    font-size: 11px; font-weight: 600;
     color: var(--gray-medium);
-    padding: 8px 6px; text-align: center;
+    padding: 6px 4px; text-align: center;
     white-space: nowrap;
 }
-.price-matrix th.col-header { background: var(--blue-light); color: var(--blue-dark); border-radius: var(--radius-xs); }
-.price-matrix th.row-header { background: var(--orange-light); color: var(--orange-dark); border-radius: var(--radius-xs); text-align: right; padding-right: 12px; }
-.price-matrix th.corner-cell { position: relative; }
-.corner-labels { font-size: 10px; color: var(--gray-medium); }
-.corner-ida   { position: absolute; bottom: 4px; right: 8px; }
-.corner-volta { position: absolute; top: 4px; left: 8px; }
+.price-matrix th.col-header {
+    background: var(--blue-light); color: var(--blue-dark);
+    border-radius: 6px;
+    min-width: 72px;    /* largura mínima de cada coluna de data */
+}
+.price-matrix th.row-header {
+    background: var(--orange-light); color: var(--orange-dark);
+    border-radius: 6px; text-align: right;
+    padding-right: 8px;
+    min-width: 72px;
+}
+.price-matrix th.corner-cell { position: relative; min-width: 56px; }
+.corner-labels { font-size: 9px; color: var(--gray-medium); }
+.corner-ida   { position: absolute; bottom: 4px; right: 6px; }
+.corner-volta { position: absolute; top: 4px; left: 6px; }
+
+/* Células compactas — legíveis mas não largas demais */
 .matrix-cell {
-    text-align: center; padding: 10px 6px;
-    border-radius: var(--radius-xs); cursor: pointer;
+    text-align: center;
+    padding: 8px 4px;       /* ← compacto */
+    border-radius: 6px;
+    cursor: pointer;
     transition: var(--transition);
     font-family: 'Poppins', sans-serif;
-    font-size: 13px; font-weight: 600;
+    font-size: 12px; font-weight: 700;  /* ← ligeiramente menor */
     position: relative; border: 2px solid transparent;
     -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+    white-space: nowrap;
+    min-width: 72px;    /* garante espaço para "R$ 1.243" */
 }
-.matrix-cell:active { transform: scale(0.97); }
-.matrix-cell.cheapest  { background: var(--green-light);  color: var(--green-dark);   border-color: var(--green); }
+.matrix-cell:active { opacity: 0.8; }
+.matrix-cell.cheapest  { background: var(--green-light);  color: var(--green-dark);  border-color: var(--green); }
 .matrix-cell.mid       { background: var(--blue-light);   color: var(--blue-dark); }
 .matrix-cell.expensive { background: var(--orange-light); color: var(--orange-dark); }
-.matrix-cell.no-data   { background: var(--gray-light);   color: var(--gray-medium); opacity: .6; cursor: default; }
-.matrix-cell.selected  { border-color: var(--gray-dark);  box-shadow: 0 0 0 3px rgba(33,39,42,0.2); }
-.matrix-noites { display: block; font-size: 10px; font-weight: 400; opacity: .7; margin-top: 2px; }
+.matrix-cell.no-data   { background: var(--gray-light);   color: var(--gray-medium); opacity: .5; cursor: default; }
+.matrix-cell.selected  { border-color: var(--gray-dark);  box-shadow: 0 0 0 2px rgba(33,39,42,0.25); }
+
+.matrix-noites {
+    display: block;
+    font-size: 9px; font-weight: 400;
+    opacity: .7; margin-top: 2px;
+}
 
 /* ── WINNER CARD ─────────────────────────── */
 .winner-card {
@@ -938,4 +1009,14 @@ body {
     .share-buttons { flex-direction: row; justify-content: center; }
     .btn-share { width: auto; }
     .combo-detail-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+}
+
+/* ── Matrix: desktop — células maiores, sem fade ── */
+@media (min-width: 560px) {
+    .matrix-section::after { display: none; }
+    .matrix-scroll-hint { display: none; }
+    .matrix-cell { padding: 10px 8px; font-size: 13px; min-width: 80px; }
+    .price-matrix th { font-size: 12px; padding: 8px 6px; }
+    .price-matrix th.col-header,
+    .price-matrix th.row-header { min-width: 80px; }
 }
