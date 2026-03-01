@@ -1,5 +1,6 @@
-// api/generate-itinerary.js - GERADOR DE ROTEIRO v1.0
+// api/generate-itinerary.js - GERADOR DE ROTEIRO v1.1
 // Gera roteiro dia a dia personalizado via Groq LLM
+// v1.1: Campo de observações do usuário + Google Maps URLs curtas
 // Fallback: Groq llama-3.3-70b → llama-3.1-8b → roteiro genérico
 
 export default async function handler(req, res) {
@@ -24,6 +25,7 @@ export default async function handler(req, res) {
         preferencias,
         intensidade,
         orcamentoAtividades,
+        observacoes,  // NOVO: campo de observações livres do usuário
     } = req.body;
 
     // ============================================================
@@ -50,6 +52,9 @@ export default async function handler(req, res) {
         const numDias = Math.ceil((volta - ida) / (1000 * 60 * 60 * 24)) + 1;
 
         console.log(`🗺️ Gerando roteiro: ${destino} | ${numDias} dias | ${companhia} | ${preferencias}`);
+        if (observacoes) {
+            console.log(`📝 Observações do usuário: ${observacoes}`);
+        }
 
         // ============================================================
         // CONTEXTO DE PASSAGEIROS
@@ -124,10 +129,33 @@ ${bebes > 0 ? '- BEBÊ(S): incluir tempo extra para logística, evitar atividade
         const estacaoInfo = getSeasonContext(mesViagem);
 
         // ============================================================
+        // NOVO: BLOCO DE OBSERVAÇÕES DO USUÁRIO PARA O PROMPT
+        // ============================================================
+        let observacoesBloco = '';
+        let observacoesInstrucao = '';
+
+        if (observacoes && observacoes.trim()) {
+            observacoesBloco = `
+═══════════════════════════════════════════
+PEDIDOS ESPECIAIS DO VIAJANTE (PRIORIDADE ALTA):
+"${observacoes.trim()}"
+═══════════════════════════════════════════
+INSTRUÇÃO: O viajante fez pedidos especiais acima. Você DEVE:
+1. Levar em conta TODAS as preferências, restrições e pedidos descritos acima ao montar o roteiro
+2. Se o viajante pediu para INCLUIR algo, garanta que isso apareça no roteiro
+3. Se o viajante pediu para EXCLUIR algo, NÃO inclua isso de forma alguma
+4. Nas "dica_tripinha" de atividades relevantes, faça referências naturais aos pedidos (ex: "Como você pediu, separei um restaurante vegetariano aqui perto!" ou "Sei que você queria evitar museus longos, então esse é rápido e interativo!")
+5. No "resumo_viagem", mencione brevemente que os pedidos especiais foram considerados, de forma natural e calorosa
+6. NÃO copie o texto do viajante literalmente — absorva as informações e demonstre que entendeu adaptando o roteiro`;
+
+            observacoesInstrucao = '\n14. O viajante fez PEDIDOS ESPECIAIS — leia com atenção a seção "PEDIDOS ESPECIAIS DO VIAJANTE" e garanta que cada solicitação foi atendida no roteiro. Demonstre nas dicas da Tripinha que os pedidos foram levados em conta.';
+        }
+
+        // ============================================================
         // ESTRUTURA JSON ESPERADA
         // ============================================================
         const estruturaJSON = `{
-  "resumo_viagem": "Frase curta e animada da Tripinha resumindo a vibe da viagem",
+  "resumo_viagem": "Frase curta e animada da Tripinha resumindo a vibe da viagem${observacoes ? ' (mencione que os pedidos especiais foram considerados)' : ''}",
   "dias": [
     {
       "dia_numero": 1,
@@ -142,7 +170,7 @@ ${bebes > 0 ? '- BEBÊ(S): incluir tempo extra para logística, evitar atividade
             {
               "nome": "Nome do local ou atividade",
               "descricao": "Descrição curta da atividade (1-2 frases)",
-              "dica_tripinha": "Dica prática da Tripinha sobre esse local",
+              "dica_tripinha": "Dica prática da Tripinha sobre esse local${observacoes ? ' (referencie pedidos do viajante quando relevante)' : ''}",
               "duracao_minutos": 90,
               "google_maps_query": "Nome do Local, Cidade, País",
               "gratuito": true,
@@ -163,6 +191,7 @@ ${bebes > 0 ? '- BEBÊ(S): incluir tempo extra para logística, evitar atividade
 DESTINO: ${destino}
 PERÍODO: ${dataIda} a ${dataVolta} (${numDias} dias)
 ${estacaoInfo ? `CONTEXTO SAZONAL: ${estacaoInfo}` : ''}
+${observacoesBloco}
 
 DIAS DA VIAGEM:
 ${diasListaTexto}
@@ -183,7 +212,7 @@ REGRAS IMPORTANTES:
 1. O DIA 1 ${horarioChegada ? `começa a partir das ${horarioChegada} (hora de chegada no destino)` : 'é o dia de chegada — comece com atividades leves de ambientação'}
 2. O ÚLTIMO DIA ${horarioPartida ? `deve considerar partida às ${horarioPartida} — o viajante precisa de tempo para ir ao aeroporto/rodoviária` : 'é o dia de partida — sugira atividades de manhã e organização para partida'}
 3. Cada dia DEVE ter atividades distribuídas por períodos (manhã, tarde, noite) conforme o ritmo escolhido
-4. "google_maps_query" deve ser o NOME REAL DO LOCAL + Cidade + País, para funcionar numa busca do Google Maps (ex: "Torre Eiffel, Paris, França")
+4. "google_maps_query" deve ser o NOME REAL DO LOCAL + Cidade + País, para funcionar numa busca do Google Maps (ex: "Torre Eiffel, Paris, França"). Use nomes curtos e diretos.
 5. "tags" podem ser: "Imperdível", "Ideal para família", "Histórico", "Gastronômico", "Compras", "Relaxante", "Aventura", "Cultural", "Gratuito", "Vida noturna", "Natureza", "Romântico"
 6. "gratuito" deve ser true se a atividade é gratuita (parques, praias, mirantes, caminhar por bairros) ou false se normalmente é paga
 7. Escreva TODOS os textos em português brasileiro
@@ -192,7 +221,7 @@ REGRAS IMPORTANTES:
 10. "duracao_minutos" é o tempo estimado naquela atividade (mínimo 30, máximo 240)
 11. Priorize LOCAIS REAIS e POPULARES que existem de fato no destino
 12. Evite repetir locais entre dias diferentes
-13. Para o dia de chegada e o dia de partida, ajuste o número de atividades ao tempo disponível
+13. Para o dia de chegada e o dia de partida, ajuste o número de atividades ao tempo disponível${observacoesInstrucao}
 
 Retorne APENAS o JSON válido, sem texto extra.
 
@@ -220,7 +249,7 @@ ${estruturaJSON}`;
                         messages: [
                             {
                                 role: 'system',
-                                content: 'Você é a Tripinha, uma cachorra vira-lata caramelo brasileira especialista em viagens. Crie roteiros detalhados e personalizados. Retorne APENAS JSON válido em português do Brasil. Zero texto extra fora do JSON. Todos os locais devem ser REAIS e existir de fato no destino. O campo google_maps_query deve conter o nome real do local para funcionar no Google Maps.'
+                                content: `Você é a Tripinha, uma cachorra vira-lata caramelo brasileira especialista em viagens. Crie roteiros detalhados e personalizados. Retorne APENAS JSON válido em português do Brasil. Zero texto extra fora do JSON. Todos os locais devem ser REAIS e existir de fato no destino. O campo google_maps_query deve conter o nome real do local para funcionar no Google Maps.${observacoes ? ' IMPORTANTE: O viajante fez pedidos especiais — demonstre nas suas dicas que você levou tudo em conta, de forma natural e acolhedora.' : ''}`
                             },
                             { role: 'user', content: prompt }
                         ],
@@ -271,14 +300,15 @@ ${estruturaJSON}`;
             return res.status(200).json(buildFallbackItinerary(req.body));
         }
 
-        // Garantir Google Maps links para cada atividade
+        // Garantir Google Maps links curtos para cada atividade
         resultado.dias.forEach(dia => {
             if (dia.periodos && Array.isArray(dia.periodos)) {
                 dia.periodos.forEach(periodo => {
                     if (periodo.atividades && Array.isArray(periodo.atividades)) {
                         periodo.atividades.forEach(ativ => {
                             if (ativ.google_maps_query) {
-                                ativ.google_maps_url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(ativ.google_maps_query)}`;
+                                // CORRIGIDO: URL mais curta para compartilhamento
+                                ativ.google_maps_url = `https://maps.google.com/?q=${encodeURIComponent(ativ.google_maps_query)}`;
                             }
                         });
                     }
@@ -290,6 +320,8 @@ ${estruturaJSON}`;
         resultado._numDias = numDias;
         resultado._destino = destino;
         resultado._geradoEm = new Date().toISOString();
+        // NOVO: flag indicando se observações foram usadas
+        resultado._observacoesUsadas = !!(observacoes && observacoes.trim());
 
         console.log(`🗺️ Roteiro completo: ${resultado.dias.length} dias para ${destino}`);
 
@@ -326,7 +358,7 @@ function getSeasonContext(mes) {
 // FALLBACK: Roteiro genérico sem LLM
 // ============================================================
 function buildFallbackItinerary(params) {
-    const { destino, dataIda, dataVolta, horarioChegada, horarioPartida } = params;
+    const { destino, dataIda, dataVolta, horarioChegada, horarioPartida, observacoes } = params;
     const ida = new Date(dataIda + 'T12:00:00');
     const volta = new Date(dataVolta + 'T12:00:00');
     const numDias = Math.ceil((volta - ida) / (1000 * 60 * 60 * 24)) + 1;
@@ -367,7 +399,7 @@ function buildFallbackItinerary(params) {
                             dica_tripinha: 'Comece sem pressa, aproveite para pegar o mapa no posto de informação turística!',
                             duracao_minutos: 120,
                             google_maps_query: `Centro, ${destino}`,
-                            google_maps_url: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent('Centro, ' + destino)}`,
+                            google_maps_url: `https://maps.google.com/?q=${encodeURIComponent('Centro, ' + destino)}`,
                             gratuito: true,
                             tags: ['Cultural']
                         }
@@ -377,12 +409,18 @@ function buildFallbackItinerary(params) {
         });
     }
 
+    let resumoViagem = `A Tripinha preparou um roteiro base para ${destino}! Personalize como quiser.`;
+    if (observacoes && observacoes.trim()) {
+        resumoViagem = `A Tripinha preparou um roteiro base para ${destino}! Recebi seus pedidos especiais e vou considerar tudo quando o roteiro completo for gerado. Por enquanto, aqui vai uma versão inicial.`;
+    }
+
     return {
-        resumo_viagem: `A Tripinha preparou um roteiro base para ${destino}! Personalize como quiser.`,
+        resumo_viagem: resumoViagem,
         dias,
         _model: 'fallback',
         _numDias: numDias,
         _destino: destino,
-        _geradoEm: new Date().toISOString()
+        _geradoEm: new Date().toISOString(),
+        _observacoesUsadas: !!(observacoes && observacoes.trim())
     };
 }
