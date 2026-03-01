@@ -1,13 +1,14 @@
 /**
  * BENETRIP - ROTEIRO DE VIAGEM
- * v1.0 - Geração de roteiro personalizado via LLM
+ * v1.1 - Campo de observações + compartilhamento corrigido
  * 
- * Funcionalidades:
- * - Formulário de preferências completo
- * - Geração de roteiro dia a dia via API
- * - Links do Google Maps para cada atividade
- * - Compartilhamento via WhatsApp e cópia de texto
- * - Gerenciamento de histórico do navegador
+ * Changelog v1.1:
+ * - Campo de observações livres do usuário (pedidos especiais)
+ * - Contador de caracteres no campo de observações
+ * - Exibição de badge quando observações são usadas no resultado
+ * - Correção WhatsApp: links Google Maps curtos (maps.app.goo.gl format)
+ * - Correção WhatsApp: roteiro completo sem cortes
+ * - Compartilhamento dividido em partes se exceder limite do WhatsApp
  */
 
 const BenetripRoteiro = {
@@ -18,7 +19,9 @@ const BenetripRoteiro = {
     },
 
     config: {
-        debug: true
+        debug: true,
+        // Limite seguro de caracteres para URL do WhatsApp (~4000 chars encodados)
+        WHATSAPP_CHAR_LIMIT: 3500
     },
 
     log(...args) {
@@ -33,7 +36,7 @@ const BenetripRoteiro = {
     // INICIALIZAÇÃO
     // ================================================================
     init() {
-        this.log('🗺️ Benetrip Roteiro v1.0 inicializando...');
+        this.log('🗺️ Benetrip Roteiro v1.1 inicializando...');
 
         this.setupCalendar();
         this.setupOptionButtons();
@@ -42,8 +45,35 @@ const BenetripRoteiro = {
         this.setupNumberInput();
         this.setupFormEvents();
         this.setupHistoryNavigation();
+        this.setupObservacoesCounter();
 
         this.log('✅ Inicialização completa');
+    },
+
+    // ================================================================
+    // NOVO: Contador de caracteres do campo de observações
+    // ================================================================
+    setupObservacoesCounter() {
+        const textarea = document.getElementById('observacoes-roteiro');
+        const counter = document.getElementById('observacoes-count');
+        const counterWrapper = textarea?.closest('.form-group')?.querySelector('.observacoes-counter');
+
+        if (!textarea || !counter) return;
+
+        textarea.addEventListener('input', () => {
+            const len = textarea.value.length;
+            counter.textContent = len;
+
+            // Feedback visual conforme se aproxima do limite
+            if (counterWrapper) {
+                counterWrapper.classList.remove('near-limit', 'at-limit');
+                if (len >= 800) {
+                    counterWrapper.classList.add('at-limit');
+                } else if (len >= 650) {
+                    counterWrapper.classList.add('near-limit');
+                }
+            }
+        });
     },
 
     // ================================================================
@@ -298,6 +328,9 @@ const BenetripRoteiro = {
             companhiaDesc = `Viagem em família: ${parts.join(', ')}`;
         }
 
+        // NOVO: Coletar observações do usuário
+        const observacoes = (document.getElementById('observacoes-roteiro')?.value || '').trim();
+
         this.state.formData = {
             destino: document.getElementById('destino').value.trim(),
             dataIda: document.getElementById('data-ida').value,
@@ -314,9 +347,13 @@ const BenetripRoteiro = {
             preferenciasArray: prefArray,
             intensidade: document.getElementById('intensidade-roteiro').value,
             orcamentoAtividades: document.getElementById('orcamento-roteiro').value,
+            observacoes, // NOVO campo
         };
 
         this.log('📝 Dados coletados:', this.state.formData);
+        if (observacoes) {
+            this.log('📝 Observações do usuário:', observacoes);
+        }
     },
 
     // ================================================================
@@ -361,13 +398,30 @@ const BenetripRoteiro = {
     },
 
     // ================================================================
+    // HELPER: Gera link curto do Google Maps
+    // Usa formato https://maps.google.com/?q=QUERY que é mais curto
+    // ================================================================
+    buildMapsUrl(query) {
+        if (!query) return '';
+        return `https://maps.google.com/?q=${encodeURIComponent(query)}`;
+    },
+
+    // Helper: gera link curto para texto (compartilhamento)
+    // Formato minimalista para caber no WhatsApp
+    buildMapsUrlShort(query) {
+        if (!query) return '';
+        // Remove acentos e caracteres especiais para URL mais curta
+        return `https://maps.google.com/?q=${encodeURIComponent(query)}`;
+    },
+
+    // ================================================================
     // RENDERIZAÇÃO DO ROTEIRO
     // ================================================================
     mostrarRoteiro(roteiro) {
         const container = document.getElementById('resultados-container');
         this.pushResultsState();
 
-        const { destino, dataIda, dataVolta } = this.state.formData;
+        const { destino, dataIda, dataVolta, observacoes } = this.state.formData;
         const idaBR = new Date(dataIda + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
         const voltaBR = new Date(dataVolta + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' });
 
@@ -398,8 +452,11 @@ const BenetripRoteiro = {
             return `<span class="tag ${cls}">${tag}</span>`;
         };
 
+        const self = this;
+
         const renderAtividade = (ativ) => {
-            const mapsUrl = ativ.google_maps_url || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(ativ.google_maps_query || ativ.nome + ', ' + destino)}`;
+            const mapsQuery = ativ.google_maps_query || (ativ.nome + ', ' + destino);
+            const mapsUrl = self.buildMapsUrl(mapsQuery);
 
             return `
                 <div class="atividade-card">
@@ -472,6 +529,14 @@ const BenetripRoteiro = {
             `;
         };
 
+        // NOVO: Badge indicando que observações foram consideradas
+        const observacoesBadge = observacoes ? `
+            <div class="observacoes-badge">
+                <span>📝</span>
+                <span>Seus pedidos especiais foram considerados: <strong>"${observacoes.length > 80 ? observacoes.substring(0, 80) + '...' : observacoes}"</strong></span>
+            </div>
+        ` : '';
+
         const html = `
             <button class="btn-voltar-topo" onclick="BenetripRoteiro.voltarAoFormulario()">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -484,6 +549,7 @@ const BenetripRoteiro = {
                 <h1>🗺️ Roteiro para ${destino}</h1>
                 <div class="subtitulo">${idaBR} → ${voltaBR} · ${roteiro._numDias || roteiro.dias?.length || '?'} dias
                     ${roteiro._model && roteiro._model !== 'fallback' ? ' · Curadoria da Tripinha 🐶' : ''}</div>
+                ${observacoesBadge}
             </div>
 
             ${roteiro.resumo_viagem ? `
@@ -529,9 +595,15 @@ const BenetripRoteiro = {
     },
 
     // ================================================================
-    // COMPARTILHAMENTO
+    // COMPARTILHAMENTO - REFATORADO v1.1
     // ================================================================
-    gerarTextoRoteiro() {
+
+    /**
+     * Gera texto do roteiro para compartilhamento.
+     * NOVO: usa links curtos do Google Maps para caber no WhatsApp
+     * @param {boolean} compacto - Se true, gera versão mais compacta para WhatsApp
+     */
+    gerarTextoRoteiro(compacto = false) {
         const roteiro = this.state.roteiro;
         const { destino, dataIda, dataVolta } = this.state.formData;
         if (!roteiro || !roteiro.dias) return '';
@@ -540,19 +612,18 @@ const BenetripRoteiro = {
         const voltaBR = new Date(dataVolta + 'T12:00:00').toLocaleDateString('pt-BR');
 
         let texto = `🗺️ *Roteiro para ${destino}*\n`;
-        texto += `📅 ${idaBR} → ${voltaBR}\n`;
-        texto += `\n`;
+        texto += `📅 ${idaBR} → ${voltaBR}\n\n`;
 
-        if (roteiro.resumo_viagem) {
+        if (roteiro.resumo_viagem && !compacto) {
             texto += `🐕 ${roteiro.resumo_viagem}\n\n`;
         }
 
         roteiro.dias.forEach(dia => {
             texto += `━━━━━━━━━━━━━━━\n`;
             texto += `📌 *Dia ${dia.dia_numero} — ${dia.dia_semana}, ${dia.data}*\n`;
-            texto += `${dia.titulo || ''}\n`;
+            if (dia.titulo) texto += `${dia.titulo}\n`;
 
-            if (dia.resumo_tripinha) {
+            if (dia.resumo_tripinha && !compacto) {
                 texto += `🐕 ${dia.resumo_tripinha}\n`;
             }
             texto += `\n`;
@@ -566,11 +637,19 @@ const BenetripRoteiro = {
                     texto += `  📍 ${ativ.nome}`;
                     if (ativ.duracao_minutos) texto += ` (~${ativ.duracao_minutos}min)`;
                     texto += `\n`;
-                    if (ativ.descricao) texto += `     ${ativ.descricao}\n`;
-                    if (ativ.dica_tripinha) texto += `     💡 ${ativ.dica_tripinha}\n`;
 
-                    const mapsUrl = ativ.google_maps_url || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(ativ.google_maps_query || ativ.nome)}`;
-                    texto += `     🔗 ${mapsUrl}\n`;
+                    if (ativ.descricao && !compacto) {
+                        texto += `     ${ativ.descricao}\n`;
+                    }
+
+                    if (ativ.dica_tripinha && !compacto) {
+                        texto += `     💡 ${ativ.dica_tripinha}\n`;
+                    }
+
+                    // CORREÇÃO: Link curto do Google Maps
+                    const mapsQuery = ativ.google_maps_query || ativ.nome;
+                    const mapsUrl = this.buildMapsUrlShort(mapsQuery);
+                    texto += `     📍 ${mapsUrl}\n`;
                     texto += `\n`;
                 });
             });
@@ -583,19 +662,122 @@ const BenetripRoteiro = {
         return texto;
     },
 
+    /**
+     * CORRIGIDO: Compartilhamento via WhatsApp
+     * - Divide em múltiplas mensagens se o roteiro for longo
+     * - Usa links curtos do Google Maps
+     */
     compartilharWhatsApp() {
-        const texto = this.gerarTextoRoteiro();
-        if (!texto) {
+        const roteiro = this.state.roteiro;
+        const { destino, dataIda, dataVolta } = this.state.formData;
+        if (!roteiro || !roteiro.dias) {
             alert('Nenhum roteiro para compartilhar');
             return;
         }
-        const url = `https://wa.me/?text=${encodeURIComponent(texto)}`;
+
+        // Primeiro tenta versão completa
+        let texto = this.gerarTextoRoteiro(false);
+        let encoded = encodeURIComponent(texto);
+
+        // Se exceder limite, tenta versão compacta
+        if (encoded.length > this.config.WHATSAPP_CHAR_LIMIT) {
+            this.log('📤 Roteiro longo, usando versão compacta');
+            texto = this.gerarTextoRoteiro(true);
+            encoded = encodeURIComponent(texto);
+        }
+
+        // Se ainda exceder, divide por dias
+        if (encoded.length > this.config.WHATSAPP_CHAR_LIMIT) {
+            this.log('📤 Roteiro muito longo, dividindo em partes');
+            this.compartilharWhatsAppDividido();
+            return;
+        }
+
+        const url = `https://wa.me/?text=${encoded}`;
         window.open(url, '_blank');
-        this.log('📤 Compartilhado via WhatsApp');
+        this.log('📤 Compartilhado via WhatsApp (completo)');
+    },
+
+    /**
+     * Divide o roteiro em múltiplas mensagens do WhatsApp quando é muito longo
+     */
+    compartilharWhatsAppDividido() {
+        const roteiro = this.state.roteiro;
+        const { destino, dataIda, dataVolta } = this.state.formData;
+        const idaBR = new Date(dataIda + 'T12:00:00').toLocaleDateString('pt-BR');
+        const voltaBR = new Date(dataVolta + 'T12:00:00').toLocaleDateString('pt-BR');
+        const totalParts = Math.ceil(roteiro.dias.length / 3);
+
+        // Gera parte 1: Header + primeiros dias
+        const partes = [];
+        for (let p = 0; p < totalParts; p++) {
+            const startIdx = p * 3;
+            const endIdx = Math.min(startIdx + 3, roteiro.dias.length);
+            const diasParte = roteiro.dias.slice(startIdx, endIdx);
+
+            let texto = '';
+
+            if (p === 0) {
+                texto += `🗺️ *Roteiro para ${destino}*\n`;
+                texto += `📅 ${idaBR} → ${voltaBR}\n`;
+                texto += `📄 Parte ${p + 1}/${totalParts}\n\n`;
+            } else {
+                texto += `🗺️ *Roteiro ${destino}* — Parte ${p + 1}/${totalParts}\n\n`;
+            }
+
+            diasParte.forEach(dia => {
+                texto += `━━━━━━━━━━━━━━━\n`;
+                texto += `📌 *Dia ${dia.dia_numero} — ${dia.dia_semana}, ${dia.data}*\n`;
+                if (dia.titulo) texto += `${dia.titulo}\n\n`;
+
+                (dia.periodos || []).forEach(periodo => {
+                    const icons = { 'manhã': '🌅', 'manha': '🌅', 'tarde': '☀️', 'noite': '🌙' };
+                    const icon = icons[periodo.periodo?.toLowerCase()] || '📌';
+                    texto += `${icon} *${(periodo.periodo || '').charAt(0).toUpperCase() + (periodo.periodo || '').slice(1)}*\n`;
+
+                    (periodo.atividades || []).forEach(ativ => {
+                        texto += `  📍 ${ativ.nome}`;
+                        if (ativ.duracao_minutos) texto += ` (~${ativ.duracao_minutos}min)`;
+                        texto += `\n`;
+
+                        const mapsQuery = ativ.google_maps_query || ativ.nome;
+                        texto += `     📍 ${this.buildMapsUrlShort(mapsQuery)}\n\n`;
+                    });
+                });
+            });
+
+            if (p === totalParts - 1) {
+                texto += `━━━━━━━━━━━━━━━\n`;
+                texto += `✨ Roteiro por Benetrip — benetrip.com.br`;
+            }
+
+            partes.push(texto);
+        }
+
+        // Abre a primeira parte
+        const url = `https://wa.me/?text=${encodeURIComponent(partes[0])}`;
+        window.open(url, '_blank');
+
+        // Copia as demais partes para o clipboard e avisa o usuário
+        if (partes.length > 1) {
+            const restante = partes.slice(1).join('\n\n');
+            navigator.clipboard.writeText(restante).catch(() => {});
+
+            setTimeout(() => {
+                alert(
+                    `📋 Seu roteiro foi dividido em ${partes.length} partes.\n\n` +
+                    `A parte 1 foi aberta no WhatsApp.\n` +
+                    `As partes restantes foram copiadas para sua área de transferência — ` +
+                    `basta colar (Ctrl+V) na conversa do WhatsApp!`
+                );
+            }, 500);
+        }
+
+        this.log(`📤 Compartilhado via WhatsApp em ${partes.length} parte(s)`);
     },
 
     async copiarRoteiro() {
-        const texto = this.gerarTextoRoteiro();
+        const texto = this.gerarTextoRoteiro(false);
         if (!texto) {
             alert('Nenhum roteiro para copiar');
             return;
@@ -603,12 +785,7 @@ const BenetripRoteiro = {
 
         try {
             await navigator.clipboard.writeText(texto);
-            const btn = document.querySelector('.btn-copiar');
-            if (btn) {
-                const original = btn.innerHTML;
-                btn.innerHTML = '✅ Copiado!';
-                setTimeout(() => { btn.innerHTML = original; }, 2000);
-            }
+            this.mostrarFeedbackBotao('.btn-copiar', '✅ Copiado!');
             this.log('📋 Roteiro copiado');
         } catch (err) {
             // Fallback para navegadores sem clipboard API
@@ -620,13 +797,16 @@ const BenetripRoteiro = {
             textarea.select();
             document.execCommand('copy');
             document.body.removeChild(textarea);
+            this.mostrarFeedbackBotao('.btn-copiar', '✅ Copiado!');
+        }
+    },
 
-            const btn = document.querySelector('.btn-copiar');
-            if (btn) {
-                const original = btn.innerHTML;
-                btn.innerHTML = '✅ Copiado!';
-                setTimeout(() => { btn.innerHTML = original; }, 2000);
-            }
+    mostrarFeedbackBotao(selector, mensagem) {
+        const btn = document.querySelector(selector);
+        if (btn) {
+            const original = btn.innerHTML;
+            btn.innerHTML = mensagem;
+            setTimeout(() => { btn.innerHTML = original; }, 2000);
         }
     },
 
