@@ -242,7 +242,7 @@ const BenetripAutoSave = (function () {
     }
 
     // ==========================================
-    // 5. ROTEIRO / ITINERÁRIO (itinerary2.html)
+    // 5. ROTEIRO / ITINERÁRIO (roteiro-viagens.html)
     // ==========================================
     async function salvarRoteiro(dados) {
         if (!_isLoggedIn()) return null;
