@@ -62,7 +62,7 @@
         <a href="${BASE}voos.html" class="bh-nav-item">
           <span class="bh-nav-icon">✈️</span> Busca de Voos
         </a>
-        <a href="${BASE}itinerary2.html" class="bh-nav-item">
+        <a href="${BASE}roteiro-viagem.html" class="bh-nav-item">
           <span class="bh-nav-icon">📋</span> Planejar Roteiro
         </a>
       </div>
@@ -134,7 +134,7 @@
           <a href="${BASE}descobrir-destinos.html" class="bh-nav-link">🎯 Descobrir</a>
           <a href="${BASE}todos-destinos.html" class="bh-nav-link">🌍 Destinos</a>
           <a href="${BASE}voos.html" class="bh-nav-link">✈️ Voos</a>
-          <a href="${BASE}itinerary2.html" class="bh-nav-link">📋 Roteiro</a>
+          <a href="${BASE}roteiro-viagem.html" class="bh-nav-link">📋 Roteiro</a>
         </nav>
 
         <div class="bh-header-auth">
