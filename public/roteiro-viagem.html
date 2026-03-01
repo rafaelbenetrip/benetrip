@@ -239,6 +239,21 @@
                         <input type="hidden" id="orcamento-roteiro" required>
                     </div>
 
+                    <!-- 8. Observações livres do viajante -->
+                    <div class="form-group">
+                        <label for="observacoes-roteiro">💬 Alguma dica especial pra Tripinha?</label>
+                        <p class="hint">Opcional! Conte o que não pode faltar no roteiro, o que quer evitar, restrições alimentares, acessibilidade, ou qualquer detalhe que ajude a Tripinha montar o roteiro perfeito.</p>
+                        <textarea 
+                            id="observacoes-roteiro" 
+                            class="text-input"
+                            rows="3" 
+                            maxlength="500"
+                            placeholder="Ex: 'Quero pelo menos um dia inteiro de praia', 'Evitar museus', 'Não vamos comer em restaurantes', 'Meu avô usa cadeira de rodas'..."
+                            style="resize: vertical; min-height: 80px;"
+                        ></textarea>
+                        <p class="hint" style="text-align: right; margin-top: 4px;"><span id="observacoes-roteiro-count">0</span>/500</p>
+                    </div>
+
                     <!-- Submit -->
                     <button type="submit" class="btn-submit" id="btn-submit">
                         🗺️ Gerar Meu Roteiro Personalizado
