@@ -53,6 +53,34 @@
         .btn-voltar-topo:hover svg {
             transform: translateX(-3px);
         }
+
+        /* Estilos do campo de observações */
+        #observacoes {
+            width: 100%;
+            padding: 14px 18px;
+            border: 2px solid #E0E0E0;
+            border-radius: 12px;
+            font-size: 15px;
+            font-family: 'Montserrat', sans-serif;
+            resize: vertical;
+            transition: all 0.3s ease;
+            line-height: 1.5;
+            min-height: 80px;
+        }
+        #observacoes:focus {
+            outline: none;
+            border-color: #E87722;
+        }
+        #observacoes::placeholder {
+            color: #aaa;
+            font-size: 14px;
+        }
+        .observacoes-counter {
+            text-align: right;
+            margin-top: 4px;
+            font-size: 12px;
+            color: #999;
+        }
     </style>
 
     <!-- Vercel Analytics -->
@@ -301,6 +329,19 @@
                                 required
                             >
                         </div>
+                    </div>
+
+                    <!-- 7. Observações livres para a Tripinha -->
+                    <div class="form-group">
+                        <label for="observacoes">💬 Quer dar uma dica extra pra Tripinha? <small style="font-weight:400; color:#999;">(opcional)</small></label>
+                        <p class="hint">Conte o que não pode faltar, o que você quer evitar, ou qualquer detalhe que ajude a Tripinha a farejar o destino perfeito pra você!</p>
+                        <textarea 
+                            id="observacoes" 
+                            placeholder="Ex: Quero um lugar com praias calmas e boa comida de rua. Não quero destinos muito frios nem com muitas escadas. Tenho interesse em mergulho..."
+                            rows="3"
+                            maxlength="500"
+                        ></textarea>
+                        <p class="observacoes-counter"><span id="observacoes-counter">0</span>/500</p>
                     </div>
 
                     <!-- Botão Submit -->
