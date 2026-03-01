@@ -3,6 +3,9 @@
 <head>
 
     <title>Comparar Voos - Encontre a Melhor Combinação | Benetrip</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#E87722">
     <meta name="description" content="Compare voos para seu destino em diferentes datas. Encontre a combinação perfeita de preço, duração e conforto!">
 
     <!-- Supabase Config -->
@@ -49,32 +52,31 @@
             <div class="form-card">
                 <form id="search-form">
 
-                    <!-- Origem + Destino -->
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="origem">📍 Origem</label>
-                            <div class="autocomplete-wrapper">
-                                <input type="text" id="origem" class="form-input"
-                                       placeholder="De onde você sai?"
-                                       autocomplete="off" required>
-                                <div id="origem-results" class="autocomplete-results"></div>
-                            </div>
-                            <input type="hidden" id="origem-data">
+                    <!-- ── Origem ── -->
+                    <div class="form-group">
+                        <label for="origem">📍 Origem</label>
+                        <div class="autocomplete-wrapper">
+                            <input type="text" id="origem" class="form-input"
+                                   placeholder="De onde você sai?"
+                                   autocomplete="off" required>
+                            <div id="origem-results" class="autocomplete-results"></div>
                         </div>
-
-                        <div class="form-group">
-                            <label for="destino">🎯 Destino</label>
-                            <div class="autocomplete-wrapper">
-                                <input type="text" id="destino" class="form-input"
-                                       placeholder="Para onde quer ir?"
-                                       autocomplete="off" required>
-                                <div id="destino-results" class="autocomplete-results"></div>
-                            </div>
-                            <input type="hidden" id="destino-data">
-                        </div>
+                        <input type="hidden" id="origem-data">
                     </div>
 
-                    <!-- Datas de Ida -->
+                    <!-- ── Destino ── -->
+                    <div class="form-group">
+                        <label for="destino">🎯 Destino</label>
+                        <div class="autocomplete-wrapper">
+                            <input type="text" id="destino" class="form-input"
+                                   placeholder="Para onde quer ir?"
+                                   autocomplete="off" required>
+                            <div id="destino-results" class="autocomplete-results"></div>
+                        </div>
+                        <input type="hidden" id="destino-data">
+                    </div>
+
+                    <!-- ── Datas de Ida ── -->
                     <div class="form-group">
                         <label>🛫 Datas de ida <span class="badge-limit">até 4 datas</span></label>
                         <input type="text" id="datas-ida" class="form-input"
@@ -83,7 +85,7 @@
                         <div class="selected-dates" id="chips-ida"></div>
                     </div>
 
-                    <!-- Datas de Volta -->
+                    <!-- ── Datas de Volta ── -->
                     <div class="form-group">
                         <label>🛬 Datas de volta <span class="badge-limit">até 4 datas</span></label>
                         <input type="text" id="datas-volta" class="form-input"
@@ -92,89 +94,87 @@
                         <div class="selected-dates" id="chips-volta"></div>
                     </div>
 
-                    <!-- Info combinações -->
+                    <!-- ── Info combinações ── -->
                     <div class="combo-info" id="combo-info" style="display:none">
                         <span class="combo-icon">🔀</span>
                         <span id="combo-text">0 combinações serão pesquisadas</span>
                     </div>
 
-                    <!-- Passageiros + Moeda -->
-                    <div class="form-row">
+                    <!-- ── Passageiros (full width, igual ao descobrir-destinos) ── -->
+                    <!-- MUDANÇA: tirado do form-row de 2 colunas, agora é full-width -->
+                    <div class="form-group">
+                        <label>👥 Passageiros</label>
+                        <div class="pax-selector">
 
-                        <!-- Passageiros por tipo -->
-                        <div class="form-group">
-                            <label>👥 Passageiros</label>
-                            <div class="pax-selector">
-
-                                <!-- Adultos -->
-                                <div class="pax-row">
-                                    <div class="pax-info">
-                                        <div class="pax-label">
-                                            <span class="pax-icon">🧑</span> Adultos
-                                        </div>
-                                        <div class="pax-desc">A partir de 12 anos</div>
+                            <!-- Adultos -->
+                            <div class="pax-row">
+                                <div class="pax-info">
+                                    <div class="pax-label">
+                                        <span class="pax-icon">🧑</span> Adultos
                                     </div>
-                                    <div class="pax-stepper">
-                                        <button type="button" class="pax-btn" id="btn-adultos-menos"
-                                                onclick="BenetripCompararVoos.ajustarPax('adultos',-1)" disabled>−</button>
-                                        <span class="pax-count has-value" id="pax-adultos-count">1</span>
-                                        <button type="button" class="pax-btn" id="btn-adultos-mais"
-                                                onclick="BenetripCompararVoos.ajustarPax('adultos',1)">+</button>
-                                    </div>
+                                    <div class="pax-desc">A partir de 12 anos</div>
                                 </div>
-
-                                <!-- Crianças -->
-                                <div class="pax-row">
-                                    <div class="pax-info">
-                                        <div class="pax-label">
-                                            <span class="pax-icon">🧒</span> Crianças
-                                        </div>
-                                        <div class="pax-desc">De 2 a 11 anos</div>
-                                    </div>
-                                    <div class="pax-stepper">
-                                        <button type="button" class="pax-btn" id="btn-criancas-menos"
-                                                onclick="BenetripCompararVoos.ajustarPax('criancas',-1)" disabled>−</button>
-                                        <span class="pax-count" id="pax-criancas-count">0</span>
-                                        <button type="button" class="pax-btn" id="btn-criancas-mais"
-                                                onclick="BenetripCompararVoos.ajustarPax('criancas',1)">+</button>
-                                    </div>
+                                <div class="pax-stepper">
+                                    <button type="button" class="pax-btn" id="btn-adultos-menos"
+                                            onclick="BenetripCompararVoos.ajustarPax('adultos',-1)" disabled>−</button>
+                                    <span class="pax-count has-value" id="pax-adultos-count">1</span>
+                                    <button type="button" class="pax-btn" id="btn-adultos-mais"
+                                            onclick="BenetripCompararVoos.ajustarPax('adultos',1)">+</button>
                                 </div>
-
-                                <!-- Bebês -->
-                                <div class="pax-row">
-                                    <div class="pax-info">
-                                        <div class="pax-label">
-                                            <span class="pax-icon">👶</span> Bebês
-                                        </div>
-                                        <div class="pax-desc free-tag">Até 2 anos · no colo · grátis</div>
-                                    </div>
-                                    <div class="pax-stepper">
-                                        <button type="button" class="pax-btn" id="btn-bebes-menos"
-                                                onclick="BenetripCompararVoos.ajustarPax('bebes',-1)" disabled>−</button>
-                                        <span class="pax-count" id="pax-bebes-count">0</span>
-                                        <button type="button" class="pax-btn" id="btn-bebes-mais"
-                                                onclick="BenetripCompararVoos.ajustarPax('bebes',1)">+</button>
-                                    </div>
-                                </div>
-
                             </div>
-                            <p class="pax-total-hint" id="pax-total-hint">
-                                Preço dividido por <strong>1</strong> passageiro
-                            </p>
+
+                            <!-- Crianças -->
+                            <div class="pax-row">
+                                <div class="pax-info">
+                                    <div class="pax-label">
+                                        <span class="pax-icon">🧒</span> Crianças
+                                    </div>
+                                    <div class="pax-desc">De 2 a 11 anos</div>
+                                </div>
+                                <div class="pax-stepper">
+                                    <button type="button" class="pax-btn" id="btn-criancas-menos"
+                                            onclick="BenetripCompararVoos.ajustarPax('criancas',-1)" disabled>−</button>
+                                    <span class="pax-count" id="pax-criancas-count">0</span>
+                                    <button type="button" class="pax-btn" id="btn-criancas-mais"
+                                            onclick="BenetripCompararVoos.ajustarPax('criancas',1)">+</button>
+                                </div>
+                            </div>
+
+                            <!-- Bebês -->
+                            <div class="pax-row">
+                                <div class="pax-info">
+                                    <div class="pax-label">
+                                        <span class="pax-icon">👶</span> Bebês
+                                    </div>
+                                    <div class="pax-desc free-tag">Até 2 anos · no colo · grátis</div>
+                                </div>
+                                <div class="pax-stepper">
+                                    <button type="button" class="pax-btn" id="btn-bebes-menos"
+                                            onclick="BenetripCompararVoos.ajustarPax('bebes',-1)" disabled>−</button>
+                                    <span class="pax-count" id="pax-bebes-count">0</span>
+                                    <button type="button" class="pax-btn" id="btn-bebes-mais"
+                                            onclick="BenetripCompararVoos.ajustarPax('bebes',1)">+</button>
+                                </div>
+                            </div>
+
                         </div>
+                        <p class="pax-total-hint" id="pax-total-hint">
+                            Preço dividido por <strong>1</strong> passageiro
+                        </p>
+                    </div>
 
-                        <!-- Moeda -->
-                        <div class="form-group">
-                            <label>💱 Moeda</label>
-                            <div class="currency-chips">
-                                <div class="currency-chip active" data-currency="BRL">R$</div>
-                                <div class="currency-chip" data-currency="USD">US$</div>
-                                <div class="currency-chip" data-currency="EUR">€</div>
-                            </div>
+                    <!-- ── Moeda (full width, igual ao descobrir-destinos) ── -->
+                    <!-- MUDANÇA: tirado do form-row de 2 colunas, agora é full-width -->
+                    <div class="form-group">
+                        <label>💱 Moeda</label>
+                        <div class="currency-chips">
+                            <div class="currency-chip active" data-currency="BRL">💰 Real (BRL)</div>
+                            <div class="currency-chip" data-currency="USD">💵 Dólar (USD)</div>
+                            <div class="currency-chip" data-currency="EUR">💶 Euro (EUR)</div>
                         </div>
                     </div>
 
-                    <!-- Submit -->
+                    <!-- ── Submit ── -->
                     <button type="submit" class="btn-submit" id="btn-submit">
                         🔍 Comparar Voos
                     </button>
@@ -221,4 +221,3 @@
     <script src="assets/js/comparar-voos.js"></script>
 </body>
 </html>
-
