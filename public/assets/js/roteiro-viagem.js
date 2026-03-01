@@ -1,70 +1,75 @@
 /**
- * BENETRIP - ROTEIRO DE VIAGEM (Formulário)
- * Versão 2.1 - Com campo de observações livres
+ * BENETRIP - ROTEIRO DE VIAGEM
+ * v1.0 - Geração de roteiro personalizado via LLM
  * 
- * Coleta preferências do formulário e chama a API /api/generate-itinerary
- * para gerar o roteiro personalizado dia a dia.
+ * Funcionalidades:
+ * - Formulário de preferências completo
+ * - Geração de roteiro dia a dia via API
+ * - Links do Google Maps para cada atividade
+ * - Compartilhamento via WhatsApp e cópia de texto
+ * - Gerenciamento de histórico do navegador
  */
 
-const BenetripRoteiroForm = {
+const BenetripRoteiro = {
     state: {
         formData: {},
-        roteiroGerado: null,
-        isSubmitting: false
+        roteiro: null,
+        viewingResults: false
     },
 
     config: {
-        debug: true,
-        apiEndpoint: '/api/generate-itinerary'
+        debug: true
     },
 
     log(...args) {
-        if (this.config.debug) console.log('[BenetripRoteiro]', ...args);
+        if (this.config.debug) console.log('[Roteiro]', ...args);
     },
 
     error(...args) {
-        console.error('[BenetripRoteiro ERROR]', ...args);
+        console.error('[Roteiro ERROR]', ...args);
     },
 
     // ================================================================
     // INICIALIZAÇÃO
     // ================================================================
     init() {
-        this.log('🗺️ Benetrip Roteiro v2.1 (Observações Livres) inicializando...');
+        this.log('🗺️ Benetrip Roteiro v1.0 inicializando...');
 
         this.setupCalendar();
         this.setupOptionButtons();
         this.setupCompanhiaConditional();
-        this.setupNumberInputs();
         this.setupFamiliaInputs();
+        this.setupNumberInput();
         this.setupFormEvents();
-        this.setupObservacoesCounter();
+        this.setupHistoryNavigation();
 
         this.log('✅ Inicialização completa');
     },
 
     // ================================================================
-    // CONTADOR DE CARACTERES DO CAMPO OBSERVAÇÕES
+    // HISTÓRICO (botão voltar do celular)
     // ================================================================
-    setupObservacoesCounter() {
-        const obsInput = document.getElementById('observacoes-roteiro');
-        const obsCount = document.getElementById('observacoes-roteiro-count');
-        if (obsInput && obsCount) {
-            obsInput.addEventListener('input', () => {
-                obsCount.textContent = obsInput.value.length;
-            });
-        }
+    setupHistoryNavigation() {
+        window.addEventListener('popstate', () => {
+            if (this.state.viewingResults) {
+                this.log('🔙 Botão voltar interceptado');
+                this.voltarAoFormulario(true);
+            }
+        });
+    },
+
+    pushResultsState() {
+        history.pushState({ benetripView: 'roteiro' }, '', '');
+        this.state.viewingResults = true;
     },
 
     // ================================================================
-    // CALENDÁRIO (Flatpickr)
+    // CALENDÁRIO
     // ================================================================
     setupCalendar() {
         const input = document.getElementById('datas-roteiro');
         const dataIda = document.getElementById('data-ida');
         const dataVolta = document.getElementById('data-volta');
-
-        if (!input) return;
 
         const amanha = new Date();
         amanha.setDate(amanha.getDate() + 1);
@@ -79,7 +84,7 @@ const BenetripRoteiroForm = {
                     dataIda.value = this.formatarDataISO(selectedDates[0]);
                     dataVolta.value = this.formatarDataISO(selectedDates[1]);
                     input.value = `${this.formatarDataBR(selectedDates[0])} - ${this.formatarDataBR(selectedDates[1])}`;
-                    this.log('📅 Datas:', dataIda.value, 'até', dataVolta.value);
+                    this.log('📅 Datas:', dataIda.value, '→', dataVolta.value);
                 }
             }
         });
@@ -112,18 +117,13 @@ const BenetripRoteiroForm = {
                     if (isMulti) {
                         btn.classList.toggle('active');
                         const selected = [];
-                        group.querySelectorAll('.btn-option.active').forEach(b => {
-                            selected.push(b.dataset.value);
-                        });
+                        group.querySelectorAll('.btn-option.active').forEach(b => selected.push(b.dataset.value));
                         hiddenInput.value = selected.join(',');
-                        this.log(`✅ ${field} (multi):`, selected);
                     } else {
                         group.querySelectorAll('.btn-option').forEach(b => b.classList.remove('active'));
                         btn.classList.add('active');
                         hiddenInput.value = btn.dataset.value;
-                        this.log(`✅ ${field}:`, btn.dataset.value);
                     }
-
                     hiddenInput.dispatchEvent(new Event('change'));
                 });
             });
@@ -131,7 +131,7 @@ const BenetripRoteiroForm = {
     },
 
     // ================================================================
-    // COMPANHIA CONDICIONAL (família / amigos)
+    // CONDICIONAL: COMPANHIA → FAMÍLIA / AMIGOS
     // ================================================================
     setupCompanhiaConditional() {
         const companhiaInput = document.getElementById('companhia-roteiro');
@@ -148,29 +148,7 @@ const BenetripRoteiroForm = {
     },
 
     // ================================================================
-    // NUMBER INPUTS (amigos)
-    // ================================================================
-    setupNumberInputs() {
-        document.querySelectorAll('.btn-number').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const targetId = btn.dataset.targetNum;
-                if (!targetId) return;
-                const input = document.getElementById(targetId);
-                if (!input) return;
-
-                const value = parseInt(input.value);
-                const min = parseInt(input.min);
-                const max = parseInt(input.max);
-                const action = btn.dataset.action;
-
-                if (action === 'increment' && value < max) input.value = value + 1;
-                if (action === 'decrement' && value > min) input.value = value - 1;
-            });
-        });
-    },
-
-    // ================================================================
-    // FAMÍLIA INPUTS (adultos, crianças, bebês)
+    // INPUTS DE FAMÍLIA (adultos/crianças/bebês)
     // ================================================================
     setupFamiliaInputs() {
         document.querySelectorAll('.btn-number-sm').forEach(btn => {
@@ -185,22 +163,19 @@ const BenetripRoteiroForm = {
                 const max = parseInt(input.max);
 
                 if (action === 'increment' && value < max) input.value = value + 1;
-                if (action === 'decrement' && value > min) input.value = value - 1;
+                else if (action === 'decrement' && value > min) input.value = value - 1;
 
                 this.validarFamilia();
                 this.atualizarTotalFamilia();
             });
         });
-
         this.atualizarTotalFamilia();
     },
 
     validarFamilia() {
-        const adultos = parseInt(document.getElementById('rot-adultos')?.value || 2);
-        const bebes = parseInt(document.getElementById('rot-bebes')?.value || 0);
-        if (bebes > adultos) {
-            document.getElementById('rot-bebes').value = adultos;
-        }
+        const adultos = parseInt(document.getElementById('rot-adultos').value);
+        const bebes = parseInt(document.getElementById('rot-bebes').value);
+        if (bebes > adultos) document.getElementById('rot-bebes').value = adultos;
     },
 
     atualizarTotalFamilia() {
@@ -211,8 +186,7 @@ const BenetripRoteiroForm = {
 
         const hint = document.getElementById('rot-familia-total-hint');
         if (hint) {
-            const parts = [];
-            parts.push(`${adultos} adulto${adultos > 1 ? 's' : ''}`);
+            const parts = [`${adultos} adulto${adultos > 1 ? 's' : ''}`];
             if (criancas > 0) parts.push(`${criancas} criança${criancas > 1 ? 's' : ''}`);
             if (bebes > 0) parts.push(`${bebes} bebê${bebes > 1 ? 's' : ''}`);
             hint.textContent = `Total: ${total} passageiro${total > 1 ? 's' : ''} (${parts.join(', ')})`;
@@ -220,65 +194,83 @@ const BenetripRoteiroForm = {
     },
 
     // ================================================================
-    // FORMULÁRIO
+    // INPUT NUMÉRICO (amigos)
+    // ================================================================
+    setupNumberInput() {
+        document.querySelectorAll('.btn-number[data-target-num]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const targetId = btn.dataset.targetNum;
+                const action = btn.dataset.action;
+                const input = document.getElementById(targetId);
+                if (!input) return;
+                const value = parseInt(input.value);
+                if (action === 'increment' && value < 20) input.value = value + 1;
+                else if (action === 'decrement' && value > 2) input.value = value - 1;
+            });
+        });
+    },
+
+    // ================================================================
+    // FORM SUBMIT
     // ================================================================
     setupFormEvents() {
         const form = document.getElementById('roteiro-form');
-        if (!form) return;
-
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
-            if (this.state.isSubmitting) return;
-
             if (!this.validarFormulario()) return;
-
             this.coletarDadosFormulario();
             await this.gerarRoteiro();
         });
     },
 
     validarFormulario() {
-        const destino = document.getElementById('destino').value.trim();
-        if (!destino) {
+        if (!document.getElementById('destino').value.trim()) {
             alert('Por favor, informe o destino da viagem');
             document.getElementById('destino').focus();
             return false;
         }
-
         if (!document.getElementById('data-ida').value || !document.getElementById('data-volta').value) {
             alert('Por favor, selecione as datas da viagem');
             document.getElementById('datas-roteiro').focus();
             return false;
         }
-
         if (!document.getElementById('companhia-roteiro').value) {
             alert('Por favor, escolha com quem você vai viajar');
             return false;
         }
-
         if (!document.getElementById('preferencias-roteiro').value) {
             alert('Por favor, escolha ao menos um tipo de experiência');
             return false;
         }
-
         if (!document.getElementById('intensidade-roteiro').value) {
             alert('Por favor, escolha o ritmo do roteiro');
             return false;
         }
-
         if (!document.getElementById('orcamento-roteiro').value) {
-            alert('Por favor, escolha o nível de orçamento para atividades');
+            alert('Por favor, escolha o nível de orçamento');
             return false;
         }
-
         return true;
+    },
+
+    COMPANHIA_MAP: {
+        0: 'Viajando sozinho(a)',
+        1: 'Viagem romântica (casal)',
+        2: 'Viagem em família',
+        3: 'Viagem com amigos'
+    },
+
+    PREFERENCIAS_MAP: {
+        'relax': 'Relaxamento, praias, descanso e natureza tranquila',
+        'aventura': 'Aventura, trilhas, esportes radicais e natureza selvagem',
+        'cultura': 'Cultura, museus, história, gastronomia e arquitetura',
+        'urbano': 'Agito urbano, vida noturna, compras e experiências cosmopolitas'
     },
 
     coletarDadosFormulario() {
         const companhia = parseInt(document.getElementById('companhia-roteiro').value);
 
         let adultos = 1, criancas = 0, bebes = 0, numPessoas = 1;
-
         switch (companhia) {
             case 0: adultos = 1; numPessoas = 1; break;
             case 1: adultos = 2; numPessoas = 2; break;
@@ -295,52 +287,36 @@ const BenetripRoteiroForm = {
         }
 
         const prefString = document.getElementById('preferencias-roteiro').value;
+        const prefArray = prefString.split(',').filter(Boolean);
+        const preferenciasDescricao = prefArray.map(p => this.PREFERENCIAS_MAP[p] || p).join(' + ');
+
+        let companhiaDesc = this.COMPANHIA_MAP[companhia] || 'Não informado';
+        if (companhia === 2) {
+            const parts = [`${adultos} adulto(s)`];
+            if (criancas > 0) parts.push(`${criancas} criança(s) de 2-11 anos`);
+            if (bebes > 0) parts.push(`${bebes} bebê(s) de 0-1 ano`);
+            companhiaDesc = `Viagem em família: ${parts.join(', ')}`;
+        }
 
         this.state.formData = {
             destino: document.getElementById('destino').value.trim(),
             dataIda: document.getElementById('data-ida').value,
             dataVolta: document.getElementById('data-volta').value,
-            horarioChegada: document.getElementById('horario-chegada').value || '14:00',
-            horarioPartida: document.getElementById('horario-partida').value || '18:00',
-            companhia: companhia,
-            adultos: adultos,
-            criancas: criancas,
-            bebes: bebes,
-            numPessoas: numPessoas,
-            preferencias: prefString,
-            preferenciasArray: prefString.split(',').filter(Boolean),
+            horarioChegada: document.getElementById('horario-chegada').value,
+            horarioPartida: document.getElementById('horario-partida').value,
+            companhia: companhiaDesc,
+            companhiaCode: companhia,
+            adultos,
+            criancas,
+            bebes,
+            numPessoas,
+            preferencias: preferenciasDescricao,
+            preferenciasArray: prefArray,
             intensidade: document.getElementById('intensidade-roteiro').value,
             orcamentoAtividades: document.getElementById('orcamento-roteiro').value,
-            observacoes: (document.getElementById('observacoes-roteiro')?.value || '').trim(),
         };
 
-        this.log('📝 Dados do roteiro:', this.state.formData);
-        if (this.state.formData.observacoes) {
-            this.log('💬 Observações do viajante:', this.state.formData.observacoes);
-        }
-    },
-
-    // ================================================================
-    // LABELS
-    // ================================================================
-    COMPANHIA_MAP: {
-        0: 'Viajando sozinho(a)',
-        1: 'Viagem romântica (casal)',
-        2: 'Viagem em família',
-        3: 'Viagem com amigos'
-    },
-
-    PREFERENCIAS_MAP: {
-        'relax': 'Relaxamento e descanso',
-        'aventura': 'Aventura e esportes',
-        'cultura': 'Cultura e história',
-        'urbano': 'Agito urbano e vida noturna'
-    },
-
-    calcularNoites(dataIda, dataVolta) {
-        const ida = new Date(dataIda);
-        const volta = new Date(dataVolta);
-        return Math.ceil((volta - ida) / (1000 * 60 * 60 * 24));
+        this.log('📝 Dados coletados:', this.state.formData);
     },
 
     // ================================================================
@@ -348,76 +324,314 @@ const BenetripRoteiroForm = {
     // ================================================================
     async gerarRoteiro() {
         try {
-            this.state.isSubmitting = true;
             this.mostrarLoading();
+            this.atualizarProgresso(10, '🔍 Pesquisando os melhores lugares...');
 
-            const fd = this.state.formData;
-            const noites = this.calcularNoites(fd.dataIda, fd.dataVolta);
+            await this.delay(500);
+            this.atualizarProgresso(30, '🗺️ Montando o roteiro dia a dia...');
 
-            // Descrição da companhia
-            let companhiaDesc = this.COMPANHIA_MAP[fd.companhia] || 'Não informado';
-            if (fd.companhia === 2) {
-                const parts = [`${fd.adultos} adulto(s)`];
-                if (fd.criancas > 0) parts.push(`${fd.criancas} criança(s) de 2-11 anos`);
-                if (fd.bebes > 0) parts.push(`${fd.bebes} bebê(s) de 0-1 ano`);
-                companhiaDesc = `Viagem em família: ${parts.join(', ')}`;
-            }
-
-            // Preferências em texto
-            const preferenciasTexto = fd.preferenciasArray
-                .map(p => this.PREFERENCIAS_MAP[p] || p)
-                .join(' + ');
-
-            this.atualizarProgresso(20, '🐕 Tripinha está montando seu roteiro...');
-
-            const response = await fetch(this.config.apiEndpoint, {
+            const response = await fetch('/api/generate-itinerary', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    destino: fd.destino,
-                    dataIda: fd.dataIda,
-                    dataVolta: fd.dataVolta,
-                    horarioChegada: fd.horarioChegada,
-                    horarioPartida: fd.horarioPartida,
-                    companhia: companhiaDesc,
-                    numPessoas: fd.numPessoas,
-                    adultos: fd.adultos,
-                    criancas: fd.criancas,
-                    bebes: fd.bebes,
-                    noites: noites,
-                    preferencias: preferenciasTexto,
-                    intensidade: fd.intensidade,
-                    orcamentoAtividades: fd.orcamentoAtividades,
-                    observacoes: fd.observacoes || ''
-                })
+                body: JSON.stringify(this.state.formData)
             });
 
-            this.atualizarProgresso(70, '✨ Finalizando detalhes...');
+            this.atualizarProgresso(70, '🐕 Tripinha adicionando dicas especiais...');
 
             if (!response.ok) {
-                const err = await response.json().catch(() => ({}));
-                throw new Error(err.message || `Erro ${response.status}`);
+                const err = await response.json();
+                throw new Error(err.message || 'Erro ao gerar roteiro');
             }
 
-            const resultado = await response.json();
-            this.state.roteiroGerado = resultado;
+            const roteiro = await response.json();
+            this.state.roteiro = roteiro;
 
-            this.atualizarProgresso(100, '🎉 Roteiro pronto!');
-            await this.delay(500);
+            this.atualizarProgresso(90, '✨ Finalizando...');
+            await this.delay(400);
+            this.atualizarProgresso(100, '🎉 Pronto!');
+            await this.delay(300);
 
-            this.mostrarResultados(resultado);
+            this.mostrarRoteiro(roteiro);
 
         } catch (erro) {
-            this.error('Erro ao gerar roteiro:', erro);
-            alert(`Erro: ${erro.message}. Tente novamente.`);
+            this.error('Erro:', erro);
+            alert(`Erro ao gerar roteiro: ${erro.message}`);
             this.esconderLoading();
-        } finally {
-            this.state.isSubmitting = false;
         }
     },
 
     // ================================================================
-    // UI HELPERS
+    // RENDERIZAÇÃO DO ROTEIRO
+    // ================================================================
+    mostrarRoteiro(roteiro) {
+        const container = document.getElementById('resultados-container');
+        this.pushResultsState();
+
+        const { destino, dataIda, dataVolta } = this.state.formData;
+        const idaBR = new Date(dataIda + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
+        const voltaBR = new Date(dataVolta + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' });
+
+        const PERIODO_ICONS = {
+            'manhã': '🌅',
+            'manha': '🌅',
+            'tarde': '☀️',
+            'noite': '🌙'
+        };
+
+        const TAG_CLASSES = {
+            'Imperdível': 'tag-imperdivel',
+            'Ideal para família': 'tag-familia',
+            'Histórico': 'tag-historico',
+            'Gastronômico': 'tag-gastronomico',
+            'Compras': 'tag-compras',
+            'Relaxante': 'tag-relaxante',
+            'Aventura': 'tag-aventura',
+            'Cultural': 'tag-cultural',
+            'Gratuito': 'tag-gratuito',
+            'Vida noturna': 'tag-noturna',
+            'Natureza': 'tag-natureza',
+            'Romântico': 'tag-romantico',
+        };
+
+        const renderTag = (tag) => {
+            const cls = TAG_CLASSES[tag] || 'tag-default';
+            return `<span class="tag ${cls}">${tag}</span>`;
+        };
+
+        const renderAtividade = (ativ) => {
+            const mapsUrl = ativ.google_maps_url || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(ativ.google_maps_query || ativ.nome + ', ' + destino)}`;
+
+            return `
+                <div class="atividade-card">
+                    <div class="atividade-nome">📍 ${ativ.nome}</div>
+                    <div class="atividade-desc">${ativ.descricao || ''}</div>
+                    
+                    ${(ativ.tags && ativ.tags.length > 0) ? `
+                        <div class="atividade-tags">
+                            ${ativ.tags.map(renderTag).join('')}
+                            ${ativ.gratuito ? '<span class="tag tag-gratuito">Gratuito</span>' : ''}
+                        </div>
+                    ` : ''}
+                    
+                    <div class="atividade-meta">
+                        ${ativ.duracao_minutos ? `<span>🕐 ~${ativ.duracao_minutos}min</span>` : ''}
+                        ${ativ.gratuito === false ? '<span>💰 Pago</span>' : ''}
+                    </div>
+
+                    ${ativ.dica_tripinha ? `
+                        <div class="atividade-dica">
+                            <span class="dica-icon">💡</span>
+                            <p><strong>Dica da Tripinha:</strong> ${ativ.dica_tripinha}</p>
+                        </div>
+                    ` : ''}
+
+                    <a href="${mapsUrl}" target="_blank" rel="noopener" class="btn-maps">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+                            <circle cx="12" cy="10" r="3"/>
+                        </svg>
+                        Ver no Google Maps
+                    </a>
+                </div>
+            `;
+        };
+
+        const renderPeriodo = (periodo) => {
+            const icon = PERIODO_ICONS[periodo.periodo?.toLowerCase()] || '📌';
+            const label = (periodo.periodo || '').charAt(0).toUpperCase() + (periodo.periodo || '').slice(1);
+
+            return `
+                <div class="periodo-section">
+                    <div class="periodo-label">${icon} ${label}</div>
+                    ${(periodo.atividades || []).map(renderAtividade).join('')}
+                </div>
+            `;
+        };
+
+        const renderDia = (dia) => {
+            return `
+                <div class="dia-card">
+                    <div class="dia-header">
+                        <div class="dia-numero">${dia.dia_numero}</div>
+                        <div class="dia-header-info">
+                            <div>${dia.titulo || `Dia ${dia.dia_numero}`}</div>
+                            <div class="dia-header-data">${dia.dia_semana || ''}, ${dia.data || ''}</div>
+                        </div>
+                    </div>
+                    <div class="dia-body">
+                        ${dia.resumo_tripinha ? `
+                            <div class="dia-resumo-tripinha">
+                                <img src="assets/images/tripinha/avatar-pensando.png" alt="Tripinha" class="avatar-mini"
+                                     onerror="this.style.display='none'">
+                                <p>${dia.resumo_tripinha}</p>
+                            </div>
+                        ` : ''}
+                        ${(dia.periodos || []).map(renderPeriodo).join('')}
+                    </div>
+                </div>
+            `;
+        };
+
+        const html = `
+            <button class="btn-voltar-topo" onclick="BenetripRoteiro.voltarAoFormulario()">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/>
+                </svg>
+                Novo roteiro
+            </button>
+
+            <div class="roteiro-header">
+                <h1>🗺️ Roteiro para ${destino}</h1>
+                <div class="subtitulo">${idaBR} → ${voltaBR} · ${roteiro._numDias || roteiro.dias?.length || '?'} dias
+                    ${roteiro._model && roteiro._model !== 'fallback' ? ' · Curadoria da Tripinha 🐶' : ''}</div>
+            </div>
+
+            ${roteiro.resumo_viagem ? `
+                <div class="roteiro-resumo">
+                    <div class="roteiro-resumo-titulo">
+                        <span>🐕</span>
+                        <span>Recado da Tripinha</span>
+                    </div>
+                    <div class="roteiro-resumo-texto">${roteiro.resumo_viagem}</div>
+                </div>
+            ` : ''}
+
+            ${(roteiro.dias || []).map(renderDia).join('')}
+
+            <div class="compartilhar-section">
+                <h3>📤 Compartilhe seu roteiro!</h3>
+                <p>Envie para quem vai viajar com você</p>
+                <div class="compartilhar-btns">
+                    <button class="btn-compartilhar btn-whatsapp" onclick="BenetripRoteiro.compartilharWhatsApp()">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+                        </svg>
+                        WhatsApp
+                    </button>
+                    <button class="btn-compartilhar btn-copiar" onclick="BenetripRoteiro.copiarRoteiro()">
+                        📋 Copiar texto
+                    </button>
+                </div>
+            </div>
+
+            <div class="compartilhar-section" style="margin-top: 16px;">
+                <p>Quer ajustar algo? Mude suas preferências e gere um novo roteiro!</p>
+                <button class="btn-ajustar" onclick="BenetripRoteiro.voltarAoFormulario()">
+                    ✏️ Ajustar e Gerar Novo Roteiro
+                </button>
+            </div>
+        `;
+
+        container.innerHTML = html;
+        document.getElementById('loading-container').style.display = 'none';
+        container.style.display = 'block';
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    },
+
+    // ================================================================
+    // COMPARTILHAMENTO
+    // ================================================================
+    gerarTextoRoteiro() {
+        const roteiro = this.state.roteiro;
+        const { destino, dataIda, dataVolta } = this.state.formData;
+        if (!roteiro || !roteiro.dias) return '';
+
+        const idaBR = new Date(dataIda + 'T12:00:00').toLocaleDateString('pt-BR');
+        const voltaBR = new Date(dataVolta + 'T12:00:00').toLocaleDateString('pt-BR');
+
+        let texto = `🗺️ *Roteiro para ${destino}*\n`;
+        texto += `📅 ${idaBR} → ${voltaBR}\n`;
+        texto += `\n`;
+
+        if (roteiro.resumo_viagem) {
+            texto += `🐕 ${roteiro.resumo_viagem}\n\n`;
+        }
+
+        roteiro.dias.forEach(dia => {
+            texto += `━━━━━━━━━━━━━━━\n`;
+            texto += `📌 *Dia ${dia.dia_numero} — ${dia.dia_semana}, ${dia.data}*\n`;
+            texto += `${dia.titulo || ''}\n`;
+
+            if (dia.resumo_tripinha) {
+                texto += `🐕 ${dia.resumo_tripinha}\n`;
+            }
+            texto += `\n`;
+
+            (dia.periodos || []).forEach(periodo => {
+                const icons = { 'manhã': '🌅', 'manha': '🌅', 'tarde': '☀️', 'noite': '🌙' };
+                const icon = icons[periodo.periodo?.toLowerCase()] || '📌';
+                texto += `${icon} *${(periodo.periodo || '').charAt(0).toUpperCase() + (periodo.periodo || '').slice(1)}*\n`;
+
+                (periodo.atividades || []).forEach(ativ => {
+                    texto += `  📍 ${ativ.nome}`;
+                    if (ativ.duracao_minutos) texto += ` (~${ativ.duracao_minutos}min)`;
+                    texto += `\n`;
+                    if (ativ.descricao) texto += `     ${ativ.descricao}\n`;
+                    if (ativ.dica_tripinha) texto += `     💡 ${ativ.dica_tripinha}\n`;
+
+                    const mapsUrl = ativ.google_maps_url || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(ativ.google_maps_query || ativ.nome)}`;
+                    texto += `     🔗 ${mapsUrl}\n`;
+                    texto += `\n`;
+                });
+            });
+        });
+
+        texto += `━━━━━━━━━━━━━━━\n`;
+        texto += `✨ Roteiro gerado por Benetrip — benetrip.com.br\n`;
+        texto += `🐕 Feito com carinho pela Tripinha!`;
+
+        return texto;
+    },
+
+    compartilharWhatsApp() {
+        const texto = this.gerarTextoRoteiro();
+        if (!texto) {
+            alert('Nenhum roteiro para compartilhar');
+            return;
+        }
+        const url = `https://wa.me/?text=${encodeURIComponent(texto)}`;
+        window.open(url, '_blank');
+        this.log('📤 Compartilhado via WhatsApp');
+    },
+
+    async copiarRoteiro() {
+        const texto = this.gerarTextoRoteiro();
+        if (!texto) {
+            alert('Nenhum roteiro para copiar');
+            return;
+        }
+
+        try {
+            await navigator.clipboard.writeText(texto);
+            const btn = document.querySelector('.btn-copiar');
+            if (btn) {
+                const original = btn.innerHTML;
+                btn.innerHTML = '✅ Copiado!';
+                setTimeout(() => { btn.innerHTML = original; }, 2000);
+            }
+            this.log('📋 Roteiro copiado');
+        } catch (err) {
+            // Fallback para navegadores sem clipboard API
+            const textarea = document.createElement('textarea');
+            textarea.value = texto;
+            textarea.style.position = 'fixed';
+            textarea.style.left = '-9999px';
+            document.body.appendChild(textarea);
+            textarea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textarea);
+
+            const btn = document.querySelector('.btn-copiar');
+            if (btn) {
+                const original = btn.innerHTML;
+                btn.innerHTML = '✅ Copiado!';
+                setTimeout(() => { btn.innerHTML = original; }, 2000);
+            }
+        }
+    },
+
+    // ================================================================
+    // UTILS: LOADING, NAVEGAÇÃO
     // ================================================================
     mostrarLoading() {
         document.getElementById('form-container').style.display = 'none';
@@ -432,80 +646,34 @@ const BenetripRoteiroForm = {
     },
 
     atualizarProgresso(pct, msg) {
-        const fill = document.getElementById('progress-fill');
-        const message = document.getElementById('loading-message');
-        if (fill) fill.style.width = `${pct}%`;
-        if (message) message.textContent = msg;
+        document.getElementById('progress-fill').style.width = `${pct}%`;
+        document.getElementById('loading-message').textContent = msg;
     },
 
     delay(ms) {
         return new Promise(r => setTimeout(r, ms));
     },
 
-    mostrarResultados(resultado) {
-        const container = document.getElementById('resultados-container');
-
-        // O resultado vem da API como JSON com o roteiro dia a dia
-        // A renderização depende da estrutura retornada pelo generate-itinerary
-        // Aqui montamos o HTML baseado na resposta
-        
-        let html = `
-            <button class="btn-voltar-topo" onclick="BenetripRoteiroForm.voltarAoFormulario()">
-                ← Nova busca
-            </button>
-            <div class="roteiro-resultado">
-                <h2>🗺️ Roteiro para ${this.state.formData.destino}</h2>
-                <p class="roteiro-periodo">${this.state.formData.dataIda} → ${this.state.formData.dataVolta}</p>
-        `;
-
-        if (resultado.roteiro && Array.isArray(resultado.roteiro.dias)) {
-            resultado.roteiro.dias.forEach(dia => {
-                html += `
-                    <div class="roteiro-dia">
-                        <h3>${dia.titulo || 'Dia ' + dia.numero}</h3>
-                        ${dia.resumo_tripinha ? `<p class="tripinha-resumo">${dia.resumo_tripinha}</p>` : ''}
-                        <div class="atividades">
-                            ${(dia.atividades || []).map(a => `
-                                <div class="atividade-item">
-                                    <span class="horario">${a.horario || ''}</span>
-                                    <div class="atividade-info">
-                                        <strong>${a.local || a.nome || ''}</strong>
-                                        <p>${a.descricao || ''}</p>
-                                    </div>
-                                </div>
-                            `).join('')}
-                        </div>
-                        ${dia.dica_tripinha ? `<div class="dica-tripinha">💡 ${dia.dica_tripinha}</div>` : ''}
-                    </div>
-                `;
-            });
-        } else if (typeof resultado === 'string') {
-            html += `<div class="roteiro-texto">${resultado}</div>`;
-        } else {
-            html += `<pre>${JSON.stringify(resultado, null, 2)}</pre>`;
-        }
-
-        html += `
-            </div>
-            <button class="btn-submit" onclick="BenetripRoteiroForm.voltarAoFormulario()">
-                ✏️ Ajustar e Gerar Novo Roteiro
-            </button>
-        `;
-
-        container.innerHTML = html;
-        document.getElementById('loading-container').style.display = 'none';
-        container.style.display = 'block';
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-    },
-
-    voltarAoFormulario() {
+    voltarAoFormulario(fromPopstate) {
         document.getElementById('resultados-container').style.display = 'none';
         document.getElementById('resultados-container').innerHTML = '';
         document.getElementById('form-container').style.display = 'block';
         window.scrollTo({ top: 0, behavior: 'smooth' });
         document.getElementById('progress-fill').style.width = '0%';
+
+        this.state.viewingResults = false;
+
+        if (!fromPopstate) {
+            if (history.state && history.state.benetripView === 'roteiro') {
+                history.back();
+            }
+        }
+
         this.log('🔄 Voltou ao formulário');
     }
 };
 
-document.addEventListener('DOMContentLoaded', () => BenetripRoteiroForm.init());
+// ================================================================
+// INIT
+// ================================================================
+document.addEventListener('DOMContentLoaded', () => BenetripRoteiro.init());
