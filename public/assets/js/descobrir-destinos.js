@@ -1,6 +1,12 @@
 /**
  * BENETRIP - DESCOBRIR DESTINOS
- * Versão GOOGLE FLIGHTS v4.2 - BUGFIX CRÍTICO
+ * Versão GOOGLE FLIGHTS v4.3 - OBSERVAÇÕES LIVRES
+ * 
+ * NOVIDADES v4.3:
+ * - Campo "Observações livres" para o usuário descrever o que quer/não quer
+ * - Observações enviadas ao LLM no rank-destinations (campo já existia na API)
+ * - Resumo de critérios exibe observações quando preenchidas
+ * - Contador de caracteres (máx 500)
  * 
  * CORREÇÃO v4.2:
  * ❌ BUG CORRIGIDO: Destinos dentro do orçamento não apareciam quando havia poucos resultados
@@ -42,7 +48,7 @@ const BenetripDiscovery = {
     },
 
     init() {
-        this.log('🐕 Benetrip Discovery v4.2 (Bugfix Orçamento) inicializando...');
+        this.log('🐕 Benetrip Discovery v4.3 (Observações Livres) inicializando...');
         
         this.carregarCidades();
         this.setupFormEvents();
@@ -53,9 +59,23 @@ const BenetripDiscovery = {
         this.setupNumberInput();
         this.setupFamiliaInputs();
         this.setupCurrencyInput();
+        this.setupObservacoesCounter();
         this.setupHistoryNavigation();
         
         this.log('✅ Inicialização completa');
+    },
+
+    // ================================================================
+    // v4.3: Contador de caracteres para observações
+    // ================================================================
+    setupObservacoesCounter() {
+        const textarea = document.getElementById('observacoes');
+        const counter = document.getElementById('observacoes-counter');
+        if (textarea && counter) {
+            textarea.addEventListener('input', () => {
+                counter.textContent = textarea.value.length;
+            });
+        }
     },
 
     setupHistoryNavigation() {
@@ -420,6 +440,8 @@ const BenetripDiscovery = {
             return false;
         }
         
+        // Observações é opcional — não valida
+        
         return true;
     },
 
@@ -450,6 +472,9 @@ const BenetripDiscovery = {
         const preferenciasArray = prefString.split(',').filter(Boolean);
         const escopoDestino = document.getElementById('escopo-destino').value || 'tanto_faz';
 
+        // v4.3: Coletar observações livres (opcional)
+        const observacoes = (document.getElementById('observacoes')?.value || '').trim();
+
         this.state.formData = {
             origem: this.state.origemSelecionada,
             companhia: companhia,
@@ -463,10 +488,12 @@ const BenetripDiscovery = {
             dataIda: document.getElementById('data-ida').value,
             dataVolta: document.getElementById('data-volta').value,
             moeda: document.getElementById('moeda').value,
-            orcamento: parseFloat(document.getElementById('orcamento').value.replace(/\./g, ''))
+            orcamento: parseFloat(document.getElementById('orcamento').value.replace(/\./g, '')),
+            observacoes: observacoes
         };
         
         this.log('📝 Dados:', this.state.formData);
+        if (observacoes) this.log('💬 Observações do viajante:', observacoes);
     },
 
     getSimbolo(moeda) {
@@ -841,6 +868,7 @@ const BenetripDiscovery = {
             companhiaDesc = `Viagem em família: ${parts.join(', ')}`;
         }
 
+        // v4.3: Enviar observações do viajante para a API de ranking
         const response = await fetch('/api/rank-destinations', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -857,7 +885,8 @@ const BenetripDiscovery = {
                 moeda: formData.moeda,
                 dataIda: formData.dataIda,
                 dataVolta: formData.dataVolta,
-                cenario: cenario || 'ideal'
+                cenario: cenario || 'ideal',
+                observacoes: formData.observacoes || ''
             })
         });
         
@@ -955,7 +984,7 @@ const BenetripDiscovery = {
     },
 
     gerarResumoCriterios() {
-        const { origem, companhia, adultos, criancas, bebes, numPessoas, preferenciasArray, escopoDestino, dataIda, dataVolta, moeda, orcamento } = this.state.formData;
+        const { origem, companhia, adultos, criancas, bebes, numPessoas, preferenciasArray, escopoDestino, dataIda, dataVolta, moeda, orcamento, observacoes } = this.state.formData;
         const noites = this.calcularNoites(dataIda, dataVolta);
         const simbolo = this.getSimbolo(moeda);
         
@@ -986,6 +1015,14 @@ const BenetripDiscovery = {
         const escopoLabel = escopoDestino === 'internacional' 
             ? '✈️ Apenas internacionais' 
             : '🗺️ Nacionais e internacionais';
+
+        // v4.3: Mostrar observações no resumo quando preenchidas
+        const observacoesItem = observacoes 
+            ? `<div class="criterio-item" style="grid-column: 1 / -1;">
+                    <span class="criterio-label">Suas dicas pra Tripinha</span>
+                    <span class="criterio-valor">💬 "${observacoes}"</span>
+               </div>`
+            : '';
 
         return `
             <div class="criterios-resumo">
@@ -1018,6 +1055,7 @@ const BenetripDiscovery = {
                         <span class="criterio-label">Orçamento</span>
                         <span class="criterio-valor">💰 Até ${simbolo} ${orcamento.toLocaleString('pt-BR')} por pessoa (ida+volta)</span>
                     </div>
+                    ${observacoesItem}
                 </div>
             </div>
         `;
