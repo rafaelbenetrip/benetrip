@@ -3,1524 +3,1122 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Minha Conta | Benetrip</title>
-    <meta name="description" content="Gerencie sua conta, veja seu histórico de simulações e destinos salvos.">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&family=Montserrat:wght@400;500;600&display=swap" rel="stylesheet">
+    <title>Minha Conta - Benetrip 🐾</title>
+
+    <!-- Favicons -->
+    <link rel="icon" type="image/svg+xml" href="assets/images/favicon/favicon.svg">
+    <link rel="icon" type="image/x-icon" href="favicon.ico">
+    <link rel="apple-touch-icon" sizes="180x180" href="assets/images/favicon/apple-touch-icon.png">
+    <meta name="theme-color" content="#E87722">
+
+    <!-- Supabase Config -->
+    <meta name="supabase-url" content="https://dlccjeazkpxtijevusbp.supabase.co">
+    <meta name="supabase-anon-key" content="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRsY2NqZWF6a3B4dGlqZXZ1c2JwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE3Mjg3MDYsImV4cCI6MjA4NzMwNDcwNn0.lwKwqF74JrHOaghkcbysZQN8jWErVVwPnxzLG7t07QU">
+
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=Montserrat:wght@300;400;500;600&display=swap" rel="stylesheet">
+
     <style>
         :root {
-            --primary: #E87722;
-            --primary-light: rgba(232, 119, 34, 0.12);
-            --primary-hover: #D06A1E;
-            --secondary: #00A3E0;
-            --secondary-light: rgba(0, 163, 224, 0.10);
+            --orange: #E87722;
+            --orange-light: #FF9A47;
+            --orange-glow: rgba(232, 119, 34, 0.12);
+            --blue: #00A3E0;
+            --blue-light: #33B5E5;
             --white: #FFFFFF;
             --dark: #21272A;
             --gray-50: #FAFAFA;
             --gray-100: #F5F5F5;
-            --gray-200: #E0E0E0;
-            --gray-300: #BDBDBD;
-            --gray-500: #757575;
-            --gray-700: #616161;
-            --green: #2E7D32;
-            --green-light: rgba(46, 125, 50, 0.1);
-            --red: #C62828;
-            --red-light: rgba(198, 40, 40, 0.08);
-            --purple: #6A1B9A;
-            --purple-light: rgba(106, 27, 154, 0.08);
-            --amber: #F9A825;
-            --amber-light: rgba(249, 168, 37, 0.10);
+            --gray-200: #E8E8E8;
+            --gray-300: #D0D0D0;
+            --gray-400: #9E9E9E;
+            --gray-600: #616161;
+            --green: #43A047;
+            --red: #E53935;
+            --radius-sm: 12px;
+            --radius-md: 16px;
+            --shadow-sm: 0 2px 8px rgba(0,0,0,0.06);
+            --shadow-md: 0 4px 20px rgba(0,0,0,0.08);
+            --shadow-lg: 0 8px 32px rgba(0,0,0,0.12);
+            --transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
         body {
             font-family: 'Montserrat', sans-serif;
-            background: var(--gray-100);
             color: var(--dark);
-            min-height: 100vh;
+            background: var(--gray-50);
             -webkit-font-smoothing: antialiased;
-        }
-
-        .app-container {
-            max-width: 480px;
-            margin: 0 auto;
-            background: var(--white);
             min-height: 100vh;
-            position: relative;
         }
 
-        /* ── HEADER ── */
+        /* ═══ HEADER ═══ */
         .header {
-            background: var(--primary);
-            padding: 16px 20px 20px;
+            background: linear-gradient(135deg, #E87722 0%, #FF8C42 30%, #FFB878 50%, #66C7FF 75%, #00A3E0 100%);
+            padding: 14px 20px;
             position: sticky;
             top: 0;
             z-index: 100;
+            box-shadow: 0 2px 20px rgba(232, 119, 34, 0.2);
         }
-        .header-top {
+        .header-inner {
+            max-width: 900px;
+            margin: 0 auto;
             display: flex;
             align-items: center;
-            justify-content: space-between;
-            margin-bottom: 14px;
+            gap: 14px;
         }
-        .header-logo {
-            font-family: 'Poppins', sans-serif;
-            font-weight: 700;
-            font-size: 20px;
-            color: var(--white);
-            text-decoration: none;
-        }
-        .header-logo span { color: var(--secondary); }
-        .btn-logout {
+        .btn-back {
             background: rgba(255,255,255,0.2);
-            border: none;
-            color: var(--white);
-            font-family: 'Montserrat', sans-serif;
-            font-size: 12px;
-            font-weight: 600;
-            padding: 6px 14px;
-            border-radius: 20px;
-            cursor: pointer;
-            transition: background 0.2s;
-        }
-        .btn-logout:hover { background: rgba(255,255,255,0.35); }
-
-        /* User info card */
-        .user-card {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-        .user-avatar {
-            width: 52px; height: 52px;
-            border-radius: 50%;
-            background: rgba(255,255,255,0.25);
-            display: flex; align-items: center; justify-content: center;
-            font-size: 24px;
-            flex-shrink: 0;
-            border: 2px solid rgba(255,255,255,0.5);
-        }
-        .user-info h2 {
-            font-family: 'Poppins', sans-serif;
-            font-weight: 700;
-            font-size: 17px;
-            color: var(--white);
-            margin-bottom: 2px;
-        }
-        .user-info p {
-            font-size: 12px;
-            color: rgba(255,255,255,0.8);
-        }
-
-        /* ── STATS BAR ── */
-        .stats-bar {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 10px;
-            padding: 16px 20px;
-            background: var(--white);
-            border-bottom: 1px solid var(--gray-200);
-        }
-        .stat-item {
-            text-align: center;
-        }
-        .stat-number {
-            font-family: 'Poppins', sans-serif;
-            font-weight: 700;
-            font-size: 22px;
-            color: var(--primary);
-            line-height: 1.1;
-        }
-        .stat-label {
-            font-size: 11px;
-            color: var(--gray-500);
-            margin-top: 2px;
-        }
-
-        /* ── TAB NAVIGATION ── */
-        .tab-nav {
-            display: flex;
-            border-bottom: 2px solid var(--gray-200);
-            background: var(--white);
-            position: sticky;
-            top: 0;
-            z-index: 50;
-        }
-        .tab-btn {
-            flex: 1;
-            padding: 12px 8px;
-            text-align: center;
-            font-family: 'Montserrat', sans-serif;
-            font-weight: 600;
-            font-size: 12px;
-            color: var(--gray-500);
-            border: none;
-            background: none;
-            cursor: pointer;
-            border-bottom: 3px solid transparent;
-            margin-bottom: -2px;
-            transition: all 0.2s;
-        }
-        .tab-btn.active {
-            color: var(--primary);
-            border-bottom-color: var(--primary);
-        }
-        .tab-btn:hover:not(.active) { color: var(--dark); }
-        .tab-icon {
-            display: block;
-            font-size: 18px;
-            margin-bottom: 3px;
-        }
-
-        .tab-panel {
-            display: none;
-            padding: 16px;
-        }
-        .tab-panel.active { display: block; }
-
-        /* ── FILTER CHIPS ── */
-        .filter-section {
-            padding: 12px 16px;
-            background: var(--gray-50);
-            border-bottom: 1px solid var(--gray-200);
-        }
-        .filter-label {
-            font-size: 11px;
-            font-weight: 600;
-            color: var(--gray-500);
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            margin-bottom: 8px;
-        }
-        .filter-chips {
-            display: flex;
-            gap: 6px;
-            overflow-x: auto;
-            padding-bottom: 4px;
-            -webkit-overflow-scrolling: touch;
-            scrollbar-width: none;
-        }
-        .filter-chips::-webkit-scrollbar { display: none; }
-        .filter-chip {
-            flex-shrink: 0;
-            padding: 6px 14px;
-            border-radius: 20px;
-            font-family: 'Montserrat', sans-serif;
-            font-size: 12px;
-            font-weight: 500;
-            border: 1.5px solid var(--gray-200);
-            background: var(--white);
-            color: var(--gray-700);
-            cursor: pointer;
-            transition: all 0.15s;
-            white-space: nowrap;
-        }
-        .filter-chip.active {
-            background: var(--primary);
-            border-color: var(--primary);
-            color: var(--white);
-        }
-        .filter-chip:hover:not(.active) {
-            border-color: var(--primary);
-            color: var(--primary);
-        }
-        .chip-badge {
-            display: inline-block;
-            background: rgba(255,255,255,0.3);
-            padding: 1px 6px;
+            border: 1.5px solid rgba(255,255,255,0.3);
             border-radius: 10px;
-            font-size: 10px;
-            margin-left: 4px;
-        }
-        .filter-chip.active .chip-badge {
-            background: rgba(255,255,255,0.35);
-        }
-        .filter-chip:not(.active) .chip-badge {
-            background: var(--gray-200);
-        }
-
-        /* ── HISTORY CARDS ── */
-        .history-empty {
-            text-align: center;
-            padding: 40px 20px;
-            color: var(--gray-500);
-        }
-        .history-empty-icon { font-size: 48px; margin-bottom: 12px; }
-        .history-empty h3 {
-            font-family: 'Poppins', sans-serif;
-            font-weight: 600;
-            font-size: 16px;
-            color: var(--dark);
-            margin-bottom: 6px;
-        }
-        .history-empty p { font-size: 13px; line-height: 1.5; }
-
-        .history-card {
-            background: var(--white);
-            border: 1px solid var(--gray-200);
-            border-radius: 12px;
-            margin-bottom: 12px;
-            overflow: hidden;
-            transition: box-shadow 0.2s;
-        }
-        .history-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.08); }
-
-        .card-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 12px 14px;
+            padding: 10px;
             cursor: pointer;
-            user-select: none;
-        }
-        .card-header-left {
+            color: white;
             display: flex;
             align-items: center;
-            gap: 10px;
-            flex: 1;
-            min-width: 0;
-        }
-        .tool-icon {
-            width: 36px; height: 36px;
-            border-radius: 10px;
-            display: flex; align-items: center; justify-content: center;
-            font-size: 18px;
-            flex-shrink: 0;
-        }
-        .tool-descobrir .tool-icon { background: var(--primary-light); }
-        .tool-todos .tool-icon { background: var(--secondary-light); }
-        .tool-comparar .tool-icon { background: var(--purple-light); }
-        .tool-baratos .tool-icon { background: var(--green-light); }
-        .tool-voos .tool-icon { background: var(--secondary-light); }
-        .tool-roteiro .tool-icon { background: var(--amber-light); }
-
-        .card-title-area { min-width: 0; flex: 1; }
-        .card-title {
-            font-family: 'Poppins', sans-serif;
-            font-weight: 600;
-            font-size: 13px;
-            color: var(--dark);
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-        .card-subtitle {
-            font-size: 11px;
-            color: var(--gray-500);
-            margin-top: 1px;
-        }
-        .card-price {
-            font-family: 'Poppins', sans-serif;
-            font-weight: 700;
-            font-size: 14px;
-            color: var(--green);
-            flex-shrink: 0;
-            margin-left: 8px;
-        }
-        .card-chevron {
-            flex-shrink: 0;
-            width: 20px; height: 20px;
-            color: var(--gray-300);
-            margin-left: 6px;
-            transition: transform 0.2s;
-        }
-        .history-card.open .card-chevron { transform: rotate(180deg); }
-
-        /* Expanded content */
-        .card-body {
-            display: none;
-            border-top: 1px solid var(--gray-200);
-            padding: 14px;
-            animation: fadeIn 0.2s ease;
-        }
-        .history-card.open .card-body { display: block; }
-
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(-4px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        .detail-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 10px;
-            margin-bottom: 12px;
-        }
-        .detail-item {
-            font-size: 12px;
-        }
-        .detail-label {
-            color: var(--gray-500);
-            font-size: 10px;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.3px;
-            margin-bottom: 2px;
-        }
-        .detail-value {
-            color: var(--dark);
-            font-weight: 500;
-        }
-        .detail-full { grid-column: 1 / -1; }
-
-        /* Result badges/tags */
-        .result-tag {
-            display: inline-block;
-            padding: 3px 10px;
-            border-radius: 12px;
-            font-size: 11px;
-            font-weight: 600;
-            margin-right: 4px;
-            margin-bottom: 4px;
-        }
-        .tag-top { background: var(--primary-light); color: var(--primary); }
-        .tag-surprise { background: var(--secondary-light); color: var(--secondary); }
-        .tag-best { background: var(--green-light); color: var(--green); }
-        .tag-direct { background: #E3F2FD; color: #1565C0; }
-        .tag-savings { background: var(--green-light); color: var(--green); }
-
-        /* Destination mini-cards */
-        .dest-mini {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            padding: 8px 10px;
-            background: var(--gray-50);
-            border-radius: 8px;
-            margin-bottom: 6px;
-        }
-        .dest-mini-flag { font-size: 18px; flex-shrink: 0; }
-        .dest-mini-name {
-            font-weight: 600;
-            font-size: 12px;
-            flex: 1;
-            min-width: 0;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-        }
-        .dest-mini-price {
-            font-family: 'Poppins', sans-serif;
-            font-weight: 700;
-            font-size: 12px;
-            color: var(--green);
-            flex-shrink: 0;
-        }
-        .dest-mini-badge {
-            font-size: 10px;
-            padding: 2px 6px;
-            border-radius: 6px;
-            font-weight: 600;
-            flex-shrink: 0;
-        }
-
-        /* Flight combos mini-table */
-        .combo-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 6px 8px;
-            font-size: 11px;
-            border-bottom: 1px solid var(--gray-100);
-        }
-        .combo-row:last-child { border-bottom: none; }
-        .combo-dates { color: var(--gray-700); }
-        .combo-price { font-weight: 700; color: var(--dark); }
-        .combo-best { background: var(--green-light); border-radius: 6px; }
-        .combo-best .combo-price { color: var(--green); }
-
-        /* Period bars */
-        .period-bar {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            margin-bottom: 4px;
-            font-size: 11px;
-        }
-        .period-bar-fill {
-            height: 6px;
-            border-radius: 3px;
-            background: var(--secondary);
-            min-width: 4px;
-        }
-
-        /* Itinerary summary */
-        .itin-day {
-            display: flex;
-            gap: 8px;
-            margin-bottom: 8px;
-        }
-        .itin-day-num {
-            width: 24px; height: 24px;
-            background: var(--primary);
-            color: var(--white);
-            border-radius: 50%;
-            font-size: 11px;
-            font-weight: 700;
-            display: flex; align-items: center; justify-content: center;
-            flex-shrink: 0;
-        }
-        .itin-day-info { font-size: 12px; }
-        .itin-day-title { font-weight: 600; margin-bottom: 2px; }
-        .itin-day-places { color: var(--gray-500); font-size: 11px; }
-
-        /* Card actions */
-        .card-actions {
-            display: flex;
-            gap: 8px;
-            margin-top: 12px;
-            padding-top: 12px;
-            border-top: 1px solid var(--gray-100);
-        }
-        .btn-action {
-            flex: 1;
-            padding: 8px 12px;
-            border-radius: 8px;
-            font-family: 'Montserrat', sans-serif;
-            font-size: 12px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.15s;
-            text-align: center;
+            transition: var(--transition);
             text-decoration: none;
+        }
+        .btn-back:hover { background: rgba(255,255,255,0.3); }
+        .btn-back svg { width: 20px; height: 20px; }
+        .header-title {
+            font-family: 'Poppins', sans-serif;
+            font-size: 1.15rem;
+            font-weight: 700;
+            color: white;
+        }
+
+        /* ═══ PROFILE HERO ═══ */
+        .profile-hero {
+            background: var(--white);
+            padding: 28px 20px;
+            text-align: center;
+            border-bottom: 1px solid var(--gray-200);
+        }
+        .profile-avatar {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 3px solid var(--orange);
+            margin: 0 auto 12px;
+            display: block;
+        }
+        .profile-initials {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--orange), var(--blue));
+            color: white;
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 4px;
-        }
-        .btn-rerun {
-            background: var(--primary);
-            color: var(--white);
-            border: none;
-        }
-        .btn-rerun:hover { background: var(--primary-hover); }
-        .btn-share {
-            background: var(--white);
-            color: var(--secondary);
-            border: 1.5px solid var(--secondary);
-        }
-        .btn-share:hover { background: var(--secondary-light); }
-        .btn-delete {
-            background: var(--white);
-            color: var(--gray-500);
-            border: 1.5px solid var(--gray-200);
-            flex: 0;
-            padding: 8px 10px;
-        }
-        .btn-delete:hover { background: var(--red-light); color: var(--red); border-color: var(--red); }
-
-        /* ── DESTINATIONS TAB ── */
-        .dest-card {
-            background: var(--white);
-            border: 1px solid var(--gray-200);
-            border-radius: 12px;
-            overflow: hidden;
-            margin-bottom: 12px;
-        }
-        .dest-image {
-            width: 100%;
-            height: 120px;
-            object-fit: cover;
-            background: var(--gray-200);
-        }
-        .dest-card-body { padding: 12px; }
-        .dest-card-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-        }
-        .dest-name {
             font-family: 'Poppins', sans-serif;
+            font-size: 2rem;
             font-weight: 700;
-            font-size: 15px;
+            margin: 0 auto 12px;
         }
-        .dest-country {
-            font-size: 12px;
-            color: var(--gray-500);
-        }
-        .dest-price-found {
+        .profile-name {
             font-family: 'Poppins', sans-serif;
+            font-size: 1.3rem;
             font-weight: 700;
-            font-size: 16px;
-            color: var(--green);
-            text-align: right;
+            margin-bottom: 4px;
         }
-        .dest-price-label {
-            font-size: 10px;
-            color: var(--gray-500);
-            text-align: right;
+        .profile-email {
+            font-size: 0.85rem;
+            color: var(--gray-600);
         }
-        .dest-notes {
-            font-size: 12px;
-            color: var(--gray-700);
-            margin-top: 8px;
-            padding-top: 8px;
-            border-top: 1px solid var(--gray-100);
-        }
-
-        /* ── SETTINGS TAB ── */
-        .settings-group {
-            margin-bottom: 20px;
-        }
-        .settings-group-title {
-            font-family: 'Poppins', sans-serif;
-            font-weight: 600;
-            font-size: 14px;
-            color: var(--dark);
-            margin-bottom: 10px;
-            padding-bottom: 6px;
-            border-bottom: 1px solid var(--gray-200);
-        }
-        .setting-item {
+        .profile-stats {
             display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 12px 0;
-            border-bottom: 1px solid var(--gray-100);
+            justify-content: center;
+            gap: 32px;
+            margin-top: 16px;
         }
-        .setting-item:last-child { border-bottom: none; }
-        .setting-label {
-            font-size: 13px;
-            font-weight: 500;
+        .stat { text-align: center; }
+        .stat-number {
+            font-family: 'Poppins', sans-serif;
+            font-size: 1.3rem;
+            font-weight: 700;
+            color: var(--orange);
         }
-        .setting-desc {
-            font-size: 11px;
-            color: var(--gray-500);
+        .stat-label {
+            font-size: 0.75rem;
+            color: var(--gray-600);
             margin-top: 2px;
         }
-        .toggle {
-            position: relative;
-            width: 44px; height: 24px;
-            background: var(--gray-300);
-            border-radius: 12px;
-            cursor: pointer;
-            transition: background 0.2s;
-            flex-shrink: 0;
-        }
-        .toggle.on { background: var(--primary); }
-        .toggle::after {
-            content: '';
-            position: absolute;
-            width: 20px; height: 20px;
+
+        /* ═══ NOT LOGGED IN ═══ */
+        .not-logged-in {
+            max-width: 420px;
+            margin: 60px auto;
+            text-align: center;
+            padding: 40px 24px;
             background: var(--white);
-            border-radius: 50%;
-            top: 2px; left: 2px;
-            transition: transform 0.2s;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+            border-radius: var(--radius-md);
+            box-shadow: var(--shadow-md);
         }
-        .toggle.on::after { transform: translateX(20px); }
-
-        .btn-danger {
-            width: 100%;
-            padding: 12px;
-            background: var(--red-light);
-            color: var(--red);
-            border: 1.5px solid var(--red);
-            border-radius: 10px;
-            font-family: 'Montserrat', sans-serif;
-            font-weight: 600;
-            font-size: 13px;
-            cursor: pointer;
-            transition: all 0.2s;
-            margin-top: 8px;
+        .not-logged-in h2 {
+            font-family: 'Poppins', sans-serif;
+            font-size: 1.4rem;
+            font-weight: 700;
+            margin: 16px 0 8px;
         }
-        .btn-danger:hover { background: var(--red); color: var(--white); }
-
-        /* ── LOADING ── */
-        .loading-container {
-            display: flex;
-            flex-direction: column;
+        .not-logged-in p {
+            color: var(--gray-600);
+            line-height: 1.6;
+            margin-bottom: 24px;
+        }
+        .btn-login-cta {
+            display: inline-flex;
             align-items: center;
-            padding: 40px 20px;
+            gap: 8px;
+            padding: 14px 32px;
+            background: var(--orange);
+            color: white;
+            border: none;
+            border-radius: var(--radius-sm);
+            font-family: 'Poppins', sans-serif;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
         }
-        .loading-spinner {
-            width: 36px; height: 36px;
-            border: 3px solid var(--gray-200);
-            border-top-color: var(--primary);
-            border-radius: 50%;
-            animation: spin 0.8s linear infinite;
-        }
-        @keyframes spin { to { transform: rotate(360deg); } }
-        .loading-text {
-            margin-top: 12px;
-            font-size: 13px;
-            color: var(--gray-500);
-        }
+        .btn-login-cta:hover { background: #D06A1D; transform: translateY(-2px); }
 
-        /* ── RESPONSIVE FIXES ── */
-        @media (max-width: 360px) {
-            .stats-bar { gap: 6px; padding: 12px; }
-            .stat-number { font-size: 18px; }
-            .filter-chip { padding: 5px 10px; font-size: 11px; }
+        /* ═══ TABS ═══ */
+        .tabs-container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 0 16px;
         }
+        .tabs-nav {
+            display: flex;
+            background: var(--white);
+            border-radius: var(--radius-sm);
+            box-shadow: var(--shadow-sm);
+            margin: -20px 0 20px;
+            position: relative;
+            z-index: 10;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
+        }
+        .tabs-nav::-webkit-scrollbar { display: none; }
+        .tab-btn {
+            flex: 1;
+            min-width: 0;
+            padding: 14px 8px;
+            background: none;
+            border: none;
+            border-bottom: 3px solid transparent;
+            cursor: pointer;
+            font-family: 'Montserrat', sans-serif;
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--gray-400);
+            transition: var(--transition);
+            text-align: center;
+            white-space: nowrap;
+        }
+        .tab-btn:hover { color: var(--gray-600); }
+        .tab-btn.active {
+            color: var(--orange);
+            border-bottom-color: var(--orange);
+        }
+        .tab-btn-icon { display: block; font-size: 1.2rem; margin-bottom: 4px; }
 
-        /* ── TRIPINHA GREETING ── */
-        .tripinha-greeting {
+        .tab-panel { display: none; }
+        .tab-panel.active { display: block; }
+
+        /* ═══ CARDS GENÉRICO ═══ */
+        .card {
+            background: var(--white);
+            border-radius: var(--radius-sm);
+            box-shadow: var(--shadow-sm);
+            overflow: hidden;
+            margin-bottom: 14px;
+            transition: var(--transition);
+            border: 1px solid var(--gray-200);
+        }
+        .card:hover { box-shadow: var(--shadow-md); }
+
+        .card-header {
             display: flex;
             align-items: flex-start;
-            gap: 10px;
-            padding: 14px;
-            background: var(--primary-light);
-            border-radius: 12px;
-            margin-bottom: 14px;
+            justify-content: space-between;
+            padding: 16px;
+            gap: 12px;
         }
-        .tripinha-avatar {
-            width: 40px; height: 40px;
-            border-radius: 50%;
-            overflow: hidden;
-            flex-shrink: 0;
+        .card-info { flex: 1; min-width: 0; }
+        .card-title {
+            font-family: 'Poppins', sans-serif;
+            font-size: 0.95rem;
+            font-weight: 700;
+            margin-bottom: 4px;
+            line-height: 1.3;
         }
-        .tripinha-avatar img { width: 100%; height: 100%; object-fit: cover; }
-        .tripinha-msg {
-            font-size: 13px;
+        .card-subtitle {
+            font-size: 0.8rem;
+            color: var(--gray-600);
+            line-height: 1.4;
+        }
+        .card-price {
+            font-family: 'Poppins', sans-serif;
+            font-size: 1rem;
+            font-weight: 700;
+            color: var(--orange);
+            white-space: nowrap;
+        }
+        .card-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            padding: 0 16px 12px;
+        }
+        .meta-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 0.72rem;
+            font-weight: 500;
+            background: var(--gray-100);
+            color: var(--gray-600);
+        }
+        .card-actions {
+            display: flex;
+            border-top: 1px solid var(--gray-200);
+        }
+        .card-action {
+            flex: 1;
+            padding: 10px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-family: 'Montserrat', sans-serif;
+            font-size: 0.78rem;
+            font-weight: 600;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            text-decoration: none;
+        }
+        .card-action:hover { background: var(--gray-100); }
+        .card-action.primary { color: var(--orange); }
+        .card-action.danger { color: var(--red); }
+        .card-action.blue { color: var(--blue); }
+        .card-action + .card-action { border-left: 1px solid var(--gray-200); }
+
+        /* ═══ BADGE TIPO ═══ */
+        .type-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 3px 10px;
+            border-radius: 20px;
+            font-size: 0.68rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+        .type-badge.destinos { background: #FFF3E6; color: #C65D00; }
+        .type-badge.todos { background: #E6FFF2; color: #0D7A3F; }
+        .type-badge.voos { background: #EEE6FF; color: #5B21B6; }
+        .type-badge.roteiro { background: #E6F5FF; color: #0369A1; }
+        .type-badge.voos-baratos { background: #FEF2F2; color: #DC2626; }
+
+        /* ═══ EMPTY STATE ═══ */
+        .empty-state {
+            text-align: center;
+            padding: 48px 24px;
+        }
+        .empty-state-icon { font-size: 3rem; margin-bottom: 16px; }
+        .empty-state h3 {
+            font-family: 'Poppins', sans-serif;
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+        .empty-state p {
+            color: var(--gray-600);
+            font-size: 0.9rem;
             line-height: 1.5;
+            max-width: 320px;
+            margin: 0 auto 20px;
+        }
+        .btn-empty-cta {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 24px;
+            background: var(--orange);
+            color: white;
+            border: none;
+            border-radius: var(--radius-sm);
+            font-family: 'Poppins', sans-serif;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            text-decoration: none;
+            transition: var(--transition);
+        }
+        .btn-empty-cta:hover { background: #D06A1D; transform: translateY(-2px); }
+
+        /* ═══ LOADING / SKELETON ═══ */
+        .skeleton {
+            background: linear-gradient(90deg, var(--gray-100) 25%, var(--gray-200) 50%, var(--gray-100) 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
+            border-radius: 8px;
+        }
+        @keyframes shimmer {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+        .skeleton-card {
+            height: 100px;
+            margin-bottom: 14px;
+            border-radius: var(--radius-sm);
+        }
+
+        /* ═══ CLEAR ALL ═══ */
+        .section-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 16px;
+        }
+        .section-title {
+            font-family: 'Poppins', sans-serif;
+            font-size: 0.9rem;
+            font-weight: 600;
             color: var(--dark);
         }
-        .tripinha-msg strong { color: var(--primary); }
+        .btn-clear-all {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 0.78rem;
+            color: var(--red);
+            font-weight: 600;
+            transition: var(--transition);
+            padding: 4px 8px;
+            border-radius: 6px;
+        }
+        .btn-clear-all:hover { background: #FFEBEE; }
 
-        /* Scrollbar styling */
-        ::-webkit-scrollbar { width: 4px; }
-        ::-webkit-scrollbar-thumb { background: var(--gray-300); border-radius: 2px; }
+        /* ═══ PROFILE FORM ═══ */
+        .profile-form {
+            max-width: 500px;
+        }
+        .form-group {
+            margin-bottom: 18px;
+        }
+        .form-label {
+            display: block;
+            font-size: 0.82rem;
+            font-weight: 600;
+            margin-bottom: 6px;
+            color: var(--dark);
+        }
+        .form-input {
+            width: 100%;
+            padding: 12px 14px;
+            border: 1.5px solid var(--gray-200);
+            border-radius: 10px;
+            font-family: 'Montserrat', sans-serif;
+            font-size: 0.9rem;
+            color: var(--dark);
+            transition: var(--transition);
+            outline: none;
+        }
+        .form-input:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(0,163,224,0.1); }
+        .form-select { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%239E9E9E' d='M6 8L1 3h10z'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 14px center; padding-right: 36px; }
+        .btn-save-profile {
+            padding: 13px 32px;
+            background: var(--orange);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-family: 'Poppins', sans-serif;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+        .btn-save-profile:hover { background: #D06A1D; }
+        .btn-save-profile:disabled { opacity: 0.6; cursor: not-allowed; }
+
+        .btn-logout {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 32px;
+            padding: 12px 24px;
+            background: none;
+            border: 1.5px solid var(--red);
+            border-radius: 10px;
+            color: var(--red);
+            font-family: 'Montserrat', sans-serif;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+        .btn-logout:hover { background: #FFEBEE; }
+
+        /* ═══ CONFIRM MODAL ═══ */
+        .confirm-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 10000;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .confirm-overlay.active { display: flex; }
+        .confirm-box {
+            background: white;
+            border-radius: var(--radius-md);
+            padding: 28px;
+            max-width: 360px;
+            width: 100%;
+            text-align: center;
+            box-shadow: var(--shadow-lg);
+        }
+        .confirm-box h3 {
+            font-family: 'Poppins', sans-serif;
+            font-size: 1.1rem;
+            margin-bottom: 8px;
+        }
+        .confirm-box p {
+            color: var(--gray-600);
+            font-size: 0.85rem;
+            margin-bottom: 20px;
+        }
+        .confirm-btns { display: flex; gap: 10px; }
+        .confirm-btns button {
+            flex: 1;
+            padding: 10px;
+            border-radius: 10px;
+            font-family: 'Poppins', sans-serif;
+            font-weight: 600;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+        .btn-confirm-cancel { background: var(--gray-100); border: none; color: var(--gray-600); }
+        .btn-confirm-cancel:hover { background: var(--gray-200); }
+        .btn-confirm-delete { background: var(--red); border: none; color: white; }
+        .btn-confirm-delete:hover { background: #C62828; }
+
+        /* ═══ RESPONSIVE ═══ */
+        @media (max-width: 640px) {
+            .tab-btn { padding: 12px 6px; font-size: 0.72rem; }
+            .tab-btn-icon { font-size: 1.1rem; }
+            .profile-stats { gap: 20px; }
+            .card-header { padding: 14px; }
+            .card-meta { padding: 0 14px 10px; }
+        }
     </style>
 </head>
 <body>
-    <div class="app-container" id="app">
-        <!-- HEADER -->
-        <div class="header">
-            <div class="header-top">
-                <a href="index.html" class="header-logo">Bene<span>trip</span></a>
-                <button class="btn-logout" onclick="handleLogout()">Sair</button>
-            </div>
-            <div class="user-card">
-                <div class="user-avatar" id="userAvatar">🐾</div>
-                <div class="user-info">
-                    <h2 id="userName">Carregando...</h2>
-                    <p id="userEmail">...</p>
+
+    <!-- Header -->
+    <header class="header">
+        <div class="header-inner">
+            <a href="/" class="btn-back" aria-label="Voltar">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+                    <path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/>
+                </svg>
+            </a>
+            <span class="header-title">Minha Conta</span>
+        </div>
+    </header>
+
+    <!-- ═══ NOT LOGGED IN STATE ═══ -->
+    <div class="not-logged-in" id="state-not-logged">
+        <div style="font-size: 4rem;">🐕</div>
+        <h2>Opa, você não está logado!</h2>
+        <p>
+            A Tripinha quer guardar seus destinos favoritos, histórico de buscas e roteiros. 
+            Faça login para acessar tudo isso!
+        </p>
+        <button class="btn-login-cta" onclick="BenetripLoginModal.open()">
+            🔑 Entrar ou Criar Conta
+        </button>
+    </div>
+
+    <!-- ═══ LOGGED IN STATE ═══ -->
+    <div id="state-logged" style="display: none;">
+
+        <!-- Profile Hero -->
+        <div class="profile-hero">
+            <div id="avatar-container"></div>
+            <div class="profile-name" id="profile-name">Viajante</div>
+            <div class="profile-email" id="profile-email"></div>
+            <div class="profile-stats">
+                <div class="stat">
+                    <div class="stat-number" id="stat-searches">0</div>
+                    <div class="stat-label">Buscas</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-number" id="stat-destinations">0</div>
+                    <div class="stat-label">Destinos</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-number" id="stat-itineraries">0</div>
+                    <div class="stat-label">Roteiros</div>
                 </div>
             </div>
         </div>
 
-        <!-- STATS BAR -->
-        <div class="stats-bar">
-            <div class="stat-item">
-                <div class="stat-number" id="statSimulacoes">-</div>
-                <div class="stat-label">Simulações</div>
+        <!-- Tabs -->
+        <div class="tabs-container">
+            <div class="tabs-nav" id="tabs-nav">
+                <button class="tab-btn active" data-tab="historico">
+                    <span class="tab-btn-icon">🔍</span> Histórico
+                </button>
+                <button class="tab-btn" data-tab="destinos">
+                    <span class="tab-btn-icon">📍</span> Destinos
+                </button>
+                <button class="tab-btn" data-tab="roteiros">
+                    <span class="tab-btn-icon">🗺️</span> Roteiros
+                </button>
+                <button class="tab-btn" data-tab="perfil">
+                    <span class="tab-btn-icon">⚙️</span> Perfil
+                </button>
             </div>
-            <div class="stat-item">
-                <div class="stat-number" id="statDestinos">-</div>
-                <div class="stat-label">Destinos Salvos</div>
-            </div>
-            <div class="stat-item">
-                <div class="stat-number" id="statRoteiros">-</div>
-                <div class="stat-label">Roteiros</div>
-            </div>
-        </div>
 
-        <!-- TAB NAVIGATION -->
-        <div class="tab-nav">
-            <button class="tab-btn active" data-tab="historico">
-                <span class="tab-icon">📋</span>Histórico
-            </button>
-            <button class="tab-btn" data-tab="destinos">
-                <span class="tab-icon">📌</span>Destinos
-            </button>
-            <button class="tab-btn" data-tab="config">
-                <span class="tab-icon">⚙️</span>Config
-            </button>
-        </div>
-
-        <!-- ═══════════════════════════════════════ -->
-        <!-- TAB: HISTÓRICO DE SIMULAÇÕES            -->
-        <!-- ═══════════════════════════════════════ -->
-        <div class="tab-panel active" id="panel-historico">
-            <!-- Filter Chips -->
-            <div class="filter-section">
-                <div class="filter-label">Filtrar por ferramenta</div>
-                <div class="filter-chips" id="filterChips">
-                    <button class="filter-chip active" data-filter="todos">Todos</button>
-                    <button class="filter-chip" data-filter="descobrir_destinos">🌍 Destinos <span class="chip-badge" id="countDestinos">0</span></button>
-                    <button class="filter-chip" data-filter="todos_destinos">📊 Ranking <span class="chip-badge" id="countTodos">0</span></button>
-                    <button class="filter-chip" data-filter="comparar_voos">⚖️ Comparar <span class="chip-badge" id="countComparar">0</span></button>
-                    <button class="filter-chip" data-filter="voos_baratos">💸 Baratos <span class="chip-badge" id="countBaratos">0</span></button>
-                    <button class="filter-chip" data-filter="busca_voos">✈️ Voos <span class="chip-badge" id="countVoos">0</span></button>
-                    <button class="filter-chip" data-filter="roteiro">🗺️ Roteiro <span class="chip-badge" id="countRoteiro">0</span></button>
+            <!-- ═══ TAB: HISTÓRICO ═══ -->
+            <div class="tab-panel active" id="panel-historico">
+                <div class="section-header">
+                    <span class="section-title">Suas buscas recentes</span>
+                    <button class="btn-clear-all" id="btn-clear-history" style="display:none;" onclick="MinhaConta.confirmarLimparHistorico()">
+                        🗑️ Limpar tudo
+                    </button>
+                </div>
+                <div id="historico-list">
+                    <div class="skeleton skeleton-card"></div>
+                    <div class="skeleton skeleton-card"></div>
+                    <div class="skeleton skeleton-card"></div>
                 </div>
             </div>
 
-            <!-- History List -->
-            <div style="padding: 16px;" id="historyContainer">
-                <div class="loading-container" id="historyLoading">
-                    <div class="loading-spinner"></div>
-                    <div class="loading-text">Carregando histórico...</div>
+            <!-- ═══ TAB: DESTINOS SALVOS ═══ -->
+            <div class="tab-panel" id="panel-destinos">
+                <div class="section-header">
+                    <span class="section-title">Destinos salvos pela Tripinha</span>
+                </div>
+                <div id="destinos-list">
+                    <div class="skeleton skeleton-card"></div>
+                    <div class="skeleton skeleton-card"></div>
                 </div>
             </div>
-        </div>
 
-        <!-- ═══════════════════════════════════════ -->
-        <!-- TAB: DESTINOS SALVOS                    -->
-        <!-- ═══════════════════════════════════════ -->
-        <div class="tab-panel" id="panel-destinos">
-            <div id="destinosContainer">
-                <div class="loading-container" id="destinosLoading">
-                    <div class="loading-spinner"></div>
-                    <div class="loading-text">Carregando destinos...</div>
+            <!-- ═══ TAB: ROTEIROS ═══ -->
+            <div class="tab-panel" id="panel-roteiros">
+                <div class="section-header">
+                    <span class="section-title">Seus roteiros de viagem</span>
+                </div>
+                <div id="roteiros-list">
+                    <div class="skeleton skeleton-card"></div>
+                    <div class="skeleton skeleton-card"></div>
                 </div>
             </div>
-        </div>
 
-        <!-- ═══════════════════════════════════════ -->
-        <!-- TAB: CONFIGURAÇÕES                      -->
-        <!-- ═══════════════════════════════════════ -->
-        <div class="tab-panel" id="panel-config">
-            <div class="settings-group">
-                <div class="settings-group-title">Preferências</div>
-                <div class="setting-item">
-                    <div>
-                        <div class="setting-label">Auto-salvar simulações</div>
-                        <div class="setting-desc">Salvar buscas automaticamente</div>
+            <!-- ═══ TAB: PERFIL ═══ -->
+            <div class="tab-panel" id="panel-perfil">
+                <div class="section-header">
+                    <span class="section-title">Seus dados</span>
+                </div>
+                <div class="profile-form">
+                    <div class="form-group">
+                        <label class="form-label">Nome de exibição</label>
+                        <input type="text" class="form-input" id="input-nome" placeholder="Como a Tripinha te chama?">
                     </div>
-                    <div class="toggle on" id="toggleAutoSave" onclick="toggleSetting(this)"></div>
-                </div>
-                <div class="setting-item">
-                    <div>
-                        <div class="setting-label">Notificações</div>
-                        <div class="setting-desc">Avisar quando preços caírem</div>
+                    <div class="form-group">
+                        <label class="form-label">Moeda preferida</label>
+                        <select class="form-input form-select" id="input-moeda">
+                            <option value="BRL">R$ — Real Brasileiro</option>
+                            <option value="USD">US$ — Dólar Americano</option>
+                            <option value="EUR">€ — Euro</option>
+                        </select>
                     </div>
-                    <div class="toggle" id="toggleNotifs" onclick="toggleSetting(this)"></div>
-                </div>
-                <div class="setting-item">
-                    <div>
-                        <div class="setting-label">Moeda padrão</div>
-                        <div class="setting-desc">BRL — Real Brasileiro</div>
+                    <div class="form-group">
+                        <label class="form-label">Cidade de origem padrão (IATA)</label>
+                        <input type="text" class="form-input" id="input-cidade-origem" placeholder="Ex: GRU, CGH, GIG..." maxlength="3" style="text-transform: uppercase;">
                     </div>
+                    <button class="btn-save-profile" id="btn-save-profile" onclick="MinhaConta.salvarPerfil()">
+                        Salvar Alterações
+                    </button>
+
+                    <button class="btn-logout" onclick="MinhaConta.logout()">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                        Sair da conta
+                    </button>
                 </div>
             </div>
-            <div class="settings-group">
-                <div class="settings-group-title">Dados</div>
-                <button class="btn-danger" onclick="confirmClearHistory()">Limpar Todo o Histórico</button>
+
+        </div><!-- /tabs-container -->
+    </div><!-- /state-logged -->
+
+    <!-- Confirm Modal -->
+    <div class="confirm-overlay" id="confirm-overlay">
+        <div class="confirm-box">
+            <h3 id="confirm-title">Tem certeza?</h3>
+            <p id="confirm-message">Essa ação não pode ser desfeita.</p>
+            <div class="confirm-btns">
+                <button class="btn-confirm-cancel" onclick="MinhaConta.fecharConfirm()">Cancelar</button>
+                <button class="btn-confirm-delete" id="btn-confirm-action">Confirmar</button>
             </div>
         </div>
     </div>
 
-    <!-- ═══════════════════════════════════════════════ -->
-    <!-- JAVASCRIPT                                      -->
-    <!-- ═══════════════════════════════════════════════ -->
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="assets/js/benetrip-auth.js"></script>
+    <script src="assets/js/benetrip-login-modal.js"></script>
+
     <script>
-    /* ============================================================
-     *  MINHA CONTA — Benetrip Account Page
-     *  Displays rich simulation history from all 6 tools
-     * ============================================================ */
-    (function () {
-        'use strict';
+    const MinhaConta = {
+        data: {
+            historico: [],
+            destinos: [],
+            roteiros: [],
+            profile: null
+        },
 
-        // ── State ──
-        let allSearchHistory = [];
-        let allDestinations = [];
-        let currentFilter = 'todos';
-
-        // ── Tool Config Map ──
-        const TOOL_CONFIG = {
-            descobrir_destinos: {
-                icon: '🌍', label: 'Descobrir Destinos', color: '#E87722',
-                page: 'descobrir-destinos.html'
-            },
-            todos_destinos: {
-                icon: '📊', label: 'Todos os Destinos', color: '#00A3E0',
-                page: 'todos-destinos.html'
-            },
-            comparar_voos: {
-                icon: '⚖️', label: 'Comparar Voos', color: '#6A1B9A',
-                page: 'comparar-voos.html'
-            },
-            voos_baratos: {
-                icon: '💸', label: 'Voos Baratos', color: '#2E7D32',
-                page: 'voos-baratos.html'
-            },
-            busca_voos: {
-                icon: '✈️', label: 'Busca de Voos', color: '#00A3E0',
-                page: 'voos.html'
-            },
-            roteiro: {
-                icon: '🗺️', label: 'Roteiro de Viagem', color: '#F9A825',
-                page: 'roteiro-viagem.html'
-            }
-        };
-
-        // ── Init ──
-        document.addEventListener('DOMContentLoaded', () => {
-            initTabs();
-            initFilters();
-            checkAuth();
-        });
-
-        // ══════════════════════════
-        //  TABS
-        // ══════════════════════════
-        function initTabs() {
+        // ════════════════════════════════
+        // INIT
+        // ════════════════════════════════
+        init() {
+            // Tabs
             document.querySelectorAll('.tab-btn').forEach(btn => {
-                btn.addEventListener('click', () => {
-                    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-                    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-                    btn.classList.add('active');
-                    document.getElementById('panel-' + btn.dataset.tab).classList.add('active');
-                });
+                btn.addEventListener('click', () => this.switchTab(btn.dataset.tab));
             });
-        }
 
-        // ══════════════════════════
-        //  FILTERS
-        // ══════════════════════════
-        function initFilters() {
-            document.querySelectorAll('.filter-chip').forEach(chip => {
-                chip.addEventListener('click', () => {
-                    document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
-                    chip.classList.add('active');
-                    currentFilter = chip.dataset.filter;
-                    renderHistory();
+            // Deep link: /minha-conta.html#destinos
+            const hash = window.location.hash.replace('#', '');
+            if (['historico', 'destinos', 'roteiros', 'perfil'].includes(hash)) {
+                this.switchTab(hash);
+            }
+
+            // Escutar auth
+            if (typeof BenetripAuth !== 'undefined') {
+                BenetripAuth.onAuthChange((event, user) => {
+                    if (user) {
+                        this.showLoggedIn(user);
+                        this.loadAll();
+                    } else {
+                        this.showNotLogged();
+                    }
                 });
-            });
-        }
 
-        // ══════════════════════════
-        //  AUTH CHECK
-        // ══════════════════════════
-        function checkAuth() {
-            if (typeof BenetripAuth === 'undefined') {
-                showDemoMode();
-                return;
+                // Check imediato
+                setTimeout(() => {
+                    const user = BenetripAuth.getUser();
+                    if (user) {
+                        this.showLoggedIn(user);
+                        this.loadAll();
+                    } else {
+                        this.showNotLogged();
+                    }
+                }, 500);
             }
-            const user = BenetripAuth.getUser();
-            if (!user) {
-                window.location.href = 'index.html';
-                return;
+        },
+
+        showLoggedIn(user) {
+            document.getElementById('state-not-logged').style.display = 'none';
+            document.getElementById('state-logged').style.display = 'block';
+
+            // Avatar
+            const container = document.getElementById('avatar-container');
+            const avatarUrl = BenetripAuth.getUserAvatar();
+            if (avatarUrl) {
+                container.innerHTML = `<img src="${avatarUrl}" alt="Avatar" class="profile-avatar" onerror="this.outerHTML='<div class=profile-initials>${BenetripAuth.getUserDisplayName().charAt(0).toUpperCase()}</div>'">`;
+            } else {
+                container.innerHTML = `<div class="profile-initials">${BenetripAuth.getUserDisplayName().charAt(0).toUpperCase()}</div>`;
             }
-            populateUserInfo(user);
-            loadAllData();
-        }
 
-        function populateUserInfo(user) {
-            const name = user.user_metadata?.full_name || user.email?.split('@')[0] || 'Triper';
-            document.getElementById('userName').textContent = name;
-            document.getElementById('userEmail').textContent = user.email || '';
-            const initial = name.charAt(0).toUpperCase();
-            document.getElementById('userAvatar').textContent = initial;
-        }
+            document.getElementById('profile-name').textContent = BenetripAuth.getUserDisplayName();
+            document.getElementById('profile-email').textContent = user.email || '';
+        },
 
-        // ══════════════════════════
-        //  LOAD DATA
-        // ══════════════════════════
-        async function loadAllData() {
+        showNotLogged() {
+            document.getElementById('state-not-logged').style.display = 'block';
+            document.getElementById('state-logged').style.display = 'none';
+        },
+
+        switchTab(tabId) {
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+            document.querySelector(`.tab-btn[data-tab="${tabId}"]`)?.classList.add('active');
+            document.getElementById(`panel-${tabId}`)?.classList.add('active');
+            window.location.hash = tabId;
+        },
+
+        // ════════════════════════════════
+        // LOAD ALL DATA
+        // ════════════════════════════════
+        async loadAll() {
+            await Promise.all([
+                this.loadHistorico(),
+                this.loadDestinos(),
+                this.loadRoteiros(),
+                this.loadPerfil()
+            ]);
+        },
+
+        // ── HISTÓRICO ──
+        async loadHistorico() {
             try {
-                const [searches, destinations, itineraries] = await Promise.all([
-                    BenetripAuth.getSearchHistory ? BenetripAuth.getSearchHistory(100) : Promise.resolve([]),
-                    BenetripAuth.getSavedDestinations ? BenetripAuth.getSavedDestinations() : Promise.resolve([]),
-                    BenetripAuth.getItineraries ? BenetripAuth.getItineraries() : Promise.resolve([])
-                ]);
-
-                allSearchHistory = (searches || []).sort((a, b) =>
-                    new Date(b.created_at) - new Date(a.created_at)
-                );
-                allDestinations = destinations || [];
-
-                updateStats(itineraries);
-                updateFilterCounts();
-                renderHistory();
-                renderDestinations();
+                const data = await BenetripAuth.getSearchHistory(50);
+                this.data.historico = data || [];
+                document.getElementById('stat-searches').textContent = this.data.historico.length;
+                this.renderHistorico();
             } catch (e) {
-                console.error('[MinhaConta] Erro ao carregar dados:', e);
-                showError('historyContainer');
-                showError('destinosContainer');
+                console.error('[MinhaConta] Erro histórico:', e);
+                this.renderHistorico();
             }
-        }
+        },
 
-        function updateStats(itineraries) {
-            document.getElementById('statSimulacoes').textContent = allSearchHistory.length;
-            document.getElementById('statDestinos').textContent = allDestinations.length;
-            document.getElementById('statRoteiros').textContent = (itineraries || []).length;
-        }
+        renderHistorico() {
+            const container = document.getElementById('historico-list');
+            const items = this.data.historico;
 
-        function updateFilterCounts() {
-            const counts = {};
-            allSearchHistory.forEach(s => {
-                const type = s.search_type || s.tipo || '';
-                counts[type] = (counts[type] || 0) + 1;
-            });
-            const map = {
-                countDestinos: 'descobrir_destinos',
-                countTodos: 'todos_destinos',
-                countComparar: 'comparar_voos',
-                countBaratos: 'voos_baratos',
-                countVoos: 'busca_voos',
-                countRoteiro: 'roteiro'
-            };
-            Object.entries(map).forEach(([id, type]) => {
-                const el = document.getElementById(id);
-                if (el) el.textContent = counts[type] || 0;
-            });
-        }
-
-        // ══════════════════════════
-        //  RENDER HISTORY
-        // ══════════════════════════
-        function renderHistory() {
-            const container = document.getElementById('historyContainer');
-            const filtered = currentFilter === 'todos'
-                ? allSearchHistory
-                : allSearchHistory.filter(s => (s.search_type || s.tipo) === currentFilter);
-
-            if (filtered.length === 0) {
-                container.innerHTML = renderEmptyState();
+            if (!items.length) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">🔍</div>
+                        <h3>Nenhuma busca ainda</h3>
+                        <p>Suas pesquisas de destinos, voos e roteiros aparecerão aqui automaticamente!</p>
+                        <a href="descobrir-destinos.html" class="btn-empty-cta">🎯 Descobrir Destinos</a>
+                    </div>`;
+                document.getElementById('btn-clear-history').style.display = 'none';
                 return;
             }
 
-            // Group by date
-            const groups = {};
-            filtered.forEach(item => {
-                const dateKey = formatDateGroup(item.created_at);
-                if (!groups[dateKey]) groups[dateKey] = [];
-                groups[dateKey].push(item);
-            });
+            document.getElementById('btn-clear-history').style.display = 'block';
 
-            let html = '';
-            Object.entries(groups).forEach(([dateLabel, items]) => {
-                html += `<div style="font-size:11px;font-weight:600;color:var(--gray-500);text-transform:uppercase;letter-spacing:0.5px;margin:16px 0 8px;padding-left:2px;">${dateLabel}</div>`;
-                items.forEach(item => {
-                    html += renderHistoryCard(item);
-                });
-            });
+            const TIPO_CONFIG = {
+                'descobrir_destinos': { emoji: '🎯', label: 'Descobrir', badge: 'destinos' },
+                'todos_destinos':     { emoji: '🌍', label: 'Todos Destinos', badge: 'todos' },
+                'busca_voos':         { emoji: '✈️', label: 'Busca Voos', badge: 'voos' },
+                'voos_baratos':       { emoji: '💸', label: 'Voos Baratos', badge: 'voos-baratos' },
+                'roteiro':            { emoji: '📋', label: 'Roteiro', badge: 'roteiro' }
+            };
 
-            container.innerHTML = html;
-            attachCardListeners();
-        }
+            container.innerHTML = items.map(item => {
+                const config = TIPO_CONFIG[item.tipo_busca] || { emoji: '🔍', label: item.tipo_busca, badge: 'destinos' };
+                const params = item.parametros || {};
+                const resultados = item.resultados_resumo || {};
+                const data = new Date(item.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 
-        function renderEmptyState() {
-            return `
-                <div class="history-empty">
-                    <div class="history-empty-icon">🔍</div>
-                    <h3>Nenhuma simulação encontrada</h3>
-                    <p>Suas buscas aparecerão aqui automaticamente.<br>Experimente uma das nossas ferramentas!</p>
-                </div>`;
-        }
+                const origemCode = params.origem?.code || params.origem || '';
+                const origemName = params.origem?.name || origemCode;
 
-        // ── Card rendering per tool type ──
-        function renderHistoryCard(item) {
-            const type = item.search_type || item.tipo || '';
-            const config = TOOL_CONFIG[type] || { icon: '📋', label: type, color: '#757575' };
-            const params = item.search_params || item.parametros || {};
-            const results = item.search_results || item.resultados || {};
-            const toolClass = 'tool-' + type.split('_')[0];
-            const id = 'card-' + (item.id || Math.random().toString(36).substr(2, 8));
-
-            const { title, subtitle, priceTag } = getCardHeader(type, params, results);
-
-            return `
-            <div class="history-card ${toolClass}" id="${id}" data-type="${type}">
-                <div class="card-header" onclick="toggleCard('${id}')">
-                    <div class="card-header-left">
-                        <div class="tool-icon">${config.icon}</div>
-                        <div class="card-title-area">
-                            <div class="card-title">${escHtml(title)}</div>
-                            <div class="card-subtitle">${escHtml(subtitle)}</div>
-                        </div>
-                    </div>
-                    ${priceTag ? `<div class="card-price">${escHtml(priceTag)}</div>` : ''}
-                    <svg class="card-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
-                </div>
-                <div class="card-body">
-                    ${renderCardBody(type, params, results, item)}
-                    <div class="card-actions">
-                        <a class="btn-action btn-rerun" href="${config.page}">🔄 Refazer</a>
-                        <button class="btn-action btn-delete" onclick="deleteSearch('${item.id}', '${id}')">🗑️</button>
-                    </div>
-                </div>
-            </div>`;
-        }
-
-        // ── Card header info per tool ──
-        function getCardHeader(type, params, results) {
-            const moeda = params.moeda || 'BRL';
-            const fmtPrice = (v) => v != null ? `${moeda} ${Number(v).toLocaleString('pt-BR')}` : '';
-
-            switch (type) {
-                case 'descobrir_destinos': {
-                    const top = results.top_destino;
-                    return {
-                        title: top ? `${top.name}, ${top.country}` : (params.origem?.name || params.origem?.code || 'Busca'),
-                        subtitle: `${formatDate(params.dataIda)} → ${formatDate(params.dataVolta)}`,
-                        priceTag: top?.price ? fmtPrice(top.price) : ''
-                    };
+                // Resumo dos resultados
+                let resumoHtml = '';
+                if (resultados.top_destino?.name) {
+                    resumoHtml = `Top: <strong>${resultados.top_destino.name}</strong>`;
+                    if (resultados.top_destino.price) resumoHtml += ` — ${this.formatarPreco(resultados.top_destino.price, params.moeda)}`;
+                } else if (resultados.total_encontrados) {
+                    resumoHtml = `${resultados.total_encontrados} destinos encontrados`;
+                    if (resultados.dentro_orcamento) resumoHtml += ` (${resultados.dentro_orcamento} no orçamento)`;
+                } else if (resultados.melhor_preco) {
+                    resumoHtml = `Melhor: ${this.formatarPreco(resultados.melhor_preco, params.moeda)}`;
                 }
-                case 'todos_destinos':
-                    return {
-                        title: `De ${params.origem?.name || params.origem?.code || '?'}`,
-                        subtitle: `${results.total_encontrados || 0} destinos encontrados`,
-                        priceTag: results.preco_min ? `a partir de ${fmtPrice(results.preco_min)}` : ''
-                    };
-                case 'comparar_voos':
-                    return {
-                        title: `${params.origem?.name || params.origem?.code || params.origem || '?'} → ${params.destino?.name || params.destino?.code || params.destino || '?'}`,
-                        subtitle: `${results.total_resultados || 0} combinações`,
-                        priceTag: results.melhor_combo?.preco ? fmtPrice(results.melhor_combo.preco) : ''
-                    };
-                case 'voos_baratos':
-                    return {
-                        title: `${params.origem?.name || params.origem?.code || params.origem || '?'} → ${params.destino?.name || params.destino?.code || params.destino || '?'}`,
-                        subtitle: `${results.total_periodos || 0} períodos · ${params.duracao || 7} dias`,
-                        priceTag: results.preco_min ? fmtPrice(results.preco_min) : ''
-                    };
-                case 'busca_voos':
-                    return {
-                        title: `${params.origemCode || params.origem || '?'} → ${params.destinoCode || params.destino || '?'}`,
-                        subtitle: `${formatDate(params.dataIda)}${params.dataVolta ? ' → ' + formatDate(params.dataVolta) : ' (só ida)'}`,
-                        priceTag: results.melhor_preco ? fmtPrice(results.melhor_preco) : ''
-                    };
-                case 'roteiro':
-                    return {
-                        title: `Roteiro ${results.destino || params.destino || ''}`,
-                        subtitle: `${results.num_dias || params.numDias || '?'} dias · ${formatDate(params.dataIda)}`,
-                        priceTag: ''
-                    };
-                default:
-                    return { title: type, subtitle: '', priceTag: '' };
-            }
-        }
 
-        // ── Expanded card body per tool ──
-        function renderCardBody(type, params, results, item) {
-            const moeda = params.moeda || 'BRL';
-            const fmtP = (v) => v != null ? `${moeda} ${Number(v).toLocaleString('pt-BR')}` : '-';
-            const ts = formatDateTime(item.created_at);
-
-            switch (type) {
-                case 'descobrir_destinos':
-                    return renderDescobrirBody(params, results, fmtP, ts);
-                case 'todos_destinos':
-                    return renderTodosBody(params, results, fmtP, ts);
-                case 'comparar_voos':
-                    return renderCompararBody(params, results, fmtP, ts);
-                case 'voos_baratos':
-                    return renderBaratosBody(params, results, fmtP, ts);
-                case 'busca_voos':
-                    return renderVoosBody(params, results, fmtP, ts);
-                case 'roteiro':
-                    return renderRoteiroBody(params, results, ts);
-                default:
-                    return `<div class="detail-item" style="font-size:12px;color:var(--gray-500);">Detalhes não disponíveis<br><small>${ts}</small></div>`;
-            }
-        }
-
-        // ── 1. DESCOBRIR DESTINOS ──
-        function renderDescobrirBody(params, results, fmtP, ts) {
-            const top = results.top_destino;
-            const alts = results.alternativas || [];
-            const surp = results.surpresa;
-
-            let destsHtml = '';
-            if (top) {
-                destsHtml += `<div class="dest-mini">
-                    <div class="dest-mini-flag">🏆</div>
-                    <div class="dest-mini-name">${escHtml(top.name || '')}, ${escHtml(top.country || '')}</div>
-                    ${top.price ? `<div class="dest-mini-price">${fmtP(top.price)}</div>` : ''}
-                </div>`;
-            }
-            alts.slice(0, 4).forEach(alt => {
-                if (!alt) return;
-                destsHtml += `<div class="dest-mini">
-                    <div class="dest-mini-flag">📋</div>
-                    <div class="dest-mini-name">${escHtml(alt.name || '')}, ${escHtml(alt.country || '')}</div>
-                    ${alt.price ? `<div class="dest-mini-price">${fmtP(alt.price)}</div>` : ''}
-                </div>`;
-            });
-            if (surp) {
-                destsHtml += `<div class="dest-mini" style="background:var(--secondary-light);">
-                    <div class="dest-mini-flag">🎁</div>
-                    <div class="dest-mini-name">${escHtml(surp.name || '')}, ${escHtml(surp.country || '')}</div>
-                    ${surp.price ? `<div class="dest-mini-price">${fmtP(surp.price)}</div>` : ''}
-                </div>`;
-            }
-
-            return `
-                <div class="detail-grid">
-                    <div class="detail-item">
-                        <div class="detail-label">Origem</div>
-                        <div class="detail-value">${escHtml(params.origem?.name || params.origem?.code || '-')}</div>
-                    </div>
-                    <div class="detail-item">
-                        <div class="detail-label">Datas</div>
-                        <div class="detail-value">${formatDate(params.dataIda)} → ${formatDate(params.dataVolta)}</div>
-                    </div>
-                    <div class="detail-item">
-                        <div class="detail-label">Companhia</div>
-                        <div class="detail-value">${escHtml(params.companhia || '-')}</div>
-                    </div>
-                    <div class="detail-item">
-                        <div class="detail-label">Orçamento</div>
-                        <div class="detail-value">${params.orcamento ? fmtP(params.orcamento) : '-'}</div>
-                    </div>
-                    <div class="detail-item detail-full">
-                        <div class="detail-label">Preferências</div>
-                        <div class="detail-value">${escHtml(params.preferencias || '-')}</div>
-                    </div>
-                </div>
-                <div style="margin-bottom:8px;font-size:11px;font-weight:600;color:var(--gray-500);text-transform:uppercase;">Destinos Encontrados</div>
-                ${destsHtml || '<div style="font-size:12px;color:var(--gray-500);">Nenhum resultado</div>'}
-                <div style="margin-top:10px;font-size:10px;color:var(--gray-500);">${ts} · ${results.total_analisados || 0} destinos analisados</div>`;
-        }
-
-        // ── 2. TODOS OS DESTINOS ──
-        function renderTodosBody(params, results, fmtP, ts) {
-            const top20 = (results.top_20 || []).slice(0, 8);
-            let listHtml = top20.map(d => `
-                <div class="dest-mini">
-                    <div class="dest-mini-flag">📍</div>
-                    <div class="dest-mini-name">${escHtml(d.name || d.airport || '')}</div>
-                    ${d.price ? `<div class="dest-mini-price">${fmtP(d.price)}</div>` : ''}
-                </div>`).join('');
-
-            return `
-                <div class="detail-grid">
-                    <div class="detail-item">
-                        <div class="detail-label">Origem</div>
-                        <div class="detail-value">${escHtml(params.origem?.name || params.origem?.code || '-')}</div>
-                    </div>
-                    <div class="detail-item">
-                        <div class="detail-label">Datas</div>
-                        <div class="detail-value">${formatDate(params.dataIda)} → ${formatDate(params.dataVolta)}</div>
-                    </div>
-                    <div class="detail-item">
-                        <div class="detail-label">Total Encontrados</div>
-                        <div class="detail-value">${results.total_encontrados || 0}</div>
-                    </div>
-                    <div class="detail-item">
-                        <div class="detail-label">Dentro do Orçamento</div>
-                        <div class="detail-value" style="color:var(--green);font-weight:600;">${results.dentro_orcamento || 0}</div>
-                    </div>
-                    <div class="detail-item">
-                        <div class="detail-label">Preço Mínimo</div>
-                        <div class="detail-value" style="color:var(--green);font-weight:600;">${fmtP(results.preco_min)}</div>
-                    </div>
-                    <div class="detail-item">
-                        <div class="detail-label">Preço Máximo</div>
-                        <div class="detail-value">${fmtP(results.preco_max)}</div>
-                    </div>
-                </div>
-                ${top20.length > 0 ? `<div style="margin-bottom:8px;font-size:11px;font-weight:600;color:var(--gray-500);text-transform:uppercase;">Top Destinos</div>${listHtml}` : ''}
-                <div style="margin-top:10px;font-size:10px;color:var(--gray-500);">${ts}</div>`;
-        }
-
-        // ── 3. COMPARAR VOOS ──
-        function renderCompararBody(params, results, fmtP, ts) {
-            const combos = (results.combinacoes || []).slice(0, 6);
-            const best = results.melhor_combo;
-
-            let comboHtml = combos.map(c => {
-                const isBest = best && c.dataIda === best.dataIda && c.dataVolta === best.dataVolta;
-                return `<div class="combo-row ${isBest ? 'combo-best' : ''}">
-                    <span class="combo-dates">${formatDate(c.dataIda)} → ${formatDate(c.dataVolta)}</span>
-                    <span class="combo-price">${c.preco ? fmtP(c.preco) : '-'}${isBest ? ' ⭐' : ''}</span>
-                </div>`;
+                return `
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-info">
+                                <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+                                    <span class="type-badge ${config.badge}">${config.emoji} ${config.label}</span>
+                                    <span style="font-size:0.72rem;color:var(--gray-400);">${data}</span>
+                                </div>
+                                <div class="card-title">${origemName} ${params.dataIda ? '→ ?' : ''}</div>
+                                <div class="card-subtitle">${resumoHtml || 'Sem resumo'}</div>
+                            </div>
+                        </div>
+                        <div class="card-meta">
+                            ${params.dataIda ? `<span class="meta-tag">📅 ${this.formatarDataCurta(params.dataIda)}${params.dataVolta ? ' → ' + this.formatarDataCurta(params.dataVolta) : ''}</span>` : ''}
+                            ${params.orcamento ? `<span class="meta-tag">💰 Até ${this.formatarPreco(params.orcamento, params.moeda)}</span>` : ''}
+                            ${params.preferencias ? `<span class="meta-tag">🎯 ${this.resumirPrefs(params.preferencias)}</span>` : ''}
+                        </div>
+                        <div class="card-actions">
+                            <button class="card-action primary" onclick="MinhaConta.refazerBusca('${item.tipo_busca}')">
+                                🔄 Refazer busca
+                            </button>
+                            <button class="card-action danger" onclick="MinhaConta.deletarHistorico('${item.id}')">
+                                🗑️ Remover
+                            </button>
+                        </div>
+                    </div>`;
             }).join('');
+        },
 
-            return `
-                <div class="detail-grid">
-                    <div class="detail-item">
-                        <div class="detail-label">Rota</div>
-                        <div class="detail-value">${escHtml((params.origem?.name || params.origem?.code || params.origem || '?') + ' → ' + (params.destino?.name || params.destino?.code || params.destino || '?'))}</div>
-                    </div>
-                    <div class="detail-item">
-                        <div class="detail-label">Total Combinações</div>
-                        <div class="detail-value">${params.total_combinacoes || results.total_resultados || 0}</div>
-                    </div>
-                    ${results.economia > 0 ? `
-                    <div class="detail-item detail-full">
-                        <span class="result-tag tag-savings">💰 Economia de ${fmtP(results.economia)} entre a melhor e pior combinação</span>
-                    </div>` : ''}
-                </div>
-                ${comboHtml ? `<div style="margin-bottom:6px;font-size:11px;font-weight:600;color:var(--gray-500);text-transform:uppercase;">Combinações</div><div style="background:var(--gray-50);border-radius:8px;overflow:hidden;margin-bottom:8px;">${comboHtml}</div>` : ''}
-                <div style="font-size:10px;color:var(--gray-500);">${ts}</div>`;
-        }
+        // ── DESTINOS SALVOS ──
+        async loadDestinos() {
+            try {
+                const data = await BenetripAuth.getSavedDestinations();
+                this.data.destinos = data || [];
+                document.getElementById('stat-destinations').textContent = this.data.destinos.length;
+                this.renderDestinos();
+            } catch (e) {
+                console.error('[MinhaConta] Erro destinos:', e);
+                this.renderDestinos();
+            }
+        },
 
-        // ── 4. VOOS BARATOS ──
-        function renderBaratosBody(params, results, fmtP, ts) {
-            const periodos = (results.periodos || []).slice(0, 6);
-            const minP = results.preco_min || 0;
-            const maxP = results.preco_max || 1;
+        renderDestinos() {
+            const container = document.getElementById('destinos-list');
+            const items = this.data.destinos;
 
-            let periodHtml = periodos.map(p => {
-                const pct = maxP > minP ? ((p.preco - minP) / (maxP - minP) * 70 + 30) : 50;
-                const isBest = results.melhor_periodo && p.dataIda === results.melhor_periodo.dataIda;
-                return `<div class="period-bar">
-                    <span style="font-size:10px;width:80px;flex-shrink:0;${isBest ? 'font-weight:700;color:var(--green);' : ''}">${formatDate(p.dataIda)}${isBest ? ' ⭐' : ''}</span>
-                    <div class="period-bar-fill" style="width:${pct}%;${isBest ? 'background:var(--green);' : ''}"></div>
-                    <span style="font-size:11px;font-weight:600;${isBest ? 'color:var(--green);' : ''}">${fmtP(p.preco)}</span>
-                </div>`;
-            }).join('');
-
-            return `
-                <div class="detail-grid">
-                    <div class="detail-item">
-                        <div class="detail-label">Rota</div>
-                        <div class="detail-value">${escHtml((params.origem?.name || params.origem?.code || params.origem || '?') + ' → ' + (params.destino?.name || params.destino?.code || params.destino || '?'))}</div>
-                    </div>
-                    <div class="detail-item">
-                        <div class="detail-label">Duração</div>
-                        <div class="detail-value">${params.duracao || 7} dias</div>
-                    </div>
-                    <div class="detail-item">
-                        <div class="detail-label">Menor Preço</div>
-                        <div class="detail-value" style="color:var(--green);font-weight:600;">${fmtP(results.preco_min)}</div>
-                    </div>
-                    <div class="detail-item">
-                        <div class="detail-label">Maior Preço</div>
-                        <div class="detail-value">${fmtP(results.preco_max)}</div>
-                    </div>
-                </div>
-                ${periodHtml ? `<div style="margin-bottom:6px;font-size:11px;font-weight:600;color:var(--gray-500);text-transform:uppercase;">Períodos</div><div style="background:var(--gray-50);border-radius:8px;padding:8px;margin-bottom:8px;">${periodHtml}</div>` : ''}
-                <div style="font-size:10px;color:var(--gray-500);">${ts}</div>`;
-        }
-
-        // ── 5. BUSCA DE VOOS ──
-        function renderVoosBody(params, results, fmtP, ts) {
-            const voos = (results.top_10_voos || []).slice(0, 5);
-            const airlines = (results.companhias_encontradas || []).join(', ');
-
-            let voosHtml = voos.map((v, i) => `
-                <div class="dest-mini" ${i === 0 ? 'style="background:var(--green-light);"' : ''}>
-                    <div class="dest-mini-flag">${i === 0 ? '🥇' : '✈️'}</div>
-                    <div class="dest-mini-name">${(v.companhias || []).join(', ') || 'Voo ' + (i + 1)} · ${v.paradas_ida === 0 ? 'Direto' : (v.paradas_ida || '?') + ' parada(s)'}</div>
-                    <div class="dest-mini-price">${v.preco ? fmtP(v.preco) : '-'}</div>
-                </div>`).join('');
-
-            return `
-                <div class="detail-grid">
-                    <div class="detail-item">
-                        <div class="detail-label">Rota</div>
-                        <div class="detail-value">${escHtml(params.origemCode || params.origem || '?')} → ${escHtml(params.destinoCode || params.destino || '?')}</div>
-                    </div>
-                    <div class="detail-item">
-                        <div class="detail-label">Datas</div>
-                        <div class="detail-value">${formatDate(params.dataIda)}${params.dataVolta ? ' → ' + formatDate(params.dataVolta) : ''}</div>
-                    </div>
-                    <div class="detail-item">
-                        <div class="detail-label">Passageiros</div>
-                        <div class="detail-value">${params.adultos || 1} adulto(s)${params.criancas ? ', ' + params.criancas + ' criança(s)' : ''}</div>
-                    </div>
-                    <div class="detail-item">
-                        <div class="detail-label">Resultados</div>
-                        <div class="detail-value">${results.total_resultados || 0} voos</div>
-                    </div>
-                    ${results.tem_direto ? '<div class="detail-item detail-full"><span class="result-tag tag-direct">Voos diretos disponíveis</span></div>' : ''}
-                    ${airlines ? `<div class="detail-item detail-full"><div class="detail-label">Companhias</div><div class="detail-value">${escHtml(airlines)}</div></div>` : ''}
-                </div>
-                ${voosHtml ? `<div style="margin-bottom:6px;font-size:11px;font-weight:600;color:var(--gray-500);text-transform:uppercase;">Melhores Voos</div>${voosHtml}` : ''}
-                <div style="margin-top:10px;font-size:10px;color:var(--gray-500);">${ts}</div>`;
-        }
-
-        // ── 6. ROTEIRO ──
-        function renderRoteiroBody(params, results, ts) {
-            const dias = results.dias || [];
-            let diasHtml = dias.slice(0, 5).map(d => `
-                <div class="itin-day">
-                    <div class="itin-day-num">${d.dia || '?'}</div>
-                    <div class="itin-day-info">
-                        <div class="itin-day-title">${escHtml(d.titulo || 'Dia ' + (d.dia || '?'))}</div>
-                        <div class="itin-day-places">${(d.locais || []).join(' · ') || d.resumo || ''}</div>
-                    </div>
-                </div>`).join('');
-
-            return `
-                <div class="detail-grid">
-                    <div class="detail-item">
-                        <div class="detail-label">Destino</div>
-                        <div class="detail-value">${escHtml(results.destino || params.destino || '-')}, ${escHtml(results.pais || params.pais || '')}</div>
-                    </div>
-                    <div class="detail-item">
-                        <div class="detail-label">Duração</div>
-                        <div class="detail-value">${results.num_dias || params.numDias || '?'} dias</div>
-                    </div>
-                    <div class="detail-item">
-                        <div class="detail-label">Datas</div>
-                        <div class="detail-value">${formatDate(params.dataIda)} → ${formatDate(params.dataVolta)}</div>
-                    </div>
-                    <div class="detail-item">
-                        <div class="detail-label">Companhia</div>
-                        <div class="detail-value">${escHtml(params.companhia || '-')}</div>
-                    </div>
-                </div>
-                ${diasHtml ? `<div style="margin-bottom:6px;font-size:11px;font-weight:600;color:var(--gray-500);text-transform:uppercase;">Resumo do Roteiro</div>${diasHtml}` : ''}
-                <div style="margin-top:10px;font-size:10px;color:var(--gray-500);">${ts}</div>`;
-        }
-
-        // ══════════════════════════
-        //  RENDER DESTINOS SALVOS
-        // ══════════════════════════
-        function renderDestinations() {
-            const container = document.getElementById('destinosContainer');
-
-            if (allDestinations.length === 0) {
+            if (!items.length) {
                 container.innerHTML = `
-                    <div class="history-empty">
-                        <div class="history-empty-icon">📌</div>
+                    <div class="empty-state">
+                        <div class="empty-state-icon">📍</div>
                         <h3>Nenhum destino salvo</h3>
-                        <p>Salve destinos durante suas buscas para vê-los aqui!</p>
+                        <p>Quando você pesquisar destinos, a Tripinha salva automaticamente as melhores descobertas!</p>
+                        <a href="descobrir-destinos.html" class="btn-empty-cta">🎯 Descobrir Destinos</a>
                     </div>`;
                 return;
             }
 
-            container.innerHTML = allDestinations.map(d => {
-                const moeda = d.moeda_preco || 'BRL';
+            container.innerHTML = items.map(item => {
+                const dados = item.dados_busca || {};
+                const data = new Date(item.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' });
+                const nota = item.notas || '';
+
                 return `
-                <div class="dest-card">
-                    ${d.imagem_url ? `<img class="dest-image" src="${escHtml(d.imagem_url)}" alt="${escHtml(d.destino_nome)}" onerror="this.style.display='none'">` : ''}
-                    <div class="dest-card-body">
-                        <div class="dest-card-row">
-                            <div>
-                                <div class="dest-name">${escHtml(d.destino_nome || 'Destino')}</div>
-                                <div class="dest-country">${escHtml(d.destino_pais || '')} ${d.iata_code ? '· ' + d.iata_code : ''}</div>
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-info">
+                                <div class="card-title">${item.destino_nome || '—'}${item.destino_pais ? ', ' + item.destino_pais : ''}</div>
+                                <div class="card-subtitle">
+                                    ${item.iata_code ? '✈️ ' + item.iata_code + ' · ' : ''}${data}
+                                    ${nota ? '<br>' + nota : ''}
+                                </div>
                             </div>
-                            ${d.preco_encontrado ? `<div>
-                                <div class="dest-price-found">${moeda} ${Number(d.preco_encontrado).toLocaleString('pt-BR')}</div>
-                                <div class="dest-price-label">preço encontrado</div>
-                            </div>` : ''}
+                            ${item.preco_encontrado ? `<div class="card-price">${this.formatarPreco(item.preco_encontrado, item.moeda_preco)}</div>` : ''}
                         </div>
-                        ${d.notas ? `<div class="dest-notes">${escHtml(d.notas)}</div>` : ''}
-                    </div>
-                </div>`;
+                        <div class="card-meta">
+                            ${dados.dataIda ? `<span class="meta-tag">📅 ${this.formatarDataCurta(dados.dataIda)}${dados.dataVolta ? ' → ' + this.formatarDataCurta(dados.dataVolta) : ''}</span>` : ''}
+                            ${dados.origem ? `<span class="meta-tag">📍 De ${dados.origem}</span>` : ''}
+                            ${dados.stops !== undefined ? `<span class="meta-tag">✈️ ${dados.stops === 0 ? 'Direto' : dados.stops + ' parada(s)'}</span>` : ''}
+                        </div>
+                        <div class="card-actions">
+                            <a href="https://www.google.com/travel/flights/search?q=flights+to+${encodeURIComponent(item.destino_nome)}" target="_blank" class="card-action blue">
+                                ✈️ Ver voos
+                            </a>
+                            <button class="card-action danger" onclick="MinhaConta.deletarDestino('${item.id}')">
+                                🗑️ Remover
+                            </button>
+                        </div>
+                    </div>`;
             }).join('');
-        }
+        },
 
-        // ══════════════════════════
-        //  ACTIONS
-        // ══════════════════════════
-        window.toggleCard = function (id) {
-            const card = document.getElementById(id);
-            if (card) card.classList.toggle('open');
-        };
-
-        window.deleteSearch = async function (searchId, cardId) {
-            if (!confirm('Remover esta simulação do histórico?')) return;
+        // ── ROTEIROS ──
+        async loadRoteiros() {
             try {
-                if (BenetripAuth.deleteSearch) await BenetripAuth.deleteSearch(searchId);
-                allSearchHistory = allSearchHistory.filter(s => s.id !== searchId);
-                updateStats();
-                updateFilterCounts();
-                const card = document.getElementById(cardId);
-                if (card) {
-                    card.style.transition = 'opacity 0.3s, transform 0.3s';
-                    card.style.opacity = '0';
-                    card.style.transform = 'translateX(50px)';
-                    setTimeout(() => { card.remove(); }, 300);
+                const data = await BenetripAuth.getSavedItineraries();
+                this.data.roteiros = data || [];
+                document.getElementById('stat-itineraries').textContent = this.data.roteiros.length;
+                this.renderRoteiros();
+            } catch (e) {
+                console.error('[MinhaConta] Erro roteiros:', e);
+                this.renderRoteiros();
+            }
+        },
+
+        renderRoteiros() {
+            const container = document.getElementById('roteiros-list');
+            const items = this.data.roteiros;
+
+            if (!items.length) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">🗺️</div>
+                        <h3>Nenhum roteiro ainda</h3>
+                        <p>Ao gerar um roteiro com a Tripinha, ele será salvo automaticamente aqui!</p>
+                        <a href="itinerary2.html" class="btn-empty-cta">📋 Criar Roteiro</a>
+                    </div>`;
+                return;
+            }
+
+            container.innerHTML = items.map(item => {
+                const data = new Date(item.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' });
+                const dias = item.num_dias || '?';
+
+                return `
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-info">
+                                <div class="card-title">🗺️ ${item.destino_nome || '—'}${item.destino_pais ? ', ' + item.destino_pais : ''}</div>
+                                <div class="card-subtitle">
+                                    ${dias} dia${dias > 1 ? 's' : ''} · Salvo em ${data}
+                                    ${item.data_ida ? '<br>📅 ' + this.formatarDataCurta(item.data_ida) + (item.data_volta ? ' → ' + this.formatarDataCurta(item.data_volta) : '') : ''}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card-actions">
+                            <button class="card-action primary" onclick="MinhaConta.compartilharRoteiro('${item.id}')">
+                                📤 Compartilhar
+                            </button>
+                            <button class="card-action danger" onclick="MinhaConta.deletarRoteiro('${item.id}')">
+                                🗑️ Remover
+                            </button>
+                        </div>
+                    </div>`;
+            }).join('');
+        },
+
+        // ── PERFIL ──
+        async loadPerfil() {
+            try {
+                const profile = await BenetripAuth.getProfile();
+                if (profile) {
+                    this.data.profile = profile;
+                    document.getElementById('input-nome').value = profile.nome_exibicao || BenetripAuth.getUserDisplayName();
+                    document.getElementById('input-moeda').value = profile.moeda_preferida || 'BRL';
+                    document.getElementById('input-cidade-origem').value = profile.cidade_origem_padrao || '';
+                } else {
+                    document.getElementById('input-nome').value = BenetripAuth.getUserDisplayName();
                 }
             } catch (e) {
-                console.error('Erro ao deletar:', e);
-                alert('Erro ao remover. Tente novamente.');
+                console.error('[MinhaConta] Erro perfil:', e);
             }
-        };
+        },
 
-        window.handleLogout = function () {
-            if (typeof BenetripAuth !== 'undefined') {
-                BenetripAuth.logout();
-            }
-            window.location.href = 'index.html';
-        };
+        // ════════════════════════════════
+        // AÇÕES
+        // ════════════════════════════════
+        async salvarPerfil() {
+            const btn = document.getElementById('btn-save-profile');
+            btn.disabled = true;
+            btn.textContent = 'Salvando...';
 
-        window.toggleSetting = function (el) {
-            el.classList.toggle('on');
-        };
-
-        window.confirmClearHistory = async function () {
-            if (!confirm('Tem certeza que deseja limpar TODO o histórico? Esta ação não pode ser desfeita.')) return;
             try {
-                if (BenetripAuth.clearSearchHistory) await BenetripAuth.clearSearchHistory();
-                allSearchHistory = [];
-                updateFilterCounts();
-                renderHistory();
-                document.getElementById('statSimulacoes').textContent = '0';
+                await BenetripAuth.updateProfile({
+                    nome_exibicao: document.getElementById('input-nome').value.trim(),
+                    moeda_preferida: document.getElementById('input-moeda').value,
+                    cidade_origem_padrao: document.getElementById('input-cidade-origem').value.trim().toUpperCase()
+                });
+                btn.textContent = '✅ Salvo!';
+                setTimeout(() => { btn.textContent = 'Salvar Alterações'; btn.disabled = false; }, 2000);
             } catch (e) {
-                console.error('Erro ao limpar:', e);
-                alert('Erro ao limpar histórico.');
+                btn.textContent = 'Erro — Tentar novamente';
+                btn.disabled = false;
+                console.error('[MinhaConta] Erro ao salvar perfil:', e);
             }
-        };
+        },
 
-        // ══════════════════════════
-        //  CARD LISTENERS
-        // ══════════════════════════
-        function attachCardListeners() {
-            // Touch-friendly: already using onclick
-        }
-
-        // ══════════════════════════
-        //  HELPERS
-        // ══════════════════════════
-        function formatDate(dateStr) {
-            if (!dateStr) return '-';
+        async deletarHistorico(id) {
             try {
-                const d = new Date(dateStr + (dateStr.length === 10 ? 'T00:00:00' : ''));
-                return d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
-            } catch { return dateStr; }
-        }
+                await BenetripAuth.deleteSearch(id);
+                this.data.historico = this.data.historico.filter(h => h.id !== id);
+                document.getElementById('stat-searches').textContent = this.data.historico.length;
+                this.renderHistorico();
+            } catch (e) { alert('Erro ao remover: ' + e.message); }
+        },
 
-        function formatDateTime(dateStr) {
-            if (!dateStr) return '';
+        async deletarDestino(id) {
             try {
-                const d = new Date(dateStr);
-                return d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' }) +
-                    ' às ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-            } catch { return dateStr; }
-        }
+                await BenetripAuth.removeDestination(id);
+                this.data.destinos = this.data.destinos.filter(d => d.id !== id);
+                document.getElementById('stat-destinations').textContent = this.data.destinos.length;
+                this.renderDestinos();
+            } catch (e) { alert('Erro ao remover: ' + e.message); }
+        },
 
-        function formatDateGroup(dateStr) {
-            if (!dateStr) return 'Sem data';
+        async deletarRoteiro(id) {
             try {
-                const d = new Date(dateStr);
-                const today = new Date();
-                const yesterday = new Date(today);
-                yesterday.setDate(yesterday.getDate() - 1);
+                await BenetripAuth.removeItinerary(id);
+                this.data.roteiros = this.data.roteiros.filter(r => r.id !== id);
+                document.getElementById('stat-itineraries').textContent = this.data.roteiros.length;
+                this.renderRoteiros();
+            } catch (e) { alert('Erro ao remover: ' + e.message); }
+        },
 
-                if (d.toDateString() === today.toDateString()) return 'Hoje';
-                if (d.toDateString() === yesterday.toDateString()) return 'Ontem';
+        async compartilharRoteiro(id) {
+            try {
+                const url = await BenetripAuth.shareItinerary(id);
+                if (navigator.share) {
+                    await navigator.share({ title: 'Meu Roteiro Benetrip 🐾', url });
+                } else {
+                    await navigator.clipboard.writeText(url);
+                    alert('Link copiado! Compartilhe com quem quiser 🐾');
+                }
+            } catch (e) { alert('Erro ao compartilhar: ' + e.message); }
+        },
 
-                const diffDays = Math.floor((today - d) / 86400000);
-                if (diffDays < 7) return 'Esta semana';
-                if (diffDays < 30) return 'Este mês';
-                return d.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
-            } catch { return 'Sem data'; }
+        confirmarLimparHistorico() {
+            document.getElementById('confirm-title').textContent = '🗑️ Limpar todo o histórico?';
+            document.getElementById('confirm-message').textContent = 'Essa ação vai remover todas as suas buscas salvas. Destinos e roteiros não serão afetados.';
+            document.getElementById('btn-confirm-action').onclick = async () => {
+                try {
+                    await BenetripAuth.clearSearchHistory();
+                    this.data.historico = [];
+                    document.getElementById('stat-searches').textContent = '0';
+                    this.renderHistorico();
+                    this.fecharConfirm();
+                } catch (e) { alert('Erro: ' + e.message); }
+            };
+            document.getElementById('confirm-overlay').classList.add('active');
+        },
+
+        fecharConfirm() {
+            document.getElementById('confirm-overlay').classList.remove('active');
+        },
+
+        refazerBusca(tipo) {
+            const PAGES = {
+                'descobrir_destinos': 'descobrir-destinos.html',
+                'todos_destinos': 'todos-destinos.html',
+                'busca_voos': 'voos.html',
+                'voos_baratos': 'voos.html',
+                'roteiro': 'itinerary2.html'
+            };
+            window.location.href = PAGES[tipo] || '/';
+        },
+
+        async logout() {
+            try {
+                await BenetripAuth.signOut();
+                window.location.href = '/';
+            } catch (e) { alert('Erro ao sair: ' + e.message); }
+        },
+
+        // ════════════════════════════════
+        // HELPERS
+        // ════════════════════════════════
+        formatarPreco(valor, moeda) {
+            const s = { 'BRL': 'R$', 'USD': 'US$', 'EUR': '€' }[moeda] || 'R$';
+            return `${s} ${Math.round(valor).toLocaleString('pt-BR')}`;
+        },
+
+        formatarDataCurta(iso) {
+            if (!iso) return '';
+            return new Date(iso + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
+        },
+
+        resumirPrefs(prefs) {
+            if (!prefs) return '';
+            const MAP = { 'relax': '🌊', 'aventura': '🏔️', 'cultura': '🏛️', 'urbano': '🏙️' };
+            return prefs.split(',').map(p => MAP[p.trim()] || p.trim()).join(' ');
         }
+    };
 
-        function escHtml(str) {
-            if (!str) return '';
-            const div = document.createElement('div');
-            div.textContent = String(str);
-            return div.innerHTML;
-        }
-
-        function showError(containerId) {
-            const el = document.getElementById(containerId);
-            if (el) el.innerHTML = `
-                <div class="history-empty">
-                    <div class="history-empty-icon">😿</div>
-                    <h3>Erro ao carregar</h3>
-                    <p>Tente recarregar a página.</p>
-                </div>`;
-        }
-
-        // ══════════════════════════
-        //  DEMO MODE (no auth)
-        // ══════════════════════════
-        function showDemoMode() {
-            document.getElementById('userName').textContent = 'Modo Demo';
-            document.getElementById('userEmail').textContent = 'Faça login para ver seus dados';
-            document.getElementById('historyContainer').innerHTML = renderEmptyState();
-            document.getElementById('destinosContainer').innerHTML = `
-                <div class="history-empty">
-                    <div class="history-empty-icon">🔒</div>
-                    <h3>Login necessário</h3>
-                    <p>Faça login para ver seus destinos salvos e histórico completo.</p>
-                </div>`;
-        }
-    })();
+    document.addEventListener('DOMContentLoaded', () => MinhaConta.init());
     </script>
 </body>
 </html>
