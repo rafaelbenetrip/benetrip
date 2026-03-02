@@ -1,27 +1,30 @@
 /**
  * ============================================
- * BENETRIP AUTO-SAVE MODULE - benetrip-autosave.js
+ * BENETRIP AUTO-SAVE MODULE v2.0
  * ============================================
- * Salva automaticamente pesquisas, destinos e roteiros
- * quando o usuário está logado. Zero fricção — sem botões "Salvar".
- * 
+ * Salva automaticamente TODAS as simulações do usuário
+ * em cada uma das 6 ferramentas da Benetrip.
+ *
+ * FERRAMENTAS COBERTAS:
+ *  1. Descobrir Destinos  (descobrir-destinos.html)
+ *  2. Todos os Destinos   (todos-destinos.html)
+ *  3. Comparar Voos       (comparar-voos.html)   ← NOVO
+ *  4. Voos Baratos        (voos-baratos.html)
+ *  5. Busca de Voos       (voos.html)
+ *  6. Roteiro de Viagem   (roteiro-viagem.html)
+ *
  * COMO USAR:
- * 1. Incluir APÓS benetrip-auth.js em cada página
- * 2. Chamar os métodos nos pontos corretos de cada página:
- *    - BenetripAutoSave.salvarBuscaDestinos(formData, resultados)
- *    - BenetripAutoSave.salvarBuscaTodosDestinos(formData, destinos)
- *    - BenetripAutoSave.salvarBuscaVoos(formData, resultados)
- *    - BenetripAutoSave.salvarRoteiro(dadosRoteiro)
- * 
+ *  Incluir APÓS benetrip-auth.js em cada página.
+ *  Chamar o método correspondente no callback de sucesso de cada ferramenta.
+ *
  * O módulo verifica internamente se o usuário está logado.
- * Se não estiver, simplesmente ignora (sem erros, sem prompts).
+ * Se não estiver, simplesmente ignora (zero fricção).
  */
 
 const BenetripAutoSave = (function () {
     'use strict';
 
-    // ── Controle de duplicatas ──
-    // Evita salvar a mesma busca/resultado mais de uma vez na sessão
+    // ── Controle de duplicatas por sessão ──
     const _savedHashes = new Set();
 
     function _hash(obj) {
@@ -31,7 +34,7 @@ const BenetripAutoSave = (function () {
             for (let i = 0; i < str.length; i++) {
                 const char = str.charCodeAt(i);
                 hash = ((hash << 5) - hash) + char;
-                hash |= 0; // Convert to 32bit int
+                hash |= 0;
             }
             return hash.toString(36);
         } catch {
@@ -45,20 +48,17 @@ const BenetripAutoSave = (function () {
         return false;
     }
 
-    // ── Verificação de auth ──
     function _isLoggedIn() {
         return typeof BenetripAuth !== 'undefined' && BenetripAuth.isLoggedIn();
     }
 
-    // ── Logger ──
     function _log(...args) {
         console.log('[AutoSave]', ...args);
     }
 
-    // ==========================================
+    // ================================================================
     // 1. DESCOBRIR DESTINOS (descobrir-destinos.html)
-    // ==========================================
-    // Chamado após mostrarResultados() com sucesso
+    // ================================================================
     async function salvarBuscaDestinos(formData, resultados) {
         if (!_isLoggedIn()) return null;
 
@@ -75,28 +75,25 @@ const BenetripAutoSave = (function () {
         }
 
         try {
-            // Salvar busca no histórico
+            const _mapDestino = (d) => d ? {
+                name: d.name || '',
+                country: d.country || '',
+                price: d.flight?.price || null,
+                airport: d.primary_airport || d.flight?.airport_code || '',
+                stops: d.flight?.stops ?? null,
+                razao: d.razao || '',
+                comentario: d.comentario || '',
+                destaque: d.destaque || '',
+                image_url: d.image_url || ''
+            } : null;
+
             const resumoResultados = {
-                top_destino: resultados.top_destino ? {
-                    name: resultados.top_destino.name,
-                    country: resultados.top_destino.country,
-                    price: resultados.top_destino.flight?.price,
-                    airport: resultados.top_destino.primary_airport
-                } : null,
-                alternativas: (resultados.alternativas || []).map(d => ({
-                    name: d.name,
-                    country: d.country,
-                    price: d.flight?.price,
-                    airport: d.primary_airport
-                })),
-                surpresa: resultados.surpresa ? {
-                    name: resultados.surpresa.name,
-                    country: resultados.surpresa.country,
-                    price: resultados.surpresa.flight?.price,
-                    airport: resultados.surpresa.primary_airport
-                } : null,
+                top_destino: _mapDestino(resultados.top_destino),
+                alternativas: (resultados.alternativas || []).map(_mapDestino),
+                surpresa: _mapDestino(resultados.surpresa),
                 total_analisados: resultados._totalAnalisados || 0,
-                model: resultados._model || ''
+                model: resultados._model || '',
+                timestamp: new Date().toISOString()
             };
 
             const result = await BenetripAuth.saveSearch('descobrir_destinos', {
@@ -104,18 +101,18 @@ const BenetripAutoSave = (function () {
                 dataIda: formData.dataIda,
                 dataVolta: formData.dataVolta,
                 companhia: formData.companhia,
-                adultos: formData.adultos,
-                criancas: formData.criancas,
-                bebes: formData.bebes,
+                adultos: formData.adultos || 1,
+                criancas: formData.criancas || 0,
+                bebes: formData.bebes || 0,
                 preferencias: formData.preferencias,
-                escopoDestino: formData.escopoDestino,
-                moeda: formData.moeda,
-                orcamento: formData.orcamento
+                escopoDestino: formData.escopoDestino || 'tanto_faz',
+                moeda: formData.moeda || 'BRL',
+                orcamento: formData.orcamento,
+                observacoes: formData.observacoes || ''
             }, resumoResultados);
 
             _log('✅ Busca "Descobrir Destinos" salva automaticamente');
 
-            // Salvar o top destino como destino salvo automaticamente
             if (resultados.top_destino) {
                 await _salvarDestinoAutomatico(resultados.top_destino, formData, 'top_destino');
             }
@@ -127,9 +124,9 @@ const BenetripAutoSave = (function () {
         }
     }
 
-    // ==========================================
+    // ================================================================
     // 2. TODOS OS DESTINOS (todos-destinos.html)
-    // ==========================================
+    // ================================================================
     async function salvarBuscaTodosDestinos(formData, destinos) {
         if (!_isLoggedIn()) return null;
 
@@ -146,29 +143,41 @@ const BenetripAutoSave = (function () {
         }
 
         try {
-            const top10 = destinos.slice(0, 10).map(d => ({
-                name: d.name,
-                country: d.country,
-                price: d.flight?.price,
-                airport: d.primary_airport || d.flight?.airport_code,
-                stops: d.flight?.stops
+            const allDestinos = destinos || [];
+            const top20 = allDestinos.slice(0, 20).map(d => ({
+                name: d.name || d.destination || '',
+                country: d.country || '',
+                price: d.flight?.price || d.price || null,
+                airport: d.primary_airport || d.flight?.airport_code || d.iata || '',
+                stops: d.flight?.stops ?? null,
+                departure_date: d.flight?.departure_date || '',
+                return_date: d.flight?.return_date || ''
             }));
 
             const result = await BenetripAuth.saveSearch('todos_destinos', {
                 origem: formData.origem,
                 dataIda: formData.dataIda,
                 dataVolta: formData.dataVolta,
-                modoData: formData.modoData,
+                datasIda: formData.datasIda || [],
+                datasVolta: formData.datasVolta || [],
+                modoData: formData.modoData || 'unica',
                 combinacoes: formData.combinacoes?.length || 1,
-                moeda: formData.moeda,
-                escopo: formData.escopo,
+                moeda: formData.moeda || 'BRL',
+                escopo: formData.escopo || 'todos',
                 orcamento: formData.orcamento
             }, {
-                total_encontrados: destinos.length,
-                dentro_orcamento: destinos.filter(d => d.flight?.price <= formData.orcamento).length,
-                top_10: top10,
-                preco_min: destinos.length > 0 ? Math.min(...destinos.map(d => d.flight?.price || Infinity)) : 0,
-                preco_max: destinos.length > 0 ? Math.max(...destinos.map(d => d.flight?.price || 0)) : 0
+                total_encontrados: allDestinos.length,
+                dentro_orcamento: allDestinos.filter(d =>
+                    (d.flight?.price || d.price || Infinity) <= formData.orcamento
+                ).length,
+                top_20: top20,
+                preco_min: allDestinos.length > 0
+                    ? Math.min(...allDestinos.map(d => d.flight?.price || d.price || Infinity))
+                    : 0,
+                preco_max: allDestinos.length > 0
+                    ? Math.max(...allDestinos.map(d => d.flight?.price || d.price || 0))
+                    : 0,
+                timestamp: new Date().toISOString()
             });
 
             _log('✅ Busca "Todos Destinos" salva automaticamente');
@@ -179,16 +188,136 @@ const BenetripAutoSave = (function () {
         }
     }
 
-    // ==========================================
-    // 3. BUSCA DE VOOS (voos.html)
-    // ==========================================
-    async function salvarBuscaVoos(parametros, resultados) {
+    // ================================================================
+    // 3. COMPARAR VOOS (comparar-voos.html)  ← NOVO
+    // ================================================================
+    async function salvarCompararVoos(formData, resultados) {
+        if (!_isLoggedIn()) return null;
+
+        const hashKey = `comparar_${_hash({
+            origem: formData.origem?.code || formData.origem,
+            destino: formData.destino?.code || formData.destino,
+            datasIda: formData.datasIda,
+            datasVolta: formData.datasVolta
+        })}`;
+
+        if (_isDuplicate(hashKey)) {
+            _log('⏭️ Comparação de voos já salva nesta sessão');
+            return null;
+        }
+
+        try {
+            const combos = (resultados.combinacoes || []).map(c => ({
+                dataIda: c.dataIda || c.departure || '',
+                dataVolta: c.dataVolta || c.return || '',
+                preco: c.preco || c.price || null,
+                duracao_ida: c.duracao_ida || c.outbound_duration || '',
+                duracao_volta: c.duracao_volta || c.return_duration || '',
+                paradas_ida: c.paradas_ida ?? c.outbound_stops ?? null,
+                paradas_volta: c.paradas_volta ?? c.return_stops ?? null,
+                companhias: c.companhias || c.airlines || [],
+                link: c.link || c.booking_url || ''
+            }));
+
+            const melhor = resultados.melhor || (combos.length > 0
+                ? combos.reduce((a, b) => (a.preco || Infinity) < (b.preco || Infinity) ? a : b)
+                : null);
+
+            const precos = combos.map(c => c.preco).filter(p => p != null && isFinite(p));
+
+            const result = await BenetripAuth.saveSearch('comparar_voos', {
+                origem: formData.origem,
+                destino: formData.destino,
+                datasIda: formData.datasIda || [],
+                datasVolta: formData.datasVolta || [],
+                adultos: formData.adultos || 1,
+                criancas: formData.criancas || 0,
+                bebes: formData.bebes || 0,
+                moeda: formData.moeda || 'BRL',
+                total_combinacoes: (formData.datasIda?.length || 0) * (formData.datasVolta?.length || 0)
+            }, {
+                combinacoes: combos,
+                melhor_combo: melhor ? {
+                    dataIda: melhor.dataIda || melhor.departure || '',
+                    dataVolta: melhor.dataVolta || melhor.return || '',
+                    preco: melhor.preco || melhor.price || null
+                } : null,
+                total_resultados: combos.length,
+                preco_min: precos.length > 0 ? Math.min(...precos) : null,
+                preco_max: precos.length > 0 ? Math.max(...precos) : null,
+                economia: precos.length > 1 ? (Math.max(...precos) - Math.min(...precos)) : 0,
+                timestamp: new Date().toISOString()
+            });
+
+            _log('✅ Comparação de voos salva automaticamente');
+            return result;
+        } catch (e) {
+            _log('⚠️ Erro ao auto-salvar comparação de voos:', e.message);
+            return null;
+        }
+    }
+
+    // ================================================================
+    // 4. VOOS BARATOS (voos-baratos.html)
+    // ================================================================
+    async function salvarBuscaVoosBaratos(formData, resultados) {
+        if (!_isLoggedIn()) return null;
+
+        const hashKey = `voos_baratos_${_hash({
+            origem: formData.origem?.code || formData.origem,
+            destino: formData.destino?.code || formData.destino,
+            duracao: formData.duracao
+        })}`;
+
+        if (_isDuplicate(hashKey)) return null;
+
+        try {
+            const periodos = (resultados || []).map(r => ({
+                dataIda: r.dataIda || r.departureDate || r.departure || '',
+                dataVolta: r.dataVolta || r.returnDate || r.return || '',
+                preco: r.preco || r.price || null,
+                companhia: r.companhia || r.airline || '',
+                link: r.link || r.booking_url || ''
+            }));
+
+            const melhor = periodos.length > 0
+                ? periodos.reduce((a, b) => (a.preco || Infinity) < (b.preco || Infinity) ? a : b)
+                : null;
+
+            const precos = periodos.map(p => p.preco).filter(p => p != null && isFinite(p));
+
+            const result = await BenetripAuth.saveSearch('voos_baratos', {
+                origem: formData.origem,
+                destino: formData.destino,
+                duracao: formData.duracao || 7,
+                moeda: formData.moeda || 'BRL'
+            }, {
+                total_periodos: periodos.length,
+                periodos: periodos.slice(0, 30),
+                melhor_periodo: melhor,
+                preco_min: precos.length > 0 ? Math.min(...precos) : null,
+                preco_max: precos.length > 0 ? Math.max(...precos) : null,
+                timestamp: new Date().toISOString()
+            });
+
+            _log('✅ Busca de voos baratos salva');
+            return result;
+        } catch (e) {
+            _log('⚠️ Erro ao salvar voos baratos:', e.message);
+            return null;
+        }
+    }
+
+    // ================================================================
+    // 5. BUSCA DE VOOS (voos.html)
+    // ================================================================
+    async function salvarBuscaVoos(formData, resultados) {
         if (!_isLoggedIn()) return null;
 
         const hashKey = `voos_${_hash({
-            origem: parametros.origem,
-            destino: parametros.destino,
-            dataIda: parametros.dataIda
+            origem: formData.origemCode || formData.origem,
+            destino: formData.destinoCode || formData.destino,
+            dataIda: formData.dataIda
         })}`;
 
         if (_isDuplicate(hashKey)) {
@@ -197,15 +326,42 @@ const BenetripAutoSave = (function () {
         }
 
         try {
-            const resumo = {
-                total_resultados: resultados?.length || resultados?.total || 0,
-                melhor_preco: resultados?.melhor_preco || (Array.isArray(resultados) && resultados.length > 0
-                    ? Math.min(...resultados.map(r => r.price || r.total || Infinity))
-                    : null
-                )
-            };
+            const voos = Array.isArray(resultados) ? resultados : (resultados?.data || []);
 
-            const result = await BenetripAuth.saveSearch('busca_voos', parametros, resumo);
+            const top10 = voos.slice(0, 10).map(v => ({
+                preco: v.price || v.total || null,
+                companhias: v.airlines || v.carriers || [],
+                paradas_ida: v.outbound_stops ?? v.stops_go ?? null,
+                paradas_volta: v.return_stops ?? v.stops_ret ?? null,
+                duracao_ida: v.outbound_duration || v.duration_go || '',
+                duracao_volta: v.return_duration || v.duration_ret || '',
+                partida_ida: v.outbound_departure || '',
+                chegada_ida: v.outbound_arrival || '',
+                link: v.link || v.booking_url || v.deep_link || ''
+            }));
+
+            const precos = voos.map(v => v.price || v.total).filter(p => p != null && isFinite(p));
+            const melhorPreco = precos.length > 0 ? Math.min(...precos) : null;
+
+            const result = await BenetripAuth.saveSearch('busca_voos', {
+                origem: formData.origem || '',
+                origemCode: formData.origemCode || '',
+                destino: formData.destino || '',
+                destinoCode: formData.destinoCode || '',
+                dataIda: formData.dataIda,
+                dataVolta: formData.dataVolta || '',
+                adultos: formData.adultos || 1,
+                criancas: formData.criancas || 0,
+                bebes: formData.bebes || 0,
+                moeda: formData.moeda || 'BRL'
+            }, {
+                total_resultados: voos.length,
+                melhor_preco: melhorPreco,
+                top_10_voos: top10,
+                companhias_encontradas: [...new Set(voos.flatMap(v => v.airlines || v.carriers || []))],
+                tem_direto: voos.some(v => (v.outbound_stops || v.stops_go || 0) === 0),
+                timestamp: new Date().toISOString()
+            });
 
             _log('✅ Busca de voos salva automaticamente');
             return result;
@@ -215,35 +371,9 @@ const BenetripAutoSave = (function () {
         }
     }
 
-    // ==========================================
-    // 4. VOOS BARATOS (voos-baratos.html)
-    // ==========================================
-    async function salvarBuscaVoosBaratos(parametros, resultados) {
-        if (!_isLoggedIn()) return null;
-
-        const hashKey = `voos_baratos_${_hash({
-            origem: parametros.origem,
-            destino: parametros.destino
-        })}`;
-
-        if (_isDuplicate(hashKey)) return null;
-
-        try {
-            const result = await BenetripAuth.saveSearch('voos_baratos', parametros, {
-                total: resultados?.length || 0,
-                melhor_preco: resultados?.[0]?.price || null
-            });
-            _log('✅ Busca de voos baratos salva');
-            return result;
-        } catch (e) {
-            _log('⚠️ Erro ao salvar voos baratos:', e.message);
-            return null;
-        }
-    }
-
-    // ==========================================
-    // 5. ROTEIRO / ITINERÁRIO (roteiro-viagens.html)
-    // ==========================================
+    // ================================================================
+    // 6. ROTEIRO DE VIAGEM (roteiro-viagem.html)
+    // ================================================================
     async function salvarRoteiro(dados) {
         if (!_isLoggedIn()) return null;
 
@@ -259,8 +389,8 @@ const BenetripAutoSave = (function () {
         }
 
         try {
-            const result = await BenetripAuth.saveItinerary({
-                destino_nome: dados.destino_nome,
+            const itinerary = await BenetripAuth.saveItinerary({
+                destino_nome: dados.destino_nome || '',
                 destino_pais: dados.destino_pais || '',
                 data_ida: dados.data_ida,
                 data_volta: dados.data_volta,
@@ -268,24 +398,59 @@ const BenetripAutoSave = (function () {
                 dados_roteiro: dados.dados_roteiro || dados
             });
 
+            // Também salvar no histórico para feed unificado
+            await BenetripAuth.saveSearch('roteiro', {
+                destino: dados.destino_nome || '',
+                pais: dados.destino_pais || '',
+                dataIda: dados.data_ida,
+                dataVolta: dados.data_volta,
+                numDias: dados.num_dias || 0,
+                companhia: dados.companhia || '',
+                preferencias: dados.preferencias || '',
+                intensidade: dados.intensidade || '',
+                orcamento: dados.orcamento || '',
+                observacoes: dados.observacoes || ''
+            }, {
+                num_dias: dados.num_dias || 0,
+                destino: dados.destino_nome || '',
+                pais: dados.destino_pais || '',
+                dias: _extrairResumoDias(dados.dados_roteiro),
+                itinerary_id: itinerary?.id || null,
+                timestamp: new Date().toISOString()
+            });
+
             _log('✅ Roteiro salvo automaticamente');
-
-            // Mostrar toast discreto para o usuário
             _showSaveToast('Roteiro salvo automaticamente! 🐾');
-
-            return result;
+            return itinerary;
         } catch (e) {
             _log('⚠️ Erro ao salvar roteiro:', e.message);
             return null;
         }
     }
 
-    // ==========================================
-    // HELPER: Salvar destino automaticamente
-    // ==========================================
+    // ================================================================
+    // HELPERS
+    // ================================================================
+
+    function _extrairResumoDias(dadosRoteiro) {
+        if (!dadosRoteiro) return [];
+        try {
+            const dias = dadosRoteiro.dias || dadosRoteiro.days || dadosRoteiro.itinerario || [];
+            if (!Array.isArray(dias)) return [];
+            return dias.map((dia, i) => ({
+                dia: dia.dia || dia.day || (i + 1),
+                titulo: dia.titulo || dia.title || '',
+                locais: (dia.locais || dia.locations || dia.atividades || [])
+                    .slice(0, 3)
+                    .map(l => typeof l === 'string' ? l : (l.nome || l.name || l.local || ''))
+                    .filter(Boolean),
+                resumo: dia.resumo || dia.summary || ''
+            }));
+        } catch { return []; }
+    }
+
     async function _salvarDestinoAutomatico(destino, formData, tipo) {
         if (!_isLoggedIn() || !destino) return;
-
         try {
             await BenetripAuth.saveDestination({
                 destino_nome: destino.name || '',
@@ -295,37 +460,25 @@ const BenetripAutoSave = (function () {
                 moeda_preco: formData.moeda || 'BRL',
                 imagem_url: destino.image_url || '',
                 dados_busca: {
-                    tipo: tipo,
-                    origem: formData.origem?.code,
-                    dataIda: formData.dataIda,
-                    dataVolta: formData.dataVolta,
-                    razao: destino.razao || '',
-                    comentario: destino.comentario || '',
+                    tipo, origem: formData.origem?.code,
+                    dataIda: formData.dataIda, dataVolta: formData.dataVolta,
+                    razao: destino.razao || '', comentario: destino.comentario || '',
                     stops: destino.flight?.stops
                 },
                 notas: `${tipo === 'top_destino' ? '🏆 Top Pick' : tipo === 'surpresa' ? '🎁 Surpresa' : '📋 Alternativa'} — auto-salvo`
             });
             _log(`✅ Destino "${destino.name}" salvo automaticamente`);
         } catch (e) {
-            // Pode dar erro de duplicata, ignorar
             _log(`⚠️ Destino "${destino.name}" já salvo ou erro:`, e.message);
         }
     }
 
-    // ==========================================
-    // SALVAR DESTINO MANUALMENTE (botão)
-    // ==========================================
     async function salvarDestino(destino, formData) {
         if (!_isLoggedIn()) {
-            // Abrir modal de login
-            if (typeof BenetripLoginModal !== 'undefined') {
-                BenetripLoginModal.open();
-            } else {
-                alert('Faça login para salvar destinos!');
-            }
+            if (typeof BenetripLoginModal !== 'undefined') BenetripLoginModal.open();
+            else alert('Faça login para salvar destinos!');
             return null;
         }
-
         try {
             const result = await BenetripAuth.saveDestination({
                 destino_nome: destino.name || '',
@@ -335,15 +488,12 @@ const BenetripAutoSave = (function () {
                 moeda_preco: formData?.moeda || 'BRL',
                 imagem_url: destino.image_url || '',
                 dados_busca: {
-                    origem: formData?.origem?.code,
-                    dataIda: formData?.dataIda,
-                    dataVolta: formData?.dataVolta,
-                    razao: destino.razao || '',
+                    origem: formData?.origem?.code, dataIda: formData?.dataIda,
+                    dataVolta: formData?.dataVolta, razao: destino.razao || '',
                     stops: destino.flight?.stops
                 },
                 notas: ''
             });
-
             _showSaveToast(`${destino.name} salvo! 🐾`);
             return result;
         } catch (e) {
@@ -356,68 +506,29 @@ const BenetripAutoSave = (function () {
         }
     }
 
-    // ==========================================
-    // TOAST NOTIFICATION (discreto)
-    // ==========================================
     function _showSaveToast(message) {
-        // Remover toast anterior se existir
         const existing = document.getElementById('benetrip-save-toast');
         if (existing) existing.remove();
-
         const toast = document.createElement('div');
         toast.id = 'benetrip-save-toast';
         toast.textContent = message;
-        toast.style.cssText = `
-            position: fixed;
-            bottom: 24px;
-            left: 50%;
-            transform: translateX(-50%) translateY(20px);
-            background: #21272A;
-            color: white;
-            padding: 12px 24px;
-            border-radius: 12px;
-            font-family: 'Montserrat', sans-serif;
-            font-size: 14px;
-            font-weight: 500;
-            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
-            z-index: 10001;
-            opacity: 0;
-            transition: all 0.3s ease;
-            pointer-events: none;
-            white-space: nowrap;
-        `;
-
+        toast.style.cssText = `position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:#21272A;color:white;padding:12px 24px;border-radius:12px;font-family:'Montserrat',sans-serif;font-size:14px;font-weight:500;box-shadow:0 8px 32px rgba(0,0,0,0.3);z-index:10001;opacity:0;transition:all 0.3s ease;pointer-events:none;white-space:nowrap;`;
         document.body.appendChild(toast);
-
-        // Animar entrada
-        requestAnimationFrame(() => {
-            toast.style.opacity = '1';
-            toast.style.transform = 'translateX(-50%) translateY(0)';
-        });
-
-        // Animar saída
-        setTimeout(() => {
-            toast.style.opacity = '0';
-            toast.style.transform = 'translateX(-50%) translateY(20px)';
-            setTimeout(() => toast.remove(), 300);
-        }, 2500);
+        requestAnimationFrame(() => { toast.style.opacity = '1'; toast.style.transform = 'translateX(-50%) translateY(0)'; });
+        setTimeout(() => { toast.style.opacity = '0'; toast.style.transform = 'translateX(-50%) translateY(20px)'; setTimeout(() => toast.remove(), 300); }, 2500);
     }
 
-    // ==========================================
-    // API PÚBLICA
-    // ==========================================
     return {
         salvarBuscaDestinos,
         salvarBuscaTodosDestinos,
-        salvarBuscaVoos,
+        salvarCompararVoos,
         salvarBuscaVoosBaratos,
+        salvarBuscaVoos,
         salvarRoteiro,
         salvarDestino,
-        // Helpers para uso externo
         isLoggedIn: _isLoggedIn,
         showToast: _showSaveToast
     };
-
 })();
 
 window.BenetripAutoSave = BenetripAutoSave;
