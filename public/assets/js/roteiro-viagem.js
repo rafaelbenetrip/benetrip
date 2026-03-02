@@ -383,13 +383,17 @@ const BenetripRoteiro = {
             const roteiro = await response.json();
             this.state.roteiro = roteiro;
 
+            // ADICIONADO: Salvamento automático
+            if (typeof BenetripAutoSave !== 'undefined') {
+                BenetripAutoSave.salvarRoteiro(this.state.formData);
+            }
+
             this.atualizarProgresso(90, '✨ Finalizando...');
             await this.delay(400);
             this.atualizarProgresso(100, '🎉 Pronto!');
             await this.delay(300);
 
             this.mostrarRoteiro(roteiro);
-
         } catch (erro) {
             this.error('Erro:', erro);
             alert(`Erro ao gerar roteiro: ${erro.message}`);
