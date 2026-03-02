@@ -402,6 +402,12 @@ const BenetripCompararVoos = {
             if (!data.success) throw new Error(data.message || 'Nenhum voo encontrado');
 
             this.state.resultados = data;
+            
+            // ADICIONADO: Salvamento automático
+            if (typeof BenetripAutoSave !== 'undefined') {
+                BenetripAutoSave.salvarCompararVoos(this.state.formData, data);
+            }
+
             this.log('✅ Resultados:', data.stats);
 
             this.updateProgress(100, '🎉 Pronto!');
