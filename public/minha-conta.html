@@ -941,46 +941,55 @@
         },
 
         renderRoteiros() {
-            const container = document.getElementById('roteiros-list');
-            const items = this.data.roteiros;
+    const container = document.getElementById('roteiros-list');
+    const items = this.data.roteiros;
 
-            if (!items.length) {
-                container.innerHTML = `
-                    <div class="empty-state">
-                        <div class="empty-state-icon">🗺️</div>
-                        <h3>Nenhum roteiro ainda</h3>
-                        <p>Ao gerar um roteiro com a Tripinha, ele será salvo automaticamente aqui!</p>
-                        <a href="roteiro-viagem.html" class="btn-empty-cta">📋 Criar Roteiro</a>
-                    </div>`;
-                return;
-            }
+    if (!items.length) {
+        container.innerHTML = `
+            <div class="empty-state">
+                <div class="empty-state-icon">🗺️</div>
+                <h3>Nenhum roteiro ainda</h3>
+                <p>Ao gerar um roteiro com a Tripinha, ele será salvo automaticamente aqui!</p>
+                <a href="roteiro-viagem.html" class="btn-empty-cta">📋 Criar Roteiro</a>
+            </div>`;
+        return;
+    }
 
-            container.innerHTML = items.map(item => {
-                const data = new Date(item.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' });
-                const dias = item.num_dias || '?';
+    container.innerHTML = items.map((item, index) => {
+        const data = new Date(item.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' });
+        const dias = item.num_dias || '?';
 
-                return `
-                    <div class="card">
-                        <div class="card-header">
-                            <div class="card-info">
-                                <div class="card-title">🗺️ ${item.destino_nome || '—'}${item.destino_pais ? ', ' + item.destino_pais : ''}</div>
-                                <div class="card-subtitle">
-                                    ${dias} dia${dias > 1 ? 's' : ''} · Salvo em ${data}
-                                    ${item.data_ida ? '<br>📅 ' + this.formatarDataCurta(item.data_ida) + (item.data_volta ? ' → ' + this.formatarDataCurta(item.data_volta) : '') : ''}
-                                </div>
-                            </div>
+        return `
+            <div class="card" id="card-roteiro-${index}">
+                <div class="card-header">
+                    <div class="card-info">
+                        <div class="card-title">🗺️ ${item.destino_nome || '—'}${item.destino_pais ? ', ' + item.destino_pais : ''}</div>
+                        <div class="card-subtitle">
+                            ${dias} dia${dias > 1 ? 's' : ''} · Salvo em ${data}
+                            ${item.data_ida ? '<br>📅 ' + this.formatarDataCurta(item.data_ida) + (item.data_volta ? ' → ' + this.formatarDataCurta(item.data_volta) : '') : ''}
                         </div>
-                        <div class="card-actions">
-                            <button class="card-action primary" onclick="MinhaConta.compartilharRoteiro('${item.id}')">
-                                📤 Compartilhar
-                            </button>
-                            <button class="card-action danger" onclick="MinhaConta.deletarRoteiro('${item.id}')">
-                                🗑️ Remover
-                            </button>
-                        </div>
-                    </div>`;
-            }).join('');
-        },
+                    </div>
+                </div>
+
+                <!-- Conteúdo expandível do roteiro -->
+                <div class="roteiro-expandido" id="roteiro-expandido-${index}" style="display:none; padding: 0 16px 12px; border-top: 1px solid var(--gray-200);">
+                    <div class="roteiro-expandido-inner"></div>
+                </div>
+
+                <div class="card-actions">
+                    <button class="card-action primary" onclick="MinhaConta.toggleVerRoteiro(${index}, ${JSON.stringify(item).replace(/"/g, '&quot;')})">
+                        👁️ <span id="btn-ver-label-${index}">Ver roteiro</span>
+                    </button>
+                    <button class="card-action blue" onclick="MinhaConta.compartilharRoteiro(${index}, ${JSON.stringify(item).replace(/"/g, '&quot;')})">
+                        📤 Compartilhar
+                    </button>
+                    <button class="card-action danger" onclick="MinhaConta.deletarRoteiro('${item.id}')">
+                        🗑️ Remover
+                    </button>
+                </div>
+            </div>`;
+    }).join('');
+},
 
         // ── PERFIL ──
         async loadPerfil() {
@@ -1049,17 +1058,136 @@
             } catch (e) { alert('Erro ao remover: ' + e.message); }
         },
 
-        async compartilharRoteiro(id) {
-            try {
-                const url = await BenetripAuth.shareItinerary(id);
-                if (navigator.share) {
-                    await navigator.share({ title: 'Meu Roteiro Benetrip 🐾', url });
-                } else {
-                    await navigator.clipboard.writeText(url);
-                    alert('Link copiado! Compartilhe com quem quiser 🐾');
-                }
-            } catch (e) { alert('Erro ao compartilhar: ' + e.message); }
-        },
+        // ── VER ROTEIRO ──
+toggleVerRoteiro(index, item) {
+    const container = document.getElementById(`roteiro-expandido-${index}`);
+    const label = document.getElementById(`btn-ver-label-${index}`);
+    const isVisible = container.style.display !== 'none';
+
+    if (isVisible) {
+        container.style.display = 'none';
+        label.textContent = 'Ver roteiro';
+        return;
+    }
+
+    const dados = item.dados_roteiro;
+    if (!dados || !dados.dias || dados.dias.length === 0) {
+        container.querySelector('.roteiro-expandido-inner').innerHTML =
+            `<p style="color:var(--gray-400);padding:12px 0;font-size:0.85rem;">
+                ⚠️ Conteúdo detalhado não disponível para este roteiro.
+                <a href="roteiro-viagem.html" style="color:var(--orange);">Gere um novo roteiro</a>
+             </p>`;
+        container.style.display = 'block';
+        label.textContent = 'Fechar';
+        return;
+    }
+
+    container.querySelector('.roteiro-expandido-inner').innerHTML =
+        this.renderRoteiroExpandido(dados, item);
+    container.style.display = 'block';
+    label.textContent = 'Fechar';
+},
+
+renderRoteiroExpandido(dados, item) {
+    const PERIODO_ICONS = { 'manhã': '🌅', 'manha': '🌅', 'tarde': '☀️', 'noite': '🌙' };
+
+    const renderAtividade = (ativ) => `
+        <div style="padding: 8px 0; border-bottom: 1px solid var(--gray-100);">
+            <div style="font-weight:600;font-size:0.85rem;">📍 ${ativ.nome || ''}</div>
+            ${ativ.descricao ? `<div style="font-size:0.8rem;color:var(--gray-600);margin-top:2px;">${ativ.descricao}</div>` : ''}
+            ${ativ.dica_tripinha ? `<div style="font-size:0.78rem;color:var(--orange);margin-top:4px;">💡 ${ativ.dica_tripinha}</div>` : ''}
+            <a href="https://maps.google.com/?q=${encodeURIComponent(ativ.google_maps_query || ativ.nome)}"
+               target="_blank"
+               style="font-size:0.75rem;color:var(--blue);text-decoration:none;display:inline-block;margin-top:4px;">
+               📍 Ver no mapa
+            </a>
+        </div>`;
+
+    const renderPeriodo = (periodo) => {
+        const icon = PERIODO_ICONS[periodo.periodo?.toLowerCase()] || '📌';
+        const label = (periodo.periodo || '').charAt(0).toUpperCase() + (periodo.periodo || '').slice(1);
+        return `
+            <div style="margin: 8px 0;">
+                <div style="font-size:0.8rem;font-weight:700;color:var(--gray-600);margin-bottom:4px;">
+                    ${icon} ${label}
+                </div>
+                ${(periodo.atividades || []).map(renderAtividade).join('')}
+            </div>`;
+    };
+
+    const renderDia = (dia) => `
+        <div style="margin-bottom:16px;">
+            <div style="background:var(--orange);color:white;padding:8px 12px;border-radius:8px;
+                        font-family:'Poppins',sans-serif;font-weight:600;font-size:0.85rem;margin-bottom:8px;">
+                Dia ${dia.dia_numero} — ${dia.dia_semana || ''}, ${dia.data || ''}
+                ${dia.titulo ? `<div style="font-weight:400;font-size:0.78rem;opacity:0.9;">${dia.titulo}</div>` : ''}
+            </div>
+            ${dia.resumo_tripinha ? `<div style="font-size:0.8rem;color:var(--gray-600);margin-bottom:8px;font-style:italic;">🐕 ${dia.resumo_tripinha}</div>` : ''}
+            ${(dia.periodos || []).map(renderPeriodo).join('')}
+        </div>`;
+
+    return `
+        <div style="padding-top:12px;">
+            ${dados.resumo_viagem ? `<div style="font-size:0.82rem;color:var(--gray-600);margin-bottom:12px;padding:10px;background:var(--gray-100);border-radius:8px;">🐕 ${dados.resumo_viagem}</div>` : ''}
+            ${(dados.dias || []).map(renderDia).join('')}
+        </div>`;
+},
+
+// ── COMPARTILHAR (corrigido) ──
+compartilharRoteiro(index, item) {
+    const dados = item.dados_roteiro;
+
+    if (!dados || !dados.dias || dados.dias.length === 0) {
+        alert('Conteúdo detalhado não disponível para compartilhar. Gere o roteiro novamente.');
+        return;
+    }
+
+    const destino = item.destino_nome || 'Destino';
+    const dataIda = item.data_ida ? new Date(item.data_ida + 'T12:00:00').toLocaleDateString('pt-BR') : '';
+    const dataVolta = item.data_volta ? new Date(item.data_volta + 'T12:00:00').toLocaleDateString('pt-BR') : '';
+
+    let texto = `🗺️ *Roteiro para ${destino}*\n`;
+    if (dataIda) texto += `📅 ${dataIda}${dataVolta ? ' → ' + dataVolta : ''}\n`;
+    texto += `\n`;
+
+    if (dados.resumo_viagem) texto += `🐕 ${dados.resumo_viagem}\n\n`;
+
+    const PERIODO_ICONS = { 'manhã': '🌅', 'manha': '🌅', 'tarde': '☀️', 'noite': '🌙' };
+
+    (dados.dias || []).forEach(dia => {
+        texto += `━━━━━━━━━━━━━━━\n`;
+        texto += `📌 *Dia ${dia.dia_numero} — ${dia.dia_semana || ''}, ${dia.data || ''}*\n`;
+        if (dia.titulo) texto += `${dia.titulo}\n`;
+        texto += `\n`;
+
+        (dia.periodos || []).forEach(periodo => {
+            const icon = PERIODO_ICONS[periodo.periodo?.toLowerCase()] || '📌';
+            const label = (periodo.periodo || '').charAt(0).toUpperCase() + (periodo.periodo || '').slice(1);
+            texto += `${icon} *${label}*\n`;
+
+            (periodo.atividades || []).forEach(ativ => {
+                texto += `  📍 ${ativ.nome}`;
+                if (ativ.duracao_minutos) texto += ` (~${ativ.duracao_minutos}min)`;
+                texto += `\n`;
+                const mapsUrl = `https://maps.google.com/?q=${encodeURIComponent(ativ.google_maps_query || ativ.nome)}`;
+                texto += `     📍 ${mapsUrl}\n\n`;
+            });
+        });
+    });
+
+    texto += `━━━━━━━━━━━━━━━\n`;
+    texto += `✨ Roteiro por Benetrip — benetrip.com.br\n🐕 Feito com carinho pela Tripinha!`;
+
+    const encoded = encodeURIComponent(texto);
+
+    if (encoded.length > 3500) {
+        navigator.clipboard.writeText(texto).catch(() => {});
+        alert('Roteiro muito longo para WhatsApp! O texto foi copiado para sua área de transferência. Cole onde quiser! 📋');
+        return;
+    }
+
+    window.open(`https://wa.me/?text=${encoded}`, '_blank');
+},
 
         confirmarLimparHistorico() {
             document.getElementById('confirm-title').textContent = '🗑️ Limpar todo o histórico?';
