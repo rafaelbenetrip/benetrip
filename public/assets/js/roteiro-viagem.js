@@ -381,12 +381,23 @@ const BenetripRoteiro = {
             }
 
             const roteiro = await response.json();
-            this.state.roteiro = roteiro;
+this.state.roteiro = roteiro;
 
-            // ADICIONADO: Salvamento automático
-            if (typeof BenetripAutoSave !== 'undefined') {
-                BenetripAutoSave.salvarRoteiro(this.state.formData);
-            }
+if (typeof BenetripAutoSave !== 'undefined') {
+    BenetripAutoSave.salvarRoteiro({
+        destino_nome:  this.state.formData.destino,
+        destino_pais:  roteiro.pais || '',
+        data_ida:      this.state.formData.dataIda,
+        data_volta:    this.state.formData.dataVolta,
+        num_dias:      roteiro.dias?.length || 0,
+        companhia:     this.state.formData.companhia,
+        preferencias:  this.state.formData.preferencias,
+        intensidade:   this.state.formData.intensidade,
+        orcamento:     this.state.formData.orcamentoAtividades,
+        observacoes:   this.state.formData.observacoes,
+        dados_roteiro: roteiro   // ✅ passa o roteiro gerado
+    });
+}
 
             this.atualizarProgresso(90, '✨ Finalizando...');
             await this.delay(400);
