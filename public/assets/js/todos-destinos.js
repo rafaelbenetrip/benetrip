@@ -343,12 +343,17 @@ const BenetripTodosDestinos = {
                 this.atualizarProgresso(20 + Math.floor((completed / totalCombos) * 60), `💰 ${completed}/${totalCombos} pesquisadas...`);
             }
 
-            this.atualizarProgresso(85, '✈️ Organizando resultados...');
+this.atualizarProgresso(85, '✈️ Organizando resultados...');
             const sorted = Array.from(allResults.values()).sort((a, b) => a.flight.price - b.flight.price);
             if (!sorted.length) throw new Error('Nenhum destino encontrado');
 
             this.state.todosDestinos = sorted;
-            BenetripAutoSave.salvarBuscaTodosDestinos(this.state.formData, sorted);
+
+            // ADICIONADO: Salvamento automático
+            if (typeof BenetripAutoSave !== 'undefined') {
+                BenetripAutoSave.salvarBuscaTodosDestinos(this.state.formData, sorted);
+            }
+
             this.prepararDadosFiltros(sorted);
             this.resetFiltros();
             this.aplicarFiltrosEMostrar();
