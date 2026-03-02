@@ -363,15 +363,21 @@ const BenetripVoos = {
     },
 
     finishSearch(){
-        if(this.state.pollTimer)clearTimeout(this.state.pollTimer);
-        if(this.state.tipInterval)clearInterval(this.state.tipInterval);
-        if(this.state.renderDebounceTimer){clearTimeout(this.state.renderDebounceTimer);this.state.renderDebounceTimer=null;}
-        this.setProgress(100,'Busca concluída!');
-        if(this.state.proposals.length===0){this.showPanel('empty');return;}
-        this.updateFilterBounds();this.populateAirlinesFilter();this.populateAirportsFilter();
-        this.showSearchingBanner(false);
-        if(!this.state.resultsShown) this.showResults();
-        else this.renderCards();
+        if(this.state.pollTimer)clearTimeout(this.state.pollTimer);
+        if(this.state.tipInterval)clearInterval(this.state.tipInterval);
+        if(this.state.renderDebounceTimer){clearTimeout(this.state.renderDebounceTimer);this.state.renderDebounceTimer=null;}
+        this.setProgress(100,'Busca concluída!');
+        if(this.state.proposals.length===0){this.showPanel('empty');return;}
+        this.updateFilterBounds();this.populateAirlinesFilter();this.populateAirportsFilter();
+        this.showSearchingBanner(false);
+        if(!this.state.resultsShown) this.showResults();
+        else this.renderCards();
+
+        // ══ AUTO-SAVE ══
+        if (typeof BenetripAutoSave !== 'undefined') {
+            BenetripAutoSave.salvarBuscaVoos(this.state.params, this.state.proposals);
+        }
+    },
 
         // ══ AUTO-SAVE ══
         // Adicionado um try/catch ou verificação de typeof para evitar que 
