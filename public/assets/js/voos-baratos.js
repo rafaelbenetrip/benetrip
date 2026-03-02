@@ -245,13 +245,19 @@ const BenetripVoosBaratos = {
                 throw new Error(err.message || 'Erro na busca');
             }
 
-            const data = await response.json();
+const data = await response.json();
 
             if (!data.success || !data.prices || data.prices.length === 0) {
                 throw new Error(data.message || 'Nenhum voo encontrado para esta rota');
             }
 
             this.state.resultados = data;
+
+            // ADICIONADO: Salvamento automático
+            if (typeof BenetripAutoSave !== 'undefined') {
+                BenetripAutoSave.salvarBuscaVoosBaratos(this.state.formData, data.prices);
+            }
+
             this.log('✅ Resultados:', data.stats);
             this.log('✈️ Voos enriquecidos:', data._meta?.enrichedCount || 0);
 
