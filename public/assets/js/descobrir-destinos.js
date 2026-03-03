@@ -657,7 +657,7 @@ const BenetripDiscovery = {
         params.set('hl', hl);
         params.set('gl', gl);
 
-        const url = `http://googleusercontent.com/google.com/travel/flights?${params.toString()}`;
+        const url = `https://www.google.com/travel/flights/search?${params.toString()}`;
 
         this.log('✈️ Google Flights URL:', {
             origin: originIata,
@@ -1285,7 +1285,6 @@ const BenetripDiscovery = {
         document.getElementById('loading-container').style.display = 'none';
         container.style.display = 'block';
         window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
-};
+    };
 
 document.addEventListener('DOMContentLoaded', () => BenetripDiscovery.init());
