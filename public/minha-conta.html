@@ -438,7 +438,6 @@
             outline: none;
         }
         .form-input:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(0,163,224,0.1); }
-        .form-select { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%239E9E9E' d='M6 8L1 3h10z'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 14px center; padding-right: 36px; }
         .btn-save-profile {
             padding: 13px 32px;
             background: var(--orange);
@@ -634,8 +633,19 @@
                 </div>
             </div>
 
-            <!-- ═══ TAB: PERFIL (dados pessoais + preferências de viagem) ═══ -->
+            <!-- ═══ TAB: PERFIL ═══ -->
             <div class="tab-panel" id="panel-perfil">
+                <div class="section-header">
+                    <span class="section-title">Seus dados</span>
+                </div>
+                <div class="profile-form">
+                    <div class="form-group">
+                        <label class="form-label">Nome de exibição</label>
+                        <input type="text" class="form-input" id="input-nome" placeholder="Como a Tripinha te chama?">
+                    </div>
+                    <button class="btn-save-profile" id="btn-save-profile" onclick="MinhaConta.salvarPerfil()">
+                        Salvar Alterações
+                    </button>
 
                     <!-- ═══ PREFERÊNCIAS DE VIAGEM (injetadas aqui por minha-conta-prefs.js) ═══ -->
                     <!-- MinhaContaPrefs.init() insere automaticamente a seção de preferências -->
@@ -1014,7 +1024,7 @@
 
             try {
                 await BenetripAuth.updateProfile({
-                    nome_exibicao: document.getElementById('input-nome').value.trim(),
+                    nome_exibicao: document.getElementById('input-nome').value.trim()
                 });
                 btn.textContent = '✅ Salvo!';
                 setTimeout(() => { btn.textContent = 'Salvar Alterações'; btn.disabled = false; }, 2000);
