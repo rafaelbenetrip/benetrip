@@ -1,19 +1,22 @@
 /**
  * BENETRIP - DESCOBRIR DESTINOS
  * Versão GOOGLE FLIGHTS v4.3 - OBSERVAÇÕES LIVRES
- * * NOVIDADES v4.3:
+ * 
+ * NOVIDADES v4.3:
  * - Campo "Observações livres" para o usuário descrever o que quer/não quer
  * - Observações enviadas ao LLM no rank-destinations (campo já existia na API)
  * - Resumo de critérios exibe observações quando preenchidas
  * - Contador de caracteres (máx 500)
- * * CORREÇÃO v4.2:
+ * 
+ * CORREÇÃO v4.2:
  * ❌ BUG CORRIGIDO: Destinos dentro do orçamento não apareciam quando havia poucos resultados
  * ✅ SOLUÇÃO: Sempre mostra destinos válidos, independente da quantidade mínima
- * * NOVIDADES v4.1:
+ * 
+ * NOVIDADES v4.1:
  * - Botão "← Nova busca" no topo dos resultados para fácil retorno
  * - Gerenciamento de histórico do navegador (pushState/popstate)
- * para que o botão "voltar" do celular retorne ao formulário
- * em vez de sair da página e perder a simulação
+ *   para que o botão "voltar" do celular retorne ao formulário
+ *   em vez de sair da página e perder a simulação
  * NOVIDADES v4.0:
  * - Links agora direcionam para Google Flights com todos os parâmetros
  * - Protobuf encoding para construir URLs compatíveis com Google Flights
@@ -21,7 +24,6 @@
  * - Classe de cabine: econômica (padrão)
  * - Auto-search ao abrir Google Flights com os parâmetros pré-preenchidos
  */
-
 const BenetripDiscovery = {
     state: {
         cidadesData: null,
@@ -30,20 +32,16 @@ const BenetripDiscovery = {
         resultados: null,
         viewingResults: false
     },
-
     config: {
         debug: true,
         cidadesJsonPath: 'data/cidades_global_iata_v6.json'
     },
-
     log(...args) {
         if (this.config.debug) console.log('[Benetrip]', ...args);
     },
-
     error(...args) {
         console.error('[Benetrip ERROR]', ...args);
     },
-
     init() {
         this.log('🐕 Benetrip Discovery v4.3 (Observações Livres) inicializando...');
         
@@ -61,7 +59,6 @@ const BenetripDiscovery = {
         
         this.log('✅ Inicialização completa');
     },
-
     // ================================================================
     // v4.3: Contador de caracteres para observações
     // ================================================================
@@ -74,7 +71,6 @@ const BenetripDiscovery = {
             });
         }
     },
-
     setupHistoryNavigation() {
         window.addEventListener('popstate', (event) => {
             if (this.state.viewingResults) {
@@ -83,13 +79,11 @@ const BenetripDiscovery = {
             }
         });
     },
-
     pushResultsState() {
         history.pushState({ benetripView: 'results' }, '', '');
         this.state.viewingResults = true;
         this.log('📌 History state pushed (results)');
     },
-
     async carregarCidades() {
         try {
             const response = await fetch(this.config.cidadesJsonPath);
@@ -111,11 +105,9 @@ const BenetripDiscovery = {
             ];
         }
     },
-
     normalizarTexto(texto) {
         return texto.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
     },
-
     buscarCidades(termo) {
         if (!this.state.cidadesData || termo.length < 2) return [];
         
@@ -138,7 +130,6 @@ const BenetripDiscovery = {
                 airport: cidade.aeroporto || null
             }));
     },
-
     setupAutocomplete() {
         const input = document.getElementById('origem');
         const results = document.getElementById('origem-results');
@@ -195,7 +186,6 @@ const BenetripDiscovery = {
             }
         });
     },
-
     selecionarOrigem(cidade) {
         const input = document.getElementById('origem');
         const results = document.getElementById('origem-results');
@@ -210,7 +200,6 @@ const BenetripDiscovery = {
         
         this.log('📍 Origem:', cidade);
     },
-
     setupCalendar() {
         const input = document.getElementById('datas');
         const dataIda = document.getElementById('data-ida');
@@ -234,18 +223,15 @@ const BenetripDiscovery = {
             }
         });
     },
-
     formatarDataISO(data) {
         const ano = data.getFullYear();
         const mes = String(data.getMonth() + 1).padStart(2, '0');
         const dia = String(data.getDate()).padStart(2, '0');
         return `${ano}-${mes}-${dia}`;
     },
-
     formatarDataBR(data) {
         return data.toLocaleDateString('pt-BR');
     },
-
     setupCompanhiaConditional() {
         const companhiaInput = document.getElementById('companhia');
         const numPessoasGroup = document.getElementById('num-pessoas-group');
@@ -259,7 +245,6 @@ const BenetripDiscovery = {
             familiaGroup.style.display = (value === 2) ? 'block' : 'none';
         });
     },
-
     setupFamiliaInputs() {
         document.querySelectorAll('.btn-number-sm').forEach(btn => {
             btn.addEventListener('click', () => {
@@ -267,25 +252,20 @@ const BenetripDiscovery = {
                 const action = btn.dataset.action;
                 const input = document.getElementById(targetId);
                 if (!input) return;
-
                 const value = parseInt(input.value);
                 const min = parseInt(input.min);
                 const max = parseInt(input.max);
-
                 if (action === 'increment' && value < max) {
                     input.value = value + 1;
                 } else if (action === 'decrement' && value > min) {
                     input.value = value - 1;
                 }
-
                 this.validarFamilia();
                 this.atualizarTotalFamilia();
             });
         });
-
         this.atualizarTotalFamilia();
     },
-
     validarFamilia() {
         const adultos = parseInt(document.getElementById('familia-adultos').value);
         const bebes = parseInt(document.getElementById('familia-bebes').value);
@@ -294,7 +274,6 @@ const BenetripDiscovery = {
             document.getElementById('familia-bebes').value = adultos;
         }
     },
-
     atualizarTotalFamilia() {
         const adultos = parseInt(document.getElementById('familia-adultos')?.value || 2);
         const criancas = parseInt(document.getElementById('familia-criancas')?.value || 0);
@@ -310,7 +289,6 @@ const BenetripDiscovery = {
             hint.textContent = `Total: ${total} passageiro${total > 1 ? 's' : ''} (${parts.join(', ')})`;
         }
     },
-
     setupOptionButtons() {
         document.querySelectorAll('.button-group').forEach(group => {
             const field = group.dataset.field;
@@ -341,7 +319,6 @@ const BenetripDiscovery = {
             });
         });
     },
-
     setupNumberInput() {
         const input = document.getElementById('num-pessoas');
         const decrementBtn = document.querySelector('#num-pessoas-group .btn-number[data-action="decrement"]');
@@ -361,7 +338,6 @@ const BenetripDiscovery = {
             });
         }
     },
-
     setupCurrencyInput() {
         const input = document.getElementById('orcamento');
         const moedaInput = document.getElementById('moeda');
@@ -386,7 +362,6 @@ const BenetripDiscovery = {
             });
         }
     },
-
     setupFormEvents() {
         const form = document.getElementById('descobrir-form');
         
@@ -401,7 +376,6 @@ const BenetripDiscovery = {
             await this.buscarDestinos();
         });
     },
-
     validarFormulario() {
         if (!this.state.origemSelecionada) {
             alert('Por favor, selecione uma cidade de origem');
@@ -424,7 +398,6 @@ const BenetripDiscovery = {
             document.getElementById('datas').focus();
             return false;
         }
-
         if (!document.getElementById('moeda').value) {
             alert('Por favor, escolha a moeda');
             return false;
@@ -441,7 +414,6 @@ const BenetripDiscovery = {
         
         return true;
     },
-
     coletarDadosFormulario() {
         const companhia = parseInt(document.getElementById('companhia').value);
         
@@ -449,7 +421,6 @@ const BenetripDiscovery = {
         let criancas = 0;
         let bebes = 0;
         let numPessoas = 1;
-
         switch (companhia) {
             case 0: adultos = 1; numPessoas = 1; break;
             case 1: adultos = 2; numPessoas = 2; break;
@@ -464,14 +435,11 @@ const BenetripDiscovery = {
                 numPessoas = adultos;
                 break;
         }
-
         const prefString = document.getElementById('preferencias').value;
         const preferenciasArray = prefString.split(',').filter(Boolean);
         const escopoDestino = document.getElementById('escopo-destino').value || 'tanto_faz';
-
         // v4.3: Coletar observações livres (opcional)
         const observacoes = (document.getElementById('observacoes')?.value || '').trim();
-
         this.state.formData = {
             origem: this.state.origemSelecionada,
             companhia: companhia,
@@ -492,51 +460,43 @@ const BenetripDiscovery = {
         this.log('📝 Dados:', this.state.formData);
         if (observacoes) this.log('💬 Observações do viajante:', observacoes);
     },
-
     getSimbolo(moeda) {
         return { 'BRL': 'R$', 'USD': 'US$', 'EUR': '€' }[moeda] || 'R$';
     },
-
     formatarPreco(valor, moeda) {
         const simbolo = this.getSimbolo(moeda || this.state.formData.moeda);
         return `${simbolo} ${Math.round(valor).toLocaleString('pt-BR')}`;
     },
-
     COMPANHIA_LABELS: {
         0: { emoji: '🧳', texto: 'Sozinho(a)' },
         1: { emoji: '❤️', texto: 'Viagem romântica' },
         2: { emoji: '👨‍👩‍👧‍👦', texto: 'Em família' },
         3: { emoji: '🎉', texto: 'Com amigos' }
     },
-
     PREFERENCIAS_LABELS: {
         'relax':    { emoji: '🌊', texto: 'Relax total' },
         'aventura': { emoji: '🏔️', texto: 'Aventura e emoção' },
         'cultura':  { emoji: '🏛️', texto: 'Cultura e história' },
         'urbano':   { emoji: '🏙️', texto: 'Agito urbano' }
     },
-
     COMPANHIA_API_MAP: {
         0: 'Viajando sozinho(a)',
         1: 'Viagem romântica (casal)',
         2: 'Viagem em família',
         3: 'Viagem com amigos'
     },
-
     PREFERENCIAS_API_MAP: {
         'relax': 'Relaxamento, praias, descanso e natureza tranquila',
         'aventura': 'Aventura, trilhas, esportes radicais e natureza selvagem',
         'cultura': 'Cultura, museus, história, gastronomia e arquitetura',
         'urbano': 'Agito urbano, vida noturna, compras e experiências cosmopolitas'
     },
-
     getPreferenciasDescricao(prefArray) {
         if (!prefArray || prefArray.length === 0) return 'Não informado';
         return prefArray
             .map(p => this.PREFERENCIAS_API_MAP[p] || p)
             .join(' + ');
     },
-
     getPreferenciasResumo(prefArray) {
         if (!prefArray || prefArray.length === 0) return { emoji: '🎯', texto: 'Não informado' };
         const partes = prefArray.map(p => this.PREFERENCIAS_LABELS[p] || { emoji: '🎯', texto: p });
@@ -545,7 +505,6 @@ const BenetripDiscovery = {
             texto: partes.map(p => p.texto).join(' + ')
         };
     },
-
     _protoVarint(n) {
         const bytes = [];
         let v = n >>> 0;
@@ -556,15 +515,12 @@ const BenetripDiscovery = {
         bytes.push(v & 0x7f);
         return bytes;
     },
-
     _protoTag(fieldNumber, wireType) {
         return this._protoVarint((fieldNumber << 3) | wireType);
     },
-
     _protoVarintField(fieldNumber, value) {
         return [...this._protoTag(fieldNumber, 0), ...this._protoVarint(value)];
     },
-
     _protoStringField(fieldNumber, str) {
         const encoded = new TextEncoder().encode(str);
         return [
@@ -573,7 +529,6 @@ const BenetripDiscovery = {
             ...encoded
         ];
     },
-
     _protoMessageField(fieldNumber, messageBytes) {
         return [
             ...this._protoTag(fieldNumber, 2),
@@ -581,7 +536,6 @@ const BenetripDiscovery = {
             ...messageBytes
         ];
     },
-
     _toBase64Url(bytes) {
         const binary = String.fromCharCode(...bytes);
         return btoa(binary)
@@ -589,14 +543,12 @@ const BenetripDiscovery = {
             .replace(/\//g, '_')
             .replace(/=+$/, '');
     },
-
     _buildAirport(iataCode) {
         return [
             ...this._protoVarintField(1, 1),
             ...this._protoStringField(2, iataCode)
         ];
     },
-
     _buildFlightLeg(date, originIata, destIata) {
         return [
             ...this._protoStringField(2, date),
@@ -604,7 +556,6 @@ const BenetripDiscovery = {
             ...this._protoMessageField(14, this._buildAirport(destIata))
         ];
     },
-
     _buildTfsParam(originIata, destIata, departDate, returnDate) {
         const tfsBytes = [
             ...this._protoVarintField(1, 28),
@@ -613,52 +564,42 @@ const BenetripDiscovery = {
             ...this._protoMessageField(3, this._buildFlightLeg(returnDate, destIata, originIata)),
             ...this._protoVarintField(14, 1)
         ];
-
         return this._toBase64Url(tfsBytes);
     },
-
     _buildTfuParam(adults, children, infantsOnLap) {
         const innerBytes = [
             ...this._protoVarintField(1, adults),
             ...this._protoVarintField(2, children),
             ...this._protoVarintField(3, infantsOnLap)
         ];
-
         const outerBytes = this._protoMessageField(2, innerBytes);
         return this._toBase64Url(outerBytes);
     },
-
     _getGoogleCurrency(moeda) {
         const map = { 'BRL': 'BRL', 'USD': 'USD', 'EUR': 'EUR' };
         return map[moeda] || 'BRL';
     },
-
     _getGoogleLocale(moeda) {
         const map = { 'BRL': 'pt-BR', 'USD': 'en', 'EUR': 'en' };
         return map[moeda] || 'pt-BR';
     },
-
     _getGoogleGl(moeda) {
         const map = { 'BRL': 'br', 'USD': 'us', 'EUR': 'de' };
         return map[moeda] || 'br';
     },
-
     buildGoogleFlightsUrl(originIata, destIata, departDate, returnDate, adults, children, infants, currency) {
         const tfs = this._buildTfsParam(originIata, destIata, departDate, returnDate);
         const tfu = this._buildTfuParam(adults, children, infants);
         const curr = this._getGoogleCurrency(currency);
         const hl = this._getGoogleLocale(currency);
         const gl = this._getGoogleGl(currency);
-
         const params = new URLSearchParams();
         params.set('tfs', tfs);
         params.set('tfu', tfu);
         params.set('curr', curr);
         params.set('hl', hl);
         params.set('gl', gl);
-
         const url = `https://www.google.com/travel/flights/search?${params.toString()}`;
-
         this.log('✈️ Google Flights URL:', {
             origin: originIata,
             destination: destIata,
@@ -667,10 +608,8 @@ const BenetripDiscovery = {
             currency: curr,
             url: url
         });
-
         return url;
     },
-
     async buscarDestinos() {
         try {
             this.mostrarLoading();
@@ -691,7 +630,6 @@ const BenetripDiscovery = {
                 this.mostrarSemResultados();
                 return;
             }
-
             const destinosParaRanking = filtro.destinos;
             this.log(`📋 Cenário: ${filtro.cenario} | ${destinosParaRanking.length} destinos para ranking`);
             
@@ -713,7 +651,6 @@ const BenetripDiscovery = {
             this.esconderLoading();
         }
     },
-
     async buscarDestinosAPI() {
         const response = await fetch('/api/search-destinations', {
             method: 'POST',
@@ -734,7 +671,6 @@ const BenetripDiscovery = {
         }
         
         const data = await response.json();
-
         if (data._meta) {
             this.log('📊 Triple Search:', {
                 global: data._meta.sources.global,
@@ -746,10 +682,8 @@ const BenetripDiscovery = {
                 escopo: data._meta.escopoDestino || 'tanto_faz'
             });
         }
-
         return data.destinations;
     },
-
     // ================================================================
     // v4.2: FILTRO DE ORÇAMENTO CORRIGIDO
     // SEMPRE MOSTRA DESTINOS VÁLIDOS, independente da quantidade mínima
@@ -757,24 +691,20 @@ const BenetripDiscovery = {
     filtrarDestinos(destinos) {
         const { orcamento, moeda } = this.state.formData;
         const simbolo = this.getSimbolo(moeda);
-
         const comPreco = destinos.filter(d => (d.flight?.price || 0) > 0);
         
         if (comPreco.length === 0) {
             this.log('❌ Nenhum destino com preço disponível');
             return { cenario: 'nenhum', destinos: [], mensagem: '' };
         }
-
         // Sem orçamento definido → mostra tudo
         if (!orcamento) {
             return { cenario: 'ideal', destinos: comPreco, mensagem: '' };
         }
-
         // ============================================================
         // NOVA LÓGICA: Sempre mostra destinos dentro do orçamento
         // A quantidade define apenas a mensagem/cenário, não se mostra
         // ============================================================
-
         // 1. Faixa ideal: 80-100% do orçamento
         const faixa80 = comPreco.filter(d => d.flight.price >= orcamento * 0.8 && d.flight.price <= orcamento);
         
@@ -783,11 +713,9 @@ const BenetripDiscovery = {
         
         // 3. Qualquer coisa abaixo do orçamento
         const abaixo = comPreco.filter(d => d.flight.price <= orcamento);
-
         // ============================================================
         // DECISÃO DE CENÁRIO (mas sempre mostra se tiver destinos!)
         // ============================================================
-
         // CENÁRIO IDEAL: 5+ destinos na faixa 80-100%
         if (faixa80.length >= 5) {
             this.log(`✅ IDEAL: ${faixa80.length} destinos na faixa 80-100%`);
@@ -797,7 +725,6 @@ const BenetripDiscovery = {
                 mensagem: '' 
             };
         }
-
         // CENÁRIO BOM: 3+ destinos na faixa 60-100%
         if (faixa60.length >= 3) {
             this.log(`👍 BOM: ${faixa60.length} destinos na faixa 60-100%`);
@@ -807,7 +734,6 @@ const BenetripDiscovery = {
                 mensagem: `🐕 A Tripinha encontrou os melhores destinos dentro do seu orçamento de ${simbolo} ${orcamento.toLocaleString('pt-BR')}. Confira as opções!`
             };
         }
-
         // ✅ CORREÇÃO v4.2: SEMPRE mostra se tiver destinos dentro do orçamento
         // (mesmo que seja 1 ou 2 destinos apenas)
         if (abaixo.length > 0) {
@@ -822,14 +748,12 @@ const BenetripDiscovery = {
             } else {
                 mensagem = `🐕 Não encontrei muitas opções próximas ao orçamento ideal, mas achei ${abaixo.length} destinos dentro de ${simbolo} ${orcamento.toLocaleString('pt-BR')} que podem te interessar!`;
             }
-
             return {
                 cenario: 'abaixo',
                 destinos: abaixo,
                 mensagem: mensagem
             };
         }
-
         // SÓ RETORNA "NENHUM" se REALMENTE não tiver nada dentro do orçamento
         this.log(`❌ Nenhum destino dentro do orçamento de ${simbolo} ${orcamento.toLocaleString('pt-BR')}`);
         
@@ -846,17 +770,14 @@ const BenetripDiscovery = {
             mensagem: '' 
         };
     },
-
     calcularNoites(dataIda, dataVolta) {
         const ida = new Date(dataIda);
         const volta = new Date(dataVolta);
         return Math.ceil((volta - ida) / (1000 * 60 * 60 * 24));
     },
-
     async ranquearDestinosAPI(destinos, cenario) {
         const { formData } = this.state;
         const noites = this.calcularNoites(formData.dataIda, formData.dataVolta);
-
         let companhiaDesc = this.COMPANHIA_API_MAP[formData.companhia] || 'Não informado';
         if (formData.companhia === 2) {
             const parts = [`${formData.adultos} adulto(s)`];
@@ -864,7 +785,6 @@ const BenetripDiscovery = {
             if (formData.bebes > 0) parts.push(`${formData.bebes} bebê(s) de 0-1 ano`);
             companhiaDesc = `Viagem em família: ${parts.join(', ')}`;
         }
-
         // v4.3: Enviar observações do viajante para a API de ranking
         const response = await fetch('/api/rank-destinations', {
             method: 'POST',
@@ -893,20 +813,15 @@ const BenetripDiscovery = {
         }
         
         const ranking = await response.json();
-
         if (ranking._model) {
             this.log(`🤖 Modelo: ${ranking._model} | Analisados: ${ranking._totalAnalisados}`);
         }
-
         return ranking;
     },
-
     gerarLinksGoogleFlights(ranking) {
         const { origem, dataIda, dataVolta, adultos, criancas, bebes, moeda } = this.state.formData;
-
         const gerarLink = (d) => {
             if (!d?.primary_airport) return '#';
-
             return this.buildGoogleFlightsUrl(
                 origem.code,
                 d.primary_airport,
@@ -928,28 +843,23 @@ const BenetripDiscovery = {
             _poucosResultados: ranking._poucosResultados || false,
         };
     },
-
     mostrarLoading() {
         document.getElementById('form-container').style.display = 'none';
         document.getElementById('loading-container').style.display = 'block';
         document.getElementById('resultados-container').style.display = 'none';
         window.scrollTo({ top: 0, behavior: 'smooth' });
     },
-
     esconderLoading() {
         document.getElementById('loading-container').style.display = 'none';
         document.getElementById('form-container').style.display = 'block';
     },
-
     atualizarProgresso(pct, msg) {
         document.getElementById('progress-fill').style.width = `${pct}%`;
         document.getElementById('loading-message').textContent = msg;
     },
-
     delay(ms) {
         return new Promise(r => setTimeout(r, ms));
     },
-
     voltarAoFormulario(fromPopstate) {
         document.getElementById('resultados-container').style.display = 'none';
         document.getElementById('resultados-container').innerHTML = '';
@@ -967,7 +877,6 @@ const BenetripDiscovery = {
         
         this.log('🔄 Voltou ao formulário com dados preservados');
     },
-
     gerarBotaoVoltarTopo() {
         return `
             <button class="btn-voltar-topo" onclick="BenetripDiscovery.voltarAoFormulario()">
@@ -979,7 +888,6 @@ const BenetripDiscovery = {
             </button>
         `;
     },
-
     gerarResumoCriterios() {
         const { origem, companhia, adultos, criancas, bebes, numPessoas, preferenciasArray, escopoDestino, dataIda, dataVolta, moeda, orcamento, observacoes } = this.state.formData;
         const noites = this.calcularNoites(dataIda, dataVolta);
@@ -990,7 +898,6 @@ const BenetripDiscovery = {
         
         const dataIdaBR = new Date(dataIda + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
         const dataVoltaBR = new Date(dataVolta + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' });
-
         let pessoasInfo = '';
         if (companhia === 0) {
             pessoasInfo = '1 adulto';
@@ -1004,15 +911,12 @@ const BenetripDiscovery = {
         } else {
             pessoasInfo = `${numPessoas} adultos`;
         }
-
         const origemDisplay = origem.airport 
             ? `${origem.name} — ${origem.airport} (${origem.code})`
             : `${origem.name} (${origem.code})`;
-
         const escopoLabel = escopoDestino === 'internacional' 
             ? '✈️ Apenas internacionais' 
             : '🗺️ Nacionais e internacionais';
-
         // v4.3: Mostrar observações no resumo quando preenchidas
         const observacoesItem = observacoes 
             ? `<div class="criterio-item" style="grid-column: 1 / -1;">
@@ -1020,7 +924,6 @@ const BenetripDiscovery = {
                     <span class="criterio-valor">💬 "${observacoes}"</span>
                </div>`
             : '';
-
         return `
             <div class="criterios-resumo">
                 <div class="criterios-titulo">
@@ -1057,19 +960,14 @@ const BenetripDiscovery = {
             </div>
         `;
     },
-
     mostrarSemResultados() {
         const container = document.getElementById('resultados-container');
         const { orcamento, moeda, origem, escopoDestino } = this.state.formData;
         const simbolo = this.getSimbolo(moeda);
-
         const isInternacional = escopoDestino === 'internacional';
-
         this.pushResultsState();
-
         container.innerHTML = `
             ${this.gerarBotaoVoltarTopo()}
-
             <div class="sem-resultados">
                 <img src="assets/images/tripinha/avatar-triste.png" alt="Tripinha triste" class="tripinha-triste" 
                      onerror="this.style.display='none'">
@@ -1093,25 +991,21 @@ const BenetripDiscovery = {
                 </button>
             </div>
         `;
-
         document.getElementById('loading-container').style.display = 'none';
         container.style.display = 'block';
         window.scrollTo({ top: 0, behavior: 'smooth' });
     },
-
     mostrarResultados(destinos, cenario, mensagem) {
         // Início da alteração: Salvamento automático
         if (typeof BenetripAutoSave !== 'undefined') {
             BenetripAutoSave.salvarBuscaDestinos(this.state.formData, destinos);
         }
         // Fim da alteração
-
         const container = document.getElementById('resultados-container');
         const { dataIda, dataVolta, moeda, numPessoas } = this.state.formData;
         const noites = this.calcularNoites(dataIda, dataVolta);
         
         this.pushResultsState();
-
         const formatPreco = (d) => this.formatarPreco(d.flight?.price || 0, moeda);
         
         const formatParadas = (d) => {
@@ -1120,14 +1014,12 @@ const BenetripDiscovery = {
             if (stops === 1) return '✈️ 1 parada';
             return `✈️ ${stops} paradas`;
         };
-
         const fonteBadge = (d) => {
             const count = d._source_count || 1;
             if (count >= 3) return '<span class="fonte-badge fonte-alta" title="Encontrado em 3 buscas diferentes">⭐ Alta confiança</span>';
             if (count >= 2) return '<span class="fonte-badge fonte-media" title="Encontrado em 2 buscas diferentes">✓ Confirmado</span>';
             return '';
         };
-
         const custoEstimado = (d) => {
             const passagem = d.flight?.price || 0;
             const hotelTotalQuarto = (d.avg_cost_per_night || 0) * noites;
@@ -1153,22 +1045,18 @@ const BenetripDiscovery = {
             }
             return '';
         };
-
         const comentarioHtml = (d) => {
             if (!d.comentario) return '';
             return `<div class="destino-comentario">${d.comentario}</div>`;
         };
-
         const dicaHtml = (d) => {
             if (!d.dica) return '';
             return `<div class="destino-dica"><span class="dica-icon">💡</span> ${d.dica}</div>`;
         };
-
         const totalExibidos = 1 
             + (destinos.alternativas?.length || 0) 
             + (destinos.surpresa ? 1 : 0);
         const poucosResultados = destinos._poucosResultados || totalExibidos < 5;
-
         let bannerPoucosResultados = '';
         if (poucosResultados) {
             bannerPoucosResultados = `
@@ -1179,10 +1067,8 @@ const BenetripDiscovery = {
                 </div>
             `;
         }
-
         const googleFlightsBtnLabel = 'Buscar no Google Flights';
         const googleFlightsBtnIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 4px;"><path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/></svg>`;
-
         let alternativasHtml = '';
         if (destinos.alternativas && destinos.alternativas.length > 0) {
             alternativasHtml = `
@@ -1207,7 +1093,6 @@ const BenetripDiscovery = {
                 </div>
             `;
         }
-
         let surpresaHtml = '';
         if (destinos.surpresa) {
             surpresaHtml = `
@@ -1222,16 +1107,15 @@ const BenetripDiscovery = {
                     <div class="descricao">${destinos.surpresa.razao || 'Descubra!'}</div>
                     ${comentarioHtml(destinos.surpresa)}
                     ${dicaHtml(destinos.surpresa)}
-                    <a href="${destinos.surpresa.link}" target="_blank" rel="noopener" class="btn-ver-voos btn-google-flights">${googleFlightsBtnIcon} Descobrir no Google Flights ✈️</a>
+                    <a href="${destinos.surpresa.link}" target="_blank" rel="noopener" class="btn-ver-voos btn-google-flights">
+                        ${googleFlightsBtnIcon} Descobrir no Google Flights ✈️
+                    </a>
                 </div>
             `;
         }
-
         const html = `
             ${this.gerarBotaoVoltarTopo()}
-
             ${this.gerarResumoCriterios()}
-
             <div class="resultado-header">
                 <h1>${cenario === 'ideal' && !poucosResultados ? '🎉 Destinos Perfeitos!' : poucosResultados ? '✈️ Destinos Encontrados' : '✈️ Destinos Encontrados!'}</h1>
                 <p class="resultado-subtitulo">
@@ -1242,15 +1126,12 @@ const BenetripDiscovery = {
                     🔗 Os links abrem diretamente no <strong>Google Flights</strong> com suas preferências pré-preenchidas
                 </p>
             </div>
-
             ${bannerPoucosResultados}
-
             ${mensagem && !poucosResultados ? `
             <div class="resultado-banner ${cenario === 'abaixo' ? 'banner-aviso' : 'banner-info'}">
                 <p>${mensagem}</p>
             </div>
             ` : ''}
-
             <div class="top-destino">
                 <div class="badge">${totalExibidos === 1 ? 'DESTINO ENCONTRADO' : 'MELHOR DESTINO PARA VOCÊ'}</div>
                 ${fonteBadge(destinos.top_destino)}
@@ -1262,13 +1143,12 @@ const BenetripDiscovery = {
                 <div class="descricao">${destinos.top_destino.razao || 'Perfeito para você!'}</div>
                 ${comentarioHtml(destinos.top_destino)}
                 ${dicaHtml(destinos.top_destino)}
-                <a href="${destinos.top_destino.link}" target="_blank" rel="noopener" class="btn-ver-voos btn-google-flights btn-google-flights-destaque">${googleFlightsBtnIcon} ${googleFlightsBtnLabel} ✈️</a>
+                <a href="${destinos.top_destino.link}" target="_blank" rel="noopener" class="btn-ver-voos btn-google-flights btn-google-flights-destaque">
+                    ${googleFlightsBtnIcon} ${googleFlightsBtnLabel} ✈️
+                </a>
             </div>
-
             ${alternativasHtml}
-
             ${surpresaHtml}
-
             <div class="buscar-novamente-section">
                 <p class="buscar-novamente-texto">
                     ${poucosResultados 
@@ -1285,6 +1165,7 @@ const BenetripDiscovery = {
         document.getElementById('loading-container').style.display = 'none';
         container.style.display = 'block';
         window.scrollTo({ top: 0, behavior: 'smooth' });
-    };
+    }   // ← fecha o método mostrarResultados (sem vírgula: último método)
+};      // ← fecha o objeto BenetripDiscovery e encerra o const
 
 document.addEventListener('DOMContentLoaded', () => BenetripDiscovery.init());
