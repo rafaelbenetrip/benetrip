@@ -711,14 +711,27 @@ const BenetripDiscovery = {
         }
     },
     // ================================================================
-    // v4.4: buscarDestinosAPI envia code (que pode ser kgmid ou IATA)
+    // v4.4: buscarDestinosAPI envia aeroportos separados por vírgula
+    // quando a origem é cidade agrupada (ex: "GRU,CGH,VCP" para São Paulo)
     // ================================================================
     async buscarDestinosAPI() {
+        const origem = this.state.formData.origem;
+        
+        // v4.4: Se é cidade agrupada, enviar aeroportos como lista
+        // Ex: "GRU,CGH,VCP" em vez de kgmid "/m/02cft"
+        let origemParaAPI;
+        if (origem.isCityCode && origem.aeroportosIncluidos && origem.aeroportosIncluidos.length > 0) {
+            origemParaAPI = origem.aeroportosIncluidos.join(',');
+            this.log(`🏙️ Origem agrupada: ${origem.displayCode} → enviando aeroportos: ${origemParaAPI}`);
+        } else {
+            origemParaAPI = origem.code;
+        }
+        
         const response = await fetch('/api/search-destinations', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                origem: this.state.formData.origem.code,  // kgmid ou IATA
+                origem: origemParaAPI,  // IATA único ou múltiplos separados por vírgula
                 dataIda: this.state.formData.dataIda,
                 dataVolta: this.state.formData.dataVolta,
                 preferencias: this.state.formData.preferenciasArray,
