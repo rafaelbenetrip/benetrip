@@ -640,23 +640,6 @@
                     <span class="section-title">Seus dados</span>
                 </div>
                 <div class="profile-form">
-                    <div class="form-group">
-                        <label class="form-label">Nome de exibição</label>
-                        <input type="text" class="form-input" id="input-nome" placeholder="Como a Tripinha te chama?">
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Moeda preferida</label>
-                        <select class="form-input form-select" id="input-moeda">
-                            <option value="BRL">R$ — Real Brasileiro</option>
-                            <option value="USD">US$ — Dólar Americano</option>
-                            <option value="EUR">€ — Euro</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Cidade de origem padrão (IATA)</label>
-                        <input type="text" class="form-input" id="input-cidade-origem" placeholder="Ex: GRU, CGH, GIG..." maxlength="3" style="text-transform: uppercase;">
-                    </div>
-                    <button class="btn-save-profile" id="btn-save-profile" onclick="MinhaConta.salvarPerfil()">
                         Salvar Alterações
                     </button>
 
@@ -1019,8 +1002,6 @@
                 if (profile) {
                     this.data.profile = profile;
                     document.getElementById('input-nome').value = profile.nome_exibicao || BenetripAuth.getUserDisplayName();
-                    document.getElementById('input-moeda').value = profile.moeda_preferida || 'BRL';
-                    document.getElementById('input-cidade-origem').value = profile.cidade_origem_padrao || '';
                 } else {
                     document.getElementById('input-nome').value = BenetripAuth.getUserDisplayName();
                 }
@@ -1040,8 +1021,6 @@
             try {
                 await BenetripAuth.updateProfile({
                     nome_exibicao: document.getElementById('input-nome').value.trim(),
-                    moeda_preferida: document.getElementById('input-moeda').value,
-                    cidade_origem_padrao: document.getElementById('input-cidade-origem').value.trim().toUpperCase()
                 });
                 btn.textContent = '✅ Salvo!';
                 setTimeout(() => { btn.textContent = 'Salvar Alterações'; btn.disabled = false; }, 2000);
