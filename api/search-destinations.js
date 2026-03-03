@@ -244,21 +244,25 @@ export default async function handler(req, res) {
         }
 
         // ============================================================
-        // v3.3: VALIDAÇÃO - Aceita IATA (GRU) ou kgmid (/m/02cft)
+        // v3.3: VALIDAÇÃO - Aceita IATA (GRU), múltiplos IATA (GRU,CGH,VCP) ou kgmid (/m/02cft)
         // ============================================================
         const origemRaw = origem.trim();
         const isKgmid = origemRaw.startsWith('/m/');
         const isIata = /^[A-Z]{3}$/i.test(origemRaw);
+        // v3.3b: Múltiplos IATA separados por vírgula (ex: GRU,CGH,VCP)
+        const isMultiIata = /^[A-Z]{3}(,[A-Z]{3})+$/i.test(origemRaw);
         
-        if (!isKgmid && !isIata) {
+        if (!isKgmid && !isIata && !isMultiIata) {
             return res.status(400).json({
                 error: 'Código de origem inválido',
-                message: 'Use código IATA (3 letras, ex: GRU) ou kgmid de cidade (ex: /m/02cft)'
+                message: 'Use código IATA (ex: GRU), múltiplos IATA (ex: GRU,CGH,VCP) ou kgmid (ex: /m/02cft)'
             });
         }
         
         // Para IATA, normaliza para maiúsculo. Para kgmid, mantém como está.
         const origemCode = isKgmid ? origemRaw : origemRaw.toUpperCase();
+        // Para geo, usar o primeiro aeroporto se for múltiplos
+        const origemGeoKey = isMultiIata ? origemCode.split(',')[0] : origemCode;
 
         if (!process.env.SEARCHAPI_KEY) {
             return res.status(500).json({
@@ -269,12 +273,12 @@ export default async function handler(req, res) {
 
         const currencyCode = (moeda && /^[A-Z]{3}$/.test(moeda)) ? moeda : 'BRL';
         const apenasInternacional = escopoDestino === 'internacional';
-        console.log(`💱 Moeda: ${currencyCode} | Escopo: ${apenasInternacional ? 'INTERNACIONAL' : 'TODOS'} | Tipo: ${isKgmid ? 'KGMID' : 'IATA'}`);
+        console.log(`💱 Moeda: ${currencyCode} | Escopo: ${apenasInternacional ? 'INTERNACIONAL' : 'TODOS'} | Tipo: ${isKgmid ? 'KGMID' : isMultiIata ? 'MULTI_IATA' : 'IATA'}`);
 
         // ============================================================
-        // v3.3: RESOLVER GEO (aceita IATA ou kgmid)
+        // v3.3: RESOLVER GEO (usa primeiro aeroporto se múltiplos)
         // ============================================================
-        const geo = resolveGeo(origemCode);
+        const geo = resolveGeo(origemGeoKey);
 
         console.log(`🔍 Multi-Continent Search de ${origemCode} | País: ${geo?.pais || '?'} | Continente: ${geo?.continente || '?'} | Internacional: ${apenasInternacional}`);
 
@@ -503,7 +507,7 @@ export default async function handler(req, res) {
                 _debug: {
                     totalBuscas: searchPromises.length,
                     apenasInternacional,
-                    origemTipo: isKgmid ? 'kgmid' : 'iata',
+                    origemTipo: isKgmid ? 'kgmid' : isMultiIata ? 'multi_iata' : 'iata',
                 }
             });
         }
@@ -555,7 +559,7 @@ export default async function handler(req, res) {
             _meta: {
                 totalTime,
                 currency: currencyCode,
-                origemTipo: isKgmid ? 'kgmid' : 'iata',
+                origemTipo: isKgmid ? 'kgmid' : isMultiIata ? 'multi_iata' : 'iata',
                 escopoDestino: apenasInternacional ? 'internacional' : 'tanto_faz',
                 preferencias: prefArray,
                 sources,      // Compatível com v3.0
