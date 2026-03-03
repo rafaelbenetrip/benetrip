@@ -34,7 +34,7 @@ const BenetripDiscovery = {
     },
     config: {
         debug: true,
-        cidadesJsonPath: 'data/cidades_global_iata_v6.json'
+        cidadesJsonPath: 'data/cidades_global_iata_v0.json'
     },
     log(...args) {
         if (this.config.debug) console.log('[Benetrip]', ...args);
