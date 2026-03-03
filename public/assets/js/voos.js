@@ -379,21 +379,6 @@ const BenetripVoos = {
         }
     },
 
-        // ══ AUTO-SAVE ══
-        // Adicionado um try/catch ou verificação de typeof para evitar que 
-        // a tela quebre caso o BenetripAutoSave demore a carregar.
-        if (typeof BenetripAutoSave !== 'undefined') {
-            BenetripAutoSave.salvarBuscaVoos({ 
-                origem: this.state.params.origin, 
-                destino: this.state.params.destination, 
-                dataIda: this.state.params.departure_date, 
-                dataVolta: this.state.params.return_date, 
-                adultos: this.state.params.adults, 
-                moeda: this.state.params.currency 
-            }, this.state.proposals);
-        }
-    },
-
     showSearchingBanner(show) {
         let banner = document.getElementById('searching-banner');
         if (show) {
