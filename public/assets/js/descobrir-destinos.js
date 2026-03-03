@@ -1,22 +1,19 @@
 /**
  * BENETRIP - DESCOBRIR DESTINOS
  * Versão GOOGLE FLIGHTS v4.3 - OBSERVAÇÕES LIVRES
- * 
- * NOVIDADES v4.3:
+ * * NOVIDADES v4.3:
  * - Campo "Observações livres" para o usuário descrever o que quer/não quer
  * - Observações enviadas ao LLM no rank-destinations (campo já existia na API)
  * - Resumo de critérios exibe observações quando preenchidas
  * - Contador de caracteres (máx 500)
- * 
- * CORREÇÃO v4.2:
+ * * CORREÇÃO v4.2:
  * ❌ BUG CORRIGIDO: Destinos dentro do orçamento não apareciam quando havia poucos resultados
  * ✅ SOLUÇÃO: Sempre mostra destinos válidos, independente da quantidade mínima
- * 
- * NOVIDADES v4.1:
+ * * NOVIDADES v4.1:
  * - Botão "← Nova busca" no topo dos resultados para fácil retorno
  * - Gerenciamento de histórico do navegador (pushState/popstate)
- *   para que o botão "voltar" do celular retorne ao formulário
- *   em vez de sair da página e perder a simulação
+ * para que o botão "voltar" do celular retorne ao formulário
+ * em vez de sair da página e perder a simulação
  * NOVIDADES v4.0:
  * - Links agora direcionam para Google Flights com todos os parâmetros
  * - Protobuf encoding para construir URLs compatíveis com Google Flights
@@ -660,7 +657,7 @@ const BenetripDiscovery = {
         params.set('hl', hl);
         params.set('gl', gl);
 
-        const url = `https://www.google.com/travel/flights/search?${params.toString()}`;
+        const url = `http://googleusercontent.com/google.com/travel/flights?${params.toString()}`;
 
         this.log('✈️ Google Flights URL:', {
             origin: originIata,
@@ -1184,7 +1181,7 @@ const BenetripDiscovery = {
         }
 
         const googleFlightsBtnLabel = 'Buscar no Google Flights';
-        const googleFlightsBtnIcon = \`<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 4px;"><path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/></svg>\`;
+        const googleFlightsBtnIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 4px;"><path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/></svg>`;
 
         let alternativasHtml = '';
         if (destinos.alternativas && destinos.alternativas.length > 0) {
@@ -1192,20 +1189,20 @@ const BenetripDiscovery = {
                 <div class="alternativas-section">
                     <h3>📋 Outras Opções</h3>
                     <div class="alternativas-grid">
-                        \${destinos.alternativas.map(d => \`
+                        ${destinos.alternativas.map(d => `
                             <div class="destino-card">
-                                \${fonteBadge(d)}
-                                <h4>\${d.name}\${d.country ? ', ' + d.country : ''}</h4>
-                                <div class="preco">\${formatPreco(d)}</div>
+                                ${fonteBadge(d)}
+                                <h4>${d.name}${d.country ? ', ' + d.country : ''}</h4>
+                                <div class="preco">${formatPreco(d)}</div>
                                 <div class="preco-label">ida e volta por pessoa</div>
-                                <div class="flight-info">\${formatParadas(d)}</div>
-                                \${custoEstimado(d)}
-                                <div class="descricao">\${d.razao || 'Boa opção!'}</div>
-                                \${comentarioHtml(d)}
-                                \${dicaHtml(d)}
-                                <a href="\${d.link}" target="_blank" rel="noopener" class="btn-ver-voos btn-google-flights">\${googleFlightsBtnIcon} \${googleFlightsBtnLabel} →</a>
+                                <div class="flight-info">${formatParadas(d)}</div>
+                                ${custoEstimado(d)}
+                                <div class="descricao">${d.razao || 'Boa opção!'}</div>
+                                ${comentarioHtml(d)}
+                                ${dicaHtml(d)}
+                                <a href="${d.link}" target="_blank" rel="noopener" class="btn-ver-voos btn-google-flights">${googleFlightsBtnIcon} ${googleFlightsBtnLabel} →</a>
                             </div>
-                        \`).join('')}
+                        `).join('')}
                     </div>
                 </div>
             `;
@@ -1216,65 +1213,65 @@ const BenetripDiscovery = {
             surpresaHtml = `
                 <div class="surpresa-card">
                     <div class="badge">🎁 DESTINO SURPRESA</div>
-                    \${fonteBadge(destinos.surpresa)}
-                    <h3>\${destinos.surpresa.name}\${destinos.surpresa.country ? ', ' + destinos.surpresa.country : ''}</h3>
-                    <div class="preco">\${formatPreco(destinos.surpresa)}</div>
+                    ${fonteBadge(destinos.surpresa)}
+                    <h3>${destinos.surpresa.name}${destinos.surpresa.country ? ', ' + destinos.surpresa.country : ''}</h3>
+                    <div class="preco">${formatPreco(destinos.surpresa)}</div>
                     <div class="preco-label">ida e volta por pessoa</div>
-                    <div class="flight-info">\${formatParadas(destinos.surpresa)}</div>
-                    \${custoEstimado(destinos.surpresa)}
-                    <div class="descricao">\${destinos.surpresa.razao || 'Descubra!'}</div>
-                    \${comentarioHtml(destinos.surpresa)}
-                    \${dicaHtml(destinos.surpresa)}
-                    <a href="\${destinos.surpresa.link}" target="_blank" rel="noopener" class="btn-ver-voos btn-google-flights">\${googleFlightsBtnIcon} Descobrir no Google Flights ✈️</a>
+                    <div class="flight-info">${formatParadas(destinos.surpresa)}</div>
+                    ${custoEstimado(destinos.surpresa)}
+                    <div class="descricao">${destinos.surpresa.razao || 'Descubra!'}</div>
+                    ${comentarioHtml(destinos.surpresa)}
+                    ${dicaHtml(destinos.surpresa)}
+                    <a href="${destinos.surpresa.link}" target="_blank" rel="noopener" class="btn-ver-voos btn-google-flights">${googleFlightsBtnIcon} Descobrir no Google Flights ✈️</a>
                 </div>
             `;
         }
 
         const html = `
-            \${this.gerarBotaoVoltarTopo()}
+            ${this.gerarBotaoVoltarTopo()}
 
-            \${this.gerarResumoCriterios()}
+            ${this.gerarResumoCriterios()}
 
             <div class="resultado-header">
-                <h1>\${cenario === 'ideal' && !poucosResultados ? '🎉 Destinos Perfeitos!' : poucosResultados ? '✈️ Destinos Encontrados' : '✈️ Destinos Encontrados!'}</h1>
+                <h1>${cenario === 'ideal' && !poucosResultados ? '🎉 Destinos Perfeitos!' : poucosResultados ? '✈️ Destinos Encontrados' : '✈️ Destinos Encontrados!'}</h1>
                 <p class="resultado-subtitulo">
-                    \${destinos._totalAnalisados ? \`\${destinos._totalAnalisados} destinos analisados\` : ''}
-                    \${destinos._model && destinos._model !== 'fallback_price' ? ' · Curadoria da Tripinha 🐶' : ''}
+                    ${destinos._totalAnalisados ? `${destinos._totalAnalisados} destinos analisados` : ''}
+                    ${destinos._model && destinos._model !== 'fallback_price' ? ' · Curadoria da Tripinha 🐶' : ''}
                 </p>
                 <p class="resultado-google-flights-info">
                     🔗 Os links abrem diretamente no <strong>Google Flights</strong> com suas preferências pré-preenchidas
                 </p>
             </div>
 
-            \${bannerPoucosResultados}
+            ${bannerPoucosResultados}
 
-            \${mensagem && !poucosResultados ? \`
-            <div class="resultado-banner \${cenario === 'abaixo' ? 'banner-aviso' : 'banner-info'}">
-                <p>\${mensagem}</p>
+            ${mensagem && !poucosResultados ? `
+            <div class="resultado-banner ${cenario === 'abaixo' ? 'banner-aviso' : 'banner-info'}">
+                <p>${mensagem}</p>
             </div>
-            \` : ''}
+            ` : ''}
 
             <div class="top-destino">
-                <div class="badge">\${totalExibidos === 1 ? 'DESTINO ENCONTRADO' : 'MELHOR DESTINO PARA VOCÊ'}</div>
-                \${fonteBadge(destinos.top_destino)}
-                <h2>\${destinos.top_destino.name}, \${destinos.top_destino.country || ''}</h2>
-                <div class="preco">\${formatPreco(destinos.top_destino)}</div>
+                <div class="badge">${totalExibidos === 1 ? 'DESTINO ENCONTRADO' : 'MELHOR DESTINO PARA VOCÊ'}</div>
+                ${fonteBadge(destinos.top_destino)}
+                <h2>${destinos.top_destino.name}, ${destinos.top_destino.country || ''}</h2>
+                <div class="preco">${formatPreco(destinos.top_destino)}</div>
                 <div class="preco-label">Passagem ida e volta por pessoa</div>
-                <div class="flight-info">\${formatParadas(destinos.top_destino)}</div>
-                \${custoEstimado(destinos.top_destino)}
-                <div class="descricao">\${destinos.top_destino.razao || 'Perfeito para você!'}</div>
-                \${comentarioHtml(destinos.top_destino)}
-                \${dicaHtml(destinos.top_destino)}
-                <a href="\${destinos.top_destino.link}" target="_blank" rel="noopener" class="btn-ver-voos btn-google-flights btn-google-flights-destaque">\${googleFlightsBtnIcon} \${googleFlightsBtnLabel} ✈️</a>
+                <div class="flight-info">${formatParadas(destinos.top_destino)}</div>
+                ${custoEstimado(destinos.top_destino)}
+                <div class="descricao">${destinos.top_destino.razao || 'Perfeito para você!'}</div>
+                ${comentarioHtml(destinos.top_destino)}
+                ${dicaHtml(destinos.top_destino)}
+                <a href="${destinos.top_destino.link}" target="_blank" rel="noopener" class="btn-ver-voos btn-google-flights btn-google-flights-destaque">${googleFlightsBtnIcon} ${googleFlightsBtnLabel} ✈️</a>
             </div>
 
-            \${alternativasHtml}
+            ${alternativasHtml}
 
-            \${surpresaHtml}
+            ${surpresaHtml}
 
             <div class="buscar-novamente-section">
                 <p class="buscar-novamente-texto">
-                    \${poucosResultados 
+                    ${poucosResultados 
                         ? 'Quer ver mais opções? Ajuste datas, orçamento ou estilo de viagem para descobrir mais destinos!' 
                         : 'Quer explorar outras opções? Ajuste seus critérios e descubra mais!'}
                 </p>
@@ -1288,6 +1285,7 @@ const BenetripDiscovery = {
         document.getElementById('loading-container').style.display = 'none';
         container.style.display = 'block';
         window.scrollTo({ top: 0, behavior: 'smooth' });
-    };
+    }
+};
 
 document.addEventListener('DOMContentLoaded', () => BenetripDiscovery.init());
