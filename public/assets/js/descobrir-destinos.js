@@ -1,28 +1,30 @@
 /**
  * BENETRIP - DESCOBRIR DESTINOS
- * Versão GOOGLE FLIGHTS v4.3 - OBSERVAÇÕES LIVRES
+ * Versão GOOGLE FLIGHTS v4.4 - CIDADES AGRUPADAS (kgmid)
+ * 
+ * NOVIDADES v4.4:
+ * - Suporte a cidades com múltiplos aeroportos via kgmid
+ *   Ex: "São Paulo — Todos os aeroportos" envia /m/02cft como departure_id
+ * - Autocomplete prioriza opções agrupadas (is_city_code) no topo
+ * - Display inteligente: mostra código legível (SAO) em vez de kgmid (/m/02cft)
+ * - Google Flights URL: quando origem é kgmid, usa primeiro aeroporto do grupo
+ * - JSON v7: cidades_global_iata_v7.json com entradas agrupadas
  * 
  * NOVIDADES v4.3:
  * - Campo "Observações livres" para o usuário descrever o que quer/não quer
- * - Observações enviadas ao LLM no rank-destinations (campo já existia na API)
- * - Resumo de critérios exibe observações quando preenchidas
- * - Contador de caracteres (máx 500)
+ * - Observações enviadas ao LLM no rank-destinations
  * 
  * CORREÇÃO v4.2:
  * ❌ BUG CORRIGIDO: Destinos dentro do orçamento não apareciam quando havia poucos resultados
  * ✅ SOLUÇÃO: Sempre mostra destinos válidos, independente da quantidade mínima
  * 
  * NOVIDADES v4.1:
- * - Botão "← Nova busca" no topo dos resultados para fácil retorno
+ * - Botão "← Nova busca" no topo dos resultados
  * - Gerenciamento de histórico do navegador (pushState/popstate)
- *   para que o botão "voltar" do celular retorne ao formulário
- *   em vez de sair da página e perder a simulação
+ * 
  * NOVIDADES v4.0:
  * - Links agora direcionam para Google Flights com todos os parâmetros
  * - Protobuf encoding para construir URLs compatíveis com Google Flights
- * - Suporte completo: origem, destino, datas, adultos, crianças, bebês, moeda
- * - Classe de cabine: econômica (padrão)
- * - Auto-search ao abrir Google Flights com os parâmetros pré-preenchidos
  */
 const BenetripDiscovery = {
     state: {
@@ -34,7 +36,8 @@ const BenetripDiscovery = {
     },
     config: {
         debug: true,
-        cidadesJsonPath: 'data/cidades_global_iata_v0.json'
+        // v4.4: Atualizado para v7 com cidades agrupadas
+        cidadesJsonPath: 'data/cidades_global_iata_v7.json'
     },
     log(...args) {
         if (this.config.debug) console.log('[Benetrip]', ...args);
@@ -43,7 +46,7 @@ const BenetripDiscovery = {
         console.error('[Benetrip ERROR]', ...args);
     },
     init() {
-        this.log('🐕 Benetrip Discovery v4.3 (Observações Livres) inicializando...');
+        this.log('🐕 Benetrip Discovery v4.4 (Cidades Agrupadas) inicializando...');
         
         this.carregarCidades();
         this.setupFormEvents();
@@ -92,13 +95,17 @@ const BenetripDiscovery = {
             const dados = await response.json();
             this.state.cidadesData = dados.filter(c => c.iata);
             
-            this.log(`✅ ${this.state.cidadesData.length} cidades carregadas (v6 com aeroportos reais)`);
+            // v4.4: Log de cidades agrupadas carregadas
+            const agrupadas = this.state.cidadesData.filter(c => c.is_city_code);
+            this.log(`✅ ${this.state.cidadesData.length} cidades carregadas (v7 com ${agrupadas.length} cidades agrupadas)`);
         } catch (erro) {
             this.error('Erro ao carregar cidades:', erro);
             this.state.cidadesData = [
+                { cidade: "São Paulo", sigla_estado: "SP", pais: "Brasil", codigo_pais: "BR", iata: "/m/02cft", iata_city_code: "SAO", aeroporto: "Todos os aeroportos (Guarulhos, Congonhas e Viracopos)", is_city_code: true, aeroportos_incluidos: ["GRU", "CGH", "VCP"] },
                 { cidade: "São Paulo", sigla_estado: "SP", pais: "Brasil", codigo_pais: "BR", iata: "GRU", aeroporto: "Aeroporto de Guarulhos" },
                 { cidade: "São Paulo", sigla_estado: "SP", pais: "Brasil", codigo_pais: "BR", iata: "CGH", aeroporto: "Aeroporto de Congonhas" },
                 { cidade: "São Paulo", sigla_estado: "SP", pais: "Brasil", codigo_pais: "BR", iata: "VCP", aeroporto: "Aeroporto de Viracopos" },
+                { cidade: "Rio de Janeiro", sigla_estado: "RJ", pais: "Brasil", codigo_pais: "BR", iata: "/m/06gmr", iata_city_code: "RIO", aeroporto: "Todos os aeroportos (Galeão e Santos Dumont)", is_city_code: true, aeroportos_incluidos: ["GIG", "SDU"] },
                 { cidade: "Rio de Janeiro", sigla_estado: "RJ", pais: "Brasil", codigo_pais: "BR", iata: "GIG", aeroporto: "Aeroporto do Galeão" },
                 { cidade: "Rio de Janeiro", sigla_estado: "RJ", pais: "Brasil", codigo_pais: "BR", iata: "SDU", aeroporto: "Aeroporto Santos Dumont" },
                 { cidade: "Salvador", sigla_estado: "BA", pais: "Brasil", codigo_pais: "BR", iata: "SSA" }
@@ -108,28 +115,50 @@ const BenetripDiscovery = {
     normalizarTexto(texto) {
         return texto.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
     },
+    // ================================================================
+    // v4.4: buscarCidades agora retorna dados extras para cidades agrupadas
+    // ================================================================
     buscarCidades(termo) {
         if (!this.state.cidadesData || termo.length < 2) return [];
         
         const termoNorm = this.normalizarTexto(termo);
         
-        return this.state.cidadesData
+        const resultados = this.state.cidadesData
             .filter(cidade => {
                 const nomeNorm = this.normalizarTexto(cidade.cidade);
-                const iataNorm = cidade.iata.toLowerCase();
+                // Para kgmid, não faz match por código (não faz sentido buscar "/m/")
+                // Mas faz match pelo iata_city_code se existir (ex: "SAO", "RIO")
+                const iataNorm = cidade.is_city_code 
+                    ? (cidade.iata_city_code || '').toLowerCase()
+                    : cidade.iata.toLowerCase();
                 const aeroNorm = cidade.aeroporto ? this.normalizarTexto(cidade.aeroporto) : '';
                 return nomeNorm.includes(termoNorm) || iataNorm.includes(termoNorm) || aeroNorm.includes(termoNorm);
             })
-            .slice(0, 8)
+            .slice(0, 10)
             .map(cidade => ({
-                code: cidade.iata,
+                code: cidade.iata,                          // kgmid ou IATA — enviado à API
+                displayCode: cidade.iata_city_code || cidade.iata,  // Código legível para exibição
                 name: cidade.cidade,
                 state: cidade.sigla_estado,
                 country: cidade.pais,
                 countryCode: cidade.codigo_pais,
-                airport: cidade.aeroporto || null
+                airport: cidade.aeroporto || null,
+                isCityCode: cidade.is_city_code || false,
+                aeroportosIncluidos: cidade.aeroportos_incluidos || null
             }));
+        
+        // v4.4: Ordenar para que cidades agrupadas apareçam PRIMEIRO
+        resultados.sort((a, b) => {
+            if (a.isCityCode && !b.isCityCode) return -1;
+            if (!a.isCityCode && b.isCityCode) return 1;
+            return 0;
+        });
+        
+        return resultados.slice(0, 8);
     },
+    // ================================================================
+    // v4.4: Autocomplete com visual diferenciado para cidades agrupadas
+    // ================================================================
     setupAutocomplete() {
         const input = document.getElementById('origem');
         const results = document.getElementById('origem-results');
@@ -159,15 +188,21 @@ const BenetripDiscovery = {
                     return;
                 }
                 
-                results.innerHTML = cidades.map(cidade => `
-                    <div class="autocomplete-item" data-city='${JSON.stringify(cidade)}'>
-                        <div class="item-code">${cidade.code}</div>
-                        <div class="item-details">
-                            <div class="item-name">${cidade.name}${cidade.state ? ', ' + cidade.state : ''}${cidade.airport ? ' — ' + cidade.airport : ''}</div>
-                            <div class="item-country">${cidade.country}</div>
+                results.innerHTML = cidades.map(cidade => {
+                    // v4.4: Visual diferenciado para cidades agrupadas
+                    const cityClass = cidade.isCityCode ? 'autocomplete-item autocomplete-city-group' : 'autocomplete-item';
+                    const cityIcon = cidade.isCityCode ? '🏙️' : '';
+                    
+                    return `
+                        <div class="${cityClass}" data-city='${JSON.stringify(cidade)}'>
+                            <div class="item-code">${cityIcon}${cidade.displayCode}</div>
+                            <div class="item-details">
+                                <div class="item-name">${cidade.name}${cidade.state ? ', ' + cidade.state : ''}${cidade.airport ? ' — ' + cidade.airport : ''}</div>
+                                <div class="item-country">${cidade.country}</div>
+                            </div>
                         </div>
-                    </div>
-                `).join('');
+                    `;
+                }).join('');
                 
                 results.style.display = 'block';
                 
@@ -186,19 +221,25 @@ const BenetripDiscovery = {
             }
         });
     },
+    // ================================================================
+    // v4.4: selecionarOrigem mostra displayCode em vez de kgmid raw
+    // ================================================================
     selecionarOrigem(cidade) {
         const input = document.getElementById('origem');
         const results = document.getElementById('origem-results');
         const hiddenInput = document.getElementById('origem-data');
         
         this.state.origemSelecionada = cidade;
+        
+        // v4.4: Usar displayCode (SAO, RIO, GRU) para exibição, não o kgmid
+        const codeDisplay = cidade.displayCode || cidade.code;
         input.value = cidade.airport 
-            ? `${cidade.name} — ${cidade.airport} (${cidade.code})`
-            : `${cidade.name} (${cidade.code})`;
+            ? `${cidade.name} — ${cidade.airport} (${codeDisplay})`
+            : `${cidade.name} (${codeDisplay})`;
         hiddenInput.value = JSON.stringify(cidade);
         results.style.display = 'none';
         
-        this.log('📍 Origem:', cidade);
+        this.log('📍 Origem:', cidade.name, `| code: ${cidade.code} | display: ${codeDisplay} | agrupada: ${cidade.isCityCode}`);
     },
     setupCalendar() {
         const input = document.getElementById('datas');
@@ -610,6 +651,24 @@ const BenetripDiscovery = {
         });
         return url;
     },
+    // ================================================================
+    // v4.4: Resolver código IATA para Google Flights
+    // Quando a origem é kgmid (cidade agrupada), usa o primeiro aeroporto
+    // porque Google Flights não aceita kgmid, só IATA
+    // ================================================================
+    getOrigemIataParaGoogleFlights() {
+        const origem = this.state.formData.origem;
+        
+        // Se é cidade agrupada com kgmid, usar o primeiro aeroporto do grupo
+        if (origem.isCityCode && origem.aeroportosIncluidos && origem.aeroportosIncluidos.length > 0) {
+            const primeiroAeroporto = origem.aeroportosIncluidos[0];
+            this.log(`🏙️ Origem agrupada: ${origem.displayCode} → usando ${primeiroAeroporto} para Google Flights`);
+            return primeiroAeroporto;
+        }
+        
+        // Se é código IATA normal, retorna direto
+        return origem.code;
+    },
     async buscarDestinos() {
         try {
             this.mostrarLoading();
@@ -651,12 +710,15 @@ const BenetripDiscovery = {
             this.esconderLoading();
         }
     },
+    // ================================================================
+    // v4.4: buscarDestinosAPI envia code (que pode ser kgmid ou IATA)
+    // ================================================================
     async buscarDestinosAPI() {
         const response = await fetch('/api/search-destinations', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                origem: this.state.formData.origem.code,
+                origem: this.state.formData.origem.code,  // kgmid ou IATA
                 dataIda: this.state.formData.dataIda,
                 dataVolta: this.state.formData.dataVolta,
                 preferencias: this.state.formData.preferenciasArray,
@@ -679,7 +741,8 @@ const BenetripDiscovery = {
                 total: data.total,
                 tempo: `${data._meta.totalTime}ms`,
                 moeda: data._meta.currency || 'BRL',
-                escopo: data._meta.escopoDestino || 'tanto_faz'
+                escopo: data._meta.escopoDestino || 'tanto_faz',
+                origemTipo: data._meta.origemTipo || 'iata'
             });
         }
         return data.destinations;
@@ -701,10 +764,6 @@ const BenetripDiscovery = {
         if (!orcamento) {
             return { cenario: 'ideal', destinos: comPreco, mensagem: '' };
         }
-        // ============================================================
-        // NOVA LÓGICA: Sempre mostra destinos dentro do orçamento
-        // A quantidade define apenas a mensagem/cenário, não se mostra
-        // ============================================================
         // 1. Faixa ideal: 80-100% do orçamento
         const faixa80 = comPreco.filter(d => d.flight.price >= orcamento * 0.8 && d.flight.price <= orcamento);
         
@@ -713,9 +772,7 @@ const BenetripDiscovery = {
         
         // 3. Qualquer coisa abaixo do orçamento
         const abaixo = comPreco.filter(d => d.flight.price <= orcamento);
-        // ============================================================
-        // DECISÃO DE CENÁRIO (mas sempre mostra se tiver destinos!)
-        // ============================================================
+
         // CENÁRIO IDEAL: 5+ destinos na faixa 80-100%
         if (faixa80.length >= 5) {
             this.log(`✅ IDEAL: ${faixa80.length} destinos na faixa 80-100%`);
@@ -734,12 +791,10 @@ const BenetripDiscovery = {
                 mensagem: `🐕 A Tripinha encontrou os melhores destinos dentro do seu orçamento de ${simbolo} ${orcamento.toLocaleString('pt-BR')}. Confira as opções!`
             };
         }
-        // ✅ CORREÇÃO v4.2: SEMPRE mostra se tiver destinos dentro do orçamento
-        // (mesmo que seja 1 ou 2 destinos apenas)
+        // SEMPRE mostra se tiver destinos dentro do orçamento
         if (abaixo.length > 0) {
             this.log(`💡 DENTRO DO ORÇAMENTO: ${abaixo.length} destino(s) de até ${simbolo} ${orcamento.toLocaleString('pt-BR')}`);
             
-            // Mensagem adaptada à quantidade
             let mensagem = '';
             if (abaixo.length === 1) {
                 mensagem = `🐕 A Tripinha encontrou 1 destino dentro do seu orçamento de ${simbolo} ${orcamento.toLocaleString('pt-BR')}. É uma ótima opção!`;
@@ -757,7 +812,6 @@ const BenetripDiscovery = {
         // SÓ RETORNA "NENHUM" se REALMENTE não tiver nada dentro do orçamento
         this.log(`❌ Nenhum destino dentro do orçamento de ${simbolo} ${orcamento.toLocaleString('pt-BR')}`);
         
-        // Debug adicional para investigação
         const maisBarato = comPreco.reduce((min, d) => 
             d.flight.price < min ? d.flight.price : min, 
             Infinity
@@ -785,7 +839,6 @@ const BenetripDiscovery = {
             if (formData.bebes > 0) parts.push(`${formData.bebes} bebê(s) de 0-1 ano`);
             companhiaDesc = `Viagem em família: ${parts.join(', ')}`;
         }
-        // v4.3: Enviar observações do viajante para a API de ranking
         const response = await fetch('/api/rank-destinations', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -818,12 +871,19 @@ const BenetripDiscovery = {
         }
         return ranking;
     },
+    // ================================================================
+    // v4.4: gerarLinksGoogleFlights usa IATA real, não kgmid
+    // ================================================================
     gerarLinksGoogleFlights(ranking) {
-        const { origem, dataIda, dataVolta, adultos, criancas, bebes, moeda } = this.state.formData;
+        const { dataIda, dataVolta, adultos, criancas, bebes, moeda } = this.state.formData;
+        
+        // v4.4: Resolver IATA real da origem para Google Flights
+        const originIata = this.getOrigemIataParaGoogleFlights();
+        
         const gerarLink = (d) => {
             if (!d?.primary_airport) return '#';
             return this.buildGoogleFlightsUrl(
-                origem.code,
+                originIata,         // v4.4: Sempre IATA (não kgmid)
                 d.primary_airport,
                 dataIda,
                 dataVolta,
@@ -888,6 +948,9 @@ const BenetripDiscovery = {
             </button>
         `;
     },
+    // ================================================================
+    // v4.4: Resumo exibe displayCode em vez de kgmid
+    // ================================================================
     gerarResumoCriterios() {
         const { origem, companhia, adultos, criancas, bebes, numPessoas, preferenciasArray, escopoDestino, dataIda, dataVolta, moeda, orcamento, observacoes } = this.state.formData;
         const noites = this.calcularNoites(dataIda, dataVolta);
@@ -911,13 +974,15 @@ const BenetripDiscovery = {
         } else {
             pessoasInfo = `${numPessoas} adultos`;
         }
+        
+        // v4.4: Usar displayCode para exibição legível
+        const codeDisplay = origem.displayCode || origem.code;
         const origemDisplay = origem.airport 
-            ? `${origem.name} — ${origem.airport} (${origem.code})`
-            : `${origem.name} (${origem.code})`;
+            ? `${origem.name} — ${origem.airport} (${codeDisplay})`
+            : `${origem.name} (${codeDisplay})`;
         const escopoLabel = escopoDestino === 'internacional' 
             ? '✈️ Apenas internacionais' 
             : '🗺️ Nacionais e internacionais';
-        // v4.3: Mostrar observações no resumo quando preenchidas
         const observacoesItem = observacoes 
             ? `<div class="criterio-item" style="grid-column: 1 / -1;">
                     <span class="criterio-label">Suas dicas pra Tripinha</span>
@@ -965,6 +1030,8 @@ const BenetripDiscovery = {
         const { orcamento, moeda, origem, escopoDestino } = this.state.formData;
         const simbolo = this.getSimbolo(moeda);
         const isInternacional = escopoDestino === 'internacional';
+        // v4.4: Usar displayCode para exibição
+        const codeDisplay = origem.displayCode || origem.code;
         this.pushResultsState();
         container.innerHTML = `
             ${this.gerarBotaoVoltarTopo()}
@@ -975,7 +1042,7 @@ const BenetripDiscovery = {
                 <p class="sem-resultados-msg">
                     A Tripinha procurou por todo canto, mas não encontrou passagens 
                     ${isInternacional ? '<strong>internacionais</strong>' : ''} 
-                    saindo de <strong>${origem.name} (${origem.code})</strong> dentro do orçamento de 
+                    saindo de <strong>${origem.name} (${codeDisplay})</strong> dentro do orçamento de 
                     <strong>${simbolo} ${orcamento?.toLocaleString('pt-BR') || '?'}</strong> para essas datas.
                 </p>
                 <div class="sem-resultados-dicas">
