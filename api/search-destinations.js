@@ -1,7 +1,8 @@
-// api/search-destinations.js - VERSÃO MULTI-CONTINENTE v3.2
+// api/search-destinations.js - VERSÃO MULTI-CONTINENTE v3.3
+// v3.3: SUPORTE A KGMID como departure_id
+// Agora aceita tanto códigos IATA (GRU, JFK) quanto kgmid de cidade (/m/02cft)
+// Cidades com múltiplos aeroportos usam kgmid para busca agrupada no Google Travel
 // v3.2: BUSCA EM MÚLTIPLOS CONTINENTES quando "apenas internacional"
-// Melhora drasticamente cobertura de destinos internacionais
-// Exemplo: Belém → América do Sul + Caribe + América do Norte + Europa
 // v3.0: Triple search + filtro internacional + multi-preferências
 
 import { readFileSync } from 'fs';
@@ -21,6 +22,46 @@ const CONTINENTES_KGMID = {
     'asia': '/m/0j0k',
     'africa': '/m/0dv5r',
     'oceania': '/m/05nrg',
+};
+
+// ============================================================
+// v3.3: MAPEAMENTO KGMID DE CIDADE → DADOS GEO
+// Usado quando departure_id é kgmid em vez de código IATA
+// ============================================================
+const KGMID_CITY_GEO = {
+    // Brasil
+    '/m/02cft':   { codigo_pais: 'BR', pais: 'Brasil',           kgmid_pais: '/m/015fr', continente: 'América do Sul',    kgmid_continente: '/m/0dg3n1', label: 'São Paulo (todos)' },
+    '/m/06gmr':   { codigo_pais: 'BR', pais: 'Brasil',           kgmid_pais: '/m/015fr', continente: 'América do Sul',    kgmid_continente: '/m/0dg3n1', label: 'Rio de Janeiro (todos)' },
+    '/m/01hhpg':  { codigo_pais: 'BR', pais: 'Brasil',           kgmid_pais: '/m/015fr', continente: 'América do Sul',    kgmid_continente: '/m/0dg3n1', label: 'Belo Horizonte (todos)' },
+    // EUA
+    '/m/02_286':  { codigo_pais: 'US', pais: 'Estados Unidos',   kgmid_pais: '/m/09c7w0', continente: 'América do Norte', kgmid_continente: '/m/059g4', label: 'Nova York (todos)' },
+    '/m/0rh6k':   { codigo_pais: 'US', pais: 'Estados Unidos',   kgmid_pais: '/m/09c7w0', continente: 'América do Norte', kgmid_continente: '/m/059g4', label: 'Washington (todos)' },
+    '/m/01_d4':   { codigo_pais: 'US', pais: 'Estados Unidos',   kgmid_pais: '/m/09c7w0', continente: 'América do Norte', kgmid_continente: '/m/059g4', label: 'Chicago (todos)' },
+    '/m/0d6lp':   { codigo_pais: 'US', pais: 'Estados Unidos',   kgmid_pais: '/m/09c7w0', continente: 'América do Norte', kgmid_continente: '/m/059g4', label: 'San Francisco (todos)' },
+    '/m/030qb3t': { codigo_pais: 'US', pais: 'Estados Unidos',   kgmid_pais: '/m/09c7w0', continente: 'América do Norte', kgmid_continente: '/m/059g4', label: 'Los Angeles (todos)' },
+    '/m/0f2rq':   { codigo_pais: 'US', pais: 'Estados Unidos',   kgmid_pais: '/m/09c7w0', continente: 'América do Norte', kgmid_continente: '/m/059g4', label: 'Dallas (todos)' },
+    '/m/03l2n':   { codigo_pais: 'US', pais: 'Estados Unidos',   kgmid_pais: '/m/09c7w0', continente: 'América do Norte', kgmid_continente: '/m/059g4', label: 'Houston (todos)' },
+    '/m/0f2v0':   { codigo_pais: 'US', pais: 'Estados Unidos',   kgmid_pais: '/m/09c7w0', continente: 'América do Norte', kgmid_continente: '/m/059g4', label: 'Miami (todos)' },
+    // Europa
+    '/m/04jpl':   { codigo_pais: 'GB', pais: 'Reino Unido',      kgmid_pais: '/m/07ssc', continente: 'Europa',            kgmid_continente: '/m/02j9z', label: 'Londres (todos)' },
+    '/m/05qtj':   { codigo_pais: 'FR', pais: 'França',           kgmid_pais: '/m/0f8l9c', continente: 'Europa',           kgmid_continente: '/m/02j9z', label: 'Paris (todos)' },
+    '/m/04swd':   { codigo_pais: 'RU', pais: 'Rússia',           kgmid_pais: '/m/06bnz', continente: 'Europa',            kgmid_continente: '/m/02j9z', label: 'Moscou (todos)' },
+    '/m/06mxs':   { codigo_pais: 'SE', pais: 'Suécia',           kgmid_pais: '/m/0d0vqn', continente: 'Europa',           kgmid_continente: '/m/02j9z', label: 'Estocolmo (todos)' },
+    '/m/0947l':   { codigo_pais: 'IT', pais: 'Itália',           kgmid_pais: '/m/03rjj', continente: 'Europa',            kgmid_continente: '/m/02j9z', label: 'Milão (todos)' },
+    '/m/06c62':   { codigo_pais: 'IT', pais: 'Itália',           kgmid_pais: '/m/03rjj', continente: 'Europa',            kgmid_continente: '/m/02j9z', label: 'Roma (todos)' },
+    // América do Sul
+    '/m/01ly5m':  { codigo_pais: 'AR', pais: 'Argentina',        kgmid_pais: '/m/0jgd', continente: 'América do Sul',     kgmid_continente: '/m/0dg3n1', label: 'Buenos Aires (todos)' },
+    // Ásia
+    '/m/07dfk':   { codigo_pais: 'JP', pais: 'Japão',            kgmid_pais: '/m/03_3d', continente: 'Ásia',              kgmid_continente: '/m/0j0k', label: 'Tóquio (todos)' },
+    '/m/0dj5q':   { codigo_pais: 'JP', pais: 'Japão',            kgmid_pais: '/m/03_3d', continente: 'Ásia',              kgmid_continente: '/m/0j0k', label: 'Osaka (todos)' },
+    '/m/0hsqf':   { codigo_pais: 'KR', pais: 'Coreia do Sul',    kgmid_pais: '/m/06qd3', continente: 'Ásia',              kgmid_continente: '/m/0j0k', label: 'Seul (todos)' },
+    '/m/0195pd':  { codigo_pais: 'TH', pais: 'Tailândia',        kgmid_pais: '/m/07f1x', continente: 'Ásia',              kgmid_continente: '/m/0j0k', label: 'Bangkok (todos)' },
+    '/m/04f_d':   { codigo_pais: 'ID', pais: 'Indonésia',        kgmid_pais: '/m/03ryn', continente: 'Ásia',              kgmid_continente: '/m/0j0k', label: 'Jacarta (todos)' },
+    '/m/01914':   { codigo_pais: 'CN', pais: 'China',            kgmid_pais: '/m/0d05w3', continente: 'Ásia',             kgmid_continente: '/m/0j0k', label: 'Pequim (todos)' },
+    '/m/06wjf':   { codigo_pais: 'CN', pais: 'China',            kgmid_pais: '/m/0d05w3', continente: 'Ásia',             kgmid_continente: '/m/0j0k', label: 'Xangai (todos)' },
+    '/m/09949m':  { codigo_pais: 'TR', pais: 'Turquia',          kgmid_pais: '/m/01znc_', continente: 'Ásia',             kgmid_continente: '/m/0j0k', label: 'Istambul (todos)' },
+    // Oriente Médio
+    '/m/0162v':   { codigo_pais: 'AE', pais: 'Emirados Árabes',  kgmid_pais: '/m/0j1z8', continente: 'Ásia',              kgmid_continente: '/m/0j0k', label: 'Dubai (todos)' },
 };
 
 // ============================================================
@@ -118,6 +159,26 @@ function getIataLookup() {
 }
 
 // ============================================================
+// v3.3: RESOLVER GEO - Aceita IATA ou kgmid
+// ============================================================
+function resolveGeo(origemCode) {
+    // Se é kgmid de cidade → buscar no mapeamento interno
+    if (origemCode.startsWith('/m/')) {
+        const cityGeo = KGMID_CITY_GEO[origemCode];
+        if (cityGeo) {
+            console.log(`[Geo] kgmid ${origemCode} → ${cityGeo.label} (${cityGeo.pais})`);
+            return cityGeo;
+        }
+        console.warn(`[Geo] kgmid ${origemCode} não encontrado no mapeamento interno`);
+        return null;
+    }
+    
+    // Se é código IATA → buscar no lookup JSON
+    const lookup = getIataLookup();
+    return lookup[origemCode] || null;
+}
+
+// ============================================================
 // BUSCA INDIVIDUAL no SearchAPI
 // ============================================================
 async function searchTravelExplore(params, label) {
@@ -182,13 +243,22 @@ export default async function handler(req, res) {
             });
         }
 
-        const origemCode = origem.toUpperCase().trim();
-        if (!/^[A-Z]{3}$/.test(origemCode)) {
+        // ============================================================
+        // v3.3: VALIDAÇÃO - Aceita IATA (GRU) ou kgmid (/m/02cft)
+        // ============================================================
+        const origemRaw = origem.trim();
+        const isKgmid = origemRaw.startsWith('/m/');
+        const isIata = /^[A-Z]{3}$/i.test(origemRaw);
+        
+        if (!isKgmid && !isIata) {
             return res.status(400).json({
-                error: 'Código IATA inválido',
-                message: 'Use 3 letras (ex: GRU, GIG, SSA)'
+                error: 'Código de origem inválido',
+                message: 'Use código IATA (3 letras, ex: GRU) ou kgmid de cidade (ex: /m/02cft)'
             });
         }
+        
+        // Para IATA, normaliza para maiúsculo. Para kgmid, mantém como está.
+        const origemCode = isKgmid ? origemRaw : origemRaw.toUpperCase();
 
         if (!process.env.SEARCHAPI_KEY) {
             return res.status(500).json({
@@ -199,13 +269,12 @@ export default async function handler(req, res) {
 
         const currencyCode = (moeda && /^[A-Z]{3}$/.test(moeda)) ? moeda : 'BRL';
         const apenasInternacional = escopoDestino === 'internacional';
-        console.log(`💱 Moeda: ${currencyCode} | Escopo: ${apenasInternacional ? 'INTERNACIONAL' : 'TODOS'}`);
+        console.log(`💱 Moeda: ${currencyCode} | Escopo: ${apenasInternacional ? 'INTERNACIONAL' : 'TODOS'} | Tipo: ${isKgmid ? 'KGMID' : 'IATA'}`);
 
         // ============================================================
-        // RESOLVER GEO DO AEROPORTO
+        // v3.3: RESOLVER GEO (aceita IATA ou kgmid)
         // ============================================================
-        const lookup = getIataLookup();
-        const geo = lookup[origemCode] || null;
+        const geo = resolveGeo(origemCode);
 
         console.log(`🔍 Multi-Continent Search de ${origemCode} | País: ${geo?.pais || '?'} | Continente: ${geo?.continente || '?'} | Internacional: ${apenasInternacional}`);
 
@@ -234,6 +303,7 @@ export default async function handler(req, res) {
 
         // ============================================================
         // PARÂMETROS BASE
+        // departure_id aceita tanto IATA quanto kgmid
         // ============================================================
         const baseParams = {
             departure_id: origemCode,
@@ -433,6 +503,7 @@ export default async function handler(req, res) {
                 _debug: {
                     totalBuscas: searchPromises.length,
                     apenasInternacional,
+                    origemTipo: isKgmid ? 'kgmid' : 'iata',
                 }
             });
         }
@@ -484,6 +555,7 @@ export default async function handler(req, res) {
             _meta: {
                 totalTime,
                 currency: currencyCode,
+                origemTipo: isKgmid ? 'kgmid' : 'iata',
                 escopoDestino: apenasInternacional ? 'internacional' : 'tanto_faz',
                 preferencias: prefArray,
                 sources,      // Compatível com v3.0
