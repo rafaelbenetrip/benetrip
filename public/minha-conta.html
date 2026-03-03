@@ -330,6 +330,7 @@
         .type-badge.voos { background: #EEE6FF; color: #5B21B6; }
         .type-badge.roteiro { background: #E6F5FF; color: #0369A1; }
         .type-badge.voos-baratos { background: #FEF2F2; color: #DC2626; }
+        .type-badge.comparar { background: #FFF8E1; color: #F57F17; }
 
         /* ═══ EMPTY STATE ═══ */
         .empty-state {
@@ -633,7 +634,7 @@
                 </div>
             </div>
 
-            <!-- ═══ TAB: PERFIL ═══ -->
+            <!-- ═══ TAB: PERFIL (dados pessoais + preferências de viagem) ═══ -->
             <div class="tab-panel" id="panel-perfil">
                 <div class="section-header">
                     <span class="section-title">Seus dados</span>
@@ -658,6 +659,10 @@
                     <button class="btn-save-profile" id="btn-save-profile" onclick="MinhaConta.salvarPerfil()">
                         Salvar Alterações
                     </button>
+
+                    <!-- ═══ PREFERÊNCIAS DE VIAGEM (injetadas aqui por minha-conta-prefs.js) ═══ -->
+                    <!-- MinhaContaPrefs.init() insere automaticamente a seção de preferências -->
+                    <!-- ANTES do botão de logout abaixo -->
 
                     <button class="btn-logout" onclick="MinhaConta.logout()">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
@@ -685,6 +690,9 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="assets/js/benetrip-auth.js"></script>
     <script src="assets/js/benetrip-login-modal.js"></script>
+    <!-- Módulos de preferências de viagem -->
+    <script src="assets/js/benetrip-preferences.js"></script>
+    <script src="assets/js/minha-conta-prefs.js"></script>
 
     <script>
     const MinhaConta = {
@@ -708,6 +716,11 @@
             const hash = window.location.hash.replace('#', '');
             if (['historico', 'destinos', 'roteiros', 'perfil'].includes(hash)) {
                 this.switchTab(hash);
+            }
+
+            // ═══ INICIALIZAR PREFERÊNCIAS NO PERFIL ═══
+            if (typeof MinhaContaPrefs !== 'undefined') {
+                MinhaContaPrefs.init();
             }
 
             // Escutar auth
@@ -774,6 +787,11 @@
                 this.loadRoteiros(),
                 this.loadPerfil()
             ]);
+
+            // Recarregar preferências após dados do perfil
+            if (typeof MinhaContaPrefs !== 'undefined') {
+                MinhaContaPrefs.loadAndRender();
+            }
         },
 
         // ── HISTÓRICO ──
@@ -810,6 +828,7 @@
             const TIPO_CONFIG = {
                 'descobrir_destinos': { emoji: '🎯', label: 'Descobrir', badge: 'destinos' },
                 'todos_destinos':     { emoji: '🌍', label: 'Todos Destinos', badge: 'todos' },
+                'comparar_voos':      { emoji: '📊', label: 'Comparar Voos', badge: 'comparar' },
                 'busca_voos':         { emoji: '✈️', label: 'Busca Voos', badge: 'voos' },
                 'voos_baratos':       { emoji: '💸', label: 'Voos Baratos', badge: 'voos-baratos' },
                 'roteiro':            { emoji: '📋', label: 'Roteiro', badge: 'roteiro' }
@@ -834,6 +853,8 @@
                     if (resultados.dentro_orcamento) resumoHtml += ` (${resultados.dentro_orcamento} no orçamento)`;
                 } else if (resultados.melhor_preco) {
                     resumoHtml = `Melhor: ${this.formatarPreco(resultados.melhor_preco, params.moeda)}`;
+                } else if (resultados.melhor_combo?.preco) {
+                    resumoHtml = `Melhor combo: ${this.formatarPreco(resultados.melhor_combo.preco, params.moeda)}`;
                 }
 
                 return `
@@ -941,55 +962,55 @@
         },
 
         renderRoteiros() {
-    const container = document.getElementById('roteiros-list');
-    const items = this.data.roteiros;
+            const container = document.getElementById('roteiros-list');
+            const items = this.data.roteiros;
 
-    if (!items.length) {
-        container.innerHTML = `
-            <div class="empty-state">
-                <div class="empty-state-icon">🗺️</div>
-                <h3>Nenhum roteiro ainda</h3>
-                <p>Ao gerar um roteiro com a Tripinha, ele será salvo automaticamente aqui!</p>
-                <a href="roteiro-viagem.html" class="btn-empty-cta">📋 Criar Roteiro</a>
-            </div>`;
-        return;
-    }
+            if (!items.length) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">🗺️</div>
+                        <h3>Nenhum roteiro ainda</h3>
+                        <p>Ao gerar um roteiro com a Tripinha, ele será salvo automaticamente aqui!</p>
+                        <a href="roteiro-viagem.html" class="btn-empty-cta">📋 Criar Roteiro</a>
+                    </div>`;
+                return;
+            }
 
-    container.innerHTML = items.map((item, index) => {
-        const data = new Date(item.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' });
-        const dias = item.num_dias || '?';
+            container.innerHTML = items.map((item, index) => {
+                const data = new Date(item.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' });
+                const dias = item.num_dias || '?';
 
-        return `
-            <div class="card" id="card-roteiro-${index}">
-                <div class="card-header">
-                    <div class="card-info">
-                        <div class="card-title">🗺️ ${item.destino_nome || '—'}${item.destino_pais ? ', ' + item.destino_pais : ''}</div>
-                        <div class="card-subtitle">
-                            ${dias} dia${dias > 1 ? 's' : ''} · Salvo em ${data}
-                            ${item.data_ida ? '<br>📅 ' + this.formatarDataCurta(item.data_ida) + (item.data_volta ? ' → ' + this.formatarDataCurta(item.data_volta) : '') : ''}
+                return `
+                    <div class="card" id="card-roteiro-${index}">
+                        <div class="card-header">
+                            <div class="card-info">
+                                <div class="card-title">🗺️ ${item.destino_nome || '—'}${item.destino_pais ? ', ' + item.destino_pais : ''}</div>
+                                <div class="card-subtitle">
+                                    ${dias} dia${dias > 1 ? 's' : ''} · Salvo em ${data}
+                                    ${item.data_ida ? '<br>📅 ' + this.formatarDataCurta(item.data_ida) + (item.data_volta ? ' → ' + this.formatarDataCurta(item.data_volta) : '') : ''}
+                                </div>
+                            </div>
                         </div>
-                    </div>
-                </div>
 
-                <!-- Conteúdo expandível do roteiro -->
-                <div class="roteiro-expandido" id="roteiro-expandido-${index}" style="display:none; padding: 0 16px 12px; border-top: 1px solid var(--gray-200);">
-                    <div class="roteiro-expandido-inner"></div>
-                </div>
+                        <!-- Conteúdo expandível do roteiro -->
+                        <div class="roteiro-expandido" id="roteiro-expandido-${index}" style="display:none; padding: 0 16px 12px; border-top: 1px solid var(--gray-200);">
+                            <div class="roteiro-expandido-inner"></div>
+                        </div>
 
-                <div class="card-actions">
-                    <button class="card-action primary" onclick="MinhaConta.toggleVerRoteiro(${index}, ${JSON.stringify(item).replace(/"/g, '&quot;')})">
-                        👁️ <span id="btn-ver-label-${index}">Ver roteiro</span>
-                    </button>
-                    <button class="card-action blue" onclick="MinhaConta.compartilharRoteiro(${index}, ${JSON.stringify(item).replace(/"/g, '&quot;')})">
-                        📤 Compartilhar
-                    </button>
-                    <button class="card-action danger" onclick="MinhaConta.deletarRoteiro('${item.id}')">
-                        🗑️ Remover
-                    </button>
-                </div>
-            </div>`;
-    }).join('');
-},
+                        <div class="card-actions">
+                            <button class="card-action primary" onclick="MinhaConta.toggleVerRoteiro(${index}, ${JSON.stringify(item).replace(/"/g, '&quot;')})">
+                                👁️ <span id="btn-ver-label-${index}">Ver roteiro</span>
+                            </button>
+                            <button class="card-action blue" onclick="MinhaConta.compartilharRoteiro(${index}, ${JSON.stringify(item).replace(/"/g, '&quot;')})">
+                                📤 Compartilhar
+                            </button>
+                            <button class="card-action danger" onclick="MinhaConta.deletarRoteiro('${item.id}')">
+                                🗑️ Remover
+                            </button>
+                        </div>
+                    </div>`;
+            }).join('');
+        },
 
         // ── PERFIL ──
         async loadPerfil() {
@@ -1059,135 +1080,135 @@
         },
 
         // ── VER ROTEIRO ──
-toggleVerRoteiro(index, item) {
-    const container = document.getElementById(`roteiro-expandido-${index}`);
-    const label = document.getElementById(`btn-ver-label-${index}`);
-    const isVisible = container.style.display !== 'none';
+        toggleVerRoteiro(index, item) {
+            const container = document.getElementById(`roteiro-expandido-${index}`);
+            const label = document.getElementById(`btn-ver-label-${index}`);
+            const isVisible = container.style.display !== 'none';
 
-    if (isVisible) {
-        container.style.display = 'none';
-        label.textContent = 'Ver roteiro';
-        return;
-    }
+            if (isVisible) {
+                container.style.display = 'none';
+                label.textContent = 'Ver roteiro';
+                return;
+            }
 
-    const dados = item.dados_roteiro;
-    if (!dados || !dados.dias || dados.dias.length === 0) {
-        container.querySelector('.roteiro-expandido-inner').innerHTML =
-            `<p style="color:var(--gray-400);padding:12px 0;font-size:0.85rem;">
-                ⚠️ Conteúdo detalhado não disponível para este roteiro.
-                <a href="roteiro-viagem.html" style="color:var(--orange);">Gere um novo roteiro</a>
-             </p>`;
-        container.style.display = 'block';
-        label.textContent = 'Fechar';
-        return;
-    }
+            const dados = item.dados_roteiro;
+            if (!dados || !dados.dias || dados.dias.length === 0) {
+                container.querySelector('.roteiro-expandido-inner').innerHTML =
+                    `<p style="color:var(--gray-400);padding:12px 0;font-size:0.85rem;">
+                        ⚠️ Conteúdo detalhado não disponível para este roteiro.
+                        <a href="roteiro-viagem.html" style="color:var(--orange);">Gere um novo roteiro</a>
+                     </p>`;
+                container.style.display = 'block';
+                label.textContent = 'Fechar';
+                return;
+            }
 
-    container.querySelector('.roteiro-expandido-inner').innerHTML =
-        this.renderRoteiroExpandido(dados, item);
-    container.style.display = 'block';
-    label.textContent = 'Fechar';
-},
+            container.querySelector('.roteiro-expandido-inner').innerHTML =
+                this.renderRoteiroExpandido(dados, item);
+            container.style.display = 'block';
+            label.textContent = 'Fechar';
+        },
 
-renderRoteiroExpandido(dados, item) {
-    const PERIODO_ICONS = { 'manhã': '🌅', 'manha': '🌅', 'tarde': '☀️', 'noite': '🌙' };
+        renderRoteiroExpandido(dados, item) {
+            const PERIODO_ICONS = { 'manhã': '🌅', 'manha': '🌅', 'tarde': '☀️', 'noite': '🌙' };
 
-    const renderAtividade = (ativ) => `
-        <div style="padding: 8px 0; border-bottom: 1px solid var(--gray-100);">
-            <div style="font-weight:600;font-size:0.85rem;">📍 ${ativ.nome || ''}</div>
-            ${ativ.descricao ? `<div style="font-size:0.8rem;color:var(--gray-600);margin-top:2px;">${ativ.descricao}</div>` : ''}
-            ${ativ.dica_tripinha ? `<div style="font-size:0.78rem;color:var(--orange);margin-top:4px;">💡 ${ativ.dica_tripinha}</div>` : ''}
-            <a href="https://maps.google.com/?q=${encodeURIComponent(ativ.google_maps_query || ativ.nome)}"
-               target="_blank"
-               style="font-size:0.75rem;color:var(--blue);text-decoration:none;display:inline-block;margin-top:4px;">
-               📍 Ver no mapa
-            </a>
-        </div>`;
+            const renderAtividade = (ativ) => `
+                <div style="padding: 8px 0; border-bottom: 1px solid var(--gray-100);">
+                    <div style="font-weight:600;font-size:0.85rem;">📍 ${ativ.nome || ''}</div>
+                    ${ativ.descricao ? `<div style="font-size:0.8rem;color:var(--gray-600);margin-top:2px;">${ativ.descricao}</div>` : ''}
+                    ${ativ.dica_tripinha ? `<div style="font-size:0.78rem;color:var(--orange);margin-top:4px;">💡 ${ativ.dica_tripinha}</div>` : ''}
+                    <a href="https://maps.google.com/?q=${encodeURIComponent(ativ.google_maps_query || ativ.nome)}"
+                       target="_blank"
+                       style="font-size:0.75rem;color:var(--blue);text-decoration:none;display:inline-block;margin-top:4px;">
+                       📍 Ver no mapa
+                    </a>
+                </div>`;
 
-    const renderPeriodo = (periodo) => {
-        const icon = PERIODO_ICONS[periodo.periodo?.toLowerCase()] || '📌';
-        const label = (periodo.periodo || '').charAt(0).toUpperCase() + (periodo.periodo || '').slice(1);
-        return `
-            <div style="margin: 8px 0;">
-                <div style="font-size:0.8rem;font-weight:700;color:var(--gray-600);margin-bottom:4px;">
-                    ${icon} ${label}
-                </div>
-                ${(periodo.atividades || []).map(renderAtividade).join('')}
-            </div>`;
-    };
+            const renderPeriodo = (periodo) => {
+                const icon = PERIODO_ICONS[periodo.periodo?.toLowerCase()] || '📌';
+                const label = (periodo.periodo || '').charAt(0).toUpperCase() + (periodo.periodo || '').slice(1);
+                return `
+                    <div style="margin: 8px 0;">
+                        <div style="font-size:0.8rem;font-weight:700;color:var(--gray-600);margin-bottom:4px;">
+                            ${icon} ${label}
+                        </div>
+                        ${(periodo.atividades || []).map(renderAtividade).join('')}
+                    </div>`;
+            };
 
-    const renderDia = (dia) => `
-        <div style="margin-bottom:16px;">
-            <div style="background:var(--orange);color:white;padding:8px 12px;border-radius:8px;
-                        font-family:'Poppins',sans-serif;font-weight:600;font-size:0.85rem;margin-bottom:8px;">
-                Dia ${dia.dia_numero} — ${dia.dia_semana || ''}, ${dia.data || ''}
-                ${dia.titulo ? `<div style="font-weight:400;font-size:0.78rem;opacity:0.9;">${dia.titulo}</div>` : ''}
-            </div>
-            ${dia.resumo_tripinha ? `<div style="font-size:0.8rem;color:var(--gray-600);margin-bottom:8px;font-style:italic;">🐕 ${dia.resumo_tripinha}</div>` : ''}
-            ${(dia.periodos || []).map(renderPeriodo).join('')}
-        </div>`;
+            const renderDia = (dia) => `
+                <div style="margin-bottom:16px;">
+                    <div style="background:var(--orange);color:white;padding:8px 12px;border-radius:8px;
+                                font-family:'Poppins',sans-serif;font-weight:600;font-size:0.85rem;margin-bottom:8px;">
+                        Dia ${dia.dia_numero} — ${dia.dia_semana || ''}, ${dia.data || ''}
+                        ${dia.titulo ? `<div style="font-weight:400;font-size:0.78rem;opacity:0.9;">${dia.titulo}</div>` : ''}
+                    </div>
+                    ${dia.resumo_tripinha ? `<div style="font-size:0.8rem;color:var(--gray-600);margin-bottom:8px;font-style:italic;">🐕 ${dia.resumo_tripinha}</div>` : ''}
+                    ${(dia.periodos || []).map(renderPeriodo).join('')}
+                </div>`;
 
-    return `
-        <div style="padding-top:12px;">
-            ${dados.resumo_viagem ? `<div style="font-size:0.82rem;color:var(--gray-600);margin-bottom:12px;padding:10px;background:var(--gray-100);border-radius:8px;">🐕 ${dados.resumo_viagem}</div>` : ''}
-            ${(dados.dias || []).map(renderDia).join('')}
-        </div>`;
-},
+            return `
+                <div style="padding-top:12px;">
+                    ${dados.resumo_viagem ? `<div style="font-size:0.82rem;color:var(--gray-600);margin-bottom:12px;padding:10px;background:var(--gray-100);border-radius:8px;">🐕 ${dados.resumo_viagem}</div>` : ''}
+                    ${(dados.dias || []).map(renderDia).join('')}
+                </div>`;
+        },
 
-// ── COMPARTILHAR (corrigido) ──
-compartilharRoteiro(index, item) {
-    const dados = item.dados_roteiro;
+        // ── COMPARTILHAR ──
+        compartilharRoteiro(index, item) {
+            const dados = item.dados_roteiro;
 
-    if (!dados || !dados.dias || dados.dias.length === 0) {
-        alert('Conteúdo detalhado não disponível para compartilhar. Gere o roteiro novamente.');
-        return;
-    }
+            if (!dados || !dados.dias || dados.dias.length === 0) {
+                alert('Conteúdo detalhado não disponível para compartilhar. Gere o roteiro novamente.');
+                return;
+            }
 
-    const destino = item.destino_nome || 'Destino';
-    const dataIda = item.data_ida ? new Date(item.data_ida + 'T12:00:00').toLocaleDateString('pt-BR') : '';
-    const dataVolta = item.data_volta ? new Date(item.data_volta + 'T12:00:00').toLocaleDateString('pt-BR') : '';
+            const destino = item.destino_nome || 'Destino';
+            const dataIda = item.data_ida ? new Date(item.data_ida + 'T12:00:00').toLocaleDateString('pt-BR') : '';
+            const dataVolta = item.data_volta ? new Date(item.data_volta + 'T12:00:00').toLocaleDateString('pt-BR') : '';
 
-    let texto = `🗺️ *Roteiro para ${destino}*\n`;
-    if (dataIda) texto += `📅 ${dataIda}${dataVolta ? ' → ' + dataVolta : ''}\n`;
-    texto += `\n`;
+            let texto = `🗺️ *Roteiro para ${destino}*\n`;
+            if (dataIda) texto += `📅 ${dataIda}${dataVolta ? ' → ' + dataVolta : ''}\n`;
+            texto += `\n`;
 
-    if (dados.resumo_viagem) texto += `🐕 ${dados.resumo_viagem}\n\n`;
+            if (dados.resumo_viagem) texto += `🐕 ${dados.resumo_viagem}\n\n`;
 
-    const PERIODO_ICONS = { 'manhã': '🌅', 'manha': '🌅', 'tarde': '☀️', 'noite': '🌙' };
+            const PERIODO_ICONS = { 'manhã': '🌅', 'manha': '🌅', 'tarde': '☀️', 'noite': '🌙' };
 
-    (dados.dias || []).forEach(dia => {
-        texto += `━━━━━━━━━━━━━━━\n`;
-        texto += `📌 *Dia ${dia.dia_numero} — ${dia.dia_semana || ''}, ${dia.data || ''}*\n`;
-        if (dia.titulo) texto += `${dia.titulo}\n`;
-        texto += `\n`;
-
-        (dia.periodos || []).forEach(periodo => {
-            const icon = PERIODO_ICONS[periodo.periodo?.toLowerCase()] || '📌';
-            const label = (periodo.periodo || '').charAt(0).toUpperCase() + (periodo.periodo || '').slice(1);
-            texto += `${icon} *${label}*\n`;
-
-            (periodo.atividades || []).forEach(ativ => {
-                texto += `  📍 ${ativ.nome}`;
-                if (ativ.duracao_minutos) texto += ` (~${ativ.duracao_minutos}min)`;
+            (dados.dias || []).forEach(dia => {
+                texto += `━━━━━━━━━━━━━━━\n`;
+                texto += `📌 *Dia ${dia.dia_numero} — ${dia.dia_semana || ''}, ${dia.data || ''}*\n`;
+                if (dia.titulo) texto += `${dia.titulo}\n`;
                 texto += `\n`;
-                const mapsUrl = `https://maps.google.com/?q=${encodeURIComponent(ativ.google_maps_query || ativ.nome)}`;
-                texto += `     📍 ${mapsUrl}\n\n`;
+
+                (dia.periodos || []).forEach(periodo => {
+                    const icon = PERIODO_ICONS[periodo.periodo?.toLowerCase()] || '📌';
+                    const label = (periodo.periodo || '').charAt(0).toUpperCase() + (periodo.periodo || '').slice(1);
+                    texto += `${icon} *${label}*\n`;
+
+                    (periodo.atividades || []).forEach(ativ => {
+                        texto += `  📍 ${ativ.nome}`;
+                        if (ativ.duracao_minutos) texto += ` (~${ativ.duracao_minutos}min)`;
+                        texto += `\n`;
+                        const mapsUrl = `https://maps.google.com/?q=${encodeURIComponent(ativ.google_maps_query || ativ.nome)}`;
+                        texto += `     📍 ${mapsUrl}\n\n`;
+                    });
+                });
             });
-        });
-    });
 
-    texto += `━━━━━━━━━━━━━━━\n`;
-    texto += `✨ Roteiro por Benetrip — benetrip.com.br\n🐕 Feito com carinho pela Tripinha!`;
+            texto += `━━━━━━━━━━━━━━━\n`;
+            texto += `✨ Roteiro por Benetrip — benetrip.com.br\n🐕 Feito com carinho pela Tripinha!`;
 
-    const encoded = encodeURIComponent(texto);
+            const encoded = encodeURIComponent(texto);
 
-    if (encoded.length > 3500) {
-        navigator.clipboard.writeText(texto).catch(() => {});
-        alert('Roteiro muito longo para WhatsApp! O texto foi copiado para sua área de transferência. Cole onde quiser! 📋');
-        return;
-    }
+            if (encoded.length > 3500) {
+                navigator.clipboard.writeText(texto).catch(() => {});
+                alert('Roteiro muito longo para WhatsApp! O texto foi copiado para sua área de transferência. Cole onde quiser! 📋');
+                return;
+            }
 
-    window.open(`https://wa.me/?text=${encoded}`, '_blank');
-},
+            window.open(`https://wa.me/?text=${encoded}`, '_blank');
+        },
 
         confirmarLimparHistorico() {
             document.getElementById('confirm-title').textContent = '🗑️ Limpar todo o histórico?';
@@ -1212,6 +1233,7 @@ compartilharRoteiro(index, item) {
             const PAGES = {
                 'descobrir_destinos': 'descobrir-destinos.html',
                 'todos_destinos': 'todos-destinos.html',
+                'comparar_voos': 'comparar-voos.html',
                 'busca_voos': 'voos.html',
                 'voos_baratos': 'voos.html',
                 'roteiro': 'roteiro-viagem.html'
