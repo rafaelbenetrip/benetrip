@@ -1,7 +1,7 @@
 /**
  * BENETRIP - VOOS BARATOS
  * Encontre o período mais barato para viajar!
- * Versão: Calendar Heatmap v1.0
+ * Versão: Calendar Heatmap v1.1 - Cidades Agrupadas
  */
 
 const BenetripVoosBaratos = {
@@ -28,7 +28,7 @@ const BenetripVoosBaratos = {
     // INICIALIZAÇÃO
     // ================================================================
     init() {
-        this.log('🐕 Benetrip Voos Baratos v1.0 inicializando...');
+        this.log('🐕 Benetrip Voos Baratos v1.1 (Cidades Agrupadas) inicializando...');
         this.carregarCidades();
         this.setupAutocomplete('origem', 'origem-results', 'origem-data', 'origemSelecionada');
         this.setupAutocomplete('destino', 'destino-results', 'destino-data', 'destinoSelecionado');
@@ -47,22 +47,21 @@ const BenetripVoosBaratos = {
             if (!response.ok) throw new Error('Erro ao carregar cidades');
             const dados = await response.json();
             this.state.cidadesData = dados.filter(c => c.iata);
-            this.log(`✅ ${this.state.cidadesData.length} cidades carregadas`);
+            
+            const agrupadas = this.state.cidadesData.filter(c => c.is_city_code);
+            this.log(`✅ ${this.state.cidadesData.length} cidades carregadas (${agrupadas.length} agrupadas)`);
         } catch (err) {
             this.log('⚠️ Usando fallback de cidades');
             this.state.cidadesData = [
+                { cidade: "São Paulo", sigla_estado: "SP", pais: "Brasil", codigo_pais: "BR", iata: "/m/02cft", iata_city_code: "SAO", aeroporto: "Todos os aeroportos", is_city_code: true, aeroportos_incluidos: ["GRU", "CGH", "VCP"] },
                 { cidade: "São Paulo", sigla_estado: "SP", pais: "Brasil", codigo_pais: "BR", iata: "GRU", aeroporto: "Aeroporto de Guarulhos" },
+                { cidade: "São Paulo", sigla_estado: "SP", pais: "Brasil", codigo_pais: "BR", iata: "CGH", aeroporto: "Aeroporto de Congonhas" },
+                { cidade: "Rio de Janeiro", sigla_estado: "RJ", pais: "Brasil", codigo_pais: "BR", iata: "/m/06gmr", iata_city_code: "RIO", aeroporto: "Todos os aeroportos", is_city_code: true, aeroportos_incluidos: ["GIG", "SDU"] },
                 { cidade: "Rio de Janeiro", sigla_estado: "RJ", pais: "Brasil", codigo_pais: "BR", iata: "GIG", aeroporto: "Aeroporto do Galeão" },
                 { cidade: "Lisboa", pais: "Portugal", codigo_pais: "PT", iata: "LIS", aeroporto: "Aeroporto de Lisboa" },
                 { cidade: "Miami", pais: "Estados Unidos", codigo_pais: "US", iata: "MIA", aeroporto: "Miami International" },
-                { cidade: "Buenos Aires", pais: "Argentina", codigo_pais: "AR", iata: "EZE", aeroporto: "Ezeiza" },
                 { cidade: "Paris", pais: "França", codigo_pais: "FR", iata: "CDG", aeroporto: "Charles de Gaulle" },
-                { cidade: "Londres", pais: "Reino Unido", codigo_pais: "GB", iata: "LHR", aeroporto: "Heathrow" },
-                { cidade: "Santiago", pais: "Chile", codigo_pais: "CL", iata: "SCL", aeroporto: "Arturo Merino Benítez" },
-                { cidade: "Orlando", pais: "Estados Unidos", codigo_pais: "US", iata: "MCO", aeroporto: "Orlando International" },
-                { cidade: "Roma", pais: "Itália", codigo_pais: "IT", iata: "FCO", aeroporto: "Fiumicino" },
-                { cidade: "Salvador", sigla_estado: "BA", pais: "Brasil", codigo_pais: "BR", iata: "SSA" },
-                { cidade: "Recife", sigla_estado: "PE", pais: "Brasil", codigo_pais: "BR", iata: "REC" },
+                { cidade: "Londres", pais: "Reino Unido", codigo_pais: "GB", iata: "LHR", aeroporto: "Heathrow" }
             ];
         }
     },
@@ -74,22 +73,38 @@ const BenetripVoosBaratos = {
     buscarCidades(termo) {
         if (!this.state.cidadesData || termo.length < 2) return [];
         const termoNorm = this.normalizarTexto(termo);
-        return this.state.cidadesData
-            .filter(c => {
-                const nomeNorm = this.normalizarTexto(c.cidade);
-                const iataNorm = c.iata.toLowerCase();
-                const aeroNorm = c.aeroporto ? this.normalizarTexto(c.aeroporto) : '';
+        
+        const resultados = this.state.cidadesData
+            .filter(cidade => {
+                const nomeNorm = this.normalizarTexto(cidade.cidade);
+                // Para kgmid, faz o match pelo iata_city_code se existir
+                const iataNorm = cidade.is_city_code 
+                    ? (cidade.iata_city_code || '').toLowerCase()
+                    : cidade.iata.toLowerCase();
+                const aeroNorm = cidade.aeroporto ? this.normalizarTexto(cidade.aeroporto) : '';
                 return nomeNorm.includes(termoNorm) || iataNorm.includes(termoNorm) || aeroNorm.includes(termoNorm);
             })
-            .slice(0, 8)
-            .map(c => ({
-                code: c.iata,
-                name: c.cidade,
-                state: c.sigla_estado || null,
-                country: c.pais,
-                countryCode: c.codigo_pais,
-                airport: c.aeroporto || null,
+            .slice(0, 10)
+            .map(cidade => ({
+                code: cidade.iata,
+                displayCode: cidade.iata_city_code || cidade.iata,
+                name: cidade.cidade,
+                state: cidade.sigla_estado || null,
+                country: cidade.pais,
+                countryCode: cidade.codigo_pais,
+                airport: cidade.aeroporto || null,
+                isCityCode: cidade.is_city_code || false,
+                aeroportosIncluidos: cidade.aeroportos_incluidos || null
             }));
+            
+        // Priorizar cidades agrupadas (ex: SAO, RIO) no topo
+        resultados.sort((a, b) => {
+            if (a.isCityCode && !b.isCityCode) return -1;
+            if (!a.isCityCode && b.isCityCode) return 1;
+            return 0;
+        });
+
+        return resultados.slice(0, 8);
     },
 
     // ================================================================
@@ -122,15 +137,20 @@ const BenetripVoosBaratos = {
                     return;
                 }
 
-                results.innerHTML = cidades.map(c => `
-                    <div class="autocomplete-item" data-city='${JSON.stringify(c)}'>
-                        <div class="item-code">${c.code}</div>
-                        <div class="item-details">
-                            <div class="item-name">${c.name}${c.state ? ', ' + c.state : ''}${c.airport ? ' — ' + c.airport : ''}</div>
-                            <div class="item-country">${c.country}</div>
+                results.innerHTML = cidades.map(c => {
+                    const cityClass = c.isCityCode ? 'autocomplete-item autocomplete-city-group' : 'autocomplete-item';
+                    const cityIcon = c.isCityCode ? '🏙️' : '';
+                    
+                    return `
+                        <div class="${cityClass}" data-city='${JSON.stringify(c)}'>
+                            <div class="item-code">${cityIcon}${c.displayCode}</div>
+                            <div class="item-details">
+                                <div class="item-name">${c.name}${c.state ? ', ' + c.state : ''}${c.airport ? ' — ' + c.airport : ''}</div>
+                                <div class="item-country">${c.country}</div>
+                            </div>
                         </div>
-                    </div>
-                `).join('');
+                    `;
+                }).join('');
 
                 results.style.display = 'block';
 
@@ -138,12 +158,15 @@ const BenetripVoosBaratos = {
                     item.addEventListener('click', () => {
                         const cidade = JSON.parse(item.dataset.city);
                         this.state[stateKey] = cidade;
+                        
+                        const codeDisplay = cidade.displayCode || cidade.code;
                         input.value = cidade.airport
-                            ? `${cidade.name} — ${cidade.airport} (${cidade.code})`
-                            : `${cidade.name} (${cidade.code})`;
+                            ? `${cidade.name} — ${cidade.airport} (${codeDisplay})`
+                            : `${cidade.name} (${codeDisplay})`;
+                            
                         hidden.value = JSON.stringify(cidade);
                         results.style.display = 'none';
-                        this.log(`📍 ${stateKey}:`, cidade.code);
+                        this.log(`📍 ${stateKey}:`, cidade.code, `| display: ${codeDisplay}`);
                     });
                 });
             }, 250);
@@ -157,7 +180,7 @@ const BenetripVoosBaratos = {
     },
 
     // ================================================================
-    // CHIPS: Duração
+    // CHIPS: Duração & Moeda
     // ================================================================
     setupDurationChips() {
         document.querySelectorAll('.chip[data-days]').forEach(chip => {
@@ -168,13 +191,9 @@ const BenetripVoosBaratos = {
                 this.log('📅 Duração:', this.state.duracaoSelecionada, 'dias');
             });
         });
-        // Selecionar 7 por padrão
         document.querySelector('.chip[data-days="7"]')?.classList.add('active');
     },
 
-    // ================================================================
-    // CHIPS: Moeda
-    // ================================================================
     setupCurrencyChips() {
         document.querySelectorAll('.currency-chip[data-currency]').forEach(chip => {
             chip.addEventListener('click', () => {
@@ -188,7 +207,7 @@ const BenetripVoosBaratos = {
     },
 
     // ================================================================
-    // FORM
+    // FORM & BUSCA
     // ================================================================
     setupForm() {
         document.getElementById('search-form').addEventListener('submit', async (e) => {
@@ -215,9 +234,6 @@ const BenetripVoosBaratos = {
         return true;
     },
 
-    // ================================================================
-    // BUSCAR VOOS BARATOS
-    // ================================================================
     async buscar() {
         const { origemSelecionada, destinoSelecionado, duracaoSelecionada, moedaSelecionada } = this.state;
 
@@ -225,7 +241,7 @@ const BenetripVoosBaratos = {
         this.updateProgress(10, '🔍 Preparando busca nos próximos 6 meses...');
 
         try {
-            this.updateProgress(25, `✈️ Pesquisando ${origemSelecionada.code} → ${destinoSelecionado.code}...`);
+            this.updateProgress(25, `✈️ Pesquisando voos para ${destinoSelecionado.name}...`);
 
             const response = await fetch('/api/cheapest-flights', {
                 method: 'POST',
@@ -245,7 +261,7 @@ const BenetripVoosBaratos = {
                 throw new Error(err.message || 'Erro na busca');
             }
 
-const data = await response.json();
+            const data = await response.json();
 
             if (!data.success || !data.prices || data.prices.length === 0) {
                 throw new Error(data.message || 'Nenhum voo encontrado para esta rota');
@@ -253,14 +269,11 @@ const data = await response.json();
 
             this.state.resultados = data;
 
-            // ADICIONADO: Salvamento automático
             if (typeof BenetripAutoSave !== 'undefined') {
                 BenetripAutoSave.salvarBuscaVoosBaratos(this.state.formData, data.prices);
             }
 
             this.log('✅ Resultados:', data.stats);
-            this.log('✈️ Voos enriquecidos:', data._meta?.enrichedCount || 0);
-
             this.updateProgress(100, '🎉 Pronto!');
             await this.delay(400);
 
@@ -274,15 +287,32 @@ const data = await response.json();
     },
 
     // ================================================================
+    // RESOLVER IATA PARA GOOGLE FLIGHTS
+    // ================================================================
+    getIataParaGoogleFlights(cidade) {
+        if (cidade.isCityCode && cidade.aeroportosIncluidos && cidade.aeroportosIncluidos.length > 0) {
+            return cidade.aeroportosIncluidos[0]; // Usa o primeiro aero do grupo, ex: GRU
+        }
+        return cidade.code;
+    },
+
+    // ================================================================
     // RENDER RESULTADOS
     // ================================================================
     renderResults(data) {
         const container = document.getElementById('results-content');
         const { origemSelecionada, destinoSelecionado, duracaoSelecionada, moedaSelecionada } = this.state;
+        
         const simbolo = this.getSimbolo(moedaSelecionada);
         const cheapest = data.stats.cheapest;
+        
+        const displayOrigemCode = origemSelecionada.displayCode || origemSelecionada.code;
+        const displayDestinoCode = destinoSelecionado.displayCode || destinoSelecionado.code;
 
-        // Tripinha dica
+        // IATA convertidos para a construção das URLs
+        const originIataGF = this.getIataParaGoogleFlights(origemSelecionada);
+        const destIataGF = this.getIataParaGoogleFlights(destinoSelecionado);
+
         const saving = data.stats.mostExpensive.price - cheapest.price;
         const savingPct = Math.round((saving / data.stats.mostExpensive.price) * 100);
 
@@ -297,18 +327,17 @@ const data = await response.json();
                 ← Nova busca
             </button>
 
-            <!-- RESUMO DA VIAGEM -->
             <div class="trip-summary fade-in">
                 <div class="trip-summary-route">
                     <div class="trip-summary-city">
-                        <span class="trip-summary-code">${origemSelecionada.code}</span>
+                        <span class="trip-summary-code">${displayOrigemCode}</span>
                         <span class="trip-summary-name">${origemSelecionada.name}</span>
                     </div>
                     <div class="trip-summary-arrow">
                         <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5l7 7-7 7"/></svg>
                     </div>
                     <div class="trip-summary-city">
-                        <span class="trip-summary-code">${destinoSelecionado.code}</span>
+                        <span class="trip-summary-code">${displayDestinoCode}</span>
                         <span class="trip-summary-name">${destinoSelecionado.name}</span>
                     </div>
                 </div>
@@ -320,7 +349,6 @@ const data = await response.json();
                 </div>
             </div>
 
-            <!-- WINNER CARD -->
             <div class="winner-card fade-in" style="animation-delay: 0.05s">
                 <div class="winner-badge">🏆 PERÍODO MAIS BARATO</div>
                 <div class="winner-price">${simbolo} ${cheapest.price.toLocaleString('pt-BR')}</div>
@@ -337,13 +365,12 @@ const data = await response.json();
                         <div class="winner-date-value">${this.formatDateBR(cheapest.return)}</div>
                     </div>
                 </div>
-                <a href="${this.buildGoogleFlightsUrl(origemSelecionada.code, destinoSelecionado.code, cheapest.departure, cheapest.return, moedaSelecionada)}" 
+                <a href="${this.buildGoogleFlightsUrl(originIataGF, destIataGF, cheapest.departure, cheapest.return, moedaSelecionada)}" 
                    target="_blank" rel="noopener" class="winner-cta">
                     ✈️ Ver no Google Flights
                 </a>
             </div>
 
-            <!-- STATS -->
             <div class="stats-row fade-in" style="animation-delay: 0.1s">
                 <div class="stat-card">
                     <div class="stat-card-label">Mais barato</div>
@@ -359,14 +386,12 @@ const data = await response.json();
                 </div>
             </div>
 
-            <!-- TRIPINHA TIP -->
             <div class="tripinha-tip fade-in" style="animation-delay: 0.15s">
                 <img src="assets/images/tripinha/avatar-pensando.png" alt="Tripinha" class="tripinha-tip-avatar"
                      onerror="this.style.display='none'">
                 <div class="tripinha-tip-text">${tipText}</div>
             </div>
 
-            <!-- GRÁFICO MENSAL -->
             <div class="chart-section fade-in" style="animation-delay: 0.2s">
                 <h3 class="chart-title">📊 Preço mais barato por mês</h3>
                 <p class="chart-hint">👆 Clique em um mês para ver todos os períodos disponíveis</p>
@@ -375,12 +400,8 @@ const data = await response.json();
                 </div>
             </div>
 
-            <!-- DETALHE DO MÊS SELECIONADO (aparece ao clicar na barra) -->
-            <div class="month-detail-section" id="month-detail" style="display:none">
-                <!-- Preenchido dinamicamente por selectMonth() -->
-            </div>
+            <div class="month-detail-section" id="month-detail" style="display:none"></div>
 
-            <!-- TOP 10 -->
             <div class="top-list-section fade-in" style="animation-delay: 0.25s">
                 <h3 class="top-list-title">🏅 Top 10 Períodos Mais Baratos</h3>
                 <div class="top-list">
@@ -388,7 +409,6 @@ const data = await response.json();
                 </div>
             </div>
 
-            <!-- COMPARTILHAR -->
             <div class="share-section fade-in" style="animation-delay: 0.3s">
                 <h3 class="share-title">📤 Compartilhar resultado</h3>
                 <p class="share-subtitle">Envie pra quem vai viajar com você!</p>
@@ -407,7 +427,6 @@ const data = await response.json();
 
         container.innerHTML = html;
 
-        // Animar barras do gráfico
         requestAnimationFrame(() => {
             setTimeout(() => this.animateChartBars(), 300);
         });
@@ -415,9 +434,6 @@ const data = await response.json();
         this.showResults();
     },
 
-    // ================================================================
-    // RENDER: Winner flight details (inside green card)
-    // ================================================================
     _renderWinnerFlightDetails(cheapest) {
         const fd = cheapest.flight_details;
         if (!fd) return '';
@@ -441,9 +457,6 @@ const data = await response.json();
         `;
     },
 
-    // ================================================================
-    // RENDER: Gráfico de barras
-    // ================================================================
     renderChart(monthlyData, simbolo) {
         if (!monthlyData || monthlyData.length === 0) return '<p>Sem dados mensais</p>';
 
@@ -488,17 +501,16 @@ const data = await response.json();
         });
     },
 
-    // ================================================================
-    // RENDER: Top item
-    // ================================================================
     renderTopItem(item, idx, simbolo) {
-        const { origemSelecionada, destinoSelecionado, moedaSelecionada } = this.state;
+        const originIataGF = this.getIataParaGoogleFlights(this.state.origemSelecionada);
+        const destIataGF = this.getIataParaGoogleFlights(this.state.destinoSelecionado);
+
         const url = this.buildGoogleFlightsUrl(
-            origemSelecionada.code,
-            destinoSelecionado.code,
+            originIataGF,
+            destIataGF,
             item.departure,
             item.return,
-            moedaSelecionada
+            this.state.moedaSelecionada
         );
 
         const depDate = new Date(item.departure + 'T12:00:00');
@@ -509,7 +521,6 @@ const data = await response.json();
 
         const svgArrow = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17l9.2-9.2M17 17V7H7"/></svg>`;
 
-        // Flight details (when enriched)
         let detailsHtml = '';
         const fd = item.flight_details;
         if (fd) {
@@ -519,12 +530,10 @@ const data = await response.json();
             const stopsStr = fd.stops === 0 ? 'Direto' : fd.stops === 1 ? '1 parada' : `${fd.stops} paradas`;
             const airlinesStr = fd.airlines.join(', ');
 
-            // Airline logos
             const logosHtml = fd.airline_logos.slice(0, 2).map(logo =>
                 `<img src="${logo}" alt="" class="detail-airline-logo" onerror="this.style.display='none'">`
             ).join('');
 
-            // Price insights badge
             let insightBadge = '';
             if (fd.price_insights && fd.price_insights.price_level) {
                 const levelMap = {
@@ -575,23 +584,18 @@ const data = await response.json();
         `;
     },
 
-    // ================================================================
-    // SELECIONAR MÊS NO GRÁFICO
-    // ================================================================
     selectMonth(monthKey) {
         const data = this.state.resultados;
         if (!data || !data.prices) return;
 
-        const { origemSelecionada, destinoSelecionado, moedaSelecionada } = this.state;
+        const { moedaSelecionada } = this.state;
         const simbolo = this.getSimbolo(moedaSelecionada);
         this.state.mesSelecionado = monthKey;
 
-        // Filtrar preços deste mês e ordenar
         const monthPrices = data.prices
             .filter(p => p.departure && p.departure.startsWith(monthKey))
             .sort((a, b) => a.price - b.price);
 
-        // Highlight visual na barra selecionada
         document.querySelectorAll('.chart-bar').forEach(bar => {
             bar.classList.remove('selected');
             if (bar.dataset.month === monthKey) bar.classList.add('selected');
@@ -650,37 +654,39 @@ const data = await response.json();
         const container = document.getElementById('month-detail');
         container.style.display = 'none';
         this.state.mesSelecionado = null;
-        // Remove highlight de barras
         document.querySelectorAll('.chart-bar').forEach(bar => bar.classList.remove('selected'));
     },
 
-    // ================================================================
-    // COMPARTILHAR VIA WHATSAPP
-    // ================================================================
     _buildShareText() {
         const data = this.state.resultados;
         if (!data || !data.stats) return null;
 
         const { origemSelecionada, destinoSelecionado, duracaoSelecionada, moedaSelecionada } = this.state;
+        
+        const displayOrigemCode = origemSelecionada.displayCode || origemSelecionada.code;
+        const displayDestinoCode = destinoSelecionado.displayCode || destinoSelecionado.code;
+
+        const originIataGF = this.getIataParaGoogleFlights(origemSelecionada);
+        const destIataGF = this.getIataParaGoogleFlights(destinoSelecionado);
+
         const simbolo = this.getSimbolo(moedaSelecionada);
         const cheapest = data.stats.cheapest;
 
         const googleUrl = this.buildGoogleFlightsUrl(
-            origemSelecionada.code,
-            destinoSelecionado.code,
+            originIataGF,
+            destIataGF,
             cheapest.departure,
             cheapest.return,
             moedaSelecionada
         );
 
         let text = `✈️ *Voos baratos encontrados pela Benetrip!*\n\n`;
-        text += `📍 ${origemSelecionada.name} (${origemSelecionada.code}) → ${destinoSelecionado.name} (${destinoSelecionado.code})\n`;
+        text += `📍 ${origemSelecionada.name} (${displayOrigemCode}) → ${destinoSelecionado.name} (${displayDestinoCode})\n`;
         text += `📅 ${duracaoSelecionada} dias de viagem\n\n`;
         text += `🏆 *Período mais barato:*\n`;
         text += `💰 *${simbolo} ${cheapest.price.toLocaleString('pt-BR')}* ida e volta\n`;
         text += `📆 ${this.formatDateBR(cheapest.departure)} → ${this.formatDateBR(cheapest.return)}\n`;
 
-        // Flight details if available
         if (cheapest.flight_details) {
             const fd = cheapest.flight_details;
             const dH = Math.floor(fd.total_duration / 60);
@@ -692,7 +698,6 @@ const data = await response.json();
 
         text += '\n';
 
-        // Top 3
         if (data.top10 && data.top10.length > 1) {
             text += `🥈 2º melhor: ${simbolo} ${data.top10[1].price.toLocaleString('pt-BR')} (${this.formatDateBR(data.top10[1].departure)})\n`;
         }
@@ -709,11 +714,9 @@ const data = await response.json();
     shareWhatsApp() {
         const text = this._buildShareText();
         if (!text) return;
-
         const encoded = encodeURIComponent(text);
         const url = `https://api.whatsapp.com/send?text=${encoded}`;
         window.open(url, '_blank');
-
         this.log('📤 Compartilhado via WhatsApp');
     },
 
@@ -722,7 +725,6 @@ const data = await response.json();
         if (!text) return;
 
         navigator.clipboard.writeText(text).then(() => {
-            // Feedback visual
             const btn = document.querySelector('.btn-share-copy');
             if (btn) {
                 const original = btn.innerHTML;
@@ -735,7 +737,6 @@ const data = await response.json();
             }
             this.log('📋 Texto copiado');
         }).catch(() => {
-            // Fallback: selecionar texto em prompt
             prompt('Copie o texto abaixo:', text);
         });
     },
@@ -797,7 +798,7 @@ const data = await response.json();
         params.set('hl', hlMap[moeda] || 'pt-BR');
         params.set('gl', glMap[moeda] || 'br');
 
-        return `https://www.google.com/travel/flights/search?${params.toString()}`;
+        return `https://www.google.com/travel/flights/search?$?${params.toString()}`;
     },
 
     // ================================================================
