@@ -502,3 +502,8 @@ body.filtros-open { overflow: hidden; }
 .main-content {
     padding: 0 0 80px; /* Substitui o '32px 0 80px' anterior */
 }
+
+.autocomplete-city-group {
+    background: #FFF8F0;
+    border-left: 3px solid #E87722;
+}
