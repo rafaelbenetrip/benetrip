@@ -37,7 +37,7 @@ const BenetripDiscovery = {
     config: {
         debug: true,
         // v4.4: Atualizado para v7 com cidades agrupadas
-        cidadesJsonPath: 'data/cidades_global_iata_v0.json'
+        cidadesJsonPath: 'data/cidades_global_iata_v7.json'
     },
     log(...args) {
         if (this.config.debug) console.log('[Benetrip]', ...args);
@@ -711,17 +711,18 @@ const BenetripDiscovery = {
         }
     },
     // ================================================================
-    // v4.4: buscarDestinosAPI envia aeroportos separados por vírgula
+    // v4.4b: buscarDestinosAPI envia aeroportos separados por vírgula
     // quando a origem é cidade agrupada (ex: "GRU,CGH,VCP" para São Paulo)
+    // O search-destinations.js constrói a URL manualmente para preservar
+    // as vírgulas literais (url.searchParams.set encoda , como %2C)
     // ================================================================
     async buscarDestinosAPI() {
         const origem = this.state.formData.origem;
         
-        // v4.4: Se é cidade agrupada, enviar aeroportos como lista
-        // Ex: "GRU,CGH,VCP" em vez de kgmid "/m/02cft"
+        // v4.4b: Se é cidade agrupada, enviar TODOS os aeroportos
         let origemParaAPI;
         if (origem.isCityCode && origem.aeroportosIncluidos && origem.aeroportosIncluidos.length > 0) {
-            origemParaAPI = origem.aeroportosIncluidos.join(',');
+            origemParaAPI = origem.aeroportosIncluidos.join(','); // Ex: "GRU,CGH,VCP"
             this.log(`🏙️ Origem agrupada: ${origem.displayCode} → enviando aeroportos: ${origemParaAPI}`);
         } else {
             origemParaAPI = origem.code;
