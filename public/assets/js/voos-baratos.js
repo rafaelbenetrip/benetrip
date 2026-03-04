@@ -798,7 +798,8 @@ const BenetripVoosBaratos = {
         params.set('hl', hlMap[moeda] || 'pt-BR');
         params.set('gl', glMap[moeda] || 'br');
 
-        return `https://www.google.com/travel/flights/search?$?${params.toString()}`;
+        // CORREÇÃO: URL oficial do Google Flights com a sintaxe de template literal corrigida
+        return `https://www.google.com/travel/flights?${params.toString()}`;
     },
 
     // ================================================================
