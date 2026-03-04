@@ -180,9 +180,12 @@ function resolveGeo(origemCode) {
 
 // ============================================================
 // BUSCA INDIVIDUAL no SearchAPI
+// NOTA v3.3b: departure_id com múltiplos aeroportos (ex: "GRU,CGH,VCP")
+// precisa manter vírgulas literais na URL. O url.searchParams.set()
+// encoda ',' como '%2C', quebrando o multi-airport.
+// Solução: construir a query string manualmente.
 // ============================================================
 async function searchTravelExplore(params, label) {
-    const url = new URL('https://www.searchapi.io/api/v1/search');
     const fullParams = {
         engine: 'google_travel_explore',
         api_key: process.env.SEARCHAPI_KEY,
@@ -191,14 +194,22 @@ async function searchTravelExplore(params, label) {
         ...params,
     };
 
+    // Construir query string manualmente para preservar vírgulas literais
+    const queryParts = [];
     Object.entries(fullParams).forEach(([k, v]) => {
-        if (v !== undefined && v !== null) url.searchParams.set(k, String(v));
+        if (v !== undefined && v !== null) {
+            // Encodar key e value, MAS preservar vírgulas no valor
+            const encodedKey = encodeURIComponent(k);
+            const encodedValue = encodeURIComponent(String(v)).replace(/%2C/gi, ',');
+            queryParts.push(`${encodedKey}=${encodedValue}`);
+        }
     });
+    const urlString = `https://www.searchapi.io/api/v1/search?${queryParts.join('&')}`;
 
     const startTime = Date.now();
 
     try {
-        const response = await fetch(url.toString(), {
+        const response = await fetch(urlString, {
             method: 'GET',
             headers: { 'Accept': 'application/json' }
         });
@@ -244,18 +255,17 @@ export default async function handler(req, res) {
         }
 
         // ============================================================
-        // v3.3: VALIDAÇÃO - Aceita IATA (GRU), múltiplos IATA (GRU,CGH,VCP) ou kgmid (/m/02cft)
+        // v3.3b: VALIDAÇÃO - Aceita IATA (GRU), multi-IATA (GRU,CGH,VCP) ou kgmid (/m/02cft)
         // ============================================================
         const origemRaw = origem.trim();
         const isKgmid = origemRaw.startsWith('/m/');
         const isIata = /^[A-Z]{3}$/i.test(origemRaw);
-        // v3.3b: Múltiplos IATA separados por vírgula (ex: GRU,CGH,VCP)
         const isMultiIata = /^[A-Z]{3}(,[A-Z]{3})+$/i.test(origemRaw);
         
         if (!isKgmid && !isIata && !isMultiIata) {
             return res.status(400).json({
                 error: 'Código de origem inválido',
-                message: 'Use código IATA (ex: GRU), múltiplos IATA (ex: GRU,CGH,VCP) ou kgmid (ex: /m/02cft)'
+                message: 'Use código IATA (ex: GRU), múltiplos (ex: GRU,CGH,VCP) ou kgmid (ex: /m/02cft)'
             });
         }
         
@@ -276,7 +286,7 @@ export default async function handler(req, res) {
         console.log(`💱 Moeda: ${currencyCode} | Escopo: ${apenasInternacional ? 'INTERNACIONAL' : 'TODOS'} | Tipo: ${isKgmid ? 'KGMID' : isMultiIata ? 'MULTI_IATA' : 'IATA'}`);
 
         // ============================================================
-        // v3.3: RESOLVER GEO (usa primeiro aeroporto se múltiplos)
+        // v3.3b: RESOLVER GEO (usa primeiro aeroporto se múltiplos)
         // ============================================================
         const geo = resolveGeo(origemGeoKey);
 
