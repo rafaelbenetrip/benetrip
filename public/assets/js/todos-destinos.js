@@ -395,6 +395,12 @@ const BenetripTodosDestinos = {
 
             this.prepararDadosFiltros(sorted);
             this.resetFiltros();
+
+            // --- ADICIONE ESTAS DUAS LINHAS AQUI ---
+            if (escopo === 'brasil') this.state.filtros.tipoDestino = 'nacional';
+            if (escopo === 'internacional') this.state.filtros.tipoDestino = 'internacional';
+            // --------------------------------------
+            
             this.aplicarFiltrosEMostrar();
 
             this.atualizarProgresso(100, '🎉 Pronto!');
