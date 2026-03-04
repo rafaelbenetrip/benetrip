@@ -37,7 +37,7 @@ const BenetripDiscovery = {
     config: {
         debug: true,
         // v4.4: Atualizado para v7 com cidades agrupadas
-        cidadesJsonPath: 'data/cidades_global_iata_v7.json'
+        cidadesJsonPath: 'data/cidades_global_iata_v0.json'
     },
     log(...args) {
         if (this.config.debug) console.log('[Benetrip]', ...args);
