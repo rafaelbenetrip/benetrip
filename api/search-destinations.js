@@ -1,5 +1,4 @@
-// api/search-destinations.js - VERSÃO MULTI-CONTINENTE v3.4 (Otimizada)
-// v3.4: Otimização de créditos (pula busca global se for apenas nacional) + Filtro defensivo
+// api/search-destinations.js - VERSÃO MULTI-CONTINENTE v3.3
 // v3.3: SUPORTE A KGMID como departure_id
 // Agora aceita tanto códigos IATA (GRU, JFK) quanto kgmid de cidade (/m/02cft)
 // Cidades com múltiplos aeroportos usam kgmid para busca agrupada no Google Travel
@@ -9,6 +8,7 @@
 import { readFileSync } from 'fs';
 import { join } from 'path';
 
+// ---> ADICIONE ESTA LINHA AQUI <---
 export const maxDuration = 60; // Aumenta o limite da Vercel para 60 segundos
 
 // ============================================================
@@ -44,24 +44,24 @@ const KGMID_CITY_GEO = {
     '/m/0f2v0':   { codigo_pais: 'US', pais: 'Estados Unidos',   kgmid_pais: '/m/09c7w0', continente: 'América do Norte', kgmid_continente: '/m/059g4', label: 'Miami (todos)' },
     // Europa
     '/m/04jpl':   { codigo_pais: 'GB', pais: 'Reino Unido',      kgmid_pais: '/m/07ssc', continente: 'Europa',            kgmid_continente: '/m/02j9z', label: 'Londres (todos)' },
-    '/m/05qtj':   { codigo_pais: 'FR', pais: 'França',           kgmid_pais: '/m/0f8l9c', continente: 'Europa',            kgmid_continente: '/m/02j9z', label: 'Paris (todos)' },
-    '/m/04swd':   { codigo_pais: 'RU', pais: 'Rússia',           kgmid_pais: '/m/06bnz', continente: 'Europa',             kgmid_continente: '/m/02j9z', label: 'Moscou (todos)' },
-    '/m/06mxs':   { codigo_pais: 'SE', pais: 'Suécia',           kgmid_pais: '/m/0d0vqn', continente: 'Europa',            kgmid_continente: '/m/02j9z', label: 'Estocolmo (todos)' },
-    '/m/0947l':   { codigo_pais: 'IT', pais: 'Itália',           kgmid_pais: '/m/03rjj', continente: 'Europa',             kgmid_continente: '/m/02j9z', label: 'Milão (todos)' },
-    '/m/06c62':   { codigo_pais: 'IT', pais: 'Itália',           kgmid_pais: '/m/03rjj', continente: 'Europa',             kgmid_continente: '/m/02j9z', label: 'Roma (todos)' },
+    '/m/05qtj':   { codigo_pais: 'FR', pais: 'França',           kgmid_pais: '/m/0f8l9c', continente: 'Europa',           kgmid_continente: '/m/02j9z', label: 'Paris (todos)' },
+    '/m/04swd':   { codigo_pais: 'RU', pais: 'Rússia',           kgmid_pais: '/m/06bnz', continente: 'Europa',            kgmid_continente: '/m/02j9z', label: 'Moscou (todos)' },
+    '/m/06mxs':   { codigo_pais: 'SE', pais: 'Suécia',           kgmid_pais: '/m/0d0vqn', continente: 'Europa',           kgmid_continente: '/m/02j9z', label: 'Estocolmo (todos)' },
+    '/m/0947l':   { codigo_pais: 'IT', pais: 'Itália',           kgmid_pais: '/m/03rjj', continente: 'Europa',            kgmid_continente: '/m/02j9z', label: 'Milão (todos)' },
+    '/m/06c62':   { codigo_pais: 'IT', pais: 'Itália',           kgmid_pais: '/m/03rjj', continente: 'Europa',            kgmid_continente: '/m/02j9z', label: 'Roma (todos)' },
     // América do Sul
-    '/m/01ly5m':  { codigo_pais: 'AR', pais: 'Argentina',        kgmid_pais: '/m/0jgd', continente: 'América do Sul',      kgmid_continente: '/m/0dg3n1', label: 'Buenos Aires (todos)' },
+    '/m/01ly5m':  { codigo_pais: 'AR', pais: 'Argentina',        kgmid_pais: '/m/0jgd', continente: 'América do Sul',     kgmid_continente: '/m/0dg3n1', label: 'Buenos Aires (todos)' },
     // Ásia
     '/m/07dfk':   { codigo_pais: 'JP', pais: 'Japão',            kgmid_pais: '/m/03_3d', continente: 'Ásia',              kgmid_continente: '/m/0j0k', label: 'Tóquio (todos)' },
     '/m/0dj5q':   { codigo_pais: 'JP', pais: 'Japão',            kgmid_pais: '/m/03_3d', continente: 'Ásia',              kgmid_continente: '/m/0j0k', label: 'Osaka (todos)' },
     '/m/0hsqf':   { codigo_pais: 'KR', pais: 'Coreia do Sul',    kgmid_pais: '/m/06qd3', continente: 'Ásia',              kgmid_continente: '/m/0j0k', label: 'Seul (todos)' },
     '/m/0195pd':  { codigo_pais: 'TH', pais: 'Tailândia',        kgmid_pais: '/m/07f1x', continente: 'Ásia',              kgmid_continente: '/m/0j0k', label: 'Bangkok (todos)' },
     '/m/04f_d':   { codigo_pais: 'ID', pais: 'Indonésia',        kgmid_pais: '/m/03ryn', continente: 'Ásia',              kgmid_continente: '/m/0j0k', label: 'Jacarta (todos)' },
-    '/m/01914':   { codigo_pais: 'CN', pais: 'China',            kgmid_pais: '/m/0d05w3', continente: 'Ásia',              kgmid_continente: '/m/0j0k', label: 'Pequim (todos)' },
-    '/m/06wjf':   { codigo_pais: 'CN', pais: 'China',            kgmid_pais: '/m/0d05w3', continente: 'Ásia',              kgmid_continente: '/m/0j0k', label: 'Xangai (todos)' },
-    '/m/09949m':  { codigo_pais: 'TR', pais: 'Turquia',          kgmid_pais: '/m/01znc_', continente: 'Ásia',              kgmid_continente: '/m/0j0k', label: 'Istambul (todos)' },
+    '/m/01914':   { codigo_pais: 'CN', pais: 'China',            kgmid_pais: '/m/0d05w3', continente: 'Ásia',             kgmid_continente: '/m/0j0k', label: 'Pequim (todos)' },
+    '/m/06wjf':   { codigo_pais: 'CN', pais: 'China',            kgmid_pais: '/m/0d05w3', continente: 'Ásia',             kgmid_continente: '/m/0j0k', label: 'Xangai (todos)' },
+    '/m/09949m':  { codigo_pais: 'TR', pais: 'Turquia',          kgmid_pais: '/m/01znc_', continente: 'Ásia',             kgmid_continente: '/m/0j0k', label: 'Istambul (todos)' },
     // Oriente Médio
-    '/m/0162v':   { codigo_pais: 'AE', pais: 'Emirados Árabes',  kgmid_pais: '/m/0j1z8', continente: 'Ásia',               kgmid_continente: '/m/0j0k', label: 'Dubai (todos)' },
+    '/m/0162v':   { codigo_pais: 'AE', pais: 'Emirados Árabes',  kgmid_pais: '/m/0j1z8', continente: 'Ásia',              kgmid_continente: '/m/0j0k', label: 'Dubai (todos)' },
 };
 
 // ============================================================
@@ -283,16 +283,14 @@ export default async function handler(req, res) {
 
         const currencyCode = (moeda && /^[A-Z]{3}$/.test(moeda)) ? moeda : 'BRL';
         const apenasInternacional = escopoDestino === 'internacional';
-        const apenasNacional = escopoDestino === 'brasil'; // ADICIONADO AQUI
-        
-        console.log(`💱 Moeda: ${currencyCode} | Escopo: ${apenasInternacional ? 'INTERNACIONAL' : apenasNacional ? 'NACIONAL' : 'TODOS'} | Tipo: ${isKgmid ? 'KGMID' : isMultiIata ? 'MULTI_IATA' : 'IATA'}`);
+        console.log(`💱 Moeda: ${currencyCode} | Escopo: ${apenasInternacional ? 'INTERNACIONAL' : 'TODOS'} | Tipo: ${isKgmid ? 'KGMID' : isMultiIata ? 'MULTI_IATA' : 'IATA'}`);
 
         // ============================================================
         // v3.3b: RESOLVER GEO (usa primeiro aeroporto se múltiplos)
         // ============================================================
         const geo = resolveGeo(origemGeoKey);
 
-        console.log(`🔍 Search de ${origemCode} | País: ${geo?.pais || '?'} | Continente: ${geo?.continente || '?'} | Internacional: ${apenasInternacional} | Nacional: ${apenasNacional}`);
+        console.log(`🔍 Multi-Continent Search de ${origemCode} | País: ${geo?.pais || '?'} | Continente: ${geo?.continente || '?'} | Internacional: ${apenasInternacional}`);
 
         // ============================================================
         // MAPEAR PREFERÊNCIAS → interests
@@ -340,9 +338,63 @@ export default async function handler(req, res) {
         const searchPromises = [];
         const startTime = Date.now();
 
-        if (apenasNacional) {
-            // Se for SÓ Brasil, faz apenas UMA busca economizando API
-            console.log(`🇧🇷 Busca APENAS NACIONAL ativada. Pulando buscas globais e continentais.`);
+        // BUSCA 1: GLOBAL (sempre)
+        searchPromises.push(
+            searchTravelExplore(
+                { ...baseParams },
+                `GLOBAL desde ${origemCode}`
+            )
+        );
+
+        if (apenasInternacional && geo?.continente) {
+            // ============================================================
+            // MODO INTERNACIONAL: Buscar em múltiplos continentes
+            // ============================================================
+            const estrategiaKey = getEstrategiaContinente(geo.continente);
+            const estrategia = ESTRATEGIA_CONTINENTES[estrategiaKey];
+            
+            if (estrategia) {
+                console.log(`🌍 Estratégia internacional: ${estrategia.descricao}`);
+                
+                // Buscar em cada continente da estratégia (máximo 4)
+                estrategia.prioridade.slice(0, 4).forEach(continenteKey => {
+                    const kgmid = CONTINENTES_KGMID[continenteKey];
+                    if (kgmid) {
+                        const continenteNome = Object.keys(CONTINENTES_KGMID).find(k => CONTINENTES_KGMID[k] === kgmid);
+                        searchPromises.push(
+                            searchTravelExplore(
+                                { ...baseParams, arrival_id: kgmid },
+                                `${continenteNome.toUpperCase()} desde ${origemCode}`
+                            )
+                        );
+                    }
+                });
+            } else {
+                // Fallback: busca apenas no continente de origem
+                searchPromises.push(
+                    searchTravelExplore(
+                        { ...baseParams, arrival_id: geo.kgmid_continente },
+                        `${geo.continente} desde ${origemCode}`
+                    )
+                );
+            }
+            
+        } else if (!apenasInternacional) {
+            // ============================================================
+            // MODO TANTO FAZ: Busca continente + país (como antes)
+            // ============================================================
+            
+            // BUSCA 2: CONTINENTE
+            if (geo?.kgmid_continente) {
+                searchPromises.push(
+                    searchTravelExplore(
+                        { ...baseParams, arrival_id: geo.kgmid_continente },
+                        `${geo.continente} desde ${origemCode}`
+                    )
+                );
+            }
+            
+            // BUSCA 3: PAÍS (doméstico)
             if (geo?.kgmid_pais) {
                 searchPromises.push(
                     searchTravelExplore(
@@ -350,75 +402,6 @@ export default async function handler(req, res) {
                         `${geo.pais} desde ${origemCode}`
                     )
                 );
-            } else {
-                console.warn(`[Aviso] kgmid_pais não encontrado para busca nacional de ${origemCode}`);
-            }
-        } else {
-            // BUSCA 1: GLOBAL (sempre, exceto se for apenasNacional)
-            searchPromises.push(
-                searchTravelExplore(
-                    { ...baseParams },
-                    `GLOBAL desde ${origemCode}`
-                )
-            );
-
-            if (apenasInternacional && geo?.continente) {
-                // ============================================================
-                // MODO INTERNACIONAL: Buscar em múltiplos continentes
-                // ============================================================
-                const estrategiaKey = getEstrategiaContinente(geo.continente);
-                const estrategia = ESTRATEGIA_CONTINENTES[estrategiaKey];
-                
-                if (estrategia) {
-                    console.log(`🌍 Estratégia internacional: ${estrategia.descricao}`);
-                    
-                    // Buscar em cada continente da estratégia (máximo 4)
-                    estrategia.prioridade.slice(0, 4).forEach(continenteKey => {
-                        const kgmid = CONTINENTES_KGMID[continenteKey];
-                        if (kgmid) {
-                            const continenteNome = Object.keys(CONTINENTES_KGMID).find(k => CONTINENTES_KGMID[k] === kgmid);
-                            searchPromises.push(
-                                searchTravelExplore(
-                                    { ...baseParams, arrival_id: kgmid },
-                                    `${continenteNome.toUpperCase()} desde ${origemCode}`
-                                )
-                            );
-                        }
-                    });
-                } else {
-                    // Fallback: busca apenas no continente de origem
-                    searchPromises.push(
-                        searchTravelExplore(
-                            { ...baseParams, arrival_id: geo.kgmid_continente },
-                            `${geo.continente} desde ${origemCode}`
-                        )
-                    );
-                }
-                
-            } else if (!apenasInternacional) {
-                // ============================================================
-                // MODO TANTO FAZ: Busca continente + país (como antes)
-                // ============================================================
-                
-                // BUSCA 2: CONTINENTE
-                if (geo?.kgmid_continente) {
-                    searchPromises.push(
-                        searchTravelExplore(
-                            { ...baseParams, arrival_id: geo.kgmid_continente },
-                            `${geo.continente} desde ${origemCode}`
-                        )
-                    );
-                }
-                
-                // BUSCA 3: PAÍS (doméstico)
-                if (geo?.kgmid_pais) {
-                    searchPromises.push(
-                        searchTravelExplore(
-                            { ...baseParams, arrival_id: geo.kgmid_pais },
-                            `${geo.pais} desde ${origemCode}`
-                        )
-                    );
-                }
             }
         }
 
@@ -464,14 +447,6 @@ export default async function handler(req, res) {
                 if (apenasInternacional && paisOrigem) {
                     const destCountry = (dest.country || '').toLowerCase();
                     if (destCountry === paisOrigem) {
-                        continue;
-                    }
-                }
-
-                // Se apenas nacional, pular destinos de outros países
-                if (apenasNacional && paisOrigem) {
-                    const destCountry = (dest.country || '').toLowerCase();
-                    if (destCountry !== paisOrigem) {
                         continue;
                     }
                 }
@@ -538,13 +513,10 @@ export default async function handler(req, res) {
                 error: 'Nenhum destino encontrado',
                 message: apenasInternacional 
                     ? 'Nenhum voo internacional encontrado. Tente incluir destinos nacionais ou ajuste datas/orçamento.'
-                    : apenasNacional
-                        ? 'Nenhum voo nacional encontrado. Tente ajustar datas ou origem.'
-                        : 'Nenhum voo encontrado nas buscas. Tente outra origem ou datas.',
+                    : 'Nenhum voo encontrado nas buscas. Tente outra origem ou datas.',
                 _debug: {
                     totalBuscas: searchPromises.length,
                     apenasInternacional,
-                    apenasNacional,
                     origemTipo: isKgmid ? 'kgmid' : isMultiIata ? 'multi_iata' : 'iata',
                 }
             });
@@ -561,8 +533,9 @@ export default async function handler(req, res) {
             pais: 0,
         };
 
-        // Se tem múltiplos continentes (modo internacional) ou modo normal
+        // Se tem múltiplos continentes (modo internacional)
         if (results.length > 1) {
+            // Somar destinos de todos os continentes buscados
             for (let i = 1; i < results.length; i++) {
                 sources.continente += results[i]?.destinations?.length || 0;
             }
@@ -597,7 +570,7 @@ export default async function handler(req, res) {
                 totalTime,
                 currency: currencyCode,
                 origemTipo: isKgmid ? 'kgmid' : isMultiIata ? 'multi_iata' : 'iata',
-                escopoDestino: apenasInternacional ? 'internacional' : apenasNacional ? 'nacional' : 'tanto_faz',
+                escopoDestino: apenasInternacional ? 'internacional' : 'tanto_faz',
                 preferencias: prefArray,
                 sources,      // Compatível com v3.0
                 timing,       // Compatível com v3.0
@@ -605,7 +578,7 @@ export default async function handler(req, res) {
                 totalBuscas: searchPromises.length,
                 buscasDetalhadas: results.map((r, i) => ({
                     ordem: i + 1,
-                    tipo: i === 0 ? 'global' : `busca_adicional_${i}`,
+                    tipo: i === 0 ? 'global' : `continente_${i}`,
                     resultados: r?.destinations?.length || 0,
                     tempo: r?.elapsed || 0,
                     erro: r?.error || null
