@@ -717,29 +717,26 @@ const BenetripDiscovery = {
     // as vírgulas literais (url.searchParams.set encoda , como %2C)
     // ================================================================
     async buscarDestinosAPI() {
-        const origem = this.state.formData.origem;
-        
-        // v4.4b: Se é cidade agrupada, enviar TODOS os aeroportos
-        let origemParaAPI;
-        if (origem.isCityCode && origem.aeroportosIncluidos && origem.aeroportosIncluidos.length > 0) {
-            origemParaAPI = origem.aeroportosIncluidos.join(','); // Ex: "GRU,CGH,VCP"
-            this.log(`🏙️ Origem agrupada: ${origem.displayCode} → enviando aeroportos: ${origemParaAPI}`);
-        } else {
-            origemParaAPI = origem.code;
-        }
-        
-        const response = await fetch('/api/search-destinations', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                origem: origemParaAPI,  // IATA único ou múltiplos separados por vírgula
-                dataIda: this.state.formData.dataIda,
-                dataVolta: this.state.formData.dataVolta,
-                preferencias: this.state.formData.preferenciasArray,
-                moeda: this.state.formData.moeda,
-                escopoDestino: this.state.formData.escopoDestino
-            })
-        });
+    const origem = this.state.formData.origem;
+    
+    // Deixe que a API backend cuide dos códigos KGMID nativamente
+    // Não use o join(',') aqui para a engine de Travel Explore
+    const origemParaAPI = origem.code; 
+    
+    this.log(`🏙️ Origem: ${origem.displayCode} → enviando código: ${origemParaAPI}`);
+    
+    const response = await fetch('/api/search-destinations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            origem: origemParaAPI,
+            dataIda: this.state.formData.dataIda,
+            dataVolta: this.state.formData.dataVolta,
+            preferencias: this.state.formData.preferenciasArray,
+            moeda: this.state.formData.moeda,
+            escopoDestino: this.state.formData.escopoDestino
+        })
+    });
         
         if (!response.ok) {
             const err = await response.json();
