@@ -1,7 +1,8 @@
-// api/cheapest-flights.js - BENETRIP VOOS BARATOS v1.0
+// api/cheapest-flights.js - BENETRIP VOOS BARATOS v1.1
 // Encontra o período mais barato para viajar nos próximos 6 meses
 // Usa SearchAPI google_flights_calendar engine
 // Estratégia: divide 6 meses em janelas de ~14 dias (max 200 combos por request)
+// v1.1: Suporte a KGMID (/m/02cft) e múltiplos aeroportos (GRU,CGH)
 
 // ============================================================
 // CONFIGURAÇÃO
@@ -43,22 +44,27 @@ function diffDays(dateStr1, dateStr2) {
 // BUSCA INDIVIDUAL no SearchAPI Calendar
 // ============================================================
 async function searchFlightsCalendar(params, label) {
-    const url = new URL('https://www.searchapi.io/api/v1/search');
-
     const fullParams = {
         engine: 'google_flights_calendar',
         api_key: process.env.SEARCHAPI_KEY,
         ...params,
     };
 
+    // Construir query string manualmente para preservar vírgulas literais (necessário para multi-IATA)
+    const queryParts = [];
     Object.entries(fullParams).forEach(([k, v]) => {
-        if (v !== undefined && v !== null) url.searchParams.set(k, String(v));
+        if (v !== undefined && v !== null) {
+            const encodedKey = encodeURIComponent(k);
+            const encodedValue = encodeURIComponent(String(v)).replace(/%2C/gi, ',');
+            queryParts.push(`${encodedKey}=${encodedValue}`);
+        }
     });
+    const urlString = `https://www.searchapi.io/api/v1/search?${queryParts.join('&')}`;
 
     const startTime = Date.now();
 
     try {
-        const response = await fetch(url.toString(), {
+        const response = await fetch(urlString, {
             method: 'GET',
             headers: { 'Accept': 'application/json' }
         });
@@ -121,8 +127,6 @@ function generateSearchWindows(startDate, months, duration) {
 // Usa engine google_flights para uma data específica
 // ============================================================
 async function enrichFlightDetails(origemCode, destinoCode, departDate, returnDate, currencyCode, locale, label) {
-    const url = new URL('https://www.searchapi.io/api/v1/search');
-
     const params = {
         engine: 'google_flights',
         api_key: process.env.SEARCHAPI_KEY,
@@ -137,14 +141,21 @@ async function enrichFlightDetails(origemCode, destinoCode, departDate, returnDa
         adults: '1',
     };
 
+    // Construir query string manualmente para preservar vírgulas literais
+    const queryParts = [];
     Object.entries(params).forEach(([k, v]) => {
-        if (v !== undefined && v !== null) url.searchParams.set(k, String(v));
+        if (v !== undefined && v !== null) {
+            const encodedKey = encodeURIComponent(k);
+            const encodedValue = encodeURIComponent(String(v)).replace(/%2C/gi, ',');
+            queryParts.push(`${encodedKey}=${encodedValue}`);
+        }
     });
+    const urlString = `https://www.searchapi.io/api/v1/search?${queryParts.join('&')}`;
 
     const startTime = Date.now();
 
     try {
-        const response = await fetch(url.toString(), {
+        const response = await fetch(urlString, {
             method: 'GET',
             headers: { 'Accept': 'application/json' }
         });
@@ -231,17 +242,25 @@ export default async function handler(req, res) {
         // ============================================================
         // VALIDAÇÕES
         // ============================================================
-        if (!origem || typeof origem !== 'string' || !/^[A-Z]{3}$/.test(origem.toUpperCase())) {
+        const isValidCode = (code) => {
+            const raw = code.trim();
+            const isKgmid = raw.startsWith('/m/');
+            const isIata = /^[A-Z]{3}$/i.test(raw);
+            const isMultiIata = /^[A-Z]{3}(,[A-Z]{3})+$/i.test(raw);
+            return isKgmid || isIata || isMultiIata;
+        };
+
+        if (!origem || typeof origem !== 'string' || !isValidCode(origem)) {
             return res.status(400).json({
                 error: 'Origem inválida',
-                message: 'Use código IATA de 3 letras (ex: GRU, GIG, SSA)'
+                message: 'Use código IATA (ex: GRU), múltiplos (ex: GRU,CGH) ou kgmid (ex: /m/02cft)'
             });
         }
 
-        if (!destino || typeof destino !== 'string' || !/^[A-Z]{3}$/.test(destino.toUpperCase())) {
+        if (!destino || typeof destino !== 'string' || !isValidCode(destino)) {
             return res.status(400).json({
                 error: 'Destino inválido',
-                message: 'Use código IATA de 3 letras (ex: LIS, MIA, CDG)'
+                message: 'Use código IATA (ex: LIS), múltiplos (ex: CDG,ORY) ou kgmid (ex: /m/05qtj)'
             });
         }
 
@@ -260,9 +279,12 @@ export default async function handler(req, res) {
             });
         }
 
-        const origemCode = origem.toUpperCase().trim();
-        const destinoCode = destino.toUpperCase().trim();
-        const currencyCode = (moeda && /^[A-Z]{3}$/.test(moeda)) ? moeda : 'BRL';
+        // Formatação: se for KGMID mantém minúsculo, se for IATA/Multi-IATA vai para maiúsculo
+        const formatCode = (code) => code.trim().startsWith('/m/') ? code.trim() : code.trim().toUpperCase();
+        
+        const origemCode = formatCode(origem);
+        const destinoCode = formatCode(destino);
+        const currencyCode = (moeda && /^[A-Z]{3}$/.test(moeda)) ? moeda.toUpperCase() : 'BRL';
 
         console.log(`✈️ Cheapest Flights: ${origemCode} → ${destinoCode} | ${duracaoNum} dias | ${currencyCode}`);
 
@@ -461,7 +483,7 @@ export default async function handler(req, res) {
         });
 
         // Se o cheapest foi enriquecido, atualizar stats
-        if (sorted[0].flight_details) {
+        if (sorted[0] && sorted[0].flight_details) {
             stats.cheapest = sorted[0];
         }
 
