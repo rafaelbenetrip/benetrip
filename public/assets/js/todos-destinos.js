@@ -1,11 +1,11 @@
 /**
  * BENETRIP - TODOS OS DESTINOS
- * Versão: Filtros Avançados v3.1
+ * Versão: Filtros Avançados v3.2 - Cidades Agrupadas (KGMID)
  *
  * - Calendário unificado: 1 data = busca exata | várias = datas flexíveis automático
  * - Filtros avançados: ordenação, paradas, duração, tipo destino,
- *   combinação de datas, companhia aérea, faixa de preço
- * - Tudo client-side para velocidade instantânea
+ * combinação de datas, companhia aérea, faixa de preço
+ * - Suporte a KGMID para múltiplos aeroportos na mesma cidade
  */
 
 const BenetripTodosDestinos = {
@@ -39,7 +39,7 @@ const BenetripTodosDestinos = {
 
     config: {
         debug: true,
-        cidadesJsonPath: 'data/cidades_global_iata_v0.json',
+        cidadesJsonPath: 'data/cidades_global_iata_v7.json', // Atualizado para v7
         maxDatasIda: 3,
         maxDatasVolta: 3,
     },
@@ -48,7 +48,7 @@ const BenetripTodosDestinos = {
     error(...args) { console.error('[Benetrip ERROR]', ...args); },
 
     init() {
-        this.log('🐕 Benetrip v3.1 (Calendário Unificado) inicializando...');
+        this.log('🐕 Benetrip v3.2 (Cidades Agrupadas) inicializando...');
         this.carregarCidades();
         this.setupFormEvents();
         this.setupAutocomplete();
@@ -67,12 +67,20 @@ const BenetripTodosDestinos = {
             if (!response.ok) throw new Error('Erro');
             const dados = await response.json();
             this.state.cidadesData = dados.filter(c => c.iata);
-            this.log('✅ ' + this.state.cidadesData.length + ' cidades');
+            
+            const agrupadas = this.state.cidadesData.filter(c => c.is_city_code);
+            this.log(`✅ ${this.state.cidadesData.length} cidades carregadas (${agrupadas.length} agrupadas)`);
         } catch (e) {
             this.error('Erro cidades:', e);
+            // Fallback atualizado com dados agrupados para evitar falhas se não carregar o JSON
             this.state.cidadesData = [
+                { cidade: "São Paulo", sigla_estado: "SP", pais: "Brasil", codigo_pais: "BR", iata: "/m/02cft", iata_city_code: "SAO", aeroporto: "Todos os aeroportos (Guarulhos, Congonhas e Viracopos)", is_city_code: true, aeroportos_incluidos: ["GRU", "CGH", "VCP"] },
                 { cidade: "São Paulo", sigla_estado: "SP", pais: "Brasil", codigo_pais: "BR", iata: "GRU", aeroporto: "Aeroporto de Guarulhos" },
+                { cidade: "São Paulo", sigla_estado: "SP", pais: "Brasil", codigo_pais: "BR", iata: "CGH", aeroporto: "Aeroporto de Congonhas" },
+                { cidade: "São Paulo", sigla_estado: "SP", pais: "Brasil", codigo_pais: "BR", iata: "VCP", aeroporto: "Aeroporto de Viracopos" },
+                { cidade: "Rio de Janeiro", sigla_estado: "RJ", pais: "Brasil", codigo_pais: "BR", iata: "/m/06gmr", iata_city_code: "RIO", aeroporto: "Todos os aeroportos (Galeão e Santos Dumont)", is_city_code: true, aeroportos_incluidos: ["GIG", "SDU"] },
                 { cidade: "Rio de Janeiro", sigla_estado: "RJ", pais: "Brasil", codigo_pais: "BR", iata: "GIG", aeroporto: "Aeroporto do Galeão" },
+                { cidade: "Rio de Janeiro", sigla_estado: "RJ", pais: "Brasil", codigo_pais: "BR", iata: "SDU", aeroporto: "Aeroporto Santos Dumont" },
                 { cidade: "Salvador", sigla_estado: "BA", pais: "Brasil", codigo_pais: "BR", iata: "SSA" }
             ];
         }
@@ -83,15 +91,37 @@ const BenetripTodosDestinos = {
     buscarCidades(termo) {
         if (!this.state.cidadesData || termo.length < 2) return [];
         const tn = this.normalizarTexto(termo);
-        return this.state.cidadesData
+        const resultados = this.state.cidadesData
             .filter(c => {
                 const n = this.normalizarTexto(c.cidade);
-                const i = c.iata.toLowerCase();
+                // Utiliza iata_city_code se existir para não pesquisar por "/m/"
+                const iataNorm = c.is_city_code 
+                    ? (c.iata_city_code || '').toLowerCase()
+                    : c.iata.toLowerCase();
                 const a = c.aeroporto ? this.normalizarTexto(c.aeroporto) : '';
-                return n.includes(tn) || i.includes(tn) || a.includes(tn);
+                return n.includes(tn) || iataNorm.includes(tn) || a.includes(tn);
             })
-            .slice(0, 8)
-            .map(c => ({ code: c.iata, name: c.cidade, state: c.sigla_estado, country: c.pais, countryCode: c.codigo_pais, airport: c.aeroporto || null }));
+            .slice(0, 10)
+            .map(c => ({ 
+                code: c.iata, 
+                displayCode: c.iata_city_code || c.iata,
+                name: c.cidade, 
+                state: c.sigla_estado, 
+                country: c.pais, 
+                countryCode: c.codigo_pais, 
+                airport: c.aeroporto || null,
+                isCityCode: c.is_city_code || false,
+                aeroportosIncluidos: c.aeroportos_incluidos || null
+            }));
+            
+        // Ordenar para que as cidades agrupadas apareçam primeiro
+        resultados.sort((a, b) => {
+            if (a.isCityCode && !b.isCityCode) return -1;
+            if (!a.isCityCode && b.isCityCode) return 1;
+            return 0;
+        });
+        
+        return resultados.slice(0, 8);
     },
 
     // ================================================================
@@ -109,14 +139,20 @@ const BenetripTodosDestinos = {
             timer = setTimeout(() => {
                 const cidades = this.buscarCidades(t);
                 if (!cidades.length) { results.innerHTML = '<div style="padding:12px;color:#666;">Nenhuma cidade encontrada</div>'; results.style.display = 'block'; return; }
-                results.innerHTML = cidades.map(c => `
-                    <div class="autocomplete-item" data-city='${JSON.stringify(c)}'>
-                        <div class="item-code">${c.code}</div>
+                
+                results.innerHTML = cidades.map(c => {
+                    const cityClass = c.isCityCode ? 'autocomplete-item autocomplete-city-group' : 'autocomplete-item';
+                    const cityIcon = c.isCityCode ? '🏙️' : '';
+                    return `
+                    <div class="${cityClass}" data-city='${JSON.stringify(c)}'>
+                        <div class="item-code">${cityIcon}${c.displayCode}</div>
                         <div class="item-details">
                             <div class="item-name">${c.name}${c.state ? ', ' + c.state : ''}${c.airport ? ' — ' + c.airport : ''}</div>
                             <div class="item-country">${c.country}</div>
                         </div>
-                    </div>`).join('');
+                    </div>`;
+                }).join('');
+                
                 results.style.display = 'block';
                 results.querySelectorAll('.autocomplete-item').forEach(item => {
                     item.addEventListener('click', () => this.selecionarOrigem(JSON.parse(item.dataset.city)));
@@ -130,7 +166,11 @@ const BenetripTodosDestinos = {
         const input = document.getElementById('origem');
         const results = document.getElementById('origem-results');
         this.state.origemSelecionada = c;
-        input.value = c.airport ? `${c.name} — ${c.airport} (${c.code})` : `${c.name} (${c.code})`;
+        
+        // Usar displayCode para exibição legível
+        const codeDisplay = c.displayCode || c.code;
+        input.value = c.airport ? `${c.name} — ${c.airport} (${codeDisplay})` : `${c.name} (${codeDisplay})`;
+        
         document.getElementById('origem-data').value = JSON.stringify(c);
         results.style.display = 'none';
         this.state.paisOrigem = (c.country || '').toLowerCase();
@@ -343,13 +383,12 @@ const BenetripTodosDestinos = {
                 this.atualizarProgresso(20 + Math.floor((completed / totalCombos) * 60), `💰 ${completed}/${totalCombos} pesquisadas...`);
             }
 
-this.atualizarProgresso(85, '✈️ Organizando resultados...');
+            this.atualizarProgresso(85, '✈️ Organizando resultados...');
             const sorted = Array.from(allResults.values()).sort((a, b) => a.flight.price - b.flight.price);
             if (!sorted.length) throw new Error('Nenhum destino encontrado');
 
             this.state.todosDestinos = sorted;
 
-            // ADICIONADO: Salvamento automático
             if (typeof BenetripAutoSave !== 'undefined') {
                 BenetripAutoSave.salvarBuscaTodosDestinos(this.state.formData, sorted);
             }
@@ -471,7 +510,8 @@ this.atualizarProgresso(85, '✈️ Organizando resultados...');
 
         if (!todos.length) { this.mostrarSemResultados(); return; }
 
-        const origemDisplay = origem.airport ? `${origem.name} — ${origem.airport} (${origem.code})` : `${origem.name} (${origem.code})`;
+        const codeDisplay = origem.displayCode || origem.code;
+        const origemDisplay = origem.airport ? `${origem.name} — ${origem.airport} (${codeDisplay})` : `${origem.name} (${codeDisplay})`;
 
         let periodoHtml = '';
         if (isFlexivel) {
@@ -644,6 +684,18 @@ this.atualizarProgresso(85, '✈️ Organizando resultados...');
     },
 
     // ================================================================
+    // KGMID HELPER PARA LINKS
+    // ================================================================
+    getOrigemIataParaGoogleFlights() {
+        const origem = this.state.formData.origem;
+        // Se é cidade agrupada com kgmid, usar o primeiro aeroporto do grupo (Google Flights precisa do IATA real)
+        if (origem.isCityCode && origem.aeroportosIncluidos && origem.aeroportosIncluidos.length > 0) {
+            return origem.aeroportosIncluidos[0];
+        }
+        return origem.code;
+    },
+
+    // ================================================================
     // CARD HTML
     // ================================================================
     _cardHtml(dest, orcamento, isFlexivel) {
@@ -659,7 +711,10 @@ this.atualizarProgresso(85, '✈️ Organizando resultados...');
         const combo = ca?.combo || dest._melhorCombo || { dataIda: this.state.formData.dataIda, dataVolta: this.state.formData.dataVolta };
         const noites = ca?.noites || dest._melhorNoites || this.calcularNoites(combo.dataIda, combo.dataVolta);
         const destIata = dest.primary_airport || dest.flight?.airport_code || '';
-        const gfUrl = this.buildGoogleFlightsUrl(origem.code, destIata, combo.dataIda, combo.dataVolta, moeda);
+        
+        // Passa a origem real IATA (não o KGMID) para o gerador de URL
+        const originIataGF = this.getOrigemIataParaGoogleFlights();
+        const gfUrl = this.buildGoogleFlightsUrl(originIataGF, destIata, combo.dataIda, combo.dataVolta, moeda);
 
         let bestDates = '';
         if (isFlexivel) {
@@ -744,7 +799,7 @@ this.atualizarProgresso(85, '✈️ Organizando resultados...');
         p.set('curr', { BRL: 'BRL', USD: 'USD', EUR: 'EUR' }[cur] || 'BRL');
         p.set('hl', { BRL: 'pt-BR', USD: 'en', EUR: 'en' }[cur] || 'pt-BR');
         p.set('gl', { BRL: 'br', USD: 'us', EUR: 'de' }[cur] || 'br');
-        return `https://www.google.com/travel/flights/search?${p.toString()}`;
+        return `https://www.google.com/travel/flights?${p.toString()}`;
     },
 
     // ================================================================
@@ -762,10 +817,14 @@ this.atualizarProgresso(85, '✈️ Organizando resultados...');
     esconderLoading() { document.getElementById('loading-container').style.display = 'none'; document.getElementById('form-container').style.display = 'block'; },
     atualizarProgresso(p, m) { document.getElementById('progress-fill').style.width = `${p}%`; document.getElementById('loading-message').textContent = m; },
     voltarAoFormulario() { document.getElementById('resultados-container').style.display = 'none'; document.getElementById('resultados-container').innerHTML = ''; document.getElementById('form-container').style.display = 'block'; this.state.filtrosAberto = false; document.body.classList.remove('filtros-open'); window.scrollTo({ top: 0, behavior: 'smooth' }); },
+    
     mostrarSemResultados() {
         const c = document.getElementById('resultados-container');
         const { origem } = this.state.formData;
-        c.innerHTML = `<button class="btn-voltar-topo" onclick="BenetripTodosDestinos.voltarAoFormulario()"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg> Nova busca</button><div class="sem-resultados"><img src="assets/images/tripinha/avatar-triste.png" alt="Tripinha" onerror="this.style.display='none'"><h2>😕 Nenhum destino encontrado</h2><p>Nenhum voo de <strong>${origem.name} (${origem.code})</strong>.</p><button class="btn-tentar-novamente" onclick="BenetripTodosDestinos.voltarAoFormulario()">✏️ Tentar Novamente</button></div>`;
+        const codeDisplay = origem.displayCode || origem.code;
+        
+        c.innerHTML = `<button class="btn-voltar-topo" onclick="BenetripTodosDestinos.voltarAoFormulario()"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg> Nova busca</button><div class="sem-resultados"><img src="assets/images/tripinha/avatar-triste.png" alt="Tripinha" onerror="this.style.display='none'"><h2>😕 Nenhum destino encontrado</h2><p>Nenhum voo de <strong>${origem.name} (${codeDisplay})</strong>.</p><button class="btn-tentar-novamente" onclick="BenetripTodosDestinos.voltarAoFormulario()">✏️ Tentar Novamente</button></div>`;
+        
         document.getElementById('loading-container').style.display = 'none';
         c.style.display = 'block';
         window.scrollTo({ top: 0, behavior: 'smooth' });
