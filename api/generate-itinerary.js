@@ -1,5 +1,6 @@
-// api/generate-itinerary.js - GERADOR DE ROTEIRO v1.1
+// api/generate-itinerary.js - GERADOR DE ROTEIRO v2.0
 // Gera roteiro dia a dia personalizado via Groq LLM
+// v2.0: MULTI-DESTINO + clima previsto + contagem de dias por destino
 // v1.1: Campo de observações do usuário + Google Maps URLs curtas
 // Fallback: Groq llama-3.3-70b → llama-3.1-8b → roteiro genérico
 
@@ -12,11 +13,15 @@ export default async function handler(req, res) {
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
     const {
+        // NOVO v2.0: array de destinos (multi-cidade)
+        destinos,
+        // LEGADO: campos únicos mantidos para compatibilidade
         destino,
         dataIda,
         dataVolta,
         horarioChegada,
         horarioPartida,
+        // Comum
         companhia,
         adultos,
         criancas,
@@ -25,35 +30,113 @@ export default async function handler(req, res) {
         preferencias,
         intensidade,
         orcamentoAtividades,
-        observacoes,  // NOVO: campo de observações livres do usuário
+        observacoes,
     } = req.body;
+
+    // ============================================================
+    // NORMALIZAR: converter formato legado para multi-destino
+    // ============================================================
+    let destinosArray = [];
+
+    if (destinos && Array.isArray(destinos) && destinos.length > 0) {
+        // v2.0: já veio como array de destinos
+        destinosArray = destinos;
+    } else if (destino && dataIda && dataVolta) {
+        // Legado: converter para array de 1 destino
+        destinosArray = [{
+            destino: destino,
+            dataChegada: dataIda,
+            dataSaida: dataVolta,
+            horarioChegada: horarioChegada || '',
+            horarioPartida: horarioPartida || ''
+        }];
+    }
 
     // ============================================================
     // VALIDAÇÃO
     // ============================================================
-    if (!destino || !dataIda || !dataVolta) {
+    if (destinosArray.length === 0) {
         return res.status(400).json({
-            error: 'Campos obrigatórios: destino, dataIda, dataVolta',
-            received: { destino, dataIda, dataVolta }
+            error: 'Informe ao menos um destino com datas',
+            received: { destinos, destino, dataIda, dataVolta }
         });
+    }
+
+    for (let i = 0; i < destinosArray.length; i++) {
+        const d = destinosArray[i];
+        if (!d.destino || !d.dataChegada || !d.dataSaida) {
+            return res.status(400).json({
+                error: `Destino ${i + 1} incompleto: necessário destino, dataChegada e dataSaida`,
+                received: d
+            });
+        }
     }
 
     if (!process.env.GROQ_API_KEY) {
         console.warn('⚠️ GROQ_API_KEY não configurada, retornando fallback');
-        return res.status(200).json(buildFallbackItinerary(req.body));
+        return res.status(200).json(buildFallbackItinerary(req.body, destinosArray));
     }
 
     try {
         // ============================================================
-        // CALCULAR DIAS DA VIAGEM
+        // CALCULAR DIAS TOTAIS E POR DESTINO
         // ============================================================
-        const ida = new Date(dataIda + 'T12:00:00');
-        const volta = new Date(dataVolta + 'T12:00:00');
-        const numDias = Math.ceil((volta - ida) / (1000 * 60 * 60 * 24)) + 1;
+        const primeiraChegada = new Date(destinosArray[0].dataChegada + 'T12:00:00');
+        const ultimaSaida = new Date(destinosArray[destinosArray.length - 1].dataSaida + 'T12:00:00');
+        const numDiasTotal = Math.ceil((ultimaSaida - primeiraChegada) / (1000 * 60 * 60 * 24)) + 1;
 
-        console.log(`🗺️ Gerando roteiro: ${destino} | ${numDias} dias | ${companhia} | ${preferencias}`);
+        const isMultiDestino = destinosArray.length > 1;
+
+        console.log(`🗺️ Gerando roteiro: ${destinosArray.map(d => d.destino).join(' → ')} | ${numDiasTotal} dias | ${companhia} | ${preferencias}`);
         if (observacoes) {
             console.log(`📝 Observações do usuário: ${observacoes}`);
+        }
+
+        // ============================================================
+        // MONTAR INFORMAÇÕES DE CADA DESTINO COM DIAS REAIS
+        // ============================================================
+        const diasSemana = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
+        let diaGlobalCounter = 1;
+        const destinosInfo = [];
+
+        for (let idx = 0; idx < destinosArray.length; idx++) {
+            const dest = destinosArray[idx];
+            const chegada = new Date(dest.dataChegada + 'T12:00:00');
+            const saida = new Date(dest.dataSaida + 'T12:00:00');
+            const numDias = Math.ceil((saida - chegada) / (1000 * 60 * 60 * 24)) + 1;
+            const mesViagem = chegada.getMonth() + 1;
+
+            const dias = [];
+            for (let i = 0; i < numDias; i++) {
+                const data = new Date(chegada);
+                data.setDate(data.getDate() + i);
+                dias.push({
+                    numeroGlobal: diaGlobalCounter++,
+                    numeroLocal: i + 1,
+                    diaSemana: diasSemana[data.getDay()],
+                    dataFormatada: data.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
+                    dataISO: formatDateISO(data),
+                    ehPrimeiro: i === 0,
+                    ehUltimo: i === numDias - 1
+                });
+            }
+
+            destinosInfo.push({
+                index: idx + 1,
+                destino: dest.destino,
+                dataChegada: dest.dataChegada,
+                dataSaida: dest.dataSaida,
+                horarioChegada: dest.horarioChegada || '',
+                horarioPartida: dest.horarioPartida || '',
+                numDias,
+                mes: mesViagem,
+                estacao: getSeasonContext(mesViagem),
+                clima: getClimateHint(dest.destino, mesViagem),
+                dias,
+                ehPrimeiroDestino: idx === 0,
+                ehUltimoDestino: idx === destinosArray.length - 1,
+                proximoDestino: idx < destinosArray.length - 1 ? destinosArray[idx + 1].destino : null
+            });
         }
 
         // ============================================================
@@ -90,46 +173,67 @@ ${bebes > 0 ? '- BEBÊ(S): incluir tempo extra para logística, evitar atividade
         // MAPEAR ORÇAMENTO ATIVIDADES
         // ============================================================
         const orcamentoDesc = {
-            'economico': 'ECONÔMICO: priorizar atividades gratuitas ou muito baratas. Parques, mirantes, praias, caminhadas, mercados públicos, free walking tours. Quando sugerir algo pago, avisar que é pago.',
-            'medio': 'MÉDIO: mistura de atividades gratuitas e pagas moderadas. Museus, passeios de barco, tours guiados acessíveis, restaurantes com bom custo-benefício.',
-            'alto': 'ALTO: incluir experiências premium sem restrição. Restaurantes renomados, passeios exclusivos, spas, shows, experiências gastronômicas, tours VIP.'
+            'economico': 'ECONÔMICO: priorizar atividades gratuitas ou muito baratas. Parques, mirantes, praias, caminhadas, mercados públicos, free walking tours.',
+            'medio': 'MÉDIO: mistura de atividades gratuitas e pagas moderadas. Museus, passeios de barco, tours guiados acessíveis.',
+            'alto': 'ALTO: incluir experiências premium sem restrição. Restaurantes renomados, passeios exclusivos, spas, tours VIP.'
         }[orcamentoAtividades] || 'MÉDIO: mistura de atividades gratuitas e pagas.';
 
         // ============================================================
-        // GERAR LISTA DE DIAS COM DATAS REAIS
+        // GERAR LISTA DE DIAS COMPLETA PARA O PROMPT
         // ============================================================
-        const diasInfo = [];
-        const diasSemana = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
-
-        for (let i = 0; i < numDias; i++) {
-            const data = new Date(ida);
-            data.setDate(data.getDate() + i);
-            const diaSemana = diasSemana[data.getDay()];
-            const dataFormatada = data.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
-            diasInfo.push({
-                numero: i + 1,
-                diaSemana,
-                dataFormatada,
-                ehPrimeiro: i === 0,
-                ehUltimo: i === numDias - 1
+        let diasListaTexto = '';
+        destinosInfo.forEach(dest => {
+            diasListaTexto += `\n📍 ${dest.destino} (${dest.numDias} dia${dest.numDias > 1 ? 's' : ''}):\n`;
+            if (dest.estacao) diasListaTexto += `   Estação: ${dest.estacao}\n`;
+            if (dest.clima) diasListaTexto += `   Clima esperado: ${dest.clima}\n`;
+            dest.dias.forEach(d => {
+                let nota = '';
+                if (d.ehPrimeiro && dest.horarioChegada) nota = ` (CHEGADA às ${dest.horarioChegada}${!dest.ehPrimeiroDestino ? ' — vindo de ' + destinosArray[dest.index - 2].destino : ''})`;
+                if (d.ehUltimo && dest.horarioPartida) nota = ` (PARTIDA às ${dest.horarioPartida}${dest.proximoDestino ? ' — rumo a ' + dest.proximoDestino : ''})`;
+                diasListaTexto += `   Dia ${d.numeroGlobal}: ${d.diaSemana}, ${d.dataFormatada}${nota}\n`;
             });
+        });
+
+        // ============================================================
+        // BLOCO MULTI-DESTINO PARA O PROMPT
+        // ============================================================
+        let multiDestinoBloco = '';
+        let multiDestinoRegras = '';
+
+        if (isMultiDestino) {
+            const rotaResumo = destinosArray.map(d => d.destino).join(' → ');
+            multiDestinoBloco = `
+═══════════════════════════════════════════
+VIAGEM MULTI-DESTINO: ${rotaResumo}
+Total: ${destinosArray.length} cidades em ${numDiasTotal} dias
+═══════════════════════════════════════════`;
+
+            multiDestinoRegras = `
+REGRAS ESPECIAIS PARA VIAGEM MULTI-DESTINO:
+- O roteiro deve cobrir TODOS os destinos na ordem listada
+- No dia de transição entre cidades (último dia em uma cidade / primeiro na próxima), considere:
+  * O viajante precisa fazer check-out, se deslocar (voo/ônibus/carro) e fazer check-in
+  * Planeje atividades mais leves nos dias de transição
+  * Mencione na dica da Tripinha que é dia de troca de cidade
+- Cada destino deve ter seu bloco de dias claramente identificado
+- O campo "destino_atual" em cada dia indica em qual cidade o viajante está
+- Adapte as sugestões ao CLIMA e ESTAÇÃO específicos de cada destino (podem ser diferentes!)
+- Se um destino tem poucos dias (1-2), priorize os destaques imperdíveis daquele lugar`;
         }
 
-        const diasListaTexto = diasInfo.map(d => {
-            let nota = '';
-            if (d.ehPrimeiro && horarioChegada) nota = ` (CHEGADA às ${horarioChegada})`;
-            if (d.ehUltimo && horarioPartida) nota = ` (PARTIDA às ${horarioPartida})`;
-            return `Dia ${d.numero}: ${d.diaSemana}, ${d.dataFormatada}${nota}`;
-        }).join('\n');
+        // ============================================================
+        // BLOCO DE CLIMA E ESTAÇÃO
+        // ============================================================
+        let climaBloco = '\nCONTEXTO CLIMÁTICO POR DESTINO:';
+        destinosInfo.forEach(dest => {
+            climaBloco += `\n- ${dest.destino}: ${dest.estacao || 'Estação não determinada'}`;
+            if (dest.clima) climaBloco += ` | ${dest.clima}`;
+            climaBloco += ` | ${dest.numDias} dia(s)`;
+        });
+        climaBloco += `\n\nINSTRUÇÃO SOBRE CLIMA: Para cada dia, considere o clima esperado do destino naquela época do ano. Sugira atividades adequadas ao clima (ex: se chove muito, tenha plano B indoor; se faz muito calor, evite atividades ao ar livre no pico do sol de 12h-15h). Nas dicas da Tripinha, mencione o clima quando relevante (ex: "Leve protetor solar, faz bastante sol nessa época!" ou "Pode chover à tarde, leve um guarda-chuva na mochila!").`;
 
         // ============================================================
-        // DETECTAR ESTAÇÃO DO ANO
-        // ============================================================
-        const mesViagem = ida.getMonth() + 1;
-        const estacaoInfo = getSeasonContext(mesViagem);
-
-        // ============================================================
-        // NOVO: BLOCO DE OBSERVAÇÕES DO USUÁRIO PARA O PROMPT
+        // BLOCO DE OBSERVAÇÕES DO USUÁRIO
         // ============================================================
         let observacoesBloco = '';
         let observacoesInstrucao = '';
@@ -144,25 +248,29 @@ INSTRUÇÃO: O viajante fez pedidos especiais acima. Você DEVE:
 1. Levar em conta TODAS as preferências, restrições e pedidos descritos acima ao montar o roteiro
 2. Se o viajante pediu para INCLUIR algo, garanta que isso apareça no roteiro
 3. Se o viajante pediu para EXCLUIR algo, NÃO inclua isso de forma alguma
-4. Nas "dica_tripinha" de atividades relevantes, faça referências naturais aos pedidos (ex: "Como você pediu, separei um restaurante vegetariano aqui perto!" ou "Sei que você queria evitar museus longos, então esse é rápido e interativo!")
-5. No "resumo_viagem", mencione brevemente que os pedidos especiais foram considerados, de forma natural e calorosa
+4. Nas "dica_tripinha" de atividades relevantes, faça referências naturais aos pedidos
+5. No "resumo_viagem", mencione brevemente que os pedidos especiais foram considerados
 6. NÃO copie o texto do viajante literalmente — absorva as informações e demonstre que entendeu adaptando o roteiro`;
 
-            observacoesInstrucao = '\n14. O viajante fez PEDIDOS ESPECIAIS — leia com atenção a seção "PEDIDOS ESPECIAIS DO VIAJANTE" e garanta que cada solicitação foi atendida no roteiro. Demonstre nas dicas da Tripinha que os pedidos foram levados em conta.';
+            observacoesInstrucao = '\n15. O viajante fez PEDIDOS ESPECIAIS — leia a seção correspondente e garanta que cada solicitação foi atendida no roteiro.';
         }
 
         // ============================================================
-        // ESTRUTURA JSON ESPERADA
+        // ESTRUTURA JSON ESPERADA (v2.0 com destino_atual)
         // ============================================================
         const estruturaJSON = `{
-  "resumo_viagem": "Frase curta e animada da Tripinha resumindo a vibe da viagem${observacoes ? ' (mencione que os pedidos especiais foram considerados)' : ''}",
+  "resumo_viagem": "Frase curta e animada da Tripinha resumindo a vibe da viagem${isMultiDestino ? ' multi-destino' : ''}${observacoes ? ' (mencione que os pedidos especiais foram considerados)' : ''}",
+  "destinos_rota": ["${destinosArray.map(d => d.destino).join('", "')}"],
   "dias": [
     {
       "dia_numero": 1,
       "dia_semana": "Quarta-feira",
       "data": "10/07",
-      "titulo": "Título curto e criativo para o dia (ex: 'Chegada e primeiras impressões')",
-      "resumo_tripinha": "Frase da Tripinha descrevendo o dia (2-3 frases, descontraída)",
+      "destino_atual": "Nome da cidade onde o viajante está neste dia",
+      "titulo": "Título curto e criativo para o dia",
+      "resumo_tripinha": "Frase da Tripinha descrevendo o dia (2-3 frases, descontraída). Mencione clima se relevante.",
+      "clima_previsto": "Ex: Ensolarado, ~28°C",
+      "eh_dia_transicao": false,
       "periodos": [
         {
           "periodo": "manhã|tarde|noite",
@@ -170,7 +278,7 @@ INSTRUÇÃO: O viajante fez pedidos especiais acima. Você DEVE:
             {
               "nome": "Nome do local ou atividade",
               "descricao": "Descrição curta da atividade (1-2 frases)",
-              "dica_tripinha": "Dica prática da Tripinha sobre esse local${observacoes ? ' (referencie pedidos do viajante quando relevante)' : ''}",
+              "dica_tripinha": "Dica prática da Tripinha sobre esse local",
               "duracao_minutos": 90,
               "google_maps_query": "Nome do Local, Cidade, País",
               "gratuito": true,
@@ -184,13 +292,18 @@ INSTRUÇÃO: O viajante fez pedidos especiais acima. Você DEVE:
 }`;
 
         // ============================================================
-        // PROMPT PRINCIPAL
+        // PROMPT PRINCIPAL v2.0
         // ============================================================
-        const prompt = `ESPECIALISTA EM ROTEIROS DE VIAGEM - Planejamento dia a dia personalizado
+        const destinoPrincipal = isMultiDestino
+            ? destinosArray.map(d => d.destino).join(' → ')
+            : destinosArray[0].destino;
 
-DESTINO: ${destino}
-PERÍODO: ${dataIda} a ${dataVolta} (${numDias} dias)
-${estacaoInfo ? `CONTEXTO SAZONAL: ${estacaoInfo}` : ''}
+        const prompt = `ESPECIALISTA EM ROTEIROS DE VIAGEM - Planejamento dia a dia personalizado
+${multiDestinoBloco}
+
+${isMultiDestino ? 'ROTA' : 'DESTINO'}: ${destinoPrincipal}
+PERÍODO TOTAL: ${destinosArray[0].dataChegada} a ${destinosArray[destinosArray.length - 1].dataSaida} (${numDiasTotal} dias)
+${climaBloco}
 ${observacoesBloco}
 
 DIAS DA VIAGEM:
@@ -202,26 +315,26 @@ PERFIL DO VIAJANTE:
 - Experiências buscadas: ${preferencias || 'Variadas'}
 - Ritmo: ${intensidadeDesc}
 - Orçamento atividades: ${orcamentoDesc}
-${horarioChegada ? `- Chegada no destino: ${horarioChegada}` : ''}
-${horarioPartida ? `- Partida do destino: ${horarioPartida}` : ''}
 ${restricoesFamilia}
+${multiDestinoRegras}
 
-TAREFA: Gere um roteiro COMPLETO de ${numDias} dias para ${destino}, cobrindo TODOS os dias listados acima.
+TAREFA: Gere um roteiro COMPLETO de ${numDiasTotal} dias${isMultiDestino ? ` cobrindo ${destinosArray.length} destinos na ordem listada` : ` para ${destinosArray[0].destino}`}, cobrindo TODOS os dias listados acima.
 
 REGRAS IMPORTANTES:
-1. O DIA 1 ${horarioChegada ? `começa a partir das ${horarioChegada} (hora de chegada no destino)` : 'é o dia de chegada — comece com atividades leves de ambientação'}
-2. O ÚLTIMO DIA ${horarioPartida ? `deve considerar partida às ${horarioPartida} — o viajante precisa de tempo para ir ao aeroporto/rodoviária` : 'é o dia de partida — sugira atividades de manhã e organização para partida'}
+1. Cada dia de chegada em um destino deve considerar o horário de chegada informado — comece com atividades leves de ambientação
+2. Cada dia de partida de um destino deve considerar o horário de partida — o viajante precisa de tempo para ir ao aeroporto/rodoviária
 3. Cada dia DEVE ter atividades distribuídas por períodos (manhã, tarde, noite) conforme o ritmo escolhido
-4. "google_maps_query" deve ser o NOME REAL DO LOCAL + Cidade + País, para funcionar numa busca do Google Maps (ex: "Torre Eiffel, Paris, França"). Use nomes curtos e diretos.
+4. "google_maps_query" deve ser o NOME REAL DO LOCAL + Cidade + País para funcionar no Google Maps
 5. "tags" podem ser: "Imperdível", "Ideal para família", "Histórico", "Gastronômico", "Compras", "Relaxante", "Aventura", "Cultural", "Gratuito", "Vida noturna", "Natureza", "Romântico"
-6. "gratuito" deve ser true se a atividade é gratuita (parques, praias, mirantes, caminhar por bairros) ou false se normalmente é paga
+6. "gratuito" deve ser true se a atividade é gratuita ou false se normalmente é paga
 7. Escreva TODOS os textos em português brasileiro
-8. Tom dos textos: Tripinha é uma cachorra vira-lata caramelo, fala em 1ª pessoa, descontraída, calorosa, amiga do viajante. Pode usar referência canina sutil (farejar, explorar) mas SEM exagerar — no máximo 1 por dia.
+8. Tom dos textos: Tripinha é uma cachorra vira-lata caramelo, fala em 1ª pessoa, descontraída, calorosa, amiga do viajante. Pode usar referência canina sutil mas SEM exagerar — no máximo 1 por dia.
 9. NÃO use emoji nos textos (o frontend adiciona)
 10. "duracao_minutos" é o tempo estimado naquela atividade (mínimo 30, máximo 240)
 11. Priorize LOCAIS REAIS e POPULARES que existem de fato no destino
 12. Evite repetir locais entre dias diferentes
-13. Para o dia de chegada e o dia de partida, ajuste o número de atividades ao tempo disponível${observacoesInstrucao}
+13. "destino_atual" deve indicar EXATAMENTE em qual cidade o viajante está naquele dia
+14. "clima_previsto" deve ser uma estimativa realista do clima para aquele destino naquela época do ano. Considere estação, latitude, altitude e padrões típicos. Adapte as sugestões ao clima.${observacoesInstrucao}
 
 Retorne APENAS o JSON válido, sem texto extra.
 
@@ -249,7 +362,7 @@ ${estruturaJSON}`;
                         messages: [
                             {
                                 role: 'system',
-                                content: `Você é a Tripinha, uma cachorra vira-lata caramelo brasileira especialista em viagens. Crie roteiros detalhados e personalizados. Retorne APENAS JSON válido em português do Brasil. Zero texto extra fora do JSON. Todos os locais devem ser REAIS e existir de fato no destino. O campo google_maps_query deve conter o nome real do local para funcionar no Google Maps.${observacoes ? ' IMPORTANTE: O viajante fez pedidos especiais — demonstre nas suas dicas que você levou tudo em conta, de forma natural e acolhedora.' : ''}`
+                                content: `Você é a Tripinha, uma cachorra vira-lata caramelo brasileira especialista em viagens. Crie roteiros detalhados e personalizados. Retorne APENAS JSON válido em português do Brasil. Zero texto extra fora do JSON. Todos os locais devem ser REAIS e existir de fato no destino. O campo google_maps_query deve conter o nome real do local para funcionar no Google Maps. IMPORTANTE: para cada dia inclua "destino_atual" (cidade atual) e "clima_previsto" (estimativa realista do clima para o destino naquela época).${observacoes ? ' O viajante fez pedidos especiais — demonstre nas suas dicas que você levou tudo em conta.' : ''}${isMultiDestino ? ' Esta é uma viagem MULTI-DESTINO — cubra todos os destinos na ordem correta, com dias de transição realistas.' : ''}`
                             },
                             { role: 'user', content: prompt }
                         ],
@@ -289,7 +402,7 @@ ${estruturaJSON}`;
         // ============================================================
         if (!resultado) {
             console.warn('⚠️ Todos os modelos falharam, usando fallback');
-            return res.status(200).json(buildFallbackItinerary(req.body));
+            return res.status(200).json(buildFallbackItinerary(req.body, destinosArray));
         }
 
         // ============================================================
@@ -297,17 +410,16 @@ ${estruturaJSON}`;
         // ============================================================
         if (!resultado.dias || !Array.isArray(resultado.dias)) {
             console.error('❌ Resposta sem array de dias');
-            return res.status(200).json(buildFallbackItinerary(req.body));
+            return res.status(200).json(buildFallbackItinerary(req.body, destinosArray));
         }
 
-        // Garantir Google Maps links curtos para cada atividade
+        // Garantir Google Maps links para cada atividade
         resultado.dias.forEach(dia => {
             if (dia.periodos && Array.isArray(dia.periodos)) {
                 dia.periodos.forEach(periodo => {
                     if (periodo.atividades && Array.isArray(periodo.atividades)) {
                         periodo.atividades.forEach(ativ => {
                             if (ativ.google_maps_query) {
-                                // CORRIGIDO: URL mais curta para compartilhamento
                                 ativ.google_maps_url = `https://maps.google.com/?q=${encodeURIComponent(ativ.google_maps_query)}`;
                             }
                         });
@@ -317,20 +429,31 @@ ${estruturaJSON}`;
         });
 
         resultado._model = usedModel;
-        resultado._numDias = numDias;
-        resultado._destino = destino;
+        resultado._numDias = numDiasTotal;
+        resultado._destino = destinoPrincipal;
+        resultado._destinos = destinosArray.map(d => d.destino);
+        resultado._isMultiDestino = isMultiDestino;
         resultado._geradoEm = new Date().toISOString();
-        // NOVO: flag indicando se observações foram usadas
         resultado._observacoesUsadas = !!(observacoes && observacoes.trim());
 
-        console.log(`🗺️ Roteiro completo: ${resultado.dias.length} dias para ${destino}`);
+        console.log(`🗺️ Roteiro completo: ${resultado.dias.length} dias para ${destinoPrincipal}`);
 
         return res.status(200).json(resultado);
 
     } catch (erro) {
         console.error('❌ Erro geral:', erro);
-        return res.status(200).json(buildFallbackItinerary(req.body));
+        return res.status(200).json(buildFallbackItinerary(req.body, destinosArray));
     }
+}
+
+// ============================================================
+// HELPER: formatar data ISO
+// ============================================================
+function formatDateISO(date) {
+    const ano = date.getFullYear();
+    const mes = String(date.getMonth() + 1).padStart(2, '0');
+    const dia = String(date.getDate()).padStart(2, '0');
+    return `${ano}-${mes}-${dia}`;
 }
 
 // ============================================================
@@ -355,71 +478,128 @@ function getSeasonContext(mes) {
 }
 
 // ============================================================
-// FALLBACK: Roteiro genérico sem LLM
+// DICAS DE CLIMA POR DESTINO (heurística baseada em padrões)
 // ============================================================
-function buildFallbackItinerary(params) {
-    const { destino, dataIda, dataVolta, horarioChegada, horarioPartida, observacoes } = params;
-    const ida = new Date(dataIda + 'T12:00:00');
-    const volta = new Date(dataVolta + 'T12:00:00');
-    const numDias = Math.ceil((volta - ida) / (1000 * 60 * 60 * 24)) + 1;
+function getClimateHint(destino, mes) {
+    // Dica genérica baseada no mês — a LLM vai refinar com base no destino real
+    const lower = (destino || '').toLowerCase();
+
+    // Destinos tropicais
+    const tropicais = ['rio', 'salvador', 'recife', 'fortaleza', 'natal', 'cancún', 'cancun', 'cartagena', 'bangkok', 'bali', 'phuket', 'havana', 'miami'];
+    if (tropicais.some(t => lower.includes(t))) {
+        if ([12, 1, 2, 3].includes(mes)) return 'Quente e úmido, possibilidade de chuvas tropicais. Temperaturas entre 28-35°C.';
+        if ([6, 7, 8].includes(mes)) return 'Temperatura agradável entre 22-30°C, menos chuvas.';
+        return 'Clima quente, entre 25-33°C. Possibilidade de chuvas rápidas.';
+    }
+
+    // Europa
+    const europa = ['lisboa', 'porto', 'madrid', 'barcelona', 'paris', 'roma', 'londres', 'amsterdam', 'berlim', 'praga', 'viena', 'atenas', 'milão'];
+    if (europa.some(t => lower.includes(t))) {
+        if ([6, 7, 8].includes(mes)) return 'Verão europeu: quente e ensolarado, 25-35°C. Dias longos.';
+        if ([12, 1, 2].includes(mes)) return 'Inverno europeu: frio, 0-10°C. Dias curtos, possibilidade de neve em algumas cidades.';
+        if ([3, 4, 5].includes(mes)) return 'Primavera europeia: temperaturas amenas 12-22°C, possibilidade de chuva.';
+        return 'Outono europeu: temperaturas amenas 8-18°C, folhagem colorida, possibilidade de chuva.';
+    }
+
+    // Patagônia / Sul
+    const frio = ['bariloche', 'ushuaia', 'patagônia', 'patagonia', 'torres del paine'];
+    if (frio.some(t => lower.includes(t))) {
+        if ([12, 1, 2].includes(mes)) return 'Verão patagônico: ameno, 10-20°C. Dias longos, vento forte.';
+        if ([6, 7, 8].includes(mes)) return 'Inverno patagônico: muito frio, -5 a 5°C. Neve, dias curtos.';
+        return 'Clima frio e ventoso, 5-15°C. Leve roupas em camadas.';
+    }
+
+    // Fallback genérico
+    return '';
+}
+
+// ============================================================
+// FALLBACK: Roteiro genérico sem LLM (v2.0 multi-destino)
+// ============================================================
+function buildFallbackItinerary(params, destinosArray) {
+    const { observacoes } = params;
     const diasSemana = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
 
     const dias = [];
-    for (let i = 0; i < numDias; i++) {
-        const data = new Date(ida);
-        data.setDate(data.getDate() + i);
+    let diaGlobal = 1;
 
-        const ehPrimeiro = i === 0;
-        const ehUltimo = i === numDias - 1;
+    for (const dest of destinosArray) {
+        const chegada = new Date(dest.dataChegada + 'T12:00:00');
+        const saida = new Date(dest.dataSaida + 'T12:00:00');
+        const numDias = Math.ceil((saida - chegada) / (1000 * 60 * 60 * 24)) + 1;
 
-        let titulo = `Dia ${i + 1} em ${destino}`;
-        let resumo = `Explore ${destino} no seu ritmo!`;
+        for (let i = 0; i < numDias; i++) {
+            const data = new Date(chegada);
+            data.setDate(data.getDate() + i);
 
-        if (ehPrimeiro) {
-            titulo = `Chegada em ${destino}`;
-            resumo = `Bem-vindo a ${destino}! Hora de se ambientar e curtir as primeiras impressões.`;
-        } else if (ehUltimo) {
-            titulo = `Despedida de ${destino}`;
-            resumo = `Último dia! Aproveite cada minuto antes de partir.`;
+            const ehPrimeiro = i === 0;
+            const ehUltimo = i === numDias - 1;
+
+            let titulo = `Dia ${diaGlobal} em ${dest.destino}`;
+            let resumo = `Explore ${dest.destino} no seu ritmo!`;
+
+            if (ehPrimeiro) {
+                titulo = `Chegada em ${dest.destino}`;
+                resumo = `Bem-vindo a ${dest.destino}! Hora de se ambientar.`;
+            } else if (ehUltimo) {
+                titulo = `Último dia em ${dest.destino}`;
+                resumo = `Aproveite os últimos momentos em ${dest.destino}!`;
+            }
+
+            dias.push({
+                dia_numero: diaGlobal,
+                dia_semana: diasSemana[data.getDay()],
+                data: data.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
+                destino_atual: dest.destino,
+                titulo,
+                resumo_tripinha: resumo,
+                clima_previsto: '',
+                eh_dia_transicao: false,
+                periodos: [
+                    {
+                        periodo: ehPrimeiro && dest.horarioChegada && parseInt(dest.horarioChegada) >= 14 ? 'tarde' : 'manhã',
+                        atividades: [
+                            {
+                                nome: `Explorar o centro de ${dest.destino}`,
+                                descricao: `Caminhe pelas ruas principais e sinta a energia do lugar.`,
+                                dica_tripinha: 'Comece sem pressa, aproveite para pegar o mapa no posto de informação turística!',
+                                duracao_minutos: 120,
+                                google_maps_query: `Centro, ${dest.destino}`,
+                                google_maps_url: `https://maps.google.com/?q=${encodeURIComponent('Centro, ' + dest.destino)}`,
+                                gratuito: true,
+                                tags: ['Cultural']
+                            }
+                        ]
+                    }
+                ]
+            });
+
+            diaGlobal++;
         }
-
-        dias.push({
-            dia_numero: i + 1,
-            dia_semana: diasSemana[data.getDay()],
-            data: data.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
-            titulo,
-            resumo_tripinha: resumo,
-            periodos: [
-                {
-                    periodo: ehPrimeiro && horarioChegada && parseInt(horarioChegada) >= 14 ? 'tarde' : 'manhã',
-                    atividades: [
-                        {
-                            nome: `Explorar o centro de ${destino}`,
-                            descricao: `Caminhe pelas ruas principais e sinta a energia do lugar.`,
-                            dica_tripinha: 'Comece sem pressa, aproveite para pegar o mapa no posto de informação turística!',
-                            duracao_minutos: 120,
-                            google_maps_query: `Centro, ${destino}`,
-                            google_maps_url: `https://maps.google.com/?q=${encodeURIComponent('Centro, ' + destino)}`,
-                            gratuito: true,
-                            tags: ['Cultural']
-                        }
-                    ]
-                }
-            ]
-        });
     }
 
-    let resumoViagem = `A Tripinha preparou um roteiro base para ${destino}! Personalize como quiser.`;
+    const destinoPrincipal = destinosArray.length > 1
+        ? destinosArray.map(d => d.destino).join(' → ')
+        : destinosArray[0].destino;
+
+    const primeiraChegada = new Date(destinosArray[0].dataChegada + 'T12:00:00');
+    const ultimaSaida = new Date(destinosArray[destinosArray.length - 1].dataSaida + 'T12:00:00');
+    const numDiasTotal = Math.ceil((ultimaSaida - primeiraChegada) / (1000 * 60 * 60 * 24)) + 1;
+
+    let resumoViagem = `A Tripinha preparou um roteiro base para ${destinoPrincipal}! Personalize como quiser.`;
     if (observacoes && observacoes.trim()) {
-        resumoViagem = `A Tripinha preparou um roteiro base para ${destino}! Recebi seus pedidos especiais e vou considerar tudo quando o roteiro completo for gerado. Por enquanto, aqui vai uma versão inicial.`;
+        resumoViagem += ' Recebi seus pedidos especiais e vou considerar tudo quando o roteiro completo for gerado.';
     }
 
     return {
         resumo_viagem: resumoViagem,
+        destinos_rota: destinosArray.map(d => d.destino),
         dias,
         _model: 'fallback',
-        _numDias: numDias,
-        _destino: destino,
+        _numDias: numDiasTotal,
+        _destino: destinoPrincipal,
+        _destinos: destinosArray.map(d => d.destino),
+        _isMultiDestino: destinosArray.length > 1,
         _geradoEm: new Date().toISOString(),
         _observacoesUsadas: !!(observacoes && observacoes.trim())
     };
