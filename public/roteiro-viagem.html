@@ -52,39 +52,71 @@
             <div id="form-container">
                 <form id="roteiro-form" class="roteiro-form">
 
-                    <!-- 1. Destino -->
+                    <!-- ================================================
+                         1. DESTINOS (Multi-Destino v2.0)
+                         ================================================ -->
                     <div class="form-group">
-                        <label for="destino">📍 Qual é o destino da viagem?</label>
-                        <p class="hint">Digite a cidade e o país (ex: Lisboa, Portugal)</p>
-                        <input type="text" id="destino" class="text-input" placeholder="Ex: Lisboa, Portugal" required autocomplete="off">
-                    </div>
+                        <label>📍 Para onde você vai?</label>
+                        <p class="hint">Adicione um ou mais destinos para sua viagem</p>
 
-                    <!-- 2. Datas -->
-                    <div class="form-group">
-                        <label for="datas-roteiro">📅 Quando será a viagem?</label>
-                        <p class="hint">Selecione a data de ida e volta</p>
-                        <input type="text" id="datas-roteiro" placeholder="Clique para selecionar datas" readonly required>
-                        <input type="hidden" id="data-ida">
-                        <input type="hidden" id="data-volta">
-                    </div>
+                        <!-- Container dinâmico dos destinos -->
+                        <div id="destinos-container">
 
-                    <!-- 3. Horários -->
-                    <div class="form-group">
-                        <label>🕐 Horários no destino</label>
-                        <p class="hint">A que horas você chega e parte do destino? (aproximado)</p>
-                        <div class="time-row">
-                            <div class="time-field">
-                                <label for="horario-chegada">Chegada</label>
-                                <input type="time" id="horario-chegada" class="time-input" value="14:00">
+                            <!-- Destino 1 (sempre presente) -->
+                            <div class="destino-card destino-card-visible" id="destino-card-1" data-index="1">
+                                <div class="destino-card-header">
+                                    <div class="destino-card-badge">1</div>
+                                    <span class="destino-card-title">Destino</span>
+                                    <button type="button" class="destino-card-remove" onclick="BenetripRoteiro.removerDestino(1)" title="Remover destino" style="display:none;">
+                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                                        </svg>
+                                    </button>
+                                </div>
+
+                                <div class="destino-card-body">
+                                    <div class="form-group" style="margin-bottom:16px;">
+                                        <label for="destino-1">📍 Cidade e país</label>
+                                        <input type="text" id="destino-1" class="text-input" placeholder="Ex: Lisboa, Portugal" required autocomplete="off">
+                                    </div>
+
+                                    <div class="form-group" style="margin-bottom:16px;">
+                                        <label for="datas-roteiro-1">📅 Datas neste destino</label>
+                                        <input type="text" id="datas-roteiro-1" class="text-input" placeholder="Clique para selecionar" readonly required>
+                                        <input type="hidden" id="data-chegada-1">
+                                        <input type="hidden" id="data-saida-1">
+                                    </div>
+
+                                    <div class="time-row">
+                                        <div class="time-field">
+                                            <label for="horario-chegada-1">🛬 Chegada</label>
+                                            <input type="time" id="horario-chegada-1" class="time-input" value="14:00">
+                                        </div>
+                                        <div class="time-field">
+                                            <label for="horario-partida-1">🛫 Partida</label>
+                                            <input type="time" id="horario-partida-1" class="time-input" value="18:00">
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
-                            <div class="time-field">
-                                <label for="horario-partida">Partida</label>
-                                <input type="time" id="horario-partida" class="time-input" value="18:00">
-                            </div>
+
+                        </div><!-- /destinos-container -->
+
+                        <!-- Botão Adicionar Destino -->
+                        <div class="adicionar-destino-wrapper">
+                            <button type="button" class="btn-adicionar-destino" id="btn-adicionar-destino">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                    <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                                </svg>
+                                Adicionar outro destino
+                            </button>
+                            <p class="hint" id="adicionar-destino-hint" style="text-align:center; margin-top:8px;">
+                                Viagem com parada em mais de uma cidade? Adicione!
+                            </p>
                         </div>
                     </div>
 
-                    <!-- 4. Com quem viaja -->
+                    <!-- 2. Com quem viaja -->
                     <div class="form-group">
                         <label>👥 Com quem você vai viajar?</label>
                         <p class="hint">Escolha quem estará com você</p>
@@ -113,7 +145,7 @@
                         <input type="hidden" id="companhia-roteiro" required>
                     </div>
 
-                    <!-- 4.1 Número de amigos (condicional) -->
+                    <!-- 2.1 Número de amigos (condicional) -->
                     <div class="form-group conditional" id="num-pessoas-roteiro-group" style="display: none;">
                         <label>Quantas pessoas na turma?</label>
                         <p class="hint">Inclua todos, inclusive você!</p>
@@ -124,7 +156,7 @@
                         </div>
                     </div>
 
-                    <!-- 4.2 Detalhes família (condicional) -->
+                    <!-- 2.2 Detalhes família (condicional) -->
                     <div class="form-group conditional" id="familia-roteiro-group" style="display: none;">
                         <label>👨‍👩‍👧‍👦 Detalhes da família</label>
                         <p class="hint">Informe a composição para personalizar o roteiro</p>
@@ -166,7 +198,7 @@
                         <p class="hint familia-hint" id="rot-familia-total-hint">Total: 2 passageiros</p>
                     </div>
 
-                    <!-- 5. Tipo de experiência (multi-select) -->
+                    <!-- 3. Tipo de experiência (multi-select) -->
                     <div class="form-group">
                         <label>🎯 Que tipo de experiência você busca?</label>
                         <p class="hint">Escolha uma ou mais opções</p>
@@ -191,7 +223,7 @@
                         <input type="hidden" id="preferencias-roteiro" required>
                     </div>
 
-                    <!-- 6. Intensidade -->
+                    <!-- 4. Intensidade -->
                     <div class="form-group">
                         <label>⚡ Qual o ritmo do seu roteiro?</label>
                         <p class="hint">Escolha a intensidade das atividades por dia</p>
@@ -215,7 +247,7 @@
                         <input type="hidden" id="intensidade-roteiro" required>
                     </div>
 
-                    <!-- 7. Orçamento atividades -->
+                    <!-- 5. Orçamento atividades -->
                     <div class="form-group">
                         <label>💰 Orçamento para atividades</label>
                         <p class="hint">Qual o nível de gasto com passeios e experiências?</p>
@@ -239,9 +271,7 @@
                         <input type="hidden" id="orcamento-roteiro" required>
                     </div>
 
-                    <!-- ================================================
-                         8. NOVO: Observações livres do usuário
-                         ================================================ -->
+                    <!-- 6. Observações livres -->
                     <div class="form-group">
                         <label for="observacoes-roteiro">📝 Algum pedido especial pra Tripinha?</label>
                         <div class="observacoes-briefing">
@@ -304,7 +334,7 @@
     <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="assets/js/benetrip-auth.js"></script>
-    <script src="assets/js/benetrip-autosave.js"></script>  <!-- ADICIONAR -->
+    <script src="assets/js/benetrip-autosave.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
     <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/pt.js"></script>
     <script src="assets/js/roteiro-viagem.js"></script>
