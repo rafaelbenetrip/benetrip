@@ -4,7 +4,7 @@
 // Fallback: Groq llama-3.3-70b → llama-3.1-8b → roteiro genérico
 
 export const config = {
-    maxDuration: 60,
+    maxDuration: 300,
 };
 
 export default async function handler(req, res) {
@@ -235,7 +235,7 @@ REGRAS:
 JSON VÁLIDO apenas, zero texto extra. Estrutura: ${estruturaJSON}`;
 
         // === TOKENS DINÂMICOS ===
-        const tokensEstimados = Math.min(Math.max(numDiasTotal * 800, 6000), 16000);
+        const tokensEstimados = Math.min(Math.max(numDiasTotal * 900, 6000), 27000);
         console.log(`📊 max_tokens: ${tokensEstimados} para ${numDiasTotal} dias`);
 
         // === GROQ API ===
