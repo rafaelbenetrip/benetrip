@@ -1,7 +1,7 @@
 /* ========================================
    ROTEIRO DE VIAGEM - BENETRIP
    Cores: Laranja #E87722, Azul #00A3E0
-   v1.1 - Campo de observações + ajustes compartilhamento
+   v2.0 - Multi-destino + clima + transição entre cidades
    ======================================== */
 
 :root {
@@ -168,6 +168,125 @@ body {
     color: #555;
     margin-bottom: 6px;
     display: block;
+}
+
+/* ========================================
+   v2.0: DESTINO CARDS (Multi-Destino)
+   ======================================== */
+#destinos-container {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    margin-bottom: 16px;
+}
+
+.destino-card {
+    background: var(--white);
+    border: 2px solid var(--gray-medium);
+    border-radius: var(--border-radius);
+    overflow: hidden;
+    transition: all 0.4s ease;
+    opacity: 0;
+    transform: translateX(-20px);
+}
+
+.destino-card-visible {
+    opacity: 1;
+    transform: translateX(0);
+}
+
+.destino-card-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    background: linear-gradient(135deg, rgba(0, 163, 224, 0.08) 0%, rgba(0, 163, 224, 0.03) 100%);
+    border-bottom: 1px solid var(--gray-medium);
+}
+
+.destino-card-badge {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background: var(--blue-secondary);
+    color: var(--white);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Poppins', sans-serif;
+    font-size: 14px;
+    font-weight: 700;
+    flex-shrink: 0;
+}
+
+.destino-card-title {
+    font-family: 'Poppins', sans-serif;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--gray-dark);
+    flex: 1;
+}
+
+.destino-card-remove {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 6px;
+    border-radius: 50%;
+    color: #999;
+    transition: var(--transition);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.destino-card-remove:hover {
+    background: rgba(229, 57, 53, 0.1);
+    color: var(--red-tag);
+}
+
+.destino-card-body {
+    padding: 16px;
+}
+
+.destino-card-body .form-group label {
+    font-size: 13px;
+    font-weight: 500;
+    color: #555;
+}
+
+/* Botão Adicionar Destino */
+.adicionar-destino-wrapper {
+    margin-top: 8px;
+}
+
+.btn-adicionar-destino {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 14px 20px;
+    background: var(--white);
+    border: 2px dashed var(--blue-secondary);
+    border-radius: var(--border-radius-sm);
+    font-family: 'Poppins', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--blue-secondary);
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.btn-adicionar-destino:hover {
+    background: rgba(0, 163, 224, 0.06);
+    border-color: #0090C7;
+    transform: translateY(-2px);
+    box-shadow: var(--shadow);
+}
+
+.btn-adicionar-destino svg {
+    flex-shrink: 0;
 }
 
 /* ========================================
@@ -392,7 +511,7 @@ body {
 }
 
 /* ========================================
-   NOVO: CAMPO DE OBSERVAÇÕES
+   CAMPO DE OBSERVAÇÕES
    ======================================== */
 .observacoes-briefing {
     display: flex;
@@ -471,7 +590,6 @@ body {
     font-weight: 700;
 }
 
-/* Badge no resultado que indica que observações foram usadas */
 .observacoes-badge {
     display: inline-flex;
     align-items: center;
@@ -493,23 +611,6 @@ body {
 /* ========================================
    CALENDÁRIO (Flatpickr)
    ======================================== */
-#datas-roteiro {
-    width: 100%;
-    padding: 14px 18px;
-    border: 2px solid var(--gray-medium);
-    border-radius: var(--border-radius-sm);
-    font-size: 15px;
-    font-family: 'Montserrat', sans-serif;
-    background: var(--white);
-    cursor: pointer;
-    transition: var(--transition);
-}
-
-#datas-roteiro:focus {
-    outline: none;
-    border-color: var(--blue-secondary);
-}
-
 .flatpickr-day.selected,
 .flatpickr-day.startRange,
 .flatpickr-day.endRange {
@@ -639,6 +740,36 @@ body {
     transform: translateX(-3px);
 }
 
+/* v2.0: Rota visual multi-destino */
+.rota-visual {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 12px 0 8px;
+    padding: 10px 16px;
+    background: rgba(0, 163, 224, 0.06);
+    border-radius: 12px;
+}
+
+.rota-cidade {
+    font-family: 'Poppins', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--blue-secondary);
+    padding: 4px 12px;
+    background: var(--white);
+    border-radius: 20px;
+    border: 1.5px solid rgba(0, 163, 224, 0.3);
+}
+
+.rota-seta {
+    color: var(--orange-primary);
+    font-weight: 700;
+    font-size: 16px;
+}
+
 /* Resumo da viagem */
 .roteiro-resumo {
     background: var(--white);
@@ -689,6 +820,69 @@ body {
 .roteiro-header .subtitulo {
     font-size: 14px;
     color: #888;
+}
+
+/* ========================================
+   v2.0: SEPARADOR DE DESTINO (multi-destino)
+   ======================================== */
+.destino-separator {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 28px 0 20px;
+}
+
+.destino-separator-line {
+    flex: 1;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--orange-primary), transparent);
+}
+
+.destino-separator-badge {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 20px;
+    background: var(--orange-primary);
+    color: var(--white);
+    border-radius: 50px;
+    font-family: 'Poppins', sans-serif;
+    font-size: 14px;
+    font-weight: 700;
+    white-space: nowrap;
+    box-shadow: 0 2px 8px rgba(232, 119, 34, 0.3);
+}
+
+/* v2.0: Badge de transição entre cidades */
+.transicao-badge {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 10px 16px;
+    background: linear-gradient(135deg, rgba(232, 119, 34, 0.08), rgba(0, 163, 224, 0.08));
+    border: 1.5px dashed var(--orange-primary);
+    border-radius: var(--border-radius-sm);
+    font-family: 'Poppins', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--orange-primary);
+    margin-bottom: 16px;
+}
+
+/* v2.0: Badge de clima previsto */
+.clima-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    background: rgba(0, 163, 224, 0.06);
+    border: 1px solid rgba(0, 163, 224, 0.15);
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 500;
+    color: #555;
+    margin-bottom: 14px;
 }
 
 /* ========================================
@@ -1078,6 +1272,8 @@ body {
     .time-row { grid-template-columns: 1fr; }
     .compartilhar-btns { flex-direction: column; }
     .btn-compartilhar { justify-content: center; }
+    .rota-visual { gap: 6px; }
+    .rota-cidade { font-size: 12px; padding: 3px 10px; }
 }
 
 @media (max-width: 380px) {
