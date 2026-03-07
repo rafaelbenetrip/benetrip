@@ -853,6 +853,16 @@ body {
     box-shadow: 0 2px 8px rgba(232, 119, 34, 0.3);
 }
 
+/* v2.1: Variante para retorno a cidade já visitada */
+.destino-separator-line.retorno {
+    background: linear-gradient(90deg, transparent, var(--blue-secondary), transparent);
+}
+
+.destino-separator-badge.retorno {
+    background: linear-gradient(135deg, var(--blue-secondary), #0090C7);
+    box-shadow: 0 2px 8px rgba(0, 163, 224, 0.3);
+}
+
 /* v2.0: Badge de transição entre cidades */
 .transicao-badge {
     display: flex;
