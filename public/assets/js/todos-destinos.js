@@ -1,12 +1,15 @@
 /**
  * BENETRIP - TODOS OS DESTINOS
- * Versão: Filtros Avançados v3.4 - Geo do JSON + Escopo correto
+ * Versão: Filtros Avançados v3.5 - Aeroportos + Hotel info + Scroll fix
  *
- * CORREÇÃO v3.4:
- * ❌ BUG: Backend não resolvia geo de cidades agrupadas (kgmid) — mapa hardcoded desatualizado
- * ✅ FIX: Frontend envia origemGeo { codigo_pais, pais, kgmid_pais, continente, kgmid_continente }
- *         diretamente do JSON, eliminando dependência de mapa no backend
+ * MELHORIAS v3.5:
+ * ✅ Filtro de aeroportos de destino (chegada)
+ * ✅ Exibição de aeroporto de ida e volta no card
+ * ✅ Scroll funcional nos filtros (mobile + desktop)
+ * ✅ Mensagem quando não há info de hotel
+ * ✅ Formato melhorado do custo com hotel: valor total | noites (hotel R$ X/noite + voo)
  *
+ * v3.4: Geo do JSON + Escopo correto
  * v3.3: escopo 'nacional'/'internacional' corrigido
  * v3.2: Cidades Agrupadas (KGMID)
  */
@@ -30,10 +33,12 @@ const BenetripTodosDestinos = {
             tipoDestino: 'todos',
             comboData: 'melhor',
             companhias: [],
+            aeroportosDestino: [],  // v3.5: filtro de aeroportos de chegada
             precoMin: 0,
             precoMax: Infinity,
         },
         companhiasDisponiveis: [],
+        aeroportosDestinoDisponiveis: [],  // v3.5: lista de aeroportos de destino
         paisOrigem: '',
         precoMinGlobal: 0,
         precoMaxGlobal: 0,
@@ -51,7 +56,7 @@ const BenetripTodosDestinos = {
     error(...args) { console.error('[Benetrip ERROR]', ...args); },
 
     init() {
-        this.log('🐕 Benetrip v3.4 (Geo do JSON) inicializando...');
+        this.log('🐕 Benetrip v3.5 (Aeroportos + Hotel + Scroll) inicializando...');
         this.carregarCidades();
         this.setupFormEvents();
         this.setupAutocomplete();
@@ -87,7 +92,7 @@ const BenetripTodosDestinos = {
     normalizarTexto(t) { return t.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''); },
 
     // ================================================================
-    // v3.4: buscarCidades agora inclui dados geo do JSON
+    // buscarCidades — inclui dados geo do JSON
     // ================================================================
     buscarCidades(termo) {
         if (!this.state.cidadesData || termo.length < 2) return [];
@@ -112,7 +117,6 @@ const BenetripTodosDestinos = {
                 airport: c.aeroporto || null,
                 isCityCode: c.is_city_code || false,
                 aeroportosIncluidos: c.aeroportos_incluidos || null,
-                // v3.4: Dados geo do JSON para enviar ao backend
                 kgmid_pais: c.kgmid_pais || null,
                 continente: c.continente || null,
                 kgmid_continente: c.kgmid_continente || null,
@@ -311,12 +315,11 @@ const BenetripTodosDestinos = {
     },
 
     // ================================================================
-    // v3.4: Montar origemGeo a partir dos dados do JSON carregado no autocomplete
+    // Montar origemGeo a partir dos dados do JSON
     // ================================================================
     _buildOrigemGeo() {
         const o = this.state.formData.origem;
         if (!o) return undefined;
-        // Só envia se tiver dados geo (vem do JSON para cidades agrupadas E individuais)
         if (o.kgmid_pais || o.continente) {
             return {
                 codigo_pais: o.countryCode || '',
@@ -335,6 +338,22 @@ const BenetripTodosDestinos = {
             case 'internacional':  return 'internacional';
             default:               return undefined;
         }
+    },
+
+    // ================================================================
+    // v3.5: Obter label legível do aeroporto de origem
+    // ================================================================
+    _getOrigemAeroportoLabel() {
+        const origem = this.state.formData.origem;
+        if (!origem) return '';
+        if (origem.isCityCode && origem.aeroportosIncluidos) {
+            return origem.aeroportosIncluidos.join(', ');
+        }
+        // Se não é kgmid e é IATA simples
+        if (/^[A-Z]{3}$/i.test(origem.code)) {
+            return origem.code;
+        }
+        return origem.displayCode || origem.code;
     },
 
     // ================================================================
@@ -366,7 +385,6 @@ const BenetripTodosDestinos = {
                     const label = `${this.formatarDataCurta(combo.dataIda)} → ${this.formatarDataCurta(combo.dataVolta)}`;
                     if (isFlexivel) document.getElementById('loading-combinacao').textContent = `Pesquisando: ${label}`;
                     
-                    // v3.4: Montar body com origemGeo
                     const requestBody = {
                         origem: origem.code,
                         dataIda: combo.dataIda,
@@ -435,10 +453,25 @@ const BenetripTodosDestinos = {
         }
     },
 
+    // ================================================================
+    // v3.5: prepararDadosFiltros inclui aeroportos de destino
+    // ================================================================
     prepararDadosFiltros(destinos) {
+        // Companhias aéreas
         const comp = new Set();
         destinos.forEach(d => { if (d.flight.airline_name) comp.add(d.flight.airline_name); });
         this.state.companhiasDisponiveis = [...comp].sort();
+
+        // v3.5: Aeroportos de destino
+        const aerosDest = new Set();
+        destinos.forEach(d => {
+            const code = d.flight?.airport_code || d.primary_airport || '';
+            if (code && /^[A-Z]{3}$/i.test(code)) aerosDest.add(code.toUpperCase());
+        });
+        this.state.aeroportosDestinoDisponiveis = [...aerosDest].sort();
+        this.log(`✈️ ${this.state.aeroportosDestinoDisponiveis.length} aeroportos de destino encontrados`);
+
+        // Faixa de preço
         const precos = destinos.map(d => d.flight.price).filter(p => p > 0);
         this.state.precoMinGlobal = Math.min(...precos);
         this.state.precoMaxGlobal = Math.max(...precos);
@@ -448,10 +481,15 @@ const BenetripTodosDestinos = {
         this.state.filtros = {
             ordenacao: 'preco_asc', orcamento: 'todos', paradas: 'qualquer',
             duracao: 'qualquer', tipoDestino: 'todos', comboData: 'melhor',
-            companhias: [], precoMin: this.state.precoMinGlobal, precoMax: this.state.precoMaxGlobal,
+            companhias: [],
+            aeroportosDestino: [],  // v3.5
+            precoMin: this.state.precoMinGlobal, precoMax: this.state.precoMaxGlobal,
         };
     },
 
+    // ================================================================
+    // v3.5: aplicarFiltrosEMostrar com filtro de aeroportos
+    // ================================================================
     aplicarFiltrosEMostrar() {
         const f = this.state.filtros;
         const { orcamento, combinacoes } = this.state.formData;
@@ -472,6 +510,7 @@ const BenetripTodosDestinos = {
         const getPreco = d => d._comboAtual ? d._comboAtual.price : d.flight.price;
         const getDur = d => d._comboAtual ? (d._comboAtual.flight?.flight_duration_minutes || d.flight.flight_duration_minutes || 0) : (d.flight.flight_duration_minutes || 0);
         const getStops = d => d._comboAtual ? (d._comboAtual.flight?.stops ?? d.flight.stops ?? 0) : (d.flight.stops || 0);
+        const getDestAirport = d => (d.flight?.airport_code || d.primary_airport || '').toUpperCase();
 
         if (f.orcamento === 'dentro') destinos = destinos.filter(d => getPreco(d) <= orcamento);
         else if (f.orcamento === 'fora') destinos = destinos.filter(d => getPreco(d) > orcamento);
@@ -498,6 +537,12 @@ const BenetripTodosDestinos = {
         }
 
         if (f.companhias.length > 0) destinos = destinos.filter(d => f.companhias.includes(d.flight.airline_name || ''));
+
+        // v3.5: Filtro de aeroportos de destino
+        if (f.aeroportosDestino.length > 0) {
+            destinos = destinos.filter(d => f.aeroportosDestino.includes(getDestAirport(d)));
+        }
+
         destinos = destinos.filter(d => { const p = getPreco(d); return p >= f.precoMin && p <= f.precoMax; });
 
         destinos.sort((a, b) => {
@@ -543,6 +588,9 @@ const BenetripTodosDestinos = {
             periodoHtml = `<div class="stat-item"><span class="stat-label">Período</span><span class="stat-value">📅 ${this.formatarDataCurta(this.state.formData.dataIda)} → ${this.formatarDataCompletaBR(this.state.formData.dataVolta)} (${n}n)</span></div>`;
         }
 
+        // v3.5: Mostrar aeroportos de ida no resumo
+        const aeroportoIdaLabel = this._getOrigemAeroportoLabel();
+
         const dentroCount = todos.filter(d => d.flight.price <= orcamento).length;
         const tripinhaMsg = this._tripinhaMsg(todos, orcamento, moeda, isFlexivel, combinacoes.length, escopo);
         const filtrosHtml = this._filtrosPainelHtml(isFlexivel);
@@ -557,6 +605,7 @@ const BenetripTodosDestinos = {
                 <h1>${escopoEmoji} ${escopoTitulo} Disponíveis</h1>
                 <div class="resultados-stats">
                     <div class="stat-item"><span class="stat-label">De</span><span class="stat-value">📍 ${origemDisplay}</span></div>
+                    <div class="stat-item"><span class="stat-label">Aeroportos de ida</span><span class="stat-value">🛫 ${aeroportoIdaLabel}</span></div>
                     ${periodoHtml}
                     <div class="stat-item"><span class="stat-label">Total</span><span class="stat-value orange">${todos.length}</span></div>
                     <div class="stat-item"><span class="stat-label">No orçamento</span><span class="stat-value green">${dentroCount}</span></div>
@@ -587,6 +636,9 @@ const BenetripTodosDestinos = {
         this._atualizarBadgeFiltros();
     },
 
+    // ================================================================
+    // v3.5: Painel de filtros com aeroportos de destino + scroll fix
+    // ================================================================
     _filtrosPainelHtml(isFlexivel) {
         const f = this.state.filtros;
         const simbolo = this.getSimbolo(this.state.formData.moeda);
@@ -607,7 +659,7 @@ const BenetripTodosDestinos = {
 
         let compHtml = '';
         if (this.state.companhiasDisponiveis.length > 1) {
-            compHtml = `<div class="filtro-grupo"><div class="filtro-titulo">🛫 Companhia Aérea</div><div class="filtro-chips">
+            compHtml = `<div class="filtro-grupo"><div class="filtro-titulo">🛫 Companhia Aérea</div><div class="filtro-chips filtro-chips-scroll">
                 <button class="chip ${f.companhias.length === 0 ? 'active' : ''}" onclick="BenetripTodosDestinos.setFiltro('companhias',[])">Todas</button>
                 ${this.state.companhiasDisponiveis.map(c =>
                     `<button class="chip ${f.companhias.includes(c) ? 'active' : ''}" onclick="BenetripTodosDestinos.toggleCompanhia('${c.replace(/'/g, "\\'")}')">${c}</button>`
@@ -615,41 +667,64 @@ const BenetripTodosDestinos = {
             </div></div>`;
         }
 
+        // v3.5: Filtro de aeroportos de destino (chegada)
+        let aeroDestinoHtml = '';
+        if (this.state.aeroportosDestinoDisponiveis.length > 1) {
+            aeroDestinoHtml = `<div class="filtro-grupo"><div class="filtro-titulo">🛬 Aeroporto de Chegada</div><div class="filtro-chips filtro-chips-scroll">
+                <button class="chip ${f.aeroportosDestino.length === 0 ? 'active' : ''}" onclick="BenetripTodosDestinos.setFiltro('aeroportosDestino',[])">Todos</button>
+                ${this.state.aeroportosDestinoDisponiveis.map(a =>
+                    `<button class="chip ${f.aeroportosDestino.includes(a) ? 'active' : ''}" onclick="BenetripTodosDestinos.toggleAeroportoDestino('${a}')">${a}</button>`
+                ).join('')}
+            </div></div>`;
+        }
+
         return `
             <div class="filtros-header-mobile"><h3>Filtros e Ordenação</h3><button class="btn-fechar-filtros" onclick="BenetripTodosDestinos.toggleFiltros()">✕</button></div>
-            <div class="filtro-grupo"><div class="filtro-titulo">📊 Ordenar por</div><div class="filtro-chips">
-                ${chip('💰 Menor preço', 'ordenacao', 'preco_asc')} ${chip('💰 Maior preço', 'ordenacao', 'preco_desc')}
-                ${chip('⏱️ Menor duração', 'ordenacao', 'duracao_asc')} ${chip('✈️ Menos paradas', 'ordenacao', 'paradas_asc')}
-                ${chip('🏨 Custo total', 'ordenacao', 'custo_total')}
-            </div></div>
-            ${comboHtml}
-            <div class="filtro-grupo"><div class="filtro-titulo">💸 Orçamento</div><div class="filtro-chips">
-                ${chip('Todos', 'orcamento', 'todos')} ${chip('✅ Dentro', 'orcamento', 'dentro')} ${chip('⚠️ Acima', 'orcamento', 'fora')}
-            </div></div>
-            <div class="filtro-grupo"><div class="filtro-titulo">🔄 Paradas</div><div class="filtro-chips">
-                ${chip('Qualquer', 'paradas', 'qualquer')} ${chip('Direto', 'paradas', 'direto')} ${chip('Até 1', 'paradas', 'max1')}
-            </div></div>
-            <div class="filtro-grupo"><div class="filtro-titulo">⏱️ Duração do Voo</div><div class="filtro-chips">
-                ${chip('Qualquer', 'duracao', 'qualquer')} ${chip('Até 3h', 'duracao', 'curto')} ${chip('3h–6h', 'duracao', 'medio')} ${chip('6h–10h', 'duracao', 'longo')} ${chip('+10h', 'duracao', 'muitolongo')}
-            </div></div>
-            <div class="filtro-grupo"><div class="filtro-titulo">🌎 Tipo de Destino</div><div class="filtro-chips">
-                ${chip('Todos', 'tipoDestino', 'todos')} ${chip('🏠 Nacional', 'tipoDestino', 'nacional')} ${chip('✈️ Internacional', 'tipoDestino', 'internacional')}
-            </div></div>
-            ${compHtml}
-            <div class="filtro-grupo"><div class="filtro-titulo">💰 Faixa de Preço</div>
-                <div class="filtro-range"><div class="range-inputs">
-                    <div class="range-field"><label>Mín</label><input type="text" id="filtro-preco-min" value="${Math.round(f.precoMin).toLocaleString('pt-BR')}" onchange="BenetripTodosDestinos.setPrecoRange()"></div>
-                    <span class="range-separator">—</span>
-                    <div class="range-field"><label>Máx</label><input type="text" id="filtro-preco-max" value="${f.precoMax === Infinity ? '' : Math.round(f.precoMax).toLocaleString('pt-BR')}" placeholder="Sem limite" onchange="BenetripTodosDestinos.setPrecoRange()"></div>
-                </div><div class="range-hint">${simbolo} ${Math.round(this.state.precoMinGlobal).toLocaleString('pt-BR')} — ${simbolo} ${Math.round(this.state.precoMaxGlobal).toLocaleString('pt-BR')}</div></div>
+            <div class="filtros-scroll-area">
+                <div class="filtro-grupo"><div class="filtro-titulo">📊 Ordenar por</div><div class="filtro-chips">
+                    ${chip('💰 Menor preço', 'ordenacao', 'preco_asc')} ${chip('💰 Maior preço', 'ordenacao', 'preco_desc')}
+                    ${chip('⏱️ Menor duração', 'ordenacao', 'duracao_asc')} ${chip('✈️ Menos paradas', 'ordenacao', 'paradas_asc')}
+                    ${chip('🏨 Custo total', 'ordenacao', 'custo_total')}
+                </div></div>
+                ${comboHtml}
+                <div class="filtro-grupo"><div class="filtro-titulo">💸 Orçamento</div><div class="filtro-chips">
+                    ${chip('Todos', 'orcamento', 'todos')} ${chip('✅ Dentro', 'orcamento', 'dentro')} ${chip('⚠️ Acima', 'orcamento', 'fora')}
+                </div></div>
+                <div class="filtro-grupo"><div class="filtro-titulo">🔄 Paradas</div><div class="filtro-chips">
+                    ${chip('Qualquer', 'paradas', 'qualquer')} ${chip('Direto', 'paradas', 'direto')} ${chip('Até 1', 'paradas', 'max1')}
+                </div></div>
+                <div class="filtro-grupo"><div class="filtro-titulo">⏱️ Duração do Voo</div><div class="filtro-chips">
+                    ${chip('Qualquer', 'duracao', 'qualquer')} ${chip('Até 3h', 'duracao', 'curto')} ${chip('3h–6h', 'duracao', 'medio')} ${chip('6h–10h', 'duracao', 'longo')} ${chip('+10h', 'duracao', 'muitolongo')}
+                </div></div>
+                <div class="filtro-grupo"><div class="filtro-titulo">🌎 Tipo de Destino</div><div class="filtro-chips">
+                    ${chip('Todos', 'tipoDestino', 'todos')} ${chip('🏠 Nacional', 'tipoDestino', 'nacional')} ${chip('✈️ Internacional', 'tipoDestino', 'internacional')}
+                </div></div>
+                ${aeroDestinoHtml}
+                ${compHtml}
+                <div class="filtro-grupo"><div class="filtro-titulo">💰 Faixa de Preço</div>
+                    <div class="filtro-range"><div class="range-inputs">
+                        <div class="range-field"><label>Mín</label><input type="text" id="filtro-preco-min" value="${Math.round(f.precoMin).toLocaleString('pt-BR')}" onchange="BenetripTodosDestinos.setPrecoRange()"></div>
+                        <span class="range-separator">—</span>
+                        <div class="range-field"><label>Máx</label><input type="text" id="filtro-preco-max" value="${f.precoMax === Infinity ? '' : Math.round(f.precoMax).toLocaleString('pt-BR')}" placeholder="Sem limite" onchange="BenetripTodosDestinos.setPrecoRange()"></div>
+                    </div><div class="range-hint">${simbolo} ${Math.round(this.state.precoMinGlobal).toLocaleString('pt-BR')} — ${simbolo} ${Math.round(this.state.precoMaxGlobal).toLocaleString('pt-BR')}</div></div>
+                </div>
+                <div class="filtro-acoes"><button class="btn-limpar-filtros" onclick="BenetripTodosDestinos.limparFiltros()">🗑️ Limpar todos os filtros</button></div>
             </div>
-            <div class="filtro-acoes"><button class="btn-limpar-filtros" onclick="BenetripTodosDestinos.limparFiltros()">🗑️ Limpar todos os filtros</button></div>
             <div class="filtro-aplicar-mobile"><button class="btn-aplicar-filtros" onclick="BenetripTodosDestinos.toggleFiltros()">Ver <span id="filtro-resultado-count">${this.state.destinosFiltrados.length}</span> resultados</button></div>
         `;
     },
 
     setFiltro(k, v) { this.state.filtros[k] = v; this.aplicarFiltrosEMostrar(); },
     toggleCompanhia(n) { const a = this.state.filtros.companhias; const i = a.indexOf(n); if (i >= 0) a.splice(i, 1); else a.push(n); this.aplicarFiltrosEMostrar(); },
+
+    // v3.5: Toggle aeroporto de destino
+    toggleAeroportoDestino(code) {
+        const a = this.state.filtros.aeroportosDestino;
+        const i = a.indexOf(code);
+        if (i >= 0) a.splice(i, 1); else a.push(code);
+        this.aplicarFiltrosEMostrar();
+    },
+
     setPrecoRange() {
         const mn = document.getElementById('filtro-preco-min');
         const mx = document.getElementById('filtro-preco-max');
@@ -666,6 +741,7 @@ const BenetripTodosDestinos = {
         document.body.classList.toggle('filtros-open', this.state.filtrosAberto);
     },
 
+    // v3.5: Badge de filtros atualizada com aeroportos
     _atualizarBadgeFiltros() {
         const f = this.state.filtros;
         let c = 0;
@@ -676,6 +752,7 @@ const BenetripTodosDestinos = {
         if (f.tipoDestino !== 'todos') c++;
         if (f.comboData !== 'melhor') c++;
         if (f.companhias.length > 0) c++;
+        if (f.aeroportosDestino.length > 0) c++;  // v3.5
         if (f.precoMin > this.state.precoMinGlobal || f.precoMax < this.state.precoMaxGlobal) c++;
         const badge = document.getElementById('filtro-count');
         if (badge) { badge.textContent = c; badge.style.display = c > 0 ? 'inline-flex' : 'none'; }
@@ -691,6 +768,9 @@ const BenetripTodosDestinos = {
         return origem.code;
     },
 
+    // ================================================================
+    // v3.5: Card com aeroportos ida/volta + hotel info melhorado
+    // ================================================================
     _cardHtml(dest, orcamento, isFlexivel) {
         const { origem, moeda } = this.state.formData;
         const ca = dest._comboAtual;
@@ -707,16 +787,37 @@ const BenetripTodosDestinos = {
         const originIataGF = this.getOrigemIataParaGoogleFlights();
         const gfUrl = this.buildGoogleFlightsUrl(originIataGF, destIata, combo.dataIda, combo.dataVolta, moeda);
 
+        // v3.5: Aeroporto de ida (origem)
+        const origemLabel = this._getOrigemAeroportoLabel();
+
         let bestDates = '';
         if (isFlexivel) {
             const c = ca?.combo || dest._melhorCombo;
             if (c) bestDates = `<div class="best-dates-badge">📅 ${this.formatarDataCurta(c.dataIda)} → ${this.formatarDataCurta(c.dataVolta)} (${noites}n)</div>`;
         }
 
-        let custoHtml = '';
-        if (dest.avg_cost_per_night > 0) {
-            const t = preco + dest.avg_cost_per_night * noites;
-            custoHtml = `<div class="custo-estimado-mini">Com hotel: <strong>${this.formatarPreco(t, moeda)}</strong> <span style="opacity:.7">(voo+${noites}n)</span></div>`;
+        // v3.5: Hotel info melhorado
+        let hotelHtml = '';
+        const avgHotel = dest.avg_cost_per_night || 0;
+        if (avgHotel > 0) {
+            const custoHotelTotal = avgHotel * noites;
+            const custoTotalViagem = preco + custoHotelTotal;
+            hotelHtml = `
+                <div class="custo-hotel-info">
+                    <div class="custo-hotel-total">
+                        🏨 Com hotel: <strong>${this.formatarPreco(custoTotalViagem, moeda)}</strong> | ${noites} noite${noites > 1 ? 's' : ''}
+                    </div>
+                    <div class="custo-hotel-detalhe">
+                        (hotel ${this.formatarPreco(avgHotel, moeda)} por noite em média + voo)
+                    </div>
+                </div>`;
+        } else {
+            hotelHtml = `
+                <div class="custo-hotel-info sem-hotel">
+                    <div class="custo-hotel-indisponivel">
+                        🏨 Sem informação de hotel disponível para esta cidade no momento
+                    </div>
+                </div>`;
         }
 
         const isNac = this.state.paisOrigem && (dest.country || '').toLowerCase() === this.state.paisOrigem;
@@ -737,12 +838,19 @@ const BenetripTodosDestinos = {
             <div class="destino-header">
                 <div class="destino-info">
                     <h3 class="destino-nome">${dest.name}</h3>
-                    <p class="destino-pais">${dest.country || '—'} · ${destIata}</p>
+                    <p class="destino-pais">${dest.country || '—'}</p>
                     ${bestDates}
                 </div>
                 <div class="destino-preco-wrapper">
                     <div class="destino-preco">${this.formatarPreco(preco, moeda)}</div>
                     <div class="destino-preco-label">ida e volta</div>
+                </div>
+            </div>
+            <div class="destino-rota">
+                <div class="rota-aeroportos">
+                    <span class="rota-item rota-ida">🛫 <strong>${origemLabel}</strong></span>
+                    <span class="rota-seta">→</span>
+                    <span class="rota-item rota-volta">🛬 <strong>${destIata || '—'}</strong></span>
                 </div>
             </div>
             <div class="destino-detalhes">
@@ -751,8 +859,8 @@ const BenetripTodosDestinos = {
                 ${flight.airline_name ? `<div class="detalhe-item"><span class="detalhe-icon">🛫</span><span>${flight.airline_name}</span></div>` : ''}
                 ${outrasHtml}
             </div>
+            ${hotelHtml}
             <div class="destino-acao">
-                ${custoHtml}
                 <a href="${gfUrl}" target="_blank" rel="noopener" class="btn-google-flights">${icon} Ver no Google Flights</a>
             </div>
         </div>`;
