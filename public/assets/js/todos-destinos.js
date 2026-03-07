@@ -1,17 +1,14 @@
 /**
  * BENETRIP - TODOS OS DESTINOS
- * Versão: Filtros Avançados v3.3 - Escopo Nacional/Internacional corrigido
+ * Versão: Filtros Avançados v3.4 - Geo do JSON + Escopo correto
  *
- * CORREÇÃO v3.3:
- * ❌ BUG: escopo 'brasil' era enviado à API mas não era reconhecido pelo backend
- * ✅ FIX: envia 'nacional' (genérico, funciona para qualquer país de origem)
- * ✅ FIX: label do botão agora diz "Nacional" em vez de "Brasil" (funciona para qualquer país)
- * ✅ FIX: backend agora busca focado no país + filtra na consolidação
+ * CORREÇÃO v3.4:
+ * ❌ BUG: Backend não resolvia geo de cidades agrupadas (kgmid) — mapa hardcoded desatualizado
+ * ✅ FIX: Frontend envia origemGeo { codigo_pais, pais, kgmid_pais, continente, kgmid_continente }
+ *         diretamente do JSON, eliminando dependência de mapa no backend
  *
- * - Calendário unificado: 1 data = busca exata | várias = datas flexíveis automático
- * - Filtros avançados: ordenação, paradas, duração, tipo destino,
- *   combinação de datas, companhia aérea, faixa de preço
- * - Suporte a KGMID para múltiplos aeroportos na mesma cidade
+ * v3.3: escopo 'nacional'/'internacional' corrigido
+ * v3.2: Cidades Agrupadas (KGMID)
  */
 
 const BenetripTodosDestinos = {
@@ -54,7 +51,7 @@ const BenetripTodosDestinos = {
     error(...args) { console.error('[Benetrip ERROR]', ...args); },
 
     init() {
-        this.log('🐕 Benetrip v3.3 (Escopo Nacional/Internacional) inicializando...');
+        this.log('🐕 Benetrip v3.4 (Geo do JSON) inicializando...');
         this.carregarCidades();
         this.setupFormEvents();
         this.setupAutocomplete();
@@ -73,19 +70,15 @@ const BenetripTodosDestinos = {
             if (!response.ok) throw new Error('Erro');
             const dados = await response.json();
             this.state.cidadesData = dados.filter(c => c.iata);
-            
             const agrupadas = this.state.cidadesData.filter(c => c.is_city_code);
             this.log(`✅ ${this.state.cidadesData.length} cidades carregadas (${agrupadas.length} agrupadas)`);
         } catch (e) {
             this.error('Erro cidades:', e);
             this.state.cidadesData = [
-                { cidade: "São Paulo", sigla_estado: "SP", pais: "Brasil", codigo_pais: "BR", iata: "/m/02cft", iata_city_code: "SAO", aeroporto: "Todos os aeroportos (Guarulhos, Congonhas e Viracopos)", is_city_code: true, aeroportos_incluidos: ["GRU", "CGH", "VCP"] },
+                { cidade: "São Paulo", sigla_estado: "SP", pais: "Brasil", codigo_pais: "BR", iata: "/m/022pfm", iata_city_code: "SAO", kgmid_pais: "/m/015fr", continente: "América do Sul", kgmid_continente: "/m/06n3y", aeroporto: "Todos os aeroportos (Guarulhos, Congonhas e Viracopos)", is_city_code: true, aeroportos_incluidos: ["GRU", "CGH", "VCP"] },
                 { cidade: "São Paulo", sigla_estado: "SP", pais: "Brasil", codigo_pais: "BR", iata: "GRU", aeroporto: "Aeroporto de Guarulhos" },
-                { cidade: "São Paulo", sigla_estado: "SP", pais: "Brasil", codigo_pais: "BR", iata: "CGH", aeroporto: "Aeroporto de Congonhas" },
-                { cidade: "São Paulo", sigla_estado: "SP", pais: "Brasil", codigo_pais: "BR", iata: "VCP", aeroporto: "Aeroporto de Viracopos" },
-                { cidade: "Rio de Janeiro", sigla_estado: "RJ", pais: "Brasil", codigo_pais: "BR", iata: "/m/06gmr", iata_city_code: "RIO", aeroporto: "Todos os aeroportos (Galeão e Santos Dumont)", is_city_code: true, aeroportos_incluidos: ["GIG", "SDU"] },
+                { cidade: "Rio de Janeiro", sigla_estado: "RJ", pais: "Brasil", codigo_pais: "BR", iata: "/m/06gmr", iata_city_code: "RIO", kgmid_pais: "/m/015fr", continente: "América do Sul", kgmid_continente: "/m/06n3y", aeroporto: "Todos os aeroportos (Galeão e Santos Dumont)", is_city_code: true, aeroportos_incluidos: ["GIG", "SDU"] },
                 { cidade: "Rio de Janeiro", sigla_estado: "RJ", pais: "Brasil", codigo_pais: "BR", iata: "GIG", aeroporto: "Aeroporto do Galeão" },
-                { cidade: "Rio de Janeiro", sigla_estado: "RJ", pais: "Brasil", codigo_pais: "BR", iata: "SDU", aeroporto: "Aeroporto Santos Dumont" },
                 { cidade: "Salvador", sigla_estado: "BA", pais: "Brasil", codigo_pais: "BR", iata: "SSA" }
             ];
         }
@@ -93,6 +86,9 @@ const BenetripTodosDestinos = {
 
     normalizarTexto(t) { return t.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''); },
 
+    // ================================================================
+    // v3.4: buscarCidades agora inclui dados geo do JSON
+    // ================================================================
     buscarCidades(termo) {
         if (!this.state.cidadesData || termo.length < 2) return [];
         const tn = this.normalizarTexto(termo);
@@ -106,16 +102,20 @@ const BenetripTodosDestinos = {
                 return n.includes(tn) || iataNorm.includes(tn) || a.includes(tn);
             })
             .slice(0, 10)
-            .map(c => ({ 
-                code: c.iata, 
+            .map(c => ({
+                code: c.iata,
                 displayCode: c.iata_city_code || c.iata,
-                name: c.cidade, 
-                state: c.sigla_estado, 
-                country: c.pais, 
-                countryCode: c.codigo_pais, 
+                name: c.cidade,
+                state: c.sigla_estado,
+                country: c.pais,
+                countryCode: c.codigo_pais,
                 airport: c.aeroporto || null,
                 isCityCode: c.is_city_code || false,
-                aeroportosIncluidos: c.aeroportos_incluidos || null
+                aeroportosIncluidos: c.aeroportos_incluidos || null,
+                // v3.4: Dados geo do JSON para enviar ao backend
+                kgmid_pais: c.kgmid_pais || null,
+                continente: c.continente || null,
+                kgmid_continente: c.kgmid_continente || null,
             }));
             
         resultados.sort((a, b) => {
@@ -176,6 +176,7 @@ const BenetripTodosDestinos = {
         document.getElementById('origem-data').value = JSON.stringify(c);
         results.style.display = 'none';
         this.state.paisOrigem = (c.country || '').toLowerCase();
+        this.log('📍 Origem:', c.name, `| code: ${c.code} | geo: ${c.continente || '?'} / ${c.kgmid_pais || '?'}`);
     },
 
     // ================================================================
@@ -193,10 +194,7 @@ const BenetripTodosDestinos = {
                 this.state.datasIda = sel.map(d => this.formatarDataISO(d)).sort();
                 this.renderDateChips('selected-idas', this.state.datasIda, 'ida');
                 this.atualizarCombinacoes();
-                if (sel.length > 0) {
-                    const mv = new Date(Math.min(...sel)); mv.setDate(mv.getDate() + 1);
-                    this.state.fpVolta.set('minDate', mv);
-                }
+                if (sel.length > 0) { const mv = new Date(Math.min(...sel)); mv.setDate(mv.getDate() + 1); this.state.fpVolta.set('minDate', mv); }
                 inpI.value = sel.length > 0 ? sel.map(d => this.formatarDataBR(d)).join(', ') : '';
             }
         });
@@ -237,14 +235,9 @@ const BenetripTodosDestinos = {
         const info = document.getElementById('combinacoes-info');
         const texto = document.getElementById('combinacoes-texto');
         const combos = this.gerarCombinacoes();
-
-        if (this.state.datasIda.length > 0 && this.state.datasVolta.length > 0) {
-            if (combos.length > 1) {
-                info.style.display = 'flex';
-                texto.textContent = `${combos.length} combinações serão pesquisadas`;
-            } else {
-                info.style.display = 'none';
-            }
+        if (this.state.datasIda.length > 0 && this.state.datasVolta.length > 0 && combos.length > 1) {
+            info.style.display = 'flex';
+            texto.textContent = `${combos.length} combinações serão pesquisadas`;
         } else {
             info.style.display = 'none';
         }
@@ -258,9 +251,6 @@ const BenetripTodosDestinos = {
         return c;
     },
 
-    // ================================================================
-    // BOTÕES DE OPÇÃO
-    // ================================================================
     setupOptionButtons() {
         document.querySelectorAll('.button-group-vertical, .button-group-horizontal').forEach(group => {
             const field = group.dataset.field;
@@ -283,9 +273,6 @@ const BenetripTodosDestinos = {
         if (inp) inp.addEventListener('input', (e) => { let v = e.target.value.replace(/\D/g, ''); e.target.value = v ? parseInt(v).toLocaleString('pt-BR') : ''; });
     },
 
-    // ================================================================
-    // FORM EVENTS
-    // ================================================================
     setupFormEvents() {
         document.getElementById('busca-form').addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -324,15 +311,29 @@ const BenetripTodosDestinos = {
     },
 
     // ================================================================
-    // v3.3: MAPEAMENTO ESCOPO FRONTEND → BACKEND
-    // Frontend: 'todos' | 'nacional' | 'internacional'
-    // Backend:  undefined | 'nacional' | 'internacional'
+    // v3.4: Montar origemGeo a partir dos dados do JSON carregado no autocomplete
     // ================================================================
+    _buildOrigemGeo() {
+        const o = this.state.formData.origem;
+        if (!o) return undefined;
+        // Só envia se tiver dados geo (vem do JSON para cidades agrupadas E individuais)
+        if (o.kgmid_pais || o.continente) {
+            return {
+                codigo_pais: o.countryCode || '',
+                pais: o.country || '',
+                kgmid_pais: o.kgmid_pais || '',
+                continente: o.continente || '',
+                kgmid_continente: o.kgmid_continente || '',
+            };
+        }
+        return undefined;
+    },
+
     _mapearEscopoParaAPI(escopo) {
         switch (escopo) {
             case 'nacional':       return 'nacional';
             case 'internacional':  return 'internacional';
-            default:               return undefined;  // 'todos' → sem filtro
+            default:               return undefined;
         }
     },
 
@@ -351,9 +352,9 @@ const BenetripTodosDestinos = {
             document.getElementById('loading-combinacao').style.display = isFlexivel ? 'block' : 'none';
             this.atualizarProgresso(10, '🌍 Preparando buscas...');
 
-            // v3.3: Mapear escopo corretamente para a API
             const escopoDestino = this._mapearEscopoParaAPI(escopo);
-            this.log(`🌎 Escopo frontend: '${escopo}' → API: '${escopoDestino || 'todos'}'`);
+            const origemGeo = this._buildOrigemGeo();
+            this.log(`🌎 Escopo: '${escopo}' → API: '${escopoDestino || 'todos'}' | Geo: ${origemGeo ? origemGeo.pais : 'não enviado'}`);
 
             const allResults = new Map();
             const batchSize = 3;
@@ -365,17 +366,15 @@ const BenetripTodosDestinos = {
                     const label = `${this.formatarDataCurta(combo.dataIda)} → ${this.formatarDataCurta(combo.dataVolta)}`;
                     if (isFlexivel) document.getElementById('loading-combinacao').textContent = `Pesquisando: ${label}`;
                     
-                    // v3.3: Montar body com escopoDestino correto
+                    // v3.4: Montar body com origemGeo
                     const requestBody = {
                         origem: origem.code,
                         dataIda: combo.dataIda,
                         dataVolta: combo.dataVolta,
                         moeda,
                     };
-                    // Só incluir escopoDestino se definido (evita enviar undefined no JSON)
-                    if (escopoDestino) {
-                        requestBody.escopoDestino = escopoDestino;
-                    }
+                    if (escopoDestino) requestBody.escopoDestino = escopoDestino;
+                    if (origemGeo) requestBody.origemGeo = origemGeo;
                     
                     return fetch('/api/search-destinations', {
                         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -421,8 +420,6 @@ const BenetripTodosDestinos = {
             this.prepararDadosFiltros(sorted);
             this.resetFiltros();
 
-            // v3.3: Setar filtro de tipo destino baseado no escopo escolhido
-            // Como o backend já filtra, isso é redundante mas mantém a UI consistente
             if (escopo === 'nacional') this.state.filtros.tipoDestino = 'nacional';
             if (escopo === 'internacional') this.state.filtros.tipoDestino = 'internacional';
             
@@ -438,9 +435,6 @@ const BenetripTodosDestinos = {
         }
     },
 
-    // ================================================================
-    // PREPARAR / RESET FILTROS
-    // ================================================================
     prepararDadosFiltros(destinos) {
         const comp = new Set();
         destinos.forEach(d => { if (d.flight.airline_name) comp.add(d.flight.airline_name); });
@@ -458,16 +452,12 @@ const BenetripTodosDestinos = {
         };
     },
 
-    // ================================================================
-    // MOTOR DE FILTROS
-    // ================================================================
     aplicarFiltrosEMostrar() {
         const f = this.state.filtros;
         const { orcamento, combinacoes } = this.state.formData;
         const isFlexivel = combinacoes.length > 1;
         let destinos = [...this.state.todosDestinos];
 
-        // Combo de datas
         if (isFlexivel && f.comboData !== 'melhor') {
             const combo = combinacoes[parseInt(f.comboData)];
             if (combo) {
@@ -508,7 +498,6 @@ const BenetripTodosDestinos = {
         }
 
         if (f.companhias.length > 0) destinos = destinos.filter(d => f.companhias.includes(d.flight.airline_name || ''));
-
         destinos = destinos.filter(d => { const p = getPreco(d); return p >= f.precoMin && p <= f.precoMax; });
 
         destinos.sort((a, b) => {
@@ -529,9 +518,6 @@ const BenetripTodosDestinos = {
         this.renderResultados();
     },
 
-    // ================================================================
-    // RENDER RESULTADOS
-    // ================================================================
     renderResultados() {
         const container = document.getElementById('resultados-container');
         const destinos = this.state.destinosFiltrados;
@@ -560,8 +546,6 @@ const BenetripTodosDestinos = {
         const dentroCount = todos.filter(d => d.flight.price <= orcamento).length;
         const tripinhaMsg = this._tripinhaMsg(todos, orcamento, moeda, isFlexivel, combinacoes.length, escopo);
         const filtrosHtml = this._filtrosPainelHtml(isFlexivel);
-        
-        // v3.3: Emoji e label baseados no escopo real
         const escopoEmoji = escopo === 'nacional' ? '🏠' : escopo === 'internacional' ? '✈️' : '🌍';
         const escopoTitulo = escopo === 'nacional' ? 'Destinos Nacionais' : escopo === 'internacional' ? 'Destinos Internacionais' : 'Todos os Destinos';
 
@@ -603,13 +587,9 @@ const BenetripTodosDestinos = {
         this._atualizarBadgeFiltros();
     },
 
-    // ================================================================
-    // FILTROS PAINEL HTML
-    // ================================================================
     _filtrosPainelHtml(isFlexivel) {
         const f = this.state.filtros;
         const simbolo = this.getSimbolo(this.state.formData.moeda);
-
         const chip = (label, chave, valor) =>
             `<button class="chip ${f[chave] === valor ? 'active' : ''}" onclick="BenetripTodosDestinos.setFiltro('${chave}','${valor}')">${label}</button>`;
 
@@ -637,35 +617,25 @@ const BenetripTodosDestinos = {
 
         return `
             <div class="filtros-header-mobile"><h3>Filtros e Ordenação</h3><button class="btn-fechar-filtros" onclick="BenetripTodosDestinos.toggleFiltros()">✕</button></div>
-
             <div class="filtro-grupo"><div class="filtro-titulo">📊 Ordenar por</div><div class="filtro-chips">
-                ${chip('💰 Menor preço', 'ordenacao', 'preco_asc')}
-                ${chip('💰 Maior preço', 'ordenacao', 'preco_desc')}
-                ${chip('⏱️ Menor duração', 'ordenacao', 'duracao_asc')}
-                ${chip('✈️ Menos paradas', 'ordenacao', 'paradas_asc')}
+                ${chip('💰 Menor preço', 'ordenacao', 'preco_asc')} ${chip('💰 Maior preço', 'ordenacao', 'preco_desc')}
+                ${chip('⏱️ Menor duração', 'ordenacao', 'duracao_asc')} ${chip('✈️ Menos paradas', 'ordenacao', 'paradas_asc')}
                 ${chip('🏨 Custo total', 'ordenacao', 'custo_total')}
             </div></div>
-
             ${comboHtml}
-
             <div class="filtro-grupo"><div class="filtro-titulo">💸 Orçamento</div><div class="filtro-chips">
                 ${chip('Todos', 'orcamento', 'todos')} ${chip('✅ Dentro', 'orcamento', 'dentro')} ${chip('⚠️ Acima', 'orcamento', 'fora')}
             </div></div>
-
             <div class="filtro-grupo"><div class="filtro-titulo">🔄 Paradas</div><div class="filtro-chips">
                 ${chip('Qualquer', 'paradas', 'qualquer')} ${chip('Direto', 'paradas', 'direto')} ${chip('Até 1', 'paradas', 'max1')}
             </div></div>
-
             <div class="filtro-grupo"><div class="filtro-titulo">⏱️ Duração do Voo</div><div class="filtro-chips">
                 ${chip('Qualquer', 'duracao', 'qualquer')} ${chip('Até 3h', 'duracao', 'curto')} ${chip('3h–6h', 'duracao', 'medio')} ${chip('6h–10h', 'duracao', 'longo')} ${chip('+10h', 'duracao', 'muitolongo')}
             </div></div>
-
             <div class="filtro-grupo"><div class="filtro-titulo">🌎 Tipo de Destino</div><div class="filtro-chips">
                 ${chip('Todos', 'tipoDestino', 'todos')} ${chip('🏠 Nacional', 'tipoDestino', 'nacional')} ${chip('✈️ Internacional', 'tipoDestino', 'internacional')}
             </div></div>
-
             ${compHtml}
-
             <div class="filtro-grupo"><div class="filtro-titulo">💰 Faixa de Preço</div>
                 <div class="filtro-range"><div class="range-inputs">
                     <div class="range-field"><label>Mín</label><input type="text" id="filtro-preco-min" value="${Math.round(f.precoMin).toLocaleString('pt-BR')}" onchange="BenetripTodosDestinos.setPrecoRange()"></div>
@@ -673,15 +643,11 @@ const BenetripTodosDestinos = {
                     <div class="range-field"><label>Máx</label><input type="text" id="filtro-preco-max" value="${f.precoMax === Infinity ? '' : Math.round(f.precoMax).toLocaleString('pt-BR')}" placeholder="Sem limite" onchange="BenetripTodosDestinos.setPrecoRange()"></div>
                 </div><div class="range-hint">${simbolo} ${Math.round(this.state.precoMinGlobal).toLocaleString('pt-BR')} — ${simbolo} ${Math.round(this.state.precoMaxGlobal).toLocaleString('pt-BR')}</div></div>
             </div>
-
             <div class="filtro-acoes"><button class="btn-limpar-filtros" onclick="BenetripTodosDestinos.limparFiltros()">🗑️ Limpar todos os filtros</button></div>
             <div class="filtro-aplicar-mobile"><button class="btn-aplicar-filtros" onclick="BenetripTodosDestinos.toggleFiltros()">Ver <span id="filtro-resultado-count">${this.state.destinosFiltrados.length}</span> resultados</button></div>
         `;
     },
 
-    // ================================================================
-    // AÇÕES FILTROS
-    // ================================================================
     setFiltro(k, v) { this.state.filtros[k] = v; this.aplicarFiltrosEMostrar(); },
     toggleCompanhia(n) { const a = this.state.filtros.companhias; const i = a.indexOf(n); if (i >= 0) a.splice(i, 1); else a.push(n); this.aplicarFiltrosEMostrar(); },
     setPrecoRange() {
@@ -717,9 +683,6 @@ const BenetripTodosDestinos = {
         if (mc) mc.textContent = this.state.destinosFiltrados.length;
     },
 
-    // ================================================================
-    // KGMID HELPER PARA LINKS
-    // ================================================================
     getOrigemIataParaGoogleFlights() {
         const origem = this.state.formData.origem;
         if (origem.isCityCode && origem.aeroportosIncluidos && origem.aeroportosIncluidos.length > 0) {
@@ -728,9 +691,6 @@ const BenetripTodosDestinos = {
         return origem.code;
     },
 
-    // ================================================================
-    // CARD HTML
-    // ================================================================
     _cardHtml(dest, orcamento, isFlexivel) {
         const { origem, moeda } = this.state.formData;
         const ca = dest._comboAtual;
@@ -744,7 +704,6 @@ const BenetripTodosDestinos = {
         const combo = ca?.combo || dest._melhorCombo || { dataIda: this.state.formData.dataIda, dataVolta: this.state.formData.dataVolta };
         const noites = ca?.noites || dest._melhorNoites || this.calcularNoites(combo.dataIda, combo.dataVolta);
         const destIata = dest.primary_airport || dest.flight?.airport_code || '';
-        
         const originIataGF = this.getOrigemIataParaGoogleFlights();
         const gfUrl = this.buildGoogleFlightsUrl(originIataGF, destIata, combo.dataIda, combo.dataVolta, moeda);
 
@@ -804,16 +763,13 @@ const BenetripTodosDestinos = {
         const fora = todos.length - dentro;
         const cheap = todos[0];
         const fMsg = flex ? ` Pesquisei ${nC} combinações!` : '';
-        // v3.3: Mensagem contextualizada pelo escopo
         const eMsg = escopo === 'nacional' ? ' nacionais' : escopo === 'internacional' ? ' internacionais' : '';
         if (!dentro) return `🐕 Nenhum destino${eMsg} no orçamento de ${this.formatarPreco(orc, moeda)}.${fMsg} O mais barato é ${this.formatarPreco(cheap.flight.price, moeda)}. Use os filtros!`;
         if (dentro === todos.length) return `🐕 Todos os ${todos.length} destinos${eMsg} cabem no orçamento!${fMsg} Use os filtros para refinar!`;
         return `🐕 ${dentro} destinos${eMsg} no orçamento e ${fora} acima.${fMsg} Use os filtros para encontrar o destino perfeito!`;
     },
 
-    // ================================================================
-    // GOOGLE FLIGHTS PROTOBUF
-    // ================================================================
+    // Google Flights Protobuf
     _protoVarint(n) { const b = []; let v = n >>> 0; while (v > 127) { b.push((v & 0x7f) | 0x80); v >>>= 7; } b.push(v & 0x7f); return b; },
     _protoTag(f, w) { return this._protoVarint((f << 3) | w); },
     _protoVarintField(f, v) { return [...this._protoTag(f, 0), ...this._protoVarint(v)]; },
@@ -835,9 +791,6 @@ const BenetripTodosDestinos = {
         return `https://www.google.com/travel/flights?${p.toString()}`;
     },
 
-    // ================================================================
-    // HELPERS
-    // ================================================================
     getSimbolo(m) { return { BRL: 'R$', USD: 'US$', EUR: '€' }[m] || 'R$'; },
     formatarPreco(v, m) { return `${this.getSimbolo(m || this.state.formData.moeda)} ${Math.round(v).toLocaleString('pt-BR')}`; },
     calcularNoites(i, v) { return Math.ceil((new Date(v) - new Date(i)) / 86400000); },
@@ -855,8 +808,6 @@ const BenetripTodosDestinos = {
         const c = document.getElementById('resultados-container');
         const { origem, escopo } = this.state.formData;
         const codeDisplay = origem.displayCode || origem.code;
-        
-        // v3.3: Mensagem de erro contextualizada pelo escopo
         const escopoMsg = escopo === 'nacional' ? ' nacionais' : escopo === 'internacional' ? ' internacionais' : '';
         
         c.innerHTML = `<button class="btn-voltar-topo" onclick="BenetripTodosDestinos.voltarAoFormulario()"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg> Nova busca</button><div class="sem-resultados"><img src="assets/images/tripinha/avatar-triste.png" alt="Tripinha" onerror="this.style.display='none'"><h2>😕 Nenhum destino encontrado</h2><p>Nenhum voo${escopoMsg} de <strong>${origem.name} (${codeDisplay})</strong> para essas datas e orçamento.</p><button class="btn-tentar-novamente" onclick="BenetripTodosDestinos.voltarAoFormulario()">✏️ Tentar Novamente</button></div>`;
