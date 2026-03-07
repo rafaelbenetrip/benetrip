@@ -1,13 +1,18 @@
 /**
  * BENETRIP - ROTEIRO DE VIAGEM
- * v1.1 - Campo de observações + compartilhamento corrigido
+ * v2.0 - MULTI-DESTINO + clima previsto + contagem de dias
+ * 
+ * Changelog v2.0:
+ * - Suporte a múltiplos destinos na mesma viagem
+ * - Cada destino com suas próprias datas e horários de chegada/partida
+ * - Exibição de destino atual e clima previsto por dia no resultado
+ * - Badge visual de transição entre cidades
+ * - Separadores visuais por destino no roteiro gerado
+ * - Compartilhamento WhatsApp adaptado para multi-destino
  * 
  * Changelog v1.1:
  * - Campo de observações livres do usuário (pedidos especiais)
- * - Contador de caracteres no campo de observações
- * - Exibição de badge quando observações são usadas no resultado
- * - Correção WhatsApp: links Google Maps curtos (maps.app.goo.gl format)
- * - Correção WhatsApp: roteiro completo sem cortes
+ * - Correção WhatsApp: links Google Maps curtos
  * - Compartilhamento dividido em partes se exceder limite do WhatsApp
  */
 
@@ -15,12 +20,14 @@ const BenetripRoteiro = {
     state: {
         formData: {},
         roteiro: null,
-        viewingResults: false
+        viewingResults: false,
+        destinoCount: 1,          // v2.0: quantidade de destinos
+        maxDestinos: 6,           // v2.0: limite máximo de destinos
+        flatpickrInstances: {},   // v2.0: instâncias do calendário por destino
     },
 
     config: {
         debug: true,
-        // Limite seguro de caracteres para URL do WhatsApp (~4000 chars encodados)
         WHATSAPP_CHAR_LIMIT: 3500
     },
 
@@ -36,9 +43,8 @@ const BenetripRoteiro = {
     // INICIALIZAÇÃO
     // ================================================================
     init() {
-        this.log('🗺️ Benetrip Roteiro v1.1 inicializando...');
+        this.log('🗺️ Benetrip Roteiro v2.0 (Multi-Destino) inicializando...');
 
-        this.setupCalendar();
         this.setupOptionButtons();
         this.setupCompanhiaConditional();
         this.setupFamiliaInputs();
@@ -47,11 +53,249 @@ const BenetripRoteiro = {
         this.setupHistoryNavigation();
         this.setupObservacoesCounter();
 
+        // v2.0: Inicializar calendário do primeiro destino
+        this.setupCalendarForDestino(1);
+
+        // v2.0: Botão adicionar destino
+        this.setupAdicionarDestino();
+
         this.log('✅ Inicialização completa');
     },
 
     // ================================================================
-    // NOVO: Contador de caracteres do campo de observações
+    // v2.0: SISTEMA MULTI-DESTINO
+    // ================================================================
+
+    /**
+     * Configura o botão "Adicionar outro destino"
+     */
+    setupAdicionarDestino() {
+        const btn = document.getElementById('btn-adicionar-destino');
+        if (!btn) return;
+
+        btn.addEventListener('click', () => {
+            if (this.state.destinoCount >= this.state.maxDestinos) {
+                alert(`Máximo de ${this.state.maxDestinos} destinos por viagem!`);
+                return;
+            }
+
+            this.state.destinoCount++;
+            this.adicionarDestinoCard(this.state.destinoCount);
+
+            // Atualizar visibilidade do botão
+            if (this.state.destinoCount >= this.state.maxDestinos) {
+                btn.style.display = 'none';
+            }
+
+            // Atualizar label do primeiro destino se agora é multi
+            this.atualizarLabelsDestino();
+
+            this.log(`➕ Destino ${this.state.destinoCount} adicionado`);
+        });
+    },
+
+    /**
+     * Cria e insere um novo card de destino no formulário
+     */
+    adicionarDestinoCard(index) {
+        const container = document.getElementById('destinos-container');
+        const amanha = new Date();
+        amanha.setDate(amanha.getDate() + 1);
+
+        const card = document.createElement('div');
+        card.className = 'destino-card';
+        card.id = `destino-card-${index}`;
+        card.dataset.index = index;
+
+        card.innerHTML = `
+            <div class="destino-card-header">
+                <div class="destino-card-badge">${index}</div>
+                <span class="destino-card-title">Destino ${index}</span>
+                <button type="button" class="destino-card-remove" onclick="BenetripRoteiro.removerDestino(${index})" title="Remover destino">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                    </svg>
+                </button>
+            </div>
+
+            <div class="destino-card-body">
+                <div class="form-group" style="margin-bottom:16px;">
+                    <label for="destino-${index}">📍 Cidade e país</label>
+                    <input type="text" id="destino-${index}" class="text-input" placeholder="Ex: Roma, Itália" required autocomplete="off">
+                </div>
+
+                <div class="form-group" style="margin-bottom:16px;">
+                    <label for="datas-roteiro-${index}">📅 Datas neste destino</label>
+                    <input type="text" id="datas-roteiro-${index}" class="text-input" placeholder="Clique para selecionar" readonly required>
+                    <input type="hidden" id="data-chegada-${index}">
+                    <input type="hidden" id="data-saida-${index}">
+                </div>
+
+                <div class="time-row">
+                    <div class="time-field">
+                        <label for="horario-chegada-${index}">🛬 Chegada</label>
+                        <input type="time" id="horario-chegada-${index}" class="time-input" value="14:00">
+                    </div>
+                    <div class="time-field">
+                        <label for="horario-partida-${index}">🛫 Partida</label>
+                        <input type="time" id="horario-partida-${index}" class="time-input" value="18:00">
+                    </div>
+                </div>
+            </div>
+        `;
+
+        container.appendChild(card);
+
+        // Animar entrada
+        requestAnimationFrame(() => {
+            card.classList.add('destino-card-visible');
+        });
+
+        // Inicializar calendário deste destino
+        this.setupCalendarForDestino(index);
+
+        // Scroll suave até o novo card
+        setTimeout(() => {
+            card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 100);
+    },
+
+    /**
+     * Remove um destino do formulário
+     */
+    removerDestino(index) {
+        if (this.state.destinoCount <= 1) return;
+
+        const card = document.getElementById(`destino-card-${index}`);
+        if (!card) return;
+
+        // Animar saída
+        card.style.opacity = '0';
+        card.style.transform = 'translateX(20px)';
+        card.style.maxHeight = card.scrollHeight + 'px';
+
+        setTimeout(() => {
+            card.style.maxHeight = '0';
+            card.style.padding = '0';
+            card.style.margin = '0';
+            card.style.overflow = 'hidden';
+        }, 200);
+
+        setTimeout(() => {
+            card.remove();
+            this.state.destinoCount--;
+
+            // Destruir instância flatpickr
+            if (this.state.flatpickrInstances[index]) {
+                this.state.flatpickrInstances[index].destroy();
+                delete this.state.flatpickrInstances[index];
+            }
+
+            // Reexibir botão de adicionar
+            const btn = document.getElementById('btn-adicionar-destino');
+            if (btn && this.state.destinoCount < this.state.maxDestinos) {
+                btn.style.display = '';
+            }
+
+            // Renumerar cards visíveis
+            this.renumerarDestinos();
+            this.atualizarLabelsDestino();
+
+            this.log(`➖ Destino ${index} removido. Total: ${this.state.destinoCount}`);
+        }, 400);
+    },
+
+    /**
+     * Renumera os badges e títulos dos destinos após remoção
+     */
+    renumerarDestinos() {
+        const cards = document.querySelectorAll('#destinos-container .destino-card');
+        cards.forEach((card, i) => {
+            const num = i + 1;
+            const badge = card.querySelector('.destino-card-badge');
+            const title = card.querySelector('.destino-card-title');
+            if (badge) badge.textContent = num;
+            if (title) title.textContent = this.state.destinoCount > 1 ? `Destino ${num}` : 'Destino';
+        });
+    },
+
+    /**
+     * Atualiza labels dos destinos (mostra "Destino 1" só se houver múltiplos)
+     */
+    atualizarLabelsDestino() {
+        const cards = document.querySelectorAll('#destinos-container .destino-card');
+        cards.forEach((card, i) => {
+            const title = card.querySelector('.destino-card-title');
+            const removeBtn = card.querySelector('.destino-card-remove');
+            if (title) {
+                title.textContent = this.state.destinoCount > 1 ? `Destino ${i + 1}` : 'Destino';
+            }
+            // Mostrar botão remover apenas se houver >1 destino
+            if (removeBtn) {
+                removeBtn.style.display = this.state.destinoCount > 1 ? '' : 'none';
+            }
+        });
+
+        // Atualizar hint do botão adicionar
+        const addHint = document.getElementById('adicionar-destino-hint');
+        if (addHint) {
+            addHint.textContent = this.state.destinoCount > 1
+                ? `${this.state.destinoCount} destinos adicionados`
+                : 'Viagem com parada em mais de uma cidade? Adicione!';
+        }
+    },
+
+    // ================================================================
+    // CALENDÁRIO (por destino)
+    // ================================================================
+    setupCalendarForDestino(index) {
+        const input = document.getElementById(`datas-roteiro-${index}`);
+        const dataChegada = document.getElementById(`data-chegada-${index}`);
+        const dataSaida = document.getElementById(`data-saida-${index}`);
+
+        if (!input || !dataChegada || !dataSaida) return;
+
+        const amanha = new Date();
+        amanha.setDate(amanha.getDate() + 1);
+
+        const instance = flatpickr(input, {
+            mode: 'range',
+            minDate: amanha,
+            dateFormat: 'Y-m-d',
+            locale: 'pt',
+            onChange: (selectedDates) => {
+                if (selectedDates.length === 2) {
+                    dataChegada.value = this.formatarDataISO(selectedDates[0]);
+                    dataSaida.value = this.formatarDataISO(selectedDates[1]);
+                    input.value = `${this.formatarDataBR(selectedDates[0])} → ${this.formatarDataBR(selectedDates[1])}`;
+                    this.log(`📅 Destino ${index}:`, dataChegada.value, '→', dataSaida.value);
+                }
+            }
+        });
+
+        this.state.flatpickrInstances[index] = instance;
+    },
+
+    // ================================================================
+    // LEGACY: setupCalendar para compatibilidade (redireciona para destino 1)
+    // ================================================================
+    setupCalendar() {
+        // Não faz nada — setupCalendarForDestino(1) é chamado no init
+    },
+
+    formatarDataISO(data) {
+        const ano = data.getFullYear();
+        const mes = String(data.getMonth() + 1).padStart(2, '0');
+        const dia = String(data.getDate()).padStart(2, '0');
+        return `${ano}-${mes}-${dia}`;
+    },
+
+    formatarDataBR(data) {
+        return data.toLocaleDateString('pt-BR');
+    },
+
+    // ================================================================
+    // CONTADOR DE OBSERVAÇÕES
     // ================================================================
     setupObservacoesCounter() {
         const textarea = document.getElementById('observacoes-roteiro');
@@ -64,7 +308,6 @@ const BenetripRoteiro = {
             const len = textarea.value.length;
             counter.textContent = len;
 
-            // Feedback visual conforme se aproxima do limite
             if (counterWrapper) {
                 counterWrapper.classList.remove('near-limit', 'at-limit');
                 if (len >= 800) {
@@ -91,44 +334,6 @@ const BenetripRoteiro = {
     pushResultsState() {
         history.pushState({ benetripView: 'roteiro' }, '', '');
         this.state.viewingResults = true;
-    },
-
-    // ================================================================
-    // CALENDÁRIO
-    // ================================================================
-    setupCalendar() {
-        const input = document.getElementById('datas-roteiro');
-        const dataIda = document.getElementById('data-ida');
-        const dataVolta = document.getElementById('data-volta');
-
-        const amanha = new Date();
-        amanha.setDate(amanha.getDate() + 1);
-
-        flatpickr(input, {
-            mode: 'range',
-            minDate: amanha,
-            dateFormat: 'Y-m-d',
-            locale: 'pt',
-            onChange: (selectedDates) => {
-                if (selectedDates.length === 2) {
-                    dataIda.value = this.formatarDataISO(selectedDates[0]);
-                    dataVolta.value = this.formatarDataISO(selectedDates[1]);
-                    input.value = `${this.formatarDataBR(selectedDates[0])} - ${this.formatarDataBR(selectedDates[1])}`;
-                    this.log('📅 Datas:', dataIda.value, '→', dataVolta.value);
-                }
-            }
-        });
-    },
-
-    formatarDataISO(data) {
-        const ano = data.getFullYear();
-        const mes = String(data.getMonth() + 1).padStart(2, '0');
-        const dia = String(data.getDate()).padStart(2, '0');
-        return `${ano}-${mes}-${dia}`;
-    },
-
-    formatarDataBR(data) {
-        return data.toLocaleDateString('pt-BR');
     },
 
     // ================================================================
@@ -178,7 +383,7 @@ const BenetripRoteiro = {
     },
 
     // ================================================================
-    // INPUTS DE FAMÍLIA (adultos/crianças/bebês)
+    // INPUTS DE FAMÍLIA
     // ================================================================
     setupFamiliaInputs() {
         document.querySelectorAll('.btn-number-sm').forEach(btn => {
@@ -253,17 +458,44 @@ const BenetripRoteiro = {
         });
     },
 
+    /**
+     * v2.0: Validação atualizada para multi-destino
+     */
     validarFormulario() {
-        if (!document.getElementById('destino').value.trim()) {
-            alert('Por favor, informe o destino da viagem');
-            document.getElementById('destino').focus();
-            return false;
+        // Validar cada destino
+        const cards = document.querySelectorAll('#destinos-container .destino-card');
+        let datasAnterior = null;
+
+        for (let i = 0; i < cards.length; i++) {
+            const card = cards[i];
+            const index = card.dataset.index || (i + 1);
+            const destinoInput = card.querySelector(`#destino-${index}`);
+            const dataChegada = card.querySelector(`#data-chegada-${index}`);
+            const dataSaida = card.querySelector(`#data-saida-${index}`);
+
+            if (!destinoInput || !destinoInput.value.trim()) {
+                alert(`Por favor, informe o destino ${cards.length > 1 ? (i + 1) : 'da viagem'}`);
+                destinoInput?.focus();
+                return false;
+            }
+
+            if (!dataChegada?.value || !dataSaida?.value) {
+                alert(`Por favor, selecione as datas ${cards.length > 1 ? 'do destino ' + (i + 1) : 'da viagem'}`);
+                return false;
+            }
+
+            // Verificar se as datas são sequenciais (para multi-destino)
+            if (datasAnterior && cards.length > 1) {
+                const chegadaAtual = new Date(dataChegada.value + 'T12:00:00');
+                const saidaAnterior = new Date(datasAnterior + 'T12:00:00');
+                if (chegadaAtual < saidaAnterior) {
+                    alert(`As datas do destino ${i + 1} devem ser após as datas do destino ${i}. A chegada no destino ${i + 1} deve ser no mesmo dia ou após a saída do destino anterior.`);
+                    return false;
+                }
+            }
+            datasAnterior = dataSaida.value;
         }
-        if (!document.getElementById('data-ida').value || !document.getElementById('data-volta').value) {
-            alert('Por favor, selecione as datas da viagem');
-            document.getElementById('datas-roteiro').focus();
-            return false;
-        }
+
         if (!document.getElementById('companhia-roteiro').value) {
             alert('Por favor, escolha com quem você vai viajar');
             return false;
@@ -297,6 +529,9 @@ const BenetripRoteiro = {
         'urbano': 'Agito urbano, vida noturna, compras e experiências cosmopolitas'
     },
 
+    /**
+     * v2.0: Coleta dados de múltiplos destinos
+     */
     coletarDadosFormulario() {
         const companhia = parseInt(document.getElementById('companhia-roteiro').value);
 
@@ -328,15 +563,31 @@ const BenetripRoteiro = {
             companhiaDesc = `Viagem em família: ${parts.join(', ')}`;
         }
 
-        // NOVO: Coletar observações do usuário
         const observacoes = (document.getElementById('observacoes-roteiro')?.value || '').trim();
 
+        // v2.0: Coletar dados de todos os destinos
+        const destinos = [];
+        const cards = document.querySelectorAll('#destinos-container .destino-card');
+
+        cards.forEach((card) => {
+            const index = card.dataset.index;
+            destinos.push({
+                destino: document.getElementById(`destino-${index}`)?.value.trim() || '',
+                dataChegada: document.getElementById(`data-chegada-${index}`)?.value || '',
+                dataSaida: document.getElementById(`data-saida-${index}`)?.value || '',
+                horarioChegada: document.getElementById(`horario-chegada-${index}`)?.value || '',
+                horarioPartida: document.getElementById(`horario-partida-${index}`)?.value || '',
+            });
+        });
+
         this.state.formData = {
-            destino: document.getElementById('destino').value.trim(),
-            dataIda: document.getElementById('data-ida').value,
-            dataVolta: document.getElementById('data-volta').value,
-            horarioChegada: document.getElementById('horario-chegada').value,
-            horarioPartida: document.getElementById('horario-partida').value,
+            // v2.0: array de destinos
+            destinos,
+            // Legado: primeiro e último destino para exibição
+            destino: destinos.map(d => d.destino).join(' → '),
+            dataIda: destinos[0]?.dataChegada || '',
+            dataVolta: destinos[destinos.length - 1]?.dataSaida || '',
+            // Comum
             companhia: companhiaDesc,
             companhiaCode: companhia,
             adultos,
@@ -347,13 +598,11 @@ const BenetripRoteiro = {
             preferenciasArray: prefArray,
             intensidade: document.getElementById('intensidade-roteiro').value,
             orcamentoAtividades: document.getElementById('orcamento-roteiro').value,
-            observacoes, // NOVO campo
+            observacoes,
         };
 
         this.log('📝 Dados coletados:', this.state.formData);
-        if (observacoes) {
-            this.log('📝 Observações do usuário:', observacoes);
-        }
+        this.log(`📍 ${destinos.length} destino(s):`, destinos.map(d => d.destino));
     },
 
     // ================================================================
@@ -362,7 +611,12 @@ const BenetripRoteiro = {
     async gerarRoteiro() {
         try {
             this.mostrarLoading();
-            this.atualizarProgresso(10, '🔍 Pesquisando os melhores lugares...');
+            const isMulti = this.state.formData.destinos.length > 1;
+            const msgPesquisa = isMulti
+                ? '🔍 Pesquisando os melhores lugares em cada cidade...'
+                : '🔍 Pesquisando os melhores lugares...';
+
+            this.atualizarProgresso(10, msgPesquisa);
 
             await this.delay(500);
             this.atualizarProgresso(30, '🗺️ Montando o roteiro dia a dia...');
@@ -373,7 +627,10 @@ const BenetripRoteiro = {
                 body: JSON.stringify(this.state.formData)
             });
 
-            this.atualizarProgresso(70, '🐕 Tripinha adicionando dicas especiais...');
+            this.atualizarProgresso(70, isMulti
+                ? '🐕 Tripinha conectando os destinos com dicas especiais...'
+                : '🐕 Tripinha adicionando dicas especiais...'
+            );
 
             if (!response.ok) {
                 const err = await response.json();
@@ -381,23 +638,24 @@ const BenetripRoteiro = {
             }
 
             const roteiro = await response.json();
-this.state.roteiro = roteiro;
+            this.state.roteiro = roteiro;
 
-if (typeof BenetripAutoSave !== 'undefined') {
-    BenetripAutoSave.salvarRoteiro({
-        destino_nome:  this.state.formData.destino,
-        destino_pais:  roteiro.pais || '',
-        data_ida:      this.state.formData.dataIda,
-        data_volta:    this.state.formData.dataVolta,
-        num_dias:      roteiro.dias?.length || 0,
-        companhia:     this.state.formData.companhia,
-        preferencias:  this.state.formData.preferencias,
-        intensidade:   this.state.formData.intensidade,
-        orcamento:     this.state.formData.orcamentoAtividades,
-        observacoes:   this.state.formData.observacoes,
-        dados_roteiro: roteiro   // ✅ passa o roteiro gerado
-    });
-}
+            if (typeof BenetripAutoSave !== 'undefined') {
+                BenetripAutoSave.salvarRoteiro({
+                    destino_nome:  this.state.formData.destino,
+                    destino_pais:  roteiro.pais || '',
+                    data_ida:      this.state.formData.dataIda,
+                    data_volta:    this.state.formData.dataVolta,
+                    num_dias:      roteiro.dias?.length || 0,
+                    companhia:     this.state.formData.companhia,
+                    preferencias:  this.state.formData.preferencias,
+                    intensidade:   this.state.formData.intensidade,
+                    orcamento:     this.state.formData.orcamentoAtividades,
+                    observacoes:   this.state.formData.observacoes,
+                    destinos:      this.state.formData.destinos,
+                    dados_roteiro: roteiro
+                });
+            }
 
             this.atualizarProgresso(90, '✨ Finalizando...');
             await this.delay(400);
@@ -413,38 +671,32 @@ if (typeof BenetripAutoSave !== 'undefined') {
     },
 
     // ================================================================
-    // HELPER: Gera link curto do Google Maps
-    // Usa formato https://maps.google.com/?q=QUERY que é mais curto
+    // HELPER: Google Maps URL
     // ================================================================
     buildMapsUrl(query) {
         if (!query) return '';
         return `https://maps.google.com/?q=${encodeURIComponent(query)}`;
     },
 
-    // Helper: gera link curto para texto (compartilhamento)
-    // Formato minimalista para caber no WhatsApp
     buildMapsUrlShort(query) {
         if (!query) return '';
-        // Remove acentos e caracteres especiais para URL mais curta
         return `https://maps.google.com/?q=${encodeURIComponent(query)}`;
     },
 
     // ================================================================
-    // RENDERIZAÇÃO DO ROTEIRO
+    // RENDERIZAÇÃO DO ROTEIRO (v2.0: multi-destino + clima)
     // ================================================================
     mostrarRoteiro(roteiro) {
         const container = document.getElementById('resultados-container');
         this.pushResultsState();
 
-        const { destino, dataIda, dataVolta, observacoes } = this.state.formData;
+        const { destino, dataIda, dataVolta, observacoes, destinos } = this.state.formData;
         const idaBR = new Date(dataIda + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
         const voltaBR = new Date(dataVolta + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' });
+        const isMulti = destinos && destinos.length > 1;
 
         const PERIODO_ICONS = {
-            'manhã': '🌅',
-            'manha': '🌅',
-            'tarde': '☀️',
-            'noite': '🌙'
+            'manhã': '🌅', 'manha': '🌅', 'tarde': '☀️', 'noite': '🌙'
         };
 
         const TAG_CLASSES = {
@@ -511,7 +763,6 @@ if (typeof BenetripAutoSave !== 'undefined') {
         const renderPeriodo = (periodo) => {
             const icon = PERIODO_ICONS[periodo.periodo?.toLowerCase()] || '📌';
             const label = (periodo.periodo || '').charAt(0).toUpperCase() + (periodo.periodo || '').slice(1);
-
             return `
                 <div class="periodo-section">
                     <div class="periodo-label">${icon} ${label}</div>
@@ -520,17 +771,59 @@ if (typeof BenetripAutoSave !== 'undefined') {
             `;
         };
 
+        // v2.0: Rastrear destino atual para inserir separadores visuais
+        let destinoAnterior = '';
+
         const renderDia = (dia) => {
+            let separadorDestino = '';
+            const destinoAtual = dia.destino_atual || '';
+
+            if (isMulti && destinoAtual && destinoAtual !== destinoAnterior) {
+                separadorDestino = `
+                    <div class="destino-separator">
+                        <div class="destino-separator-line"></div>
+                        <div class="destino-separator-badge">
+                            <span>📍</span>
+                            <span>${destinoAtual}</span>
+                        </div>
+                        <div class="destino-separator-line"></div>
+                    </div>
+                `;
+                destinoAnterior = destinoAtual;
+            }
+
+            // v2.0: Badge de transição
+            const transicaoBadge = dia.eh_dia_transicao ? `
+                <div class="transicao-badge">
+                    ✈️ Dia de deslocamento entre cidades
+                </div>
+            ` : '';
+
+            // v2.0: Clima previsto
+            const climaBadge = dia.clima_previsto ? `
+                <div class="clima-badge">
+                    <span>🌤️</span>
+                    <span>${dia.clima_previsto}</span>
+                </div>
+            ` : '';
+
             return `
+                ${separadorDestino}
                 <div class="dia-card">
                     <div class="dia-header">
                         <div class="dia-numero">${dia.dia_numero}</div>
                         <div class="dia-header-info">
                             <div>${dia.titulo || `Dia ${dia.dia_numero}`}</div>
-                            <div class="dia-header-data">${dia.dia_semana || ''}, ${dia.data || ''}</div>
+                            <div class="dia-header-data">
+                                ${dia.dia_semana || ''}, ${dia.data || ''}
+                                ${isMulti && destinoAtual ? ` · ${destinoAtual}` : ''}
+                            </div>
                         </div>
                     </div>
                     <div class="dia-body">
+                        ${transicaoBadge}
+                        ${climaBadge}
+
                         ${dia.resumo_tripinha ? `
                             <div class="dia-resumo-tripinha">
                                 <img src="assets/images/tripinha/avatar-pensando.png" alt="Tripinha" class="avatar-mini"
@@ -544,11 +837,21 @@ if (typeof BenetripAutoSave !== 'undefined') {
             `;
         };
 
-        // NOVO: Badge indicando que observações foram consideradas
+        // Badge de observações
         const observacoesBadge = observacoes ? `
             <div class="observacoes-badge">
                 <span>📝</span>
                 <span>Seus pedidos especiais foram considerados: <strong>"${observacoes.length > 80 ? observacoes.substring(0, 80) + '...' : observacoes}"</strong></span>
+            </div>
+        ` : '';
+
+        // v2.0: Rota visual dos destinos
+        const rotaVisual = isMulti ? `
+            <div class="rota-visual">
+                ${destinos.map((d, i) => `
+                    <span class="rota-cidade">${d.destino}</span>
+                    ${i < destinos.length - 1 ? '<span class="rota-seta">→</span>' : ''}
+                `).join('')}
             </div>
         ` : '';
 
@@ -561,7 +864,8 @@ if (typeof BenetripAutoSave !== 'undefined') {
             </button>
 
             <div class="roteiro-header">
-                <h1>🗺️ Roteiro para ${destino}</h1>
+                <h1>🗺️ ${isMulti ? 'Roteiro Multi-Destino' : `Roteiro para ${destino}`}</h1>
+                ${rotaVisual}
                 <div class="subtitulo">${idaBR} → ${voltaBR} · ${roteiro._numDias || roteiro.dias?.length || '?'} dias
                     ${roteiro._model && roteiro._model !== 'fallback' ? ' · Curadoria da Tripinha 🐶' : ''}</div>
                 ${observacoesBadge}
@@ -610,33 +914,40 @@ if (typeof BenetripAutoSave !== 'undefined') {
     },
 
     // ================================================================
-    // COMPARTILHAMENTO - REFATORADO v1.1
+    // COMPARTILHAMENTO (v2.0: multi-destino aware)
     // ================================================================
-
-    /**
-     * Gera texto do roteiro para compartilhamento.
-     * NOVO: usa links curtos do Google Maps para caber no WhatsApp
-     * @param {boolean} compacto - Se true, gera versão mais compacta para WhatsApp
-     */
     gerarTextoRoteiro(compacto = false) {
         const roteiro = this.state.roteiro;
-        const { destino, dataIda, dataVolta } = this.state.formData;
+        const { destino, dataIda, dataVolta, destinos } = this.state.formData;
         if (!roteiro || !roteiro.dias) return '';
 
         const idaBR = new Date(dataIda + 'T12:00:00').toLocaleDateString('pt-BR');
         const voltaBR = new Date(dataVolta + 'T12:00:00').toLocaleDateString('pt-BR');
+        const isMulti = destinos && destinos.length > 1;
 
-        let texto = `🗺️ *Roteiro para ${destino}*\n`;
+        let texto = `🗺️ *${isMulti ? 'Roteiro Multi-Destino' : `Roteiro para ${destino}`}*\n`;
+        if (isMulti) {
+            texto += `📍 ${destinos.map(d => d.destino).join(' → ')}\n`;
+        }
         texto += `📅 ${idaBR} → ${voltaBR}\n\n`;
 
         if (roteiro.resumo_viagem && !compacto) {
             texto += `🐕 ${roteiro.resumo_viagem}\n\n`;
         }
 
+        let destinoAnterior = '';
+
         roteiro.dias.forEach(dia => {
+            // Separador de destino para multi-destino
+            if (isMulti && dia.destino_atual && dia.destino_atual !== destinoAnterior) {
+                texto += `\n🏙️ *═══ ${dia.destino_atual} ═══*\n\n`;
+                destinoAnterior = dia.destino_atual;
+            }
+
             texto += `━━━━━━━━━━━━━━━\n`;
             texto += `📌 *Dia ${dia.dia_numero} — ${dia.dia_semana}, ${dia.data}*\n`;
             if (dia.titulo) texto += `${dia.titulo}\n`;
+            if (dia.clima_previsto && !compacto) texto += `🌤️ ${dia.clima_previsto}\n`;
 
             if (dia.resumo_tripinha && !compacto) {
                 texto += `🐕 ${dia.resumo_tripinha}\n`;
@@ -661,7 +972,6 @@ if (typeof BenetripAutoSave !== 'undefined') {
                         texto += `     💡 ${ativ.dica_tripinha}\n`;
                     }
 
-                    // CORREÇÃO: Link curto do Google Maps
                     const mapsQuery = ativ.google_maps_query || ativ.nome;
                     const mapsUrl = this.buildMapsUrlShort(mapsQuery);
                     texto += `     📍 ${mapsUrl}\n`;
@@ -677,31 +987,22 @@ if (typeof BenetripAutoSave !== 'undefined') {
         return texto;
     },
 
-    /**
-     * CORRIGIDO: Compartilhamento via WhatsApp
-     * - Divide em múltiplas mensagens se o roteiro for longo
-     * - Usa links curtos do Google Maps
-     */
     compartilharWhatsApp() {
         const roteiro = this.state.roteiro;
-        const { destino, dataIda, dataVolta } = this.state.formData;
         if (!roteiro || !roteiro.dias) {
             alert('Nenhum roteiro para compartilhar');
             return;
         }
 
-        // Primeiro tenta versão completa
         let texto = this.gerarTextoRoteiro(false);
         let encoded = encodeURIComponent(texto);
 
-        // Se exceder limite, tenta versão compacta
         if (encoded.length > this.config.WHATSAPP_CHAR_LIMIT) {
             this.log('📤 Roteiro longo, usando versão compacta');
             texto = this.gerarTextoRoteiro(true);
             encoded = encodeURIComponent(texto);
         }
 
-        // Se ainda exceder, divide por dias
         if (encoded.length > this.config.WHATSAPP_CHAR_LIMIT) {
             this.log('📤 Roteiro muito longo, dividindo em partes');
             this.compartilharWhatsAppDividido();
@@ -713,17 +1014,14 @@ if (typeof BenetripAutoSave !== 'undefined') {
         this.log('📤 Compartilhado via WhatsApp (completo)');
     },
 
-    /**
-     * Divide o roteiro em múltiplas mensagens do WhatsApp quando é muito longo
-     */
     compartilharWhatsAppDividido() {
         const roteiro = this.state.roteiro;
-        const { destino, dataIda, dataVolta } = this.state.formData;
+        const { destino, dataIda, dataVolta, destinos } = this.state.formData;
         const idaBR = new Date(dataIda + 'T12:00:00').toLocaleDateString('pt-BR');
         const voltaBR = new Date(dataVolta + 'T12:00:00').toLocaleDateString('pt-BR');
+        const isMulti = destinos && destinos.length > 1;
         const totalParts = Math.ceil(roteiro.dias.length / 3);
 
-        // Gera parte 1: Header + primeiros dias
         const partes = [];
         for (let p = 0; p < totalParts; p++) {
             const startIdx = p * 3;
@@ -733,16 +1031,19 @@ if (typeof BenetripAutoSave !== 'undefined') {
             let texto = '';
 
             if (p === 0) {
-                texto += `🗺️ *Roteiro para ${destino}*\n`;
+                texto += `🗺️ *${isMulti ? 'Roteiro Multi-Destino' : `Roteiro para ${destino}`}*\n`;
+                if (isMulti) texto += `📍 ${destinos.map(d => d.destino).join(' → ')}\n`;
                 texto += `📅 ${idaBR} → ${voltaBR}\n`;
                 texto += `📄 Parte ${p + 1}/${totalParts}\n\n`;
             } else {
-                texto += `🗺️ *Roteiro ${destino}* — Parte ${p + 1}/${totalParts}\n\n`;
+                texto += `🗺️ *Roteiro ${isMulti ? 'Multi-Destino' : destino}* — Parte ${p + 1}/${totalParts}\n\n`;
             }
 
             diasParte.forEach(dia => {
                 texto += `━━━━━━━━━━━━━━━\n`;
-                texto += `📌 *Dia ${dia.dia_numero} — ${dia.dia_semana}, ${dia.data}*\n`;
+                texto += `📌 *Dia ${dia.dia_numero} — ${dia.dia_semana}, ${dia.data}*`;
+                if (dia.destino_atual) texto += ` (${dia.destino_atual})`;
+                texto += `\n`;
                 if (dia.titulo) texto += `${dia.titulo}\n\n`;
 
                 (dia.periodos || []).forEach(periodo => {
@@ -754,7 +1055,6 @@ if (typeof BenetripAutoSave !== 'undefined') {
                         texto += `  📍 ${ativ.nome}`;
                         if (ativ.duracao_minutos) texto += ` (~${ativ.duracao_minutos}min)`;
                         texto += `\n`;
-
                         const mapsQuery = ativ.google_maps_query || ativ.nome;
                         texto += `     📍 ${this.buildMapsUrlShort(mapsQuery)}\n\n`;
                     });
@@ -769,11 +1069,9 @@ if (typeof BenetripAutoSave !== 'undefined') {
             partes.push(texto);
         }
 
-        // Abre a primeira parte
         const url = `https://wa.me/?text=${encodeURIComponent(partes[0])}`;
         window.open(url, '_blank');
 
-        // Copia as demais partes para o clipboard e avisa o usuário
         if (partes.length > 1) {
             const restante = partes.slice(1).join('\n\n');
             navigator.clipboard.writeText(restante).catch(() => {});
@@ -803,7 +1101,6 @@ if (typeof BenetripAutoSave !== 'undefined') {
             this.mostrarFeedbackBotao('.btn-copiar', '✅ Copiado!');
             this.log('📋 Roteiro copiado');
         } catch (err) {
-            // Fallback para navegadores sem clipboard API
             const textarea = document.createElement('textarea');
             textarea.value = texto;
             textarea.style.position = 'fixed';
