@@ -1,9 +1,10 @@
-// api/search-destinations.js - VERSÃO MULTI-CONTINENTE v3.5
-// v3.5: GEO VINDO DO FRONTEND — elimina dependência de KGMID_CITY_GEO hardcoded
-// - O frontend envia origemGeo { codigo_pais, pais, kgmid_pais, continente, kgmid_continente }
-// - Backend usa direto, sem precisar de mapa interno para cada kgmid de cidade
-// - Fallback para iata_geo_lookup.json quando origemGeo não é fornecido (IATA simples)
+// api/search-destinations.js - VERSÃO MULTI-CONTINENTE v3.6
+// v3.6: FIX — Origens kgmid (cidades agregadas) com filtro internacional/nacional
+// - resolveGeo agora aceita geo parcial do frontend (só pais, sem kgmid_pais)
+// - Safety net: se geo não resolvido e escopo requer filtro, retorna 404 em vez de resultados não-filtrados
+// - Fallback kgmid: tenta resolver geo via aeroportos incluídos quando origemGeo incompleto
 //
+// v3.5: GEO VINDO DO FRONTEND — elimina dependência de KGMID_CITY_GEO hardcoded
 // v3.4: SUPORTE A ESCOPO "NACIONAL"
 // v3.3: SUPORTE A KGMID como departure_id
 // v3.2: BUSCA EM MÚLTIPLOS CONTINENTES quando "apenas internacional"
@@ -97,22 +98,27 @@ function getIataLookup() {
             "POA": { "codigo_pais": "BR", "pais": "Brasil", "kgmid_pais": "/m/015fr", "continente": "América do Sul", "kgmid_continente": "/m/0dg3n1" },
             "CWB": { "codigo_pais": "BR", "pais": "Brasil", "kgmid_pais": "/m/015fr", "continente": "América do Sul", "kgmid_continente": "/m/0dg3n1" },
             "VCP": { "codigo_pais": "BR", "pais": "Brasil", "kgmid_pais": "/m/015fr", "continente": "América do Sul", "kgmid_continente": "/m/0dg3n1" },
+            "CGH": { "codigo_pais": "BR", "pais": "Brasil", "kgmid_pais": "/m/015fr", "continente": "América do Sul", "kgmid_continente": "/m/0dg3n1" },
+            "SDU": { "codigo_pais": "BR", "pais": "Brasil", "kgmid_pais": "/m/015fr", "continente": "América do Sul", "kgmid_continente": "/m/0dg3n1" },
         };
     }
     return IATA_LOOKUP;
 }
 
 // ============================================================
-// v3.5: RESOLVER GEO — prioriza origemGeo enviado pelo frontend
+// v3.6: RESOLVER GEO — prioriza origemGeo enviado pelo frontend
+// FIX: Aceita geo parcial (só pais, sem kgmid_pais)
+// FIX: Fallback para kgmid via aeroportos incluídos
 // ============================================================
 function resolveGeo(origemCode, origemGeoFromFrontend) {
-    // 1. Frontend enviou dados geo → usa direto (fonte mais confiável)
-    if (origemGeoFromFrontend && origemGeoFromFrontend.pais && origemGeoFromFrontend.kgmid_pais) {
-        console.log(`[Geo] Dados geo do frontend: ${origemGeoFromFrontend.pais} (${origemGeoFromFrontend.kgmid_pais})`);
+    // 1. Frontend enviou dados geo → usa direto
+    //    v3.6 FIX: aceita se tiver pelo menos 'pais' (antes exigia kgmid_pais também)
+    if (origemGeoFromFrontend && origemGeoFromFrontend.pais) {
+        console.log(`[Geo] Dados geo do frontend: ${origemGeoFromFrontend.pais} (kgmid_pais: ${origemGeoFromFrontend.kgmid_pais || 'N/A'})`);
         return {
             codigo_pais: origemGeoFromFrontend.codigo_pais || '',
             pais: origemGeoFromFrontend.pais,
-            kgmid_pais: origemGeoFromFrontend.kgmid_pais,
+            kgmid_pais: origemGeoFromFrontend.kgmid_pais || '',
             continente: origemGeoFromFrontend.continente || '',
             kgmid_continente: origemGeoFromFrontend.kgmid_continente || '',
         };
@@ -137,6 +143,44 @@ function resolveGeo(origemCode, origemGeoFromFrontend) {
             console.log(`[Geo] Multi-IATA → usando ${primeiro} → ${geo.pais}`);
             return geo;
         }
+    }
+
+    // 4. v3.6 FIX: kgmid → tentar resolver via aeroportos incluídos do frontend
+    //    O frontend pode ter enviado origemGeo parcial (sem pais mas com codigo_pais)
+    //    ou não ter enviado nada. Tentamos via lookup usando aeroportos conhecidos.
+    if (origemCode.startsWith('/m/')) {
+        // v3.6: Se o frontend enviou origemGeo com pelo menos codigo_pais, usar
+        if (origemGeoFromFrontend && origemGeoFromFrontend.codigo_pais) {
+            console.log(`[Geo] kgmid ${origemCode} → usando codigo_pais do frontend: ${origemGeoFromFrontend.codigo_pais}`);
+            return {
+                codigo_pais: origemGeoFromFrontend.codigo_pais,
+                pais: origemGeoFromFrontend.pais || '',
+                kgmid_pais: origemGeoFromFrontend.kgmid_pais || '',
+                continente: origemGeoFromFrontend.continente || '',
+                kgmid_continente: origemGeoFromFrontend.kgmid_continente || '',
+            };
+        }
+
+        // v3.6: Última tentativa — varrer o lookup IATA buscando algum aeroporto
+        //        cujo kgmid de cidade corresponda (heurística limitada)
+        //        Isso cobre o caso onde o JSON de cidades NÃO tem campos geo
+        //        mas o iata_geo_lookup.json tem os aeroportos individuais
+        const lookup = getIataLookup();
+        // Mapeamento conhecido de kgmid de cidade → primeiro aeroporto IATA
+        const KGMID_FALLBACK = {
+            '/m/022pfm': 'GRU',  // São Paulo
+            '/m/06gmr':  'GIG',  // Rio de Janeiro
+            '/m/01ky2c': 'BSB',  // Brasília
+            '/m/01nmhq': 'SSA',  // Salvador
+            '/m/04cjn':  'GIG',  // Rio (variante)
+        };
+        const fallbackIata = KGMID_FALLBACK[origemCode];
+        if (fallbackIata && lookup[fallbackIata]) {
+            console.log(`[Geo] kgmid ${origemCode} → fallback IATA ${fallbackIata} → ${lookup[fallbackIata].pais}`);
+            return lookup[fallbackIata];
+        }
+
+        console.warn(`[Geo] ⚠️ kgmid ${origemCode}: NÃO foi possível resolver geo — filtro nacional/internacional pode falhar`);
     }
 
     console.warn(`[Geo] Não foi possível resolver geo para ${origemCode}`);
@@ -242,6 +286,28 @@ export default async function handler(req, res) {
         const geo = resolveGeo(origemCode, origemGeoBody);
         console.log(`🔍 Search de ${origemCode} | País: ${geo?.pais || '?'} | Continente: ${geo?.continente || '?'} | Escopo: ${escopoLabel}`);
 
+        // ============================================================
+        // v3.6 SAFETY NET: Se escopo requer filtro mas geo não foi resolvido
+        // ============================================================
+        if (!geo && (apenasInternacional || apenasNacional)) {
+            console.error(`❌ SAFETY NET: Geo não resolvido para ${origemCode} — impossível filtrar ${escopoLabel}`);
+            return res.status(404).json({
+                error: 'Não foi possível determinar o país de origem',
+                message: `Para buscar destinos ${apenasInternacional ? 'internacionais' : 'nacionais'}, precisamos identificar seu país de origem. Tente selecionar um aeroporto específico (ex: GRU em vez de "São Paulo — Todos os aeroportos") ou tente novamente.`,
+                _debug: { origemCode, isKgmid, escopoDestino, geoResolvido: false }
+            });
+        }
+
+        // v3.6: Verificação adicional — geo resolvido mas sem pais (campo crítico para filtro)
+        if ((apenasInternacional || apenasNacional) && geo && !geo.pais) {
+            console.error(`❌ SAFETY NET: Geo resolvido mas sem campo 'pais' para ${origemCode} — impossível filtrar ${escopoLabel}`);
+            return res.status(404).json({
+                error: 'País de origem não identificado',
+                message: `Não conseguimos identificar o país de origem para filtrar destinos ${apenasInternacional ? 'internacionais' : 'nacionais'}. Tente selecionar um aeroporto específico.`,
+                _debug: { origemCode, geo, escopoDestino }
+            });
+        }
+
         // Preferências → interests
         const INTERESTS_MAP = { 'relax': 'beaches', 'aventura': 'outdoors', 'cultura': 'museums', 'urbano': 'popular' };
         let prefArray = [];
@@ -305,12 +371,23 @@ export default async function handler(req, res) {
         const allDestinations = new Map();
         const paisOrigem = geo?.pais?.toLowerCase() || '';
 
+        // v3.6: Log explícito quando paisOrigem está vazio e escopo requer filtro
+        if (!paisOrigem && (apenasInternacional || apenasNacional)) {
+            // Este caso já é tratado pelo safety net acima, mas log extra por segurança
+            console.error(`❌ CRITICAL: paisOrigem vazio na consolidação com escopo ${escopoLabel} — isto não deveria acontecer`);
+        }
+
         function addDestinations(destinations, source) {
             if (!destinations || !Array.isArray(destinations)) return;
             for (const dest of destinations) {
                 if (!dest || !dest.name || !dest.country) continue;
                 const destCountry = (dest.country || '').toLowerCase();
                 const isDestinoDomestico = paisOrigem && destCountry === paisOrigem;
+
+                // v3.6: Se paisOrigem está vazio e escopo requer filtro, NÃO inclui o destino
+                // (fail-safe: preferimos não retornar resultado a retornar resultado errado)
+                if ((apenasInternacional || apenasNacional) && !paisOrigem) continue;
+
                 if (apenasInternacional && isDestinoDomestico) continue;
                 if (apenasNacional && !isDestinoDomestico) continue;
 
@@ -372,7 +449,7 @@ export default async function handler(req, res) {
             return res.status(404).json({
                 error: 'Nenhum destino encontrado',
                 message: mensagemErro,
-                _debug: { totalBuscas: searchPromises.length, escopo: escopoLabel, geoResolvido: !!geo }
+                _debug: { totalBuscas: searchPromises.length, escopo: escopoLabel, geoResolvido: !!geo, paisOrigem: paisOrigem || '(vazio)' }
             });
         }
 
