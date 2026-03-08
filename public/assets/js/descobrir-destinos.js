@@ -1,12 +1,18 @@
 /**
  * BENETRIP - DESCOBRIR DESTINOS
- * Versão GOOGLE FLIGHTS v4.5 - GEO DO JSON
+ * Versão GOOGLE FLIGHTS v4.5.1 - FIX GEO ORIGEM AGREGADA
+ * 
+ * FIX v4.5.1:
+ * - _buildOrigemGeo() agora envia dados geo se 'country' ou 'countryCode' estiver disponível
+ *   (antes exigia kgmid_pais ou continente, que podem não existir no JSON para cidades agrupadas)
+ * - Isso garante que o backend receba pelo menos o campo 'pais' para filtrar nacional/internacional
+ * - Corrige bug: origens agregadas (SAO) retornando destinos domésticos com escopo internacional
  * 
  * NOVIDADES v4.5:
  * - Envia origemGeo ao backend (codigo_pais, pais, kgmid_pais, continente, kgmid_continente)
  * - Dados geo vêm do JSON de cidades, não de mapa hardcoded no backend
  * - buscarCidades() agora inclui campos geo no objeto retornado
- * - Compatível com search-destinations.js v3.5
+ * - Compatível com search-destinations.js v3.5+
  * 
  * NOVIDADES v4.4:
  * - Suporte a cidades com múltiplos aeroportos via kgmid
@@ -50,7 +56,7 @@ const BenetripDiscovery = {
         console.error('[Benetrip ERROR]', ...args);
     },
     init() {
-        this.log('🐕 Benetrip Discovery v4.5 (Geo do JSON) inicializando...');
+        this.log('🐕 Benetrip Discovery v4.5.1 (Fix Geo Agregada) inicializando...');
         
         this.carregarCidades();
         this.setupFormEvents();
@@ -239,7 +245,7 @@ const BenetripDiscovery = {
         hiddenInput.value = JSON.stringify(cidade);
         results.style.display = 'none';
         
-        this.log('📍 Origem:', cidade.name, `| code: ${cidade.code} | display: ${codeDisplay} | agrupada: ${cidade.isCityCode} | geo: ${cidade.continente || '?'}`);
+        this.log('📍 Origem:', cidade.name, `| code: ${cidade.code} | display: ${codeDisplay} | agrupada: ${cidade.isCityCode} | geo: ${cidade.continente || '?'} | pais: ${cidade.country || '?'}`);
     },
     setupCalendar() {
         const input = document.getElementById('datas');
@@ -660,12 +666,15 @@ const BenetripDiscovery = {
         return origem.code;
     },
     // ================================================================
-    // v4.5: Montar origemGeo a partir dos dados do JSON
+    // v4.5.1 FIX: Montar origemGeo — envia se tiver QUALQUER info de país
+    // Antes exigia kgmid_pais ou continente (que podem não existir no JSON para cidades agrupadas)
+    // Agora basta ter country ou countryCode (que SEMPRE existem no JSON)
     // ================================================================
     _buildOrigemGeo() {
         const o = this.state.formData.origem;
         if (!o) return undefined;
-        if (o.kgmid_pais || o.continente) {
+        // v4.5.1 FIX: Condição ampliada — country e countryCode sempre existem no JSON
+        if (o.country || o.countryCode || o.kgmid_pais || o.continente) {
             return {
                 codigo_pais: o.countryCode || '',
                 pais: o.country || '',
@@ -727,6 +736,10 @@ const BenetripDiscovery = {
         this.log(`🏙️ Origem: ${origem.displayCode} → enviando código: ${origemParaAPI}`);
         
         // v4.5: Montar body com origemGeo
+        // v4.5.1: _buildOrigemGeo() agora sempre retorna dados se country disponível
+        const origemGeo = this._buildOrigemGeo();
+        this.log(`🌍 origemGeo enviado:`, origemGeo || '(nenhum)');
+        
         const requestBody = {
             origem: origemParaAPI,
             dataIda: this.state.formData.dataIda,
@@ -734,7 +747,7 @@ const BenetripDiscovery = {
             preferencias: this.state.formData.preferenciasArray,
             moeda: this.state.formData.moeda,
             escopoDestino: this.state.formData.escopoDestino,
-            origemGeo: this._buildOrigemGeo()
+            origemGeo: origemGeo
         };
         
         const response = await fetch('/api/search-destinations', {
