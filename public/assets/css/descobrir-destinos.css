@@ -1350,3 +1350,18 @@ body {
     background: #FFF8F0;
     border-left: 3px solid #E87722;
 }
+
+.escopo-group {
+    grid-template-columns: 1fr;
+    gap: 10px;
+}
+
+/* Em telas maiores: "tanto faz" full-width, nacional e internacional lado a lado */
+@media (min-width: 480px) {
+    .escopo-group {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    .escopo-group .btn-option:first-child {
+        grid-column: 1 / -1;
+    }
+}
