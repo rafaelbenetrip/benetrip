@@ -1,7 +1,11 @@
 /**
  * BENETRIP - DESCOBRIR DESTINOS
- * Versão GOOGLE FLIGHTS v4.5.1 - FIX GEO ORIGEM AGREGADA
+ * Versão GOOGLE FLIGHTS v4.5.2 - ESCOPO NACIONAL + FIX GEO
  * 
+ * v4.5.2:
+ * - Suporte a escopo "nacional" no frontend (3 opções: tanto faz / nacional / internacional)
+ * - gerarResumoCriterios() e mostrarSemResultados() atualizados para 3 escopos
+ *
  * FIX v4.5.1:
  * - _buildOrigemGeo() agora envia dados geo se 'country' ou 'countryCode' estiver disponível
  *   (antes exigia kgmid_pais ou continente, que podem não existir no JSON para cidades agrupadas)
@@ -56,7 +60,7 @@ const BenetripDiscovery = {
         console.error('[Benetrip ERROR]', ...args);
     },
     init() {
-        this.log('🐕 Benetrip Discovery v4.5.1 (Fix Geo Agregada) inicializando...');
+        this.log('🐕 Benetrip Discovery v4.5.2 (Escopo Nacional) inicializando...');
         
         this.carregarCidades();
         this.setupFormEvents();
@@ -979,6 +983,8 @@ const BenetripDiscovery = {
             : `${origem.name} (${codeDisplay})`;
         const escopoLabel = escopoDestino === 'internacional' 
             ? '✈️ Apenas internacionais' 
+            : escopoDestino === 'nacional'
+            ? '🏠 Apenas nacionais'
             : '🗺️ Nacionais e internacionais';
         const observacoesItem = observacoes 
             ? `<div class="criterio-item" style="grid-column: 1 / -1;">
@@ -1027,6 +1033,7 @@ const BenetripDiscovery = {
         const { orcamento, moeda, origem, escopoDestino } = this.state.formData;
         const simbolo = this.getSimbolo(moeda);
         const isInternacional = escopoDestino === 'internacional';
+        const isNacional = escopoDestino === 'nacional';
         const codeDisplay = origem.displayCode || origem.code;
         this.pushResultsState();
         container.innerHTML = `
@@ -1037,7 +1044,7 @@ const BenetripDiscovery = {
                 <h2>😕 Puxa, não encontrei destinos...</h2>
                 <p class="sem-resultados-msg">
                     A Tripinha procurou por todo canto, mas não encontrou passagens 
-                    ${isInternacional ? '<strong>internacionais</strong>' : ''} 
+                    ${isInternacional ? '<strong>internacionais</strong>' : isNacional ? '<strong>nacionais</strong>' : ''} 
                     saindo de <strong>${origem.name} (${codeDisplay})</strong> dentro do orçamento de 
                     <strong>${simbolo} ${orcamento?.toLocaleString('pt-BR') || '?'}</strong> para essas datas.
                 </p>
@@ -1046,6 +1053,7 @@ const BenetripDiscovery = {
                     <div class="dica">💰 <strong>Aumente o orçamento</strong> — às vezes um pouco mais abre muitas opções!</div>
                     <div class="dica">📅 <strong>Tente outras datas</strong> — viajar em dias da semana costuma ser mais barato.</div>
                     ${isInternacional ? '<div class="dica">🗺️ <strong>Inclua destinos nacionais</strong> — selecione "Tanto faz" para mais opções!</div>' : ''}
+                    ${isNacional ? '<div class="dica">✈️ <strong>Inclua destinos internacionais</strong> — selecione "Tanto faz" para mais opções!</div>' : ''}
                     <div class="dica">📍 <strong>Mude a cidade de origem</strong> — aeroportos maiores têm mais rotas e preços melhores.</div>
                     <div class="dica">🌍 <strong>Experimente outros estilos</strong> — pode revelar destinos menos óbvios!</div>
                 </div>
