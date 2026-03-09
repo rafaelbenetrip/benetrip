@@ -261,18 +261,22 @@
                         <input type="hidden" id="preferencias" required>
                     </div>
 
-                    <!-- 3.1 Destinos internacionais ou tanto faz? -->
+                    <!-- 3.1 Escopo de destinos -->
                     <div class="form-group">
-                        <label>🌍 Destinos internacionais ou nacionais?</label>
-                        <p class="hint">Prefere sair do país ou tanto faz?</p>
-                        <div class="button-group button-group-full" data-field="escopo-destino">
+                        <label>🌍 Pra onde você quer ir?</label>
+                        <p class="hint">A Tripinha busca destinos de acordo com sua preferência</p>
+                        <div class="button-group escopo-group" data-field="escopo-destino">
                             <button type="button" class="btn-option btn-full" data-value="tanto_faz">
                                 <span class="emoji">🗺️</span>
                                 <span class="text">Tanto faz — surpreenda-me!</span>
                             </button>
+                            <button type="button" class="btn-option btn-full" data-value="nacional">
+                                <span class="emoji">🏠</span>
+                                <span class="text">Destinos nacionais</span>
+                            </button>
                             <button type="button" class="btn-option btn-full" data-value="internacional">
                                 <span class="emoji">✈️</span>
-                                <span class="text">Apenas destinos internacionais</span>
+                                <span class="text">Destinos internacionais</span>
                             </button>
                         </div>
                         <input type="hidden" id="escopo-destino" value="tanto_faz">
