@@ -1,5 +1,6 @@
 /**
- * BENETRIP — COMPARAR VOOS v2.0
+ * BENETRIP — COMPARAR VOOS v2.1
+ * v2.1: cheaper_alternatives (seção Tripinha), fare_type badge, baggage_allowance_links
  * Passageiros: adultos, crianças, bebês
  * Filtros: paradas, companhias, horários, duração, preço, aeroportos
  */
@@ -10,35 +11,30 @@ const BenetripCompararVoos = {
         origemSelecionada: null,
         destinoSelecionado: null,
         moedaSelecionada: 'BRL',
-        // Passageiros por tipo
         numAdultos: 1,
         numCriancas: 0,
         numBebes: 0,
-        // Datas
         datasIda: [],
         datasVolta: [],
         fpIda: null,
         fpVolta: null,
-        // Resultados
         resultados: null,
         comboSelecionada: null,
-        sortAtivo: 'melhor',  // melhor | barato | rapido
-        // Painel de filtros
+        sortAtivo: 'melhor',
         filtrosPanelAberto: false,
         filtros: {
-            paradas: new Set(),            // Set<number> — 0=direto,1=1p,2=2+p
-            companhias: new Set(),         // Set<string>
-            aeroportosSaida: new Set(),    // Set<string> — aeroporto partida na ida
-            aeroportosChegada: new Set(),  // Set<string> — aeroporto chegada na ida
-            aeroportosRetSaida: new Set(), // Set<string> — aeroporto partida na volta
-            aeroportosRetChegada: new Set(),// Set<string> — aeroporto chegada na volta
-            precoMax: null,               // number | null
-            horarioSaidaIda: new Set(),   // Set<string>: madrugada,manha,tarde,noite
+            paradas: new Set(),
+            companhias: new Set(),
+            aeroportosSaida: new Set(),
+            aeroportosChegada: new Set(),
+            aeroportosRetSaida: new Set(),
+            aeroportosRetChegada: new Set(),
+            precoMax: null,
+            horarioSaidaIda: new Set(),
             horarioSaidaVolta: new Set(),
-            duracaoMaxIda: null,          // minutos | null
-            duracaoMaxVolta: null,        // minutos | null
+            duracaoMaxIda: null,
+            duracaoMaxVolta: null,
         },
-        // Opções extraídas dos resultados (para popular os filtros)
         filterOptions: null,
     },
 
@@ -56,13 +52,23 @@ const BenetripCompararVoos = {
         noite:     { label: 'Noite',     range: '18:00–23:59', icon: '🌆', min: 1080,max: 1439 },
     },
 
+    // v2.1: mapeamento de fare_type para exibição
+    FARE_TYPE_MAP: {
+        'Basic Economy':    { label: 'Economy Básica', color: '#666',        bg: '#F5F5F5' },
+        'Economy':          { label: 'Economy',        color: '#00A3E0',     bg: '#E6F7FF' },
+        'Main Cabin':       { label: 'Economy',        color: '#00A3E0',     bg: '#E6F7FF' },
+        'Premium Economy':  { label: 'Prem. Economy',  color: '#E87722',     bg: '#FFF3E8' },
+        'Business':         { label: 'Business',       color: '#7B2FBE',     bg: '#F3E8FF' },
+        'First':            { label: 'Primeira Classe',color: '#B8860B',     bg: '#FFFDE7' },
+    },
+
     log(...a) { if (this.config.debug) console.log('[CompararVoos]', ...a); },
 
     // ════════════════════════════════════════
     // INIT
     // ════════════════════════════════════════
     init() {
-        this.log('🐕 Comparar Voos v2.0 inicializando...');
+        this.log('🐕 Comparar Voos v2.1 inicializando...');
         this.carregarCidades();
         this.setupAutocomplete('origem', 'origem-results', 'origem-data', 'origemSelecionada');
         this.setupAutocomplete('destino', 'destino-results', 'destino-data', 'destinoSelecionado');
@@ -184,11 +190,10 @@ const BenetripCompararVoos = {
     },
 
     // ════════════════════════════════════════
-    // PASSAGEIROS — Métodos
+    // PASSAGEIROS
     // ════════════════════════════════════════
     ajustarPax(tipo, delta) {
         const { numAdultos, numCriancas, numBebes } = this.state;
-        const totalPagantes = numAdultos + numCriancas;
 
         if (tipo === 'adultos') {
             const novo = numAdultos + delta;
@@ -200,7 +205,7 @@ const BenetripCompararVoos = {
             this.state.numCriancas = novo;
         } else if (tipo === 'bebes') {
             const novo = numBebes + delta;
-            if (novo < 0 || novo > Math.min(4, this.state.numAdultos)) return; // 1 bebê por adulto
+            if (novo < 0 || novo > Math.min(4, this.state.numAdultos)) return;
             this.state.numBebes = novo;
         }
 
@@ -211,7 +216,6 @@ const BenetripCompararVoos = {
         const { numAdultos, numCriancas, numBebes } = this.state;
         const totalPagantes = numAdultos + numCriancas;
 
-        // Atualizar counts
         const setCount = (id, val) => {
             const el = document.getElementById(id);
             if (el) {
@@ -223,7 +227,6 @@ const BenetripCompararVoos = {
         setCount('pax-criancas-count', numCriancas);
         setCount('pax-bebes-count', numBebes);
 
-        // Atualizar estados dos botões
         const setDisabled = (id, disabled) => {
             const el = document.getElementById(id);
             if (el) el.disabled = disabled;
@@ -235,7 +238,6 @@ const BenetripCompararVoos = {
         setDisabled('btn-bebes-menos', numBebes <= 0);
         setDisabled('btn-bebes-mais', numBebes >= 4 || numBebes >= numAdultos);
 
-        // Hint total
         const hint = document.getElementById('pax-total-hint');
         if (hint) {
             const partes = [];
@@ -402,13 +404,13 @@ const BenetripCompararVoos = {
             if (!data.success) throw new Error(data.message || 'Nenhum voo encontrado');
 
             this.state.resultados = data;
-            
-            // ADICIONADO: Salvamento automático
+
             if (typeof BenetripAutoSave !== 'undefined') {
                 BenetripAutoSave.salvarCompararVoos(this.state.formData, data);
             }
 
             this.log('✅ Resultados:', data.stats);
+            this.log('💡 Alternativas mais baratas:', data.cheaperAlternatives?.length || 0);
 
             this.updateProgress(100, '🎉 Pronto!');
             await this.delay(400);
@@ -467,7 +469,6 @@ const BenetripCompararVoos = {
         return count;
     },
 
-    // Extrair legs de ida e volta de um voo
     _splitLegs(voo) {
         const legs = voo.legs || [];
         const dest = this.state.destinoSelecionado;
@@ -485,13 +486,12 @@ const BenetripCompararVoos = {
         };
     },
 
-    // Extrair options disponíveis da combo atual
     extractFilterOptions(combo) {
         const voos = combo?.voos || [];
         const opts = {
-            paradas: new Map(),         // value -> count
-            companhias: new Map(),      // name -> {logo, count}
-            aeroportosSaida: new Map(), // id -> {name, count}
+            paradas: new Map(),
+            companhias: new Map(),
+            aeroportosSaida: new Map(),
             aeroportosChegada: new Map(),
             aeroportosRetSaida: new Map(),
             aeroportosRetChegada: new Map(),
@@ -506,22 +506,18 @@ const BenetripCompararVoos = {
         };
 
         voos.forEach(voo => {
-            // Paradas
             const stopsKey = Math.min(voo.stops, 2);
             opts.paradas.set(stopsKey, (opts.paradas.get(stopsKey) || 0) + 1);
 
-            // Companhias
             voo.airlines.forEach(a => {
                 const cur = opts.companhias.get(a.name) || { logo: a.logo, count: 0 };
                 cur.count++;
                 opts.companhias.set(a.name, cur);
             });
 
-            // Preço
             opts.precoMin = Math.min(opts.precoMin, voo.price);
             opts.precoMax = Math.max(opts.precoMax, voo.price);
 
-            // Split legs
             const { outbound, returnLegs } = this._splitLegs(voo);
 
             const addAirport = (map, id, name) => {
@@ -536,10 +532,8 @@ const BenetripCompararVoos = {
                 const last = outbound[outbound.length - 1];
                 addAirport(opts.aeroportosSaida, first.departure_airport.id, first.departure_airport.name);
                 addAirport(opts.aeroportosChegada, last.arrival_airport.id, last.arrival_airport.name);
-                // Duração total ida
                 const dur = outbound.reduce((s, l) => s + l.duration, 0);
                 opts.duracaoMaxIda = Math.max(opts.duracaoMaxIda, dur);
-                // Horário saída ida
                 const block = this._getTimeBlock(first.departure_airport.time);
                 if (block) opts.horarioCounts.ida[block]++;
             }
@@ -575,69 +569,56 @@ const BenetripCompararVoos = {
         return parseInt(match[1]) * 60 + parseInt(match[2]);
     },
 
-    // Aplicar todos os filtros num array de voos
     applyFilters(voos) {
         const f = this.state.filtros;
         const s = this.state.sortAtivo;
 
         let resultado = voos.filter(voo => {
-            // ── Paradas ──────────────────────────────
             if (f.paradas.size > 0) {
                 const stopsKey = Math.min(voo.stops, 2);
                 if (!f.paradas.has(stopsKey)) return false;
             }
 
-            // ── Companhias ────────────────────────────
             if (f.companhias.size > 0) {
                 const vooAirlines = voo.airlines.map(a => a.name);
                 if (!Array.from(f.companhias).some(c => vooAirlines.includes(c))) return false;
             }
 
-            // ── Preço máximo ──────────────────────────
             if (f.precoMax !== null && voo.price > f.precoMax) return false;
 
-            // ── Split legs para demais filtros ────────
             const { outbound, returnLegs } = this._splitLegs(voo);
 
-            // ── Aeroportos de saída (ida) ─────────────
             if (f.aeroportosSaida.size > 0 && outbound.length > 0) {
                 if (!f.aeroportosSaida.has(outbound[0].departure_airport.id)) return false;
             }
 
-            // ── Aeroportos de chegada (ida) ───────────
             if (f.aeroportosChegada.size > 0 && outbound.length > 0) {
                 if (!f.aeroportosChegada.has(outbound[outbound.length - 1].arrival_airport.id)) return false;
             }
 
-            // ── Aeroportos de saída (volta) ───────────
             if (f.aeroportosRetSaida.size > 0 && returnLegs.length > 0) {
                 if (!f.aeroportosRetSaida.has(returnLegs[0].departure_airport.id)) return false;
             }
 
-            // ── Aeroportos de chegada (volta) ─────────
             if (f.aeroportosRetChegada.size > 0 && returnLegs.length > 0) {
                 if (!f.aeroportosRetChegada.has(returnLegs[returnLegs.length - 1].arrival_airport.id)) return false;
             }
 
-            // ── Horário de saída ida ──────────────────
             if (f.horarioSaidaIda.size > 0 && outbound.length > 0) {
                 const block = this._getTimeBlock(outbound[0].departure_airport.time);
                 if (!block || !f.horarioSaidaIda.has(block)) return false;
             }
 
-            // ── Horário de saída volta ────────────────
             if (f.horarioSaidaVolta.size > 0 && returnLegs.length > 0) {
                 const block = this._getTimeBlock(returnLegs[0].departure_airport.time);
                 if (!block || !f.horarioSaidaVolta.has(block)) return false;
             }
 
-            // ── Duração máxima ida ────────────────────
             if (f.duracaoMaxIda !== null && outbound.length > 0) {
                 const dur = outbound.reduce((s, l) => s + l.duration, 0);
                 if (dur > f.duracaoMaxIda) return false;
             }
 
-            // ── Duração máxima volta ──────────────────
             if (f.duracaoMaxVolta !== null && returnLegs.length > 0) {
                 const dur = returnLegs.reduce((s, l) => s + l.duration, 0);
                 if (dur > f.duracaoMaxVolta) return false;
@@ -646,13 +627,11 @@ const BenetripCompararVoos = {
             return true;
         });
 
-        // ── Ordenação ─────────────────────────────
         if (s === 'barato') {
             resultado.sort((a, b) => a.price - b.price);
         } else if (s === 'rapido') {
             resultado.sort((a, b) => a.total_duration - b.total_duration);
         } else if (s === 'melhor') {
-            // Score composto: normalizar preço + duração, peso 60/40
             const precoMax = Math.max(...resultado.map(v => v.price)) || 1;
             const durMax = Math.max(...resultado.map(v => v.total_duration)) || 1;
             resultado.sort((a, b) => {
@@ -769,7 +748,6 @@ const BenetripCompararVoos = {
 
         const voosFiltered = this.applyFilters(combo.voos);
 
-        // Atualizar tags ativas
         if (tagsEl) tagsEl.innerHTML = this._buildActiveFilterTags();
 
         if (voosFiltered.length === 0) {
@@ -792,19 +770,16 @@ const BenetripCompararVoos = {
         const opts = this.extractFilterOptions(combo);
         const f = this.state.filtros;
 
-        // Paradas
         [0, 1, 2].forEach(val => {
             const el = document.querySelector(`.stops-opt[data-val="${val}"]`);
             if (el) el.classList.toggle('checked', f.paradas.has(val));
         });
 
-        // Companhias
         opts.companhias.forEach((_, nome) => {
             const el = document.querySelector(`.filter-check-item[data-airline="${CSS.escape(nome)}"]`);
             if (el) el.classList.toggle('checked', f.companhias.has(nome));
         });
 
-        // Aeroportos
         ['aeroportosSaida','aeroportosChegada','aeroportosRetSaida','aeroportosRetChegada'].forEach(tipo => {
             f[tipo].forEach(id => {
                 const el = document.querySelector(`.filter-check-item[data-airport="${tipo}-${CSS.escape(id)}"]`);
@@ -812,7 +787,6 @@ const BenetripCompararVoos = {
             });
         });
 
-        // Horários
         ['ida','volta'].forEach(dir => {
             const key = dir === 'ida' ? 'horarioSaidaIda' : 'horarioSaidaVolta';
             Object.keys(this.TIME_BLOCKS).forEach(block => {
@@ -821,7 +795,6 @@ const BenetripCompararVoos = {
             });
         });
 
-        // Sliders
         const precoSlider = document.getElementById('range-preco');
         if (precoSlider && f.precoMax !== null) precoSlider.value = f.precoMax;
 
@@ -831,7 +804,6 @@ const BenetripCompararVoos = {
         const durVoltaSlider = document.getElementById('range-dur-volta');
         if (durVoltaSlider && f.duracaoMaxVolta !== null) durVoltaSlider.value = f.duracaoMaxVolta;
 
-        // Sort chips
         document.querySelectorAll('.sort-chip').forEach(c => {
             c.classList.toggle('active', c.dataset.sort === this.state.sortAtivo);
         });
@@ -890,6 +862,73 @@ const BenetripCompararVoos = {
     },
 
     // ════════════════════════════════════════
+    // v2.1: RENDER CHEAPER ALTERNATIVES
+    // ════════════════════════════════════════
+    _renderCheaperAlternatives(data) {
+        const alts = data.cheaperAlternatives;
+        if (!alts || alts.length === 0) return '';
+
+        const { origemSelecionada: orig, destinoSelecionado: dest, moedaSelecionada: moeda } = this.state;
+        const s = this.getSimbolo(moeda);
+        const paxParaPreco = data.paxParaPreco || 1;
+        const cheapestSearched = data.stats.cheapest;
+
+        const altItems = alts.map(alt => {
+            const precoPp = Math.round(alt.price / paxParaPreco);
+            const economia = Math.round((cheapestSearched - alt.price) / paxParaPreco);
+            const gfUrl = this.buildGoogleFlightsUrl(orig.code, dest.code, alt.departure, alt.return, moeda);
+            const d1 = new Date(alt.departure + 'T12:00:00');
+            const d2 = new Date(alt.return + 'T12:00:00');
+            const noites = Math.round((d2 - d1) / (1000 * 60 * 60 * 24));
+
+            return `
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 0;border-bottom:1px solid rgba(255,255,255,0.15);">
+                    <div style="flex:1;min-width:0;">
+                        <div style="font-family:'Poppins',sans-serif;font-size:13px;font-weight:600;color:#fff;">
+                            ${this.fmtDateShort(alt.departure)} → ${this.fmtDateShort(alt.return)}
+                        </div>
+                        <div style="font-size:11px;color:rgba(255,255,255,0.75);margin-top:2px;">
+                            ${noites} noite${noites !== 1 ? 's' : ''} · economia de ${s} ${economia.toLocaleString('pt-BR')}/pessoa
+                        </div>
+                    </div>
+                    <div style="text-align:right;flex-shrink:0;">
+                        <div style="font-family:'Poppins',sans-serif;font-size:16px;font-weight:800;color:#fff;">
+                            ${s} ${precoPp.toLocaleString('pt-BR')}
+                        </div>
+                        <div style="font-size:10px;color:rgba(255,255,255,0.7);">por pessoa</div>
+                    </div>
+                    <a href="${gfUrl}" target="_blank" rel="noopener"
+                       style="display:inline-flex;align-items:center;gap:4px;padding:8px 12px;background:rgba(255,255,255,0.2);color:#fff;border-radius:8px;font-family:'Poppins',sans-serif;font-size:12px;font-weight:600;text-decoration:none;white-space:nowrap;flex-shrink:0;transition:background .2s;"
+                       onmouseover="this.style.background='rgba(255,255,255,0.35)'"
+                       onmouseout="this.style.background='rgba(255,255,255,0.2)'">
+                        ✈️ Ver
+                    </a>
+                </div>`;
+        }).join('');
+
+        return `
+            <div class="fade-in" style="animation-delay:.12s;background:linear-gradient(135deg,#E87722 0%,#D66A1A 100%);border-radius:16px;padding:20px;margin-bottom:16px;box-shadow:0 8px 32px rgba(232,119,34,0.3);">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;">
+                    <img src="assets/images/tripinha/avatar-pensando.png" alt="Tripinha" style="width:36px;height:36px;flex-shrink:0;" onerror="this.style.display='none'">
+                    <div>
+                        <div style="font-family:'Poppins',sans-serif;font-size:14px;font-weight:700;color:#fff;">
+                            Farejei datas ainda mais baratas! 🐾
+                        </div>
+                        <div style="font-size:12px;color:rgba(255,255,255,0.85);">
+                            Fora das suas datas, mas vale dar uma olhada!
+                        </div>
+                    </div>
+                </div>
+                <div style="margin-top:8px;">
+                    ${altItems}
+                    <div style="padding-top:10px;font-size:11px;color:rgba(255,255,255,0.65);text-align:center;">
+                        Preços estimados · confirme no Google Flights
+                    </div>
+                </div>
+            </div>`;
+    },
+
+    // ════════════════════════════════════════
     // RENDER FILTROS
     // ════════════════════════════════════════
     _renderFilterPanel(combo) {
@@ -898,7 +937,6 @@ const BenetripCompararVoos = {
         const s = this.getSimbolo(this.state.moedaSelecionada);
         const paxParaPreco = this.state.resultados?.paxParaPreco || 1;
 
-        // ── Paradas ──────────────────────────────
         const stopLabels = { 0: { label: 'Direto', icon: '✅' }, 1: { label: '1 parada', icon: '🔄' }, 2: { label: '2+ paradas', icon: '🔀' } };
         const stopsHtml = [0, 1, 2].map(val => {
             const cnt = opts.paradas.get(val) || 0;
@@ -911,7 +949,6 @@ const BenetripCompararVoos = {
             </div>`;
         }).join('');
 
-        // ── Companhias ────────────────────────────
         const compHtml = Array.from(opts.companhias.entries()).map(([nome, info]) => `
             <div class="filter-check-item ${f.companhias.has(nome) ? 'checked' : ''}" data-airline="${nome}" onclick="BenetripCompararVoos.toggleCompanhia('${nome.replace(/'/g,"\\'")}')">
                 <span class="fci-check"></span>
@@ -919,7 +956,6 @@ const BenetripCompararVoos = {
                 ${nome} <span class="fci-count">${info.count}</span>
             </div>`).join('');
 
-        // ── Horários ──────────────────────────────
         const buildTimeHtml = (dir) => {
             const key = dir === 'ida' ? 'horarioSaidaIda' : 'horarioSaidaVolta';
             const counts = opts.horarioCounts[dir];
@@ -934,7 +970,6 @@ const BenetripCompararVoos = {
             }).join('');
         };
 
-        // ── Preço ─────────────────────────────────
         const precoMinPp = Math.round(opts.precoMin / paxParaPreco);
         const precoMaxPp = Math.round(opts.precoMax / paxParaPreco);
         const precoAtual = f.precoMax ?? opts.precoMax;
@@ -956,7 +991,6 @@ const BenetripCompararVoos = {
                 </div>
             </div>` : '<p style="font-size:13px;color:var(--gray-medium)">Dados de preço indisponíveis</p>';
 
-        // ── Duração ───────────────────────────────
         const buildDurHtml = (tipo) => {
             const maxDur = tipo === 'ida' ? opts.duracaoMaxIda : opts.duracaoMaxVolta;
             if (maxDur === 0) return '<p style="font-size:13px;color:var(--gray-medium)">Dados indisponíveis</p>';
@@ -978,7 +1012,6 @@ const BenetripCompararVoos = {
                 </div>`;
         };
 
-        // ── Aeroportos ────────────────────────────
         const buildAirportHtml = (map, tipo) => {
             if (map.size <= 1) return '';
             return Array.from(map.entries()).map(([id, info]) => `
@@ -992,7 +1025,6 @@ const BenetripCompararVoos = {
         const aerChegadaHtml = buildAirportHtml(opts.aeroportosChegada, 'aeroportosChegada');
         const aerRetSaidaHtml = buildAirportHtml(opts.aeroportosRetSaida, 'aeroportosRetSaida');
         const aerRetChegadaHtml = buildAirportHtml(opts.aeroportosRetChegada, 'aeroportosRetChegada');
-
         const hasAeroportos = aerSaidaHtml || aerChegadaHtml || aerRetSaidaHtml || aerRetChegadaHtml;
 
         return `
@@ -1043,7 +1075,6 @@ const BenetripCompararVoos = {
         `;
     },
 
-    // Live display updates para sliders (sem esperar onChange)
     _updatePrecoDisplay(val) {
         const paxParaPreco = this.state.resultados?.paxParaPreco || 1;
         const s = this.getSimbolo(this.state.moedaSelecionada);
@@ -1081,11 +1112,13 @@ const BenetripCompararVoos = {
             ? `A diferença entre as combinações é de <strong>${s} ${Math.round(saving / paxParaPreco).toLocaleString('pt-BR')}</strong> por pessoa. Cada real conta! 🐾`
             : `Os preços estão bem parecidos. Escolha a data mais conveniente! 🎉`;
 
-        // Resumo de passageiros
         const paxParts = [`${numAdultos} adulto${numAdultos > 1 ? 's' : ''}`];
         if (numCriancas > 0) paxParts.push(`${numCriancas} criança${numCriancas > 1 ? 's' : ''}`);
         if (numBebes > 0) paxParts.push(`${numBebes} bebê${numBebes > 1 ? 's' : ''}`);
         const paxDesc = paxParts.join(' + ');
+
+        // v2.1: seção de alternativas mais baratas (renderizada condicionalmente)
+        const cheaperAltsHtml = this._renderCheaperAlternatives(data);
 
         container.innerHTML = `
             <button class="btn-back" onclick="BenetripCompararVoos.showForm()">← Nova busca</button>
@@ -1145,6 +1178,8 @@ const BenetripCompararVoos = {
                 <div class="stat-card"><div class="stat-label">Média</div><div class="stat-value blue">${s} ${precoPorPessoaMedia.toLocaleString('pt-BR')}</div></div>
                 <div class="stat-card"><div class="stat-label">Mais caro</div><div class="stat-value orange">${s} ${precoPorPessoaMaisCaro.toLocaleString('pt-BR')}</div></div>
             </div>
+
+            ${cheaperAltsHtml}
 
             <div class="tripinha-tip fade-in" style="animation-delay:.15s">
                 <img src="assets/images/tripinha/avatar-pensando.png" alt="Tripinha" class="tripinha-tip-avatar" onerror="this.style.display='none'">
@@ -1331,7 +1366,7 @@ const BenetripCompararVoos = {
     },
 
     // ════════════════════════════════════════
-    // FLIGHT CARD
+    // FLIGHT CARD — v2.1: fare_type + baggage
     // ════════════════════════════════════════
     _renderFlightCard(voo, idx, simbolo, paxParaPreco, combo) {
         const { origemSelecionada: orig, destinoSelecionado: dest, moedaSelecionada: moeda, numBebes } = this.state;
@@ -1357,7 +1392,6 @@ const BenetripCompararVoos = {
         const carbonHtml = voo.carbon_emissions ? `<span class="flight-tag"><span class="flight-tag-icon">🌱</span> ${voo.carbon_emissions} kg CO₂</span>` : '';
         const extHtml = voo.extensions.slice(0, 2).map(ext => `<span class="flight-tag"><span class="flight-tag-icon">📋</span> ${this.traduzirTexto(ext)}</span>`).join('');
 
-        // Detalhamento por tipo de passageiro
         let paxDetailHtml = '';
         const { numAdultos, numCriancas } = this.state;
         if (numCriancas > 0 || numBebes > 0) {
@@ -1368,12 +1402,41 @@ const BenetripCompararVoos = {
             paxDetailHtml = `<div class="flight-price-detail">${parts.join(' + ')}</div>`;
         }
 
+        // v2.1: badge de fare_type
+        let fareTypeBadgeHtml = '';
+        if (voo.fare_type) {
+            const fareInfo = this.FARE_TYPE_MAP[voo.fare_type] || { label: voo.fare_type, color: '#666', bg: '#F5F5F5' };
+            fareTypeBadgeHtml = `<span style="display:inline-block;padding:2px 8px;border-radius:6px;font-family:'Poppins',sans-serif;font-size:10px;font-weight:600;background:${fareInfo.bg};color:${fareInfo.color};margin-top:4px;">${fareInfo.label}</span>`;
+        }
+
+        // v2.1: link de política de bagagem
+        let baggageHtml = '';
+        if (voo.baggage_allowance_links && voo.baggage_allowance_links.length > 0) {
+            const links = voo.baggage_allowance_links.slice(0, 2).map(item => {
+                const airline = item.airline || '';
+                const url = item.link || item.url || '';
+                if (!url) return '';
+                return `<a href="${url}" target="_blank" rel="noopener"
+                    style="display:inline-flex;align-items:center;gap:4px;font-size:12px;color:var(--blue);text-decoration:none;padding:2px 0;"
+                    onmouseover="this.style.textDecoration='underline'"
+                    onmouseout="this.style.textDecoration='none'">
+                    🧳 Bagagem${airline ? ' · ' + airline : ''}
+                </a>`;
+            }).filter(Boolean).join('<span style="color:var(--gray-border);margin:0 4px">·</span>');
+            if (links) {
+                baggageHtml = `<div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;">${links}</div>`;
+            }
+        }
+
         return `
             <div class="flight-card ${isBest ? 'best-flight' : ''}">
                 <div class="flight-top">
                     <div class="flight-airlines">
                         ${airlinesHtml}
-                        <span class="airline-names">${airlinesNames}</span>
+                        <div>
+                            <span class="airline-names">${airlinesNames}</span>
+                            ${fareTypeBadgeHtml}
+                        </div>
                     </div>
                     <div class="flight-price-box">
                         <div class="flight-price">${simbolo} ${precoPorPessoa.toLocaleString('pt-BR')}</div>
@@ -1394,6 +1457,7 @@ const BenetripCompararVoos = {
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/></svg>
                         Ver no Google Flights
                     </a>
+                    ${baggageHtml}
                 </div>
             </div>
         `;
@@ -1499,6 +1563,16 @@ const BenetripCompararVoos = {
         text += `💰 *${s} ${precoPorPessoa.toLocaleString('pt-BR')}* por pessoa\n`;
         text += `📆 ${this.fmtDateFull(stats.cheapestCombo.dataIda)} → ${this.fmtDateFull(stats.cheapestCombo.dataVolta)}\n`;
         if (paxParaPreco > 1) text += `💰 Total: *${s} ${stats.cheapest.toLocaleString('pt-BR')}*${numBebes > 0 ? ` (+${numBebes} bebê grátis)` : ''}\n`;
+
+        // v2.1: incluir melhor alternativa no share se houver
+        const alts = data.cheaperAlternatives;
+        if (alts && alts.length > 0) {
+            const best = alts[0];
+            const bestPp = Math.round(best.price / paxParaPreco);
+            text += `\n💡 *Dica da Tripinha:* vi datas ainda mais baratas!\n`;
+            text += `📅 ${this.fmtDateFull(best.departure)} → ${this.fmtDateFull(best.return)}: *${s} ${bestPp.toLocaleString('pt-BR')}*/pessoa\n`;
+        }
+
         text += `\n🔗 ${gfUrl}\n\n🐕 benetrip.com.br`;
         return text;
     },
@@ -1583,8 +1657,6 @@ const BenetripCompararVoos = {
         document.getElementById('loading-section').style.display = 'none';
         document.getElementById('results-section').style.display = 'block';
         window.scrollTo({ top: 0, behavior: 'smooth' });
-        
-        // Chamada do fade scroll na matriz após exibir a tela
         this.initMatrixScrollFade();
     },
 
@@ -1595,27 +1667,18 @@ const BenetripCompararVoos = {
         if (msgEl) msgEl.textContent = msg;
     },
 
-    // ════════════════════════════════════════
-    // FADE SCROLL DA MATRIZ
-    // ════════════════════════════════════════
     initMatrixScrollFade() {
         const section = document.querySelector('.matrix-section');
         if (!section) return;
-
-        // Encontra o elemento scrollável (wrapper ou tabela direta)
         const scrollEl = section.querySelector('.matrix-scroll-wrapper')
                       || section.querySelector('table')
                       || section;
-
         if (!scrollEl || scrollEl === section) return;
-
         const checkScroll = () => {
             const atEnd = scrollEl.scrollLeft + scrollEl.clientWidth >= scrollEl.scrollWidth - 4;
             section.classList.toggle('scrolled-end', atEnd);
         };
-
         scrollEl.addEventListener('scroll', checkScroll, { passive: true });
-        // Verifica na primeira renderização (pode já caber na tela)
         setTimeout(checkScroll, 100);
     }
 };
