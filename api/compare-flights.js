@@ -1,4 +1,5 @@
-// api/compare-flights.js - BENETRIP COMPARAR VOOS v2.0
+// api/compare-flights.js - BENETRIP COMPARAR VOOS v2.1
+// v2.1: cheaper_alternatives, fare_type, baggage_allowance_links (SearchAPI update)
 // Suporte a adultos, crianças (2-11) e bebês (0-2)
 
 export const maxDuration = 60;
@@ -42,9 +43,12 @@ async function searchFlights(params, label) {
         const allFlights = [...bestFlights, ...otherFlights];
         const priceInsights = data.price_insights || null;
 
-        console.log(`[Flights][${label}] ${allFlights.length} voos (${bestFlights.length} best + ${otherFlights.length} other) (${elapsed}ms)`);
+        // v2.1: capturar cheaper_alternatives retornadas pela API
+        const cheaperAlternatives = data.cheaper_alternatives || [];
 
-        return { flights: allFlights, priceInsights, error: null, elapsed, isBest: bestFlights.length };
+        console.log(`[Flights][${label}] ${allFlights.length} voos (${bestFlights.length} best + ${otherFlights.length} other) | ${cheaperAlternatives.length} alternativas mais baratas (${elapsed}ms)`);
+
+        return { flights: allFlights, priceInsights, cheaperAlternatives, error: null, elapsed, isBest: bestFlights.length };
     } catch (err) {
         const elapsed = Date.now() - startTime;
         console.error(`[Flights][${label}] Erro (${elapsed}ms):`, err.message);
@@ -104,6 +108,9 @@ function extractFlightDetails(flight, isBestFlight) {
         booking_token: flight.booking_token || null,
         type: flight.type || 'round_trip',
         extensions: flight.extensions || [],
+        // v2.1: novos campos da SearchAPI
+        fare_type: flight.fare_type || null,
+        baggage_allowance_links: flight.baggage_allowance_links || null,
     };
 }
 
@@ -143,14 +150,12 @@ export default async function handler(req, res) {
         // ── Passageiros ──────────────────────────────────────────────
         const numAdultos = Math.min(Math.max(parseInt(adultos) || 1, 1), MAX_PAX_TOTAL);
         const numCriancas = Math.min(Math.max(parseInt(criancas) || 0, 0), MAX_PAX_TOTAL);
-        const numBebes = Math.min(Math.max(parseInt(bebes) || 0, 0), 4); // máx 4 bebês
+        const numBebes = Math.min(Math.max(parseInt(bebes) || 0, 0), 4);
 
-        // Total adultos+crianças não pode exceder 9
         const totalPagantes = Math.min(numAdultos + numCriancas, MAX_PAX_TOTAL);
         const adultosFinal = Math.min(numAdultos, MAX_PAX_TOTAL);
         const criancasFinal = Math.max(0, totalPagantes - adultosFinal);
-        // Bebês não são incluídos na conta de preço por pessoa
-        const paxParaPreco = adultosFinal + criancasFinal; // base para dividir preço
+        const paxParaPreco = adultosFinal + criancasFinal;
 
         const combinacoes = [];
         for (const ida of datasIda)
@@ -163,7 +168,7 @@ export default async function handler(req, res) {
                 message: 'As datas de volta devem ser posteriores às de ida',
             });
 
-        console.log(`✈️ Compare Flights v2: ${origemCode}→${destinoCode} | ${combinacoes.length} combos | ${adultosFinal}A/${criancasFinal}C/${numBebes}B | ${currencyCode}`);
+        console.log(`✈️ Compare Flights v2.1: ${origemCode}→${destinoCode} | ${combinacoes.length} combos | ${adultosFinal}A/${criancasFinal}C/${numBebes}B | ${currencyCode}`);
 
         const localeMap = {
             'BRL': { gl: 'br', hl: 'pt-BR' },
@@ -208,11 +213,32 @@ export default async function handler(req, res) {
         let globalCheapest = Infinity;
         let globalCheapestCombo = null;
 
+        // v2.1: acumular cheaper_alternatives de todas as buscas
+        const searchedKeys = new Set(combinacoes.map(c => `${c.dataIda}_${c.dataVolta}`));
+        const rawCheaperAlts = new Map(); // key -> {departure, return, price}
+
         for (const result of allResults) {
-            const { combo, flights, priceInsights, error, elapsed } = result;
+            const { combo, flights, priceInsights, cheaperAlternatives, error, elapsed } = result;
             const d1 = new Date(combo.dataIda + 'T00:00:00Z');
             const d2 = new Date(combo.dataVolta + 'T00:00:00Z');
             const noites = Math.round((d2 - d1) / (1000 * 60 * 60 * 24));
+
+            // v2.1: coletar alternativas mais baratas retornadas pela API para essa busca
+            if (cheaperAlternatives && cheaperAlternatives.length > 0) {
+                cheaperAlternatives.forEach(alt => {
+                    if (!alt.departure_date || !alt.return_date || !alt.price) return;
+                    const altKey = `${alt.departure_date}_${alt.return_date}`;
+                    // Ignorar datas que já foram pesquisadas
+                    if (searchedKeys.has(altKey)) return;
+                    if (!rawCheaperAlts.has(altKey) || alt.price < rawCheaperAlts.get(altKey).price) {
+                        rawCheaperAlts.set(altKey, {
+                            departure: alt.departure_date,
+                            return: alt.return_date,
+                            price: alt.price,
+                        });
+                    }
+                });
+            }
 
             if (error || !flights.length) {
                 combinacoesResult.push({ dataIda: combo.dataIda, dataVolta: combo.dataVolta, noites, voos: [], melhorPreco: null, priceInsights: null, error: error || 'Sem voos', elapsed });
@@ -246,6 +272,16 @@ export default async function handler(req, res) {
             });
         }
 
+        // v2.1: filtrar e ordenar alternativas — só manter as mais baratas que o globalCheapest
+        const cheaperAlternativesFinal = Array.from(rawCheaperAlts.values())
+            .filter(alt => alt.price < globalCheapest)
+            .sort((a, b) => a.price - b.price)
+            .slice(0, 5);
+
+        if (cheaperAlternativesFinal.length > 0) {
+            console.log(`💡 ${cheaperAlternativesFinal.length} alternativas mais baratas encontradas | Mais barata: ${cheaperAlternativesFinal[0].price} ${currencyCode} (${cheaperAlternativesFinal[0].departure}→${cheaperAlternativesFinal[0].return})`);
+        }
+
         const matrizPrecos = {};
         combinacoesResult.forEach(c => {
             matrizPrecos[`${c.dataIda}_${c.dataVolta}`] = {
@@ -275,7 +311,7 @@ export default async function handler(req, res) {
             combinacoesSemVoo: combinacoes.length - precosValidos.length,
         };
 
-        console.log(`✅ Completo em ${totalTime}ms | Mais barato: ${globalCheapest} ${currencyCode} | Pax: ${adultosFinal}A/${criancasFinal}C/${numBebes}B`);
+        console.log(`✅ Completo em ${totalTime}ms | Mais barato: ${globalCheapest} ${currencyCode} | Pax: ${adultosFinal}A/${criancasFinal}C/${numBebes}B | Alternativas: ${cheaperAlternativesFinal.length}`);
 
         return res.status(200).json({
             success: true,
@@ -292,6 +328,8 @@ export default async function handler(req, res) {
             matrizPrecos,
             combinacoes: combinacoesResult,
             companhias: Array.from(todasCompanhias.values()),
+            // v2.1: alternativas mais baratas fora das datas pesquisadas
+            cheaperAlternatives: cheaperAlternativesFinal,
             _meta: { totalTime, totalCombinacoes: combinacoes.length, batchSize: BATCH_SIZE },
         });
 
