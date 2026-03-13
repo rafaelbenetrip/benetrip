@@ -202,6 +202,14 @@ body {
 }
 .autocomplete-item:last-child { border-bottom: none; }
 .autocomplete-item:hover { background-color: var(--orange-light); }
+/* v2.2: Visual diferenciado para cidades agrupadas (SAO, RIO, NYC, etc.) */
+.autocomplete-city-group {
+    background: #FFF8F0;
+    border-left: 3px solid #E87722;
+}
+.autocomplete-city-group:hover {
+    background: #FFF0E0;
+}
 .item-code {
     background-color: var(--orange);
     color: var(--white);
