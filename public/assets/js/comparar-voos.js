@@ -1536,7 +1536,7 @@ const BenetripCompararVoos = {
         let html = '<div class="flight-legs-container">';
 
         html += '<div class="leg-column">';
-        html += `<div class="leg-label">🛫 Ida · ${orig.code} → ${dest.code}</div>`;
+        html += `<div class="leg-label">🛫 Ida · ${orig.displayCode || orig.code} → ${dest.displayCode || dest.code}</div>`;
         if (outbound.length > 0) {
             outbound.forEach((leg, i) => {
                 html += this._renderLegRow(leg);
@@ -1548,7 +1548,7 @@ const BenetripCompararVoos = {
         html += '</div>';
 
         html += '<div class="leg-column">';
-        html += `<div class="leg-label">🛬 Volta · ${dest.code} → ${orig.code}</div>`;
+        html += `<div class="leg-label">🛬 Volta · ${dest.displayCode || dest.code} → ${orig.displayCode || orig.code}</div>`;
         if (returnLegs.length > 0) {
             returnLegs.forEach((leg, i) => {
                 html += this._renderLegRow(leg);
