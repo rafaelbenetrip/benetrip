@@ -1424,14 +1424,14 @@ const BENETRIP_DESTINOS = {
       const searchParam = `${codigoOrigem}${diaIdaFormatado}${mesIdaFormatado}${codigoDestino}${diaVoltaFormatado}${mesVoltaFormatado}${quantidadePassageiros}`;
 
       // URL final para voos
-      const urlWhitelabel = `https://voos.benetrip.com.br/?flightSearch=${searchParam}`;
+      const urlWhitelabel = `https://benetrip.com.br/voos?flightSearch=${searchParam}`;
 
       console.log('✅ URL de voos construída:', urlWhitelabel);
       return urlWhitelabel;
 
     } catch (erro) {
       console.error('❌ Erro ao construir URL de voos:', erro);
-      return 'https://voos.benetrip.com.br/';
+      return 'https://benetrip.com.br/voos';
     }
   },
 

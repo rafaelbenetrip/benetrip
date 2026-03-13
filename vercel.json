@@ -49,6 +49,19 @@
       "maxDuration": 300
     }
   },
+  "redirects": [
+    {
+      "source": "/:path*",
+      "has": [
+        {
+          "type": "host",
+          "value": "voos.benetrip.com.br"
+        }
+      ],
+      "destination": "https://benetrip.com.br/voos/:path*",
+      "statusCode": 301
+    }
+  ],
   "headers": [
     {
       "source": "/robots.txt",

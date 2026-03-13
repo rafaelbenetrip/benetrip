@@ -133,7 +133,15 @@ async function getPrerenderedPage(url, token) {
  */
 export default async function middleware(request) {
   var url = new URL(request.url);
+  var hostname = url.hostname;
   var pathname = url.pathname;
+
+  // Redirect 301: voos.benetrip.com.br → benetrip.com.br/voos
+  // Consolida autoridade de domínio movendo subdomínio para subdiretório
+  if (hostname === 'voos.benetrip.com.br') {
+    var newUrl = 'https://benetrip.com.br/voos' + pathname + url.search;
+    return Response.redirect(newUrl, 301);
+  }
 
   // Ignora rotas que não são páginas HTML
   if (!shouldProcess(pathname)) {
