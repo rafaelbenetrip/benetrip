@@ -159,13 +159,9 @@ export default async function middleware(request) {
       }
     }
 
-    // Fallback: se não tem token ou Prerender.io falhou,
-    // adiciona headers SEO básicos
-    var headers = new Headers();
-    headers.set('X-Robots-Tag', 'index, follow');
-    headers.set('Cache-Control', 'public, s-maxage=3600, stale-while-revalidate=86400');
-    headers.set('Vary', 'User-Agent');
-    return new Response(null, { headers: headers });
+    // Fallback: se não tem token ou Prerender.io falhou, passa direto
+    // (não retornar Response vazia — isso serviria HTML em branco ao crawler)
+    return;
   }
 
   // Para usuários normais: não faz nada, deixa passar
