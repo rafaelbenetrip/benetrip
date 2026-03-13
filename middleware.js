@@ -148,11 +148,9 @@ export default async function middleware(request) {
     var token = process.env.PRERENDER_TOKEN;
 
     if (token) {
-      // Monta a URL completa da página
+      // Monta a URL limpa (sem extensão .html) — as rotas do vercel.json
+      // servem os arquivos HTML a partir das URLs canônicas sem extensão
       var pageUrl = url.origin + pathname;
-      if (pathname !== '/' && !pathname.endsWith('.html')) {
-        pageUrl = pageUrl + '.html';
-      }
 
       // Tenta buscar a versão pré-renderizada
       var prerendered = await getPrerenderedPage(pageUrl, token);
