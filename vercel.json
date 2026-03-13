@@ -1,5 +1,8 @@
 {
   "version": 2,
+  "outputDirectory": "public",
+  "cleanUrls": true,
+  "trailingSlash": false,
   "functions": {
     "api/recommendations.js": {
       "memory": 1024,
@@ -14,8 +17,8 @@
       "maxDuration": 90
     },
     "api/flight-results.js": {
-       "memory": 1024,
-       "maxDuration": 90
+      "memory": 1024,
+      "maxDuration": 90
     },
     "api/flight-redirect.js": {
       "memory": 1024,
@@ -46,182 +49,51 @@
       "maxDuration": 300
     }
   },
-  "routes": [
+  "headers": [
     {
-      "src": "/robots.txt",
-      "dest": "/public/robots.txt",
-      "headers": {
-        "Content-Type": "text/plain; charset=utf-8",
-        "Cache-Control": "public, max-age=86400"
-      }
+      "source": "/robots.txt",
+      "headers": [
+        { "key": "Content-Type", "value": "text/plain; charset=utf-8" },
+        { "key": "Cache-Control", "value": "public, max-age=86400" }
+      ]
     },
     {
-      "src": "/sitemap.xml",
-      "dest": "/public/sitemap.xml",
-      "headers": {
-        "Content-Type": "application/xml; charset=utf-8",
-        "Cache-Control": "public, max-age=86400"
-      }
+      "source": "/sitemap.xml",
+      "headers": [
+        { "key": "Content-Type", "value": "application/xml; charset=utf-8" },
+        { "key": "Cache-Control", "value": "public, max-age=86400" }
+      ]
     },
     {
-      "src": "/assets/js/(.*)\\.js",
-      "headers": {
-        "Content-Type": "application/javascript; charset=utf-8",
-        "Access-Control-Allow-Origin": "*",
-        "Cache-Control": "public, max-age=86400",
-        "X-Content-Type-Options": "nosniff"
-      },
-      "continue": true
+      "source": "/assets/js/:path*.js",
+      "headers": [
+        { "key": "Content-Type", "value": "application/javascript; charset=utf-8" },
+        { "key": "Cache-Control", "value": "public, max-age=86400" },
+        { "key": "X-Content-Type-Options", "value": "nosniff" }
+      ]
     },
     {
-      "src": "/assets/css/(.*)\\.css",
-      "headers": {
-        "Content-Type": "text/css; charset=utf-8",
-        "Access-Control-Allow-Origin": "*",
-        "Cache-Control": "public, max-age=86400"
-      },
-      "continue": true
+      "source": "/assets/css/:path*.css",
+      "headers": [
+        { "key": "Content-Type", "value": "text/css; charset=utf-8" },
+        { "key": "Cache-Control", "value": "public, max-age=86400" }
+      ]
     },
     {
-      "src": "/api/weather",
-      "headers": {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET, OPTIONS",
-        "Content-Type": "application/json; charset=utf-8",
-        "X-Content-Type-Options": "nosniff",
-        "Cache-Control": "public, max-age=300, stale-while-revalidate=86400"
-      },
-      "dest": "/api/weather.js"
+      "source": "/assets/:path*",
+      "headers": [
+        { "key": "Access-Control-Allow-Origin", "value": "*" },
+        { "key": "Cache-Control", "value": "public, max-age=86400" }
+      ]
     },
     {
-      "src": "/api/itinerary-generator",
-      "headers": {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "POST, OPTIONS",
-        "Content-Type": "application/json; charset=utf-8",
-        "X-Content-Type-Options": "nosniff"
-      },
-      "dest": "/api/itinerary-generator.js"
-    },
-    {
-      "src": "/api/flight-results",
-      "headers": {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET, OPTIONS",
-        "Content-Type": "application/json; charset=utf-8",
-        "X-Content-Type-Options": "nosniff"
-      },
-      "dest": "/api/flight-results.js"
-    },
-    {
-      "src": "/api/flight-redirect",
-      "headers": {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET, OPTIONS",
-        "Content-Type": "application/json; charset=utf-8",
-        "X-Content-Type-Options": "nosniff"
-      },
-      "dest": "/api/flight-redirect.js"
-    },
-    {
-      "src": "/api/multidatas",
-      "headers": {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "POST, OPTIONS",
-        "Content-Type": "application/json; charset=utf-8",
-        "X-Content-Type-Options": "nosniff"
-      },
-      "dest": "/api/multidatas.js"
-    },
-    {
-      "src": "/api/compare-flights",
-      "headers": {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
-        "Content-Type": "application/json; charset=utf-8",
-        "X-Content-Type-Options": "nosniff"
-      },
-      "dest": "/api/compare-flights.js"
-    },
-    {
-      "src": "/api/recommendations",
-      "dest": "/api/recommendations.js"
-    },
-    {
-      "src": "/api/flight-search",
-      "dest": "/api/flight-search.js"
-    },
-    {
-      "src": "/api/image-search",
-      "dest": "/api/image-search.js"
-    },
-    {
-      "src": "/api/(.*)",
-      "headers": {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type, Authorization",
-        "Content-Type": "application/json",
-        "Connection": "keep-alive",
-        "Keep-Alive": "timeout=60",
-        "Cache-Control": "public, max-age=60, stale-while-revalidate=300"
-      },
-      "continue": true
-    },
-
-    {
-      "src": "/index\\.html",
-      "headers": {
-        "Location": "/"
-      },
-      "status": 301
-    },
-    {
-      "src": "/(.*)\\.html",
-      "headers": {
-        "Location": "/$1"
-      },
-      "status": 301
-    },
-    {
-      "src": "/(.+)/",
-      "headers": {
-        "Location": "/$1"
-      },
-      "status": 301
-    },
-
-    {
-      "src": "/assets/(.*)",
-      "headers": {
-        "Access-Control-Allow-Origin": "*",
-        "Cache-Control": "public, max-age=86400"
-      },
-      "dest": "/public/assets/$1"
-    },
-    {
-      "src": "/chat",
-      "dest": "/public/chat/index.html"
-    },
-    {
-      "src": "/hoteis",
-      "dest": "/public/hoteis/index.html"
-    },
-    {
-      "src": "/inicio",
-      "dest": "/public/inicio/index.html"
-    },
-    {
-      "src": "/$",
-      "dest": "/public/index.html"
-    },
-    {
-      "src": "/([^/]+)",
-      "dest": "/public/$1.html"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/public/$1"
+      "source": "/api/:path*",
+      "headers": [
+        { "key": "Access-Control-Allow-Origin", "value": "*" },
+        { "key": "Access-Control-Allow-Methods", "value": "GET, POST, OPTIONS" },
+        { "key": "Access-Control-Allow-Headers", "value": "Content-Type, Authorization" },
+        { "key": "X-Content-Type-Options", "value": "nosniff" }
+      ]
     }
   ]
 }
