@@ -1,27 +1,27 @@
 /**
- * Vercel Edge Middleware - Prerendering para Crawlers
+ * Vercel Edge Middleware - Prerendering com Prerender.io
  *
  * COMO FUNCIONA:
  * ==============
  *
- * 1. DETECÇÃO DE BOT: Quando uma requisição chega, o middleware analisa o
- *    User-Agent para identificar se é um crawler (Googlebot, Bingbot, etc.)
+ * 1. DETECÇÃO DE BOT: Analisa o User-Agent para identificar crawlers
  *
- * 2. SE FOR UM USUÁRIO NORMAL: A requisição passa direto, sem alteração.
- *    O site funciona normalmente com JavaScript no navegador.
+ * 2. SE FOR UM USUÁRIO NORMAL: Passa direto, sem alteração
  *
- * 3. SE FOR UM CRAWLER:
- *    a) Verifica se a página é uma rota HTML válida (não API, não asset)
- *    b) Adiciona headers especiais que indicam ao Vercel para priorizar
- *       o conteúdo HTML estático
- *    c) Define headers de cache para que o conteúdo pré-renderizado
- *       fique em cache por 1 hora no edge da Vercel
+ * 3. SE FOR UM CRAWLER (Googlebot, etc.):
+ *    a) Redireciona a requisição para o Prerender.io
+ *    b) O Prerender.io abre a página num Chrome headless
+ *    c) Espera o JavaScript executar e renderizar todo o conteúdo
+ *    d) Devolve o HTML completo e estático para o crawler
+ *    e) O crawler vê TUDO: cards de destinos, resultados de voos, etc.
  *
- * 4. HEADERS SEO: Adiciona headers de segurança e SEO em todas as respostas
- *    (X-Robots-Tag, referrer-policy, etc.)
+ * 4. CACHE: O Prerender.io mantém cache das páginas renderizadas,
+ *    então a segunda visita do Googlebot é instantânea
  *
- * ONDE COLOCAR: Na raiz do projeto (middleware.js)
- * O Vercel detecta automaticamente e executa antes de cada requisição.
+ * CONFIGURAÇÃO:
+ * - Token do Prerender.io deve estar na variável de ambiente PRERENDER_TOKEN
+ *   no painel da Vercel (Settings > Environment Variables)
+ * - Ou diretamente no .env local para testes
  */
 
 // Lista de User-Agents de crawlers conhecidos
@@ -87,10 +87,51 @@ function shouldProcess(pathname) {
 }
 
 /**
+ * Busca a página pré-renderizada no Prerender.io
+ *
+ * O Prerender.io funciona assim:
+ * 1. Recebe a URL da sua página
+ * 2. Abre num Chrome headless (navegador sem tela)
+ * 3. Espera o JavaScript executar completamente
+ * 4. Captura o HTML final (com todo o conteúdo renderizado)
+ * 5. Devolve esse HTML estático
+ *
+ * Para o Googlebot, é como se a página fosse 100% HTML estático!
+ */
+async function getPrerenderedPage(url, token) {
+  var prerenderUrl = 'https://service.prerender.io/' + url;
+
+  var response = await fetch(prerenderUrl, {
+    headers: {
+      'X-Prerender-Token': token
+    },
+    redirect: 'follow'
+  });
+
+  if (!response.ok) {
+    // Se o Prerender.io falhar, retorna null para servir a página normal
+    return null;
+  }
+
+  var html = await response.text();
+
+  return new Response(html, {
+    status: 200,
+    headers: {
+      'Content-Type': 'text/html; charset=utf-8',
+      'X-Prerender': 'true',
+      'X-Robots-Tag': 'index, follow',
+      'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=86400',
+      'Vary': 'User-Agent'
+    }
+  });
+}
+
+/**
  * Edge Middleware principal
  * Executa no Edge Runtime da Vercel (rápido, global)
  */
-export default function middleware(request) {
+export default async function middleware(request) {
   var url = new URL(request.url);
   var pathname = url.pathname;
 
@@ -102,33 +143,35 @@ export default function middleware(request) {
   var userAgent = request.headers.get('user-agent') || '';
   var isCrawler = isBot(userAgent);
 
-  // Cria headers adicionais para a resposta
-  var responseHeaders = new Headers();
-
-  // Headers SEO para todas as respostas
-  responseHeaders.set('X-Robots-Tag', 'index, follow');
-  responseHeaders.set('Referrer-Policy', 'origin-when-cross-origin');
-
   if (isCrawler) {
-    // Para crawlers: adiciona headers que indicam conteúdo estático
-    // e define cache agressivo no edge
-    responseHeaders.set('X-Prerender', 'true');
-    responseHeaders.set('Cache-Control', 'public, s-maxage=3600, stale-while-revalidate=86400');
-    responseHeaders.set('Vary', 'User-Agent');
+    // Pega o token do Prerender.io das variáveis de ambiente
+    var token = process.env.PRERENDER_TOKEN;
 
-    // Reescreve a URL para garantir que .html é servido
-    // (crawlers devem ver o HTML completo, não redirecionamentos)
-    if (!pathname.endsWith('.html') && pathname !== '/' && !pathname.endsWith('/')) {
-      var htmlPath = pathname + '.html';
-      return Response.redirect(new URL(htmlPath, request.url), 302);
+    if (token) {
+      // Monta a URL completa da página
+      var pageUrl = url.origin + pathname;
+      if (pathname !== '/' && !pathname.endsWith('.html')) {
+        pageUrl = pageUrl + '.html';
+      }
+
+      // Tenta buscar a versão pré-renderizada
+      var prerendered = await getPrerenderedPage(pageUrl, token);
+      if (prerendered) {
+        return prerendered;
+      }
     }
+
+    // Fallback: se não tem token ou Prerender.io falhou,
+    // adiciona headers SEO básicos
+    var headers = new Headers();
+    headers.set('X-Robots-Tag', 'index, follow');
+    headers.set('Cache-Control', 'public, s-maxage=3600, stale-while-revalidate=86400');
+    headers.set('Vary', 'User-Agent');
+    return new Response(null, { headers: headers });
   }
 
-  // Retorna a resposta com os headers adicionais
-  return new Response(null, {
-    headers: responseHeaders,
-    status: 200
-  });
+  // Para usuários normais: não faz nada, deixa passar
+  return;
 }
 
 /**
@@ -137,13 +180,6 @@ export default function middleware(request) {
  */
 export var config = {
   matcher: [
-    /*
-     * Match todas as rotas exceto:
-     * - api (rotas de API)
-     * - _next (arquivos internos do Next.js, se houver)
-     * - _vercel (arquivos internos da Vercel)
-     * - assets estáticos (js, css, imagens)
-     */
     '/((?!api|_next|_vercel|assets|.*\\.).*)'
   ]
 };
