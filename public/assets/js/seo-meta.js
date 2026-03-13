@@ -184,6 +184,105 @@
       'url': canonicalUrl,
       'description': description
     };
+  } else if (path === '/termos') {
+    jsonLd = {
+      '@context': 'https://schema.org',
+      '@type': 'WebPage',
+      'name': title,
+      'url': canonicalUrl,
+      'description': description,
+      'mainEntity': {
+        '@type': 'CreativeWork',
+        'name': 'Termos e Condições de Uso',
+        'text': description
+      }
+    };
+  } else if (path === '/privacidade') {
+    jsonLd = {
+      '@context': 'https://schema.org',
+      '@type': 'WebPage',
+      'name': title,
+      'url': canonicalUrl,
+      'description': description,
+      'mainEntity': {
+        '@type': 'CreativeWork',
+        'name': 'Política de Privacidade',
+        'text': description
+      }
+    };
+  } else if (path === '/cookies') {
+    jsonLd = {
+      '@context': 'https://schema.org',
+      '@type': 'WebPage',
+      'name': title,
+      'url': canonicalUrl,
+      'description': description
+    };
+  } else if (path === '/destinos') {
+    jsonLd = {
+      '@context': 'https://schema.org',
+      '@type': 'WebApplication',
+      'name': title,
+      'url': canonicalUrl,
+      'applicationCategory': 'TravelApplication',
+      'operatingSystem': 'Web',
+      'description': description,
+      'provider': {
+        '@type': 'Organization',
+        'name': 'Benetrip',
+        'url': SITE_URL
+      }
+    };
+  } else if (path === '/hoteis') {
+    jsonLd = {
+      '@context': 'https://schema.org',
+      '@type': 'WebApplication',
+      'name': title,
+      'url': canonicalUrl,
+      'applicationCategory': 'TravelApplication',
+      'operatingSystem': 'Web',
+      'description': description,
+      'provider': {
+        '@type': 'Organization',
+        'name': 'Benetrip',
+        'url': SITE_URL
+      },
+      'offers': {
+        '@type': 'AggregateOffer',
+        'priceCurrency': 'BRL',
+        'availability': 'https://schema.org/InStock'
+      }
+    };
+  } else if (path === '/chat' || path === '/inicio') {
+    jsonLd = {
+      '@context': 'https://schema.org',
+      '@type': 'WebApplication',
+      'name': title,
+      'url': canonicalUrl,
+      'applicationCategory': 'TravelApplication',
+      'operatingSystem': 'Web',
+      'description': description,
+      'provider': {
+        '@type': 'Organization',
+        'name': 'Benetrip',
+        'url': SITE_URL
+      }
+    };
+  } else if (path === '/itinerary' || path === '/itinerary2' || path === '/flights') {
+    jsonLd = {
+      '@context': 'https://schema.org',
+      '@type': 'WebApplication',
+      'name': title,
+      'url': canonicalUrl,
+      'applicationCategory': 'TravelApplication',
+      'operatingSystem': 'Web',
+      'description': description,
+      'provider': {
+        '@type': 'Organization',
+        'name': 'Benetrip',
+        'url': SITE_URL
+      }
+    };
   }
 
   // Injeta JSON-LD se existir para esta página
