@@ -1,5 +1,8 @@
 /**
- * BENETRIP — COMPARAR VOOS v2.1
+ * BENETRIP — COMPARAR VOOS v2.2
+ * v2.2: Suporte a aeroportos agrupados (SAO, RIO, NYC, etc.) via kgmid
+ *       Autocomplete com visual diferenciado para cidades agrupadas
+ *       SearchAPI recebe kgmid para cidades agrupadas ou IATA para aeroportos individuais
  * v2.1: cheaper_alternatives (seção Tripinha), fare_type badge, baggage_allowance_links
  * Passageiros: adultos, crianças, bebês
  * Filtros: paradas, companhias, horários, duração, preço, aeroportos
@@ -40,7 +43,7 @@ const BenetripCompararVoos = {
 
     config: {
         debug: true,
-        cidadesJsonPath: 'data/cidades_global_iata_v6.json',
+        cidadesJsonPath: 'data/cidades_global_iata_v0.json',
         maxDatasIda: 4,
         maxDatasVolta: 4,
     },
@@ -68,7 +71,7 @@ const BenetripCompararVoos = {
     // INIT
     // ════════════════════════════════════════
     init() {
-        this.log('🐕 Comparar Voos v2.1 inicializando...');
+        this.log('🐕 Comparar Voos v2.2 inicializando...');
         this.carregarCidades();
         this.setupAutocomplete('origem', 'origem-results', 'origem-data', 'origemSelecionada');
         this.setupAutocomplete('destino', 'destino-results', 'destino-data', 'destinoSelecionado');
@@ -107,17 +110,22 @@ const BenetripCompararVoos = {
             if (!r.ok) throw new Error('Erro');
             const d = await r.json();
             this.state.cidadesData = d.filter(c => c.iata);
-            this.log(`✅ ${this.state.cidadesData.length} cidades`);
+            const agrupadas = this.state.cidadesData.filter(c => c.is_city_code);
+            this.log(`✅ ${this.state.cidadesData.length} cidades (${agrupadas.length} cidades agrupadas)`);
         } catch {
             this.state.cidadesData = [
-                { cidade: "São Paulo",     sigla_estado: "SP", pais: "Brasil",         codigo_pais: "BR", iata: "GRU", aeroporto: "Aeroporto de Guarulhos" },
-                { cidade: "Rio de Janeiro",sigla_estado: "RJ", pais: "Brasil",         codigo_pais: "BR", iata: "GIG", aeroporto: "Aeroporto do Galeão" },
-                { cidade: "Lisboa",                             pais: "Portugal",       codigo_pais: "PT", iata: "LIS" },
-                { cidade: "Miami",                              pais: "Estados Unidos", codigo_pais: "US", iata: "MIA", aeroporto: "Miami International" },
-                { cidade: "Buenos Aires",                       pais: "Argentina",      codigo_pais: "AR", iata: "EZE", aeroporto: "Ezeiza" },
-                { cidade: "Paris",                              pais: "França",         codigo_pais: "FR", iata: "CDG", aeroporto: "Charles de Gaulle" },
-                { cidade: "Orlando",                            pais: "Estados Unidos", codigo_pais: "US", iata: "MCO", aeroporto: "Orlando International" },
-                { cidade: "Salvador",      sigla_estado: "BA", pais: "Brasil",         codigo_pais: "BR", iata: "SSA" },
+                { cidade: "São Paulo", sigla_estado: "SP", pais: "Brasil", codigo_pais: "BR", iata: "/m/022pfm", iata_city_code: "SAO", aeroporto: "Todos os aeroportos (Guarulhos, Congonhas e Viracopos)", is_city_code: true, aeroportos_incluidos: ["GRU", "CGH", "VCP"] },
+                { cidade: "São Paulo", sigla_estado: "SP", pais: "Brasil", codigo_pais: "BR", iata: "GRU", aeroporto: "Aeroporto de Guarulhos" },
+                { cidade: "São Paulo", sigla_estado: "SP", pais: "Brasil", codigo_pais: "BR", iata: "CGH", aeroporto: "Aeroporto de Congonhas" },
+                { cidade: "Rio de Janeiro", sigla_estado: "RJ", pais: "Brasil", codigo_pais: "BR", iata: "/m/06gmr", iata_city_code: "RIO", aeroporto: "Todos os aeroportos (Galeão e Santos Dumont)", is_city_code: true, aeroportos_incluidos: ["GIG", "SDU"] },
+                { cidade: "Rio de Janeiro", sigla_estado: "RJ", pais: "Brasil", codigo_pais: "BR", iata: "GIG", aeroporto: "Aeroporto do Galeão" },
+                { cidade: "Rio de Janeiro", sigla_estado: "RJ", pais: "Brasil", codigo_pais: "BR", iata: "SDU", aeroporto: "Aeroporto Santos Dumont" },
+                { cidade: "Lisboa", pais: "Portugal", codigo_pais: "PT", iata: "LIS" },
+                { cidade: "Miami", pais: "Estados Unidos", codigo_pais: "US", iata: "MIA", aeroporto: "Miami International" },
+                { cidade: "Buenos Aires", pais: "Argentina", codigo_pais: "AR", iata: "EZE", aeroporto: "Ezeiza" },
+                { cidade: "Paris", pais: "França", codigo_pais: "FR", iata: "CDG", aeroporto: "Charles de Gaulle" },
+                { cidade: "Orlando", pais: "Estados Unidos", codigo_pais: "US", iata: "MCO", aeroporto: "Orlando International" },
+                { cidade: "Salvador", sigla_estado: "BA", pais: "Brasil", codigo_pais: "BR", iata: "SSA" },
             ];
         }
     },
@@ -127,15 +135,36 @@ const BenetripCompararVoos = {
     buscarCidades(termo) {
         if (!this.state.cidadesData || termo.length < 2) return [];
         const tn = this.norm(termo);
-        return this.state.cidadesData
+        const resultados = this.state.cidadesData
             .filter(c => {
                 const n = this.norm(c.cidade);
-                const i = c.iata.toLowerCase();
+                const i = c.is_city_code
+                    ? (c.iata_city_code || '').toLowerCase()
+                    : c.iata.toLowerCase();
                 const a = c.aeroporto ? this.norm(c.aeroporto) : '';
                 return n.includes(tn) || i.includes(tn) || a.includes(tn);
             })
-            .slice(0, 8)
-            .map(c => ({ code: c.iata, name: c.cidade, state: c.sigla_estado || null, country: c.pais, countryCode: c.codigo_pais, airport: c.aeroporto || null }));
+            .slice(0, 10)
+            .map(c => ({
+                code: c.iata,
+                displayCode: c.iata_city_code || c.iata,
+                name: c.cidade,
+                state: c.sigla_estado || null,
+                country: c.pais,
+                countryCode: c.codigo_pais,
+                airport: c.aeroporto || null,
+                isCityCode: c.is_city_code || false,
+                aeroportosIncluidos: c.aeroportos_incluidos || null,
+            }));
+
+        // Ordenar: cidades agrupadas aparecem PRIMEIRO
+        resultados.sort((a, b) => {
+            if (a.isCityCode && !b.isCityCode) return -1;
+            if (!a.isCityCode && b.isCityCode) return 1;
+            return 0;
+        });
+
+        return resultados.slice(0, 8);
     },
 
     // ════════════════════════════════════════
@@ -162,20 +191,27 @@ const BenetripCompararVoos = {
                     results.style.display = 'block';
                     return;
                 }
-                results.innerHTML = cidades.map(c => `
-                    <div class="autocomplete-item" data-city='${JSON.stringify(c)}'>
-                        <div class="item-code">${c.code}</div>
+                results.innerHTML = cidades.map(c => {
+                    const cityClass = c.isCityCode ? 'autocomplete-item autocomplete-city-group' : 'autocomplete-item';
+                    const cityIcon = c.isCityCode ? '🏙️' : '';
+                    return `
+                    <div class="${cityClass}" data-city='${JSON.stringify(c)}'>
+                        <div class="item-code">${cityIcon}${c.displayCode}</div>
                         <div class="item-details">
                             <div class="item-name">${c.name}${c.state ? ', ' + c.state : ''}${c.airport ? ' — ' + c.airport : ''}</div>
                             <div class="item-country">${c.country}</div>
                         </div>
-                    </div>`).join('');
+                    </div>`;
+                }).join('');
                 results.style.display = 'block';
                 results.querySelectorAll('.autocomplete-item').forEach(item => {
                     item.addEventListener('click', () => {
                         const cidade = JSON.parse(item.dataset.city);
                         this.state[stateKey] = cidade;
-                        input.value = cidade.airport ? `${cidade.name} — ${cidade.airport} (${cidade.code})` : `${cidade.name} (${cidade.code})`;
+                        const codeDisplay = cidade.displayCode || cidade.code;
+                        input.value = cidade.airport
+                            ? `${cidade.name} — ${cidade.airport} (${codeDisplay})`
+                            : `${cidade.name} (${codeDisplay})`;
                         hidden.value = JSON.stringify(cidade);
                         results.style.display = 'none';
                     });
@@ -377,7 +413,9 @@ const BenetripCompararVoos = {
         document.getElementById('loading-sub').textContent = `${combos.length} combinações · ${paxDesc}`;
 
         try {
-            this.updateProgress(25, `✈️ Pesquisando ${origemSelecionada.code} → ${destinoSelecionado.code}...`);
+            const origDisplay = origemSelecionada.displayCode || origemSelecionada.code;
+            const destDisplay = destinoSelecionado.displayCode || destinoSelecionado.code;
+            this.updateProgress(25, `✈️ Pesquisando ${origDisplay} → ${destDisplay}...`);
 
             const response = await fetch('/api/compare-flights', {
                 method: 'POST',
@@ -385,6 +423,12 @@ const BenetripCompararVoos = {
                 body: JSON.stringify({
                     origem: origemSelecionada.code,
                     destino: destinoSelecionado.code,
+                    origemDisplay: origDisplay,
+                    destinoDisplay: destDisplay,
+                    origemIsCityCode: origemSelecionada.isCityCode || false,
+                    destinoIsCityCode: destinoSelecionado.isCityCode || false,
+                    origemAeroportos: origemSelecionada.aeroportosIncluidos || null,
+                    destinoAeroportos: destinoSelecionado.aeroportosIncluidos || null,
                     datasIda, datasVolta,
                     moeda: moedaSelecionada,
                     adultos: numAdultos,
@@ -472,10 +516,19 @@ const BenetripCompararVoos = {
     _splitLegs(voo) {
         const legs = voo.legs || [];
         const dest = this.state.destinoSelecionado;
+
+        // Para cidades agrupadas, verificar se o aeroporto de chegada é qualquer um do grupo
+        const destCodes = new Set();
+        if (dest.isCityCode && dest.aeroportosIncluidos) {
+            dest.aeroportosIncluidos.forEach(c => destCodes.add(c));
+        } else {
+            destCodes.add(dest.code);
+        }
+
         let splitIdx = -1;
         for (let i = 0; i < legs.length; i++) {
             const arrId = legs[i].arrival_airport.id;
-            if (arrId === dest.code || arrId.startsWith(dest.code)) {
+            if (destCodes.has(arrId) || Array.from(destCodes).some(c => arrId.startsWith(c))) {
                 splitIdx = i;
                 break;
             }
@@ -1120,20 +1173,23 @@ const BenetripCompararVoos = {
         // v2.1: seção de alternativas mais baratas (renderizada condicionalmente)
         const cheaperAltsHtml = this._renderCheaperAlternatives(data);
 
+        const origDisplay = orig.displayCode || orig.code;
+        const destDisplay = dest.displayCode || dest.code;
+
         container.innerHTML = `
             <button class="btn-back" onclick="BenetripCompararVoos.showForm()">← Nova busca</button>
 
             <div class="trip-summary fade-in">
                 <div class="trip-route">
                     <div class="trip-city">
-                        <span class="trip-code">${orig.code}</span>
+                        <span class="trip-code">${origDisplay}</span>
                         <span class="trip-name">${orig.name}</span>
                     </div>
                     <div class="trip-arrow">
                         <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5l7 7-7 7"/></svg>
                     </div>
                     <div class="trip-city">
-                        <span class="trip-code">${dest.code}</span>
+                        <span class="trip-code">${destDisplay}</span>
                         <span class="trip-name">${dest.name}</span>
                     </div>
                 </div>
@@ -1556,8 +1612,10 @@ const BenetripCompararVoos = {
         if (numCriancas > 0) paxParts.push(`${numCriancas} criança${numCriancas > 1 ? 's' : ''}`);
         if (numBebes > 0) paxParts.push(`${numBebes} bebê`);
 
+        const origDisplay = orig.displayCode || orig.code;
+        const destDisplay = dest.displayCode || dest.code;
         let text = `✈️ *Comparação de voos pela Benetrip!*\n\n`;
-        text += `📍 ${orig.name} (${orig.code}) → ${dest.name} (${dest.code})\n`;
+        text += `📍 ${orig.name} (${origDisplay}) → ${dest.name} (${destDisplay})\n`;
         text += `👥 ${paxParts.join(' + ')}\n\n`;
         text += `🏆 *Melhor combinação:*\n`;
         text += `💰 *${s} ${precoPorPessoa.toLocaleString('pt-BR')}* por pessoa\n`;
@@ -1608,8 +1666,24 @@ const BenetripCompararVoos = {
     _bAirport(c){return[...this._pVF(1,1),...this._pSF(2,c)];},
     _bLeg(d,o,de){return[...this._pSF(2,d),...this._pMF(13,this._bAirport(o)),...this._pMF(14,this._bAirport(de))];},
 
+    // Retorna o código de aeroporto para uso no Google Flights URL
+    // Para cidades agrupadas (kgmid), usa o primeiro aeroporto do grupo
+    _getGfAirportCode(cityObj) {
+        if (!cityObj) return '';
+        if (cityObj.isCityCode && cityObj.aeroportosIncluidos && cityObj.aeroportosIncluidos.length > 0) {
+            return cityObj.aeroportosIncluidos[0]; // Ex: GRU para SAO
+        }
+        return cityObj.code;
+    },
+
     buildGoogleFlightsUrl(o, d, dep, ret, cur) {
-        const tfs = this._b64u([...this._pVF(1,28),...this._pVF(2,2),...this._pMF(3,this._bLeg(dep,o,d)),...this._pMF(3,this._bLeg(ret,d,o)),...this._pVF(14,1)]);
+        // Para Google Flights URL, converter kgmid para aeroporto real
+        const orig = this.state.origemSelecionada;
+        const dest = this.state.destinoSelecionado;
+        const oCode = (orig && orig.code === o) ? this._getGfAirportCode(orig) : o;
+        const dCode = (dest && dest.code === d) ? this._getGfAirportCode(dest) : d;
+
+        const tfs = this._b64u([...this._pVF(1,28),...this._pVF(2,2),...this._pMF(3,this._bLeg(dep,oCode,dCode)),...this._pMF(3,this._bLeg(ret,dCode,oCode)),...this._pVF(14,1)]);
         const tfu = this._b64u(this._pMF(2,[...this._pVF(1,1),...this._pVF(2,0),...this._pVF(3,0)]));
         const p = new URLSearchParams();
         p.set('tfs', tfs); p.set('tfu', tfu);

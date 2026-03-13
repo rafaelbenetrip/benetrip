@@ -1,4 +1,6 @@
-// api/compare-flights.js - BENETRIP COMPARAR VOOS v2.1
+// api/compare-flights.js - BENETRIP COMPARAR VOOS v2.2
+// v2.2: Suporte a aeroportos agrupados via kgmid (SAO, RIO, NYC, etc.)
+//       SearchAPI aceita tanto IATA codes (GRU) quanto kgmid (/m/022pfm) como departure_id/arrival_id
 // v2.1: cheaper_alternatives, fare_type, baggage_allowance_links (SearchAPI update)
 // Suporte a adultos, crianças (2-11) e bebês (0-2)
 
@@ -123,12 +125,15 @@ export default async function handler(req, res) {
     if (req.method !== 'POST') return res.status(405).json({ error: 'Apenas POST' });
 
     try {
-        const { origem, destino, datasIda, datasVolta, moeda, adultos, criancas, bebes } = req.body;
+        const { origem, destino, origemDisplay, destinoDisplay, origemIsCityCode, destinoIsCityCode, origemAeroportos, destinoAeroportos, datasIda, datasVolta, moeda, adultos, criancas, bebes } = req.body;
 
-        if (!origem || !/^[A-Z]{3}$/i.test(origem))
-            return res.status(400).json({ error: 'Origem inválida (IATA 3 letras)' });
-        if (!destino || !/^[A-Z]{3}$/i.test(destino))
-            return res.status(400).json({ error: 'Destino inválido (IATA 3 letras)' });
+        // v2.2: Validação aceita IATA (3 letras) ou kgmid (/m/...)
+        const isValidCode = (code) => /^[A-Z]{3}$/i.test(code) || /^\/m\/[a-z0-9_]+$/i.test(code);
+
+        if (!origem || !isValidCode(origem))
+            return res.status(400).json({ error: 'Origem inválida (IATA 3 letras ou código de cidade)' });
+        if (!destino || !isValidCode(destino))
+            return res.status(400).json({ error: 'Destino inválido (IATA 3 letras ou código de cidade)' });
         if (!Array.isArray(datasIda) || datasIda.length === 0 || datasIda.length > MAX_IDAS)
             return res.status(400).json({ error: `Informe 1 a ${MAX_IDAS} datas de ida` });
         if (!Array.isArray(datasVolta) || datasVolta.length === 0 || datasVolta.length > MAX_VOLTAS)
@@ -143,8 +148,12 @@ export default async function handler(req, res) {
         if (!process.env.SEARCHAPI_KEY)
             return res.status(500).json({ error: 'SEARCHAPI_KEY não configurada' });
 
-        const origemCode = origem.toUpperCase().trim();
-        const destinoCode = destino.toUpperCase().trim();
+        // v2.2: kgmid codes (/m/...) são enviados tal qual para a SearchAPI
+        // IATA codes são normalizados para uppercase
+        const origemCode = origem.startsWith('/m/') ? origem.trim() : origem.toUpperCase().trim();
+        const destinoCode = destino.startsWith('/m/') ? destino.trim() : destino.toUpperCase().trim();
+        const origemLabel = origemDisplay || origemCode;
+        const destinoLabel = destinoDisplay || destinoCode;
         const currencyCode = (moeda && /^[A-Z]{3}$/.test(moeda)) ? moeda : 'BRL';
 
         // ── Passageiros ──────────────────────────────────────────────
@@ -168,7 +177,7 @@ export default async function handler(req, res) {
                 message: 'As datas de volta devem ser posteriores às de ida',
             });
 
-        console.log(`✈️ Compare Flights v2.1: ${origemCode}→${destinoCode} | ${combinacoes.length} combos | ${adultosFinal}A/${criancasFinal}C/${numBebes}B | ${currencyCode}`);
+        console.log(`✈️ Compare Flights v2.2: ${origemLabel}(${origemCode})→${destinoLabel}(${destinoCode}) | ${combinacoes.length} combos | ${adultosFinal}A/${criancasFinal}C/${numBebes}B | ${currencyCode}`);
 
         const localeMap = {
             'BRL': { gl: 'br', hl: 'pt-BR' },
@@ -295,7 +304,7 @@ export default async function handler(req, res) {
         if (!precosValidos.length) {
             return res.status(404).json({
                 error: 'Nenhum voo encontrado',
-                message: `Não foram encontrados voos de ${origemCode} para ${destinoCode} nas datas selecionadas.`,
+                message: `Não foram encontrados voos de ${origemLabel} para ${destinoLabel} nas datas selecionadas.`,
                 combinacoesTestadas: combinacoes.length,
             });
         }
@@ -311,12 +320,16 @@ export default async function handler(req, res) {
             combinacoesSemVoo: combinacoes.length - precosValidos.length,
         };
 
-        console.log(`✅ Completo em ${totalTime}ms | Mais barato: ${globalCheapest} ${currencyCode} | Pax: ${adultosFinal}A/${criancasFinal}C/${numBebes}B | Alternativas: ${cheaperAlternativesFinal.length}`);
+        console.log(`✅ Completo em ${totalTime}ms | ${origemLabel}→${destinoLabel} | Mais barato: ${globalCheapest} ${currencyCode} | Pax: ${adultosFinal}A/${criancasFinal}C/${numBebes}B | Alternativas: ${cheaperAlternativesFinal.length}`);
 
         return res.status(200).json({
             success: true,
             origem: origemCode,
             destino: destinoCode,
+            origemDisplay: origemLabel,
+            destinoDisplay: destinoLabel,
+            origemIsCityCode: origemIsCityCode || false,
+            destinoIsCityCode: destinoIsCityCode || false,
             moeda: currencyCode,
             adultos: adultosFinal,
             criancas: criancasFinal,
