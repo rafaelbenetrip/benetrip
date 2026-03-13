@@ -48,6 +48,22 @@
   },
   "routes": [
     {
+      "src": "/robots.txt",
+      "dest": "/public/robots.txt",
+      "headers": {
+        "Content-Type": "text/plain; charset=utf-8",
+        "Cache-Control": "public, max-age=86400"
+      }
+    },
+    {
+      "src": "/sitemap.xml",
+      "dest": "/public/sitemap.xml",
+      "headers": {
+        "Content-Type": "application/xml; charset=utf-8",
+        "Cache-Control": "public, max-age=86400"
+      }
+    },
+    {
       "src": "/assets/js/(.*)\\.js",
       "headers": {
         "Content-Type": "application/javascript; charset=utf-8",

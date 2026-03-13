@@ -1,0 +1,15 @@
+# Benetrip - Regras para crawlers
+User-agent: *
+Allow: /
+
+# Páginas que não devem ser indexadas
+Disallow: /api/
+Disallow: /auth-callback
+Disallow: /api-error
+Disallow: /teste-api
+Disallow: /teste-amadeus
+Disallow: /redirect
+Disallow: /confirmation
+
+# Sitemap
+Sitemap: https://benetrip.com.br/sitemap.xml
