@@ -32,7 +32,7 @@ const BenetripVoosBaratos = {
         this.carregarCidades();
         this.setupAutocomplete('origem', 'origem-results', 'origem-data', 'origemSelecionada');
         this.setupAutocomplete('destino', 'destino-results', 'destino-data', 'destinoSelecionado');
-        this.setupDurationChips();
+        this.setupDurationSlider();
         this.setupCurrencyChips();
         this.setupForm();
         this.log('✅ Pronto!');
@@ -182,16 +182,22 @@ const BenetripVoosBaratos = {
     // ================================================================
     // CHIPS: Duração & Moeda
     // ================================================================
-    setupDurationChips() {
-        document.querySelectorAll('.chip[data-days]').forEach(chip => {
-            chip.addEventListener('click', () => {
-                document.querySelectorAll('.chip[data-days]').forEach(c => c.classList.remove('active'));
-                chip.classList.add('active');
-                this.state.duracaoSelecionada = parseInt(chip.dataset.days);
-                this.log('📅 Duração:', this.state.duracaoSelecionada, 'dias');
-            });
-        });
-        document.querySelector('.chip[data-days="7"]')?.classList.add('active');
+    setupDurationSlider() {
+        const slider = document.getElementById('duration-slider');
+        const display = document.getElementById('duration-display');
+        if (!slider || !display) return;
+
+        const updateSlider = (value) => {
+            this.state.duracaoSelecionada = value;
+            display.textContent = `${value} dia${value !== 1 ? 's' : ''}`;
+            // Gradient fill to show progress
+            const pct = ((value - slider.min) / (slider.max - slider.min)) * 100;
+            slider.style.background = `linear-gradient(to right, var(--orange) ${pct}%, var(--gray-border) ${pct}%)`;
+            this.log('📅 Duração:', value, 'dias');
+        };
+
+        slider.addEventListener('input', () => updateSlider(parseInt(slider.value)));
+        updateSlider(parseInt(slider.value));
     },
 
     setupCurrencyChips() {
@@ -267,6 +273,19 @@ const BenetripVoosBaratos = {
                 throw new Error(data.message || 'Nenhum voo encontrado para esta rota');
             }
 
+            // Sincronizar slider se houve fallback de duração
+            if (data.fallback) {
+                this.state.duracaoSelecionada = data.duracao;
+                const slider = document.getElementById('duration-slider');
+                if (slider) {
+                    slider.value = data.duracao;
+                    const pct = ((data.duracao - slider.min) / (slider.max - slider.min)) * 100;
+                    slider.style.background = `linear-gradient(to right, var(--orange) ${pct}%, var(--gray-border) ${pct}%)`;
+                }
+                const display = document.getElementById('duration-display');
+                if (display) display.textContent = `${data.duracao} dias`;
+            }
+
             this.state.resultados = data;
 
             if (typeof BenetripAutoSave !== 'undefined') {
@@ -322,10 +341,21 @@ const BenetripVoosBaratos = {
             ? `A diferença entre o mais barato e o mais caro é de <strong>${simbolo} ${saving.toLocaleString('pt-BR')}</strong>. Nem sempre dá pra ser flexível, mas cada real conta! 🐾`
             : `Os preços estão bem estáveis para esta rota! Praticamente qualquer período tem um bom preço. Que sorte! 🎉`;
 
+        const fallbackNotice = data.fallback ? `
+            <div class="fallback-notice fade-in">
+                <span class="fallback-icon">ℹ️</span>
+                <span class="fallback-text">
+                    Poucos resultados para <strong>${data.fallback.duracaoOriginal} dias</strong>.
+                    Mostrando os melhores preços para <strong>${data.fallback.duracaoAjustada} dias</strong> (padrão mais próximo).
+                </span>
+            </div>` : '';
+
         const html = `
             <button class="btn-back" onclick="BenetripVoosBaratos.showForm()">
                 ← Nova busca
             </button>
+
+            ${fallbackNotice}
 
             <div class="trip-summary fade-in">
                 <div class="trip-summary-route">

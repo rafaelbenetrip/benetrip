@@ -79,20 +79,19 @@
                     <!-- Duração -->
                     <div class="form-row">
                         <div class="form-group">
-                            <label>📅 Duração da viagem</label>
-                            <div class="duration-chips">
-                                <div class="chip" data-days="7">
-                                    <span class="chip-days">7</span>
-                                    <span class="chip-label">dias</span>
-                                </div>
-                                <div class="chip" data-days="14">
-                                    <span class="chip-days">14</span>
-                                    <span class="chip-label">dias</span>
-                                </div>
-                                <div class="chip" data-days="21">
-                                    <span class="chip-days">21</span>
-                                    <span class="chip-label">dias</span>
-                                </div>
+                            <label>📅 Duração da viagem: <span id="duration-display" class="duration-display">7 dias</span></label>
+                            <div class="duration-slider-wrap">
+                                <span class="duration-tick">3</span>
+                                <input type="range" id="duration-slider" class="duration-slider"
+                                       min="3" max="30" step="1" value="7">
+                                <span class="duration-tick">30</span>
+                            </div>
+                            <div class="duration-marks">
+                                <span>3 dias</span>
+                                <span>7 dias</span>
+                                <span>14 dias</span>
+                                <span>21 dias</span>
+                                <span>30 dias</span>
                             </div>
                         </div>
 
