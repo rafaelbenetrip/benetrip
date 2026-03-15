@@ -11,6 +11,8 @@ const MAX_COMBOS_PER_REQUEST = 200;
 const WINDOW_SIZE_DAYS = 14; // 14 x 14 = 196 combos (< 200)
 const MONTHS_AHEAD = 6;
 const ENRICH_TOP_N = 5; // Enriquecer os top N com detalhes do voo
+const STANDARD_DURATIONS = [7, 14, 21];
+const LOW_RESULTS_THRESHOLD = 15; // Abaixo disso, tentar fallback para duração padrão
 
 // ============================================================
 // HELPER: Formatar data como YYYY-MM-DD
@@ -225,6 +227,87 @@ async function enrichFlightDetails(origemCode, destinoCode, departDate, returnDa
 }
 
 // ============================================================
+// HELPER: Duração padrão mais próxima
+// ============================================================
+function nearestStandardDuration(duration) {
+    return STANDARD_DURATIONS.reduce((best, std) =>
+        Math.abs(std - duration) < Math.abs(best - duration) ? std : best
+    );
+}
+
+// ============================================================
+// BUSCA PRINCIPAL: retorna sorted prices para uma duração
+// ============================================================
+async function runSearch(origemCode, destinoCode, duracaoNum, currencyCode, locale) {
+    const today = new Date();
+    const startDate = addDays(today, 1);
+    const windows = generateSearchWindows(startDate, MONTHS_AHEAD, duracaoNum);
+    console.log(`📅 ${windows.length} janelas para ${duracaoNum} dias`);
+
+    const searchPromises = windows.map((window, idx) => {
+        const params = {
+            flight_type: 'round_trip',
+            departure_id: origemCode,
+            arrival_id: destinoCode,
+            currency: currencyCode,
+            gl: locale.gl,
+            hl: locale.hl,
+            ...window,
+        };
+        return searchFlightsCalendar(params, `Janela ${idx + 1}/${windows.length}`);
+    });
+
+    let results;
+    try {
+        results = await Promise.all(searchPromises);
+    } catch (err) {
+        console.error('❌ Erro nas buscas paralelas:', err);
+        results = searchPromises.map(() => ({ calendar: [], error: 'Falha', elapsed: 0 }));
+    }
+
+    const allPrices = [];
+    let totalCalendarEntries = 0;
+    let validEntries = 0;
+    let errorsCount = 0;
+
+    results.forEach(result => {
+        if (result.error) { errorsCount++; return; }
+        totalCalendarEntries += result.calendar.length;
+
+        result.calendar.forEach(entry => {
+            if (entry.has_no_flights || !entry.price) return;
+
+            if (entry.departure && entry.return) {
+                const actualDuration = diffDays(entry.departure, entry.return);
+                if (actualDuration !== duracaoNum) return;
+            }
+
+            validEntries++;
+            allPrices.push({
+                departure: entry.departure,
+                return: entry.return || null,
+                price: entry.price,
+                is_lowest: entry.is_lowest_price || false,
+            });
+        });
+    });
+
+    console.log(`📊 Entries: ${totalCalendarEntries} | Válidos (${duracaoNum}d): ${validEntries} | Erros: ${errorsCount}`);
+
+    // Deduplicar
+    const uniquePrices = new Map();
+    allPrices.forEach(entry => {
+        const key = `${entry.departure}_${entry.return}`;
+        if (!uniquePrices.has(key) || entry.price < uniquePrices.get(key).price) {
+            uniquePrices.set(key, entry);
+        }
+    });
+
+    const sorted = Array.from(uniquePrices.values()).sort((a, b) => a.price - b.price);
+    return { sorted, totalCalendarEntries, validEntries, errorsCount, windows: windows.length };
+}
+
+// ============================================================
 // HANDLER PRINCIPAL
 // ============================================================
 export default async function handler(req, res) {
@@ -289,15 +372,6 @@ export default async function handler(req, res) {
         console.log(`✈️ Cheapest Flights: ${origemCode} → ${destinoCode} | ${duracaoNum} dias | ${currencyCode}`);
 
         // ============================================================
-        // GERAR JANELAS DE BUSCA
-        // ============================================================
-        const today = new Date();
-        const startDate = addDays(today, 1); // Começar amanhã
-
-        const windows = generateSearchWindows(startDate, MONTHS_AHEAD, duracaoNum);
-        console.log(`📅 ${windows.length} janelas de busca geradas para ${MONTHS_AHEAD} meses`);
-
-        // ============================================================
         // LOCALIZAÇÃO (gl/hl baseado na moeda)
         // ============================================================
         const localeMap = {
@@ -308,89 +382,41 @@ export default async function handler(req, res) {
         const locale = localeMap[currencyCode] || localeMap['BRL'];
 
         // ============================================================
-        // FAZER BUSCAS EM PARALELO
+        // BUSCA PRINCIPAL
         // ============================================================
         const startTime = Date.now();
 
-        const searchPromises = windows.map((window, idx) => {
-            const params = {
-                flight_type: 'round_trip',
-                departure_id: origemCode,
-                arrival_id: destinoCode,
-                currency: currencyCode,
-                gl: locale.gl,
-                hl: locale.hl,
-                ...window,
-            };
+        let searchResult = await runSearch(origemCode, destinoCode, duracaoNum, currencyCode, locale);
+        let sorted = searchResult.sorted;
+        let duracaoFinal = duracaoNum;
+        let fallback = null;
 
-            return searchFlightsCalendar(params, `Janela ${idx + 1}/${windows.length}`);
-        });
+        // ============================================================
+        // FALLBACK: se volume baixo e duração não-padrão, tentar padrão mais próximo
+        // ============================================================
+        const isStandard = STANDARD_DURATIONS.includes(duracaoNum);
+        if (!isStandard && sorted.length < LOW_RESULTS_THRESHOLD) {
+            const nearest = nearestStandardDuration(duracaoNum);
+            console.log(`⚠️ Volume baixo (${sorted.length}) para ${duracaoNum}d. Tentando fallback para ${nearest}d...`);
 
-        let results;
-        try {
-            results = await Promise.all(searchPromises);
-        } catch (err) {
-            console.error('❌ Erro nas buscas paralelas:', err);
-            results = searchPromises.map(() => ({ calendar: [], error: 'Falha', elapsed: 0 }));
+            const fallbackResult = await runSearch(origemCode, destinoCode, nearest, currencyCode, locale);
+
+            if (fallbackResult.sorted.length > sorted.length) {
+                fallback = {
+                    duracaoOriginal: duracaoNum,
+                    duracaoAjustada: nearest,
+                    motivoAjuste: `Poucos resultados (${sorted.length}) para ${duracaoNum} dias. Exibindo ${nearest} dias.`,
+                };
+                sorted = fallbackResult.sorted;
+                duracaoFinal = nearest;
+                searchResult = fallbackResult;
+                console.log(`✅ Fallback para ${nearest}d obteve ${sorted.length} resultados`);
+            } else {
+                console.log(`ℹ️ Fallback não melhorou (${fallbackResult.sorted.length} vs ${sorted.length}). Mantendo original.`);
+            }
         }
 
         const totalTime = Date.now() - startTime;
-
-        // ============================================================
-        // CONSOLIDAR E FILTRAR RESULTADOS
-        // Só manter combinações onde return - departure = duração
-        // ============================================================
-        const allPrices = [];
-        let totalCalendarEntries = 0;
-        let validEntries = 0;
-        let errorsCount = 0;
-
-        results.forEach((result, idx) => {
-            if (result.error) {
-                errorsCount++;
-                return;
-            }
-
-            totalCalendarEntries += result.calendar.length;
-
-            result.calendar.forEach(entry => {
-                // Pular entradas sem voo
-                if (entry.has_no_flights || !entry.price) return;
-
-                // Para round_trip, filtrar só as combinações com duração correta
-                if (entry.departure && entry.return) {
-                    const actualDuration = diffDays(entry.departure, entry.return);
-
-                    // Aceitar duração exata ± 0 dias (strict)
-                    if (actualDuration !== duracaoNum) return;
-                }
-
-                validEntries++;
-
-                allPrices.push({
-                    departure: entry.departure,
-                    return: entry.return || null,
-                    price: entry.price,
-                    is_lowest: entry.is_lowest_price || false,
-                });
-            });
-        });
-
-        console.log(`📊 Total entries: ${totalCalendarEntries} | Valid (${duracaoNum}d): ${validEntries} | Errors: ${errorsCount}`);
-
-        // ============================================================
-        // DEDUPLICAR (mesma data de ida pode vir em janelas sobrepostas)
-        // ============================================================
-        const uniquePrices = new Map();
-        allPrices.forEach(entry => {
-            const key = `${entry.departure}_${entry.return}`;
-            if (!uniquePrices.has(key) || entry.price < uniquePrices.get(key).price) {
-                uniquePrices.set(key, entry);
-            }
-        });
-
-        // Ordenar por preço (mais barato primeiro)
-        const sorted = Array.from(uniquePrices.values()).sort((a, b) => a.price - b.price);
 
         // ============================================================
         // CALCULAR ESTATÍSTICAS
@@ -493,11 +519,11 @@ export default async function handler(req, res) {
         if (sorted.length === 0) {
             return res.status(404).json({
                 error: 'Nenhum voo encontrado',
-                message: `Não foram encontrados voos de ${origemCode} para ${destinoCode} com ${duracaoNum} dias nos próximos ${MONTHS_AHEAD} meses.`,
+                message: `Não foram encontrados voos de ${origemCode} para ${destinoCode} com ${duracaoFinal} dias nos próximos ${MONTHS_AHEAD} meses.`,
                 _debug: {
-                    windows: windows.length,
-                    totalCalendarEntries,
-                    errorsCount,
+                    windows: searchResult.windows,
+                    totalCalendarEntries: searchResult.totalCalendarEntries,
+                    errorsCount: searchResult.errorsCount,
                     totalTime,
                 }
             });
@@ -509,8 +535,9 @@ export default async function handler(req, res) {
             success: true,
             origem: origemCode,
             destino: destinoCode,
-            duracao: duracaoNum,
+            duracao: duracaoFinal,
             moeda: currencyCode,
+            fallback,
             stats,
             monthlyData,
             prices: sorted, // Todas as datas ordenadas por preço
@@ -520,10 +547,10 @@ export default async function handler(req, res) {
                 calendarTime: totalTime,
                 enrichTime,
                 enrichedCount: enrichResults.filter(r => r !== null).length,
-                windows: windows.length,
-                totalCalendarEntries,
-                validEntries,
-                errorsCount,
+                windows: searchResult.windows,
+                totalCalendarEntries: searchResult.totalCalendarEntries,
+                validEntries: searchResult.validEntries,
+                errorsCount: searchResult.errorsCount,
                 monthsSearched: MONTHS_AHEAD,
             }
         });

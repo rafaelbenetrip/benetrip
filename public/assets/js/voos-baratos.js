@@ -273,6 +273,19 @@ const BenetripVoosBaratos = {
                 throw new Error(data.message || 'Nenhum voo encontrado para esta rota');
             }
 
+            // Sincronizar slider se houve fallback de duração
+            if (data.fallback) {
+                this.state.duracaoSelecionada = data.duracao;
+                const slider = document.getElementById('duration-slider');
+                if (slider) {
+                    slider.value = data.duracao;
+                    const pct = ((data.duracao - slider.min) / (slider.max - slider.min)) * 100;
+                    slider.style.background = `linear-gradient(to right, var(--orange) ${pct}%, var(--gray-border) ${pct}%)`;
+                }
+                const display = document.getElementById('duration-display');
+                if (display) display.textContent = `${data.duracao} dias`;
+            }
+
             this.state.resultados = data;
 
             if (typeof BenetripAutoSave !== 'undefined') {
@@ -328,10 +341,21 @@ const BenetripVoosBaratos = {
             ? `A diferença entre o mais barato e o mais caro é de <strong>${simbolo} ${saving.toLocaleString('pt-BR')}</strong>. Nem sempre dá pra ser flexível, mas cada real conta! 🐾`
             : `Os preços estão bem estáveis para esta rota! Praticamente qualquer período tem um bom preço. Que sorte! 🎉`;
 
+        const fallbackNotice = data.fallback ? `
+            <div class="fallback-notice fade-in">
+                <span class="fallback-icon">ℹ️</span>
+                <span class="fallback-text">
+                    Poucos resultados para <strong>${data.fallback.duracaoOriginal} dias</strong>.
+                    Mostrando os melhores preços para <strong>${data.fallback.duracaoAjustada} dias</strong> (padrão mais próximo).
+                </span>
+            </div>` : '';
+
         const html = `
             <button class="btn-back" onclick="BenetripVoosBaratos.showForm()">
                 ← Nova busca
             </button>
+
+            ${fallbackNotice}
 
             <div class="trip-summary fade-in">
                 <div class="trip-summary-route">
