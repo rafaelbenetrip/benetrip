@@ -1,14 +1,23 @@
 /**
  * ============================================
- * BENETRIP LOGIN MODAL - benetrip-login-modal.js
+ * BENETRIP LOGIN MODAL - benetrip-login-modal.js v2.0
  * ============================================
- * Modal de login/cadastro reutilizável.
+ * Modal de login/cadastro reutilizavel.
  * Segue identidade visual da Benetrip.
- * 
+ *
+ * NOVIDADES v2.0:
+ * - Magic link (login sem senha)
+ * - Validacao de senha em tempo real com checklist
+ * - Redirect para URL original apos login
+ * - Onboarding pos-registro
+ * - Cooldown contra brute force
+ * - Melhor feedback de erros
+ *
  * COMO USAR:
- * BenetripLoginModal.open()      — abre o modal
- * BenetripLoginModal.open('signup') — abre direto no cadastro
- * BenetripLoginModal.close()     — fecha o modal
+ * BenetripLoginModal.open()             - abre o modal (login)
+ * BenetripLoginModal.open('signup')     - abre direto no cadastro
+ * BenetripLoginModal.open('login', '/minha-conta.html') - abre com redirect
+ * BenetripLoginModal.close()            - fecha o modal
  */
 
 const BenetripLoginModal = (function () {
@@ -28,8 +37,11 @@ const BenetripLoginModal = (function () {
     };
 
     let modalElement = null;
-    let currentView = 'login'; // 'login' | 'signup' | 'forgot'
+    let currentView = 'login'; // 'login' | 'signup' | 'forgot' | 'magic' | 'onboarding'
     let isLoading = false;
+    let redirectAfterLogin = null;
+    let failedAttempts = 0;
+    let cooldownUntil = 0;
 
     // ==========================================
     // CRIAR MODAL HTML
@@ -53,20 +65,20 @@ const BenetripLoginModal = (function () {
                         </button>
                         <div class="benetrip-modal-mascot">
                             <img src="assets/tripinha-avatar.png" alt="Tripinha" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />
-                            <div class="benetrip-modal-mascot-fallback" style="display:none;">🐕</div>
+                            <div class="benetrip-modal-mascot-fallback" style="display:none;">&#x1F415;</div>
                         </div>
-                        <h2 class="benetrip-modal-title" id="benetrip-modal-title">Bem-vindo!!!</h2>
+                        <h2 class="benetrip-modal-title" id="benetrip-modal-title">Bem-vindo!!</h2>
                         <p class="benetrip-modal-subtitle" id="benetrip-modal-subtitle">
-                            A Tripinha guardou seu lugar! 🐾
+                            A Tripinha guardou seu lugar!
                         </p>
                     </div>
 
                     <!-- Mensagem de feedback -->
                     <div class="benetrip-modal-message" id="benetrip-modal-message" style="display:none;"></div>
 
-                    <!-- Conteúdo do modal (muda entre login/signup/forgot) -->
+                    <!-- Conteudo do modal -->
                     <div class="benetrip-modal-body" id="benetrip-modal-body">
-                        
+
                         <!-- ===== VIEW: LOGIN ===== -->
                         <div class="benetrip-auth-view" id="benetrip-view-login">
                             <!-- Social Login -->
@@ -96,8 +108,8 @@ const BenetripLoginModal = (function () {
                             <form class="benetrip-form" id="benetrip-form-login" novalidate>
                                 <div class="benetrip-input-group">
                                     <label for="benetrip-login-email">Email</label>
-                                    <input type="email" id="benetrip-login-email" 
-                                           placeholder="seu@email.com" 
+                                    <input type="email" id="benetrip-login-email"
+                                           placeholder="seu@email.com"
                                            autocomplete="email" required />
                                 </div>
                                 <div class="benetrip-input-group">
@@ -106,8 +118,8 @@ const BenetripLoginModal = (function () {
                                         <a href="#" class="benetrip-link-forgot" id="benetrip-link-forgot">Esqueci minha senha</a>
                                     </label>
                                     <div class="benetrip-password-wrapper">
-                                        <input type="password" id="benetrip-login-password" 
-                                               placeholder="Sua senha" 
+                                        <input type="password" id="benetrip-login-password"
+                                               placeholder="Sua senha"
                                                autocomplete="current-password" required />
                                         <button type="button" class="benetrip-password-toggle" data-target="benetrip-login-password" aria-label="Mostrar senha">
                                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -129,14 +141,23 @@ const BenetripLoginModal = (function () {
                                 </button>
                             </form>
 
+                            <div class="benetrip-magic-link-area">
+                                <button class="benetrip-btn-magic" id="benetrip-btn-magic-link">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+                                        <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+                                    </svg>
+                                    Entrar com link magico (sem senha)
+                                </button>
+                            </div>
+
                             <p class="benetrip-switch-view">
-                                Não tem uma conta? <a href="#" id="benetrip-link-signup">Criar conta</a>
+                                Nao tem uma conta? <a href="#" id="benetrip-link-signup">Criar conta</a>
                             </p>
                         </div>
 
                         <!-- ===== VIEW: SIGNUP ===== -->
                         <div class="benetrip-auth-view" id="benetrip-view-signup" style="display:none;">
-                            <!-- Social Login -->
                             <div class="benetrip-social-buttons">
                                 <button class="benetrip-btn-social benetrip-btn-google" id="benetrip-btn-google-signup">
                                     <svg width="20" height="20" viewBox="0 0 24 24">
@@ -162,22 +183,22 @@ const BenetripLoginModal = (function () {
                             <form class="benetrip-form" id="benetrip-form-signup" novalidate>
                                 <div class="benetrip-input-group">
                                     <label for="benetrip-signup-name">Seu nome</label>
-                                    <input type="text" id="benetrip-signup-name" 
-                                           placeholder="Como a Tripinha te chama?" 
+                                    <input type="text" id="benetrip-signup-name"
+                                           placeholder="Como a Tripinha te chama?"
                                            autocomplete="name" required />
                                 </div>
                                 <div class="benetrip-input-group">
                                     <label for="benetrip-signup-email">Email</label>
-                                    <input type="email" id="benetrip-signup-email" 
-                                           placeholder="seu@email.com" 
+                                    <input type="email" id="benetrip-signup-email"
+                                           placeholder="seu@email.com"
                                            autocomplete="email" required />
                                 </div>
                                 <div class="benetrip-input-group">
                                     <label for="benetrip-signup-password">Senha</label>
                                     <div class="benetrip-password-wrapper">
-                                        <input type="password" id="benetrip-signup-password" 
-                                               placeholder="Mínimo 6 caracteres" 
-                                               autocomplete="new-password" 
+                                        <input type="password" id="benetrip-signup-password"
+                                               placeholder="Crie uma senha forte"
+                                               autocomplete="new-password"
                                                minlength="6" required />
                                         <button type="button" class="benetrip-password-toggle" data-target="benetrip-signup-password" aria-label="Mostrar senha">
                                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -187,6 +208,20 @@ const BenetripLoginModal = (function () {
                                         </button>
                                     </div>
                                     <div class="benetrip-password-strength" id="benetrip-password-strength"></div>
+                                    <div class="benetrip-password-checklist" id="benetrip-password-checklist">
+                                        <div class="benetrip-check-item" data-check="length">
+                                            <span class="benetrip-check-icon">&#x25CB;</span>
+                                            Pelo menos 6 caracteres
+                                        </div>
+                                        <div class="benetrip-check-item" data-check="uppercase">
+                                            <span class="benetrip-check-icon">&#x25CB;</span>
+                                            Uma letra maiuscula
+                                        </div>
+                                        <div class="benetrip-check-item" data-check="number">
+                                            <span class="benetrip-check-icon">&#x25CB;</span>
+                                            Um numero
+                                        </div>
+                                    </div>
                                 </div>
                                 <button type="submit" class="benetrip-btn-primary" id="benetrip-btn-signup">
                                     <span class="benetrip-btn-text">Criar conta gratuita</span>
@@ -201,7 +236,7 @@ const BenetripLoginModal = (function () {
                             </form>
 
                             <p class="benetrip-switch-view">
-                                Já tem uma conta? <a href="#" id="benetrip-link-login">Fazer login</a>
+                                Ja tem uma conta? <a href="#" id="benetrip-link-login">Fazer login</a>
                             </p>
                         </div>
 
@@ -210,12 +245,12 @@ const BenetripLoginModal = (function () {
                             <form class="benetrip-form" id="benetrip-form-forgot" novalidate>
                                 <div class="benetrip-input-group">
                                     <label for="benetrip-forgot-email">Email cadastrado</label>
-                                    <input type="email" id="benetrip-forgot-email" 
-                                           placeholder="seu@email.com" 
+                                    <input type="email" id="benetrip-forgot-email"
+                                           placeholder="seu@email.com"
                                            autocomplete="email" required />
                                 </div>
                                 <button type="submit" class="benetrip-btn-primary" id="benetrip-btn-forgot">
-                                    <span class="benetrip-btn-text">Enviar link de recuperação</span>
+                                    <span class="benetrip-btn-text">Enviar link de recuperacao</span>
                                     <span class="benetrip-btn-loading" style="display:none;">
                                         <svg class="benetrip-spinner" width="20" height="20" viewBox="0 0 24 24">
                                             <circle cx="12" cy="12" r="10" stroke="white" stroke-width="3" fill="none" stroke-dasharray="31.4" stroke-linecap="round">
@@ -227,26 +262,87 @@ const BenetripLoginModal = (function () {
                             </form>
 
                             <p class="benetrip-switch-view">
-                                <a href="#" id="benetrip-link-back-login">← Voltar para o login</a>
+                                <a href="#" id="benetrip-link-back-login">&larr; Voltar para o login</a>
                             </p>
+                        </div>
+
+                        <!-- ===== VIEW: MAGIC LINK ===== -->
+                        <div class="benetrip-auth-view" id="benetrip-view-magic" style="display:none;">
+                            <div class="benetrip-magic-info">
+                                <p>Enviaremos um link para seu email. Clique nele para entrar sem precisar de senha!</p>
+                            </div>
+                            <form class="benetrip-form" id="benetrip-form-magic" novalidate>
+                                <div class="benetrip-input-group">
+                                    <label for="benetrip-magic-email">Seu email</label>
+                                    <input type="email" id="benetrip-magic-email"
+                                           placeholder="seu@email.com"
+                                           autocomplete="email" required />
+                                </div>
+                                <button type="submit" class="benetrip-btn-primary benetrip-btn-magic-submit">
+                                    <span class="benetrip-btn-text">Enviar link magico</span>
+                                    <span class="benetrip-btn-loading" style="display:none;">
+                                        <svg class="benetrip-spinner" width="20" height="20" viewBox="0 0 24 24">
+                                            <circle cx="12" cy="12" r="10" stroke="white" stroke-width="3" fill="none" stroke-dasharray="31.4" stroke-linecap="round">
+                                                <animateTransform attributeName="transform" type="rotate" dur="0.8s" from="0 12 12" to="360 12 12" repeatCount="indefinite"/>
+                                            </circle>
+                                        </svg>
+                                    </span>
+                                </button>
+                            </form>
+
+                            <p class="benetrip-switch-view">
+                                <a href="#" id="benetrip-link-back-login-magic">&larr; Voltar para o login</a>
+                            </p>
+                        </div>
+
+                        <!-- ===== VIEW: ONBOARDING POS-REGISTRO ===== -->
+                        <div class="benetrip-auth-view" id="benetrip-view-onboarding" style="display:none;">
+                            <div class="benetrip-onboarding-content">
+                                <div class="benetrip-onboarding-welcome">
+                                    <h3>Conta criada com sucesso!</h3>
+                                    <p>Conte para a Tripinha: como voce gosta de viajar?</p>
+                                </div>
+                                <form class="benetrip-form" id="benetrip-form-onboarding">
+                                    <div class="benetrip-input-group">
+                                        <label>Estilo de viagem preferido</label>
+                                        <div class="benetrip-option-grid" id="benetrip-travel-style">
+                                            <button type="button" class="benetrip-option-btn" data-value="relax">&#x1F3D6;&#xFE0F; Relaxar</button>
+                                            <button type="button" class="benetrip-option-btn" data-value="aventura">&#x26F0;&#xFE0F; Aventura</button>
+                                            <button type="button" class="benetrip-option-btn" data-value="cultura">&#x1F3DB;&#xFE0F; Cultura</button>
+                                            <button type="button" class="benetrip-option-btn" data-value="urbano">&#x1F3D9;&#xFE0F; Urbano</button>
+                                        </div>
+                                    </div>
+                                    <div class="benetrip-input-group">
+                                        <label>Quem viaja com voce?</label>
+                                        <div class="benetrip-option-grid" id="benetrip-travel-companion">
+                                            <button type="button" class="benetrip-option-btn" data-value="solo">&#x1F9D1; Sozinho(a)</button>
+                                            <button type="button" class="benetrip-option-btn" data-value="casal">&#x1F491; Casal</button>
+                                            <button type="button" class="benetrip-option-btn" data-value="familia">&#x1F46A; Familia</button>
+                                            <button type="button" class="benetrip-option-btn" data-value="amigos">&#x1F46B; Amigos</button>
+                                        </div>
+                                    </div>
+                                    <button type="submit" class="benetrip-btn-primary">
+                                        <span class="benetrip-btn-text">Pronto! Vamos viajar</span>
+                                    </button>
+                                    <button type="button" class="benetrip-btn-skip" id="benetrip-btn-skip-onboarding">
+                                        Pular por enquanto
+                                    </button>
+                                </form>
+                            </div>
                         </div>
                     </div>
 
                     <!-- Footer -->
                     <div class="benetrip-modal-footer">
-                        <p>Ao continuar, você aceita os <a href="/termos.html" target="_blank">Termos de Uso</a> e a <a href="/privacidade.html" target="_blank">Política de Privacidade</a> da Benetrip.</p>
+                        <p>Ao continuar, voce aceita os <a href="/termos.html" target="_blank">Termos de Uso</a> e a <a href="/privacidade.html" target="_blank">Politica de Privacidade</a> da Benetrip.</p>
                     </div>
                 </div>
             </div>
         `;
 
-        // Inserir estilos
         _injectStyles();
-
         document.body.appendChild(modal);
         modalElement = modal;
-
-        // Bind eventos
         _bindEvents();
     }
 
@@ -263,10 +359,8 @@ const BenetripLoginModal = (function () {
             /* Overlay */
             .benetrip-modal-overlay {
                 position: fixed;
-                top: 0;
-                left: 0;
-                width: 100%;
-                height: 100%;
+                top: 0; left: 0;
+                width: 100%; height: 100%;
                 background: rgba(0, 0, 0, 0.5);
                 backdrop-filter: blur(4px);
                 z-index: 10000;
@@ -277,9 +371,7 @@ const BenetripLoginModal = (function () {
                 opacity: 0;
                 transition: opacity 0.25s ease;
             }
-            .benetrip-modal-overlay.active {
-                opacity: 1;
-            }
+            .benetrip-modal-overlay.active { opacity: 1; }
 
             /* Container */
             .benetrip-modal-container {
@@ -306,14 +398,10 @@ const BenetripLoginModal = (function () {
             }
             .benetrip-modal-close {
                 position: absolute;
-                top: 12px;
-                right: 12px;
-                background: none;
-                border: none;
-                cursor: pointer;
-                padding: 8px;
-                border-radius: 50%;
-                color: #666;
+                top: 12px; right: 12px;
+                background: none; border: none;
+                cursor: pointer; padding: 8px;
+                border-radius: 50%; color: #666;
                 transition: all 0.2s;
             }
             .benetrip-modal-close:hover {
@@ -321,38 +409,28 @@ const BenetripLoginModal = (function () {
                 color: ${THEME.dark};
             }
             .benetrip-modal-mascot {
-                width: 64px;
-                height: 64px;
+                width: 64px; height: 64px;
                 margin: 0 auto 12px;
             }
             .benetrip-modal-mascot img {
-                width: 100%;
-                height: 100%;
-                object-fit: cover;
-                border-radius: 50%;
+                width: 100%; height: 100%;
+                object-fit: cover; border-radius: 50%;
             }
             .benetrip-modal-mascot-fallback {
-                width: 64px;
-                height: 64px;
+                width: 64px; height: 64px;
                 background: ${THEME.primary};
                 border-radius: 50%;
-                display: flex;
-                align-items: center;
-                justify-content: center;
+                display: flex; align-items: center; justify-content: center;
                 font-size: 32px;
             }
             .benetrip-modal-title {
                 font-family: 'Poppins', sans-serif;
-                font-size: 22px;
-                font-weight: 700;
-                color: ${THEME.dark};
-                margin: 0 0 4px;
+                font-size: 22px; font-weight: 700;
+                color: ${THEME.dark}; margin: 0 0 4px;
             }
             .benetrip-modal-subtitle {
                 font-family: 'Montserrat', sans-serif;
-                font-size: 14px;
-                color: #666;
-                margin: 0;
+                font-size: 14px; color: #666; margin: 0;
             }
 
             /* Feedback Message */
@@ -373,216 +451,259 @@ const BenetripLoginModal = (function () {
                 color: ${THEME.success};
                 border: 1px solid #C8E6C9;
             }
+            .benetrip-modal-message.info {
+                background: #E3F2FD;
+                color: #1565C0;
+                border: 1px solid #BBDEFB;
+            }
 
             /* Body */
-            .benetrip-modal-body {
-                padding: 0 24px;
-            }
+            .benetrip-modal-body { padding: 0 24px; }
 
             /* Social Buttons */
             .benetrip-social-buttons {
-                display: flex;
-                flex-direction: column;
-                gap: 10px;
-                margin-bottom: 16px;
+                display: flex; flex-direction: column;
+                gap: 10px; margin-bottom: 16px;
             }
             .benetrip-btn-social {
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                gap: 10px;
-                width: 100%;
-                padding: 11px 16px;
-                border-radius: 10px;
+                display: flex; align-items: center; justify-content: center;
+                gap: 10px; width: 100%;
+                padding: 11px 16px; border-radius: 10px;
                 border: 1.5px solid ${THEME.mediumGray};
-                background: ${THEME.white};
-                cursor: pointer;
+                background: ${THEME.white}; cursor: pointer;
                 font-family: 'Montserrat', sans-serif;
-                font-size: 14px;
-                font-weight: 500;
-                color: ${THEME.dark};
-                transition: all 0.2s;
+                font-size: 14px; font-weight: 500;
+                color: ${THEME.dark}; transition: all 0.2s;
             }
             .benetrip-btn-social:hover {
                 border-color: #bbb;
                 background: ${THEME.lightGray};
             }
-            .benetrip-btn-social:active {
-                transform: scale(0.98);
-            }
+            .benetrip-btn-social:active { transform: scale(0.98); }
 
             /* Divider */
             .benetrip-divider {
-                display: flex;
-                align-items: center;
-                margin: 16px 0;
-                gap: 12px;
+                display: flex; align-items: center;
+                margin: 16px 0; gap: 12px;
             }
             .benetrip-divider::before,
             .benetrip-divider::after {
-                content: '';
-                flex: 1;
-                height: 1px;
+                content: ''; flex: 1; height: 1px;
                 background: ${THEME.mediumGray};
             }
             .benetrip-divider span {
                 font-family: 'Montserrat', sans-serif;
-                font-size: 12px;
-                color: #999;
-                white-space: nowrap;
+                font-size: 12px; color: #999; white-space: nowrap;
             }
 
             /* Form */
             .benetrip-form {
-                display: flex;
-                flex-direction: column;
-                gap: 14px;
+                display: flex; flex-direction: column; gap: 14px;
             }
             .benetrip-input-group {
-                display: flex;
-                flex-direction: column;
-                gap: 4px;
+                display: flex; flex-direction: column; gap: 4px;
             }
             .benetrip-input-group label {
                 font-family: 'Montserrat', sans-serif;
-                font-size: 13px;
-                font-weight: 600;
+                font-size: 13px; font-weight: 600;
                 color: ${THEME.dark};
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
+                display: flex; justify-content: space-between; align-items: center;
             }
             .benetrip-link-forgot {
-                font-size: 12px;
-                font-weight: 400;
-                color: ${THEME.secondary};
-                text-decoration: none;
+                font-size: 12px; font-weight: 400;
+                color: ${THEME.secondary}; text-decoration: none;
             }
-            .benetrip-link-forgot:hover {
-                text-decoration: underline;
-            }
+            .benetrip-link-forgot:hover { text-decoration: underline; }
             .benetrip-input-group input {
-                width: 100%;
-                padding: 11px 14px;
+                width: 100%; padding: 11px 14px;
                 border: 1.5px solid ${THEME.mediumGray};
                 border-radius: 10px;
                 font-family: 'Montserrat', sans-serif;
-                font-size: 14px;
-                color: ${THEME.dark};
+                font-size: 14px; color: ${THEME.dark};
                 transition: border-color 0.2s;
-                outline: none;
-                box-sizing: border-box;
+                outline: none; box-sizing: border-box;
             }
             .benetrip-input-group input:focus {
                 border-color: ${THEME.secondary};
                 box-shadow: 0 0 0 3px rgba(0, 163, 224, 0.1);
             }
-            .benetrip-input-group input::placeholder {
-                color: #aaa;
-            }
+            .benetrip-input-group input::placeholder { color: #aaa; }
 
             /* Password wrapper */
-            .benetrip-password-wrapper {
-                position: relative;
-            }
-            .benetrip-password-wrapper input {
-                padding-right: 44px;
-            }
+            .benetrip-password-wrapper { position: relative; }
+            .benetrip-password-wrapper input { padding-right: 44px; }
             .benetrip-password-toggle {
-                position: absolute;
-                right: 10px;
-                top: 50%;
+                position: absolute; right: 10px; top: 50%;
                 transform: translateY(-50%);
-                background: none;
-                border: none;
-                cursor: pointer;
-                color: #999;
-                padding: 4px;
+                background: none; border: none;
+                cursor: pointer; color: #999; padding: 4px;
             }
-            .benetrip-password-toggle:hover {
-                color: ${THEME.dark};
+            .benetrip-password-toggle:hover { color: ${THEME.dark}; }
+
+            /* Password strength bar */
+            .benetrip-password-strength {
+                height: 3px; border-radius: 3px;
+                margin-top: 4px; transition: all 0.3s;
             }
 
-            /* Password strength */
-            .benetrip-password-strength {
-                height: 3px;
-                border-radius: 3px;
-                margin-top: 4px;
-                transition: all 0.3s;
+            /* Password checklist */
+            .benetrip-password-checklist {
+                display: flex; flex-direction: column;
+                gap: 4px; margin-top: 6px;
+            }
+            .benetrip-check-item {
+                font-family: 'Montserrat', sans-serif;
+                font-size: 12px; color: #999;
+                display: flex; align-items: center; gap: 6px;
+                transition: color 0.2s;
+            }
+            .benetrip-check-item.valid {
+                color: ${THEME.success};
+            }
+            .benetrip-check-item.valid .benetrip-check-icon::after {
+                content: '\\2713';
+            }
+            .benetrip-check-icon {
+                font-size: 12px; width: 14px; text-align: center;
+            }
+            .benetrip-check-item.valid .benetrip-check-icon {
+                color: ${THEME.success}; font-weight: 700;
             }
 
             /* Primary button */
             .benetrip-btn-primary {
-                width: 100%;
-                padding: 13px 16px;
-                border: none;
-                border-radius: 10px;
+                width: 100%; padding: 13px 16px;
+                border: none; border-radius: 10px;
                 background: ${THEME.primary};
                 color: ${THEME.white};
                 font-family: 'Poppins', sans-serif;
-                font-size: 15px;
+                font-size: 15px; font-weight: 600;
+                cursor: pointer; transition: all 0.2s;
+                display: flex; align-items: center; justify-content: center;
+                gap: 8px; margin-top: 4px;
+            }
+            .benetrip-btn-primary:hover { background: ${THEME.primaryHover}; }
+            .benetrip-btn-primary:active { transform: scale(0.98); }
+            .benetrip-btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
+
+            /* Magic link button */
+            .benetrip-magic-link-area {
+                margin-top: 12px; text-align: center;
+            }
+            .benetrip-btn-magic {
+                display: inline-flex; align-items: center; gap: 6px;
+                background: none; border: none;
+                font-family: 'Montserrat', sans-serif;
+                font-size: 12px; color: ${THEME.secondary};
+                cursor: pointer; padding: 6px 12px;
+                border-radius: 8px; transition: all 0.2s;
+            }
+            .benetrip-btn-magic:hover {
+                background: rgba(0, 163, 224, 0.08);
+                color: ${THEME.secondaryHover};
+            }
+
+            /* Magic link info */
+            .benetrip-magic-info {
+                background: rgba(0, 163, 224, 0.06);
+                border-radius: 10px; padding: 14px;
+                margin-bottom: 16px;
+            }
+            .benetrip-magic-info p {
+                font-family: 'Montserrat', sans-serif;
+                font-size: 13px; color: #555;
+                margin: 0; line-height: 1.5;
+            }
+
+            /* Skip button */
+            .benetrip-btn-skip {
+                width: 100%; padding: 10px;
+                background: none; border: none;
+                font-family: 'Montserrat', sans-serif;
+                font-size: 13px; color: #999;
+                cursor: pointer; transition: color 0.2s;
+            }
+            .benetrip-btn-skip:hover { color: ${THEME.dark}; }
+
+            /* Onboarding */
+            .benetrip-onboarding-welcome {
+                text-align: center; margin-bottom: 16px;
+            }
+            .benetrip-onboarding-welcome h3 {
+                font-family: 'Poppins', sans-serif;
+                font-size: 16px; font-weight: 600;
+                color: ${THEME.success}; margin: 0 0 4px;
+            }
+            .benetrip-onboarding-welcome p {
+                font-family: 'Montserrat', sans-serif;
+                font-size: 13px; color: #666; margin: 0;
+            }
+
+            /* Option grid */
+            .benetrip-option-grid {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 8px; margin-top: 4px;
+            }
+            .benetrip-option-btn {
+                padding: 10px 8px;
+                border: 1.5px solid ${THEME.mediumGray};
+                border-radius: 10px;
+                background: ${THEME.white};
+                font-family: 'Montserrat', sans-serif;
+                font-size: 13px; font-weight: 500;
+                color: ${THEME.dark};
+                cursor: pointer; transition: all 0.2s;
+                text-align: center;
+            }
+            .benetrip-option-btn:hover {
+                border-color: ${THEME.primary};
+                background: rgba(232, 119, 34, 0.04);
+            }
+            .benetrip-option-btn.selected {
+                border-color: ${THEME.primary};
+                background: rgba(232, 119, 34, 0.1);
+                color: ${THEME.primary};
                 font-weight: 600;
-                cursor: pointer;
-                transition: all 0.2s;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                gap: 8px;
-                margin-top: 4px;
             }
-            .benetrip-btn-primary:hover {
-                background: ${THEME.primaryHover};
-            }
-            .benetrip-btn-primary:active {
-                transform: scale(0.98);
-            }
-            .benetrip-btn-primary:disabled {
-                opacity: 0.6;
-                cursor: not-allowed;
+
+            /* Cooldown warning */
+            .benetrip-cooldown-msg {
+                font-family: 'Montserrat', sans-serif;
+                font-size: 12px; color: ${THEME.error};
+                text-align: center; margin-top: 4px;
             }
 
             /* Switch view */
             .benetrip-switch-view {
                 text-align: center;
                 font-family: 'Montserrat', sans-serif;
-                font-size: 13px;
-                color: #666;
-                margin: 16px 0 0;
+                font-size: 13px; color: #666; margin: 16px 0 0;
             }
             .benetrip-switch-view a {
                 color: ${THEME.primary};
-                font-weight: 600;
-                text-decoration: none;
+                font-weight: 600; text-decoration: none;
             }
-            .benetrip-switch-view a:hover {
-                text-decoration: underline;
-            }
+            .benetrip-switch-view a:hover { text-decoration: underline; }
 
             /* Footer */
             .benetrip-modal-footer {
-                padding: 16px 24px 20px;
-                text-align: center;
+                padding: 16px 24px 20px; text-align: center;
             }
             .benetrip-modal-footer p {
                 font-family: 'Montserrat', sans-serif;
-                font-size: 11px;
-                color: #999;
-                margin: 0;
-                line-height: 1.5;
+                font-size: 11px; color: #999;
+                margin: 0; line-height: 1.5;
             }
             .benetrip-modal-footer a {
-                color: ${THEME.secondary};
-                text-decoration: none;
+                color: ${THEME.secondary}; text-decoration: none;
             }
-            .benetrip-modal-footer a:hover {
-                text-decoration: underline;
-            }
+            .benetrip-modal-footer a:hover { text-decoration: underline; }
 
             /* Responsive */
             @media (max-width: 480px) {
                 .benetrip-modal-overlay {
-                    padding: 0;
-                    align-items: flex-end;
+                    padding: 0; align-items: flex-end;
                 }
                 .benetrip-modal-container {
                     border-radius: 16px 16px 0 0;
@@ -622,6 +743,15 @@ const BenetripLoginModal = (function () {
             e.preventDefault();
             _switchView('login');
         });
+        document.getElementById('benetrip-link-back-login-magic').addEventListener('click', (e) => {
+            e.preventDefault();
+            _switchView('login');
+        });
+
+        // Magic link
+        document.getElementById('benetrip-btn-magic-link').addEventListener('click', () => {
+            _switchView('magic');
+        });
 
         // Google login
         document.getElementById('benetrip-btn-google').addEventListener('click', _handleGoogleLogin);
@@ -640,6 +770,24 @@ const BenetripLoginModal = (function () {
         // Forgot password form
         document.getElementById('benetrip-form-forgot').addEventListener('submit', _handleForgotPassword);
 
+        // Magic link form
+        document.getElementById('benetrip-form-magic').addEventListener('submit', _handleMagicLink);
+
+        // Onboarding form
+        document.getElementById('benetrip-form-onboarding').addEventListener('submit', _handleOnboarding);
+        document.getElementById('benetrip-btn-skip-onboarding').addEventListener('click', () => {
+            _finishLogin();
+        });
+
+        // Option grid buttons (onboarding)
+        document.querySelectorAll('.benetrip-option-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const grid = btn.closest('.benetrip-option-grid');
+                grid.querySelectorAll('.benetrip-option-btn').forEach(b => b.classList.remove('selected'));
+                btn.classList.add('selected');
+            });
+        });
+
         // Password toggles
         document.querySelectorAll('.benetrip-password-toggle').forEach(btn => {
             btn.addEventListener('click', () => {
@@ -650,7 +798,7 @@ const BenetripLoginModal = (function () {
             });
         });
 
-        // Password strength indicator
+        // Password strength and checklist
         const signupPassword = document.getElementById('benetrip-signup-password');
         if (signupPassword) {
             signupPassword.addEventListener('input', _updatePasswordStrength);
@@ -668,6 +816,24 @@ const BenetripLoginModal = (function () {
     // HANDLERS
     // ==========================================
 
+    function _checkCooldown() {
+        if (Date.now() < cooldownUntil) {
+            const secsLeft = Math.ceil((cooldownUntil - Date.now()) / 1000);
+            _showMessage(`Muitas tentativas. Aguarde ${secsLeft}s antes de tentar novamente.`, 'error');
+            return true;
+        }
+        return false;
+    }
+
+    function _registerFailedAttempt() {
+        failedAttempts++;
+        if (failedAttempts >= 5) {
+            // 30 second cooldown after 5 failed attempts
+            cooldownUntil = Date.now() + 30000;
+            failedAttempts = 0;
+        }
+    }
+
     async function _handleGoogleLogin() {
         if (isLoading) return;
         _setLoading(true);
@@ -675,7 +841,6 @@ const BenetripLoginModal = (function () {
 
         try {
             await BenetripAuth.signInWithGoogle();
-            // Redireciona para Google — não precisa fechar modal
         } catch (error) {
             _showMessage(error.message, 'error');
             _setLoading(false);
@@ -698,6 +863,7 @@ const BenetripLoginModal = (function () {
     async function _handleEmailLogin(e) {
         e.preventDefault();
         if (isLoading) return;
+        if (_checkCooldown()) return;
 
         const email = document.getElementById('benetrip-login-email').value;
         const password = document.getElementById('benetrip-login-password').value;
@@ -712,9 +878,11 @@ const BenetripLoginModal = (function () {
 
         try {
             await BenetripAuth.signInWithEmail(email, password);
-            _showMessage('Login realizado com sucesso! 🎉', 'success');
-            setTimeout(close, 800);
+            failedAttempts = 0;
+            _showMessage('Login realizado com sucesso!', 'success');
+            setTimeout(() => _finishLogin(), 800);
         } catch (error) {
+            _registerFailedAttempt();
             _showMessage(error.message, 'error');
         } finally {
             _setLoading(false);
@@ -746,11 +914,10 @@ const BenetripLoginModal = (function () {
             const data = await BenetripAuth.signUpWithEmail(email, password, nome);
 
             if (data.user && !data.session) {
-                // Email precisa ser confirmado
-                _showMessage('Conta criada! Verifique seu email para confirmar o cadastro. 📧', 'success');
+                _showMessage('Conta criada! Verifique seu email para confirmar o cadastro.', 'success');
             } else {
-                _showMessage('Conta criada com sucesso! Bem-vindo à Benetrip! 🐾', 'success');
-                setTimeout(close, 1200);
+                // Show onboarding
+                _switchView('onboarding');
             }
         } catch (error) {
             _showMessage(error.message, 'error');
@@ -775,11 +942,78 @@ const BenetripLoginModal = (function () {
 
         try {
             await BenetripAuth.resetPassword(email);
-            _showMessage('Se este email estiver cadastrado, você receberá um link de recuperação. 📧', 'success');
+            _showMessage('Se este email estiver cadastrado, voce recebera um link de recuperacao.', 'success');
         } catch (error) {
             _showMessage(error.message, 'error');
         } finally {
             _setLoading(false);
+        }
+    }
+
+    async function _handleMagicLink(e) {
+        e.preventDefault();
+        if (isLoading) return;
+
+        const email = document.getElementById('benetrip-magic-email').value;
+
+        if (!email) {
+            _showMessage('Digite seu email.', 'error');
+            return;
+        }
+
+        _setLoading(true);
+        _hideMessage();
+
+        try {
+            if (typeof BenetripAuth !== 'undefined' && BenetripAuth.signInWithMagicLink) {
+                await BenetripAuth.signInWithMagicLink(email);
+            } else {
+                // Fallback: use Supabase OTP directly if method not yet available
+                _showMessage('Magic link ainda nao configurado. Use email e senha.', 'info');
+                _setLoading(false);
+                return;
+            }
+            _showMessage('Link magico enviado! Verifique seu email para entrar.', 'success');
+        } catch (error) {
+            _showMessage(error.message, 'error');
+        } finally {
+            _setLoading(false);
+        }
+    }
+
+    async function _handleOnboarding(e) {
+        e.preventDefault();
+
+        const styleBtn = document.querySelector('#benetrip-travel-style .benetrip-option-btn.selected');
+        const companionBtn = document.querySelector('#benetrip-travel-companion .benetrip-option-btn.selected');
+
+        const preferences = {};
+        if (styleBtn) preferences.estilo = styleBtn.dataset.value;
+        if (companionBtn) preferences.companhia = companionBtn.dataset.value;
+
+        // Save preferences if BenetripPreferences is available
+        if (typeof BenetripPreferences !== 'undefined' && Object.keys(preferences).length > 0) {
+            try {
+                await BenetripPreferences.save({
+                    preferencias: preferences.estilo,
+                    companhia: preferences.companhia === 'solo' ? 0 :
+                              preferences.companhia === 'casal' ? 1 :
+                              preferences.companhia === 'familia' ? 2 : 3,
+                });
+            } catch (e) {
+                // Non-critical, continue
+            }
+        }
+
+        _finishLogin();
+    }
+
+    function _finishLogin() {
+        close();
+        if (redirectAfterLogin) {
+            const url = redirectAfterLogin;
+            redirectAfterLogin = null;
+            window.location.href = url;
         }
     }
 
@@ -791,31 +1025,36 @@ const BenetripLoginModal = (function () {
         currentView = view;
         _hideMessage();
 
-        // Esconder todas as views
         document.querySelectorAll('.benetrip-auth-view').forEach(el => {
             el.style.display = 'none';
         });
 
-        // Mostrar view atual
         const viewEl = document.getElementById(`benetrip-view-${view}`);
         if (viewEl) viewEl.style.display = 'block';
 
-        // Atualizar título
         const titleEl = document.getElementById('benetrip-modal-title');
         const subtitleEl = document.getElementById('benetrip-modal-subtitle');
 
         switch (view) {
             case 'login':
                 titleEl.textContent = 'Bem-vindo!!';
-                subtitleEl.textContent = 'A Tripinha guardou seu lugar! 🐾';
+                subtitleEl.textContent = 'A Tripinha guardou seu lugar!';
                 break;
             case 'signup':
                 titleEl.textContent = 'Crie sua conta';
-                subtitleEl.textContent = 'A Tripinha quer conhecer você! 🐕✨';
+                subtitleEl.textContent = 'A Tripinha quer conhecer voce!';
                 break;
             case 'forgot':
                 titleEl.textContent = 'Recuperar senha';
-                subtitleEl.textContent = 'A Tripinha vai te ajudar! 🐾💌';
+                subtitleEl.textContent = 'A Tripinha vai te ajudar!';
+                break;
+            case 'magic':
+                titleEl.textContent = 'Link magico';
+                subtitleEl.textContent = 'Entre sem precisar de senha!';
+                break;
+            case 'onboarding':
+                titleEl.textContent = 'Quase la!';
+                subtitleEl.textContent = 'So mais um pouquinho...';
                 break;
         }
     }
@@ -836,7 +1075,6 @@ const BenetripLoginModal = (function () {
     function _setLoading(loading) {
         isLoading = loading;
 
-        // Desabilitar/habilitar botões
         document.querySelectorAll('.benetrip-btn-primary').forEach(btn => {
             btn.disabled = loading;
             const textEl = btn.querySelector('.benetrip-btn-text');
@@ -854,8 +1092,25 @@ const BenetripLoginModal = (function () {
     function _updatePasswordStrength() {
         const password = document.getElementById('benetrip-signup-password').value;
         const strengthEl = document.getElementById('benetrip-password-strength');
-        if (!strengthEl) return;
 
+        // Update checklist
+        const checks = {
+            length: password.length >= 6,
+            uppercase: /[A-Z]/.test(password),
+            number: /\d/.test(password),
+        };
+
+        document.querySelectorAll('.benetrip-check-item').forEach(item => {
+            const check = item.dataset.check;
+            if (checks[check]) {
+                item.classList.add('valid');
+            } else {
+                item.classList.remove('valid');
+            }
+        });
+
+        // Update strength bar
+        if (!strengthEl) return;
         let strength = 0;
         if (password.length >= 6) strength++;
         if (password.length >= 8) strength++;
@@ -872,25 +1127,25 @@ const BenetripLoginModal = (function () {
     }
 
     // ==========================================
-    // API PÚBLICA
+    // API PUBLICA
     // ==========================================
 
-    function open(view = 'login') {
+    function open(view = 'login', redirectUrl = null) {
         _createModal();
         _switchView(view);
         _hideMessage();
         _setLoading(false);
 
+        // Store redirect URL
+        redirectAfterLogin = redirectUrl || null;
+
         modalElement.style.display = '';
-        // Trigger animation
         requestAnimationFrame(() => {
             document.getElementById('benetrip-modal-overlay').classList.add('active');
         });
 
-        // Prevenir scroll do body
         document.body.style.overflow = 'hidden';
 
-        // Focus no primeiro input
         setTimeout(() => {
             const firstInput = document.querySelector(`#benetrip-view-${view} input`);
             if (firstInput) firstInput.focus();
@@ -906,13 +1161,15 @@ const BenetripLoginModal = (function () {
         setTimeout(() => {
             modalElement.style.display = 'none';
             document.body.style.overflow = '';
-            // Limpar formulários
             document.querySelectorAll('.benetrip-form').forEach(form => form.reset());
+            // Reset checklist
+            document.querySelectorAll('.benetrip-check-item').forEach(item => item.classList.remove('valid'));
+            const strengthEl = document.getElementById('benetrip-password-strength');
+            if (strengthEl) { strengthEl.style.width = '0'; strengthEl.style.background = 'transparent'; }
         }, 300);
     }
 
     return { open, close };
 })();
 
-// Exportar globalmente
 window.BenetripLoginModal = BenetripLoginModal;

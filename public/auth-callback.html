@@ -186,7 +186,19 @@
             function showSuccess(callbackType) {
                 document.getElementById('loading-state').style.display = 'none';
                 document.getElementById('success-state').style.display = 'block';
-                const redirectTo = callbackType === 'recovery' ? '/redefinir-senha.html' : '/';
+                // Check for stored redirect URL
+                let redirectTo = '/';
+                if (callbackType === 'recovery') {
+                    redirectTo = '/redefinir-senha.html';
+                } else {
+                    try {
+                        const stored = sessionStorage.getItem('benetrip_redirect_after_login');
+                        if (stored) {
+                            redirectTo = stored;
+                            sessionStorage.removeItem('benetrip_redirect_after_login');
+                        }
+                    } catch (e) { /* ignore */ }
+                }
                 setTimeout(() => { window.location.href = redirectTo; }, 1500);
             }
 

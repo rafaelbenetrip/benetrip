@@ -269,6 +269,18 @@ const BenetripAuth = (function () {
         if (error) throw _translateError(error);
     }
 
+    async function signInWithMagicLink(email) {
+        _ensureInitialized();
+        const { data, error } = await supabase.auth.signInWithOtp({
+            email: email.trim().toLowerCase(),
+            options: {
+                emailRedirectTo: `${CONFIG.redirectUrl}/auth-callback.html`
+            }
+        });
+        if (error) throw _translateError(error);
+        return data;
+    }
+
     // ==========================================
     // PERFIL DO USUÁRIO
     // ==========================================
@@ -598,11 +610,11 @@ const BenetripAuth = (function () {
 
     return {
         init, signInWithEmail, signUpWithEmail, signInWithGoogle, signInWithFacebook,
-        signOut, resetPassword, getUser, isLoggedIn, getProfile, updateProfile,
-        getUserDisplayName, getUserAvatar, onAuthChange, saveSearch, getSearchHistory,
-        deleteSearch, clearSearchHistory, saveDestination, getSavedDestinations,
-        removeDestination, saveItinerary, getSavedItineraries, shareItinerary,
-        getSharedItinerary, removeItinerary,
+        signInWithMagicLink, signOut, resetPassword, getUser, isLoggedIn, getProfile,
+        updateProfile, getUserDisplayName, getUserAvatar, onAuthChange, saveSearch,
+        getSearchHistory, deleteSearch, clearSearchHistory, saveDestination,
+        getSavedDestinations, removeDestination, saveItinerary, getSavedItineraries,
+        shareItinerary, getSharedItinerary, removeItinerary,
     };
 
 })();
