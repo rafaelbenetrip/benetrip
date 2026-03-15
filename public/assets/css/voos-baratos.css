@@ -277,53 +277,75 @@ body {
 }
 
 /* ========================================
-   DURATION SELECTOR (chips)
+   DURATION SELECTOR (slider)
    ======================================== */
-.duration-chips {
-    display: flex;
-    gap: 10px;
+.duration-display {
+    font-weight: 700;
+    color: var(--orange);
 }
 
-.chip {
+.duration-slider-wrap {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.duration-tick {
+    font-size: 12px;
+    color: var(--gray-medium);
+    white-space: nowrap;
+    min-width: 20px;
+    text-align: center;
+}
+
+.duration-slider {
+    -webkit-appearance: none;
+    appearance: none;
     flex: 1;
-    padding: 14px 12px;
-    border: 2px solid var(--gray-border);
-    border-radius: var(--radius-xs);
-    background: var(--white);
+    height: 6px;
+    border-radius: 3px;
+    background: var(--gray-border);
+    outline: none;
     cursor: pointer;
     transition: var(--transition);
-    text-align: center;
-    font-family: 'Poppins', sans-serif;
 }
 
-.chip-days {
-    display: block;
-    font-size: 20px;
-    font-weight: 700;
-    color: var(--gray-dark);
-    line-height: 1.2;
-}
-
-.chip-label {
-    display: block;
-    font-size: 11px;
-    color: var(--gray-medium);
-    margin-top: 2px;
-}
-
-.chip:hover {
-    border-color: var(--orange);
-    background: var(--orange-light);
-}
-
-.chip.active {
-    border-color: var(--orange);
+.duration-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
     background: var(--orange);
+    cursor: pointer;
+    border: 2px solid var(--white);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+    transition: var(--transition);
 }
 
-.chip.active .chip-days,
-.chip.active .chip-label {
-    color: var(--white);
+.duration-slider::-moz-range-thumb {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--orange);
+    cursor: pointer;
+    border: 2px solid var(--white);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+}
+
+.duration-slider:hover::-webkit-slider-thumb,
+.duration-slider:focus::-webkit-slider-thumb {
+    box-shadow: 0 0 0 4px rgba(255, 107, 0, 0.18);
+}
+
+.duration-marks {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 4px;
+    padding: 0 0;
+    font-size: 10px;
+    color: var(--gray-medium);
 }
 
 /* ========================================

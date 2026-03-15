@@ -32,7 +32,7 @@ const BenetripVoosBaratos = {
         this.carregarCidades();
         this.setupAutocomplete('origem', 'origem-results', 'origem-data', 'origemSelecionada');
         this.setupAutocomplete('destino', 'destino-results', 'destino-data', 'destinoSelecionado');
-        this.setupDurationChips();
+        this.setupDurationSlider();
         this.setupCurrencyChips();
         this.setupForm();
         this.log('✅ Pronto!');
@@ -182,16 +182,22 @@ const BenetripVoosBaratos = {
     // ================================================================
     // CHIPS: Duração & Moeda
     // ================================================================
-    setupDurationChips() {
-        document.querySelectorAll('.chip[data-days]').forEach(chip => {
-            chip.addEventListener('click', () => {
-                document.querySelectorAll('.chip[data-days]').forEach(c => c.classList.remove('active'));
-                chip.classList.add('active');
-                this.state.duracaoSelecionada = parseInt(chip.dataset.days);
-                this.log('📅 Duração:', this.state.duracaoSelecionada, 'dias');
-            });
-        });
-        document.querySelector('.chip[data-days="7"]')?.classList.add('active');
+    setupDurationSlider() {
+        const slider = document.getElementById('duration-slider');
+        const display = document.getElementById('duration-display');
+        if (!slider || !display) return;
+
+        const updateSlider = (value) => {
+            this.state.duracaoSelecionada = value;
+            display.textContent = `${value} dia${value !== 1 ? 's' : ''}`;
+            // Gradient fill to show progress
+            const pct = ((value - slider.min) / (slider.max - slider.min)) * 100;
+            slider.style.background = `linear-gradient(to right, var(--orange) ${pct}%, var(--gray-border) ${pct}%)`;
+            this.log('📅 Duração:', value, 'dias');
+        };
+
+        slider.addEventListener('input', () => updateSlider(parseInt(slider.value)));
+        updateSlider(parseInt(slider.value));
     },
 
     setupCurrencyChips() {

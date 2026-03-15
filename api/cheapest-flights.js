@@ -265,10 +265,10 @@ export default async function handler(req, res) {
         }
 
         const duracaoNum = parseInt(duracao);
-        if (![7, 14, 21].includes(duracaoNum)) {
+        if (isNaN(duracaoNum) || duracaoNum < 3 || duracaoNum > 30) {
             return res.status(400).json({
                 error: 'Duração inválida',
-                message: 'Escolha 7, 14 ou 21 dias'
+                message: 'Escolha entre 3 e 30 dias'
             });
         }
 
