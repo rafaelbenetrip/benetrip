@@ -133,6 +133,29 @@
         'availability': 'https://schema.org/InStock'
       }
     };
+  } else if (path === '/destinos-baratos') {
+    jsonLd = {
+      '@context': 'https://schema.org',
+      '@type': 'CollectionPage',
+      'name': title,
+      'url': canonicalUrl,
+      'description': description,
+      'provider': {
+        '@type': 'Organization',
+        'name': 'Benetrip',
+        'url': SITE_URL
+      },
+      'about': {
+        '@type': 'Thing',
+        'name': 'Passagens aéreas baratas',
+        'description': 'Ranking diário dos destinos mais baratos saindo das principais cidades do Brasil'
+      },
+      'mainEntity': {
+        '@type': 'ItemList',
+        'itemListOrder': 'https://schema.org/ItemListOrderAscending',
+        'name': 'Destinos mais baratos hoje'
+      }
+    };
   } else if (path === '/descobrir-destinos' || path === '/todos-destinos') {
     jsonLd = {
       '@context': 'https://schema.org',

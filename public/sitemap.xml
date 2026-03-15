@@ -54,6 +54,13 @@
     <priority>0.6</priority>
   </url>
 
+  <!-- Páginas de Descoberta (atualizadas diariamente) -->
+  <url>
+    <loc>https://benetrip.com.br/destinos-baratos</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.9</priority>
+  </url>
+
   <!-- Páginas Institucionais -->
   <url>
     <loc>https://benetrip.com.br/quemsomos</loc>
