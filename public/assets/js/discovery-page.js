@@ -151,7 +151,7 @@ const DiscoveryPage = {
                 this.state.destinos = data.destinations
                     .filter(d => d.flight?.price > 0)
                     .sort((a, b) => (a.flight?.price || 0) - (b.flight?.price || 0))
-                    .slice(0, 20)
+                    .slice(0, 50)
                     .map((d, i) => this.converterDestinoLive(d, i + 1));
 
                 this.state.dataSnapshot = new Date().toISOString().split('T')[0];
