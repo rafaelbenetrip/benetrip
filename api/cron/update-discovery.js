@@ -33,7 +33,7 @@ const ORIGENS = [
     { codigo: 'VCP', nome: 'Campinas', kgmid: '' },
 ];
 
-const MAX_DESTINOS_POR_ORIGEM = 20;
+const MAX_DESTINOS_POR_ORIGEM = 50;
 
 // Categorias de estilo baseadas em keywords do destino
 const ESTILOS = {
