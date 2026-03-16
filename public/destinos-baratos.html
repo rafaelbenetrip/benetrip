@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#E87722">
+    <title>Destinos Baratos Saindo de São Paulo Hoje | Benetrip</title>
+    <meta name="description" content="Descubra os destinos mais baratos para viajar hoje. Ranking atualizado diariamente com preços reais de passagens aéreas saindo das principais cidades do Brasil.">
+
+    <!-- SEO Meta Tags (OG, Twitter, JSON-LD) -->
+    <script src="assets/js/seo-meta.js" defer></script>
+
+    <!-- Supabase Config -->
+    <meta name="supabase-url" content="https://dlccjeazkpxtijevusbp.supabase.co">
+    <meta name="supabase-anon-key" content="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRsY2NqZWF6a3B4dGlqZXZ1c2JwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE3Mjg3MDYsImV4cCI6MjA4NzMwNDcwNn0.lwKwqF74JrHOaghkcbysZQN8jWErVVwPnxzLG7t07QU">
+
+    <!-- Favicons -->
+    <link rel="icon" type="image/svg+xml" href="assets/images/favicon/favicon.svg">
+    <link rel="apple-touch-icon" sizes="180x180" href="assets/images/favicon/apple-touch-icon.png">
+
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Montserrat:wght@400;500&display=swap" rel="stylesheet">
+
+    <!-- Styles -->
+    <link rel="stylesheet" href="assets/css/discovery.css">
+
+    <!-- Vercel Analytics -->
+    <script>
+        window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
+    </script>
+    <script defer src="/_vercel/insights/script.js"></script>
+    <script src="assets/js/benetrip-autosave.js"></script>
+</head>
+<body>
+    <!-- Header -->
+    <div id="benetrip-header-root"></div>
+
+    <!-- ========================================
+         BLOCO 1: HERO
+         ======================================== -->
+    <section class="discovery-hero">
+        <div class="container hero-content">
+            <img src="assets/images/tripinha/avatar-pensando.png" alt="Tripinha" class="hero-avatar"
+                 onerror="this.style.display='none'">
+            <h1 id="hero-title">Destinos Baratos Saindo de <span id="hero-city">São Paulo</span> Hoje</h1>
+            <p class="hero-subtitle" id="hero-subtitle">
+                Ranking atualizado diariamente com os melhores preços de passagens aéreas.
+            </p>
+            <div class="hero-badge">
+                <span class="pulse-dot"></span>
+                <span id="hero-update-text">Atualizado hoje</span>
+            </div>
+        </div>
+    </section>
+
+    <!-- ========================================
+         BLOCO 2: SELETOR DE CIDADE
+         ======================================== -->
+    <div class="origin-selector">
+        <div class="origin-chips" id="origin-chips">
+            <button class="origin-chip active" data-origin="GRU" data-name="São Paulo">São Paulo</button>
+            <button class="origin-chip" data-origin="GIG" data-name="Rio de Janeiro">Rio de Janeiro</button>
+            <button class="origin-chip" data-origin="BSB" data-name="Brasília">Brasília</button>
+            <button class="origin-chip" data-origin="CNF" data-name="Belo Horizonte">Belo Horizonte</button>
+            <button class="origin-chip" data-origin="SSA" data-name="Salvador">Salvador</button>
+            <button class="origin-chip" data-origin="REC" data-name="Recife">Recife</button>
+            <button class="origin-chip" data-origin="POA" data-name="Porto Alegre">Porto Alegre</button>
+            <button class="origin-chip" data-origin="CWB" data-name="Curitiba">Curitiba</button>
+            <button class="origin-chip" data-origin="FOR" data-name="Fortaleza">Fortaleza</button>
+            <button class="origin-chip" data-origin="VCP" data-name="Campinas">Campinas</button>
+        </div>
+    </div>
+
+    <!-- ========================================
+         BLOCO 3: FILTROS RÁPIDOS
+         ======================================== -->
+    <div class="quick-filters">
+        <div class="filter-row" id="filter-chips">
+            <button class="filter-chip active" data-filter="todos">Todos</button>
+            <button class="filter-chip" data-filter="praia">Praia</button>
+            <button class="filter-chip" data-filter="cidade">Cidade</button>
+            <button class="filter-chip" data-filter="natureza">Natureza</button>
+            <button class="filter-chip" data-filter="romantico">Casal</button>
+            <button class="filter-chip" data-filter="familia">Família</button>
+            <button class="filter-chip" data-filter="aventura">Aventura</button>
+            <button class="filter-chip" data-filter="nacional">Nacional</button>
+            <button class="filter-chip" data-filter="internacional">Internacional</button>
+            <button class="filter-chip" data-filter="ate1000">Até R$ 1.000</button>
+            <button class="filter-chip" data-filter="ate2000">Até R$ 2.000</button>
+            <button class="filter-chip" data-filter="ate3000">Até R$ 3.000</button>
+        </div>
+    </div>
+
+    <!-- ========================================
+         BLOCO 4: STATS BAR
+         ======================================== -->
+    <div class="stats-bar" id="stats-bar">
+        <!-- Preenchido via JS -->
+    </div>
+
+    <!-- ========================================
+         BLOCO 5: LOADING STATE
+         ======================================== -->
+    <div class="discovery-loading" id="loading-state">
+        <div class="spinner"></div>
+        <p>A Tripinha está buscando os destinos mais baratos...</p>
+    </div>
+
+    <!-- ========================================
+         BLOCO 6: EMPTY / ERROR STATE
+         ======================================== -->
+    <div class="discovery-empty" id="empty-state" style="display: none;">
+        <img src="assets/images/tripinha/avatar-pensando.png" alt="Tripinha"
+             onerror="this.style.display='none'">
+        <h3>Nenhum destino encontrado</h3>
+        <p id="empty-message">Tente outra cidade de origem ou remova os filtros.</p>
+    </div>
+
+    <!-- ========================================
+         BLOCO 7: CARDS DE DESTINOS
+         ======================================== -->
+    <main class="destinations-section" id="destinations-section" style="display: none;">
+        <div class="section-header">
+            <h2 class="section-title" id="section-title">Top Destinos</h2>
+            <span class="section-count" id="section-count">0 destinos</span>
+        </div>
+        <div class="destinations-grid" id="destinations-grid">
+            <!-- Cards preenchidos via JS -->
+        </div>
+    </main>
+
+    <!-- ========================================
+         BLOCO 8: CTA FINAL
+         ======================================== -->
+    <section class="discovery-cta" id="cta-section" style="display: none;">
+        <img src="assets/images/tripinha/avatar-pensando.png" alt="Tripinha" class="cta-avatar"
+             onerror="this.style.display='none'">
+        <h2>Quer algo mais parecido com você?</h2>
+        <p>A Tripinha analisa seu perfil e encontra destinos que combinam 100% com você.</p>
+        <a href="/descobrir-destinos" class="cta-button">Descobrir Meu Destino Ideal</a>
+        <br>
+        <a href="/voos-baratos" class="cta-button secondary">Ver Calendário de Preços</a>
+    </section>
+
+    <!-- ========================================
+         SHARE FAB
+         ======================================== -->
+    <button class="share-fab-discovery" id="share-fab" title="Compartilhar" style="display: none;">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="18" cy="5" r="3"></circle>
+            <circle cx="6" cy="12" r="3"></circle>
+            <circle cx="18" cy="19" r="3"></circle>
+            <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
+            <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
+        </svg>
+    </button>
+
+    <!-- Footer -->
+    <footer class="discovery-footer">
+        Feito com amor pela Tripinha | Benetrip &copy; 2026
+        <br>
+        <span id="footer-update" style="font-size: 10px; opacity: 0.7;">Dados atualizados automaticamente todos os dias.</span>
+    </footer>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="assets/js/benetrip-header.js"></script>
+    <script src="assets/js/benetrip-auth.js"></script>
+    <script src="assets/js/discovery-page.js"></script>
+</body>
+</html>

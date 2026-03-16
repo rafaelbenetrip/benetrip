@@ -47,8 +47,22 @@
     "api/compare-flights.js": {
       "memory": 1024,
       "maxDuration": 300
+    },
+    "api/discovery.js": {
+      "memory": 1024,
+      "maxDuration": 60
+    },
+    "api/cron/update-discovery.js": {
+      "memory": 1024,
+      "maxDuration": 300
     }
   },
+  "crons": [
+    {
+      "path": "/api/cron/update-discovery",
+      "schedule": "0 9 * * *"
+    }
+  ],
   "headers": [
     {
       "source": "/robots.txt",
