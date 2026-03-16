@@ -76,13 +76,46 @@ async function supabaseInsert(tableName, data) {
 }
 
 // ============================================================
-// BUSCA DE DESTINOS (reutiliza lógica do search-destinations)
+// BUSCA DE DESTINOS — 2 buscas: GLOBAL + PAÍS (Brasil)
+// Garante mix balanceado de destinos nacionais e internacionais
 // ============================================================
+const BRASIL_KGMID = '/m/015fr';
+const AMERICA_SUL_KGMID = '/m/0dg3n1';
+
+async function buscarUma(params, label) {
+    const queryParts = Object.entries(params).map(([k, v]) => {
+        return `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`;
+    });
+    const url = `https://www.searchapi.io/api/v1/search?${queryParts.join('&')}`;
+    const startTime = Date.now();
+
+    try {
+        const response = await fetch(url, {
+            method: 'GET',
+            headers: { 'Accept': 'application/json' },
+        });
+        const elapsed = Date.now() - startTime;
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error(`[Discovery][${label}] HTTP ${response.status} (${elapsed}ms): ${errorText.substring(0, 200)}`);
+            return [];
+        }
+
+        const data = await response.json();
+        console.log(`[Discovery][${label}] ${(data.destinations || []).length} destinos (${elapsed}ms)`);
+        return data.destinations || [];
+    } catch (err) {
+        console.error(`[Discovery][${label}] Erro: ${err.message}`);
+        return [];
+    }
+}
+
 async function buscarDestinosParaOrigem(origemCode) {
     const apiKey = process.env.SEARCHAPI_KEY;
     if (!apiKey) throw new Error('SEARCHAPI_KEY não configurada');
 
-    const params = {
+    const baseParams = {
         engine: 'google_travel_explore',
         api_key: apiKey,
         departure_id: origemCode,
@@ -92,24 +125,26 @@ async function buscarDestinosParaOrigem(origemCode) {
         hl: 'pt-BR',
     };
 
-    const queryParts = Object.entries(params).map(([k, v]) => {
-        return `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`;
-    });
-    const url = `https://www.searchapi.io/api/v1/search?${queryParts.join('&')}`;
+    // 3 buscas paralelas: GLOBAL + BRASIL + AMÉRICA DO SUL
+    const [global, brasil, amSul] = await Promise.all([
+        buscarUma(baseParams, `${origemCode}/GLOBAL`),
+        buscarUma({ ...baseParams, arrival_id: BRASIL_KGMID }, `${origemCode}/BRASIL`),
+        buscarUma({ ...baseParams, arrival_id: AMERICA_SUL_KGMID }, `${origemCode}/AM_SUL`),
+    ]);
 
-    const response = await fetch(url, {
-        method: 'GET',
-        headers: { 'Accept': 'application/json' },
-    });
-
-    if (!response.ok) {
-        const errorText = await response.text();
-        console.error(`[Discovery][${origemCode}] HTTP ${response.status}: ${errorText.substring(0, 200)}`);
-        return [];
+    // Deduplicar por nome+país, mantendo menor preço
+    const map = new Map();
+    for (const dest of [...global, ...brasil, ...amSul]) {
+        if (!dest?.name || !dest?.country) continue;
+        const key = `${dest.name.toLowerCase()}_${dest.country.toLowerCase()}`;
+        const price = dest.flight?.price ?? 0;
+        if (!map.has(key) || (price > 0 && (map.get(key).flight?.price === 0 || price < map.get(key).flight?.price))) {
+            map.set(key, dest);
+        }
     }
 
-    const data = await response.json();
-    return data.destinations || [];
+    console.log(`[Discovery][${origemCode}] Consolidado: ${map.size} únicos (GLOBAL: ${global.length}, BRASIL: ${brasil.length}, AM_SUL: ${amSul.length})`);
+    return Array.from(map.values());
 }
 
 // ============================================================
@@ -193,16 +228,35 @@ async function processarOrigem(origem) {
             return null;
         }
 
-        // Ordenar por preço (menor primeiro), remover sem preço
+        // Separar nacionais e internacionais, ambos ordenados por preço
         const comPreco = destinosRaw.filter(d => d.flight?.price > 0);
-        comPreco.sort((a, b) => (a.flight?.price || 0) - (b.flight?.price || 0));
+        const nacionais = comPreco
+            .filter(d => (d.country || '').toLowerCase() === 'brasil')
+            .sort((a, b) => a.flight.price - b.flight.price);
+        const internacionais = comPreco
+            .filter(d => (d.country || '').toLowerCase() !== 'brasil')
+            .sort((a, b) => a.flight.price - b.flight.price);
 
-        // Pegar os top N
-        const topDestinos = comPreco
-            .slice(0, MAX_DESTINOS_POR_ORIGEM)
-            .map((d, i) => formatarDestino(d, i + 1, 'brasil'));
+        // Garantir mínimo de 10 nacionais (ou todos disponíveis se < 10)
+        const MIN_NACIONAIS = 10;
+        const nacReservados = nacionais.slice(0, MIN_NACIONAIS);
+        const nacRestantes = nacionais.slice(MIN_NACIONAIS);
 
-        console.log(`✅ [${origem.codigo}] ${topDestinos.length} destinos formatados (${elapsed}ms) | Mais barato: R$${topDestinos[0]?.preco || '?'}`);
+        // Preencher o resto com os mais baratos (nacionais restantes + internacionais)
+        const vagasRestantes = MAX_DESTINOS_POR_ORIGEM - nacReservados.length;
+        const pool = [...nacRestantes, ...internacionais]
+            .sort((a, b) => a.flight.price - b.flight.price)
+            .slice(0, vagasRestantes);
+
+        // Juntar e ordenar tudo por preço
+        const selecionados = [...nacReservados, ...pool]
+            .sort((a, b) => a.flight.price - b.flight.price);
+
+        const topDestinos = selecionados.map((d, i) => formatarDestino(d, i + 1, 'brasil'));
+        const totalNac = topDestinos.filter(d => !d.internacional).length;
+        const totalIntl = topDestinos.filter(d => d.internacional).length;
+
+        console.log(`✅ [${origem.codigo}] ${topDestinos.length} destinos (${totalNac} nacionais, ${totalIntl} internacionais) (${elapsed}ms) | Mais barato: R$${topDestinos[0]?.preco || '?'}`);
 
         // Montar snapshot
         const hoje = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
