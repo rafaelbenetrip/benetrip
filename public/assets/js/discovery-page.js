@@ -335,14 +335,20 @@ const DiscoveryPage = {
 
         grid.innerHTML = destinos.map(d => this.renderCard(d)).join('');
 
-        // Bind clicks nos cards
+        // Bind clicks nos cards → leva para voos-baratos com tudo preenchido
         grid.querySelectorAll('.dest-card').forEach(card => {
             card.addEventListener('click', () => {
                 const aeroporto = card.dataset.aeroporto;
                 const nome = card.dataset.nome;
+                const duracao = card.dataset.duracao;
                 if (aeroporto) {
-                    // Ir para busca de voos com origem e destino preenchidos
-                    window.location.href = `/voos-baratos?origem=${this.state.origemAtual}&destino=${aeroporto}&nome=${encodeURIComponent(nome)}`;
+                    const params = new URLSearchParams({
+                        origem: this.state.origemAtual,
+                        destino: aeroporto,
+                        nome: nome,
+                    });
+                    if (duracao) params.set('duracao', duracao);
+                    window.location.href = `/voos-baratos?${params.toString()}`;
                 }
             });
         });
@@ -363,8 +369,10 @@ const DiscoveryPage = {
             ? `<strong>${d.duracao_ideal.min}-${d.duracao_ideal.max}</strong> dias`
             : '';
 
+        const duracaoIdeal = d.duracao_ideal ? d.duracao_ideal.ideal : '';
+
         return `
-            <article class="dest-card" data-aeroporto="${d.aeroporto}" data-nome="${d.nome}">
+            <article class="dest-card" data-aeroporto="${d.aeroporto}" data-nome="${d.nome}" data-duracao="${duracaoIdeal}">
                 <div class="dest-card-inner">
                     <div class="dest-image-wrapper">
                         <img class="dest-image" src="${imgSrc}" alt="${d.nome}"
