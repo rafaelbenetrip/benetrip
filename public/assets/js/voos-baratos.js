@@ -29,13 +29,94 @@ const BenetripVoosBaratos = {
     // ================================================================
     init() {
         this.log('🐕 Benetrip Voos Baratos v1.1 (Cidades Agrupadas) inicializando...');
-        this.carregarCidades();
+        this.carregarCidades().then(() => this.preencherViaURL());
         this.setupAutocomplete('origem', 'origem-results', 'origem-data', 'origemSelecionada');
         this.setupAutocomplete('destino', 'destino-results', 'destino-data', 'destinoSelecionado');
         this.setupDurationSlider();
         this.setupCurrencyChips();
         this.setupForm();
         this.log('✅ Pronto!');
+    },
+
+    // ================================================================
+    // PRÉ-PREENCHIMENTO VIA URL (vindo da página de discovery)
+    // Params: ?origem=GRU&destino=REC&nome=Recife&duracao=7
+    // ================================================================
+    preencherViaURL() {
+        const params = new URLSearchParams(window.location.search);
+        const origemCode = params.get('origem');
+        const destinoCode = params.get('destino');
+        const destinoNome = params.get('nome');
+        const duracao = params.get('duracao');
+
+        if (!origemCode && !destinoCode) return;
+
+        this.log('📡 Pré-preenchendo via URL:', { origemCode, destinoCode, destinoNome, duracao });
+
+        if (origemCode) {
+            const cidadeOrigem = this.encontrarCidadePorCodigo(origemCode);
+            if (cidadeOrigem) {
+                this.selecionarCidade('origem', 'origem-data', 'origemSelecionada', cidadeOrigem);
+            }
+        }
+
+        if (destinoCode) {
+            const cidadeDestino = this.encontrarCidadePorCodigo(destinoCode);
+            if (cidadeDestino) {
+                this.selecionarCidade('destino', 'destino-data', 'destinoSelecionado', cidadeDestino);
+            } else if (destinoNome) {
+                const input = document.getElementById('destino');
+                if (input) input.value = `${destinoNome} (${destinoCode})`;
+            }
+        }
+
+        if (duracao) {
+            const slider = document.getElementById('duration-slider');
+            if (slider) {
+                slider.value = parseInt(duracao) || 7;
+                slider.dispatchEvent(new Event('input'));
+            }
+        }
+    },
+
+    encontrarCidadePorCodigo(code) {
+        if (!this.state.cidadesData) return null;
+        const codeUpper = code.toUpperCase();
+
+        const cidade = this.state.cidadesData.find(c => {
+            if (c.iata === codeUpper) return true;
+            if (c.iata_city_code === codeUpper) return true;
+            if (c.aeroportos_incluidos && c.aeroportos_incluidos.includes(codeUpper)) return true;
+            return false;
+        });
+
+        if (!cidade) return null;
+
+        return {
+            code: cidade.iata,
+            displayCode: cidade.iata_city_code || cidade.iata,
+            name: cidade.cidade,
+            state: cidade.sigla_estado || null,
+            country: cidade.pais,
+            countryCode: cidade.codigo_pais,
+            airport: cidade.aeroporto || null,
+            isCityCode: cidade.is_city_code || false,
+            aeroportosIncluidos: cidade.aeroportos_incluidos || null
+        };
+    },
+
+    selecionarCidade(inputId, hiddenId, stateKey, cidade) {
+        const input = document.getElementById(inputId);
+        const hidden = document.getElementById(hiddenId);
+        if (!input || !hidden) return;
+
+        this.state[stateKey] = cidade;
+        const codeDisplay = cidade.displayCode || cidade.code;
+        input.value = cidade.airport
+            ? `${cidade.name} — ${cidade.airport} (${codeDisplay})`
+            : `${cidade.name} (${codeDisplay})`;
+        hidden.value = cidade.code;
+        this.log(`✅ ${inputId} preenchido: ${input.value}`);
     },
 
     // ================================================================
