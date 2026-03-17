@@ -65,8 +65,17 @@ const BenetripVoosBaratos = {
             if (cidadeDestino) {
                 this.selecionarCidade('destino', 'destino-data', 'destinoSelecionado', cidadeDestino);
             } else if (destinoNome) {
+                // Destino não encontrado no JSON — criar objeto manual para permitir busca
+                this.state.destinoSelecionado = {
+                    code: destinoCode.toUpperCase(),
+                    displayCode: destinoCode.toUpperCase(),
+                    name: destinoNome,
+                    airport: null,
+                };
                 const input = document.getElementById('destino');
                 if (input) input.value = `${destinoNome} (${destinoCode})`;
+                const hidden = document.getElementById('destino-data');
+                if (hidden) hidden.value = destinoCode.toUpperCase();
             }
         }
 
@@ -76,6 +85,14 @@ const BenetripVoosBaratos = {
                 slider.value = parseInt(duracao) || 7;
                 slider.dispatchEvent(new Event('input'));
             }
+        }
+
+        // Auto-trigger: se origem e destino preenchidos via URL, buscar direto
+        if (this.state.origemSelecionada && this.state.destinoSelecionado) {
+            this.log('🚀 Auto-trigger: origem e destino preenchidos via URL, buscando direto...');
+            setTimeout(() => {
+                if (this.validar()) this.buscar();
+            }, 100);
         }
     },
 
@@ -328,7 +345,8 @@ const BenetripVoosBaratos = {
         this.updateProgress(10, '🔍 Preparando busca nos próximos 6 meses...');
 
         try {
-            this.updateProgress(25, `✈️ Pesquisando voos para ${destinoSelecionado.name}...`);
+            const destinoDisplay = destinoSelecionado.airport || destinoSelecionado.name;
+            this.updateProgress(25, `✈️ Pesquisando voos para ${destinoDisplay}...`);
 
             const response = await fetch('/api/cheapest-flights', {
                 method: 'POST',
@@ -442,14 +460,14 @@ const BenetripVoosBaratos = {
                 <div class="trip-summary-route">
                     <div class="trip-summary-city">
                         <span class="trip-summary-code">${displayOrigemCode}</span>
-                        <span class="trip-summary-name">${origemSelecionada.name}</span>
+                        <span class="trip-summary-name">${origemSelecionada.airport || origemSelecionada.name}</span>
                     </div>
                     <div class="trip-summary-arrow">
                         <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5l7 7-7 7"/></svg>
                     </div>
                     <div class="trip-summary-city">
                         <span class="trip-summary-code">${displayDestinoCode}</span>
-                        <span class="trip-summary-name">${destinoSelecionado.name}</span>
+                        <span class="trip-summary-name">${destinoSelecionado.airport || destinoSelecionado.name}</span>
                     </div>
                 </div>
                 <div class="trip-summary-meta">
