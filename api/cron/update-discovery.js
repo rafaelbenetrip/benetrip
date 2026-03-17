@@ -27,7 +27,7 @@ export const maxDuration = 300; // 5 minutos
 // CONFIGURAÇÃO
 // ============================================================
 const CIDADES_POR_LOTE = 15;     // Quantas cidades processar por execução
-const LOTES_POR_DIA = 7;         // Cron roda 7x/dia
+const LOTES_POR_DIA = 2;         // Cron roda 2x/dia (30 cidades / 15 por lote)
 
 // Carregar cidades do JSON
 function carregarCidades() {

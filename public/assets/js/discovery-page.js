@@ -1,18 +1,14 @@
 /**
- * BENETRIP DISCOVERY PAGE v2.0
+ * BENETRIP DISCOVERY PAGE v3.0
  *
- * Melhorias v2.0:
- * - Filtros combináveis (multi-select): estilo + preço + escopo simultaneamente
- * - Busca inteligente via Groq (linguagem natural)
- * - Ordenação por relevância, preço, nome
- * - UX melhorada com feedback visual
- *
- * FLUXO:
- * 1. Página carrega → busca snapshot da origem padrão (GRU)
- * 2. Usuário clica em outra cidade → busca snapshot daquela origem
- * 3. Usuário combina filtros → filtra destinos no client-side
- * 4. Usuário digita busca → chama Groq via /api/discovery-smart-filter
- * 5. Botão share → gera mensagem e abre modal de compartilhamento
+ * v3.0:
+ * - 30 cidades automáticas (snapshot diário do cron)
+ * - Qualquer cidade: busca ao vivo via /api/search-destinations
+ * - Barra de busca de cidade proeminente no hero
+ * - Chips rápidos + dropdown com todas as 30 cidades automáticas
+ * - Filtros combináveis (multi-select): estilo + preço + escopo
+ * - Busca inteligente de destinos via Groq
+ * - Cache local (sessionStorage) para buscas manuais
  */
 
 const DiscoveryPage = {
@@ -22,46 +18,124 @@ const DiscoveryPage = {
     state: {
         origemAtual: 'GRU',
         origemNome: 'São Paulo',
-        destinos: [],              // Todos os destinos do snapshot
-        destinosFiltrados: [],     // Destinos após filtros combinados
+        origemManual: false,       // true = busca ao vivo, false = snapshot
+        destinos: [],
+        destinosFiltrados: [],
         dataSnapshot: null,
         carregando: false,
         buscandoIA: false,
 
-        // Filtros combináveis (múltiplos ativos ao mesmo tempo)
         filtros: {
-            estilos: [],           // ['praia', 'natureza'] — OR entre si
-            precoMax: null,        // 1000, 2000, 3000 ou null
-            escopo: null,          // 'nacional', 'internacional' ou null
+            estilos: [],
+            precoMax: null,
+            escopo: null,
         },
 
-        // Busca inteligente
         buscaQuery: '',
-        buscaResultado: null,      // Resultado do Groq
-        ordenacao: 'preco',        // 'preco', 'nome'
+        buscaResultado: null,
+        ordenacao: 'preco',
     },
+
+    // Lista de cidades automáticas (carregada do JSON)
+    cidadesAutomaticas: [],
 
     // ============================================================
     // INICIALIZAÇÃO
     // ============================================================
-    init() {
-        console.log('🔍 Discovery Page v2.0 inicializando...');
+    async init() {
+        console.log('🔍 Discovery Page v3.0');
+        await this.carregarCidadesAutomaticas();
         this.bindEvents();
         this.carregarDestinos(this.state.origemAtual);
+    },
+
+    async carregarCidadesAutomaticas() {
+        try {
+            const response = await fetch('/assets/data/brazilian-airports.json');
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            const data = await response.json();
+            this.cidadesAutomaticas = data.cidades || [];
+        } catch (err) {
+            console.warn('Erro ao carregar cidades:', err);
+            // Fallback: extrair dos chips do HTML
+            this.cidadesAutomaticas = [];
+            document.querySelectorAll('.origin-chip[data-origin]').forEach(chip => {
+                if (chip.id === 'origin-more-btn') return;
+                this.cidadesAutomaticas.push({
+                    codigo: chip.dataset.origin,
+                    nome: chip.dataset.name,
+                    estado: '',
+                    regiao: '',
+                });
+            });
+        }
     },
 
     // ============================================================
     // BIND DE EVENTOS
     // ============================================================
     bindEvents() {
-        // Chips de origem (principais)
-        document.getElementById('origin-chips').addEventListener('click', (e) => {
+        // === BUSCA DE CIDADE (hero) ===
+        const cityInput = document.getElementById('city-search-input');
+        const cityClear = document.getElementById('city-search-clear');
+        const suggestions = document.getElementById('city-suggestions');
+
+        if (cityInput) {
+            cityInput.addEventListener('input', () => {
+                const val = cityInput.value.trim();
+                if (cityClear) cityClear.style.display = val ? 'flex' : 'none';
+                if (val.length >= 2) {
+                    this.mostrarSugestoesCidade(val);
+                } else if (suggestions) {
+                    suggestions.style.display = 'none';
+                }
+            });
+
+            cityInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    const val = cityInput.value.trim();
+                    if (val.length >= 2) this.selecionarCidadeDigitada(val);
+                }
+            });
+
+            // Fechar sugestões ao clicar fora
+            document.addEventListener('click', (e) => {
+                if (!e.target.closest('.hero-city-search') && suggestions) {
+                    suggestions.style.display = 'none';
+                }
+            });
+        }
+
+        if (cityClear) {
+            cityClear.addEventListener('click', () => {
+                if (cityInput) cityInput.value = '';
+                cityClear.style.display = 'none';
+                if (suggestions) suggestions.style.display = 'none';
+            });
+        }
+
+        if (suggestions) {
+            suggestions.addEventListener('click', (e) => {
+                const item = e.target.closest('.city-suggestion-item');
+                if (!item) return;
+                const code = item.dataset.code;
+                const name = item.dataset.name;
+                const isAuto = item.dataset.auto === 'true';
+                if (cityInput) cityInput.value = '';
+                if (cityClear) cityClear.style.display = 'none';
+                suggestions.style.display = 'none';
+                this.selecionarCidade(code, name, !isAuto);
+            });
+        }
+
+        // === CHIPS DE ORIGEM (rápidos) ===
+        document.getElementById('origin-chips')?.addEventListener('click', (e) => {
             const chip = e.target.closest('.origin-chip');
             if (!chip) return;
 
-            // Botão "Mais cidades..."
             if (chip.id === 'origin-more-btn') {
-                this.abrirDropdownCidades();
+                this.mostrarTodasCidadesDropdown();
                 return;
             }
 
@@ -69,356 +143,203 @@ const DiscoveryPage = {
             const name = chip.dataset.name;
             if (!origin) return;
 
-            document.querySelectorAll('.origin-chip').forEach(c => c.classList.remove('active'));
-            chip.classList.add('active');
-
-            this.state.origemAtual = origin;
-            this.state.origemNome = name;
-            this.carregarDestinos(origin);
+            this.selecionarCidade(origin, name, false);
         });
 
-        // Dropdown de cidades expandido
-        const dropdownClose = document.getElementById('origin-dropdown-close');
-        if (dropdownClose) {
-            dropdownClose.addEventListener('click', () => this.fecharDropdownCidades());
-        }
-
-        const originSearchInput = document.getElementById('origin-search-input');
-        if (originSearchInput) {
-            originSearchInput.addEventListener('input', () => {
-                this.filtrarDropdownCidades(originSearchInput.value.trim());
-            });
-        }
-
-        document.getElementById('origin-dropdown-list')?.addEventListener('click', (e) => {
-            const item = e.target.closest('.origin-dropdown-item');
-            if (!item) return;
-
-            const origin = item.dataset.origin;
-            const name = item.dataset.name;
-
-            // Desativar chips principais
-            document.querySelectorAll('.origin-chip').forEach(c => c.classList.remove('active'));
-
-            // Se a cidade está nos chips, ativá-la
-            const chipExistente = document.querySelector(`.origin-chip[data-origin="${origin}"]`);
-            if (chipExistente) chipExistente.classList.add('active');
-
-            this.state.origemAtual = origin;
-            this.state.origemNome = name;
-            this.fecharDropdownCidades();
-            this.carregarDestinos(origin);
-        });
-
-        // Chips de filtro (multi-select)
-        document.getElementById('filter-chips').addEventListener('click', (e) => {
+        // === FILTROS ===
+        document.getElementById('filter-chips')?.addEventListener('click', (e) => {
             const chip = e.target.closest('.filter-chip');
             if (!chip) return;
-
-            const filter = chip.dataset.filter;
-            const tipo = chip.dataset.tipo;
-
-            this.toggleFiltro(filter, tipo, chip);
+            this.toggleFiltro(chip.dataset.filter, chip.dataset.tipo, chip);
         });
 
-        // Busca inteligente
+        // === BUSCA INTELIGENTE ===
         const searchInput = document.getElementById('smart-search-input');
         const searchBtn = document.getElementById('smart-search-btn');
         const searchClear = document.getElementById('smart-search-clear');
 
         if (searchInput) {
-            let debounceTimer = null;
-
             searchInput.addEventListener('keydown', (e) => {
                 if (e.key === 'Enter') {
                     e.preventDefault();
-                    clearTimeout(debounceTimer);
                     this.executarBuscaInteligente(searchInput.value.trim());
                 }
             });
-
             searchInput.addEventListener('input', () => {
                 const val = searchInput.value.trim();
                 if (searchClear) searchClear.style.display = val ? 'flex' : 'none';
-
-                // Se apagou tudo, volta aos filtros normais
-                if (!val && this.state.buscaResultado) {
-                    this.limparBusca();
-                }
+                if (!val && this.state.buscaResultado) this.limparBusca();
             });
         }
+        searchBtn?.addEventListener('click', () => {
+            const val = searchInput?.value.trim();
+            if (val) this.executarBuscaInteligente(val);
+        });
+        searchClear?.addEventListener('click', () => {
+            if (searchInput) searchInput.value = '';
+            searchClear.style.display = 'none';
+            this.limparBusca();
+        });
 
-        if (searchBtn) {
-            searchBtn.addEventListener('click', () => {
-                const val = searchInput?.value.trim();
-                if (val) this.executarBuscaInteligente(val);
-            });
-        }
+        // === ORDENAÇÃO ===
+        document.getElementById('sort-select')?.addEventListener('change', (e) => {
+            this.state.ordenacao = e.target.value;
+            this.aplicarFiltros();
+        });
 
-        if (searchClear) {
-            searchClear.addEventListener('click', () => {
-                if (searchInput) searchInput.value = '';
-                searchClear.style.display = 'none';
-                this.limparBusca();
-            });
-        }
-
-        // Ordenação
-        const sortSelect = document.getElementById('sort-select');
-        if (sortSelect) {
-            sortSelect.addEventListener('change', (e) => {
-                this.state.ordenacao = e.target.value;
-                this.aplicarFiltros();
-            });
-        }
-
-        // FAB de compartilhamento
-        document.getElementById('share-fab').addEventListener('click', () => {
+        // === SHARE ===
+        document.getElementById('share-fab')?.addEventListener('click', () => {
             this.abrirShareModal();
         });
     },
 
     // ============================================================
-    // TOGGLE DE FILTRO (multi-select combinável)
+    // BUSCA DE CIDADE (sugestões)
     // ============================================================
-    toggleFiltro(filter, tipo, chipEl) {
-        // Limpar busca IA quando usa filtros manuais
-        if (this.state.buscaResultado) {
-            this.limparBusca(false); // false = não re-renderizar ainda
-        }
+    mostrarSugestoesCidade(query) {
+        const container = document.getElementById('city-suggestions');
+        if (!container) return;
 
-        if (filter === 'todos') {
-            // "Todos" limpa todos os filtros
-            this.state.filtros = { estilos: [], precoMax: null, escopo: null };
-            document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
-            chipEl.classList.add('active');
-        } else if (tipo === 'estilo') {
-            // Estilos: toggle individual (OR entre si)
-            const idx = this.state.filtros.estilos.indexOf(filter);
-            if (idx >= 0) {
-                this.state.filtros.estilos.splice(idx, 1);
-                chipEl.classList.remove('active');
-            } else {
-                this.state.filtros.estilos.push(filter);
-                chipEl.classList.add('active');
-            }
-            // Remover "Todos" quando qualquer filtro estiver ativo
-            document.querySelector('.filter-chip[data-filter="todos"]')?.classList.remove('active');
-        } else if (tipo === 'preco') {
-            const valor = parseInt(filter);
-            if (this.state.filtros.precoMax === valor) {
-                // Desativar mesmo preço
-                this.state.filtros.precoMax = null;
-                chipEl.classList.remove('active');
-            } else {
-                // Trocar preço (só um por vez)
-                this.state.filtros.precoMax = valor;
-                document.querySelectorAll('.filter-chip[data-tipo="preco"]').forEach(c => c.classList.remove('active'));
-                chipEl.classList.add('active');
-            }
-            document.querySelector('.filter-chip[data-filter="todos"]')?.classList.remove('active');
-        } else if (tipo === 'escopo') {
-            if (this.state.filtros.escopo === filter) {
-                this.state.filtros.escopo = null;
-                chipEl.classList.remove('active');
-            } else {
-                this.state.filtros.escopo = filter;
-                document.querySelectorAll('.filter-chip[data-tipo="escopo"]').forEach(c => c.classList.remove('active'));
-                chipEl.classList.add('active');
-            }
-            document.querySelector('.filter-chip[data-filter="todos"]')?.classList.remove('active');
-        }
+        const normalizado = query.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        const isIATA = /^[A-Z]{3}$/i.test(query.trim());
 
-        // Se nenhum filtro ativo, ativar "Todos"
-        const { estilos, precoMax, escopo } = this.state.filtros;
-        if (estilos.length === 0 && !precoMax && !escopo) {
-            document.querySelector('.filter-chip[data-filter="todos"]')?.classList.add('active');
-        }
+        // Buscar nas automáticas
+        const matches = this.cidadesAutomaticas.filter(c => {
+            const nome = c.nome.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+            const codigo = c.codigo.toLowerCase();
+            return nome.includes(normalizado) || codigo.includes(normalizado);
+        }).slice(0, 6);
 
-        this.aplicarFiltros();
-    },
+        let html = '';
 
-    // ============================================================
-    // APLICAR FILTROS COMBINADOS (client-side)
-    // ============================================================
-    aplicarFiltros() {
-        const { estilos, precoMax, escopo } = this.state.filtros;
-        let resultado = [...this.state.destinos];
-
-        // Filtro por estilos (OR: pelo menos um estilo deve bater)
-        if (estilos.length > 0) {
-            resultado = resultado.filter(d =>
-                (d.estilos || []).some(e => estilos.includes(e))
-            );
-        }
-
-        // Filtro por preço máximo
-        if (precoMax) {
-            resultado = resultado.filter(d => d.preco <= precoMax);
-        }
-
-        // Filtro por escopo (nacional/internacional)
-        if (escopo === 'nacional') {
-            resultado = resultado.filter(d => !d.internacional);
-        } else if (escopo === 'internacional') {
-            resultado = resultado.filter(d => d.internacional);
-        }
-
-        // Ordenação
-        resultado = this.ordenar(resultado);
-
-        this.state.destinosFiltrados = resultado;
-        this.renderizarCards();
-        this.atualizarContagem();
-    },
-
-    // ============================================================
-    // ORDENAÇÃO
-    // ============================================================
-    ordenar(destinos) {
-        const tipo = this.state.ordenacao;
-        const copia = [...destinos];
-
-        switch (tipo) {
-            case 'preco':
-                return copia.sort((a, b) => a.preco - b.preco);
-            case 'nome':
-                return copia.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
-            default:
-                return copia;
-        }
-    },
-
-    // ============================================================
-    // BUSCA INTELIGENTE (Groq via API)
-    // ============================================================
-    async executarBuscaInteligente(query) {
-        if (!query || this.state.buscandoIA) return;
-
-        this.state.buscandoIA = true;
-        this.state.buscaQuery = query;
-        this.mostrarBuscaLoading(true);
-
-        try {
-            const response = await fetch('/api/discovery-smart-filter', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    query,
-                    destinos: this.state.destinos,
-                }),
+        if (matches.length > 0) {
+            html += '<div class="suggestions-group-label">Cidades com dados diários</div>';
+            matches.forEach(c => {
+                html += `<button class="city-suggestion-item" data-code="${c.codigo}" data-name="${c.nome}" data-auto="true">
+                    <span class="suggestion-name">${c.nome}</span>
+                    <span class="suggestion-meta">${c.codigo} · ${c.estado} · <span class="suggestion-badge-auto">Atualizado diariamente</span></span>
+                </button>`;
             });
-
-            if (!response.ok) throw new Error(`HTTP ${response.status}`);
-
-            const data = await response.json();
-
-            if (data.success && data.indices) {
-                this.state.buscaResultado = data;
-
-                // Mapear índices para destinos
-                const resultado = data.indices
-                    .filter(i => i >= 0 && i < this.state.destinos.length)
-                    .map(i => this.state.destinos[i]);
-
-                // Limpar chips de filtro visual
-                document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
-                this.state.filtros = { estilos: [], precoMax: null, escopo: null };
-
-                this.state.destinosFiltrados = resultado;
-                this.renderizarCards();
-                this.atualizarContagem(data.titulo || `Resultados: "${query}"`);
-                this.mostrarBuscaFeedback(data.explicacao, resultado.length);
-            }
-        } catch (error) {
-            console.error('❌ Busca inteligente falhou:', error);
-            this.mostrarToast('Erro na busca. Tente novamente.');
-        } finally {
-            this.state.buscandoIA = false;
-            this.mostrarBuscaLoading(false);
         }
+
+        // Sempre mostrar opção de busca manual
+        const nomeExibicao = isIATA ? query.toUpperCase() : query;
+        html += `<div class="suggestions-group-label">Buscar ao vivo</div>`;
+        html += `<button class="city-suggestion-item suggestion-manual" data-code="${isIATA ? query.toUpperCase() : query}" data-name="${nomeExibicao}" data-auto="false">
+            <span class="suggestion-name">Buscar "${nomeExibicao}" ao vivo</span>
+            <span class="suggestion-meta">Pesquisa em tempo real · pode demorar alguns segundos</span>
+        </button>`;
+
+        container.innerHTML = html;
+        container.style.display = 'block';
     },
 
-    limparBusca(reRender = true) {
-        this.state.buscaQuery = '';
-        this.state.buscaResultado = null;
+    selecionarCidadeDigitada(val) {
+        const isIATA = /^[A-Z]{3}$/i.test(val.trim());
+        const normalizado = val.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 
-        const feedback = document.getElementById('search-feedback');
-        if (feedback) feedback.style.display = 'none';
-
-        if (reRender) {
-            // Reativar "Todos"
-            this.state.filtros = { estilos: [], precoMax: null, escopo: null };
-            document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
-            document.querySelector('.filter-chip[data-filter="todos"]')?.classList.add('active');
-
-            this.state.destinosFiltrados = [...this.state.destinos];
-            this.renderizarCards();
-            this.atualizarContagem();
-        }
-    },
-
-    mostrarBuscaLoading(ativo) {
-        const btn = document.getElementById('smart-search-btn');
-        const input = document.getElementById('smart-search-input');
-        if (btn) {
-            btn.disabled = ativo;
-            btn.innerHTML = ativo
-                ? '<div class="search-spinner"></div>'
-                : '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>';
-        }
-        if (input) input.disabled = ativo;
-    },
-
-    mostrarBuscaFeedback(explicacao, count) {
-        const feedback = document.getElementById('search-feedback');
-        if (!feedback) return;
-
-        feedback.style.display = 'flex';
-        feedback.innerHTML = `
-            <span class="feedback-icon">&#129302;</span>
-            <span class="feedback-text">${explicacao} &middot; ${count} destino${count !== 1 ? 's' : ''}</span>
-            <button class="feedback-clear" id="feedback-clear-btn">Limpar</button>
-        `;
-
-        document.getElementById('feedback-clear-btn')?.addEventListener('click', () => {
-            const input = document.getElementById('smart-search-input');
-            if (input) input.value = '';
-            const clearBtn = document.getElementById('smart-search-clear');
-            if (clearBtn) clearBtn.style.display = 'none';
-            this.limparBusca();
+        // Checar se é uma cidade automática
+        const autoMatch = this.cidadesAutomaticas.find(c => {
+            const nome = c.nome.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+            return c.codigo.toLowerCase() === normalizado || nome === normalizado;
         });
+
+        if (autoMatch) {
+            this.selecionarCidade(autoMatch.codigo, autoMatch.nome, false);
+        } else {
+            // Busca manual
+            const code = isIATA ? val.toUpperCase() : val;
+            this.selecionarCidade(code, val, true);
+        }
+
+        const suggestions = document.getElementById('city-suggestions');
+        if (suggestions) suggestions.style.display = 'none';
+        const cityInput = document.getElementById('city-search-input');
+        if (cityInput) cityInput.value = '';
+        const cityClear = document.getElementById('city-search-clear');
+        if (cityClear) cityClear.style.display = 'none';
     },
 
     // ============================================================
-    // CARREGAR DESTINOS DA API
+    // DROPDOWN "MAIS CIDADES"
+    // ============================================================
+    mostrarTodasCidadesDropdown() {
+        const container = document.getElementById('city-suggestions');
+        if (!container) return;
+
+        // Agrupar por região
+        const regioes = {};
+        const nomeRegiao = {
+            'sudeste': 'Sudeste', 'sul': 'Sul', 'nordeste': 'Nordeste',
+            'centro-oeste': 'Centro-Oeste', 'norte': 'Norte',
+        };
+
+        this.cidadesAutomaticas.forEach(c => {
+            const r = c.regiao || 'outro';
+            if (!regioes[r]) regioes[r] = [];
+            regioes[r].push(c);
+        });
+
+        let html = '';
+        for (const [regiao, cidades] of Object.entries(regioes)) {
+            html += `<div class="suggestions-group-label">${nomeRegiao[regiao] || regiao}</div>`;
+            cidades.forEach(c => {
+                const ativa = c.codigo === this.state.origemAtual ? ' active' : '';
+                html += `<button class="city-suggestion-item${ativa}" data-code="${c.codigo}" data-name="${c.nome}" data-auto="true">
+                    <span class="suggestion-name">${c.nome}</span>
+                    <span class="suggestion-meta">${c.codigo} · ${c.estado}</span>
+                </button>`;
+            });
+        }
+
+        container.innerHTML = html;
+        container.style.display = 'block';
+
+        // Scroll até o container e focus no input
+        const cityInput = document.getElementById('city-search-input');
+        if (cityInput) {
+            cityInput.focus();
+            cityInput.placeholder = 'Filtrar cidades...';
+        }
+    },
+
+    // ============================================================
+    // SELECIONAR CIDADE (automática ou manual)
+    // ============================================================
+    selecionarCidade(code, name, isManual) {
+        // Atualizar chips
+        document.querySelectorAll('.origin-chip').forEach(c => c.classList.remove('active'));
+        const chipExistente = document.querySelector(`.origin-chip[data-origin="${code}"]`);
+        if (chipExistente) chipExistente.classList.add('active');
+
+        this.state.origemAtual = code;
+        this.state.origemNome = name;
+        this.state.origemManual = isManual;
+
+        if (isManual) {
+            this.carregarDestinosAoVivo(code);
+        } else {
+            this.carregarDestinos(code);
+        }
+    },
+
+    // ============================================================
+    // CARREGAR DESTINOS (snapshot automático)
     // ============================================================
     async carregarDestinos(origem) {
         if (this.state.carregando) return;
         this.state.carregando = true;
-
-        this.mostrarLoading();
-
-        // Limpar busca e filtros ao trocar cidade
-        this.state.buscaQuery = '';
-        this.state.buscaResultado = null;
-        this.state.filtros = { estilos: [], precoMax: null, escopo: null };
-        document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
-        document.querySelector('.filter-chip[data-filter="todos"]')?.classList.add('active');
-        const searchInput = document.getElementById('smart-search-input');
-        if (searchInput) searchInput.value = '';
-        const feedback = document.getElementById('search-feedback');
-        if (feedback) feedback.style.display = 'none';
-        const clearBtn = document.getElementById('smart-search-clear');
-        if (clearBtn) clearBtn.style.display = 'none';
+        this.resetarFiltros();
+        this.mostrarLoading('A Tripinha está buscando os destinos mais baratos...');
 
         try {
             const response = await fetch(`/api/discovery?origem=${origem}`);
 
             if (!response.ok) {
                 if (response.status === 404) {
-                    console.log('📡 Snapshot não encontrado, tentando busca ao vivo...');
-                    await this.buscarAoVivo(origem);
+                    console.log('Snapshot não encontrado, tentando ao vivo...');
+                    this.state.carregando = false;
+                    await this.carregarDestinosAoVivo(origem);
                     return;
                 }
                 throw new Error(`HTTP ${response.status}`);
@@ -426,26 +347,52 @@ const DiscoveryPage = {
 
             const data = await response.json();
 
-            if (data.success && data.destinos) {
+            if (data.success && data.destinos && data.destinos.length > 0) {
                 this.state.destinos = data.destinos;
                 this.state.dataSnapshot = data.data;
+                this.state.origemManual = false;
                 this.state.destinosFiltrados = [...this.state.destinos];
                 this.renderizar();
             } else {
-                this.mostrarVazio('Nenhum destino encontrado para esta cidade.');
+                this.state.carregando = false;
+                await this.carregarDestinosAoVivo(origem);
             }
         } catch (error) {
-            console.error('❌ Erro ao carregar destinos:', error);
-            await this.buscarAoVivo(origem);
+            console.error('Erro ao carregar snapshot:', error);
+            this.state.carregando = false;
+            await this.carregarDestinosAoVivo(origem);
         } finally {
             this.state.carregando = false;
         }
     },
 
     // ============================================================
-    // BUSCA AO VIVO (fallback quando cron não rodou ainda)
+    // BUSCA AO VIVO (qualquer cidade)
     // ============================================================
-    async buscarAoVivo(origem) {
+    async carregarDestinosAoVivo(origem) {
+        if (this.state.carregando) return;
+        this.state.carregando = true;
+        this.state.origemManual = true;
+        this.resetarFiltros();
+        this.mostrarLoading(`Buscando voos saindo de ${this.state.origemNome} em tempo real...`);
+
+        // Checar cache
+        const cacheKey = `discovery_live_${origem}`;
+        const cached = sessionStorage.getItem(cacheKey);
+        if (cached) {
+            try {
+                const data = JSON.parse(cached);
+                if (Date.now() - data.timestamp < 10 * 60 * 1000) { // 10 min cache
+                    this.state.destinos = data.destinos;
+                    this.state.dataSnapshot = new Date().toISOString().split('T')[0];
+                    this.state.destinosFiltrados = [...this.state.destinos];
+                    this.renderizar();
+                    this.state.carregando = false;
+                    return;
+                }
+            } catch (e) { /* cache inválido */ }
+        }
+
         try {
             const response = await fetch('/api/search-destinations', {
                 method: 'POST',
@@ -461,32 +408,43 @@ const DiscoveryPage = {
 
             const data = await response.json();
 
-            if (data.success && data.destinations) {
-                this.state.destinos = data.destinations
+            if (data.success && data.destinations && data.destinations.length > 0) {
+                const destinos = data.destinations
                     .filter(d => d.flight?.price > 0)
                     .sort((a, b) => (a.flight?.price || 0) - (b.flight?.price || 0))
                     .slice(0, 50)
                     .map((d, i) => this.converterDestinoLive(d, i + 1));
 
+                // Salvar no cache
+                sessionStorage.setItem(cacheKey, JSON.stringify({
+                    destinos,
+                    timestamp: Date.now(),
+                }));
+
+                this.state.destinos = destinos;
                 this.state.dataSnapshot = new Date().toISOString().split('T')[0];
                 this.state.destinosFiltrados = [...this.state.destinos];
                 this.renderizar();
             } else {
-                this.mostrarVazio('Nenhum destino disponível no momento. Tente novamente mais tarde.');
+                this.mostrarVazio(`Nenhum destino encontrado saindo de ${this.state.origemNome}. Tente outra cidade.`);
             }
         } catch (error) {
-            console.error('❌ Erro na busca ao vivo:', error);
-            this.mostrarVazio('Erro ao buscar destinos. Tente novamente em alguns instantes.');
+            console.error('Erro na busca ao vivo:', error);
+            this.mostrarVazio(`Erro ao buscar destinos de ${this.state.origemNome}. Tente novamente.`);
+        } finally {
+            this.state.carregando = false;
         }
     },
 
     converterDestinoLive(dest, posicao) {
         const nome = (dest.name || '').toLowerCase();
         const estilos = [];
-        const praiaKw = ['beach', 'praia', 'litoral', 'natal', 'maceió', 'florianópolis', 'cancún', 'punta cana'];
-        const natKw = ['serra', 'chapada', 'bonito', 'foz', 'monte verde'];
+        const praiaKw = ['beach', 'praia', 'litoral', 'natal', 'maceió', 'florianópolis', 'cancún', 'punta cana', 'búzios', 'ilha', 'island', 'arraial', 'porto seguro', 'jericoacoara'];
+        const natKw = ['serra', 'chapada', 'bonito', 'foz', 'monte verde', 'brotas', 'jalapão'];
+        const romKw = ['gramado', 'campos do jordão', 'paris', 'veneza', 'santorini'];
         if (praiaKw.some(k => nome.includes(k))) estilos.push('praia');
         if (natKw.some(k => nome.includes(k))) estilos.push('natureza');
+        if (romKw.some(k => nome.includes(k))) estilos.push('romantico');
         if (estilos.length === 0) estilos.push('cidade');
 
         const isIntl = (dest.country || '').toLowerCase() !== 'brazil' && (dest.country || '').toLowerCase() !== 'brasil';
@@ -513,10 +471,193 @@ const DiscoveryPage = {
     },
 
     // ============================================================
-    // RENDERIZAR TUDO
+    // FILTROS COMBINÁVEIS
+    // ============================================================
+    toggleFiltro(filter, tipo, chipEl) {
+        if (this.state.buscaResultado) this.limparBusca(false);
+
+        if (filter === 'todos') {
+            this.state.filtros = { estilos: [], precoMax: null, escopo: null };
+            document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+            chipEl.classList.add('active');
+        } else if (tipo === 'estilo') {
+            const idx = this.state.filtros.estilos.indexOf(filter);
+            if (idx >= 0) {
+                this.state.filtros.estilos.splice(idx, 1);
+                chipEl.classList.remove('active');
+            } else {
+                this.state.filtros.estilos.push(filter);
+                chipEl.classList.add('active');
+            }
+            document.querySelector('.filter-chip[data-filter="todos"]')?.classList.remove('active');
+        } else if (tipo === 'preco') {
+            const valor = parseInt(filter);
+            if (this.state.filtros.precoMax === valor) {
+                this.state.filtros.precoMax = null;
+                chipEl.classList.remove('active');
+            } else {
+                this.state.filtros.precoMax = valor;
+                document.querySelectorAll('.filter-chip[data-tipo="preco"]').forEach(c => c.classList.remove('active'));
+                chipEl.classList.add('active');
+            }
+            document.querySelector('.filter-chip[data-filter="todos"]')?.classList.remove('active');
+        } else if (tipo === 'escopo') {
+            if (this.state.filtros.escopo === filter) {
+                this.state.filtros.escopo = null;
+                chipEl.classList.remove('active');
+            } else {
+                this.state.filtros.escopo = filter;
+                document.querySelectorAll('.filter-chip[data-tipo="escopo"]').forEach(c => c.classList.remove('active'));
+                chipEl.classList.add('active');
+            }
+            document.querySelector('.filter-chip[data-filter="todos"]')?.classList.remove('active');
+        }
+
+        const { estilos, precoMax, escopo } = this.state.filtros;
+        if (estilos.length === 0 && !precoMax && !escopo) {
+            document.querySelector('.filter-chip[data-filter="todos"]')?.classList.add('active');
+        }
+
+        this.aplicarFiltros();
+    },
+
+    aplicarFiltros() {
+        const { estilos, precoMax, escopo } = this.state.filtros;
+        let resultado = [...this.state.destinos];
+
+        if (estilos.length > 0) {
+            resultado = resultado.filter(d => (d.estilos || []).some(e => estilos.includes(e)));
+        }
+        if (precoMax) {
+            resultado = resultado.filter(d => d.preco <= precoMax);
+        }
+        if (escopo === 'nacional') {
+            resultado = resultado.filter(d => !d.internacional);
+        } else if (escopo === 'internacional') {
+            resultado = resultado.filter(d => d.internacional);
+        }
+
+        resultado = this.ordenar(resultado);
+        this.state.destinosFiltrados = resultado;
+        this.renderizarCards();
+        this.atualizarContagem();
+    },
+
+    ordenar(destinos) {
+        const copia = [...destinos];
+        switch (this.state.ordenacao) {
+            case 'preco': return copia.sort((a, b) => a.preco - b.preco);
+            case 'nome': return copia.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+            default: return copia;
+        }
+    },
+
+    resetarFiltros() {
+        this.state.buscaQuery = '';
+        this.state.buscaResultado = null;
+        this.state.filtros = { estilos: [], precoMax: null, escopo: null };
+        document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+        document.querySelector('.filter-chip[data-filter="todos"]')?.classList.add('active');
+        const searchInput = document.getElementById('smart-search-input');
+        if (searchInput) searchInput.value = '';
+        const feedback = document.getElementById('search-feedback');
+        if (feedback) feedback.style.display = 'none';
+        const clearBtn = document.getElementById('smart-search-clear');
+        if (clearBtn) clearBtn.style.display = 'none';
+    },
+
+    // ============================================================
+    // BUSCA INTELIGENTE (Groq via API)
+    // ============================================================
+    async executarBuscaInteligente(query) {
+        if (!query || this.state.buscandoIA) return;
+
+        this.state.buscandoIA = true;
+        this.state.buscaQuery = query;
+        this.mostrarBuscaLoading(true);
+
+        try {
+            const response = await fetch('/api/discovery-smart-filter', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ query, destinos: this.state.destinos }),
+            });
+
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            const data = await response.json();
+
+            if (data.success && data.indices) {
+                this.state.buscaResultado = data;
+                const resultado = data.indices
+                    .filter(i => i >= 0 && i < this.state.destinos.length)
+                    .map(i => this.state.destinos[i]);
+
+                document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+                this.state.filtros = { estilos: [], precoMax: null, escopo: null };
+
+                this.state.destinosFiltrados = resultado;
+                this.renderizarCards();
+                this.atualizarContagem(data.titulo || `Resultados: "${query}"`);
+                this.mostrarBuscaFeedback(data.explicacao, resultado.length);
+            }
+        } catch (error) {
+            console.error('Busca inteligente falhou:', error);
+            this.mostrarToast('Erro na busca. Tente novamente.');
+        } finally {
+            this.state.buscandoIA = false;
+            this.mostrarBuscaLoading(false);
+        }
+    },
+
+    limparBusca(reRender = true) {
+        this.state.buscaQuery = '';
+        this.state.buscaResultado = null;
+        const feedback = document.getElementById('search-feedback');
+        if (feedback) feedback.style.display = 'none';
+
+        if (reRender) {
+            this.resetarFiltros();
+            this.state.destinosFiltrados = [...this.state.destinos];
+            this.renderizarCards();
+            this.atualizarContagem();
+        }
+    },
+
+    mostrarBuscaLoading(ativo) {
+        const btn = document.getElementById('smart-search-btn');
+        const input = document.getElementById('smart-search-input');
+        if (btn) {
+            btn.disabled = ativo;
+            btn.innerHTML = ativo
+                ? '<div class="search-spinner"></div>'
+                : '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>';
+        }
+        if (input) input.disabled = ativo;
+    },
+
+    mostrarBuscaFeedback(explicacao, count) {
+        const feedback = document.getElementById('search-feedback');
+        if (!feedback) return;
+        feedback.style.display = 'flex';
+        feedback.innerHTML = `
+            <span class="feedback-icon">&#129302;</span>
+            <span class="feedback-text">${explicacao} &middot; ${count} destino${count !== 1 ? 's' : ''}</span>
+            <button class="feedback-clear" id="feedback-clear-btn">Limpar</button>
+        `;
+        document.getElementById('feedback-clear-btn')?.addEventListener('click', () => {
+            const input = document.getElementById('smart-search-input');
+            if (input) input.value = '';
+            const clearBtn = document.getElementById('smart-search-clear');
+            if (clearBtn) clearBtn.style.display = 'none';
+            this.limparBusca();
+        });
+    },
+
+    // ============================================================
+    // RENDERIZAÇÃO
     // ============================================================
     renderizar() {
-        this.atualizarHero();
+        this.atualizarCityBar();
         this.renderizarStats();
         this.renderizarCards();
         this.atualizarContagem();
@@ -524,37 +665,43 @@ const DiscoveryPage = {
         document.getElementById('loading-state').style.display = 'none';
         document.getElementById('empty-state').style.display = 'none';
         document.getElementById('destinations-section').style.display = 'block';
+        document.getElementById('filters-section').style.display = 'block';
         document.getElementById('cta-section').style.display = 'block';
         document.getElementById('share-fab').style.display = 'flex';
+        document.getElementById('active-city-bar').style.display = 'flex';
     },
 
-    // ============================================================
-    // ATUALIZAR HERO
-    // ============================================================
-    atualizarHero() {
-        document.getElementById('hero-city').textContent = this.state.origemNome;
-        document.title = `Destinos Baratos Saindo de ${this.state.origemNome} Hoje | Benetrip`;
+    atualizarCityBar() {
+        const nameEl = document.getElementById('active-city-name');
+        const badgeEl = document.getElementById('active-city-badge');
+        const sourceEl = document.getElementById('active-city-source');
 
-        if (this.state.dataSnapshot) {
-            const dataObj = new Date(this.state.dataSnapshot + 'T12:00:00');
-            const hoje = new Date();
-            hoje.setHours(12, 0, 0, 0);
+        if (nameEl) nameEl.textContent = `${this.state.origemNome} (${this.state.origemAtual})`;
 
-            const diffDias = Math.round((hoje - dataObj) / (1000 * 60 * 60 * 24));
+        document.title = `Destinos Baratos Saindo de ${this.state.origemNome} | Benetrip`;
 
-            if (diffDias === 0) {
-                document.getElementById('hero-update-text').textContent = 'Atualizado hoje';
-            } else if (diffDias === 1) {
-                document.getElementById('hero-update-text').textContent = 'Atualizado ontem';
-            } else {
-                document.getElementById('hero-update-text').textContent = `Atualizado há ${diffDias} dias`;
+        if (this.state.origemManual) {
+            if (badgeEl) {
+                badgeEl.textContent = 'Busca ao vivo';
+                badgeEl.className = 'active-city-badge badge-live';
             }
+            if (sourceEl) sourceEl.textContent = 'Dados em tempo real';
+        } else {
+            if (this.state.dataSnapshot) {
+                const dataObj = new Date(this.state.dataSnapshot + 'T12:00:00');
+                const hoje = new Date();
+                hoje.setHours(12, 0, 0, 0);
+                const diffDias = Math.round((hoje - dataObj) / (1000 * 60 * 60 * 24));
+
+                if (badgeEl) {
+                    badgeEl.textContent = diffDias === 0 ? 'Atualizado hoje' : diffDias === 1 ? 'Atualizado ontem' : `Há ${diffDias} dias`;
+                    badgeEl.className = 'active-city-badge badge-auto';
+                }
+            }
+            if (sourceEl) sourceEl.textContent = 'Dados automáticos';
         }
     },
 
-    // ============================================================
-    // RENDERIZAR STATS
-    // ============================================================
     renderizarStats() {
         const destinos = this.state.destinos;
         if (destinos.length === 0) return;
@@ -565,17 +712,16 @@ const DiscoveryPage = {
         const nacionais = destinos.filter(d => !d.internacional).length;
         const internacionais = destinos.filter(d => d.internacional).length;
 
-        const statsBar = document.getElementById('stats-bar');
-        statsBar.innerHTML = `
+        document.getElementById('stats-bar').innerHTML = `
             <div class="stat-card">
                 <div class="stat-label">Mais barato</div>
-                <div class="stat-value">R$ ${this.formatarPreco(maisBarato.preco)}</div>
+                <div class="stat-value">R$ ${this.fmt(maisBarato.preco)}</div>
                 <div class="stat-detail">${maisBarato.nome}</div>
                 ${this.renderVariacao(maisBarato.variacao)}
             </div>
             <div class="stat-card">
                 <div class="stat-label">Preço médio</div>
-                <div class="stat-value">R$ ${this.formatarPreco(media)}</div>
+                <div class="stat-value">R$ ${this.fmt(media)}</div>
                 <div class="stat-detail">${destinos.length} destinos</div>
             </div>
             <div class="stat-card">
@@ -591,9 +737,6 @@ const DiscoveryPage = {
         `;
     },
 
-    // ============================================================
-    // RENDERIZAR CARDS
-    // ============================================================
     renderizarCards() {
         const grid = document.getElementById('destinations-grid');
         const destinos = this.state.destinosFiltrados;
@@ -607,51 +750,37 @@ const DiscoveryPage = {
 
         document.getElementById('empty-state').style.display = 'none';
         document.getElementById('destinations-section').style.display = 'block';
-
         grid.innerHTML = destinos.map(d => this.renderCard(d)).join('');
 
         grid.querySelectorAll('.dest-card').forEach(card => {
             card.addEventListener('click', () => {
-                const aeroporto = card.dataset.aeroporto;
-                const nome = card.dataset.nome;
-                const duracao = card.dataset.duracao;
-                const destino = aeroporto || nome;
-                if (destino) {
+                const dest = card.dataset.aeroporto || card.dataset.nome;
+                if (dest) {
                     const params = new URLSearchParams({
                         origem: this.state.origemAtual,
-                        destino: destino,
-                        nome: nome,
+                        destino: dest,
+                        nome: card.dataset.nome,
                     });
-                    if (duracao) params.set('duracao', duracao);
+                    if (card.dataset.duracao) params.set('duracao', card.dataset.duracao);
                     window.location.href = `/voos-baratos?${params.toString()}`;
                 }
             });
         });
     },
 
-    // ============================================================
-    // RENDER DE UM CARD
-    // ============================================================
     renderCard(d) {
         const imgSrc = d.imagem || 'assets/images/tripinha/avatar-pensando.png';
         const estilosTags = (d.estilos || []).map(e =>
             `<span class="dest-tag">${this.capitalize(e)}</span>`
         ).join('');
-
         const variacaoHtml = d.variacao ? this.renderVariacaoInline(d.variacao) : '';
-
-        const duracaoTexto = d.duracao_ideal
-            ? `<strong>${d.duracao_ideal.min}-${d.duracao_ideal.max}</strong> dias`
-            : '';
-
-        const duracaoIdeal = d.duracao_ideal ? d.duracao_ideal.ideal : '';
+        const duracaoTexto = d.duracao_ideal ? `<strong>${d.duracao_ideal.min}-${d.duracao_ideal.max}</strong> dias` : '';
 
         return `
-            <article class="dest-card" data-aeroporto="${d.aeroporto}" data-nome="${d.nome}" data-duracao="${duracaoIdeal}">
+            <article class="dest-card" data-aeroporto="${d.aeroporto}" data-nome="${d.nome}" data-duracao="${d.duracao_ideal?.ideal || ''}">
                 <div class="dest-card-inner">
                     <div class="dest-image-wrapper">
-                        <img class="dest-image" src="${imgSrc}" alt="${d.nome}"
-                             loading="lazy"
+                        <img class="dest-image" src="${imgSrc}" alt="${d.nome}" loading="lazy"
                              onerror="this.src='assets/images/tripinha/avatar-pensando.png'">
                         <span class="dest-rank">${d.posicao}</span>
                         ${d.internacional ? '<span class="dest-badge-international">Internacional</span>' : ''}
@@ -665,49 +794,30 @@ const DiscoveryPage = {
                         <div class="dest-footer">
                             <div class="dest-price-block">
                                 <span class="dest-price-label">A partir de</span>
-                                <span class="dest-price">R$ ${this.formatarPreco(d.preco)}</span>
+                                <span class="dest-price">R$ ${this.fmt(d.preco)}</span>
                                 ${variacaoHtml}
                             </div>
-                            <div class="dest-duration">
-                                ${duracaoTexto}
-                            </div>
+                            <div class="dest-duration">${duracaoTexto}</div>
                         </div>
                     </div>
                 </div>
-            </article>
-        `;
+            </article>`;
     },
 
-    // ============================================================
-    // VARIAÇÃO DE PREÇO
-    // ============================================================
-    renderVariacao(variacao) {
-        if (!variacao) return '';
-        const { direcao, percentual } = variacao;
-        if (direcao === 'desceu') {
-            return `<div class="stat-variation down">↓ ${Math.abs(percentual)}% vs ontem</div>`;
-        }
-        if (direcao === 'subiu') {
-            return `<div class="stat-variation up">↑ ${Math.abs(percentual)}% vs ontem</div>`;
-        }
+    renderVariacao(v) {
+        if (!v) return '';
+        if (v.direcao === 'desceu') return `<div class="stat-variation down">↓ ${Math.abs(v.percentual)}% vs ontem</div>`;
+        if (v.direcao === 'subiu') return `<div class="stat-variation up">↑ ${Math.abs(v.percentual)}% vs ontem</div>`;
         return `<div class="stat-variation stable">→ Estável</div>`;
     },
 
-    renderVariacaoInline(variacao) {
-        if (!variacao) return '';
-        const { direcao, diferenca } = variacao;
-        if (direcao === 'desceu') {
-            return `<span class="dest-price-variation down">↓ R$ ${Math.abs(diferenca)} vs ontem</span>`;
-        }
-        if (direcao === 'subiu') {
-            return `<span class="dest-price-variation up">↑ R$ ${Math.abs(diferenca)} vs ontem</span>`;
-        }
+    renderVariacaoInline(v) {
+        if (!v) return '';
+        if (v.direcao === 'desceu') return `<span class="dest-price-variation down">↓ R$ ${Math.abs(v.diferenca)} vs ontem</span>`;
+        if (v.direcao === 'subiu') return `<span class="dest-price-variation up">↑ R$ ${Math.abs(v.diferenca)} vs ontem</span>`;
         return '';
     },
 
-    // ============================================================
-    // CONTAGEM
-    // ============================================================
     atualizarContagem(tituloOverride) {
         const count = this.state.destinosFiltrados.length;
         document.getElementById('section-count').textContent = `${count} destino${count !== 1 ? 's' : ''}`;
@@ -721,13 +831,12 @@ const DiscoveryPage = {
         const temFiltro = estilos.length > 0 || precoMax || escopo;
 
         if (!temFiltro) {
-            document.getElementById('section-title').textContent =
-                `Top Destinos Saindo de ${this.state.origemNome}`;
+            document.getElementById('section-title').textContent = `Top Destinos de ${this.state.origemNome}`;
         } else {
             const partes = [];
             if (estilos.length > 0) partes.push(estilos.map(e => this.capitalize(e)).join(' + '));
             if (escopo) partes.push(this.capitalize(escopo));
-            if (precoMax) partes.push(`Até R$ ${this.formatarPreco(precoMax)}`);
+            if (precoMax) partes.push(`Até R$ ${this.fmt(precoMax)}`);
             document.getElementById('section-title').textContent = partes.join(' · ');
         }
     },
@@ -735,10 +844,12 @@ const DiscoveryPage = {
     // ============================================================
     // LOADING / VAZIO
     // ============================================================
-    mostrarLoading() {
+    mostrarLoading(msg) {
         document.getElementById('loading-state').style.display = 'block';
+        document.getElementById('loading-message').textContent = msg || 'Buscando destinos...';
         document.getElementById('empty-state').style.display = 'none';
         document.getElementById('destinations-section').style.display = 'none';
+        document.getElementById('filters-section').style.display = 'none';
         document.getElementById('cta-section').style.display = 'none';
         document.getElementById('share-fab').style.display = 'none';
     },
@@ -748,6 +859,8 @@ const DiscoveryPage = {
         document.getElementById('empty-state').style.display = 'block';
         document.getElementById('destinations-section').style.display = 'none';
         document.getElementById('empty-message').textContent = mensagem;
+        document.getElementById('active-city-bar').style.display = 'flex';
+        this.atualizarCityBar();
         this.state.carregando = false;
     },
 
@@ -759,7 +872,6 @@ const DiscoveryPage = {
         if (destinos.length === 0) return;
 
         const mensagem = this.gerarMensagemShare(destinos);
-
         const overlay = document.createElement('div');
         overlay.className = 'share-overlay';
         overlay.innerHTML = `
@@ -770,16 +882,8 @@ const DiscoveryPage = {
                         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
                         WhatsApp
                     </button>
-                    <button class="share-btn facebook" data-platform="facebook">
-                        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
-                        Facebook
-                    </button>
-                    <button class="share-btn twitter" data-platform="twitter">
-                        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
-                        X
-                    </button>
                     <button class="share-btn copy" data-platform="copy">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"></path></svg>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
                         Copiar
                     </button>
                 </div>
@@ -788,11 +892,7 @@ const DiscoveryPage = {
         `;
 
         document.body.appendChild(overlay);
-
-        overlay.addEventListener('click', (e) => {
-            if (e.target === overlay) overlay.remove();
-        });
-
+        overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
         overlay.querySelectorAll('.share-btn').forEach(btn => {
             btn.addEventListener('click', () => {
                 this.executarShare(btn.dataset.platform, mensagem);
@@ -802,159 +902,33 @@ const DiscoveryPage = {
     },
 
     gerarMensagemShare(destinos) {
-        const top = destinos.slice(0, 5);
-        const linhas = top.map(d =>
-            `${d.posicao}. ${d.nome} (${d.pais}) - R$ ${this.formatarPreco(d.preco)}`
+        const linhas = destinos.slice(0, 5).map(d =>
+            `${d.posicao}. ${d.nome} (${d.pais}) - R$ ${this.fmt(d.preco)}`
         );
-
         return `✈️ Destinos baratos saindo de ${this.state.origemNome} hoje!\n\n` +
             linhas.join('\n') +
-            `\n\n🐶 Atualizado diariamente pela Tripinha\n` +
-            `🔗 https://benetrip.com.br/destinos-baratos`;
+            `\n\n🐶 Pela Tripinha\n🔗 https://benetrip.com.br/destinos-baratos`;
     },
 
     executarShare(platform, mensagem) {
-        const url = 'https://benetrip.com.br/destinos-baratos?utm_source=share&utm_medium=' + platform;
-
-        switch (platform) {
-            case 'whatsapp':
-                window.open(`https://wa.me/?text=${encodeURIComponent(mensagem)}`, '_blank');
-                break;
-            case 'facebook':
-                window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`, '_blank');
-                break;
-            case 'twitter': {
-                const tweet = mensagem.length > 250 ? mensagem.substring(0, 247) + '...' : mensagem;
-                window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(tweet)}`, '_blank');
-                break;
-            }
-            case 'copy':
-                navigator.clipboard.writeText(mensagem).then(() => {
-                    this.mostrarToast('Link copiado!');
-                });
-                break;
+        if (platform === 'whatsapp') {
+            window.open(`https://wa.me/?text=${encodeURIComponent(mensagem)}`, '_blank');
+        } else if (platform === 'copy') {
+            navigator.clipboard.writeText(mensagem).then(() => this.mostrarToast('Copiado!'));
         }
-    },
-
-    // ============================================================
-    // DROPDOWN DE CIDADES (100+)
-    // ============================================================
-    _cidadesCache: null,
-
-    async carregarListaCidades() {
-        if (this._cidadesCache) return this._cidadesCache;
-
-        try {
-            const response = await fetch('/assets/data/brazilian-airports.json');
-            if (!response.ok) throw new Error(`HTTP ${response.status}`);
-            const data = await response.json();
-            this._cidadesCache = data.cidades || [];
-            return this._cidadesCache;
-        } catch (err) {
-            console.warn('Erro ao carregar lista de cidades:', err);
-            // Fallback: cidades dos chips
-            this._cidadesCache = [];
-            document.querySelectorAll('.origin-chip[data-origin]').forEach(chip => {
-                if (chip.id === 'origin-more-btn') return;
-                this._cidadesCache.push({
-                    codigo: chip.dataset.origin,
-                    nome: chip.dataset.name,
-                    estado: '',
-                    regiao: '',
-                    prioridade: 1,
-                });
-            });
-            return this._cidadesCache;
-        }
-    },
-
-    async abrirDropdownCidades() {
-        const dropdown = document.getElementById('origin-dropdown');
-        const list = document.getElementById('origin-dropdown-list');
-        const searchInput = document.getElementById('origin-search-input');
-
-        if (!dropdown || !list) return;
-
-        dropdown.style.display = 'block';
-
-        const cidades = await this.carregarListaCidades();
-
-        // Agrupar por região
-        const regioes = { 'sudeste': [], 'sul': [], 'nordeste': [], 'centro-oeste': [], 'norte': [] };
-        cidades.forEach(c => {
-            const r = c.regiao || 'outro';
-            if (!regioes[r]) regioes[r] = [];
-            regioes[r].push(c);
-        });
-
-        const nomeRegiao = {
-            'sudeste': 'Sudeste', 'sul': 'Sul', 'nordeste': 'Nordeste',
-            'centro-oeste': 'Centro-Oeste', 'norte': 'Norte',
-        };
-
-        let html = '';
-        for (const [regiao, cidadesRegiao] of Object.entries(regioes)) {
-            if (cidadesRegiao.length === 0) continue;
-            html += `<div class="origin-dropdown-group" data-regiao="${regiao}">
-                <div class="origin-dropdown-label">${nomeRegiao[regiao] || regiao}</div>`;
-            cidadesRegiao.forEach(c => {
-                const ativa = c.codigo === this.state.origemAtual ? ' active' : '';
-                html += `<button class="origin-dropdown-item${ativa}" data-origin="${c.codigo}" data-name="${c.nome}">
-                    <span class="origin-item-name">${c.nome}</span>
-                    <span class="origin-item-code">${c.codigo} · ${c.estado}</span>
-                </button>`;
-            });
-            html += '</div>';
-        }
-
-        list.innerHTML = html;
-        if (searchInput) {
-            searchInput.value = '';
-            searchInput.focus();
-        }
-    },
-
-    fecharDropdownCidades() {
-        const dropdown = document.getElementById('origin-dropdown');
-        if (dropdown) dropdown.style.display = 'none';
-    },
-
-    filtrarDropdownCidades(query) {
-        const list = document.getElementById('origin-dropdown-list');
-        if (!list) return;
-
-        const normalizado = query.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-        const items = list.querySelectorAll('.origin-dropdown-item');
-        const groups = list.querySelectorAll('.origin-dropdown-group');
-
-        items.forEach(item => {
-            const nome = (item.dataset.name || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-            const codigo = (item.dataset.origin || '').toLowerCase();
-            const match = !normalizado || nome.includes(normalizado) || codigo.includes(normalizado);
-            item.style.display = match ? 'flex' : 'none';
-        });
-
-        // Esconder grupos vazios
-        groups.forEach(group => {
-            const visibleItems = group.querySelectorAll('.origin-dropdown-item[style="display: flex;"], .origin-dropdown-item:not([style])');
-            const hasVisible = Array.from(group.querySelectorAll('.origin-dropdown-item')).some(
-                item => item.style.display !== 'none'
-            );
-            group.style.display = hasVisible ? 'block' : 'none';
-        });
     },
 
     // ============================================================
     // UTILITÁRIOS
     // ============================================================
-    formatarPreco(valor) {
+    fmt(valor) {
         if (!valor) return '0';
         return Number(valor).toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
     },
 
     capitalize(str) {
         if (!str) return '';
-        const map = { romantico: 'Casal', familia: 'Família', aventura: 'Aventura', praia: 'Praia', natureza: 'Natureza', cidade: 'Cidade' };
+        const map = { romantico: 'Casal', familia: 'Família', aventura: 'Aventura', praia: 'Praia', natureza: 'Natureza', cidade: 'Cidade', nacional: 'Nacional', internacional: 'Internacional' };
         return map[str] || str.charAt(0).toUpperCase() + str.slice(1);
     },
 
@@ -973,9 +947,4 @@ const DiscoveryPage = {
     },
 };
 
-// ============================================================
-// INICIALIZAR
-// ============================================================
-document.addEventListener('DOMContentLoaded', () => {
-    DiscoveryPage.init();
-});
+document.addEventListener('DOMContentLoaded', () => DiscoveryPage.init());

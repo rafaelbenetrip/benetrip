@@ -42,22 +42,34 @@
         <div class="container hero-content">
             <img src="assets/images/tripinha/avatar-pensando.png" alt="Tripinha" class="hero-avatar"
                  onerror="this.style.display='none'">
-            <h1 id="hero-title">Destinos Baratos Saindo de <span id="hero-city">São Paulo</span> Hoje</h1>
+            <h1 id="hero-title">De onde você quer viajar?</h1>
             <p class="hero-subtitle" id="hero-subtitle">
-                Ranking atualizado diariamente com os melhores preços de passagens aéreas.
+                Escolha sua cidade ou digite qualquer aeroporto brasileiro.
             </p>
-            <div class="hero-badge">
-                <span class="pulse-dot"></span>
-                <span id="hero-update-text">Atualizado hoje</span>
+
+            <!-- BUSCA DE CIDADE (dentro do hero) -->
+            <div class="hero-city-search">
+                <div class="city-search-box" id="city-search-box">
+                    <svg class="city-search-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                    <input type="text" id="city-search-input"
+                           placeholder="Digite sua cidade ou código do aeroporto..."
+                           autocomplete="off" maxlength="60">
+                    <button class="city-search-clear" id="city-search-clear" style="display:none;" aria-label="Limpar">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    </button>
+                </div>
+                <!-- Dropdown de sugestões -->
+                <div class="city-suggestions" id="city-suggestions" style="display:none;">
+                    <!-- Preenchido via JS -->
+                </div>
             </div>
         </div>
     </section>
 
     <!-- ========================================
-         BLOCO 2: SELETOR DE CIDADE (100+ cidades)
+         BLOCO 2: CHIPS RÁPIDOS (cidades automáticas)
          ======================================== -->
     <div class="origin-selector">
-        <!-- Cidades principais (chips rápidos) -->
         <div class="origin-chips" id="origin-chips">
             <button class="origin-chip active" data-origin="GRU" data-name="São Paulo">São Paulo</button>
             <button class="origin-chip" data-origin="GIG" data-name="Rio de Janeiro">Rio de Janeiro</button>
@@ -69,57 +81,60 @@
             <button class="origin-chip" data-origin="CWB" data-name="Curitiba">Curitiba</button>
             <button class="origin-chip" data-origin="FOR" data-name="Fortaleza">Fortaleza</button>
             <button class="origin-chip" data-origin="FLN" data-name="Florianópolis">Florianópolis</button>
-            <button class="origin-chip origin-chip-more" id="origin-more-btn">Mais cidades...</button>
-        </div>
-        <!-- Seletor expandido (dropdown pesquisável) -->
-        <div class="origin-dropdown" id="origin-dropdown" style="display:none;">
-            <div class="origin-dropdown-search">
-                <input type="text" id="origin-search-input" placeholder="Buscar cidade..." autocomplete="off">
-                <button class="origin-dropdown-close" id="origin-dropdown-close" aria-label="Fechar">✕</button>
-            </div>
-            <div class="origin-dropdown-list" id="origin-dropdown-list">
-                <!-- Preenchido via JS -->
-            </div>
+            <button class="origin-chip origin-chip-more" id="origin-more-btn">Mais cidades</button>
         </div>
     </div>
 
     <!-- ========================================
-         BLOCO 3: BUSCA INTELIGENTE
+         BLOCO 3: INDICADOR DE CIDADE ATIVA + BADGE
          ======================================== -->
-    <div class="smart-search-section">
-        <div class="smart-search-box">
-            <input type="text" id="smart-search-input"
-                   placeholder="Ex: praia barata pra casal, natureza até 1500..."
-                   autocomplete="off" maxlength="100">
-            <button class="smart-search-clear" id="smart-search-clear" style="display:none;" aria-label="Limpar">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-            </button>
-            <button class="smart-search-btn" id="smart-search-btn" aria-label="Buscar">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-            </button>
+    <div class="active-city-bar" id="active-city-bar" style="display:none;">
+        <div class="active-city-info">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+            <span class="active-city-name" id="active-city-name">São Paulo (GRU)</span>
+            <span class="active-city-badge" id="active-city-badge">Atualizado hoje</span>
         </div>
-        <div class="search-feedback" id="search-feedback" style="display:none;"></div>
+        <span class="active-city-source" id="active-city-source"></span>
     </div>
 
     <!-- ========================================
-         BLOCO 4: FILTROS COMBINÁVEIS
+         BLOCO 4: FILTROS + BUSCA INTELIGENTE
          ======================================== -->
-    <div class="quick-filters">
-        <div class="filter-row" id="filter-chips">
-            <button class="filter-chip active" data-filter="todos" data-tipo="reset">Todos</button>
-            <button class="filter-chip" data-filter="praia" data-tipo="estilo">Praia</button>
-            <button class="filter-chip" data-filter="cidade" data-tipo="estilo">Cidade</button>
-            <button class="filter-chip" data-filter="natureza" data-tipo="estilo">Natureza</button>
-            <button class="filter-chip" data-filter="romantico" data-tipo="estilo">Casal</button>
-            <button class="filter-chip" data-filter="familia" data-tipo="estilo">Família</button>
-            <button class="filter-chip" data-filter="aventura" data-tipo="estilo">Aventura</button>
-            <span class="filter-separator"></span>
-            <button class="filter-chip" data-filter="nacional" data-tipo="escopo">Nacional</button>
-            <button class="filter-chip" data-filter="internacional" data-tipo="escopo">Internacional</button>
-            <span class="filter-separator"></span>
-            <button class="filter-chip" data-filter="1000" data-tipo="preco">Até R$ 1.000</button>
-            <button class="filter-chip" data-filter="2000" data-tipo="preco">Até R$ 2.000</button>
-            <button class="filter-chip" data-filter="3000" data-tipo="preco">Até R$ 3.000</button>
+    <div class="filters-section" id="filters-section" style="display:none;">
+        <!-- Busca inteligente por destino -->
+        <div class="smart-search-section">
+            <div class="smart-search-box">
+                <input type="text" id="smart-search-input"
+                       placeholder="Filtrar: praia barata, natureza até 1500..."
+                       autocomplete="off" maxlength="100">
+                <button class="smart-search-clear" id="smart-search-clear" style="display:none;" aria-label="Limpar">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+                <button class="smart-search-btn" id="smart-search-btn" aria-label="Buscar">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                </button>
+            </div>
+            <div class="search-feedback" id="search-feedback" style="display:none;"></div>
+        </div>
+
+        <!-- Filtros combináveis -->
+        <div class="quick-filters">
+            <div class="filter-row" id="filter-chips">
+                <button class="filter-chip active" data-filter="todos" data-tipo="reset">Todos</button>
+                <button class="filter-chip" data-filter="praia" data-tipo="estilo">Praia</button>
+                <button class="filter-chip" data-filter="cidade" data-tipo="estilo">Cidade</button>
+                <button class="filter-chip" data-filter="natureza" data-tipo="estilo">Natureza</button>
+                <button class="filter-chip" data-filter="romantico" data-tipo="estilo">Casal</button>
+                <button class="filter-chip" data-filter="familia" data-tipo="estilo">Família</button>
+                <button class="filter-chip" data-filter="aventura" data-tipo="estilo">Aventura</button>
+                <span class="filter-separator"></span>
+                <button class="filter-chip" data-filter="nacional" data-tipo="escopo">Nacional</button>
+                <button class="filter-chip" data-filter="internacional" data-tipo="escopo">Internacional</button>
+                <span class="filter-separator"></span>
+                <button class="filter-chip" data-filter="1000" data-tipo="preco">Até R$ 1.000</button>
+                <button class="filter-chip" data-filter="2000" data-tipo="preco">Até R$ 2.000</button>
+                <button class="filter-chip" data-filter="3000" data-tipo="preco">Até R$ 3.000</button>
+            </div>
         </div>
     </div>
 
@@ -131,15 +146,15 @@
     </div>
 
     <!-- ========================================
-         BLOCO 5: LOADING STATE
+         BLOCO 6: LOADING STATE
          ======================================== -->
-    <div class="discovery-loading" id="loading-state">
+    <div class="discovery-loading" id="loading-state" style="display:none;">
         <div class="spinner"></div>
-        <p>A Tripinha está buscando os destinos mais baratos...</p>
+        <p id="loading-message">A Tripinha está buscando os destinos mais baratos...</p>
     </div>
 
     <!-- ========================================
-         BLOCO 6: EMPTY / ERROR STATE
+         BLOCO 7: EMPTY / ERROR STATE
          ======================================== -->
     <div class="discovery-empty" id="empty-state" style="display: none;">
         <img src="assets/images/tripinha/avatar-pensando.png" alt="Tripinha"
@@ -149,7 +164,7 @@
     </div>
 
     <!-- ========================================
-         BLOCO 7: CARDS DE DESTINOS
+         BLOCO 8: CARDS DE DESTINOS
          ======================================== -->
     <main class="destinations-section" id="destinations-section" style="display: none;">
         <div class="section-header">
@@ -168,7 +183,7 @@
     </main>
 
     <!-- ========================================
-         BLOCO 8: CTA FINAL
+         BLOCO 9: CTA FINAL
          ======================================== -->
     <section class="discovery-cta" id="cta-section" style="display: none;">
         <img src="assets/images/tripinha/avatar-pensando.png" alt="Tripinha" class="cta-avatar"
