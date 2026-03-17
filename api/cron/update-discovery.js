@@ -1,37 +1,72 @@
-// api/cron/update-discovery.js - BENETRIP DISCOVERY CRON v1.0
-// Roda automaticamente via Vercel Cron (todo dia às 6h BRT)
-// Busca destinos baratos para as principais cidades brasileiras
+// api/cron/update-discovery.js - BENETRIP DISCOVERY CRON v2.0
+// Roda automaticamente via Vercel Cron (7x ao dia, a cada ~3h)
+// Busca destinos baratos para 100 cidades brasileiras usando lotes rotativos
 // e salva snapshots no Supabase para consulta rápida + histórico
 //
-// COMO FUNCIONA:
-// 1. Para cada cidade de origem, chama a SearchAPI (google_travel_explore)
-// 2. Formata os top destinos com preço, duração, estilo
-// 3. Salva no Supabase (tabela discovery_snapshots)
-// 4. O snapshot anterior permanece = histórico automático
+// v2.0: Lotes rotativos (15 cidades por execução)
+//       Classificação de estilos via Groq
+//       100 cidades carregadas de brazilian-airports.json
 //
-// TRIGGER: Vercel Cron configurado em vercel.json
+// COMO FUNCIONA:
+// 1. Carrega lista de 100 cidades de brazilian-airports.json
+// 2. Determina qual lote processar (baseado na hora do dia)
+// 3. Para cada cidade do lote, chama a SearchAPI (google_travel_explore)
+// 4. Classifica estilos via Groq (batch) com fallback keywords
+// 5. Salva no Supabase (tabela discovery_snapshots)
+//
+// TRIGGER: Vercel Cron configurado em vercel.json (7x/dia)
 // MANUAL:  GET /api/cron/update-discovery?key=CRON_SECRET
+// FORÇAR LOTE: GET /api/cron/update-discovery?key=CRON_SECRET&lote=3
 
 import { readFileSync } from 'fs';
 import { join } from 'path';
 
-export const maxDuration = 300; // 5 minutos (busca múltiplas cidades)
+export const maxDuration = 300; // 5 minutos
 
 // ============================================================
 // CONFIGURAÇÃO
 // ============================================================
-const ORIGENS = [
-    { codigo: 'GRU', nome: 'São Paulo', kgmid: '/m/022pfm' },
-    { codigo: 'GIG', nome: 'Rio de Janeiro', kgmid: '/m/06gmr' },
-    { codigo: 'BSB', nome: 'Brasília', kgmid: '/m/01ky2c' },
-    { codigo: 'CNF', nome: 'Belo Horizonte', kgmid: '/m/01nmhq' },
-    { codigo: 'SSA', nome: 'Salvador', kgmid: '' },
-    { codigo: 'REC', nome: 'Recife', kgmid: '' },
-    { codigo: 'POA', nome: 'Porto Alegre', kgmid: '' },
-    { codigo: 'CWB', nome: 'Curitiba', kgmid: '' },
-    { codigo: 'FOR', nome: 'Fortaleza', kgmid: '' },
-    { codigo: 'VCP', nome: 'Campinas', kgmid: '' },
-];
+const CIDADES_POR_LOTE = 15;     // Quantas cidades processar por execução
+const LOTES_POR_DIA = 7;         // Cron roda 7x/dia
+
+// Carregar cidades do JSON
+function carregarCidades() {
+    try {
+        const filePath = join(process.cwd(), 'api', 'data', 'brazilian-airports.json');
+        const raw = readFileSync(filePath, 'utf-8');
+        const data = JSON.parse(raw);
+        // Ordenar por prioridade (1 = mais importante, processa primeiro)
+        return (data.cidades || []).sort((a, b) => a.prioridade - b.prioridade);
+    } catch (err) {
+        console.warn('⚠️ Erro ao carregar brazilian-airports.json, usando fallback');
+        return [
+            { codigo: 'GRU', nome: 'São Paulo (Guarulhos)', estado: 'SP', regiao: 'sudeste', prioridade: 1 },
+            { codigo: 'GIG', nome: 'Rio de Janeiro (Galeão)', estado: 'RJ', regiao: 'sudeste', prioridade: 1 },
+            { codigo: 'BSB', nome: 'Brasília', estado: 'DF', regiao: 'centro-oeste', prioridade: 1 },
+            { codigo: 'CNF', nome: 'Belo Horizonte', estado: 'MG', regiao: 'sudeste', prioridade: 1 },
+            { codigo: 'SSA', nome: 'Salvador', estado: 'BA', regiao: 'nordeste', prioridade: 1 },
+            { codigo: 'REC', nome: 'Recife', estado: 'PE', regiao: 'nordeste', prioridade: 1 },
+            { codigo: 'POA', nome: 'Porto Alegre', estado: 'RS', regiao: 'sul', prioridade: 1 },
+            { codigo: 'CWB', nome: 'Curitiba', estado: 'PR', regiao: 'sul', prioridade: 1 },
+            { codigo: 'FOR', nome: 'Fortaleza', estado: 'CE', regiao: 'nordeste', prioridade: 1 },
+            { codigo: 'VCP', nome: 'Campinas', estado: 'SP', regiao: 'sudeste', prioridade: 1 },
+        ];
+    }
+}
+
+// Determinar qual lote processar baseado na hora UTC
+function calcularLote(totalCidades, forcarLote) {
+    if (forcarLote !== undefined && forcarLote !== null) {
+        const lote = parseInt(forcarLote);
+        if (!isNaN(lote) && lote >= 0) return lote;
+    }
+
+    // Baseado na hora UTC: cada execução pega o próximo lote
+    const hora = new Date().getUTCHours();
+    const execucao = Math.floor(hora / 3); // 0-7
+    const totalLotes = Math.ceil(totalCidades / CIDADES_POR_LOTE);
+    return execucao % totalLotes;
+}
 
 const MAX_DESTINOS_POR_ORIGEM = 50;
 
@@ -385,18 +420,35 @@ export default async function handler(req, res) {
         return res.status(401).json({ error: 'Não autorizado' });
     }
 
+    // Carregar cidades e calcular lote
+    const todasCidades = carregarCidades();
+    const loteForcar = req.query?.lote;
+    const loteIndex = calcularLote(todasCidades.length, loteForcar);
+    const inicio = loteIndex * CIDADES_POR_LOTE;
+    const cidadesDoLote = todasCidades.slice(inicio, inicio + CIDADES_POR_LOTE);
+    const totalLotes = Math.ceil(todasCidades.length / CIDADES_POR_LOTE);
+
     console.log(`\n${'='.repeat(60)}`);
-    console.log(`🚀 DISCOVERY CRON - Início: ${new Date().toISOString()}`);
+    console.log(`🚀 DISCOVERY CRON v2.0 - Início: ${new Date().toISOString()}`);
+    console.log(`📦 Lote ${loteIndex + 1}/${totalLotes} (cidades ${inicio + 1}-${inicio + cidadesDoLote.length} de ${todasCidades.length})`);
+    console.log(`🏙️ Cidades: ${cidadesDoLote.map(c => c.codigo).join(', ')}`);
     console.log(`${'='.repeat(60)}`);
 
-    const startTime = Date.now();
-    const resultados = { sucesso: 0, falha: 0, detalhes: [] };
+    if (cidadesDoLote.length === 0) {
+        return res.status(200).json({
+            success: true,
+            message: `Lote ${loteIndex + 1} vazio (total: ${todasCidades.length} cidades)`,
+        });
+    }
 
-    // Processar todas as origens em paralelo (máx 3 por vez para não sobrecarregar)
+    const startTime = Date.now();
+    const resultados = { sucesso: 0, falha: 0, detalhes: [], lote: loteIndex + 1, totalLotes };
+
+    // Processar cidades do lote em paralelo (máx 3 por vez para não sobrecarregar)
     const batchSize = 3;
-    for (let i = 0; i < ORIGENS.length; i += batchSize) {
-        const batch = ORIGENS.slice(i, i + batchSize);
-        const promises = batch.map(origem => processarOrigem(origem));
+    for (let i = 0; i < cidadesDoLote.length; i += batchSize) {
+        const batch = cidadesDoLote.slice(i, i + batchSize);
+        const promises = batch.map(cidade => processarOrigem(cidade));
         const snapshots = await Promise.all(promises);
 
         // Salvar no Supabase
@@ -430,13 +482,13 @@ export default async function handler(req, res) {
     const totalTime = Date.now() - startTime;
 
     console.log(`\n${'='.repeat(60)}`);
-    console.log(`✅ DISCOVERY CRON - Completo em ${totalTime}ms`);
+    console.log(`✅ DISCOVERY CRON v2.0 - Lote ${loteIndex + 1}/${totalLotes} completo em ${totalTime}ms`);
     console.log(`   Sucesso: ${resultados.sucesso} | Falha: ${resultados.falha}`);
     console.log(`${'='.repeat(60)}\n`);
 
     return res.status(200).json({
         success: true,
-        message: `Discovery atualizado: ${resultados.sucesso} origens processadas`,
+        message: `Lote ${loteIndex + 1}/${totalLotes}: ${resultados.sucesso} origens processadas`,
         totalTime,
         resultados,
     });

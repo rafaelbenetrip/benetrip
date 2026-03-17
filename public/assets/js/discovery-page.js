@@ -54,19 +54,59 @@ const DiscoveryPage = {
     // BIND DE EVENTOS
     // ============================================================
     bindEvents() {
-        // Chips de origem
+        // Chips de origem (principais)
         document.getElementById('origin-chips').addEventListener('click', (e) => {
             const chip = e.target.closest('.origin-chip');
             if (!chip) return;
 
+            // Botão "Mais cidades..."
+            if (chip.id === 'origin-more-btn') {
+                this.abrirDropdownCidades();
+                return;
+            }
+
             const origin = chip.dataset.origin;
             const name = chip.dataset.name;
+            if (!origin) return;
 
             document.querySelectorAll('.origin-chip').forEach(c => c.classList.remove('active'));
             chip.classList.add('active');
 
             this.state.origemAtual = origin;
             this.state.origemNome = name;
+            this.carregarDestinos(origin);
+        });
+
+        // Dropdown de cidades expandido
+        const dropdownClose = document.getElementById('origin-dropdown-close');
+        if (dropdownClose) {
+            dropdownClose.addEventListener('click', () => this.fecharDropdownCidades());
+        }
+
+        const originSearchInput = document.getElementById('origin-search-input');
+        if (originSearchInput) {
+            originSearchInput.addEventListener('input', () => {
+                this.filtrarDropdownCidades(originSearchInput.value.trim());
+            });
+        }
+
+        document.getElementById('origin-dropdown-list')?.addEventListener('click', (e) => {
+            const item = e.target.closest('.origin-dropdown-item');
+            if (!item) return;
+
+            const origin = item.dataset.origin;
+            const name = item.dataset.name;
+
+            // Desativar chips principais
+            document.querySelectorAll('.origin-chip').forEach(c => c.classList.remove('active'));
+
+            // Se a cidade está nos chips, ativá-la
+            const chipExistente = document.querySelector(`.origin-chip[data-origin="${origin}"]`);
+            if (chipExistente) chipExistente.classList.add('active');
+
+            this.state.origemAtual = origin;
+            this.state.origemNome = name;
+            this.fecharDropdownCidades();
             this.carregarDestinos(origin);
         });
 
@@ -794,6 +834,114 @@ const DiscoveryPage = {
                 });
                 break;
         }
+    },
+
+    // ============================================================
+    // DROPDOWN DE CIDADES (100+)
+    // ============================================================
+    _cidadesCache: null,
+
+    async carregarListaCidades() {
+        if (this._cidadesCache) return this._cidadesCache;
+
+        try {
+            const response = await fetch('/assets/data/brazilian-airports.json');
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            const data = await response.json();
+            this._cidadesCache = data.cidades || [];
+            return this._cidadesCache;
+        } catch (err) {
+            console.warn('Erro ao carregar lista de cidades:', err);
+            // Fallback: cidades dos chips
+            this._cidadesCache = [];
+            document.querySelectorAll('.origin-chip[data-origin]').forEach(chip => {
+                if (chip.id === 'origin-more-btn') return;
+                this._cidadesCache.push({
+                    codigo: chip.dataset.origin,
+                    nome: chip.dataset.name,
+                    estado: '',
+                    regiao: '',
+                    prioridade: 1,
+                });
+            });
+            return this._cidadesCache;
+        }
+    },
+
+    async abrirDropdownCidades() {
+        const dropdown = document.getElementById('origin-dropdown');
+        const list = document.getElementById('origin-dropdown-list');
+        const searchInput = document.getElementById('origin-search-input');
+
+        if (!dropdown || !list) return;
+
+        dropdown.style.display = 'block';
+
+        const cidades = await this.carregarListaCidades();
+
+        // Agrupar por região
+        const regioes = { 'sudeste': [], 'sul': [], 'nordeste': [], 'centro-oeste': [], 'norte': [] };
+        cidades.forEach(c => {
+            const r = c.regiao || 'outro';
+            if (!regioes[r]) regioes[r] = [];
+            regioes[r].push(c);
+        });
+
+        const nomeRegiao = {
+            'sudeste': 'Sudeste', 'sul': 'Sul', 'nordeste': 'Nordeste',
+            'centro-oeste': 'Centro-Oeste', 'norte': 'Norte',
+        };
+
+        let html = '';
+        for (const [regiao, cidadesRegiao] of Object.entries(regioes)) {
+            if (cidadesRegiao.length === 0) continue;
+            html += `<div class="origin-dropdown-group" data-regiao="${regiao}">
+                <div class="origin-dropdown-label">${nomeRegiao[regiao] || regiao}</div>`;
+            cidadesRegiao.forEach(c => {
+                const ativa = c.codigo === this.state.origemAtual ? ' active' : '';
+                html += `<button class="origin-dropdown-item${ativa}" data-origin="${c.codigo}" data-name="${c.nome}">
+                    <span class="origin-item-name">${c.nome}</span>
+                    <span class="origin-item-code">${c.codigo} · ${c.estado}</span>
+                </button>`;
+            });
+            html += '</div>';
+        }
+
+        list.innerHTML = html;
+        if (searchInput) {
+            searchInput.value = '';
+            searchInput.focus();
+        }
+    },
+
+    fecharDropdownCidades() {
+        const dropdown = document.getElementById('origin-dropdown');
+        if (dropdown) dropdown.style.display = 'none';
+    },
+
+    filtrarDropdownCidades(query) {
+        const list = document.getElementById('origin-dropdown-list');
+        if (!list) return;
+
+        const normalizado = query.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        const items = list.querySelectorAll('.origin-dropdown-item');
+        const groups = list.querySelectorAll('.origin-dropdown-group');
+
+        items.forEach(item => {
+            const nome = (item.dataset.name || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+            const codigo = (item.dataset.origin || '').toLowerCase();
+            const match = !normalizado || nome.includes(normalizado) || codigo.includes(normalizado);
+            item.style.display = match ? 'flex' : 'none';
+        });
+
+        // Esconder grupos vazios
+        groups.forEach(group => {
+            const visibleItems = group.querySelectorAll('.origin-dropdown-item[style="display: flex;"], .origin-dropdown-item:not([style])');
+            const hasVisible = Array.from(group.querySelectorAll('.origin-dropdown-item')).some(
+                item => item.style.display !== 'none'
+            );
+            group.style.display = hasVisible ? 'block' : 'none';
+        });
     },
 
     // ============================================================

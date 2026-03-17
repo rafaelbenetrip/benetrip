@@ -54,9 +54,10 @@
     </section>
 
     <!-- ========================================
-         BLOCO 2: SELETOR DE CIDADE
+         BLOCO 2: SELETOR DE CIDADE (100+ cidades)
          ======================================== -->
     <div class="origin-selector">
+        <!-- Cidades principais (chips rápidos) -->
         <div class="origin-chips" id="origin-chips">
             <button class="origin-chip active" data-origin="GRU" data-name="São Paulo">São Paulo</button>
             <button class="origin-chip" data-origin="GIG" data-name="Rio de Janeiro">Rio de Janeiro</button>
@@ -67,7 +68,18 @@
             <button class="origin-chip" data-origin="POA" data-name="Porto Alegre">Porto Alegre</button>
             <button class="origin-chip" data-origin="CWB" data-name="Curitiba">Curitiba</button>
             <button class="origin-chip" data-origin="FOR" data-name="Fortaleza">Fortaleza</button>
-            <button class="origin-chip" data-origin="VCP" data-name="Campinas">Campinas</button>
+            <button class="origin-chip" data-origin="FLN" data-name="Florianópolis">Florianópolis</button>
+            <button class="origin-chip origin-chip-more" id="origin-more-btn">Mais cidades...</button>
+        </div>
+        <!-- Seletor expandido (dropdown pesquisável) -->
+        <div class="origin-dropdown" id="origin-dropdown" style="display:none;">
+            <div class="origin-dropdown-search">
+                <input type="text" id="origin-search-input" placeholder="Buscar cidade..." autocomplete="off">
+                <button class="origin-dropdown-close" id="origin-dropdown-close" aria-label="Fechar">✕</button>
+            </div>
+            <div class="origin-dropdown-list" id="origin-dropdown-list">
+                <!-- Preenchido via JS -->
+            </div>
         </div>
     </div>
 

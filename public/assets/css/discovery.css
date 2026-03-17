@@ -144,6 +144,133 @@ body {
     color: var(--white);
 }
 
+.origin-chip-more {
+    border-style: dashed;
+    color: var(--orange-primary);
+    border-color: var(--orange-primary);
+    font-weight: 600;
+}
+
+.origin-chip-more:hover {
+    background: rgba(232, 119, 34, 0.08);
+}
+
+/* ========================================
+   DROPDOWN DE CIDADES (100+)
+   ======================================== */
+.origin-dropdown {
+    background: var(--white);
+    border-top: 1px solid #E8E8E8;
+    padding: 12px 20px 16px;
+    max-height: 360px;
+    display: flex;
+    flex-direction: column;
+}
+
+.origin-dropdown-search {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.origin-dropdown-search input {
+    flex: 1;
+    border: 1.5px solid #E0E0E0;
+    border-radius: 10px;
+    padding: 10px 14px;
+    font-family: 'Montserrat', sans-serif;
+    font-size: 13px;
+    outline: none;
+    transition: var(--transition);
+}
+
+.origin-dropdown-search input:focus {
+    border-color: var(--orange-primary);
+}
+
+.origin-dropdown-close {
+    width: 36px;
+    height: 36px;
+    border: none;
+    background: #EFEFEF;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 16px;
+    color: var(--gray-medium);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.origin-dropdown-close:hover {
+    background: #DDD;
+}
+
+.origin-dropdown-list {
+    overflow-y: auto;
+    flex: 1;
+    max-height: 280px;
+    scrollbar-width: thin;
+}
+
+.origin-dropdown-group {
+    margin-bottom: 8px;
+}
+
+.origin-dropdown-label {
+    font-family: 'Poppins', sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--gray-medium);
+    padding: 6px 0 4px;
+    border-bottom: 1px solid #F0F0F0;
+    margin-bottom: 4px;
+}
+
+.origin-dropdown-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    padding: 10px 8px;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    font-family: 'Montserrat', sans-serif;
+    font-size: 13px;
+    color: var(--gray-dark);
+    border-radius: 8px;
+    transition: var(--transition);
+    text-align: left;
+}
+
+.origin-dropdown-item:hover {
+    background: #FFF3E8;
+}
+
+.origin-dropdown-item.active {
+    background: var(--orange-primary);
+    color: var(--white);
+}
+
+.origin-dropdown-item.active .origin-item-code {
+    color: rgba(255,255,255,0.8);
+}
+
+.origin-item-name {
+    font-weight: 500;
+}
+
+.origin-item-code {
+    font-size: 11px;
+    color: var(--gray-medium);
+    font-weight: 400;
+}
+
 /* ========================================
    BUSCA INTELIGENTE
    ======================================== */

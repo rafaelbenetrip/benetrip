@@ -60,7 +60,7 @@
   "crons": [
     {
       "path": "/api/cron/update-discovery",
-      "schedule": "0 9 * * *"
+      "schedule": "0 0,3,6,9,12,15,18,21 * * *"
     }
   ],
   "headers": [
