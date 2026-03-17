@@ -341,10 +341,12 @@ const DiscoveryPage = {
                 const aeroporto = card.dataset.aeroporto;
                 const nome = card.dataset.nome;
                 const duracao = card.dataset.duracao;
-                if (aeroporto) {
+                // Fallback: usar código IATA do aeroporto; se não houver, usar nome da cidade
+                const destino = aeroporto || nome;
+                if (destino) {
                     const params = new URLSearchParams({
                         origem: this.state.origemAtual,
-                        destino: aeroporto,
+                        destino: destino,
                         nome: nome,
                     });
                     if (duracao) params.set('duracao', duracao);

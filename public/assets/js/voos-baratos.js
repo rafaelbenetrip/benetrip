@@ -345,7 +345,7 @@ const BenetripVoosBaratos = {
         this.updateProgress(10, '🔍 Preparando busca nos próximos 6 meses...');
 
         try {
-            const destinoDisplay = destinoSelecionado.airport || destinoSelecionado.name;
+            const destinoDisplay = destinoSelecionado.airport || destinoSelecionado.displayCode || destinoSelecionado.code || destinoSelecionado.name;
             this.updateProgress(25, `✈️ Pesquisando voos para ${destinoDisplay}...`);
 
             const response = await fetch('/api/cheapest-flights', {
@@ -460,14 +460,14 @@ const BenetripVoosBaratos = {
                 <div class="trip-summary-route">
                     <div class="trip-summary-city">
                         <span class="trip-summary-code">${displayOrigemCode}</span>
-                        <span class="trip-summary-name">${origemSelecionada.airport || origemSelecionada.name}</span>
+                        <span class="trip-summary-name">${origemSelecionada.airport || origemSelecionada.displayCode || origemSelecionada.code || origemSelecionada.name}</span>
                     </div>
                     <div class="trip-summary-arrow">
                         <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5l7 7-7 7"/></svg>
                     </div>
                     <div class="trip-summary-city">
                         <span class="trip-summary-code">${displayDestinoCode}</span>
-                        <span class="trip-summary-name">${destinoSelecionado.airport || destinoSelecionado.name}</span>
+                        <span class="trip-summary-name">${destinoSelecionado.airport || destinoSelecionado.displayCode || destinoSelecionado.code || destinoSelecionado.name}</span>
                     </div>
                 </div>
                 <div class="trip-summary-meta">
