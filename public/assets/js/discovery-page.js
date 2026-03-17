@@ -1,14 +1,18 @@
 /**
- * BENETRIP DISCOVERY PAGE v1.0
+ * BENETRIP DISCOVERY PAGE v2.0
  *
- * JavaScript reutilizável para todas as páginas de descoberta.
- * Consome api/discovery.js e renderiza cards com filtros.
+ * Melhorias v2.0:
+ * - Filtros combináveis (multi-select): estilo + preço + escopo simultaneamente
+ * - Busca inteligente via Groq (linguagem natural)
+ * - Ordenação por relevância, preço, nome
+ * - UX melhorada com feedback visual
  *
  * FLUXO:
  * 1. Página carrega → busca snapshot da origem padrão (GRU)
  * 2. Usuário clica em outra cidade → busca snapshot daquela origem
- * 3. Usuário clica em filtro → filtra destinos no client-side
- * 4. Botão share → gera mensagem e abre modal de compartilhamento
+ * 3. Usuário combina filtros → filtra destinos no client-side
+ * 4. Usuário digita busca → chama Groq via /api/discovery-smart-filter
+ * 5. Botão share → gera mensagem e abre modal de compartilhamento
  */
 
 const DiscoveryPage = {
@@ -18,18 +22,30 @@ const DiscoveryPage = {
     state: {
         origemAtual: 'GRU',
         origemNome: 'São Paulo',
-        filtroAtual: 'todos',
-        destinos: [],          // Todos os destinos do snapshot
-        destinosFiltrados: [], // Destinos após filtro
+        destinos: [],              // Todos os destinos do snapshot
+        destinosFiltrados: [],     // Destinos após filtros combinados
         dataSnapshot: null,
         carregando: false,
+        buscandoIA: false,
+
+        // Filtros combináveis (múltiplos ativos ao mesmo tempo)
+        filtros: {
+            estilos: [],           // ['praia', 'natureza'] — OR entre si
+            precoMax: null,        // 1000, 2000, 3000 ou null
+            escopo: null,          // 'nacional', 'internacional' ou null
+        },
+
+        // Busca inteligente
+        buscaQuery: '',
+        buscaResultado: null,      // Resultado do Groq
+        ordenacao: 'preco',        // 'preco', 'nome'
     },
 
     // ============================================================
     // INICIALIZAÇÃO
     // ============================================================
     init() {
-        console.log('🔍 Discovery Page v1.0 inicializando...');
+        console.log('🔍 Discovery Page v2.0 inicializando...');
         this.bindEvents();
         this.carregarDestinos(this.state.origemAtual);
     },
@@ -46,35 +62,291 @@ const DiscoveryPage = {
             const origin = chip.dataset.origin;
             const name = chip.dataset.name;
 
-            // Atualizar visual
             document.querySelectorAll('.origin-chip').forEach(c => c.classList.remove('active'));
             chip.classList.add('active');
 
-            // Carregar destinos
             this.state.origemAtual = origin;
             this.state.origemNome = name;
             this.carregarDestinos(origin);
         });
 
-        // Chips de filtro
+        // Chips de filtro (multi-select)
         document.getElementById('filter-chips').addEventListener('click', (e) => {
             const chip = e.target.closest('.filter-chip');
             if (!chip) return;
 
             const filter = chip.dataset.filter;
+            const tipo = chip.dataset.tipo;
 
-            // Atualizar visual
-            document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
-            chip.classList.add('active');
-
-            // Aplicar filtro
-            this.state.filtroAtual = filter;
-            this.aplicarFiltro(filter);
+            this.toggleFiltro(filter, tipo, chip);
         });
+
+        // Busca inteligente
+        const searchInput = document.getElementById('smart-search-input');
+        const searchBtn = document.getElementById('smart-search-btn');
+        const searchClear = document.getElementById('smart-search-clear');
+
+        if (searchInput) {
+            let debounceTimer = null;
+
+            searchInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    clearTimeout(debounceTimer);
+                    this.executarBuscaInteligente(searchInput.value.trim());
+                }
+            });
+
+            searchInput.addEventListener('input', () => {
+                const val = searchInput.value.trim();
+                if (searchClear) searchClear.style.display = val ? 'flex' : 'none';
+
+                // Se apagou tudo, volta aos filtros normais
+                if (!val && this.state.buscaResultado) {
+                    this.limparBusca();
+                }
+            });
+        }
+
+        if (searchBtn) {
+            searchBtn.addEventListener('click', () => {
+                const val = searchInput?.value.trim();
+                if (val) this.executarBuscaInteligente(val);
+            });
+        }
+
+        if (searchClear) {
+            searchClear.addEventListener('click', () => {
+                if (searchInput) searchInput.value = '';
+                searchClear.style.display = 'none';
+                this.limparBusca();
+            });
+        }
+
+        // Ordenação
+        const sortSelect = document.getElementById('sort-select');
+        if (sortSelect) {
+            sortSelect.addEventListener('change', (e) => {
+                this.state.ordenacao = e.target.value;
+                this.aplicarFiltros();
+            });
+        }
 
         // FAB de compartilhamento
         document.getElementById('share-fab').addEventListener('click', () => {
             this.abrirShareModal();
+        });
+    },
+
+    // ============================================================
+    // TOGGLE DE FILTRO (multi-select combinável)
+    // ============================================================
+    toggleFiltro(filter, tipo, chipEl) {
+        // Limpar busca IA quando usa filtros manuais
+        if (this.state.buscaResultado) {
+            this.limparBusca(false); // false = não re-renderizar ainda
+        }
+
+        if (filter === 'todos') {
+            // "Todos" limpa todos os filtros
+            this.state.filtros = { estilos: [], precoMax: null, escopo: null };
+            document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+            chipEl.classList.add('active');
+        } else if (tipo === 'estilo') {
+            // Estilos: toggle individual (OR entre si)
+            const idx = this.state.filtros.estilos.indexOf(filter);
+            if (idx >= 0) {
+                this.state.filtros.estilos.splice(idx, 1);
+                chipEl.classList.remove('active');
+            } else {
+                this.state.filtros.estilos.push(filter);
+                chipEl.classList.add('active');
+            }
+            // Remover "Todos" quando qualquer filtro estiver ativo
+            document.querySelector('.filter-chip[data-filter="todos"]')?.classList.remove('active');
+        } else if (tipo === 'preco') {
+            const valor = parseInt(filter);
+            if (this.state.filtros.precoMax === valor) {
+                // Desativar mesmo preço
+                this.state.filtros.precoMax = null;
+                chipEl.classList.remove('active');
+            } else {
+                // Trocar preço (só um por vez)
+                this.state.filtros.precoMax = valor;
+                document.querySelectorAll('.filter-chip[data-tipo="preco"]').forEach(c => c.classList.remove('active'));
+                chipEl.classList.add('active');
+            }
+            document.querySelector('.filter-chip[data-filter="todos"]')?.classList.remove('active');
+        } else if (tipo === 'escopo') {
+            if (this.state.filtros.escopo === filter) {
+                this.state.filtros.escopo = null;
+                chipEl.classList.remove('active');
+            } else {
+                this.state.filtros.escopo = filter;
+                document.querySelectorAll('.filter-chip[data-tipo="escopo"]').forEach(c => c.classList.remove('active'));
+                chipEl.classList.add('active');
+            }
+            document.querySelector('.filter-chip[data-filter="todos"]')?.classList.remove('active');
+        }
+
+        // Se nenhum filtro ativo, ativar "Todos"
+        const { estilos, precoMax, escopo } = this.state.filtros;
+        if (estilos.length === 0 && !precoMax && !escopo) {
+            document.querySelector('.filter-chip[data-filter="todos"]')?.classList.add('active');
+        }
+
+        this.aplicarFiltros();
+    },
+
+    // ============================================================
+    // APLICAR FILTROS COMBINADOS (client-side)
+    // ============================================================
+    aplicarFiltros() {
+        const { estilos, precoMax, escopo } = this.state.filtros;
+        let resultado = [...this.state.destinos];
+
+        // Filtro por estilos (OR: pelo menos um estilo deve bater)
+        if (estilos.length > 0) {
+            resultado = resultado.filter(d =>
+                (d.estilos || []).some(e => estilos.includes(e))
+            );
+        }
+
+        // Filtro por preço máximo
+        if (precoMax) {
+            resultado = resultado.filter(d => d.preco <= precoMax);
+        }
+
+        // Filtro por escopo (nacional/internacional)
+        if (escopo === 'nacional') {
+            resultado = resultado.filter(d => !d.internacional);
+        } else if (escopo === 'internacional') {
+            resultado = resultado.filter(d => d.internacional);
+        }
+
+        // Ordenação
+        resultado = this.ordenar(resultado);
+
+        this.state.destinosFiltrados = resultado;
+        this.renderizarCards();
+        this.atualizarContagem();
+    },
+
+    // ============================================================
+    // ORDENAÇÃO
+    // ============================================================
+    ordenar(destinos) {
+        const tipo = this.state.ordenacao;
+        const copia = [...destinos];
+
+        switch (tipo) {
+            case 'preco':
+                return copia.sort((a, b) => a.preco - b.preco);
+            case 'nome':
+                return copia.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+            default:
+                return copia;
+        }
+    },
+
+    // ============================================================
+    // BUSCA INTELIGENTE (Groq via API)
+    // ============================================================
+    async executarBuscaInteligente(query) {
+        if (!query || this.state.buscandoIA) return;
+
+        this.state.buscandoIA = true;
+        this.state.buscaQuery = query;
+        this.mostrarBuscaLoading(true);
+
+        try {
+            const response = await fetch('/api/discovery-smart-filter', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    query,
+                    destinos: this.state.destinos,
+                }),
+            });
+
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+            const data = await response.json();
+
+            if (data.success && data.indices) {
+                this.state.buscaResultado = data;
+
+                // Mapear índices para destinos
+                const resultado = data.indices
+                    .filter(i => i >= 0 && i < this.state.destinos.length)
+                    .map(i => this.state.destinos[i]);
+
+                // Limpar chips de filtro visual
+                document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+                this.state.filtros = { estilos: [], precoMax: null, escopo: null };
+
+                this.state.destinosFiltrados = resultado;
+                this.renderizarCards();
+                this.atualizarContagem(data.titulo || `Resultados: "${query}"`);
+                this.mostrarBuscaFeedback(data.explicacao, resultado.length);
+            }
+        } catch (error) {
+            console.error('❌ Busca inteligente falhou:', error);
+            this.mostrarToast('Erro na busca. Tente novamente.');
+        } finally {
+            this.state.buscandoIA = false;
+            this.mostrarBuscaLoading(false);
+        }
+    },
+
+    limparBusca(reRender = true) {
+        this.state.buscaQuery = '';
+        this.state.buscaResultado = null;
+
+        const feedback = document.getElementById('search-feedback');
+        if (feedback) feedback.style.display = 'none';
+
+        if (reRender) {
+            // Reativar "Todos"
+            this.state.filtros = { estilos: [], precoMax: null, escopo: null };
+            document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+            document.querySelector('.filter-chip[data-filter="todos"]')?.classList.add('active');
+
+            this.state.destinosFiltrados = [...this.state.destinos];
+            this.renderizarCards();
+            this.atualizarContagem();
+        }
+    },
+
+    mostrarBuscaLoading(ativo) {
+        const btn = document.getElementById('smart-search-btn');
+        const input = document.getElementById('smart-search-input');
+        if (btn) {
+            btn.disabled = ativo;
+            btn.innerHTML = ativo
+                ? '<div class="search-spinner"></div>'
+                : '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>';
+        }
+        if (input) input.disabled = ativo;
+    },
+
+    mostrarBuscaFeedback(explicacao, count) {
+        const feedback = document.getElementById('search-feedback');
+        if (!feedback) return;
+
+        feedback.style.display = 'flex';
+        feedback.innerHTML = `
+            <span class="feedback-icon">&#129302;</span>
+            <span class="feedback-text">${explicacao} &middot; ${count} destino${count !== 1 ? 's' : ''}</span>
+            <button class="feedback-clear" id="feedback-clear-btn">Limpar</button>
+        `;
+
+        document.getElementById('feedback-clear-btn')?.addEventListener('click', () => {
+            const input = document.getElementById('smart-search-input');
+            if (input) input.value = '';
+            const clearBtn = document.getElementById('smart-search-clear');
+            if (clearBtn) clearBtn.style.display = 'none';
+            this.limparBusca();
         });
     },
 
@@ -87,11 +359,23 @@ const DiscoveryPage = {
 
         this.mostrarLoading();
 
+        // Limpar busca e filtros ao trocar cidade
+        this.state.buscaQuery = '';
+        this.state.buscaResultado = null;
+        this.state.filtros = { estilos: [], precoMax: null, escopo: null };
+        document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+        document.querySelector('.filter-chip[data-filter="todos"]')?.classList.add('active');
+        const searchInput = document.getElementById('smart-search-input');
+        if (searchInput) searchInput.value = '';
+        const feedback = document.getElementById('search-feedback');
+        if (feedback) feedback.style.display = 'none';
+        const clearBtn = document.getElementById('smart-search-clear');
+        if (clearBtn) clearBtn.style.display = 'none';
+
         try {
             const response = await fetch(`/api/discovery?origem=${origem}`);
 
             if (!response.ok) {
-                // Se API retorna 404, tentar busca direta (fallback para quando cron não rodou)
                 if (response.status === 404) {
                     console.log('📡 Snapshot não encontrado, tentando busca ao vivo...');
                     await this.buscarAoVivo(origem);
@@ -105,13 +389,6 @@ const DiscoveryPage = {
             if (data.success && data.destinos) {
                 this.state.destinos = data.destinos;
                 this.state.dataSnapshot = data.data;
-
-                // Resetar filtro
-                this.state.filtroAtual = 'todos';
-                document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
-                const todosChip = document.querySelector('.filter-chip[data-filter="todos"]');
-                if (todosChip) todosChip.classList.add('active');
-
                 this.state.destinosFiltrados = [...this.state.destinos];
                 this.renderizar();
             } else {
@@ -119,7 +396,6 @@ const DiscoveryPage = {
             }
         } catch (error) {
             console.error('❌ Erro ao carregar destinos:', error);
-            // Fallback: buscar ao vivo
             await this.buscarAoVivo(origem);
         } finally {
             this.state.carregando = false;
@@ -128,7 +404,6 @@ const DiscoveryPage = {
 
     // ============================================================
     // BUSCA AO VIVO (fallback quando cron não rodou ainda)
-    // Chama search-destinations diretamente
     // ============================================================
     async buscarAoVivo(origem) {
         try {
@@ -147,7 +422,6 @@ const DiscoveryPage = {
             const data = await response.json();
 
             if (data.success && data.destinations) {
-                // Converter formato search-destinations → formato discovery
                 this.state.destinos = data.destinations
                     .filter(d => d.flight?.price > 0)
                     .sort((a, b) => (a.flight?.price || 0) - (b.flight?.price || 0))
@@ -166,7 +440,6 @@ const DiscoveryPage = {
         }
     },
 
-    // Converter formato da API live para formato discovery
     converterDestinoLive(dest, posicao) {
         const nome = (dest.name || '').toLowerCase();
         const estilos = [];
@@ -200,43 +473,6 @@ const DiscoveryPage = {
     },
 
     // ============================================================
-    // APLICAR FILTRO (client-side)
-    // ============================================================
-    aplicarFiltro(filtro) {
-        let resultado = [...this.state.destinos];
-
-        switch (filtro) {
-            case 'todos':
-                break;
-            case 'nacional':
-                resultado = resultado.filter(d => !d.internacional);
-                break;
-            case 'internacional':
-                resultado = resultado.filter(d => d.internacional);
-                break;
-            case 'ate1000':
-                resultado = resultado.filter(d => d.preco <= 1000);
-                break;
-            case 'ate2000':
-                resultado = resultado.filter(d => d.preco <= 2000);
-                break;
-            case 'ate3000':
-                resultado = resultado.filter(d => d.preco <= 3000);
-                break;
-            default:
-                // Filtro por estilo (praia, cidade, natureza, etc)
-                resultado = resultado.filter(d =>
-                    (d.estilos || []).includes(filtro)
-                );
-                break;
-        }
-
-        this.state.destinosFiltrados = resultado;
-        this.renderizarCards();
-        this.atualizarContagem();
-    },
-
-    // ============================================================
     // RENDERIZAR TUDO
     // ============================================================
     renderizar() {
@@ -259,7 +495,6 @@ const DiscoveryPage = {
         document.getElementById('hero-city').textContent = this.state.origemNome;
         document.title = `Destinos Baratos Saindo de ${this.state.origemNome} Hoje | Benetrip`;
 
-        // Atualizar badge de data
         if (this.state.dataSnapshot) {
             const dataObj = new Date(this.state.dataSnapshot + 'T12:00:00');
             const hoje = new Date();
@@ -335,13 +570,11 @@ const DiscoveryPage = {
 
         grid.innerHTML = destinos.map(d => this.renderCard(d)).join('');
 
-        // Bind clicks nos cards → leva para voos-baratos com tudo preenchido
         grid.querySelectorAll('.dest-card').forEach(card => {
             card.addEventListener('click', () => {
                 const aeroporto = card.dataset.aeroporto;
                 const nome = card.dataset.nome;
                 const duracao = card.dataset.duracao;
-                // Fallback: usar código IATA do aeroporto; se não houver, usar nome da cidade
                 const destino = aeroporto || nome;
                 if (destino) {
                     const params = new URLSearchParams({
@@ -435,13 +668,28 @@ const DiscoveryPage = {
     // ============================================================
     // CONTAGEM
     // ============================================================
-    atualizarContagem() {
+    atualizarContagem(tituloOverride) {
         const count = this.state.destinosFiltrados.length;
         document.getElementById('section-count').textContent = `${count} destino${count !== 1 ? 's' : ''}`;
-        document.getElementById('section-title').textContent =
-            this.state.filtroAtual === 'todos'
-                ? `Top Destinos Saindo de ${this.state.origemNome}`
-                : `Destinos: ${this.capitalize(this.state.filtroAtual)}`;
+
+        if (tituloOverride) {
+            document.getElementById('section-title').textContent = tituloOverride;
+            return;
+        }
+
+        const { estilos, precoMax, escopo } = this.state.filtros;
+        const temFiltro = estilos.length > 0 || precoMax || escopo;
+
+        if (!temFiltro) {
+            document.getElementById('section-title').textContent =
+                `Top Destinos Saindo de ${this.state.origemNome}`;
+        } else {
+            const partes = [];
+            if (estilos.length > 0) partes.push(estilos.map(e => this.capitalize(e)).join(' + '));
+            if (escopo) partes.push(this.capitalize(escopo));
+            if (precoMax) partes.push(`Até R$ ${this.formatarPreco(precoMax)}`);
+            document.getElementById('section-title').textContent = partes.join(' · ');
+        }
     },
 
     // ============================================================
@@ -472,7 +720,6 @@ const DiscoveryPage = {
 
         const mensagem = this.gerarMensagemShare(destinos);
 
-        // Criar overlay
         const overlay = document.createElement('div');
         overlay.className = 'share-overlay';
         overlay.innerHTML = `
@@ -502,12 +749,10 @@ const DiscoveryPage = {
 
         document.body.appendChild(overlay);
 
-        // Fechar ao clicar fora
         overlay.addEventListener('click', (e) => {
             if (e.target === overlay) overlay.remove();
         });
 
-        // Handlers de share
         overlay.querySelectorAll('.share-btn').forEach(btn => {
             btn.addEventListener('click', () => {
                 this.executarShare(btn.dataset.platform, mensagem);
@@ -538,10 +783,11 @@ const DiscoveryPage = {
             case 'facebook':
                 window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`, '_blank');
                 break;
-            case 'twitter':
+            case 'twitter': {
                 const tweet = mensagem.length > 250 ? mensagem.substring(0, 247) + '...' : mensagem;
                 window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(tweet)}`, '_blank');
                 break;
+            }
             case 'copy':
                 navigator.clipboard.writeText(mensagem).then(() => {
                     this.mostrarToast('Link copiado!');
@@ -560,7 +806,8 @@ const DiscoveryPage = {
 
     capitalize(str) {
         if (!str) return '';
-        return str.charAt(0).toUpperCase() + str.slice(1);
+        const map = { romantico: 'Casal', familia: 'Família', aventura: 'Aventura', praia: 'Praia', natureza: 'Natureza', cidade: 'Cidade' };
+        return map[str] || str.charAt(0).toUpperCase() + str.slice(1);
     },
 
     escapeHtml(text) {

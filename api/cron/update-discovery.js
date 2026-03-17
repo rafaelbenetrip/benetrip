@@ -35,14 +35,14 @@ const ORIGENS = [
 
 const MAX_DESTINOS_POR_ORIGEM = 50;
 
-// Categorias de estilo baseadas em keywords do destino
-const ESTILOS = {
-    praia: ['beach', 'praia', 'litoral', 'costa', 'island', 'ilha', 'cabo', 'porto seguro', 'florianópolis', 'natal', 'maceió', 'cancún', 'punta cana', 'cartagena'],
-    natureza: ['nature', 'natureza', 'serra', 'chapada', 'foz', 'bonito', 'amazônia', 'pantanal', 'lençóis', 'jalapão', 'monte verde'],
-    cidade: ['city', 'cidade', 'urban', 'buenos aires', 'santiago', 'lima', 'montevideo', 'bogotá', 'são paulo', 'new york', 'paris', 'london', 'lisboa', 'madrid', 'barcelona'],
-    romantico: ['romantic', 'gramado', 'campos do jordão', 'paris', 'veneza', 'venice', 'santorini', 'maldivas'],
-    aventura: ['adventure', 'aventura', 'trekking', 'dive', 'surf', 'rapids'],
-    familia: ['family', 'família', 'disney', 'orlando', 'parque', 'theme park'],
+// Categorias de estilo baseadas em keywords do destino (fallback quando Groq falha)
+const ESTILOS_KEYWORDS = {
+    praia: ['beach', 'praia', 'litoral', 'costa', 'island', 'ilha', 'cabo', 'porto seguro', 'florianópolis', 'natal', 'maceió', 'cancún', 'punta cana', 'cartagena', 'búzios', 'guarujá', 'ubatuba', 'ilhabela', 'jericoacoara', 'arraial', 'trancoso', 'noronha', 'maragogi', 'san andrés', 'aruba', 'curaçao', 'varadero', 'playa', 'riviera maya', 'bahamas', 'barbados', 'cabo frio'],
+    natureza: ['nature', 'natureza', 'serra', 'chapada', 'foz', 'bonito', 'amazônia', 'pantanal', 'lençóis', 'jalapão', 'monte verde', 'brotas', 'socorro', 'urubici', 'patagônia', 'machu picchu', 'galapagos', 'atacama', 'iguaçu', 'falls', 'cachoeira'],
+    cidade: ['city', 'cidade', 'urban', 'buenos aires', 'santiago', 'lima', 'montevideo', 'bogotá', 'são paulo', 'new york', 'paris', 'london', 'lisboa', 'madrid', 'barcelona', 'roma', 'milão', 'berlim', 'amsterdam', 'tokyo', 'bangkok'],
+    romantico: ['romantic', 'gramado', 'campos do jordão', 'paris', 'veneza', 'venice', 'santorini', 'maldivas', 'monte verde', 'são miguel dos milagres', 'fernando de noronha', 'búzios', 'trancoso'],
+    aventura: ['adventure', 'aventura', 'trekking', 'dive', 'surf', 'rapids', 'brotas', 'socorro', 'jalapão', 'chapada', 'rapel', 'trilha'],
+    familia: ['family', 'família', 'disney', 'orlando', 'parque', 'theme park', 'resort', 'beto carrero', 'hot park', 'beach park', 'gramado'],
 };
 
 // ============================================================
@@ -148,22 +148,94 @@ async function buscarDestinosParaOrigem(origemCode) {
 }
 
 // ============================================================
-// CLASSIFICAR ESTILO DO DESTINO
+// CLASSIFICAR ESTILO DO DESTINO (keyword-based fallback)
 // ============================================================
-function classificarEstilo(destino) {
+function classificarEstiloKeywords(destino) {
     const nome = (destino.name || '').toLowerCase();
     const pais = (destino.country || '').toLowerCase();
     const texto = `${nome} ${pais}`;
 
     const estilosEncontrados = [];
-    for (const [estilo, keywords] of Object.entries(ESTILOS)) {
+    for (const [estilo, keywords] of Object.entries(ESTILOS_KEYWORDS)) {
         if (keywords.some(kw => texto.includes(kw))) {
             estilosEncontrados.push(estilo);
         }
     }
 
-    // Default: se não identificou, assume "cidade"
     return estilosEncontrados.length > 0 ? estilosEncontrados : ['cidade'];
+}
+
+// ============================================================
+// CLASSIFICAR ESTILOS VIA GROQ (batch de destinos)
+// ============================================================
+async function classificarEstilosGroq(destinosFormatados) {
+    if (!process.env.GROQ_API_KEY || destinosFormatados.length === 0) {
+        return null; // vai usar fallback keyword
+    }
+
+    const lista = destinosFormatados.map((d, i) =>
+        `${i}|${d.nome}|${d.pais}|${d.internacional ? 'intl' : 'nac'}`
+    ).join('\n');
+
+    const systemMessage = `Você é um classificador de destinos turísticos. Para cada destino, atribua 1-3 estilos da lista:
+- praia (destinos litorâneos, ilhas, balneários)
+- natureza (serra, parques, ecoturismo, cachoeiras, trilhas)
+- cidade (centros urbanos, capitais, cultura, gastronomia, compras)
+- romantico (destinos para casais, lua de mel, charme)
+- aventura (esportes radicais, trilhas, mergulho, escalada)
+- familia (parques temáticos, resorts, praias calmas, atrações para crianças)
+
+Retorne APENAS um JSON: { "classificacoes": [[estilos_destino_0], [estilos_destino_1], ...] }
+Cada item é um array de strings. Mantenha a mesma ordem dos destinos.
+Se não conhecer o destino, use ["cidade"] como default.`;
+
+    const models = ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant'];
+
+    for (const model of models) {
+        try {
+            const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
+                },
+                body: JSON.stringify({
+                    model,
+                    messages: [
+                        { role: 'system', content: systemMessage },
+                        { role: 'user', content: `Classifique estes ${destinosFormatados.length} destinos:\n${lista}` },
+                    ],
+                    response_format: { type: 'json_object' },
+                    temperature: 0.2,
+                    max_tokens: 4000,
+                }),
+                signal: AbortSignal.timeout(30000),
+            });
+
+            if (!response.ok) {
+                console.warn(`⚠️ Groq classificação ${model} HTTP ${response.status}`);
+                continue;
+            }
+
+            const data = await response.json();
+            const content = data.choices?.[0]?.message?.content;
+            if (!content) continue;
+
+            const parsed = JSON.parse(content);
+            const classificacoes = parsed.classificacoes;
+
+            if (Array.isArray(classificacoes) && classificacoes.length === destinosFormatados.length) {
+                console.log(`✅ Groq classificou ${classificacoes.length} destinos (${model})`);
+                return classificacoes;
+            }
+
+            console.warn(`⚠️ Groq retornou ${classificacoes?.length || 0} classificações, esperava ${destinosFormatados.length}`);
+        } catch (err) {
+            console.warn(`⚠️ Groq classificação ${model} erro:`, err.message);
+        }
+    }
+
+    return null; // fallback para keywords
 }
 
 // ============================================================
@@ -186,8 +258,8 @@ function calcularDuracaoIdeal(destino, origemPais) {
 // ============================================================
 // FORMATAR DESTINO PARA O SNAPSHOT
 // ============================================================
-function formatarDestino(destino, posicao, origemPais) {
-    const estilos = classificarEstilo(destino);
+function formatarDestino(destino, posicao, origemPais, estilosOverride) {
+    const estilos = estilosOverride || classificarEstiloKeywords(destino);
     const duracao = calcularDuracaoIdeal(destino, origemPais);
     const preco = destino.flight?.price || 0;
     const isInternacional = (destino.country || '').toLowerCase() !== origemPais;
@@ -252,7 +324,24 @@ async function processarOrigem(origem) {
         const selecionados = [...nacReservados, ...pool]
             .sort((a, b) => a.flight.price - b.flight.price);
 
-        const topDestinos = selecionados.map((d, i) => formatarDestino(d, i + 1, 'brasil'));
+        // Primeiro formata com keywords (fallback)
+        let topDestinos = selecionados.map((d, i) => formatarDestino(d, i + 1, 'brasil'));
+
+        // Tenta classificar via Groq (batch) — muito mais preciso
+        try {
+            const classificacoesGroq = await classificarEstilosGroq(topDestinos);
+            if (classificacoesGroq) {
+                const estilosValidos = ['praia', 'natureza', 'cidade', 'romantico', 'aventura', 'familia'];
+                topDestinos = topDestinos.map((d, i) => {
+                    const estilosGroq = (classificacoesGroq[i] || []).filter(e => estilosValidos.includes(e));
+                    return { ...d, estilos: estilosGroq.length > 0 ? estilosGroq : d.estilos };
+                });
+                console.log(`🧠 [${origem.codigo}] Estilos classificados via Groq`);
+            }
+        } catch (groqErr) {
+            console.warn(`⚠️ [${origem.codigo}] Groq classificação falhou, usando keywords:`, groqErr.message);
+        }
+
         const totalNac = topDestinos.filter(d => !d.internacional).length;
         const totalIntl = topDestinos.filter(d => d.internacional).length;
 

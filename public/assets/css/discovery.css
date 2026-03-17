@@ -145,10 +145,138 @@ body {
 }
 
 /* ========================================
-   FILTROS RÁPIDOS
+   BUSCA INTELIGENTE
+   ======================================== */
+.smart-search-section {
+    padding: 16px 20px 8px;
+}
+
+.smart-search-box {
+    display: flex;
+    align-items: center;
+    background: var(--white);
+    border: 2px solid #E0E0E0;
+    border-radius: 28px;
+    padding: 4px 6px 4px 18px;
+    transition: var(--transition);
+    gap: 4px;
+}
+
+.smart-search-box:focus-within {
+    border-color: var(--blue-secondary);
+    box-shadow: 0 0 0 3px rgba(0, 163, 224, 0.12);
+}
+
+#smart-search-input {
+    flex: 1;
+    border: none;
+    outline: none;
+    font-family: 'Montserrat', sans-serif;
+    font-size: 13px;
+    color: var(--gray-dark);
+    background: transparent;
+    padding: 10px 0;
+    min-width: 0;
+}
+
+#smart-search-input::placeholder {
+    color: #AAA;
+    font-size: 12px;
+}
+
+.smart-search-btn {
+    flex-shrink: 0;
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    border: none;
+    background: var(--blue-secondary);
+    color: var(--white);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: var(--transition);
+}
+
+.smart-search-btn:hover {
+    background: #008cc0;
+}
+
+.smart-search-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.smart-search-clear {
+    flex-shrink: 0;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: none;
+    background: #EFEFEF;
+    color: var(--gray-medium);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: var(--transition);
+}
+
+.smart-search-clear:hover {
+    background: #DDD;
+}
+
+.search-spinner {
+    width: 18px;
+    height: 18px;
+    border: 2.5px solid rgba(255,255,255,0.3);
+    border-top-color: var(--white);
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+}
+
+.search-feedback {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 10px;
+    padding: 8px 14px;
+    background: #E8F6FF;
+    border-radius: 12px;
+    font-size: 12px;
+    color: #0077A8;
+}
+
+.feedback-icon {
+    font-size: 16px;
+    flex-shrink: 0;
+}
+
+.feedback-text {
+    flex: 1;
+}
+
+.feedback-clear {
+    flex-shrink: 0;
+    border: none;
+    background: transparent;
+    color: var(--blue-secondary);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 2px 6px;
+}
+
+.feedback-clear:hover {
+    text-decoration: underline;
+}
+
+/* ========================================
+   FILTROS COMBINÁVEIS
    ======================================== */
 .quick-filters {
-    padding: 16px 0;
+    padding: 8px 0 16px;
 }
 
 .filter-row {
@@ -157,9 +285,17 @@ body {
     overflow-x: auto;
     padding: 0 20px;
     scrollbar-width: none;
+    align-items: center;
 }
 
 .filter-row::-webkit-scrollbar { display: none; }
+
+.filter-separator {
+    width: 1px;
+    height: 20px;
+    background: #DDD;
+    flex-shrink: 0;
+}
 
 .filter-chip {
     flex-shrink: 0;
@@ -184,6 +320,18 @@ body {
     background: var(--blue-secondary);
     border-color: var(--blue-secondary);
     color: var(--white);
+}
+
+/* Estilo diferenciado para chips de preço ativos */
+.filter-chip[data-tipo="preco"].active {
+    background: var(--green-success);
+    border-color: var(--green-success);
+}
+
+/* Estilo diferenciado para chips de escopo ativos */
+.filter-chip[data-tipo="escopo"].active {
+    background: var(--orange-primary);
+    border-color: var(--orange-primary);
 }
 
 /* ========================================
@@ -251,6 +399,7 @@ body {
     justify-content: space-between;
     align-items: center;
     padding: 16px 0 12px;
+    gap: 12px;
 }
 
 .section-title {
@@ -258,6 +407,31 @@ body {
     font-size: 18px;
     font-weight: 600;
     color: var(--gray-dark);
+    flex: 1;
+    min-width: 0;
+}
+
+.section-header-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.sort-select {
+    font-family: 'Montserrat', sans-serif;
+    font-size: 11px;
+    color: var(--gray-medium);
+    background: var(--white);
+    border: 1.5px solid #E0E0E0;
+    border-radius: 8px;
+    padding: 4px 8px;
+    cursor: pointer;
+    outline: none;
+}
+
+.sort-select:focus {
+    border-color: var(--blue-secondary);
 }
 
 .section-count {
@@ -266,6 +440,7 @@ body {
     background: #EFEFEF;
     padding: 4px 10px;
     border-radius: 12px;
+    white-space: nowrap;
 }
 
 .destinations-grid {
