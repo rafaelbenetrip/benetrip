@@ -870,19 +870,32 @@ const DiscoveryPage = {
         }
 
         try {
+            // Enviar apenas os campos necessários (payload leve)
+            const destinosLeves = this.state.destinos.map(d => ({
+                nome: d.nome,
+                pais: d.pais,
+                preco: d.preco,
+                internacional: d.internacional,
+                estilos: d.estilos,
+                variacao: d.variacao,
+                paradas: d.paradas,
+            }));
+
             const response = await fetch('/api/tripinha-insight', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     origem: this.state.origemNome,
                     origemCodigo: this.state.origemAtual,
-                    destinos: this.state.destinos,
+                    destinos: destinosLeves,
                 }),
             });
 
             if (!response.ok) return;
 
             const data = await response.json();
+            console.log(`🐶 Tripinha insight [${data.modelo || '?'}]: "${data.insight}"`);
+            if (data.motivo) console.warn(`🐶 Tripinha fallback motivo: ${data.motivo}`);
             if (data.success && data.insight) {
                 textEl.textContent = data.insight;
                 bar.style.display = 'flex';
@@ -890,6 +903,7 @@ const DiscoveryPage = {
                 // Salvar no cache
                 sessionStorage.setItem(cacheKey, JSON.stringify({
                     insight: data.insight,
+                    modelo: data.modelo,
                     timestamp: Date.now(),
                 }));
             }
