@@ -129,7 +129,7 @@ ${intlDestaques ? `- Internacionais acessíveis (<R$2500): ${intlDestaques}` : '
                         { role: 'user', content: userMessage },
                     ],
                     response_format: { type: 'json_object' },
-                    temperature: 0.7,
+                    temperature: 0.9,
                     max_tokens: 200,
                 }),
                 signal: AbortSignal.timeout(10000),
@@ -161,19 +161,86 @@ ${intlDestaques ? `- Internacionais acessíveis (<R$2500): ${intlDestaques}` : '
 }
 
 // ============================================================
-// FALLBACK: insight estático baseado nos dados
+// FALLBACK: insight dinâmico baseado nos dados
 // ============================================================
 function gerarFallback(origem, destinos) {
-    if (!destinos || destinos.length === 0) return `Buscando as melhores ofertas de ${origem} pra você!`;
+    if (!destinos || destinos.length === 0) return `✈️ Buscando as melhores ofertas de ${origem} pra você!`;
 
     const maisBarato = destinos[0];
-    const internacionais = destinos.filter(d => d.internacional).length;
+    const segundo = destinos[1];
+    const total = destinos.length;
+    const precos = destinos.filter(d => d.preco > 0).map(d => d.preco);
+    const media = precos.length > 0 ? Math.round(precos.reduce((a, b) => a + b, 0) / precos.length) : 0;
+    const nacionais = destinos.filter(d => !d.internacional);
+    const internacionais = destinos.filter(d => d.internacional);
+    const intlBaratos = internacionais.filter(d => d.preco <= 2500);
 
-    if (maisBarato.preco <= 500) {
-        return `🔥 ${maisBarato.nome} por apenas R$${maisBarato.preco} saindo de ${origem} — corre que é pechincha!`;
+    // Variações
+    const desceram = destinos.filter(d => d.variacao?.direcao === 'desceu');
+    const maiorQueda = desceram.sort((a, b) => Math.abs(b.variacao?.diferenca || 0) - Math.abs(a.variacao?.diferenca || 0))[0];
+
+    // Pool de frases contextuais — escolha baseada no hash do dia + origem
+    const hoje = new Date().getDate();
+    const seed = (hoje + origem.length + total) % 20;
+
+    // Prioridade 1: variação de preço
+    if (maiorQueda) {
+        const queda = Math.abs(maiorQueda.variacao.diferenca);
+        const frases = [
+            `📉 ${maiorQueda.nome} caiu R$${queda} e tá custando R$${maiorQueda.preco} — vai que é agora!`,
+            `🔥 Preço despencou! ${maiorQueda.nome} por R$${maiorQueda.preco} (caiu R$${queda}) saindo de ${origem}`,
+            `💸 ${maiorQueda.nome} ficou R$${queda} mais barato hoje! Tá R$${maiorQueda.preco} saindo de ${origem}`,
+        ];
+        return frases[seed % frases.length];
     }
-    if (internacionais > 10) {
-        return `🌎 ${internacionais} destinos internacionais acessíveis saindo de ${origem} hoje!`;
+
+    // Prioridade 2: pechincha (preço muito baixo)
+    if (maisBarato.preco <= 400) {
+        const frases = [
+            `🔥 ${maisBarato.nome} por R$${maisBarato.preco}?! Isso é preço de rodoviária, não de avião! Corre!`,
+            `✈️ R$${maisBarato.preco} pra ${maisBarato.nome} saindo de ${origem} — tá praticamente de graça!`,
+            `💰 Achei ${maisBarato.nome} por R$${maisBarato.preco}! Preço assim some rápido, bora?`,
+        ];
+        return frases[seed % frases.length];
     }
-    return `✈️ Hoje o mais barato de ${origem} é ${maisBarato.nome} por R$${maisBarato.preco} — bora?`;
+
+    // Prioridade 3: internacionais baratos
+    if (intlBaratos.length >= 3) {
+        const dest = intlBaratos[0];
+        const frases = [
+            `🌎 ${intlBaratos.length} destinos internacionais abaixo de R$2.500! ${dest.nome} por R$${dest.preco} tá imperdível`,
+            `✈️ Quer sair do Brasil? ${dest.nome} por R$${dest.preco} e mais ${intlBaratos.length - 1} opções baratas saindo de ${origem}!`,
+            `🌍 ${dest.nome} a R$${dest.preco} saindo de ${origem}! E tem mais ${intlBaratos.length - 1} internacionais acessíveis`,
+        ];
+        return frases[seed % frases.length];
+    }
+
+    // Prioridade 4: bom preço geral
+    if (maisBarato.preco <= 800) {
+        const frases = [
+            `✈️ ${maisBarato.nome} por R$${maisBarato.preco} é o destino mais barato de ${origem} hoje — corre!`,
+            `🐶 Farejei ${total} destinos de ${origem} e o campeão é ${maisBarato.nome} por R$${maisBarato.preco}!`,
+            `💡 De ${origem} pra ${maisBarato.nome} por R$${maisBarato.preco}${segundo ? ` ou ${segundo.nome} por R$${segundo.preco}` : ''} — qual você escolhe?`,
+        ];
+        return frases[seed % frases.length];
+    }
+
+    // Prioridade 5: muitas opções
+    if (total >= 20) {
+        const frases = [
+            `✈️ ${total} destinos saindo de ${origem}! O mais em conta é ${maisBarato.nome} por R$${maisBarato.preco}`,
+            `🗺️ Tem ${nacionais.length} nacionais e ${internacionais.length} internacionais de ${origem} — ${maisBarato.nome} lidera com R$${maisBarato.preco}`,
+            `🐶 Fuçando ${total} opções de ${origem}! Preço médio R$${media}, mas tem ${maisBarato.nome} por R$${maisBarato.preco}`,
+        ];
+        return frases[seed % frases.length];
+    }
+
+    // Default variado
+    const frases = [
+        `✈️ ${maisBarato.nome} por R$${maisBarato.preco} é a melhor pedida saindo de ${origem} hoje!`,
+        `🐶 O melhor que achei de ${origem}: ${maisBarato.nome} por R$${maisBarato.preco}${segundo ? ` e ${segundo.nome} por R$${segundo.preco}` : ''}`,
+        `💡 Saindo de ${origem}? ${maisBarato.nome} tá R$${maisBarato.preco} — preço médio dos ${total} destinos é R$${media}`,
+        `✈️ Top 1 de ${origem}: ${maisBarato.nome} a R$${maisBarato.preco}! Tem ${total} destinos pra explorar`,
+    ];
+    return frases[seed % frases.length];
 }

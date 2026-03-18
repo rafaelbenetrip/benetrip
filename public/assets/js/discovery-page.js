@@ -883,6 +883,7 @@ const DiscoveryPage = {
             if (!response.ok) return;
 
             const data = await response.json();
+            console.log(`🐶 Tripinha insight [${data.modelo || '?'}]: "${data.insight}"`);
             if (data.success && data.insight) {
                 textEl.textContent = data.insight;
                 bar.style.display = 'flex';
@@ -890,6 +891,7 @@ const DiscoveryPage = {
                 // Salvar no cache
                 sessionStorage.setItem(cacheKey, JSON.stringify({
                     insight: data.insight,
+                    modelo: data.modelo,
                     timestamp: Date.now(),
                 }));
             }
