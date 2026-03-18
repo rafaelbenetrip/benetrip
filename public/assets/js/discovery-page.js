@@ -794,9 +794,13 @@ const DiscoveryPage = {
                         <div class="dest-tags">${estilosTags}</div>
                         <div class="dest-footer">
                             <div class="dest-price-block">
-                                <span class="dest-price-label">${d.preco_verificado ? 'Melhor preço' : 'A partir de'}</span>
-                                <span class="dest-price">R$ ${this.fmt(d.preco)}</span>
-                                ${d.preco_verificado && d.data_ida ? `<span class="dest-price-date">${this.formatarDataCurta(d.data_ida)}</span>` : ''}
+                                ${d.preco_verificado
+                                    ? `<span class="dest-price-label dest-price-confirmed">✅ Preço confirmado hoje!</span>
+                                       <span class="dest-price">R$ ${this.fmt(d.preco)}</span>
+                                       ${d.data_ida && d.data_volta ? `<span class="dest-price-date">${this.formatarDataCurta(d.data_ida)} → ${this.formatarDataCurta(d.data_volta)}</span>` : ''}`
+                                    : `<span class="dest-price-label">Preço em torno de</span>
+                                       <span class="dest-price">R$ ${this.fmt(d.preco)}</span>`
+                                }
                                 ${variacaoHtml}
                             </div>
                             <div class="dest-duration">${duracaoTexto}</div>

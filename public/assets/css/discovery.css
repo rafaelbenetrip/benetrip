@@ -712,6 +712,7 @@ body {
 .dest-price-block { display: flex; flex-direction: column; }
 
 .dest-price-label { font-size: 10px; color: var(--gray-medium); text-transform: uppercase; }
+.dest-price-confirmed { color: var(--green-success, #27ae60); font-weight: 600; }
 
 .dest-price {
     font-family: 'Poppins', sans-serif;

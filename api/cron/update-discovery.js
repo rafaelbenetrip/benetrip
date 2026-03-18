@@ -326,7 +326,8 @@ function formatarDestino(destino, posicao, origemPais, estilosOverride) {
 // Para os top N destinos, faz uma busca rápida de calendário
 // com janela de 2 meses para encontrar o preço mínimo real
 // ============================================================
-const VERIFICAR_TOP_N = 15;       // Verificar preço dos top N destinos
+const VERIFICAR_TOP_NAC = 5;      // Verificar preço real para os 5 nacionais mais baratos
+const VERIFICAR_TOP_INTL = 5;     // Verificar preço real para os 5 internacionais mais baratos
 const VERIFICAR_MESES = 2;        // Janela de busca: próximos 2 meses
 const VERIFICAR_WINDOW_DAYS = 14; // Tamanho da janela (14x14=196 combos)
 const VERIFICAR_BATCH_SIZE = 5;   // Verificar 5 em paralelo
@@ -435,10 +436,15 @@ async function verificarPrecoReal(origemCode, destino) {
 }
 
 async function verificarPrecosTop(origemCode, destinos) {
-    const aVerificar = destinos.slice(0, VERIFICAR_TOP_N).filter(d => d.aeroporto);
+    // Separar nacionais e internacionais, pegar top 5 de cada
+    const nacionaisComAeroporto = destinos.filter(d => !d.internacional && d.aeroporto);
+    const internacionaisComAeroporto = destinos.filter(d => d.internacional && d.aeroporto);
+    const topNac = nacionaisComAeroporto.slice(0, VERIFICAR_TOP_NAC);
+    const topIntl = internacionaisComAeroporto.slice(0, VERIFICAR_TOP_INTL);
+    const aVerificar = [...topNac, ...topIntl];
     if (aVerificar.length === 0) return destinos;
 
-    console.log(`🔎 [${origemCode}] Verificando preço real para top ${aVerificar.length} destinos...`);
+    console.log(`🔎 [${origemCode}] Verificando preço real para top ${topNac.length} nacionais + ${topIntl.length} internacionais (${aVerificar.length} total)...`);
     const startTime = Date.now();
 
     let verificados = 0;
@@ -465,6 +471,9 @@ async function verificarPrecosTop(origemCode, destinos) {
                 } else {
                     // O explore price era igual ou menor — manter, mas marcar como verificado
                     destino.preco_explore = destino.preco;
+                    // Guardar as datas verificadas mesmo quando o preço explore era melhor
+                    destino.data_ida = result.data_ida;
+                    destino.data_volta = result.data_volta;
                 }
             }
         });
