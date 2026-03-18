@@ -721,6 +721,8 @@ body {
     line-height: 1.2;
 }
 
+.dest-price-date { font-size: 10px; color: var(--gray-medium); display: block; }
+
 .dest-price-variation { font-size: 10px; font-weight: 600; }
 .dest-price-variation.down { color: var(--green-success); }
 .dest-price-variation.up { color: var(--red-alert); }

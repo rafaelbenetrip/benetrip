@@ -794,8 +794,9 @@ const DiscoveryPage = {
                         <div class="dest-tags">${estilosTags}</div>
                         <div class="dest-footer">
                             <div class="dest-price-block">
-                                <span class="dest-price-label">A partir de</span>
+                                <span class="dest-price-label">${d.preco_verificado ? 'Melhor preço' : 'A partir de'}</span>
                                 <span class="dest-price">R$ ${this.fmt(d.preco)}</span>
+                                ${d.preco_verificado && d.data_ida ? `<span class="dest-price-date">${this.formatarDataCurta(d.data_ida)}</span>` : ''}
                                 ${variacaoHtml}
                             </div>
                             <div class="dest-duration">${duracaoTexto}</div>
@@ -1061,6 +1062,15 @@ const DiscoveryPage = {
     fmt(valor) {
         if (!valor) return '0';
         return Number(valor).toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+    },
+
+    formatarDataCurta(dateStr) {
+        if (!dateStr) return '';
+        try {
+            const [y, m, d] = dateStr.split('-');
+            const meses = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+            return `${parseInt(d)} ${meses[parseInt(m) - 1]}`;
+        } catch { return ''; }
     },
 
     capitalize(str) {

@@ -6,6 +6,8 @@
 // v2.0: Lotes rotativos (15 cidades por execução)
 //       Classificação de estilos via Groq
 //       100 cidades carregadas de brazilian-airports.json
+// v2.1: Verificação de preço real via google_flights_calendar
+//       Top 15 destinos têm preço real verificado (não apenas estimativa)
 //
 // COMO FUNCIONA:
 // 1. Carrega lista de 100 cidades de brazilian-airports.json
@@ -320,6 +322,166 @@ function formatarDestino(destino, posicao, origemPais, estilosOverride) {
 }
 
 // ============================================================
+// VERIFICAÇÃO DE PREÇO REAL via google_flights_calendar
+// Para os top N destinos, faz uma busca rápida de calendário
+// com janela de 2 meses para encontrar o preço mínimo real
+// ============================================================
+const VERIFICAR_TOP_N = 15;       // Verificar preço dos top N destinos
+const VERIFICAR_MESES = 2;        // Janela de busca: próximos 2 meses
+const VERIFICAR_WINDOW_DAYS = 14; // Tamanho da janela (14x14=196 combos)
+const VERIFICAR_BATCH_SIZE = 5;   // Verificar 5 em paralelo
+
+function formatDateCron(date) {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+}
+
+function addDaysCron(date, days) {
+    const result = new Date(date);
+    result.setDate(result.getDate() + days);
+    return result;
+}
+
+async function verificarPrecoReal(origemCode, destino) {
+    const apiKey = process.env.SEARCHAPI_KEY;
+    if (!apiKey || !destino.aeroporto) return null;
+
+    const duracao = destino.duracao_ideal?.ideal || 7;
+    const today = new Date();
+    const startDate = addDaysCron(today, 1);
+    const endDate = addDaysCron(today, VERIFICAR_MESES * 30);
+
+    // Gerar janelas de busca para os próximos 2 meses
+    const windows = [];
+    let windowStart = new Date(startDate);
+    while (windowStart < endDate) {
+        let windowEnd = addDaysCron(windowStart, VERIFICAR_WINDOW_DAYS - 1);
+        if (windowEnd > endDate) windowEnd = endDate;
+
+        windows.push({
+            outbound_date: formatDateCron(windowStart),
+            outbound_date_start: formatDateCron(windowStart),
+            outbound_date_end: formatDateCron(windowEnd),
+            return_date: formatDateCron(addDaysCron(windowStart, duracao)),
+            return_date_start: formatDateCron(addDaysCron(windowStart, duracao)),
+            return_date_end: formatDateCron(addDaysCron(windowEnd, duracao)),
+        });
+
+        windowStart = addDaysCron(windowEnd, 1);
+    }
+
+    let menorPreco = null;
+    let melhorData = null;
+    let melhorVolta = null;
+
+    // Buscar todas as janelas em paralelo
+    const promises = windows.map(async (window, idx) => {
+        const params = {
+            engine: 'google_flights_calendar',
+            api_key: apiKey,
+            flight_type: 'round_trip',
+            departure_id: origemCode,
+            arrival_id: destino.aeroporto,
+            currency: 'BRL',
+            gl: 'br',
+            hl: 'pt-BR',
+            ...window,
+        };
+
+        const queryParts = Object.entries(params).map(([k, v]) =>
+            `${encodeURIComponent(k)}=${encodeURIComponent(String(v)).replace(/%2C/gi, ',')}`
+        );
+        const url = `https://www.searchapi.io/api/v1/search?${queryParts.join('&')}`;
+
+        try {
+            const response = await fetch(url, {
+                method: 'GET',
+                headers: { 'Accept': 'application/json' },
+                signal: AbortSignal.timeout(15000),
+            });
+
+            if (!response.ok) return null;
+
+            const data = await response.json();
+            const calendar = data.calendar || [];
+
+            for (const entry of calendar) {
+                if (entry.has_no_flights || !entry.price) continue;
+                if (entry.departure && entry.return) {
+                    const d1 = new Date(entry.departure + 'T00:00:00Z');
+                    const d2 = new Date(entry.return + 'T00:00:00Z');
+                    const actualDuration = Math.round((d2 - d1) / (1000 * 60 * 60 * 24));
+                    if (actualDuration !== duracao) continue;
+                }
+                if (menorPreco === null || entry.price < menorPreco) {
+                    menorPreco = entry.price;
+                    melhorData = entry.departure || null;
+                    melhorVolta = entry.return || null;
+                }
+            }
+        } catch (err) {
+            // silently fail - keep explore price
+        }
+    });
+
+    await Promise.all(promises);
+
+    if (menorPreco !== null) {
+        return { preco: menorPreco, data_ida: melhorData, data_volta: melhorVolta };
+    }
+    return null;
+}
+
+async function verificarPrecosTop(origemCode, destinos) {
+    const aVerificar = destinos.slice(0, VERIFICAR_TOP_N).filter(d => d.aeroporto);
+    if (aVerificar.length === 0) return destinos;
+
+    console.log(`🔎 [${origemCode}] Verificando preço real para top ${aVerificar.length} destinos...`);
+    const startTime = Date.now();
+
+    let verificados = 0;
+    let atualizados = 0;
+
+    // Processar em batches para não sobrecarregar
+    for (let i = 0; i < aVerificar.length; i += VERIFICAR_BATCH_SIZE) {
+        const batch = aVerificar.slice(i, i + VERIFICAR_BATCH_SIZE);
+        const results = await Promise.all(
+            batch.map(d => verificarPrecoReal(origemCode, d))
+        );
+
+        results.forEach((result, idx) => {
+            const destino = batch[idx];
+            if (result) {
+                verificados++;
+                destino.preco_verificado = true;
+                if (result.preco < destino.preco) {
+                    atualizados++;
+                    destino.preco_explore = destino.preco; // guardar o preço original do explore
+                    destino.preco = result.preco;
+                    destino.data_ida = result.data_ida;
+                    destino.data_volta = result.data_volta;
+                } else {
+                    // O explore price era igual ou menor — manter, mas marcar como verificado
+                    destino.preco_explore = destino.preco;
+                }
+            }
+        });
+    }
+
+    const elapsed = Date.now() - startTime;
+
+    // Re-ordenar por preço e atualizar posições
+    destinos.sort((a, b) => a.preco - b.preco);
+    destinos.forEach((d, i) => { d.posicao = i + 1; });
+
+    console.log(`✅ [${origemCode}] Preços verificados: ${verificados}/${aVerificar.length} | Atualizados (menor): ${atualizados} (${elapsed}ms)`);
+
+    return destinos;
+}
+
+// ============================================================
 // PROCESSAR UMA CIDADE DE ORIGEM
 // ============================================================
 async function processarOrigem(origem) {
@@ -377,10 +539,18 @@ async function processarOrigem(origem) {
             console.warn(`⚠️ [${origem.codigo}] Groq classificação falhou, usando keywords:`, groqErr.message);
         }
 
+        // Verificar preços reais para os top destinos via calendar
+        try {
+            topDestinos = await verificarPrecosTop(origem.codigo, topDestinos);
+        } catch (verifyErr) {
+            console.warn(`⚠️ [${origem.codigo}] Verificação de preços falhou, mantendo preços do explore:`, verifyErr.message);
+        }
+
         const totalNac = topDestinos.filter(d => !d.internacional).length;
         const totalIntl = topDestinos.filter(d => d.internacional).length;
+        const totalVerificados = topDestinos.filter(d => d.preco_verificado).length;
 
-        console.log(`✅ [${origem.codigo}] ${topDestinos.length} destinos (${totalNac} nacionais, ${totalIntl} internacionais) (${elapsed}ms) | Mais barato: R$${topDestinos[0]?.preco || '?'}`);
+        console.log(`✅ [${origem.codigo}] ${topDestinos.length} destinos (${totalNac} nac, ${totalIntl} intl, ${totalVerificados} verificados) (${elapsed}ms) | Mais barato: R$${topDestinos[0]?.preco || '?'}`);
 
         // Montar snapshot
         const hoje = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
