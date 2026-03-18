@@ -23,10 +23,12 @@ export default async function handler(req, res) {
     }
 
     if (!process.env.GROQ_API_KEY) {
+        console.warn('⚠️ Tripinha: GROQ_API_KEY não encontrada');
         return res.status(200).json({
             success: true,
             insight: gerarFallback(origem, destinos),
             modelo: 'fallback',
+            motivo: 'GROQ_API_KEY não configurada',
         });
     }
 
@@ -34,11 +36,12 @@ export default async function handler(req, res) {
         const insight = await gerarInsight(origem, origemCodigo, destinos);
         return res.status(200).json({ success: true, ...insight });
     } catch (error) {
-        console.error('❌ Tripinha insight erro:', error.message);
+        console.error('❌ Tripinha insight erro:', error.message, error.stack);
         return res.status(200).json({
             success: true,
             insight: gerarFallback(origem, destinos),
             modelo: 'fallback',
+            motivo: error.message,
         });
     }
 }
@@ -113,9 +116,13 @@ ${intlDestaques ? `- Internacionais acessíveis (<R$2500): ${intlDestaques}` : '
 - Estilos: ${resumo.estilosDisponiveis}`;
 
     const models = ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant'];
+    const erros = [];
+
+    console.log(`🐶 Tripinha: gerando insight para ${origem} (${total} destinos)`);
 
     for (const model of models) {
         try {
+            console.log(`🐶 Tentando modelo: ${model}`);
             const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
                 method: 'POST',
                 headers: {
@@ -132,17 +139,25 @@ ${intlDestaques ? `- Internacionais acessíveis (<R$2500): ${intlDestaques}` : '
                     temperature: 0.9,
                     max_tokens: 200,
                 }),
-                signal: AbortSignal.timeout(10000),
+                signal: AbortSignal.timeout(15000),
             });
 
             if (!response.ok) {
-                console.warn(`⚠️ Groq ${model} HTTP ${response.status}`);
+                const body = await response.text().catch(() => '');
+                const msg = `Groq ${model} HTTP ${response.status}: ${body.slice(0, 200)}`;
+                console.warn(`⚠️ ${msg}`);
+                erros.push(msg);
                 continue;
             }
 
             const data = await response.json();
             const content = data.choices?.[0]?.message?.content;
-            if (!content) continue;
+            if (!content) {
+                const msg = `Groq ${model}: resposta vazia`;
+                console.warn(`⚠️ ${msg}`);
+                erros.push(msg);
+                continue;
+            }
 
             const parsed = JSON.parse(content);
             const insight = (parsed.insight || '').trim();
@@ -151,13 +166,22 @@ ${intlDestaques ? `- Internacionais acessíveis (<R$2500): ${intlDestaques}` : '
                 console.log(`✅ Tripinha insight (${model}): "${insight}"`);
                 return { insight, modelo: model };
             }
+
+            erros.push(`Groq ${model}: JSON sem campo insight`);
         } catch (err) {
-            console.warn(`⚠️ Groq ${model} erro:`, err.message);
+            const msg = `Groq ${model}: ${err.message}`;
+            console.warn(`⚠️ ${msg}`);
+            erros.push(msg);
             continue;
         }
     }
 
-    return { insight: gerarFallback(origem, destinos), modelo: 'fallback' };
+    console.warn(`⚠️ Tripinha: todos os modelos falharam. Erros: ${erros.join(' | ')}`);
+    return {
+        insight: gerarFallback(origem, destinos),
+        modelo: 'fallback',
+        motivo: erros.join(' | '),
+    };
 }
 
 // ============================================================
