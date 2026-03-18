@@ -300,6 +300,8 @@
         .card-flights:hover { border-color: var(--blue); }
         .card-itinerary::before { background: linear-gradient(90deg, var(--amber), #FBBF24); }
         .card-itinerary:hover { border-color: var(--amber); }
+        .card-cheap-dest::before { background: linear-gradient(90deg, #0D9488, #14B8A6); }
+        .card-cheap-dest:hover { border-color: #0D9488; }
 
         .card-top-row { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 10px; }
         .card-icon { width: 48px; height: 48px; border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 1.4rem; flex-shrink: 0; transition: transform 0.3s ease; }
@@ -309,6 +311,7 @@
         .card-cheap .card-icon { background: linear-gradient(135deg, #FEE6E6, #FFC0C0); }
         .card-flights .card-icon { background: linear-gradient(135deg, #E6F5FF, #B8E4FF); }
         .card-itinerary .card-icon { background: linear-gradient(135deg, #FFF8E6, #FFE8A0); }
+        .card-cheap-dest .card-icon { background: linear-gradient(135deg, #E6FFF9, #B8F5EC); }
 
         .card-badge { padding: 4px 10px; border-radius: 20px; font-size: 0.65rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; }
         .badge-new { background: linear-gradient(135deg, #EFF6FF, #DBEAFE); color: #1D4ED8; }
@@ -324,6 +327,7 @@
         .card-cheap .card-cta { color: var(--red); }
         .card-flights .card-cta { color: var(--blue); }
         .card-itinerary .card-cta { color: var(--amber); }
+        .card-cheap-dest .card-cta { color: #0D9488; }
         .card-cta svg { width: 16px; height: 16px; transition: transform 0.3s ease; }
         .tool-card:hover .card-cta svg { transform: translateX(4px); }
 
@@ -424,6 +428,10 @@
             <a href="descobrir-destinos.html" class="nav-item primary-cta">
                 <span class="nav-item-icon">🎯</span> Descobrir meu destino!
                 <span class="nav-badge-sm popular">Popular</span>
+            </a>
+            <a href="destinos-baratos.html" class="nav-item">
+                <span class="nav-item-icon">💰</span> Destinos Baratos
+                <span class="nav-badge-sm hot">Hot</span>
             </a>
             <a href="todos-destinos.html" class="nav-item">
                 <span class="nav-item-icon">🌍</span> Todos os Destinos
@@ -526,7 +534,7 @@
                     🎯 Descobrir meu destino
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" width="18" height="18"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
                 </a>
-                <a href="voos.html" class="hero-cta-secondary" onclick="cardClick(this)">✈️ Buscar voos</a>
+                <a href="destinos-baratos.html" class="hero-cta-secondary" onclick="cardClick(this)">💰 Destinos baratos</a>
             </div>
         </div>
     </section>
@@ -534,7 +542,7 @@
     <!-- STATS BAR -->
     <div class="stats-bar">
         <div class="stats-inner">
-            <div class="stat-item"><div class="stat-num">6</div><div class="stat-label">Ferramentas</div></div>
+            <div class="stat-item"><div class="stat-num">7</div><div class="stat-label">Ferramentas</div></div>
             <div class="stat-item"><div class="stat-num">200+</div><div class="stat-label">Destinos</div></div>
             <div class="stat-item"><div class="stat-num">100%</div><div class="stat-label">Preços Reais</div></div>
             <div class="stat-item"><div class="stat-num">Grátis</div><div class="stat-label">Sempre</div></div>
@@ -565,8 +573,14 @@
             </div>
         </a>
 
-        <!-- GRID: 5 tools -->
+        <!-- GRID: 6 tools -->
         <div class="tools-grid">
+            <a href="destinos-baratos.html" class="tool-card card-cheap-dest" onclick="cardClick(this)">
+                <div class="card-top-row"><div class="card-icon">💰</div><span class="card-badge badge-hot">Hot</span></div>
+                <h3 class="card-title">Destinos baratos agora</h3>
+                <p class="card-desc">Quer viajar sem gastar muito? A Tripinha fareja os destinos com passagens mais baratas disponíveis agora e te mostra as melhores oportunidades do momento!</p>
+                <span class="card-cta">Ver destinos baratos <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg></span>
+            </a>
             <a href="todos-destinos.html" class="tool-card card-all-dest" onclick="cardClick(this)">
                 <div class="card-top-row"><div class="card-icon">🌍</div><span class="card-badge badge-new">Novo</span></div>
                 <h3 class="card-title">Explorar todos os destinos</h3>
