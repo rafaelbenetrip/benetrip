@@ -76,18 +76,30 @@ async function gerarInsight(origem, origemCodigo, destinos) {
 
     const systemMessage = `Você é a Tripinha, a cachorrinha mascote da Benetrip — uma plataforma de viagens. Você é simpática, animada e fala de forma coloquial em português brasileiro.
 
-Sua tarefa: gerar UMA frase curta e envolvente (máximo 140 caracteres) comentando os destinos baratos disponíveis hoje para quem sai de ${origem}.
+Sua tarefa: gerar UMA frase curta e envolvente (máximo 160 caracteres) comentando os destinos baratos disponíveis hoje para quem sai de ${origem}.
 
 Regras:
 - Fale como se fosse um tweet/story curto, na primeira pessoa
-- Seja específica: mencione o destino mais barato ou uma tendência de preço
-- Se preços caíram, destaque isso como oportunidade
-- Se há muitos internacionais baratos, comente
+- PRIORIZE variações de preço: se destinos ficaram mais baratos, destaque como OPORTUNIDADE URGENTE
+- Se preços caíram, mencione o destino específico que caiu e quanto (ex: "Salvador caiu R$120!")
+- Se preços subiram, sugira alternativas baratas
+- Se há internacionais abaixo de R$2.500, destaque como achado
+- Mencione pelo menos 1 destino pelo nome com preço
 - Use no máximo 1 emoji no início da frase
 - NÃO use hashtags
 - NÃO comece com "Ei" ou "Olha"
-- Seja criativa e varie o estilo
+- Seja criativa, varie o estilo, gere urgência positiva (tipo "corre!", "vai que é agora")
 - Retorne APENAS um JSON: { "insight": "sua frase aqui" }`;
+
+    // Detalhes de quem caiu mais
+    const topDesceram = desceram
+        .sort((a, b) => Math.abs(b.variacao?.diferenca || 0) - Math.abs(a.variacao?.diferenca || 0))
+        .slice(0, 3)
+        .map(d => `${d.nome} caiu R$${Math.abs(d.variacao.diferenca)} (agora R$${d.preco})`)
+        .join('; ');
+
+    const intlBaratos = destinos.filter(d => d.internacional && d.preco <= 2500);
+    const intlDestaques = intlBaratos.slice(0, 3).map(d => `${d.nome} R$${d.preco}`).join(', ');
 
     const userMessage = `Dados de hoje para ${origem}:
 - Total: ${resumo.total} destinos
@@ -96,6 +108,8 @@ Regras:
 - Nacionais: ${resumo.nacionais} | Internacionais: ${resumo.internacionais}
 - Top 5: ${resumo.top5}
 - Variações: ${resumo.variacoes}
+${topDesceram ? `- Maiores quedas: ${topDesceram}` : ''}
+${intlDestaques ? `- Internacionais acessíveis (<R$2500): ${intlDestaques}` : ''}
 - Estilos: ${resumo.estilosDisponiveis}`;
 
     const models = ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant'];
