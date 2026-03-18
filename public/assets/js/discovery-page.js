@@ -661,6 +661,7 @@ const DiscoveryPage = {
         this.renderizarStats();
         this.renderizarCards();
         this.atualizarContagem();
+        this.buscarTripinhaInsight();
 
         document.getElementById('loading-state').style.display = 'none';
         document.getElementById('empty-state').style.display = 'none';
@@ -838,6 +839,62 @@ const DiscoveryPage = {
             if (escopo) partes.push(this.capitalize(escopo));
             if (precoMax) partes.push(`Até R$ ${this.fmt(precoMax)}`);
             document.getElementById('section-title').textContent = partes.join(' · ');
+        }
+    },
+
+    // ============================================================
+    // TRIPINHA INSIGHT (frase da IA sobre os destinos)
+    // ============================================================
+    async buscarTripinhaInsight() {
+        const bar = document.getElementById('tripinha-insight-bar');
+        const textEl = document.getElementById('tripinha-insight-text');
+        if (!bar || !textEl) return;
+
+        // Esconder enquanto carrega
+        bar.style.display = 'none';
+
+        if (this.state.destinos.length === 0) return;
+
+        // Cache por origem (evita chamadas repetidas na mesma sessão)
+        const cacheKey = `tripinha_insight_${this.state.origemAtual}`;
+        const cached = sessionStorage.getItem(cacheKey);
+        if (cached) {
+            try {
+                const data = JSON.parse(cached);
+                if (Date.now() - data.timestamp < 15 * 60 * 1000) {
+                    textEl.textContent = data.insight;
+                    bar.style.display = 'flex';
+                    return;
+                }
+            } catch (e) { /* cache inválido */ }
+        }
+
+        try {
+            const response = await fetch('/api/tripinha-insight', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    origem: this.state.origemNome,
+                    origemCodigo: this.state.origemAtual,
+                    destinos: this.state.destinos,
+                }),
+            });
+
+            if (!response.ok) return;
+
+            const data = await response.json();
+            if (data.success && data.insight) {
+                textEl.textContent = data.insight;
+                bar.style.display = 'flex';
+
+                // Salvar no cache
+                sessionStorage.setItem(cacheKey, JSON.stringify({
+                    insight: data.insight,
+                    timestamp: Date.now(),
+                }));
+            }
+        } catch (error) {
+            console.warn('Tripinha insight erro:', error.message);
         }
     },
 

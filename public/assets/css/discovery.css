@@ -315,6 +315,34 @@ body {
 }
 
 /* ========================================
+   TRIPINHA INSIGHT BAR
+   ======================================== */
+.tripinha-insight-bar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 20px;
+    background: linear-gradient(135deg, #FFF8F0 0%, #FFF3E8 100%);
+    border-bottom: 1px solid #F5E0CA;
+}
+
+.insight-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: 2px solid var(--orange-primary);
+    flex-shrink: 0;
+}
+
+.insight-text {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--gray-dark);
+    line-height: 1.4;
+    flex: 1;
+}
+
+/* ========================================
    BUSCA INTELIGENTE (filtro de destinos)
    ======================================== */
 .filters-section {
