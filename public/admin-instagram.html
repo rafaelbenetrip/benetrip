@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Benetrip - Instagram Admin</title>
+    <meta name="robots" content="noindex, nofollow">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0a0a0a;
+            color: #e0e0e0;
+            min-height: 100vh;
+        }
+        .header {
+            background: linear-gradient(135deg, #833AB4, #FD1D1D, #F77737);
+            padding: 20px 30px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .header h1 { color: white; font-size: 1.4rem; }
+        .header .subtitle { color: rgba(255,255,255,0.8); font-size: 0.85rem; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 30px 20px; }
+
+        /* Auth */
+        .auth-section {
+            background: #1a1a1a;
+            border-radius: 12px;
+            padding: 30px;
+            margin-bottom: 30px;
+            border: 1px solid #333;
+        }
+        .auth-section input {
+            background: #2a2a2a;
+            border: 1px solid #444;
+            color: white;
+            padding: 10px 16px;
+            border-radius: 8px;
+            width: 300px;
+            margin-right: 10px;
+            font-size: 0.95rem;
+        }
+        .auth-section input:focus { outline: none; border-color: #833AB4; }
+
+        /* Controls */
+        .controls {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-bottom: 30px;
+        }
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+        .btn:hover { transform: translateY(-1px); }
+        .btn-primary { background: linear-gradient(135deg, #833AB4, #FD1D1D); color: white; }
+        .btn-secondary { background: #333; color: white; }
+        .btn-success { background: #22c55e; color: white; }
+        .btn-danger { background: #ef4444; color: white; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+        select {
+            background: #2a2a2a;
+            color: white;
+            border: 1px solid #444;
+            padding: 10px 16px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+        }
+
+        /* Post Preview */
+        .post-preview {
+            display: grid;
+            grid-template-columns: 400px 1fr;
+            gap: 30px;
+            background: #1a1a1a;
+            border-radius: 12px;
+            overflow: hidden;
+            border: 1px solid #333;
+        }
+        @media (max-width: 800px) {
+            .post-preview { grid-template-columns: 1fr; }
+        }
+        .post-image {
+            width: 100%;
+            aspect-ratio: 1;
+            object-fit: cover;
+            background: #333;
+        }
+        .post-image-placeholder {
+            width: 100%;
+            aspect-ratio: 1;
+            background: #2a2a2a;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #666;
+            font-size: 3rem;
+        }
+        .post-details { padding: 24px; }
+        .post-details h3 { color: #f0f0f0; margin-bottom: 8px; font-size: 1.2rem; }
+        .post-meta {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
+        .post-meta .tag {
+            background: #2a2a2a;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            color: #aaa;
+        }
+        .post-meta .tag.price { background: #22c55e22; color: #22c55e; font-weight: 600; }
+        .post-meta .tag.style { background: #833AB422; color: #c084fc; }
+        .caption-preview {
+            background: #0a0a0a;
+            border-radius: 8px;
+            padding: 16px;
+            max-height: 300px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            font-size: 0.9rem;
+            line-height: 1.5;
+            color: #ccc;
+            border: 1px solid #222;
+        }
+        .persona-info {
+            margin-top: 16px;
+            padding: 12px;
+            background: #0a0a0a;
+            border-radius: 8px;
+            border: 1px solid #222;
+        }
+        .persona-info h4 { color: #aaa; font-size: 0.8rem; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px; }
+        .persona-info p { font-size: 0.85rem; color: #888; margin-bottom: 4px; }
+
+        /* Status Messages */
+        .status {
+            padding: 12px 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 0.9rem;
+        }
+        .status.info { background: #1e3a5f; color: #93c5fd; border: 1px solid #2563eb44; }
+        .status.success { background: #14532d; color: #86efac; border: 1px solid #22c55e44; }
+        .status.error { background: #450a0a; color: #fca5a5; border: 1px solid #ef444444; }
+        .status.loading { background: #1a1a1a; color: #aaa; border: 1px solid #33333344; }
+
+        /* History */
+        .history-section { margin-top: 40px; }
+        .history-section h2 { margin-bottom: 16px; color: #ccc; }
+        .history-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: #1a1a1a;
+            border-radius: 12px;
+            overflow: hidden;
+        }
+        .history-table th {
+            background: #222;
+            padding: 12px 16px;
+            text-align: left;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #888;
+        }
+        .history-table td {
+            padding: 12px 16px;
+            border-top: 1px solid #2a2a2a;
+            font-size: 0.85rem;
+        }
+        .badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        .badge-published { background: #22c55e22; color: #22c55e; }
+        .badge-pending { background: #f5920022; color: #f59e0b; }
+
+        .spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid #666;
+            border-top-color: #fff;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .hidden { display: none; }
+
+        .setup-guide {
+            background: #1a1a1a;
+            border: 1px solid #333;
+            border-radius: 12px;
+            padding: 24px;
+            margin-top: 30px;
+        }
+        .setup-guide h3 { color: #f0f0f0; margin-bottom: 12px; }
+        .setup-guide ol { padding-left: 20px; }
+        .setup-guide li { margin-bottom: 8px; color: #aaa; font-size: 0.9rem; line-height: 1.5; }
+        .setup-guide code {
+            background: #2a2a2a;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            color: #c084fc;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div>
+            <h1>Benetrip Instagram Manager</h1>
+            <div class="subtitle">Automacao de posts diarios com personas simuladas</div>
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- Auth -->
+        <div class="auth-section">
+            <label style="display:block;margin-bottom:8px;color:#888;font-size:0.85rem;">Chave de acesso (CRON_SECRET)</label>
+            <div style="display:flex;align-items:center;">
+                <input type="password" id="secretKey" placeholder="Digite sua CRON_SECRET...">
+                <button class="btn btn-secondary" onclick="salvarChave()">Salvar</button>
+            </div>
+        </div>
+
+        <!-- Controls -->
+        <div class="controls">
+            <button class="btn btn-primary" id="btnGenerate" onclick="gerarPost()">
+                Gerar Preview
+            </button>
+            <select id="estiloSelect">
+                <option value="">Estilo do dia (auto)</option>
+                <option value="praia">Praia</option>
+                <option value="cidade">Cidade</option>
+                <option value="natureza">Natureza</option>
+                <option value="romantico">Romantico</option>
+                <option value="aventura">Aventura</option>
+                <option value="familia">Familia</option>
+            </select>
+            <select id="origemSelect">
+                <option value="">Origem aleatoria</option>
+                <option value="GRU">Sao Paulo (GRU)</option>
+                <option value="GIG">Rio de Janeiro (GIG)</option>
+                <option value="BSB">Brasilia (BSB)</option>
+                <option value="CNF">Belo Horizonte (CNF)</option>
+                <option value="SSA">Salvador (SSA)</option>
+                <option value="REC">Recife (REC)</option>
+                <option value="POA">Porto Alegre (POA)</option>
+                <option value="CWB">Curitiba (CWB)</option>
+                <option value="FOR">Fortaleza (FOR)</option>
+            </select>
+            <button class="btn btn-success hidden" id="btnPublish" onclick="publicarPost()">
+                Publicar no Instagram
+            </button>
+        </div>
+
+        <!-- Status -->
+        <div id="statusArea"></div>
+
+        <!-- Post Preview -->
+        <div id="postPreview" class="hidden"></div>
+
+        <!-- History -->
+        <div class="history-section">
+            <h2>Historico de Posts</h2>
+            <div id="historyArea">
+                <p style="color:#666;">Carregue o historico apos inserir a chave de acesso.</p>
+            </div>
+        </div>
+
+        <!-- Setup Guide -->
+        <div class="setup-guide">
+            <h3>Como configurar o Instagram</h3>
+            <ol>
+                <li>Crie um app em <code>developers.facebook.com</code></li>
+                <li>Conecte sua conta Instagram Business a uma Facebook Page</li>
+                <li>No Graph API Explorer, gere um token com permissoes: <code>instagram_basic</code>, <code>instagram_content_publish</code>, <code>pages_show_list</code></li>
+                <li>Troque por um <strong>long-lived token</strong> (valido por 60 dias)</li>
+                <li>Obtenha o <strong>Instagram Business Account ID</strong> via Graph API</li>
+                <li>Configure no Vercel:
+                    <br><code>INSTAGRAM_ACCESS_TOKEN</code> = seu token
+                    <br><code>INSTAGRAM_BUSINESS_ID</code> = ID da conta
+                </li>
+                <li>O cron roda automaticamente todo dia as <strong>9:00 BRT</strong> (12:00 UTC)</li>
+            </ol>
+        </div>
+    </div>
+
+    <script>
+        let currentPost = null;
+
+        function getSecret() {
+            return localStorage.getItem('benetrip_admin_secret') || document.getElementById('secretKey').value;
+        }
+
+        function salvarChave() {
+            const key = document.getElementById('secretKey').value;
+            if (key) {
+                localStorage.setItem('benetrip_admin_secret', key);
+                showStatus('Chave salva!', 'success');
+                carregarHistorico();
+            }
+        }
+
+        function showStatus(msg, type = 'info') {
+            document.getElementById('statusArea').innerHTML =
+                `<div class="status ${type}">${type === 'loading' ? '<span class="spinner"></span>' : ''}${msg}</div>`;
+        }
+
+        async function gerarPost() {
+            const secret = getSecret();
+            if (!secret) { showStatus('Insira a chave de acesso primeiro.', 'error'); return; }
+
+            const estilo = document.getElementById('estiloSelect').value;
+            const origem = document.getElementById('origemSelect').value;
+
+            const btn = document.getElementById('btnGenerate');
+            btn.disabled = true;
+            btn.textContent = 'Gerando...';
+            showStatus('Gerando post com persona simulada...', 'loading');
+
+            try {
+                const body = {};
+                if (estilo) body.estilo = estilo;
+                if (origem) body.origem = origem;
+
+                const res = await fetch('/api/instagram/generate-post', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${secret}`,
+                    },
+                    body: JSON.stringify(body),
+                });
+
+                const data = await res.json();
+                if (!res.ok || !data.success) {
+                    throw new Error(data.error || data.message || 'Erro desconhecido');
+                }
+
+                currentPost = data.post;
+                renderPreview(data.post);
+                showStatus('Post gerado com sucesso! Revise e publique.', 'success');
+                document.getElementById('btnPublish').classList.remove('hidden');
+            } catch (err) {
+                showStatus(`Erro: ${err.message}`, 'error');
+                currentPost = null;
+                document.getElementById('btnPublish').classList.add('hidden');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Gerar Preview';
+            }
+        }
+
+        function renderPreview(post) {
+            const preview = document.getElementById('postPreview');
+            preview.classList.remove('hidden');
+
+            const imageHtml = post.imagem?.url
+                ? `<img class="post-image" src="${post.imagem.url}" alt="${post.gancho}" onerror="this.parentElement.innerHTML='<div class=post-image-placeholder>&#128247;</div>'">`
+                : `<div class="post-image-placeholder">&#128247;</div>`;
+
+            preview.innerHTML = `
+                <div class="post-preview">
+                    <div>${imageHtml}</div>
+                    <div class="post-details">
+                        <h3>${post.destino.nome}, ${post.destino.pais}</h3>
+                        <div class="post-meta">
+                            <span class="tag price">R$${post.destino.preco}</span>
+                            <span class="tag style">${post.estilo}</span>
+                            ${(post.destino.estilos || []).map(e => `<span class="tag">${e}</span>`).join('')}
+                            <span class="tag">${post.destino.internacional ? 'Internacional' : 'Nacional'}</span>
+                        </div>
+                        <div class="caption-preview">${escapeHtml(post.fullCaption)}</div>
+                        <div class="persona-info">
+                            <h4>Persona Simulada</h4>
+                            <p><strong>${post.persona.nome}</strong>, ${post.persona.profissao}</p>
+                            <p>De ${post.persona.origem.name}/${post.persona.origem.state} | ${post.persona.companhia}</p>
+                            <p>Preferencias: ${post.persona.preferencias.join(', ')} | Orcamento: R$${post.persona.orcamento}</p>
+                            <p>"${post.persona.observacoes}"</p>
+                        </div>
+                        ${post.imagem?.photographer ? `<p style="margin-top:8px;font-size:0.75rem;color:#666;">Foto: ${post.imagem.photographer} (${post.imagem.source})</p>` : ''}
+                    </div>
+                </div>
+            `;
+        }
+
+        async function publicarPost() {
+            if (!currentPost) { showStatus('Gere um post primeiro.', 'error'); return; }
+            if (!currentPost.imagem?.url) { showStatus('Post sem imagem. Nao e possivel publicar.', 'error'); return; }
+
+            const secret = getSecret();
+            if (!confirm('Tem certeza que deseja publicar este post no Instagram?')) return;
+
+            const btn = document.getElementById('btnPublish');
+            btn.disabled = true;
+            btn.textContent = 'Publicando...';
+            showStatus('Publicando no Instagram...', 'loading');
+
+            try {
+                const res = await fetch('/api/instagram/publish', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${secret}`,
+                    },
+                    body: JSON.stringify({
+                        imageUrl: currentPost.imagem.url,
+                        caption: currentPost.fullCaption,
+                        altText: currentPost.gancho,
+                        destinoNome: currentPost.destino.nome,
+                        data: new Date().toISOString().split('T')[0],
+                    }),
+                });
+
+                const data = await res.json();
+                if (!res.ok || !data.success) {
+                    throw new Error(data.error || 'Falha ao publicar');
+                }
+
+                showStatus(`Publicado com sucesso! Media ID: ${data.mediaId}`, 'success');
+                currentPost = null;
+                btn.classList.add('hidden');
+                carregarHistorico();
+            } catch (err) {
+                showStatus(`Erro ao publicar: ${err.message}`, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Publicar no Instagram';
+            }
+        }
+
+        async function carregarHistorico() {
+            const secret = getSecret();
+            if (!secret) return;
+
+            try {
+                const supabaseUrl = await getSupabaseUrl();
+                if (!supabaseUrl) {
+                    document.getElementById('historyArea').innerHTML = '<p style="color:#666;">Configure o Supabase para ver o historico.</p>';
+                    return;
+                }
+
+                const res = await fetch(
+                    `${supabaseUrl}/rest/v1/instagram_posts?select=*&order=created_at.desc&limit=20`,
+                    { headers: { 'apikey': secret } }
+                );
+
+                if (!res.ok) {
+                    document.getElementById('historyArea').innerHTML = '<p style="color:#666;">Nao foi possivel carregar o historico.</p>';
+                    return;
+                }
+
+                const posts = await res.json();
+                if (posts.length === 0) {
+                    document.getElementById('historyArea').innerHTML = '<p style="color:#666;">Nenhum post gerado ainda.</p>';
+                    return;
+                }
+
+                let html = `<table class="history-table"><thead><tr>
+                    <th>Data</th><th>Destino</th><th>Preco</th><th>Estilo</th><th>Origem</th><th>Persona</th><th>Status</th>
+                </tr></thead><tbody>`;
+
+                for (const p of posts) {
+                    html += `<tr>
+                        <td>${p.data}</td>
+                        <td>${p.destino_nome}${p.destino_pais ? ', ' + p.destino_pais : ''}</td>
+                        <td>R$${p.destino_preco || '?'}</td>
+                        <td>${p.estilo || '-'}</td>
+                        <td>${p.origem || '-'}</td>
+                        <td>${p.persona_nome || '-'}</td>
+                        <td>${p.published
+                            ? '<span class="badge badge-published">Publicado</span>'
+                            : '<span class="badge badge-pending">Pendente</span>'}</td>
+                    </tr>`;
+                }
+
+                html += '</tbody></table>';
+                document.getElementById('historyArea').innerHTML = html;
+            } catch (err) {
+                console.error('Erro historico:', err);
+            }
+        }
+
+        async function getSupabaseUrl() {
+            try {
+                const res = await fetch('/api/auth/config');
+                const data = await res.json();
+                return data.supabaseUrl || null;
+            } catch { return null; }
+        }
+
+        function escapeHtml(str) {
+            return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>');
+        }
+
+        // Init
+        window.addEventListener('load', () => {
+            const saved = localStorage.getItem('benetrip_admin_secret');
+            if (saved) {
+                document.getElementById('secretKey').value = saved;
+                carregarHistorico();
+            }
+        });
+    </script>
+</body>
+</html>
