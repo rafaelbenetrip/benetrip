@@ -34,51 +34,68 @@ async function getSharp() {
 
 export const maxDuration = 30;
 
-// Cache da fonte para não baixar toda vez
-let fontCache = null;
+// Cache de fontes
+let fontRegularCache = null;
+let fontBoldCache = null;
 
-async function loadFont() {
-    if (fontCache) return fontCache;
-
-    // Satori só aceita .ttf ou .woff (NÃO woff2)
-    const fontUrls = [
-        'https://cdn.jsdelivr.net/fontsource/fonts/inter@latest/latin-400-normal.ttf',
-        'https://cdn.jsdelivr.net/gh/rsms/inter@v4.0/docs/font-files/Inter-Regular.woff',
-        'https://raw.githubusercontent.com/rsms/inter/v4.0/docs/font-files/Inter-Regular.woff',
-    ];
-
-    for (const url of fontUrls) {
+async function loadFontFromUrls(urls) {
+    for (const url of urls) {
         try {
             const res = await fetch(url);
             if (res.ok) {
-                fontCache = await res.arrayBuffer();
-                console.log(`Fonte carregada: ${url} (${fontCache.byteLength} bytes)`);
-                return fontCache;
+                const buf = await res.arrayBuffer();
+                console.log(`Fonte carregada: ${url} (${buf.byteLength} bytes)`);
+                return buf;
             }
         } catch (err) {
             console.warn(`Fonte ${url}: ${err.message}`);
         }
     }
+    return null;
+}
 
-    // Último fallback: Google Fonts CSS pedindo TTF
-    try {
-        const cssRes = await fetch(
-            'https://fonts.googleapis.com/css2?family=Inter:wght@400&display=swap',
-            // User-Agent antigo força Google a retornar TTF em vez de woff2
-            { headers: { 'User-Agent': 'Mozilla/4.0 (compatible; MSIE 8.0; Windows NT 6.1)' } }
-        );
-        const css = await cssRes.text();
-        const urlMatch = css.match(/src:\s*url\(([^)]+)\)\s*format\('truetype'\)/);
-        if (urlMatch) {
-            const fontRes = await fetch(urlMatch[1]);
-            fontCache = await fontRes.arrayBuffer();
-            return fontCache;
+async function loadFonts() {
+    if (fontRegularCache && fontBoldCache) return { regular: fontRegularCache, bold: fontBoldCache };
+
+    // Poppins - fonte oficial da Benetrip (TTF para satori)
+    const [regular, bold] = await Promise.all([
+        loadFontFromUrls([
+            'https://cdn.jsdelivr.net/fontsource/fonts/poppins@latest/latin-400-normal.ttf',
+            'https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/poppins/Poppins-Regular.ttf',
+        ]),
+        loadFontFromUrls([
+            'https://cdn.jsdelivr.net/fontsource/fonts/poppins@latest/latin-700-normal.ttf',
+            'https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/poppins/Poppins-Bold.ttf',
+        ]),
+    ]);
+
+    // Fallback: Google Fonts CSS pedindo TTF
+    if (!regular || !bold) {
+        try {
+            const cssRes = await fetch(
+                'https://fonts.googleapis.com/css2?family=Poppins:wght@400;700&display=swap',
+                { headers: { 'User-Agent': 'Mozilla/4.0 (compatible; MSIE 8.0; Windows NT 6.1)' } }
+            );
+            const css = await cssRes.text();
+            const matches = [...css.matchAll(/font-weight:\s*(\d+);[^}]*src:\s*url\(([^)]+)\)\s*format\('truetype'\)/g)];
+            for (const m of matches) {
+                const fontRes = await fetch(m[2]);
+                const buf = await fontRes.arrayBuffer();
+                if (m[1] === '400' && !regular) fontRegularCache = buf;
+                if (m[1] === '700' && !bold) fontBoldCache = buf;
+            }
+        } catch (err) {
+            console.error('Falha no fallback Google Fonts:', err.message);
         }
-    } catch (err) {
-        console.error('Falha total ao carregar fonte:', err.message);
     }
 
-    throw new Error('Não conseguiu carregar nenhuma fonte');
+    fontRegularCache = regular || fontRegularCache;
+    fontBoldCache = bold || fontBoldCache;
+
+    if (!fontRegularCache) throw new Error('Nao conseguiu carregar fonte Poppins regular');
+    if (!fontBoldCache) fontBoldCache = fontRegularCache; // usa regular como fallback
+
+    return { regular: fontRegularCache, bold: fontBoldCache };
 }
 
 // Helper para criar elementos sem JSX
@@ -95,44 +112,172 @@ function h(type, props, ...children) {
 }
 
 // ============================================================
+// PALETA BENETRIP OFICIAL
+// ============================================================
+const BRAND = {
+    orange: '#E87722',
+    orangeDark: '#CF6A1D',
+    orangeLight: '#FF9A47',
+    blue: '#00A3E0',
+    blueDark: '#0090C7',
+    dark: '#21272A',
+    white: '#FFFFFF',
+    gray100: '#F4F5F7',
+    gray500: '#8B939C',
+    green: '#22C55E',
+};
+
+// URL base para assets (Tripinha avatar hospedada no Vercel)
+const ASSETS_BASE = 'https://benetrip.vercel.app/assets/images';
+const TRIPINHA_FELIZ = `${ASSETS_BASE}/tripinha/avatar-feliz.png`;
+const LOGO_WHITE = `${ASSETS_BASE}/logo/logo-benetrip-white.png`;
+
+// ============================================================
+// COMPONENTES REUTILIZÁVEIS
+// ============================================================
+
+// Header bar com gradiente laranja→azul (como o site real)
+function brandHeader(badgeText, showLogo) {
+    return h('div', {
+        style: {
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            background: `linear-gradient(135deg, ${BRAND.orange} 0%, ${BRAND.orangeLight} 40%, #FFB878 60%, #66C7FF 80%, ${BRAND.blue} 100%)`,
+            padding: '28px 40px',
+            borderRadius: '24px',
+            marginBottom: '32px',
+        },
+    },
+        // Badge pill
+        h('div', {
+            style: {
+                display: 'flex', alignItems: 'center',
+                background: 'rgba(0,0,0,0.25)', padding: '10px 24px',
+                borderRadius: '50px', fontSize: '26px', fontWeight: '700',
+                color: BRAND.white, letterSpacing: '0.5px',
+            },
+        }, badgeText),
+        // Logo area
+        showLogo ? h('div', {
+            style: {
+                display: 'flex', alignItems: 'center', gap: '12px',
+            },
+        },
+            h('div', {
+                style: {
+                    display: 'flex', fontSize: '24px', fontWeight: '700',
+                    color: BRAND.white, letterSpacing: '-0.5px',
+                },
+            }, 'benetrip.com.br'),
+        ) : null,
+    );
+}
+
+// Tripinha avatar circle com borda branca (como no hero do site)
+function tripinhaAvatar(size) {
+    return h('img', {
+        src: TRIPINHA_FELIZ,
+        width: size,
+        height: size,
+        style: {
+            borderRadius: '50%',
+            border: `4px solid ${BRAND.white}`,
+            boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
+        },
+    });
+}
+
+// Footer com Tripinha + CTA
+function brandFooter(text) {
+    return h('div', {
+        style: {
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            gap: '16px', marginTop: 'auto', paddingTop: '24px',
+        },
+    },
+        tripinhaAvatar(64),
+        h('div', {
+            style: {
+                display: 'flex', flexDirection: 'column',
+            },
+        },
+            h('div', {
+                style: {
+                    display: 'flex', fontSize: '24px', fontWeight: '700',
+                    color: BRAND.orange,
+                },
+            }, text),
+            h('div', {
+                style: {
+                    display: 'flex', fontSize: '20px', color: 'rgba(255,255,255,0.6)',
+                },
+            }, 'benetrip.com.br'),
+        ),
+    );
+}
+
+// CTA button pill (estilo do site)
+function ctaButton(text) {
+    return h('div', {
+        style: {
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: `linear-gradient(135deg, ${BRAND.orange}, ${BRAND.orangeLight})`,
+            padding: '16px 40px', borderRadius: '50px',
+            fontSize: '26px', fontWeight: '700', color: BRAND.white,
+            boxShadow: `0 8px 30px rgba(232,119,34,0.3)`,
+        },
+    }, text);
+}
+
+// Check item com bolinha verde
+function checkItem(text) {
+    return h('div', {
+        style: { display: 'flex', alignItems: 'center', fontSize: '26px', gap: '14px' },
+    },
+        h('div', {
+            style: {
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                background: BRAND.green, borderRadius: '50%',
+                width: '34px', height: '34px', fontSize: '18px', color: BRAND.white,
+                flexShrink: '0',
+            },
+        }, '✓'),
+        h('div', { style: { display: 'flex', color: 'rgba(255,255,255,0.9)' } }, text),
+    );
+}
+
+// ============================================================
 // CORES E ESTILOS POR FORMATO
 // ============================================================
 const TEMAS = {
     descobridor: {
-        bg: 'linear-gradient(135deg, #0f172a 0%, #1e3a5f 50%, #0d9488 100%)',
-        accent: '#f97316',
-        badge: '🐾 TRIPINHA DESCOBRIU!',
-        badgeBg: '#f97316',
+        bg: `linear-gradient(160deg, ${BRAND.dark} 0%, #1a2d45 40%, #163040 70%, #0d3d3d 100%)`,
+        accent: BRAND.orange,
+        badge: 'TRIPINHA DESCOBRIU!',
     },
     top5: {
-        bg: 'linear-gradient(135deg, #7c3aed 0%, #4f46e5 50%, #2563eb 100%)',
-        accent: '#fbbf24',
-        badge: '🔥 TOP 5 MAIS BARATOS',
-        badgeBg: '#dc2626',
+        bg: `linear-gradient(160deg, ${BRAND.dark} 0%, #1a2040 40%, #1e2860 70%, #1e3a6f 100%)`,
+        accent: BRAND.orange,
+        badge: 'TOP 5 MAIS BARATOS',
     },
     economia: {
-        bg: 'linear-gradient(135deg, #065f46 0%, #047857 50%, #059669 100%)',
-        accent: '#34d399',
-        badge: '📉 PREÇO CAIU!',
-        badgeBg: '#059669',
+        bg: `linear-gradient(160deg, ${BRAND.dark} 0%, #102820 40%, #0d3828 70%, #064e31 100%)`,
+        accent: BRAND.green,
+        badge: 'PRECO CAIU!',
     },
     origens: {
-        bg: 'linear-gradient(135deg, #1e3a5f 0%, #1e40af 50%, #3b82f6 100%)',
-        accent: '#93c5fd',
-        badge: '✈️ DE ONDE SAI MAIS BARATO?',
-        badgeBg: '#2563eb',
+        bg: `linear-gradient(160deg, ${BRAND.dark} 0%, #1a2a4a 40%, #1e3060 70%, #1e3a6f 100%)`,
+        accent: BRAND.blue,
+        badge: 'DE ONDE SAI MAIS BARATO?',
     },
     roteiro: {
-        bg: 'linear-gradient(135deg, #92400e 0%, #b45309 50%, #d97706 100%)',
-        accent: '#fde68a',
-        badge: '📋 ROTEIRO COMPLETO',
-        badgeBg: '#b45309',
+        bg: `linear-gradient(160deg, ${BRAND.dark} 0%, #2a1a10 40%, #3a2010 70%, #4a2a10 100%)`,
+        accent: BRAND.orange,
+        badge: 'ROTEIRO COMPLETO',
     },
     ranking: {
-        bg: 'linear-gradient(135deg, #581c87 0%, #7c3aed 50%, #8b5cf6 100%)',
-        accent: '#c4b5fd',
-        badge: '🏆 RANKING DA SEMANA',
-        badgeBg: '#7c3aed',
+        bg: `linear-gradient(160deg, ${BRAND.dark} 0%, #1a1530 40%, #251a40 70%, #302050 100%)`,
+        accent: BRAND.orange,
+        badge: 'RANKING DA SEMANA',
     },
 };
 
@@ -150,118 +295,114 @@ function cardDescobridor(params) {
         const c = params.get(`c${i}`);
         if (c) checks.push(decodeURIComponent(c));
     }
-    const persona = decodeURIComponent(params.get('pn') || '');
 
     return h('div', {
         style: {
             display: 'flex', flexDirection: 'column', width: '100%', height: '100%',
-            background: tema.bg, padding: '60px', fontFamily: 'sans-serif', color: 'white',
+            background: tema.bg, padding: '48px', fontFamily: 'Poppins', color: BRAND.white,
         },
     },
-        // Header
+        // Header gradient bar
+        brandHeader(tema.badge, true),
+
+        // Quote box - o que o usuario pediu
         h('div', {
             style: {
-                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                marginBottom: '40px',
+                display: 'flex', alignItems: 'center',
+                background: 'rgba(255,255,255,0.08)', borderRadius: '20px',
+                padding: '28px 32px', marginBottom: '28px',
+                border: '1px solid rgba(255,255,255,0.12)',
+                gap: '20px',
             },
         },
+            // Aspas estilizadas
             h('div', {
                 style: {
-                    display: 'flex', background: tema.badgeBg, padding: '12px 28px',
-                    borderRadius: '50px', fontSize: '28px', fontWeight: 'bold',
+                    display: 'flex', fontSize: '48px', color: BRAND.orange,
+                    fontWeight: '700', lineHeight: '1', marginTop: '-12px',
                 },
-            }, tema.badge),
+            }, '"'),
             h('div', {
-                style: { display: 'flex', fontSize: '24px', opacity: '0.8' },
-            }, 'benetrip.com.br'),
+                style: {
+                    display: 'flex', flex: '1', fontSize: '28px',
+                    fontStyle: 'italic', lineHeight: '1.4', opacity: '0.9',
+                },
+            }, pedido),
         ),
-        // Persona quote
+
+        // Tripinha arrow section
         h('div', {
             style: {
-                display: 'flex', flexDirection: 'column',
-                background: 'rgba(255,255,255,0.1)', borderRadius: '24px',
-                padding: '36px', marginBottom: '36px', border: '2px solid rgba(255,255,255,0.2)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                gap: '16px', marginBottom: '20px',
             },
         },
-            persona ? h('div', {
-                style: { display: 'flex', fontSize: '22px', opacity: '0.7', marginBottom: '12px' },
-            }, persona) : null,
+            tripinhaAvatar(80),
             h('div', {
                 style: {
-                    display: 'flex', fontSize: '30px', fontStyle: 'italic', lineHeight: '1.4',
+                    display: 'flex', fontSize: '20px', color: BRAND.orange,
+                    fontWeight: '600',
                 },
-            }, `"${pedido}"`),
+            }, 'A Tripinha farejou e encontrou...'),
         ),
-        // Arrow
-        h('div', {
-            style: {
-                display: 'flex', justifyContent: 'center', fontSize: '48px',
-                marginBottom: '24px',
-            },
-        }, '⬇️'),
-        // Result
+
+        // Result card
         h('div', {
             style: {
                 display: 'flex', flexDirection: 'column', flex: '1',
-                background: 'rgba(0,0,0,0.3)', borderRadius: '24px',
-                padding: '40px', border: `3px solid ${tema.accent}`,
+                background: 'rgba(0,0,0,0.35)', borderRadius: '24px',
+                padding: '36px 40px',
+                border: `3px solid ${BRAND.orange}`,
+                boxShadow: `0 0 40px rgba(232,119,34,0.15)`,
             },
         },
+            // Destino + pais
             h('div', {
                 style: {
-                    display: 'flex', alignItems: 'baseline', marginBottom: '20px',
-                    flexWrap: 'wrap', gap: '12px',
+                    display: 'flex', alignItems: 'center', marginBottom: '16px',
+                    gap: '14px',
                 },
             },
                 h('div', {
-                    style: { display: 'flex', fontSize: '52px', fontWeight: 'bold' },
+                    style: { display: 'flex', fontSize: '50px', fontWeight: '700' },
                 }, destino),
                 pais ? h('div', {
-                    style: { display: 'flex', fontSize: '32px', opacity: '0.8' },
+                    style: { display: 'flex', fontSize: '30px', opacity: '0.7' },
                 }, pais) : null,
             ),
+            // Preco
             h('div', {
                 style: {
-                    display: 'flex', alignItems: 'baseline', marginBottom: '28px', gap: '8px',
+                    display: 'flex', alignItems: 'baseline', marginBottom: '24px', gap: '10px',
                 },
             },
                 h('div', {
-                    style: { display: 'flex', fontSize: '24px', opacity: '0.7' },
+                    style: { display: 'flex', fontSize: '22px', opacity: '0.6' },
                 }, 'a partir de'),
                 h('div', {
                     style: {
-                        display: 'flex', fontSize: '56px', fontWeight: 'bold',
-                        color: tema.accent,
+                        display: 'flex', fontSize: '52px', fontWeight: '700',
+                        color: BRAND.orange,
                     },
                 }, `R$${preco}`),
             ),
             // Checkmarks
             h('div', {
-                style: { display: 'flex', flexDirection: 'column', gap: '12px' },
+                style: { display: 'flex', flexDirection: 'column', gap: '14px' },
             },
-                ...checks.map(check =>
-                    h('div', {
-                        style: { display: 'flex', alignItems: 'center', fontSize: '26px', gap: '12px' },
-                    },
-                        h('div', {
-                            style: {
-                                display: 'flex', background: '#10b981', borderRadius: '50%',
-                                width: '36px', height: '36px', alignItems: 'center',
-                                justifyContent: 'center', fontSize: '20px',
-                            },
-                        }, '✓'),
-                        h('div', { style: { display: 'flex' } }, check),
-                    )
-                ),
+                ...checks.map(check => checkItem(check)),
             ),
         ),
+
         // Footer
         h('div', {
             style: {
-                display: 'flex', justifyContent: 'center', marginTop: '32px',
-                fontSize: '26px', opacity: '0.8',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                marginTop: '28px', gap: '12px',
             },
-        }, 'Diga o que precisa, a Tripinha encontra! 🐾'),
+        },
+            ctaButton('Diga o que precisa, a Tripinha encontra!'),
+        ),
     );
 }
 
@@ -270,82 +411,70 @@ function cardDescobridor(params) {
 // ============================================================
 function cardTop5(params) {
     const tema = TEMAS.top5;
-    const origem = decodeURIComponent(params.get('o') || 'São Paulo');
+    const origem = decodeURIComponent(params.get('o') || 'Sao Paulo');
     const destinos = [];
     for (let i = 1; i <= 5; i++) {
         const n = params.get(`d${i}n`);
         const p = params.get(`d${i}p`);
-        const f = params.get(`d${i}f`); // flag emoji
+        const f = params.get(`d${i}f`);
         if (n && p) destinos.push({ nome: decodeURIComponent(n), preco: p, flag: f ? decodeURIComponent(f) : '' });
     }
 
-    const medalhas = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣'];
+    const medalhas = ['1', '2', '3', '4', '5'];
 
     return h('div', {
         style: {
             display: 'flex', flexDirection: 'column', width: '100%', height: '100%',
-            background: tema.bg, padding: '60px', fontFamily: 'sans-serif', color: 'white',
+            background: tema.bg, padding: '48px', fontFamily: 'Poppins', color: BRAND.white,
         },
     },
-        // Header
+        brandHeader(tema.badge, true),
+        // Subtitle
         h('div', {
             style: {
-                display: 'flex', flexDirection: 'column', alignItems: 'center',
-                marginBottom: '36px',
+                display: 'flex', justifyContent: 'center',
+                fontSize: '26px', opacity: '0.7', marginBottom: '28px',
             },
-        },
-            h('div', {
-                style: {
-                    display: 'flex', background: tema.badgeBg, padding: '12px 28px',
-                    borderRadius: '50px', fontSize: '32px', fontWeight: 'bold',
-                    marginBottom: '16px',
-                },
-            }, tema.badge),
-            h('div', {
-                style: { display: 'flex', fontSize: '26px', opacity: '0.8' },
-            }, `Saindo de ${origem} esta semana`),
-        ),
+        }, `Saindo de ${origem} esta semana`),
         // List
         h('div', {
             style: {
                 display: 'flex', flexDirection: 'column', flex: '1',
-                gap: '16px', justifyContent: 'center',
+                gap: '14px', justifyContent: 'center',
             },
         },
             ...destinos.map((d, i) =>
                 h('div', {
                     style: {
                         display: 'flex', alignItems: 'center',
-                        background: i === 0 ? 'rgba(251,191,36,0.2)' : 'rgba(255,255,255,0.1)',
-                        borderRadius: '16px', padding: '24px 28px',
-                        border: i === 0 ? '2px solid #fbbf24' : '1px solid rgba(255,255,255,0.15)',
+                        background: i === 0 ? `rgba(232,119,34,0.15)` : 'rgba(255,255,255,0.07)',
+                        borderRadius: '16px', padding: '22px 28px',
+                        border: i === 0 ? `2px solid ${BRAND.orange}` : '1px solid rgba(255,255,255,0.1)',
                     },
                 },
+                    // Numero com circulo
                     h('div', {
-                        style: { display: 'flex', fontSize: '40px', marginRight: '20px' },
+                        style: {
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            width: '44px', height: '44px', borderRadius: '50%',
+                            background: i === 0 ? BRAND.orange : 'rgba(255,255,255,0.15)',
+                            fontSize: '24px', fontWeight: '700', marginRight: '20px',
+                            flexShrink: '0',
+                        },
                     }, medalhas[i]),
                     h('div', {
-                        style: { display: 'flex', flex: '1', fontSize: '32px', fontWeight: '600' },
+                        style: { display: 'flex', flex: '1', fontSize: '30px', fontWeight: '600' },
                     }, `${d.flag} ${d.nome}`),
                     h('div', {
                         style: {
-                            display: 'flex', fontSize: '36px', fontWeight: 'bold',
-                            color: i === 0 ? '#fbbf24' : '#93c5fd',
+                            display: 'flex', fontSize: '34px', fontWeight: '700',
+                            color: i === 0 ? BRAND.orange : BRAND.blue,
                         },
                     }, `R$${d.preco}`),
                 )
             ),
         ),
-        // Footer
-        h('div', {
-            style: {
-                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                marginTop: '32px', fontSize: '24px', opacity: '0.8',
-            },
-        },
-            h('div', { style: { display: 'flex' } }, 'Preços reais atualizados pela Tripinha 🐾'),
-            h('div', { style: { display: 'flex' } }, 'benetrip.com.br'),
-        ),
+        brandFooter('Precos reais atualizados pela Tripinha'),
     );
 }
 
@@ -365,58 +494,44 @@ function cardEconomia(params) {
     return h('div', {
         style: {
             display: 'flex', flexDirection: 'column', width: '100%', height: '100%',
-            background: tema.bg, padding: '60px', fontFamily: 'sans-serif', color: 'white',
+            background: tema.bg, padding: '48px', fontFamily: 'Poppins', color: BRAND.white,
         },
     },
-        // Header
-        h('div', {
-            style: {
-                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                marginBottom: '48px',
-            },
-        },
-            h('div', {
-                style: {
-                    display: 'flex', background: tema.badgeBg, padding: '12px 28px',
-                    borderRadius: '50px', fontSize: '28px', fontWeight: 'bold',
-                },
-            }, tema.badge),
-            h('div', { style: { display: 'flex', fontSize: '24px', opacity: '0.8' } }, 'benetrip.com.br'),
-        ),
+        brandHeader(tema.badge, true),
         // Destination name
         h('div', {
             style: {
                 display: 'flex', flexDirection: 'column', alignItems: 'center',
-                marginBottom: '48px',
+                marginBottom: '40px',
             },
         },
             h('div', {
-                style: { display: 'flex', fontSize: '52px', fontWeight: 'bold' },
+                style: { display: 'flex', fontSize: '48px', fontWeight: '700' },
             }, `${destino} ${pais}`),
             origem ? h('div', {
-                style: { display: 'flex', fontSize: '26px', opacity: '0.7', marginTop: '8px' },
+                style: { display: 'flex', fontSize: '24px', opacity: '0.6', marginTop: '8px' },
             }, `Saindo de ${origem}`) : null,
         ),
         // Price comparison
         h('div', {
             style: {
                 display: 'flex', flexDirection: 'column', flex: '1',
-                justifyContent: 'center', gap: '24px',
+                justifyContent: 'center', gap: '20px',
             },
         },
             // Before
             h('div', {
                 style: {
                     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                    background: 'rgba(255,255,255,0.1)', borderRadius: '16px',
+                    background: 'rgba(255,255,255,0.08)', borderRadius: '16px',
                     padding: '28px 36px',
                 },
             },
-                h('div', { style: { display: 'flex', fontSize: '28px', opacity: '0.7' } }, '📅 Semana passada'),
+                h('div', { style: { display: 'flex', fontSize: '26px', opacity: '0.6' } }, 'Semana passada'),
                 h('div', {
                     style: {
-                        display: 'flex', fontSize: '40px', textDecoration: 'line-through',
-                        opacity: '0.5',
+                        display: 'flex', fontSize: '38px', textDecoration: 'line-through',
+                        opacity: '0.4',
                     },
                 }, `R$${precoAntes}`),
             ),
@@ -424,13 +539,13 @@ function cardEconomia(params) {
             h('div', {
                 style: {
                     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                    background: 'rgba(52,211,153,0.2)', borderRadius: '16px',
-                    padding: '28px 36px', border: '3px solid #34d399',
+                    background: 'rgba(34,197,94,0.15)', borderRadius: '16px',
+                    padding: '28px 36px', border: `3px solid ${BRAND.green}`,
                 },
             },
-                h('div', { style: { display: 'flex', fontSize: '28px', fontWeight: 'bold' } }, '📅 Hoje'),
+                h('div', { style: { display: 'flex', fontSize: '26px', fontWeight: '700' } }, 'Hoje'),
                 h('div', {
-                    style: { display: 'flex', fontSize: '52px', fontWeight: 'bold', color: '#34d399' },
+                    style: { display: 'flex', fontSize: '50px', fontWeight: '700', color: BRAND.green },
                 }, `R$${precoAgora}`),
             ),
             // Savings
@@ -438,28 +553,22 @@ function cardEconomia(params) {
                 style: {
                     display: 'flex', justifyContent: 'center', alignItems: 'center',
                     background: 'rgba(0,0,0,0.3)', borderRadius: '16px',
-                    padding: '32px', gap: '16px',
+                    padding: '28px', gap: '16px',
                 },
             },
                 h('div', {
-                    style: { display: 'flex', fontSize: '36px', fontWeight: 'bold', color: '#34d399' },
-                }, `💰 Economia: R$${economia}`),
+                    style: { display: 'flex', fontSize: '34px', fontWeight: '700', color: BRAND.green },
+                }, `Economia: R$${economia}`),
                 h('div', {
                     style: {
-                        display: 'flex', background: '#34d399', color: '#065f46',
-                        padding: '8px 16px', borderRadius: '8px',
-                        fontSize: '28px', fontWeight: 'bold',
+                        display: 'flex', background: BRAND.green, color: BRAND.dark,
+                        padding: '8px 18px', borderRadius: '10px',
+                        fontSize: '26px', fontWeight: '700',
                     },
                 }, `-${percentual}%`),
             ),
         ),
-        // Footer
-        h('div', {
-            style: {
-                display: 'flex', justifyContent: 'center', marginTop: '32px',
-                fontSize: '26px', opacity: '0.8',
-            },
-        }, 'A Tripinha monitora preços todo dia pra você! 🐾'),
+        brandFooter('A Tripinha monitora precos pra voce!'),
     );
 }
 
@@ -476,39 +585,28 @@ function cardOrigens(params) {
         const p = params.get(`o${i}p`);
         if (n && p) origens.push({ nome: decodeURIComponent(n), preco: parseInt(p) });
     }
-    // Sort by price
     origens.sort((a, b) => a.preco - b.preco);
     const melhor = origens[0];
 
     return h('div', {
         style: {
             display: 'flex', flexDirection: 'column', width: '100%', height: '100%',
-            background: tema.bg, padding: '60px', fontFamily: 'sans-serif', color: 'white',
+            background: tema.bg, padding: '48px', fontFamily: 'Poppins', color: BRAND.white,
         },
     },
-        // Header
+        brandHeader(tema.badge, true),
+        // Destination
         h('div', {
             style: {
-                display: 'flex', flexDirection: 'column', alignItems: 'center',
-                marginBottom: '36px',
+                display: 'flex', justifyContent: 'center',
+                fontSize: '46px', fontWeight: '700', marginBottom: '28px',
             },
-        },
-            h('div', {
-                style: {
-                    display: 'flex', background: tema.badgeBg, padding: '12px 28px',
-                    borderRadius: '50px', fontSize: '26px', fontWeight: 'bold',
-                    marginBottom: '20px',
-                },
-            }, tema.badge),
-            h('div', {
-                style: { display: 'flex', fontSize: '52px', fontWeight: 'bold' },
-            }, `${destino} ${pais}`),
-        ),
+        }, `${destino} ${pais}`),
         // Origins list
         h('div', {
             style: {
                 display: 'flex', flexDirection: 'column', flex: '1',
-                gap: '14px', justifyContent: 'center',
+                gap: '12px', justifyContent: 'center',
             },
         },
             ...origens.map((o, i) => {
@@ -517,59 +615,50 @@ function cardOrigens(params) {
                 return h('div', {
                     style: {
                         display: 'flex', alignItems: 'center',
-                        background: isMelhor ? 'rgba(59,130,246,0.3)' : 'rgba(255,255,255,0.08)',
-                        borderRadius: '14px', padding: '20px 28px',
-                        border: isMelhor ? '2px solid #60a5fa' : '1px solid rgba(255,255,255,0.1)',
+                        background: isMelhor ? `rgba(0,163,224,0.2)` : 'rgba(255,255,255,0.06)',
+                        borderRadius: '14px', padding: '18px 24px',
+                        border: isMelhor ? `2px solid ${BRAND.blue}` : '1px solid rgba(255,255,255,0.08)',
                     },
                 },
                     h('div', {
                         style: {
-                            display: 'flex', width: '200px', fontSize: '28px',
-                            fontWeight: isMelhor ? 'bold' : '500',
+                            display: 'flex', width: '180px', fontSize: '26px',
+                            fontWeight: isMelhor ? '700' : '400',
                         },
                     }, `De ${o.nome}`),
                     h('div', {
                         style: {
-                            display: 'flex', flex: '1', height: '24px',
-                            background: 'rgba(255,255,255,0.1)', borderRadius: '12px',
-                            marginLeft: '20px', marginRight: '20px', overflow: 'hidden',
+                            display: 'flex', flex: '1', height: '20px',
+                            background: 'rgba(255,255,255,0.08)', borderRadius: '10px',
+                            marginLeft: '16px', marginRight: '16px', overflow: 'hidden',
                         },
                     },
                         h('div', {
                             style: {
                                 display: 'flex', width: `${barWidth}%`, height: '100%',
-                                background: isMelhor ? '#60a5fa' : 'rgba(255,255,255,0.3)',
-                                borderRadius: '12px',
+                                background: isMelhor ? BRAND.blue : 'rgba(255,255,255,0.25)',
+                                borderRadius: '10px',
                             },
                         }),
                     ),
                     h('div', {
                         style: {
-                            display: 'flex', fontSize: '32px', fontWeight: 'bold',
-                            color: isMelhor ? '#60a5fa' : 'white',
-                            minWidth: '140px', justifyContent: 'flex-end',
+                            display: 'flex', fontSize: '30px', fontWeight: '700',
+                            color: isMelhor ? BRAND.blue : BRAND.white,
+                            minWidth: '130px', justifyContent: 'flex-end',
                         },
                     }, `R$${o.preco}`),
                     isMelhor ? h('div', {
                         style: {
-                            display: 'flex', marginLeft: '12px', fontSize: '22px',
-                            background: '#60a5fa', color: '#1e3a5f',
-                            padding: '4px 12px', borderRadius: '8px', fontWeight: 'bold',
+                            display: 'flex', marginLeft: '10px', fontSize: '18px',
+                            background: BRAND.blue, color: BRAND.white,
+                            padding: '4px 12px', borderRadius: '8px', fontWeight: '700',
                         },
-                    }, 'MENOR!') : null,
+                    }, 'MENOR') : null,
                 );
             }),
         ),
-        // Footer
-        h('div', {
-            style: {
-                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                marginTop: '28px', fontSize: '24px', opacity: '0.8',
-            },
-        },
-            h('div', { style: { display: 'flex' } }, 'Compare preços de 100 cidades 🐾'),
-            h('div', { style: { display: 'flex' } }, 'benetrip.com.br'),
-        ),
+        brandFooter('Compare precos de 100 cidades'),
     );
 }
 
@@ -592,37 +681,25 @@ function cardRoteiro(params) {
         }
     }
 
-    const emojis = ['🌅', '☀️', '🌄', '🌙', '⭐'];
-
     return h('div', {
         style: {
             display: 'flex', flexDirection: 'column', width: '100%', height: '100%',
-            background: tema.bg, padding: '60px', fontFamily: 'sans-serif', color: 'white',
+            background: tema.bg, padding: '48px', fontFamily: 'Poppins', color: BRAND.white,
         },
     },
-        // Header
+        brandHeader(tema.badge, true),
+        // Title
         h('div', {
             style: {
-                display: 'flex', flexDirection: 'column', alignItems: 'center',
-                marginBottom: '36px',
+                display: 'flex', justifyContent: 'center',
+                fontSize: '42px', fontWeight: '700', marginBottom: '28px',
             },
-        },
-            h('div', {
-                style: {
-                    display: 'flex', background: tema.badgeBg, padding: '12px 28px',
-                    borderRadius: '50px', fontSize: '28px', fontWeight: 'bold',
-                    marginBottom: '16px',
-                },
-            }, tema.badge),
-            h('div', {
-                style: { display: 'flex', fontSize: '48px', fontWeight: 'bold' },
-            }, `${dias} DIAS EM ${destino.toUpperCase()}`),
-        ),
+        }, `${dias} dias em ${destino}`),
         // Days
         h('div', {
             style: {
                 display: 'flex', flexDirection: 'column', flex: '1',
-                gap: '16px', justifyContent: 'center',
+                gap: '14px', justifyContent: 'center',
             },
         },
             ...items.map((item, i) =>
@@ -630,40 +707,31 @@ function cardRoteiro(params) {
                     style: {
                         display: 'flex', flexDirection: 'column',
                         background: 'rgba(0,0,0,0.25)', borderRadius: '16px',
-                        padding: '24px 28px',
-                        borderLeft: '4px solid #fde68a',
+                        padding: '22px 28px',
+                        borderLeft: `4px solid ${BRAND.orange}`,
                     },
                 },
                     h('div', {
                         style: {
-                            display: 'flex', fontSize: '28px', fontWeight: 'bold',
-                            color: '#fde68a', marginBottom: '10px',
+                            display: 'flex', fontSize: '26px', fontWeight: '700',
+                            color: BRAND.orange, marginBottom: '8px',
                         },
-                    }, `${emojis[i] || '📍'} DIA ${i + 1} — ${item.titulo}`),
+                    }, `DIA ${i + 1} - ${item.titulo}`),
                     h('div', {
                         style: {
-                            display: 'flex', flexDirection: 'column', gap: '6px',
+                            display: 'flex', flexDirection: 'column', gap: '4px',
                         },
                     },
                         ...item.atividades.map(a =>
                             h('div', {
-                                style: { display: 'flex', fontSize: '24px', opacity: '0.9' },
-                            }, `• ${a}`)
+                                style: { display: 'flex', fontSize: '22px', opacity: '0.85' },
+                            }, `  ${a}`)
                         ),
                     ),
                 )
             ),
         ),
-        // Footer
-        h('div', {
-            style: {
-                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                marginTop: '28px', fontSize: '24px', opacity: '0.8',
-            },
-        },
-            h('div', { style: { display: 'flex' } }, 'Roteiro gerado por IA 🐾'),
-            h('div', { style: { display: 'flex' } }, 'benetrip.com.br'),
-        ),
+        brandFooter('Roteiro gerado por IA'),
     );
 }
 
@@ -677,38 +745,25 @@ function cardRanking(params) {
     for (let i = 1; i <= 8; i++) {
         const n = params.get(`d${i}n`);
         const p = params.get(`d${i}p`);
-        const e = params.get(`d${i}e`); // estilo emoji
         if (n && p) destinos.push({
             nome: decodeURIComponent(n),
             preco: p,
-            emoji: e ? decodeURIComponent(e) : '✈️',
         });
     }
 
     return h('div', {
         style: {
             display: 'flex', flexDirection: 'column', width: '100%', height: '100%',
-            background: tema.bg, padding: '52px', fontFamily: 'sans-serif', color: 'white',
+            background: tema.bg, padding: '48px', fontFamily: 'Poppins', color: BRAND.white,
         },
     },
-        // Header
+        brandHeader(tema.badge, true),
         h('div', {
             style: {
-                display: 'flex', flexDirection: 'column', alignItems: 'center',
-                marginBottom: '28px',
+                display: 'flex', justifyContent: 'center',
+                fontSize: '22px', opacity: '0.6', marginBottom: '20px',
             },
-        },
-            h('div', {
-                style: {
-                    display: 'flex', background: tema.badgeBg, padding: '12px 28px',
-                    borderRadius: '50px', fontSize: '30px', fontWeight: 'bold',
-                    marginBottom: '12px',
-                },
-            }, tema.badge),
-            h('div', {
-                style: { display: 'flex', fontSize: '22px', opacity: '0.7' },
-            }, semana),
-        ),
+        }, semana),
         // Grid
         h('div', {
             style: {
@@ -720,42 +775,33 @@ function cardRanking(params) {
                 h('div', {
                     style: {
                         display: 'flex', alignItems: 'center',
-                        background: i < 3 ? 'rgba(196,181,253,0.15)' : 'rgba(255,255,255,0.06)',
+                        background: i < 3 ? `rgba(232,119,34,0.12)` : 'rgba(255,255,255,0.05)',
                         borderRadius: '12px', padding: '16px 24px',
+                        border: i === 0 ? `2px solid ${BRAND.orange}` : 'none',
                     },
                 },
                     h('div', {
                         style: {
-                            display: 'flex', fontSize: '28px', fontWeight: 'bold',
-                            color: i < 3 ? '#c4b5fd' : 'rgba(255,255,255,0.5)',
-                            width: '48px',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            width: '40px', height: '40px', borderRadius: '50%',
+                            background: i < 3 ? BRAND.orange : 'rgba(255,255,255,0.1)',
+                            fontSize: '20px', fontWeight: '700', marginRight: '16px',
+                            flexShrink: '0',
                         },
-                    }, `${i + 1}º`),
+                    }, `${i + 1}`),
                     h('div', {
-                        style: { display: 'flex', fontSize: '24px', marginRight: '12px' },
-                    }, d.emoji),
-                    h('div', {
-                        style: { display: 'flex', flex: '1', fontSize: '28px', fontWeight: '500' },
+                        style: { display: 'flex', flex: '1', fontSize: '26px', fontWeight: '500' },
                     }, d.nome),
                     h('div', {
                         style: {
-                            display: 'flex', fontSize: '30px', fontWeight: 'bold',
-                            color: i === 0 ? '#fbbf24' : '#c4b5fd',
+                            display: 'flex', fontSize: '28px', fontWeight: '700',
+                            color: i === 0 ? BRAND.orange : BRAND.blue,
                         },
                     }, `R$${d.preco}`),
                 )
             ),
         ),
-        // Footer
-        h('div', {
-            style: {
-                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                marginTop: '24px', fontSize: '22px', opacity: '0.8',
-            },
-        },
-            h('div', { style: { display: 'flex' } }, 'Dados reais de 100 cidades brasileiras 🐾'),
-            h('div', { style: { display: 'flex' } }, 'benetrip.com.br'),
-        ),
+        brandFooter('Dados reais de 100 cidades brasileiras'),
     );
 }
 
@@ -777,12 +823,12 @@ const CARD_BUILDERS = {
 export default async function handler(req, res) {
     res.setHeader('Access-Control-Allow-Origin', '*');
 
-    // Modo diagnóstico
+    // Modo diagnostico
     if (req.query?.debug === 'true') {
         const diag = { satori: false, sharp: false, font: false };
         try { await getSatori(); diag.satori = true; } catch (e) { diag.satoriError = e.message; }
         try { await getSharp(); diag.sharp = true; } catch (e) { diag.sharpError = e.message; }
-        try { await loadFont(); diag.font = true; } catch (e) { diag.fontError = e.message; }
+        try { await loadFonts(); diag.font = true; } catch (e) { diag.fontError = e.message; }
         return res.status(200).json({ diagnostics: diag });
     }
 
@@ -795,23 +841,21 @@ export default async function handler(req, res) {
     }
 
     try {
-        // Carregar dependências dinamicamente
         const satori = await getSatori();
-        const fontData = await loadFont();
+        const { regular, bold } = await loadFonts();
         const element = builder(searchParams);
 
-        // Satori: React element → SVG
         const svg = await satori(element, {
             width: 1080,
             height: 1080,
             fonts: [
-                { name: 'sans-serif', data: fontData, weight: 400, style: 'normal' },
-                { name: 'sans-serif', data: fontData, weight: 600, style: 'normal' },
-                { name: 'sans-serif', data: fontData, weight: 700, style: 'normal' },
+                { name: 'Poppins', data: regular, weight: 400, style: 'normal' },
+                { name: 'Poppins', data: regular, weight: 500, style: 'normal' },
+                { name: 'Poppins', data: bold, weight: 600, style: 'normal' },
+                { name: 'Poppins', data: bold, weight: 700, style: 'normal' },
             ],
         });
 
-        // Tentar converter SVG → PNG com sharp
         try {
             const sharp = await getSharp();
             const pngBuffer = await sharp(Buffer.from(svg))
@@ -824,7 +868,6 @@ export default async function handler(req, res) {
             return res.status(200).send(pngBuffer);
         } catch (sharpErr) {
             console.warn('Sharp falhou, retornando SVG:', sharpErr.message);
-            // Fallback: retornar SVG
             res.setHeader('Content-Type', 'image/svg+xml');
             res.setHeader('Cache-Control', 'public, max-age=3600');
             return res.status(200).send(svg);
@@ -833,7 +876,7 @@ export default async function handler(req, res) {
         console.error('Erro ao gerar card:', error);
         return res.status(500).json({
             error: error.message,
-            step: !_satori ? 'satori_import' : !fontCache ? 'font_load' : 'render',
+            step: !_satori ? 'satori_import' : !fontRegularCache ? 'font_load' : 'render',
         });
     }
 }
