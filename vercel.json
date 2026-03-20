@@ -55,12 +55,28 @@
     "api/cron/update-discovery.js": {
       "memory": 1024,
       "maxDuration": 300
+    },
+    "api/cron/instagram-post.js": {
+      "memory": 1024,
+      "maxDuration": 120
+    },
+    "api/instagram/generate-post.js": {
+      "memory": 1024,
+      "maxDuration": 60
+    },
+    "api/instagram/publish.js": {
+      "memory": 1024,
+      "maxDuration": 60
     }
   },
   "crons": [
     {
       "path": "/api/cron/update-discovery",
       "schedule": "0 6,18 * * *"
+    },
+    {
+      "path": "/api/cron/instagram-post",
+      "schedule": "0 12 * * *"
     }
   ],
   "headers": [
