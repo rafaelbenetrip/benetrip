@@ -2,7 +2,7 @@
 // Gera imagens 1080x1080 PNG com layout branded da Benetrip
 //
 // ENDPOINT: GET /api/instagram/card?f=FORMAT&PARAMS...
-// Retorna: image/png
+// Retorna: image/png (ou image/svg+xml como fallback)
 //
 // FORMATOS:
 //   descobridor - Card com pedido da persona → resultado da Tripinha
@@ -12,8 +12,25 @@
 //   roteiro     - Roteiro dia-a-dia
 //   ranking     - Ranking semanal de destinos
 
-import satori from 'satori';
-import sharp from 'sharp';
+// Imports dinâmicos para capturar erros de módulo
+let _satori = null;
+let _sharp = null;
+
+async function getSatori() {
+    if (!_satori) {
+        const mod = await import('satori');
+        _satori = mod.default;
+    }
+    return _satori;
+}
+
+async function getSharp() {
+    if (!_sharp) {
+        const mod = await import('sharp');
+        _sharp = mod.default;
+    }
+    return _sharp;
+}
 
 export const maxDuration = 30;
 
@@ -22,14 +39,32 @@ let fontCache = null;
 
 async function loadFont() {
     if (fontCache) return fontCache;
+
+    // Tentar várias URLs de fonte Inter
+    const fontUrls = [
+        'https://fonts.gstatic.com/s/inter/v18/UcCO3FwrK3iLTeHuS_fvQtMwCp50KnMa2JL7W0Q5nw.woff2',
+        'https://cdn.jsdelivr.net/fontsource/fonts/inter@latest/latin-400-normal.woff2',
+    ];
+
+    for (const url of fontUrls) {
+        try {
+            const res = await fetch(url);
+            if (res.ok) {
+                fontCache = await res.arrayBuffer();
+                return fontCache;
+            }
+        } catch (err) {
+            console.warn(`Fonte ${url}: ${err.message}`);
+        }
+    }
+
+    // Último fallback: Google Fonts CSS
     try {
-        // Baixar Inter do Google Fonts (fonte limpa e moderna)
-        const fontUrl = 'https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap';
-        const cssRes = await fetch(fontUrl, {
-            headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
-        });
+        const cssRes = await fetch(
+            'https://fonts.googleapis.com/css2?family=Inter:wght@400&display=swap',
+            { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' } }
+        );
         const css = await cssRes.text();
-        // Extrair URL do woff2
         const urlMatch = css.match(/src:\s*url\(([^)]+)\)\s*format\('woff2'\)/);
         if (urlMatch) {
             const fontRes = await fetch(urlMatch[1]);
@@ -37,20 +72,10 @@ async function loadFont() {
             return fontCache;
         }
     } catch (err) {
-        console.warn('Falha ao baixar Inter, usando fallback:', err.message);
+        console.error('Falha total ao carregar fonte:', err.message);
     }
 
-    // Fallback: URL direta do Inter Regular do Google Fonts CDN
-    try {
-        const fallbackRes = await fetch(
-            'https://fonts.gstatic.com/s/inter/v18/UcCO3FwrK3iLTeHuS_fvQtMwCp50KnMa2JL7W0Q5nw.woff2'
-        );
-        fontCache = await fallbackRes.arrayBuffer();
-        return fontCache;
-    } catch (err) {
-        console.error('Falha total ao carregar fonte:', err.message);
-        throw new Error('Não conseguiu carregar nenhuma fonte');
-    }
+    throw new Error('Não conseguiu carregar nenhuma fonte');
 }
 
 // Helper para criar elementos sem JSX
@@ -749,6 +774,15 @@ const CARD_BUILDERS = {
 export default async function handler(req, res) {
     res.setHeader('Access-Control-Allow-Origin', '*');
 
+    // Modo diagnóstico
+    if (req.query?.debug === 'true') {
+        const diag = { satori: false, sharp: false, font: false };
+        try { await getSatori(); diag.satori = true; } catch (e) { diag.satoriError = e.message; }
+        try { await getSharp(); diag.sharp = true; } catch (e) { diag.sharpError = e.message; }
+        try { await loadFont(); diag.font = true; } catch (e) { diag.fontError = e.message; }
+        return res.status(200).json({ diagnostics: diag });
+    }
+
     const formato = req.query?.f || 'descobridor';
     const searchParams = new URLSearchParams(req.query || {});
 
@@ -758,6 +792,8 @@ export default async function handler(req, res) {
     }
 
     try {
+        // Carregar dependências dinamicamente
+        const satori = await getSatori();
         const fontData = await loadFont();
         const element = builder(searchParams);
 
@@ -772,17 +808,29 @@ export default async function handler(req, res) {
             ],
         });
 
-        // Sharp: SVG → PNG
-        const pngBuffer = await sharp(Buffer.from(svg))
-            .resize(1080, 1080)
-            .png({ quality: 90 })
-            .toBuffer();
+        // Tentar converter SVG → PNG com sharp
+        try {
+            const sharp = await getSharp();
+            const pngBuffer = await sharp(Buffer.from(svg))
+                .resize(1080, 1080)
+                .png()
+                .toBuffer();
 
-        res.setHeader('Content-Type', 'image/png');
-        res.setHeader('Cache-Control', 'public, max-age=3600');
-        return res.status(200).send(pngBuffer);
+            res.setHeader('Content-Type', 'image/png');
+            res.setHeader('Cache-Control', 'public, max-age=3600');
+            return res.status(200).send(pngBuffer);
+        } catch (sharpErr) {
+            console.warn('Sharp falhou, retornando SVG:', sharpErr.message);
+            // Fallback: retornar SVG
+            res.setHeader('Content-Type', 'image/svg+xml');
+            res.setHeader('Cache-Control', 'public, max-age=3600');
+            return res.status(200).send(svg);
+        }
     } catch (error) {
         console.error('Erro ao gerar card:', error);
-        return res.status(500).json({ error: error.message });
+        return res.status(500).json({
+            error: error.message,
+            step: !_satori ? 'satori_import' : !fontCache ? 'font_load' : 'render',
+        });
     }
 }
