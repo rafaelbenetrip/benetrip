@@ -1,4 +1,4 @@
-// api/instagram/card.js - Gerador de Cards Branded para Instagram (Edge Runtime)
+// api/instagram/card.js - Gerador de Cards Branded para Instagram (Node.js)
 // Gera imagens 1080x1080 PNG com layout branded da Benetrip
 //
 // ENDPOINT: GET /api/instagram/card?f=FORMAT&PARAMS...
@@ -12,9 +12,31 @@
 //   roteiro     - Roteiro dia-a-dia
 //   ranking     - Ranking semanal de destinos
 
-import { ImageResponse } from '@vercel/og';
+import satori from 'satori';
+import { Resvg } from '@resvg/resvg-js';
 
-export const config = { runtime: 'edge' };
+export const maxDuration = 30;
+
+// Cache da fonte para não baixar toda vez
+let fontCache = null;
+
+async function loadFont() {
+    if (fontCache) return fontCache;
+    // Baixar Inter do Google Fonts (fonte limpa e moderna)
+    const fontUrl = 'https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap';
+    const cssRes = await fetch(fontUrl, {
+        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
+    });
+    const css = await cssRes.text();
+    // Extrair URL do woff2 (weight 400)
+    const urlMatch = css.match(/src:\s*url\(([^)]+)\)\s*format\('woff2'\)/);
+    if (!urlMatch) {
+        throw new Error('Não conseguiu extrair URL da fonte');
+    }
+    const fontRes = await fetch(urlMatch[1]);
+    fontCache = await fontRes.arrayBuffer();
+    return fontCache;
+}
 
 // Helper para criar elementos sem JSX
 function h(type, props, ...children) {
@@ -707,31 +729,46 @@ const CARD_BUILDERS = {
 };
 
 // ============================================================
-// HANDLER (Edge Runtime)
+// HANDLER (Node.js Runtime)
 // ============================================================
-export default async function handler(req) {
-    const { searchParams } = new URL(req.url);
-    const formato = searchParams.get('f') || 'descobridor';
+export default async function handler(req, res) {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+
+    const formato = req.query?.f || 'descobridor';
+    const searchParams = new URLSearchParams(req.query || {});
 
     const builder = CARD_BUILDERS[formato];
     if (!builder) {
-        return new Response(JSON.stringify({ error: `Formato desconhecido: ${formato}` }), {
-            status: 400,
-            headers: { 'Content-Type': 'application/json' },
-        });
+        return res.status(400).json({ error: `Formato desconhecido: ${formato}` });
     }
 
     try {
+        const fontData = await loadFont();
         const element = builder(searchParams);
 
-        return new ImageResponse(element, {
+        // Satori: React element → SVG
+        const svg = await satori(element, {
             width: 1080,
             height: 1080,
+            fonts: [
+                { name: 'sans-serif', data: fontData, weight: 400, style: 'normal' },
+                { name: 'sans-serif', data: fontData, weight: 600, style: 'normal' },
+                { name: 'sans-serif', data: fontData, weight: 700, style: 'normal' },
+            ],
         });
+
+        // Resvg: SVG → PNG
+        const resvg = new Resvg(svg, {
+            fitTo: { mode: 'width', value: 1080 },
+        });
+        const pngData = resvg.render();
+        const pngBuffer = pngData.asPng();
+
+        res.setHeader('Content-Type', 'image/png');
+        res.setHeader('Cache-Control', 'public, max-age=3600');
+        return res.status(200).send(Buffer.from(pngBuffer));
     } catch (error) {
-        return new Response(JSON.stringify({ error: error.message }), {
-            status: 500,
-            headers: { 'Content-Type': 'application/json' },
-        });
+        console.error('Erro ao gerar card:', error);
+        return res.status(500).json({ error: error.message });
     }
 }
