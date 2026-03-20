@@ -69,6 +69,7 @@
       "maxDuration": 60
     },
     "api/instagram/card.js": {
+      "memory": 1024,
       "maxDuration": 30
     }
   },
