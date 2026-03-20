@@ -40,10 +40,11 @@ let fontCache = null;
 async function loadFont() {
     if (fontCache) return fontCache;
 
-    // Tentar várias URLs de fonte Inter
+    // Satori só aceita .ttf ou .woff (NÃO woff2)
     const fontUrls = [
-        'https://fonts.gstatic.com/s/inter/v18/UcCO3FwrK3iLTeHuS_fvQtMwCp50KnMa2JL7W0Q5nw.woff2',
-        'https://cdn.jsdelivr.net/fontsource/fonts/inter@latest/latin-400-normal.woff2',
+        'https://cdn.jsdelivr.net/fontsource/fonts/inter@latest/latin-400-normal.ttf',
+        'https://cdn.jsdelivr.net/gh/rsms/inter@v4.0/docs/font-files/Inter-Regular.woff',
+        'https://raw.githubusercontent.com/rsms/inter/v4.0/docs/font-files/Inter-Regular.woff',
     ];
 
     for (const url of fontUrls) {
@@ -51,6 +52,7 @@ async function loadFont() {
             const res = await fetch(url);
             if (res.ok) {
                 fontCache = await res.arrayBuffer();
+                console.log(`Fonte carregada: ${url} (${fontCache.byteLength} bytes)`);
                 return fontCache;
             }
         } catch (err) {
@@ -58,14 +60,15 @@ async function loadFont() {
         }
     }
 
-    // Último fallback: Google Fonts CSS
+    // Último fallback: Google Fonts CSS pedindo TTF
     try {
         const cssRes = await fetch(
             'https://fonts.googleapis.com/css2?family=Inter:wght@400&display=swap',
-            { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' } }
+            // User-Agent antigo força Google a retornar TTF em vez de woff2
+            { headers: { 'User-Agent': 'Mozilla/4.0 (compatible; MSIE 8.0; Windows NT 6.1)' } }
         );
         const css = await cssRes.text();
-        const urlMatch = css.match(/src:\s*url\(([^)]+)\)\s*format\('woff2'\)/);
+        const urlMatch = css.match(/src:\s*url\(([^)]+)\)\s*format\('truetype'\)/);
         if (urlMatch) {
             const fontRes = await fetch(urlMatch[1]);
             fontCache = await fontRes.arrayBuffer();
