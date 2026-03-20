@@ -235,15 +235,16 @@ export function gerarPersonaComEstilo(estiloPreferido) {
     return persona;
 }
 
-// Rotação de estilos por dia da semana para variedade nos posts
+// Rotação de estilos por dia da semana
+// Usado para o formato "descobridor" (Dom e Sab) e como fallback
 const ESTILOS_POR_DIA = [
-    'praia',      // Domingo
+    'praia',      // Domingo (Descobridor)
     'cidade',     // Segunda
     'natureza',   // Terça
     'romantico',  // Quarta
     'aventura',   // Quinta
     'familia',    // Sexta
-    'praia',      // Sábado
+    'aventura',   // Sábado (Descobridor)
 ];
 
 /**
@@ -253,3 +254,18 @@ export function estiloDodia() {
     const dia = new Date().getDay();
     return ESTILOS_POR_DIA[dia];
 }
+
+// ============================================================
+// FORMATOS DO INSTAGRAM (v2.0)
+// Cada dia da semana tem um formato diferente de post.
+// O sistema de persona é usado principalmente nos formatos "descobridor".
+// ============================================================
+//
+// CALENDÁRIO:
+//   Dom: Descobridor (Persona Story) — persona.estilo = praia
+//   Seg: Top 5 Mais Baratos — sem persona
+//   Ter: Economia (Preço Caiu!) — sem persona
+//   Qua: De Onde Sai Mais Barato — sem persona
+//   Qui: Roteiro dia-a-dia — sem persona
+//   Sex: Ranking Semanal — sem persona
+//   Sab: Descobridor (Persona Surpresa) — persona.estilo = aventura

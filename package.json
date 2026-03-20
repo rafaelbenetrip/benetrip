@@ -10,7 +10,8 @@
     "dotenv": "^16.3.1",
     "openai": "^4.20.1",
     "@anthropic-ai/sdk": "^0.10.0",
-    "pexels": "^1.4.0"
+    "pexels": "^1.4.0",
+    "@vercel/og": "^0.6.0"
   },
   "devDependencies": {
     "@vercel/node": "^2.15.1"

@@ -67,6 +67,9 @@
     "api/instagram/publish.js": {
       "memory": 1024,
       "maxDuration": 60
+    },
+    "api/instagram/card.js": {
+      "maxDuration": 30
     }
   },
   "crons": [

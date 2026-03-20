@@ -1,125 +1,31 @@
-// api/instagram/generate-post.js - Gerador de Conteúdo para Instagram v1.0
-// Combina: persona simulada + destinos baratos reais (Supabase) + IA (Groq) + imagem (Pexels)
+// api/instagram/generate-post.js - Gerador de Conteúdo para Instagram v2.0
+//
+// Sistema de 7 formatos diferentes (1 por dia da semana).
+// Cada formato usa dados REAIS do Supabase + IA (Groq) para caption.
+// Gera URL do card branded via /api/instagram/card.
 //
 // ENDPOINT: POST /api/instagram/generate-post
-// BODY (opcional): { estilo: "praia", origem: "GRU", forceDestino: "Cancún" }
-// RESPOSTA: { persona, destino, caption, hashtags, imageUrl, postData }
+// BODY: { formato?: string, origem?: string }
+// RESPOSTA: { post: { formato, cardUrl, fullCaption, ... } }
 
-import { gerarPersona, gerarPersonaComEstilo, estiloDodia } from './persona-simulator.js';
+import { gerarPersona, gerarPersonaComEstilo } from './persona-simulator.js';
+import {
+    formatoDescobridor, formatoTop5, formatoEconomia,
+    formatoOrigens, formatoRoteiro, formatoRanking,
+    formatoDodia, ORIGENS_NOMES, flagPais, ESTILO_EMOJI,
+} from './formats.js';
 
 export const maxDuration = 60;
 
 // ============================================================
-// BUSCAR DESTINOS BARATOS DO SUPABASE
+// GERAR CAPTION COM GROQ (format-specific prompts)
 // ============================================================
-async function buscarDestinosBaratos(origemCode) {
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-    if (!supabaseUrl || !supabaseKey) {
-        throw new Error('Supabase não configurado');
-    }
-
-    // Buscar snapshot mais recente para a origem
-    const url = `${supabaseUrl}/rest/v1/discovery_snapshots?origem=eq.${origemCode}&tipo=eq.destinos-baratos&select=*&order=data.desc&limit=1`;
-
-    const response = await fetch(url, {
-        headers: {
-            'apikey': supabaseKey,
-            'Authorization': `Bearer ${supabaseKey}`,
-        },
-    });
-
-    if (!response.ok) {
-        throw new Error(`Erro ao buscar Supabase: ${response.status}`);
-    }
-
-    const rows = await response.json();
-    if (rows.length === 0) return [];
-
-    return rows[0].destinos || [];
-}
-
-// ============================================================
-// FILTRAR DESTINO POR ESTILO/PERSONA
-// ============================================================
-function escolherDestinoParaPersona(destinos, persona, estiloPreferido) {
-    if (destinos.length === 0) return null;
-
-    let candidatos = destinos;
-
-    // Filtrar por estilo se definido
-    if (estiloPreferido) {
-        const comEstilo = destinos.filter(d =>
-            (d.estilos || []).includes(estiloPreferido)
-        );
-        if (comEstilo.length > 0) candidatos = comEstilo;
-    }
-
-    // Filtrar por escopo (nacional/internacional)
-    if (persona.escopoDestino === 'nacional') {
-        const nacionais = candidatos.filter(d => !d.internacional);
-        if (nacionais.length > 0) candidatos = nacionais;
-    } else if (persona.escopoDestino === 'internacional') {
-        const internacionais = candidatos.filter(d => d.internacional);
-        if (internacionais.length > 0) candidatos = internacionais;
-    }
-
-    // Filtrar por orçamento (preço do voo < 60% do orçamento)
-    const dentroOrcamento = candidatos.filter(d => d.preco <= persona.orcamento * 0.6);
-    if (dentroOrcamento.length > 0) candidatos = dentroOrcamento;
-
-    // Escolher aleatoriamente entre os top 10 mais baratos para variedade
-    const top = candidatos.slice(0, Math.min(10, candidatos.length));
-    return top[Math.floor(Math.random() * top.length)];
-}
-
-// ============================================================
-// GERAR CAPTION COM IA (GROQ)
-// ============================================================
-async function gerarCaption(persona, destino) {
+async function gerarCaptionGroq(formato, dados) {
     const groqKey = process.env.GROQ_API_KEY;
-    if (!groqKey) {
-        // Fallback sem IA
-        return gerarCaptionFallback(persona, destino);
-    }
+    if (!groqKey) return null;
 
-    const prompt = `Você é o social media da Benetrip, uma plataforma brasileira de viagens baratas.
-A mascote é a Tripinha, uma cachorrinha vira-lata caramelo aventureira.
-
-Gere um post de Instagram ENGAJANTE para o seguinte cenário:
-
-PERSONA DO VIAJANTE:
-- Nome: ${persona.nome}, ${persona.idade} anos, ${persona.profissao}
-- Viajando: ${persona.companhiaLabel} (${persona.numPessoas} pessoa(s))
-- Saindo de: ${persona.origem.name}/${persona.origem.state}
-- Preferências: ${persona.preferencias}
-- Orçamento: R$${persona.orcamento} por pessoa
-- Contexto: "${persona.observacoes}"
-
-DESTINO ENCONTRADO:
-- Destino: ${destino.nome}, ${destino.pais}
-- Preço da passagem: R$${destino.preco}
-- Estilos: ${(destino.estilos || []).join(', ')}
-- ${destino.internacional ? 'Internacional' : 'Nacional'}
-
-REGRAS DO POST:
-1. Máximo 2200 caracteres (limite Instagram)
-2. Começar com um hook forte (pergunta, dado surpreendente, ou provocação)
-3. Contar uma mini-história da persona descobrindo o destino na Benetrip
-4. Incluir o PREÇO da passagem (destaque como oferta)
-5. Mencionar a Tripinha de forma natural e fofa
-6. Call-to-action: convidar a usar o descobridor de destinos no site
-7. Tom: informal, entusiasmado, brasileiro, com emojis moderados
-8. NÃO usar hashtags no caption (serão adicionados separadamente)
-9. Incluir quebras de linha para boa leitura no Instagram
-
-Retorne APENAS um JSON:
-{
-  "caption": "texto do post aqui",
-  "hashtags": ["viagem", "destino", ...],
-  "gancho": "frase curta para alt-text da imagem"
-}`;
+    const prompt = buildPrompt(formato, dados);
+    if (!prompt) return null;
 
     try {
         const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -130,9 +36,7 @@ Retorne APENAS um JSON:
             },
             body: JSON.stringify({
                 model: 'llama-3.3-70b-versatile',
-                messages: [
-                    { role: 'user', content: prompt },
-                ],
+                messages: [{ role: 'user', content: prompt }],
                 response_format: { type: 'json_object' },
                 temperature: 0.8,
                 max_tokens: 2000,
@@ -140,137 +44,285 @@ Retorne APENAS um JSON:
             signal: AbortSignal.timeout(30000),
         });
 
-        if (!response.ok) {
-            console.warn(`Groq HTTP ${response.status}, usando fallback`);
-            return gerarCaptionFallback(persona, destino);
-        }
+        if (!response.ok) return null;
 
         const data = await response.json();
         const content = data.choices?.[0]?.message?.content;
-        if (!content) return gerarCaptionFallback(persona, destino);
+        if (!content) return null;
 
-        const parsed = JSON.parse(content);
-        return {
-            caption: parsed.caption || gerarCaptionFallback(persona, destino).caption,
-            hashtags: parsed.hashtags || gerarHashtagsPadrao(destino),
-            gancho: parsed.gancho || `${destino.nome} por R$${destino.preco}`,
-        };
+        return JSON.parse(content);
     } catch (err) {
-        console.error('Erro Groq caption:', err.message);
-        return gerarCaptionFallback(persona, destino);
+        console.error('Erro Groq:', err.message);
+        return null;
     }
 }
 
 // ============================================================
-// FALLBACK: CAPTION SEM IA
+// PROMPTS POR FORMATO
 // ============================================================
-function gerarCaptionFallback(persona, destino) {
-    const hooks = [
-        `Passagem pra ${destino.nome} por apenas R$${destino.preco}?! A Tripinha farejou essa oferta! 🐕`,
-        `${persona.nome} queria viajar gastando pouco. A Tripinha encontrou ${destino.nome} por R$${destino.preco}! ✈️`,
-        `Sabia que dá pra ir de ${persona.origem.name} pra ${destino.nome} por R$${destino.preco}? 🤯`,
-        `A Tripinha não para! Achou ${destino.nome} saindo de ${persona.origem.name} por R$${destino.preco} 🐾`,
-    ];
+function buildPrompt(formato, dados) {
+    const baseInstrucoes = `Você é o social media da Benetrip, plataforma brasileira de viagens baratas.
+A mascote é a Tripinha, uma cachorrinha vira-lata caramelo aventureira que "fareja" as melhores ofertas.
+Tom: informal, brasileiro, entusiasmado, com emojis moderados.
+REGRAS: máximo 2200 caracteres, quebras de linha para boa leitura, NÃO incluir hashtags (serão adicionadas separadas).
+Retorne APENAS JSON: { "caption": "texto", "hashtags": ["tag1", ...], "gancho": "frase curta alt-text" }`;
 
-    const caption = `${hooks[Math.floor(Math.random() * hooks.length)]}
+    switch (formato) {
+        case 'descobridor':
+            return `${baseInstrucoes}
 
-${persona.companhiaEmoji} ${persona.nome}, ${persona.profissao} de ${persona.origem.name}, sonhava com uma viagem ${persona.preferenciasArray.includes('relax') ? 'relaxante' : 'incrível'} ${persona.companhiaNome === 'solo' ? 'solo' : persona.companhiaNome === 'casal' ? 'a dois' : persona.companhiaNome === 'familia' ? 'em família' : 'com amigos'}.
+FORMATO: DESCOBRIDOR DE DESTINOS (história de persona usando a ferramenta)
 
-Usando o Descobridor de Destinos da Benetrip, encontrou ${destino.nome} ${destino.pais !== 'Brasil' ? '(' + destino.pais + ') ' : ''}com passagem a partir de R$${destino.preco}! ${destino.internacional ? '🌎' : '🇧🇷'}
+IMPORTANTE: O post deve mostrar os DIFERENCIAIS da ferramenta Descobridor de Destinos:
+- O usuário pode digitar livremente o que precisa (orçamento, estilo, itens essenciais)
+- A Tripinha analisa o perfil e encontra o destino ideal com preços reais
+- É personalizado: cada pessoa recebe uma recomendação diferente
 
-${destino.estilos?.includes('praia') ? '🏖️ Praia' : destino.estilos?.includes('natureza') ? '🌿 Natureza' : destino.estilos?.includes('cidade') ? '🏙️ Cidade' : '✨ Destino'} perfeito${persona.companhiaNome === 'casal' ? ' pra dois' : persona.companhiaNome === 'familia' ? ' pra família toda' : ''}!
+PERSONA:
+- Nome: ${dados.persona.nome}, ${dados.persona.idade} anos, ${dados.persona.profissao}
+- De: ${dados.origemNome}
+- Viajando: ${dados.persona.companhiaLabel}
+- O que pediu: "${dados.pedido}"
 
-🐾 A Tripinha sempre encontra as melhores ofertas pra você!
+DESTINO ENCONTRADO PELA TRIPINHA:
+- ${dados.destino.nome}, ${dados.destino.pais} - R$${dados.destino.preco}
+- Estilos: ${(dados.destino.estilos || []).join(', ')}
+- Diferenciais atendidos: ${dados.checks.join(', ')}
 
-Quer descobrir destinos baratos saindo da sua cidade?
-Link na bio! 👆`;
+ESTRUTURA DO POST:
+1. Começar apresentando a persona e o que ela digitou no campo de busca
+2. Mostrar como a Tripinha analisou o pedido
+3. Revelar o destino com preço
+4. Listar os diferenciais atendidos (checklist ✅)
+5. CTA: "Diga o que precisa no campo de busca e a Tripinha encontra pra você!"
+6. "Link na bio"`;
 
-    return {
-        caption,
-        hashtags: gerarHashtagsPadrao(destino),
-        gancho: `${destino.nome} por R$${destino.preco}`,
-    };
+        case 'top5':
+            return `${baseInstrucoes}
+
+FORMATO: TOP 5 DESTINOS MAIS BARATOS DA SEMANA
+
+DADOS REAIS (preços de hoje):
+${dados.top5.map((d, i) => `${i + 1}. ${d.nome} (${d.pais}) - R$${d.preco}`).join('\n')}
+Saindo de: ${dados.origemNome}
+
+DESTAQUE a ferramenta "Destinos Baratos" da Benetrip que mostra ofertas reais de 100 cidades.
+O post deve mostrar que esses preços são REAIS e atualizados.
+
+ESTRUTURA:
+1. Hook impactante com o menor preço
+2. Lista numerada dos 5 destinos com preço
+3. Destacar que são preços reais, atualizados pela Tripinha
+4. CTA: "Veja destinos baratos saindo da sua cidade!"
+5. "Link na bio"`;
+
+        case 'economia':
+            return `${baseInstrucoes}
+
+FORMATO: ECONOMIA - PREÇO QUE CAIU!
+
+DADOS REAIS:
+- Destino: ${dados.destino.nome}, ${dados.destino.pais}
+- Saindo de: ${dados.origemNome}
+- Preço anterior: R$${dados.precoAntes}
+- Preço atual: R$${dados.precoAgora}
+- Economia: R$${dados.economia} (-${dados.percentual}%)
+
+DESTAQUE a ferramenta "Comparar Voos" da Benetrip que monitora preços.
+Mostre que a Tripinha fareja quedas de preço automaticamente.
+
+ESTRUTURA:
+1. Hook: "Preço caiu!" ou dado surpreendente sobre a economia
+2. Mostrar preço antes vs agora
+3. Destacar a economia em reais e percentual
+4. Explicar que a Benetrip monitora preços de 100 cidades
+5. CTA: "Compare voos e encontre quedas de preço!"
+6. "Link na bio"`;
+
+        case 'origens':
+            return `${baseInstrucoes}
+
+FORMATO: DE ONDE SAI MAIS BARATO - COMPARAR ORIGENS
+
+DADOS REAIS - ${dados.destinoNome} ${flagPais(dados.destinoPais)}:
+${dados.origens.map(o => `- De ${o.origemNome}: R$${o.preco}`).join('\n')}
+
+DESTAQUE: A Benetrip compara preços de 100 cidades brasileiras.
+A Tripinha encontra de qual cidade sai mais barato pro mesmo destino.
+
+ESTRUTURA:
+1. Hook: "Sabia que o preço muda MUITO dependendo de onde você sai?"
+2. Mostrar comparação de preços por origem
+3. Destacar o mais barato e a diferença pro mais caro
+4. CTA: "Descubra de onde sai mais barato!"
+5. "Link na bio"`;
+
+        case 'roteiro':
+            return `${baseInstrucoes}
+
+FORMATO: ROTEIRO DIA A DIA
+
+Gere um roteiro de 3 dias para ${dados.destino.nome} (${dados.destino.pais}).
+O destino tem preço de passagem R$${dados.destino.preco} saindo de ${dados.origemNome}.
+Estilos: ${(dados.destino.estilos || []).join(', ')}
+
+DESTAQUE a ferramenta "Roteiro Viagem" da Benetrip que gera roteiros personalizados com IA.
+
+IMPORTANTE: Retorne JSON com campos adicionais para o card:
+{
+  "caption": "texto do post",
+  "hashtags": ["tag1", ...],
+  "gancho": "frase curta",
+  "roteiro": {
+    "dias": 3,
+    "itens": [
+      { "titulo": "Chegada", "atividades": ["Check-in", "Almoço no centro", "Passeio pelo bairro histórico"] },
+      { "titulo": "Exploração", "atividades": ["Ponto turístico 1", "Almoço típico", "Atividade da tarde"] },
+      { "titulo": "Despedida", "atividades": ["Café da manhã especial", "Última atração", "Compras de souvenirs"] }
+    ]
+  }
 }
 
-function gerarHashtagsPadrao(destino) {
-    const base = ['benetrip', 'viagembarata', 'passagembarata', 'tripinha', 'descobridordedestinos'];
-    const destTags = [
-        destino.nome.toLowerCase().replace(/\s+/g, ''),
-        destino.pais.toLowerCase().replace(/\s+/g, ''),
-    ];
-    const estiloTags = {
-        praia: ['praia', 'beach', 'ferias', 'sol'],
-        natureza: ['natureza', 'ecoturismo', 'trilha'],
-        cidade: ['cidade', 'cultura', 'gastronomia'],
-        romantico: ['romance', 'luademel', 'viagemadois'],
-        aventura: ['aventura', 'adrenalina', 'esporteradical'],
-        familia: ['viagememfamilia', 'feriasemfamilia', 'viajarcomcriancas'],
-    };
+ESTRUTURA DO CAPTION:
+1. Hook: "X dias em ${dados.destino.nome}? Roteiro pronto!"
+2. Resumo dia a dia com emojis
+3. Destacar que a Benetrip gera roteiros personalizados com IA
+4. CTA: "Monte seu roteiro personalizado!"
+5. "Link na bio"`;
 
-    let tags = [...base, ...destTags];
-    for (const estilo of (destino.estilos || [])) {
-        tags.push(...(estiloTags[estilo] || []));
+        case 'ranking':
+            return `${baseInstrucoes}
+
+FORMATO: RANKING SEMANAL - MELHORES DESTINOS
+
+DADOS REAIS (${dados.semana}):
+${dados.ranking.map((d, i) => `${i + 1}º ${d.nome} (${d.pais}) - R$${d.preco} ${d.estilos[0] ? `[${d.estilos[0]}]` : ''} saindo de ${d.origem}`).join('\n')}
+
+DESTAQUE: Ranking baseado em dados reais de 100 cidades brasileiras.
+A Tripinha analisa todos os destinos e monta o ranking semanal.
+
+ESTRUTURA:
+1. Hook: "Os destinos mais baratos do Brasil esta semana!"
+2. Listar os top destinos com preço
+3. Comentário sobre tendências (nacional vs internacional, estilos populares)
+4. CTA: "Veja todos os destinos no site!"
+5. "Link na bio"`;
+
+        default:
+            return null;
     }
-
-    // Deduplicate and limit to 30 (Instagram limit)
-    return [...new Set(tags)].slice(0, 30);
 }
 
 // ============================================================
-// BUSCAR IMAGEM DO DESTINO (PEXELS)
+// FALLBACK CAPTIONS (sem IA)
 // ============================================================
-async function buscarImagemDestino(destino) {
+function captionFallback(formato, dados) {
+    switch (formato) {
+        case 'descobridor':
+            return {
+                caption: `${dados.persona.nome}, ${dados.persona.profissao} de ${dados.origemNome}, digitou no Descobridor:\n\n"${dados.pedido}"\n\nE a Tripinha encontrou: ${dados.destino.nome} ${flagPais(dados.destino.pais)} por R$${dados.destino.preco}! 🐾\n\n${dados.checks.map(c => `✅ ${c}`).join('\n')}\n\nVocê também pode! Digite o que precisa — orçamento, estilo, itens essenciais — e a Tripinha fareja o destino perfeito.\n\n👆 Link na bio`,
+                hashtags: ['benetrip', 'tripinha', 'descobridordedestinos', 'viagembarata', dados.destino.nome.toLowerCase().replace(/\s/g, '')],
+                gancho: `${dados.destino.nome} por R$${dados.destino.preco}`,
+            };
+
+        case 'top5':
+            return {
+                caption: `🔥 TOP 5 destinos mais baratos saindo de ${dados.origemNome} esta semana!\n\n${dados.top5.map((d, i) => `${['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣'][i]} ${d.nome} ${flagPais(d.pais)} — R$${d.preco}`).join('\n')}\n\nPreços reais, atualizados hoje pela Tripinha! 🐾\n\nVeja todos os destinos baratos saindo da sua cidade.\n👆 Link na bio`,
+                hashtags: ['benetrip', 'top5', 'viagembarata', 'passagembarata', 'tripinha', ...dados.top5.map(d => d.nome.toLowerCase().replace(/\s/g, ''))],
+                gancho: `Top 5 mais baratos de ${dados.origemNome}`,
+            };
+
+        case 'economia':
+            return {
+                caption: `📉 PREÇO CAIU!\n\n${dados.destino.nome} ${flagPais(dados.destino.pais)} saindo de ${dados.origemNome}:\n\n📅 Antes: R$${dados.precoAntes}\n📅 Agora: R$${dados.precoAgora}\n💰 Economia: R$${dados.economia} (-${dados.percentual}%)\n\nA Tripinha monitora preços de 100 cidades brasileiras e fareja as quedas! 🐾\n\nCompare voos e encontre o melhor preço.\n👆 Link na bio`,
+                hashtags: ['benetrip', 'precocaiu', 'economia', 'viagembarata', dados.destino.nome.toLowerCase().replace(/\s/g, '')],
+                gancho: `${dados.destino.nome} caiu ${dados.percentual}%`,
+            };
+
+        case 'origens':
+            return {
+                caption: `✈️ ${dados.destinoNome} ${flagPais(dados.destinoPais)} — de onde sai mais barato?\n\n${dados.origens.map((o, i) => `${i === 0 ? '🏆' : '📍'} De ${o.origemNome}: R$${o.preco}`).join('\n')}\n\nDiferença de R$${dados.origens[dados.origens.length - 1].preco - dados.origens[0].preco} entre o mais barato e o mais caro!\n\nA Tripinha compara preços de 100 cidades brasileiras! 🐾\n\n👆 Link na bio`,
+                hashtags: ['benetrip', 'compararvoos', 'viagembarata', dados.destinoNome.toLowerCase().replace(/\s/g, '')],
+                gancho: `${dados.destinoNome} de ${dados.origens[0].origemNome}: R$${dados.origens[0].preco}`,
+            };
+
+        case 'roteiro':
+            return {
+                caption: `📋 3 DIAS EM ${dados.destino.nome.toUpperCase()}!\n\n🌅 Dia 1: Chegada e exploração do centro\n☀️ Dia 2: Pontos turísticos principais\n🌄 Dia 3: Compras e despedida\n\nPassagem a partir de R$${dados.destino.preco} saindo de ${dados.origemNome}!\n\nA Tripinha monta roteiros personalizados com IA! 🐾\nDiga pra onde vai e ela organiza tudo.\n\n👆 Link na bio`,
+                hashtags: ['benetrip', 'roteiro', 'roteirodeviagem', dados.destino.nome.toLowerCase().replace(/\s/g, '')],
+                gancho: `Roteiro: 3 dias em ${dados.destino.nome}`,
+            };
+
+        case 'ranking':
+            return {
+                caption: `🏆 RANKING DA SEMANA — ${dados.semana}\n\n${dados.ranking.slice(0, 8).map((d, i) => `${i + 1}º ${d.nome} ${flagPais(d.pais)} — R$${d.preco}`).join('\n')}\n\nRanking baseado em preços reais de 100 cidades brasileiras! 🐾\n\nVeja todos os destinos no site.\n👆 Link na bio`,
+                hashtags: ['benetrip', 'ranking', 'viagembarata', 'destinosbaratos'],
+                gancho: `Ranking semanal de destinos`,
+            };
+
+        default:
+            return { caption: 'Benetrip 🐾', hashtags: ['benetrip'], gancho: 'Benetrip' };
+    }
+}
+
+// ============================================================
+// GERAR HASHTAGS PADRÃO POR FORMATO
+// ============================================================
+function hashtagsPadrao(formato, dados) {
+    const base = ['benetrip', 'tripinha', 'viagembarata'];
+    const extras = {
+        descobridor: ['descobridordedestinos', 'viagempersonalizada'],
+        top5: ['top5', 'passagembarata', 'destinosbaratos'],
+        economia: ['precocaiu', 'economia', 'compararvoos'],
+        origens: ['compararvoos', 'melhorpreco'],
+        roteiro: ['roteiro', 'roteirodeviagem', 'dicadeviagem'],
+        ranking: ['ranking', 'destinosbaratos', 'melhordestino'],
+    };
+    return [...base, ...(extras[formato] || [])];
+}
+
+// ============================================================
+// BUSCAR IMAGEM PEXELS
+// ============================================================
+async function buscarImagemPexels(query) {
     const pexelsKey = process.env.PEXELS_API_KEY;
-    if (!pexelsKey) {
-        return {
-            url: destino.imagem || null,
-            source: 'snapshot',
-            photographer: null,
-        };
-    }
-
-    const query = `${destino.nome} ${destino.pais} travel landscape`;
+    if (!pexelsKey) return null;
 
     try {
         const response = await fetch(
             `https://api.pexels.com/v1/search?query=${encodeURIComponent(query)}&per_page=5&orientation=square&size=large`,
-            {
-                headers: { Authorization: pexelsKey },
-            }
+            { headers: { Authorization: pexelsKey } }
         );
-
-        if (!response.ok) {
-            console.warn(`Pexels HTTP ${response.status}`);
-            return { url: destino.imagem || null, source: 'snapshot', photographer: null };
-        }
+        if (!response.ok) return null;
 
         const data = await response.json();
-        if (data.photos && data.photos.length > 0) {
-            // Escolher aleatoriamente entre as top 5 para variedade
+        if (data.photos?.length > 0) {
             const photo = data.photos[Math.floor(Math.random() * data.photos.length)];
             return {
                 url: photo.src.large2x || photo.src.large || photo.src.original,
-                urlSquare: photo.src.large || photo.src.medium,
                 source: 'pexels',
                 photographer: photo.photographer,
-                photographerUrl: photo.photographer_url,
-                pexelsUrl: photo.url,
             };
         }
     } catch (err) {
         console.error('Erro Pexels:', err.message);
     }
-
-    return { url: destino.imagem || null, source: 'snapshot', photographer: null };
+    return null;
 }
 
 // ============================================================
-// SALVAR POST NO SUPABASE (HISTÓRICO)
+// CONSTRUIR URL DO CARD
 // ============================================================
-async function salvarPostHistorico(postData) {
+function buildCardUrl(baseUrl, cardParams) {
+    return `${baseUrl}/api/instagram/card?${cardParams}`;
+}
+
+// ============================================================
+// SALVAR NO SUPABASE
+// ============================================================
+async function salvarPost(postData) {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
     if (!supabaseUrl || !supabaseServiceKey) return;
 
     try {
@@ -284,7 +336,7 @@ async function salvarPostHistorico(postData) {
             body: JSON.stringify(postData),
         });
     } catch (err) {
-        console.warn('Erro ao salvar histórico do post:', err.message);
+        console.warn('Erro ao salvar post:', err.message);
     }
 }
 
@@ -295,117 +347,189 @@ export default async function handler(req, res) {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-
     if (req.method === 'OPTIONS') return res.status(200).end();
 
-    // Autenticação (CRON_SECRET ou admin)
+    // Auth
     const authHeader = req.headers['authorization'];
     const cronSecret = process.env.CRON_SECRET;
-    const queryKey = req.query?.key;
     const isAuth = (cronSecret && authHeader === `Bearer ${cronSecret}`) ||
-                   (cronSecret && queryKey === cronSecret) ||
-                   !cronSecret; // Se não tem secret, permite (dev)
-
-    if (!isAuth) {
-        return res.status(401).json({ error: 'Não autorizado' });
-    }
+                   (cronSecret && req.query?.key === cronSecret) || !cronSecret;
+    if (!isAuth) return res.status(401).json({ error: 'Não autorizado' });
 
     try {
         const body = req.method === 'POST' ? req.body || {} : req.query || {};
-        const estiloParam = body.estilo || estiloDodia();
+        const formatoParam = body.formato || formatoDodia();
         const origemParam = body.origem || null;
-        const forceDestino = body.forceDestino || null;
 
-        console.log(`\n📸 [Instagram] Gerando post - Estilo: ${estiloParam}`);
+        console.log(`\n📸 [Instagram v2] Formato: ${formatoParam}`);
 
-        // 1. Gerar persona
-        const persona = gerarPersonaComEstilo(estiloParam);
-        if (origemParam) {
-            persona.origem.code = origemParam;
+        // Obter base URL para card
+        const proto = req.headers['x-forwarded-proto'] || 'https';
+        const host = req.headers['x-forwarded-host'] || req.headers['host'] || 'benetrip.vercel.app';
+        const baseUrl = `${proto}://${host}`;
+
+        // STEP 1: Gerar dados do formato
+        let formatoData;
+        let persona = null;
+
+        switch (formatoParam) {
+            case 'descobridor': {
+                // Gerar persona com estilo baseado no dia (Dom=praia, Sab=aventura)
+                const dia = new Date().getDay();
+                const estilos = ['praia', 'cidade', 'natureza', 'romantico', 'aventura', 'familia', 'aventura'];
+                persona = gerarPersonaComEstilo(estilos[dia]);
+                if (origemParam) persona.origem.code = origemParam;
+                formatoData = await formatoDescobridor(persona);
+                break;
+            }
+            case 'top5':
+                formatoData = await formatoTop5();
+                break;
+            case 'economia':
+                formatoData = await formatoEconomia();
+                break;
+            case 'origens':
+                formatoData = await formatoOrigens();
+                break;
+            case 'roteiro':
+                formatoData = await formatoRoteiro();
+                break;
+            case 'ranking':
+                formatoData = await formatoRanking();
+                break;
+            default:
+                return res.status(400).json({ error: `Formato desconhecido: ${formatoParam}` });
         }
 
-        console.log(`👤 Persona: ${persona.nome}, ${persona.profissao} de ${persona.origem.name} (${persona.companhiaLabel})`);
+        console.log(`   Dados gerados para formato: ${formatoParam}`);
 
-        // 2. Buscar destinos baratos reais do Supabase
-        const destinos = await buscarDestinosBaratos(persona.origem.code);
-        if (destinos.length === 0) {
-            return res.status(404).json({
-                error: 'Nenhum destino encontrado',
-                message: `Sem snapshots para ${persona.origem.code}. O cron de discovery já rodou?`,
+        // STEP 2: Gerar caption com Groq
+        let captionData = await gerarCaptionGroq(formatoParam, formatoData.dadosCaption);
+        if (!captionData) {
+            console.log('   Usando caption fallback (sem IA)');
+            captionData = captionFallback(formatoParam, formatoData.dadosCaption);
+        }
+
+        // Para roteiro: construir cardParams com dados do Groq
+        if (formatoParam === 'roteiro' && captionData.roteiro) {
+            const { destino } = formatoData;
+            const rot = captionData.roteiro;
+            const cardParams = new URLSearchParams({
+                f: 'roteiro',
+                dn: destino.nome,
+                nd: String(rot.dias || 3),
             });
+            (rot.itens || []).forEach((item, i) => {
+                cardParams.set(`d${i + 1}t`, item.titulo);
+                cardParams.set(`d${i + 1}a`, (item.atividades || []).join('|'));
+            });
+            formatoData.cardParams = cardParams.toString();
+        } else if (formatoParam === 'roteiro' && !formatoData.cardParams) {
+            // Fallback roteiro card
+            const { destino } = formatoData;
+            const cardParams = new URLSearchParams({
+                f: 'roteiro',
+                dn: destino.nome,
+                nd: '3',
+                d1t: 'Chegada',
+                d1a: 'Check-in|Almoço no centro|Explorar o bairro',
+                d2t: 'Exploração',
+                d2a: 'Ponto turístico principal|Almoço típico|Passeio à tarde',
+                d3t: 'Despedida',
+                d3a: 'Café especial|Último passeio|Compras e volta',
+            });
+            formatoData.cardParams = cardParams.toString();
         }
 
-        // 3. Escolher destino ideal para a persona
-        let destino;
-        if (forceDestino) {
-            destino = destinos.find(d => d.nome.toLowerCase().includes(forceDestino.toLowerCase()));
+        // STEP 3: Construir URL do card e buscar imagem Pexels (em paralelo)
+        const cardUrl = formatoData.cardParams ? buildCardUrl(baseUrl, formatoData.cardParams) : null;
+
+        // Buscar imagem Pexels como alternativa/fallback
+        let pexelsQuery;
+        if (formatoData.destino) {
+            pexelsQuery = `${formatoData.destino.nome} ${formatoData.destino.pais || ''} travel`;
+        } else if (formatoData.destinos?.[0]) {
+            pexelsQuery = `${formatoData.destinos[0].nome} travel landscape`;
+        } else if (formatoData.destinoNome) {
+            pexelsQuery = `${formatoData.destinoNome} travel`;
+        } else if (formatoData.ranking?.[0]) {
+            pexelsQuery = `${formatoData.ranking[0].nome} travel`;
+        } else {
+            pexelsQuery = 'travel destinations beautiful landscape';
         }
-        if (!destino) {
-            destino = escolherDestinoParaPersona(destinos, persona, estiloParam);
-        }
-        if (!destino) {
-            destino = destinos[Math.floor(Math.random() * Math.min(5, destinos.length))];
-        }
 
-        console.log(`✈️ Destino: ${destino.nome}, ${destino.pais} - R$${destino.preco}`);
+        const pexelsData = await buscarImagemPexels(pexelsQuery);
 
-        // 4. Gerar caption com IA + buscar imagem (paralelo)
-        const [captionData, imagemData] = await Promise.all([
-            gerarCaption(persona, destino),
-            buscarImagemDestino(destino),
-        ]);
+        // Usar card como imagem principal, Pexels como fallback
+        const imageUrl = cardUrl || pexelsData?.url || null;
 
-        // 5. Montar post completo
-        const fullCaption = `${captionData.caption}\n\n${captionData.hashtags.map(h => `#${h}`).join(' ')}`;
+        // STEP 4: Montar hashtags
+        const hashtags = captionData.hashtags?.length > 0
+            ? captionData.hashtags
+            : hashtagsPadrao(formatoParam, formatoData);
+        const hashtagStr = [...new Set(hashtags)].slice(0, 30).map(h => `#${h}`).join(' ');
 
-        const postData = {
-            persona: {
-                nome: persona.nome,
-                idade: persona.idade,
-                profissao: persona.profissao,
-                origem: persona.origem,
-                companhia: persona.companhiaLabel,
-                preferencias: persona.preferenciasArray,
-                orcamento: persona.orcamento,
-                observacoes: persona.observacoes,
-            },
-            destino: {
-                nome: destino.nome,
-                pais: destino.pais,
-                preco: destino.preco,
-                estilos: destino.estilos,
-                internacional: destino.internacional,
+        const fullCaption = `${captionData.caption}\n\n${hashtagStr}`;
+
+        // STEP 5: Montar resposta
+        const post = {
+            formato: formatoParam,
+            cardUrl,
+            imagem: {
+                url: imageUrl,
+                source: cardUrl ? 'card' : 'pexels',
+                pexelsUrl: pexelsData?.url || null,
+                photographer: pexelsData?.photographer || null,
             },
             caption: captionData.caption,
-            hashtags: captionData.hashtags,
+            hashtags,
             fullCaption,
-            gancho: captionData.gancho,
-            imagem: imagemData,
-            estilo: estiloParam,
+            gancho: captionData.gancho || '',
+            dadosFormato: formatoData,
             geradoEm: new Date().toISOString(),
         };
 
-        // 6. Salvar no histórico
-        await salvarPostHistorico({
+        // Adicionar persona se existir
+        if (persona || formatoData.persona) {
+            const p = persona || formatoData.persona;
+            post.persona = {
+                nome: p.nome,
+                idade: p.idade,
+                profissao: p.profissao,
+                origem: p.origem,
+                companhia: p.companhiaLabel,
+            };
+        }
+
+        // Adicionar destino principal se existir
+        if (formatoData.destino) {
+            post.destino = {
+                nome: formatoData.destino.nome,
+                pais: formatoData.destino.pais,
+                preco: formatoData.destino.preco,
+                estilos: formatoData.destino.estilos,
+            };
+        }
+
+        // STEP 6: Salvar histórico
+        await salvarPost({
             data: new Date().toISOString().split('T')[0],
-            estilo: estiloParam,
-            destino_nome: destino.nome,
-            destino_pais: destino.pais,
-            destino_preco: destino.preco,
-            origem: persona.origem.code,
-            persona_nome: persona.nome,
+            formato: formatoParam,
+            estilo: formatoData.destino?.estilos?.[0] || formatoParam,
+            destino_nome: formatoData.destino?.nome || formatoData.destinoNome || formatoData.ranking?.[0]?.nome || 'Vários',
+            destino_pais: formatoData.destino?.pais || formatoData.destinoPais || '',
+            destino_preco: formatoData.destino?.preco || formatoData.destinos?.[0]?.preco || 0,
+            origem: persona?.origem?.code || formatoData.origem?.code || '',
+            persona_nome: persona?.nome || '',
             caption: captionData.caption,
-            hashtags: captionData.hashtags,
-            image_url: imagemData.url,
+            hashtags,
+            image_url: imageUrl,
             published: false,
         });
 
-        console.log(`✅ [Instagram] Post gerado para ${destino.nome}`);
+        console.log(`   ✅ Post gerado: ${formatoParam}`);
 
-        return res.status(200).json({
-            success: true,
-            post: postData,
-        });
+        return res.status(200).json({ success: true, post });
     } catch (error) {
         console.error('❌ [Instagram] Erro:', error);
         return res.status(500).json({ error: error.message });
