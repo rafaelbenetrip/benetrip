@@ -13,7 +13,7 @@
 //   ranking     - Ranking semanal de destinos
 
 import satori from 'satori';
-import { Resvg } from '@resvg/resvg-js';
+import sharp from 'sharp';
 
 export const maxDuration = 30;
 
@@ -22,20 +22,35 @@ let fontCache = null;
 
 async function loadFont() {
     if (fontCache) return fontCache;
-    // Baixar Inter do Google Fonts (fonte limpa e moderna)
-    const fontUrl = 'https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap';
-    const cssRes = await fetch(fontUrl, {
-        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
-    });
-    const css = await cssRes.text();
-    // Extrair URL do woff2 (weight 400)
-    const urlMatch = css.match(/src:\s*url\(([^)]+)\)\s*format\('woff2'\)/);
-    if (!urlMatch) {
-        throw new Error('Não conseguiu extrair URL da fonte');
+    try {
+        // Baixar Inter do Google Fonts (fonte limpa e moderna)
+        const fontUrl = 'https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap';
+        const cssRes = await fetch(fontUrl, {
+            headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
+        });
+        const css = await cssRes.text();
+        // Extrair URL do woff2
+        const urlMatch = css.match(/src:\s*url\(([^)]+)\)\s*format\('woff2'\)/);
+        if (urlMatch) {
+            const fontRes = await fetch(urlMatch[1]);
+            fontCache = await fontRes.arrayBuffer();
+            return fontCache;
+        }
+    } catch (err) {
+        console.warn('Falha ao baixar Inter, usando fallback:', err.message);
     }
-    const fontRes = await fetch(urlMatch[1]);
-    fontCache = await fontRes.arrayBuffer();
-    return fontCache;
+
+    // Fallback: URL direta do Inter Regular do Google Fonts CDN
+    try {
+        const fallbackRes = await fetch(
+            'https://fonts.gstatic.com/s/inter/v18/UcCO3FwrK3iLTeHuS_fvQtMwCp50KnMa2JL7W0Q5nw.woff2'
+        );
+        fontCache = await fallbackRes.arrayBuffer();
+        return fontCache;
+    } catch (err) {
+        console.error('Falha total ao carregar fonte:', err.message);
+        throw new Error('Não conseguiu carregar nenhuma fonte');
+    }
 }
 
 // Helper para criar elementos sem JSX
@@ -757,16 +772,15 @@ export default async function handler(req, res) {
             ],
         });
 
-        // Resvg: SVG → PNG
-        const resvg = new Resvg(svg, {
-            fitTo: { mode: 'width', value: 1080 },
-        });
-        const pngData = resvg.render();
-        const pngBuffer = pngData.asPng();
+        // Sharp: SVG → PNG
+        const pngBuffer = await sharp(Buffer.from(svg))
+            .resize(1080, 1080)
+            .png({ quality: 90 })
+            .toBuffer();
 
         res.setHeader('Content-Type', 'image/png');
         res.setHeader('Cache-Control', 'public, max-age=3600');
-        return res.status(200).send(Buffer.from(pngBuffer));
+        return res.status(200).send(pngBuffer);
     } catch (error) {
         console.error('Erro ao gerar card:', error);
         return res.status(500).json({ error: error.message });
