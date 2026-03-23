@@ -1,4 +1,5 @@
 // api/itinerary-generator.js - Endpoint para geração de roteiro personalizado com GROQ
+// Versão 2.2 - Tokens dinâmicos por intensidade, atividades por período, grupos, hidden gems
 // Versão 2.1 - Prompt melhorado para viagens curtas e longas
 const axios = require('axios');
 const http = require('http');
@@ -15,7 +16,7 @@ const CONFIG = {
       fast: 'llama-3.1-8b-instant',
       toolUse: 'llama3-groq-70b-8192-tool-use-preview'
     },
-    timeout: 90000,       // ✅ FIX: 90 segundos para viagens longas
+    timeout: 120000,      // ✅ FIX v2.2: 120 segundos para viagens longas e intensas
     temperature: 0.7
   },
   retries: 2,
@@ -25,11 +26,11 @@ const CONFIG = {
   }
 };
 
-// ✅ FIX v2.1: maxTokens dinâmico baseado no número de dias
-function calcularMaxTokens(diasViagem) {
-  // ~400 tokens por dia é o mínimo para um roteiro detalhado
-  // Base de 1500 tokens + 500 por dia
-  const tokens = Math.min(Math.max(1500 + (diasViagem * 500), 3000), 8000);
+// ✅ FIX v2.2: maxTokens dinâmico — teto aumentado para viagens longas e intensas
+function calcularMaxTokens(diasViagem, intensidade) {
+  // v2.2: tokens por dia baseado na intensidade
+  const tokensPorDia = { 'leve': 600, 'moderado': 800, 'intenso': 1200 }[intensidade] || 800;
+  const tokens = Math.min(Math.max(1500 + (diasViagem * tokensPorDia), 4000), 32000);
   return tokens;
 }
 
@@ -184,11 +185,12 @@ function gerarPromptGroq(params) {
     preferencias
   } = params;
   
+  // v2.2: contagem explícita por período E total por dia
   const intensidadeInfo = {
-    'leve': '2-3 atividades por período (manhã/tarde/noite)',
-    'moderado': '3-4 atividades por período',
-    'intenso': '4-5 atividades por período'
-  }[preferencias?.intensidade_roteiro] || '3-4 atividades por período';
+    'leve': '1-2 atividades por período (manhã/tarde/noite) = 3-6 atividades/dia. Ritmo relaxado.',
+    'moderado': '2-3 atividades por período (manhã/tarde/noite) = 6-9 atividades/dia. Bom equilíbrio.',
+    'intenso': '3-4 atividades por período (manhã/tarde/noite) = 9-12 atividades/dia. Máximo aproveitamento, agenda cheia.'
+  }[preferencias?.intensidade_roteiro] || '2-3 atividades por período = 6-9 atividades/dia.';
   
   const orcamentoInfo = {
     'economico': 'Priorize atividades gratuitas e de baixo custo. Sugira restaurantes acessíveis e transporte público.',
@@ -218,14 +220,16 @@ ATENÇÃO - VIAGEM LONGA (${diasViagem} dias):
 - Dia 1 pode ser mais leve (chegada) e último dia focado na partida`;
   }
 
-  // ✅ FIX v2.1: Adaptação para companhia
+  // ✅ FIX v2.2: Adaptação detalhada para companhia
   let instrucaoCompanhia = '';
   if (tipoCompanhia === 'familia' || tipoCompanhia === 'Família') {
-    instrucaoCompanhia = 'Inclua atividades adequadas para crianças. Evite locais com muitas escadas ou caminhos perigosos. Considere paradas para descanso.';
+    instrucaoCompanhia = 'FAMÍLIA: Inclua atividades para crianças. Evite locais perigosos. Considere paradas para descanso e alimentação.';
   } else if (tipoCompanhia === 'casal' || tipoCompanhia === 'Casal') {
-    instrucaoCompanhia = 'Inclua experiências românticas: restaurantes aconchegantes, mirantes ao pôr-do-sol, passeios a dois.';
+    instrucaoCompanhia = 'CASAL: Experiências românticas — jantares à luz de velas, mirantes ao pôr-do-sol, passeios intimistas, spa.';
   } else if (tipoCompanhia === 'amigos' || tipoCompanhia === 'Amigos') {
-    instrucaoCompanhia = 'Inclua atividades em grupo: bares, vida noturna, experiências divertidas e interativas.';
+    instrucaoCompanhia = 'GRUPO DE AMIGOS: Atividades coletivas e interativas — bar crawls, degustações, aventuras, vida noturna intensa, restaurantes com mesas grandes. Inclua experiências competitivas e divertidas em grupo.';
+  } else if (tipoCompanhia === 'sozinho' || tipoCompanhia === 'Sozinho') {
+    instrucaoCompanhia = 'SOLO: Tours guiados, free walking tours, locais amigáveis para viajantes solo, experiências sociais.';
   }
 
   return `Crie um roteiro COMPLETO e DETALHADO de EXATAMENTE ${diasViagem} dia${diasViagem > 1 ? 's' : ''} para ${destino}, ${pais}.
@@ -244,11 +248,12 @@ ${instrucoesDuracao}
 REGRAS PARA O JSON:
 1. O array "dias" deve ter EXATAMENTE ${diasViagem} objetos — confira antes de retornar
 2. Cada dia deve ter os campos: data, descricao, manha, tarde, noite
-3. Cada período (manha/tarde/noite) deve ter um array "atividades" com pelo menos 1 atividade
+3. CADA período (manha/tarde/noite) DEVE ter MÚLTIPLAS atividades conforme a intensidade. NÃO coloque apenas 1 atividade por período.
 4. No DIA 1: se o horário de chegada for depois das 18h, a manhã e tarde podem ter atividades simplificadas (ex: "Chegada e transfer para hotel")
 5. No ÚLTIMO DIA: considere o horário de partida. Se for antes das 12h, manhã deve ser check-out e aeroporto
-6. Cada atividade deve ter: horario (HH:MM), local (nome REAL do local), tags (array com 1-3 tags), dica (frase prática e útil)
-7. Use SOMENTE locais reais de ${destino} — não invente nomes
+6. Cada atividade deve ter: horario (HH:MM), local (nome REAL e ESPECÍFICO do local), tags (array com 1-3 tags), dica (frase prática, ESPECÍFICA e útil — horário ideal, prato recomendado, truque para fila)
+7. Use SOMENTE locais reais de ${destino} — não invente nomes. Use nomes específicos, não genéricos como "restaurante local"
+8. DIFERENCIAL: misture atrações clássicas com hidden gems e segredos locais. Cada dia deve ter diversidade de tipos (cultura, gastronomia, aventura, compras, noite)
 
 ESTRUTURA JSON OBRIGATÓRIA (retorne APENAS este JSON, nada mais):
 {
@@ -430,8 +435,9 @@ module.exports = async (req, res) => {
     
     const diasViagem = calcularDiasViagem(dataInicio, dataFim);
     
-    // ✅ FIX v2.1: Calcular tokens dinamicamente
-    const maxTokens = calcularMaxTokens(diasViagem);
+    // ✅ FIX v2.2: Calcular tokens dinamicamente com intensidade
+    const intensidadeParam = intensidade || preferencias?.intensidade || 'moderado';
+    const maxTokens = calcularMaxTokens(diasViagem, intensidadeParam);
     
     logEvent('info', 'Gerando roteiro com Groq', {
       destino,
