@@ -1,4 +1,5 @@
 // api/itinerary-generator.js - Endpoint para geração de roteiro personalizado com GROQ
+// Versão 2.3 - Anti-repetição, contagem forçada, dicas específicas, títulos criativos
 // Versão 2.2 - Tokens dinâmicos por intensidade, atividades por período, grupos, hidden gems
 // Versão 2.1 - Prompt melhorado para viagens curtas e longas
 const axios = require('axios');
@@ -29,7 +30,7 @@ const CONFIG = {
 // ✅ FIX v2.2: maxTokens dinâmico — teto aumentado para viagens longas e intensas
 function calcularMaxTokens(diasViagem, intensidade) {
   // v2.2: tokens por dia baseado na intensidade
-  const tokensPorDia = { 'leve': 600, 'moderado': 800, 'intenso': 1200 }[intensidade] || 800;
+  const tokensPorDia = { 'leve': 700, 'moderado': 1000, 'intenso': 1500 }[intensidade] || 1000;
   const tokens = Math.min(Math.max(1500 + (diasViagem * tokensPorDia), 4000), 32000);
   return tokens;
 }
@@ -111,13 +112,14 @@ PERSONALIDADE:
 - Use emojis com moderação nas dicas
 
 REGRAS ABSOLUTAS:
-- Crie EXATAMENTE o número de dias solicitado no prompt — nem mais, nem menos
-- Cada dia DEVE ter atividades nos 3 períodos: manhã, tarde e noite
-- Use APENAS locais, restaurantes e pontos turísticos REAIS que existem de verdade
-- NÃO invente nomes de locais. Se não conhece locais específicos, use categorias genéricas como "Restaurante local" com dica útil
-- Respeite horários de chegada no primeiro dia e partida no último dia
-- Adapte o ritmo das atividades ao tipo de viajante e intensidade solicitada
-- Retorne APENAS JSON válido, sem formatação markdown, sem texto antes ou depois`;
+- Crie EXATAMENTE o número de dias solicitado — nem mais, nem menos
+- Cada dia DEVE ter atividades nos 3 períodos com o MÍNIMO conforme intensidade
+- Use APENAS locais REAIS com nomes ESPECÍFICOS verificáveis no Google Maps
+- NUNCA repita o mesmo local em dias diferentes. ZERO repetição.
+- PROIBIDO frases genéricas nas dicas: "aproveite a atmosfera", "peça o menu degustação", "aproveite a vista"
+- Cada dica deve ser ÚNICA: nome do prato, horário sem fila, truque local, segredo de morador
+- Respeite horários de chegada/partida
+- Retorne APENAS JSON válido, sem markdown, sem texto extra`;
 
   try {
     logEvent('info', `Chamando Groq API (${model}), maxTokens: ${maxTokens}...`);
@@ -185,12 +187,12 @@ function gerarPromptGroq(params) {
     preferencias
   } = params;
   
-  // v2.2: contagem explícita por período E total por dia
+  // v2.3: contagem FORÇADA por período com mínimo explícito
   const intensidadeInfo = {
-    'leve': '1-2 atividades por período (manhã/tarde/noite) = 3-6 atividades/dia. Ritmo relaxado.',
-    'moderado': '2-3 atividades por período (manhã/tarde/noite) = 6-9 atividades/dia. Bom equilíbrio.',
-    'intenso': '3-4 atividades por período (manhã/tarde/noite) = 9-12 atividades/dia. Máximo aproveitamento, agenda cheia.'
-  }[preferencias?.intensidade_roteiro] || '2-3 atividades por período = 6-9 atividades/dia.';
+    'leve': 'MÍNIMO 2 atividades por período (manha/tarde/noite). Total MÍNIMO: 6 atividades/dia.',
+    'moderado': 'MÍNIMO 3 atividades por período (manha/tarde/noite). Total MÍNIMO: 9 atividades/dia.',
+    'intenso': 'MÍNIMO 4 atividades por período (manha/tarde/noite). Total MÍNIMO: 12 atividades/dia. Agenda LOTADA.'
+  }[preferencias?.intensidade_roteiro] || 'MÍNIMO 3 atividades por período = 9 atividades/dia.';
   
   const orcamentoInfo = {
     'economico': 'Priorize atividades gratuitas e de baixo custo. Sugira restaurantes acessíveis e transporte público.',
@@ -227,7 +229,7 @@ ATENÇÃO - VIAGEM LONGA (${diasViagem} dias):
   } else if (tipoCompanhia === 'casal' || tipoCompanhia === 'Casal') {
     instrucaoCompanhia = 'CASAL: Experiências românticas — jantares à luz de velas, mirantes ao pôr-do-sol, passeios intimistas, spa.';
   } else if (tipoCompanhia === 'amigos' || tipoCompanhia === 'Amigos') {
-    instrucaoCompanhia = 'GRUPO DE AMIGOS: Atividades coletivas e interativas — bar crawls, degustações, aventuras, vida noturna intensa, restaurantes com mesas grandes. Inclua experiências competitivas e divertidas em grupo.';
+    instrucaoCompanhia = 'GRUPO DE AMIGOS (PRIORIDADE): Pelo menos 1 atividade coletiva/interativa por dia (pub crawl, aula de culinária, escape room, degustação). Vida noturna TODA NOITE (bares, rooftops, clubes). Restaurantes com mesas grandes e clima animado. Experiências competitivas e divertidas.';
   } else if (tipoCompanhia === 'sozinho' || tipoCompanhia === 'Sozinho') {
     instrucaoCompanhia = 'SOLO: Tours guiados, free walking tours, locais amigáveis para viajantes solo, experiências sociais.';
   }
@@ -248,12 +250,15 @@ ${instrucoesDuracao}
 REGRAS PARA O JSON:
 1. O array "dias" deve ter EXATAMENTE ${diasViagem} objetos — confira antes de retornar
 2. Cada dia deve ter os campos: data, descricao, manha, tarde, noite
-3. CADA período (manha/tarde/noite) DEVE ter MÚLTIPLAS atividades conforme a intensidade. NÃO coloque apenas 1 atividade por período.
-4. No DIA 1: se o horário de chegada for depois das 18h, a manhã e tarde podem ter atividades simplificadas (ex: "Chegada e transfer para hotel")
-5. No ÚLTIMO DIA: considere o horário de partida. Se for antes das 12h, manhã deve ser check-out e aeroporto
-6. Cada atividade deve ter: horario (HH:MM), local (nome REAL e ESPECÍFICO do local), tags (array com 1-3 tags), dica (frase prática, ESPECÍFICA e útil — horário ideal, prato recomendado, truque para fila)
-7. Use SOMENTE locais reais de ${destino} — não invente nomes. Use nomes específicos, não genéricos como "restaurante local"
-8. DIFERENCIAL: misture atrações clássicas com hidden gems e segredos locais. Cada dia deve ter diversidade de tipos (cultura, gastronomia, aventura, compras, noite)
+3. CADA período (manha/tarde/noite) DEVE ter o MÍNIMO de atividades conforme a intensidade acima. Conte antes de retornar!
+4. No DIA 1: se a chegada for depois das 18h, manhã e tarde simplificadas. Senão, roteiro completo.
+5. No ÚLTIMO DIA: manhã útil + check-out + aeroporto
+6. Cada atividade deve ter: horario (HH:MM), local (nome REAL e ESPECÍFICO), tags (1-3), dica (ESPECÍFICA e ÚNICA)
+7. Use SOMENTE locais reais de ${destino}. PROIBIDO inventar nomes ou usar genéricos ("restaurante local", "café da estação")
+8. PROIBIDO repetir o MESMO local em dias diferentes. Cada local aparece UMA VEZ no roteiro.
+9. DIFERENCIAL: 40% atrações clássicas + 30% hidden gems + 30% gastronomia/noturna. Inclua landmarks icônicos.
+10. Títulos dos dias: CRIATIVOS e ÚNICOS — proibido "Explorando X", "Aventuras em X", "Cultura em X"
+11. Dicas: PROIBIDO "Aproveite a atmosfera animada", "Aproveite a vista", "Peça o menu degustação". Cada dica = informação ÚNICA e ÚTIL.
 
 ESTRUTURA JSON OBRIGATÓRIA (retorne APENAS este JSON, nada mais):
 {

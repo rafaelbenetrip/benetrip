@@ -1,4 +1,6 @@
-// api/generate-itinerary.js - GERADOR DE ROTEIRO v2.2
+// api/generate-itinerary.js - GERADOR DE ROTEIRO v2.3
+// v2.3: Anti-repetição, contagem forçada, clima granular, títulos criativos,
+//        dicas proibidas, landmarks obrigatórios, transição melhorada
 // v2.2: Tokens dinâmicos por intensidade, timeout adaptativo, atividades por período,
 //        instruções para grupos/amigos/casal/solo, hidden gems, temperatura 0.7
 // v2.1: Fix timeout Vercel + cidades repetidas (roteiro complementar) + max_tokens dinâmico
@@ -85,7 +87,6 @@ export default async function handler(req, res) {
             const chegada = new Date(dest.dataChegada + 'T12:00:00');
             const saida = new Date(dest.dataSaida + 'T12:00:00');
             const numDias = Math.ceil((saida - chegada) / (1000 * 60 * 60 * 24)) + 1;
-            const mesViagem = chegada.getMonth() + 1;
 
             const dias = [];
             for (let i = 0; i < numDias; i++) {
@@ -109,8 +110,7 @@ export default async function handler(req, res) {
                 index: idx + 1, arrayIndex: idx, destino: dest.destino,
                 dataChegada: dest.dataChegada, dataSaida: dest.dataSaida,
                 horarioChegada: dest.horarioChegada || '', horarioPartida: dest.horarioPartida || '',
-                numDias, mes: mesViagem, estacao: getSeasonContext(mesViagem),
-                clima: getClimateHint(dest.destino, mesViagem), dias,
+                numDias, dias,
                 ehPrimeiroDestino: idx === 0, ehUltimoDestino: idx === destinosArray.length - 1,
                 proximoDestino: idx < destinosArray.length - 1 ? destinosArray[idx + 1].destino : null,
                 numVisita, totalVisitas, ehCidadeRepetida: totalVisitas > 1,
@@ -128,12 +128,12 @@ export default async function handler(req, res) {
             restricoesFamilia = `\nATENÇÃO - VIAGEM COM CRIANÇAS/BEBÊS:\n- Atividades adequadas para crianças\n- Pausas e intervalos\n- Horários de refeição e descanso${bebes > 0 ? '\n- BEBÊ(S): tempo extra para logística' : ''}`;
         }
 
-        // v2.2: contagem explícita POR PERÍODO para guiar a IA corretamente
+        // v2.3: contagem FORÇADA por período com mínimo explícito
         const intensidadeDesc = {
-            'leve': 'Ritmo LEVE: 1-2 atividades por período (manhã/tarde/noite) = 3-6 atividades/dia. Priorizou conforto e contemplação.',
-            'moderado': 'Ritmo MODERADO: 2-3 atividades por período (manhã/tarde/noite) = 6-9 atividades/dia. Bom equilíbrio passeio/descanso.',
-            'intenso': 'Ritmo INTENSO: 3-4 atividades por período (manhã/tarde/noite) = 9-12 atividades/dia. Máximo aproveitamento, sem tempo ocioso.'
-        }[intensidade] || 'Ritmo MODERADO: 2-3 atividades por período = 6-9 atividades/dia.';
+            'leve': 'Ritmo LEVE: MÍNIMO 2 atividades por período (manhã/tarde/noite). Total MÍNIMO: 6 atividades/dia.',
+            'moderado': 'Ritmo MODERADO: MÍNIMO 3 atividades por período (manhã/tarde/noite). Total MÍNIMO: 9 atividades/dia.',
+            'intenso': 'Ritmo INTENSO: MÍNIMO 4 atividades por período (manhã/tarde/noite). Total MÍNIMO: 12 atividades/dia. Agenda LOTADA do amanhecer até a madrugada.'
+        }[intensidade] || 'Ritmo MODERADO: MÍNIMO 3 atividades por período = 9 atividades/dia.';
         const orcamentoDesc = {
             'economico': 'ECONÔMICO: priorize atividades gratuitas, street food, mercados locais, parques. Evite restaurantes caros.',
             'medio': 'MÉDIO: mix equilibrado gratuito + pago. Restaurantes de preço médio, algumas experiências pagas.',
@@ -144,12 +144,14 @@ export default async function handler(req, res) {
         let companhiaInstrucoes = '';
         const numViajantes = parseInt(numPessoas) || 1;
         if (companhia === 'amigos' || companhia === 'Amigos') {
-            companhiaInstrucoes = `\nVIAGEM COM GRUPO DE ${numViajantes} AMIGOS:
-- Inclua atividades COLETIVAS e interativas: tours em grupo, aulas de culinária, bar crawls, degustações
-- Priorize vida noturna: bares locais, rooftops, clubes, karaokês
-- Sugira restaurantes com mesas grandes e ambiente animado
-- Inclua experiências divertidas: aventura, esportes, competições entre amigos
-- Para ${numViajantes} pessoas: reserve locais que comportem o grupo, evite lugares muito apertados`;
+            companhiaInstrucoes = `\n══ VIAGEM COM GRUPO DE ${numViajantes} AMIGOS (PRIORIDADE ALTA) ══
+OBRIGATÓRIO em TODOS os dias:
+- Pelo menos 1 atividade COLETIVA/INTERATIVA por dia: pub crawl, aula de culinária, degustação de cerveja/vinho, escape room, karaokê, boliche, competição entre amigos
+- Vida noturna TODA NOITE: bares locais, rooftops, clubes, pubs com música ao vivo — NÃO apenas "passeio pelo rio"
+- Restaurantes com mesas GRANDES e ambiente ANIMADO — nada de restaurantes finos/românticos para mesa de 2
+- Para ${numViajantes} pessoas: cite locais que comportem grupos, food halls, cervejarias, biergartens
+- Inclua experiências ÚNICAS para amigos: tours de street art, esportes radicais, jogos em grupo, festas locais
+- Tom da Tripinha: animado, divertido, como uma amiga que sabe os melhores rolês da cidade`;
         } else if (companhia === 'casal' || companhia === 'Casal') {
             companhiaInstrucoes = `\nVIAGEM ROMÂNTICA A DOIS:
 - Inclua experiências românticas: jantares à luz de velas, mirantes ao pôr-do-sol
@@ -166,9 +168,7 @@ export default async function handler(req, res) {
         let diasListaTexto = '';
         destinosInfo.forEach(dest => {
             const visitaLabel = dest.ehCidadeRepetida ? ` [${dest.numVisita}ª visita]` : '';
-            diasListaTexto += `\n📍 ${dest.destino}${visitaLabel} (${dest.numDias} dia${dest.numDias > 1 ? 's' : ''}):\n`;
-            if (dest.estacao) diasListaTexto += `   Estação: ${dest.estacao}\n`;
-            if (dest.clima) diasListaTexto += `   Clima: ${dest.clima}\n`;
+            diasListaTexto += `\n📍 ${dest.destino}${visitaLabel} (${dest.numDias} dia${dest.numDias > 1 ? 's' : ''}, ${dest.dataChegada} a ${dest.dataSaida}):\n`;
             dest.dias.forEach(d => {
                 let nota = '';
                 if (d.ehPrimeiro && dest.horarioChegada) nota = ` (CHEGADA ${dest.horarioChegada}${dest.arrayIndex > 0 ? ' — vindo de ' + destinosArray[dest.arrayIndex - 1].destino : ''})`;
@@ -185,7 +185,7 @@ export default async function handler(req, res) {
                 return (cidadeOcorrencias[chave]?.length || 1) > 1 ? `${d.destino} (${visitaNumero[i]}ª)` : d.destino;
             }).join(' → ');
             multiDestinoBloco = `\n═══════════════════════════════════════════\nVIAGEM MULTI-DESTINO: ${rotaResumo}\nTotal: ${destinosArray.length} paradas em ${numDiasTotal} dias\n═══════════════════════════════════════════`;
-            multiDestinoRegras = `\nREGRAS MULTI-DESTINO:\n- Cubra TODOS os destinos na ordem\n- Dias de transição: atividades leves, mencione troca de cidade\n- "destino_atual" indica a cidade de cada dia\n- Se destino tem 1-2 dias, priorize imperdíveis`;
+            multiDestinoRegras = `\nREGRAS MULTI-DESTINO:\n- Cubra TODOS os destinos na ordem\n- Dias de transição: NÃO desperdiçar. Manhã = última atividade especial na cidade (mirante favorito, café icônico, mercado local). Tarde = viagem. Noite = primeira experiência na nova cidade (jantar típico local, passeio noturno pelo centro)\n- "destino_atual" indica a cidade de cada dia\n- Se destino tem 1-2 dias, priorize LANDMARKS ICÔNICOS imperdíveis\n- PROIBIDO "Visita ao café da estação de trem" como atividade — use locais REAIS com nome`;
         }
 
         // === BLOCO CIDADES REPETIDAS ===
@@ -209,14 +209,8 @@ REGRAS PARA VISITAS REPETIDAS (PRIORIDADE ALTA):
 5. "destino_atual" = mesmo nome da cidade (sem "2ª visita"). Use "visita_numero" para indicar.`;
         }
 
-        // === CLIMA ===
-        let climaBloco = '\nCLIMA POR DESTINO:';
-        destinosInfo.forEach(dest => {
-            climaBloco += `\n- ${dest.destino}: ${dest.estacao || '?'}`;
-            if (dest.clima) climaBloco += ` | ${dest.clima}`;
-            climaBloco += ` | ${dest.numDias}d`;
-        });
-        climaBloco += '\nConsidere clima ao sugerir atividades. Mencione nas dicas quando relevante.';
+        // === CLIMA (inferido pela LLM com base nas datas) ===
+        const climaBloco = '\nCLIMA: Com base nas datas da viagem e nos destinos, estime o clima típico de cada cidade nessa época do ano. Use esse conhecimento para adaptar atividades (ex: atividades indoor em dias frios, ao ar livre no verão). Preencha "clima_previsto" com estimativa realista de temperatura e condições.';
 
         // === OBSERVAÇÕES ===
         let observacoesBloco = '', observacoesInstrucao = '';
@@ -253,27 +247,38 @@ ${multiDestinoRegras}
 
 TAREFA: Roteiro COMPLETO e DETALHADO de ${numDiasTotal} dias${isMultiDestino ? `, ${destinosArray.length} paradas` : ''}.
 
-REGRAS:
-1. Dia de chegada: atividades leves a partir do horário informado
-2. Dia de partida: tempo para aeroporto/rodoviária
-3. CADA período (manhã/tarde/noite) DEVE ter MÚLTIPLAS atividades conforme o ritmo. NÃO coloque apenas 1 atividade por período.
-4. google_maps_query = NOME REAL + Cidade + País
-5. tags: Imperdível, Ideal para família, Histórico, Gastronômico, Compras, Relaxante, Aventura, Cultural, Gratuito, Vida noturna, Natureza, Romântico
-6. Textos em pt-BR. Tripinha: 1ª pessoa, calorosa, max 1 ref canina/dia. SEM emoji.
-7. duracao_minutos: 30-240. Locais REAIS. Não repita locais entre dias.
-8. destino_atual = cidade exata. clima_previsto = estimativa realista.
-9. visita_numero = número da visita àquela cidade (1, 2, 3...)
-10. Se cidade repetida: roteiro COMPLEMENTAR, atrações DIFERENTES da visita anterior
-11. DIFERENCIAL: inclua hidden gems, segredos locais, experiências autênticas — NÃO apenas pontos turísticos óbvios. Misture atrações clássicas com descobertas únicas.
-12. Varie os TIPOS de atividade: cultura, gastronomia, natureza, compras, vida noturna. Cada dia deve ter diversidade.
-13. Inclua nomes ESPECÍFICOS: nome do restaurante, nome do bar, nome da praça — não genéricos como "restaurante local".
-14. dica_tripinha deve ser ÚTIL e ESPECÍFICA: horário ideal, prato recomendado, truque para evitar fila, melhor mesa${observacoesInstrucao}
+═══ REGRAS DE QUANTIDADE (OBRIGATÓRIO) ═══
+1. CADA período (manhã/tarde/noite) DEVE ter o MÍNIMO de atividades conforme o ritmo acima. Conte antes de retornar!
+2. Dia de chegada: atividades a partir do horário informado (pode ter menos na manhã se chegou tarde)
+3. Dia de partida: tempo para aeroporto/rodoviária, mas NÃO desperdiçar a manhã
+
+═══ REGRAS ANTI-REPETIÇÃO (CRÍTICO) ═══
+4. PROIBIDO repetir o MESMO local em dias diferentes. ZERO repetição. Cada local aparece UMA VEZ no roteiro inteiro.
+5. PROIBIDO usar "café da estação de trem" ou locais genéricos como atividade. Use locais REAIS com nome próprio.
+6. Dias de transição entre cidades: inclua atividade específica de despedida (último café famoso, mirante, mercado) — NÃO genéricos.
+7. PROIBIDO repetir a mesma estrutura de dia (ex: museu+parque+restaurante+bar) — varie a sequência.
+
+═══ REGRAS DE QUALIDADE ═══
+8. google_maps_query = NOME REAL ESPECÍFICO + Cidade + País (ex: "The Nightjar, Londres, Reino Unido")
+9. tags: Imperdível, Ideal para família, Histórico, Gastronômico, Compras, Relaxante, Aventura, Cultural, Gratuito, Vida noturna, Natureza, Romântico
+10. Textos em pt-BR. Tripinha: 1ª pessoa, calorosa, max 1 ref canina/dia. SEM emoji.
+11. duracao_minutos: 30-240. Locais REAIS verificáveis no Google Maps.
+12. destino_atual = cidade exata. clima_previsto = estimativa realista baseada no mês.
+13. visita_numero = número da visita àquela cidade (1, 2, 3...)
+
+═══ REGRAS DE DIFERENCIAL ═══
+14. Inclua os LANDMARKS ICÔNICOS de cada cidade (ex: Big Ben em Londres, Torre Eiffel em Paris, Anne Frank House em Amsterdam). NÃO pule os imperdíveis.
+15. MISTURE: 40% atrações clássicas + 30% hidden gems/segredos locais + 30% experiências gastronômicas/noturnas
+16. Títulos dos dias devem ser CRIATIVOS e ÚNICOS — NÃO use padrões como "Explorando X", "Aventuras em X", "Cultura em X"
+17. dica_tripinha: PROIBIDO frases genéricas como "Aproveite a atmosfera animada", "Aproveite a vista da cidade", "Peça o menu degustação". Cada dica deve ser ÚNICA e ESPECÍFICA: nome do prato, horário ideal, truque local, segredo que só morador sabe.
+18. Descrições das atividades devem ser DISTINTAS entre si — PROIBIDO "Um museu com uma vasta coleção de..." repetidamente.
+19. Se cidade repetida: roteiro COMPLEMENTAR, atrações DIFERENTES da visita anterior${observacoesInstrucao}
 
 JSON VÁLIDO apenas, zero texto extra. Estrutura: ${estruturaJSON}`;
 
         // === TOKENS DINÂMICOS ===
         // v2.2: tokens por dia baseado na intensidade para garantir conteúdo rico
-        const tokensPorDia = { 'leve': 800, 'moderado': 1100, 'intenso': 1500 }[intensidade] || 1100;
+        const tokensPorDia = { 'leve': 900, 'moderado': 1200, 'intenso': 1800 }[intensidade] || 1200;
         const tokensEstimados = Math.min(Math.max(numDiasTotal * tokensPorDia, 6000), 32000);
         console.log(`📊 max_tokens: ${tokensEstimados} para ${numDiasTotal} dias (${intensidade || 'moderado'})`);
 
@@ -296,7 +301,7 @@ JSON VÁLIDO apenas, zero texto extra. Estrutura: ${estruturaJSON}`;
                     body: JSON.stringify({
                         model,
                         messages: [
-                            { role: 'system', content: `Você é a Tripinha, cachorra vira-lata caramelo brasileira especialista em viagens. JSON válido pt-BR. Locais REAIS. Inclua destino_atual, clima_previsto, visita_numero.${temCidadesRepetidas ? ' CIDADES REPETIDAS: 2ª visita = roteiro COMPLEMENTAR, atrações DIFERENTES.' : ''}` },
+                            { role: 'system', content: `Você é a Tripinha, cachorra vira-lata caramelo brasileira e guia de viagem expert. Gere JSON válido pt-BR com locais REAIS verificáveis no Google Maps. REGRAS CRÍTICAS: (1) NUNCA repita o mesmo local em dias diferentes. (2) Respeite o MÍNIMO de atividades por período conforme a intensidade. (3) Dicas devem ser ESPECÍFICAS e ÚNICAS — proibido "aproveite a atmosfera" ou "peça o menu degustação". (4) Inclua destino_atual, clima_previsto, visita_numero.${temCidadesRepetidas ? ' CIDADES REPETIDAS: 2ª visita = roteiro COMPLEMENTAR, atrações DIFERENTES.' : ''}` },
                             { role: 'user', content: prompt }
                         ],
                         response_format: { type: 'json_object' },
@@ -358,21 +363,7 @@ JSON VÁLIDO apenas, zero texto extra. Estrutura: ${estruturaJSON}`;
     }
 }
 
-function getSeasonContext(mes) {
-    const m = { 1:'Janeiro: verão sul, inverno norte', 2:'Fevereiro: verão/carnaval sul, inverno norte', 3:'Março: fim verão sul, primavera norte', 4:'Abril: outono sul, primavera norte', 5:'Maio: outono sul, primavera norte', 6:'Junho: inverno sul, verão norte', 7:'Julho: inverno sul, verão norte', 8:'Agosto: inverno sul, verão norte', 9:'Setembro: primavera sul, outono norte', 10:'Outubro: primavera sul, outono norte', 11:'Novembro: pré-verão sul, outono norte', 12:'Dezembro: verão sul, inverno norte' };
-    return m[mes] || '';
-}
 
-function getClimateHint(destino, mes) {
-    const l = (destino || '').toLowerCase();
-    const tropicais = ['rio','salvador','recife','fortaleza','natal','cancún','cancun','cartagena','bangkok','bali','phuket','havana','miami'];
-    if (tropicais.some(t => l.includes(t))) return [12,1,2,3].includes(mes) ? 'Quente/úmido, chuvas tropicais. 28-35°C.' : [6,7,8].includes(mes) ? 'Agradável 22-30°C.' : 'Quente 25-33°C.';
-    const europa = ['lisboa','porto','madrid','barcelona','paris','roma','londres','amsterdam','berlim','praga','viena','atenas','milão','florença','veneza'];
-    if (europa.some(t => l.includes(t))) return [6,7,8].includes(mes) ? 'Verão: 25-35°C, dias longos.' : [12,1,2].includes(mes) ? 'Inverno: 0-10°C, dias curtos.' : [3,4,5].includes(mes) ? 'Primavera: 12-22°C.' : 'Outono: 8-18°C.';
-    const frio = ['bariloche','ushuaia','patagônia','patagonia'];
-    if (frio.some(t => l.includes(t))) return [12,1,2].includes(mes) ? 'Verão: 10-20°C, vento.' : [6,7,8].includes(mes) ? 'Inverno: -5 a 5°C, neve.' : 'Frio 5-15°C.';
-    return '';
-}
 
 function buildFallbackItinerary(params, destinosArray) {
     const diasSemana = ['Domingo','Segunda-feira','Terça-feira','Quarta-feira','Quinta-feira','Sexta-feira','Sábado'];
