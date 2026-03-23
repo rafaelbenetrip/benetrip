@@ -126,7 +126,22 @@ export default async function handler(req, res) {
             restricoesFamilia = `\nATENÇÃO - VIAGEM COM CRIANÇAS/BEBÊS:\n- Atividades adequadas para crianças\n- Pausas e intervalos\n- Horários de refeição e descanso${bebes > 0 ? '\n- BEBÊ(S): tempo extra para logística' : ''}`;
         }
 
-        const intensidadeDesc = { 'leve': 'Ritmo leve (2-3 atividades/dia)', 'moderado': 'Ritmo moderado (3-4/dia)', 'intenso': 'Ritmo intenso (5-6/dia)' }[intensidade] || 'Ritmo moderado.';
+        // === DICAS GRUPO DE AMIGOS ===
+        let dicasGrupo = '';
+        const numPessoasNum = parseInt(numPessoas) || 1;
+        if (companhia === 'Amigos') {
+            if (numPessoasNum >= 6) {
+                dicasGrupo = `\nATENÇÃO - GRUPO GRANDE DE AMIGOS (${numPessoasNum} pessoas):\n- Atividades que funcionam para grupos grandes (tours guiados, passeios de barco, aulas coletivas)\n- Noite: bares badalados, música ao vivo, baladas, vida noturna local — inclua TODA noite disponível\n- Restaurantes com mesas para grupos grandes\n- Experiências interativas e memoráveis para o grupo\n- Inclua pelo menos 1 experiência gastronômica especial por cidade\n- Misture pontos turísticos icônicos com locais frequentados por moradores\n- Considere que o grupo pode se dividir em sub-grupos em algumas atividades`;
+            } else {
+                dicasGrupo = `\nATENÇÃO - VIAGEM COM AMIGOS (${numPessoasNum} pessoas):\n- Atividades sociais, interativas e divertidas\n- Noite: vida noturna, bares, shows, música ao vivo\n- Experiências coletivas e memoráveis\n- Misture cultura com agito`;
+            }
+        }
+
+        const intensidadeDesc = {
+            'leve': 'Ritmo LEVE: máximo 2-3 atividades por dia. 1 atividade por período. Muitas pausas, descanso, sem pressa.',
+            'moderado': 'Ritmo MODERADO: 4 atividades por dia. 1-2 por período. Equilibrado entre ver e relaxar.',
+            'intenso': 'Ritmo INTENSO: MÍNIMO 6 atividades por dia — 2 atividades obrigatórias em CADA período (manhã, tarde e noite). Aproveite cada hora. Sem períodos vazios.'
+        }[intensidade] || 'Ritmo moderado: 4 atividades por dia.';
         const orcamentoDesc = { 'economico': 'ECONÔMICO: atividades gratuitas/baratas.', 'medio': 'MÉDIO: mix gratuito + pago moderado.', 'alto': 'ALTO: experiências premium.' }[orcamentoAtividades] || 'MÉDIO.';
 
         // === LISTA DE DIAS ===
@@ -215,7 +230,7 @@ VIAJANTE:
 - Experiências: ${preferencias || 'Variadas'}
 - Ritmo: ${intensidadeDesc}
 - Orçamento: ${orcamentoDesc}
-${restricoesFamilia}
+${restricoesFamilia}${dicasGrupo}
 ${multiDestinoRegras}
 
 TAREFA: Roteiro COMPLETO de ${numDiasTotal} dias${isMultiDestino ? `, ${destinosArray.length} paradas` : ''}.
@@ -223,20 +238,26 @@ TAREFA: Roteiro COMPLETO de ${numDiasTotal} dias${isMultiDestino ? `, ${destinos
 REGRAS:
 1. Dia de chegada: atividades leves a partir do horário informado
 2. Dia de partida: tempo para aeroporto/rodoviária
-3. Períodos: manhã/tarde/noite conforme ritmo
+3. Períodos: manhã/tarde/noite — TODOS os 3 períodos DEVEM ter atividades todos os dias (exceto chegada/partida)
 4. google_maps_query = NOME REAL + Cidade + País
 5. tags: Imperdível, Ideal para família, Histórico, Gastronômico, Compras, Relaxante, Aventura, Cultural, Gratuito, Vida noturna, Natureza, Romântico
 6. Textos em pt-BR. Tripinha: 1ª pessoa, calorosa, max 1 ref canina/dia. SEM emoji.
-7. duracao_minutos: 30-240. Locais REAIS. Não repita locais entre dias.
+7. duracao_minutos: 30-240. Locais REAIS com nomes específicos. Não repita locais entre dias.
 8. destino_atual = cidade exata. clima_previsto = estimativa realista.
 9. visita_numero = número da visita àquela cidade (1, 2, 3...)
-10. Se cidade repetida: roteiro COMPLEMENTAR, atrações DIFERENTES da visita anterior${observacoesInstrucao}
+10. Se cidade repetida: roteiro COMPLEMENTAR, atrações DIFERENTES da visita anterior
+11. RITMO INTENSO: cada período DEVE ter exatamente 2 atividades. Nenhum período pode ter menos que 2.
+12. VARIEDADE OBRIGATÓRIA: não repita categorias de atividade em dias consecutivos (ex: se dia 1 teve museu, dia 2 não pode ser museu). Alterne: cultura → gastronomia → natureza → vida noturna → compras → aventura.
+13. Para viagens +7 dias: cada cidade deve ter identidade única no roteiro. Destaque o que é EXCLUSIVO daquela cidade vs as outras.
+14. LOCAIS ESPECÍFICOS: use nomes reais de bares, restaurantes, museus, parques — NUNCA generalize com "um bar local" ou "restaurante típico".${observacoesInstrucao}
 
 JSON VÁLIDO apenas, zero texto extra. Estrutura: ${estruturaJSON}`;
 
         // === TOKENS DINÂMICOS ===
-        const tokensEstimados = Math.min(Math.max(numDiasTotal * 900, 6000), 27000);
-        console.log(`📊 max_tokens: ${tokensEstimados} para ${numDiasTotal} dias`);
+        // Ritmo intenso precisa de ~1400 tokens/dia (2 ativ/período × 3 períodos), moderado ~900, leve ~600
+        const tokensPorDia = intensidade === 'intenso' ? 1400 : intensidade === 'leve' ? 700 : 950;
+        const tokensEstimados = Math.min(Math.max(numDiasTotal * tokensPorDia, 8000), 32000);
+        console.log(`📊 max_tokens: ${tokensEstimados} para ${numDiasTotal} dias (ritmo: ${intensidade})`);
 
         // === GROQ API ===
         const models = ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant'];
@@ -259,7 +280,7 @@ JSON VÁLIDO apenas, zero texto extra. Estrutura: ${estruturaJSON}`;
                             { role: 'user', content: prompt }
                         ],
                         response_format: { type: 'json_object' },
-                        temperature: 0.5,
+                        temperature: 0.75,
                         max_tokens: tokensEstimados,
                     })
                 });
