@@ -1,4 +1,6 @@
-// api/generate-itinerary.js - GERADOR DE ROTEIRO v2.1
+// api/generate-itinerary.js - GERADOR DE ROTEIRO v2.2
+// v2.2: Tokens dinâmicos por intensidade, timeout adaptativo, atividades por período,
+//        instruções para grupos/amigos/casal/solo, hidden gems, temperatura 0.7
 // v2.1: Fix timeout Vercel + cidades repetidas (roteiro complementar) + max_tokens dinâmico
 // v2.0: MULTI-DESTINO + clima previsto + contagem de dias por destino
 // Fallback: Groq llama-3.3-70b → llama-3.1-8b → roteiro genérico
@@ -126,8 +128,39 @@ export default async function handler(req, res) {
             restricoesFamilia = `\nATENÇÃO - VIAGEM COM CRIANÇAS/BEBÊS:\n- Atividades adequadas para crianças\n- Pausas e intervalos\n- Horários de refeição e descanso${bebes > 0 ? '\n- BEBÊ(S): tempo extra para logística' : ''}`;
         }
 
-        const intensidadeDesc = { 'leve': 'Ritmo leve (2-3 atividades/dia)', 'moderado': 'Ritmo moderado (3-4/dia)', 'intenso': 'Ritmo intenso (5-6/dia)' }[intensidade] || 'Ritmo moderado.';
-        const orcamentoDesc = { 'economico': 'ECONÔMICO: atividades gratuitas/baratas.', 'medio': 'MÉDIO: mix gratuito + pago moderado.', 'alto': 'ALTO: experiências premium.' }[orcamentoAtividades] || 'MÉDIO.';
+        // v2.2: contagem explícita POR PERÍODO para guiar a IA corretamente
+        const intensidadeDesc = {
+            'leve': 'Ritmo LEVE: 1-2 atividades por período (manhã/tarde/noite) = 3-6 atividades/dia. Priorizou conforto e contemplação.',
+            'moderado': 'Ritmo MODERADO: 2-3 atividades por período (manhã/tarde/noite) = 6-9 atividades/dia. Bom equilíbrio passeio/descanso.',
+            'intenso': 'Ritmo INTENSO: 3-4 atividades por período (manhã/tarde/noite) = 9-12 atividades/dia. Máximo aproveitamento, sem tempo ocioso.'
+        }[intensidade] || 'Ritmo MODERADO: 2-3 atividades por período = 6-9 atividades/dia.';
+        const orcamentoDesc = {
+            'economico': 'ECONÔMICO: priorize atividades gratuitas, street food, mercados locais, parques. Evite restaurantes caros.',
+            'medio': 'MÉDIO: mix equilibrado gratuito + pago. Restaurantes de preço médio, algumas experiências pagas.',
+            'alto': 'ALTO: experiências premium, restaurantes sofisticados, tours exclusivos, ingressos VIP.'
+        }[orcamentoAtividades] || 'MÉDIO.';
+
+        // v2.2: instruções específicas para tipo de companhia e tamanho do grupo
+        let companhiaInstrucoes = '';
+        const numViajantes = parseInt(numPessoas) || 1;
+        if (companhia === 'amigos' || companhia === 'Amigos') {
+            companhiaInstrucoes = `\nVIAGEM COM GRUPO DE ${numViajantes} AMIGOS:
+- Inclua atividades COLETIVAS e interativas: tours em grupo, aulas de culinária, bar crawls, degustações
+- Priorize vida noturna: bares locais, rooftops, clubes, karaokês
+- Sugira restaurantes com mesas grandes e ambiente animado
+- Inclua experiências divertidas: aventura, esportes, competições entre amigos
+- Para ${numViajantes} pessoas: reserve locais que comportem o grupo, evite lugares muito apertados`;
+        } else if (companhia === 'casal' || companhia === 'Casal') {
+            companhiaInstrucoes = `\nVIAGEM ROMÂNTICA A DOIS:
+- Inclua experiências românticas: jantares à luz de velas, mirantes ao pôr-do-sol
+- Passeios intimistas: jardins, ruelas charmosas, cafés escondidos
+- Sugira pelo menos 1 experiência exclusiva (spa, cruzeiro, degustação privada)`;
+        } else if (companhia === 'sozinho' || companhia === 'Sozinho') {
+            companhiaInstrucoes = `\nVIAGEM SOLO:
+- Inclua tours guiados e atividades sociais (free walking tours, hostel events)
+- Sugira locais seguros e amigáveis para viajantes solo
+- Inclua experiências para conhecer outros viajantes`;
+        }
 
         // === LISTA DE DIAS ===
         let diasListaTexto = '';
@@ -210,33 +243,39 @@ DIAS:
 ${diasListaTexto}
 
 VIAJANTE:
-- Companhia: ${companhia || '?'}
+- Companhia: ${companhia || '?'} (${numViajantes} pessoa${numViajantes > 1 ? 's' : ''})
 - Passageiros: ${passageirosInfo}
 - Experiências: ${preferencias || 'Variadas'}
 - Ritmo: ${intensidadeDesc}
 - Orçamento: ${orcamentoDesc}
-${restricoesFamilia}
+${restricoesFamilia}${companhiaInstrucoes}
 ${multiDestinoRegras}
 
-TAREFA: Roteiro COMPLETO de ${numDiasTotal} dias${isMultiDestino ? `, ${destinosArray.length} paradas` : ''}.
+TAREFA: Roteiro COMPLETO e DETALHADO de ${numDiasTotal} dias${isMultiDestino ? `, ${destinosArray.length} paradas` : ''}.
 
 REGRAS:
 1. Dia de chegada: atividades leves a partir do horário informado
 2. Dia de partida: tempo para aeroporto/rodoviária
-3. Períodos: manhã/tarde/noite conforme ritmo
+3. CADA período (manhã/tarde/noite) DEVE ter MÚLTIPLAS atividades conforme o ritmo. NÃO coloque apenas 1 atividade por período.
 4. google_maps_query = NOME REAL + Cidade + País
 5. tags: Imperdível, Ideal para família, Histórico, Gastronômico, Compras, Relaxante, Aventura, Cultural, Gratuito, Vida noturna, Natureza, Romântico
 6. Textos em pt-BR. Tripinha: 1ª pessoa, calorosa, max 1 ref canina/dia. SEM emoji.
 7. duracao_minutos: 30-240. Locais REAIS. Não repita locais entre dias.
 8. destino_atual = cidade exata. clima_previsto = estimativa realista.
 9. visita_numero = número da visita àquela cidade (1, 2, 3...)
-10. Se cidade repetida: roteiro COMPLEMENTAR, atrações DIFERENTES da visita anterior${observacoesInstrucao}
+10. Se cidade repetida: roteiro COMPLEMENTAR, atrações DIFERENTES da visita anterior
+11. DIFERENCIAL: inclua hidden gems, segredos locais, experiências autênticas — NÃO apenas pontos turísticos óbvios. Misture atrações clássicas com descobertas únicas.
+12. Varie os TIPOS de atividade: cultura, gastronomia, natureza, compras, vida noturna. Cada dia deve ter diversidade.
+13. Inclua nomes ESPECÍFICOS: nome do restaurante, nome do bar, nome da praça — não genéricos como "restaurante local".
+14. dica_tripinha deve ser ÚTIL e ESPECÍFICA: horário ideal, prato recomendado, truque para evitar fila, melhor mesa${observacoesInstrucao}
 
 JSON VÁLIDO apenas, zero texto extra. Estrutura: ${estruturaJSON}`;
 
         // === TOKENS DINÂMICOS ===
-        const tokensEstimados = Math.min(Math.max(numDiasTotal * 900, 6000), 27000);
-        console.log(`📊 max_tokens: ${tokensEstimados} para ${numDiasTotal} dias`);
+        // v2.2: tokens por dia baseado na intensidade para garantir conteúdo rico
+        const tokensPorDia = { 'leve': 800, 'moderado': 1100, 'intenso': 1500 }[intensidade] || 1100;
+        const tokensEstimados = Math.min(Math.max(numDiasTotal * tokensPorDia, 6000), 32000);
+        console.log(`📊 max_tokens: ${tokensEstimados} para ${numDiasTotal} dias (${intensidade || 'moderado'})`);
 
         // === GROQ API ===
         const models = ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant'];
@@ -246,7 +285,9 @@ JSON VÁLIDO apenas, zero texto extra. Estrutura: ${estruturaJSON}`;
             try {
                 console.log(`🤖 Tentando: ${model}`);
                 const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 50000);
+                // v2.2: timeout dinâmico — 50s base + 3s por dia extra (além de 5 dias)
+                const timeoutMs = Math.min(50000 + Math.max(numDiasTotal - 5, 0) * 3000, 120000);
+                const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
                 const groqResponse = await fetch('https://api.groq.com/openai/v1/chat/completions', {
                     method: 'POST',
@@ -259,7 +300,7 @@ JSON VÁLIDO apenas, zero texto extra. Estrutura: ${estruturaJSON}`;
                             { role: 'user', content: prompt }
                         ],
                         response_format: { type: 'json_object' },
-                        temperature: 0.5,
+                        temperature: 0.7,
                         max_tokens: tokensEstimados,
                     })
                 });
@@ -284,15 +325,21 @@ JSON VÁLIDO apenas, zero texto extra. Estrutura: ${estruturaJSON}`;
             return res.status(200).json(buildFallbackItinerary(req.body, destinosArray));
         }
 
-        // === ENRIQUECER ===
+        // === ENRIQUECER E VALIDAR ===
+        const minAtividadesPorPeriodo = { 'leve': 1, 'moderado': 2, 'intenso': 3 }[intensidade] || 2;
+        let totalAtividades = 0;
         resultado.dias.forEach(dia => {
             if (!dia.visita_numero) dia.visita_numero = 1;
             (dia.periodos || []).forEach(p => {
-                (p.atividades || []).forEach(a => {
+                const atividades = p.atividades || [];
+                totalAtividades += atividades.length;
+                atividades.forEach(a => {
                     if (a.google_maps_query) a.google_maps_url = `https://maps.google.com/?q=${encodeURIComponent(a.google_maps_query)}`;
                 });
             });
         });
+        const mediaAtividadesPorDia = totalAtividades / (resultado.dias.length || 1);
+        console.log(`📊 Validação: ${totalAtividades} atividades total, média ${mediaAtividadesPorDia.toFixed(1)}/dia, mínimo esperado/período: ${minAtividadesPorPeriodo}`);
 
         resultado._model = usedModel;
         resultado._numDias = numDiasTotal;
