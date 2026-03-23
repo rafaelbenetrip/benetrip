@@ -87,7 +87,6 @@ export default async function handler(req, res) {
             const chegada = new Date(dest.dataChegada + 'T12:00:00');
             const saida = new Date(dest.dataSaida + 'T12:00:00');
             const numDias = Math.ceil((saida - chegada) / (1000 * 60 * 60 * 24)) + 1;
-            const mesViagem = chegada.getMonth() + 1;
 
             const dias = [];
             for (let i = 0; i < numDias; i++) {
@@ -111,8 +110,7 @@ export default async function handler(req, res) {
                 index: idx + 1, arrayIndex: idx, destino: dest.destino,
                 dataChegada: dest.dataChegada, dataSaida: dest.dataSaida,
                 horarioChegada: dest.horarioChegada || '', horarioPartida: dest.horarioPartida || '',
-                numDias, mes: mesViagem, estacao: getSeasonContext(mesViagem),
-                clima: getClimateHint(dest.destino, mesViagem), dias,
+                numDias, dias,
                 ehPrimeiroDestino: idx === 0, ehUltimoDestino: idx === destinosArray.length - 1,
                 proximoDestino: idx < destinosArray.length - 1 ? destinosArray[idx + 1].destino : null,
                 numVisita, totalVisitas, ehCidadeRepetida: totalVisitas > 1,
@@ -170,9 +168,7 @@ OBRIGATÓRIO em TODOS os dias:
         let diasListaTexto = '';
         destinosInfo.forEach(dest => {
             const visitaLabel = dest.ehCidadeRepetida ? ` [${dest.numVisita}ª visita]` : '';
-            diasListaTexto += `\n📍 ${dest.destino}${visitaLabel} (${dest.numDias} dia${dest.numDias > 1 ? 's' : ''}):\n`;
-            if (dest.estacao) diasListaTexto += `   Estação: ${dest.estacao}\n`;
-            if (dest.clima) diasListaTexto += `   Clima: ${dest.clima}\n`;
+            diasListaTexto += `\n📍 ${dest.destino}${visitaLabel} (${dest.numDias} dia${dest.numDias > 1 ? 's' : ''}, ${dest.dataChegada} a ${dest.dataSaida}):\n`;
             dest.dias.forEach(d => {
                 let nota = '';
                 if (d.ehPrimeiro && dest.horarioChegada) nota = ` (CHEGADA ${dest.horarioChegada}${dest.arrayIndex > 0 ? ' — vindo de ' + destinosArray[dest.arrayIndex - 1].destino : ''})`;
@@ -213,14 +209,8 @@ REGRAS PARA VISITAS REPETIDAS (PRIORIDADE ALTA):
 5. "destino_atual" = mesmo nome da cidade (sem "2ª visita"). Use "visita_numero" para indicar.`;
         }
 
-        // === CLIMA ===
-        let climaBloco = '\nCLIMA POR DESTINO:';
-        destinosInfo.forEach(dest => {
-            climaBloco += `\n- ${dest.destino}: ${dest.estacao || '?'}`;
-            if (dest.clima) climaBloco += ` | ${dest.clima}`;
-            climaBloco += ` | ${dest.numDias}d`;
-        });
-        climaBloco += '\nConsidere clima ao sugerir atividades. Mencione nas dicas quando relevante.';
+        // === CLIMA (inferido pela LLM com base nas datas) ===
+        const climaBloco = '\nCLIMA: Com base nas datas da viagem e nos destinos, estime o clima típico de cada cidade nessa época do ano. Use esse conhecimento para adaptar atividades (ex: atividades indoor em dias frios, ao ar livre no verão). Preencha "clima_previsto" com estimativa realista de temperatura e condições.';
 
         // === OBSERVAÇÕES ===
         let observacoesBloco = '', observacoesInstrucao = '';
@@ -373,24 +363,7 @@ JSON VÁLIDO apenas, zero texto extra. Estrutura: ${estruturaJSON}`;
     }
 }
 
-function getSeasonContext(mes) {
-    const m = { 1:'Janeiro: verão sul, inverno norte', 2:'Fevereiro: verão/carnaval sul, inverno norte', 3:'Março: fim verão sul, primavera norte', 4:'Abril: outono sul, primavera norte', 5:'Maio: outono sul, primavera norte', 6:'Junho: inverno sul, verão norte', 7:'Julho: inverno sul, verão norte', 8:'Agosto: inverno sul, verão norte', 9:'Setembro: primavera sul, outono norte', 10:'Outubro: primavera sul, outono norte', 11:'Novembro: pré-verão sul, outono norte', 12:'Dezembro: verão sul, inverno norte' };
-    return m[mes] || '';
-}
 
-function getClimateHint(destino, mes) {
-    const l = (destino || '').toLowerCase();
-    const tropicais = ['rio','salvador','recife','fortaleza','natal','cancún','cancun','cartagena','bangkok','bali','phuket','havana','miami'];
-    if (tropicais.some(t => l.includes(t))) return [12,1,2,3].includes(mes) ? 'Quente/úmido, chuvas tropicais. 28-35°C.' : [6,7,8].includes(mes) ? 'Agradável 22-30°C.' : 'Quente 25-33°C.';
-    // v2.3: Europa separada em sul (quente) e norte (fresco) para clima mais preciso
-    const europaSul = ['lisboa','porto','madrid','barcelona','roma','atenas','milão','florença','veneza','sevilha','valência','nápoles'];
-    if (europaSul.some(t => l.includes(t))) return [6,7,8].includes(mes) ? 'Verão: 28-38°C, muito quente. Dias longos.' : [12,1,2].includes(mes) ? 'Inverno: 5-12°C, ameno.' : [3,4,5].includes(mes) ? 'Primavera: 15-25°C, agradável.' : 'Outono: 12-22°C.';
-    const europaNorte = ['londres','amsterdam','berlim','praga','viena','paris','bruxelas','dublin','edimburgo','copenhague','estocolmo','munique','frankfurt','hamburgo','colônia','zurique','genebra'];
-    if (europaNorte.some(t => l.includes(t))) return [6,7,8].includes(mes) ? 'Verão: 18-26°C, dias longos. Noites frescas 12-15°C.' : [12,1,2].includes(mes) ? 'Inverno: -2 a 6°C, dias curtos, possível neve.' : [3,4,5].includes(mes) ? 'Primavera: 8-18°C, variável. Leve casaco.' : 'Outono: 6-15°C, chuvas frequentes.';
-    const frio = ['bariloche','ushuaia','patagônia','patagonia'];
-    if (frio.some(t => l.includes(t))) return [12,1,2].includes(mes) ? 'Verão: 10-20°C, vento.' : [6,7,8].includes(mes) ? 'Inverno: -5 a 5°C, neve.' : 'Frio 5-15°C.';
-    return '';
-}
 
 function buildFallbackItinerary(params, destinosArray) {
     const diasSemana = ['Domingo','Segunda-feira','Terça-feira','Quarta-feira','Quinta-feira','Sexta-feira','Sábado'];
