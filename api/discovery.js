@@ -12,6 +12,8 @@
 //   preco_max=1500            → Filtrar por preço máximo
 //   internacional=true/false  → Apenas internacionais ou nacionais
 
+import { fetchSnapshot as fetchSnapshotShared, calcularVariacoes as calcularVariacoesShared } from './_lib/discovery-shared.js';
+
 export default async function handler(req, res) {
     // CORS
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -55,7 +57,7 @@ export default async function handler(req, res) {
 
         // ─── MODO 3: Snapshot específico (por data ou mais recente) ───
         if (origem) {
-            const snapshot = await fetchSnapshot(supabaseUrl, supabaseKey, origem, tipo, data || null);
+            const snapshot = await fetchSnapshotShared(origem, tipo, data || null);
 
             if (!snapshot) {
                 return res.status(404).json({
@@ -74,10 +76,10 @@ export default async function handler(req, res) {
             const ontem = new Date();
             ontem.setDate(ontem.getDate() - 1);
             const ontemStr = ontem.toISOString().split('T')[0];
-            const snapshotOntem = await fetchSnapshot(supabaseUrl, supabaseKey, origem, tipo, ontemStr);
+            const snapshotOntem = await fetchSnapshotShared(origem, tipo, ontemStr);
 
             // Calcular variações de preço
-            const destinosComVariacao = calcularVariacoes(destinos, snapshotOntem?.destinos || []);
+            const destinosComVariacao = calcularVariacoesShared(destinos, snapshotOntem?.destinos || []);
 
             return res.status(200).json({
                 success: true,
@@ -106,29 +108,6 @@ export default async function handler(req, res) {
         console.error('❌ Discovery API erro:', error);
         return res.status(500).json({ error: 'Erro interno', message: error.message });
     }
-}
-
-// ============================================================
-// FETCH SNAPSHOT DO SUPABASE
-// ============================================================
-async function fetchSnapshot(supabaseUrl, supabaseKey, origem, tipo, data) {
-    let url = `${supabaseUrl}/rest/v1/discovery_snapshots?origem=eq.${origem}&tipo=eq.${tipo}&select=*&order=data.desc&limit=1`;
-
-    if (data) {
-        url = `${supabaseUrl}/rest/v1/discovery_snapshots?origem=eq.${origem}&tipo=eq.${tipo}&data=eq.${data}&select=*&limit=1`;
-    }
-
-    const response = await fetch(url, {
-        headers: {
-            'apikey': supabaseKey,
-            'Authorization': `Bearer ${supabaseKey}`,
-        },
-    });
-
-    if (!response.ok) return null;
-
-    const rows = await response.json();
-    return rows.length > 0 ? rows[0] : null;
 }
 
 // ============================================================
@@ -280,39 +259,4 @@ function aplicarFiltros(destinos, filtros) {
     }
 
     return resultado;
-}
-
-// ============================================================
-// CALCULAR VARIAÇÕES DE PREÇO (comparar com ontem)
-// ============================================================
-function calcularVariacoes(destinosHoje, destinosOntem) {
-    if (destinosOntem.length === 0) {
-        return destinosHoje.map(d => ({ ...d, variacao: null }));
-    }
-
-    // Criar mapa de preços de ontem por nome+país
-    const precoOntemMap = new Map();
-    for (const d of destinosOntem) {
-        const key = `${(d.nome || '').toLowerCase()}_${(d.pais || '').toLowerCase()}`;
-        precoOntemMap.set(key, d.preco);
-    }
-
-    return destinosHoje.map(d => {
-        const key = `${(d.nome || '').toLowerCase()}_${(d.pais || '').toLowerCase()}`;
-        const precoOntem = precoOntemMap.get(key);
-
-        let variacao = null;
-        if (precoOntem && d.preco) {
-            const diff = d.preco - precoOntem;
-            const percentual = ((diff / precoOntem) * 100).toFixed(1);
-            variacao = {
-                preco_anterior: precoOntem,
-                diferenca: diff,
-                percentual: parseFloat(percentual),
-                direcao: diff > 0 ? 'subiu' : diff < 0 ? 'desceu' : 'estavel',
-            };
-        }
-
-        return { ...d, variacao };
-    });
 }

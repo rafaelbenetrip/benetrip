@@ -71,8 +71,21 @@
     "api/instagram/card.js": {
       "memory": 1024,
       "maxDuration": 30
+    },
+    "api/destinos-baratos-page.js": {
+      "memory": 1024,
+      "maxDuration": 15
+    },
+    "api/sitemap.js": {
+      "memory": 1024,
+      "maxDuration": 15
     }
   },
+  "rewrites": [
+    { "source": "/destinos-baratos", "destination": "/api/destinos-baratos-page" },
+    { "source": "/destinos-baratos/:cidade", "destination": "/api/destinos-baratos-page?cidade=:cidade" },
+    { "source": "/sitemap.xml", "destination": "/api/sitemap" }
+  ],
   "crons": [
     {
       "path": "/api/cron/update-discovery",
@@ -88,13 +101,6 @@
       "source": "/robots.txt",
       "headers": [
         { "key": "Content-Type", "value": "text/plain; charset=utf-8" },
-        { "key": "Cache-Control", "value": "public, max-age=86400" }
-      ]
-    },
-    {
-      "source": "/sitemap.xml",
-      "headers": [
-        { "key": "Content-Type", "value": "application/xml; charset=utf-8" },
         { "key": "Cache-Control", "value": "public, max-age=86400" }
       ]
     },
