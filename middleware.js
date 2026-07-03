@@ -63,7 +63,10 @@ const IGNORE_PATTERNS = [
   '.json',
   '.xml',
   '.txt',
-  '.webmanifest'
+  '.webmanifest',
+  // /destinos-baratos já é renderizada no servidor (api/destinos-baratos-page.js)
+  // com conteúdo completo pra bots, sem precisar do Prerender.io.
+  '/destinos-baratos'
 ];
 
 /**

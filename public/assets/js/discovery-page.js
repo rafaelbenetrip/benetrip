@@ -1,5 +1,11 @@
 /**
- * BENETRIP DISCOVERY PAGE v3.0
+ * BENETRIP DISCOVERY PAGE v3.1
+ *
+ * v3.1:
+ * - Hidrata a partir de window.__DISCOVERY_INITIAL__ (dados renderizados no
+ *   servidor por api/destinos-baratos-page.js), sem fetch inicial
+ * - Chips de cidade são <a href="/destinos-baratos/{slug}">, com pushState
+ *   ao trocar de cidade automática (URL real + suporte a voltar/avançar)
  *
  * v3.0:
  * - 30 cidades automáticas (snapshot diário do cron)
@@ -43,18 +49,75 @@ const DiscoveryPage = {
     // INICIALIZAÇÃO
     // ============================================================
     async init() {
-        console.log('🔍 Discovery Page v3.0');
+        console.log('🔍 Discovery Page v3.1');
         await this.carregarCidadesAutomaticas();
         this.bindEvents();
-        this.carregarDestinos(this.state.origemAtual);
+
+        const inicial = window.__DISCOVERY_INITIAL__;
+        if (inicial && Array.isArray(inicial.destinos)) {
+            this.hidratar(inicial);
+        } else {
+            this.carregarDestinos(this.state.origemAtual);
+        }
+
+        window.addEventListener('popstate', () => this.carregarDestinosFromPath(location.pathname));
+    },
+
+    // Preenche o estado com os dados já renderizados no servidor (SSR),
+    // evitando um fetch redundante em /api/discovery no primeiro carregamento.
+    hidratar(inicial) {
+        this.state.origemAtual = inicial.origemAtual;
+        this.state.origemNome = inicial.origemNome;
+        this.state.origemManual = !!inicial.origemManual;
+        this.state.destinos = inicial.destinos || [];
+        this.state.dataSnapshot = inicial.dataSnapshot || null;
+        this.state.destinosFiltrados = [...this.state.destinos];
+        this.resetarFiltros();
+
+        if (this.state.destinos.length > 0) {
+            this.renderizar();
+        } else {
+            this.mostrarVazio(`Ainda não temos destinos para ${this.state.origemNome}. Tente outra cidade de origem.`);
+        }
+    },
+
+    // Deriva a origem a partir do path (usado no botão voltar/avançar do navegador)
+    carregarDestinosFromPath(pathname) {
+        const match = pathname.match(/^\/destinos-baratos\/?([a-z0-9-]+)?\/?$/);
+        if (!match) return;
+        const slug = match[1] || null;
+
+        if (!slug) {
+            const saoPaulo = this.cidadesAutomaticas.find(c => c.codigo === 'GRU');
+            this.selecionarCidade('GRU', saoPaulo?.nome || 'São Paulo', false, { pushState: false });
+            return;
+        }
+
+        const cidade = this.cidadesAutomaticas.find(c => (c.slug || this.slugify(c.nome)) === slug);
+        if (cidade) this.selecionarCidade(cidade.codigo, cidade.nome, false, { pushState: false });
+    },
+
+    slugify(nome) {
+        return String(nome || '')
+            .toLowerCase()
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .replace(/[^a-z0-9]+/g, '-')
+            .replace(/(^-+|-+$)/g, '');
     },
 
     async carregarCidadesAutomaticas() {
+        const inicial = window.__DISCOVERY_INITIAL__;
+        if (inicial && Array.isArray(inicial.cidadesAutomaticas) && inicial.cidadesAutomaticas.length > 0) {
+            this.cidadesAutomaticas = inicial.cidadesAutomaticas.map(c => ({ ...c, slug: c.slug || this.slugify(c.nome) }));
+            return;
+        }
+
         try {
             const response = await fetch('/assets/data/brazilian-airports.json');
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
             const data = await response.json();
-            this.cidadesAutomaticas = data.cidades || [];
+            this.cidadesAutomaticas = (data.cidades || []).map(c => ({ ...c, slug: c.slug || this.slugify(c.nome) }));
         } catch (err) {
             console.warn('Erro ao carregar cidades:', err);
             // Fallback: extrair dos chips do HTML
@@ -66,6 +129,7 @@ const DiscoveryPage = {
                     nome: chip.dataset.name,
                     estado: '',
                     regiao: '',
+                    slug: this.slugify(chip.dataset.name),
                 });
             });
         }
@@ -135,6 +199,7 @@ const DiscoveryPage = {
             if (!chip) return;
 
             if (chip.id === 'origin-more-btn') {
+                e.preventDefault();
                 this.mostrarTodasCidadesDropdown();
                 return;
             }
@@ -143,6 +208,9 @@ const DiscoveryPage = {
             const name = chip.dataset.name;
             if (!origin) return;
 
+            // Chips agora são <a href="/destinos-baratos/{slug}">: intercepta pra
+            // trocar via AJAX (como antes), mas com URL real via pushState.
+            e.preventDefault();
             this.selecionarCidade(origin, name, false);
         });
 
@@ -306,7 +374,9 @@ const DiscoveryPage = {
     // ============================================================
     // SELECIONAR CIDADE (automática ou manual)
     // ============================================================
-    selecionarCidade(code, name, isManual) {
+    selecionarCidade(code, name, isManual, opts = {}) {
+        const { pushState = true } = opts;
+
         // Atualizar chips
         document.querySelectorAll('.origin-chip').forEach(c => c.classList.remove('active'));
         const chipExistente = document.querySelector(`.origin-chip[data-origin="${code}"]`);
@@ -315,6 +385,15 @@ const DiscoveryPage = {
         this.state.origemAtual = code;
         this.state.origemNome = name;
         this.state.origemManual = isManual;
+
+        if (pushState && !isManual) {
+            const cidade = this.cidadesAutomaticas.find(c => c.codigo === code);
+            const slug = cidade?.slug || this.slugify(name);
+            const path = slug === 'sao-paulo' ? '/destinos-baratos' : `/destinos-baratos/${slug}`;
+            if (location.pathname !== path) {
+                history.pushState({ origem: code }, '', path);
+            }
+        }
 
         if (isManual) {
             this.carregarDestinosAoVivo(code);
@@ -680,6 +759,14 @@ const DiscoveryPage = {
         if (nameEl) nameEl.textContent = `${this.state.origemNome} (${this.state.origemAtual})`;
 
         document.title = `Destinos Baratos Saindo de ${this.state.origemNome} | Benetrip`;
+
+        if (!this.state.origemManual) {
+            const cidade = this.cidadesAutomaticas.find(c => c.codigo === this.state.origemAtual);
+            const slug = cidade?.slug || this.slugify(this.state.origemNome);
+            const path = slug === 'sao-paulo' ? '/destinos-baratos' : `/destinos-baratos/${slug}`;
+            const canonical = document.querySelector('link[rel="canonical"]');
+            if (canonical) canonical.setAttribute('href', `https://benetrip.com.br${path}`);
+        }
 
         if (this.state.origemManual) {
             if (badgeEl) {
