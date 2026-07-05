@@ -399,13 +399,13 @@ export async function formatoRoteiro() {
     const top = snapshot.destinos.slice(0, 10);
     const destino = top[Math.floor(Math.random() * top.length)];
 
-    // O roteiro será gerado pelo Groq no generate-post
+    // O roteiro será gerado pela IA no generate-post
     // Aqui preparamos os dados base
     return {
         formato: 'roteiro',
         destino,
         origem: { code: origemCode, nome: ORIGENS_NOMES[origemCode] },
-        cardParams: null, // Será construído após Groq gerar o roteiro
+        cardParams: null, // Será construído após a IA gerar o roteiro
         dadosCaption: {
             destino,
             origemNome: ORIGENS_NOMES[origemCode],

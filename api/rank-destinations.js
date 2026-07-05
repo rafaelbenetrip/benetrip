@@ -1,6 +1,10 @@
-// api/rank-destinations.js - v4.3 (Observações Livres)
+// api/rank-destinations.js - v5.0 (Cerebras)
 // Vercel Serverless Function
 // Recebe destinos pré-filtrados e usa LLM para ranquear com base no perfil do viajante
+
+function getCerebrasKey() {
+    return process.env.CEREBRAS_KEY || process.env.CEREBRAS_API_KEY || null;
+}
 
 export default async function handler(req, res) {
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -25,8 +29,8 @@ export default async function handler(req, res) {
         });
     }
 
-    if (!process.env.GROQ_API_KEY) {
-        console.warn('⚠️ GROQ_API_KEY não configurada, usando fallback por preço');
+    if (!getCerebrasKey()) {
+        console.warn('⚠️ CEREBRAS_KEY não configurada, usando fallback por preço');
         return res.status(200).json(rankByPrice(destinos, orcamento));
     }
 
@@ -157,17 +161,17 @@ JSON:
         // ============================================================
         // TENTAR MODELOS EM CASCATA
         // ============================================================
-        const models = ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant'];
+        const models = ['llama-3.3-70b', 'llama3.1-8b'];
         let ranking = null;
         let usedModel = null;
 
         for (const model of models) {
             try {
-                const groqResponse = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+                const aiResponse = await fetch('https://api.cerebras.ai/v1/chat/completions', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${process.env.GROQ_API_KEY}`
+                        'Authorization': `Bearer ${getCerebrasKey()}`
                     },
                     body: JSON.stringify({
                         model,
@@ -184,14 +188,14 @@ JSON:
                     })
                 });
 
-                if (!groqResponse.ok) {
-                    const errText = await groqResponse.text();
-                    console.warn(`⚠️ Modelo ${model} falhou: ${groqResponse.status} - ${errText}`);
+                if (!aiResponse.ok) {
+                    const errText = await aiResponse.text();
+                    console.warn(`⚠️ Modelo ${model} falhou: ${aiResponse.status} - ${errText}`);
                     continue;
                 }
 
-                const groqData = await groqResponse.json();
-                const content = groqData.choices?.[0]?.message?.content;
+                const aiData = await aiResponse.json();
+                const content = aiData.choices?.[0]?.message?.content;
 
                 if (!content) {
                     console.warn(`⚠️ Modelo ${model}: resposta vazia`);

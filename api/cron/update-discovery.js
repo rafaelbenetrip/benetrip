@@ -4,14 +4,14 @@
 // e salva snapshots no Supabase para consulta rápida + histórico
 //
 // v2.0: Lotes rotativos (15 cidades por execução)
-//       Classificação de estilos via Groq
+//       Classificação de estilos via Cerebras
 //       100 cidades carregadas de brazilian-airports.json
 //
 // COMO FUNCIONA:
 // 1. Carrega lista de 100 cidades de brazilian-airports.json
 // 2. Determina qual lote processar (baseado na hora do dia)
 // 3. Para cada cidade do lote, chama a SearchAPI (google_travel_explore)
-// 4. Classifica estilos via Groq (batch) com fallback keywords
+// 4. Classifica estilos via Cerebras (batch) com fallback keywords
 // 5. Salva no Supabase (tabela discovery_snapshots)
 //
 // TRIGGER: Vercel Cron configurado em vercel.json (7x/dia)
@@ -70,7 +70,7 @@ function calcularLote(totalCidades, forcarLote) {
 
 const MAX_DESTINOS_POR_ORIGEM = 50;
 
-// Categorias de estilo baseadas em keywords do destino (fallback quando Groq falha)
+// Categorias de estilo baseadas em keywords do destino (fallback quando a IA falha)
 const ESTILOS_KEYWORDS = {
     praia: ['beach', 'praia', 'litoral', 'costa', 'island', 'ilha', 'cabo', 'porto seguro', 'florianópolis', 'natal', 'maceió', 'cancún', 'punta cana', 'cartagena', 'búzios', 'guarujá', 'ubatuba', 'ilhabela', 'jericoacoara', 'arraial', 'trancoso', 'noronha', 'maragogi', 'san andrés', 'aruba', 'curaçao', 'varadero', 'playa', 'riviera maya', 'bahamas', 'barbados', 'cabo frio'],
     natureza: ['nature', 'natureza', 'serra', 'chapada', 'foz', 'bonito', 'amazônia', 'pantanal', 'lençóis', 'jalapão', 'monte verde', 'brotas', 'socorro', 'urubici', 'patagônia', 'machu picchu', 'galapagos', 'atacama', 'iguaçu', 'falls', 'cachoeira'],
@@ -201,10 +201,14 @@ function classificarEstiloKeywords(destino) {
 }
 
 // ============================================================
-// CLASSIFICAR ESTILOS VIA GROQ (batch de destinos)
+// CLASSIFICAR ESTILOS VIA CEREBRAS (batch de destinos)
 // ============================================================
-async function classificarEstilosGroq(destinosFormatados) {
-    if (!process.env.GROQ_API_KEY || destinosFormatados.length === 0) {
+function getCerebrasKey() {
+    return process.env.CEREBRAS_KEY || process.env.CEREBRAS_API_KEY || null;
+}
+
+async function classificarEstilosIA(destinosFormatados) {
+    if (!getCerebrasKey() || destinosFormatados.length === 0) {
         return null; // vai usar fallback keyword
     }
 
@@ -224,15 +228,15 @@ Retorne APENAS um JSON: { "classificacoes": [[estilos_destino_0], [estilos_desti
 Cada item é um array de strings. Mantenha a mesma ordem dos destinos.
 Se não conhecer o destino, use ["cidade"] como default.`;
 
-    const models = ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant'];
+    const models = ['llama-3.3-70b', 'llama3.1-8b'];
 
     for (const model of models) {
         try {
-            const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+            const response = await fetch('https://api.cerebras.ai/v1/chat/completions', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
+                    'Authorization': `Bearer ${getCerebrasKey()}`,
                 },
                 body: JSON.stringify({
                     model,
@@ -248,7 +252,7 @@ Se não conhecer o destino, use ["cidade"] como default.`;
             });
 
             if (!response.ok) {
-                console.warn(`⚠️ Groq classificação ${model} HTTP ${response.status}`);
+                console.warn(`⚠️ Cerebras classificação ${model} HTTP ${response.status}`);
                 continue;
             }
 
@@ -260,13 +264,13 @@ Se não conhecer o destino, use ["cidade"] como default.`;
             const classificacoes = parsed.classificacoes;
 
             if (Array.isArray(classificacoes) && classificacoes.length === destinosFormatados.length) {
-                console.log(`✅ Groq classificou ${classificacoes.length} destinos (${model})`);
+                console.log(`✅ Cerebras classificou ${classificacoes.length} destinos (${model})`);
                 return classificacoes;
             }
 
-            console.warn(`⚠️ Groq retornou ${classificacoes?.length || 0} classificações, esperava ${destinosFormatados.length}`);
+            console.warn(`⚠️ Cerebras retornou ${classificacoes?.length || 0} classificações, esperava ${destinosFormatados.length}`);
         } catch (err) {
-            console.warn(`⚠️ Groq classificação ${model} erro:`, err.message);
+            console.warn(`⚠️ Cerebras classificação ${model} erro:`, err.message);
         }
     }
 
@@ -362,19 +366,19 @@ async function processarOrigem(origem) {
         // Primeiro formata com keywords (fallback)
         let topDestinos = selecionados.map((d, i) => formatarDestino(d, i + 1, 'brasil'));
 
-        // Tenta classificar via Groq (batch) — muito mais preciso
+        // Tenta classificar via Cerebras (batch) — muito mais preciso
         try {
-            const classificacoesGroq = await classificarEstilosGroq(topDestinos);
-            if (classificacoesGroq) {
+            const classificacoesIA = await classificarEstilosIA(topDestinos);
+            if (classificacoesIA) {
                 const estilosValidos = ['praia', 'natureza', 'cidade', 'romantico', 'aventura', 'familia'];
                 topDestinos = topDestinos.map((d, i) => {
-                    const estilosGroq = (classificacoesGroq[i] || []).filter(e => estilosValidos.includes(e));
-                    return { ...d, estilos: estilosGroq.length > 0 ? estilosGroq : d.estilos };
+                    const estilosIA = (classificacoesIA[i] || []).filter(e => estilosValidos.includes(e));
+                    return { ...d, estilos: estilosIA.length > 0 ? estilosIA : d.estilos };
                 });
-                console.log(`🧠 [${origem.codigo}] Estilos classificados via Groq`);
+                console.log(`🧠 [${origem.codigo}] Estilos classificados via Cerebras`);
             }
-        } catch (groqErr) {
-            console.warn(`⚠️ [${origem.codigo}] Groq classificação falhou, usando keywords:`, groqErr.message);
+        } catch (iaErr) {
+            console.warn(`⚠️ [${origem.codigo}] Cerebras classificação falhou, usando keywords:`, iaErr.message);
         }
 
         const totalNac = topDestinos.filter(d => !d.internacional).length;

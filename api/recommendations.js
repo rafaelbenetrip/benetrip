@@ -6,21 +6,27 @@ const http = require('http');
 const https = require('https');
 
 // =======================
-// Configurações Groq - REASONING OPTIMIZED
+// Configurações de IA - Gemini Flash (principal) + Cerebras (fallback)
 // =======================
 const CONFIG = {
-    groq: {
-        baseURL: 'https://api.groq.com/openai/v1',
-        models: {
-            reasoning: 'openai/gpt-oss-120b',               // Reasoning principal
-            personality: 'llama-3.3-70b-versatile',         // Personalidade Tripinha
-            fast: 'llama-3.1-8b-instant',                   // Backup rápido
-            toolUse: 'llama3-groq-70b-8192-tool-use-preview' // APIs futuras
+    providers: {
+        gemini: {
+            baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai',
+            apiKeyEnvs: ['GEMINI_API_KEY', 'GOOGLE_API_KEY']
         },
-        timeout: 180000,   // 3 minutos para reasoning
-        maxTokens: 5000,   // Reduzido pois não precisa de preços
-        temperature: 0.6   // Focado para análise
+        cerebras: {
+            baseURL: 'https://api.cerebras.ai/v1',
+            apiKeyEnvs: ['CEREBRAS_KEY', 'CEREBRAS_API_KEY']
+        }
     },
+    // Cadeia de fallback: cada entrada é tentada em ordem
+    modelChain: [
+        { provider: 'gemini',   model: process.env.GEMINI_MODEL || 'gemini-2.5-flash', role: 'reasoning',   maxTokens: 8000, timeout: 180000 },
+        { provider: 'cerebras', model: 'llama-3.3-70b',                                role: 'personality', maxTokens: 5000, timeout: 60000 },
+        { provider: 'cerebras', model: 'llama3.1-8b',                                  role: 'fast',        maxTokens: 5000, timeout: 60000 }
+    ],
+    timeout: 180000,   // 3 minutos para reasoning
+    temperature: 0.6,  // Focado para análise
     retries: 2,
     logging: {
         enabled: true,
@@ -29,11 +35,18 @@ const CONFIG = {
     budgetThreshold: 401  // Limite para viagens rodoviárias
 };
 
+function getApiKey(provider) {
+    for (const envName of CONFIG.providers[provider].apiKeyEnvs) {
+        if (process.env[envName]) return process.env[envName];
+    }
+    return null;
+}
+
 // =======================
 // Cliente HTTP configurado
 // =======================
 const apiClient = axios.create({
-    timeout: CONFIG.groq.timeout,
+    timeout: CONFIG.timeout,
     httpAgent: new http.Agent({ keepAlive: true }),
     httpsAgent: new https.Agent({ keepAlive: true })
 });
@@ -219,13 +232,14 @@ function obterCodigoIATAPadrao(cidade, pais) {
 }
 
 // =======================
-// Função para chamada ao Groq
+// Função para chamada à IA (Gemini/Cerebras via API OpenAI-compatível)
 // =======================
-async function callGroqAPI(prompt, requestData, model = CONFIG.groq.models.reasoning) {
-    const apiKey = process.env.GROQ_API_KEY;
-    
+async function callAIAPI(prompt, requestData, chainEntry = CONFIG.modelChain[0]) {
+    const { provider, model, role } = chainEntry;
+    const apiKey = getApiKey(provider);
+
     if (!apiKey) {
-        throw new Error('Chave da API Groq não configurada (GROQ_API_KEY)');
+        throw new Error(`Chave da API ${provider} não configurada (${CONFIG.providers[provider].apiKeyEnvs.join(' ou ')})`);
     }
 
     // 🚗🚌✈️ ATUALIZADO: Incluir viagem_carro
@@ -237,8 +251,8 @@ async function callGroqAPI(prompt, requestData, model = CONFIG.groq.models.reaso
     const infoCidadePartida = utils.extrairInfoCidadePartida(requestData.cidade_partida);
 
     let systemMessage;
-    
-    if (model === CONFIG.groq.models.reasoning) {
+
+    if (role === 'reasoning') {
         // Sistema otimizado para reasoning
         const isCarroRodoviario = tipoViagem === 'carro' || tipoViagem === 'rodoviario';
         const limiteDistancia = tipoViagem === 'carro' ? 
@@ -269,7 +283,7 @@ CRITÉRIOS DE DECISÃO:
 - Considere a distância e facilidade de acesso a partir da cidade de origem${tipoViagem === 'carro' ? ' por estrada' : ''}
 
 RESULTADO: JSON estruturado com recomendações fundamentadas no raciocínio acima.`;
-    } else if (model === CONFIG.groq.models.personality) {
+    } else if (role === 'personality') {
         // Sistema focado na personalidade da Tripinha
         systemMessage = `Você é a Tripinha, uma vira-lata caramelo especialista em viagens! 🐾
 ${tipoViagem === 'carro' ? `ESPECIALISTA EM ROAD TRIPS DE ATÉ ${requestData.distancia_maxima || '1500km'}!` : ''}
@@ -296,8 +310,8 @@ RETORNE APENAS JSON VÁLIDO sem formatação markdown.`;
     }
 
     try {
-        utils.log(`🧠 Enviando requisição para Groq (${model}) - Tipo: ${tipoViagem}...`);
-        
+        utils.log(`🧠 Enviando requisição para ${provider} (${model}) - Tipo: ${tipoViagem}...`);
+
         const requestPayload = {
             model: model,
             messages: [
@@ -310,35 +324,40 @@ RETORNE APENAS JSON VÁLIDO sem formatação markdown.`;
                     content: prompt
                 }
             ],
-            temperature: model === CONFIG.groq.models.reasoning ? 0.6 : CONFIG.groq.temperature,
-            max_tokens: CONFIG.groq.maxTokens,
+            temperature: CONFIG.temperature,
+            max_tokens: chainEntry.maxTokens,
             stream: false
         };
-        
+
+        // Gemini 2.5: limita o "thinking" para sobrar orçamento de tokens para o JSON final
+        if (provider === 'gemini') {
+            requestPayload.reasoning_effort = 'low';
+        }
+
         const response = await apiClient({
             method: 'post',
-            url: `${CONFIG.groq.baseURL}/chat/completions`,
+            url: `${CONFIG.providers[provider].baseURL}/chat/completions`,
             headers: {
                 'Authorization': `Bearer ${apiKey}`,
                 'Content-Type': 'application/json'
             },
             data: requestPayload,
-            timeout: model === CONFIG.groq.models.reasoning ? CONFIG.groq.timeout : 60000
+            timeout: chainEntry.timeout
         });
-        
+
         if (!response.data?.choices?.[0]?.message?.content) {
-            throw new Error(`Formato de resposta do Groq inválido (${model})`);
+            throw new Error(`Formato de resposta do ${provider} inválido (${model})`);
         }
-        
+
         const content = response.data.choices[0].message.content;
         utils.log(`📥 Resposta recebida (${model}):`, content.substring(0, 300));
-        
+
         return utils.extrairJSONDaResposta(content);
-        
+
     } catch (error) {
-        console.error(`❌ Erro na chamada à API Groq (${model}):`, error.message);
+        console.error(`❌ Erro na chamada à API ${provider} (${model}):`, error.message);
         if (error.response) {
-            utils.log(`🔴 Resposta de erro do Groq (${model}):`, error.response.data);
+            utils.log(`🔴 Resposta de erro do ${provider} (${model}):`, error.response.data);
         }
         throw error;
     }
@@ -347,7 +366,7 @@ RETORNE APENAS JSON VÁLIDO sem formatação markdown.`;
 // =======================
 // 🚗 NOVA FUNÇÃO: Geração de prompt específico para VIAGEM DE CARRO
 // =======================
-function gerarPromptParaGroq(dados) {
+function gerarPromptParaIA(dados) {
     const infoCidadePartida = utils.extrairInfoCidadePartida(dados.cidade_partida);
     
     const infoViajante = {
@@ -976,47 +995,48 @@ function ensureValidDestinationData(jsonString, requestData) {
 // Função de retry com fallback inteligente entre modelos
 // =======================
 async function retryWithBackoffAndFallback(prompt, requestData, maxAttempts = CONFIG.retries) {
-    const modelOrder = [
-        CONFIG.groq.models.reasoning,     // Primeiro: Reasoning model
-        CONFIG.groq.models.personality,   // Segundo: Llama 3.3 70B (personalidade)
-        CONFIG.groq.models.fast           // Terceiro: Llama 3.1 8B (backup rápido)
-    ];
-    
-    for (const model of modelOrder) {
-        console.log(`🔄 Tentando modelo: ${model}`);
-        
+    for (const chainEntry of CONFIG.modelChain) {
+        const { provider, model } = chainEntry;
+
+        if (!getApiKey(provider)) {
+            console.log(`⏭️ Pulando ${provider} (${model}): chave de API não configurada`);
+            continue;
+        }
+
+        console.log(`🔄 Tentando modelo: ${provider}/${model}`);
+
         let attempt = 1;
         let delay = 1500;
-        
+
         while (attempt <= maxAttempts) {
             try {
                 console.log(`🔄 Modelo ${model} - Tentativa ${attempt}/${maxAttempts}...`);
-                
-                const result = await callGroqAPI(prompt, requestData, model);
-                
+
+                const result = await callAIAPI(prompt, requestData, chainEntry);
+
                 if (result && utils.isValidDestinationJSON(result, requestData)) {
-                    console.log(`✅ Sucesso com ${model} na tentativa ${attempt}`);
-                    return { result, model };
+                    console.log(`✅ Sucesso com ${provider}/${model} na tentativa ${attempt}`);
+                    return { result, model, provider, role: chainEntry.role };
                 } else {
                     console.log(`❌ ${model} - Tentativa ${attempt}: resposta inválida`);
                 }
-                
+
             } catch (error) {
                 console.error(`❌ ${model} - Tentativa ${attempt} falhou:`, error.message);
             }
-            
+
             if (attempt === maxAttempts) {
                 console.log(`🚫 ${model}: Todas as ${maxAttempts} tentativas falharam`);
                 break;
             }
-            
+
             console.log(`⏳ Aguardando ${delay}ms antes da próxima tentativa...`);
             await new Promise(resolve => setTimeout(resolve, delay));
             delay = Math.min(delay * 1.2, 5000);
             attempt++;
         }
     }
-    
+
     console.log('🚫 Todos os modelos falharam');
     return null;
 }
@@ -1057,26 +1077,26 @@ module.exports = async function handler(req, res) {
     }
 
     try {
-        console.log('🚗🚌✈️ === BENETRIP GROQ API v10.1 - CARRO + ÔNIBUS + AVIÃO ===');
-        
+        console.log('🚗🚌✈️ === BENETRIP AI API v11.0 (GEMINI + CEREBRAS) - CARRO + ÔNIBUS + AVIÃO ===');
+
         if (!req.body) {
             isResponseSent = true;
             clearTimeout(serverTimeout);
             return res.status(400).json({ error: "Nenhum dado fornecido na requisição" });
         }
-        
+
         const requestData = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
-        
-        // Verificar se a chave do Groq está configurada
-        if (!process.env.GROQ_API_KEY) {
-            console.error('❌ GROQ_API_KEY não configurada');
+
+        // Verificar se ao menos um provedor de IA está configurado
+        if (!getApiKey('gemini') && !getApiKey('cerebras')) {
+            console.error('❌ Nenhuma chave de IA configurada (GEMINI_API_KEY/GOOGLE_API_KEY ou CEREBRAS_KEY)');
             if (!isResponseSent) {
                 isResponseSent = true;
                 clearTimeout(serverTimeout);
                 return res.status(500).json({
                     tipo: "erro",
                     message: "Serviço temporariamente indisponível.",
-                    error: "groq_api_key_missing"
+                    error: "ai_api_key_missing"
                 });
             }
             return;
@@ -1116,28 +1136,28 @@ module.exports = async function handler(req, res) {
             console.log('📏 Limite máximo: 700km ou 10 horas');
         }
         
-        // Gerar prompt otimizado para Groq
-        const prompt = gerarPromptParaGroq(requestData);
-        console.log(`📝 Prompt gerado para Groq (${tipoViagem})`);
-        
+        // Gerar prompt otimizado para a IA
+        const prompt = gerarPromptParaIA(requestData);
+        console.log(`📝 Prompt gerado (${tipoViagem})`);
+
         // Tentar obter recomendações com fallback inteligente entre modelos
         const resultado = await retryWithBackoffAndFallback(prompt, requestData);
-        
+
         if (!resultado) {
-            console.error('🚫 Falha em todos os modelos do Groq');
+            console.error('🚫 Falha em todos os modelos de IA');
             if (!isResponseSent) {
                 isResponseSent = true;
                 clearTimeout(serverTimeout);
                 return res.status(503).json({
                     tipo: "erro",
                     message: "Não foi possível obter recomendações no momento. Tente novamente em alguns instantes.",
-                    error: "groq_all_models_failed"
+                    error: "ai_all_models_failed"
                 });
             }
             return;
         }
-        
-        const { result: recomendacoesBrutas, model: modeloUsado } = resultado;
+
+        const { result: recomendacoesBrutas, model: modeloUsado, provider: providerUsado, role: roleUsado } = resultado;
         
         // Processar e retornar resultado
         try {
@@ -1148,10 +1168,10 @@ module.exports = async function handler(req, res) {
             // Adicionar metadados incluindo modelo usado e tipo de viagem
             dados.metadados = {
                 modelo: modeloUsado,
-                provider: 'groq',
-                versao: '10.1-carro-completo',
+                provider: providerUsado,
+                versao: '11.0-gemini-cerebras',
                 timestamp: new Date().toISOString(),
-                reasoning_enabled: modeloUsado === CONFIG.groq.models.reasoning,
+                reasoning_enabled: roleUsado === 'reasoning',
                 origem: infoCidadePartida,
                 tipoViagem: tipoViagem,
                 orcamento: requestData.orcamento_valor,
@@ -1181,7 +1201,7 @@ module.exports = async function handler(req, res) {
                 isResponseSent = true;
                 clearTimeout(serverTimeout);
                 return res.status(200).json({
-                    tipo: "groq_success",
+                    tipo: "ai_success",
                     modelo: modeloUsado,
                     tipoViagem: tipoViagem,
                     conteudo: JSON.stringify(dados)
@@ -1195,7 +1215,7 @@ module.exports = async function handler(req, res) {
                 isResponseSent = true;
                 clearTimeout(serverTimeout);
                 return res.status(200).json({
-                    tipo: "groq_partial_success",
+                    tipo: "ai_partial_success",
                     modelo: modeloUsado,
                     tipoViagem: tipoViagem,
                     conteudo: recomendacoesBrutas

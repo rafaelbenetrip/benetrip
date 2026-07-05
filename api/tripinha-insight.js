@@ -1,5 +1,5 @@
-// api/tripinha-insight.js - BENETRIP TRIPINHA INSIGHT v1.0
-// Usa Groq para gerar uma frase curta da Tripinha interpretando
+// api/tripinha-insight.js - BENETRIP TRIPINHA INSIGHT v2.0
+// Usa Cerebras para gerar uma frase curta da Tripinha interpretando
 // os destinos baratos disponíveis para uma cidade de origem.
 //
 // POST /api/tripinha-insight
@@ -22,13 +22,13 @@ export default async function handler(req, res) {
         });
     }
 
-    if (!process.env.GROQ_API_KEY) {
-        console.warn('⚠️ Tripinha: GROQ_API_KEY não encontrada');
+    if (!getCerebrasKey()) {
+        console.warn('⚠️ Tripinha: CEREBRAS_KEY não encontrada');
         return res.status(200).json({
             success: true,
             insight: gerarFallback(origem, destinos),
             modelo: 'fallback',
-            motivo: 'GROQ_API_KEY não configurada',
+            motivo: 'CEREBRAS_KEY não configurada',
         });
     }
 
@@ -46,8 +46,12 @@ export default async function handler(req, res) {
     }
 }
 
+function getCerebrasKey() {
+    return process.env.CEREBRAS_KEY || process.env.CEREBRAS_API_KEY || null;
+}
+
 // ============================================================
-// INSIGHT VIA GROQ
+// INSIGHT VIA CEREBRAS
 // ============================================================
 async function gerarInsight(origem, origemCodigo, destinos) {
     const top5 = destinos.slice(0, 5);
@@ -115,7 +119,7 @@ ${topDesceram ? `- Maiores quedas: ${topDesceram}` : ''}
 ${intlDestaques ? `- Internacionais acessíveis (<R$2500): ${intlDestaques}` : ''}
 - Estilos: ${resumo.estilosDisponiveis}`;
 
-    const models = ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant'];
+    const models = ['llama-3.3-70b', 'llama3.1-8b'];
     const erros = [];
 
     console.log(`🐶 Tripinha: gerando insight para ${origem} (${total} destinos)`);
@@ -123,11 +127,11 @@ ${intlDestaques ? `- Internacionais acessíveis (<R$2500): ${intlDestaques}` : '
     for (const model of models) {
         try {
             console.log(`🐶 Tentando modelo: ${model}`);
-            const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+            const response = await fetch('https://api.cerebras.ai/v1/chat/completions', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
+                    'Authorization': `Bearer ${getCerebrasKey()}`,
                 },
                 body: JSON.stringify({
                     model,
@@ -144,7 +148,7 @@ ${intlDestaques ? `- Internacionais acessíveis (<R$2500): ${intlDestaques}` : '
 
             if (!response.ok) {
                 const body = await response.text().catch(() => '');
-                const msg = `Groq ${model} HTTP ${response.status}: ${body.slice(0, 200)}`;
+                const msg = `Cerebras ${model} HTTP ${response.status}: ${body.slice(0, 200)}`;
                 console.warn(`⚠️ ${msg}`);
                 erros.push(msg);
                 continue;
@@ -153,7 +157,7 @@ ${intlDestaques ? `- Internacionais acessíveis (<R$2500): ${intlDestaques}` : '
             const data = await response.json();
             const content = data.choices?.[0]?.message?.content;
             if (!content) {
-                const msg = `Groq ${model}: resposta vazia`;
+                const msg = `Cerebras ${model}: resposta vazia`;
                 console.warn(`⚠️ ${msg}`);
                 erros.push(msg);
                 continue;
@@ -167,9 +171,9 @@ ${intlDestaques ? `- Internacionais acessíveis (<R$2500): ${intlDestaques}` : '
                 return { insight, modelo: model };
             }
 
-            erros.push(`Groq ${model}: JSON sem campo insight`);
+            erros.push(`Cerebras ${model}: JSON sem campo insight`);
         } catch (err) {
-            const msg = `Groq ${model}: ${err.message}`;
+            const msg = `Cerebras ${model}: ${err.message}`;
             console.warn(`⚠️ ${msg}`);
             erros.push(msg);
             continue;

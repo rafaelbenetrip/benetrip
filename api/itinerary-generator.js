@@ -1,31 +1,45 @@
-// api/itinerary-generator.js - Endpoint para geração de roteiro personalizado com GROQ
+// api/itinerary-generator.js - Endpoint para geração de roteiro personalizado
+// Versão 3.0 - Gemini Flash (principal) + Cerebras (fallback)
 // Versão 2.3 - Anti-repetição, contagem forçada, dicas específicas, títulos criativos
 // Versão 2.2 - Tokens dinâmicos por intensidade, atividades por período, grupos, hidden gems
-// Versão 2.1 - Prompt melhorado para viagens curtas e longas
 const axios = require('axios');
 const http = require('http');
 const https = require('https');
 
 // =======================
-// Configurações Groq
+// Configurações de IA - Gemini Flash (principal) + Cerebras (fallback)
 // =======================
 const CONFIG = {
-  groq: {
-    baseURL: 'https://api.groq.com/openai/v1',
-    models: {
-      primary: 'llama-3.3-70b-versatile',
-      fast: 'llama-3.1-8b-instant',
-      toolUse: 'llama3-groq-70b-8192-tool-use-preview'
+  providers: {
+    gemini: {
+      baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai',
+      apiKeyEnvs: ['GEMINI_API_KEY', 'GOOGLE_API_KEY']
     },
-    timeout: 120000,      // ✅ FIX v2.2: 120 segundos para viagens longas e intensas
-    temperature: 0.7
+    cerebras: {
+      baseURL: 'https://api.cerebras.ai/v1',
+      apiKeyEnvs: ['CEREBRAS_KEY', 'CEREBRAS_API_KEY']
+    }
   },
+  modelChain: [
+    { provider: 'gemini',   model: process.env.GEMINI_MODEL || 'gemini-2.5-flash' },
+    { provider: 'cerebras', model: 'llama-3.3-70b' },
+    { provider: 'cerebras', model: 'llama3.1-8b' }
+  ],
+  timeout: 120000,      // ✅ FIX v2.2: 120 segundos para viagens longas e intensas
+  temperature: 0.7,
   retries: 2,
   logging: {
     enabled: true,
     maxLength: 500
   }
 };
+
+function getApiKey(provider) {
+  for (const envName of CONFIG.providers[provider].apiKeyEnvs) {
+    if (process.env[envName]) return process.env[envName];
+  }
+  return null;
+}
 
 // ✅ FIX v2.2: maxTokens dinâmico — teto aumentado para viagens longas e intensas
 function calcularMaxTokens(diasViagem, intensidade) {
@@ -39,7 +53,7 @@ function calcularMaxTokens(diasViagem, intensidade) {
 // Cliente HTTP configurado
 // =======================
 const apiClient = axios.create({
-  timeout: CONFIG.groq.timeout,
+  timeout: CONFIG.timeout,
   httpAgent: new http.Agent({ keepAlive: true }),
   httpsAgent: new https.Agent({ keepAlive: true })
 });
@@ -92,13 +106,14 @@ function extrairJSONDaResposta(texto) {
 }
 
 // =======================
-// Chamada à API Groq
+// Chamada à API de IA (Gemini/Cerebras via API OpenAI-compatível)
 // =======================
-async function chamarGroqAPI(prompt, model = CONFIG.groq.models.primary, maxTokens = 4000) {
-  const apiKey = process.env.GROQ_API_KEY;
-  
+async function chamarIAAPI(prompt, chainEntry = CONFIG.modelChain[0], maxTokens = 4000) {
+  const { provider, model } = chainEntry;
+  const apiKey = getApiKey(provider);
+
   if (!apiKey) {
-    throw new Error('Chave da API Groq não configurada (GROQ_API_KEY)');
+    throw new Error(`Chave da API ${provider} não configurada (${CONFIG.providers[provider].apiKeyEnvs.join(' ou ')})`);
   }
   
   // ✅ FIX v2.1: System message melhorado
@@ -122,49 +137,54 @@ REGRAS ABSOLUTAS:
 - Retorne APENAS JSON válido, sem markdown, sem texto extra`;
 
   try {
-    logEvent('info', `Chamando Groq API (${model}), maxTokens: ${maxTokens}...`);
-    
+    logEvent('info', `Chamando API ${provider} (${model}), maxTokens: ${maxTokens}...`);
+
     const requestPayload = {
       model: model,
       messages: [
         { role: "system", content: systemMessage },
         { role: "user", content: prompt }
       ],
-      temperature: CONFIG.groq.temperature,
+      temperature: CONFIG.temperature,
       max_tokens: maxTokens,
       stream: false
     };
-    
+
+    // Gemini 2.5: limita o "thinking" para sobrar orçamento de tokens para o roteiro
+    if (provider === 'gemini') {
+      requestPayload.reasoning_effort = 'low';
+    }
+
     const response = await apiClient({
       method: 'post',
-      url: `${CONFIG.groq.baseURL}/chat/completions`,
+      url: `${CONFIG.providers[provider].baseURL}/chat/completions`,
       headers: {
         'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json'
       },
       data: requestPayload
     });
-    
+
     if (!response.data?.choices?.[0]?.message?.content) {
-      throw new Error(`Formato de resposta inválido do Groq`);
+      throw new Error(`Formato de resposta inválido do ${provider}`);
     }
-    
+
     const content = response.data.choices[0].message.content;
-    
+
     // ✅ FIX v2.1: Log de finish_reason para detectar truncamento
     const finishReason = response.data.choices[0].finish_reason;
-    logEvent('info', `Resposta recebida do Groq (${model}), finish_reason: ${finishReason}`);
-    
+    logEvent('info', `Resposta recebida do ${provider} (${model}), finish_reason: ${finishReason}`);
+
     if (finishReason === 'length') {
       logEvent('warning', 'Resposta TRUNCADA pelo limite de tokens!');
     }
-    
+
     return extrairJSONDaResposta(content);
-    
+
   } catch (error) {
-    logEvent('error', `Erro na API Groq (${model})`, { 
+    logEvent('error', `Erro na API ${provider} (${model})`, {
       message: error.message,
-      response: error.response?.data 
+      response: error.response?.data
     });
     throw error;
   }
@@ -173,7 +193,7 @@ REGRAS ABSOLUTAS:
 // =======================
 // ✅ FIX v2.1: Prompt otimizado para qualidade e diferentes durações
 // =======================
-function gerarPromptGroq(params) {
+function gerarPromptIA(params) {
   const {
     destino,
     pais,
@@ -300,37 +320,39 @@ Retorne APENAS o JSON, sem explicações.`;
 // Retry com fallback entre modelos
 // =======================
 async function executarComRetry(prompt, maxTentativas = CONFIG.retries, maxTokens = 4000) {
-  const modelos = [
-    CONFIG.groq.models.primary,
-    CONFIG.groq.models.fast
-  ];
-  
-  for (const modelo of modelos) {
-    logEvent('info', `Tentando com modelo: ${modelo}, maxTokens: ${maxTokens}`);
-    
+  for (const chainEntry of CONFIG.modelChain) {
+    const { provider, model } = chainEntry;
+
+    if (!getApiKey(provider)) {
+      logEvent('warning', `Pulando ${provider} (${model}): chave de API não configurada`);
+      continue;
+    }
+
+    logEvent('info', `Tentando com modelo: ${provider}/${model}, maxTokens: ${maxTokens}`);
+
     for (let tentativa = 1; tentativa <= maxTentativas; tentativa++) {
       try {
-        const resultado = await chamarGroqAPI(prompt, modelo, maxTokens);
-        
+        const resultado = await chamarIAAPI(prompt, chainEntry, maxTokens);
+
         if (resultado && validarRoteiro(resultado)) {
-          logEvent('info', `Sucesso com ${modelo} na tentativa ${tentativa}`);
-          return { roteiro: resultado, modelo };
+          logEvent('info', `Sucesso com ${provider}/${model} na tentativa ${tentativa}`);
+          return { roteiro: resultado, modelo: model, provider };
         }
-        
-        logEvent('warning', `Resposta inválida do ${modelo}, tentativa ${tentativa}`);
-        
+
+        logEvent('warning', `Resposta inválida do ${model}, tentativa ${tentativa}`);
+
       } catch (error) {
-        logEvent('error', `Erro no ${modelo}, tentativa ${tentativa}`, { 
-          message: error.message 
+        logEvent('error', `Erro no ${model}, tentativa ${tentativa}`, {
+          message: error.message
         });
-        
+
         if (tentativa < maxTentativas) {
           await new Promise(resolve => setTimeout(resolve, 1000 * tentativa));
         }
       }
     }
   }
-  
+
   throw new Error('Todos os modelos falharam após múltiplas tentativas');
 }
 
@@ -444,7 +466,7 @@ module.exports = async (req, res) => {
     const intensidadeParam = intensidade || preferencias?.intensidade || 'moderado';
     const maxTokens = calcularMaxTokens(diasViagem, intensidadeParam);
     
-    logEvent('info', 'Gerando roteiro com Groq', {
+    logEvent('info', 'Gerando roteiro com IA (Gemini/Cerebras)', {
       destino,
       pais: pais || 'Internacional',
       diasViagem,
@@ -462,7 +484,7 @@ module.exports = async (req, res) => {
       orcamento_nivel: orcamento || preferencias?.orcamento || 'medio'
     };
     
-    const prompt = gerarPromptGroq({
+    const prompt = gerarPromptIA({
       destino,
       pais: pais || 'Internacional',
       dataInicio,
@@ -475,14 +497,14 @@ module.exports = async (req, res) => {
       preferencias: preferenciasCompletas
     });
     
-    const { roteiro, modelo } = await executarComRetry(prompt, CONFIG.retries, maxTokens);
-    
+    const { roteiro, modelo, provider } = await executarComRetry(prompt, CONFIG.retries, maxTokens);
+
     const roteiroCompleto = completarRoteiro(roteiro, diasViagem);
-    
+
     roteiroCompleto.metadados = {
-      provider: 'groq',
+      provider: provider,
       modelo: modelo,
-      versao: '2.1',
+      versao: '3.0-gemini-cerebras',
       timestamp: new Date().toISOString(),
       diasSolicitados: diasViagem,
       maxTokensUsados: maxTokens
@@ -503,7 +525,7 @@ module.exports = async (req, res) => {
       stack: erro.stack
     });
     
-    if (erro.message.includes('GROQ_API_KEY')) {
+    if (erro.message.includes('não configurada')) {
       return res.status(500).json({
         error: 'Configuração do servidor incompleta',
         details: 'API key não configurada'
