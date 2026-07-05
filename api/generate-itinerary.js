@@ -25,8 +25,8 @@ const AI_PROVIDERS = {
 
 const AI_MODEL_CHAIN = [
     { provider: 'gemini', model: process.env.GEMINI_MODEL || 'gemini-2.5-flash' },
-    { provider: 'cerebras', model: 'llama-3.3-70b' },
-    { provider: 'cerebras', model: 'llama3.1-8b' },
+    { provider: 'cerebras', model: process.env.CEREBRAS_MODEL || 'gpt-oss-120b' },
+    { provider: 'cerebras', model: process.env.CEREBRAS_MODEL_FALLBACK || 'zai-glm-4.7' },
 ];
 
 function getAIKey(provider) {
@@ -333,8 +333,8 @@ JSON VÁLIDO apenas, zero texto extra. Estrutura: ${estruturaJSON}`;
                         response_format: { type: 'json_object' },
                         temperature: 0.7,
                         max_tokens: tokensEstimados,
-                        // Gemini 2.5: limita o "thinking" para sobrar orçamento de tokens para o roteiro
-                        ...(provider === 'gemini' ? { reasoning_effort: 'low' } : {}),
+                        // Modelos com "thinking": limita o raciocínio para sobrar tokens para o roteiro
+                        reasoning_effort: 'low',
                     })
                 });
                 clearTimeout(timeoutId);

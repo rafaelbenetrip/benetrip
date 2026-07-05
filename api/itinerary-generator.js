@@ -22,8 +22,8 @@ const CONFIG = {
   },
   modelChain: [
     { provider: 'gemini',   model: process.env.GEMINI_MODEL || 'gemini-2.5-flash' },
-    { provider: 'cerebras', model: 'llama-3.3-70b' },
-    { provider: 'cerebras', model: 'llama3.1-8b' }
+    { provider: 'cerebras', model: process.env.CEREBRAS_MODEL || 'gpt-oss-120b' },
+    { provider: 'cerebras', model: process.env.CEREBRAS_MODEL_FALLBACK || 'zai-glm-4.7' }
   ],
   timeout: 120000,      // ✅ FIX v2.2: 120 segundos para viagens longas e intensas
   temperature: 0.7,
@@ -150,10 +150,9 @@ REGRAS ABSOLUTAS:
       stream: false
     };
 
-    // Gemini 2.5: limita o "thinking" para sobrar orçamento de tokens para o roteiro
-    if (provider === 'gemini') {
-      requestPayload.reasoning_effort = 'low';
-    }
+    // Gemini, gpt-oss e GLM são modelos com "thinking": limita o raciocínio
+    // para sobrar orçamento de tokens para o roteiro
+    requestPayload.reasoning_effort = 'low';
 
     const response = await apiClient({
       method: 'post',

@@ -21,9 +21,9 @@ const CONFIG = {
     },
     // Cadeia de fallback: cada entrada é tentada em ordem
     modelChain: [
-        { provider: 'gemini',   model: process.env.GEMINI_MODEL || 'gemini-2.5-flash', role: 'reasoning',   maxTokens: 8000, timeout: 180000 },
-        { provider: 'cerebras', model: 'llama-3.3-70b',                                role: 'personality', maxTokens: 5000, timeout: 60000 },
-        { provider: 'cerebras', model: 'llama3.1-8b',                                  role: 'fast',        maxTokens: 5000, timeout: 60000 }
+        { provider: 'gemini',   model: process.env.GEMINI_MODEL || 'gemini-2.5-flash',        role: 'reasoning', maxTokens: 8000, timeout: 180000 },
+        { provider: 'cerebras', model: process.env.CEREBRAS_MODEL || 'gpt-oss-120b',          role: 'reasoning', maxTokens: 8000, timeout: 90000 },
+        { provider: 'cerebras', model: process.env.CEREBRAS_MODEL_FALLBACK || 'zai-glm-4.7', role: 'personality', maxTokens: 8000, timeout: 90000 }
     ],
     timeout: 180000,   // 3 minutos para reasoning
     temperature: 0.6,  // Focado para análise
@@ -329,10 +329,9 @@ RETORNE APENAS JSON VÁLIDO sem formatação markdown.`;
             stream: false
         };
 
-        // Gemini 2.5: limita o "thinking" para sobrar orçamento de tokens para o JSON final
-        if (provider === 'gemini') {
-            requestPayload.reasoning_effort = 'low';
-        }
+        // Gemini, gpt-oss e GLM são modelos com "thinking": limita o raciocínio
+        // para sobrar orçamento de tokens para o JSON final
+        requestPayload.reasoning_effort = 'low';
 
         const response = await apiClient({
             method: 'post',
