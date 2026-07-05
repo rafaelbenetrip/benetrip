@@ -161,7 +161,7 @@ JSON:
         // ============================================================
         // TENTAR MODELOS EM CASCATA
         // ============================================================
-        const models = ['llama-3.3-70b', 'llama3.1-8b'];
+        const models = [process.env.CEREBRAS_MODEL || 'gpt-oss-120b', process.env.CEREBRAS_MODEL_FALLBACK || 'zai-glm-4.7'];
         let ranking = null;
         let usedModel = null;
 
@@ -183,7 +183,8 @@ JSON:
                             { role: 'user', content: prompt }
                         ],
                         temperature: 0.4,
-                        max_tokens: 2000,
+                        max_tokens: 4000, // inclui tokens de "thinking" dos modelos de reasoning
+                        reasoning_effort: 'low',
                         response_format: { type: 'json_object' }
                     })
                 });

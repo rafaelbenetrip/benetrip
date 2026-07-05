@@ -74,7 +74,7 @@ IMPORTANTE: Retorne APENAS o JSON, sem markdown, sem explicação extra.`;
 Destinos disponíveis (índice|nome|país|preço|estilos|tipo|paradas):
 ${listaCompacta}`;
 
-    const models = ['llama-3.3-70b', 'llama3.1-8b'];
+    const models = [process.env.CEREBRAS_MODEL || 'gpt-oss-120b', process.env.CEREBRAS_MODEL_FALLBACK || 'zai-glm-4.7'];
 
     for (const model of models) {
         try {
@@ -92,7 +92,8 @@ ${listaCompacta}`;
                     ],
                     response_format: { type: 'json_object' },
                     temperature: 0.3,
-                    max_tokens: 1000,
+                    max_tokens: 2500, // inclui tokens de "thinking" dos modelos de reasoning
+                    reasoning_effort: 'low',
                 }),
                 signal: AbortSignal.timeout(15000),
             });

@@ -228,7 +228,7 @@ Retorne APENAS um JSON: { "classificacoes": [[estilos_destino_0], [estilos_desti
 Cada item é um array de strings. Mantenha a mesma ordem dos destinos.
 Se não conhecer o destino, use ["cidade"] como default.`;
 
-    const models = ['llama-3.3-70b', 'llama3.1-8b'];
+    const models = [process.env.CEREBRAS_MODEL || 'gpt-oss-120b', process.env.CEREBRAS_MODEL_FALLBACK || 'zai-glm-4.7'];
 
     for (const model of models) {
         try {
@@ -246,7 +246,8 @@ Se não conhecer o destino, use ["cidade"] como default.`;
                     ],
                     response_format: { type: 'json_object' },
                     temperature: 0.2,
-                    max_tokens: 4000,
+                    max_tokens: 6000, // inclui tokens de "thinking" dos modelos de reasoning
+                    reasoning_effort: 'low',
                 }),
                 signal: AbortSignal.timeout(30000),
             });

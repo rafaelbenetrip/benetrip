@@ -35,11 +35,12 @@ async function gerarCaptionIA(formato, dados) {
                 'Authorization': `Bearer ${cerebrasKey}`,
             },
             body: JSON.stringify({
-                model: 'llama-3.3-70b',
+                model: process.env.CEREBRAS_MODEL || 'gpt-oss-120b',
                 messages: [{ role: 'user', content: prompt }],
                 response_format: { type: 'json_object' },
                 temperature: 0.8,
-                max_tokens: 2000,
+                max_tokens: 3000, // inclui tokens de "thinking" dos modelos de reasoning
+                reasoning_effort: 'low',
             }),
             signal: AbortSignal.timeout(30000),
         });
