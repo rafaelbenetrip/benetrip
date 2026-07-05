@@ -5,11 +5,36 @@
 //        instruções para grupos/amigos/casal/solo, hidden gems, temperatura 0.7
 // v2.1: Fix timeout Vercel + cidades repetidas (roteiro complementar) + max_tokens dinâmico
 // v2.0: MULTI-DESTINO + clima previsto + contagem de dias por destino
-// Fallback: Groq llama-3.3-70b → llama-3.1-8b → roteiro genérico
+// Fallback: Gemini Flash → Cerebras llama-3.3-70b → llama3.1-8b → roteiro genérico
 
 export const config = {
     maxDuration: 300,
 };
+
+// Provedores de IA (API OpenAI-compatível): Gemini Flash principal, Cerebras fallback
+const AI_PROVIDERS = {
+    gemini: {
+        baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai',
+        apiKeyEnvs: ['GEMINI_API_KEY', 'GOOGLE_API_KEY'],
+    },
+    cerebras: {
+        baseURL: 'https://api.cerebras.ai/v1',
+        apiKeyEnvs: ['CEREBRAS_KEY', 'CEREBRAS_API_KEY'],
+    },
+};
+
+const AI_MODEL_CHAIN = [
+    { provider: 'gemini', model: process.env.GEMINI_MODEL || 'gemini-2.5-flash' },
+    { provider: 'cerebras', model: 'llama-3.3-70b' },
+    { provider: 'cerebras', model: 'llama3.1-8b' },
+];
+
+function getAIKey(provider) {
+    for (const envName of AI_PROVIDERS[provider].apiKeyEnvs) {
+        if (process.env[envName]) return process.env[envName];
+    }
+    return null;
+}
 
 export default async function handler(req, res) {
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -42,7 +67,7 @@ export default async function handler(req, res) {
         }
     }
 
-    if (!process.env.GROQ_API_KEY) {
+    if (!getAIKey('gemini') && !getAIKey('cerebras')) {
         return res.status(200).json(buildFallbackItinerary(req.body, destinosArray));
     }
 
@@ -282,21 +307,22 @@ JSON VÁLIDO apenas, zero texto extra. Estrutura: ${estruturaJSON}`;
         const tokensEstimados = Math.min(Math.max(numDiasTotal * tokensPorDia, 6000), 32000);
         console.log(`📊 max_tokens: ${tokensEstimados} para ${numDiasTotal} dias (${intensidade || 'moderado'})`);
 
-        // === GROQ API ===
-        const models = ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant'];
+        // === IA (GEMINI + CEREBRAS) ===
         let resultado = null, usedModel = null;
 
-        for (const model of models) {
+        for (const { provider, model } of AI_MODEL_CHAIN) {
+            const apiKey = getAIKey(provider);
+            if (!apiKey) { console.warn(`⏭️ Pulando ${provider}/${model}: chave não configurada`); continue; }
             try {
-                console.log(`🤖 Tentando: ${model}`);
+                console.log(`🤖 Tentando: ${provider}/${model}`);
                 const controller = new AbortController();
                 // v2.2: timeout dinâmico — 50s base + 3s por dia extra (além de 5 dias)
                 const timeoutMs = Math.min(50000 + Math.max(numDiasTotal - 5, 0) * 3000, 120000);
                 const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
-                const groqResponse = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+                const aiResponse = await fetch(`${AI_PROVIDERS[provider].baseURL}/chat/completions`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.GROQ_API_KEY}` },
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
                     signal: controller.signal,
                     body: JSON.stringify({
                         model,
@@ -307,13 +333,15 @@ JSON VÁLIDO apenas, zero texto extra. Estrutura: ${estruturaJSON}`;
                         response_format: { type: 'json_object' },
                         temperature: 0.7,
                         max_tokens: tokensEstimados,
+                        // Gemini 2.5: limita o "thinking" para sobrar orçamento de tokens para o roteiro
+                        ...(provider === 'gemini' ? { reasoning_effort: 'low' } : {}),
                     })
                 });
                 clearTimeout(timeoutId);
 
-                if (!groqResponse.ok) { console.error(`[${model}] HTTP ${groqResponse.status}`); continue; }
-                const groqData = await groqResponse.json();
-                const content = groqData.choices?.[0]?.message?.content;
+                if (!aiResponse.ok) { console.error(`[${model}] HTTP ${aiResponse.status}`); continue; }
+                const aiData = await aiResponse.json();
+                const content = aiData.choices?.[0]?.message?.content;
                 if (!content) { console.error(`[${model}] Vazio`); continue; }
 
                 resultado = JSON.parse(content);

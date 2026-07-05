@@ -1,7 +1,7 @@
 // api/instagram/generate-post.js - Gerador de Conteúdo para Instagram v2.0
 //
 // Sistema de 7 formatos diferentes (1 por dia da semana).
-// Cada formato usa dados REAIS do Supabase + IA (Groq) para caption.
+// Cada formato usa dados REAIS do Supabase + IA (Cerebras) para caption.
 // Gera URL do card branded via /api/instagram/card.
 //
 // ENDPOINT: POST /api/instagram/generate-post
@@ -18,24 +18,24 @@ import {
 export const maxDuration = 60;
 
 // ============================================================
-// GERAR CAPTION COM GROQ (format-specific prompts)
+// GERAR CAPTION COM CEREBRAS (format-specific prompts)
 // ============================================================
-async function gerarCaptionGroq(formato, dados) {
-    const groqKey = process.env.GROQ_API_KEY;
-    if (!groqKey) return null;
+async function gerarCaptionIA(formato, dados) {
+    const cerebrasKey = process.env.CEREBRAS_KEY || process.env.CEREBRAS_API_KEY;
+    if (!cerebrasKey) return null;
 
     const prompt = buildPrompt(formato, dados);
     if (!prompt) return null;
 
     try {
-        const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        const response = await fetch('https://api.cerebras.ai/v1/chat/completions', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${groqKey}`,
+                'Authorization': `Bearer ${cerebrasKey}`,
             },
             body: JSON.stringify({
-                model: 'llama-3.3-70b-versatile',
+                model: 'llama-3.3-70b',
                 messages: [{ role: 'user', content: prompt }],
                 response_format: { type: 'json_object' },
                 temperature: 0.8,
@@ -52,7 +52,7 @@ async function gerarCaptionGroq(formato, dados) {
 
         return JSON.parse(content);
     } catch (err) {
-        console.error('Erro Groq:', err.message);
+        console.error('Erro Cerebras:', err.message);
         return null;
     }
 }
@@ -403,14 +403,14 @@ export default async function handler(req, res) {
 
         console.log(`   Dados gerados para formato: ${formatoParam}`);
 
-        // STEP 2: Gerar caption com Groq
-        let captionData = await gerarCaptionGroq(formatoParam, formatoData.dadosCaption);
+        // STEP 2: Gerar caption com Cerebras
+        let captionData = await gerarCaptionIA(formatoParam, formatoData.dadosCaption);
         if (!captionData) {
             console.log('   Usando caption fallback (sem IA)');
             captionData = captionFallback(formatoParam, formatoData.dadosCaption);
         }
 
-        // Para roteiro: construir cardParams com dados do Groq
+        // Para roteiro: construir cardParams com dados da IA
         if (formatoParam === 'roteiro' && captionData.roteiro) {
             const { destino } = formatoData;
             const rot = captionData.roteiro;

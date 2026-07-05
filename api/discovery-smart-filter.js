@@ -1,5 +1,5 @@
-// api/discovery-smart-filter.js - BENETRIP DISCOVERY SMART FILTER v1.0
-// Usa Groq (LLM) para interpretar busca em linguagem natural
+// api/discovery-smart-filter.js - BENETRIP DISCOVERY SMART FILTER v2.0 (Cerebras)
+// Usa Cerebras (LLM) para interpretar busca em linguagem natural
 // e retornar filtros estruturados para o frontend aplicar client-side
 //
 // POST /api/discovery-smart-filter
@@ -22,7 +22,7 @@ export default async function handler(req, res) {
         });
     }
 
-    if (!process.env.GROQ_API_KEY) {
+    if (!getCerebrasKey()) {
         // Fallback: busca textual simples
         return res.status(200).json(fallbackTextSearch(query, destinos));
     }
@@ -32,13 +32,17 @@ export default async function handler(req, res) {
         return res.status(200).json({ success: true, ...resultado });
     } catch (error) {
         console.error('❌ Smart filter erro:', error.message);
-        // Fallback em caso de erro do Groq
+        // Fallback em caso de erro da IA
         return res.status(200).json(fallbackTextSearch(query, destinos));
     }
 }
 
+function getCerebrasKey() {
+    return process.env.CEREBRAS_KEY || process.env.CEREBRAS_API_KEY || null;
+}
+
 // ============================================================
-// SMART FILTER VIA GROQ
+// SMART FILTER VIA CEREBRAS
 // ============================================================
 async function smartFilter(query, destinos) {
     // Montar lista compacta dos destinos para o LLM
@@ -70,15 +74,15 @@ IMPORTANTE: Retorne APENAS o JSON, sem markdown, sem explicação extra.`;
 Destinos disponíveis (índice|nome|país|preço|estilos|tipo|paradas):
 ${listaCompacta}`;
 
-    const models = ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant'];
+    const models = ['llama-3.3-70b', 'llama3.1-8b'];
 
     for (const model of models) {
         try {
-            const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+            const response = await fetch('https://api.cerebras.ai/v1/chat/completions', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
+                    'Authorization': `Bearer ${getCerebrasKey()}`,
                 },
                 body: JSON.stringify({
                     model,
@@ -94,7 +98,7 @@ ${listaCompacta}`;
             });
 
             if (!response.ok) {
-                console.warn(`⚠️ Groq ${model} HTTP ${response.status}`);
+                console.warn(`⚠️ Cerebras ${model} HTTP ${response.status}`);
                 continue;
             }
 
@@ -115,7 +119,7 @@ ${listaCompacta}`;
                 fallback: false,
             };
         } catch (err) {
-            console.warn(`⚠️ Groq ${model} erro:`, err.message);
+            console.warn(`⚠️ Cerebras ${model} erro:`, err.message);
             continue;
         }
     }
