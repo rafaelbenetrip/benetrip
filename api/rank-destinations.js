@@ -184,7 +184,7 @@ JSON:
                         ],
                         temperature: 0.4,
                         max_tokens: 4000, // inclui tokens de "thinking" dos modelos de reasoning
-                        reasoning_effort: 'low',
+                        reasoning_effort: model.startsWith('zai-glm') ? 'none' : 'low',
                         response_format: { type: 'json_object' }
                     })
                 });

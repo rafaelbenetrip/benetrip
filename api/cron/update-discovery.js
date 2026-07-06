@@ -247,7 +247,7 @@ Se não conhecer o destino, use ["cidade"] como default.`;
                     response_format: { type: 'json_object' },
                     temperature: 0.2,
                     max_tokens: 6000, // inclui tokens de "thinking" dos modelos de reasoning
-                    reasoning_effort: 'low',
+                    reasoning_effort: model.startsWith('zai-glm') ? 'none' : 'low',
                 }),
                 signal: AbortSignal.timeout(30000),
             });

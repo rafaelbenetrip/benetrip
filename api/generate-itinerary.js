@@ -314,21 +314,29 @@ JSON VÁLIDO apenas, zero texto extra. Estrutura: ${estruturaJSON}`;
 
         // === TOKENS DINÂMICOS ===
         // v2.2: tokens por dia baseado na intensidade para garantir conteúdo rico
-        const tokensPorDia = { 'leve': 900, 'moderado': 1200, 'intenso': 1800 }[intensidade] || 1200;
+        const tokensPorDia = { 'leve': 1100, 'moderado': 1600, 'intenso': 2200 }[intensidade] || 1600;
         const tokensEstimados = Math.min(Math.max(numDiasTotal * tokensPorDia, 6000), 32000);
         console.log(`📊 max_tokens: ${tokensEstimados} para ${numDiasTotal} dias (${intensidade || 'moderado'})`);
 
         // === IA (GEMINI + CEREBRAS) ===
+        // Viagens longas (>7 dias) geram JSONs de 20k+ tokens: o Gemini não termina
+        // dentro do timeout, então o Cerebras (muito mais rápido) assume a frente.
+        const modelChain = numDiasTotal > 7
+            ? [AI_MODEL_CHAIN[1], AI_MODEL_CHAIN[2], AI_MODEL_CHAIN[0]]
+            : AI_MODEL_CHAIN;
         let resultado = null, usedModel = null;
 
-        for (const { provider, model } of AI_MODEL_CHAIN) {
+        for (const { provider, model } of modelChain) {
             const apiKey = getAIKey(provider);
             if (!apiKey) { console.warn(`⏭️ Pulando ${provider}/${model}: chave não configurada`); continue; }
+            // Timeout dinâmico: Gemini gera ~100 tokens/s e precisa de mais tempo;
+            // Cerebras é ordens de magnitude mais rápido
+            const timeoutMs = provider === 'gemini'
+                ? Math.min(60000 + numDiasTotal * 8000, 150000)
+                : Math.min(50000 + Math.max(numDiasTotal - 5, 0) * 3000, 120000);
             try {
-                console.log(`🤖 Tentando: ${provider}/${model}`);
+                console.log(`🤖 Tentando: ${provider}/${model} (timeout ${Math.round(timeoutMs / 1000)}s)`);
                 const controller = new AbortController();
-                // v2.2: timeout dinâmico — 50s base + 3s por dia extra (além de 5 dias)
-                const timeoutMs = Math.min(50000 + Math.max(numDiasTotal - 5, 0) * 3000, 120000);
                 const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
                 const aiResponse = await fetch(`${AI_PROVIDERS[provider].baseURL}/chat/completions`, {
@@ -348,8 +356,9 @@ JSON VÁLIDO apenas, zero texto extra. Estrutura: ${estruturaJSON}`;
                         ],
                         response_format: { type: 'json_object' },
                         temperature: 0.7,
-                        // Modelos com "thinking": limita o raciocínio para sobrar tokens para o roteiro
-                        reasoning_effort: 'low',
+                        // Gemini/gpt-oss: raciocínio mínimo para sobrar tokens para o roteiro.
+                        // GLM: thinking desligado (mesmo em 'low' ele consome o orçamento inteiro)
+                        reasoning_effort: model.startsWith('zai-glm') ? 'none' : 'low',
                     })
                 });
                 clearTimeout(timeoutId);
@@ -373,7 +382,7 @@ JSON VÁLIDO apenas, zero texto extra. Estrutura: ${estruturaJSON}`;
                 console.log(`✅ [${model}] ${resultado.dias?.length || 0} dias`);
                 break;
             } catch (err) {
-                console.error(`[${model}] ${err.name === 'AbortError' ? 'Timeout 50s' : err.message}`);
+                console.error(`[${model}] ${err.name === 'AbortError' ? `Timeout ${Math.round(timeoutMs / 1000)}s` : err.message}`);
                 continue;
             }
         }
