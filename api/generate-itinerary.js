@@ -335,15 +335,19 @@ JSON VÁLIDO apenas, zero texto extra. Estrutura: ${estruturaJSON}`;
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
                     signal: controller.signal,
+                    // Gemini é mais verboso e gasta parte do orçamento com thinking:
+                    // dobra o limite para evitar JSON truncado (finish_reason: length)
                     body: JSON.stringify({
                         model,
+                        max_tokens: provider === 'gemini'
+                            ? Math.min(tokensEstimados * 2 + 2000, 60000)
+                            : tokensEstimados,
                         messages: [
                             { role: 'system', content: `Você é a Tripinha, cachorra vira-lata caramelo brasileira e guia de viagem expert. Gere JSON válido pt-BR com locais REAIS verificáveis no Google Maps. REGRAS CRÍTICAS: (1) NUNCA repita o mesmo local em dias diferentes. (2) Respeite o MÍNIMO de atividades por período conforme a intensidade. (3) Dicas devem ser ESPECÍFICAS e ÚNICAS — proibido "aproveite a atmosfera" ou "peça o menu degustação". (4) Inclua destino_atual, clima_previsto, visita_numero.${temCidadesRepetidas ? ' CIDADES REPETIDAS: 2ª visita = roteiro COMPLEMENTAR, atrações DIFERENTES.' : ''}` },
                             { role: 'user', content: prompt }
                         ],
                         response_format: { type: 'json_object' },
                         temperature: 0.7,
-                        max_tokens: tokensEstimados,
                         // Modelos com "thinking": limita o raciocínio para sobrar tokens para o roteiro
                         reasoning_effort: 'low',
                     })

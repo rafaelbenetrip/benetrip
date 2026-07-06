@@ -6,7 +6,7 @@ const http = require('http');
 const https = require('https');
 
 // =======================
-// Configurações de IA - Gemini Flash (principal) + Cerebras (fallback)
+// Configurações de IA - Cerebras (principal) + Gemini Flash (fallback)
 // =======================
 const CONFIG = {
     providers: {
@@ -19,10 +19,12 @@ const CONFIG = {
             apiKeyEnvs: ['CEREBRAS_KEY', 'CEREBRAS_API_KEY']
         }
     },
-    // Cadeia de fallback: cada entrada é tentada em ordem
+    // Cadeia de fallback: cada entrada é tentada em ordem.
+    // Destinos sugeridos usam Cerebras primeiro (rápido e sem limite de cota);
+    // Gemini fica como fallback e com a cota gratuita preservada para os roteiros.
     modelChain: [
-        { provider: 'gemini',   model: process.env.GEMINI_MODEL || 'gemini-2.5-flash',        role: 'reasoning', maxTokens: 8000, timeout: 180000 },
         { provider: 'cerebras', model: process.env.CEREBRAS_MODEL || 'gpt-oss-120b',          role: 'reasoning', maxTokens: 8000, timeout: 90000 },
+        { provider: 'gemini',   model: process.env.GEMINI_MODEL || 'gemini-2.5-flash',        role: 'reasoning', maxTokens: 8000, timeout: 180000 },
         { provider: 'cerebras', model: process.env.CEREBRAS_MODEL_FALLBACK || 'zai-glm-4.7', role: 'personality', maxTokens: 8000, timeout: 90000 }
     ],
     timeout: 180000,   // 3 minutos para reasoning
