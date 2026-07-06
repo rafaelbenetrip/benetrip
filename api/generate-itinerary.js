@@ -1,4 +1,5 @@
-// api/generate-itinerary.js - GERADOR DE ROTEIRO v2.3
+// api/generate-itinerary.js - GERADOR DE ROTEIRO v3.1
+// v3.1: Geração em blocos para viagens longas (>8 dias) + contagem exata garantida
 // v2.3: Anti-repetição, contagem forçada, clima granular, títulos criativos,
 //        dicas proibidas, landmarks obrigatórios, transição melhorada
 // v2.2: Tokens dinâmicos por intensidade, timeout adaptativo, atividades por período,
@@ -201,17 +202,24 @@ OBRIGATÓRIO em TODOS os dias:
         }
 
         // === LISTA DE DIAS ===
-        let diasListaTexto = '';
-        destinosInfo.forEach(dest => {
-            const visitaLabel = dest.ehCidadeRepetida ? ` [${dest.numVisita}ª visita]` : '';
-            diasListaTexto += `\n📍 ${dest.destino}${visitaLabel} (${dest.numDias} dia${dest.numDias > 1 ? 's' : ''}, ${dest.dataChegada} a ${dest.dataSaida}):\n`;
-            dest.dias.forEach(d => {
-                let nota = '';
-                if (d.ehPrimeiro && dest.horarioChegada) nota = ` (CHEGADA ${dest.horarioChegada}${dest.arrayIndex > 0 ? ' — vindo de ' + destinosArray[dest.arrayIndex - 1].destino : ''})`;
-                if (d.ehUltimo && dest.horarioPartida) nota = ` (PARTIDA ${dest.horarioPartida}${dest.proximoDestino ? ' — rumo a ' + dest.proximoDestino : ''})`;
-                diasListaTexto += `   Dia ${d.numeroGlobal}: ${d.diaSemana}, ${d.dataFormatada}${nota}\n`;
+        // Aceita um intervalo (deN..ateN) para a geração em blocos de viagens longas
+        const montarListaDias = (deN = 1, ateN = Infinity) => {
+            let texto = '';
+            destinosInfo.forEach(dest => {
+                const diasNoIntervalo = dest.dias.filter(d => d.numeroGlobal >= deN && d.numeroGlobal <= ateN);
+                if (diasNoIntervalo.length === 0) return;
+                const visitaLabel = dest.ehCidadeRepetida ? ` [${dest.numVisita}ª visita]` : '';
+                texto += `\n📍 ${dest.destino}${visitaLabel} (${dest.numDias} dia${dest.numDias > 1 ? 's' : ''} no total, ${dest.dataChegada} a ${dest.dataSaida}):\n`;
+                diasNoIntervalo.forEach(d => {
+                    let nota = '';
+                    if (d.ehPrimeiro && dest.horarioChegada) nota = ` (CHEGADA ${dest.horarioChegada}${dest.arrayIndex > 0 ? ' — vindo de ' + destinosArray[dest.arrayIndex - 1].destino : ''})`;
+                    if (d.ehUltimo && dest.horarioPartida) nota = ` (PARTIDA ${dest.horarioPartida}${dest.proximoDestino ? ' — rumo a ' + dest.proximoDestino : ''})`;
+                    texto += `   Dia ${d.numeroGlobal}: ${d.diaSemana}, ${d.dataFormatada}${nota}\n`;
+                });
             });
-        });
+            return texto;
+        };
+        const diasListaTexto = montarListaDias();
 
         // === BLOCO MULTI-DESTINO ===
         let multiDestinoBloco = '', multiDestinoRegras = '';
@@ -260,7 +268,7 @@ REGRAS PARA VISITAS REPETIDAS (PRIORIDADE ALTA):
 
         // === PROMPT ===
         const destinoPrincipal = isMultiDestino ? destinosArray.map(d => d.destino).join(' → ') : destinosArray[0].destino;
-        const prompt = `ESPECIALISTA EM ROTEIROS DE VIAGEM
+        const montarPrompt = (diasLista, blocoExtra = '') => `ESPECIALISTA EM ROTEIROS DE VIAGEM
 ${multiDestinoBloco}
 
 ${isMultiDestino ? 'ROTA' : 'DESTINO'}: ${destinoPrincipal}
@@ -270,7 +278,7 @@ ${cidadesRepetidasBloco}
 ${observacoesBloco}
 
 DIAS:
-${diasListaTexto}
+${diasLista}
 
 VIAJANTE:
 - Companhia: ${companhia || '?'} (${numViajantes} pessoa${numViajantes > 1 ? 's' : ''})
@@ -282,6 +290,7 @@ ${restricoesFamilia}${companhiaInstrucoes}
 ${multiDestinoRegras}
 
 TAREFA: Roteiro COMPLETO e DETALHADO de ${numDiasTotal} dias${isMultiDestino ? `, ${destinosArray.length} paradas` : ''}.
+${blocoExtra}
 
 ═══ REGRAS DE QUANTIDADE (OBRIGATÓRIO) ═══
 1. CADA período (manhã/tarde/noite) DEVE ter o MÍNIMO de atividades conforme o ritmo acima. Conte antes de retornar!
@@ -312,83 +321,152 @@ TAREFA: Roteiro COMPLETO e DETALHADO de ${numDiasTotal} dias${isMultiDestino ? `
 
 JSON VÁLIDO apenas, zero texto extra. Estrutura: ${estruturaJSON}`;
 
+        const promptCompleto = montarPrompt(diasListaTexto,
+            `═══ CONTAGEM DE DIAS (OBRIGATÓRIO) ═══\nO array "dias" DEVE ter EXATAMENTE ${numDiasTotal} objetos, com "dia_numero" de 1 a ${numDiasTotal}. Conte antes de retornar!`);
+
         // === TOKENS DINÂMICOS ===
         // v2.2: tokens por dia baseado na intensidade para garantir conteúdo rico
         const tokensPorDia = { 'leve': 1100, 'moderado': 1600, 'intenso': 2200 }[intensidade] || 1600;
         const tokensEstimados = Math.min(Math.max(numDiasTotal * tokensPorDia, 6000), 32000);
         console.log(`📊 max_tokens: ${tokensEstimados} para ${numDiasTotal} dias (${intensidade || 'moderado'})`);
 
-        // === IA (GEMINI + CEREBRAS) ===
-        // Viagens longas (>7 dias) geram JSONs de 20k+ tokens: o Gemini não termina
-        // dentro do timeout, então o Cerebras (muito mais rápido) assume a frente.
-        const modelChain = numDiasTotal > 7
-            ? [AI_MODEL_CHAIN[1], AI_MODEL_CHAIN[2], AI_MODEL_CHAIN[0]]
-            : AI_MODEL_CHAIN;
-        let resultado = null, usedModel = null;
+        // === CHAMADA À IA (função reutilizada pela geração em blocos) ===
+        const systemContent = `Você é a Tripinha, cachorra vira-lata caramelo brasileira e guia de viagem expert. Gere JSON válido pt-BR com locais REAIS verificáveis no Google Maps. REGRAS CRÍTICAS: (1) NUNCA repita o mesmo local em dias diferentes. (2) Respeite o MÍNIMO de atividades por período conforme a intensidade. (3) Dicas devem ser ESPECÍFICAS e ÚNICAS — proibido "aproveite a atmosfera" ou "peça o menu degustação". (4) Inclua destino_atual, clima_previsto, visita_numero.${temCidadesRepetidas ? ' CIDADES REPETIDAS: 2ª visita = roteiro COMPLEMENTAR, atrações DIFERENTES.' : ''}`;
 
-        for (const { provider, model } of modelChain) {
-            const apiKey = getAIKey(provider);
-            if (!apiKey) { console.warn(`⏭️ Pulando ${provider}/${model}: chave não configurada`); continue; }
-            // Timeout dinâmico: Gemini gera ~100 tokens/s e precisa de mais tempo;
-            // Cerebras é ordens de magnitude mais rápido
-            const timeoutMs = provider === 'gemini'
-                ? Math.min(60000 + numDiasTotal * 8000, 150000)
-                : Math.min(50000 + Math.max(numDiasTotal - 5, 0) * 3000, 120000);
-            try {
-                console.log(`🤖 Tentando: ${provider}/${model} (timeout ${Math.round(timeoutMs / 1000)}s)`);
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+        const chamarModelos = async (promptTexto, maxTokensAlvo, diasAlvo, cerebrasPrimeiro) => {
+            const chain = cerebrasPrimeiro
+                ? [AI_MODEL_CHAIN[1], AI_MODEL_CHAIN[2], AI_MODEL_CHAIN[0]]
+                : AI_MODEL_CHAIN;
 
-                const aiResponse = await fetch(`${AI_PROVIDERS[provider].baseURL}/chat/completions`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
-                    signal: controller.signal,
-                    // Gemini é mais verboso e gasta parte do orçamento com thinking:
-                    // dobra o limite para evitar JSON truncado (finish_reason: length)
-                    body: JSON.stringify({
-                        model,
-                        max_tokens: provider === 'gemini'
-                            ? Math.min(tokensEstimados * 2 + 2000, 60000)
-                            : tokensEstimados,
-                        messages: [
-                            { role: 'system', content: `Você é a Tripinha, cachorra vira-lata caramelo brasileira e guia de viagem expert. Gere JSON válido pt-BR com locais REAIS verificáveis no Google Maps. REGRAS CRÍTICAS: (1) NUNCA repita o mesmo local em dias diferentes. (2) Respeite o MÍNIMO de atividades por período conforme a intensidade. (3) Dicas devem ser ESPECÍFICAS e ÚNICAS — proibido "aproveite a atmosfera" ou "peça o menu degustação". (4) Inclua destino_atual, clima_previsto, visita_numero.${temCidadesRepetidas ? ' CIDADES REPETIDAS: 2ª visita = roteiro COMPLEMENTAR, atrações DIFERENTES.' : ''}` },
-                            { role: 'user', content: prompt }
-                        ],
-                        response_format: { type: 'json_object' },
-                        temperature: 0.7,
-                        // Gemini/gpt-oss: raciocínio mínimo para sobrar tokens para o roteiro.
-                        // GLM: thinking desligado (mesmo em 'low' ele consome o orçamento inteiro)
-                        reasoning_effort: model.startsWith('zai-glm') ? 'none' : 'low',
-                    })
-                });
-                clearTimeout(timeoutId);
+            for (const { provider, model } of chain) {
+                const apiKey = getAIKey(provider);
+                if (!apiKey) { console.warn(`⏭️ Pulando ${provider}/${model}: chave não configurada`); continue; }
+                // Timeout dinâmico: Gemini gera ~100 tokens/s e precisa de mais tempo;
+                // Cerebras é ordens de magnitude mais rápido
+                const timeoutMs = provider === 'gemini'
+                    ? Math.min(60000 + diasAlvo * 8000, 150000)
+                    : Math.min(50000 + Math.max(diasAlvo - 5, 0) * 3000, 120000);
+                try {
+                    console.log(`🤖 Tentando: ${provider}/${model} (timeout ${Math.round(timeoutMs / 1000)}s, max_tokens ${maxTokensAlvo})`);
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
-                if (!aiResponse.ok) {
-                    const errBody = await aiResponse.text().catch(() => '');
-                    console.error(`[${model}] HTTP ${aiResponse.status} - ${errBody.slice(0, 300)}`);
+                    const aiResponse = await fetch(`${AI_PROVIDERS[provider].baseURL}/chat/completions`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+                        signal: controller.signal,
+                        // Gemini é mais verboso e gasta parte do orçamento com thinking:
+                        // dobra o limite para evitar JSON truncado (finish_reason: length)
+                        body: JSON.stringify({
+                            model,
+                            max_tokens: provider === 'gemini'
+                                ? Math.min(maxTokensAlvo * 2 + 2000, 60000)
+                                : maxTokensAlvo,
+                            messages: [
+                                { role: 'system', content: systemContent },
+                                { role: 'user', content: promptTexto }
+                            ],
+                            response_format: { type: 'json_object' },
+                            temperature: 0.7,
+                            // Gemini/gpt-oss: raciocínio mínimo para sobrar tokens para o roteiro.
+                            // GLM: thinking desligado (mesmo em 'low' ele consome o orçamento inteiro)
+                            reasoning_effort: model.startsWith('zai-glm') ? 'none' : 'low',
+                        })
+                    });
+                    clearTimeout(timeoutId);
+
+                    if (!aiResponse.ok) {
+                        const errBody = await aiResponse.text().catch(() => '');
+                        console.error(`[${model}] HTTP ${aiResponse.status} - ${errBody.slice(0, 300)}`);
+                        continue;
+                    }
+                    const aiData = await aiResponse.json();
+                    const content = aiData.choices?.[0]?.message?.content;
+                    if (!content) { console.error(`[${model}] Vazio`); continue; }
+
+                    const finishReason = aiData.choices?.[0]?.finish_reason;
+                    if (finishReason === 'length') {
+                        console.warn(`[${model}] Resposta truncada pelo limite de tokens (finish_reason: length)`);
+                    }
+
+                    const parsed = extrairJSONRobusto(content);
+                    if (!parsed?.dias?.length) { console.error(`[${model}] JSON sem dias`); continue; }
+                    console.log(`✅ [${model}] ${parsed.dias.length} dias`);
+                    return { resultado: parsed, usedModel: model };
+                } catch (err) {
+                    console.error(`[${model}] ${err.name === 'AbortError' ? `Timeout ${Math.round(timeoutMs / 1000)}s` : err.message}`);
                     continue;
                 }
-                const aiData = await aiResponse.json();
-                const content = aiData.choices?.[0]?.message?.content;
-                if (!content) { console.error(`[${model}] Vazio`); continue; }
+            }
+            return null;
+        };
 
-                const finishReason = aiData.choices?.[0]?.finish_reason;
-                if (finishReason === 'length') {
-                    console.warn(`[${model}] Resposta truncada pelo limite de tokens (finish_reason: length)`);
-                }
+        // === GERAÇÃO ===
+        const DIAS_POR_BLOCO = 6;
+        let resultado = null, usedModel = null;
 
-                resultado = extrairJSONRobusto(content);
-                usedModel = model;
-                console.log(`✅ [${model}] ${resultado.dias?.length || 0} dias`);
-                break;
-            } catch (err) {
-                console.error(`[${model}] ${err.name === 'AbortError' ? `Timeout ${Math.round(timeoutMs / 1000)}s` : err.message}`);
-                continue;
+        if (numDiasTotal <= 8) {
+            // Viagem curta: uma chamada única (Gemini primeiro até 7 dias)
+            const r = await chamarModelos(promptCompleto, tokensEstimados, numDiasTotal, numDiasTotal > 7);
+            if (r) ({ resultado, usedModel } = r);
+        } else {
+            // Viagem longa: gera em blocos de até 6 dias — os modelos não conseguem
+            // produzir 15+ dias completos numa única resposta (truncam ou "encurtam")
+            console.log(`🧩 Roteiro longo (${numDiasTotal} dias): gerando em blocos de até ${DIAS_POR_BLOCO} dias`);
+            const diasAcumulados = [];
+            const locaisUsados = [];
+            const modelosUsados = new Set();
+            let base = null;
+
+            for (let de = 1; de <= numDiasTotal; de += DIAS_POR_BLOCO) {
+                const ate = Math.min(de + DIAS_POR_BLOCO - 1, numDiasTotal);
+                const n = ate - de + 1;
+                const blocoInstrucao = `═══ GERAÇÃO EM BLOCOS (OBRIGATÓRIO) ═══
+O roteiro completo tem ${numDiasTotal} dias, mas NESTA RESPOSTA gere SOMENTE os dias ${de} a ${ate} (${n} dias), exatamente os listados em DIAS acima.
+O array "dias" deve ter EXATAMENTE ${n} objetos, com "dia_numero" de ${de} a ${ate}.${locaisUsados.length ? `\nLOCAIS JÁ USADOS nos dias anteriores (PROIBIDO repetir qualquer um): ${locaisUsados.slice(-120).join('; ')}` : ''}`;
+
+                const promptBloco = montarPrompt(montarListaDias(de, ate), blocoInstrucao);
+                const maxTokensBloco = Math.min(n * tokensPorDia + 2500, 32000);
+                // Blocos sempre começam pelo Cerebras: 3+ chamadas ao Gemini estourariam o tempo da função
+                const r = await chamarModelos(promptBloco, maxTokensBloco, n, true);
+
+                if (!r) { console.error(`🧩 Bloco ${de}-${ate}: todos os modelos falharam`); continue; }
+                if (!base) base = r.resultado;
+                modelosUsados.add(r.usedModel);
+
+                const diasBloco = (r.resultado.dias || []).filter(d => d && Array.isArray(d.periodos));
+                diasBloco.forEach(d => {
+                    (d.periodos || []).forEach(p => (p.atividades || []).forEach(a => { if (a.nome) locaisUsados.push(a.nome); }));
+                });
+                diasAcumulados.push(...diasBloco);
+                console.log(`🧩 Bloco ${de}-${ate}: ${diasBloco.length} dias gerados (${r.usedModel})`);
+            }
+
+            if (base && diasAcumulados.length > 0) {
+                resultado = { ...base, dias: diasAcumulados };
+                usedModel = [...modelosUsados].join('+');
             }
         }
 
-        if (!resultado || !resultado.dias || !Array.isArray(resultado.dias)) {
+        if (!resultado || !resultado.dias || !Array.isArray(resultado.dias) || resultado.dias.length === 0) {
             return res.status(200).json(buildFallbackItinerary(req.body, destinosArray));
+        }
+
+        // === GARANTIR CONTAGEM EXATA DE DIAS ===
+        resultado.dias.forEach((d, i) => { if (!d.dia_numero) d.dia_numero = i + 1; });
+        if (resultado.dias.length > numDiasTotal) {
+            resultado.dias = resultado.dias.slice(0, numDiasTotal);
+        }
+        if (resultado.dias.length < numDiasTotal) {
+            // Completa dias faltantes com conteúdo genérico em vez de entregar roteiro incompleto
+            console.warn(`⚠️ Modelo gerou ${resultado.dias.length}/${numDiasTotal} dias — completando faltantes`);
+            const fallbackDias = buildFallbackItinerary(req.body, destinosArray).dias;
+            const numerosPresentes = new Set(resultado.dias.map(d => d.dia_numero));
+            fallbackDias.forEach(fd => {
+                if (!numerosPresentes.has(fd.dia_numero)) resultado.dias.push(fd);
+            });
+            resultado.dias.sort((a, b) => (a.dia_numero || 0) - (b.dia_numero || 0));
+            resultado.dias = resultado.dias.slice(0, numDiasTotal);
         }
 
         // === ENRIQUECER E VALIDAR ===
