@@ -93,7 +93,7 @@ ${listaCompacta}`;
                     response_format: { type: 'json_object' },
                     temperature: 0.3,
                     max_tokens: 2500, // inclui tokens de "thinking" dos modelos de reasoning
-                    reasoning_effort: 'low',
+                    reasoning_effort: model.startsWith('zai-glm') ? 'none' : 'low',
                 }),
                 signal: AbortSignal.timeout(15000),
             });

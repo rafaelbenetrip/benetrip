@@ -43,8 +43,8 @@ function getApiKey(provider) {
 
 // ✅ FIX v2.2: maxTokens dinâmico — teto aumentado para viagens longas e intensas
 function calcularMaxTokens(diasViagem, intensidade) {
-  // v2.2: tokens por dia baseado na intensidade
-  const tokensPorDia = { 'leve': 700, 'moderado': 1000, 'intenso': 1500 }[intensidade] || 1000;
+  // v3.1: tokens por dia maiores — roteiros longos truncavam com o valor antigo
+  const tokensPorDia = { 'leve': 1000, 'moderado': 1400, 'intenso': 2000 }[intensidade] || 1400;
   const tokens = Math.min(Math.max(1500 + (diasViagem * tokensPorDia), 4000), 32000);
   return tokens;
 }
@@ -156,9 +156,9 @@ REGRAS ABSOLUTAS:
       stream: false
     };
 
-    // Gemini, gpt-oss e GLM são modelos com "thinking": limita o raciocínio
-    // para sobrar orçamento de tokens para o roteiro
-    requestPayload.reasoning_effort = 'low';
+    // Gemini/gpt-oss: raciocínio mínimo para sobrar tokens para o roteiro.
+    // GLM: thinking desligado (mesmo em 'low' ele consome o orçamento inteiro)
+    requestPayload.reasoning_effort = model.startsWith('zai-glm') ? 'none' : 'low';
 
     const response = await apiClient({
       method: 'post',
@@ -324,8 +324,13 @@ Retorne APENAS o JSON, sem explicações.`;
 // =======================
 // Retry com fallback entre modelos
 // =======================
-async function executarComRetry(prompt, maxTentativas = CONFIG.retries, maxTokens = 4000) {
-  for (const chainEntry of CONFIG.modelChain) {
+async function executarComRetry(prompt, maxTentativas = CONFIG.retries, maxTokens = 4000, diasViagem = 1) {
+  // Viagens longas (>7 dias) geram JSONs grandes demais para o Gemini terminar
+  // dentro do timeout: o Cerebras (muito mais rápido) assume a frente
+  const modelChain = diasViagem > 7
+    ? [CONFIG.modelChain[1], CONFIG.modelChain[2], CONFIG.modelChain[0]]
+    : CONFIG.modelChain;
+  for (const chainEntry of modelChain) {
     const { provider, model } = chainEntry;
 
     if (!getApiKey(provider)) {
@@ -502,7 +507,7 @@ module.exports = async (req, res) => {
       preferencias: preferenciasCompletas
     });
     
-    const { roteiro, modelo, provider } = await executarComRetry(prompt, CONFIG.retries, maxTokens);
+    const { roteiro, modelo, provider } = await executarComRetry(prompt, CONFIG.retries, maxTokens, diasViagem);
 
     const roteiroCompleto = completarRoteiro(roteiro, diasViagem);
 
