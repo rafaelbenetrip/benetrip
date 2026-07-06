@@ -421,9 +421,22 @@ JSON VÁLIDO apenas, zero texto extra. Estrutura: ${estruturaJSON}`;
             for (let de = 1; de <= numDiasTotal; de += DIAS_POR_BLOCO) {
                 const ate = Math.min(de + DIAS_POR_BLOCO - 1, numDiasTotal);
                 const n = ate - de + 1;
+                const ehUltimoBloco = ate === numDiasTotal;
+                const ehPrimeiroBloco = de === 1;
+
+                // Sem este aviso, o modelo trata o último dia de CADA bloco como o fim
+                // da viagem (despedidas, malas, partida) — mas a viagem continua
+                const continuidade = ehUltimoBloco
+                    ? `O dia ${numDiasTotal} é o ÚLTIMO dia da viagem inteira: pode incluir clima de despedida e logística de partida.`
+                    : `ATENÇÃO — A VIAGEM NÃO TERMINA NO DIA ${ate}: ela continua no dia ${ate + 1} (que será gerado depois). PROIBIDO tratar o dia ${ate} como último dia. Nada de despedidas, "último dia", check-out, malas, aeroporto ou encerramento nos dias ${de} a ${ate}. Todos são dias NORMAIS de viagem, com noite completa de atividades.`;
+                const inicio = ehPrimeiroBloco
+                    ? ''
+                    : `\nA viagem JÁ COMEÇOU: o viajante está na cidade desde o dia 1. NÃO trate o dia ${de} como chegada — é continuação natural do roteiro.`;
+
                 const blocoInstrucao = `═══ GERAÇÃO EM BLOCOS (OBRIGATÓRIO) ═══
 O roteiro completo tem ${numDiasTotal} dias, mas NESTA RESPOSTA gere SOMENTE os dias ${de} a ${ate} (${n} dias), exatamente os listados em DIAS acima.
-O array "dias" deve ter EXATAMENTE ${n} objetos, com "dia_numero" de ${de} a ${ate}.${locaisUsados.length ? `\nLOCAIS JÁ USADOS nos dias anteriores (PROIBIDO repetir qualquer um): ${locaisUsados.slice(-120).join('; ')}` : ''}`;
+O array "dias" deve ter EXATAMENTE ${n} objetos, com "dia_numero" de ${de} a ${ate}.
+${continuidade}${inicio}${locaisUsados.length ? `\nLOCAIS JÁ USADOS nos dias anteriores (PROIBIDO repetir qualquer um): ${locaisUsados.slice(-120).join('; ')}` : ''}`;
 
                 const promptBloco = montarPrompt(montarListaDias(de, ate), blocoInstrucao);
                 const maxTokensBloco = Math.min(n * tokensPorDia + 2500, 32000);
