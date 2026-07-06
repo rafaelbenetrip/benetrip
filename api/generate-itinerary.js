@@ -36,6 +36,17 @@ function getAIKey(provider) {
     return null;
 }
 
+// Extrai JSON mesmo quando o modelo devolve markdown (```json ... ```) ou texto extra.
+// O Gemini pode ignorar response_format e embrulhar o JSON em fences.
+function extrairJSONRobusto(texto) {
+    try { return JSON.parse(texto); } catch {}
+    const limpo = texto.replace(/```json/gi, '').replace(/```/g, '').trim();
+    try { return JSON.parse(limpo); } catch {}
+    const match = limpo.match(/\{[\s\S]*\}/);
+    if (match) return JSON.parse(match[0]);
+    throw new Error(`JSON não encontrado na resposta: "${texto.slice(0, 120)}..."`);
+}
+
 export default async function handler(req, res) {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -339,12 +350,21 @@ JSON VÁLIDO apenas, zero texto extra. Estrutura: ${estruturaJSON}`;
                 });
                 clearTimeout(timeoutId);
 
-                if (!aiResponse.ok) { console.error(`[${model}] HTTP ${aiResponse.status}`); continue; }
+                if (!aiResponse.ok) {
+                    const errBody = await aiResponse.text().catch(() => '');
+                    console.error(`[${model}] HTTP ${aiResponse.status} - ${errBody.slice(0, 300)}`);
+                    continue;
+                }
                 const aiData = await aiResponse.json();
                 const content = aiData.choices?.[0]?.message?.content;
                 if (!content) { console.error(`[${model}] Vazio`); continue; }
 
-                resultado = JSON.parse(content);
+                const finishReason = aiData.choices?.[0]?.finish_reason;
+                if (finishReason === 'length') {
+                    console.warn(`[${model}] Resposta truncada pelo limite de tokens (finish_reason: length)`);
+                }
+
+                resultado = extrairJSONRobusto(content);
                 usedModel = model;
                 console.log(`✅ [${model}] ${resultado.dias?.length || 0} dias`);
                 break;
