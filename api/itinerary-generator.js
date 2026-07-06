@@ -139,6 +139,12 @@ REGRAS ABSOLUTAS:
   try {
     logEvent('info', `Chamando API ${provider} (${model}), maxTokens: ${maxTokens}...`);
 
+    // Gemini é mais verboso e gasta parte do orçamento com thinking:
+    // dobra o limite para evitar JSON truncado (finish_reason: length)
+    const maxTokensFinal = provider === 'gemini'
+      ? Math.min(maxTokens * 2 + 2000, 60000)
+      : maxTokens;
+
     const requestPayload = {
       model: model,
       messages: [
@@ -146,7 +152,7 @@ REGRAS ABSOLUTAS:
         { role: "user", content: prompt }
       ],
       temperature: CONFIG.temperature,
-      max_tokens: maxTokens,
+      max_tokens: maxTokensFinal,
       stream: false
     };
 
