@@ -1,0 +1,205 @@
+/* ========================================
+   ESCAPADAS PAGE - BENETRIP
+   Complementa discovery.css (carregado antes).
+   Componentes exclusivos da /escapadas:
+   seletor de janela, barra de feriado e
+   calendário de feriados.
+   ======================================== */
+
+/* ---- Seletor de janela (fds + feriados) ---- */
+.janela-selector {
+    display: flex;
+    gap: 10px;
+    overflow-x: auto;
+    padding: 14px 20px 6px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+}
+
+.janela-selector::-webkit-scrollbar { display: none; }
+
+.janela-chip {
+    flex: 0 0 auto;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+    padding: 10px 16px;
+    background: var(--white);
+    border: 2px solid transparent;
+    border-radius: var(--border-radius-sm);
+    box-shadow: var(--shadow);
+    cursor: pointer;
+    transition: var(--transition);
+    font-family: 'Montserrat', sans-serif;
+    text-align: left;
+    min-width: 150px;
+}
+
+.janela-chip:hover {
+    box-shadow: var(--shadow-hover);
+    transform: translateY(-1px);
+}
+
+.janela-chip.active {
+    border-color: var(--orange-primary);
+    background: #FFF4EB;
+}
+
+.janela-chip-rotulo {
+    font-family: 'Poppins', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--gray-dark);
+}
+
+.janela-chip-datas {
+    font-size: 11px;
+    color: var(--gray-medium);
+}
+
+.janela-chip-preco {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--orange-primary);
+    margin-top: 2px;
+}
+
+.janela-chip-preco-vazio {
+    color: var(--gray-medium);
+    font-weight: 400;
+    font-style: italic;
+}
+
+.janela-chip-feriado .janela-chip-rotulo {
+    color: #7B3FA0;
+}
+
+.janela-chip-feriado.active {
+    border-color: #7B3FA0;
+    background: #F7F0FB;
+}
+
+.janela-chip-feriado .janela-chip-preco {
+    color: #7B3FA0;
+}
+
+/* ---- Barra do próximo feriado ---- */
+.feriado-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    max-width: 960px;
+    margin: 12px auto 0;
+    padding: 10px 20px;
+    background: linear-gradient(135deg, #7B3FA0 0%, #9C5FC4 100%);
+    color: var(--white);
+    border-radius: var(--border-radius-sm);
+    font-size: 13px;
+}
+
+.feriado-bar-emoji { font-size: 18px; }
+
+.feriado-bar-texto { flex: 1; margin: 0; line-height: 1.4; }
+
+.feriado-bar-link {
+    flex: 0 0 auto;
+    background: rgba(255, 255, 255, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    color: var(--white);
+    border-radius: 20px;
+    padding: 5px 14px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: 'Montserrat', sans-serif;
+    transition: var(--transition);
+}
+
+.feriado-bar-link:hover { background: rgba(255, 255, 255, 0.35); }
+
+@media (max-width: 720px) {
+    .feriado-bar { margin: 12px 12px 0; }
+}
+
+/* ---- Calendário de feriados (seção SEO) ---- */
+.calendario-feriados {
+    max-width: 960px;
+    margin: 32px auto 0;
+    padding: 0 20px;
+}
+
+.calendario-sub {
+    font-size: 13px;
+    color: var(--gray-medium);
+    margin: -6px 0 16px;
+}
+
+.feriado-lista {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin: 0;
+    padding: 0;
+}
+
+.feriado-item {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    background: var(--white);
+    border-radius: var(--border-radius-sm);
+    box-shadow: var(--shadow);
+    padding: 12px 16px;
+}
+
+.feriado-item-ativo {
+    border-left: 4px solid #7B3FA0;
+}
+
+.feriado-item-data {
+    flex: 0 0 72px;
+    font-family: 'Poppins', sans-serif;
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--orange-primary);
+}
+
+.feriado-item-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    font-size: 13px;
+    line-height: 1.4;
+}
+
+.feriado-item-emenda {
+    font-size: 12px;
+    color: var(--gray-medium);
+}
+
+.feriado-item-dias {
+    flex: 0 0 auto;
+    font-size: 12px;
+    color: var(--gray-medium);
+}
+
+.feriado-item-link {
+    flex: 0 0 auto;
+    background: #F7F0FB;
+    border: 1px solid #7B3FA0;
+    color: #7B3FA0;
+    border-radius: 20px;
+    padding: 5px 14px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: 'Montserrat', sans-serif;
+    transition: var(--transition);
+}
+
+.feriado-item-link:hover {
+    background: #7B3FA0;
+    color: var(--white);
+}

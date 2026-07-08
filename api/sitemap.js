@@ -50,6 +50,11 @@ export default async function handler(req, res) {
         ...cidades
             .filter((c) => c.slug !== 'sao-paulo')
             .map((c) => urlEntry(`/destinos-baratos/${c.slug}`, hoje, 'daily', '0.7')),
+        urlEntry('/escapadas', hoje, 'daily', '0.9'),
+        // Mesma regra: /escapadas/sao-paulo redireciona pra base
+        ...cidades
+            .filter((c) => c.slug !== 'sao-paulo')
+            .map((c) => urlEntry(`/escapadas/${c.slug}`, hoje, 'daily', '0.7')),
     ];
 
     const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.join('\n')}\n</urlset>\n`;
