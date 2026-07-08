@@ -119,12 +119,14 @@ async function buscarJanela(origemCode, janela) {
     const apiKey = process.env.SEARCHAPI_KEY;
     if (!apiKey) throw new Error('SEARCHAPI_KEY não configurada');
 
+    // Datas fixas no explore vão em time_period=IDA..VOLTA (round-trip).
+    // outbound_date/return_date NÃO são parâmetros deste engine e eram
+    // ignorados silenciosamente, devolvendo preços de "qualquer data".
     const baseParams = {
         engine: 'google_travel_explore',
         api_key: apiKey,
         departure_id: origemCode,
-        outbound_date: janela.ida,
-        return_date: janela.volta,
+        time_period: `${janela.ida}..${janela.volta}`,
         interests: 'popular',
         currency: 'BRL',
         gl: 'br',
