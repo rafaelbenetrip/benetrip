@@ -56,16 +56,17 @@ function carregarCidades() {
     }
 }
 
-// Determinar qual lote processar baseado na hora UTC
-function calcularLote(totalCidades, forcarLote) {
+// Determinar qual lote processar baseado na execução do dia.
+// O cron roda LOTES_POR_DIA vezes ao dia (6h e 18h UTC): o dia é dividido em
+// janelas iguais e cada janela corresponde a um lote. Com floor(hora/3) as
+// duas execuções caíam sempre no lote 0 e as cidades 16-30 nunca atualizavam.
+export function calcularLote(totalCidades, forcarLote, horaUTC = new Date().getUTCHours()) {
     if (forcarLote !== undefined && forcarLote !== null) {
         const lote = parseInt(forcarLote);
         if (!isNaN(lote) && lote >= 0) return lote;
     }
 
-    // Baseado na hora UTC: cada execução pega o próximo lote
-    const hora = new Date().getUTCHours();
-    const execucao = Math.floor(hora / 3); // 0-7
+    const execucao = Math.floor(horaUTC / (24 / LOTES_POR_DIA)); // 6h -> 0, 18h -> 1
     const totalLotes = Math.ceil(totalCidades / CIDADES_POR_LOTE);
     return execucao % totalLotes;
 }

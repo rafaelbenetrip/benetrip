@@ -240,6 +240,37 @@
         }
         .hero-cta-secondary:hover { background: var(--blue); color: white; transform: translateY(-3px); }
 
+        /* ═══ Radar de Feriado (contagem regressiva -> /escapadas) ═══ */
+        .feriado-radar {
+            display: none;
+            background: linear-gradient(135deg, #7B3FA0 0%, #9C5FC4 100%);
+            padding: 12px 20px;
+        }
+        .feriado-radar.visible { display: block; }
+        .feriado-radar-inner {
+            max-width: 800px; margin: 0 auto;
+            display: flex; align-items: center; gap: 12px;
+            color: white;
+        }
+        .feriado-radar-emoji { font-size: 1.4rem; flex-shrink: 0; animation: gentle-bounce 3s ease-in-out infinite; }
+        .feriado-radar-text { flex: 1; font-size: 0.88rem; line-height: 1.45; }
+        .feriado-radar-text strong { font-family: 'Poppins', sans-serif; }
+        .feriado-radar-text .radar-emenda { opacity: 0.9; }
+        .feriado-radar-cta {
+            flex-shrink: 0; display: inline-flex; align-items: center; gap: 6px;
+            padding: 9px 18px; background: rgba(255,255,255,0.18);
+            border: 1.5px solid rgba(255,255,255,0.45); border-radius: 50px;
+            color: white; text-decoration: none;
+            font-family: 'Poppins', sans-serif; font-size: 0.82rem; font-weight: 600;
+            white-space: nowrap; transition: var(--transition); backdrop-filter: blur(8px);
+        }
+        .feriado-radar-cta:hover { background: rgba(255,255,255,0.32); transform: translateY(-2px); }
+        @media (max-width: 640px) {
+            .feriado-radar-inner { flex-wrap: wrap; }
+            .feriado-radar-text { flex-basis: calc(100% - 40px); }
+            .feriado-radar-cta { margin-left: 40px; }
+        }
+
         /* ═══ Stats Bar ═══ */
         .stats-bar { background: var(--white); border-top: 1px solid var(--gray-200); border-bottom: 1px solid var(--gray-200); padding: 14px 20px; }
         .stats-inner { max-width: 800px; margin: 0 auto; display: flex; justify-content: space-around; gap: 10px; }
@@ -294,6 +325,10 @@
         .card-all-dest:hover { border-color: var(--green); }
         .card-cheap-dest::before { background: linear-gradient(90deg, #F59E0B, #FBBF24); }
         .card-cheap-dest:hover { border-color: #F59E0B; }
+        .card-escapadas::before { background: linear-gradient(90deg, #7B3FA0, #9C5FC4); }
+        .card-escapadas:hover { border-color: #7B3FA0; }
+        .card-escapadas .card-icon { background: linear-gradient(135deg, #F7F0FB, #E4CCF5); }
+        .card-escapadas .card-cta { color: #7B3FA0; }
         .card-compare::before { background: linear-gradient(90deg, var(--purple), #818CF8); }
         .card-compare:hover { border-color: var(--purple); }
         .card-cheap::before { background: linear-gradient(90deg, var(--red), #F87171); }
@@ -427,9 +462,13 @@
                 <span class="nav-item-icon">🎯</span> Descobrir meu destino!
                 <span class="nav-badge-sm popular">Popular</span>
             </a>
+            <a href="/escapadas" class="nav-item">
+                <span class="nav-item-icon">🏖️</span> Escapadas de Feriado
+                <span class="nav-badge-sm new">Novo</span>
+            </a>
             <a href="/destinos-baratos" class="nav-item">
                 <span class="nav-item-icon">💰</span> Destinos Baratos
-                <span class="nav-badge-sm new">Novo</span>
+                <span class="nav-badge-sm hot">Hot</span>
             </a>
             <a href="todos-destinos.html" class="nav-item">
                 <span class="nav-item-icon">🌍</span> Todos os Destinos
@@ -493,6 +532,7 @@
             <div class="header-right">
                 <nav class="header-nav">
                     <a href="descobrir-destinos.html">🎯 Descobrir</a>
+                    <a href="/escapadas">🏖️ Escapadas</a>
                     <a href="/destinos-baratos">💰 Baratos</a>
                     <a href="todos-destinos.html">🌍 Destinos</a>
                     <a href="voos.html">✈️ Voos</a>
@@ -538,10 +578,22 @@
         </div>
     </section>
 
+    <!-- RADAR DE FERIADO (preenchido via JS: contagem regressiva pro próximo feriado) -->
+    <div class="feriado-radar" id="feriado-radar">
+        <div class="feriado-radar-inner">
+            <span class="feriado-radar-emoji">🏖️</span>
+            <p class="feriado-radar-text" id="feriado-radar-text"></p>
+            <a href="/escapadas" class="feriado-radar-cta" id="feriado-radar-cta" onclick="cardClick(this)">
+                Ver voos do feriado
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" width="15" height="15"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            </a>
+        </div>
+    </div>
+
     <!-- STATS BAR -->
     <div class="stats-bar">
         <div class="stats-inner">
-            <div class="stat-item"><div class="stat-num">7</div><div class="stat-label">Ferramentas</div></div>
+            <div class="stat-item"><div class="stat-num">8</div><div class="stat-label">Ferramentas</div></div>
             <div class="stat-item"><div class="stat-num">200+</div><div class="stat-label">Destinos</div></div>
             <div class="stat-item"><div class="stat-num">100%</div><div class="stat-label">Preços Reais</div></div>
             <div class="stat-item"><div class="stat-num">Grátis</div><div class="stat-label">Sempre</div></div>
@@ -572,10 +624,16 @@
             </div>
         </a>
 
-        <!-- GRID: 6 tools -->
+        <!-- GRID: 7 tools -->
         <div class="tools-grid">
+            <a href="/escapadas" class="tool-card card-escapadas" onclick="cardClick(this)">
+                <div class="card-top-row"><div class="card-icon">🏖️</div><span class="card-badge badge-new">Novo</span></div>
+                <h3 class="card-title">Escapadas de fim de semana e feriados</h3>
+                <p class="card-desc">Não está de férias? Sem problema! Veja pra onde dá pra fugir no próximo fim de semana ou feriado, com preço real de ida e volta pra cada data. Tem até calendário de emendas!</p>
+                <span class="card-cta">Ver escapadas <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg></span>
+            </a>
             <a href="/destinos-baratos" class="tool-card card-cheap-dest" onclick="cardClick(this)">
-                <div class="card-top-row"><div class="card-icon">💰</div><span class="card-badge badge-new">Novo</span></div>
+                <div class="card-top-row"><div class="card-icon">💰</div><span class="card-badge badge-popular">Popular</span></div>
                 <h3 class="card-title">Destinos baratos pra viajar agora</h3>
                 <p class="card-desc">A Tripinha encontra os destinos mais baratos saindo do Brasil, com preços reais e atualizados. Perfeito pra quem quer viajar gastando pouco!</p>
                 <span class="card-cta">Ver destinos baratos <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg></span>
@@ -648,6 +706,7 @@
                 <p class="footer-tagline">Sua próxima aventura começa aqui! 🐾</p>
             </div>
             <div class="footer-links">
+                <div class="footer-col"><h4>🚀 Ferramentas</h4><a href="descobrir-destinos.html">🎯 Descobrir Destinos</a><a href="/escapadas">🏖️ Escapadas de Feriado</a><a href="/destinos-baratos">💰 Destinos Baratos</a><a href="voos-baratos.html">💸 Voos Baratos</a><a href="roteiro-viagem.html">📋 Roteiro de Viagem</a></div>
                 <div class="footer-col"><h4>📱 Redes Sociais</h4><a href="https://www.instagram.com/benetrip.oficial/" target="_blank">📷 Instagram Oficial</a></div>
                 <div class="footer-col"><h4>ℹ️ Sobre Nós</h4><a href="quemsomos.html">🏢 Quem Somos</a><a href="perguntasfrequentes.html">❓ Perguntas Frequentes</a></div>
                 <div class="footer-col"><h4>📋 Políticas</h4><a href="termos.html">📜 Termos de Uso</a><a href="privacidade.html">🔒 Privacidade</a><a href="cookies.html">🍪 Cookies</a></div>
@@ -698,6 +757,62 @@
             const m = document.getElementById('benetrip-user-menu-container');
             if (d && !m?.contains(e.target)) d.classList.remove('active');
         });
+
+        // ═══ RADAR DE FERIADO ═══
+        // Contagem regressiva pro próximo feriado nacional, calculada no
+        // navegador (mesma lógica de api/_lib/feriados.js em versão compacta).
+        // Linka pra janela correspondente em /escapadas.
+        (function () {
+            function pascoa(ano) {
+                const a = ano % 19, b = Math.floor(ano / 100), c = ano % 100, d = Math.floor(b / 4), e = b % 4,
+                    f = Math.floor((b + 8) / 25), g = Math.floor((b - f + 1) / 3), h = (19 * a + b - d - g + 15) % 30,
+                    i = Math.floor(c / 4), k = c % 4, l = (32 + 2 * e + 2 * i - h - k) % 7,
+                    m = Math.floor((a + 11 * h + 22 * l) / 451);
+                return new Date(Date.UTC(ano, Math.floor((h + l - 7 * m + 114) / 31) - 1, ((h + l - 7 * m + 114) % 31) + 1, 12));
+            }
+            function mais(dt, dias) { const d = new Date(dt); d.setUTCDate(d.getUTCDate() + dias); return d; }
+            function feriados(ano) {
+                const p = pascoa(ano);
+                return [
+                    ['confraternizacao', 'Confraternização Universal', new Date(Date.UTC(ano, 0, 1, 12))],
+                    ['carnaval', 'o Carnaval', mais(p, -47)],
+                    ['sexta-santa', 'a Sexta-feira Santa', mais(p, -2)],
+                    ['tiradentes', 'Tiradentes', new Date(Date.UTC(ano, 3, 21, 12))],
+                    ['dia-do-trabalho', 'o Dia do Trabalho', new Date(Date.UTC(ano, 4, 1, 12))],
+                    ['corpus-christi', 'Corpus Christi', mais(p, 60)],
+                    ['independencia', 'o 7 de Setembro', new Date(Date.UTC(ano, 8, 7, 12))],
+                    ['aparecida', 'o feriado de N. Sra. Aparecida', new Date(Date.UTC(ano, 9, 12, 12))],
+                    ['finados', 'Finados', new Date(Date.UTC(ano, 10, 2, 12))],
+                    ['proclamacao', 'a Proclamação da República', new Date(Date.UTC(ano, 10, 15, 12))],
+                    ['consciencia-negra', 'a Consciência Negra', new Date(Date.UTC(ano, 10, 20, 12))],
+                    ['natal', 'o Natal', new Date(Date.UTC(ano, 11, 25, 12))],
+                ].map(([slug, nome, data]) => ({ slug, nome, data, ano }));
+            }
+            const agora = new Date();
+            const hoje = new Date(Date.UTC(agora.getFullYear(), agora.getMonth(), agora.getDate(), 12));
+            const proximo = feriados(hoje.getUTCFullYear()).concat(feriados(hoje.getUTCFullYear() + 1))
+                .find(f => f.data >= hoje);
+            if (!proximo) return;
+
+            const dias = Math.round((proximo.data - hoje) / 86400000);
+            const dow = proximo.data.getUTCDay();
+            const emenda = {
+                0: 'cai num domingo — rende um fim de semana de 3 dias',
+                1: 'cai numa segunda — 3 dias de viagem sem pedir folga',
+                2: 'cai numa terça — emendando a segunda rende 4 dias',
+                3: 'cai numa quarta — emendando rende 5 dias de viagem',
+                4: 'cai numa quinta — emendando a sexta rende 4 dias',
+                5: 'cai numa sexta — 3 dias de viagem sem pedir folga',
+                6: 'cai num sábado — rende um fim de semana de 3 dias',
+            }[dow];
+            const contagem = dias === 0 ? '🎉 É hoje!' : dias === 1 ? '🎉 É amanhã:' : `Faltam <strong>${dias} dias</strong> para`;
+
+            document.getElementById('feriado-radar-text').innerHTML =
+                `${contagem} ${proximo.nome} · <span class="radar-emenda">${emenda}</span>`;
+            document.getElementById('feriado-radar-cta').href =
+                `/escapadas?janela=feriado-${proximo.slug}-${proximo.ano}`;
+            document.getElementById('feriado-radar').classList.add('visible');
+        })();
     </script>
 </body>
 </html>

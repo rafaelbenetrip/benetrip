@@ -272,7 +272,11 @@ export function renderDatasCardHtml(d) {
                     </div>`;
 }
 
-export function renderCardHtml(d) {
+// opts.escapada: card de /escapadas — preço é de ida e volta em datas fixas
+// e a duração é em noites (min === max). Proteção contra .map(renderCardHtml),
+// que passa o índice como segundo argumento.
+export function renderCardHtml(d, opts) {
+    const { escapada = false } = (opts && typeof opts === 'object') ? opts : {};
     const imgSrc = d.imagem ? escapeHtml(d.imagem) : 'assets/images/tripinha/avatar-pensando.png';
     const nome = escapeHtml(d.nome);
     const pais = escapeHtml(d.pais);
@@ -282,7 +286,12 @@ export function renderCardHtml(d) {
         .join('');
     const variacaoHtml = renderVariacaoInlineHtml(d.variacao);
     const datasHtml = renderDatasCardHtml(d);
-    const duracaoTexto = d.duracao_ideal ? `<strong>${d.duracao_ideal.min}-${d.duracao_ideal.max}</strong> dias` : '';
+    const labelPreco = escapada ? 'Ida e volta' : 'A partir de';
+    const noites = d.duracao_ideal?.min ?? 0;
+    const duracaoTexto = !d.duracao_ideal ? ''
+        : escapada
+            ? `<strong>${noites}</strong> noite${noites !== 1 ? 's' : ''}`
+            : `<strong>${d.duracao_ideal.min}-${d.duracao_ideal.max}</strong> dias`;
     const duracaoIdeal = d.duracao_ideal?.ideal ?? '';
     const quedaDestaque = d.variacao?.direcao === 'desceu' && Math.abs(d.variacao.percentual) >= QUEDA_DESTAQUE_PCT
         ? `<span class="dest-badge-drop">&darr; ${Math.abs(d.variacao.percentual)}%</span>`
@@ -307,7 +316,7 @@ export function renderCardHtml(d) {
                     ${datasHtml}
                     <div class="dest-footer">
                         <div class="dest-price-block">
-                            <span class="dest-price-label">A partir de</span>
+                            <span class="dest-price-label">${labelPreco}</span>
                             <span class="dest-price">R$ ${fmt(d.preco)}</span>
                             ${variacaoHtml}
                         </div>
