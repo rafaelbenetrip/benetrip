@@ -103,7 +103,7 @@
     },
     {
       "path": "/api/cron/update-escapadas",
-      "schedule": "0 7,19 * * *"
+      "schedule": "0 1,7,13,19 * * *"
     },
     {
       "path": "/api/cron/instagram-post",

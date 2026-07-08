@@ -22,8 +22,12 @@ import { janelasAtivas, hojeISO } from '../_lib/escapadas-shared.js';
 
 export const maxDuration = 300; // 5 minutos
 
-const CIDADES_POR_LOTE = 15;
-const LOTES_POR_DIA = 2;
+// 8 cidades x ~9 buscas por execução: cabe com folga nos 300s da função.
+// Com 15 cidades a execução estourava o maxDuration (FUNCTION_INVOCATION_TIMEOUT)
+// com a latência real da SearchAPI. 4 execuções/dia cobrem as 30 cidades
+// com o mesmo custo diário de API (cada cidade continua 1x/dia).
+const CIDADES_POR_LOTE = 8;
+const LOTES_POR_DIA = 4;
 const MAX_DESTINOS_POR_JANELA = 30;
 const MIN_NACIONAIS = 10; // reserva de nacionais nas janelas de feriado
 
@@ -45,7 +49,7 @@ function calcularLote(totalCidades, forcarLote, horaUTC = new Date().getUTCHours
         const lote = parseInt(forcarLote);
         if (!isNaN(lote) && lote >= 0) return lote;
     }
-    const execucao = Math.floor(horaUTC / (24 / LOTES_POR_DIA)); // 7h -> 0, 19h -> 1
+    const execucao = Math.floor(horaUTC / (24 / LOTES_POR_DIA)); // 1h -> 0, 7h -> 1, 13h -> 2, 19h -> 3
     const totalLotes = Math.ceil(totalCidades / CIDADES_POR_LOTE);
     return execucao % totalLotes;
 }
@@ -60,7 +64,10 @@ async function supabaseInsert(tableName, data) {
         throw new Error('Supabase não configurado (NEXT_PUBLIC_SUPABASE_URL ou SUPABASE_SERVICE_ROLE_KEY)');
     }
 
-    const response = await fetch(`${supabaseUrl}/rest/v1/${tableName}`, {
+    // on_conflict é obrigatório: sem ele o PostgREST resolve merge-duplicates
+    // pela chave primária (id), e re-execuções no mesmo dia dão 409 na
+    // constraint UNIQUE (data, origem, tipo) em vez de atualizar o snapshot.
+    const response = await fetch(`${supabaseUrl}/rest/v1/${tableName}?on_conflict=data,origem,tipo`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
