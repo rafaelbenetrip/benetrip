@@ -94,13 +94,16 @@ async function supabaseInsert(tableName, data) {
         throw new Error('Supabase não configurado (NEXT_PUBLIC_SUPABASE_URL ou SUPABASE_SERVICE_ROLE_KEY)');
     }
 
-    const response = await fetch(`${supabaseUrl}/rest/v1/${tableName}`, {
+    // on_conflict é obrigatório para o UPSERT: sem ele o PostgREST resolve
+    // merge-duplicates pela chave primária (id) e re-execuções no mesmo dia
+    // dão 409 na constraint UNIQUE (data, origem, tipo) em vez de atualizar.
+    const response = await fetch(`${supabaseUrl}/rest/v1/${tableName}?on_conflict=data,origem,tipo`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
             'apikey': supabaseServiceKey,
             'Authorization': `Bearer ${supabaseServiceKey}`,
-            'Prefer': 'resolution=merge-duplicates',  // UPSERT: se já existir snapshot do dia, atualiza
+            'Prefer': 'resolution=merge-duplicates',
         },
         body: JSON.stringify(data),
     });
