@@ -12,7 +12,11 @@
 //   preco_max=1500            → Filtrar por preço máximo
 //   internacional=true/false  → Apenas internacionais ou nacionais
 
-import { fetchSnapshot as fetchSnapshotShared, calcularVariacoes as calcularVariacoesShared } from './_lib/discovery-shared.js';
+import {
+    fetchSnapshot as fetchSnapshotShared,
+    fetchSnapshotComVariacao,
+    calcularVariacoes as calcularVariacoesShared,
+} from './_lib/discovery-shared.js';
 
 export default async function handler(req, res) {
     // CORS
@@ -57,7 +61,27 @@ export default async function handler(req, res) {
 
         // ─── MODO 3: Snapshot específico (por data ou mais recente) ───
         if (origem) {
-            const snapshot = await fetchSnapshotShared(origem, tipo, data || null);
+            let snapshot;
+            let destinosComVariacao;
+
+            if (data) {
+                // Data específica: variação vs. o dia anterior à data pedida
+                snapshot = await fetchSnapshotShared(origem, tipo, data);
+                if (snapshot) {
+                    const anterior = new Date(data + 'T12:00:00Z');
+                    anterior.setUTCDate(anterior.getUTCDate() - 1);
+                    const anteriorStr = anterior.toISOString().split('T')[0];
+                    const snapshotAnterior = await fetchSnapshotShared(origem, tipo, anteriorStr);
+                    const destinos = aplicarFiltros(snapshot.destinos || [], { estilo, preco_max, internacional });
+                    destinosComVariacao = calcularVariacoesShared(destinos, snapshotAnterior?.destinos || []);
+                }
+            } else {
+                // Mais recente: variação vs. média dos últimos 7 dias (1 query)
+                snapshot = await fetchSnapshotComVariacao(origem, tipo);
+                if (snapshot) {
+                    destinosComVariacao = aplicarFiltros(snapshot.destinos || [], { estilo, preco_max, internacional });
+                }
+            }
 
             if (!snapshot) {
                 return res.status(404).json({
@@ -68,19 +92,6 @@ export default async function handler(req, res) {
                 });
             }
 
-            // Aplicar filtros nos destinos
-            let destinos = snapshot.destinos || [];
-            destinos = aplicarFiltros(destinos, { estilo, preco_max, internacional });
-
-            // Buscar snapshot de ontem para comparação
-            const ontem = new Date();
-            ontem.setDate(ontem.getDate() - 1);
-            const ontemStr = ontem.toISOString().split('T')[0];
-            const snapshotOntem = await fetchSnapshotShared(origem, tipo, ontemStr);
-
-            // Calcular variações de preço
-            const destinosComVariacao = calcularVariacoesShared(destinos, snapshotOntem?.destinos || []);
-
             return res.status(200).json({
                 success: true,
                 origem: snapshot.origem,
@@ -90,6 +101,8 @@ export default async function handler(req, res) {
                 total: destinosComVariacao.length,
                 total_original: (snapshot.destinos || []).length,
                 destinos: destinosComVariacao,
+                insight: snapshot.insight || null,
+                tripinha_pick: snapshot.tripinha_pick || null,
                 filtros_aplicados: { estilo, preco_max, internacional },
                 atualizado_em: snapshot.created_at,
             });

@@ -568,6 +568,154 @@ body {
 .stat-variation.down { color: var(--green-success); }
 .stat-variation.stable { color: var(--gray-medium); }
 
+.stat-card-drop { border: 1.5px solid #C8E6C9; background: #F4FBF4; }
+.stat-value-drop { color: var(--green-success); }
+
+/* ========================================
+   MAIORES QUEDAS DE PREÇO
+   ======================================== */
+.quedas-section { padding: 0 20px 8px; }
+
+.quedas-header {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    flex-wrap: wrap;
+    padding: 4px 0 10px;
+}
+
+.quedas-title {
+    font-family: 'Poppins', sans-serif;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--gray-dark);
+}
+
+.quedas-sub { font-size: 11px; color: var(--gray-medium); }
+
+.quedas-row {
+    display: flex;
+    gap: 10px;
+    overflow-x: auto;
+    padding-bottom: 8px;
+    scrollbar-width: none;
+}
+
+.quedas-row::-webkit-scrollbar { display: none; }
+
+.queda-card {
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+    min-width: 150px;
+    padding: 12px 14px;
+    background: var(--white);
+    border: 1.5px solid #C8E6C9;
+    border-radius: var(--border-radius-sm);
+    box-shadow: var(--shadow);
+    cursor: pointer;
+    font-family: 'Montserrat', sans-serif;
+    text-align: left;
+    transition: var(--transition);
+}
+
+.queda-card:hover {
+    box-shadow: var(--shadow-hover);
+    transform: translateY(-2px);
+    border-color: var(--green-success);
+}
+
+.queda-badge {
+    background: var(--green-success);
+    color: var(--white);
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 10px;
+}
+
+.queda-nome {
+    font-family: 'Poppins', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--gray-dark);
+}
+
+.queda-precos { font-size: 12px; color: var(--gray-medium); }
+.queda-precos s { opacity: 0.7; }
+.queda-precos strong { color: var(--orange-primary); font-size: 14px; margin-left: 4px; }
+
+.queda-datas { font-size: 10px; color: var(--gray-medium); }
+
+/* ========================================
+   ESCOLHA DA TRIPINHA
+   ======================================== */
+.tripinha-pick-section { padding: 4px 20px 8px; }
+
+.tripinha-pick-card {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 16px;
+    background: linear-gradient(135deg, #FFF8F0 0%, #FFF3E8 100%);
+    border: 1.5px solid #F5D5B8;
+    border-radius: var(--border-radius);
+    box-shadow: var(--shadow);
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.tripinha-pick-card:hover {
+    box-shadow: var(--shadow-hover);
+    transform: translateY(-2px);
+    border-color: var(--orange-primary);
+}
+
+.pick-avatar {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    border: 2px solid var(--orange-primary);
+    flex-shrink: 0;
+}
+
+.pick-content {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    flex: 1;
+    min-width: 0;
+}
+
+.pick-label {
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--orange-primary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.pick-destino {
+    font-family: 'Poppins', sans-serif;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--gray-dark);
+}
+
+.pick-destino strong { color: var(--orange-primary); }
+
+.pick-datas { font-size: 11px; font-weight: 500; color: var(--gray-medium); }
+
+.pick-motivo { font-size: 12px; color: var(--gray-medium); line-height: 1.4; }
+
+.pick-arrow {
+    font-size: 18px;
+    color: var(--orange-primary);
+    flex-shrink: 0;
+}
+
 /* ========================================
    GRID DE DESTINOS (CARDS)
    ======================================== */
@@ -679,6 +827,17 @@ body {
     text-transform: uppercase;
 }
 
+.dest-badge-drop {
+    position: absolute;
+    top: 8px; right: 8px;
+    background: var(--green-success);
+    color: var(--white);
+    padding: 2px 8px;
+    border-radius: 8px;
+    font-size: 10px;
+    font-weight: 700;
+}
+
 .dest-info {
     flex: 1;
     padding: 14px 16px;
@@ -709,6 +868,18 @@ body {
     color: var(--blue-secondary);
     font-weight: 500;
 }
+
+.dest-dates {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--gray-medium);
+    margin-bottom: 6px;
+}
+
+.dest-dates svg { flex-shrink: 0; color: var(--blue-secondary); }
 
 .dest-footer { display: flex; justify-content: space-between; align-items: flex-end; }
 

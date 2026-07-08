@@ -20,6 +20,8 @@
 
 import { readFileSync } from 'fs';
 import { join } from 'path';
+import { gerarConteudoTripinha } from '../_lib/tripinha-shared.js';
+import { fetchSnapshots, calcularVariacoesHistorico } from '../_lib/discovery-shared.js';
 
 export const maxDuration = 300; // 5 minutos
 
@@ -104,6 +106,17 @@ async function supabaseInsert(tableName, data) {
 
     if (!response.ok) {
         const errorText = await response.text();
+
+        // Colunas insight/tripinha_pick exigem a migração
+        // supabase-migration-tripinha.sql. Enquanto ela não rodar, salva o
+        // snapshot sem esses campos em vez de perder o dia inteiro de dados.
+        const colunaFaltando = response.status === 400 && /insight|tripinha_pick|PGRST204/i.test(errorText);
+        if (colunaFaltando && ('insight' in data || 'tripinha_pick' in data)) {
+            console.warn('⚠️ Colunas insight/tripinha_pick ausentes no Supabase — rode supabase-migration-tripinha.sql. Salvando snapshot sem elas.');
+            const { insight, tripinha_pick, ...semTripinha } = data;
+            return supabaseInsert(tableName, semTripinha);
+        }
+
         throw new Error(`Supabase insert falhou (${response.status}): ${errorText}`);
     }
 
@@ -387,8 +400,25 @@ async function processarOrigem(origem) {
 
         console.log(`✅ [${origem.codigo}] ${topDestinos.length} destinos (${totalNac} nacionais, ${totalIntl} internacionais) (${elapsed}ms) | Mais barato: R$${topDestinos[0]?.preco || '?'}`);
 
-        // Montar snapshot
         const hoje = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+
+        // Pré-gerar insight + escolha da Tripinha (1x por cidade/dia, custo ~zero
+        // vs. gerar por visitante; frase entra no HTML SSR sem latência).
+        // A variação vs. histórico é calculada só para dar contexto de quedas à IA.
+        let insight = null;
+        let tripinhaPick = null;
+        try {
+            const snapshotsAnteriores = (await fetchSnapshots(origem.codigo, 'destinos-baratos', 8))
+                .filter(s => s.data !== hoje);
+            const destinosComVariacao = calcularVariacoesHistorico(topDestinos, snapshotsAnteriores);
+            const conteudo = await gerarConteudoTripinha(origem.nome, destinosComVariacao, { incluirEscolha: true });
+            insight = conteudo.insight || null;
+            tripinhaPick = conteudo.escolha || null;
+            console.log(`🐶 [${origem.codigo}] Insight: "${insight}" | Escolha: ${tripinhaPick?.nome || '-'} (${conteudo.modelo})`);
+        } catch (tripErr) {
+            console.warn(`⚠️ [${origem.codigo}] Falha ao gerar conteúdo da Tripinha (snapshot segue sem):`, tripErr.message);
+        }
+
         return {
             data: hoje,
             origem: origem.codigo,
@@ -397,6 +427,8 @@ async function processarOrigem(origem) {
             destinos: topDestinos,
             total_destinos: topDestinos.length,
             moeda: 'BRL',
+            insight,
+            tripinha_pick: tripinhaPick,
         };
     } catch (error) {
         console.error(`❌ [${origem.codigo}] Erro:`, error.message);

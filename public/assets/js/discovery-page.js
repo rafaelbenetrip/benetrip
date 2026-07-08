@@ -28,6 +28,8 @@ const DiscoveryPage = {
         destinos: [],
         destinosFiltrados: [],
         dataSnapshot: null,
+        insight: null,        // frase da Tripinha pré-gerada no cron (snapshot)
+        tripinhaPick: null,   // escolha da Tripinha { nome, motivo } (snapshot)
         carregando: false,
         buscandoIA: false,
 
@@ -71,6 +73,8 @@ const DiscoveryPage = {
         this.state.origemManual = !!inicial.origemManual;
         this.state.destinos = inicial.destinos || [];
         this.state.dataSnapshot = inicial.dataSnapshot || null;
+        this.state.insight = inicial.insight || null;
+        this.state.tripinhaPick = inicial.tripinhaPick || null;
         this.state.destinosFiltrados = [...this.state.destinos];
         this.resetarFiltros();
 
@@ -429,6 +433,8 @@ const DiscoveryPage = {
             if (data.success && data.destinos && data.destinos.length > 0) {
                 this.state.destinos = data.destinos;
                 this.state.dataSnapshot = data.data;
+                this.state.insight = data.insight || null;
+                this.state.tripinhaPick = data.tripinha_pick || null;
                 this.state.origemManual = false;
                 this.state.destinosFiltrados = [...this.state.destinos];
                 this.renderizar();
@@ -452,6 +458,8 @@ const DiscoveryPage = {
         if (this.state.carregando) return;
         this.state.carregando = true;
         this.state.origemManual = true;
+        this.state.insight = null;      // busca ao vivo não tem insight pré-gerado
+        this.state.tripinhaPick = null;
         this.resetarFiltros();
         this.mostrarLoading(`Buscando voos saindo de ${this.state.origemNome} em tempo real...`);
 
@@ -626,6 +634,8 @@ const DiscoveryPage = {
         const copia = [...destinos];
         switch (this.state.ordenacao) {
             case 'preco': return copia.sort((a, b) => a.preco - b.preco);
+            // Maior queda primeiro (percentual mais negativo); sem variação vai pro fim
+            case 'queda': return copia.sort((a, b) => (a.variacao?.percentual ?? Infinity) - (b.variacao?.percentual ?? Infinity));
             case 'nome': return copia.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
             default: return copia;
         }
@@ -738,9 +748,11 @@ const DiscoveryPage = {
     renderizar() {
         this.atualizarCityBar();
         this.renderizarStats();
+        this.renderizarQuedas();
+        this.renderizarTripinhaPick();
         this.renderizarCards();
         this.atualizarContagem();
-        this.buscarTripinhaInsight();
+        this.mostrarInsight();
 
         document.getElementById('loading-state').style.display = 'none';
         document.getElementById('empty-state').style.display = 'none';
@@ -800,13 +812,21 @@ const DiscoveryPage = {
         const nacionais = destinos.filter(d => !d.internacional).length;
         const internacionais = destinos.filter(d => d.internacional).length;
 
+        const maiorQueda = this.maioresQuedas(destinos, 1)[0];
+        const maiorQuedaHtml = maiorQueda ? `
+            <div class="stat-card stat-card-drop">
+                <div class="stat-label">Maior queda</div>
+                <div class="stat-value stat-value-drop">↓ ${Math.abs(maiorQueda.variacao.percentual)}%</div>
+                <div class="stat-detail">${maiorQueda.nome} · agora R$ ${this.fmt(maiorQueda.preco)}</div>
+            </div>` : '';
+
         document.getElementById('stats-bar').innerHTML = `
             <div class="stat-card">
                 <div class="stat-label">Mais barato</div>
                 <div class="stat-value">R$ ${this.fmt(maisBarato.preco)}</div>
                 <div class="stat-detail">${maisBarato.nome}</div>
                 ${this.renderVariacao(maisBarato.variacao)}
-            </div>
+            </div>${maiorQuedaHtml}
             <div class="stat-card">
                 <div class="stat-label">Preço médio</div>
                 <div class="stat-value">R$ ${this.fmt(media)}</div>
@@ -825,6 +845,100 @@ const DiscoveryPage = {
         `;
     },
 
+    // ============================================================
+    // SEÇÃO "MAIORES QUEDAS" + "ESCOLHA DA TRIPINHA"
+    // ============================================================
+    maioresQuedas(destinos, limite) {
+        return (destinos || [])
+            .filter(d => d.variacao?.direcao === 'desceu' && Math.abs(d.variacao.percentual) >= 3)
+            .sort((a, b) => a.variacao.percentual - b.variacao.percentual)
+            .slice(0, limite || 5);
+    },
+
+    renderizarQuedas() {
+        const section = document.getElementById('quedas-section');
+        if (!section) return;
+
+        const quedas = this.maioresQuedas(this.state.destinos, 5);
+        if (quedas.length === 0) {
+            section.innerHTML = '';
+            section.style.display = 'none';
+            return;
+        }
+
+        const cards = quedas.map(d => {
+            const periodo = this.fmtPeriodo(d.data_ida, d.data_volta);
+            return `
+            <button class="queda-card" data-aeroporto="${d.aeroporto}" data-nome="${d.nome}" data-duracao="${d.duracao_ideal?.ideal ?? ''}" data-ida="${d.data_ida || ''}" data-volta="${d.data_volta || ''}">
+                <span class="queda-badge">↓ ${Math.abs(d.variacao.percentual)}%</span>
+                <span class="queda-nome">${d.nome}</span>
+                <span class="queda-precos"><s>R$ ${this.fmt(d.variacao.preco_anterior)}</s> <strong>R$ ${this.fmt(d.preco)}</strong></span>
+                ${periodo ? `<span class="queda-datas">${periodo}</span>` : ''}
+            </button>`;
+        }).join('');
+
+        section.innerHTML = `
+            <div class="quedas-header">
+                <h2 class="quedas-title">🔥 Maiores quedas de preço</h2>
+                <span class="quedas-sub">comparado à média dos últimos dias</span>
+            </div>
+            <div class="quedas-row">${cards}</div>`;
+        section.style.display = 'block';
+
+        section.querySelectorAll('.queda-card').forEach(card => {
+            card.addEventListener('click', () => this.navegarParaVoos(card.dataset));
+        });
+    },
+
+    renderizarTripinhaPick() {
+        const section = document.getElementById('tripinha-pick-section');
+        if (!section) return;
+
+        const pick = this.state.tripinhaPick;
+        const dest = pick?.nome
+            ? this.state.destinos.find(d => (d.nome || '').toLowerCase() === pick.nome.toLowerCase())
+            : null;
+
+        if (!dest) {
+            section.innerHTML = '';
+            section.style.display = 'none';
+            return;
+        }
+
+        const periodo = this.fmtPeriodo(dest.data_ida, dest.data_volta);
+        section.innerHTML = `
+            <div class="tripinha-pick-card" data-aeroporto="${dest.aeroporto}" data-nome="${dest.nome}" data-duracao="${dest.duracao_ideal?.ideal ?? ''}" data-ida="${dest.data_ida || ''}" data-volta="${dest.data_volta || ''}">
+                <img src="/assets/images/tripinha/avatar-pensando.png" alt="Tripinha" class="pick-avatar" onerror="this.style.display='none'">
+                <div class="pick-content">
+                    <span class="pick-label">🐾 Escolha da Tripinha</span>
+                    <span class="pick-destino">${dest.nome} · <strong>R$ ${this.fmt(dest.preco)}</strong>${periodo ? ` <span class="pick-datas">(${periodo})</span>` : ''}</span>
+                    ${pick.motivo ? `<span class="pick-motivo">${pick.motivo}</span>` : ''}
+                </div>
+                <span class="pick-arrow">→</span>
+            </div>`;
+        section.style.display = 'block';
+
+        section.querySelector('.tripinha-pick-card')?.addEventListener('click', (e) => {
+            this.navegarParaVoos(e.currentTarget.dataset);
+        });
+    },
+
+    // Navega para o calendário de preços já com destino, duração e as datas
+    // do preço mostrado (continuidade da oferta que convenceu o clique)
+    navegarParaVoos(dataset) {
+        const dest = dataset.aeroporto || dataset.nome;
+        if (!dest) return;
+        const params = new URLSearchParams({
+            origem: this.state.origemAtual,
+            destino: dest,
+            nome: dataset.nome,
+        });
+        if (dataset.duracao) params.set('duracao', dataset.duracao);
+        if (dataset.ida) params.set('data_ida', dataset.ida);
+        if (dataset.volta) params.set('data_volta', dataset.volta);
+        window.location.href = `/voos-baratos?${params.toString()}`;
+    },
+
     renderizarCards() {
         const grid = document.getElementById('destinations-grid');
         const destinos = this.state.destinosFiltrados;
@@ -841,18 +955,7 @@ const DiscoveryPage = {
         grid.innerHTML = destinos.map(d => this.renderCard(d)).join('');
 
         grid.querySelectorAll('.dest-card').forEach(card => {
-            card.addEventListener('click', () => {
-                const dest = card.dataset.aeroporto || card.dataset.nome;
-                if (dest) {
-                    const params = new URLSearchParams({
-                        origem: this.state.origemAtual,
-                        destino: dest,
-                        nome: card.dataset.nome,
-                    });
-                    if (card.dataset.duracao) params.set('duracao', card.dataset.duracao);
-                    window.location.href = `/voos-baratos?${params.toString()}`;
-                }
-            });
+            card.addEventListener('click', () => this.navegarParaVoos(card.dataset));
         });
     },
 
@@ -863,14 +966,25 @@ const DiscoveryPage = {
         ).join('');
         const variacaoHtml = d.variacao ? this.renderVariacaoInline(d.variacao) : '';
         const duracaoTexto = d.duracao_ideal ? `<strong>${d.duracao_ideal.min}-${d.duracao_ideal.max}</strong> dias` : '';
+        const periodo = this.fmtPeriodo(d.data_ida, d.data_volta);
+        const datasHtml = periodo
+            ? `<div class="dest-dates" title="Preço encontrado para essas datas — outras datas podem variar">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                    <span>${periodo}</span>
+                </div>`
+            : '';
+        const quedaDestaque = d.variacao?.direcao === 'desceu' && Math.abs(d.variacao.percentual) >= 5
+            ? `<span class="dest-badge-drop">↓ ${Math.abs(d.variacao.percentual)}%</span>`
+            : '';
 
         return `
-            <article class="dest-card" data-aeroporto="${d.aeroporto}" data-nome="${d.nome}" data-duracao="${d.duracao_ideal?.ideal || ''}">
+            <article class="dest-card" data-aeroporto="${d.aeroporto}" data-nome="${d.nome}" data-duracao="${d.duracao_ideal?.ideal || ''}" data-ida="${d.data_ida || ''}" data-volta="${d.data_volta || ''}">
                 <div class="dest-card-inner">
                     <div class="dest-image-wrapper">
                         <img class="dest-image" src="${imgSrc}" alt="${d.nome}" loading="lazy"
                              onerror="this.src='assets/images/tripinha/avatar-pensando.png'">
                         <span class="dest-rank">${d.posicao}</span>
+                        ${quedaDestaque}
                         ${d.internacional ? '<span class="dest-badge-international">Internacional</span>' : ''}
                     </div>
                     <div class="dest-info">
@@ -879,6 +993,7 @@ const DiscoveryPage = {
                             <p class="dest-country">${d.pais}${d.paradas > 0 ? ` · ${d.paradas} parada${d.paradas > 1 ? 's' : ''}` : ' · Direto'}</p>
                         </div>
                         <div class="dest-tags">${estilosTags}</div>
+                        ${datasHtml}
                         <div class="dest-footer">
                             <div class="dest-price-block">
                                 <span class="dest-price-label">A partir de</span>
@@ -892,17 +1007,21 @@ const DiscoveryPage = {
             </article>`;
     },
 
+    labelVariacao(v) {
+        return v?.referencia === 'ontem' ? 'vs ontem' : 'vs média da semana';
+    },
+
     renderVariacao(v) {
         if (!v) return '';
-        if (v.direcao === 'desceu') return `<div class="stat-variation down">↓ ${Math.abs(v.percentual)}% vs ontem</div>`;
-        if (v.direcao === 'subiu') return `<div class="stat-variation up">↑ ${Math.abs(v.percentual)}% vs ontem</div>`;
+        if (v.direcao === 'desceu') return `<div class="stat-variation down">↓ ${Math.abs(v.percentual)}% ${this.labelVariacao(v)}</div>`;
+        if (v.direcao === 'subiu') return `<div class="stat-variation up">↑ ${Math.abs(v.percentual)}% ${this.labelVariacao(v)}</div>`;
         return `<div class="stat-variation stable">→ Estável</div>`;
     },
 
     renderVariacaoInline(v) {
         if (!v) return '';
-        if (v.direcao === 'desceu') return `<span class="dest-price-variation down">↓ R$ ${Math.abs(v.diferenca)} vs ontem</span>`;
-        if (v.direcao === 'subiu') return `<span class="dest-price-variation up">↑ R$ ${Math.abs(v.diferenca)} vs ontem</span>`;
+        if (v.direcao === 'desceu') return `<span class="dest-price-variation down">↓ R$ ${this.fmt(Math.abs(v.diferenca))} ${this.labelVariacao(v)}</span>`;
+        if (v.direcao === 'subiu') return `<span class="dest-price-variation up">↑ R$ ${this.fmt(Math.abs(v.diferenca))} ${this.labelVariacao(v)}</span>`;
         return '';
     },
 
@@ -930,8 +1049,25 @@ const DiscoveryPage = {
     },
 
     // ============================================================
-    // TRIPINHA INSIGHT (frase da IA sobre os destinos)
+    // TRIPINHA INSIGHT (frase sobre os destinos)
+    // Caminho principal: insight pré-gerado no cron, já embutido no snapshot
+    // (zero latência e zero custo por visitante). A chamada à API só acontece
+    // para buscas ao vivo e snapshots antigos sem o campo.
     // ============================================================
+    mostrarInsight() {
+        const bar = document.getElementById('tripinha-insight-bar');
+        const textEl = document.getElementById('tripinha-insight-text');
+        if (!bar || !textEl) return;
+
+        if (this.state.insight) {
+            textEl.textContent = this.state.insight;
+            bar.style.display = 'flex';
+            return;
+        }
+
+        this.buscarTripinhaInsight();
+    },
+
     async buscarTripinhaInsight() {
         const bar = document.getElementById('tripinha-insight-bar');
         const textEl = document.getElementById('tripinha-insight-text');
@@ -1010,6 +1146,10 @@ const DiscoveryPage = {
         document.getElementById('filters-section').style.display = 'none';
         document.getElementById('cta-section').style.display = 'none';
         document.getElementById('share-fab').style.display = 'none';
+        const quedas = document.getElementById('quedas-section');
+        if (quedas) quedas.style.display = 'none';
+        const pick = document.getElementById('tripinha-pick-section');
+        if (pick) pick.style.display = 'none';
     },
 
     mostrarVazio(mensagem) {
@@ -1072,15 +1212,19 @@ const DiscoveryPage = {
         const maisBarato = top[0];
         const origem = this.state.origemNome;
 
-        // Insight da Tripinha (se disponível no cache)
+        // Insight da Tripinha (do snapshot ou do cache da busca via API)
         let insightLine = '';
-        const cacheKey = `tripinha_insight_${this.state.origemAtual}`;
-        const cached = sessionStorage.getItem(cacheKey);
-        if (cached) {
-            try {
-                const data = JSON.parse(cached);
-                if (data.insight) insightLine = `\n🐶 ${data.insight}\n`;
-            } catch (e) { /* sem insight */ }
+        if (this.state.insight) {
+            insightLine = `\n🐶 ${this.state.insight}\n`;
+        } else {
+            const cacheKey = `tripinha_insight_${this.state.origemAtual}`;
+            const cached = sessionStorage.getItem(cacheKey);
+            if (cached) {
+                try {
+                    const data = JSON.parse(cached);
+                    if (data.insight) insightLine = `\n🐶 ${data.insight}\n`;
+                } catch (e) { /* sem insight */ }
+            }
         }
 
         // Destaque de preço: variações
@@ -1107,12 +1251,13 @@ const DiscoveryPage = {
             intlLine = `\n🌍 ${intlBaratos.length} destinos internacionais por menos de R$ 2.500!\n`;
         }
 
+        const periodoMaisBarato = this.fmtPeriodo(maisBarato.data_ida, maisBarato.data_volta);
         return `✈️ *Top ${top.length} destinos baratos saindo de ${origem}!*\n` +
             insightLine +
             variacaoLine +
             `\n${linhas.join('\n')}\n` +
             intlLine +
-            `\n💡 O mais barato: ${maisBarato.nome} por apenas R$ ${this.fmt(maisBarato.preco)}` +
+            `\n💡 O mais barato: ${maisBarato.nome} por apenas R$ ${this.fmt(maisBarato.preco)}${periodoMaisBarato ? ` (${periodoMaisBarato})` : ''}` +
             `\n\n🐶 Vem ver na Benetrip! A Tripinha encontra viagens do seu jeito.` +
             `\n👉 https://benetrip.com.br/destinos-baratos`;
     },
@@ -1148,6 +1293,22 @@ const DiscoveryPage = {
     fmt(valor) {
         if (!valor) return '0';
         return Number(valor).toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+    },
+
+    // "2026-09-12" -> "12 set" (parse manual para não depender de timezone)
+    fmtDataCurta(iso) {
+        if (!iso || typeof iso !== 'string') return '';
+        const meses = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+        const [y, m, d] = iso.split('-').map(Number);
+        if (!y || !m || !d || m < 1 || m > 12) return '';
+        return `${d} ${meses[m - 1]}`;
+    },
+
+    fmtPeriodo(dataIda, dataVolta) {
+        const ida = this.fmtDataCurta(dataIda);
+        if (!ida) return '';
+        const volta = this.fmtDataCurta(dataVolta);
+        return volta ? `${ida} → ${volta}` : ida;
     },
 
     capitalize(str) {

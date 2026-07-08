@@ -13,6 +13,7 @@ const BenetripVoosBaratos = {
         moedaSelecionada: 'BRL',
         resultados: null,
         mesSelecionado: null, // mês clicado no gráfico (YYYY-MM)
+        mesPreferidoURL: null, // mês da data_ida vinda da URL (destinos baratos)
     },
 
     config: {
@@ -40,7 +41,9 @@ const BenetripVoosBaratos = {
 
     // ================================================================
     // PRÉ-PREENCHIMENTO VIA URL (vindo da página de discovery)
-    // Params: ?origem=GRU&destino=REC&nome=Recife&duracao=7
+    // Params: ?origem=GRU&destino=REC&nome=Recife&duracao=7&data_ida=2026-09-12&data_volta=2026-09-19
+    // data_ida/data_volta são as datas do preço mostrado no card de destinos
+    // baratos: usadas para pré-selecionar o mês correspondente no calendário.
     // ================================================================
     preencherViaURL() {
         const params = new URLSearchParams(window.location.search);
@@ -48,10 +51,15 @@ const BenetripVoosBaratos = {
         const destinoCode = params.get('destino');
         const destinoNome = params.get('nome');
         const duracao = params.get('duracao');
+        const dataIda = params.get('data_ida');
+
+        if (dataIda && /^\d{4}-\d{2}(-\d{2})?/.test(dataIda)) {
+            this.state.mesPreferidoURL = dataIda.slice(0, 7); // YYYY-MM
+        }
 
         if (!origemCode && !destinoCode) return;
 
-        this.log('📡 Pré-preenchendo via URL:', { origemCode, destinoCode, destinoNome, duracao });
+        this.log('📡 Pré-preenchendo via URL:', { origemCode, destinoCode, destinoNome, duracao, dataIda });
 
         if (origemCode) {
             const cidadeOrigem = this.encontrarCidadePorCodigo(origemCode);
@@ -396,6 +404,15 @@ const BenetripVoosBaratos = {
             await this.delay(400);
 
             this.renderResults(data);
+
+            // Veio da página de destinos baratos com a data do preço do card:
+            // abre o calendário já no mês daquela oferta (uma vez só)
+            if (this.state.mesPreferidoURL) {
+                const mes = this.state.mesPreferidoURL;
+                this.state.mesPreferidoURL = null;
+                const temMes = (data.monthlyData || []).some(m => m.month === mes);
+                if (temMes) this.selectMonth(mes);
+            }
 
         } catch (err) {
             this.log('❌ Erro:', err.message);

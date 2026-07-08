@@ -26,6 +26,8 @@ import {
     badgeAtualizacao,
     renderCardHtml,
     renderStatsBarHtml,
+    renderQuedasHtml,
+    renderTripinhaPickHtml,
 } from './_lib/discovery-shared.js';
 
 const SITE_URL = 'https://benetrip.com.br';
@@ -130,6 +132,10 @@ function renderPage({ cidadeAtual, cidades, snapshot, isDefault }) {
 
     const chips = montarChips(cidadeAtual, cidades);
     const badge = temDestinos ? badgeAtualizacao(snapshot.data) : null;
+    const insight = temDestinos ? (snapshot.insight || null) : null;
+    const tripinhaPick = temDestinos ? (snapshot.tripinha_pick || null) : null;
+    const quedasHtml = temDestinos ? renderQuedasHtml(destinos) : '';
+    const pickHtml = temDestinos ? renderTripinhaPickHtml(tripinhaPick, destinos) : '';
 
     return `<!DOCTYPE html>
 <html lang="pt-BR">
@@ -157,7 +163,7 @@ function renderPage({ cidadeAtual, cidades, snapshot, isDefault }) {
 
     <!-- JSON-LD -->
     <script type="application/ld+json">${jsonLdSafe(renderBreadcrumbJsonLd(cidadeAtual, isDefault, canonicalUrl))}</script>
-    ${temDestinos ? `<script type="application/ld+json">${jsonLdSafe(renderItemListJsonLd(cidadeAtual, destinos, canonicalUrl))}</script>` : ''}
+    ${temDestinos ? `<script type="application/ld+json">${jsonLdSafe(renderItemListJsonLd(cidadeAtual, destinos, canonicalUrl, snapshot.data))}</script>` : ''}
 
     <!-- Supabase Config (usado pelo benetrip-auth.js para login, não para os destinos) -->
     <meta name="supabase-url" content="https://dlccjeazkpxtijevusbp.supabase.co">
@@ -238,12 +244,14 @@ function renderPage({ cidadeAtual, cidades, snapshot, isDefault }) {
     </div>
 
     <!-- ========================================
-         BLOCO 3.5: TRIPINHA INSIGHT (frase da IA, carregada via JS)
+         BLOCO 3.5: TRIPINHA INSIGHT
+         Pré-gerado no cron e renderizado no servidor (sem flicker, visível
+         pra SEO). O JS só busca via API quando o snapshot não tem insight.
          ======================================== -->
-    <div class="tripinha-insight-bar" id="tripinha-insight-bar" style="display:none;">
+    <div class="tripinha-insight-bar" id="tripinha-insight-bar" style="${insight ? '' : 'display:none;'}">
         <img src="/assets/images/tripinha/avatar-pensando.png" alt="Tripinha" class="insight-avatar"
              onerror="this.style.display='none'">
-        <p class="insight-text" id="tripinha-insight-text"></p>
+        <p class="insight-text" id="tripinha-insight-text">${insight ? escapeHtml(insight) : ''}</p>
     </div>
 
     <!-- ========================================
@@ -293,6 +301,16 @@ function renderPage({ cidadeAtual, cidades, snapshot, isDefault }) {
     <div class="stats-bar" id="stats-bar">${renderStatsBarHtml(destinos)}</div>
 
     <!-- ========================================
+         BLOCO 5.1: MAIORES QUEDAS DE PREÇO (vs média dos últimos dias)
+         ======================================== -->
+    <section class="quedas-section" id="quedas-section" style="${quedasHtml ? '' : 'display:none;'}">${quedasHtml}</section>
+
+    <!-- ========================================
+         BLOCO 5.2: ESCOLHA DA TRIPINHA (pré-gerada no cron)
+         ======================================== -->
+    <section class="tripinha-pick-section" id="tripinha-pick-section" style="${pickHtml ? '' : 'display:none;'}">${pickHtml}</section>
+
+    <!-- ========================================
          BLOCO 6: LOADING STATE (só reaparece em trocas de cidade via JS)
          ======================================== -->
     <div class="discovery-loading" id="loading-state" style="display:none;">
@@ -319,6 +337,7 @@ function renderPage({ cidadeAtual, cidades, snapshot, isDefault }) {
             <div class="section-header-right">
                 <select class="sort-select" id="sort-select" aria-label="Ordenar por">
                     <option value="preco">Menor preço</option>
+                    <option value="queda">Maior queda de preço</option>
                     <option value="nome">Nome A-Z</option>
                 </select>
                 <span class="section-count" id="section-count">${destinos.length} destino${destinos.length !== 1 ? 's' : ''}</span>
@@ -369,6 +388,8 @@ function renderPage({ cidadeAtual, cidades, snapshot, isDefault }) {
         origemManual: false,
         destinos,
         dataSnapshot: snapshot?.data || null,
+        insight,
+        tripinhaPick,
         cidadesAutomaticas: cidades.map((c) => ({ codigo: c.codigo, nome: c.nome, estado: c.estado, regiao: c.regiao, slug: c.slug })),
     })}</script>
     <script>
@@ -457,8 +478,20 @@ function renderBreadcrumbJsonLd(cidadeAtual, isDefault, canonicalUrl) {
     };
 }
 
-function renderItemListJsonLd(cidadeAtual, destinos, canonicalUrl) {
+function renderItemListJsonLd(cidadeAtual, destinos, canonicalUrl, dataSnapshot) {
     const top = destinos.slice(0, 20);
+
+    // Preços são atualizados diariamente pelo cron: a oferta vale até o dia
+    // seguinte à data do snapshot.
+    let priceValidUntil = null;
+    if (dataSnapshot) {
+        const validade = new Date(dataSnapshot + 'T12:00:00Z');
+        if (!Number.isNaN(validade.getTime())) {
+            validade.setUTCDate(validade.getUTCDate() + 1);
+            priceValidUntil = validade.toISOString().split('T')[0];
+        }
+    }
+
     return {
         '@context': 'https://schema.org',
         '@type': 'ItemList',
@@ -474,6 +507,7 @@ function renderItemListJsonLd(cidadeAtual, destinos, canonicalUrl) {
                 priceCurrency: d.moeda || 'BRL',
                 price: String(d.preco || 0),
                 availability: 'https://schema.org/InStock',
+                ...(priceValidUntil ? { priceValidUntil } : {}),
                 url: canonicalUrl,
             },
         })),
