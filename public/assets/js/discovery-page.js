@@ -772,6 +772,17 @@ const DiscoveryPage = {
 
         document.title = `Destinos Baratos Saindo de ${this.state.origemNome} | Benetrip`;
 
+        // Hero é renderizado no servidor com a cidade inicial: precisa
+        // acompanhar a troca de cidade feita via JS (pushState)
+        const heroTitle = document.getElementById('hero-title');
+        if (heroTitle) heroTitle.textContent = `Destinos Baratos Saindo de ${this.state.origemNome}`;
+        const heroSubtitle = document.getElementById('hero-subtitle');
+        if (heroSubtitle) {
+            heroSubtitle.textContent = this.state.origemManual
+                ? `A Tripinha está farejando os voos mais baratos partindo de ${this.state.origemNome} (${this.state.origemAtual}) em tempo real.`
+                : `A Tripinha farejou os voos mais baratos partindo de ${this.state.origemNome} (${this.state.origemAtual}). Preços reais, atualizados todos os dias.`;
+        }
+
         if (!this.state.origemManual) {
             const cidade = this.cidadesAutomaticas.find(c => c.codigo === this.state.origemAtual);
             const slug = cidade?.slug || this.slugify(this.state.origemNome);
