@@ -13,6 +13,32 @@ a.dest-card {
     display: block;
 }
 
+/* Botão de compartilhar destino (canto da imagem do card) */
+.dest-share-btn {
+    position: absolute;
+    right: 8px;
+    bottom: 8px;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(255, 255, 255, 0.92);
+    color: var(--gray-dark);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: var(--shadow);
+    transition: var(--transition);
+    z-index: 2;
+}
+
+.dest-share-btn:hover {
+    background: var(--orange-primary);
+    color: var(--white);
+    transform: scale(1.1);
+}
+
 /* ---- Seletor de janela (fds + feriados) ---- */
 .janela-selector {
     display: flex;
