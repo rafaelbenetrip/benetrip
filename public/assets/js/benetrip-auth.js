@@ -3,7 +3,7 @@
  * BENETRIP AUTH MODULE - benetrip-auth.js
  * ============================================
  * Módulo global de autenticação para todas as páginas da Benetrip.
- * Utiliza Supabase Auth com suporte a Email/Senha, Google e Facebook.
+ * Utiliza Supabase Auth com suporte a Email/Senha e Google.
  * 
  * COMO USAR:
  * 1. Incluir este script em todas as páginas ANTES dos outros scripts
@@ -233,19 +233,6 @@ const BenetripAuth = (function () {
             options: {
                 redirectTo: `${CONFIG.redirectUrl}/auth-callback.html`,
                 queryParams: { access_type: 'offline', prompt: 'consent' }
-            }
-        });
-        if (error) throw _translateError(error);
-        return data;
-    }
-
-    async function signInWithFacebook() {
-        _ensureInitialized();
-        const { data, error } = await supabase.auth.signInWithOAuth({
-            provider: 'facebook',
-            options: {
-                redirectTo: `${CONFIG.redirectUrl}/auth-callback.html`,
-                scopes: 'email,public_profile'
             }
         });
         if (error) throw _translateError(error);
@@ -609,7 +596,7 @@ const BenetripAuth = (function () {
     // ==========================================
 
     return {
-        init, signInWithEmail, signUpWithEmail, signInWithGoogle, signInWithFacebook,
+        init, signInWithEmail, signUpWithEmail, signInWithGoogle,
         signInWithMagicLink, signOut, resetPassword, getUser, isLoggedIn, getProfile,
         updateProfile, getUserDisplayName, getUserAvatar, onAuthChange, saveSearch,
         getSearchHistory, deleteSearch, clearSearchHistory, saveDestination,
