@@ -201,6 +201,20 @@ function renderPage({ cidadeAtual, cidades, janelas, janelaAtiva, hoje, isDefaul
             <p class="hero-subtitle" id="hero-subtitle">
                 Fins de semana e feriados nacionais com preço real por data, saindo de ${escapeHtml(cidadeAtual.nome)} (${escapeHtml(cidadeAtual.codigo)}). Para quem não está de férias, mas não abre mão de viajar.
             </p>
+
+            <!-- BUSCA DE CIDADE (30 automáticas + qualquer aeroporto ao vivo) -->
+            <div class="hero-city-search">
+                <div class="city-search-box" id="city-search-box">
+                    <svg class="city-search-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                    <input type="text" id="city-search-input"
+                           placeholder="Digite sua cidade ou código do aeroporto..."
+                           autocomplete="off" maxlength="60">
+                    <button class="city-search-clear" id="city-search-clear" style="display:none;" aria-label="Limpar">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    </button>
+                </div>
+                <div class="city-suggestions" id="city-suggestions" style="display:none;"></div>
+            </div>
         </div>
     </section>
 
@@ -264,6 +278,14 @@ function renderPage({ cidadeAtual, cidades, janelas, janelaAtiva, hoje, isDefaul
     <div class="stats-bar" id="stats-bar">${renderStatsBarHtml(destinos)}</div>
 
     <!-- ========================================
+         BLOCO 7.5: LOADING (busca ao vivo de cidade fora das 30)
+         ======================================== -->
+    <div class="discovery-loading" id="loading-state" style="display:none;">
+        <div class="spinner"></div>
+        <p id="loading-message">A Tripinha está farejando voos em tempo real...</p>
+    </div>
+
+    <!-- ========================================
          BLOCO 8: EMPTY STATE (janela sem snapshot ainda)
          ======================================== -->
     <div class="discovery-empty" id="empty-state" style="${temDestinos ? 'display:none;' : ''}">
@@ -325,6 +347,7 @@ function renderPage({ cidadeAtual, cidades, janelas, janelaAtiva, hoje, isDefaul
         origemNome: cidadeAtual.nome,
         origemSlug: cidadeAtual.slug,
         janelaAtiva: janelaAtiva?.id || null,
+        cidadesAutomaticas: cidades.map((c) => ({ codigo: c.codigo, nome: c.nome, estado: c.estado, regiao: c.regiao, slug: c.slug })),
         janelas: janelas.map((j) => ({
             id: j.id,
             categoria: j.categoria,
