@@ -22,6 +22,7 @@ import {
     badgeAtualizacao,
     renderCardHtml,
     renderStatsBarHtml,
+    buildGoogleFlightsUrl,
 } from './_lib/discovery-shared.js';
 import { janelasAtivas, fetchSnapshotsEscapadas, hojeISO } from './_lib/escapadas-shared.js';
 import { feriadosDoAno, proximosFeriados, janelaDoFeriado, descricaoEmenda, diffDias } from './_lib/feriados.js';
@@ -288,7 +289,7 @@ function renderPage({ cidadeAtual, cidades, janelas, janelaAtiva, hoje, isDefaul
                 <span class="section-count" id="section-count">${destinos.length} destino${destinos.length !== 1 ? 's' : ''}</span>
             </div>
         </div>
-        <div class="destinations-grid" id="destinations-grid">${destinos.map((d) => renderCardHtml(d, { escapada: true })).join('')}</div>
+        <div class="destinations-grid" id="destinations-grid">${destinos.map((d) => renderCardHtml(d, { escapada: true, href: hrefDoDestino(d, cidadeAtual) })).join('')}</div>
     </main>
 
     <!-- ========================================
@@ -346,6 +347,19 @@ function renderPage({ cidadeAtual, cidades, janelas, janelaAtiva, hoje, isDefaul
     <script src="/assets/js/escapadas-page.js"></script>
 </body>
 </html>`;
+}
+
+// Card leva direto ao Google Flights com as datas da janela (a pessoa vê as
+// opções de voo na hora). Sem código IATA não há como montar a busca: cai no
+// calendário interno de preços como antes.
+function hrefDoDestino(d, cidadeAtual) {
+    if (d.aeroporto && d.data_ida && d.data_volta) {
+        return buildGoogleFlightsUrl(cidadeAtual.codigo, d.aeroporto, d.data_ida, d.data_volta);
+    }
+    const params = new URLSearchParams({ origem: cidadeAtual.codigo, destino: d.aeroporto || d.nome, nome: d.nome });
+    if (d.data_ida) params.set('data_ida', d.data_ida);
+    if (d.data_volta) params.set('data_volta', d.data_volta);
+    return `/voos-baratos?${params.toString()}`;
 }
 
 function tituloSecao(janelaAtiva, cidadeAtual) {

@@ -29,7 +29,6 @@ const EscapadasPage = {
         this.state.destinosFiltrados = [...(this.state.janelaAtiva?.destinos || [])];
 
         this.bindEvents();
-        this.bindCardClicks();
     },
 
     bindEvents() {
@@ -204,30 +203,79 @@ const EscapadasPage = {
         const grid = document.getElementById('destinations-grid');
         if (!grid) return;
         grid.innerHTML = this.state.destinosFiltrados.map(d => this.renderCard(d)).join('');
-        this.bindCardClicks();
     },
 
-    bindCardClicks() {
-        document.querySelectorAll('#destinations-grid .dest-card').forEach(card => {
-            if (card.dataset.bound) return;
-            card.dataset.bound = '1';
-            card.addEventListener('click', () => this.navegarParaVoos(card.dataset));
-        });
-    },
-
-    // Navega para o calendário de preços já com as datas da janela travadas
-    navegarParaVoos(dataset) {
-        const dest = dataset.aeroporto || dataset.nome;
-        if (!dest) return;
+    // O card é um <a target="_blank"> direto pro Google Flights com as datas
+    // da janela (link real: imune a bloqueio de popup, funciona com clique do
+    // meio). Sem código IATA cai no calendário interno de preços.
+    hrefDoDestino(d) {
+        if (d.aeroporto && d.data_ida && d.data_volta) {
+            return this.buildGoogleFlightsUrl(this.state.origemAtual, d.aeroporto, d.data_ida, d.data_volta);
+        }
         const params = new URLSearchParams({
             origem: this.state.origemAtual,
-            destino: dest,
-            nome: dataset.nome,
+            destino: d.aeroporto || d.nome,
+            nome: d.nome,
         });
-        if (dataset.duracao) params.set('duracao', dataset.duracao);
-        if (dataset.ida) params.set('data_ida', dataset.ida);
-        if (dataset.volta) params.set('data_volta', dataset.volta);
-        window.location.href = `/voos-baratos?${params.toString()}`;
+        if (d.data_ida) params.set('data_ida', d.data_ida);
+        if (d.data_volta) params.set('data_volta', d.data_volta);
+        return `/voos-baratos?${params.toString()}`;
+    },
+
+    // ============================================================
+    // GOOGLE FLIGHTS URL (mesmo encoding tfs/tfu do descobrir-destinos.js:
+    // protobuf em base64url, abre direto nos resultados de ida e volta)
+    // ============================================================
+    _protoVarint(value) {
+        const bytes = [];
+        let v = value >>> 0;
+        while (v > 0x7f) { bytes.push((v & 0x7f) | 0x80); v >>>= 7; }
+        bytes.push(v & 0x7f);
+        return bytes;
+    },
+    _protoVarintField(fieldNumber, value) {
+        return [...this._protoVarint((fieldNumber << 3) | 0), ...this._protoVarint(value)];
+    },
+    _protoStringField(fieldNumber, str) {
+        const encoded = new TextEncoder().encode(str);
+        return [...this._protoVarint((fieldNumber << 3) | 2), ...this._protoVarint(encoded.length), ...encoded];
+    },
+    _protoMessageField(fieldNumber, messageBytes) {
+        return [...this._protoVarint((fieldNumber << 3) | 2), ...this._protoVarint(messageBytes.length), ...messageBytes];
+    },
+    _toBase64Url(bytes) {
+        return btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    },
+    _buildAirport(iataCode) {
+        return [...this._protoVarintField(1, 1), ...this._protoStringField(2, iataCode)];
+    },
+    _buildFlightLeg(date, originIata, destIata) {
+        return [
+            ...this._protoStringField(2, date),
+            ...this._protoMessageField(13, this._buildAirport(originIata)),
+            ...this._protoMessageField(14, this._buildAirport(destIata)),
+        ];
+    },
+    buildGoogleFlightsUrl(originIata, destIata, departDate, returnDate) {
+        const tfs = this._toBase64Url([
+            ...this._protoVarintField(1, 28),
+            ...this._protoVarintField(2, 2),
+            ...this._protoMessageField(3, this._buildFlightLeg(departDate, originIata, destIata)),
+            ...this._protoMessageField(3, this._buildFlightLeg(returnDate, destIata, originIata)),
+            ...this._protoVarintField(14, 1),
+        ]);
+        const tfu = this._toBase64Url(this._protoMessageField(2, [
+            ...this._protoVarintField(1, 1),
+            ...this._protoVarintField(2, 0),
+            ...this._protoVarintField(3, 0),
+        ]));
+        const params = new URLSearchParams();
+        params.set('tfs', tfs);
+        params.set('tfu', tfu);
+        params.set('curr', 'BRL');
+        params.set('hl', 'pt-BR');
+        params.set('gl', 'br');
+        return `https://www.google.com/travel/flights/search?${params.toString()}`;
     },
 
     renderCard(d) {
@@ -242,7 +290,7 @@ const EscapadasPage = {
             : '';
 
         return `
-            <article class="dest-card" data-aeroporto="${d.aeroporto}" data-nome="${d.nome}" data-duracao="${noites || ''}" data-ida="${d.data_ida || ''}" data-volta="${d.data_volta || ''}">
+            <a class="dest-card" href="${this.hrefDoDestino(d)}" target="_blank" rel="noopener nofollow" data-aeroporto="${d.aeroporto}" data-nome="${d.nome}" data-duracao="${noites || ''}" data-ida="${d.data_ida || ''}" data-volta="${d.data_volta || ''}">
                 <div class="dest-card-inner">
                     <div class="dest-image-wrapper">
                         <img class="dest-image" src="${imgSrc}" alt="${d.nome}" loading="lazy"
@@ -271,7 +319,7 @@ const EscapadasPage = {
                         </div>
                     </div>
                 </div>
-            </article>`;
+            </a>`;
     },
 
     renderStats(destinos) {
