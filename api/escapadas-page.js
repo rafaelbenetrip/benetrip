@@ -85,7 +85,10 @@ export default async function handler(req, res) {
         janelasComDados[0];
 
     const isDefault = !slugParam;
-    const html = renderPage({ cidadeAtual, cidades, janelas: janelasComDados, janelaAtiva, hoje, isDefault });
+    // Link compartilhado com ?janela= ganha título/OG específicos da janela:
+    // é o preview no WhatsApp que "vende" o clique dentro da conversa.
+    const janelaExplicita = janelaParam && janelaAtiva?.id === janelaParam;
+    const html = renderPage({ cidadeAtual, cidades, janelas: janelasComDados, janelaAtiva, hoje, isDefault, janelaExplicita });
 
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.setHeader('X-Robots-Tag', 'index, follow');
@@ -125,17 +128,30 @@ function sendErrorPage(res, status, title, message) {
 // ============================================================
 // MONTAGEM DA PÁGINA
 // ============================================================
-function renderPage({ cidadeAtual, cidades, janelas, janelaAtiva, hoje, isDefault }) {
+function renderPage({ cidadeAtual, cidades, janelas, janelaAtiva, hoje, isDefault, janelaExplicita }) {
     const destinos = janelaAtiva?.snapshot?.destinos || [];
     const temDestinos = destinos.length > 0;
     const canonicalPath = isDefault ? '/escapadas' : `/escapadas/${cidadeAtual.slug}`;
+    // Canonical fica sem ?janela= (as janelas rolam; a página da cidade é o
+    // conteúdo permanente). O og:url mantém a janela pro preview do link.
     const canonicalUrl = `${SITE_URL}${canonicalPath}`;
+    const ogUrl = janelaExplicita ? `${canonicalUrl}?janela=${encodeURIComponent(janelaAtiva.id)}` : canonicalUrl;
 
     const menorPreco = temDestinos ? destinos[0].preco : null;
-    const title = `Escapadas de Fim de Semana e Feriados Saindo de ${cidadeAtual.nome} | Benetrip`;
-    const description = temDestinos
+    let title = `Escapadas de Fim de Semana e Feriados Saindo de ${cidadeAtual.nome} | Benetrip`;
+    let description = temDestinos
         ? `Para onde viajar no fim de semana ou no próximo feriado saindo de ${cidadeAtual.nome}? Voos de ida e volta a partir de R$ ${fmt(menorPreco)} para ${janelaAtiva.rotuloDatas}. Preços reais por data, atualizados todos os dias.`
         : `A Tripinha está farejando voos de fim de semana e feriados saindo de ${cidadeAtual.nome}. Volte em breve para ver os preços por data.`;
+
+    if (janelaExplicita) {
+        const rotuloJanela = janelaAtiva.categoria === 'feriado'
+            ? `${janelaAtiva.feriado.nome} (${janelaAtiva.rotuloDatas})`
+            : `Fim de semana de ${janelaAtiva.rotuloDatas}`;
+        title = `${rotuloJanela}: escapadas saindo de ${cidadeAtual.nome} | Benetrip`;
+        description = temDestinos
+            ? `Voos de ida e volta saindo de ${cidadeAtual.nome} para ${janelaAtiva.rotuloDatas}, a partir de R$ ${fmt(menorPreco)}.${janelaAtiva.categoria === 'feriado' ? ` ${janelaAtiva.feriado.nome} ${janelaAtiva.feriado.emenda}.` : ''} Preços reais, atualizados todos os dias.`
+            : `Escapadas saindo de ${cidadeAtual.nome} para ${janelaAtiva.rotuloDatas}. A Tripinha está farejando os preços — volte em breve.`;
+    }
 
     const chips = montarChips(cidadeAtual, cidades);
     const badge = janelaAtiva?.snapshot ? badgeAtualizacao(janelaAtiva.snapshot.data) : null;
@@ -157,7 +173,7 @@ function renderPage({ cidadeAtual, cidades, janelas, janelaAtiva, hoje, isDefaul
     <meta property="og:site_name" content="Benetrip">
     <meta property="og:title" content="${escapeHtml(title)}">
     <meta property="og:description" content="${escapeHtml(description)}">
-    <meta property="og:url" content="${canonicalUrl}">
+    <meta property="og:url" content="${ogUrl}">
     <meta property="og:image" content="${DEFAULT_OG_IMAGE}">
     <meta property="og:locale" content="pt_BR">
     <meta name="twitter:card" content="summary_large_image">
@@ -333,6 +349,19 @@ function renderPage({ cidadeAtual, cidades, janelas, janelaAtiva, hoje, isDefaul
         <br>
         <a href="/voos-baratos" class="cta-button secondary">Ver Calendário de Preços</a>
     </section>
+
+    <!-- ========================================
+         SHARE FAB (mensagem da janela ativa)
+         ======================================== -->
+    <button class="share-fab-discovery" id="share-fab" title="Compartilhar escapadas" style="${temDestinos ? 'display:flex;' : 'display:none;'}">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="18" cy="5" r="3"></circle>
+            <circle cx="6" cy="12" r="3"></circle>
+            <circle cx="18" cy="19" r="3"></circle>
+            <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
+            <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
+        </svg>
+    </button>
 
     <!-- Footer -->
     <footer class="discovery-footer">
