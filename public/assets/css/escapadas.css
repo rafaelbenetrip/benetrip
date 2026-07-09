@@ -6,6 +6,13 @@
    calendário de feriados.
    ======================================== */
 
+/* Card como link real pro Google Flights (herda o visual do <article>) */
+a.dest-card {
+    text-decoration: none;
+    color: inherit;
+    display: block;
+}
+
 /* ---- Seletor de janela (fds + feriados) ---- */
 .janela-selector {
     display: flex;

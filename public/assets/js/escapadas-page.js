@@ -11,12 +11,17 @@ const EscapadasPage = {
     state: {
         origemAtual: 'GRU',
         origemNome: 'São Paulo',
+        origemManual: false,   // true = cidade fora das 30, busca ao vivo
         janelas: [],
         janelaAtiva: null,     // objeto da janela ativa
+        liveDestinos: {},      // { janelaId: [...] } resultados da busca ao vivo
         destinosFiltrados: [],
+        carregandoLive: false,
         filtros: { estilos: [], precoMax: null, voo: [] },
         ordenacao: 'preco',
     },
+
+    cidadesAutomaticas: [],
 
     init() {
         const inicial = window.__ESCAPADAS_INITIAL__;
@@ -27,12 +32,67 @@ const EscapadasPage = {
         this.state.janelas = inicial.janelas;
         this.state.janelaAtiva = inicial.janelas.find(j => j.id === inicial.janelaAtiva) || inicial.janelas[0] || null;
         this.state.destinosFiltrados = [...(this.state.janelaAtiva?.destinos || [])];
+        this.cidadesAutomaticas = inicial.cidadesAutomaticas || [];
 
         this.bindEvents();
-        this.bindCardClicks();
+    },
+
+    // Destinos da janela ativa, respeitando o modo (snapshot ou ao vivo)
+    destinosAtivos() {
+        const janela = this.state.janelaAtiva;
+        if (!janela) return [];
+        return this.state.origemManual
+            ? (this.state.liveDestinos[janela.id] || [])
+            : (janela.destinos || []);
     },
 
     bindEvents() {
+        // === BUSCA DE CIDADE (hero) ===
+        const cityInput = document.getElementById('city-search-input');
+        const cityClear = document.getElementById('city-search-clear');
+        const suggestions = document.getElementById('city-suggestions');
+
+        if (cityInput) {
+            cityInput.addEventListener('input', () => {
+                const val = cityInput.value.trim();
+                if (cityClear) cityClear.style.display = val ? 'flex' : 'none';
+                if (val.length >= 2) this.mostrarSugestoesCidade(val);
+                else if (suggestions) suggestions.style.display = 'none';
+            });
+            cityInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    const val = cityInput.value.trim();
+                    if (val.length >= 2) this.selecionarCidadeDigitada(val);
+                }
+            });
+            document.addEventListener('click', (e) => {
+                if (!e.target.closest('.hero-city-search') && suggestions) suggestions.style.display = 'none';
+            });
+        }
+        if (cityClear) {
+            cityClear.addEventListener('click', () => {
+                if (cityInput) cityInput.value = '';
+                cityClear.style.display = 'none';
+                if (suggestions) suggestions.style.display = 'none';
+            });
+        }
+        if (suggestions) {
+            suggestions.addEventListener('click', (e) => {
+                const item = e.target.closest('.city-suggestion-item');
+                if (!item || item.disabled) return;
+                if (cityInput) cityInput.value = '';
+                if (cityClear) cityClear.style.display = 'none';
+                suggestions.style.display = 'none';
+                if (item.dataset.auto === 'true') {
+                    const slug = item.dataset.slug;
+                    window.location.href = slug === 'sao-paulo' ? '/escapadas' : `/escapadas/${slug}`;
+                } else {
+                    this.selecionarCidadeLive(item.dataset.code);
+                }
+            });
+        }
+
         // === SELETOR DE JANELA ===
         document.getElementById('janela-selector')?.addEventListener('click', (e) => {
             const chip = e.target.closest('.janela-chip');
@@ -63,7 +123,142 @@ const EscapadasPage = {
     },
 
     // ============================================================
-    // TROCA DE JANELA (sem fetch: dados já hidratados)
+    // BUSCA DE CIDADE (30 automáticas + qualquer aeroporto ao vivo)
+    // ============================================================
+    normalizar(s) {
+        return String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    },
+
+    mostrarSugestoesCidade(query) {
+        const container = document.getElementById('city-suggestions');
+        if (!container) return;
+
+        const q = this.normalizar(query);
+        const isIATA = /^[a-z]{3}$/i.test(query.trim());
+        const matches = this.cidadesAutomaticas.filter(c =>
+            this.normalizar(c.nome).includes(q) || c.codigo.toLowerCase().includes(q)
+        ).slice(0, 6);
+
+        let html = '';
+        if (matches.length > 0) {
+            html += '<div class="suggestions-group-label">Cidades com preços diários</div>';
+            matches.forEach(c => {
+                html += `<button class="city-suggestion-item" data-auto="true" data-slug="${c.slug}" data-code="${c.codigo}">
+                    <span class="suggestion-name">${c.nome}</span>
+                    <span class="suggestion-meta">${c.codigo} · ${c.estado} · <span class="suggestion-badge-auto">Atualizado diariamente</span></span>
+                </button>`;
+            });
+        }
+
+        html += '<div class="suggestions-group-label">Buscar ao vivo</div>';
+        if (isIATA) {
+            const code = query.trim().toUpperCase();
+            html += `<button class="city-suggestion-item suggestion-manual" data-auto="false" data-code="${code}">
+                <span class="suggestion-name">Buscar escapadas saindo de ${code}</span>
+                <span class="suggestion-meta">Pesquisa em tempo real nas datas da janela · alguns segundos</span>
+            </button>`;
+        } else {
+            html += `<button class="city-suggestion-item suggestion-manual" disabled style="opacity:.65;cursor:default;">
+                <span class="suggestion-name">Para outras cidades, digite o código do aeroporto</span>
+                <span class="suggestion-meta">Ex.: RAO (Ribeirão Preto), UDI (Uberlândia), XAP (Chapecó)</span>
+            </button>`;
+        }
+
+        container.innerHTML = html;
+        container.style.display = 'block';
+    },
+
+    selecionarCidadeDigitada(val) {
+        const q = this.normalizar(val);
+        const auto = this.cidadesAutomaticas.find(c =>
+            c.codigo.toLowerCase() === q || this.normalizar(c.nome) === q
+        );
+        const suggestions = document.getElementById('city-suggestions');
+        if (suggestions) suggestions.style.display = 'none';
+
+        if (auto) {
+            window.location.href = auto.slug === 'sao-paulo' ? '/escapadas' : `/escapadas/${auto.slug}`;
+        } else if (/^[a-z]{3}$/i.test(val.trim())) {
+            this.selecionarCidadeLive(val.trim().toUpperCase());
+        } else {
+            this.mostrarSugestoesCidade(val); // mantém a dica do código IATA visível
+        }
+    },
+
+    // ============================================================
+    // BUSCA AO VIVO (cidade fora das 30: /api/escapadas-live por janela)
+    // ============================================================
+    selecionarCidadeLive(iata) {
+        this.state.origemManual = true;
+        this.state.origemAtual = iata;
+        this.state.origemNome = iata;
+        this.state.liveDestinos = {};
+
+        document.querySelectorAll('.origin-chip').forEach(c => c.classList.remove('active'));
+        document.querySelectorAll('.janela-chip-preco').forEach(el => { el.textContent = 'buscar'; el.classList.add('janela-chip-preco-vazio'); });
+
+        const heroTitle = document.getElementById('hero-title');
+        if (heroTitle) heroTitle.textContent = `Escapadas de Fim de Semana Saindo de ${iata}`;
+        const heroSub = document.getElementById('hero-subtitle');
+        if (heroSub) heroSub.textContent = `Busca em tempo real saindo de ${iata}, nas datas exatas de cada janela. Preços de agora, direto da fonte.`;
+
+        this.buscarLive(this.state.janelaAtiva);
+    },
+
+    async buscarLive(janela) {
+        if (!janela || this.state.carregandoLive) return;
+        this.state.carregandoLive = true;
+        this.resetarFiltros();
+
+        // Cache de sessão (10 min) por origem+janela
+        const cacheKey = `escapadas_live_${this.state.origemAtual}_${janela.id}`;
+        const cached = sessionStorage.getItem(cacheKey);
+        if (cached) {
+            try {
+                const data = JSON.parse(cached);
+                if (Date.now() - data.timestamp < 10 * 60 * 1000) {
+                    this.state.liveDestinos[janela.id] = data.destinos;
+                    this.state.carregandoLive = false;
+                    this.renderizar();
+                    return;
+                }
+            } catch (e) { /* cache inválido */ }
+        }
+
+        this.mostrarLoading(`Buscando voos de ${this.state.origemAtual} para ${janela.rotuloDatas}...`);
+
+        try {
+            const resp = await fetch(`/api/escapadas-live?origem=${encodeURIComponent(this.state.origemAtual)}&janela=${encodeURIComponent(janela.id)}`);
+            const data = resp.ok ? await resp.json() : null;
+
+            if (data?.success) {
+                this.state.liveDestinos[janela.id] = data.destinos || [];
+                sessionStorage.setItem(cacheKey, JSON.stringify({ destinos: data.destinos || [], timestamp: Date.now() }));
+            } else {
+                this.state.liveDestinos[janela.id] = [];
+            }
+        } catch (err) {
+            console.warn('Busca ao vivo falhou:', err.message);
+            this.state.liveDestinos[janela.id] = [];
+        } finally {
+            this.state.carregandoLive = false;
+            this.renderizar();
+        }
+    },
+
+    mostrarLoading(msg) {
+        const loading = document.getElementById('loading-state');
+        if (loading) loading.style.display = 'block';
+        const msgEl = document.getElementById('loading-message');
+        if (msgEl) msgEl.textContent = msg;
+        document.getElementById('destinations-section').style.display = 'none';
+        document.getElementById('filters-section').style.display = 'none';
+        document.getElementById('empty-state').style.display = 'none';
+        document.getElementById('stats-bar').innerHTML = '';
+    },
+
+    // ============================================================
+    // TROCA DE JANELA (snapshot: sem fetch; ao vivo: busca a janela)
     // ============================================================
     selecionarJanela(janelaId) {
         const janela = this.state.janelas.find(j => j.id === janelaId);
@@ -71,7 +266,6 @@ const EscapadasPage = {
 
         this.state.janelaAtiva = janela;
         this.resetarFiltros();
-        this.state.destinosFiltrados = [...(janela.destinos || [])];
 
         // Chips
         document.querySelectorAll('.janela-chip').forEach(c => {
@@ -86,7 +280,11 @@ const EscapadasPage = {
         url.searchParams.set('janela', janelaId);
         history.replaceState(null, '', url.pathname + url.search);
 
-        this.renderizar();
+        if (this.state.origemManual && !this.state.liveDestinos[janela.id]) {
+            this.buscarLive(janela);
+        } else {
+            this.renderizar();
+        }
     },
 
     // ============================================================
@@ -127,7 +325,7 @@ const EscapadasPage = {
 
     aplicarFiltros() {
         const { estilos, precoMax, voo } = this.state.filtros;
-        let resultado = [...(this.state.janelaAtiva?.destinos || [])];
+        let resultado = [...this.destinosAtivos()];
 
         if (estilos.length > 0) {
             resultado = resultado.filter(d => (d.estilos || []).some(e => estilos.includes(e)));
@@ -172,14 +370,37 @@ const EscapadasPage = {
     // ============================================================
     renderizar() {
         const janela = this.state.janelaAtiva;
-        const destinos = janela?.destinos || [];
+        const destinos = this.destinosAtivos();
         const temDestinos = destinos.length > 0;
+        this.state.destinosFiltrados = [...destinos];
+
+        const loading = document.getElementById('loading-state');
+        if (loading) loading.style.display = 'none';
 
         // Barra da janela ativa
         const nomeEl = document.getElementById('janela-ativa-nome');
         if (nomeEl && janela) nomeEl.textContent = `${janela.rotulo} · ${janela.rotuloDatas}`;
         const badgeEl = document.getElementById('janela-ativa-badge');
-        if (badgeEl) badgeEl.textContent = janela?.dataSnapshot ? this.badgeAtualizacao(janela.dataSnapshot) : 'Aguardando preços';
+        if (badgeEl) {
+            badgeEl.textContent = this.state.origemManual
+                ? 'Busca ao vivo'
+                : (janela?.dataSnapshot ? this.badgeAtualizacao(janela.dataSnapshot) : 'Aguardando preços');
+        }
+        const sourceEl = document.querySelector('.active-city-source');
+        if (sourceEl) sourceEl.textContent = `ida e volta · ${this.state.origemNome}`;
+
+        // No modo ao vivo, o chip da janela mostra o menor preço encontrado
+        if (this.state.origemManual && janela) {
+            const chipPreco = document.querySelector(`.janela-chip[data-janela="${janela.id}"] .janela-chip-preco`);
+            if (chipPreco) {
+                if (temDestinos) {
+                    chipPreco.textContent = `a partir de R$ ${this.fmt(destinos[0].preco)}`;
+                    chipPreco.classList.remove('janela-chip-preco-vazio');
+                } else {
+                    chipPreco.textContent = 'sem voos';
+                }
+            }
+        }
 
         // Stats
         document.getElementById('stats-bar').innerHTML = temDestinos ? this.renderStats(destinos) : '';
@@ -204,30 +425,79 @@ const EscapadasPage = {
         const grid = document.getElementById('destinations-grid');
         if (!grid) return;
         grid.innerHTML = this.state.destinosFiltrados.map(d => this.renderCard(d)).join('');
-        this.bindCardClicks();
     },
 
-    bindCardClicks() {
-        document.querySelectorAll('#destinations-grid .dest-card').forEach(card => {
-            if (card.dataset.bound) return;
-            card.dataset.bound = '1';
-            card.addEventListener('click', () => this.navegarParaVoos(card.dataset));
-        });
-    },
-
-    // Navega para o calendário de preços já com as datas da janela travadas
-    navegarParaVoos(dataset) {
-        const dest = dataset.aeroporto || dataset.nome;
-        if (!dest) return;
+    // O card é um <a target="_blank"> direto pro Google Flights com as datas
+    // da janela (link real: imune a bloqueio de popup, funciona com clique do
+    // meio). Sem código IATA cai no calendário interno de preços.
+    hrefDoDestino(d) {
+        if (d.aeroporto && d.data_ida && d.data_volta) {
+            return this.buildGoogleFlightsUrl(this.state.origemAtual, d.aeroporto, d.data_ida, d.data_volta);
+        }
         const params = new URLSearchParams({
             origem: this.state.origemAtual,
-            destino: dest,
-            nome: dataset.nome,
+            destino: d.aeroporto || d.nome,
+            nome: d.nome,
         });
-        if (dataset.duracao) params.set('duracao', dataset.duracao);
-        if (dataset.ida) params.set('data_ida', dataset.ida);
-        if (dataset.volta) params.set('data_volta', dataset.volta);
-        window.location.href = `/voos-baratos?${params.toString()}`;
+        if (d.data_ida) params.set('data_ida', d.data_ida);
+        if (d.data_volta) params.set('data_volta', d.data_volta);
+        return `/voos-baratos?${params.toString()}`;
+    },
+
+    // ============================================================
+    // GOOGLE FLIGHTS URL (mesmo encoding tfs/tfu do descobrir-destinos.js:
+    // protobuf em base64url, abre direto nos resultados de ida e volta)
+    // ============================================================
+    _protoVarint(value) {
+        const bytes = [];
+        let v = value >>> 0;
+        while (v > 0x7f) { bytes.push((v & 0x7f) | 0x80); v >>>= 7; }
+        bytes.push(v & 0x7f);
+        return bytes;
+    },
+    _protoVarintField(fieldNumber, value) {
+        return [...this._protoVarint((fieldNumber << 3) | 0), ...this._protoVarint(value)];
+    },
+    _protoStringField(fieldNumber, str) {
+        const encoded = new TextEncoder().encode(str);
+        return [...this._protoVarint((fieldNumber << 3) | 2), ...this._protoVarint(encoded.length), ...encoded];
+    },
+    _protoMessageField(fieldNumber, messageBytes) {
+        return [...this._protoVarint((fieldNumber << 3) | 2), ...this._protoVarint(messageBytes.length), ...messageBytes];
+    },
+    _toBase64Url(bytes) {
+        return btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    },
+    _buildAirport(iataCode) {
+        return [...this._protoVarintField(1, 1), ...this._protoStringField(2, iataCode)];
+    },
+    _buildFlightLeg(date, originIata, destIata) {
+        return [
+            ...this._protoStringField(2, date),
+            ...this._protoMessageField(13, this._buildAirport(originIata)),
+            ...this._protoMessageField(14, this._buildAirport(destIata)),
+        ];
+    },
+    buildGoogleFlightsUrl(originIata, destIata, departDate, returnDate) {
+        const tfs = this._toBase64Url([
+            ...this._protoVarintField(1, 28),
+            ...this._protoVarintField(2, 2),
+            ...this._protoMessageField(3, this._buildFlightLeg(departDate, originIata, destIata)),
+            ...this._protoMessageField(3, this._buildFlightLeg(returnDate, destIata, originIata)),
+            ...this._protoVarintField(14, 1),
+        ]);
+        const tfu = this._toBase64Url(this._protoMessageField(2, [
+            ...this._protoVarintField(1, 1),
+            ...this._protoVarintField(2, 0),
+            ...this._protoVarintField(3, 0),
+        ]));
+        const params = new URLSearchParams();
+        params.set('tfs', tfs);
+        params.set('tfu', tfu);
+        params.set('curr', 'BRL');
+        params.set('hl', 'pt-BR');
+        params.set('gl', 'br');
+        return `https://www.google.com/travel/flights/search?${params.toString()}`;
     },
 
     renderCard(d) {
@@ -242,7 +512,7 @@ const EscapadasPage = {
             : '';
 
         return `
-            <article class="dest-card" data-aeroporto="${d.aeroporto}" data-nome="${d.nome}" data-duracao="${noites || ''}" data-ida="${d.data_ida || ''}" data-volta="${d.data_volta || ''}">
+            <a class="dest-card" href="${this.hrefDoDestino(d)}" target="_blank" rel="noopener nofollow" data-aeroporto="${d.aeroporto}" data-nome="${d.nome}" data-duracao="${noites || ''}" data-ida="${d.data_ida || ''}" data-volta="${d.data_volta || ''}">
                 <div class="dest-card-inner">
                     <div class="dest-image-wrapper">
                         <img class="dest-image" src="${imgSrc}" alt="${d.nome}" loading="lazy"
@@ -271,7 +541,7 @@ const EscapadasPage = {
                         </div>
                     </div>
                 </div>
-            </article>`;
+            </a>`;
     },
 
     renderStats(destinos) {

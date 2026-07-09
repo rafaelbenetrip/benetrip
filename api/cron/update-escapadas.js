@@ -18,7 +18,7 @@
 
 import { readFileSync } from 'fs';
 import { join } from 'path';
-import { janelasAtivas, hojeISO } from '../_lib/escapadas-shared.js';
+import { janelasAtivas, hojeISO, buscarDestinosJanela, selecionarEFormatarDestinos } from '../_lib/escapadas-shared.js';
 
 export const maxDuration = 300; // 5 minutos
 
@@ -28,11 +28,6 @@ export const maxDuration = 300; // 5 minutos
 // com o mesmo custo diário de API (cada cidade continua 1x/dia).
 const CIDADES_POR_LOTE = 8;
 const LOTES_POR_DIA = 4;
-const MAX_DESTINOS_POR_JANELA = 30;
-const MIN_NACIONAIS = 10; // reserva de nacionais nas janelas de feriado
-
-const BRASIL_KGMID = '/m/015fr';
-const AMERICA_SUL_KGMID = '/m/0dg3n1';
 
 // ============================================================
 // CIDADES E LOTE (mesma mecânica do update-discovery)
@@ -86,153 +81,17 @@ async function supabaseInsert(tableName, data) {
 }
 
 // ============================================================
-// BUSCA COM DATAS FIXAS (google_travel_explore + outbound/return_date)
-// ============================================================
-async function buscarUma(params, label) {
-    const query = Object.entries(params)
-        .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`)
-        .join('&');
-    const startTime = Date.now();
-
-    try {
-        const response = await fetch(`https://www.searchapi.io/api/v1/search?${query}`, {
-            headers: { 'Accept': 'application/json' },
-        });
-        const elapsed = Date.now() - startTime;
-
-        if (!response.ok) {
-            const errorText = await response.text();
-            console.error(`[Escapadas][${label}] HTTP ${response.status} (${elapsed}ms): ${errorText.substring(0, 200)}`);
-            return [];
-        }
-
-        const data = await response.json();
-        console.log(`[Escapadas][${label}] ${(data.destinations || []).length} destinos (${elapsed}ms)`);
-        return data.destinations || [];
-    } catch (err) {
-        console.error(`[Escapadas][${label}] Erro: ${err.message}`);
-        return [];
-    }
-}
-
-async function buscarJanela(origemCode, janela) {
-    const apiKey = process.env.SEARCHAPI_KEY;
-    if (!apiKey) throw new Error('SEARCHAPI_KEY não configurada');
-
-    // Datas fixas no explore vão em time_period=IDA..VOLTA (round-trip).
-    // outbound_date/return_date NÃO são parâmetros deste engine e eram
-    // ignorados silenciosamente, devolvendo preços de "qualquer data".
-    const baseParams = {
-        engine: 'google_travel_explore',
-        api_key: apiKey,
-        departure_id: origemCode,
-        time_period: `${janela.ida}..${janela.volta}`,
-        interests: 'popular',
-        currency: 'BRL',
-        gl: 'br',
-        hl: 'pt-BR',
-    };
-
-    const buscas = [buscarUma({ ...baseParams, arrival_id: BRASIL_KGMID }, `${origemCode}/${janela.id}/BR`)];
-    if (janela.categoria === 'feriado') {
-        buscas.push(buscarUma({ ...baseParams, arrival_id: AMERICA_SUL_KGMID }, `${origemCode}/${janela.id}/AMSUL`));
-    }
-    const resultados = await Promise.all(buscas);
-
-    // Deduplicar por nome+país mantendo o menor preço
-    const map = new Map();
-    for (const dest of resultados.flat()) {
-        if (!dest?.name || !dest?.country) continue;
-        const key = `${dest.name.toLowerCase()}_${dest.country.toLowerCase()}`;
-        const price = dest.flight?.price ?? 0;
-        if (!map.has(key) || (price > 0 && (map.get(key).flight?.price === 0 || price < map.get(key).flight?.price))) {
-            map.set(key, dest);
-        }
-    }
-    return Array.from(map.values());
-}
-
-// ============================================================
-// CLASSIFICAÇÃO DE ESTILO (keywords; mesmos estilos do discovery)
-// Sem chamada de IA aqui: com ~6 janelas x 15 cidades por execução, o batch
-// via Cerebras multiplicaria as chamadas sem ganho proporcional nos filtros.
-// ============================================================
-const ESTILOS_KEYWORDS = {
-    praia: ['beach', 'praia', 'litoral', 'costa', 'ilha', 'island', 'porto seguro', 'florianópolis', 'natal', 'maceió', 'búzios', 'guarujá', 'ubatuba', 'ilhabela', 'jericoacoara', 'arraial', 'trancoso', 'noronha', 'maragogi', 'cabo frio', 'balneário'],
-    natureza: ['serra', 'chapada', 'foz', 'bonito', 'pantanal', 'lençóis', 'jalapão', 'monte verde', 'brotas', 'socorro', 'urubici', 'iguaçu', 'cachoeira', 'gramado', 'canela'],
-    cidade: ['são paulo', 'rio de janeiro', 'belo horizonte', 'curitiba', 'brasília', 'buenos aires', 'santiago', 'montevideo', 'montevidéu', 'lima', 'bogotá', 'assunção', 'goiânia', 'recife', 'salvador', 'fortaleza', 'porto alegre'],
-    romantico: ['gramado', 'campos do jordão', 'monte verde', 'búzios', 'trancoso', 'noronha', 'milagres'],
-    familia: ['orlando', 'parque', 'resort', 'beto carrero', 'hot park', 'beach park', 'gramado', 'olímpia', 'caldas novas'],
-};
-
-function classificarEstilos(destino) {
-    const texto = `${destino.name || ''} ${destino.country || ''}`.toLowerCase();
-    const estilos = [];
-    for (const [estilo, keywords] of Object.entries(ESTILOS_KEYWORDS)) {
-        if (keywords.some((kw) => texto.includes(kw))) estilos.push(estilo);
-    }
-    return estilos.length > 0 ? estilos.slice(0, 3) : ['cidade'];
-}
-
-// ============================================================
-// FORMATAR DESTINO (mesmo shape dos snapshots de destinos-baratos,
-// para reaproveitar renderCardHtml e o histórico de variações)
-// ============================================================
-function formatarDestino(destino, posicao, janela) {
-    const isInternacional = (destino.country || '').toLowerCase() !== 'brasil';
-    // Fonte da verdade das datas é a resposta da API; a janela é o fallback.
-    const dataIda = destino.outbound_date || janela.ida;
-    const dataVolta = destino.return_date || janela.volta;
-    if (destino.outbound_date && destino.outbound_date !== janela.ida) {
-        console.warn(`⚠️ [Escapadas] Engine devolveu ida ${destino.outbound_date} para janela ${janela.id} (${destino.name})`);
-    }
-
-    return {
-        posicao,
-        nome: destino.name || '',
-        pais: destino.country || '',
-        aeroporto: destino.flight?.airport_code || destino.primary_airport || '',
-        preco: destino.flight?.price || 0,
-        moeda: 'BRL',
-        paradas: destino.flight?.stops || 0,
-        duracao_voo_min: destino.flight?.flight_duration_minutes || 0,
-        cia_aerea: destino.flight?.airline_name || '',
-        custo_noite: destino.avg_cost_per_night || 0,
-        imagem: destino.image || '',
-        estilos: classificarEstilos(destino),
-        duracao_ideal: { min: janela.noites, max: janela.noites, ideal: janela.noites },
-        internacional: isInternacional,
-        data_ida: dataIda,
-        data_volta: dataVolta,
-    };
-}
-
-// ============================================================
 // PROCESSAR UMA (CIDADE, JANELA) -> SNAPSHOT
 // ============================================================
 async function processarJanela(origem, janela, hoje) {
     try {
-        const destinosRaw = await buscarJanela(origem.codigo, janela);
-        const comPreco = destinosRaw
-            .filter((d) => d.flight?.price > 0)
-            .sort((a, b) => a.flight.price - b.flight.price);
+        const destinosRaw = await buscarDestinosJanela(origem.codigo, janela);
+        const destinos = selecionarEFormatarDestinos(destinosRaw, janela);
 
-        if (comPreco.length === 0) {
+        if (destinos.length === 0) {
             console.log(`⚠️ [${origem.codigo}/${janela.id}] Nenhum destino com preço`);
             return null;
         }
-
-        // Reserva de nacionais (só relevante nas janelas de feriado, que
-        // misturam América do Sul; nas de fds tudo já é nacional)
-        const nacionais = comPreco.filter((d) => (d.country || '').toLowerCase() === 'brasil');
-        const internacionais = comPreco.filter((d) => (d.country || '').toLowerCase() !== 'brasil');
-        const reservados = nacionais.slice(0, MIN_NACIONAIS);
-        const pool = [...nacionais.slice(MIN_NACIONAIS), ...internacionais]
-            .sort((a, b) => a.flight.price - b.flight.price)
-            .slice(0, MAX_DESTINOS_POR_JANELA - reservados.length);
-
-        const selecionados = [...reservados, ...pool].sort((a, b) => a.flight.price - b.flight.price);
-        const destinos = selecionados.map((d, i) => formatarDestino(d, i + 1, janela));
 
         console.log(`✅ [${origem.codigo}/${janela.id}] ${destinos.length} destinos | Mais barato: R$${destinos[0]?.preco || '?'}`);
 

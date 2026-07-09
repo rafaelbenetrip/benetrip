@@ -246,6 +246,65 @@ export function badgeAtualizacao(dataSnapshot) {
 }
 
 // ============================================================
+// GOOGLE FLIGHTS URL (server-side)
+// Mesmo encoding tfs/tfu (protobuf em base64url) já usado no client em
+// descobrir-destinos.js e comparar-voos.js: abre direto nos resultados
+// de ida e volta com as datas preenchidas.
+// ============================================================
+function protoVarint(value) {
+    const bytes = [];
+    let v = value >>> 0;
+    while (v > 0x7f) { bytes.push((v & 0x7f) | 0x80); v >>>= 7; }
+    bytes.push(v & 0x7f);
+    return bytes;
+}
+function protoVarintField(fieldNumber, value) {
+    return [...protoVarint((fieldNumber << 3) | 0), ...protoVarint(value)];
+}
+function protoStringField(fieldNumber, str) {
+    const encoded = Array.from(Buffer.from(str, 'utf-8'));
+    return [...protoVarint((fieldNumber << 3) | 2), ...protoVarint(encoded.length), ...encoded];
+}
+function protoMessageField(fieldNumber, messageBytes) {
+    return [...protoVarint((fieldNumber << 3) | 2), ...protoVarint(messageBytes.length), ...messageBytes];
+}
+function toBase64Url(bytes) {
+    return Buffer.from(bytes).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+function buildAirport(iataCode) {
+    return [...protoVarintField(1, 1), ...protoStringField(2, iataCode)];
+}
+function buildFlightLeg(date, originIata, destIata) {
+    return [
+        ...protoStringField(2, date),
+        ...protoMessageField(13, buildAirport(originIata)),
+        ...protoMessageField(14, buildAirport(destIata)),
+    ];
+}
+
+export function buildGoogleFlightsUrl(originIata, destIata, departDate, returnDate) {
+    const tfs = toBase64Url([
+        ...protoVarintField(1, 28),
+        ...protoVarintField(2, 2),
+        ...protoMessageField(3, buildFlightLeg(departDate, originIata, destIata)),
+        ...protoMessageField(3, buildFlightLeg(returnDate, destIata, originIata)),
+        ...protoVarintField(14, 1),
+    ]);
+    const tfu = toBase64Url(protoMessageField(2, [
+        ...protoVarintField(1, 1),
+        ...protoVarintField(2, 0),
+        ...protoVarintField(3, 0),
+    ]));
+    const params = new URLSearchParams();
+    params.set('tfs', tfs);
+    params.set('tfu', tfu);
+    params.set('curr', 'BRL');
+    params.set('hl', 'pt-BR');
+    params.set('gl', 'br');
+    return `https://www.google.com/travel/flights/search?${params.toString()}`;
+}
+
+// ============================================================
 // RENDER HTML (server-side, espelha discovery-page.js no client)
 // ============================================================
 export function renderVariacaoStatHtml(v) {
@@ -273,10 +332,12 @@ export function renderDatasCardHtml(d) {
 }
 
 // opts.escapada: card de /escapadas — preço é de ida e volta em datas fixas
-// e a duração é em noites (min === max). Proteção contra .map(renderCardHtml),
-// que passa o índice como segundo argumento.
+// e a duração é em noites (min === max).
+// opts.href: card vira um <a target="_blank"> (link real, imune a bloqueio
+// de popup) em vez de <article> clicável via JS.
+// Proteção contra .map(renderCardHtml), que passa o índice como 2º argumento.
 export function renderCardHtml(d, opts) {
-    const { escapada = false } = (opts && typeof opts === 'object') ? opts : {};
+    const { escapada = false, href = null } = (opts && typeof opts === 'object') ? opts : {};
     const imgSrc = d.imagem ? escapeHtml(d.imagem) : 'assets/images/tripinha/avatar-pensando.png';
     const nome = escapeHtml(d.nome);
     const pais = escapeHtml(d.pais);
@@ -297,8 +358,13 @@ export function renderCardHtml(d, opts) {
         ? `<span class="dest-badge-drop">&darr; ${Math.abs(d.variacao.percentual)}%</span>`
         : '';
 
+    const tagAbre = href
+        ? `<a class="dest-card" href="${escapeHtml(href)}" target="_blank" rel="noopener nofollow"`
+        : '<article class="dest-card"';
+    const tagFecha = href ? '</a>' : '</article>';
+
     return `
-        <article class="dest-card" data-aeroporto="${aeroporto}" data-nome="${nome}" data-duracao="${duracaoIdeal}" data-ida="${escapeHtml(d.data_ida || '')}" data-volta="${escapeHtml(d.data_volta || '')}">
+        ${tagAbre} data-aeroporto="${aeroporto}" data-nome="${nome}" data-duracao="${duracaoIdeal}" data-ida="${escapeHtml(d.data_ida || '')}" data-volta="${escapeHtml(d.data_volta || '')}">
             <div class="dest-card-inner">
                 <div class="dest-image-wrapper">
                     <img class="dest-image" src="${imgSrc}" alt="${nome}" loading="lazy"
@@ -324,7 +390,7 @@ export function renderCardHtml(d, opts) {
                     </div>
                 </div>
             </div>
-        </article>`;
+        ${tagFecha}`;
 }
 
 export function renderStatsBarHtml(destinos) {
