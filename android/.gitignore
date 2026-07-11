@@ -1,0 +1,7 @@
+android.keystore
+keystore-password.txt
+*.aab
+*.apk
+build/
+app/build/
+.gradle/
