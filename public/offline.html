@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sem conexão - Benetrip</title>
+    <meta name="theme-color" content="#E87722">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #FAFAFA;
+            color: #21272A;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            text-align: center;
+        }
+        .card {
+            max-width: 400px;
+            background: #FFFFFF;
+            border-radius: 20px;
+            padding: 40px 28px;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.08);
+        }
+        .card img {
+            width: 96px;
+            height: 96px;
+            border-radius: 50%;
+            margin-bottom: 20px;
+        }
+        h1 {
+            font-size: 1.4rem;
+            margin-bottom: 12px;
+            color: #E87722;
+        }
+        p {
+            font-size: 0.95rem;
+            color: #616161;
+            line-height: 1.5;
+            margin-bottom: 24px;
+        }
+        button {
+            background: #E87722;
+            color: #FFFFFF;
+            border: none;
+            border-radius: 12px;
+            padding: 14px 32px;
+            font-size: 1rem;
+            font-weight: 600;
+            font-family: inherit;
+            cursor: pointer;
+        }
+        button:active { background: #D06A1D; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <img src="/logo-tripinha.png" alt="Tripinha, a mascote da Benetrip">
+        <h1>Você está sem conexão</h1>
+        <p>A Tripinha não conseguiu se conectar à internet. Verifique sua conexão e tente novamente.</p>
+        <button onclick="location.reload()">Tentar novamente</button>
+    </div>
+</body>
+</html>
