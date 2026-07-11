@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "br.com.benetrip.app",
+      "sha256_cert_fingerprints": [
+        "56:7A:D6:07:3B:1E:ED:23:13:F4:55:B6:63:85:15:63:C1:EB:2C:D2:1D:EC:27:80:6B:4C:0C:F8:17:96:16:02"
+      ]
+    }
+  }
+]

@@ -1,0 +1,62 @@
+{
+  "packageId": "br.com.benetrip.app",
+  "host": "benetrip.com.br",
+  "name": "Benetrip - Viagens com IA",
+  "launcherName": "Benetrip",
+  "display": "standalone",
+  "themeColor": "#E87722",
+  "themeColorDark": "#E87722",
+  "navigationColor": "#FFFFFF",
+  "navigationColorDark": "#21272A",
+  "navigationDividerColor": "#FFFFFF",
+  "navigationDividerColorDark": "#21272A",
+  "backgroundColor": "#FFFFFF",
+  "enableNotifications": true,
+  "startUrl": "/?source=twa",
+  "iconUrl": "https://benetrip.com.br/assets/images/favicon/web-app-manifest-512x512.png",
+  "maskableIconUrl": "https://benetrip.com.br/assets/images/favicon/web-app-manifest-512x512.png",
+  "splashScreenFadeOutDuration": 300,
+  "signingKey": {
+    "path": "./android.keystore",
+    "alias": "benetrip"
+  },
+  "appVersionName": "1.0.0",
+  "appVersionCode": 1,
+  "shortcuts": [
+    {
+      "name": "Descobrir Destinos",
+      "shortName": "Destinos",
+      "url": "https://benetrip.com.br/descobrir-destinos?source=twa",
+      "chosenIconUrl": "https://benetrip.com.br/assets/images/favicon/web-app-manifest-192x192.png"
+    },
+    {
+      "name": "Voos Baratos",
+      "shortName": "Voos",
+      "url": "https://benetrip.com.br/voos-baratos?source=twa",
+      "chosenIconUrl": "https://benetrip.com.br/assets/images/favicon/web-app-manifest-192x192.png"
+    },
+    {
+      "name": "Criar Roteiro",
+      "shortName": "Roteiro",
+      "url": "https://benetrip.com.br/create-itinerary?source=twa",
+      "chosenIconUrl": "https://benetrip.com.br/assets/images/favicon/web-app-manifest-192x192.png"
+    }
+  ],
+  "generatorApp": "bubblewrap-cli",
+  "webManifestUrl": "https://benetrip.com.br/manifest.webmanifest",
+  "fallbackType": "customtabs",
+  "features": {},
+  "alphaDependencies": {
+    "enabled": false
+  },
+  "enableSiteSettingsShortcut": true,
+  "isChromeOSOnly": false,
+  "isMetaQuest": false,
+  "fullScopeUrl": "https://benetrip.com.br/",
+  "minSdkVersion": 21,
+  "orientation": "portrait",
+  "fingerprints": [],
+  "additionalTrustedOrigins": ["www.benetrip.com.br"],
+  "retainedBundles": [],
+  "appVersion": "1.0.0"
+}
