@@ -1,0 +1,64 @@
+{
+  "name": "Benetrip - Planeje Viagens Baratas com IA",
+  "short_name": "Benetrip",
+  "description": "Planeje sua viagem perfeita com a Tripinha! Descubra destinos incríveis, encontre passagens aéreas baratas e crie roteiros personalizados com inteligência artificial.",
+  "id": "/",
+  "start_url": "/?source=pwa",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "lang": "pt-BR",
+  "dir": "ltr",
+  "background_color": "#FFFFFF",
+  "theme_color": "#E87722",
+  "categories": ["travel", "navigation", "lifestyle"],
+  "icons": [
+    {
+      "src": "/assets/images/favicon/web-app-manifest-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/assets/images/favicon/web-app-manifest-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/assets/images/favicon/web-app-manifest-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/assets/images/favicon/web-app-manifest-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Descobrir Destinos",
+      "short_name": "Destinos",
+      "description": "Descubra destinos com a Tripinha",
+      "url": "/descobrir-destinos?source=pwa",
+      "icons": [{ "src": "/assets/images/favicon/web-app-manifest-192x192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Voos Baratos",
+      "short_name": "Voos",
+      "description": "Encontre passagens aéreas baratas",
+      "url": "/voos-baratos?source=pwa",
+      "icons": [{ "src": "/assets/images/favicon/web-app-manifest-192x192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Criar Roteiro",
+      "short_name": "Roteiro",
+      "description": "Crie um roteiro personalizado",
+      "url": "/create-itinerary?source=pwa",
+      "icons": [{ "src": "/assets/images/favicon/web-app-manifest-192x192.png", "sizes": "192x192" }]
+    }
+  ]
+}
