@@ -72,6 +72,9 @@ body{font-family:'Montserrat',-apple-system,sans-serif;background:var(--g50);col
 .sf-dd-info{flex:1;min-width:0}
 .sf-dd-name{font-weight:600;font-size:13px;color:var(--g800);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .sf-dd-sub{font-size:11px;color:var(--g400)}
+.sf-dd-type{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;padding:2px 6px;border-radius:4px;flex-shrink:0;margin-left:auto}
+.sf-dd-type.t-air{color:var(--blue);background:var(--blue-lt)}
+.sf-dd-type.t-city{color:var(--g500);background:var(--g100)}
 
 /* Passengers trigger + dropdown */
 .sf-pax-trigger{width:100%;border:none;outline:none;background:transparent;font-size:15px;font-weight:500;color:var(--g800);font-family:'Montserrat',sans-serif;cursor:pointer;display:flex;align-items:center;gap:4px;padding:2px 0;text-align:left}
