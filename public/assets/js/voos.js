@@ -1,5 +1,8 @@
 /**
- * BENETRIP VOOS v4.1 — Busca de voos completa
+ * BENETRIP VOOS v4.2 — Busca de voos completa
+ *
+ * Changelog v4.2:
+ * - REFACTOR: Autocomplete extraído para módulo compartilhado benetrip-places.js
  *
  * Changelog v4.1:
  * - NEW: Autocomplete por AEROPORTO via API Travelpayouts places2 (locale pt)
@@ -20,9 +23,6 @@
 const BenetripVoos = {
 
     state: {
-        cidadesData: null,
-        cidadesLoadError: false,
-        placesCache: new Map(),
         params: {},
         searchId: null,
         currencyRates: {},
@@ -66,7 +66,7 @@ const BenetripVoos = {
     // INIT
     // ================================================================
     async init() {
-        console.log('✈️ BenetripVoos v4.1');
+        console.log('✈️ BenetripVoos v4.2');
         this.setupSearchForm();
         this.setupSortTabs();
         this.setupFilterChips();
@@ -79,111 +79,7 @@ const BenetripVoos = {
         }
     },
 
-    // ================================================================
-    // AUTOCOMPLETE DE LUGARES (aeroportos + cidades)
-    // Fonte primária: API Travelpayouts places2 (mesma base da busca de voos,
-    // então todo código retornado aqui é pesquisável — inclui regionais como JJG
-    // e agregadores de cidade como SAO/RIO).
-    // Fallback: base estática local, carregada apenas se a API falhar.
-    // ================================================================
-    async searchPlaces(term) {
-        const key = this.normalize(term);
-        if (this.state.placesCache.has(key)) return this.state.placesCache.get(key);
-
-        const url = `https://autocomplete.travelpayouts.com/places2?locale=pt&types%5B%5D=airport&types%5B%5D=city&term=${encodeURIComponent(term)}`;
-        const ctrl = new AbortController();
-        const timeout = setTimeout(() => ctrl.abort(), 5000);
-        try {
-            const r = await fetch(url, { signal: ctrl.signal });
-            if (!r.ok) throw new Error(`HTTP ${r.status}`);
-            const data = await r.json();
-            const results = (Array.isArray(data) ? data : [])
-                .filter(p => p.code && /^[A-Z]{3}$/.test(p.code) && (p.type === 'airport' || p.type === 'city'))
-                .slice(0, 8)
-                .map(p => this.mapPlace(p));
-            if (this.state.placesCache.size > 80) this.state.placesCache.clear();
-            this.state.placesCache.set(key, results);
-            return results;
-        } finally {
-            clearTimeout(timeout);
-        }
-    },
-
-    mapPlace(p) {
-        if (p.type === 'airport') {
-            const city = p.city_name || '';
-            const airport = p.name || p.code;
-            return {
-                code: p.code, type: 'airport',
-                name: city || airport,
-                label: city && this.normalize(airport).indexOf(this.normalize(city)) === -1 ? `${city} — ${airport}` : airport,
-                sub: p.country_name || '',
-            };
-        }
-        // city: com main_airport_name = cidade de aeroporto único;
-        // sem = código agregador (SAO, RIO, BUE...) que busca em todos os aeroportos
-        return {
-            code: p.code, type: 'city',
-            name: p.name,
-            label: p.main_airport_name ? `${p.name} — ${p.main_airport_name}` : `${p.name} — Todos os aeroportos`,
-            sub: p.country_name || '',
-        };
-    },
-
-    // ---------- Fallback estático (só é baixado se a API places2 falhar) ----------
-    async ensureFallbackCities() {
-        if (this.state.cidadesData) return;
-        try {
-            const r = await fetch('data/cidades_global_iata_v7.json');
-            if (!r.ok) throw new Error(`HTTP ${r.status}`);
-            const data = await r.json();
-            this.state.cidadesData = data.filter(c => c.iata);
-            this.state.cidadesLoadError = false;
-            console.log(`📍 Fallback: ${this.state.cidadesData.length} cidades carregadas`);
-        } catch (e) {
-            console.warn('⚠️ Falha ao carregar cidades, usando fallback:', e.message);
-            this.state.cidadesLoadError = true;
-            this.state.cidadesData = [
-                {cidade:'São Paulo',sigla_estado:'SP',pais:'Brasil',codigo_pais:'BR',iata:'GRU',aeroporto:'Guarulhos'},
-                {cidade:'São Paulo',sigla_estado:'SP',pais:'Brasil',codigo_pais:'BR',iata:'CGH',aeroporto:'Congonhas'},
-                {cidade:'São Paulo',sigla_estado:'SP',pais:'Brasil',codigo_pais:'BR',iata:'SAO',aeroporto:'Todos os aeroportos'},
-                {cidade:'Rio de Janeiro',sigla_estado:'RJ',pais:'Brasil',codigo_pais:'BR',iata:'GIG',aeroporto:'Galeão'},
-                {cidade:'Rio de Janeiro',sigla_estado:'RJ',pais:'Brasil',codigo_pais:'BR',iata:'SDU',aeroporto:'Santos Dumont'},
-                {cidade:'Salvador',sigla_estado:'BA',pais:'Brasil',codigo_pais:'BR',iata:'SSA'},
-                {cidade:'Brasília',sigla_estado:'DF',pais:'Brasil',codigo_pais:'BR',iata:'BSB'},
-                {cidade:'Recife',sigla_estado:'PE',pais:'Brasil',codigo_pais:'BR',iata:'REC'},
-                {cidade:'Fortaleza',sigla_estado:'CE',pais:'Brasil',codigo_pais:'BR',iata:'FOR'},
-                {cidade:'Belo Horizonte',sigla_estado:'MG',pais:'Brasil',codigo_pais:'BR',iata:'CNF',aeroporto:'Confins'},
-                {cidade:'Curitiba',sigla_estado:'PR',pais:'Brasil',codigo_pais:'BR',iata:'CWB'},
-                {cidade:'Porto Alegre',sigla_estado:'RS',pais:'Brasil',codigo_pais:'BR',iata:'POA'},
-                {cidade:'Florianópolis',sigla_estado:'SC',pais:'Brasil',codigo_pais:'BR',iata:'FLN'},
-                {cidade:'Manaus',sigla_estado:'AM',pais:'Brasil',codigo_pais:'BR',iata:'MAO'},
-                {cidade:'Natal',sigla_estado:'RN',pais:'Brasil',codigo_pais:'BR',iata:'NAT'},
-                {cidade:'Buenos Aires',sigla_estado:'',pais:'Argentina',codigo_pais:'AR',iata:'BUE',aeroporto:'Todos'},
-                {cidade:'Santiago',sigla_estado:'',pais:'Chile',codigo_pais:'CL',iata:'SCL'},
-                {cidade:'Lima',sigla_estado:'',pais:'Peru',codigo_pais:'PE',iata:'LIM'},
-                {cidade:'Lisboa',sigla_estado:'',pais:'Portugal',codigo_pais:'PT',iata:'LIS'},
-                {cidade:'Miami',sigla_estado:'FL',pais:'EUA',codigo_pais:'US',iata:'MIA'},
-            ];
-        }
-    },
-
-    normalize(t) { return t.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''); },
-    escAttr(t) { return String(t).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;'); },
-
-    searchCitiesFallback(term) {
-        if (!this.state.cidadesData || term.length < 2) return [];
-        const n = this.normalize(term);
-        return this.state.cidadesData
-            .filter(c => this.normalize(c.cidade).includes(n) || c.iata.toLowerCase().includes(n) || (c.aeroporto && this.normalize(c.aeroporto).includes(n)))
-            .slice(0, 8)
-            .map(c => ({
-                code: c.iata, type: c.aeroporto ? 'airport' : 'city',
-                name: c.cidade,
-                label: `${c.cidade}${c.sigla_estado ? ', ' + c.sigla_estado : ''}${c.aeroporto ? ' \u2014 ' + c.aeroporto : ''}`,
-                sub: c.pais || '',
-            }));
-    },
+    // Autocomplete de lugares: ver assets/js/benetrip-places.js (módulo compartilhado)
 
     parseUrlParams() {
         const p = new URL(window.location.href).searchParams;
@@ -268,23 +164,16 @@ const BenetripVoos = {
             if(term.length<2){dd.classList.remove('open');hCode.value='';return;}
             timer=setTimeout(async()=>{
                 const seq=++reqSeq;
-                let res, apiError=false;
-                try {
-                    res = await this.searchPlaces(term);
-                } catch (e) {
-                    console.warn('⚠️ API places2 falhou, usando fallback local:', e.message);
-                    await this.ensureFallbackCities();
-                    res = this.searchCitiesFallback(term);
-                    apiError = this.state.cidadesLoadError;
-                }
+                const { results: res, apiError } = await BenetripPlaces.search(term);
                 // Descarta resposta atrasada (o usuário já digitou outra coisa)
-                if (seq !== reqSeq || this.normalize(input.value.trim()) !== this.normalize(term)) return;
+                if (seq !== reqSeq || BenetripPlaces.normalize(input.value.trim()) !== BenetripPlaces.normalize(term)) return;
                 if (res.length === 0) {
                     dd.innerHTML = apiError
                         ? '<div class="sf-ac-error">⚠️ Busca de aeroportos indisponível. Digite o código IATA diretamente (ex: GRU)</div>'
                         : '<div style="padding:12px;color:#999;font-size:13px">Nenhum resultado</div>';
                 } else {
-                    dd.innerHTML = res.map(c=>`<div class="sf-dd-item" data-code="${c.code}" data-name="${this.escAttr(c.name)}" data-full="${this.escAttr(c.label)} (${c.code})"><span class="sf-dd-code">${c.code}</span><div class="sf-dd-info"><div class="sf-dd-name">${this.escAttr(c.label)}</div><div class="sf-dd-sub">${this.escAttr(c.sub)}</div></div><span class="sf-dd-type ${c.type==='airport'?'t-air':'t-city'}">${c.type==='airport'?'Aeroporto':'Cidade'}</span></div>`).join('');
+                    const esc = t => BenetripPlaces.escAttr(t);
+                    dd.innerHTML = res.map(c=>`<div class="sf-dd-item" data-code="${c.code}" data-name="${esc(c.name)}" data-full="${esc(c.label)} (${c.code})"><span class="sf-dd-code">${c.code}</span><div class="sf-dd-info"><div class="sf-dd-name">${esc(c.label)}</div><div class="sf-dd-sub">${esc(c.sub)}</div></div><span class="sf-dd-type ${c.type==='airport'?'t-air':'t-city'}">${c.type==='airport'?'Aeroporto':'Cidade'}</span></div>`).join('');
                 }
                 dd.classList.add('open');
                 dd.querySelectorAll('.sf-dd-item').forEach(item => {

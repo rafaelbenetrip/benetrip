@@ -19,10 +19,21 @@ const BenetripMultiDatas = {
         this.setupForm();
     },
 
-    // Mock simples de autocomplete adaptado para o exemplo (reaproveitar do sistema atual)
+    // Autocomplete por aeroporto/cidade via módulo compartilhado (benetrip-places.js)
     setupAutocomplete(inputId, resultsId, hiddenId, stateKey) {
-        // Usa a mesma lógica robusta já implementada em todos-destinos.js
-        // ... (Para brevidade, assumimos o bind correto com this.state[stateKey])
+        BenetripPlaces.attach({
+            input: document.getElementById(inputId),
+            dropdown: document.getElementById(resultsId),
+            onSelect: (place) => {
+                const legacy = BenetripPlaces.toLegacy(place);
+                this.state[stateKey] = legacy;
+                document.getElementById(hiddenId).value = JSON.stringify(legacy);
+            },
+            onClear: () => {
+                this.state[stateKey] = null;
+                document.getElementById(hiddenId).value = '';
+            },
+        });
     },
 
     setupCalendars() {
@@ -55,6 +66,9 @@ const BenetripMultiDatas = {
     setupForm() {
         document.getElementById('multi-form').addEventListener('submit', async (e) => {
             e.preventDefault();
+            if (!this.state.origem) { alert('Selecione a origem.'); return; }
+            if (!this.state.destino) { alert('Selecione o destino.'); return; }
+            if (this.state.origem.code === this.state.destino.code) { alert('Origem e destino devem ser diferentes.'); return; }
             if (this.state.idas.length === 0 || this.state.voltas.length === 0) {
                 alert('Selecione ao menos 1 data de ida e 1 de volta.');
                 return;
@@ -71,8 +85,10 @@ const BenetripMultiDatas = {
         const bebes = parseInt(document.getElementById('pax-bebes').value);
 
         const payload = {
-            origem: "GRU", // Pegar do this.state.origem.code na vida real
-            destino: "LIS", // Pegar do this.state.destino.code
+            origem: this.state.origem.code,
+            destino: this.state.destino.code,
+            origemDisplay: this.state.origem.displayCode || this.state.origem.code,
+            destinoDisplay: this.state.destino.displayCode || this.state.destino.code,
             idas: this.state.idas,
             voltas: this.state.voltas,
             adultos, criancas, bebes,
@@ -110,7 +126,7 @@ const BenetripMultiDatas = {
         const p = this.state.payload;
         const pagantes = p.adultos + p.criancas; // Regra de negócio exigida!
         
-        document.getElementById('titulo-rota').textContent = `✈️ ${p.origem} ➔ ${p.destino}`;
+        document.getElementById('titulo-rota').textContent = `✈️ ${p.origemDisplay || p.origem} ➔ ${p.destinoDisplay || p.destino}`;
         document.getElementById('subtitulo-pax').textContent = `${p.adultos} Adulto(s) ${p.criancas > 0 ? `, ${p.criancas} Criança(s)` : ''} ${p.bebes > 0 ? ` (+${p.bebes} Bebê de colo)` : ''}`;
 
         this.renderMatriz(pagantes);
