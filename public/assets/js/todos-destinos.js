@@ -16,7 +16,6 @@
 
 const BenetripTodosDestinos = {
     state: {
-        cidadesData: null,
         origemSelecionada: null,
         formData: {},
         todosDestinos: [],
@@ -47,7 +46,6 @@ const BenetripTodosDestinos = {
 
     config: {
         debug: true,
-        cidadesJsonPath: 'data/cidades_global_iata_v0.json',
         maxDatasIda: 3,
         maxDatasVolta: 3,
     },
@@ -57,7 +55,6 @@ const BenetripTodosDestinos = {
 
     init() {
         this.log('🐕 Benetrip v3.5 (Aeroportos + Hotel + Scroll) inicializando...');
-        this.carregarCidades();
         this.setupFormEvents();
         this.setupAutocomplete();
         this.setupCalendars();
@@ -67,68 +64,15 @@ const BenetripTodosDestinos = {
     },
 
     // ================================================================
-    // CARREGAR CIDADES
+    // CIDADES — busca por aeroporto via módulo compartilhado
+    // (benetrip-places.js). Agregadores (SAO, RIO...) viram kgmid via toLegacy().
     // ================================================================
-    async carregarCidades() {
-        try {
-            const response = await fetch(this.config.cidadesJsonPath);
-            if (!response.ok) throw new Error('Erro');
-            const dados = await response.json();
-            this.state.cidadesData = dados.filter(c => c.iata);
-            const agrupadas = this.state.cidadesData.filter(c => c.is_city_code);
-            this.log(`✅ ${this.state.cidadesData.length} cidades carregadas (${agrupadas.length} agrupadas)`);
-        } catch (e) {
-            this.error('Erro cidades:', e);
-            this.state.cidadesData = [
-                { cidade: "São Paulo", sigla_estado: "SP", pais: "Brasil", codigo_pais: "BR", iata: "/m/022pfm", iata_city_code: "SAO", kgmid_pais: "/m/015fr", continente: "América do Sul", kgmid_continente: "/m/06n3y", aeroporto: "Todos os aeroportos (Guarulhos, Congonhas e Viracopos)", is_city_code: true, aeroportos_incluidos: ["GRU", "CGH", "VCP"] },
-                { cidade: "São Paulo", sigla_estado: "SP", pais: "Brasil", codigo_pais: "BR", iata: "GRU", aeroporto: "Aeroporto de Guarulhos" },
-                { cidade: "Rio de Janeiro", sigla_estado: "RJ", pais: "Brasil", codigo_pais: "BR", iata: "/m/06gmr", iata_city_code: "RIO", kgmid_pais: "/m/015fr", continente: "América do Sul", kgmid_continente: "/m/06n3y", aeroporto: "Todos os aeroportos (Galeão e Santos Dumont)", is_city_code: true, aeroportos_incluidos: ["GIG", "SDU"] },
-                { cidade: "Rio de Janeiro", sigla_estado: "RJ", pais: "Brasil", codigo_pais: "BR", iata: "GIG", aeroporto: "Aeroporto do Galeão" },
-                { cidade: "Salvador", sigla_estado: "BA", pais: "Brasil", codigo_pais: "BR", iata: "SSA" }
-            ];
-        }
-    },
-
     normalizarTexto(t) { return t.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''); },
 
-    // ================================================================
-    // buscarCidades — inclui dados geo do JSON
-    // ================================================================
-    buscarCidades(termo) {
-        if (!this.state.cidadesData || termo.length < 2) return [];
-        const tn = this.normalizarTexto(termo);
-        const resultados = this.state.cidadesData
-            .filter(c => {
-                const n = this.normalizarTexto(c.cidade);
-                const iataNorm = c.is_city_code 
-                    ? (c.iata_city_code || '').toLowerCase()
-                    : c.iata.toLowerCase();
-                const a = c.aeroporto ? this.normalizarTexto(c.aeroporto) : '';
-                return n.includes(tn) || iataNorm.includes(tn) || a.includes(tn);
-            })
-            .slice(0, 10)
-            .map(c => ({
-                code: c.iata,
-                displayCode: c.iata_city_code || c.iata,
-                name: c.cidade,
-                state: c.sigla_estado,
-                country: c.pais,
-                countryCode: c.codigo_pais,
-                airport: c.aeroporto || null,
-                isCityCode: c.is_city_code || false,
-                aeroportosIncluidos: c.aeroportos_incluidos || null,
-                kgmid_pais: c.kgmid_pais || null,
-                continente: c.continente || null,
-                kgmid_continente: c.kgmid_continente || null,
-            }));
-            
-        resultados.sort((a, b) => {
-            if (a.isCityCode && !b.isCityCode) return -1;
-            if (!a.isCityCode && b.isCityCode) return 1;
-            return 0;
-        });
-        
-        return resultados.slice(0, 8);
+    async buscarCidades(termo) {
+        if (termo.length < 2) return [];
+        const { results } = await BenetripPlaces.search(termo);
+        return results.map(p => BenetripPlaces.toLegacy(p));
     },
 
     // ================================================================
@@ -143,15 +87,16 @@ const BenetripTodosDestinos = {
             clearTimeout(timer);
             const t = e.target.value.trim();
             if (t.length < 2) { results.innerHTML = ''; results.style.display = 'none'; this.state.origemSelecionada = null; hidden.value = ''; return; }
-            timer = setTimeout(() => {
-                const cidades = this.buscarCidades(t);
+            timer = setTimeout(async () => {
+                const cidades = await this.buscarCidades(t);
+                if (this.normalizarTexto(input.value.trim()) !== this.normalizarTexto(t)) return; // resposta atrasada
                 if (!cidades.length) { results.innerHTML = '<div style="padding:12px;color:#666;">Nenhuma cidade encontrada</div>'; results.style.display = 'block'; return; }
                 
                 results.innerHTML = cidades.map(c => {
                     const cityClass = c.isCityCode ? 'autocomplete-item autocomplete-city-group' : 'autocomplete-item';
                     const cityIcon = c.isCityCode ? '🏙️' : '';
                     return `
-                    <div class="${cityClass}" data-city='${JSON.stringify(c)}'>
+                    <div class="${cityClass}" data-city='${JSON.stringify(c).replace(/'/g, "&#39;")}'>
                         <div class="item-code">${cityIcon}${c.displayCode}</div>
                         <div class="item-details">
                             <div class="item-name">${c.name}${c.state ? ', ' + c.state : ''}${c.airport ? ' — ' + c.airport : ''}</div>
@@ -320,7 +265,7 @@ const BenetripTodosDestinos = {
     _buildOrigemGeo() {
         const o = this.state.formData.origem;
         if (!o) return undefined;
-        if (o.kgmid_pais || o.continente) {
+        if (o.kgmid_pais || o.continente || o.countryCode) {
             return {
                 codigo_pais: o.countryCode || '',
                 pais: o.country || '',

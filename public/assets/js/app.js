@@ -127,9 +127,25 @@ const BENETRIP = {
     },
 
     /**
-     * Busca cidades no JSON local
+     * Busca cidades e aeroportos.
+     * Fonte primária: módulo compartilhado benetrip-places.js (API places2 —
+     * inclui aeroportos regionais como JJG e agregadores como SAO/RIO).
+     * Fallback: busca no JSON local (lógica original abaixo).
      */
     buscarCidadesLocal: async function(termo) {
+        if (typeof BenetripPlaces !== 'undefined') {
+            const { results, apiError } = await BenetripPlaces.search(termo);
+            if (!apiError) {
+                return results.map(p => ({
+                    type: p.type,
+                    code: p.code,
+                    name: p.label,
+                    city_name: p.name,
+                    country_name: p.sub,
+                    state_code: null,
+                }));
+            }
+        }
         // Garantir que os dados estejam carregados
         if (!this.cache.cidadesData) {
             await this.carregarDadosCidades();
@@ -300,12 +316,8 @@ const BENETRIP = {
     init() {
         console.log("Benetrip inicializando...");
 
-        // << IMPLEMENTAÇÃO >> Carregar dados de cidades em background
-        this.carregarDadosCidades().then(() => {
-            console.log("Dados de cidades prontos para uso");
-        }).catch(erro => {
-            console.error("Falha ao carregar dados de cidades:", erro);
-        });
+        // Base local de cidades agora é fallback do benetrip-places.js:
+        // só é baixada sob demanda se a API de autocomplete falhar.
 
         // Verificar se estamos na página inicial
         if (document.getElementById('chat-container')) {

@@ -31,7 +31,6 @@ const MinhaContaPrefs = (function () {
         red: '#E53935'
     };
 
-    let cidadesData = null;
     let currentPrefs = null;
     let isEditing = false;
 
@@ -42,7 +41,6 @@ const MinhaContaPrefs = (function () {
     function init() {
         _injectStyles();
         _injectPrefsSection();
-        _loadCidades();
         loadAndRender();
     }
 
@@ -351,8 +349,9 @@ const MinhaContaPrefs = (function () {
                     origemResults.style.display = 'none';
                     return;
                 }
-                debounce = setTimeout(() => {
-                    const cidades = _buscarCidades(termo);
+                debounce = setTimeout(async () => {
+                    const cidades = await _buscarCidades(termo);
+                    if (origemInput.value.trim() !== termo) return; // resposta atrasada
                     if (cidades.length === 0) {
                         origemResults.innerHTML = '<div class="pref-ac-empty">Nenhuma cidade encontrada</div>';
                         origemResults.style.display = 'block';
@@ -612,40 +611,20 @@ const MinhaContaPrefs = (function () {
     }
 
     // ================================================================
-    // CARREGAR CIDADES
+    // CIDADES — busca por aeroporto via módulo compartilhado (benetrip-places.js)
     // ================================================================
 
-    async function _loadCidades() {
-        try {
-            const resp = await fetch('data/cidades_global_iata_v6.json');
-            if (!resp.ok) throw new Error('Erro ao carregar');
-            const data = await resp.json();
-            cidadesData = data.filter(c => c.iata);
-        } catch (e) {
-            console.warn('[MinhaContaPrefs] Cidades não carregadas:', e.message);
-            cidadesData = [];
-        }
-    }
-
-    function _buscarCidades(termo) {
-        if (!cidadesData || termo.length < 2) return [];
-        const norm = termo.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-        return cidadesData
-            .filter(c => {
-                const nome = c.cidade.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-                const iata = c.iata.toLowerCase();
-                const aero = c.aeroporto ? c.aeroporto.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '') : '';
-                return nome.includes(norm) || iata.includes(norm) || aero.includes(norm);
-            })
-            .slice(0, 8)
-            .map(c => ({
-                code: c.iata,
-                name: c.cidade,
-                state: c.sigla_estado,
-                country: c.pais,
-                countryCode: c.codigo_pais,
-                airport: c.aeroporto || null
-            }));
+    async function _buscarCidades(termo) {
+        if (termo.length < 2) return [];
+        const { results } = await BenetripPlaces.search(termo);
+        return results.map(p => ({
+            code: p.code,
+            name: p.name,
+            state: p.state,
+            country: p.country,
+            countryCode: p.countryCode,
+            airport: p.isAggregate ? 'Todos os aeroportos' : (p.airportName || null),
+        }));
     }
 
     // ================================================================

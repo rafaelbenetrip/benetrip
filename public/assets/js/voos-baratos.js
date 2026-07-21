@@ -1,12 +1,11 @@
 /**
  * BENETRIP - VOOS BARATOS
  * Encontre o período mais barato para viajar!
- * Versão: Calendar Heatmap v1.1 - Cidades Agrupadas
+ * Versão: Calendar Heatmap v1.2 - Busca por aeroporto (benetrip-places.js)
  */
 
 const BenetripVoosBaratos = {
     state: {
-        cidadesData: null,
         origemSelecionada: null,
         destinoSelecionado: null,
         duracaoSelecionada: 7,
@@ -18,7 +17,6 @@ const BenetripVoosBaratos = {
 
     config: {
         debug: true,
-        cidadesJsonPath: 'data/cidades_global_iata_v0.json',
     },
 
     log(...args) {
@@ -29,8 +27,8 @@ const BenetripVoosBaratos = {
     // INICIALIZAÇÃO
     // ================================================================
     init() {
-        this.log('🐕 Benetrip Voos Baratos v1.1 (Cidades Agrupadas) inicializando...');
-        this.carregarCidades().then(() => this.preencherViaURL());
+        this.log('🐕 Benetrip Voos Baratos v1.2 (busca por aeroporto) inicializando...');
+        this.preencherViaURL();
         this.setupAutocomplete('origem', 'origem-results', 'origem-data', 'origemSelecionada');
         this.setupAutocomplete('destino', 'destino-results', 'destino-data', 'destinoSelecionado');
         this.setupDurationSlider();
@@ -45,7 +43,7 @@ const BenetripVoosBaratos = {
     // data_ida/data_volta são as datas do preço mostrado no card de destinos
     // baratos: usadas para pré-selecionar o mês correspondente no calendário.
     // ================================================================
-    preencherViaURL() {
+    async preencherViaURL() {
         const params = new URLSearchParams(window.location.search);
         const origemCode = params.get('origem');
         const destinoCode = params.get('destino');
@@ -62,14 +60,14 @@ const BenetripVoosBaratos = {
         this.log('📡 Pré-preenchendo via URL:', { origemCode, destinoCode, destinoNome, duracao, dataIda });
 
         if (origemCode) {
-            const cidadeOrigem = this.encontrarCidadePorCodigo(origemCode);
+            const cidadeOrigem = await this.encontrarCidadePorCodigo(origemCode);
             if (cidadeOrigem) {
                 this.selecionarCidade('origem', 'origem-data', 'origemSelecionada', cidadeOrigem);
             }
         }
 
         if (destinoCode) {
-            const cidadeDestino = this.encontrarCidadePorCodigo(destinoCode);
+            const cidadeDestino = await this.encontrarCidadePorCodigo(destinoCode);
             if (cidadeDestino) {
                 this.selecionarCidade('destino', 'destino-data', 'destinoSelecionado', cidadeDestino);
             } else if (destinoNome) {
@@ -104,30 +102,11 @@ const BenetripVoosBaratos = {
         }
     },
 
-    encontrarCidadePorCodigo(code) {
-        if (!this.state.cidadesData) return null;
+    async encontrarCidadePorCodigo(code) {
         const codeUpper = code.toUpperCase();
-
-        const cidade = this.state.cidadesData.find(c => {
-            if (c.iata === codeUpper) return true;
-            if (c.iata_city_code === codeUpper) return true;
-            if (c.aeroportos_incluidos && c.aeroportos_incluidos.includes(codeUpper)) return true;
-            return false;
-        });
-
-        if (!cidade) return null;
-
-        return {
-            code: cidade.iata,
-            displayCode: cidade.iata_city_code || cidade.iata,
-            name: cidade.cidade,
-            state: cidade.sigla_estado || null,
-            country: cidade.pais,
-            countryCode: cidade.codigo_pais,
-            airport: cidade.aeroporto || null,
-            isCityCode: cidade.is_city_code || false,
-            aeroportosIncluidos: cidade.aeroportos_incluidos || null
-        };
+        const { results } = await BenetripPlaces.search(codeUpper);
+        const hit = results.find(p => p.code === codeUpper) || results[0] || null;
+        return hit ? BenetripPlaces.toLegacy(hit) : null;
     },
 
     selecionarCidade(inputId, hiddenId, stateKey, cidade) {
@@ -145,72 +124,18 @@ const BenetripVoosBaratos = {
     },
 
     // ================================================================
-    // CARREGAR CIDADES
+    // CIDADES — v1.2: busca por aeroporto via módulo compartilhado
+    // (benetrip-places.js). Agregadores (SAO, RIO...) viram kgmid
+    // para a SearchAPI via BenetripPlaces.toLegacy().
     // ================================================================
-    async carregarCidades() {
-        try {
-            const response = await fetch(this.config.cidadesJsonPath);
-            if (!response.ok) throw new Error('Erro ao carregar cidades');
-            const dados = await response.json();
-            this.state.cidadesData = dados.filter(c => c.iata);
-            
-            const agrupadas = this.state.cidadesData.filter(c => c.is_city_code);
-            this.log(`✅ ${this.state.cidadesData.length} cidades carregadas (${agrupadas.length} agrupadas)`);
-        } catch (err) {
-            this.log('⚠️ Usando fallback de cidades');
-            this.state.cidadesData = [
-                { cidade: "São Paulo", sigla_estado: "SP", pais: "Brasil", codigo_pais: "BR", iata: "/m/02cft", iata_city_code: "SAO", aeroporto: "Todos os aeroportos", is_city_code: true, aeroportos_incluidos: ["GRU", "CGH", "VCP"] },
-                { cidade: "São Paulo", sigla_estado: "SP", pais: "Brasil", codigo_pais: "BR", iata: "GRU", aeroporto: "Aeroporto de Guarulhos" },
-                { cidade: "São Paulo", sigla_estado: "SP", pais: "Brasil", codigo_pais: "BR", iata: "CGH", aeroporto: "Aeroporto de Congonhas" },
-                { cidade: "Rio de Janeiro", sigla_estado: "RJ", pais: "Brasil", codigo_pais: "BR", iata: "/m/06gmr", iata_city_code: "RIO", aeroporto: "Todos os aeroportos", is_city_code: true, aeroportos_incluidos: ["GIG", "SDU"] },
-                { cidade: "Rio de Janeiro", sigla_estado: "RJ", pais: "Brasil", codigo_pais: "BR", iata: "GIG", aeroporto: "Aeroporto do Galeão" },
-                { cidade: "Lisboa", pais: "Portugal", codigo_pais: "PT", iata: "LIS", aeroporto: "Aeroporto de Lisboa" },
-                { cidade: "Miami", pais: "Estados Unidos", codigo_pais: "US", iata: "MIA", aeroporto: "Miami International" },
-                { cidade: "Paris", pais: "França", codigo_pais: "FR", iata: "CDG", aeroporto: "Charles de Gaulle" },
-                { cidade: "Londres", pais: "Reino Unido", codigo_pais: "GB", iata: "LHR", aeroporto: "Heathrow" }
-            ];
-        }
-    },
-
     normalizarTexto(texto) {
         return texto.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
     },
 
-    buscarCidades(termo) {
-        if (!this.state.cidadesData || termo.length < 2) return [];
-        const termoNorm = this.normalizarTexto(termo);
-        
-        const resultados = this.state.cidadesData
-            .filter(cidade => {
-                const nomeNorm = this.normalizarTexto(cidade.cidade);
-                // Para kgmid, faz o match pelo iata_city_code se existir
-                const iataNorm = cidade.is_city_code 
-                    ? (cidade.iata_city_code || '').toLowerCase()
-                    : cidade.iata.toLowerCase();
-                const aeroNorm = cidade.aeroporto ? this.normalizarTexto(cidade.aeroporto) : '';
-                return nomeNorm.includes(termoNorm) || iataNorm.includes(termoNorm) || aeroNorm.includes(termoNorm);
-            })
-            .slice(0, 10)
-            .map(cidade => ({
-                code: cidade.iata,
-                displayCode: cidade.iata_city_code || cidade.iata,
-                name: cidade.cidade,
-                state: cidade.sigla_estado || null,
-                country: cidade.pais,
-                countryCode: cidade.codigo_pais,
-                airport: cidade.aeroporto || null,
-                isCityCode: cidade.is_city_code || false,
-                aeroportosIncluidos: cidade.aeroportos_incluidos || null
-            }));
-            
-        // Priorizar cidades agrupadas (ex: SAO, RIO) no topo
-        resultados.sort((a, b) => {
-            if (a.isCityCode && !b.isCityCode) return -1;
-            if (!a.isCityCode && b.isCityCode) return 1;
-            return 0;
-        });
-
-        return resultados.slice(0, 8);
+    async buscarCidades(termo) {
+        if (termo.length < 2) return [];
+        const { results } = await BenetripPlaces.search(termo);
+        return results.map(p => BenetripPlaces.toLegacy(p));
     },
 
     // ================================================================
@@ -234,8 +159,9 @@ const BenetripVoosBaratos = {
                 return;
             }
 
-            timer = setTimeout(() => {
-                const cidades = this.buscarCidades(termo);
+            timer = setTimeout(async () => {
+                const cidades = await this.buscarCidades(termo);
+                if (this.normalizarTexto(input.value.trim()) !== this.normalizarTexto(termo)) return; // resposta atrasada
 
                 if (cidades.length === 0) {
                     results.innerHTML = '<div style="padding:12px;color:#666;font-size:13px;">Nenhuma cidade encontrada</div>';
@@ -248,7 +174,7 @@ const BenetripVoosBaratos = {
                     const cityIcon = c.isCityCode ? '🏙️' : '';
                     
                     return `
-                        <div class="${cityClass}" data-city='${JSON.stringify(c)}'>
+                        <div class="${cityClass}" data-city='${JSON.stringify(c).replace(/'/g, "&#39;")}'>
                             <div class="item-code">${cityIcon}${c.displayCode}</div>
                             <div class="item-details">
                                 <div class="item-name">${c.name}${c.state ? ', ' + c.state : ''}${c.airport ? ' — ' + c.airport : ''}</div>

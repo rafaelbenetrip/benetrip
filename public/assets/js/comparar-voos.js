@@ -10,7 +10,6 @@
 
 const BenetripCompararVoos = {
     state: {
-        cidadesData: null,
         origemSelecionada: null,
         destinoSelecionado: null,
         moedaSelecionada: 'BRL',
@@ -43,7 +42,6 @@ const BenetripCompararVoos = {
 
     config: {
         debug: true,
-        cidadesJsonPath: 'data/cidades_global_iata_v0.json',
         maxDatasIda: 4,
         maxDatasVolta: 4,
     },
@@ -71,8 +69,7 @@ const BenetripCompararVoos = {
     // INIT
     // ════════════════════════════════════════
     init() {
-        this.log('🐕 Comparar Voos v2.2 inicializando...');
-        this.carregarCidades();
+        this.log('🐕 Comparar Voos v2.3 inicializando...');
         this.setupAutocomplete('origem', 'origem-results', 'origem-data', 'origemSelecionada');
         this.setupAutocomplete('destino', 'destino-results', 'destino-data', 'destinoSelecionado');
         this.setupCalendars();
@@ -102,69 +99,16 @@ const BenetripCompararVoos = {
     },
 
     // ════════════════════════════════════════
-    // CIDADES
+    // CIDADES — v2.3: busca por aeroporto via módulo compartilhado
+    // (benetrip-places.js). Agregadores (SAO, RIO...) continuam virando kgmid
+    // para a SearchAPI via BenetripPlaces.toLegacy().
     // ════════════════════════════════════════
-    async carregarCidades() {
-        try {
-            const r = await fetch(this.config.cidadesJsonPath);
-            if (!r.ok) throw new Error('Erro');
-            const d = await r.json();
-            this.state.cidadesData = d.filter(c => c.iata);
-            const agrupadas = this.state.cidadesData.filter(c => c.is_city_code);
-            this.log(`✅ ${this.state.cidadesData.length} cidades (${agrupadas.length} cidades agrupadas)`);
-        } catch {
-            this.state.cidadesData = [
-                { cidade: "São Paulo", sigla_estado: "SP", pais: "Brasil", codigo_pais: "BR", iata: "/m/022pfm", iata_city_code: "SAO", aeroporto: "Todos os aeroportos (Guarulhos, Congonhas e Viracopos)", is_city_code: true, aeroportos_incluidos: ["GRU", "CGH", "VCP"] },
-                { cidade: "São Paulo", sigla_estado: "SP", pais: "Brasil", codigo_pais: "BR", iata: "GRU", aeroporto: "Aeroporto de Guarulhos" },
-                { cidade: "São Paulo", sigla_estado: "SP", pais: "Brasil", codigo_pais: "BR", iata: "CGH", aeroporto: "Aeroporto de Congonhas" },
-                { cidade: "Rio de Janeiro", sigla_estado: "RJ", pais: "Brasil", codigo_pais: "BR", iata: "/m/06gmr", iata_city_code: "RIO", aeroporto: "Todos os aeroportos (Galeão e Santos Dumont)", is_city_code: true, aeroportos_incluidos: ["GIG", "SDU"] },
-                { cidade: "Rio de Janeiro", sigla_estado: "RJ", pais: "Brasil", codigo_pais: "BR", iata: "GIG", aeroporto: "Aeroporto do Galeão" },
-                { cidade: "Rio de Janeiro", sigla_estado: "RJ", pais: "Brasil", codigo_pais: "BR", iata: "SDU", aeroporto: "Aeroporto Santos Dumont" },
-                { cidade: "Lisboa", pais: "Portugal", codigo_pais: "PT", iata: "LIS" },
-                { cidade: "Miami", pais: "Estados Unidos", codigo_pais: "US", iata: "MIA", aeroporto: "Miami International" },
-                { cidade: "Buenos Aires", pais: "Argentina", codigo_pais: "AR", iata: "EZE", aeroporto: "Ezeiza" },
-                { cidade: "Paris", pais: "França", codigo_pais: "FR", iata: "CDG", aeroporto: "Charles de Gaulle" },
-                { cidade: "Orlando", pais: "Estados Unidos", codigo_pais: "US", iata: "MCO", aeroporto: "Orlando International" },
-                { cidade: "Salvador", sigla_estado: "BA", pais: "Brasil", codigo_pais: "BR", iata: "SSA" },
-            ];
-        }
-    },
-
     norm(t) { return t.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''); },
 
-    buscarCidades(termo) {
-        if (!this.state.cidadesData || termo.length < 2) return [];
-        const tn = this.norm(termo);
-        const resultados = this.state.cidadesData
-            .filter(c => {
-                const n = this.norm(c.cidade);
-                const i = c.is_city_code
-                    ? (c.iata_city_code || '').toLowerCase()
-                    : c.iata.toLowerCase();
-                const a = c.aeroporto ? this.norm(c.aeroporto) : '';
-                return n.includes(tn) || i.includes(tn) || a.includes(tn);
-            })
-            .slice(0, 10)
-            .map(c => ({
-                code: c.iata,
-                displayCode: c.iata_city_code || c.iata,
-                name: c.cidade,
-                state: c.sigla_estado || null,
-                country: c.pais,
-                countryCode: c.codigo_pais,
-                airport: c.aeroporto || null,
-                isCityCode: c.is_city_code || false,
-                aeroportosIncluidos: c.aeroportos_incluidos || null,
-            }));
-
-        // Ordenar: cidades agrupadas aparecem PRIMEIRO
-        resultados.sort((a, b) => {
-            if (a.isCityCode && !b.isCityCode) return -1;
-            if (!a.isCityCode && b.isCityCode) return 1;
-            return 0;
-        });
-
-        return resultados.slice(0, 8);
+    async buscarCidades(termo) {
+        if (termo.length < 2) return [];
+        const { results } = await BenetripPlaces.search(termo);
+        return results.map(p => BenetripPlaces.toLegacy(p));
     },
 
     // ════════════════════════════════════════
@@ -184,8 +128,9 @@ const BenetripCompararVoos = {
                 this.state[stateKey] = null; hidden.value = '';
                 return;
             }
-            timer = setTimeout(() => {
-                const cidades = this.buscarCidades(t);
+            timer = setTimeout(async () => {
+                const cidades = await this.buscarCidades(t);
+                if (this.norm(input.value.trim()) !== this.norm(t)) return; // resposta atrasada
                 if (!cidades.length) {
                     results.innerHTML = '<div style="padding:12px;color:#666;font-size:13px;">Nenhuma cidade encontrada</div>';
                     results.style.display = 'block';
@@ -195,7 +140,7 @@ const BenetripCompararVoos = {
                     const cityClass = c.isCityCode ? 'autocomplete-item autocomplete-city-group' : 'autocomplete-item';
                     const cityIcon = c.isCityCode ? '🏙️' : '';
                     return `
-                    <div class="${cityClass}" data-city='${JSON.stringify(c)}'>
+                    <div class="${cityClass}" data-city='${JSON.stringify(c).replace(/'/g, "&#39;")}'>
                         <div class="item-code">${cityIcon}${c.displayCode}</div>
                         <div class="item-details">
                             <div class="item-name">${c.name}${c.state ? ', ' + c.state : ''}${c.airport ? ' — ' + c.airport : ''}</div>
