@@ -4,6 +4,28 @@
    componentes base vêm de lá).
    ======================================== */
 
+/* ---------- HERO: avatar circular da Tripinha ---------- */
+.hero-avatar-circle {
+    width: 96px;
+    height: 96px;
+    margin: 0 auto 16px;
+    border-radius: 50%;
+    overflow: hidden;
+    position: relative;
+    border: 3px solid rgba(255, 255, 255, 0.9);
+    background: #FFF6EC;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+}
+
+.hero-avatar-circle img {
+    /* zoom no rosto sorridente da ilustração 1024x1024 */
+    position: absolute;
+    width: 190%;
+    height: auto;
+    left: -44%;
+    top: -10%;
+}
+
 /* ---------- HERO: chips de personas ---------- */
 .hero-personas {
     display: flex;
