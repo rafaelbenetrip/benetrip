@@ -90,7 +90,7 @@ async function searchFlightsCalendar(params, label) {
         if (!response.ok) {
             const errorText = await response.text();
             console.error(`[VaiEVem][${label}] HTTP ${response.status} (${elapsed}ms):`, errorText.substring(0, 200));
-            return { calendar: [], error: `HTTP ${response.status}` };
+            return { calendar: [], error: `HTTP ${response.status}`, errorDetail: errorText.substring(0, 200) };
         }
 
         const data = await response.json();
@@ -469,15 +469,26 @@ export default async function handler(req, res) {
         const horizonteFim = formatDate(addDays(startDate, mesesNum * 30));
         const unique = new Map();
         let errorsCount = 0;
+        const errorDetails = [];
+        let entradasComPreco = 0;
+        const dowsIdaDisponiveis = new Set();
+        const dowsVoltaDisponiveis = new Set();
 
         results.forEach(result => {
-            if (result.error) { errorsCount++; return; }
+            if (result.error) {
+                errorsCount++;
+                if (result.errorDetail && errorDetails.length < 3) errorDetails.push(result.errorDetail);
+                return;
+            }
             result.calendar.forEach(entry => {
                 if (entry.has_no_flights || !entry.price || !entry.departure || !entry.return) return;
                 if (entry.departure > horizonteFim) return;
 
                 const dowIda = diaDaSemana(entry.departure);
                 const dowVolta = diaDaSemana(entry.return);
+                entradasComPreco++;
+                dowsIdaDisponiveis.add(dowIda);
+                dowsVoltaDisponiveis.add(dowVolta);
                 if (!setIda.has(dowIda) || !setVolta.has(dowVolta)) return;
 
                 const noites = diffDays(entry.departure, entry.return);
@@ -494,9 +505,33 @@ export default async function handler(req, res) {
         const viagens = Array.from(unique.values()).sort((a, b) => a.price - b.price);
 
         if (viagens.length === 0) {
+            // Todas as janelas falharam: problema no buscador (chave/cota do
+            // SearchAPI, instabilidade), não ausência de voos — não confundir o usuário
+            if (errorsCount === windows.length) {
+                console.error(`❌ VaiEVem: todas as ${windows.length} janelas falharam. Amostra:`, errorDetails[0] || 'sem detalhe');
+                return res.status(503).json({
+                    error: 'Busca temporariamente indisponível',
+                    message: 'Nosso buscador de preços está temporariamente indisponível. Tenta de novo em alguns minutos? 🐕',
+                    _debug: { windows: windows.length, errorsCount, errorDetails },
+                });
+            }
+
+            // A rota tem voos, mas nenhum nos dias escolhidos: dizer QUAIS dias têm voo
+            // (rotas regionais muitas vezes só operam em dias específicos)
+            if (entradasComPreco > 0) {
+                const nomesDias = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
+                const listaDias = (set) => [...set].sort().map(d => nomesDias[d]).join(', ');
+                return res.status(404).json({
+                    error: 'Nenhum voo nos dias escolhidos',
+                    message: `Essa rota tem voos, mas não achei combinações nos dias que você escolheu. Nos próximos ${mesesNum} meses, os voos de ida saem ${listaDias(dowsIdaDisponiveis)} e os de volta ${listaDias(dowsVoltaDisponiveis)}. Ajusta os dias e tenta de novo!`,
+                    diasComVoo: { ida: [...dowsIdaDisponiveis].sort(), volta: [...dowsVoltaDisponiveis].sort() },
+                });
+            }
+
             return res.status(404).json({
                 error: 'Nenhum voo encontrado',
-                message: `Não achei voos de ${origemCode} para ${destinoCode} nos dias escolhidos para os próximos ${mesesNum} meses. Tente ampliar os dias da semana ou o período.`,
+                message: `O Google Flights não retornou preços de ${origemCode} para ${destinoCode} nos próximos ${mesesNum} meses. Se a rota é atendida por outro aeroporto da mesma cidade (ex.: em São Paulo, muitos voos regionais saem de Viracopos), tente buscar pela cidade em vez do aeroporto específico.`,
+                _debug: { windows: windows.length, errorsCount, errorDetails },
             });
         }
 
