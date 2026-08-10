@@ -29,9 +29,7 @@ export const maxDuration = 300; // 5 minutos
 // CONFIGURAÇÃO
 // ============================================================
 const CIDADES_POR_LOTE = 15;     // Quantas cidades processar por execução
-const LOTES_POR_DIA = 1;         // Cron roda 1x/dia; os lotes alternam por dia
-                                 // (cada cidade atualiza a cada 2 dias — corta o
-                                 // consumo de SearchAPI pela metade, ~1.400/mês)
+const LOTES_POR_DIA = 2;         // Cron roda 2x/dia (30 cidades / 15 por lote)
 
 // Carregar cidades do JSON
 function carregarCidades() {
