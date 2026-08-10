@@ -15,6 +15,7 @@ const PAGINAS_ESTATICAS = [
     { loc: '/todos-destinos', changefreq: 'weekly', priority: '0.8' },
     { loc: '/voos', changefreq: 'daily', priority: '0.9' },
     { loc: '/voos-baratos', changefreq: 'daily', priority: '0.8' },
+    { loc: '/vai-e-vem', changefreq: 'daily', priority: '0.8' },
     { loc: '/comparar-voos', changefreq: 'daily', priority: '0.7' },
     { loc: '/multidatas', changefreq: 'daily', priority: '0.7' },
     { loc: '/roteiro-viagem', changefreq: 'weekly', priority: '0.8' },

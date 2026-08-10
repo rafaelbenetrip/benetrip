@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#E87722">
+    <title>Vai e Vem - Sua Rota de Sempre pelo Menor Preço | Benetrip</title>
+    <meta name="description" content="Visita a família em outra cidade? Amor à distância? Escolha seus dias de ida e volta e descubra quando sua rota de sempre está mais barata nos próximos meses.">
+
+    <!-- SEO Meta Tags (OG, Twitter, JSON-LD) -->
+    <script src="assets/js/seo-meta.js" defer></script>
+
+    <!-- Favicons -->
+    <link rel="icon" type="image/svg+xml" href="assets/images/favicon/favicon.svg">
+    <link rel="apple-touch-icon" sizes="180x180" href="assets/images/favicon/apple-touch-icon.png">
+
+    <!-- Styles -->
+    <link rel="stylesheet" href="assets/css/voos-baratos.css">
+    <link rel="stylesheet" href="assets/css/vai-e-vem.css">
+
+    <!-- Vercel Analytics -->
+    <script>
+        window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
+    </script>
+    <script defer src="/_vercel/insights/script.js"></script>
+    <link rel="manifest" href="/manifest.webmanifest">
+    <script src="/assets/js/pwa.js" defer></script>
+</head>
+<body>
+
+    <!-- Supabase Config -->
+    <meta name="supabase-url" content="https://dlccjeazkpxtijevusbp.supabase.co">
+    <meta name="supabase-anon-key" content="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRsY2NqZWF6a3B4dGlqZXZ1c2JwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE3Mjg3MDYsImV4cCI6MjA4NzMwNDcwNn0.lwKwqF74JrHOaghkcbysZQN8jWErVVwPnxzLG7t07QU">
+
+    <!-- Header -->
+    <div id="benetrip-header-root"></div>
+
+    <!-- HERO -->
+    <section class="hero-section" id="hero-section">
+        <div class="container hero-content">
+            <img src="assets/images/tripinha/avatar-farejando.png" alt="Tripinha" class="hero-avatar"
+                 onerror="this.style.display='none'">
+            <h1>Vai e Vem: sua rota de sempre pelo menor preço 🔁</h1>
+            <p>Visita a família em outra cidade? Namora à distância, trabalha ou estuda longe de casa?
+               Escolha os dias da semana que você costuma ir e voltar, e a Tripinha fareja os próximos meses
+               pra mostrar quando a passagem tá valendo a pena. Chega de pesquisar a mesma rota toda hora! 🐕</p>
+            <div class="hero-personas">
+                <span class="persona-chip">👨‍👩‍👧 Ver a família</span>
+                <span class="persona-chip">❤️ Amor à distância</span>
+                <span class="persona-chip">💼 Trabalho em outra cidade</span>
+                <span class="persona-chip">🎓 Estudo fora</span>
+            </div>
+        </div>
+    </section>
+
+    <!-- FORMULÁRIO -->
+    <section class="form-section" id="form-section">
+        <div class="container">
+            <div class="form-card">
+                <form id="search-form">
+
+                    <!-- Origem + Destino -->
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="origem">📍 De onde você sai</label>
+                            <div class="autocomplete-wrapper">
+                                <input type="text" id="origem" class="form-input"
+                                       placeholder="Cidade onde você está"
+                                       autocomplete="off" required>
+                                <div id="origem-results" class="autocomplete-results"></div>
+                            </div>
+                            <input type="hidden" id="origem-data">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="destino">🏠 Pra onde você sempre vai</label>
+                            <div class="autocomplete-wrapper">
+                                <input type="text" id="destino" class="form-input"
+                                       placeholder="Cidade da família, do amor..."
+                                       autocomplete="off" required>
+                                <div id="destino-results" class="autocomplete-results"></div>
+                            </div>
+                            <input type="hidden" id="destino-data">
+                        </div>
+                    </div>
+
+                    <!-- Dias da semana -->
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>🛫 Dias que você pode ir</label>
+                            <div class="dias-chips" id="dias-ida"></div>
+                        </div>
+                        <div class="form-group">
+                            <label>🛬 Dias que você pode voltar</label>
+                            <div class="dias-chips" id="dias-volta"></div>
+                        </div>
+                    </div>
+                    <p class="dias-hint">💡 Cada ida combina com a volta seguinte naqueles dias — ex.: ida na quinta + volta na segunda = o fim de semana estendido daquela semana.</p>
+
+                    <!-- Meses + Moeda -->
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>📆 Pesquisar quantos meses à frente?</label>
+                            <div class="meses-chips" id="meses-chips">
+                                <div class="mes-chip" data-meses="1">1 mês</div>
+                                <div class="mes-chip active" data-meses="2">2 meses</div>
+                                <div class="mes-chip" data-meses="3">3 meses</div>
+                                <div class="mes-chip" data-meses="4">4 meses</div>
+                                <div class="mes-chip" data-meses="6">6 meses</div>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>💱 Moeda</label>
+                            <div class="currency-chips">
+                                <div class="currency-chip" data-currency="BRL">R$</div>
+                                <div class="currency-chip" data-currency="USD">US$</div>
+                                <div class="currency-chip" data-currency="EUR">€</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Submit -->
+                    <button type="submit" class="btn-submit" id="btn-submit">
+                        🔍 Farejar Minha Rota
+                    </button>
+
+                </form>
+            </div>
+        </div>
+    </section>
+
+    <!-- LOADING -->
+    <section class="loading-section" id="loading-section">
+        <div class="container">
+            <div class="loading-card">
+                <img src="assets/images/tripinha/avatar-pensando.png" alt="Tripinha buscando" class="loading-avatar"
+                     onerror="this.style.display='none'">
+                <h2>🐕 Farejando todas as suas idas e voltas...</h2>
+                <div class="progress-container">
+                    <div class="progress-track">
+                        <div class="progress-bar" id="progress-bar"></div>
+                    </div>
+                </div>
+                <p class="loading-msg" id="loading-msg">Iniciando busca...</p>
+                <p class="loading-tip">A Tripinha está checando o preço de cada semana da sua rota nos dias que você escolheu. Isso pode levar alguns segundos...</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- RESULTADOS -->
+    <section class="results-section" id="results-section">
+        <div class="container" id="results-content">
+            <!-- Preenchido dinamicamente -->
+        </div>
+    </section>
+
+    <!-- FOOTER -->
+    <footer class="footer">
+        <p>🐕 Feito com amor pela Tripinha | Benetrip © 2026</p>
+    </footer>
+
+    <!-- SCRIPT -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="assets/js/benetrip-auth.js"></script>
+    <script src="assets/js/benetrip-header.js"></script>
+    <script src="assets/js/benetrip-places.js?v=1.0"></script>
+    <script src="assets/js/vai-e-vem.js?v=1.0"></script>
+</body>
+</html>

@@ -36,6 +36,10 @@
       "memory": 1024,
       "maxDuration": 90
     },
+    "api/vai-e-vem.js": {
+      "memory": 1024,
+      "maxDuration": 90
+    },
     "api/search-destinations.js": {
       "memory": 1024,
       "maxDuration": 90

@@ -1,0 +1,403 @@
+/* ========================================
+   BENETRIP VAI E VEM v1.0
+   Complementa voos-baratos.css (variáveis e
+   componentes base vêm de lá).
+   ======================================== */
+
+/* ---------- HERO: chips de personas ---------- */
+.hero-personas {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 18px;
+    position: relative;
+    z-index: 1;
+}
+
+.persona-chip {
+    background: rgba(255, 255, 255, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.45);
+    color: var(--white);
+    padding: 6px 14px;
+    border-radius: 999px;
+    font-size: 13px;
+    font-weight: 500;
+    backdrop-filter: blur(4px);
+}
+
+/* ---------- FORM: chips de dias da semana ---------- */
+.dias-chips {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.dia-chip {
+    flex: 1;
+    min-width: 40px;
+    padding: 10px 4px;
+    border: 2px solid var(--gray-border);
+    border-radius: var(--radius-xs);
+    background: var(--white);
+    cursor: pointer;
+    transition: var(--transition);
+    text-align: center;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    color: inherit;
+}
+
+.dia-chip:hover {
+    border-color: var(--orange);
+    background: var(--orange-light);
+}
+
+.dia-chip.active {
+    border-color: var(--orange);
+    background: var(--orange);
+    color: var(--white);
+}
+
+.dias-hint {
+    font-size: 13px;
+    color: #666;
+    background: var(--blue-light);
+    border-radius: var(--radius-xs);
+    padding: 10px 14px;
+    margin: -6px 0 18px;
+    line-height: 1.5;
+}
+
+/* ---------- FORM: chips de meses ---------- */
+.meses-chips {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.mes-chip {
+    flex: 1;
+    min-width: 60px;
+    padding: 12px 8px;
+    border: 2px solid var(--gray-border);
+    border-radius: var(--radius-xs);
+    background: var(--white);
+    cursor: pointer;
+    transition: var(--transition);
+    text-align: center;
+    font-size: 13px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.mes-chip:hover {
+    border-color: var(--blue);
+    background: var(--blue-light);
+}
+
+.mes-chip.active {
+    border-color: var(--blue);
+    background: var(--blue);
+    color: var(--white);
+}
+
+/* ---------- RESULTADOS: badges de classificação ---------- */
+.badge-classe {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.badge-barato {
+    background: var(--green-light);
+    color: var(--green-dark);
+}
+
+.badge-barato::before {
+    content: '●';
+    color: var(--green);
+}
+
+.badge-normal {
+    background: var(--blue-light);
+    color: var(--blue-dark);
+}
+
+.badge-normal::before {
+    content: '●';
+    color: var(--blue);
+}
+
+.badge-caro {
+    background: #FDEDEB;
+    color: var(--red);
+}
+
+.badge-caro::before {
+    content: '●';
+    color: var(--red);
+}
+
+/* ---------- Legenda ---------- */
+.legenda-classes {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    background: var(--white);
+    border: 1px solid var(--gray-border);
+    border-radius: var(--radius-xs);
+    padding: 12px 16px;
+    margin-bottom: 20px;
+    font-size: 13px;
+    color: #555;
+}
+
+.legenda-itens {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+/* ---------- Tripinha: escolha ---------- */
+.tripinha-escolha {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 12px;
+    margin-top: 12px;
+    padding: 12px 14px;
+    background: var(--white);
+    border-radius: var(--radius-xs);
+    border: 1px dashed var(--orange);
+}
+
+.escolha-badge {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--orange);
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+}
+
+.escolha-dates {
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.escolha-preco {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--green-dark);
+}
+
+.escolha-motivo {
+    flex-basis: 100%;
+    font-size: 13px;
+    color: #666;
+    font-style: italic;
+}
+
+.escolha-link {
+    margin-left: auto;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--blue);
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.escolha-link:hover {
+    text-decoration: underline;
+}
+
+/* ---------- Tag de feriado no winner card ---------- */
+.feriado-tag {
+    display: inline-block;
+    background: rgba(255, 255, 255, 0.22);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    color: var(--white);
+    padding: 4px 12px;
+    border-radius: 999px;
+    font-size: 13px;
+    font-weight: 600;
+    margin: 8px 0 4px;
+}
+
+/* ---------- Lista de semanas ---------- */
+.semanas-section {
+    margin-bottom: 28px;
+}
+
+.semanas-title {
+    font-size: 20px;
+    font-weight: 700;
+    margin-bottom: 4px;
+}
+
+.semanas-hint {
+    font-size: 13px;
+    color: #666;
+    margin-bottom: 16px;
+}
+
+.semanas-lista {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.semana-card {
+    background: var(--white);
+    border: 1px solid var(--gray-border);
+    border-left: 5px solid var(--gray-border);
+    border-radius: var(--radius-xs);
+    padding: 14px 16px;
+    transition: var(--transition);
+}
+
+.semana-card.classe-barato {
+    border-left-color: var(--green);
+}
+
+.semana-card.classe-normal {
+    border-left-color: var(--blue);
+}
+
+.semana-card.classe-caro {
+    border-left-color: var(--red);
+}
+
+.semana-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 14px;
+    margin-bottom: 10px;
+}
+
+.semana-label {
+    font-size: 15px;
+    font-weight: 700;
+}
+
+.semana-feriado {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--orange-dark);
+    background: var(--orange-light);
+    padding: 3px 10px;
+    border-radius: 999px;
+}
+
+.semana-desde {
+    margin-left: auto;
+    font-size: 13px;
+    color: #666;
+}
+
+.semana-desde strong {
+    color: var(--green-dark);
+    font-size: 15px;
+}
+
+.semana-opcoes {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.opcao-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    border-radius: var(--radius-xs);
+    background: var(--gray-light, #F5F7FA);
+    transition: var(--transition);
+}
+
+.opcao-row:hover {
+    background: var(--blue-light);
+}
+
+.opcao-row.opcao-melhor {
+    outline: 2px solid var(--green);
+    outline-offset: -2px;
+}
+
+.opcao-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.opcao-dates {
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.opcao-meta {
+    font-size: 12px;
+    color: #888;
+    margin-top: 2px;
+}
+
+.opcao-preco {
+    font-size: 16px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.opcao-link {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    background: var(--blue);
+    color: var(--white);
+    flex-shrink: 0;
+    transition: var(--transition);
+}
+
+.opcao-link:hover {
+    background: var(--blue-dark);
+    transform: scale(1.08);
+}
+
+.opcao-link svg {
+    width: 16px;
+    height: 16px;
+}
+
+/* ---------- Mobile ---------- */
+@media (max-width: 560px) {
+    .dia-chip {
+        min-width: 36px;
+        padding: 9px 2px;
+        font-size: 12px;
+    }
+
+    .semana-desde {
+        margin-left: 0;
+        flex-basis: 100%;
+    }
+
+    .opcao-row {
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .opcao-preco {
+        margin-left: auto;
+    }
+}
