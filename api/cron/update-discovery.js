@@ -1,20 +1,22 @@
-// api/cron/update-discovery.js - BENETRIP DISCOVERY CRON v2.0
-// Roda automaticamente via Vercel Cron (7x ao dia, a cada ~3h)
-// Busca destinos baratos para 100 cidades brasileiras usando lotes rotativos
+// api/cron/update-discovery.js - BENETRIP DISCOVERY CRON v2.1
+// Busca destinos baratos para as cidades brasileiras usando lotes rotativos
 // e salva snapshots no Supabase para consulta rápida + histórico
 //
+// v2.1: Frequência configurável (DISCOVERY_EXECUCOES_POR_DIA, default 1x/dia).
+//       Com 1 execução/dia o lote rotaciona POR DIA: cada cidade é atualizada
+//       em dias alternados (2 lotes). Custo: 15 cidades x 3 buscas = 45
+//       buscas SearchAPI/dia. Para escalar, ver api/_lib/cron-lotes.js.
 // v2.0: Lotes rotativos (15 cidades por execução)
 //       Classificação de estilos via Cerebras
-//       100 cidades carregadas de brazilian-airports.json
 //
 // COMO FUNCIONA:
-// 1. Carrega lista de 100 cidades de brazilian-airports.json
-// 2. Determina qual lote processar (baseado na hora do dia)
+// 1. Carrega lista de cidades de brazilian-airports.json
+// 2. Determina qual lote processar (rodízio por dia + hora, ver cron-lotes.js)
 // 3. Para cada cidade do lote, chama a SearchAPI (google_travel_explore)
 // 4. Classifica estilos via Cerebras (batch) com fallback keywords
 // 5. Salva no Supabase (tabela discovery_snapshots)
 //
-// TRIGGER: Vercel Cron configurado em vercel.json (7x/dia)
+// TRIGGER: Vercel Cron configurado em vercel.json
 // MANUAL:  GET /api/cron/update-discovery?key=CRON_SECRET
 // FORÇAR LOTE: GET /api/cron/update-discovery?key=CRON_SECRET&lote=3
 
@@ -22,14 +24,16 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 import { gerarConteudoTripinha } from '../_lib/tripinha-shared.js';
 import { fetchSnapshots, calcularVariacoesHistorico } from '../_lib/discovery-shared.js';
+import { calcularLote, lerExecucoesPorDia } from '../_lib/cron-lotes.js';
 
 export const maxDuration = 300; // 5 minutos
 
 // ============================================================
 // CONFIGURAÇÃO
 // ============================================================
-const CIDADES_POR_LOTE = 15;     // Quantas cidades processar por execução
-const LOTES_POR_DIA = 2;         // Cron roda 2x/dia (30 cidades / 15 por lote)
+const CIDADES_POR_LOTE = 15; // Quantas cidades processar por execução
+// Execuções por dia — DEVE bater com o cron em vercel.json (ver cron-lotes.js)
+const EXECUCOES_POR_DIA = lerExecucoesPorDia(process.env.DISCOVERY_EXECUCOES_POR_DIA);
 
 // Carregar cidades do JSON
 function carregarCidades() {
@@ -54,21 +58,6 @@ function carregarCidades() {
             { codigo: 'VCP', nome: 'Campinas', estado: 'SP', regiao: 'sudeste', prioridade: 1 },
         ];
     }
-}
-
-// Determinar qual lote processar baseado na execução do dia.
-// O cron roda LOTES_POR_DIA vezes ao dia (6h e 18h UTC): o dia é dividido em
-// janelas iguais e cada janela corresponde a um lote. Com floor(hora/3) as
-// duas execuções caíam sempre no lote 0 e as cidades 16-30 nunca atualizavam.
-export function calcularLote(totalCidades, forcarLote, horaUTC = new Date().getUTCHours()) {
-    if (forcarLote !== undefined && forcarLote !== null) {
-        const lote = parseInt(forcarLote);
-        if (!isNaN(lote) && lote >= 0) return lote;
-    }
-
-    const execucao = Math.floor(horaUTC / (24 / LOTES_POR_DIA)); // 6h -> 0, 18h -> 1
-    const totalLotes = Math.ceil(totalCidades / CIDADES_POR_LOTE);
-    return execucao % totalLotes;
 }
 
 const MAX_DESTINOS_POR_ORIGEM = 50;
@@ -463,14 +452,13 @@ export default async function handler(req, res) {
 
     // Carregar cidades e calcular lote
     const todasCidades = carregarCidades();
-    const loteForcar = req.query?.lote;
-    const loteIndex = calcularLote(todasCidades.length, loteForcar);
+    const totalLotes = Math.ceil(todasCidades.length / CIDADES_POR_LOTE);
+    const loteIndex = calcularLote(totalLotes, EXECUCOES_POR_DIA, req.query?.lote);
     const inicio = loteIndex * CIDADES_POR_LOTE;
     const cidadesDoLote = todasCidades.slice(inicio, inicio + CIDADES_POR_LOTE);
-    const totalLotes = Math.ceil(todasCidades.length / CIDADES_POR_LOTE);
 
     console.log(`\n${'='.repeat(60)}`);
-    console.log(`🚀 DISCOVERY CRON v2.0 - Início: ${new Date().toISOString()}`);
+    console.log(`🚀 DISCOVERY CRON v2.1 - Início: ${new Date().toISOString()}`);
     console.log(`📦 Lote ${loteIndex + 1}/${totalLotes} (cidades ${inicio + 1}-${inicio + cidadesDoLote.length} de ${todasCidades.length})`);
     console.log(`🏙️ Cidades: ${cidadesDoLote.map(c => c.codigo).join(', ')}`);
     console.log(`${'='.repeat(60)}`);
@@ -523,7 +511,7 @@ export default async function handler(req, res) {
     const totalTime = Date.now() - startTime;
 
     console.log(`\n${'='.repeat(60)}`);
-    console.log(`✅ DISCOVERY CRON v2.0 - Lote ${loteIndex + 1}/${totalLotes} completo em ${totalTime}ms`);
+    console.log(`✅ DISCOVERY CRON v2.1 - Lote ${loteIndex + 1}/${totalLotes} completo em ${totalTime}ms`);
     console.log(`   Sucesso: ${resultados.sucesso} | Falha: ${resultados.falha}`);
     console.log(`${'='.repeat(60)}\n`);
 

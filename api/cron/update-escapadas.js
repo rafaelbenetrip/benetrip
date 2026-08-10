@@ -1,8 +1,11 @@
-// api/cron/update-escapadas.js - BENETRIP ESCAPADAS CRON v1.0
-// Roda 2x/dia via Vercel Cron (7h e 19h UTC, deslocado do update-discovery).
+// api/cron/update-escapadas.js - BENETRIP ESCAPADAS CRON v1.1
 // Para cada cidade do lote, busca voos com DATAS FIXAS para cada janela de
 // escapada ativa (3 fins de semana rolantes + próximos feriados nacionais)
 // e salva um snapshot por janela no Supabase.
+//
+// v1.1: Frequência configurável (ESCAPADAS_EXECUCOES_POR_DIA, default 1x/dia).
+//       Com 1 execução/dia o lote rotaciona POR DIA: cada cidade é atualizada
+//       a cada 4 dias (4 lotes de 8). Para escalar, ver api/_lib/cron-lotes.js.
 //
 // Snapshots na tabela discovery_snapshots, um `tipo` por janela:
 //   fds-2026-07-10, feriado-independencia-2026, ...
@@ -10,7 +13,8 @@
 //
 // CUSTO DE API: fim de semana = 1 busca (só Brasil: escapada de 2 noites é
 // doméstica); feriado = 2 buscas (Brasil + América do Sul, 3+ dias viabilizam
-// Buenos Aires, Santiago etc). ~9 buscas/cidade/dia com 6 janelas ativas.
+// Buenos Aires, Santiago etc). Com 6 janelas ativas, ~9 buscas por cidade:
+// 8 cidades x ~9 = ~72 buscas SearchAPI por execução.
 //
 // TRIGGER: Vercel Cron configurado em vercel.json
 // MANUAL:  GET /api/cron/update-escapadas?key=CRON_SECRET
@@ -19,34 +23,25 @@
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import { janelasAtivas, hojeISO, buscarDestinosJanela, selecionarEFormatarDestinos } from '../_lib/escapadas-shared.js';
+import { calcularLote, lerExecucoesPorDia } from '../_lib/cron-lotes.js';
 
 export const maxDuration = 300; // 5 minutos
 
 // 8 cidades x ~9 buscas por execução: cabe com folga nos 300s da função.
 // Com 15 cidades a execução estourava o maxDuration (FUNCTION_INVOCATION_TIMEOUT)
-// com a latência real da SearchAPI. 4 execuções/dia cobrem as 30 cidades
-// com o mesmo custo diário de API (cada cidade continua 1x/dia).
+// com a latência real da SearchAPI.
 const CIDADES_POR_LOTE = 8;
-const LOTES_POR_DIA = 4;
+// Execuções por dia — DEVE bater com o cron em vercel.json (ver cron-lotes.js)
+const EXECUCOES_POR_DIA = lerExecucoesPorDia(process.env.ESCAPADAS_EXECUCOES_POR_DIA);
 
 // ============================================================
-// CIDADES E LOTE (mesma mecânica do update-discovery)
+// CIDADES (mesma mecânica do update-discovery)
 // ============================================================
 function carregarCidades() {
     const filePath = join(process.cwd(), 'api', 'data', 'brazilian-airports.json');
     const raw = readFileSync(filePath, 'utf-8');
     const data = JSON.parse(raw);
     return (data.cidades || []).sort((a, b) => (a.prioridade || 99) - (b.prioridade || 99));
-}
-
-function calcularLote(totalCidades, forcarLote, horaUTC = new Date().getUTCHours()) {
-    if (forcarLote !== undefined && forcarLote !== null) {
-        const lote = parseInt(forcarLote);
-        if (!isNaN(lote) && lote >= 0) return lote;
-    }
-    const execucao = Math.floor(horaUTC / (24 / LOTES_POR_DIA)); // 1h -> 0, 7h -> 1, 13h -> 2, 19h -> 3
-    const totalLotes = Math.ceil(totalCidades / CIDADES_POR_LOTE);
-    return execucao % totalLotes;
 }
 
 // ============================================================
@@ -133,16 +128,16 @@ export default async function handler(req, res) {
         return res.status(500).json({ error: 'Falha ao carregar lista de cidades' });
     }
 
-    const loteIndex = calcularLote(todasCidades.length, req.query?.lote);
+    const totalLotes = Math.ceil(todasCidades.length / CIDADES_POR_LOTE);
+    const loteIndex = calcularLote(totalLotes, EXECUCOES_POR_DIA, req.query?.lote);
     const inicio = loteIndex * CIDADES_POR_LOTE;
     const cidadesDoLote = todasCidades.slice(inicio, inicio + CIDADES_POR_LOTE);
-    const totalLotes = Math.ceil(todasCidades.length / CIDADES_POR_LOTE);
 
     const hoje = hojeISO();
     const janelas = janelasAtivas(hoje);
 
     console.log(`\n${'='.repeat(60)}`);
-    console.log(`🏖️ ESCAPADAS CRON v1.0 - Início: ${new Date().toISOString()}`);
+    console.log(`🏖️ ESCAPADAS CRON v1.1 - Início: ${new Date().toISOString()}`);
     console.log(`📦 Lote ${loteIndex + 1}/${totalLotes} (${cidadesDoLote.map((c) => c.codigo).join(', ')})`);
     console.log(`📅 Janelas: ${janelas.map((j) => j.id).join(', ')}`);
     console.log(`${'='.repeat(60)}`);

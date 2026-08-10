@@ -103,11 +103,11 @@
   "crons": [
     {
       "path": "/api/cron/update-discovery",
-      "schedule": "0 6,18 * * *"
+      "schedule": "0 6 * * *"
     },
     {
       "path": "/api/cron/update-escapadas",
-      "schedule": "0 1,7,13,19 * * *"
+      "schedule": "0 7 * * *"
     },
     {
       "path": "/api/cron/instagram-post",
