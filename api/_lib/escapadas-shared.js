@@ -21,8 +21,13 @@ import {
 import { calcularVariacoesHistorico } from './discovery-shared.js';
 
 // Quantas janelas de cada tipo ficam vivas
-export const FDS_ATIVOS = 3;
-export const FERIADOS_ATIVOS = 3;
+// 2 janelas de fds (este + próximo). Já foi 3, mas a janela "Em 2 semanas"
+// custava 1 busca SearchAPI extra por cidade/dia (~900/mês) e era a menos usada.
+export const FDS_ATIVOS = 2;
+// 2 feriados ativos (já foi 3). Na temporada set-nov chegam 3+ feriados na
+// janela de 150 dias ao mesmo tempo, e cada feriado ativo custa 1-2 buscas
+// SearchAPI por cidade/dia no cron — o terceiro estourava o orçamento mensal.
+export const FERIADOS_ATIVOS = 2;
 
 // Um fim de semana só vale a pena ser exibido/pesquisado se a sexta ainda
 // estiver a pelo menos 2 dias: na quinta a janela "este fds" rola pra frente
@@ -77,12 +82,14 @@ export function janelasAtivas(hoje = hojeISO()) {
     }
 
     // --- Próximos feriados nacionais ---
+    let primeiroFeriado = true;
     for (const feriado of proximosFeriados(hoje, FERIADOS_ATIVOS, MIN_DIAS_FERIADO)) {
         if (diffDias(hoje, feriado.data) > MAX_DIAS_FERIADO) continue;
         const j = janelaDoFeriado(feriado);
         janelas.push({
             id: `feriado-${feriado.slug}-${feriado.ano}`,
             categoria: 'feriado',
+            internacional: primeiroFeriado,
             rotulo: feriado.nome,
             rotuloDatas: `${fmtCurta(j.ida)}–${fmtCurta(j.volta)}`,
             ida: j.ida,
@@ -98,6 +105,7 @@ export function janelasAtivas(hoje = hojeISO()) {
                 emenda: descricaoEmenda(feriado),
             },
         });
+        primeiroFeriado = false;
     }
 
     // Feriado na sexta gera janela idêntica à do fds (ex.: 1/jan numa sexta):
@@ -213,7 +221,10 @@ export async function buscarDestinosJanela(origemCode, janela) {
     };
 
     const buscas = [buscarUma({ ...baseParams, arrival_id: BRASIL_KGMID }, `${origemCode}/${janela.id}/BR`)];
-    if (janela.categoria === 'feriado') {
+    // América do Sul só para o feriado mais próximo (viagem internacional pede
+    // mais antecedência de planejamento, não de monitoramento diário) — cada
+    // busca extra aqui custa 1 request SearchAPI por cidade/dia no cron.
+    if (janela.categoria === 'feriado' && janela.internacional !== false) {
         buscas.push(buscarUma({ ...baseParams, arrival_id: AMERICA_SUL_KGMID }, `${origemCode}/${janela.id}/AMSUL`));
     }
     const resultados = await Promise.all(buscas);

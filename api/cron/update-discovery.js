@@ -29,7 +29,9 @@ export const maxDuration = 300; // 5 minutos
 // CONFIGURAÇÃO
 // ============================================================
 const CIDADES_POR_LOTE = 15;     // Quantas cidades processar por execução
-const LOTES_POR_DIA = 2;         // Cron roda 2x/dia (30 cidades / 15 por lote)
+const LOTES_POR_DIA = 1;         // Cron roda 1x/dia; os lotes alternam por dia
+                                 // (cada cidade atualiza a cada 2 dias — corta o
+                                 // consumo de SearchAPI pela metade, ~1.400/mês)
 
 // Carregar cidades do JSON
 function carregarCidades() {
@@ -56,17 +58,18 @@ function carregarCidades() {
     }
 }
 
-// Determinar qual lote processar baseado na execução do dia.
-// O cron roda LOTES_POR_DIA vezes ao dia (6h e 18h UTC): o dia é dividido em
-// janelas iguais e cada janela corresponde a um lote. Com floor(hora/3) as
-// duas execuções caíam sempre no lote 0 e as cidades 16-30 nunca atualizavam.
-export function calcularLote(totalCidades, forcarLote, horaUTC = new Date().getUTCHours()) {
+// Determinar qual lote processar. As execuções do dia (janelas de hora) e os
+// próprios dias entram na mesma sequência, então a rotação cobre todos os
+// lotes mesmo com menos execuções diárias que lotes: com 1 execução/dia e 2
+// lotes, o lote alterna por dia e cada cidade atualiza a cada 2 dias.
+export function calcularLote(totalCidades, forcarLote, horaUTC = new Date().getUTCHours(), diaEpoch = Math.floor(Date.now() / 86400000)) {
     if (forcarLote !== undefined && forcarLote !== null) {
         const lote = parseInt(forcarLote);
         if (!isNaN(lote) && lote >= 0) return lote;
     }
 
-    const execucao = Math.floor(horaUTC / (24 / LOTES_POR_DIA)); // 6h -> 0, 18h -> 1
+    const execucaoDoDia = Math.floor(horaUTC / (24 / LOTES_POR_DIA));
+    const execucao = diaEpoch * LOTES_POR_DIA + execucaoDoDia;
     const totalLotes = Math.ceil(totalCidades / CIDADES_POR_LOTE);
     return execucao % totalLotes;
 }
