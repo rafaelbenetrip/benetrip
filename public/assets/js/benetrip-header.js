@@ -40,6 +40,7 @@
       'voos': { label: 'Busca de Voos', icon: '&#x2708;&#xFE0F;' },
       'voos-baratos': { label: 'Voos Baratos', icon: '&#x1F4B8;' },
       'comparar-voos': { label: 'Comparar Voos', icon: '&#x1F500;' },
+      'vai-e-vem': { label: 'Vai e Vem', icon: '&#x1F501;' },
       'roteiro-viagem': { label: 'Planejar Roteiro', icon: '&#x1F4CB;' },
       'minha-conta': { label: 'Minha Conta', icon: '&#x1F464;' },
       'quemsomos': { label: 'Quem Somos', icon: '&#x1F3E2;' },
@@ -80,6 +81,10 @@
         <a href="${BASE}voos-baratos.html" class="bh-nav-item">
           <span class="bh-nav-icon">&#x1F4B8;</span> Voos Baratos
           <span class="bh-nav-badge hot">Hot</span>
+        </a>
+        <a href="${BASE}vai-e-vem.html" class="bh-nav-item">
+          <span class="bh-nav-icon">&#x1F501;</span> Vai e Vem
+          <span class="bh-nav-badge new">Novo</span>
         </a>
         <a href="${BASE}voos.html" class="bh-nav-item">
           <span class="bh-nav-icon">&#x2708;&#xFE0F;</span> Busca de Voos

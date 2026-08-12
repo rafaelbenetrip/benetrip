@@ -113,7 +113,7 @@
         }
       }
     ];
-  } else if (path === '/voos' || path === '/voos-baratos' || path === '/comparar-voos' || path === '/multidatas') {
+  } else if (path === '/voos' || path === '/voos-baratos' || path === '/comparar-voos' || path === '/multidatas' || path === '/vai-e-vem') {
     jsonLd = {
       '@context': 'https://schema.org',
       '@type': 'WebApplication',
