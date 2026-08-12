@@ -271,6 +271,37 @@
             .feriado-radar-cta { margin-left: 40px; }
         }
 
+        /* ═══ Radar Vai e Vem (datas de matar a saudade -> /vai-e-vem) ═══ */
+        .vaievem-radar {
+            display: none;
+            background: linear-gradient(135deg, #BE185D 0%, #EC4899 100%);
+            padding: 12px 20px;
+        }
+        .vaievem-radar.visible { display: block; }
+        .vaievem-radar-inner {
+            max-width: 800px; margin: 0 auto;
+            display: flex; align-items: center; gap: 12px;
+            color: white;
+        }
+        .vaievem-radar-emoji { font-size: 1.4rem; flex-shrink: 0; animation: gentle-bounce 3s ease-in-out infinite; }
+        .vaievem-radar-text { flex: 1; font-size: 0.88rem; line-height: 1.45; }
+        .vaievem-radar-text strong { font-family: 'Poppins', sans-serif; }
+        .vaievem-radar-text .radar-saudade { opacity: 0.9; }
+        .vaievem-radar-cta {
+            flex-shrink: 0; display: inline-flex; align-items: center; gap: 6px;
+            padding: 9px 18px; background: rgba(255,255,255,0.18);
+            border: 1.5px solid rgba(255,255,255,0.45); border-radius: 50px;
+            color: white; text-decoration: none;
+            font-family: 'Poppins', sans-serif; font-size: 0.82rem; font-weight: 600;
+            white-space: nowrap; transition: var(--transition); backdrop-filter: blur(8px);
+        }
+        .vaievem-radar-cta:hover { background: rgba(255,255,255,0.32); transform: translateY(-2px); }
+        @media (max-width: 640px) {
+            .vaievem-radar-inner { flex-wrap: wrap; }
+            .vaievem-radar-text { flex-basis: calc(100% - 40px); }
+            .vaievem-radar-cta { margin-left: 40px; }
+        }
+
         /* ═══ Stats Bar ═══ */
         .stats-bar { background: var(--white); border-top: 1px solid var(--gray-200); border-bottom: 1px solid var(--gray-200); padding: 14px 20px; }
         .stats-inner { max-width: 800px; margin: 0 auto; display: flex; justify-content: space-around; gap: 10px; }
@@ -600,6 +631,18 @@
         </div>
     </div>
 
+    <!-- RADAR VAI E VEM (preenchido via JS: contagem regressiva pra datas de matar a saudade) -->
+    <div class="vaievem-radar" id="vaievem-radar">
+        <div class="vaievem-radar-inner">
+            <span class="vaievem-radar-emoji" id="vaievem-radar-emoji">🔁</span>
+            <p class="vaievem-radar-text" id="vaievem-radar-text"></p>
+            <a href="/vai-e-vem" class="vaievem-radar-cta" onclick="cardClick(this)">
+                Planejar com o Vai e Vem
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" width="15" height="15"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            </a>
+        </div>
+    </div>
+
     <!-- STATS BAR -->
     <div class="stats-bar">
         <div class="stats-inner">
@@ -828,6 +871,39 @@
             document.getElementById('feriado-radar-cta').href =
                 `/escapadas?janela=feriado-${proximo.slug}-${proximo.ano}`;
             document.getElementById('feriado-radar').classList.add('visible');
+        })();
+
+        // ═══ RADAR VAI E VEM ═══
+        // Contagem regressiva pra datas de "matar a saudade" (Dia das Mães,
+        // Dia dos Namorados, Dia dos Pais). Aparece só nos 40 dias que
+        // antecedem a data, apontando pro /vai-e-vem.
+        (function () {
+            function segundoDomingo(ano, mes) {
+                const primeiro = new Date(Date.UTC(ano, mes, 1, 12));
+                const ateDomingo = (7 - primeiro.getUTCDay()) % 7;
+                return new Date(Date.UTC(ano, mes, 1 + ateDomingo + 7, 12));
+            }
+            function ocasioes(ano) {
+                return [
+                    { nome: 'o Dia das Mães', emoji: '💐', data: segundoDomingo(ano, 4), saudade: 'bora matar a saudade da mãe?' },
+                    { nome: 'o Dia dos Namorados', emoji: '❤️', data: new Date(Date.UTC(ano, 5, 12, 12)), saudade: 'amor à distância merece passagem no precinho!' },
+                    { nome: 'o Dia dos Pais', emoji: '👔', data: segundoDomingo(ano, 7), saudade: 'bora matar a saudade do pai?' },
+                ];
+            }
+            const JANELA_DIAS = 40;
+            const agora = new Date();
+            const hoje = new Date(Date.UTC(agora.getFullYear(), agora.getMonth(), agora.getDate(), 12));
+            const proxima = ocasioes(hoje.getUTCFullYear()).concat(ocasioes(hoje.getUTCFullYear() + 1))
+                .find(o => o.data >= hoje && (o.data - hoje) / 86400000 <= JANELA_DIAS);
+            if (!proxima) return;
+
+            const dias = Math.round((proxima.data - hoje) / 86400000);
+            const contagem = dias === 0 ? '🎉 Hoje é' : dias === 1 ? '🎉 Amanhã é' : `Faltam <strong>${dias} dias</strong> para`;
+
+            document.getElementById('vaievem-radar-emoji').textContent = proxima.emoji;
+            document.getElementById('vaievem-radar-text').innerHTML =
+                `${contagem} ${proxima.nome} · <span class="radar-saudade">${proxima.saudade} Veja quando sua rota de sempre fica mais barata.</span>`;
+            document.getElementById('vaievem-radar').classList.add('visible');
         })();
     </script>
 </body>
