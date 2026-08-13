@@ -27,6 +27,10 @@ const BenetripVoos = {
         searchId: null,
         currencyRates: {},
         proposals: [],
+        // Acumulador de propostas entre pollings (ver benetrip-proposals.js):
+        // cada polling é um LOTE PARCIAL, não um retrato completo da busca
+        proposalStore: new Map(),
+        lastUpdateAt: null,
         searchComplete: false,
         pollTimer: null,
         pollCount: 0,
@@ -249,7 +253,7 @@ const BenetripVoos = {
     // ================================================================
     // SEARCH FLOW
     // ================================================================
-    resetSearchState(){this.state.searchId=null;this.state.proposals=[];this.state.searchComplete=false;this.state.resultsShown=false;this.state.displayedCount=0;this.state.pollCount=0;this.state.allAirlines={};this.state.allAirports={};this.state.currencyRates={};this.state.previousBestPrice=Infinity;if(this.state.pollTimer)clearTimeout(this.state.pollTimer);if(this.state.tipInterval)clearInterval(this.state.tipInterval);if(this.state.renderDebounceTimer)clearTimeout(this.state.renderDebounceTimer)},
+    resetSearchState(){this.state.searchId=null;this.state.proposals=[];this.state.proposalStore=new Map();this.state.lastUpdateAt=null;this.state.searchComplete=false;this.state.resultsShown=false;this.state.displayedCount=0;this.state.pollCount=0;this.state.allAirlines={};this.state.allAirports={};this.state.currencyRates={};this.state.previousBestPrice=Infinity;if(this.state.pollTimer)clearTimeout(this.state.pollTimer);if(this.state.tipInterval)clearInterval(this.state.tipInterval);if(this.state.renderDebounceTimer)clearTimeout(this.state.renderDebounceTimer)},
 
     async startSearch(){
         this.setProgress(10,'Iniciando busca...');this.startTips();
@@ -284,27 +288,37 @@ const BenetripVoos = {
                 this.state.currencyRates = { ...this.state.currencyRates, ...data.currency_rates };
             }
 
-            const pct=Math.min(90,20+(this.state.pollCount/this.state.maxPolls)*70);
-            this.setProgress(pct,data.total>0?`${data.total} ofertas encontradas...`:'Consultando agências...');
-
             if(data.proposals?.length>0){
                 const prevCount = this.state.proposals.length;
-                this.state.proposals=data.proposals;
+                // CONSOLIDA em vez de substituir: cada polling traz o que as
+                // agências responderam desde a consulta anterior. Substituir a
+                // lista fazia a melhor tarifa sumir quando ela não vinha no
+                // lote seguinte.
+                const stats = BenetripProposals.mergeBatch(this.state.proposalStore, data.proposals, Date.now());
+                this.state.proposals = BenetripProposals.toList(this.state.proposalStore);
+                this.state.lastUpdateAt = Date.now();
+                console.log(`🧩 [Poll ${this.state.pollCount}] lote: +${stats.added} novas, ${stats.updated} atualizadas, ${stats.skipped} sem link | acumulado: ${this.state.proposals.length}`);
+
                 this.updateFilterBounds();
                 this.updateAirportsMap();
 
-                if(data.total >= 5 && !this.state.resultsShown){
+                const total = this.state.proposals.length;
+                if(total >= 5 && !this.state.resultsShown){
                     this.state.resultsShown=true;
                     this.showResults();
                     this.showSearchingBanner(true);
-                    console.log(`📋 [Poll ${this.state.pollCount}] First render with ${data.total} results`);
-                } else if(this.state.resultsShown && data.proposals.length !== prevCount) {
+                    console.log(`📋 [Poll ${this.state.pollCount}] First render with ${total} results`);
+                } else if(this.state.resultsShown && total !== prevCount) {
                     // Debounced re-render to avoid jank on mobile
                     this.debouncedRender();
-                    this.checkForBetterPrice(data.proposals);
-                    console.log(`📋 [Poll ${this.state.pollCount}] Queued re-render: ${prevCount} → ${data.total} results`);
+                    this.checkForBetterPrice(this.state.proposals);
+                    console.log(`📋 [Poll ${this.state.pollCount}] Queued re-render: ${prevCount} → ${total} results`);
                 }
             }
+
+            const pct=Math.min(90,20+(this.state.pollCount/this.state.maxPolls)*70);
+            const acumulado=this.state.proposals.length;
+            this.setProgress(pct,acumulado>0?`${acumulado} ofertas encontradas...`:'Consultando agências...');
             if(data.completed){this.state.searchComplete=true;this.finishSearch();return;}
             this.state.pollTimer=setTimeout(()=>this.poll(),this.state.pollCount<5?2000:1500);
         }catch(e){console.warn('Poll:',e.message);this.state.pollTimer=setTimeout(()=>this.poll(),2000);}
@@ -339,6 +353,21 @@ const BenetripVoos = {
         }
     },
 
+    fmtClock(ts) {
+        if (!ts) return '';
+        return new Date(ts).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    },
+
+    // Horário da última atualização: deixa claro que a lista só cresce
+    // enquanto a busca roda, e quando ela parou de receber lotes.
+    updateLastUpdateLabel() {
+        const el = document.getElementById('last-update-label');
+        if (!el) return;
+        const hora = this.fmtClock(this.state.lastUpdateAt);
+        el.textContent = hora ? `Atualizado às ${hora}` : '';
+        el.style.display = hora ? 'inline' : 'none';
+    },
+
     showSearchingBanner(show) {
         let banner = document.getElementById('searching-banner');
         if (show) {
@@ -346,7 +375,7 @@ const BenetripVoos = {
                 banner = document.createElement('div');
                 banner.id = 'searching-banner';
                 banner.className = 'searching-banner';
-                banner.innerHTML = `<div class="searching-banner-inner"><div class="searching-banner-pulse"></div><span>🔍 Ainda buscando ofertas melhores...</span></div>`;
+                banner.innerHTML = `<div class="searching-banner-inner"><div class="searching-banner-pulse"></div><span>🔍 Ainda buscando ofertas melhores — a lista só cresce, nada some.</span></div>`;
                 const resultsInfo = document.querySelector('.results-info');
                 if (resultsInfo) resultsInfo.parentNode.insertBefore(banner, resultsInfo);
             }
@@ -733,6 +762,7 @@ const BenetripVoos = {
             document.getElementById('sv-best').textContent=this.fmtPrice(this.pricePerPerson(be.price));
         }
         document.getElementById('r-count').textContent=`${sorted.length} resultado${sorted.length!==1?'s':''}`;
+        this.updateLastUpdateLabel();
         const cur=this.CURRENCY[this.state.params.currency]||this.CURRENCY.BRL;
         document.getElementById('r-currency').textContent=`Preços por pessoa em ${cur.name} (${this.state.params.currency})`;
         const container=document.getElementById('results-list');

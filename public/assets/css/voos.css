@@ -408,3 +408,11 @@ body{font-family:'Montserrat',-apple-system,sans-serif;background:var(--g50);col
 .main-content {
     padding: 0 0 80px; /* Substitui o '32px 0 80px' anterior */
 }
+
+/* Horário da última atualização da lista consolidada de ofertas */
+.results-last-update {
+    font-size: 11px;
+    color: #8a8a8a;
+    margin-left: auto;
+    white-space: nowrap;
+}
