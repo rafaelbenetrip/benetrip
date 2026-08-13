@@ -209,6 +209,16 @@ async function enrichFlightDetails(origemCode, destinoCode, departDate, returnDa
             typical_price_range: data.price_insights.typical_price_range || null,
         } : null;
 
+        // Aeroportos EFETIVOS da tarifa: numa busca por cidade agregada (SAO)
+        // o menor preço pode sair de VCP — o CTA precisa abrir esse aeroporto,
+        // não o primeiro da lista da cidade.
+        const origemReal = outboundLegs[0]?.from || null;
+        let destinoReal = null;
+        for (const leg of outboundLegs) {
+            if (leg.to && leg.to !== origemReal) destinoReal = leg.to;
+            if (leg.to && leg.to === origemReal) break; // retorno começou
+        }
+
         return {
             total_duration: totalDuration,
             stops,
@@ -217,6 +227,8 @@ async function enrichFlightDetails(origemCode, destinoCode, departDate, returnDa
             legs: outboundLegs,
             price: price,
             price_insights: priceInsights,
+            origin_airport: origemReal,
+            destination_airport: destinoReal,
         };
 
     } catch (err) {

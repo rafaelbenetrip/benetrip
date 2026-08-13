@@ -707,8 +707,10 @@ const BenetripTodosDestinos = {
 
     getOrigemIataParaGoogleFlights() {
         const origem = this.state.formData.origem;
+        // v3.6: origem agregada → lista completa (o link do Google Flights
+        // aceita múltiplos aeroportos por trecho, sem fixar o primeiro)
         if (origem.isCityCode && origem.aeroportosIncluidos && origem.aeroportosIncluidos.length > 0) {
-            return origem.aeroportosIncluidos[0];
+            return origem.aeroportosIncluidos;
         }
         return origem.code;
     },
@@ -835,6 +837,12 @@ const BenetripTodosDestinos = {
     _buildTfuParam(a, c, i) { return this._toBase64Url(this._protoMessageField(2, [...this._protoVarintField(1, a), ...this._protoVarintField(2, c), ...this._protoVarintField(3, i)])); },
 
     buildGoogleFlightsUrl(o, d, dep, ret, cur) {
+        // v3.6: módulo compartilhado com suporte a múltiplos aeroportos
+        if (typeof BenetripFlightLinks !== 'undefined') {
+            const url = BenetripFlightLinks.buildUrl({ origins: o, destinations: d, departDate: dep, returnDate: ret, currency: cur });
+            if (url) return url;
+        }
+        if (Array.isArray(o)) o = o[0];
         const p = new URLSearchParams();
         p.set('tfs', this._buildTfsParam(o, d, dep, ret));
         p.set('tfu', this._buildTfuParam(1, 0, 0));

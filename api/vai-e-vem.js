@@ -157,6 +157,21 @@ async function enrichFlightDetails(origemCode, destinoCode, departDate, returnDa
             typical_price_range: data.price_insights.typical_price_range || null,
         } : null;
 
+        // Aeroportos EFETIVOS da tarifa: quando a busca é por cidade agregada
+        // (SAO), a tarifa mais barata pode sair de VCP/CGH — o link externo
+        // precisa abrir esse aeroporto, não o primeiro da lista da cidade.
+        const primeiroTrecho = flights[0] || null;
+        // Em round_trip os trechos de ida vêm primeiro; o destino é o
+        // aeroporto de chegada do último trecho antes do retorno começar.
+        const origemReal = primeiroTrecho?.departure_airport?.id || null;
+        let destinoReal = null;
+        for (const leg of flights) {
+            const chegada = leg.arrival_airport?.id;
+            if (chegada && chegada !== origemReal) destinoReal = chegada;
+            // ao voltar para a origem, o trecho de retorno começou
+            if (chegada && chegada === origemReal) break;
+        }
+
         return {
             total_duration: bestFlight.total_duration || 0,
             stops: (bestFlight.layovers || []).length,
@@ -164,6 +179,8 @@ async function enrichFlightDetails(origemCode, destinoCode, departDate, returnDa
             airline_logos: Array.from(airlineLogos),
             price: bestFlight.price || 0,
             price_insights: priceInsights,
+            origin_airport: origemReal,
+            destination_airport: destinoReal,
         };
     } catch (err) {
         console.error(`[VaiEVem][Enrich][${label}] Erro:`, err.message);

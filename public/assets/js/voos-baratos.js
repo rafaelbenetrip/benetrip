@@ -351,10 +351,23 @@ const BenetripVoosBaratos = {
     // RESOLVER IATA PARA GOOGLE FLIGHTS
     // ================================================================
     getIataParaGoogleFlights(cidade) {
+        // Cidade agregada → lista completa de aeroportos (o link do Google
+        // Flights aceita múltiplos por trecho; não fixa mais o primeiro)
         if (cidade.isCityCode && cidade.aeroportosIncluidos && cidade.aeroportosIncluidos.length > 0) {
-            return cidade.aeroportosIncluidos[0]; // Usa o primeiro aero do grupo, ex: GRU
+            return cidade.aeroportosIncluidos;
         }
         return cidade.code;
+    },
+
+    // Aeroportos REAIS da tarifa, quando o item foi enriquecido pelo backend
+    // — ex.: numa busca "São Paulo, todos os aeroportos" o menor preço pode
+    // sair de VCP, e é VCP que o CTA deve abrir.
+    _realAirportsFromDetails(fd) {
+        if (!fd) return { origin: null, dest: null };
+        return {
+            origin: fd.origin_airport || null,
+            dest: fd.destination_airport || null,
+        };
     },
 
     // ================================================================
@@ -437,9 +450,9 @@ const BenetripVoosBaratos = {
                         <div class="winner-date-value">${this.formatDateBR(cheapest.return)}</div>
                     </div>
                 </div>
-                <a href="${this.buildGoogleFlightsUrl(originIataGF, destIataGF, cheapest.departure, cheapest.return, moedaSelecionada)}" 
+                <a href="${(() => { const ra = this._realAirportsFromDetails(cheapest.flight_details); return this.buildGoogleFlightsUrl(originIataGF, destIataGF, cheapest.departure, cheapest.return, moedaSelecionada, ra.origin, ra.dest); })()}"
                    target="_blank" rel="noopener" class="winner-cta">
-                    ✈️ Ver no Google Flights
+                    ✈️ Ver no Google Flights${(() => { const ra = this._realAirportsFromDetails(cheapest.flight_details); return ra.origin ? ` (saindo de ${ra.origin})` : ''; })()}
                 </a>
             </div>
 
@@ -520,11 +533,19 @@ const BenetripVoosBaratos = {
             `<img src="${logo}" alt="" style="width:24px;height:24px;border-radius:4px;background:#fff;" onerror="this.style.display='none'">`
         ).join('');
 
+        // Aeroportos reais da tarifa (transparência: pode diferir do
+        // primeiro aeroporto da cidade agregada, ex.: VCP em vez de GRU)
+        const real = this._realAirportsFromDetails(fd);
+        const airportChip = real.origin && real.dest
+            ? `<div class="winner-detail-chip">🛫 ${real.origin} → ${real.dest}</div>`
+            : '';
+
         return `
             <div class="winner-flight-details">
                 <div class="winner-detail-chip">${logosHtml} ${airlinesStr}</div>
                 <div class="winner-detail-chip">⏱️ ${durationStr}</div>
                 <div class="winner-detail-chip">${fd.stops === 0 ? '✅' : '🔄'} ${stopsStr}</div>
+                ${airportChip}
             </div>
         `;
     },
@@ -577,12 +598,16 @@ const BenetripVoosBaratos = {
         const originIataGF = this.getIataParaGoogleFlights(this.state.origemSelecionada);
         const destIataGF = this.getIataParaGoogleFlights(this.state.destinoSelecionado);
 
+        // Aeroporto real da tarifa quando o item foi enriquecido
+        const real = this._realAirportsFromDetails(item.flight_details);
         const url = this.buildGoogleFlightsUrl(
             originIataGF,
             destIataGF,
             item.departure,
             item.return,
-            this.state.moedaSelecionada
+            this.state.moedaSelecionada,
+            real.origin,
+            real.dest
         );
 
         const depDate = new Date(item.departure + 'T12:00:00');
@@ -744,12 +769,15 @@ const BenetripVoosBaratos = {
         const simbolo = this.getSimbolo(moedaSelecionada);
         const cheapest = data.stats.cheapest;
 
+        const realShare = this._realAirportsFromDetails(cheapest.flight_details);
         const googleUrl = this.buildGoogleFlightsUrl(
             originIataGF,
             destIataGF,
             cheapest.departure,
             cheapest.return,
-            moedaSelecionada
+            moedaSelecionada,
+            realShare.origin,
+            realShare.dest
         );
 
         let text = `✈️ *Voos baratos encontrados pela Benetrip!*\n\n`;
@@ -846,7 +874,19 @@ const BenetripVoosBaratos = {
         ];
     },
 
-    buildGoogleFlightsUrl(orig, dest, depDate, retDate, moeda) {
+    buildGoogleFlightsUrl(orig, dest, depDate, retDate, moeda, realOrig = null, realDest = null) {
+        // Módulo compartilhado: usa o aeroporto real da tarifa quando
+        // conhecido; senão, codifica todos os aeroportos do grupo
+        if (typeof BenetripFlightLinks !== 'undefined') {
+            const url = BenetripFlightLinks.buildUrl({
+                origins: realOrig || orig,
+                destinations: realDest || dest,
+                departDate: depDate, returnDate: retDate, currency: moeda,
+            });
+            if (url) return url;
+        }
+        if (Array.isArray(orig)) orig = orig[0];
+        if (Array.isArray(dest)) dest = dest[0];
         const tfsBytes = [
             ...this._protoVarintField(1, 28),
             ...this._protoVarintField(2, 2),

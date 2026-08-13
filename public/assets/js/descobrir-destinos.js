@@ -636,6 +636,17 @@ const BenetripDiscovery = {
         return map[moeda] || 'br';
     },
     buildGoogleFlightsUrl(originIata, destIata, departDate, returnDate, adults, children, infants, currency) {
+        // v5.0: módulo compartilhado — codifica TODOS os aeroportos de uma
+        // origem agregada (em vez de fixar o primeiro) e o aeroporto real
+        // da tarifa quando conhecido
+        if (typeof BenetripFlightLinks !== 'undefined') {
+            const url = BenetripFlightLinks.buildUrl({
+                origins: originIata, destinations: destIata,
+                departDate, returnDate, adults, children, infants, currency,
+            });
+            if (url) return url;
+        }
+        if (Array.isArray(originIata)) originIata = originIata[0];
         const tfs = this._buildTfsParam(originIata, destIata, departDate, returnDate);
         const tfu = this._buildTfuParam(adults, children, infants);
         const curr = this._getGoogleCurrency(currency);
@@ -660,13 +671,14 @@ const BenetripDiscovery = {
     },
     getOrigemIataParaGoogleFlights() {
         const origem = this.state.formData.origem;
-        
+
+        // v5.0: origem agregada → lista completa de aeroportos do grupo
+        // (o link do Google Flights aceita múltiplos aeroportos por trecho)
         if (origem.isCityCode && origem.aeroportosIncluidos && origem.aeroportosIncluidos.length > 0) {
-            const primeiroAeroporto = origem.aeroportosIncluidos[0];
-            this.log(`🏙️ Origem agrupada: ${origem.displayCode} → usando ${primeiroAeroporto} para Google Flights`);
-            return primeiroAeroporto;
+            this.log(`🏙️ Origem agrupada: ${origem.displayCode} → usando ${origem.aeroportosIncluidos.join(', ')} para Google Flights`);
+            return origem.aeroportosIncluidos;
         }
-        
+
         return origem.code;
     },
     // ================================================================
