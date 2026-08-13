@@ -1365,3 +1365,52 @@ body {
         grid-column: 1 / -1;
     }
 }
+
+/* ============================================================
+   v5.0 — Transparência do resultado (época + ponto de atenção)
+   ============================================================ */
+.destino-epoca,
+.destino-ponto-negativo {
+    font-size: 0.85rem;
+    line-height: 1.45;
+    padding: 8px 12px;
+    border-radius: 8px;
+    margin-top: 8px;
+    text-align: left;
+}
+.destino-epoca {
+    background: rgba(0, 163, 224, 0.08);
+    color: #01475c;
+}
+.destino-ponto-negativo {
+    background: rgba(232, 119, 34, 0.09);
+    color: #7a3c0d;
+}
+
+/* ============================================================
+   v5.0 — Seção "Opções um pouco acima do seu orçamento"
+   ============================================================ */
+.acima-orcamento-section {
+    margin-top: 32px;
+    padding-top: 24px;
+    border-top: 2px dashed #e0e0e0;
+}
+.acima-orcamento-aviso {
+    font-size: 0.9rem;
+    color: #666;
+    margin: 4px 0 16px;
+}
+.destino-card-acima {
+    border: 1px dashed #e87722;
+    opacity: 0.95;
+}
+.acima-diferenca {
+    display: inline-block;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: #b3541e;
+    background: rgba(232, 119, 34, 0.12);
+    border-radius: 6px;
+    padding: 4px 10px;
+    margin: 6px 0;
+}
