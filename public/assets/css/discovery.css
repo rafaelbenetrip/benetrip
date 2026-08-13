@@ -1160,3 +1160,20 @@ body {
     .destinations-grid { grid-template-columns: repeat(3, 1fr); }
     .discovery-hero h1 { font-size: 30px; }
 }
+
+/* Aeroporto do card: o voo pousa no aeroporto, não no atrativo */
+.dest-via-aeroporto {
+    font-size: 11px;
+    line-height: 1.4;
+    color: #6b6b6b;
+    margin-top: 4px;
+}
+
+/* Interpretação do filtro em linguagem natural */
+.feedback-criterios {
+    display: block;
+    margin-top: 3px;
+    font-size: 11px;
+    font-weight: 500;
+    opacity: 0.85;
+}

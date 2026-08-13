@@ -22,6 +22,7 @@ import {
     badgeAtualizacao,
     renderCardHtml,
     renderStatsBarHtml,
+    lugaresPorAeroporto,
     buildGoogleFlightsUrl,
 } from './_lib/discovery-shared.js';
 import { janelasAtivas, fetchSnapshotsEscapadas, hojeISO } from './_lib/escapadas-shared.js';
@@ -131,6 +132,7 @@ function sendErrorPage(res, status, title, message) {
 function renderPage({ cidadeAtual, cidades, janelas, janelaAtiva, hoje, isDefault, janelaExplicita }) {
     const destinos = janelaAtiva?.snapshot?.destinos || [];
     const temDestinos = destinos.length > 0;
+    const porAeroporto = lugaresPorAeroporto(destinos);
     const canonicalPath = isDefault ? '/escapadas' : `/escapadas/${cidadeAtual.slug}`;
     // Canonical fica sem ?janela= (as janelas rolam; a página da cidade é o
     // conteúdo permanente). O og:url mantém a janela pro preview do link.
@@ -333,7 +335,7 @@ function renderPage({ cidadeAtual, cidades, janelas, janelaAtiva, hoje, isDefaul
                 <span class="section-count" id="section-count">${destinos.length} destino${destinos.length !== 1 ? 's' : ''}</span>
             </div>
         </div>
-        <div class="destinations-grid" id="destinations-grid">${destinos.map((d) => renderCardHtml(d, { escapada: true, href: hrefDoDestino(d, cidadeAtual) })).join('')}</div>
+        <div class="destinations-grid" id="destinations-grid">${destinos.map((d) => renderCardHtml(d, { escapada: true, href: hrefDoDestino(d, cidadeAtual), compartilhamAeroporto: porAeroporto.get((d.aeroporto || '').toUpperCase()) || 0 })).join('')}</div>
     </main>
 
     <!-- ========================================

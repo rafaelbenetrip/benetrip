@@ -337,7 +337,7 @@ export function renderDatasCardHtml(d) {
 // de popup) em vez de <article> clicável via JS.
 // Proteção contra .map(renderCardHtml), que passa o índice como 2º argumento.
 export function renderCardHtml(d, opts) {
-    const { escapada = false, href = null } = (opts && typeof opts === 'object') ? opts : {};
+    const { escapada = false, href = null, compartilhamAeroporto = 0 } = (opts && typeof opts === 'object') ? opts : {};
     const imgSrc = d.imagem ? escapeHtml(d.imagem) : 'assets/images/tripinha/avatar-pensando.png';
     const nome = escapeHtml(d.nome);
     const pais = escapeHtml(d.pais);
@@ -356,6 +356,14 @@ export function renderCardHtml(d, opts) {
     const duracaoIdeal = d.duracao_ideal?.ideal ?? '';
     const quedaDestaque = d.variacao?.direcao === 'desceu' && Math.abs(d.variacao.percentual) >= QUEDA_DESTAQUE_PCT
         ? `<span class="dest-badge-drop">&darr; ${Math.abs(d.variacao.percentual)}%</span>`
+        : '';
+
+    // O voo pousa no aeroporto, não no atrativo: quando outros lugares da
+    // lista usam o mesmo aeroporto, isso fica explícito no card.
+    const viaAeroporto = aeroporto
+        ? `<div class="dest-via-aeroporto">via ${aeroporto}${compartilhamAeroporto > 1
+            ? ` &middot; mesmo aeroporto de outros ${compartilhamAeroporto - 1} lugar${compartilhamAeroporto - 1 > 1 ? 'es' : ''} desta lista; pode haver deslocamento terrestre`
+            : ''}</div>`
         : '';
 
     const tagAbre = href
@@ -383,6 +391,7 @@ export function renderCardHtml(d, opts) {
                     </div>
                     <div class="dest-tags">${estilosTags}</div>
                     ${datasHtml}
+                    ${viaAeroporto}
                     <div class="dest-footer">
                         <div class="dest-price-block">
                             <span class="dest-price-label">${labelPreco}</span>
@@ -396,6 +405,27 @@ export function renderCardHtml(d, opts) {
         ${tagFecha}`;
 }
 
+// Lugares e aeroportos são contagens diferentes: vários destinos turísticos
+// podem ser servidos pelo mesmo aeroporto (e pela mesma tarifa).
+export function contarLugaresEAeroportos(destinos) {
+    const lista = destinos || [];
+    const aeroportos = new Set(
+        lista.map((d) => (d.aeroporto || '').toUpperCase()).filter(Boolean)
+    );
+    return { lugares: lista.length, aeroportos: aeroportos.size };
+}
+
+// Quantos lugares da lista usam cada aeroporto
+export function lugaresPorAeroporto(destinos) {
+    const mapa = new Map();
+    for (const d of destinos || []) {
+        const code = (d.aeroporto || '').toUpperCase();
+        if (!code) continue;
+        mapa.set(code, (mapa.get(code) || 0) + 1);
+    }
+    return mapa;
+}
+
 export function renderStatsBarHtml(destinos) {
     if (!destinos || destinos.length === 0) return '';
     const maisBarato = destinos[0];
@@ -404,6 +434,7 @@ export function renderStatsBarHtml(destinos) {
     const nacionais = destinos.filter((d) => !d.internacional).length;
     const internacionais = destinos.filter((d) => d.internacional).length;
     const maiorQueda = maioresQuedas(destinos, 1)[0];
+    const contagem = contarLugaresEAeroportos(destinos);
 
     const maiorQuedaHtml = maiorQueda ? `
         <div class="stat-card stat-card-drop">
@@ -422,7 +453,7 @@ export function renderStatsBarHtml(destinos) {
         <div class="stat-card">
             <div class="stat-label">Preço médio</div>
             <div class="stat-value">R$ ${fmt(media)}</div>
-            <div class="stat-detail">${destinos.length} destinos</div>
+            <div class="stat-detail">${contagem.lugares} lugares &middot; ${contagem.aeroportos} aeroporto${contagem.aeroportos !== 1 ? 's' : ''}</div>
         </div>
         <div class="stat-card">
             <div class="stat-label">Nacionais</div>

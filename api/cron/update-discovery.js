@@ -416,7 +416,9 @@ async function processarOrigem(origem) {
             const snapshotsAnteriores = (await fetchSnapshots(origem.codigo, 'destinos-baratos', 8))
                 .filter(s => s.data !== hoje);
             const destinosComVariacao = calcularVariacoesHistorico(topDestinos, snapshotsAnteriores);
-            const conteudo = await gerarConteudoTripinha(origem.nome, destinosComVariacao, { incluirEscolha: true });
+            // dataSnapshot entra na avaliação de evidência: linguagem de
+            // oportunidade exige dado recente, não só queda de preço
+            const conteudo = await gerarConteudoTripinha(origem.nome, destinosComVariacao, { incluirEscolha: true, dataSnapshot: hoje });
             insight = conteudo.insight || null;
             tripinhaPick = conteudo.escolha || null;
             console.log(`🐶 [${origem.codigo}] Insight: "${insight}" | Escolha: ${tripinhaPick?.nome || '-'} (${conteudo.modelo})`);

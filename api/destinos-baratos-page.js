@@ -26,6 +26,8 @@ import {
     badgeAtualizacao,
     renderCardHtml,
     renderStatsBarHtml,
+    contarLugaresEAeroportos,
+    lugaresPorAeroporto,
     renderQuedasHtml,
     renderTripinhaPickHtml,
 } from './_lib/discovery-shared.js';
@@ -120,6 +122,10 @@ function sendErrorPage(res, status, title, message) {
 // ============================================================
 function renderPage({ cidadeAtual, cidades, snapshot, isDefault }) {
     const destinos = snapshot?.destinos || [];
+    // Lugares e aeroportos são contagens distintas (vários destinos podem
+    // compartilhar o mesmo aeroporto e a mesma tarifa)
+    const contagem = contarLugaresEAeroportos(destinos);
+    const porAeroporto = lugaresPorAeroporto(destinos);
     const temDestinos = destinos.length > 0;
     const canonicalPath = isDefault ? '/destinos-baratos' : `/destinos-baratos/${cidadeAtual.slug}`;
     const canonicalUrl = `${SITE_URL}${canonicalPath}`;
@@ -340,10 +346,10 @@ function renderPage({ cidadeAtual, cidades, snapshot, isDefault }) {
                     <option value="queda">Maior queda de preço</option>
                     <option value="nome">Nome A-Z</option>
                 </select>
-                <span class="section-count" id="section-count">${destinos.length} destino${destinos.length !== 1 ? 's' : ''}</span>
+                <span class="section-count" id="section-count">${contagem.lugares} lugar${contagem.lugares !== 1 ? 'es' : ''} &middot; ${contagem.aeroportos} aeroporto${contagem.aeroportos !== 1 ? 's' : ''}</span>
             </div>
         </div>
-        <div class="destinations-grid" id="destinations-grid">${destinos.map(renderCardHtml).join('')}</div>
+        <div class="destinations-grid" id="destinations-grid">${destinos.map((d) => renderCardHtml(d, { compartilhamAeroporto: porAeroporto.get((d.aeroporto || '').toUpperCase()) || 0 })).join('')}</div>
     </main>
 
     ${renderOutrasCidadesHtml(cidades, cidadeAtual)}
