@@ -6,6 +6,22 @@
     <meta name="theme-color" content="#00A3E0">
     <title>Crie seu Roteiro de Viagem - Benetrip</title>
     <meta name="description" content="Crie roteiros de viagem personalizados com inteligência artificial. Planeje dia a dia suas atividades, restaurantes e pontos turísticos.">
+    <!-- Canonical e social (estáticos: não dependem de JS nem de prerender) -->
+    <link rel="canonical" href="https://benetrip.com.br/roteiro-viagem">
+    <meta name="robots" content="index, follow">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Benetrip">
+    <meta property="og:title" content="Crie seu Roteiro de Viagem - Benetrip">
+    <meta property="og:description" content="Crie roteiros de viagem personalizados com inteligência artificial. Planeje dia a dia suas atividades, restaurantes e pontos turísticos.">
+    <meta property="og:url" content="https://benetrip.com.br/roteiro-viagem">
+    <meta property="og:image" content="https://benetrip.com.br/assets/images/favicon/web-app-manifest-512x512.png">
+    <meta property="og:locale" content="pt_BR">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Crie seu Roteiro de Viagem - Benetrip">
+    <meta name="twitter:description" content="Crie roteiros de viagem personalizados com inteligência artificial. Planeje dia a dia suas atividades, restaurantes e pontos turísticos.">
+    <meta name="twitter:image" content="https://benetrip.com.br/assets/images/favicon/web-app-manifest-512x512.png">
+    <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Benetrip", "item": "https://benetrip.com.br/"}, {"@type": "ListItem", "position": 2, "name": "Roteiro de Viagem", "item": "https://benetrip.com.br/roteiro-viagem"}]}</script>
+
 
     <!-- SEO Meta Tags (OG, Twitter, JSON-LD) -->
     <script src="assets/js/seo-meta.js" defer></script>
@@ -157,7 +173,7 @@
                         <p class="hint">Inclua todos, inclusive você!</p>
                         <div class="number-input">
                             <button type="button" class="btn-number" data-action="decrement" data-target-num="num-pessoas-roteiro">−</button>
-                            <input type="number" id="num-pessoas-roteiro" value="2" min="2" max="20" readonly>
+                            <input type="number" id="num-pessoas-roteiro" value="2" min="2" max="20" readonly aria-label="Número de pessoas no roteiro">
                             <button type="button" class="btn-number" data-action="increment" data-target-num="num-pessoas-roteiro">+</button>
                         </div>
                     </div>
@@ -174,7 +190,7 @@
                                 </div>
                                 <div class="number-input-compact">
                                     <button type="button" class="btn-number-sm" data-target="rot-adultos" data-action="decrement">−</button>
-                                    <input type="number" id="rot-adultos" value="2" min="1" max="9" readonly>
+                                    <input type="number" id="rot-adultos" value="2" min="1" max="9" readonly aria-label="Número de adultos">
                                     <button type="button" class="btn-number-sm" data-target="rot-adultos" data-action="increment">+</button>
                                 </div>
                             </div>
@@ -185,7 +201,7 @@
                                 </div>
                                 <div class="number-input-compact">
                                     <button type="button" class="btn-number-sm" data-target="rot-criancas" data-action="decrement">−</button>
-                                    <input type="number" id="rot-criancas" value="0" min="0" max="6" readonly>
+                                    <input type="number" id="rot-criancas" value="0" min="0" max="6" readonly aria-label="Número de crianças de 2 a 11 anos">
                                     <button type="button" class="btn-number-sm" data-target="rot-criancas" data-action="increment">+</button>
                                 </div>
                             </div>
@@ -196,7 +212,7 @@
                                 </div>
                                 <div class="number-input-compact">
                                     <button type="button" class="btn-number-sm" data-target="rot-bebes" data-action="decrement">−</button>
-                                    <input type="number" id="rot-bebes" value="0" min="0" max="4" readonly>
+                                    <input type="number" id="rot-bebes" value="0" min="0" max="4" readonly aria-label="Número de bebês de colo, até 2 anos">
                                     <button type="button" class="btn-number-sm" data-target="rot-bebes" data-action="increment">+</button>
                                 </div>
                             </div>

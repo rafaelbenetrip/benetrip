@@ -229,9 +229,12 @@ function renderPage({ cidadeAtual, cidades, janelas, janelaAtiva, hoje, isDefaul
             <div class="hero-city-search">
                 <div class="city-search-box" id="city-search-box">
                     <svg class="city-search-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                    <label class="sr-only" for="city-search-input">Cidade ou aeroporto de origem</label>
                     <input type="text" id="city-search-input"
                            placeholder="Digite sua cidade ou código do aeroporto..."
-                           autocomplete="off" maxlength="60">
+                           autocomplete="off" maxlength="60"
+                           aria-describedby="city-search-hint">
+                    <span id="city-search-hint" class="sr-only">Digite pelo menos duas letras para ver sugestões de cidades e aeroportos.</span>
                     <button class="city-search-clear" id="city-search-clear" style="display:none;" aria-label="Limpar">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                     </button>
@@ -310,7 +313,7 @@ function renderPage({ cidadeAtual, cidades, janelas, janelaAtiva, hoje, isDefaul
     <!-- ========================================
          BLOCO 7.5: LOADING (busca ao vivo de cidade fora das 30)
          ======================================== -->
-    <div class="discovery-loading" id="loading-state" style="display:none;">
+    <div class="discovery-loading" id="loading-state" style="display:none;" role="status" aria-live="polite">
         <div class="spinner"></div>
         <p id="loading-message">A Tripinha está farejando voos em tempo real...</p>
     </div>
@@ -341,7 +344,7 @@ function renderPage({ cidadeAtual, cidades, janelas, janelaAtiva, hoje, isDefaul
                 <span class="section-count" id="section-count">${recomendados.length} destino${recomendados.length !== 1 ? 's' : ''}${naoRecomendados.length > 0 ? ` &middot; ${naoRecomendados.length} fora da janela` : ''}</span>
             </div>
         </div>
-        <div class="destinations-grid" id="destinations-grid">${recomendados.map((d) => renderCardHtml(d, { escapada: true, href: hrefDoDestino(d, cidadeAtual), compartilhamAeroporto: porAeroporto.get((d.aeroporto || '').toUpperCase()) || 0 })).join('')}</div>
+        <div class="destinations-grid" id="destinations-grid" aria-live="polite" aria-busy="false">${recomendados.map((d) => renderCardHtml(d, { escapada: true, href: hrefDoDestino(d, cidadeAtual), compartilhamAeroporto: porAeroporto.get((d.aeroporto || '').toUpperCase()) || 0 })).join('')}</div>
     </main>
 
     <!-- ========================================
@@ -598,7 +601,7 @@ function renderOutrasCidadesHtml(cidades, cidadeAtual) {
     return `
     <section class="other-cities">
         <details>
-            <summary>Ver escapadas saindo de outras ${cidades.length} cidades</summary>
+            <summary aria-label="Ver escapadas saindo de outras cidades">Ver escapadas saindo de outras ${cidades.length} cidades</summary>
             <div class="other-cities-body">${grupos}</div>
         </details>
     </section>`;

@@ -6,6 +6,22 @@
     <meta name="theme-color" content="#E87722">
     <title>Passagens Aéreas - Benetrip</title>
     <meta name="description" content="Busque e compare passagens aéreas com os melhores preços. A Tripinha fareja centenas de companhias e agências para encontrar a melhor opção para você.">
+    <!-- Canonical e social (estáticos: não dependem de JS nem de prerender) -->
+    <link rel="canonical" href="https://benetrip.com.br/voos">
+    <meta name="robots" content="index, follow">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Benetrip">
+    <meta property="og:title" content="Passagens Aéreas - Benetrip">
+    <meta property="og:description" content="Busque e compare passagens aéreas com os melhores preços. A Tripinha fareja centenas de companhias e agências para encontrar a melhor opção para você.">
+    <meta property="og:url" content="https://benetrip.com.br/voos">
+    <meta property="og:image" content="https://benetrip.com.br/assets/images/favicon/web-app-manifest-512x512.png">
+    <meta property="og:locale" content="pt_BR">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Passagens Aéreas - Benetrip">
+    <meta name="twitter:description" content="Busque e compare passagens aéreas com os melhores preços. A Tripinha fareja centenas de companhias e agências para encontrar a melhor opção para você.">
+    <meta name="twitter:image" content="https://benetrip.com.br/assets/images/favicon/web-app-manifest-512x512.png">
+    <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Benetrip", "item": "https://benetrip.com.br/"}, {"@type": "ListItem", "position": 2, "name": "Busca de Voos", "item": "https://benetrip.com.br/voos"}]}</script>
+
 
     <!-- SEO Meta Tags (OG, Twitter, JSON-LD) -->
     <script src="assets/js/seo-meta.js" defer></script>
@@ -82,7 +98,7 @@
                                 <div><strong>Adultos</strong><br><small>12+ anos</small></div>
                                 <div class="pax-ctrl">
                                     <button type="button" class="pax-btn" data-t="pax-adults" data-a="dec">−</button>
-                                    <input type="number" id="pax-adults" value="1" min="1" max="9" readonly>
+                                    <input type="number" id="pax-adults" value="1" min="1" max="9" readonly aria-label="Número de adultos">
                                     <button type="button" class="pax-btn" data-t="pax-adults" data-a="inc">+</button>
                                 </div>
                             </div>
@@ -90,7 +106,7 @@
                                 <div><strong>Crianças</strong><br><small>2–11 anos</small></div>
                                 <div class="pax-ctrl">
                                     <button type="button" class="pax-btn" data-t="pax-children" data-a="dec">−</button>
-                                    <input type="number" id="pax-children" value="0" min="0" max="6" readonly>
+                                    <input type="number" id="pax-children" value="0" min="0" max="6" readonly aria-label="Número de crianças de 2 a 11 anos">
                                     <button type="button" class="pax-btn" data-t="pax-children" data-a="inc">+</button>
                                 </div>
                             </div>
@@ -98,7 +114,7 @@
                                 <div><strong>Bebês</strong><br><small>0–1 (no colo)</small></div>
                                 <div class="pax-ctrl">
                                     <button type="button" class="pax-btn" data-t="pax-infants" data-a="dec">−</button>
-                                    <input type="number" id="pax-infants" value="0" min="0" max="4" readonly>
+                                    <input type="number" id="pax-infants" value="0" min="0" max="4" readonly aria-label="Número de bebês de colo, até 2 anos">
                                     <button type="button" class="pax-btn" data-t="pax-infants" data-a="inc">+</button>
                                 </div>
                             </div>
@@ -225,10 +241,10 @@
                 <!-- STOPS -->
                 <div class="filter-panel" id="fp-stops" style="display:none">
                     <div class="fp-header"><span>Paradas</span><button class="fp-close">✕</button></div>
-                    <label class="fp-opt"><input type="checkbox" name="stops" value="all" checked> Todas</label>
-                    <label class="fp-opt"><input type="checkbox" name="stops" value="0"> Direto</label>
-                    <label class="fp-opt"><input type="checkbox" name="stops" value="1"> 1 parada</label>
-                    <label class="fp-opt"><input type="checkbox" name="stops" value="2"> 2+ paradas</label>
+                    <label class="fp-opt"><input type="checkbox" name="stops" value="all" checked aria-label="Qualquer número de paradas"> Todas</label>
+                    <label class="fp-opt"><input type="checkbox" name="stops" value="0" aria-label="Somente voos diretos"> Direto</label>
+                    <label class="fp-opt"><input type="checkbox" name="stops" value="1" aria-label="Até 1 parada"> 1 parada</label>
+                    <label class="fp-opt"><input type="checkbox" name="stops" value="2" aria-label="Até 2 paradas"> 2+ paradas</label>
                 </div>
 
                 <!-- AIRPORTS (NEW) -->
@@ -250,32 +266,32 @@
                         <div class="fp-section-title">🛫 Partida (ida)</div>
                         <div class="fp-range-row"><span class="fp-range-val" id="fv-dep-go-min">00:00</span><span class="fp-range-val" id="fv-dep-go-max">23:59</span></div>
                         <div class="fp-dual-range">
-                            <input type="range" id="fr-dep-go-min" min="0" max="1439" value="0" step="30">
-                            <input type="range" id="fr-dep-go-max" min="0" max="1439" value="1439" step="30">
+                            <input type="range" id="fr-dep-go-min" min="0" max="1439" value="0" step="30" aria-label="Horário mínimo de partida da ida">
+                            <input type="range" id="fr-dep-go-max" min="0" max="1439" value="1439" step="30" aria-label="Horário máximo de partida da ida">
                         </div>
                     </div>
                     <div class="fp-section">
                         <div class="fp-section-title">🛬 Chegada (ida)</div>
                         <div class="fp-range-row"><span class="fp-range-val" id="fv-arr-go-min">00:00</span><span class="fp-range-val" id="fv-arr-go-max">23:59</span></div>
                         <div class="fp-dual-range">
-                            <input type="range" id="fr-arr-go-min" min="0" max="1439" value="0" step="30">
-                            <input type="range" id="fr-arr-go-max" min="0" max="1439" value="1439" step="30">
+                            <input type="range" id="fr-arr-go-min" min="0" max="1439" value="0" step="30" aria-label="Horário mínimo de chegada da ida">
+                            <input type="range" id="fr-arr-go-max" min="0" max="1439" value="1439" step="30" aria-label="Horário máximo de chegada da ida">
                         </div>
                     </div>
                     <div class="fp-section" id="fp-times-return" style="display:none">
                         <div class="fp-section-title">🛫 Partida (volta)</div>
                         <div class="fp-range-row"><span class="fp-range-val" id="fv-dep-ret-min">00:00</span><span class="fp-range-val" id="fv-dep-ret-max">23:59</span></div>
                         <div class="fp-dual-range">
-                            <input type="range" id="fr-dep-ret-min" min="0" max="1439" value="0" step="30">
-                            <input type="range" id="fr-dep-ret-max" min="0" max="1439" value="1439" step="30">
+                            <input type="range" id="fr-dep-ret-min" min="0" max="1439" value="0" step="30" aria-label="Horário mínimo de partida da volta">
+                            <input type="range" id="fr-dep-ret-max" min="0" max="1439" value="1439" step="30" aria-label="Horário máximo de partida da volta">
                         </div>
                     </div>
                     <div class="fp-section" id="fp-times-return-arr" style="display:none">
                         <div class="fp-section-title">🛬 Chegada (volta)</div>
                         <div class="fp-range-row"><span class="fp-range-val" id="fv-arr-ret-min">00:00</span><span class="fp-range-val" id="fv-arr-ret-max">23:59</span></div>
                         <div class="fp-dual-range">
-                            <input type="range" id="fr-arr-ret-min" min="0" max="1439" value="0" step="30">
-                            <input type="range" id="fr-arr-ret-max" min="0" max="1439" value="1439" step="30">
+                            <input type="range" id="fr-arr-ret-min" min="0" max="1439" value="0" step="30" aria-label="Horário mínimo de chegada da volta">
+                            <input type="range" id="fr-arr-ret-max" min="0" max="1439" value="1439" step="30" aria-label="Horário máximo de chegada da volta">
                         </div>
                     </div>
                 </div>
@@ -298,7 +314,7 @@
                     <div class="fp-section">
                         <div class="fp-range-row"><span class="fp-range-val" id="fv-price-min"></span><span class="fp-range-val" id="fv-price-max"></span></div>
                         <div class="fp-single-range">
-                            <input type="range" id="fr-price-max" min="0" max="100000" value="100000" step="50">
+                            <input type="range" id="fr-price-max" min="0" max="100000" value="100000" step="50" aria-label="Preço máximo">
                         </div>
                         <div class="fp-price-label">Preço máximo por pessoa</div>
                     </div>
@@ -310,7 +326,7 @@
                     <div class="fp-section">
                         <div class="fp-range-row"><span class="fp-range-val" id="fv-dur-val">Qualquer</span></div>
                         <div class="fp-single-range">
-                            <input type="range" id="fr-duration-max" min="0" max="2880" value="2880" step="30">
+                            <input type="range" id="fr-duration-max" min="0" max="2880" value="2880" step="30" aria-label="Duração máxima total do voo">
                         </div>
                         <div class="fp-price-label">Duração total do trecho mais longo</div>
                     </div>

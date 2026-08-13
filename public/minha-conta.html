@@ -965,7 +965,7 @@
                         <div class="empty-state-icon">🗺️</div>
                         <h3>Nenhum roteiro ainda</h3>
                         <p>Ao gerar um roteiro com a Tripinha, ele será salvo automaticamente aqui!</p>
-                        <a href="roteiro-viagem.html" class="btn-empty-cta">📋 Criar Roteiro</a>
+                        <a href="/roteiro-viagem" class="btn-empty-cta">📋 Criar Roteiro</a>
                     </div>`;
                 return;
             }
@@ -1086,7 +1086,7 @@
                 container.querySelector('.roteiro-expandido-inner').innerHTML =
                     `<p style="color:var(--gray-400);padding:12px 0;font-size:0.85rem;">
                         ⚠️ Conteúdo detalhado não disponível para este roteiro.
-                        <a href="roteiro-viagem.html" style="color:var(--orange);">Gere um novo roteiro</a>
+                        <a href="/roteiro-viagem" style="color:var(--orange);">Gere um novo roteiro</a>
                      </p>`;
                 container.style.display = 'block';
                 label.textContent = 'Fechar';

@@ -221,9 +221,12 @@ function renderPage({ cidadeAtual, cidades, snapshot, isDefault }) {
             <div class="hero-city-search">
                 <div class="city-search-box" id="city-search-box">
                     <svg class="city-search-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                    <label class="sr-only" for="city-search-input">Cidade ou aeroporto de origem</label>
                     <input type="text" id="city-search-input"
                            placeholder="Digite sua cidade ou código do aeroporto..."
-                           autocomplete="off" maxlength="60">
+                           autocomplete="off" maxlength="60"
+                           aria-describedby="city-search-hint">
+                    <span id="city-search-hint" class="sr-only">Digite pelo menos duas letras para ver sugestões de cidades e aeroportos.</span>
                     <button class="city-search-clear" id="city-search-clear" style="display:none;" aria-label="Limpar">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                     </button>
@@ -276,9 +279,12 @@ function renderPage({ cidadeAtual, cidades, snapshot, isDefault }) {
         <!-- Busca inteligente por destino -->
         <div class="smart-search-section">
             <div class="smart-search-box">
+                <label class="sr-only" for="smart-search-input">Filtrar destinos em linguagem natural</label>
                 <input type="text" id="smart-search-input"
                        placeholder="Filtrar: praia barata, natureza até 1500..."
-                       autocomplete="off" maxlength="100">
+                       autocomplete="off" maxlength="100"
+                       aria-describedby="smart-search-hint">
+                <span id="smart-search-hint" class="sr-only">Exemplo: praia internacional barata, sem escalas, até quatro mil reais.</span>
                 <button class="smart-search-clear" id="smart-search-clear" style="display:none;" aria-label="Limpar">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                 </button>
@@ -328,7 +334,7 @@ function renderPage({ cidadeAtual, cidades, snapshot, isDefault }) {
     <!-- ========================================
          BLOCO 6: LOADING STATE (só reaparece em trocas de cidade via JS)
          ======================================== -->
-    <div class="discovery-loading" id="loading-state" style="display:none;">
+    <div class="discovery-loading" id="loading-state" style="display:none;" role="status" aria-live="polite">
         <div class="spinner"></div>
         <p id="loading-message">A Tripinha está buscando os destinos mais baratos...</p>
     </div>
@@ -358,7 +364,7 @@ function renderPage({ cidadeAtual, cidades, snapshot, isDefault }) {
                 <span class="section-count" id="section-count">${contagem.lugares} lugar${contagem.lugares !== 1 ? 'es' : ''} &middot; ${contagem.aeroportos} aeroporto${contagem.aeroportos !== 1 ? 's' : ''}</span>
             </div>
         </div>
-        <div class="destinations-grid" id="destinations-grid">${destinos.map((d) => renderCardHtml(d, { compartilhamAeroporto: porAeroporto.get((d.aeroporto || '').toUpperCase()) || 0 })).join('')}</div>
+        <div class="destinations-grid" id="destinations-grid" aria-live="polite" aria-busy="false">${destinos.map((d) => renderCardHtml(d, { compartilhamAeroporto: porAeroporto.get((d.aeroporto || '').toUpperCase()) || 0 })).join('')}</div>
     </main>
 
     ${renderOutrasCidadesHtml(cidades, cidadeAtual)}

@@ -7,6 +7,22 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Benetrip - Planeje Viagens Baratas com IA | Passagens, Destinos e Roteiros</title>
     <meta name="description" content="Planeje sua viagem perfeita com a Tripinha, assistente de viagem com inteligência artificial! Descubra destinos incríveis, encontre passagens aéreas baratas e crie roteiros personalizados.">
+    <!-- Canonical e social (estáticos: não dependem de JS nem de prerender) -->
+    <link rel="canonical" href="https://benetrip.com.br/">
+    <meta name="robots" content="index, follow">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Benetrip">
+    <meta property="og:title" content="Benetrip - Planeje Viagens Baratas com IA | Passagens, Destinos e Roteiros">
+    <meta property="og:description" content="Planeje sua viagem perfeita com a Tripinha, assistente de viagem com inteligência artificial! Descubra destinos incríveis, encontre passagens aéreas baratas e crie roteiros personalizados.">
+    <meta property="og:url" content="https://benetrip.com.br/">
+    <meta property="og:image" content="https://benetrip.com.br/assets/images/favicon/web-app-manifest-512x512.png">
+    <meta property="og:locale" content="pt_BR">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Benetrip - Planeje Viagens Baratas com IA | Passagens, Destinos e Roteiros">
+    <meta name="twitter:description" content="Planeje sua viagem perfeita com a Tripinha, assistente de viagem com inteligência artificial! Descubra destinos incríveis, encontre passagens aéreas baratas e crie roteiros personalizados.">
+    <meta name="twitter:image" content="https://benetrip.com.br/assets/images/favicon/web-app-manifest-512x512.png">
+    <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Benetrip", "item": "https://benetrip.com.br/"}]}</script>
+
 
     <!-- SEO Meta Tags (OG, Twitter, JSON-LD) -->
     <script src="assets/js/seo-meta.js" defer></script>
@@ -354,6 +370,24 @@
         .destaque-desc { display: block; font-size: .88rem; color: var(--gray-600); line-height: 1.5; }
         .tools-by-problem { margin-top: 34px; }
         .tools-group { margin-bottom: 30px; }
+        /* No desktop os grupos ficam abertos; no mobile viram accordion, com
+           o primeiro aberto. O conteúdo continua no HTML (nada é escondido
+           de mecanismos de busca), só o estado visual muda. */
+        .tools-group-summary { cursor: pointer; list-style: none; }
+        .tools-group-summary::-webkit-details-marker { display: none; }
+        .tools-group-summary::after {
+            content: '▾';
+            float: right;
+            margin-right: 16px;
+            color: var(--gray-600);
+            transition: transform .2s ease;
+        }
+        .tools-group[open] > .tools-group-summary::after { transform: rotate(180deg); }
+        .tools-group-summary:focus-visible { outline: 3px solid var(--blue); outline-offset: 2px; border-radius: 8px; }
+        @media (min-width: 900px) {
+            .tools-group-summary { cursor: default; }
+            .tools-group-summary::after { display: none; }
+        }
         .tools-group-title {
             font-family: 'Poppins', sans-serif; font-size: 1.08rem; font-weight: 700; color: var(--dark);
             margin-bottom: 4px; padding-left: 12px; border-left: 4px solid var(--orange);
@@ -517,7 +551,7 @@
         </div>
         <div class="nav-group">
             <div class="nav-group-title">🚀 Ferramentas</div>
-            <a href="descobrir-destinos.html" class="nav-item primary-cta">
+            <a href="/descobrir-destinos" class="nav-item primary-cta">
                 <span class="nav-item-icon">🎯</span> Descobrir meu destino!
                 <span class="nav-badge-sm popular">Popular</span>
             </a>
@@ -533,28 +567,28 @@
                 <span class="nav-item-icon">💰</span> Destinos Baratos
                 <span class="nav-badge-sm hot">Hot</span>
             </a>
-            <a href="todos-destinos.html" class="nav-item">
+            <a href="/todos-destinos" class="nav-item">
                 <span class="nav-item-icon">🌍</span> Todos os Destinos
                 <span class="nav-badge-sm new">Novo</span>
             </a>
-            <a href="comparar-voos.html" class="nav-item">
+            <a href="/comparar-voos" class="nav-item">
                 <span class="nav-item-icon">🔀</span> Comparar Voos
                 <span class="nav-badge-sm new">Novo</span>
             </a>
-            <a href="voos-baratos.html" class="nav-item">
+            <a href="/voos-baratos" class="nav-item">
                 <span class="nav-item-icon">💸</span> Voos Baratos
                 <span class="nav-badge-sm hot">Hot</span>
             </a>
-            <a href="voos.html" class="nav-item">
+            <a href="/voos" class="nav-item">
                 <span class="nav-item-icon">✈️</span> Busca de Voos
             </a>
-            <a href="roteiro-viagem.html" class="nav-item">
+            <a href="/roteiro-viagem" class="nav-item">
                 <span class="nav-item-icon">📋</span> Planejar Roteiro
             </a>
         </div>
         <div class="nav-group" data-auth-show="logged-in" style="display:none;">
             <div class="nav-group-title">👤 Minha Conta</div>
-            <a href="minha-conta.html" class="nav-item"><span class="nav-item-icon">📊</span> Histórico de Buscas</a>
+            <a href="/minha-conta" class="nav-item"><span class="nav-item-icon">📊</span> Histórico de Buscas</a>
             <a href="minha-conta.html#destinos" class="nav-item"><span class="nav-item-icon">💾</span> Destinos Salvos</a>
             <a href="minha-conta.html#roteiros" class="nav-item"><span class="nav-item-icon">🗺️</span> Roteiros Salvos</a>
         </div>
@@ -570,14 +604,14 @@
         </div>
         <div class="nav-group">
             <div class="nav-group-title">ℹ️ Sobre</div>
-            <a href="quemsomos.html" class="nav-item"><span class="nav-item-icon">🏢</span> Quem Somos</a>
-            <a href="perguntasfrequentes.html" class="nav-item"><span class="nav-item-icon">❓</span> Perguntas Frequentes</a>
+            <a href="/quemsomos" class="nav-item"><span class="nav-item-icon">🏢</span> Quem Somos</a>
+            <a href="/perguntasfrequentes" class="nav-item"><span class="nav-item-icon">❓</span> Perguntas Frequentes</a>
         </div>
         <div class="nav-group">
             <div class="nav-group-title">📋 Políticas</div>
-            <a href="termos.html" class="nav-item"><span class="nav-item-icon">📜</span> Termos de Uso</a>
-            <a href="privacidade.html" class="nav-item"><span class="nav-item-icon">🔒</span> Privacidade</a>
-            <a href="cookies.html" class="nav-item"><span class="nav-item-icon">🍪</span> Cookies</a>
+            <a href="/termos" class="nav-item"><span class="nav-item-icon">📜</span> Termos de Uso</a>
+            <a href="/privacidade" class="nav-item"><span class="nav-item-icon">🔒</span> Privacidade</a>
+            <a href="/cookies" class="nav-item"><span class="nav-item-icon">🍪</span> Cookies</a>
         </div>
     </nav>
 
@@ -594,13 +628,13 @@
             </div>
             <div class="header-right">
                 <nav class="header-nav">
-                    <a href="descobrir-destinos.html">🎯 Descobrir</a>
+                    <a href="/descobrir-destinos">🎯 Descobrir</a>
                     <a href="/vai-e-vem">🔁 Vai e Vem</a>
                     <a href="/escapadas">🏖️ Escapadas</a>
                     <a href="/destinos-baratos">💰 Baratos</a>
-                    <a href="todos-destinos.html">🌍 Destinos</a>
-                    <a href="voos.html">✈️ Voos</a>
-                    <a href="roteiro-viagem.html">📋 Roteiro</a>
+                    <a href="/todos-destinos">🌍 Destinos</a>
+                    <a href="/voos">✈️ Voos</a>
+                    <a href="/roteiro-viagem">📋 Roteiro</a>
                 </nav>
                 <div class="benetrip-header-auth">
                     <button class="benetrip-header-login-btn" data-auth="login-btn" onclick="BenetripLoginModal.open()">
@@ -612,7 +646,7 @@
                         <img class="benetrip-header-avatar" data-auth="user-avatar" alt="Avatar" onclick="document.getElementById('benetrip-user-dropdown').classList.toggle('active')" />
                         <div class="benetrip-header-initials" data-auth="user-initials" onclick="document.getElementById('benetrip-user-dropdown').classList.toggle('active')"></div>
                         <div class="benetrip-header-dropdown" id="benetrip-user-dropdown">
-                            <a href="minha-conta.html"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg> Minha Conta</a>
+                            <a href="/minha-conta"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg> Minha Conta</a>
                             <a href="minha-conta.html#historico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg> Histórico de Buscas</a>
                             <a href="minha-conta.html#destinos"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path></svg> Destinos Salvos</a>
                             <a href="minha-conta.html#roteiros"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg> Roteiros Salvos</a>
@@ -633,7 +667,7 @@
             <p class="hero-sub">A Benetrip combina seu orçamento, suas datas e seu estilo com preços reais de voos. Conte o que você procura e a Tripinha filtra, ranqueia e explica cada opção pra você.</p>
             <div class="hero-welcome" id="hero-welcome" data-auth-show="logged-in">🐾 Oi, <strong id="hero-user-name">viajante</strong>! Que bom te ver de volta! Bora planejar?</div>
             <div class="hero-ctas">
-                <a href="descobrir-destinos.html" class="hero-cta-primary" onclick="cardClick(this)">
+                <a href="/descobrir-destinos" class="hero-cta-primary" onclick="cardClick(this)">
                     🎯 Descobrir meu destino
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" width="18" height="18"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
                 </a>
@@ -670,9 +704,9 @@
     <div class="stats-bar">
         <div class="stats-inner">
             <div class="stat-item"><div class="stat-num">9</div><div class="stat-label">Ferramentas</div></div>
-            <div class="stat-item"><div class="stat-num">200+</div><div class="stat-label">Destinos</div></div>
-            <div class="stat-item"><div class="stat-num">100%</div><div class="stat-label">Preços Reais</div></div>
-            <div class="stat-item"><div class="stat-num">Grátis</div><div class="stat-label">Sempre</div></div>
+            <div class="stat-item"><div class="stat-num">Centenas</div><div class="stat-label">de destinos encontrados</div></div>
+            <div class="stat-item"><div class="stat-num">Reais</div><div class="stat-label">preços obtidos em buscas</div></div>
+            <div class="stat-item"><div class="stat-num">Grátis</div><div class="stat-label">para usar</div></div>
         </div>
     </div>
 
@@ -681,24 +715,9 @@
         <h2 class="tools-section-title">O que a Tripinha pode fazer por você? 🐾</h2>
         <p class="tools-section-sub">Cada ferramenta resolve uma etapa da sua viagem. Escolha a que combina com o momento!</p>
 
-        <!-- FEATURED: Descobrir Destinos -->
-        <a href="descobrir-destinos.html" class="featured-tool" onclick="cardClick(this)">
-            <div class="featured-body">
-                <div class="featured-top">
-                    <div class="featured-icon">🎯</div>
-                    <span class="featured-badge">Mais usado</span>
-                </div>
-                <h3 class="featured-title">Descobrir Destinos: recomendações para o seu perfil e orçamento</h3>
-                <p class="featured-desc">Conte seu estilo de viagem, seu orçamento, suas datas e com quem você vai. A Benetrip busca <strong>preços reais de passagens</strong> para vários destinos, guarda os que cabem no seu orçamento e ordena pensando em escalas, duração do voo e época do ano. Cada recomendação vem com o motivo, o preço e o ponto de atenção.</p>
-                <div class="featured-highlights">
-                    <span class="featured-tag">💰 Preços reais primeiro</span>
-                    <span class="featured-tag">🎯 Orçamento como teto</span>
-                    <span class="featured-tag">✈️ Escalas e duração no ranking</span>
-                    <span class="featured-tag">📅 Adequação à época</span>
-                </div>
-                <span class="featured-cta-btn">Descobrir meu destino perfeito <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg></span>
-            </div>
-        </a>
+        <!-- A Descoberta é protagonista no hero e volta no catálogo completo
+             abaixo. O bloco destacado que repetia a mesma ferramenta uma
+             terceira vez, logo depois do hero, foi removido. -->
 
         <!-- DESTAQUES SECUNDÁRIOS -->
         <div class="destaques-row">
@@ -720,15 +739,17 @@
         </div>
 
         <!-- FERRAMENTAS ORGANIZADAS PELO PROBLEMA -->
-        <div class="tools-by-problem" id="ferramentas">
+        <div class="tools-by-problem" id="ferramentas" data-accordion-mobile="true">
             <h2 class="tools-section-title">O que você já sabe sobre a viagem?</h2>
             <p class="tools-section-sub">Todas as nove ferramentas estão aqui. É só escolher pelo ponto em que você está.</p>
 
-        <div class="tools-group">
-            <h3 class="tools-group-title">Não sei para onde ir</h3>
-            <p class="tools-group-sub">Comece pelo seu perfil, pelo orçamento ou pelas oportunidades do momento.</p>
+        <details class="tools-group" open>
+            <summary class="tools-group-summary">
+                <h3 class="tools-group-title">Não sei para onde ir</h3>
+                <p class="tools-group-sub">Comece pelo seu perfil, pelo orçamento ou pelas oportunidades do momento.</p>
+            </summary>
             <div class="tools-grid">
-            <a href="descobrir-destinos.html" class="tool-card card-discover" onclick="cardClick(this)">
+            <a href="/descobrir-destinos" class="tool-card card-discover" onclick="cardClick(this)">
                 <div class="card-top-row"><div class="card-icon">🎯</div></div>
                 <h3 class="card-title">Descobrir Destinos</h3>
                 <p class="card-desc">Não sabe pra onde ir? Conte seu estilo, seu orçamento e as datas que você tem. A Tripinha busca preços reais, guarda só o que cabe no seu bolso e explica por que cada destino combina com você.</p>
@@ -740,18 +761,20 @@
                 <p class="card-desc">Quer viajar gastando pouco e tanto faz o lugar? Veja as oportunidades que saem da sua cidade, com preço atualizado todos os dias e quanto cada uma caiu.</p>
                 <span class="card-cta">Ver oportunidades <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg></span>
             </a>
-            <a href="todos-destinos.html" class="tool-card card-all-dest" onclick="cardClick(this)">
+            <a href="/todos-destinos" class="tool-card card-all-dest" onclick="cardClick(this)">
                 <div class="card-top-row"><div class="card-icon">🌍</div></div>
                 <h3 class="card-title">Todos os Destinos</h3>
                 <p class="card-desc">Escolha as datas em que você pode viajar e compare centenas de destinos encontrados, do melhor custo-benefício ao mais barato, filtrando por escala e duração. A cobertura depende das rotas retornadas pelos parceiros.</p>
                 <span class="card-cta">Comparar destinos <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg></span>
             </a>
             </div>
-        </div>
+        </details>
 
-        <div class="tools-group">
-            <h3 class="tools-group-title">Sei quando posso viajar</h3>
-            <p class="tools-group-sub">Você já tem as datas, ou o feriado, e quer saber o que cabe nelas.</p>
+        <details class="tools-group" open>
+            <summary class="tools-group-summary">
+                <h3 class="tools-group-title">Sei quando posso viajar</h3>
+                <p class="tools-group-sub">Você já tem as datas, ou o feriado, e quer saber o que cabe nelas.</p>
+            </summary>
             <div class="tools-grid">
             <a href="/escapadas" class="tool-card card-escapadas" onclick="cardClick(this)">
                 <div class="card-top-row"><div class="card-icon">🏖️</div><span class="card-badge badge-new">Novo</span></div>
@@ -759,26 +782,28 @@
                 <p class="card-desc">Não está de férias mas quer viajar? Veja pra onde dá pra fugir no próximo fim de semana ou feriado, com preço de ida e volta em cada data e o calendário de emendas.</p>
                 <span class="card-cta">Ver escapadas <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg></span>
             </a>
-            <a href="todos-destinos.html" class="tool-card card-all-dest" onclick="cardClick(this)">
+            <a href="/todos-destinos" class="tool-card card-all-dest" onclick="cardClick(this)">
                 <div class="card-top-row"><div class="card-icon">🌍</div></div>
                 <h3 class="card-title">Todos os Destinos</h3>
                 <p class="card-desc">Escolha as datas em que você pode viajar e compare centenas de destinos encontrados, do melhor custo-benefício ao mais barato, filtrando por escala e duração. A cobertura depende das rotas retornadas pelos parceiros.</p>
                 <span class="card-cta">Comparar destinos <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg></span>
             </a>
             </div>
-        </div>
+        </details>
 
-        <div class="tools-group">
-            <h3 class="tools-group-title">Sei o destino, mas sou flexível</h3>
-            <p class="tools-group-sub">O lugar já está decidido, agora falta achar a melhor data.</p>
+        <details class="tools-group" open>
+            <summary class="tools-group-summary">
+                <h3 class="tools-group-title">Sei o destino, mas sou flexível</h3>
+                <p class="tools-group-sub">O lugar já está decidido, agora falta achar a melhor data.</p>
+            </summary>
             <div class="tools-grid">
-            <a href="comparar-voos.html" class="tool-card card-compare" onclick="cardClick(this)">
+            <a href="/comparar-voos" class="tool-card card-compare" onclick="cardClick(this)">
                 <div class="card-top-row"><div class="card-icon">🔀</div><span class="card-badge badge-smart">Smart</span></div>
                 <h3 class="card-title">Comparar Voos</h3>
                 <p class="card-desc">Já sabe o destino mas tem datas flexíveis? Escolha até 4 datas de ida e 4 de volta. A Tripinha testa todas as combinações e mostra qual delas sai mais barata.</p>
                 <span class="card-cta">Comparar combinações <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg></span>
             </a>
-            <a href="voos-baratos.html" class="tool-card card-cheap" onclick="cardClick(this)">
+            <a href="/voos-baratos" class="tool-card card-cheap" onclick="cardClick(this)">
                 <div class="card-top-row"><div class="card-icon">💸</div><span class="card-badge badge-hot">Hot</span></div>
                 <h3 class="card-title">Voos Baratos nos próximos 6 meses</h3>
                 <p class="card-desc">Sabe pra onde quer ir mas não sabe quando? A Tripinha varre os próximos seis meses e mostra em qual semana a passagem fica mais barata pro seu destino.</p>
@@ -791,33 +816,37 @@
                 <span class="card-cta">Farejar minha rota <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg></span>
             </a>
             </div>
-        </div>
+        </details>
 
-        <div class="tools-group">
-            <h3 class="tools-group-title">Já sei destino e datas</h3>
-            <p class="tools-group-sub">Hora de comparar as ofertas disponíveis para o que você já decidiu.</p>
+        <details class="tools-group" open>
+            <summary class="tools-group-summary">
+                <h3 class="tools-group-title">Já sei destino e datas</h3>
+                <p class="tools-group-sub">Hora de comparar as ofertas disponíveis para o que você já decidiu.</p>
+            </summary>
             <div class="tools-grid">
-            <a href="voos.html" class="tool-card card-flights" onclick="cardClick(this)">
+            <a href="/voos" class="tool-card card-flights" onclick="cardClick(this)">
                 <div class="card-top-row"><div class="card-icon">✈️</div><span class="card-badge badge-popular">Popular</span></div>
                 <h3 class="card-title">Buscar Voos</h3>
                 <p class="card-desc">Já tem tudo definido? Origem, destino, datas e pronto. A Tripinha compara centenas de companhias e agências em tempo real pra achar o melhor preço.</p>
                 <span class="card-cta">Buscar voos <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg></span>
             </a>
             </div>
-        </div>
+        </details>
 
-        <div class="tools-group">
-            <h3 class="tools-group-title">Já decidi a viagem</h3>
-            <p class="tools-group-sub">Agora é organizar os dias.</p>
+        <details class="tools-group" open>
+            <summary class="tools-group-summary">
+                <h3 class="tools-group-title">Já decidi a viagem</h3>
+                <p class="tools-group-sub">Agora é organizar os dias.</p>
+            </summary>
             <div class="tools-grid">
-            <a href="roteiro-viagem.html" class="tool-card card-itinerary" onclick="cardClick(this)">
+            <a href="/roteiro-viagem" class="tool-card card-itinerary" onclick="cardClick(this)">
                 <div class="card-top-row"><div class="card-icon">📋</div><span class="card-badge badge-popular">Popular</span></div>
                 <h3 class="card-title">Roteiro de viagem</h3>
                 <p class="card-desc">Viagem marcada e agora? A Tripinha monta o dia a dia com atividades, restaurantes e dicas locais, no ritmo que você escolher e respeitando o que pediu pra evitar.</p>
                 <span class="card-cta">Criar meu roteiro <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg></span>
             </a>
             </div>
-        </div>
+        </details>
 
         </div>
     </section>
@@ -834,7 +863,7 @@
                 <div class="benefit"><div class="benefit-icon">⚡</div><h3>Acesso rápido</h3><p>Retome de onde parou sem preencher tudo de novo</p></div>
             </div>
             <button class="account-cta-btn" data-auth-show="logged-out" onclick="BenetripLoginModal.open()">🔑 Criar conta grátis</button>
-            <div class="account-logged-msg" data-auth-show="logged-in">✅ Você já está logado! <a href="minha-conta.html" style="color:var(--orange);font-weight:700;">Ver minha conta</a></div>
+            <div class="account-logged-msg" data-auth-show="logged-in">✅ Você já está logado! <a href="/minha-conta" style="color:var(--orange);font-weight:700;">Ver minha conta</a></div>
         </div>
     </section>
 
@@ -842,10 +871,10 @@
     <section class="pillars-section" id="pillars">
         <h2>Por que viajar comigo é a melhor escolha? 🐾</h2>
         <div class="pillars-grid">
-            <div class="pillar"><div class="pillar-icon">💰</div><h3>Preços reais!</h3><p>Nada de preço inventado. Tudo vem de buscas reais em tempo real.</p></div>
-            <div class="pillar"><div class="pillar-icon">🎯</div><h3>Personalização total</h3><p>Cada sugestão é baseada no SEU perfil, orçamento e preferências.</p></div>
-            <div class="pillar"><div class="pillar-icon">⚡</div><h3>Rápida como um raio</h3><p>Em segundos sua viagem planejada. Sem enrolação!</p></div>
-            <div class="pillar"><div class="pillar-icon">🆓</div><h3>100% gratuito</h3><p>Todas as ferramentas são de graça. Sem pegadinha!</p></div>
+            <div class="pillar"><div class="pillar-icon">💰</div><h3>Preços obtidos em buscas reais</h3><p>Nada de preço inventado. Os valores vêm dos parceiros e podem mudar até a conclusão da reserva.</p></div>
+            <div class="pillar"><div class="pillar-icon">🎯</div><h3>Sugestões pelo seu perfil</h3><p>Cada sugestão considera o seu perfil, o seu orçamento e as suas preferências.</p></div>
+            <div class="pillar"><div class="pillar-icon">⚡</div><h3>Resultados organizados</h3><p>A Benetrip consulta parceiros e organiza as opções para você: em tempo real ou atualizadas diariamente, conforme a ferramenta.</p></div>
+            <div class="pillar"><div class="pillar-icon">🆓</div><h3>Uso gratuito</h3><p>Todas as ferramentas são gratuitas para você usar.</p></div>
         </div>
     </section>
 
@@ -857,10 +886,10 @@
                 <p class="footer-tagline">Sua próxima aventura começa aqui! 🐾</p>
             </div>
             <div class="footer-links">
-                <div class="footer-col"><h4>🚀 Ferramentas</h4><a href="descobrir-destinos.html">🎯 Descobrir Destinos</a><a href="/vai-e-vem">🔁 Vai e Vem</a><a href="/escapadas">🏖️ Escapadas de Feriado</a><a href="/destinos-baratos">💰 Destinos Baratos</a><a href="voos-baratos.html">💸 Voos Baratos</a><a href="roteiro-viagem.html">📋 Roteiro de Viagem</a></div>
+                <div class="footer-col"><h4>🚀 Ferramentas</h4><a href="/descobrir-destinos">🎯 Descobrir Destinos</a><a href="/vai-e-vem">🔁 Vai e Vem</a><a href="/escapadas">🏖️ Escapadas de Feriado</a><a href="/destinos-baratos">💰 Destinos Baratos</a><a href="/voos-baratos">💸 Voos Baratos</a><a href="/roteiro-viagem">📋 Roteiro de Viagem</a></div>
                 <div class="footer-col"><h4>📱 Redes Sociais</h4><a href="https://www.instagram.com/benetrip.oficial/" target="_blank">📷 Instagram Oficial</a></div>
-                <div class="footer-col"><h4>ℹ️ Sobre Nós</h4><a href="quemsomos.html">🏢 Quem Somos</a><a href="perguntasfrequentes.html">❓ Perguntas Frequentes</a></div>
-                <div class="footer-col"><h4>📋 Políticas</h4><a href="termos.html">📜 Termos de Uso</a><a href="privacidade.html">🔒 Privacidade</a><a href="cookies.html">🍪 Cookies</a></div>
+                <div class="footer-col"><h4>ℹ️ Sobre Nós</h4><a href="/quemsomos">🏢 Quem Somos</a><a href="/perguntasfrequentes">❓ Perguntas Frequentes</a></div>
+                <div class="footer-col"><h4>📋 Políticas</h4><a href="/termos">📜 Termos de Uso</a><a href="/privacidade">🔒 Privacidade</a><a href="/cookies">🍪 Cookies</a></div>
             </div>
             <div class="footer-bottom">© 2026 Benetrip. Todos os direitos reservados. Feito com ❤️ pela Tripinha! 🐾</div>
         </div>
@@ -888,6 +917,15 @@
         }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
 
         document.addEventListener('DOMContentLoaded', () => {
+            // Mobile: mantém apenas o primeiro estágio aberto. O HTML segue
+            // completo, então os nove links continuam visíveis para crawlers.
+            (function ajustarAccordionMobile() {
+                const container = document.getElementById('ferramentas');
+                if (!container || !window.matchMedia('(max-width: 899px)').matches) return;
+                const grupos = container.querySelectorAll('details.tools-group');
+                grupos.forEach((g, i) => { g.open = i === 0; });
+            })();
+
             document.querySelectorAll('.tool-card, .featured-tool, .pillar, .benefit').forEach(el => {
                 el.style.opacity = '0'; el.style.transform = 'translateY(24px)';
                 el.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
