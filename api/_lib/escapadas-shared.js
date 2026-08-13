@@ -95,6 +95,8 @@ export function janelasAtivas(hoje = hojeISO()) {
                 diasAte: diffDias(hoje, feriado.data),
                 folga: j.folga,
                 diasLivres: j.diasLivres,
+                // Feriado em sábado/domingo não acrescenta dia livre nenhum
+                estendeFimDeSemana: j.estendeFimDeSemana,
                 emenda: descricaoEmenda(feriado),
             },
         });
@@ -251,6 +253,42 @@ function classificarEstilos(destino) {
     return estilos.length > 0 ? estilos.slice(0, 3) : ['cidade'];
 }
 
+// ============================================================
+// VIABILIDADE DA ESCAPADA
+// Uma escapada de 2 noites não comporta 10h, 20h ou 40h de voo: o
+// deslocamento consome a viagem. Classifica cada destino em
+// 'boa' | 'aceitavel' | 'inviavel' comparando o tempo de voo (ida +
+// volta) com o tempo total da janela.
+//
+// Sem duração de voo na resposta do fornecedor, a viabilidade fica
+// 'desconhecida' — nunca inventamos um número para preencher.
+// ============================================================
+export const VIABILIDADE = {
+    // fração máxima da janela consumida por ida+volta
+    BOA: 0.12,
+    ACEITAVEL: 0.22,
+};
+
+export function classificarViabilidade({ duracaoVooMin, paradas, noites }) {
+    if (!duracaoVooMin || duracaoVooMin <= 0 || !noites || noites <= 0) {
+        return { nivel: 'desconhecida', fracao: null, motivo: null };
+    }
+    const minutosJanela = noites * 24 * 60;
+    const fracao = (duracaoVooMin * 2) / minutosJanela;
+
+    if (fracao > VIABILIDADE.ACEITAVEL) {
+        return { nivel: 'inviavel', fracao, motivo: 'O tempo de voo consome uma parte grande da escapada' };
+    }
+    // 2+ escalas numa janela curta praticamente inviabiliza a viagem
+    if ((paradas || 0) >= 2 && noites <= 2) {
+        return { nivel: 'inviavel', fracao, motivo: 'Duas ou mais escalas numa escapada curta' };
+    }
+    if (fracao > VIABILIDADE.BOA || (paradas || 0) >= 1) {
+        return { nivel: 'aceitavel', fracao, motivo: null };
+    }
+    return { nivel: 'boa', fracao, motivo: null };
+}
+
 function formatarDestino(destino, posicao, janela) {
     const isInternacional = (destino.country || '').toLowerCase() !== 'brasil';
     // Fonte da verdade das datas é a resposta da API; a janela é o fallback.
@@ -260,6 +298,11 @@ function formatarDestino(destino, posicao, janela) {
         console.warn(`⚠️ [Escapadas] Engine devolveu ida ${destino.outbound_date} para janela ${janela.id} (${destino.name})`);
     }
 
+    const duracaoVooMin = destino.flight?.flight_duration_minutes || 0;
+    const paradas = destino.flight?.stops || 0;
+    // Zero sem fonte confirmada = dado ausente, não hospedagem grátis.
+    const custoNoite = destino.avg_cost_per_night > 0 ? destino.avg_cost_per_night : null;
+
     return {
         posicao,
         nome: destino.name || '',
@@ -267,21 +310,25 @@ function formatarDestino(destino, posicao, janela) {
         aeroporto: destino.flight?.airport_code || destino.primary_airport || '',
         preco: destino.flight?.price || 0,
         moeda: 'BRL',
-        paradas: destino.flight?.stops || 0,
-        duracao_voo_min: destino.flight?.flight_duration_minutes || 0,
+        paradas,
+        duracao_voo_min: duracaoVooMin || null,
         cia_aerea: destino.flight?.airline_name || '',
-        custo_noite: destino.avg_cost_per_night || 0,
+        custo_noite: custoNoite,
         imagem: destino.image || '',
         estilos: classificarEstilos(destino),
         duracao_ideal: { min: janela.noites, max: janela.noites, ideal: janela.noites },
         internacional: isInternacional,
         data_ida: dataIda,
         data_volta: dataVolta,
+        viabilidade: classificarViabilidade({ duracaoVooMin, paradas, noites: janela.noites }),
     };
 }
 
 // Seleciona (reserva de nacionais + mais baratos) e formata os destinos
 // crus da SearchAPI no shape dos snapshots. Retorna [] se nada com preço.
+// Destinos inviáveis para a janela (voo longo demais para o número de
+// noites) não são removidos, mas vão para o FIM da lista — a auditoria
+// pediu que não apareçam entre as melhores escapadas, sem esconder a opção.
 export function selecionarEFormatarDestinos(destinosRaw, janela) {
     const comPreco = destinosRaw
         .filter((d) => d.flight?.price > 0)
@@ -295,7 +342,22 @@ export function selecionarEFormatarDestinos(destinosRaw, janela) {
         .sort((a, b) => a.flight.price - b.flight.price)
         .slice(0, MAX_DESTINOS_POR_JANELA - reservados.length);
 
-    return [...reservados, ...pool]
+    const formatados = [...reservados, ...pool]
         .sort((a, b) => a.flight.price - b.flight.price)
         .map((d, i) => formatarDestino(d, i + 1, janela));
+
+    return ordenarPorViabilidade(formatados);
+}
+
+// Reordena: viáveis (por preço) primeiro, inviáveis no fim. Reatribui
+// `posicao` para bater com a ordem exibida.
+export function ordenarPorViabilidade(destinos) {
+    const peso = { boa: 0, aceitavel: 1, desconhecida: 1, inviavel: 2 };
+    return [...destinos]
+        .sort((a, b) => {
+            const pa = peso[a.viabilidade?.nivel] ?? 1;
+            const pb = peso[b.viabilidade?.nivel] ?? 1;
+            return pa - pb || (a.preco || 0) - (b.preco || 0);
+        })
+        .map((d, i) => ({ ...d, posicao: i + 1 }));
 }

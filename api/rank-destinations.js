@@ -1,6 +1,14 @@
-// api/rank-destinations.js - v5.0 (Cerebras)
+// api/rank-destinations.js - v5.1 (Cerebras + camada determinística)
 // Vercel Serverless Function
-// Recebe destinos pré-filtrados e usa LLM para ranquear com base no perfil do viajante
+// Recebe destinos pré-filtrados (orçamento é TETO, filtrado no frontend),
+// aplica score determinístico de qualidade de voo (escalas, duração, perfil)
+// e usa LLM apenas para explicar e desempatar — nunca para violar limites objetivos.
+
+import {
+    ranquearPorQualidade,
+    violaRestricaoObjetiva,
+    descreverPenalidades,
+} from './_lib/flight-quality.js';
 
 function getCerebrasKey() {
     return process.env.CEREBRAS_KEY || process.env.CEREBRAS_API_KEY || null;
@@ -29,9 +37,23 @@ export default async function handler(req, res) {
         });
     }
 
+    // ============================================================
+    // v5.1: CAMADA DETERMINÍSTICA — score de qualidade de voo
+    // Calculada antes da IA; a lista enviada ao LLM já vem ordenada
+    // por qualidade e o resultado da IA é validado contra ela.
+    // ============================================================
+    const noitesNum = parseInt(noites) || 7;
+    const perfilVoo = {
+        orcamento: parseFloat(orcamento) || 0,
+        criancas: parseInt(criancas) || 0,
+        bebes: parseInt(bebes) || 0,
+        noites: noitesNum,
+    };
+    const destinosQualidade = ranquearPorQualidade(destinos, perfilVoo);
+
     if (!getCerebrasKey()) {
-        console.warn('⚠️ CEREBRAS_KEY não configurada, usando fallback por preço');
-        return res.status(200).json(rankByPrice(destinos, orcamento));
+        console.warn('⚠️ CEREBRAS_KEY não configurada, usando fallback determinístico');
+        return res.status(200).json(rankByQuality(destinosQualidade, orcamento));
     }
 
     try {
@@ -50,10 +72,13 @@ export default async function handler(req, res) {
         console.log(`📊 Estrutura: top(1) + alt(${numAlternativas}) + surpresa(${temSurpresa ? 1 : 0}) = ${totalSelecionados} de ${totalDestinos} disponíveis`);
 
         // ============================================================
-        // DETECTAR ESTAÇÃO DO ANO
+        // DETECTAR ESTAÇÃO DO ANO / CONTEXTO SAZONAL COM DATAS REAIS
         // ============================================================
         const mesViagem = dataIda ? new Date(dataIda + 'T12:00:00').getMonth() + 1 : null;
         const estacaoInfo = mesViagem ? getSeasonContext(mesViagem) : '';
+        const nomeMesViagem = mesViagem
+            ? ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'][mesViagem - 1]
+            : null;
 
         // ============================================================
         // SÍMBOLO DA MOEDA
@@ -63,13 +88,20 @@ export default async function handler(req, res) {
 
         // ============================================================
         // FORMATO COMPACTO PARA O LLM
+        // v5.1: lista já ordenada pelo score determinístico, com duração
+        // e alertas objetivos por destino visíveis para a IA
         // ============================================================
-        const listaCompacta = destinos.map((d, i) => {
+        const listaCompacta = destinosQualidade.map((d, i) => {
             const passagem = d.flight?.price || 0;
             const paradas = d.flight?.stops || 0;
             const fontes = d._source_count || 1;
             const hotel = d.avg_cost_per_night || 0;
-            return `${i + 1}|${d.name}|${d.country}|${d.primary_airport}|${simboloMoeda}${passagem}|${paradas}paradas|${fontes}fontes|Hotel:${simboloMoeda}${hotel}/noite`;
+            const durMin = d.flight?.flight_duration_minutes || 0;
+            const durTxt = durMin > 0 ? `${Math.floor(durMin / 60)}h${String(durMin % 60).padStart(2, '0')}` : '?';
+            const hotelTxt = hotel > 0 ? `Hotel:${simboloMoeda}${hotel}/noite` : 'Hotel:sem dado';
+            const alertas = descreverPenalidades(d._quality);
+            const alertaTxt = alertas.length > 0 ? `|ALERTA: ${alertas.join('; ')}` : '';
+            return `${i + 1}|${d.name}|${d.country}|${d.primary_airport}|${simboloMoeda}${passagem}|${paradas}paradas|voo ${durTxt}|score ${d._quality.score}|${fontes}fontes|${hotelTxt}${alertaTxt}`;
         }).join('\n');
 
         // ============================================================
@@ -119,8 +151,9 @@ ${estacaoInfo ? `- Contexto sazonal: ${estacaoInfo}` : ''}
 ${cenario === 'abaixo' ? `- NOTA: Poucos destinos dentro do orçamento — valorize os disponíveis` : ''}
 ${restricoesFamilia}
 ${observacoesBloco}
-DESTINOS PRÉ-FILTRADOS (já dentro do orçamento):
-Formato: ID|Nome|País|Aeroporto|Passagem ida+volta|Paradas|Fontes de confirmação|Hotel/noite
+DESTINOS PRÉ-FILTRADOS (todos DENTRO do orçamento — o orçamento é um TETO, opções mais baratas são tão válidas quanto as próximas do limite):
+Formato: ID|Nome|País|Aeroporto|Passagem ida+volta|Paradas|Duração do voo|Score objetivo (0-125, maior = melhor logística)|Fontes|Hotel/noite|Alertas
+A lista já está ORDENADA pelo score objetivo (preço, escalas, duração do voo vs. duração da viagem, perfil dos passageiros).
 ${listaCompacta}
 
 TAREFA: Com base no PERFIL acima, escolha os melhores destinos:
@@ -129,17 +162,24 @@ ${numAlternativas > 0 ? `2. ${numAlternativas} ALTERNATIVA${numAlternativas > 1 
 ${temSurpresa ? `3. 1 SURPRESA (inesperado e interessante)` : ''}
 
 CRITÉRIOS DE SELEÇÃO (em ordem de prioridade):
-1. MATCH COM PERFIL: O destino combina com "${preferencias}"? É adequado para ${companhia}?
+1. RESTRIÇÕES OBJETIVAS (NÃO NEGOCIÁVEL): você pode desempatar entre destinos de score parecido, mas NÃO pode escolher como MELHOR DESTINO uma opção com ALERTA de escalas/duração quando existir opção sem alerta de score igual ou maior. Um destino mais barato que o orçamento NUNCA é motivo de rejeição.
+2. MATCH COM PERFIL: O destino combina com "${preferencias}"? É adequado para ${companhia}?
    - Família com crianças → segurança, infraestrutura, atividades para crianças, voos curtos
    - Família com bebês → infraestrutura de saúde, clima ameno, facilidade de acesso
    - Casal → romance, gastronomia, cenários bonitos
    - Amigos → diversão, vida noturna, aventuras em grupo
    - Sozinho → segurança, facilidade, experiências culturais
-2. CLIMA NO PERÍODO: O destino é bom para visitar nessas datas?
-3. FONTES: Destinos com 2-3 fontes são mais confiáveis
-4. CUSTO TOTAL: passagem + hotel × ${noites || 7} noites
-5. DIVERSIDADE: Não repita países
-${(criancas > 0 || bebes > 0) ? '6. LOGÍSTICA FAMILIAR: Prefira voos diretos ou com menos paradas' : ''}
+3. ADEQUAÇÃO À ÉPOCA: a viagem é de ${dataIda || '?'} a ${dataVolta || '?'}${nomeMesViagem ? ` (${nomeMesViagem})` : ''}. Avalie se o destino é bom NESSAS datas.
+4. FONTES: Destinos com 2-3 fontes são mais confiáveis
+5. CUSTO TOTAL: passagem + hotel × ${noites || 7} noites
+6. DIVERSIDADE: Não repita países
+${(criancas > 0 || bebes > 0) ? '7. LOGÍSTICA FAMILIAR: Prefira voos diretos ou com menos paradas' : ''}
+
+REGRAS DE SAZONALIDADE (OBRIGATÓRIO):
+✓ NUNCA apresente fenômeno sazonal (lagoas cheias, neve, floração, desova, clima perfeito) como GARANTIDO
+✓ Se a experiência típica do destino depende da época e ${nomeMesViagem || 'o mês da viagem'} está fora do período mais favorável, diga isso em "adequacao_epoca" (ex: "fora do período mais favorável para as lagoas — confirme as condições antes da viagem")
+✓ Use expressões como "costuma", "geralmente", "as condições variam nesta época", nunca certezas
+✓ Preencha "adequacao_epoca" (1 frase sobre o destino nessas datas) e "ponto_negativo" (1 ponto de atenção honesto: escalas, chuva, alta temporada, deslocamento etc.) para CADA destino escolhido
 
 REGRAS:
 ✓ Use APENAS IDs da lista (1-${destinos.length})
@@ -153,9 +193,9 @@ ${observacoes ? '✓ O viajante deixou OBSERVAÇÕES PESSOAIS — faça referên
 
 JSON:
 {
-  "top_destino": {"id":1,"razao":"frase curta","comentario":"2-3 frases descritivas da Tripinha","dica":"dica prática da Tripinha"},
-  "alternativas": [${numAlternativas > 0 ? '\n    {"id":2,"razao":"frase","comentario":"descrição","dica":"dica"}' : ''}${numAlternativas > 1 ? ',\n    {"id":3,"razao":"frase","comentario":"descrição","dica":"dica"}' : ''}${numAlternativas > 2 ? ',\n    {"id":4,"razao":"frase","comentario":"descrição","dica":"dica"}' : ''}\n  ],
-  "surpresa": ${temSurpresa ? '{"id":5,"razao":"frase surpreendente","comentario":"descrição","dica":"dica"}' : 'null'}
+  "top_destino": {"id":1,"razao":"frase curta","comentario":"2-3 frases descritivas da Tripinha","dica":"dica prática da Tripinha","adequacao_epoca":"1 frase honesta sobre a época","ponto_negativo":"1 ponto de atenção"},
+  "alternativas": [${numAlternativas > 0 ? '\n    {"id":2,"razao":"frase","comentario":"descrição","dica":"dica","adequacao_epoca":"...","ponto_negativo":"..."}' : ''}${numAlternativas > 1 ? ',\n    {"id":3,"razao":"frase","comentario":"descrição","dica":"dica","adequacao_epoca":"...","ponto_negativo":"..."}' : ''}${numAlternativas > 2 ? ',\n    {"id":4,"razao":"frase","comentario":"descrição","dica":"dica","adequacao_epoca":"...","ponto_negativo":"..."}' : ''}\n  ],
+  "surpresa": ${temSurpresa ? '{"id":5,"razao":"frase surpreendente","comentario":"descrição","dica":"dica","adequacao_epoca":"...","ponto_negativo":"..."}' : 'null'}
 }`;
 
         // ============================================================
@@ -222,21 +262,21 @@ JSON:
         }
 
         // ============================================================
-        // FALLBACK: Ranking por preço (sem LLM)
+        // FALLBACK: Ranking determinístico (sem LLM)
         // ============================================================
         if (!ranking) {
-            console.warn('⚠️ Todos os modelos falharam, usando fallback por preço');
-            return res.status(200).json(rankByPrice(destinos, orcamento));
+            console.warn('⚠️ Todos os modelos falharam, usando fallback determinístico');
+            return res.status(200).json(rankByQuality(destinosQualidade, orcamento));
         }
 
         // ============================================================
-        // MAPEAR IDs → DADOS REAIS
+        // MAPEAR IDs → DADOS REAIS (na ordem enviada ao LLM)
         // ============================================================
         const mapDestino = (item) => {
             if (!item || typeof item.id !== 'number') return null;
             const idx = item.id - 1;
-            if (idx < 0 || idx >= destinos.length) return null;
-            const d = destinos[idx];
+            if (idx < 0 || idx >= destinosQualidade.length) return null;
+            const d = destinosQualidade[idx];
             return {
                 id: item.id,
                 name: d.name,
@@ -250,9 +290,12 @@ JSON:
                 return_date: d.return_date,
                 _sources: d._sources,
                 _source_count: d._source_count,
+                _quality: d._quality,
                 razao: item.razao || '',
                 comentario: item.comentario || '',
                 dica: item.dica || '',
+                adequacao_epoca: item.adequacao_epoca || '',
+                ponto_negativo: item.ponto_negativo || '',
             };
         };
 
@@ -267,7 +310,49 @@ JSON:
 
         if (!resultado.top_destino) {
             console.warn('⚠️ top_destino inválido após mapeamento, usando fallback');
-            return res.status(200).json(rankByPrice(destinos, orcamento));
+            return res.status(200).json(rankByQuality(destinosQualidade, orcamento));
+        }
+
+        // ============================================================
+        // v5.1: VALIDAÇÃO DETERMINÍSTICA PÓS-IA
+        // Se o top_destino da IA viola restrição objetiva (família + 2 ou
+        // mais escalas havendo opção melhor), promove a melhor alternativa
+        // que respeita a restrição e rebaixa a escolha da IA.
+        // ============================================================
+        if (violaRestricaoObjetiva(resultado.top_destino, destinosQualidade, perfilVoo)) {
+            const candidatos = [
+                ...resultado.alternativas,
+                ...(resultado.surpresa ? [resultado.surpresa] : []),
+            ].filter(d => d && !violaRestricaoObjetiva(d, destinosQualidade, perfilVoo));
+
+            let substituto = candidatos[0] || null;
+            if (!substituto) {
+                // Nenhuma escolha da IA respeita a restrição: usa o melhor do score
+                const melhor = destinosQualidade.find(d => !violaRestricaoObjetiva(d, destinosQualidade, perfilVoo));
+                if (melhor) {
+                    substituto = {
+                        ...melhor,
+                        id: destinosQualidade.indexOf(melhor) + 1,
+                        razao: 'Melhor combinação objetiva de preço, escalas e duração para o seu grupo.',
+                        comentario: '',
+                        dica: '',
+                        adequacao_epoca: '',
+                        ponto_negativo: '',
+                    };
+                }
+            }
+
+            if (substituto) {
+                console.warn(`⚖️ Top da IA (${resultado.top_destino.name}, ${resultado.top_destino.flight?.stops} escalas) viola restrição objetiva — promovendo ${substituto.name}`);
+                const antigoTop = resultado.top_destino;
+                resultado.top_destino = substituto;
+                resultado.alternativas = [
+                    antigoTop,
+                    ...resultado.alternativas.filter(d => d !== substituto),
+                ].slice(0, 3);
+                if (resultado.surpresa === substituto) resultado.surpresa = null;
+                resultado._ajusteDeterministico = true;
+            }
         }
 
         return res.status(200).json(resultado);
@@ -276,7 +361,7 @@ JSON:
         console.error('❌ Erro no ranking:', erro);
 
         try {
-            return res.status(200).json(rankByPrice(destinos, orcamento));
+            return res.status(200).json(rankByQuality(ranquearPorQualidade(destinos, perfilVoo), orcamento));
         } catch (fallbackErr) {
             return res.status(500).json({
                 error: 'Erro interno no ranking',
@@ -308,20 +393,14 @@ function getSeasonContext(mes) {
 }
 
 // ============================================================
-// FALLBACK: Ranking simples por preço (sem LLM)
+// FALLBACK: Ranking determinístico por score de qualidade (sem LLM)
+// Recebe a lista JÁ ordenada por ranquearPorQualidade().
 // ============================================================
-function rankByPrice(destinos, orcamento) {
-    const comPreco = destinos.filter(d => d.flight?.price > 0);
-
-    if (comPreco.length === 0) {
-        const top5 = destinos.slice(0, 5);
-        return buildFallbackResult(top5, orcamento);
+function rankByQuality(destinosOrdenados, orcamento) {
+    const pool = destinosOrdenados.filter(d => d.flight?.price > 0);
+    if (pool.length === 0) {
+        return buildFallbackResult(destinosOrdenados.slice(0, 5), orcamento);
     }
-
-    const dentroOrcamento = comPreco.filter(d => d.flight.price <= orcamento);
-    const pool = dentroOrcamento.length >= 5 ? dentroOrcamento : comPreco;
-
-    pool.sort((a, b) => a.flight.price - b.flight.price);
 
     const selected = [];
     const usedNames = new Set();
@@ -366,19 +445,22 @@ function buildFallbackResult(selected, orcamento) {
         return_date: d.return_date,
         _sources: d._sources,
         _source_count: d._source_count,
+        _quality: d._quality || null,
         razao,
         comentario: '',
         dica: '',
+        adequacao_epoca: '',
+        ponto_negativo: '',
     });
 
     const totalDisponivel = selected.length;
     const poucosResultados = totalDisponivel < 5;
 
     return {
-        top_destino: selected[0] ? wrap(selected[0], 'A Tripinha farejou o melhor preço pra você! 🐶') : null,
-        alternativas: selected.slice(1, Math.min(4, totalDisponivel)).map(d => wrap(d, 'Outra opção bacana que encontrei!')),
-        surpresa: (totalDisponivel >= 5 && selected[4]) ? wrap(selected[4], 'A Tripinha farejou um lugar diferente pra você explorar! 🎁') : null,
-        _model: 'fallback_price',
+        top_destino: selected[0] ? wrap(selected[0], 'Melhor combinação de preço, escalas e duração entre as opções pesquisadas.') : null,
+        alternativas: selected.slice(1, Math.min(4, totalDisponivel)).map(d => wrap(d, 'Outra opção com boa relação preço e logística.')),
+        surpresa: (totalDisponivel >= 5 && selected[4]) ? wrap(selected[4], 'Um lugar diferente entre as opções pesquisadas!') : null,
+        _model: 'fallback_quality',
         _totalAnalisados: totalDisponivel,
         _poucosResultados: poucosResultados,
     };

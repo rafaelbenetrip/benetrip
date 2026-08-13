@@ -302,10 +302,21 @@ const BenetripVaiEVem = {
     // RESOLVER IATA PARA GOOGLE FLIGHTS
     // ================================================================
     getIataParaGoogleFlights(cidade) {
+        // Cidade agregada → lista completa de aeroportos (o link do Google
+        // Flights aceita múltiplos por trecho; não abre mais só o primeiro)
         if (cidade.isCityCode && cidade.aeroportosIncluidos && cidade.aeroportosIncluidos.length > 0) {
-            return cidade.aeroportosIncluidos[0];
+            return cidade.aeroportosIncluidos;
         }
         return cidade.code;
+    },
+
+    // Aeroportos reais da tarifa quando a viagem foi enriquecida
+    _realAirports(viagem) {
+        const fd = viagem?.flight_details;
+        return {
+            origin: fd?.origin_airport || null,
+            dest: fd?.destination_airport || null,
+        };
     },
 
     // ================================================================
@@ -327,7 +338,8 @@ const BenetripVaiEVem = {
         const diasIdaLabel = [...this.state.diasIda].sort().map(d => this.DIAS_CURTO[d]).join(', ');
         const diasVoltaLabel = [...this.state.diasVolta].sort().map(d => this.DIAS_CURTO[d]).join(', ');
 
-        const winnerUrl = this.buildGoogleFlightsUrl(originIataGF, destIataGF, maisBarata.ida, maisBarata.volta, moedaSelecionada);
+        const realWinner = this._realAirports(maisBarata);
+        const winnerUrl = this.buildGoogleFlightsUrl(originIataGF, destIataGF, maisBarata.ida, maisBarata.volta, moedaSelecionada, realWinner.origin, realWinner.dest);
 
         // Tripinha: insight + escolha
         const tripinha = data.tripinha || {};
@@ -336,7 +348,8 @@ const BenetripVaiEVem = {
         if (escolha) {
             const viagemEscolhida = this.encontrarViagem(data, escolha.ida, escolha.volta);
             if (viagemEscolhida) {
-                const url = this.buildGoogleFlightsUrl(originIataGF, destIataGF, viagemEscolhida.ida, viagemEscolhida.volta, moedaSelecionada);
+                const realEscolha = this._realAirports(viagemEscolhida);
+                const url = this.buildGoogleFlightsUrl(originIataGF, destIataGF, viagemEscolhida.ida, viagemEscolhida.volta, moedaSelecionada, realEscolha.origin, realEscolha.dest);
                 escolhaHtml = `
                     <div class="tripinha-escolha">
                         <span class="escolha-badge">🏆 Escolha da Tripinha</span>
@@ -348,19 +361,26 @@ const BenetripVaiEVem = {
             }
         }
 
-        // Legenda de classificação
-        const faixa = data.classificacao?.faixa;
-        const fonteGoogle = data.classificacao?.fonte === 'google';
+        // Legenda de classificação: a referência é sempre a distribuição das
+        // semanas pesquisadas — a faixa do Google entra apenas como contexto
+        const classificacao = data.classificacao || {};
+        const faixa = classificacao.faixa;
+        const faixaGoogle = classificacao.faixaGoogle;
+        const contextoGoogle = faixaGoogle
+            ? `<span class="legenda-contexto">Contexto: o Google indica faixa típica de <strong>${simbolo} ${faixaGoogle.low.toLocaleString('pt-BR')} — ${simbolo} ${faixaGoogle.high.toLocaleString('pt-BR')}</strong> para esta rota.</span>`
+            : '';
         const legendaHtml = faixa ? `
             <div class="legenda-classes fade-in" style="animation-delay: 0.18s">
-                <span class="legenda-titulo">${fonteGoogle
-                    ? `Faixa típica do Google para esta rota: <strong>${simbolo} ${faixa.low.toLocaleString('pt-BR')} — ${simbolo} ${faixa.high.toLocaleString('pt-BR')}</strong>`
-                    : 'Comparação entre as semanas encontradas:'}</span>
+                <span class="legenda-titulo">${classificacao.precosSemelhantes
+                    ? 'As semanas pesquisadas têm preços semelhantes — escolha pela conveniência das datas.'
+                    : 'Classificação <strong>em relação às semanas pesquisadas</strong> (não é comparação histórica):'}</span>
+                ${classificacao.precosSemelhantes ? '' : `
                 <div class="legenda-itens">
-                    <span class="badge-classe badge-barato">Preço bom</span>
+                    <span class="badge-classe badge-barato">Mais barata que a maioria</span>
                     <span class="badge-classe badge-normal">Na média</span>
-                    <span class="badge-classe badge-caro">Salgado</span>
-                </div>
+                    <span class="badge-classe badge-caro">Mais cara que a maioria</span>
+                </div>`}
+                ${contextoGoogle}
             </div>` : '';
 
         const html = `
@@ -425,6 +445,10 @@ const BenetripVaiEVem = {
                     <div class="stat-card-label">Mais cara</div>
                     <div class="stat-card-value orange">${simbolo} ${data.stats.maisCara.price.toLocaleString('pt-BR')}</div>
                 </div>
+                <div class="stat-card">
+                    <div class="stat-card-label">Economia entre semanas</div>
+                    <div class="stat-card-value">${simbolo} ${(data.stats.economia || 0).toLocaleString('pt-BR')}</div>
+                </div>
             </div>
 
             <div class="tripinha-tip fade-in" style="animation-delay: 0.15s">
@@ -437,6 +461,7 @@ const BenetripVaiEVem = {
             </div>
 
             ${legendaHtml}
+            ${this.renderAlertaSection()}
 
             <div class="semanas-section fade-in" style="animation-delay: 0.2s">
                 <h3 class="semanas-title">📅 Semana a semana na sua rota</h3>
@@ -466,6 +491,30 @@ const BenetripVaiEVem = {
         this.showResults();
     },
 
+    // ================================================================
+    // ALERTA DE PREÇO (segunda etapa)
+    // Só aparece com a feature flag ligada, o que exige a infraestrutura
+    // descrita em docs/alertas-de-preco.md (canal de envio, fila e
+    // persistência). Sem isso não exibimos formulário: cadastrar um alerta
+    // que nunca seria disparado é pior do que não oferecer.
+    // ================================================================
+    renderAlertaSection() {
+        if (!window.BENETRIP_FLAGS?.alertasPreco) return '';
+        const { origemSelecionada, destinoSelecionado } = this.state;
+        const rota = `${origemSelecionada?.displayCode || origemSelecionada?.code} → ${destinoSelecionado?.displayCode || destinoSelecionado?.code}`;
+        return `
+            <div class="alerta-section fade-in">
+                <h3 class="alerta-title">🔔 Avisar quando ficar mais barato</h3>
+                <p class="alerta-sub">Rota ${rota}, nos dias que você escolheu.</p>
+                <button class="btn-alerta" onclick="BenetripVaiEVem.abrirCadastroAlerta()">Criar alerta</button>
+            </div>`;
+    },
+
+    abrirCadastroAlerta() {
+        // Implementação depende de POST /api/price-alerts (ver docs/alertas-de-preco.md)
+        console.warn('[VaiEVem] Cadastro de alerta indisponível: infraestrutura de notificação não configurada');
+    },
+
     encontrarViagem(data, ida, volta) {
         for (const s of data.semanas) {
             const hit = s.opcoes.find(o => o.ida === ida && o.volta === volta);
@@ -493,11 +542,19 @@ const BenetripVaiEVem = {
             `<img src="${logo}" alt="" style="width:24px;height:24px;border-radius:4px;background:#fff;" onerror="this.style.display='none'">`
         ).join('');
 
+        // Aeroportos reais da tarifa (podem diferir do primeiro aeroporto
+        // da cidade agregada — ex.: VCP em vez de GRU)
+        const real = this._realAirports(viagem);
+        const airportChip = real.origin && real.dest
+            ? `<div class="winner-detail-chip">🛫 ${real.origin} → ${real.dest}</div>`
+            : '';
+
         return `
             <div class="winner-flight-details">
                 <div class="winner-detail-chip">${logosHtml} ${airlinesStr}</div>
                 <div class="winner-detail-chip">⏱️ ${durationStr}</div>
                 <div class="winner-detail-chip">${fd.stops === 0 ? '✅' : '🔄'} ${stopsStr}</div>
+                ${airportChip}
             </div>
         `;
     },
@@ -508,7 +565,8 @@ const BenetripVaiEVem = {
             : '';
 
         const opcoesHtml = semana.opcoes.map(o => {
-            const url = this.buildGoogleFlightsUrl(originIataGF, destIataGF, o.ida, o.volta, this.state.moedaSelecionada);
+            const realOpcao = this._realAirports(o);
+            const url = this.buildGoogleFlightsUrl(originIataGF, destIataGF, o.ida, o.volta, this.state.moedaSelecionada, realOpcao.origin, realOpcao.dest);
             const isMaisBarata = o === semana.maisBarata || (o.ida === semana.maisBarata.ida && o.volta === semana.maisBarata.volta);
             const svgArrow = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17l9.2-9.2M17 17V7H7"/></svg>`;
 
@@ -520,10 +578,12 @@ const BenetripVaiEVem = {
                         </div>
                         <div class="opcao-meta">
                             ${o.noites} noite${o.noites > 1 ? 's' : ''}
+                            ${o.flight_details ? ` · ${o.flight_details.stops === 0 ? 'direto' : `${o.flight_details.stops} conexão${o.flight_details.stops > 1 ? 'ões' : ''}`}${o.flight_details.total_duration ? ` · ${Math.floor(o.flight_details.total_duration / 60)}h${String(o.flight_details.total_duration % 60).padStart(2, '0')}` : ''}` : ''}
                             ${o.feriados && o.feriados.length > 0 ? ` · 🎉 ${o.feriados[0].nome}` : ''}
                         </div>
+                        ${o.viabilidade?.nivel === 'inviavel' ? `<div class="opcao-aviso">⚠️ ${o.viabilidade.motivo}</div>` : ''}
                     </div>
-                    <span class="badge-classe badge-${o.classe}">${{ barato: 'Preço bom', normal: 'Na média', caro: 'Salgado' }[o.classe] || ''}</span>
+                    <span class="badge-classe badge-${o.classe}">${{ barato: 'Mais barata', normal: 'Na média', caro: 'Mais cara' }[o.classe] || ''}</span>
                     <div class="opcao-preco">${simbolo} ${o.price.toLocaleString('pt-BR')}</div>
                     <a href="${url}" target="_blank" rel="noopener" class="opcao-link" title="Ver no Google Flights">${svgArrow}</a>
                 </div>
@@ -561,7 +621,8 @@ const BenetripVaiEVem = {
         const simbolo = this.getSimbolo(moedaSelecionada);
         const maisBarata = data.stats.maisBarata;
 
-        const googleUrl = this.buildGoogleFlightsUrl(originIataGF, destIataGF, maisBarata.ida, maisBarata.volta, moedaSelecionada);
+        const realBarata = this._realAirports(maisBarata);
+        const googleUrl = this.buildGoogleFlightsUrl(originIataGF, destIataGF, maisBarata.ida, maisBarata.volta, moedaSelecionada, realBarata.origin, realBarata.dest);
 
         let text = `🔁 *Achei as melhores datas pra nossa rota de sempre!*\n\n`;
         text += `📍 ${origemSelecionada.name} (${displayOrigemCode}) → ${destinoSelecionado.name} (${displayDestinoCode})\n\n`;
@@ -637,7 +698,19 @@ const BenetripVaiEVem = {
         ];
     },
 
-    buildGoogleFlightsUrl(orig, dest, depDate, retDate, moeda) {
+    buildGoogleFlightsUrl(orig, dest, depDate, retDate, moeda, realOrig = null, realDest = null) {
+        // Módulo compartilhado: aeroporto real da tarifa quando conhecido;
+        // senão, todos os aeroportos do grupo agregado
+        if (typeof BenetripFlightLinks !== 'undefined') {
+            const url = BenetripFlightLinks.buildUrl({
+                origins: realOrig || orig,
+                destinations: realDest || dest,
+                departDate: depDate, returnDate: retDate, currency: moeda,
+            });
+            if (url) return url;
+        }
+        if (Array.isArray(orig)) orig = orig[0];
+        if (Array.isArray(dest)) dest = dest[0];
         const tfsBytes = [
             ...this._protoVarintField(1, 28),
             ...this._protoVarintField(2, 2),

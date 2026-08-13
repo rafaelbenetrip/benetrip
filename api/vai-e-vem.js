@@ -157,6 +157,21 @@ async function enrichFlightDetails(origemCode, destinoCode, departDate, returnDa
             typical_price_range: data.price_insights.typical_price_range || null,
         } : null;
 
+        // Aeroportos EFETIVOS da tarifa: quando a busca é por cidade agregada
+        // (SAO), a tarifa mais barata pode sair de VCP/CGH — o link externo
+        // precisa abrir esse aeroporto, não o primeiro da lista da cidade.
+        const primeiroTrecho = flights[0] || null;
+        // Em round_trip os trechos de ida vêm primeiro; o destino é o
+        // aeroporto de chegada do último trecho antes do retorno começar.
+        const origemReal = primeiroTrecho?.departure_airport?.id || null;
+        let destinoReal = null;
+        for (const leg of flights) {
+            const chegada = leg.arrival_airport?.id;
+            if (chegada && chegada !== origemReal) destinoReal = chegada;
+            // ao voltar para a origem, o trecho de retorno começou
+            if (chegada && chegada === origemReal) break;
+        }
+
         return {
             total_duration: bestFlight.total_duration || 0,
             stops: (bestFlight.layovers || []).length,
@@ -164,6 +179,8 @@ async function enrichFlightDetails(origemCode, destinoCode, departDate, returnDa
             airline_logos: Array.from(airlineLogos),
             price: bestFlight.price || 0,
             price_insights: priceInsights,
+            origin_airport: origemReal,
+            destination_airport: destinoReal,
         };
     } catch (err) {
         console.error(`[VaiEVem][Enrich][${label}] Erro:`, err.message);
@@ -219,26 +236,83 @@ function feriadosNoPeriodo(todosFeriados, ida, volta) {
 
 // ============================================================
 // CLASSIFICAÇÃO DE PREÇO
-// Preferência: faixa típica do Google (price_insights). Sem ela,
-// fallback por quartis dos próprios resultados.
+//
+// A base é SEMPRE a distribuição das semanas efetivamente pesquisadas
+// (quartis): é o único conjunto que a Benetrip realmente mediu, e a tela
+// diz isso com todas as letras ("em relação às semanas pesquisadas").
+// A faixa típica do Google, quando existe, entra como CONTEXTO extra —
+// nunca como base para afirmar que um preço é barato historicamente.
+//
+// Quando todas as semanas custam praticamente o mesmo (amplitude < 10%),
+// não faz sentido chamar uma de barata e outra de cara: todas viram 'normal'.
 // ============================================================
-function criarClassificador(faixaTipica, precosOrdenados) {
-    if (faixaTipica && faixaTipica.length === 2 && faixaTipica[0] > 0) {
-        const [low, high] = faixaTipica;
+export const AMPLITUDE_MINIMA_PCT = 10;
+
+export function criarClassificador(precosOrdenados, faixaTipicaGoogle = null) {
+    const precos = [...(precosOrdenados || [])].sort((a, b) => a - b);
+    const contexto = (faixaTipicaGoogle && faixaTipicaGoogle.length === 2 && faixaTipicaGoogle[0] > 0)
+        ? { low: faixaTipicaGoogle[0], high: faixaTipicaGoogle[1] }
+        : null;
+
+    if (precos.length === 0) {
         return {
-            fonte: 'google',
-            faixa: { low, high },
-            classificar: (preco) => (preco <= low ? 'barato' : preco <= high ? 'normal' : 'caro'),
+            fonte: 'semanas_pesquisadas',
+            referencia: 'em relação às semanas pesquisadas',
+            faixa: null,
+            faixaGoogle: contexto,
+            precosSemelhantes: false,
+            classificar: () => 'normal',
         };
     }
 
-    const p25 = precosOrdenados[Math.floor(precosOrdenados.length * 0.25)];
-    const p75 = precosOrdenados[Math.floor(precosOrdenados.length * 0.75)];
+    const menor = precos[0];
+    const maior = precos[precos.length - 1];
+    const amplitudePct = maior > 0 ? ((maior - menor) / maior) * 100 : 0;
+
+    if (amplitudePct < AMPLITUDE_MINIMA_PCT) {
+        return {
+            fonte: 'semanas_pesquisadas',
+            referencia: 'as semanas pesquisadas têm preços semelhantes',
+            faixa: { low: menor, high: maior },
+            faixaGoogle: contexto,
+            precosSemelhantes: true,
+            classificar: () => 'normal',
+        };
+    }
+
+    const quartil = (q) => precos[Math.min(precos.length - 1, Math.floor(precos.length * q))];
+    const p25 = quartil(0.25);
+    const p75 = quartil(0.75);
+
     return {
-        fonte: 'quartis',
+        fonte: 'semanas_pesquisadas',
+        referencia: 'em relação às semanas pesquisadas',
         faixa: { low: p25, high: p75 },
+        faixaGoogle: contexto,
+        precosSemelhantes: false,
         classificar: (preco) => (preco <= p25 ? 'barato' : preco <= p75 ? 'normal' : 'caro'),
     };
+}
+
+// ============================================================
+// VIABILIDADE DA VIAGEM
+// Uma ida e volta de 2 noites não comporta 12h de voo com 2 escalas.
+// Só avalia quando há detalhes do voo — sem dado, não afirma nada.
+// ============================================================
+export function classificarViabilidadeViagem(viagem) {
+    const fd = viagem?.flight_details;
+    const noites = viagem?.noites || 0;
+    if (!fd || !fd.total_duration || !noites) return { nivel: 'desconhecida', motivo: null };
+
+    const fracao = fd.total_duration / (noites * 24 * 60);
+    if (fracao > 0.25) {
+        return { nivel: 'inviavel', motivo: 'O tempo de voo consome uma parte grande da viagem' };
+    }
+    if ((fd.stops || 0) >= 2 && noites <= 2) {
+        return { nivel: 'inviavel', motivo: 'Duas ou mais conexões para poucas noites' };
+    }
+    if (fracao > 0.15 || (fd.stops || 0) >= 1) return { nivel: 'aceitavel', motivo: null };
+    return { nivel: 'boa', motivo: null };
 }
 
 // ============================================================
@@ -261,7 +335,7 @@ function gerarFallbackTripinha(contexto) {
     const escolha = {
         ida: maisBarato.ida,
         volta: maisBarato.volta,
-        motivo: `A viagem mais barata do período: ${simbolo} ${maisBarato.price.toLocaleString('pt-BR')} indo ${nomeDiaSemana(maisBarato.ida, true)} e voltando ${nomeDiaSemana(maisBarato.volta, true)}!`,
+        motivo: `Mais barata entre as semanas pesquisadas: ${simbolo} ${maisBarato.price.toLocaleString('pt-BR')} indo ${nomeDiaSemana(maisBarato.ida, true)} e voltando ${nomeDiaSemana(maisBarato.volta, true)}.`,
     };
 
     if (economia > 0 && maisBarato.price > 0 && economia / maisBarato.price >= 0.3) {
@@ -316,6 +390,7 @@ Regras:
 - Use os NÚMEROS EXATOS fornecidos, nunca invente preços ou datas
 - Use no máximo 1 emoji no início
 - NÃO use hashtags, NÃO comece com "Ei" ou "Olha"
+- A comparação é SEMPRE entre as semanas pesquisadas. É PROIBIDO afirmar que um preço é barato "historicamente", "como nunca" ou "o menor do ano" — não temos histórico para isso. Diga "mais barata entre as semanas que pesquisei" ou equivalente.
 
 Além do insight, escolha 1 viagem da lista como "escolha da Tripinha" — o melhor custo-benefício considerando preço e feriados. Justifique em até 110 caracteres, factual.
 Retorne APENAS um JSON: { "insight": "sua frase", "escolha": { "ida": "YYYY-MM-DD exato da lista", "volta": "YYYY-MM-DD exato da lista", "motivo": "justificativa curta" } }`;
@@ -565,10 +640,15 @@ export default async function handler(req, res) {
 
         // ============================================================
         // CLASSIFICAÇÃO barato / normal / caro
+        // Base: distribuição das semanas pesquisadas (a faixa do Google
+        // entra só como contexto exibido, não como critério)
         // ============================================================
         const precosOrdenados = viagens.map(v => v.price).sort((a, b) => a - b);
-        const classificador = criarClassificador(faixaTipica, precosOrdenados);
-        viagens.forEach(v => { v.classe = classificador.classificar(v.price); });
+        const classificador = criarClassificador(precosOrdenados, faixaTipica);
+        viagens.forEach(v => {
+            v.classe = classificador.classificar(v.price);
+            v.viabilidade = classificarViabilidadeViagem(v);
+        });
 
         // ============================================================
         // AGRUPAR POR SEMANA (segunda-feira da semana da ida)
@@ -602,6 +682,11 @@ export default async function handler(req, res) {
             media: Math.round(soma / viagens.length),
             totalViagens: viagens.length,
             totalSemanas: semanas.length,
+            // Economia entre a semana mais barata e a mais cara pesquisadas
+            economia: viagens[viagens.length - 1].price - viagens[0].price,
+            economiaPct: viagens[viagens.length - 1].price > 0
+                ? Math.round(((viagens[viagens.length - 1].price - viagens[0].price) / viagens[viagens.length - 1].price) * 100)
+                : 0,
         };
 
         const nomesMes = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
@@ -637,12 +722,15 @@ export default async function handler(req, res) {
             feriadosResumo: comFeriado > 0
                 ? `${comFeriado} (ex.: ${viagens.find(v => v.feriados.length > 0).feriados[0].nome})`
                 : null,
-            faixaResumo: classificador.fonte === 'google'
-                ? `${simbolo} ${classificador.faixa.low.toLocaleString('pt-BR')} a ${simbolo} ${classificador.faixa.high.toLocaleString('pt-BR')}`
+            faixaResumo: classificador.faixaGoogle
+                ? `${simbolo} ${classificador.faixaGoogle.low.toLocaleString('pt-BR')} a ${simbolo} ${classificador.faixaGoogle.high.toLocaleString('pt-BR')}`
                 : null,
         };
 
-        const tripinha = await gerarTripinha(contexto, viagens.slice(0, 8));
+        // A escolha da Tripinha não pode recair sobre uma viagem com voo
+        // desproporcional para o número de noites
+        const candidatas = viagens.filter(v => v.viabilidade?.nivel !== 'inviavel').slice(0, 8);
+        const tripinha = await gerarTripinha(contexto, candidatas.length > 0 ? candidatas : viagens.slice(0, 8));
 
         const totalTime = Date.now() - startTime;
         console.log(`✅ VaiEVem completo em ${totalTime}ms | ${viagens.length} viagens em ${semanas.length} semanas | mais barata: ${simbolo} ${stats.maisBarata.price}`);
@@ -655,7 +743,13 @@ export default async function handler(req, res) {
             meses: mesesNum,
             diasIda: [...setIda].sort(),
             diasVolta: [...setVolta].sort(),
-            classificacao: { fonte: classificador.fonte, faixa: classificador.faixa },
+            classificacao: {
+                fonte: classificador.fonte,
+                referencia: classificador.referencia,
+                faixa: classificador.faixa,
+                faixaGoogle: classificador.faixaGoogle,
+                precosSemelhantes: classificador.precosSemelhantes,
+            },
             stats,
             semanas,
             mesesResumo,

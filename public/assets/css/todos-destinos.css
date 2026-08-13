@@ -991,3 +991,24 @@ body.filtros-open { overflow: hidden; }
     font-size: 12px;
     font-weight: 700;
 }
+
+/* ============================================================
+   Contagem de lugares x aeroportos e aviso de aeroporto compartilhado
+   ============================================================ */
+.contagem-explicacao {
+    font-size: 12px;
+    line-height: 1.5;
+    color: #666;
+    margin: 10px 0 0;
+    padding: 0 4px;
+}
+
+.destino-via-aeroporto {
+    font-size: 11px;
+    line-height: 1.4;
+    color: #7a3c0d;
+    background: rgba(232, 119, 34, 0.09);
+    border-radius: 6px;
+    padding: 5px 8px;
+    margin-top: 6px;
+}

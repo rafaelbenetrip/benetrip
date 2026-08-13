@@ -4,7 +4,19 @@
 //
 // POST /api/discovery-smart-filter
 // Body: { query: "praia barata pra casal", destinos: [...] }
-// Response: { filtros: {...}, indices: [0,2,5], explicacao: "..." }
+// Response: { filtros: {...}, filtrosDescricao: [...], indices: [0,2,5], explicacao: "..." }
+//
+// v2.1: a IA interpreta o pedido em filtros ESTRUTURADOS e a aplicação deles
+// é determinística (api/_lib/smart-filter.js). A IA ordena por relevância mas
+// não consegue furar um critério objetivo — "sem escalas, até R$ 1.500" passa
+// a valer de verdade. Os filtros interpretados voltam para a tela.
+
+import {
+    aplicarFiltrosEstruturados,
+    combinarComRelevancia,
+    descreverFiltros,
+    normalizarFiltros,
+} from './_lib/smart-filter.js';
 
 export default async function handler(req, res) {
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -47,25 +59,30 @@ function getCerebrasKey() {
 async function smartFilter(query, destinos) {
     // Montar lista compacta dos destinos para o LLM
     const listaCompacta = destinos.map((d, i) =>
-        `${i}|${d.nome}|${d.pais}|R$${d.preco}|${(d.estilos || []).join(',')}|${d.internacional ? 'intl' : 'nac'}|${d.paradas}p`
+        `${i}|${d.nome}|${d.pais}|R$${d.preco}|${(d.estilos || []).join(',')}|${d.internacional ? 'intl' : 'nac'}|${d.paradas}p|${d.duracao_voo_min ? `${d.duracao_voo_min}min` : 'dur?'}|${d.aeroporto || '?'}`
     ).join('\n');
 
     const systemMessage = `Você é um assistente de viagens da Benetrip. O usuário quer filtrar destinos de viagem.
 
-Analise o pedido do usuário e retorne um JSON com:
-1. "indices": array com os índices (números) dos destinos que melhor combinam com o pedido, ordenados do mais relevante ao menos. Retorne no máximo 20.
-2. "explicacao": frase curta (máx 60 chars) explicando o filtro aplicado, em português. Ex: "Praias baratas para casal"
-3. "titulo": título curto para a seção de resultados (máx 40 chars). Ex: "Praias para Casal"
+Analise o pedido e retorne um JSON com:
+1. "filtros": objeto com os critérios OBJETIVOS extraídos do pedido. Use apenas os campos citados pelo usuário; omita o resto.
+   - precoMax / precoMin: número em reais
+   - estilos: array entre praia, cidade, natureza, romantico, familia, aventura
+   - familia: true quando o pedido é para viajar com família/crianças
+   - internacional: true (só exterior) ou false (só nacional)
+   - pais: nome do país, se citado
+   - direto: true quando o usuário pede sem escalas
+   - maxParadas: número máximo de paradas, se citado
+   - duracaoMaxMin: duração máxima do voo em minutos, se citada
+   - aeroporto: código IATA, se citado
+   - periodo: "AAAA-MM" quando um mês específico for citado
+2. "indices": array com os índices dos destinos mais relevantes, do melhor ao pior (máx 20). Serve para ORDENAR; os critérios objetivos são aplicados pelo sistema.
+3. "explicacao": frase curta (máx 60 chars) do que foi entendido. Ex: "Praias para família, sem escalas, até R$ 1.500"
+4. "titulo": título curto para a seção (máx 40 chars). Ex: "Praias para Família"
 
-Considere:
-- Preço: "barato/econômico" = até R$800, "médio" = R$800-1500, "caro/premium" = acima de R$1500
-- "Perto" = voos nacionais ou paradas=0
-- "Longe/exótico" = internacional
-- Estilos: praia, cidade, natureza, romantico, familia, aventura
-- "Casal/romântico" = estilo romantico ou cidades conhecidas como românticas
-- "Família/crianças" = estilo familia
-- Se o pedido for vago, priorize os mais baratos
-- Se pedir algo impossível (ex: praia no interior), retorne array vazio
+Referências de preço quando o usuário não der um valor:
+- "barato/econômico" = precoMax 800 · "médio" = precoMax 1500 · "caro/premium" = precoMin 1500
+Outras equivalências: "perto" = direto true · "longe/exótico" = internacional true · "casal/romântico" = estilo romantico
 
 IMPORTANTE: Retorne APENAS o JSON, sem markdown, sem explicação extra.`;
 
@@ -108,12 +125,20 @@ ${listaCompacta}`;
             if (!content) continue;
 
             const parsed = JSON.parse(content);
-            const indices = (parsed.indices || []).filter(i => i >= 0 && i < destinos.length);
+            const indicesIA = (parsed.indices || []).filter(i => Number.isInteger(i) && i >= 0 && i < destinos.length);
 
-            console.log(`✅ Smart filter (${model}): "${query}" → ${indices.length} resultados`);
+            // Os critérios objetivos são aplicados aqui, não pela IA:
+            // ela só define a ordem de relevância entre os que passaram.
+            const filtros = normalizarFiltros(parsed.filtros);
+            const indices = combinarComRelevancia(destinos, filtros, indicesIA);
+            const descartadosPelaIA = indicesIA.filter(i => !indices.includes(i)).length;
+
+            console.log(`✅ Smart filter (${model}): "${query}" → ${indices.length} resultados${descartadosPelaIA > 0 ? ` (${descartadosPelaIA} sugestões da IA descartadas por não atenderem os critérios)` : ''}`);
 
             return {
                 indices,
+                filtros,
+                filtrosDescricao: descreverFiltros(filtros),
                 explicacao: parsed.explicacao || '',
                 titulo: parsed.titulo || 'Resultados',
                 modelo: model,
@@ -153,30 +178,54 @@ function fallbackTextSearch(query, destinos) {
     let precoMax = null;
     let estiloFiltro = null;
     let escopoFiltro = null;
+    let direto = null;
     const textoBusca = [];
 
+    // "sem escalas" / "voo direto" tamb\u00e9m valem no fallback sem IA
+    const queryNorm = query.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    if (/(sem escala|voo direto|direto)/.test(queryNorm)) direto = true;
+    // "at\u00e9 R$ 1500" / "ate 1500"
+    const tetoMatch = queryNorm.match(/at(e|\u00e9)\s*r?\$?\s*([\d.]+)/);
+    if (tetoMatch) {
+        const valor = parseInt(tetoMatch[2].replace(/\./g, ''), 10);
+        if (Number.isFinite(valor) && valor > 0) precoMax = valor;
+    }
+
     for (const t of termos) {
-        if (precoMap[t]) precoMax = precoMap[t];
+        if (!precoMax && precoMap[t]) precoMax = precoMap[t];
         else if (estiloMap[t]) estiloFiltro = estiloMap[t];
         else if (escopoMap[t] !== undefined) escopoFiltro = escopoMap[t];
         else textoBusca.push(t);
     }
 
-    const indices = [];
-    destinos.forEach((d, i) => {
-        const nomeNorm = (d.nome + ' ' + d.pais).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-
-        if (precoMax && d.preco > precoMax) return;
-        if (estiloFiltro && !(d.estilos || []).includes(estiloFiltro)) return;
-        if (escopoFiltro !== null && d.internacional !== escopoFiltro) return;
-        if (textoBusca.length > 0 && !textoBusca.some(t => nomeNorm.includes(t))) return;
-
-        indices.push(i);
+    const filtros = normalizarFiltros({
+        precoMax,
+        estilos: estiloFiltro ? [estiloFiltro] : [],
+        internacional: escopoFiltro,
+        direto,
+        familia: estiloFiltro === 'familia' ? true : null,
     });
+
+    // Crit\u00e9rios objetivos aplicados de forma determin\u00edstica; o texto livre
+    // ainda filtra por nome/pa\u00eds entre os que passaram
+    let indices = aplicarFiltrosEstruturados(destinos, filtros);
+    if (textoBusca.length > 0) {
+        const semRuido = textoBusca.filter(t => t.length > 2 && !['sem', 'escalas', 'escala', 'para', 'com', 'ate'].includes(t));
+        if (semRuido.length > 0) {
+            const comTexto = indices.filter(i => {
+                const nomeNorm = `${destinos[i].nome} ${destinos[i].pais}`.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+                return semRuido.some(t => nomeNorm.includes(t));
+            });
+            // S\u00f3 restringe por texto se sobrar algo \u2014 sen\u00e3o o filtro objetivo manda
+            if (comTexto.length > 0) indices = comTexto;
+        }
+    }
 
     return {
         success: true,
         indices,
+        filtros,
+        filtrosDescricao: descreverFiltros(filtros),
         explicacao: `Busca: "${query}"`,
         titulo: 'Resultados da Busca',
         modelo: 'fallback',

@@ -8,6 +8,15 @@
 // v2.0: MULTI-DESTINO + clima previsto + contagem de dias por destino
 // Fallback: Gemini Flash → Cerebras llama-3.3-70b → llama3.1-8b → roteiro genérico
 
+import {
+    extrairRestricoes,
+    blocoInstrucoes,
+    validarRoteiro,
+    aplicarRestricoes,
+    tipoDeClima,
+    rotuloClima,
+} from './_lib/itinerary-constraints.js';
+
 export const config = {
     maxDuration: 300,
 };
@@ -253,8 +262,19 @@ REGRAS PARA VISITAS REPETIDAS (PRIORIDADE ALTA):
 5. "destino_atual" = mesmo nome da cidade (sem "2ª visita"). Use "visita_numero" para indicar.`;
         }
 
-        // === CLIMA (inferido pela LLM com base nas datas) ===
-        const climaBloco = '\nCLIMA: Com base nas datas da viagem e nos destinos, estime o clima típico de cada cidade nessa época do ano. Use esse conhecimento para adaptar atividades (ex: atividades indoor em dias frios, ao ar livre no verão). Preencha "clima_previsto" com estimativa realista de temperatura e condições.';
+        // === CLIMA ===
+        // Sem integração meteorológica aqui e com viagens marcadas meses antes,
+        // o que a LLM produz é clima TÍPICO da época — nunca previsão.
+        const climaTipo = tipoDeClima(destinosArray[0].dataChegada);
+        const climaBloco = `\nCLIMA: Descreva o CLIMA TÍPICO de cada cidade nessa época do ano (médias históricas), nunca uma previsão do tempo. Use isso para adaptar atividades (indoor no frio, ao ar livre no verão). Preencha "clima_previsto" com o padrão típico e use linguagem de tendência ("costuma", "geralmente"), jamais afirmando o tempo que vai fazer no dia.`;
+
+        // === RESTRIÇÕES ESTRUTURADAS ===
+        // As observações livres viram regras conferidas após a geração
+        const restricoes = extrairRestricoes({ observacoes, criancas, bebes, intensidade });
+        const restricoesBloco = blocoInstrucoes(restricoes);
+        if (restricoes.chaves.length > 0) {
+            console.log(`🔒 Restrições detectadas: ${restricoes.chaves.join(', ')} (obrigatórias: ${restricoes.obrigatorias.join(', ') || 'nenhuma'})`);
+        }
 
         // === OBSERVAÇÕES ===
         let observacoesBloco = '', observacoesInstrucao = '';
@@ -264,7 +284,7 @@ REGRAS PARA VISITAS REPETIDAS (PRIORIDADE ALTA):
         }
 
         // === ESTRUTURA JSON ===
-        const estruturaJSON = `{"resumo_viagem":"...","destinos_rota":[...],"dias":[{"dia_numero":1,"dia_semana":"...","data":"DD/MM","destino_atual":"Cidade","visita_numero":1,"titulo":"...","resumo_tripinha":"...","clima_previsto":"...","eh_dia_transicao":false,"periodos":[{"periodo":"manhã|tarde|noite","atividades":[{"nome":"...","descricao":"...","dica_tripinha":"...","duracao_minutos":90,"google_maps_query":"Local, Cidade, País","gratuito":true,"tags":["..."]}]}]}]}`;
+        const estruturaJSON = `{"resumo_viagem":"...","destinos_rota":[...],"dias":[{"dia_numero":1,"dia_semana":"...","data":"DD/MM","destino_atual":"Cidade","visita_numero":1,"titulo":"...","resumo_tripinha":"...","clima_previsto":"...","eh_dia_transicao":false,"periodos":[{"periodo":"manhã|tarde|noite","atividades":[{"nome":"...","descricao":"...","dica_tripinha":"...","duracao_minutos":90,"google_maps_query":"Local, Cidade, País","gratuito":true,"faixa_custo":"gratuito|baixo|medio|alto","regiao":"bairro ou região da cidade","tags":["..."]}]}]}]}`;
 
         // === PROMPT ===
         const destinoPrincipal = isMultiDestino ? destinosArray.map(d => d.destino).join(' → ') : destinosArray[0].destino;
@@ -276,6 +296,7 @@ PERÍODO: ${destinosArray[0].dataChegada} a ${destinosArray[destinosArray.length
 ${climaBloco}
 ${cidadesRepetidasBloco}
 ${observacoesBloco}
+${restricoesBloco}
 
 DIAS:
 ${diasLista}
@@ -308,7 +329,9 @@ ${blocoExtra}
 9. tags: Imperdível, Ideal para família, Histórico, Gastronômico, Compras, Relaxante, Aventura, Cultural, Gratuito, Vida noturna, Natureza, Romântico
 10. Textos em pt-BR. Tripinha: 1ª pessoa, calorosa, max 1 ref canina/dia. SEM emoji.
 11. duracao_minutos: 30-240. Locais REAIS verificáveis no Google Maps.
-12. destino_atual = cidade exata. clima_previsto = estimativa realista baseada no mês.
+12. destino_atual = cidade exata. clima_previsto = CLIMA TÍPICO do mês (padrão histórico), com linguagem de tendência — nunca previsão do tempo.
+12b. faixa_custo = faixa QUALITATIVA compatível com o orçamento informado (gratuito, baixo, medio, alto). PROIBIDO inventar preço exato de ingresso ou refeição.
+12c. regiao = bairro ou região da cidade onde a atividade fica. Atividades do MESMO período devem ficar na MESMA região, para não cruzar a cidade.
 13. visita_numero = número da visita àquela cidade (1, 2, 3...)
 
 ═══ REGRAS DE DIFERENCIAL ═══
@@ -482,6 +505,19 @@ ${continuidade}${inicio}${locaisUsados.length ? `\nLOCAIS JÁ USADOS nos dias an
             resultado.dias = resultado.dias.slice(0, numDiasTotal);
         }
 
+        // === VALIDAÇÃO DETERMINÍSTICA DAS RESTRIÇÕES ===
+        // Segunda camada: o que o modelo gerou violando restrição obrigatória
+        // é REMOVIDO. Nada de dizer que respeitou quando não respeitou.
+        const violacoes = validarRoteiro(resultado, restricoes);
+        if (violacoes.length > 0) {
+            console.warn(`⚠️ ${violacoes.length} violação(ões) de restrição obrigatória: ${violacoes.map(v => `dia ${v.dia}/${v.periodo}/${v.atividade} (${v.restricao})`).join('; ')}`);
+        }
+        const { roteiro: roteiroValidado, removidas } = aplicarRestricoes(resultado, restricoes);
+        resultado = roteiroValidado;
+        if (removidas.length > 0) {
+            console.log(`🧹 ${removidas.length} atividade(s) removida(s) por violar restrição obrigatória`);
+        }
+
         // === ENRIQUECER E VALIDAR ===
         const minAtividadesPorPeriodo = { 'leve': 1, 'moderado': 2, 'intenso': 3 }[intensidade] || 2;
         let totalAtividades = 0;
@@ -492,12 +528,28 @@ ${continuidade}${inicio}${locaisUsados.length ? `\nLOCAIS JÁ USADOS nos dias an
                 totalAtividades += atividades.length;
                 atividades.forEach(a => {
                     if (a.google_maps_query) a.google_maps_url = `https://maps.google.com/?q=${encodeURIComponent(a.google_maps_query)}`;
+                    // Sem integração de lugares não há como confirmar horário
+                    // de funcionamento: o roteiro diz isso em vez de inventar.
+                    a.horario_confirmar = true;
                 });
             });
         });
         const mediaAtividadesPorDia = totalAtividades / (resultado.dias.length || 1);
         console.log(`📊 Validação: ${totalAtividades} atividades total, média ${mediaAtividadesPorDia.toFixed(1)}/dia, mínimo esperado/período: ${minAtividadesPorPeriodo}`);
 
+        // Metadados de transparência consumidos pelo frontend
+        resultado._restricoes = {
+            chaves: restricoes.chaves,
+            obrigatorias: restricoes.obrigatorias,
+            rotulos: restricoes.detalhes.map(r => r.rotulo),
+        };
+        resultado._violacoesRemovidas = removidas;
+        resultado._clima = {
+            tipo: climaTipo,
+            rotulo: rotuloClima(climaTipo),
+            fonte: 'estimativa do modelo a partir do padrão histórico do período',
+        };
+        resultado._avisoLocais = 'Locais e horários não são verificados por uma base de lugares. Confirme funcionamento e necessidade de reserva antes de ir.';
         resultado._model = usedModel;
         resultado._numDias = numDiasTotal;
         resultado._destino = destinoPrincipal;

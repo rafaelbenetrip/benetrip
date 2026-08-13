@@ -1289,3 +1289,32 @@ body {
 @media (max-width: 380px) {
     .button-group { grid-template-columns: 1fr; }
 }
+
+/* ============================================================
+   Transparência do roteiro: restrições aplicadas, clima típico,
+   confirmação de horários e faixa de custo
+   ============================================================ */
+.restricoes-aplicadas {
+    display: inline-block;
+    margin-top: 4px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #1d7a4c;
+}
+
+.aviso-locais {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    font-size: 12px;
+    line-height: 1.5;
+    color: #555;
+    background: #f4f4f4;
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin: 12px 0;
+}
+
+.meta-confirmar {
+    color: #7a3c0d;
+}

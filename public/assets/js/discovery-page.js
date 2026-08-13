@@ -544,9 +544,10 @@ const DiscoveryPage = {
             preco: dest.flight?.price || 0,
             moeda: 'BRL',
             paradas: dest.flight?.stops || 0,
-            duracao_voo_min: dest.flight?.flight_duration_minutes || 0,
+            duracao_voo_min: dest.flight?.flight_duration_minutes || null,
             cia_aerea: dest.flight?.airline_name || '',
-            custo_noite: dest.avg_cost_per_night || 0,
+            // Zero sem fonte confirmada = dado ausente, não hospedagem grátis
+            custo_noite: dest.avg_cost_per_night > 0 ? dest.avg_cost_per_night : null,
             imagem: dest.image || '',
             estilos,
             duracao_ideal: isIntl ? { min: 7, max: 14, ideal: 10 } : { min: 3, max: 7, ideal: 5 },
@@ -687,7 +688,7 @@ const DiscoveryPage = {
                 this.state.destinosFiltrados = resultado;
                 this.renderizarCards();
                 this.atualizarContagem(data.titulo || `Resultados: "${query}"`);
-                this.mostrarBuscaFeedback(data.explicacao, resultado.length);
+                this.mostrarBuscaFeedback(data.explicacao, resultado.length, data.filtrosDescricao);
             }
         } catch (error) {
             console.error('Busca inteligente falhou:', error);
@@ -724,13 +725,18 @@ const DiscoveryPage = {
         if (input) input.disabled = ativo;
     },
 
-    mostrarBuscaFeedback(explicacao, count) {
+    // Mostra COMO o pedido foi interpretado (critérios objetivos aplicados),
+    // para o usuário conferir e ajustar em vez de adivinhar
+    mostrarBuscaFeedback(explicacao, count, filtrosDescricao) {
         const feedback = document.getElementById('search-feedback');
         if (!feedback) return;
+        const criterios = (filtrosDescricao || []).length
+            ? `<span class="feedback-criterios">Interpretei como: ${filtrosDescricao.join(' · ')}</span>`
+            : '';
         feedback.style.display = 'flex';
         feedback.innerHTML = `
             <span class="feedback-icon">&#129302;</span>
-            <span class="feedback-text">${explicacao} &middot; ${count} destino${count !== 1 ? 's' : ''}</span>
+            <span class="feedback-text">${explicacao} &middot; ${count} lugar${count !== 1 ? 'es' : ''}${criterios}</span>
             <button class="feedback-clear" id="feedback-clear-btn">Limpar</button>
         `;
         document.getElementById('feedback-clear-btn')?.addEventListener('click', () => {
@@ -841,7 +847,7 @@ const DiscoveryPage = {
             <div class="stat-card">
                 <div class="stat-label">Preço médio</div>
                 <div class="stat-value">R$ ${this.fmt(media)}</div>
-                <div class="stat-detail">${destinos.length} destinos</div>
+                <div class="stat-detail">${destinos.length} lugares &middot; ${new Set(destinos.map(d => (d.aeroporto || '').toUpperCase()).filter(Boolean)).size} aeroportos</div>
             </div>
             <div class="stat-card">
                 <div class="stat-label">Nacionais</div>
@@ -1038,7 +1044,13 @@ const DiscoveryPage = {
 
     atualizarContagem(tituloOverride) {
         const count = this.state.destinosFiltrados.length;
-        document.getElementById('section-count').textContent = `${count} destino${count !== 1 ? 's' : ''}`;
+        // Lugares e aeroportos são contagens diferentes: vários destinos podem
+        // ser servidos pelo mesmo aeroporto (e pela mesma tarifa)
+        const aeroportos = new Set(
+            this.state.destinosFiltrados.map(d => (d.aeroporto || '').toUpperCase()).filter(Boolean)
+        ).size;
+        document.getElementById('section-count').textContent =
+            `${count} lugar${count !== 1 ? 'es' : ''} · ${aeroportos} aeroporto${aeroportos !== 1 ? 's' : ''}`;
 
         if (tituloOverride) {
             document.getElementById('section-title').textContent = tituloOverride;

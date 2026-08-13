@@ -608,8 +608,20 @@ const BenetripRoteiro = {
 
         const self = this;
 
+        // Faixa qualitativa de custo: o roteiro não tem fonte de preço por
+        // atividade, então mostra faixa e nunca um valor exato inventado
+        const FAIXA_CUSTO_LABEL = {
+            gratuito: '💰 Gratuito',
+            baixo: '💰 Custo baixo (estimativa)',
+            medio: '💰 Custo médio (estimativa)',
+            alto: '💰 Custo alto (estimativa)',
+        };
+
         const renderAtividade = (ativ) => {
             const mapsUrl = self.buildMapsUrl(ativ.google_maps_query || ativ.nome);
+            const faixaCusto = ativ.gratuito === true
+                ? FAIXA_CUSTO_LABEL.gratuito
+                : FAIXA_CUSTO_LABEL[ativ.faixa_custo] || (ativ.gratuito === false ? '💰 Pago (estimativa)' : '');
             return `
                 <div class="atividade-card">
                     <div class="atividade-nome">📍 ${ativ.nome}</div>
@@ -617,7 +629,9 @@ const BenetripRoteiro = {
                     ${(ativ.tags?.length) ? `<div class="atividade-tags">${ativ.tags.map(t => `<span class="tag ${TAG_CLASSES[t]||'tag-default'}">${t}</span>`).join('')}${ativ.gratuito ? '<span class="tag tag-gratuito">Gratuito</span>' : ''}</div>` : ''}
                     <div class="atividade-meta">
                         ${ativ.duracao_minutos ? `<span>🕐 ~${ativ.duracao_minutos}min</span>` : ''}
-                        ${ativ.gratuito === false ? '<span>💰 Pago</span>' : ''}
+                        ${faixaCusto ? `<span>${faixaCusto}</span>` : ''}
+                        ${ativ.regiao ? `<span>🗺️ ${ativ.regiao}</span>` : ''}
+                        ${ativ.horario_confirmar ? '<span class="meta-confirmar">⏰ Confirme o horário antes de ir</span>' : ''}
                     </div>
                     ${ativ.dica_tripinha ? `<div class="atividade-dica"><span class="dica-icon">💡</span><p><strong>Dica da Tripinha:</strong> ${ativ.dica_tripinha}</p></div>` : ''}
                     <a href="${mapsUrl}" target="_blank" rel="noopener" class="btn-maps">
@@ -660,7 +674,12 @@ const BenetripRoteiro = {
             }
 
             const transicao = dia.eh_dia_transicao ? `<div class="transicao-badge">✈️ Dia de deslocamento entre cidades</div>` : '';
-            const clima = dia.clima_previsto ? `<div class="clima-badge"><span>🌤️</span><span>${dia.clima_previsto}</span></div>` : '';
+            // Clima com vários meses de antecedência não é previsão: o rótulo
+            // vem do backend e diz o que o dado realmente é.
+            const climaRotulo = roteiro._clima?.rotulo || 'Clima típico para o período';
+            const clima = dia.clima_previsto
+                ? `<div class="clima-badge" title="${climaRotulo}"><span>🌤️</span><span><strong>${climaRotulo}:</strong> ${dia.clima_previsto}</span></div>`
+                : '';
 
             return `
                 ${separador}
@@ -680,7 +699,20 @@ const BenetripRoteiro = {
                 </div>`;
         };
 
-        const obsBadge = observacoes ? `<div class="observacoes-badge"><span>📝</span><span>Pedidos especiais considerados: <strong>"${observacoes.length > 80 ? observacoes.substring(0, 80) + '...' : observacoes}"</strong></span></div>` : '';
+        // O texto só afirma que a restrição foi aplicada porque o backend
+        // valida e remove o que a violou (ver api/_lib/itinerary-constraints.js)
+        const restricoesAplicadas = roteiro._restricoes?.rotulos || [];
+        const obsBadge = observacoes
+            ? `<div class="observacoes-badge"><span>📝</span><span>Seu pedido: <strong>"${observacoes.length > 80 ? observacoes.substring(0, 80) + '...' : observacoes}"</strong>${
+                restricoesAplicadas.length
+                    ? `<br><span class="restricoes-aplicadas">Restrições aplicadas e conferidas: ${restricoesAplicadas.join(' · ')}</span>`
+                    : ''
+              }</span></div>`
+            : '';
+
+        const avisoLocais = roteiro._avisoLocais
+            ? `<div class="aviso-locais"><span>ℹ️</span><span>${roteiro._avisoLocais}</span></div>`
+            : '';
 
         const rotaVisual = isMulti ? `<div class="rota-visual">${destinos.map((d, i) => `<span class="rota-cidade">${d.destino}</span>${i < destinos.length - 1 ? '<span class="rota-seta">→</span>' : ''}`).join('')}</div>` : '';
 
@@ -695,6 +727,7 @@ const BenetripRoteiro = {
                 <div class="subtitulo">${idaBR} → ${voltaBR} · ${roteiro._numDias || roteiro.dias?.length || '?'} dias${roteiro._model && roteiro._model !== 'fallback' ? ' · Curadoria da Tripinha 🐶' : ''}</div>
                 ${obsBadge}
             </div>
+            ${avisoLocais}
             ${roteiro.resumo_viagem ? `<div class="roteiro-resumo"><div class="roteiro-resumo-titulo"><span>🐕</span><span>Recado da Tripinha</span></div><div class="roteiro-resumo-texto">${roteiro.resumo_viagem}</div></div>` : ''}
             ${(roteiro.dias || []).map(renderDia).join('')}
             <div class="compartilhar-section">

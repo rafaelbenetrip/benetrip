@@ -73,7 +73,9 @@ const BenetripDiscovery = {
         this.setupCurrencyInput();
         this.setupObservacoesCounter();
         this.setupHistoryNavigation();
-        
+
+        if (typeof BenetripAnalytics !== 'undefined') BenetripAnalytics.toolViewed('descobrir-destinos');
+
         this.log('✅ Inicialização completa');
     },
     // ================================================================
@@ -636,6 +638,17 @@ const BenetripDiscovery = {
         return map[moeda] || 'br';
     },
     buildGoogleFlightsUrl(originIata, destIata, departDate, returnDate, adults, children, infants, currency) {
+        // v5.0: módulo compartilhado — codifica TODOS os aeroportos de uma
+        // origem agregada (em vez de fixar o primeiro) e o aeroporto real
+        // da tarifa quando conhecido
+        if (typeof BenetripFlightLinks !== 'undefined') {
+            const url = BenetripFlightLinks.buildUrl({
+                origins: originIata, destinations: destIata,
+                departDate, returnDate, adults, children, infants, currency,
+            });
+            if (url) return url;
+        }
+        if (Array.isArray(originIata)) originIata = originIata[0];
         const tfs = this._buildTfsParam(originIata, destIata, departDate, returnDate);
         const tfu = this._buildTfuParam(adults, children, infants);
         const curr = this._getGoogleCurrency(currency);
@@ -660,13 +673,14 @@ const BenetripDiscovery = {
     },
     getOrigemIataParaGoogleFlights() {
         const origem = this.state.formData.origem;
-        
+
+        // v5.0: origem agregada → lista completa de aeroportos do grupo
+        // (o link do Google Flights aceita múltiplos aeroportos por trecho)
         if (origem.isCityCode && origem.aeroportosIncluidos && origem.aeroportosIncluidos.length > 0) {
-            const primeiroAeroporto = origem.aeroportosIncluidos[0];
-            this.log(`🏙️ Origem agrupada: ${origem.displayCode} → usando ${primeiroAeroporto} para Google Flights`);
-            return primeiroAeroporto;
+            this.log(`🏙️ Origem agrupada: ${origem.displayCode} → usando ${origem.aeroportosIncluidos.join(', ')} para Google Flights`);
+            return origem.aeroportosIncluidos;
         }
-        
+
         return origem.code;
     },
     // ================================================================
@@ -690,23 +704,40 @@ const BenetripDiscovery = {
         return undefined;
     },
     async buscarDestinos() {
+        const inicio = Date.now();
+        const A = typeof BenetripAnalytics !== 'undefined' ? BenetripAnalytics : null;
+        const { formData } = this.state;
+        // Analytics sem dado pessoal: nada de observações, origem textual ou
+        // orçamento exato — só o formato da busca
+        A?.searchSubmitted('descobrir-destinos', {
+            escopo: formData.escopoDestino,
+            passageiros: formData.numPessoas,
+            com_criancas: (formData.criancas || 0) + (formData.bebes || 0) > 0,
+            noites: this.calcularNoites(formData.dataIda, formData.dataVolta),
+            tem_observacoes: Boolean(formData.observacoes),
+        });
+
         try {
             this.mostrarLoading();
-            
+
             this.atualizarProgresso(15, '🔍 Buscando destinos pelo mundo...');
             const destinosDisponiveis = await this.buscarDestinosAPI();
-            
+
             if (!destinosDisponiveis || destinosDisponiveis.length === 0) {
                 throw new Error('Nenhum destino encontrado');
             }
-            
+
             this.atualizarProgresso(40, '💰 Filtrando pelo seu orçamento...');
             const filtro = this.filtrarDestinos(destinosDisponiveis);
-            
+
             if (filtro.cenario === 'nenhum') {
                 this.atualizarProgresso(100, '😕 Nenhum destino encontrado...');
                 await this.delay(500);
-                this.mostrarSemResultados();
+                A?.emptyResult('descobrir-destinos', {
+                    escopo: formData.escopoDestino,
+                    acima_orcamento: (filtro.acimaOrcamento || []).length,
+                });
+                this.mostrarSemResultados(filtro.acimaOrcamento || []);
                 return;
             }
             const destinosParaRanking = filtro.destinos;
@@ -722,13 +753,50 @@ const BenetripDiscovery = {
             
             this.atualizarProgresso(100, '🎉 Pronto!');
             await this.delay(500);
+            A?.searchCompleted('descobrir-destinos', {
+                duracaoMs: Date.now() - inicio,
+                resultados: destinosParaRanking.length,
+                escopo: formData.escopoDestino,
+                flexivel: false,
+            });
             this.mostrarResultados(destinosComLinks, filtro.cenario, filtro.mensagem);
-            
+
         } catch (erro) {
             this.error('Erro:', erro);
-            alert(`Erro: ${erro.message}`);
-            this.esconderLoading();
+            A?.searchFailed('descobrir-destinos', {
+                duracaoMs: Date.now() - inicio,
+                motivo: (erro.message || 'desconhecido').slice(0, 60),
+            });
+            this.mostrarErroRecuperavel(erro.message);
         }
+    },
+
+    // Erro recuperável: mantém o formulário preenchido e oferece nova
+    // tentativa, em vez do alert() que só sumia com a mensagem
+    mostrarErroRecuperavel(mensagem) {
+        this.esconderLoading();
+        const container = document.getElementById('form-container');
+        let painel = document.getElementById('erro-busca');
+        if (!painel) {
+            painel = document.createElement('div');
+            painel.id = 'erro-busca';
+            painel.className = 'erro-busca';
+            container.insertBefore(painel, container.firstChild);
+        }
+        painel.innerHTML = `
+            <div class="erro-busca-titulo">😕 A busca não completou</div>
+            <p class="erro-busca-msg">${mensagem || 'Não conseguimos falar com o buscador de preços agora.'}</p>
+            <p class="erro-busca-dica">Seus dados continuam preenchidos abaixo. Você pode tentar de novo.</p>
+            <button type="button" class="btn-tentar-novamente" onclick="BenetripDiscovery.tentarNovamente()">🔄 Tentar novamente</button>
+        `;
+        painel.style.display = 'block';
+        painel.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    },
+
+    async tentarNovamente() {
+        const painel = document.getElementById('erro-busca');
+        if (painel) painel.style.display = 'none';
+        await this.buscarDestinos();
     },
     // ================================================================
     // v4.5: buscarDestinosAPI envia origemGeo ao backend
@@ -781,58 +849,63 @@ const BenetripDiscovery = {
         return data.destinations;
     },
     // ================================================================
-    // v4.2: FILTRO DE ORÇAMENTO CORRIGIDO
+    // v5.0: ORÇAMENTO É TETO, NÃO VALOR-ALVO
+    // preço válido <= orçamento máximo. Nunca descarta uma opção por
+    // ser barata demais (as faixas 80-100% / 60-100% foram removidas).
+    // Quando nada cabe no teto, devolve as opções mais próximas acima
+    // do orçamento em lista SEPARADA (não misturada ao resultado).
     // ================================================================
+    // Limite prático de destinos enviados ao ranking (o LLM recebe a
+    // lista inteira no prompt). Os mais baratos entram primeiro, então
+    // nenhuma opção barata dentro do teto fica de fora por causa do corte.
+    MAX_DESTINOS_RANKING: 60,
     filtrarDestinos(destinos) {
         const { orcamento, moeda } = this.state.formData;
         const simbolo = this.getSimbolo(moeda);
         const comPreco = destinos.filter(d => (d.flight?.price || 0) > 0);
-        
+
         if (comPreco.length === 0) {
             this.log('❌ Nenhum destino com preço disponível');
-            return { cenario: 'nenhum', destinos: [], mensagem: '' };
+            return { cenario: 'nenhum', destinos: [], mensagem: '', acimaOrcamento: [] };
         }
         if (!orcamento) {
-            return { cenario: 'ideal', destinos: comPreco, mensagem: '' };
+            return { cenario: 'ideal', destinos: comPreco.slice(0, this.MAX_DESTINOS_RANKING), mensagem: '', acimaOrcamento: [] };
         }
-        const faixa80 = comPreco.filter(d => d.flight.price >= orcamento * 0.8 && d.flight.price <= orcamento);
-        const faixa60 = comPreco.filter(d => d.flight.price >= orcamento * 0.6 && d.flight.price <= orcamento);
-        const abaixo = comPreco.filter(d => d.flight.price <= orcamento);
 
-        if (faixa80.length >= 5) {
-            this.log(`✅ IDEAL: ${faixa80.length} destinos na faixa 80-100%`);
-            return { cenario: 'ideal', destinos: faixa80, mensagem: '' };
-        }
-        if (faixa60.length >= 3) {
-            this.log(`👍 BOM: ${faixa60.length} destinos na faixa 60-100%`);
+        const dentro = comPreco
+            .filter(d => d.flight.price <= orcamento)
+            .sort((a, b) => a.flight.price - b.flight.price);
+
+        if (dentro.length > 0) {
+            this.log(`✅ ${dentro.length} destino(s) dentro do teto de ${simbolo} ${orcamento.toLocaleString('pt-BR')}`);
+            const poucos = dentro.length < 5;
+            const mensagem = poucos
+                ? `🐕 A Tripinha encontrou ${dentro.length === 1 ? '1 destino' : `${dentro.length} destinos`} dentro do seu orçamento de ${simbolo} ${orcamento.toLocaleString('pt-BR')}. ${dentro.length === 1 ? 'É uma ótima opção!' : 'Confira!'}`
+                : '';
             return {
-                cenario: 'bom',
-                destinos: faixa60,
-                mensagem: `🐕 A Tripinha encontrou os melhores destinos dentro do seu orçamento de ${simbolo} ${orcamento.toLocaleString('pt-BR')}. Confira as opções!`
+                cenario: poucos ? 'abaixo' : 'ideal',
+                destinos: dentro.slice(0, this.MAX_DESTINOS_RANKING),
+                mensagem,
+                acimaOrcamento: []
             };
         }
-        if (abaixo.length > 0) {
-            this.log(`💡 DENTRO DO ORÇAMENTO: ${abaixo.length} destino(s) de até ${simbolo} ${orcamento.toLocaleString('pt-BR')}`);
-            
-            let mensagem = '';
-            if (abaixo.length === 1) {
-                mensagem = `🐕 A Tripinha encontrou 1 destino dentro do seu orçamento de ${simbolo} ${orcamento.toLocaleString('pt-BR')}. É uma ótima opção!`;
-            } else if (abaixo.length === 2) {
-                mensagem = `🐕 A Tripinha encontrou 2 destinos dentro do seu orçamento de ${simbolo} ${orcamento.toLocaleString('pt-BR')}. Confira!`;
-            } else {
-                mensagem = `🐕 Não encontrei muitas opções próximas ao orçamento ideal, mas achei ${abaixo.length} destinos dentro de ${simbolo} ${orcamento.toLocaleString('pt-BR')} que podem te interessar!`;
-            }
-            return { cenario: 'abaixo', destinos: abaixo, mensagem: mensagem };
-        }
-        this.log(`❌ Nenhum destino dentro do orçamento de ${simbolo} ${orcamento.toLocaleString('pt-BR')}`);
-        
-        const maisBarato = comPreco.reduce((min, d) => 
-            d.flight.price < min ? d.flight.price : min, 
-            Infinity
-        );
-        this.log(`💰 Destino mais barato disponível: ${simbolo} ${maisBarato.toLocaleString('pt-BR')}`);
-        
-        return { cenario: 'nenhum', destinos: [], mensagem: '' };
+
+        // Nada dentro do teto: separa as opções mais próximas acima do
+        // orçamento, com diferença em valor e percentual, para exibição
+        // em seção própria (nunca misturadas ao resultado principal).
+        const acima = comPreco
+            .filter(d => d.flight.price > orcamento)
+            .sort((a, b) => a.flight.price - b.flight.price)
+            .slice(0, 5)
+            .map(d => ({
+                ...d,
+                _acimaOrcamento: {
+                    diferenca: Math.round(d.flight.price - orcamento),
+                    percentual: Math.round(((d.flight.price - orcamento) / orcamento) * 100),
+                }
+            }));
+        this.log(`❌ Nenhum destino dentro do orçamento — ${acima.length} opção(ões) acima para exibir separadamente`);
+        return { cenario: 'nenhum', destinos: [], mensagem: '', acimaOrcamento: acima };
     },
     calcularNoites(dataIda, dataVolta) {
         const ida = new Date(dataIda);
@@ -1028,7 +1101,40 @@ const BenetripDiscovery = {
             </div>
         `;
     },
-    mostrarSemResultados() {
+    // ================================================================
+    // v5.0: Seção separada "Opções um pouco acima do seu orçamento"
+    // Mostra diferença em valor e percentual — nunca mistura essas
+    // opções ao resultado principal.
+    // ================================================================
+    gerarSecaoAcimaOrcamento(acimaOrcamento) {
+        if (!acimaOrcamento || acimaOrcamento.length === 0) return '';
+        const { moeda, dataIda, dataVolta, adultos, criancas, bebes } = this.state.formData;
+        const originIata = this.getOrigemIataParaGoogleFlights();
+        const cards = acimaOrcamento.map(d => {
+            const diff = d._acimaOrcamento || { diferenca: 0, percentual: 0 };
+            const stops = d.flight?.stops || 0;
+            const stopsTxt = stops === 0 ? 'Voo direto' : stops === 1 ? '1 parada' : `${stops} paradas`;
+            const link = d.primary_airport
+                ? this.buildGoogleFlightsUrl(originIata, d.primary_airport, dataIda, dataVolta, adultos, criancas, bebes, moeda)
+                : '#';
+            return `
+                <div class="destino-card destino-card-acima">
+                    <h4>${d.name}${d.country ? ', ' + d.country : ''}</h4>
+                    <div class="preco">${this.formatarPreco(d.flight.price, moeda)}</div>
+                    <div class="preco-label">ida e volta por pessoa</div>
+                    <div class="acima-diferenca">+ ${this.formatarPreco(diff.diferenca, moeda)} acima do orçamento (+${diff.percentual}%)</div>
+                    <div class="flight-info">✈️ ${stopsTxt}</div>
+                    <a href="${link}" target="_blank" rel="noopener" class="btn-ver-voos btn-google-flights">Ver no Google Flights →</a>
+                </div>`;
+        }).join('');
+        return `
+            <div class="alternativas-section acima-orcamento-section">
+                <h3>💸 Opções um pouco acima do seu orçamento</h3>
+                <p class="acima-orcamento-aviso">Nenhuma dessas cabe no valor que você definiu — estão aqui só como referência, com a diferença indicada.</p>
+                <div class="alternativas-grid">${cards}</div>
+            </div>`;
+    },
+    mostrarSemResultados(acimaOrcamento = []) {
         const container = document.getElementById('resultados-container');
         const { orcamento, moeda, origem, escopoDestino } = this.state.formData;
         const simbolo = this.getSimbolo(moeda);
@@ -1061,6 +1167,7 @@ const BenetripDiscovery = {
                     ✏️ Ajustar Busca
                 </button>
             </div>
+            ${this.gerarSecaoAcimaOrcamento(acimaOrcamento)}
         `;
         document.getElementById('loading-container').style.display = 'none';
         container.style.display = 'block';
@@ -1079,9 +1186,20 @@ const BenetripDiscovery = {
         
         const formatParadas = (d) => {
             const stops = d.flight?.stops || 0;
-            if (stops === 0) return '✈️ Voo direto';
-            if (stops === 1) return '✈️ 1 parada';
-            return `✈️ ${stops} paradas`;
+            const durMin = d.flight?.flight_duration_minutes || 0;
+            const durTxt = durMin > 0 ? ` · ⏱️ ${Math.floor(durMin / 60)}h${String(durMin % 60).padStart(2, '0')}` : '';
+            if (stops === 0) return `✈️ Voo direto${durTxt}`;
+            if (stops === 1) return `✈️ 1 parada${durTxt}`;
+            return `✈️ ${stops} paradas${durTxt}`;
+        };
+        // v5.0: transparência — adequação à época e ponto de atenção
+        const epocaHtml = (d) => {
+            if (!d.adequacao_epoca) return '';
+            return `<div class="destino-epoca">📅 <strong>Nessas datas:</strong> ${d.adequacao_epoca}</div>`;
+        };
+        const negativoHtml = (d) => {
+            if (!d.ponto_negativo) return '';
+            return `<div class="destino-ponto-negativo">⚠️ <strong>Fique de olho:</strong> ${d.ponto_negativo}</div>`;
         };
         const fonteBadge = (d) => {
             const count = d._source_count || 1;
@@ -1154,6 +1272,8 @@ const BenetripDiscovery = {
                                 ${custoEstimado(d)}
                                 <div class="descricao">${d.razao || 'Boa opção!'}</div>
                                 ${comentarioHtml(d)}
+                                ${epocaHtml(d)}
+                                ${negativoHtml(d)}
                                 ${dicaHtml(d)}
                                 <a href="${d.link}" target="_blank" rel="noopener" class="btn-ver-voos btn-google-flights">${googleFlightsBtnIcon} ${googleFlightsBtnLabel} →</a>
                             </div>
@@ -1175,6 +1295,8 @@ const BenetripDiscovery = {
                     ${custoEstimado(destinos.surpresa)}
                     <div class="descricao">${destinos.surpresa.razao || 'Descubra!'}</div>
                     ${comentarioHtml(destinos.surpresa)}
+                    ${epocaHtml(destinos.surpresa)}
+                    ${negativoHtml(destinos.surpresa)}
                     ${dicaHtml(destinos.surpresa)}
                     <a href="${destinos.surpresa.link}" target="_blank" rel="noopener" class="btn-ver-voos btn-google-flights">
                         ${googleFlightsBtnIcon} Descobrir no Google Flights ✈️
@@ -1211,6 +1333,8 @@ const BenetripDiscovery = {
                 ${custoEstimado(destinos.top_destino)}
                 <div class="descricao">${destinos.top_destino.razao || 'Perfeito para você!'}</div>
                 ${comentarioHtml(destinos.top_destino)}
+                ${epocaHtml(destinos.top_destino)}
+                ${negativoHtml(destinos.top_destino)}
                 ${dicaHtml(destinos.top_destino)}
                 <a href="${destinos.top_destino.link}" target="_blank" rel="noopener" class="btn-ver-voos btn-google-flights btn-google-flights-destaque">
                     ${googleFlightsBtnIcon} ${googleFlightsBtnLabel} ✈️

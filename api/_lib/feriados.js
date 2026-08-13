@@ -98,49 +98,78 @@ export function proximosFeriados(aPartirDe, limite = 3, minDiasAntecedencia = 0)
 
 // ============================================================
 // JANELA DE ESCAPADA DE UM FERIADO
-// Retorna a janela de viagem "sem tirar férias": ida/volta coladas no bloco
-// de dias não úteis, e quantos dias de folga a emenda exige (0 = nenhum).
+// Retorna a janela de viagem: ida/volta coladas no bloco de dias não úteis
+// e quantos dias de folga a emenda exige (0 = nenhum).
+//
+// `estendeFimDeSemana` diz se o FERIADO EM SI acrescenta um dia livre ao fim
+// de semana normal. Feriado que cai em sábado ou domingo NÃO acrescenta nada
+// (o dia já era livre) — dizer que "rende um fim de semana de 3 dias" nesse
+// caso é falso, e era o bug corrigido aqui.
+//
+// Regras (dia da semana do feriado):
+//   sexta   -> 3 dias livres, 0 folga, estende o fim de semana
+//   segunda -> 3 dias livres, 0 folga, estende o fim de semana
+//   sábado  -> fim de semana normal (2 dias), 0 folga, NÃO estende
+//   domingo -> fim de semana normal (2 dias), 0 folga, NÃO estende
+//   terça   -> 4 dias livres com 1 folga (segunda)
+//   quinta  -> 4 dias livres com 1 folga (sexta)
+//   quarta  -> só vira viagem longa com 2 folgas; não é fim de semana
+//              prolongado automático
 // ============================================================
 export function janelaDoFeriado(feriado) {
     const dow = feriado.diaSemana;
     const d = feriado.data;
-    let ida, volta, folga;
+    let ida, volta, folga, estendeFimDeSemana;
 
     switch (dow) {
         case 1: // segunda: sáb -> seg, 3 dias sem folga
-            ida = somarDias(d, -2); volta = d; folga = 0; break;
+            ida = somarDias(d, -2); volta = d; folga = 0; estendeFimDeSemana = true; break;
         case 2: // terça: sáb -> ter emendando a segunda
-            ida = somarDias(d, -3); volta = d; folga = 1; break;
-        case 3: // quarta: qua -> dom emendando qui+sex
-            ida = d; volta = somarDias(d, 4); folga = 2; break;
+            ida = somarDias(d, -3); volta = d; folga = 1; estendeFimDeSemana = false; break;
+        case 3: // quarta: qua -> dom só com 2 folgas (qui + sex)
+            ida = d; volta = somarDias(d, 4); folga = 2; estendeFimDeSemana = false; break;
         case 4: // quinta: qui -> dom emendando a sexta
-            ida = d; volta = somarDias(d, 3); folga = 1; break;
+            ida = d; volta = somarDias(d, 3); folga = 1; estendeFimDeSemana = false; break;
         case 5: // sexta: sex -> dom, 3 dias sem folga
-            ida = d; volta = somarDias(d, 2); folga = 0; break;
-        case 6: // sábado: fim de semana normal
-            ida = somarDias(d, -1); volta = somarDias(d, 1); folga = 0; break;
-        default: // domingo: fim de semana normal terminando no feriado
-            ida = somarDias(d, -2); volta = d; folga = 0; break;
+            ida = d; volta = somarDias(d, 2); folga = 0; estendeFimDeSemana = true; break;
+        case 6: // sábado: já era dia livre — fim de semana normal (sex noite -> dom)
+            ida = somarDias(d, -1); volta = somarDias(d, 1); folga = 0; estendeFimDeSemana = false; break;
+        default: // domingo: já era dia livre — fim de semana normal
+            ida = somarDias(d, -2); volta = d; folga = 0; estendeFimDeSemana = false; break;
     }
+
+    const noites = diffDias(ida, volta);
+    // Dias livres = dias sem trabalhar cobertos pela janela. Num feriado de
+    // sábado/domingo a janela sex->dom cobre o fim de semana normal: 2 dias
+    // livres (sáb e dom), com a sexta servindo só de dia de embarque.
+    const diasLivres = (dow === 6 || dow === 0) ? 2 : noites + 1;
 
     return {
         ida,
         volta,
         folga,
-        noites: diffDias(ida, volta),
-        diasLivres: diffDias(ida, volta) + 1,
+        noites,
+        diasLivres,
+        estendeFimDeSemana,
     };
 }
 
-// Frase curta sobre a emenda, usada na barra de feriados da página
+// Frase curta sobre a emenda, usada na barra de feriados da página.
+// Diferencia dias livres, noites e dias de folga necessários — e nunca
+// promete um terceiro dia que o feriado não cria.
 export function descricaoEmenda(feriado) {
     const janela = janelaDoFeriado(feriado);
     const dia = nomeDiaSemana(feriado.data);
+    const noitesTxt = `${janela.noites} noite${janela.noites > 1 ? 's' : ''}`;
+
     if (feriado.diaSemana === 6 || feriado.diaSemana === 0) {
-        return `cai no ${dia} — rende um fim de semana de ${janela.diasLivres} dias`;
+        return `cai no ${dia} — já é dia livre, então não estende o fim de semana (${noitesTxt} de viagem)`;
     }
     if (janela.folga === 0) {
-        return `cai numa ${dia} — ${janela.diasLivres} dias de viagem sem pedir folga`;
+        return `cai numa ${dia} — ${janela.diasLivres} dias livres sem pedir folga (${noitesTxt} de viagem)`;
     }
-    return `cai numa ${dia} — emendando ${janela.folga} dia${janela.folga > 1 ? 's' : ''} rende ${janela.diasLivres} dias de viagem`;
+    if (feriado.diaSemana === 3) {
+        return `cai numa ${dia} — no meio da semana: só rende viagem longa pedindo ${janela.folga} dias de folga (${noitesTxt})`;
+    }
+    return `cai numa ${dia} — pedindo ${janela.folga} dia${janela.folga > 1 ? 's' : ''} de folga rende ${janela.diasLivres} dias livres (${noitesTxt} de viagem)`;
 }

@@ -1407,3 +1407,64 @@ body {
     background: #FFF8F0;
     border-left: 3px solid #E87722;
 }
+
+/* Filtros de voo da lista (não alteram as estatísticas) */
+.voo-filtros {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 8px 0 6px;
+}
+
+.voo-filtro-chip {
+    border: 1px solid var(--gray-border, #e0e0e0);
+    background: #fff;
+    border-radius: 999px;
+    padding: 6px 14px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #555;
+    cursor: pointer;
+}
+
+.voo-filtro-chip.active {
+    background: var(--orange, #E87722);
+    border-color: var(--orange, #E87722);
+    color: #fff;
+}
+
+.voo-filtros-nota {
+    font-size: 11px;
+    color: #777;
+    margin: 0 0 12px;
+    line-height: 1.45;
+}
+
+.top-list-vazio {
+    text-align: center;
+    font-size: 13px;
+    color: #666;
+    padding: 20px 12px;
+}
+
+.btn-limpar-voo-filtro {
+    display: block;
+    margin: 10px auto 0;
+    border: none;
+    background: var(--orange, #E87722);
+    color: #fff;
+    border-radius: 8px;
+    padding: 8px 16px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.top-lowest-badge {
+    display: block;
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--green, #2e9e5b);
+    text-transform: uppercase;
+    letter-spacing: .04em;
+}
