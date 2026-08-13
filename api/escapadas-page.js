@@ -267,6 +267,12 @@ function renderPage({ cidadeAtual, cidades, janelas, janelaAtiva, hoje, isDefaul
         <span class="active-city-source">ida e volta · ${escapeHtml(cidadeAtual.nome)}</span>
     </div>
 
+    <!-- Aviso de horários: o buscador devolve o preço da janela de datas,
+         não os horários dos voos — então não prometemos "sem pedir folga" -->
+    <p class="horarios-aviso container">
+        Datas que aproveitam o fim de semana. Os horários de ida e volta não vêm nesta busca &mdash; confirme no Google Flights se você precisará de folga.
+    </p>
+
     <!-- ========================================
          BLOCO 6: FILTROS DE ESCAPADA
          ======================================== -->
@@ -449,7 +455,7 @@ function renderJanelaChipHtml(janela, janelaAtiva) {
     const feriadoClass = janela.categoria === 'feriado' ? ' janela-chip-feriado' : '';
     return `<button class="janela-chip${feriadoClass}${ativo ? ' active' : ''}" data-janela="${escapeHtml(janela.id)}"${ativo ? ' aria-current="true"' : ''}>
             <span class="janela-chip-rotulo">${janela.categoria === 'feriado' ? '&#127958;&#65039; ' : ''}${escapeHtml(janela.rotulo)}</span>
-            <span class="janela-chip-datas">${escapeHtml(janela.rotuloDatas)}${janela.categoria === 'feriado' && janela.feriado.folga === 0 ? ' · sem folga' : ''}</span>
+            <span class="janela-chip-datas">${escapeHtml(janela.rotuloDatas)}${janela.categoria === 'feriado' && janela.feriado.folga === 0 && janela.feriado.estendeFimDeSemana ? ' · sem folga' : ''}</span>
             ${menorPreco ? `<span class="janela-chip-preco">a partir de R$ ${fmt(menorPreco)}</span>` : '<span class="janela-chip-preco janela-chip-preco-vazio">em breve</span>'}
         </button>`;
 }
@@ -502,7 +508,7 @@ function renderCalendarioFeriadosHtml(hoje, janelas) {
         <div class="section-header">
             <h2 class="section-title">Próximos feriados no Brasil</h2>
         </div>
-        <p class="calendario-sub">Quando cai cada feriado, se vale a emenda e quantos dias de viagem rendem sem tirar férias.</p>
+        <p class="calendario-sub">Quando cai cada feriado, quantos dias livres ele realmente rende e quantos dias de folga a emenda exige. Feriado que cai no sábado ou no domingo não estende o fim de semana.</p>
         <ul class="feriado-lista">${itens}</ul>
     </section>`;
 }

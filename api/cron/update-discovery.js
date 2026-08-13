@@ -329,9 +329,10 @@ function formatarDestino(destino, posicao, origemPais, estilosOverride) {
         preco,
         moeda: 'BRL',
         paradas: destino.flight?.stops || 0,
-        duracao_voo_min: destino.flight?.flight_duration_minutes || 0,
+        duracao_voo_min: destino.flight?.flight_duration_minutes || null,
         cia_aerea: destino.flight?.airline_name || '',
-        custo_noite: destino.avg_cost_per_night || 0,
+        // Zero sem fonte confirmada = dado ausente, não hospedagem grátis
+        custo_noite: destino.avg_cost_per_night > 0 ? destino.avg_cost_per_night : null,
         imagem: destino.image || '',
         estilos,
         duracao_ideal: duracao,

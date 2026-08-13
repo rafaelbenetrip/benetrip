@@ -236,3 +236,31 @@ a.dest-card {
     background: #7B3FA0;
     color: var(--white);
 }
+
+/* ============================================================
+   Aviso de horários e viabilidade da escapada
+   ============================================================ */
+.horarios-aviso {
+    font-size: 12px;
+    line-height: 1.5;
+    color: #6b6b6b;
+    text-align: center;
+    margin: 8px auto 4px;
+    padding: 0 16px;
+    max-width: 640px;
+}
+
+.dest-aviso-viabilidade {
+    display: block;
+    font-size: 11px;
+    line-height: 1.4;
+    color: #7a3c0d;
+    background: rgba(232, 119, 34, 0.1);
+    border-radius: 6px;
+    padding: 5px 8px;
+    margin-top: 6px;
+}
+
+.dest-card-inviavel .dest-card-inner {
+    opacity: 0.82;
+}

@@ -366,14 +366,37 @@ const EscapadasPage = {
         this.atualizarContagem();
     },
 
+    // ============================================================
+    // VIABILIDADE DA ESCAPADA (espelha api/_lib/escapadas-shared.js)
+    // Calculada no cliente também para snapshots antigos, que foram
+    // salvos antes do campo existir.
+    // ============================================================
+    viabilidadeDe(d) {
+        if (d.viabilidade && d.viabilidade.nivel) return d.viabilidade;
+        const noites = this.state.janelaAtiva?.noites || 0;
+        const dur = d.duracao_voo_min || 0;
+        if (!dur || !noites) return { nivel: 'desconhecida', fracao: null, motivo: null };
+        const fracao = (dur * 2) / (noites * 24 * 60);
+        if (fracao > 0.22) return { nivel: 'inviavel', fracao, motivo: 'O tempo de voo consome uma parte grande da escapada' };
+        if ((d.paradas || 0) >= 2 && noites <= 2) return { nivel: 'inviavel', fracao, motivo: 'Duas ou mais escalas numa escapada curta' };
+        if (fracao > 0.12 || (d.paradas || 0) >= 1) return { nivel: 'aceitavel', fracao, motivo: null };
+        return { nivel: 'boa', fracao, motivo: null };
+    },
+
     ordenar(destinos) {
         const copia = [...destinos];
+        // Independente da ordenação escolhida, opções inviáveis para a
+        // janela (voo longo demais para o número de noites) vão para o fim
+        // — sem sumir da lista.
+        const peso = (d) => ({ boa: 0, aceitavel: 1, desconhecida: 1, inviavel: 2 })[this.viabilidadeDe(d).nivel] ?? 1;
+        const comViabilidade = (cmp) => (a, b) => (peso(a) - peso(b)) || cmp(a, b);
+
         switch (this.state.ordenacao) {
-            case 'preco': return copia.sort((a, b) => a.preco - b.preco);
-            case 'voo': return copia.sort((a, b) => (a.duracao_voo_min || Infinity) - (b.duracao_voo_min || Infinity));
-            case 'queda': return copia.sort((a, b) => (a.variacao?.percentual ?? Infinity) - (b.variacao?.percentual ?? Infinity));
-            case 'nome': return copia.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
-            default: return copia;
+            case 'preco': return copia.sort(comViabilidade((a, b) => a.preco - b.preco));
+            case 'voo': return copia.sort(comViabilidade((a, b) => (a.duracao_voo_min || Infinity) - (b.duracao_voo_min || Infinity)));
+            case 'queda': return copia.sort(comViabilidade((a, b) => (a.variacao?.percentual ?? Infinity) - (b.variacao?.percentual ?? Infinity)));
+            case 'nome': return copia.sort(comViabilidade((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')));
+            default: return copia.sort(comViabilidade(() => 0));
         }
     },
 
@@ -533,9 +556,14 @@ const EscapadasPage = {
         const quedaDestaque = d.variacao?.direcao === 'desceu' && Math.abs(d.variacao.percentual) >= 5
             ? `<span class="dest-badge-drop">↓ ${Math.abs(d.variacao.percentual)}%</span>`
             : '';
+        // Aviso honesto quando o deslocamento não cabe bem na janela
+        const viab = this.viabilidadeDe(d);
+        const avisoViabilidade = viab.nivel === 'inviavel'
+            ? `<div class="dest-aviso-viabilidade">⚠️ ${viab.motivo || 'Deslocamento longo para esta janela'}</div>`
+            : '';
 
         return `
-            <a class="dest-card" href="${this.hrefDoDestino(d)}" target="_blank" rel="noopener nofollow" data-aeroporto="${d.aeroporto}" data-nome="${d.nome}" data-duracao="${noites || ''}" data-ida="${d.data_ida || ''}" data-volta="${d.data_volta || ''}">
+            <a class="dest-card${viab.nivel === 'inviavel' ? ' dest-card-inviavel' : ''}" href="${this.hrefDoDestino(d)}" target="_blank" rel="noopener nofollow" data-aeroporto="${d.aeroporto}" data-nome="${d.nome}" data-duracao="${noites || ''}" data-ida="${d.data_ida || ''}" data-volta="${d.data_volta || ''}">
                 <div class="dest-card-inner">
                     <div class="dest-image-wrapper">
                         <img class="dest-image" src="${imgSrc}" alt="${d.nome}" loading="lazy"
@@ -557,6 +585,7 @@ const EscapadasPage = {
                             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
                             <span>${periodo}</span>
                         </div>` : ''}
+                        ${avisoViabilidade}
                         <div class="dest-footer">
                             <div class="dest-price-block">
                                 <span class="dest-price-label">Ida e volta</span>

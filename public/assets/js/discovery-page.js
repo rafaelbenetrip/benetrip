@@ -544,9 +544,10 @@ const DiscoveryPage = {
             preco: dest.flight?.price || 0,
             moeda: 'BRL',
             paradas: dest.flight?.stops || 0,
-            duracao_voo_min: dest.flight?.flight_duration_minutes || 0,
+            duracao_voo_min: dest.flight?.flight_duration_minutes || null,
             cia_aerea: dest.flight?.airline_name || '',
-            custo_noite: dest.avg_cost_per_night || 0,
+            // Zero sem fonte confirmada = dado ausente, não hospedagem grátis
+            custo_noite: dest.avg_cost_per_night > 0 ? dest.avg_cost_per_night : null,
             imagem: dest.image || '',
             estilos,
             duracao_ideal: isIntl ? { min: 7, max: 14, ideal: 10 } : { min: 3, max: 7, ideal: 5 },
