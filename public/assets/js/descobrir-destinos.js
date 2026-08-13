@@ -73,7 +73,9 @@ const BenetripDiscovery = {
         this.setupCurrencyInput();
         this.setupObservacoesCounter();
         this.setupHistoryNavigation();
-        
+
+        if (typeof BenetripAnalytics !== 'undefined') BenetripAnalytics.toolViewed('descobrir-destinos');
+
         this.log('✅ Inicialização completa');
     },
     // ================================================================
@@ -702,22 +704,39 @@ const BenetripDiscovery = {
         return undefined;
     },
     async buscarDestinos() {
+        const inicio = Date.now();
+        const A = typeof BenetripAnalytics !== 'undefined' ? BenetripAnalytics : null;
+        const { formData } = this.state;
+        // Analytics sem dado pessoal: nada de observações, origem textual ou
+        // orçamento exato — só o formato da busca
+        A?.searchSubmitted('descobrir-destinos', {
+            escopo: formData.escopoDestino,
+            passageiros: formData.numPessoas,
+            com_criancas: (formData.criancas || 0) + (formData.bebes || 0) > 0,
+            noites: this.calcularNoites(formData.dataIda, formData.dataVolta),
+            tem_observacoes: Boolean(formData.observacoes),
+        });
+
         try {
             this.mostrarLoading();
-            
+
             this.atualizarProgresso(15, '🔍 Buscando destinos pelo mundo...');
             const destinosDisponiveis = await this.buscarDestinosAPI();
-            
+
             if (!destinosDisponiveis || destinosDisponiveis.length === 0) {
                 throw new Error('Nenhum destino encontrado');
             }
-            
+
             this.atualizarProgresso(40, '💰 Filtrando pelo seu orçamento...');
             const filtro = this.filtrarDestinos(destinosDisponiveis);
-            
+
             if (filtro.cenario === 'nenhum') {
                 this.atualizarProgresso(100, '😕 Nenhum destino encontrado...');
                 await this.delay(500);
+                A?.emptyResult('descobrir-destinos', {
+                    escopo: formData.escopoDestino,
+                    acima_orcamento: (filtro.acimaOrcamento || []).length,
+                });
                 this.mostrarSemResultados(filtro.acimaOrcamento || []);
                 return;
             }
@@ -734,13 +753,50 @@ const BenetripDiscovery = {
             
             this.atualizarProgresso(100, '🎉 Pronto!');
             await this.delay(500);
+            A?.searchCompleted('descobrir-destinos', {
+                duracaoMs: Date.now() - inicio,
+                resultados: destinosParaRanking.length,
+                escopo: formData.escopoDestino,
+                flexivel: false,
+            });
             this.mostrarResultados(destinosComLinks, filtro.cenario, filtro.mensagem);
-            
+
         } catch (erro) {
             this.error('Erro:', erro);
-            alert(`Erro: ${erro.message}`);
-            this.esconderLoading();
+            A?.searchFailed('descobrir-destinos', {
+                duracaoMs: Date.now() - inicio,
+                motivo: (erro.message || 'desconhecido').slice(0, 60),
+            });
+            this.mostrarErroRecuperavel(erro.message);
         }
+    },
+
+    // Erro recuperável: mantém o formulário preenchido e oferece nova
+    // tentativa, em vez do alert() que só sumia com a mensagem
+    mostrarErroRecuperavel(mensagem) {
+        this.esconderLoading();
+        const container = document.getElementById('form-container');
+        let painel = document.getElementById('erro-busca');
+        if (!painel) {
+            painel = document.createElement('div');
+            painel.id = 'erro-busca';
+            painel.className = 'erro-busca';
+            container.insertBefore(painel, container.firstChild);
+        }
+        painel.innerHTML = `
+            <div class="erro-busca-titulo">😕 A busca não completou</div>
+            <p class="erro-busca-msg">${mensagem || 'Não conseguimos falar com o buscador de preços agora.'}</p>
+            <p class="erro-busca-dica">Seus dados continuam preenchidos abaixo. Você pode tentar de novo.</p>
+            <button type="button" class="btn-tentar-novamente" onclick="BenetripDiscovery.tentarNovamente()">🔄 Tentar novamente</button>
+        `;
+        painel.style.display = 'block';
+        painel.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    },
+
+    async tentarNovamente() {
+        const painel = document.getElementById('erro-busca');
+        if (painel) painel.style.display = 'none';
+        await this.buscarDestinos();
     },
     // ================================================================
     // v4.5: buscarDestinosAPI envia origemGeo ao backend

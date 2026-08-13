@@ -422,14 +422,19 @@ const BenetripVoos = {
     airlineLogo(iata){return iata?`https://pics.avs.io/60/60/${iata}.png`:''},
 
     /**
-     * FIX: pricePerPerson now considers total passengers including infants.
-     * The Travelpayouts API returns total price for ALL passengers,
-     * so we divide by the total headcount.
+     * Preço por pessoa: o total vem para todos os passageiros e é dividido
+     * apenas pelos PAGANTES (adultos + crianças). Bebê de colo não entra na
+     * divisão — incluí-lo reduzia artificialmente o valor exibido aqui e
+     * fazia esta tela discordar do Comparar Voos para a mesma família.
+     * Regra compartilhada em assets/js/benetrip-price.js.
      */
     pricePerPerson(total){
-        const {adults, children, infants} = this.state.params;
-        const pax = (adults || 1) + (children || 0) + (infants || 0);
-        return pax > 0 ? Math.round(total / pax) : total;
+        const {adults, children} = this.state.params;
+        if (typeof BenetripPrice !== 'undefined') {
+            return BenetripPrice.porPessoa(total, { adultos: adults, criancas: children }) ?? total;
+        }
+        const pax = Math.max(1, (adults || 1) + (children || 0));
+        return Math.round(total / pax);
     },
 
     /**
@@ -828,7 +833,7 @@ const BenetripVoos = {
             return `<div class="fc-mo-row"><span class="fc-mo-gate">${t.gate_name}${curWarn}</span><span class="fc-mo-price">${this.fmtPrice(this.pricePerPerson(t.price))}</span><button class="fc-mo-book" onclick="BenetripVoos.book('${this.state.searchId}','${t.url}',this)">Reservar</button></div>`;
         }).join('')}</div>`:'';
 
-        return`<div class="flight-card"><div class="fc-main"><div class="fc-segments">${segs}${baggageHtml}${currencyWarnHtml}</div><div class="fc-price-panel"><div><div class="fc-price">${this.fmtPrice(pp)}</div><div class="fc-price-lbl">por pessoa · ${isRet?'ida e volta':'só ida'}</div><div class="fc-gate">${p.gate_name}${operatorCount>1?` <span class="fc-gate-more">+${operatorCount-1}</span>`:''}</div></div><button class="fc-book" onclick="BenetripVoos.book('${this.state.searchId}','${p.terms_url}',this)">Reservar →</button></div></div>${more}</div>`;
+        return`<div class="flight-card"><div class="fc-main"><div class="fc-segments">${segs}${baggageHtml}${currencyWarnHtml}</div><div class="fc-price-panel"><div><div class="fc-price">${this.fmtPrice(pp)}</div><div class="fc-price-lbl">por pessoa · ${isRet?'ida e volta':'só ida'}${(this.state.params.infants||0)>0?' · bebê de colo não entra na divisão':''}</div><div class="fc-gate">${p.gate_name}${operatorCount>1?` <span class="fc-gate-more">+${operatorCount-1}</span>`:''}</div></div><button class="fc-book" onclick="BenetripVoos.book('${this.state.searchId}','${p.terms_url}',this)">Reservar →</button></div></div>${more}</div>`;
     },
 
     toggleMore(btn){const l=btn.closest('.flight-card').querySelector('.fc-more-list');if(l){l.classList.toggle('open');btn.textContent=l.classList.contains('open')?'Menos ofertas':btn.textContent;}},
