@@ -127,7 +127,7 @@ PERSONALIDADE:
 - Use emojis com moderação nas dicas
 
 REGRAS ABSOLUTAS:
-- Crie EXATAMENTE o número de dias solicitado — nem mais, nem menos
+- Crie EXATAMENTE o número de dias solicitado, nem mais, nem menos
 - Cada dia DEVE ter atividades nos 3 períodos com o MÍNIMO conforme intensidade
 - Use APENAS locais REAIS com nomes ESPECÍFICOS verificáveis no Google Maps
 - NUNCA repita o mesmo local em dias diferentes. ZERO repetição.
@@ -231,7 +231,7 @@ function gerarPromptIA(params) {
     instrucoesDuracao = `
 ATENÇÃO - VIAGEM CURTA (${diasViagem} dia${diasViagem > 1 ? 's' : ''}):
 - Com poucos dias, foque nos DESTAQUES IMPERDÍVEIS de ${destino}
-- Cada atividade deve ser realmente valiosa — não perca tempo com locais secundários
+- Cada atividade deve ser realmente valiosa, não perca tempo com locais secundários
 - No primeiro dia, se a chegada for tarde, priorize jantar especial e passeio noturno
 - Se for apenas 1 dia, crie um roteiro COMPLETO com manhã, tarde e noite bem aproveitados
 - Inclua os pontos turísticos mais icônicos e fotogênicos`;
@@ -242,7 +242,7 @@ ATENÇÃO - VIAGEM LONGA (${diasViagem} dias):
 - Inclua 1-2 dias para excursões fora do centro ou cidades próximas
 - Alterne dias intensos com dias mais leves para descanso
 - Sugira bairros diferentes a cada dia para cobrir bem a cidade
-- NÃO repita locais — cada dia deve ter atividades totalmente diferentes
+- NÃO repita locais, cada dia deve ter atividades totalmente diferentes
 - Considere incluir um "dia livre" no meio da viagem para descanso
 - Dia 1 pode ser mais leve (chegada) e último dia focado na partida`;
   }
@@ -252,7 +252,7 @@ ATENÇÃO - VIAGEM LONGA (${diasViagem} dias):
   if (tipoCompanhia === 'familia' || tipoCompanhia === 'Família') {
     instrucaoCompanhia = 'FAMÍLIA: Inclua atividades para crianças. Evite locais perigosos. Considere paradas para descanso e alimentação.';
   } else if (tipoCompanhia === 'casal' || tipoCompanhia === 'Casal') {
-    instrucaoCompanhia = 'CASAL: Experiências românticas — jantares à luz de velas, mirantes ao pôr-do-sol, passeios intimistas, spa.';
+    instrucaoCompanhia = 'CASAL: Experiências românticas, jantares à luz de velas, mirantes ao pôr-do-sol, passeios intimistas, spa.';
   } else if (tipoCompanhia === 'amigos' || tipoCompanhia === 'Amigos') {
     instrucaoCompanhia = 'GRUPO DE AMIGOS (PRIORIDADE): Pelo menos 1 atividade coletiva/interativa por dia (pub crawl, aula de culinária, escape room, degustação). Vida noturna TODA NOITE (bares, rooftops, clubes). Restaurantes com mesas grandes e clima animado. Experiências competitivas e divertidas.';
   } else if (tipoCompanhia === 'sozinho' || tipoCompanhia === 'Sozinho') {
@@ -273,7 +273,7 @@ ${instrucaoCompanhia ? `- Dica para companhia: ${instrucaoCompanhia}` : ''}
 ${instrucoesDuracao}
 
 REGRAS PARA O JSON:
-1. O array "dias" deve ter EXATAMENTE ${diasViagem} objetos — confira antes de retornar
+1. O array "dias" deve ter EXATAMENTE ${diasViagem} objetos, confira antes de retornar
 2. Cada dia deve ter os campos: data, descricao, manha, tarde, noite
 3. CADA período (manha/tarde/noite) DEVE ter o MÍNIMO de atividades conforme a intensidade acima. Conte antes de retornar!
 4. No DIA 1: se a chegada for depois das 18h, manhã e tarde simplificadas. Senão, roteiro completo.
@@ -282,7 +282,7 @@ REGRAS PARA O JSON:
 7. Use SOMENTE locais reais de ${destino}. PROIBIDO inventar nomes ou usar genéricos ("restaurante local", "café da estação")
 8. PROIBIDO repetir o MESMO local em dias diferentes. Cada local aparece UMA VEZ no roteiro.
 9. DIFERENCIAL: 40% atrações clássicas + 30% hidden gems + 30% gastronomia/noturna. Inclua landmarks icônicos.
-10. Títulos dos dias: CRIATIVOS e ÚNICOS — proibido "Explorando X", "Aventuras em X", "Cultura em X"
+10. Títulos dos dias: CRIATIVOS e ÚNICOS: proibido "Explorando X", "Aventuras em X", "Cultura em X"
 11. Dicas: PROIBIDO "Aproveite a atmosfera animada", "Aproveite a vista", "Peça o menu degustação". Cada dica = informação ÚNICA e ÚTIL.
 
 ESTRUTURA JSON OBRIGATÓRIA (retorne APENAS este JSON, nada mais):

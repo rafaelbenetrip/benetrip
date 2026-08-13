@@ -152,7 +152,7 @@ export function violaRestricaoObjetiva(escolhido, pool, perfil = {}) {
 // ============================================================
 export function descreverPenalidades(quality) {
     const map = {
-        escalas_familia: 'Voo com 2+ escalas — cansativo para quem viaja com crianças',
+        escalas_familia: 'Voo com 2 ou mais escalas, cansativo para quem viaja com crianças',
         muitas_escalas: 'Voo com 2 ou mais escalas',
         voo_consome_viagem: 'O deslocamento consome uma parte grande da viagem',
         voo_longo_para_duracao: 'Voo relativamente longo para a duração da viagem',

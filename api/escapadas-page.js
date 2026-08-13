@@ -152,7 +152,7 @@ function renderPage({ cidadeAtual, cidades, janelas, janelaAtiva, hoje, isDefaul
         title = `${rotuloJanela}: escapadas saindo de ${cidadeAtual.nome} | Benetrip`;
         description = temDestinos
             ? `Voos de ida e volta saindo de ${cidadeAtual.nome} para ${janelaAtiva.rotuloDatas}, a partir de R$ ${fmt(menorPreco)}.${janelaAtiva.categoria === 'feriado' ? ` ${janelaAtiva.feriado.nome} ${janelaAtiva.feriado.emenda}.` : ''} Preços reais, atualizados todos os dias.`
-            : `Escapadas saindo de ${cidadeAtual.nome} para ${janelaAtiva.rotuloDatas}. A Tripinha está farejando os preços — volte em breve.`;
+            : `Escapadas saindo de ${cidadeAtual.nome} para ${janelaAtiva.rotuloDatas}. A Tripinha está farejando os preços, volte em breve.`;
     }
 
     const chips = montarChips(cidadeAtual, cidades);
@@ -272,7 +272,7 @@ function renderPage({ cidadeAtual, cidades, janelas, janelaAtiva, hoje, isDefaul
     <!-- Aviso de horários: o buscador devolve o preço da janela de datas,
          não os horários dos voos — então não prometemos "sem pedir folga" -->
     <p class="horarios-aviso container">
-        Datas que aproveitam o fim de semana. Os horários de ida e volta não vêm nesta busca &mdash; confirme no Google Flights se você precisará de folga.
+        Datas que aproveitam o fim de semana. Os horários de ida e volta não vêm nesta busca, então confirme no Google Flights se você vai precisar de folga.
     </p>
 
     <!-- ========================================

@@ -96,7 +96,7 @@
                 return {
                     code: p.code, type: 'airport', isAggregate: false,
                     name: city || airport,
-                    label: city && this.normalize(airport).indexOf(this.normalize(city)) === -1 ? `${city} — ${airport}` : airport,
+                    label: city && this.normalize(airport).indexOf(this.normalize(city)) === -1 ? `${city} · ${airport}` : airport,
                     sub: p.country_name || '',
                     airportName: airport,
                     state: p.state_code || null,
@@ -110,7 +110,7 @@
             return {
                 code: p.code, type: 'city', isAggregate,
                 name: p.name,
-                label: isAggregate ? `${p.name} — Todos os aeroportos` : `${p.name} — ${p.main_airport_name}`,
+                label: isAggregate ? `${p.name} · todos os aeroportos` : `${p.name} · ${p.main_airport_name}`,
                 sub: p.country_name || '',
                 airportName: p.main_airport_name || null,
                 state: p.state_code || null,
@@ -163,7 +163,7 @@
                     type: c.aeroporto ? 'airport' : 'city',
                     isAggregate: !!(c.aeroporto && this.normalize(c.aeroporto).startsWith('todos')),
                     name: c.cidade,
-                    label: `${c.cidade}${c.sigla_estado ? ', ' + c.sigla_estado : ''}${c.aeroporto ? ' — ' + c.aeroporto : ''}`,
+                    label: `${c.cidade}${c.sigla_estado ? ', ' + c.sigla_estado : ''}${c.aeroporto ? ' · ' + c.aeroporto : ''}`,
                     sub: c.pais || '',
                     airportName: c.aeroporto || null,
                     state: c.sigla_estado || null,

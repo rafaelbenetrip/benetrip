@@ -325,7 +325,7 @@ export function renderVariacaoInlineHtml(v) {
 export function renderDatasCardHtml(d) {
     const periodo = fmtPeriodo(d.data_ida, d.data_volta);
     if (!periodo) return '';
-    return `<div class="dest-dates" title="Preço encontrado para essas datas — outras datas podem variar">
+    return `<div class="dest-dates" title="Preço encontrado para essas datas, outras datas podem variar">
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
                         <span>${escapeHtml(periodo).replace('→', '&rarr;')}</span>
                     </div>`;
@@ -362,7 +362,7 @@ export function renderCardHtml(d, opts) {
     // lista usam o mesmo aeroporto, isso fica explícito no card.
     const viaAeroporto = aeroporto
         ? `<div class="dest-via-aeroporto">via ${aeroporto}${compartilhamAeroporto > 1
-            ? ` &middot; mesmo aeroporto de outros ${compartilhamAeroporto - 1} lugar${compartilhamAeroporto - 1 > 1 ? 'es' : ''} desta lista; pode haver deslocamento terrestre`
+            ? ` &middot; mesmo aeroporto de outros ${compartilhamAeroporto - 1} lugar${compartilhamAeroporto - 1 > 1 ? 'es' : ''} desta lista, com possível deslocamento terrestre`
             : ''}</div>`
         : '';
 

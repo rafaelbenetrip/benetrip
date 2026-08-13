@@ -77,7 +77,7 @@ const BenetripVaiEVem = {
         this.state[stateKey] = cidade;
         const codeDisplay = cidade.displayCode || cidade.code;
         input.value = cidade.airport
-            ? `${cidade.name} — ${cidade.airport} (${codeDisplay})`
+            ? `${cidade.name} · ${cidade.airport} (${codeDisplay})`
             : `${cidade.name} (${codeDisplay})`;
         hidden.value = cidade.code;
     },
@@ -131,7 +131,7 @@ const BenetripVaiEVem = {
                         <div class="${cityClass}" data-city='${JSON.stringify(c).replace(/'/g, "&#39;")}'>
                             <div class="item-code">${cityIcon}${c.displayCode}</div>
                             <div class="item-details">
-                                <div class="item-name">${c.name}${c.state ? ', ' + c.state : ''}${c.airport ? ' — ' + c.airport : ''}</div>
+                                <div class="item-name">${c.name}${c.state ? ', ' + c.state : ''}${c.airport ? ' · ' + c.airport : ''}</div>
                                 <div class="item-country">${c.country}</div>
                             </div>
                         </div>
@@ -147,7 +147,7 @@ const BenetripVaiEVem = {
 
                         const codeDisplay = cidade.displayCode || cidade.code;
                         input.value = cidade.airport
-                            ? `${cidade.name} — ${cidade.airport} (${codeDisplay})`
+                            ? `${cidade.name} · ${cidade.airport} (${codeDisplay})`
                             : `${cidade.name} (${codeDisplay})`;
 
                         hidden.value = JSON.stringify(cidade);
@@ -367,12 +367,12 @@ const BenetripVaiEVem = {
         const faixa = classificacao.faixa;
         const faixaGoogle = classificacao.faixaGoogle;
         const contextoGoogle = faixaGoogle
-            ? `<span class="legenda-contexto">Contexto: o Google indica faixa típica de <strong>${simbolo} ${faixaGoogle.low.toLocaleString('pt-BR')} — ${simbolo} ${faixaGoogle.high.toLocaleString('pt-BR')}</strong> para esta rota.</span>`
+            ? `<span class="legenda-contexto">De referência: o Google indica faixa típica de <strong>${simbolo} ${faixaGoogle.low.toLocaleString('pt-BR')} a ${simbolo} ${faixaGoogle.high.toLocaleString('pt-BR')}</strong> para esta rota.</span>`
             : '';
         const legendaHtml = faixa ? `
             <div class="legenda-classes fade-in" style="animation-delay: 0.18s">
                 <span class="legenda-titulo">${classificacao.precosSemelhantes
-                    ? 'As semanas pesquisadas têm preços semelhantes — escolha pela conveniência das datas.'
+                    ? 'As semanas pesquisadas têm preços parecidos, então escolha pela data que for mais conveniente.'
                     : 'Classificação <strong>em relação às semanas pesquisadas</strong> (não é comparação histórica):'}</span>
                 ${classificacao.precosSemelhantes ? '' : `
                 <div class="legenda-itens">
@@ -749,13 +749,13 @@ const BenetripVaiEVem = {
     },
 
     formatDateBR(dateStr) {
-        if (!dateStr) return '—';
+        if (!dateStr) return 'sem data';
         const d = new Date(dateStr + 'T12:00:00');
         return d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
     },
 
     formatDateComDia(dateStr) {
-        if (!dateStr) return '—';
+        if (!dateStr) return 'sem data';
         return `${this.DIAS_CURTO[this.getDow(dateStr)]} ${this.formatDateBR(dateStr)}`;
     },
 

@@ -177,7 +177,7 @@ const BenetripPreferences = (function () {
             if (input && hiddenInput) {
                 const cidade = prefs.origem;
                 input.value = cidade.airport
-                    ? `${cidade.name} — ${cidade.airport} (${cidade.code})`
+                    ? `${cidade.name} · ${cidade.airport} (${cidade.code})`
                     : `${cidade.name} (${cidade.code})`;
                 hiddenInput.value = JSON.stringify(cidade);
 
@@ -338,7 +338,7 @@ const BenetripPreferences = (function () {
 
         const origemText = prefs.origem
             ? (prefs.origem.airport
-                ? `${prefs.origem.name} — ${prefs.origem.airport} (${prefs.origem.code})`
+                ? `${prefs.origem.name} · ${prefs.origem.airport} (${prefs.origem.code})`
                 : `${prefs.origem.name} (${prefs.origem.code})`)
             : 'Não definida';
 

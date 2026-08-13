@@ -141,7 +141,7 @@ async function gerarViaCerebras(origem, destinos, incluirEscolha, evidencias) {
 
     const escolhaInstrucoes = incluirEscolha
         ? `
-Além do insight, escolha 1 destino da lista como "escolha da Tripinha" do dia — o melhor achado considerando preço, queda de preço e apelo do destino. Justifique em até 90 caracteres, tom animado mas factual (baseado nos dados, sem inventar clima/eventos).
+Além do insight, escolha 1 destino da lista como "escolha da Tripinha" do dia, o melhor achado considerando preço, queda de preço e apelo do destino. Justifique em até 90 caracteres, tom animado mas factual (baseado nos dados, sem inventar clima/eventos).
 Retorne APENAS um JSON: { "insight": "sua frase", "escolha": { "nome": "nome EXATO do destino como está na lista", "motivo": "justificativa curta" } }`
         : `
 Retorne APENAS um JSON: { "insight": "sua frase aqui" }`;
@@ -153,7 +153,7 @@ Retorne APENAS um JSON: { "insight": "sua frase aqui" }`;
 - Escreva de forma factual: cite o preço e, se houver queda, diga "caiu R$X em relação à referência recente".
 - Você pode dizer que um preço é o menor ENTRE OS DESTINOS PESQUISADOS, nunca que é barato em termos absolutos.`;
 
-    const systemMessage = `Você é a Tripinha, a cachorrinha mascote da Benetrip — uma plataforma de viagens. Você é simpática, animada e fala de forma coloquial em português brasileiro.
+    const systemMessage = `Você é a Tripinha, a cachorrinha mascote da Benetrip, uma plataforma de viagens. Você é simpática, animada e fala de forma coloquial em português brasileiro.
 
 Sua tarefa: gerar UMA frase curta e envolvente (máximo 160 caracteres) comentando os destinos baratos disponíveis hoje para quem sai de ${origem}.
 
@@ -163,8 +163,9 @@ Regras:
 - Use no máximo 1 emoji no início da frase
 - NÃO use hashtags
 - NÃO comece com "Ei" ou "Olha"
+- NÃO use travessão (—) no texto: escreva com vírgula, ponto ou dois-pontos
 - NUNCA invente preço, clima, evento ou disponibilidade: use apenas os números fornecidos
-- Queda de preço, preço absoluto e comparação histórica são coisas diferentes — não troque uma pela outra
+- Queda de preço, preço absoluto e comparação histórica são coisas diferentes, não troque uma pela outra
 ${regrasLinguagem}${escolhaInstrucoes}`;
 
     const userMessage = `Dados de hoje para ${origem}:
@@ -312,7 +313,7 @@ export function gerarFallbackInsight(origem, destinos, evidencias = null) {
         const q = ev.quedaRelevante;
         const frases = [
             `📉 ${q.nome} caiu ${q.percentual}% em relação à média dos últimos ${q.dias} dias: agora R$${q.preco}`,
-            `💸 ${q.nome} está R$${q.diferenca} mais barato que a média recente — agora R$${q.preco} saindo de ${origem}`,
+            `💸 ${q.nome} está R$${q.diferenca} mais barato que a média recente: R$${q.preco} saindo de ${origem}`,
             `🔎 Boa hora pra olhar ${q.nome}: R$${q.preco}, ${q.percentual}% abaixo da referência dos últimos ${q.dias} dias`,
         ];
         return frases[seed % frases.length];
@@ -334,7 +335,7 @@ export function gerarFallbackInsight(origem, destinos, evidencias = null) {
     if (total >= 20) {
         const frases = [
             `✈️ ${total} destinos pesquisados saindo de ${origem}. O menor preço é ${maisBarato.nome}, R$${maisBarato.preco}`,
-            `🗺️ ${nacionais.length} nacionais e ${internacionais.length} internacionais saindo de ${origem} — ${maisBarato.nome} lidera com R$${maisBarato.preco}`,
+            `🗺️ ${nacionais.length} nacionais e ${internacionais.length} internacionais saindo de ${origem}, e ${maisBarato.nome} lidera com R$${maisBarato.preco}`,
             `🐶 Farejei ${total} opções de ${origem}: média R$${media}, e ${maisBarato.nome} sai por R$${maisBarato.preco}`,
         ];
         return frases[seed % frases.length];

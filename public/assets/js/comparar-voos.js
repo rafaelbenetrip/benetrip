@@ -143,7 +143,7 @@ const BenetripCompararVoos = {
                     <div class="${cityClass}" data-city='${JSON.stringify(c).replace(/'/g, "&#39;")}'>
                         <div class="item-code">${cityIcon}${c.displayCode}</div>
                         <div class="item-details">
-                            <div class="item-name">${c.name}${c.state ? ', ' + c.state : ''}${c.airport ? ' — ' + c.airport : ''}</div>
+                            <div class="item-name">${c.name}${c.state ? ', ' + c.state : ''}${c.airport ? ' · ' + c.airport : ''}</div>
                             <div class="item-country">${c.country}</div>
                         </div>
                     </div>`;
@@ -155,7 +155,7 @@ const BenetripCompararVoos = {
                         this.state[stateKey] = cidade;
                         const codeDisplay = cidade.displayCode || cidade.code;
                         input.value = cidade.airport
-                            ? `${cidade.name} — ${cidade.airport} (${codeDisplay})`
+                            ? `${cidade.name} · ${cidade.airport} (${codeDisplay})`
                             : `${cidade.name} (${codeDisplay})`;
                         hidden.value = JSON.stringify(cidade);
                         results.style.display = 'none';
@@ -1015,7 +1015,7 @@ const BenetripCompararVoos = {
             return Array.from(map.entries()).map(([id, info]) => `
                 <div class="filter-check-item ${f[tipo].has(id) ? 'checked' : ''}" data-airport="${tipo}-${id}" onclick="BenetripCompararVoos.toggleAeroporto('${tipo}','${id}')">
                     <span class="fci-check"></span>
-                    <strong>${id}</strong> — ${info.name} <span class="fci-count">${info.count}</span>
+                    <strong>${id}</strong> · ${info.name} <span class="fci-count">${info.count}</span>
                 </div>`).join('');
         };
 
@@ -1043,12 +1043,12 @@ const BenetripCompararVoos = {
             </div>
 
             <div class="filter-section">
-                <div class="filter-section-title"><span class="filter-section-title-icon">🛫</span> Horário de Saída — Ida</div>
+                <div class="filter-section-title"><span class="filter-section-title-icon">🛫</span> Horário de saída da ida</div>
                 <div class="time-blocks">${buildTimeHtml('ida') || '<span style="font-size:13px;color:var(--gray-medium)">Dados indisponíveis</span>'}</div>
             </div>
 
             <div class="filter-section">
-                <div class="filter-section-title"><span class="filter-section-title-icon">🛬</span> Horário de Saída — Volta</div>
+                <div class="filter-section-title"><span class="filter-section-title-icon">🛬</span> Horário de saída da volta</div>
                 <div class="time-blocks">${buildTimeHtml('volta') || '<span style="font-size:13px;color:var(--gray-medium)">Dados indisponíveis</span>'}</div>
             </div>
 
@@ -1100,7 +1100,7 @@ const BenetripCompararVoos = {
         const precoPorPessoaMaisCaro = Math.round(stats.mostExpensive / paxParaPreco);
 
         const winnerCombo = data.combinacoes.find(c => c.dataIda === stats.cheapestCombo.dataIda && c.dataVolta === stats.cheapestCombo.dataVolta);
-        const winnerNoites = winnerCombo?.noites || '—';
+        const winnerNoites = winnerCombo?.noites ?? 'n/d';
 
         const saving = stats.mostExpensive - stats.cheapest;
         const savingPct = stats.mostExpensive > 0 ? Math.round((saving / stats.mostExpensive) * 100) : 0;
@@ -1250,7 +1250,7 @@ const BenetripCompararVoos = {
                 const key = `${ida}_${volta}`;
                 const cell = matrizPrecos[key];
                 if (!cell || cell.error || cell.melhorPreco === null) {
-                    html += `<td class="matrix-cell no-data">${volta <= ida ? '—' : '✗'}</td>`;
+                    html += `<td class="matrix-cell no-data">${volta <= ida ? '·' : '✗'}</td>`;
                     return;
                 }
                 const pricePp = Math.round(cell.melhorPreco / paxParaPreco);
@@ -1470,7 +1470,7 @@ const BenetripCompararVoos = {
                     ${extHtml}
                 </div>
                 ${legsHtml}
-                ${vooCompleto ? '' : '<div class="aviso-volta aviso-volta-card">Só o voo de ida está definido aqui. Escolha a volta no Google Flights — a tarifa final pode variar conforme o retorno.</div>'}
+                ${vooCompleto ? '' : '<div class="aviso-volta aviso-volta-card">Só o voo de ida está definido aqui. Escolha a volta no Google Flights, porque a tarifa final pode variar conforme o retorno.</div>'}
                 <div class="flight-action">
                     <a href="${gfUrl}" target="_blank" rel="noopener" class="btn-google-flights">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/></svg>

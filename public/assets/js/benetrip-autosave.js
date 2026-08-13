@@ -465,7 +465,7 @@ const BenetripAutoSave = (function () {
                     razao: destino.razao || '', comentario: destino.comentario || '',
                     stops: destino.flight?.stops
                 },
-                notas: `${tipo === 'top_destino' ? '🏆 Top Pick' : tipo === 'surpresa' ? '🎁 Surpresa' : '📋 Alternativa'} — auto-salvo`
+                notas: `${tipo === 'top_destino' ? '🏆 Top Pick' : tipo === 'surpresa' ? '🎁 Surpresa' : '📋 Alternativa'} · auto-salvo`
             });
             _log(`✅ Destino "${destino.name}" salvo automaticamente`);
         } catch (e) {

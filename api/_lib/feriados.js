@@ -163,13 +163,13 @@ export function descricaoEmenda(feriado) {
     const noitesTxt = `${janela.noites} noite${janela.noites > 1 ? 's' : ''}`;
 
     if (feriado.diaSemana === 6 || feriado.diaSemana === 0) {
-        return `cai no ${dia} — já é dia livre, então não estende o fim de semana (${noitesTxt} de viagem)`;
+        return `cai no ${dia}, que já é dia livre, então não estende o fim de semana (${noitesTxt} de viagem)`;
     }
     if (janela.folga === 0) {
-        return `cai numa ${dia} — ${janela.diasLivres} dias livres sem pedir folga (${noitesTxt} de viagem)`;
+        return `cai numa ${dia} e rende ${janela.diasLivres} dias livres sem pedir folga (${noitesTxt} de viagem)`;
     }
     if (feriado.diaSemana === 3) {
-        return `cai numa ${dia} — no meio da semana: só rende viagem longa pedindo ${janela.folga} dias de folga (${noitesTxt})`;
+        return `cai numa ${dia}, no meio da semana: só vira viagem longa pedindo ${janela.folga} dias de folga (${noitesTxt})`;
     }
-    return `cai numa ${dia} — pedindo ${janela.folga} dia${janela.folga > 1 ? 's' : ''} de folga rende ${janela.diasLivres} dias livres (${noitesTxt} de viagem)`;
+    return `cai numa ${dia} e, pedindo ${janela.folga} dia${janela.folga > 1 ? 's' : ''} de folga, rende ${janela.diasLivres} dias livres (${noitesTxt} de viagem)`;
 }
