@@ -111,15 +111,15 @@ const MinhaContaPrefs = (function () {
         const simbolo = { 'BRL': 'R$', 'USD': 'US$', 'EUR': '€' }[p.moeda] || 'R$';
 
         // Origem
-        let origemText = '—';
+        let origemText = 'não informada';
         if (p.origem && p.origem.name) {
             origemText = p.origem.airport
-                ? `${p.origem.name} — ${p.origem.airport} (${p.origem.code})`
+                ? `${p.origem.name} · ${p.origem.airport} (${p.origem.code})`
                 : `${p.origem.name} (${p.origem.code})`;
         }
 
         // Companhia + detalhes
-        let compText = COMP_LABELS[p.companhia] || '—';
+        let compText = COMP_LABELS[p.companhia] || 'não informada';
         if (p.companhia === 2) {
             const parts = [`${p.adultos || 2} adulto(s)`];
             if (p.criancas > 0) parts.push(`${p.criancas} criança(s)`);
@@ -130,7 +130,7 @@ const MinhaContaPrefs = (function () {
         }
 
         // Preferências
-        let prefsText = '—';
+        let prefsText = 'não informadas';
         if (p.preferencias) {
             prefsText = p.preferencias.split(',')
                 .filter(Boolean)
@@ -159,15 +159,15 @@ const MinhaContaPrefs = (function () {
                     </div>
                     <div class="prefs-item">
                         <span class="prefs-label">Destinos</span>
-                        <span class="prefs-value">${ESCOPO_LABELS[p.escopoDestino] || '—'}</span>
+                        <span class="prefs-value">${ESCOPO_LABELS[p.escopoDestino] || 'não informado'}</span>
                     </div>
                     <div class="prefs-item">
                         <span class="prefs-label">Moeda</span>
-                        <span class="prefs-value">${MOEDA_LABELS[p.moeda] || '—'}</span>
+                        <span class="prefs-value">${MOEDA_LABELS[p.moeda] || 'não informada'}</span>
                     </div>
                     <div class="prefs-item">
                         <span class="prefs-label">Orçamento passagens</span>
-                        <span class="prefs-value">${p.orcamento ? `${simbolo} ${Math.round(p.orcamento).toLocaleString('pt-BR')} por pessoa` : '—'}</span>
+                        <span class="prefs-value">${p.orcamento ? `${simbolo} ${Math.round(p.orcamento).toLocaleString('pt-BR')} por pessoa` : 'não informado'}</span>
                     </div>
                     ${p.observacoes ? `
                     <div class="prefs-item prefs-item-full">
@@ -198,7 +198,7 @@ const MinhaContaPrefs = (function () {
         let origemDisplay = '';
         if (p.origem && p.origem.name) {
             origemDisplay = p.origem.airport
-                ? `${p.origem.name} — ${p.origem.airport} (${p.origem.code})`
+                ? `${p.origem.name} · ${p.origem.airport} (${p.origem.code})`
                 : `${p.origem.name} (${p.origem.code})`;
         }
 
@@ -359,7 +359,7 @@ const MinhaContaPrefs = (function () {
                     }
                     origemResults.innerHTML = cidades.map(c => `
                         <div class="pref-ac-item" data-city='${JSON.stringify(c).replace(/'/g, '&#39;')}'>
-                            <strong>${c.code}</strong> ${c.name}${c.state ? ', ' + c.state : ''}${c.airport ? ' — ' + c.airport : ''}
+                            <strong>${c.code}</strong> ${c.name}${c.state ? ', ' + c.state : ''}${c.airport ? ' · ' + c.airport : ''}
                             <small>${c.country}</small>
                         </div>`).join('');
                     origemResults.style.display = 'block';
@@ -368,7 +368,7 @@ const MinhaContaPrefs = (function () {
                         item.addEventListener('click', () => {
                             const city = JSON.parse(item.dataset.city.replace(/&#39;/g, "'"));
                             origemInput.value = city.airport
-                                ? `${city.name} — ${city.airport} (${city.code})`
+                                ? `${city.name} · ${city.airport} (${city.code})`
                                 : `${city.name} (${city.code})`;
                             document.getElementById('pref-origem-data').value = JSON.stringify(city);
                             origemResults.style.display = 'none';

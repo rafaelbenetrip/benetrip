@@ -78,7 +78,7 @@
              'O Vai e Vem mostra quando sua rota de sempre fica mais barata nos próximos meses.';
     }
     return 'Se você vive indo e voltando entre <strong>' + route.origem.name +
-           '</strong> e <strong>' + route.destino.name + '</strong> — família, amor, trabalho — ' +
+           '</strong> e <strong>' + route.destino.name + '</strong>, seja por família, amor ou trabalho, ' +
            'o Vai e Vem mostra quando essa rota fica mais barata nos próximos meses, ' +
            'nos dias da semana que você costuma viajar.';
   }

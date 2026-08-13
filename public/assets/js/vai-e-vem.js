@@ -77,7 +77,7 @@ const BenetripVaiEVem = {
         this.state[stateKey] = cidade;
         const codeDisplay = cidade.displayCode || cidade.code;
         input.value = cidade.airport
-            ? `${cidade.name} — ${cidade.airport} (${codeDisplay})`
+            ? `${cidade.name} · ${cidade.airport} (${codeDisplay})`
             : `${cidade.name} (${codeDisplay})`;
         hidden.value = cidade.code;
     },
@@ -131,7 +131,7 @@ const BenetripVaiEVem = {
                         <div class="${cityClass}" data-city='${JSON.stringify(c).replace(/'/g, "&#39;")}'>
                             <div class="item-code">${cityIcon}${c.displayCode}</div>
                             <div class="item-details">
-                                <div class="item-name">${c.name}${c.state ? ', ' + c.state : ''}${c.airport ? ' — ' + c.airport : ''}</div>
+                                <div class="item-name">${c.name}${c.state ? ', ' + c.state : ''}${c.airport ? ' · ' + c.airport : ''}</div>
                                 <div class="item-country">${c.country}</div>
                             </div>
                         </div>
@@ -147,7 +147,7 @@ const BenetripVaiEVem = {
 
                         const codeDisplay = cidade.displayCode || cidade.code;
                         input.value = cidade.airport
-                            ? `${cidade.name} — ${cidade.airport} (${codeDisplay})`
+                            ? `${cidade.name} · ${cidade.airport} (${codeDisplay})`
                             : `${cidade.name} (${codeDisplay})`;
 
                         hidden.value = JSON.stringify(cidade);
@@ -749,13 +749,13 @@ const BenetripVaiEVem = {
     },
 
     formatDateBR(dateStr) {
-        if (!dateStr) return '—';
+        if (!dateStr) return 'sem data';
         const d = new Date(dateStr + 'T12:00:00');
         return d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
     },
 
     formatDateComDia(dateStr) {
-        if (!dateStr) return '—';
+        if (!dateStr) return 'sem data';
         return `${this.DIAS_CURTO[this.getDow(dateStr)]} ${this.formatDateBR(dateStr)}`;
     },
 

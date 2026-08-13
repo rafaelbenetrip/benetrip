@@ -193,8 +193,8 @@ export default async function handler(req, res) {
             companhiaInstrucoes = `\n══ VIAGEM COM GRUPO DE ${numViajantes} AMIGOS (PRIORIDADE ALTA) ══
 OBRIGATÓRIO em TODOS os dias:
 - Pelo menos 1 atividade COLETIVA/INTERATIVA por dia: pub crawl, aula de culinária, degustação de cerveja/vinho, escape room, karaokê, boliche, competição entre amigos
-- Vida noturna TODA NOITE: bares locais, rooftops, clubes, pubs com música ao vivo — NÃO apenas "passeio pelo rio"
-- Restaurantes com mesas GRANDES e ambiente ANIMADO — nada de restaurantes finos/românticos para mesa de 2
+- Vida noturna TODA NOITE: bares locais, rooftops, clubes, pubs com música ao vivo, NÃO apenas "passeio pelo rio"
+- Restaurantes com mesas GRANDES e ambiente ANIMADO: nada de restaurantes finos/românticos para mesa de 2
 - Para ${numViajantes} pessoas: cite locais que comportem grupos, food halls, cervejarias, biergartens
 - Inclua experiências ÚNICAS para amigos: tours de street art, esportes radicais, jogos em grupo, festas locais
 - Tom da Tripinha: animado, divertido, como uma amiga que sabe os melhores rolês da cidade`;
@@ -221,8 +221,8 @@ OBRIGATÓRIO em TODOS os dias:
                 texto += `\n📍 ${dest.destino}${visitaLabel} (${dest.numDias} dia${dest.numDias > 1 ? 's' : ''} no total, ${dest.dataChegada} a ${dest.dataSaida}):\n`;
                 diasNoIntervalo.forEach(d => {
                     let nota = '';
-                    if (d.ehPrimeiro && dest.horarioChegada) nota = ` (CHEGADA ${dest.horarioChegada}${dest.arrayIndex > 0 ? ' — vindo de ' + destinosArray[dest.arrayIndex - 1].destino : ''})`;
-                    if (d.ehUltimo && dest.horarioPartida) nota = ` (PARTIDA ${dest.horarioPartida}${dest.proximoDestino ? ' — rumo a ' + dest.proximoDestino : ''})`;
+                    if (d.ehPrimeiro && dest.horarioChegada) nota = ` (CHEGADA ${dest.horarioChegada}${dest.arrayIndex > 0 ? ', vindo de ' + destinosArray[dest.arrayIndex - 1].destino : ''})`;
+                    if (d.ehUltimo && dest.horarioPartida) nota = ` (PARTIDA ${dest.horarioPartida}${dest.proximoDestino ? ', rumo a ' + dest.proximoDestino : ''})`;
                     texto += `   Dia ${d.numeroGlobal}: ${d.diaSemana}, ${d.dataFormatada}${nota}\n`;
                 });
             });
@@ -238,7 +238,7 @@ OBRIGATÓRIO em TODOS os dias:
                 return (cidadeOcorrencias[chave]?.length || 1) > 1 ? `${d.destino} (${visitaNumero[i]}ª)` : d.destino;
             }).join(' → ');
             multiDestinoBloco = `\n═══════════════════════════════════════════\nVIAGEM MULTI-DESTINO: ${rotaResumo}\nTotal: ${destinosArray.length} paradas em ${numDiasTotal} dias\n═══════════════════════════════════════════`;
-            multiDestinoRegras = `\nREGRAS MULTI-DESTINO:\n- Cubra TODOS os destinos na ordem\n- Dias de transição: NÃO desperdiçar. Manhã = última atividade especial na cidade (mirante favorito, café icônico, mercado local). Tarde = viagem. Noite = primeira experiência na nova cidade (jantar típico local, passeio noturno pelo centro)\n- "destino_atual" indica a cidade de cada dia\n- Se destino tem 1-2 dias, priorize LANDMARKS ICÔNICOS imperdíveis\n- PROIBIDO "Visita ao café da estação de trem" como atividade — use locais REAIS com nome`;
+            multiDestinoRegras = `\nREGRAS MULTI-DESTINO:\n- Cubra TODOS os destinos na ordem\n- Dias de transição: NÃO desperdiçar. Manhã = última atividade especial na cidade (mirante favorito, café icônico, mercado local). Tarde = viagem. Noite = primeira experiência na nova cidade (jantar típico local, passeio noturno pelo centro)\n- "destino_atual" indica a cidade de cada dia\n- Se destino tem 1-2 dias, priorize LANDMARKS ICÔNICOS imperdíveis\n- PROIBIDO "Visita ao café da estação de trem" como atividade, use locais REAIS com nome`;
         }
 
         // === BLOCO CIDADES REPETIDAS ===
@@ -255,10 +255,10 @@ CIDADES VISITADAS MAIS DE UMA VEZ:
 ${detalhes}
 ═══════════════════════════════════════════
 REGRAS PARA VISITAS REPETIDAS (PRIORIDADE ALTA):
-1. O roteiro da 2ª (ou 3ª) visita DEVE ser COMPLEMENTAR — NÃO repita NENHUMA atração, restaurante, bairro ou atividade da visita anterior
+1. O roteiro da 2ª (ou 3ª) visita DEVE ser COMPLEMENTAR: NÃO repita NENHUMA atração, restaurante, bairro ou atividade da visita anterior
 2. Na 2ª visita: sugira bairros locais, experiências gastronômicas diferentes, mercados/feiras/parques novos
 3. Na dica da Tripinha, referencie a volta: "Agora que você já conhece o básico, bora explorar o lado B!"
-4. No título do dia, indique retorno: "De volta a [cidade] — explorando novos cantos"
+4. No título do dia, indique retorno: "De volta a [cidade]: explorando novos cantos"
 5. "destino_atual" = mesmo nome da cidade (sem "2ª visita"). Use "visita_numero" para indicar.`;
         }
 
@@ -321,15 +321,15 @@ ${blocoExtra}
 ═══ REGRAS ANTI-REPETIÇÃO (CRÍTICO) ═══
 4. PROIBIDO repetir o MESMO local em dias diferentes. ZERO repetição. Cada local aparece UMA VEZ no roteiro inteiro.
 5. PROIBIDO usar "café da estação de trem" ou locais genéricos como atividade. Use locais REAIS com nome próprio.
-6. Dias de transição entre cidades: inclua atividade específica de despedida (último café famoso, mirante, mercado) — NÃO genéricos.
-7. PROIBIDO repetir a mesma estrutura de dia (ex: museu+parque+restaurante+bar) — varie a sequência.
+6. Dias de transição entre cidades: inclua atividade específica de despedida (último café famoso, mirante, mercado): NÃO genéricos.
+7. PROIBIDO repetir a mesma estrutura de dia (ex: museu+parque+restaurante+bar): varie a sequência.
 
 ═══ REGRAS DE QUALIDADE ═══
 8. google_maps_query = NOME REAL ESPECÍFICO + Cidade + País (ex: "The Nightjar, Londres, Reino Unido")
 9. tags: Imperdível, Ideal para família, Histórico, Gastronômico, Compras, Relaxante, Aventura, Cultural, Gratuito, Vida noturna, Natureza, Romântico
-10. Textos em pt-BR. Tripinha: 1ª pessoa, calorosa, max 1 ref canina/dia. SEM emoji.
+10. Textos em pt-BR. Tripinha: 1ª pessoa, calorosa, max 1 ref canina/dia. SEM emoji e SEM travessão (—): use vírgula, ponto ou dois-pontos.
 11. duracao_minutos: 30-240. Locais REAIS verificáveis no Google Maps.
-12. destino_atual = cidade exata. clima_previsto = CLIMA TÍPICO do mês (padrão histórico), com linguagem de tendência — nunca previsão do tempo.
+12. destino_atual = cidade exata. clima_previsto = CLIMA TÍPICO do mês (padrão histórico), com linguagem de tendência, nunca previsão do tempo.
 12b. faixa_custo = faixa QUALITATIVA compatível com o orçamento informado (gratuito, baixo, medio, alto). PROIBIDO inventar preço exato de ingresso ou refeição.
 12c. regiao = bairro ou região da cidade onde a atividade fica. Atividades do MESMO período devem ficar na MESMA região, para não cruzar a cidade.
 13. visita_numero = número da visita àquela cidade (1, 2, 3...)
@@ -337,9 +337,9 @@ ${blocoExtra}
 ═══ REGRAS DE DIFERENCIAL ═══
 14. Inclua os LANDMARKS ICÔNICOS de cada cidade (ex: Big Ben em Londres, Torre Eiffel em Paris, Anne Frank House em Amsterdam). NÃO pule os imperdíveis.
 15. MISTURE: 40% atrações clássicas + 30% hidden gems/segredos locais + 30% experiências gastronômicas/noturnas
-16. Títulos dos dias devem ser CRIATIVOS e ÚNICOS — NÃO use padrões como "Explorando X", "Aventuras em X", "Cultura em X"
+16. Títulos dos dias devem ser CRIATIVOS e ÚNICOS: NÃO use padrões como "Explorando X", "Aventuras em X", "Cultura em X"
 17. dica_tripinha: PROIBIDO frases genéricas como "Aproveite a atmosfera animada", "Aproveite a vista da cidade", "Peça o menu degustação". Cada dica deve ser ÚNICA e ESPECÍFICA: nome do prato, horário ideal, truque local, segredo que só morador sabe.
-18. Descrições das atividades devem ser DISTINTAS entre si — PROIBIDO "Um museu com uma vasta coleção de..." repetidamente.
+18. Descrições das atividades devem ser DISTINTAS entre si, PROIBIDO "Um museu com uma vasta coleção de..." repetidamente.
 19. Se cidade repetida: roteiro COMPLEMENTAR, atrações DIFERENTES da visita anterior${observacoesInstrucao}
 
 JSON VÁLIDO apenas, zero texto extra. Estrutura: ${estruturaJSON}`;
@@ -354,7 +354,7 @@ JSON VÁLIDO apenas, zero texto extra. Estrutura: ${estruturaJSON}`;
         console.log(`📊 max_tokens: ${tokensEstimados} para ${numDiasTotal} dias (${intensidade || 'moderado'})`);
 
         // === CHAMADA À IA (função reutilizada pela geração em blocos) ===
-        const systemContent = `Você é a Tripinha, cachorra vira-lata caramelo brasileira e guia de viagem expert. Gere JSON válido pt-BR com locais REAIS verificáveis no Google Maps. REGRAS CRÍTICAS: (1) NUNCA repita o mesmo local em dias diferentes. (2) Respeite o MÍNIMO de atividades por período conforme a intensidade. (3) Dicas devem ser ESPECÍFICAS e ÚNICAS — proibido "aproveite a atmosfera" ou "peça o menu degustação". (4) Inclua destino_atual, clima_previsto, visita_numero.${temCidadesRepetidas ? ' CIDADES REPETIDAS: 2ª visita = roteiro COMPLEMENTAR, atrações DIFERENTES.' : ''}`;
+        const systemContent = `Você é a Tripinha, cachorra vira-lata caramelo brasileira e guia de viagem expert. Gere JSON válido pt-BR com locais REAIS verificáveis no Google Maps. REGRAS CRÍTICAS: (1) NUNCA repita o mesmo local em dias diferentes. (2) Respeite o MÍNIMO de atividades por período conforme a intensidade. (3) Dicas devem ser ESPECÍFICAS e ÚNICAS: proibido "aproveite a atmosfera" ou "peça o menu degustação". (4) Inclua destino_atual, clima_previsto, visita_numero.${temCidadesRepetidas ? ' CIDADES REPETIDAS: 2ª visita = roteiro COMPLEMENTAR, atrações DIFERENTES.' : ''}`;
 
         const chamarModelos = async (promptTexto, maxTokensAlvo, diasAlvo, cerebrasPrimeiro) => {
             const chain = cerebrasPrimeiro
@@ -451,10 +451,10 @@ JSON VÁLIDO apenas, zero texto extra. Estrutura: ${estruturaJSON}`;
                 // da viagem (despedidas, malas, partida) — mas a viagem continua
                 const continuidade = ehUltimoBloco
                     ? `O dia ${numDiasTotal} é o ÚLTIMO dia da viagem inteira: pode incluir clima de despedida e logística de partida.`
-                    : `ATENÇÃO — A VIAGEM NÃO TERMINA NO DIA ${ate}: ela continua no dia ${ate + 1} (que será gerado depois). PROIBIDO tratar o dia ${ate} como último dia. Nada de despedidas, "último dia", check-out, malas, aeroporto ou encerramento nos dias ${de} a ${ate}. Todos são dias NORMAIS de viagem, com noite completa de atividades.`;
+                    : `ATENÇÃO: A VIAGEM NÃO TERMINA NO DIA ${ate}: ela continua no dia ${ate + 1} (que será gerado depois). PROIBIDO tratar o dia ${ate} como último dia. Nada de despedidas, "último dia", check-out, malas, aeroporto ou encerramento nos dias ${de} a ${ate}. Todos são dias NORMAIS de viagem, com noite completa de atividades.`;
                 const inicio = ehPrimeiroBloco
                     ? ''
-                    : `\nA viagem JÁ COMEÇOU: o viajante está na cidade desde o dia 1. NÃO trate o dia ${de} como chegada — é continuação natural do roteiro.`;
+                    : `\nA viagem JÁ COMEÇOU: o viajante está na cidade desde o dia 1. NÃO trate o dia ${de} como chegada, é continuação natural do roteiro.`;
 
                 const blocoInstrucao = `═══ GERAÇÃO EM BLOCOS (OBRIGATÓRIO) ═══
 O roteiro completo tem ${numDiasTotal} dias, mas NESTA RESPOSTA gere SOMENTE os dias ${de} a ${ate} (${n} dias), exatamente os listados em DIAS acima.
@@ -495,7 +495,7 @@ ${continuidade}${inicio}${locaisUsados.length ? `\nLOCAIS JÁ USADOS nos dias an
         }
         if (resultado.dias.length < numDiasTotal) {
             // Completa dias faltantes com conteúdo genérico em vez de entregar roteiro incompleto
-            console.warn(`⚠️ Modelo gerou ${resultado.dias.length}/${numDiasTotal} dias — completando faltantes`);
+            console.warn(`⚠️ Modelo gerou ${resultado.dias.length}/${numDiasTotal} dias, completando faltantes`);
             const fallbackDias = buildFallbackItinerary(req.body, destinosArray).dias;
             const numerosPresentes = new Set(resultado.dias.map(d => d.dia_numero));
             fallbackDias.forEach(fd => {

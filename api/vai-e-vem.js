@@ -340,7 +340,7 @@ function gerarFallbackTripinha(contexto) {
 
     if (economia > 0 && maisBarato.price > 0 && economia / maisBarato.price >= 0.3) {
         return {
-            insight: `🐶 Farejei ${totalViagens} viagens na sua rota: indo ${fmtBR(maisBarato.ida)} você paga ${simbolo} ${maisBarato.price.toLocaleString('pt-BR')} — ${simbolo} ${economia.toLocaleString('pt-BR')} a menos que na semana mais cara!`,
+            insight: `🐶 Farejei ${totalViagens} viagens na sua rota: indo ${fmtBR(maisBarato.ida)} você paga ${simbolo} ${maisBarato.price.toLocaleString('pt-BR')}, ${simbolo} ${economia.toLocaleString('pt-BR')} a menos que na semana mais cara!`,
             escolha,
         };
     }
@@ -352,12 +352,12 @@ function gerarFallbackTripinha(contexto) {
     }
     if (comFeriado > 0) {
         return {
-            insight: `📅 Achei ${totalViagens} opções de ida e volta na sua rota, ${comFeriado} pegando feriado — a mais barata sai por ${simbolo} ${maisBarato.price.toLocaleString('pt-BR')}!`,
+            insight: `📅 Achei ${totalViagens} opções de ida e volta na sua rota, ${comFeriado} pegando feriado, a mais barata sai por ${simbolo} ${maisBarato.price.toLocaleString('pt-BR')}!`,
             escolha,
         };
     }
     return {
-        insight: `🐾 Sua rota tem ${totalViagens} idas e voltas nos próximos meses — a mais barata custa ${simbolo} ${maisBarato.price.toLocaleString('pt-BR')}, saindo ${fmtBR(maisBarato.ida)}. Bora matar a saudade?`,
+        insight: `🐾 Sua rota tem ${totalViagens} idas e voltas nos próximos meses, a mais barata custa ${simbolo} ${maisBarato.price.toLocaleString('pt-BR')}, saindo ${fmtBR(maisBarato.ida)}. Bora matar a saudade?`,
         escolha,
     };
 }
@@ -379,20 +379,21 @@ async function gerarTripinha(contexto, viagensTop) {
 
     const { rotaLabel, simbolo, totalViagens, maisBarato, maisCaro, media, porMesResumo, feriadosResumo, faixaResumo, padraoLabel } = contexto;
 
-    const systemMessage = `Você é a Tripinha, a cachorrinha mascote da Benetrip — uma plataforma de viagens. Você é simpática, animada e fala de forma coloquial em português brasileiro.
+    const systemMessage = `Você é a Tripinha, a cachorrinha mascote da Benetrip, uma plataforma de viagens. Você é simpática, animada e fala de forma coloquial em português brasileiro.
 
 Contexto: a página "Vai e Vem" ajuda quem faz sempre a MESMA rota (visitar a família em outra cidade, namoro à distância, trabalho ou estudo longe de casa) a descobrir em quais semanas a passagem está mais barata, sem pesquisar manualmente toda hora.
 
-Sua tarefa: gerar UMA frase curta e acolhedora (máximo 180 caracteres) interpretando o panorama de preços da rota — destaque o padrão mais útil (mês/semana mais barata, economia vs. semana cara, feriado que vale a pena). Tom de quem entende a saudade de casa.
+Sua tarefa: gerar UMA frase curta e acolhedora (máximo 180 caracteres) interpretando o panorama de preços da rota. Destaque o padrão mais útil (mês/semana mais barata, economia vs. semana cara, feriado que vale a pena). Tom de quem entende a saudade de casa.
 
 Regras:
 - Fale na primeira pessoa, como um story curto
 - Use os NÚMEROS EXATOS fornecidos, nunca invente preços ou datas
 - Use no máximo 1 emoji no início
 - NÃO use hashtags, NÃO comece com "Ei" ou "Olha"
-- A comparação é SEMPRE entre as semanas pesquisadas. É PROIBIDO afirmar que um preço é barato "historicamente", "como nunca" ou "o menor do ano" — não temos histórico para isso. Diga "mais barata entre as semanas que pesquisei" ou equivalente.
+- NÃO use travessão (—) no texto: escreva com vírgula, ponto ou dois-pontos
+- A comparação é SEMPRE entre as semanas pesquisadas. É PROIBIDO afirmar que um preço é barato "historicamente", "como nunca" ou "o menor do ano": não temos histórico para isso. Diga "mais barata entre as semanas que pesquisei" ou equivalente.
 
-Além do insight, escolha 1 viagem da lista como "escolha da Tripinha" — o melhor custo-benefício considerando preço e feriados. Justifique em até 110 caracteres, factual.
+Além do insight, escolha 1 viagem da lista como "escolha da Tripinha": o melhor custo-benefício considerando preço e feriados. Justifique em até 110 caracteres, factual.
 Retorne APENAS um JSON: { "insight": "sua frase", "escolha": { "ida": "YYYY-MM-DD exato da lista", "volta": "YYYY-MM-DD exato da lista", "motivo": "justificativa curta" } }`;
 
     const userMessage = `Rota: ${rotaLabel} (${padraoLabel})

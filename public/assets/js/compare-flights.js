@@ -89,14 +89,14 @@ const BenetripCompararVoos = {
                 results.innerHTML = cidades.map(c => `
                     <div class="autocomplete-item" data-city='${JSON.stringify(c)}'>
                         <div class="item-code">${c.code}</div>
-                        <div class="item-details"><div class="item-name">${c.name}${c.airport ? ' — ' + c.airport : ''}</div><div class="item-country">${c.country}</div></div>
+                        <div class="item-details"><div class="item-name">${c.name}${c.airport ? ' · ' + c.airport : ''}</div><div class="item-country">${c.country}</div></div>
                     </div>`).join('');
                 results.style.display = 'block';
                 results.querySelectorAll('.autocomplete-item').forEach(item => {
                     item.addEventListener('click', () => {
                         const cidade = JSON.parse(item.dataset.city);
                         this.state[stateKey] = cidade;
-                        input.value = cidade.airport ? `${cidade.name} — ${cidade.airport} (${cidade.code})` : `${cidade.name} (${cidade.code})`;
+                        input.value = cidade.airport ? `${cidade.name} · ${cidade.airport} (${cidade.code})` : `${cidade.name} (${cidade.code})`;
                         hidden.value = JSON.stringify(cidade);
                         results.style.display = 'none';
                     });
@@ -283,7 +283,7 @@ const BenetripCompararVoos = {
         const precPorPax = Math.round(stats.cheapest / paxPagantes);
 
         const winnerCombo = data.combinacoes.find(c => c.dataIda === stats.cheapestCombo.dataIda && c.dataVolta === stats.cheapestCombo.dataVolta);
-        const winnerNoites = winnerCombo?.noites || '—';
+        const winnerNoites = winnerCombo?.noites ?? 'n/d';
 
         container.innerHTML = `
             <button class="btn-back" onclick="BenetripCompararVoos.showForm()">← Nova busca</button>
@@ -339,7 +339,7 @@ const BenetripCompararVoos = {
             datasIda.forEach(ida => {
                 const cell = matrizPrecos[`${ida}_${volta}`];
                 if (!cell || cell.error || cell.melhorPreco === null) {
-                    html += `<td class="matrix-cell no-data">${volta <= ida ? '—' : '✗'}</td>`; return;
+                    html += `<td class="matrix-cell no-data">${volta <= ida ? '·' : '✗'}</td>`; return;
                 }
                 const isCheapest = cell.melhorPreco === stats.cheapest;
                 const isSelected = sel && sel.dataIda === ida && sel.dataVolta === volta;

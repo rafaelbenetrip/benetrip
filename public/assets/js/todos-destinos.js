@@ -99,7 +99,7 @@ const BenetripTodosDestinos = {
                     <div class="${cityClass}" data-city='${JSON.stringify(c).replace(/'/g, "&#39;")}'>
                         <div class="item-code">${cityIcon}${c.displayCode}</div>
                         <div class="item-details">
-                            <div class="item-name">${c.name}${c.state ? ', ' + c.state : ''}${c.airport ? ' — ' + c.airport : ''}</div>
+                            <div class="item-name">${c.name}${c.state ? ', ' + c.state : ''}${c.airport ? ' · ' + c.airport : ''}</div>
                             <div class="item-country">${c.country}</div>
                         </div>
                     </div>`;
@@ -120,7 +120,7 @@ const BenetripTodosDestinos = {
         this.state.origemSelecionada = c;
         
         const codeDisplay = c.displayCode || c.code;
-        input.value = c.airport ? `${c.name} — ${c.airport} (${codeDisplay})` : `${c.name} (${codeDisplay})`;
+        input.value = c.airport ? `${c.name} · ${c.airport} (${codeDisplay})` : `${c.name} (${codeDisplay})`;
         
         document.getElementById('origem-data').value = JSON.stringify(c);
         results.style.display = 'none';
@@ -536,7 +536,7 @@ const BenetripTodosDestinos = {
         if (!todos.length) { this.mostrarSemResultados(); return; }
 
         const codeDisplay = origem.displayCode || origem.code;
-        const origemDisplay = origem.airport ? `${origem.name} — ${origem.airport} (${codeDisplay})` : `${origem.name} (${codeDisplay})`;
+        const origemDisplay = origem.airport ? `${origem.name} · ${origem.airport} (${codeDisplay})` : `${origem.name} (${codeDisplay})`;
 
         let periodoHtml = '';
         if (isFlexivel) {
@@ -674,9 +674,9 @@ const BenetripTodosDestinos = {
                 <div class="filtro-grupo"><div class="filtro-titulo">💰 Faixa de Preço</div>
                     <div class="filtro-range"><div class="range-inputs">
                         <div class="range-field"><label>Mín</label><input type="text" id="filtro-preco-min" value="${Math.round(f.precoMin).toLocaleString('pt-BR')}" onchange="BenetripTodosDestinos.setPrecoRange()"></div>
-                        <span class="range-separator">—</span>
+                        <span class="range-separator">a</span>
                         <div class="range-field"><label>Máx</label><input type="text" id="filtro-preco-max" value="${f.precoMax === Infinity ? '' : Math.round(f.precoMax).toLocaleString('pt-BR')}" placeholder="Sem limite" onchange="BenetripTodosDestinos.setPrecoRange()"></div>
-                    </div><div class="range-hint">${simbolo} ${Math.round(this.state.precoMinGlobal).toLocaleString('pt-BR')} — ${simbolo} ${Math.round(this.state.precoMaxGlobal).toLocaleString('pt-BR')}</div></div>
+                    </div><div class="range-hint">de ${simbolo} ${Math.round(this.state.precoMinGlobal).toLocaleString('pt-BR')} a ${simbolo} ${Math.round(this.state.precoMaxGlobal).toLocaleString('pt-BR')}</div></div>
                 </div>
                 <div class="filtro-acoes"><button class="btn-limpar-filtros" onclick="BenetripTodosDestinos.limparFiltros()">🗑️ Limpar todos os filtros</button></div>
             </div>
@@ -817,7 +817,7 @@ const BenetripTodosDestinos = {
             <div class="destino-header">
                 <div class="destino-info">
                     <h3 class="destino-nome">${dest.name}</h3>
-                    <p class="destino-pais">${dest.country || '—'}</p>
+                    <p class="destino-pais">${dest.country || ''}</p>
                     ${bestDates}
                 </div>
                 <div class="destino-preco-wrapper">
@@ -829,7 +829,7 @@ const BenetripTodosDestinos = {
                 <div class="rota-aeroportos">
                     <span class="rota-item rota-ida">🛫 <strong>${origemLabel}</strong></span>
                     <span class="rota-seta">→</span>
-                    <span class="rota-item rota-volta">🛬 <strong>${destIata || '—'}</strong></span>
+                    <span class="rota-item rota-volta">🛬 <strong>${destIata || 'a confirmar'}</strong></span>
                 </div>
                 ${viaHtml}
             </div>

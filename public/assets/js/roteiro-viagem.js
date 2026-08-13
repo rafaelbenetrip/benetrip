@@ -658,7 +658,7 @@ const BenetripRoteiro = {
 
             if (isMulti && dest && chaveAtual !== chaveAnterior) {
                 // v2.1: Mostrar "Xª visita" se visita > 1
-                const visitaLabel = visita > 1 ? ` — ${visita}ª visita` : '';
+                const visitaLabel = visita > 1 ? ` · ${visita}ª visita` : '';
                 const isRetorno = visita > 1;
 
                 separador = `
@@ -778,7 +778,7 @@ const BenetripRoteiro = {
                 texto += `\n🏙️ *═══ ${destAtual}${label} ═══*\n\n`;
                 destAnterior = chave;
             }
-            texto += `━━━━━━━━━━━━━━━\n📌 *Dia ${dia.dia_numero} — ${dia.dia_semana}, ${dia.data}*\n`;
+            texto += `━━━━━━━━━━━━━━━\n📌 *Dia ${dia.dia_numero} · ${dia.dia_semana}, ${dia.data}*\n`;
             if (dia.titulo) texto += `${dia.titulo}\n`;
             if (dia.clima_previsto && !compacto) texto += `🌤️ ${dia.clima_previsto}\n`;
             if (dia.resumo_tripinha && !compacto) texto += `🐕 ${dia.resumo_tripinha}\n`;
@@ -795,7 +795,7 @@ const BenetripRoteiro = {
                 });
             });
         });
-        texto += `━━━━━━━━━━━━━━━\n✨ Roteiro por Benetrip — benetrip.com.br\n🐕 Feito com carinho pela Tripinha!`;
+        texto += `━━━━━━━━━━━━━━━\n✨ Roteiro por Benetrip · benetrip.com.br\n🐕 Feito com carinho pela Tripinha!`;
         return texto;
     },
 
@@ -822,13 +822,13 @@ const BenetripRoteiro = {
             const dias = r.dias.slice(p * 3, Math.min((p + 1) * 3, r.dias.length));
             let t = p === 0 ? `🗺️ *${isMulti ? 'Multi-Destino' : destino}*\n📅 ${idaBR} → ${voltaBR}\n📄 ${p + 1}/${totalParts}\n\n` : `🗺️ *Roteiro* — ${p + 1}/${totalParts}\n\n`;
             dias.forEach(dia => {
-                t += `━━━━━━━━━━━━━━━\n📌 *Dia ${dia.dia_numero} — ${dia.dia_semana}, ${dia.data}*${dia.destino_atual ? ` (${dia.destino_atual})` : ''}\n${dia.titulo || ''}\n\n`;
+                t += `━━━━━━━━━━━━━━━\n📌 *Dia ${dia.dia_numero} · ${dia.dia_semana}, ${dia.data}*${dia.destino_atual ? ` (${dia.destino_atual})` : ''}\n${dia.titulo || ''}\n\n`;
                 (dia.periodos || []).forEach(per => {
                     t += `${{'manhã':'🌅','tarde':'☀️','noite':'🌙'}[per.periodo?.toLowerCase()] || '📌'} *${(per.periodo||'').charAt(0).toUpperCase()+(per.periodo||'').slice(1)}*\n`;
                     (per.atividades || []).forEach(a => { t += `  📍 ${a.nome}${a.duracao_minutos ? ` (~${a.duracao_minutos}min)` : ''}\n     📍 ${this.buildMapsUrl(a.google_maps_query || a.nome)}\n\n`; });
                 });
             });
-            if (p === totalParts - 1) t += `━━━━━━━━━━━━━━━\n✨ Benetrip — benetrip.com.br`;
+            if (p === totalParts - 1) t += `━━━━━━━━━━━━━━━\n✨ Benetrip · benetrip.com.br`;
             partes.push(t);
         }
         window.open(`https://wa.me/?text=${encodeURIComponent(partes[0])}`, '_blank');

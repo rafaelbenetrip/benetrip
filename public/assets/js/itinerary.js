@@ -619,7 +619,7 @@ const BENETRIP_ROTEIRO = {
     elemento.innerHTML = `
       <div class="dia-header">
         <div class="dia-numero">${numeroDia}</div>
-        <span>Dia ${numeroDia} — ${dataFormatada}</span>
+        <span>Dia ${numeroDia} · ${dataFormatada}</span>
       </div>
       
       <div class="dia-content">

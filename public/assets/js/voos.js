@@ -107,7 +107,7 @@ const BenetripVoos = {
             document.getElementById('sf-departure').value = p.departure_date;
             document.getElementById('sf-return').value = p.return_date;
             const fmt = d => d ? new Date(d+'T12:00:00').toLocaleDateString('pt-BR') : '';
-            document.getElementById('sf-input-dates').value = p.return_date ? `${fmt(p.departure_date)} — ${fmt(p.return_date)}` : fmt(p.departure_date);
+            document.getElementById('sf-input-dates').value = p.return_date ? `${fmt(p.departure_date)} a ${fmt(p.return_date)}` : fmt(p.departure_date);
         }
         document.getElementById('pax-adults').value = p.adults;
         document.getElementById('pax-children').value = p.children;
@@ -133,7 +133,7 @@ const BenetripVoos = {
                 if (sel.length===2) {
                     document.getElementById('sf-departure').value = this.isoDate(sel[0]);
                     document.getElementById('sf-return').value = this.isoDate(sel[1]);
-                    document.getElementById('sf-input-dates').value = `${this.brDate(sel[0])} — ${this.brDate(sel[1])}`;
+                    document.getElementById('sf-input-dates').value = `${this.brDate(sel[0])} a ${this.brDate(sel[1])}`;
                 } else if (sel.length===1) {
                     document.getElementById('sf-departure').value = this.isoDate(sel[0]);
                     document.getElementById('sf-return').value = '';
@@ -822,7 +822,7 @@ const BenetripVoos = {
         // Currency warning
         let currencyWarnHtml = '';
         if (currencyMismatch) {
-            currencyWarnHtml = `<div class="fc-currency-warn"><span class="fc-currency-warn-icon">💱</span> Preço convertido — agência vende em ${bestTermCurrency.toUpperCase()}</div>`;
+            currencyWarnHtml = `<div class="fc-currency-warn"><span class="fc-currency-warn-icon">💱</span> Preço convertido, a agência vende em ${bestTermCurrency.toUpperCase()}</div>`;
         }
 
         // More offers with currency info

@@ -213,7 +213,7 @@ const BenetripDiscovery = {
                         <div class="${cityClass}" data-city='${JSON.stringify(cidade)}'>
                             <div class="item-code">${cityIcon}${cidade.displayCode}</div>
                             <div class="item-details">
-                                <div class="item-name">${cidade.name}${cidade.state ? ', ' + cidade.state : ''}${cidade.airport ? ' — ' + cidade.airport : ''}</div>
+                                <div class="item-name">${cidade.name}${cidade.state ? ', ' + cidade.state : ''}${cidade.airport ? ' · ' + cidade.airport : ''}</div>
                                 <div class="item-country">${cidade.country}</div>
                             </div>
                         </div>
@@ -246,7 +246,7 @@ const BenetripDiscovery = {
         
         const codeDisplay = cidade.displayCode || cidade.code;
         input.value = cidade.airport 
-            ? `${cidade.name} — ${cidade.airport} (${codeDisplay})`
+            ? `${cidade.name} · ${cidade.airport} (${codeDisplay})`
             : `${cidade.name} (${codeDisplay})`;
         hiddenInput.value = JSON.stringify(cidade);
         results.style.display = 'none';
@@ -1052,7 +1052,7 @@ const BenetripDiscovery = {
         
         const codeDisplay = origem.displayCode || origem.code;
         const origemDisplay = origem.airport 
-            ? `${origem.name} — ${origem.airport} (${codeDisplay})`
+            ? `${origem.name} · ${origem.airport} (${codeDisplay})`
             : `${origem.name} (${codeDisplay})`;
         const escopoLabel = escopoDestino === 'internacional' 
             ? '✈️ Apenas internacionais' 
@@ -1156,12 +1156,12 @@ const BenetripDiscovery = {
                 </p>
                 <div class="sem-resultados-dicas">
                     <h3>🐕 Dicas da Tripinha:</h3>
-                    <div class="dica">💰 <strong>Aumente o orçamento</strong> — às vezes um pouco mais abre muitas opções!</div>
-                    <div class="dica">📅 <strong>Tente outras datas</strong> — viajar em dias da semana costuma ser mais barato.</div>
-                    ${isInternacional ? '<div class="dica">🗺️ <strong>Inclua destinos nacionais</strong> — selecione "Tanto faz" para mais opções!</div>' : ''}
-                    ${isNacional ? '<div class="dica">✈️ <strong>Inclua destinos internacionais</strong> — selecione "Tanto faz" para mais opções!</div>' : ''}
-                    <div class="dica">📍 <strong>Mude a cidade de origem</strong> — aeroportos maiores têm mais rotas e preços melhores.</div>
-                    <div class="dica">🌍 <strong>Experimente outros estilos</strong> — pode revelar destinos menos óbvios!</div>
+                    <div class="dica">💰 <strong>Aumente o orçamento:</strong> às vezes um pouco mais já abre muitas opções!</div>
+                    <div class="dica">📅 <strong>Tente outras datas:</strong> viajar em dias de semana costuma sair mais barato.</div>
+                    ${isInternacional ? '<div class="dica">🗺️ <strong>Inclua destinos nacionais:</strong> selecione "Tanto faz" para ver mais opções!</div>' : ''}
+                    ${isNacional ? '<div class="dica">✈️ <strong>Inclua destinos internacionais:</strong> selecione "Tanto faz" para ver mais opções!</div>' : ''}
+                    <div class="dica">📍 <strong>Mude a cidade de origem:</strong> aeroportos maiores costumam ter mais rotas e preços melhores.</div>
+                    <div class="dica">🌍 <strong>Experimente outros estilos:</strong> pode revelar destinos menos óbvios!</div>
                 </div>
                 <button class="btn-submit btn-tentar-novamente" onclick="BenetripDiscovery.voltarAoFormulario()">
                     ✏️ Ajustar Busca

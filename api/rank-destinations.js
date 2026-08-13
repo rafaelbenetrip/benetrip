@@ -130,7 +130,7 @@ ${criancas > 0 ? '- CRIANÇAS: considere destinos com atividades infantis, parqu
         // v4.3: BLOCO DE OBSERVAÇÕES DO VIAJANTE
         // ============================================================
         const observacoesBloco = observacoes
-            ? `\nOBSERVAÇÕES PESSOAIS DO VIAJANTE (MUITO IMPORTANTE — leve em conta na seleção e nos comentários):
+            ? `\nOBSERVAÇÕES PESSOAIS DO VIAJANTE (MUITO IMPORTANTE: leve em conta na seleção e nos comentários):
 "${observacoes}"
 `
             : '';
@@ -148,10 +148,10 @@ PERFIL DO VIAJANTE:
 - Período: ${dataIda || '?'} a ${dataVolta || '?'}
 ${estacaoInfo ? `- Contexto sazonal: ${estacaoInfo}` : ''}
 - Orçamento PASSAGENS (ida+volta/pessoa): ${simboloMoeda} ${orcamento} ${nomeMoeda}
-${cenario === 'abaixo' ? `- NOTA: Poucos destinos dentro do orçamento — valorize os disponíveis` : ''}
+${cenario === 'abaixo' ? `- NOTA: Poucos destinos dentro do orçamento, valorize os disponíveis` : ''}
 ${restricoesFamilia}
 ${observacoesBloco}
-DESTINOS PRÉ-FILTRADOS (todos DENTRO do orçamento — o orçamento é um TETO, opções mais baratas são tão válidas quanto as próximas do limite):
+DESTINOS PRÉ-FILTRADOS (todos DENTRO do orçamento, o orçamento é um TETO, opções mais baratas são tão válidas quanto as próximas do limite):
 Formato: ID|Nome|País|Aeroporto|Passagem ida+volta|Paradas|Duração do voo|Score objetivo (0-125, maior = melhor logística)|Fontes|Hotel/noite|Alertas
 A lista já está ORDENADA pelo score objetivo (preço, escalas, duração do voo vs. duração da viagem, perfil dos passageiros).
 ${listaCompacta}
@@ -177,7 +177,7 @@ ${(criancas > 0 || bebes > 0) ? '7. LOGÍSTICA FAMILIAR: Prefira voos diretos ou
 
 REGRAS DE SAZONALIDADE (OBRIGATÓRIO):
 ✓ NUNCA apresente fenômeno sazonal (lagoas cheias, neve, floração, desova, clima perfeito) como GARANTIDO
-✓ Se a experiência típica do destino depende da época e ${nomeMesViagem || 'o mês da viagem'} está fora do período mais favorável, diga isso em "adequacao_epoca" (ex: "fora do período mais favorável para as lagoas — confirme as condições antes da viagem")
+✓ Se a experiência típica do destino depende da época e ${nomeMesViagem || 'o mês da viagem'} está fora do período mais favorável, diga isso em "adequacao_epoca" (ex: "fora do período mais favorável para as lagoas, confirme as condições antes da viagem")
 ✓ Use expressões como "costuma", "geralmente", "as condições variam nesta época", nunca certezas
 ✓ Preencha "adequacao_epoca" (1 frase sobre o destino nessas datas) e "ponto_negativo" (1 ponto de atenção honesto: escalas, chuva, alta temporada, deslocamento etc.) para CADA destino escolhido
 
@@ -188,7 +188,8 @@ REGRAS:
 ✓ A "dica" também deve ter tom da Tripinha (ex: "Fica a dica da Tripinha: reserve o passeio X com antecedência!")
 ✓ Use no máximo 1 referência canina por destino para não saturar
 ✓ NÃO use emoji nos textos (o frontend já cuida disso)
-${observacoes ? '✓ O viajante deixou OBSERVAÇÕES PESSOAIS — faça referência a elas nos comentários e dicas, mostrando que a Tripinha levou em conta o pedido específico dele' : ''}
+✓ NÃO use travessão (—) nos textos: escreva com vírgula, ponto ou dois-pontos
+${observacoes ? '✓ O viajante deixou OBSERVAÇÕES PESSOAIS: faça referência a elas nos comentários e dicas, mostrando que a Tripinha levou em conta o pedido específico dele' : ''}
 ✓ Retorne APENAS JSON válido, sem markdown
 
 JSON:
@@ -343,7 +344,7 @@ JSON:
             }
 
             if (substituto) {
-                console.warn(`⚖️ Top da IA (${resultado.top_destino.name}, ${resultado.top_destino.flight?.stops} escalas) viola restrição objetiva — promovendo ${substituto.name}`);
+                console.warn(`⚖️ Top da IA (${resultado.top_destino.name}, ${resultado.top_destino.flight?.stops} escalas) viola restrição objetiva, promovendo ${substituto.name}`);
                 const antigoTop = resultado.top_destino;
                 resultado.top_destino = substituto;
                 resultado.alternativas = [

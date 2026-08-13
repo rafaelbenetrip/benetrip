@@ -1376,7 +1376,7 @@ const BENETRIP_ROTEIRO = {
       </div>
 
       <div class="resumo-final-footer">
-        <p>🐾 Roteiro criado com carinho pela Tripinha — <strong>benetrip.com.br</strong></p>
+        <p>🐾 Roteiro criado com carinho pela Tripinha · <strong>benetrip.com.br</strong></p>
       </div>
     `;
     
@@ -1409,8 +1409,8 @@ const BENETRIP_ROTEIRO = {
     return `Preparei ${dias} dias incríveis em ${destino} ${companhiaTexto}, ` +
       `com foco em ${estiloTexto}. ` +
       `Cada dia foi pensado para equilibrar descobertas, descanso e momentos inesquecíveis. ` +
-      `Lembre-se: o melhor roteiro é aquele que se adapta ao seu ritmo — ` +
-      `sinta-se livre para ajustar conforme sua vontade! Au au! 🐾`;
+      `Lembre-se: o melhor roteiro é aquele que se adapta ao seu ritmo, ` +
+      `então sinta-se livre para ajustar conforme sua vontade! Au au! 🐾`;
   },
 
   /**
@@ -1493,7 +1493,7 @@ const BENETRIP_ROTEIRO = {
     const dataIda = this.formatarData(this.getDataIda());
     const dataVolta = this.getDataVolta() ? this.formatarData(this.getDataVolta()) : null;
     
-    let texto = `🐕 RESUMO DO ROTEIRO — ${destino.toUpperCase()} ✈️\n\n`;
+    let texto = `🐕 RESUMO DO ROTEIRO · ${destino.toUpperCase()} ✈️\n\n`;
     texto += `📍 ${destino}, ${pais}\n`;
     texto += `📅 ${dataIda}${dataVolta ? ` a ${dataVolta}` : ''} (${dias} dias)\n`;
     texto += `👥 ${this.obterTextoCompanhiaResumido()}\n`;
@@ -1524,9 +1524,9 @@ const BENETRIP_ROTEIRO = {
    */
   obterTextoOrcamento() {
     const mapa = {
-      'economico': 'Econômico — Atividades gratuitas e baixo custo',
-      'medio': 'Médio — Mix de atividades pagas e gratuitas',
-      'alto': 'Alto — Experiências premium'
+      'economico': 'Econômico, com atividades gratuitas e de baixo custo',
+      'medio': 'Médio, misturando atividades pagas e gratuitas',
+      'alto': 'Alto, com experiências premium'
     };
     return mapa[this.dadosFormulario?.orcamento] || 'Não definido';
   },
@@ -1558,7 +1558,7 @@ const BENETRIP_ROTEIRO = {
     elemento.innerHTML = `
       <div class="dia-header">
         <div class="dia-numero">${numeroDia}</div>
-        <span>Dia ${numeroDia} — ${dataFormatada}</span>
+        <span>Dia ${numeroDia} · ${dataFormatada}</span>
       </div>
       
       <div class="dia-content">

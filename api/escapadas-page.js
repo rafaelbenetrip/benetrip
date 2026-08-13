@@ -152,7 +152,7 @@ function renderPage({ cidadeAtual, cidades, janelas, janelaAtiva, hoje, isDefaul
         title = `${rotuloJanela}: escapadas saindo de ${cidadeAtual.nome} | Benetrip`;
         description = temDestinos
             ? `Voos de ida e volta saindo de ${cidadeAtual.nome} para ${janelaAtiva.rotuloDatas}, a partir de R$ ${fmt(menorPreco)}.${janelaAtiva.categoria === 'feriado' ? ` ${janelaAtiva.feriado.nome} ${janelaAtiva.feriado.emenda}.` : ''} Preços reais, atualizados todos os dias.`
-            : `Escapadas saindo de ${cidadeAtual.nome} para ${janelaAtiva.rotuloDatas}. A Tripinha está farejando os preços — volte em breve.`;
+            : `Escapadas saindo de ${cidadeAtual.nome} para ${janelaAtiva.rotuloDatas}. A Tripinha está farejando os preços, volte em breve.`;
     }
 
     const chips = montarChips(cidadeAtual, cidades);

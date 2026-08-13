@@ -679,14 +679,14 @@ const EscapadasPage = {
 
         const linhas = destinos.map(d => {
             const flag = d.internacional ? '🌎' : '🇧🇷';
-            return `${flag} ${d.nome} — R$ ${this.fmt(d.preco)}${d.paradas === 0 ? ' · direto' : ''}`;
+            return `${flag} ${d.nome}: R$ ${this.fmt(d.preco)}${d.paradas === 0 ? ' · direto' : ''}`;
         });
 
         const cabecalho = j.categoria === 'feriado'
             ? `✈️ *${this.tituloJanela()} saindo de ${this.state.origemNome}!*\n🗓️ ${j.rotuloDatas} · ${j.feriado.emenda}`
             : `✈️ *${this.tituloJanela()} saindo de ${this.state.origemNome}!*\n🗓️ ida e volta · ${j.noites} noite${j.noites > 1 ? 's' : ''}`;
 
-        return `${cabecalho}\n\n${linhas.join('\n')}\n\n💡 Preços de ida e volta encontrados hoje (${this.hojeCurto()}) — podem mudar.` +
+        return `${cabecalho}\n\n${linhas.join('\n')}\n\n💡 Preços de ida e volta encontrados hoje (${this.hojeCurto()}), podem mudar.` +
             `\n\n🐶 Vem ver na Benetrip:\n${this.urlCompartilhavel()}`;
     },
 

@@ -841,7 +841,7 @@
                 let resumoHtml = '';
                 if (resultados.top_destino?.name) {
                     resumoHtml = `Top: <strong>${resultados.top_destino.name}</strong>`;
-                    if (resultados.top_destino.price) resumoHtml += ` — ${this.formatarPreco(resultados.top_destino.price, params.moeda)}`;
+                    if (resultados.top_destino.price) resumoHtml += ` · ${this.formatarPreco(resultados.top_destino.price, params.moeda)}`;
                 } else if (resultados.total_encontrados) {
                     resumoHtml = `${resultados.total_encontrados} destinos encontrados`;
                     if (resultados.dentro_orcamento) resumoHtml += ` (${resultados.dentro_orcamento} no orçamento)`;
@@ -917,7 +917,7 @@
                     <div class="card">
                         <div class="card-header">
                             <div class="card-info">
-                                <div class="card-title">${item.destino_nome || '—'}${item.destino_pais ? ', ' + item.destino_pais : ''}</div>
+                                <div class="card-title">${item.destino_nome || 'destino não informado'}${item.destino_pais ? ', ' + item.destino_pais : ''}</div>
                                 <div class="card-subtitle">
                                     ${item.iata_code ? '✈️ ' + item.iata_code + ' · ' : ''}${data}
                                     ${nota ? '<br>' + nota : ''}
@@ -978,7 +978,7 @@
                     <div class="card" id="card-roteiro-${index}">
                         <div class="card-header">
                             <div class="card-info">
-                                <div class="card-title">🗺️ ${item.destino_nome || '—'}${item.destino_pais ? ', ' + item.destino_pais : ''}</div>
+                                <div class="card-title">🗺️ ${item.destino_nome || 'destino não informado'}${item.destino_pais ? ', ' + item.destino_pais : ''}</div>
                                 <div class="card-subtitle">
                                     ${dias} dia${dias > 1 ? 's' : ''} · Salvo em ${data}
                                     ${item.data_ida ? '<br>📅 ' + this.formatarDataCurta(item.data_ida) + (item.data_volta ? ' → ' + this.formatarDataCurta(item.data_volta) : '') : ''}
@@ -1036,7 +1036,7 @@
                 btn.textContent = '✅ Salvo!';
                 setTimeout(() => { btn.textContent = 'Salvar Alterações'; btn.disabled = false; }, 2000);
             } catch (e) {
-                btn.textContent = 'Erro — Tentar novamente';
+                btn.textContent = 'Erro, tentar novamente';
                 btn.disabled = false;
                 console.error('[MinhaConta] Erro ao salvar perfil:', e);
             }
@@ -1130,7 +1130,7 @@
                 <div style="margin-bottom:16px;">
                     <div style="background:var(--orange);color:white;padding:8px 12px;border-radius:8px;
                                 font-family:'Poppins',sans-serif;font-weight:600;font-size:0.85rem;margin-bottom:8px;">
-                        Dia ${dia.dia_numero} — ${dia.dia_semana || ''}, ${dia.data || ''}
+                        Dia ${dia.dia_numero} · ${dia.dia_semana || ''}, ${dia.data || ''}
                         ${dia.titulo ? `<div style="font-weight:400;font-size:0.78rem;opacity:0.9;">${dia.titulo}</div>` : ''}
                     </div>
                     ${dia.resumo_tripinha ? `<div style="font-size:0.8rem;color:var(--gray-600);margin-bottom:8px;font-style:italic;">🐕 ${dia.resumo_tripinha}</div>` : ''}
@@ -1167,7 +1167,7 @@
 
             (dados.dias || []).forEach(dia => {
                 texto += `━━━━━━━━━━━━━━━\n`;
-                texto += `📌 *Dia ${dia.dia_numero} — ${dia.dia_semana || ''}, ${dia.data || ''}*\n`;
+                texto += `📌 *Dia ${dia.dia_numero} · ${dia.dia_semana || ''}, ${dia.data || ''}*\n`;
                 if (dia.titulo) texto += `${dia.titulo}\n`;
                 texto += `\n`;
 
@@ -1187,7 +1187,7 @@
             });
 
             texto += `━━━━━━━━━━━━━━━\n`;
-            texto += `✨ Roteiro por Benetrip — benetrip.com.br\n🐕 Feito com carinho pela Tripinha!`;
+            texto += `✨ Roteiro por Benetrip · benetrip.com.br\n🐕 Feito com carinho pela Tripinha!`;
 
             const encoded = encodeURIComponent(texto);
 
