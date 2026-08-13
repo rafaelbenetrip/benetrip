@@ -218,9 +218,17 @@ ${intlDestaques ? `- Internacionais acessíveis (<R$2500): ${intlDestaques}` : '
             }
 
             const parsed = JSON.parse(content);
-            const insight = (parsed.insight || '').trim();
-            if (!insight) {
+            const insightBruto = (parsed.insight || '').trim();
+            if (!insightBruto) {
                 erros.push(`Cerebras ${model}: JSON sem campo insight`);
+                continue;
+            }
+
+            // Guarda determinística: urgência sem evidência não passa, mesmo
+            // que o prompt tenha proibido e o modelo tenha insistido.
+            const insight = aplicarGuardaDeLinguagem(insightBruto, evidencias);
+            if (!insight) {
+                erros.push(`Cerebras ${model}: urgência sem evidência ("${insightBruto.slice(0, 80)}")`);
                 continue;
             }
 
@@ -257,6 +265,41 @@ function validarEscolha(escolha, destinos) {
         nome: dest.nome,
         motivo: String(escolha.motivo || '').trim().slice(0, 120),
     };
+}
+
+// ============================================================
+// GUARDA DE LINGUAGEM (determinística)
+//
+// O prompt proíbe urgência sem evidência, mas prompt não é garantia: o
+// modelo pode escorregar e os snapshots antigos, gerados antes da regra,
+// continuam guardados no banco. Esta guarda roda na GERAÇÃO e também na
+// RENDERIZAÇÃO, então a página nunca exibe "corre que é oportunidade
+// urgente" só porque um preço caiu.
+//
+// Não é censura de estilo: é a diferença entre afirmar escassez (que não
+// medimos) e relatar variação de preço (que medimos).
+// ============================================================
+const TERMOS_URGENCIA = [
+    'urgente', 'urgência', 'corre ', 'corra', 'correndo pra', 'última chance',
+    'ultima chance', 'vai acabar', 'acaba hoje', 'imperdível', 'imperdivel',
+    'baratinh', 'quase de graça', 'quase de graca', 'pechinch', 'não perca',
+    'nao perca', 'aproveite agora', 'só hoje', 'so hoje', 'agora ou nunca',
+    'vai que é agora', 'queda forte', 'despencou', 'preço absurdo',
+];
+
+export function contemUrgencia(texto) {
+    const t = String(texto || '').toLowerCase();
+    return TERMOS_URGENCIA.some((termo) => t.includes(termo));
+}
+
+// Devolve o texto quando ele é aceitável, ou null quando a afirmação de
+// urgência não tem evidência por trás. Quem chama substitui pelo fallback
+// factual em vez de exibir a frase original.
+export function aplicarGuardaDeLinguagem(texto, { permiteUrgencia = false } = {}) {
+    if (!texto) return null;
+    if (!contemUrgencia(texto)) return texto;
+    if (permiteUrgencia) return texto;
+    return null;
 }
 
 // ============================================================

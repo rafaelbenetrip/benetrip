@@ -418,6 +418,7 @@ function renderPage({ cidadeAtual, cidades, janelas, janelaAtiva, hoje, isDefaul
 
     <!-- Scripts -->
     <script src="/assets/js/benetrip-header.js"></script>
+    <script src="/assets/js/benetrip-shared-ui.js"></script>
     <script src="/assets/js/escapadas-page.js"></script>
 </body>
 </html>`;

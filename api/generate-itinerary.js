@@ -16,6 +16,15 @@ import {
     tipoDeClima,
     rotuloClima,
 } from './_lib/itinerary-constraints.js';
+import {
+    STATUS_LUGAR,
+    TEXTO_HORARIO_NAO_VERIFICADO,
+    placesDisponivel,
+    resolverLugares,
+    ehCandidatoEspeculativo,
+    sugestaoPorCategoria,
+    reconciliarCusto,
+} from './_lib/places.js';
 
 export const config = {
     maxDuration: 300,
@@ -518,6 +527,15 @@ ${continuidade}${inicio}${locaisUsados.length ? `\nLOCAIS JÁ USADOS nos dias an
             console.log(`🧹 ${removidas.length} atividade(s) removida(s) por violar restrição obrigatória`);
         }
 
+        // === VALIDAÇÃO EXTERNA DOS LUGARES ===
+        // A IA organiza a viagem; a EXISTÊNCIA dos lugares é resolvida em API
+        // global de lugares. Candidatos especulativos ("Café do Forte, se
+        // acessível, ou um café similar") e não encontrados deixam de ser
+        // recomendação específica e viram sugestão de categoria/região.
+        const validacaoLugares = await validarLugaresDoRoteiro(resultado, {
+            destinos: destinosArray,
+        });
+
         // === ENRIQUECER E VALIDAR ===
         const minAtividadesPorPeriodo = { 'leve': 1, 'moderado': 2, 'intenso': 3 }[intensidade] || 2;
         let totalAtividades = 0;
@@ -527,10 +545,17 @@ ${continuidade}${inicio}${locaisUsados.length ? `\nLOCAIS JÁ USADOS nos dias an
                 const atividades = p.atividades || [];
                 totalAtividades += atividades.length;
                 atividades.forEach(a => {
-                    if (a.google_maps_query) a.google_maps_url = `https://maps.google.com/?q=${encodeURIComponent(a.google_maps_query)}`;
-                    // Sem integração de lugares não há como confirmar horário
-                    // de funcionamento: o roteiro diz isso em vez de inventar.
-                    a.horario_confirmar = true;
+                    // Link de mapa: preferimos o place_id resolvido; sem ele,
+                    // a busca textual (nunca um endereço inventado).
+                    if (a._lugar?.urlMapa) a.google_maps_url = a._lugar.urlMapa;
+                    else if (a.google_maps_query) a.google_maps_url = `https://maps.google.com/?q=${encodeURIComponent(a.google_maps_query)}`;
+                    // Horário só é afirmado quando veio do provedor
+                    a.horario_confirmar = !a._lugar?.horarioDoDia;
+                    // Custo reconciliado: nada é pago e gratuito ao mesmo tempo
+                    const custo = reconciliarCusto(a);
+                    a.gratuito = custo.gratuito;
+                    a.custo_rotulo = custo.rotulo;
+                    a.custo_conflito = custo.conflito;
                 });
             });
         });
@@ -549,7 +574,16 @@ ${continuidade}${inicio}${locaisUsados.length ? `\nLOCAIS JÁ USADOS nos dias an
             rotulo: rotuloClima(climaTipo),
             fonte: 'estimativa do modelo a partir do padrão histórico do período',
         };
-        resultado._avisoLocais = 'Locais e horários não são verificados por uma base de lugares. Confirme funcionamento e necessidade de reserva antes de ir.';
+        // Só afirmamos "restrições aplicadas e conferidas" quando o validador
+        // determinístico realmente processou restrições obrigatórias.
+        resultado._restricoesConferidas = restricoes.obrigatorias.length > 0;
+        resultado._rotuloRestricoes = restricoes.obrigatorias.length > 0
+            ? 'Restrições aplicadas e conferidas'
+            : 'Restrições consideradas na geração';
+        resultado._validacaoLugares = validacaoLugares;
+        resultado._avisoLocais = validacaoLugares.disponivel
+            ? `Locais confirmados em fonte externa (${validacaoLugares.verificados} de ${validacaoLugares.total}). Horários e necessidade de reserva podem mudar: confirme antes de ir.`
+            : 'Não foi possível confirmar os locais em fonte externa desta vez. As sugestões estão por categoria e região; escolha uma opção aberta no momento.';
         resultado._model = usedModel;
         resultado._numDias = numDiasTotal;
         resultado._destino = destinoPrincipal;
@@ -568,6 +602,140 @@ ${continuidade}${inicio}${locaisUsados.length ? `\nLOCAIS JÁ USADOS nos dias an
 }
 
 
+
+// ============================================================
+// VALIDAÇÃO EXTERNA DOS LUGARES DO ROTEIRO
+//
+// Etapas:
+//   1. descartar candidatos especulativos pelo próprio texto;
+//   2. resolver cada nome restante em API global de lugares;
+//   3. marcar verified | partially_verified | not_verified;
+//   4. transformar o que não foi verificado em sugestão de categoria/região,
+//      sem nome de estabelecimento inventado.
+//
+// Sem provedor configurado, TODOS os candidatos ficam not_verified e o
+// roteiro é entregue com sugestões por região. O roteiro nunca deixa de sair
+// por causa disto.
+// ============================================================
+async function validarLugaresDoRoteiro(roteiro, { destinos = [] } = {}) {
+    const atividades = [];
+    for (const dia of roteiro?.dias || []) {
+        for (const periodo of dia?.periodos || []) {
+            for (const atividade of periodo?.atividades || []) {
+                atividades.push({ atividade, dia });
+            }
+        }
+    }
+    if (atividades.length === 0) {
+        return { disponivel: false, total: 0, verificados: 0, parciais: 0, naoVerificados: 0 };
+    }
+
+    const cidadePadrao = destinos[0]?.destino || '';
+    const disponivel = placesDisponivel();
+
+    // 1. Candidato especulativo nunca vira recomendação específica
+    const paraResolver = [];
+    for (const item of atividades) {
+        const nome = String(item.atividade?.nome || '');
+        if (!nome.trim() || ehCandidatoEspeculativo(nome)) {
+            item.especulativo = true;
+            continue;
+        }
+        // A cidade do dia manda mais que a cidade principal (multi-destino)
+        const cidadeDoDia = item.dia?.destino_atual || cidadePadrao;
+        const diaDaSemana = diaDaSemanaDaAtividade(item.dia);
+        paraResolver.push({ item, nome, cidade: cidadeDoDia, diaDaSemana });
+    }
+
+    // 2. Resolução externa (só se houver provedor)
+    if (disponivel && paraResolver.length > 0) {
+        const resolvidos = await resolverLugares(
+            paraResolver.map((p) => ({ nome: p.nome, diaDaSemana: p.diaDaSemana })),
+            { cidade: cidadePadrao, concorrencia: 4 }
+        );
+        resolvidos.forEach((lugar, i) => { paraResolver[i].item.lugar = lugar; });
+    }
+
+    // 3 e 4. Aplicar o veredito em cada atividade
+    let verificados = 0;
+    let parciais = 0;
+    let naoVerificados = 0;
+
+    for (const item of atividades) {
+        const a = item.atividade;
+        const lugar = item.lugar || null;
+        const status = item.especulativo
+            ? STATUS_LUGAR.NAO_VERIFICADO
+            : (lugar?.status || STATUS_LUGAR.NAO_VERIFICADO);
+
+        a._lugar = lugar && status !== STATUS_LUGAR.NAO_VERIFICADO ? lugar : null;
+        a.validacao_local = status;
+        a.verificado_em = lugar?.verificadoEm || new Date().toISOString();
+
+        if (status === STATUS_LUGAR.VERIFICADO) {
+            verificados++;
+            a.nome = lugar.nomeOficial || a.nome;
+            a.endereco = lugar.endereco;
+            a.coordenadas = lugar.coordenadas;
+            a.categoria_externa = lugar.categoria;
+            a.status_funcionamento = lugar.statusFuncionamento;
+            a.horario_do_dia = lugar.horarioDoDia || null;
+            a.fonte_local = lugar.fonte;
+        } else if (status === STATUS_LUGAR.PARCIAL) {
+            parciais++;
+            a.nome = lugar.nomeOficial || a.nome;
+            a.endereco = lugar.endereco || null;
+            a.horario_do_dia = lugar.horarioDoDia || null;
+            a.fonte_local = lugar.fonte;
+        } else {
+            naoVerificados++;
+            // Sem verificação, o roteiro recomenda categoria e região —
+            // nunca um estabelecimento cujo nome não conseguimos confirmar.
+            a.nome_sugerido_original = a.nome;
+            a.nome = sugestaoPorCategoria({
+                categoria: categoriaLegivel(a),
+                regiao: a.regiao || '',
+            });
+            a.sugestao_generica = true;
+            a.endereco = null;
+            a.coordenadas = null;
+            a.horario_do_dia = null;
+        }
+
+        if (!a.horario_do_dia) a.aviso_horario = TEXTO_HORARIO_NAO_VERIFICADO;
+    }
+
+    console.log(`📍 Lugares: ${verificados} verificados, ${parciais} parciais, ${naoVerificados} sem verificação (provedor ${disponivel ? 'ativo' : 'indisponível'})`);
+
+    return {
+        disponivel,
+        total: atividades.length,
+        verificados,
+        parciais,
+        naoVerificados,
+        fonte: disponivel ? 'Google Places' : null,
+    };
+}
+
+// Categoria legível para a sugestão genérica, derivada das tags da própria
+// atividade (nada de catálogo).
+function categoriaLegivel(atividade) {
+    const texto = `${atividade?.nome || ''} ${atividade?.descricao || ''} ${(atividade?.tags || []).join(' ')}`.toLowerCase();
+    if (/\bcaf[ée]\b|cafeteria/.test(texto)) return 'pausa para café';
+    if (/restaurante|almo[çc]o|jantar|gastronom/.test(texto)) return 'refeição';
+    if (/museu|galeria|exposi/.test(texto)) return 'visita a um museu ou galeria';
+    if (/praia|mar\b/.test(texto)) return 'tempo na praia';
+    if (/mercado|feira|compras/.test(texto)) return 'passeio por mercado ou feira';
+    if (/igreja|catedral|templo/.test(texto)) return 'visita a um templo histórico';
+    if (/parque|jardim|praça/.test(texto)) return 'caminhada por um parque ou praça';
+    return 'uma parada';
+}
+
+function diaDaSemanaDaAtividade(dia) {
+    const nomes = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
+    const idx = nomes.indexOf(String(dia?.dia_semana || ''));
+    return idx >= 0 ? idx : null;
+}
 
 function buildFallbackItinerary(params, destinosArray) {
     const diasSemana = ['Domingo','Segunda-feira','Terça-feira','Quarta-feira','Quinta-feira','Sexta-feira','Sábado'];

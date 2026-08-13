@@ -332,6 +332,42 @@ export function renderDatasCardHtml(d) {
 }
 
 // ============================================================
+// NOME DO DESTINO
+//
+// O fornecedor às vezes devolve o nome com acentuação errada ("Belêm" em vez
+// de "Belém"). Em vez de manter uma tabela de correções, comparamos com a
+// lista de cidades que o projeto JÁ usa como origens: quando o código IATA
+// bate e os nomes só diferem nos acentos, vale a grafia canônica.
+//
+// Destino sem correspondência (a maior parte do mundo) passa intacto — nada
+// aqui limita a Benetrip a um catálogo.
+// ============================================================
+function semAcento(texto) {
+    return String(texto || '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .trim();
+}
+
+export function normalizarNomeDestino(nome, aeroporto) {
+    const bruto = String(nome || '').trim();
+    const code = String(aeroporto || '').toUpperCase();
+    if (!bruto || !/^[A-Z]{3}$/.test(code)) return bruto;
+
+    let cidade = null;
+    try {
+        cidade = encontrarCidadePorCodigo(code);
+    } catch {
+        return bruto;
+    }
+    if (!cidade) return bruto;
+
+    // Só corrige quando é a MESMA palavra, escrita com acento diferente
+    return semAcento(cidade.nome) === semAcento(bruto) ? cidade.nome : bruto;
+}
+
+// ============================================================
 // DESTINO x AEROPORTO (componente compartilhado)
 //
 // "Direto" qualifica o voo ATÉ O AEROPORTO, nunca a chegada ao destino
@@ -411,7 +447,9 @@ export function renderAeroportoDisclosureHtml({
 export function renderCardHtml(d, opts) {
     const { escapada = false, href = null, compartilhamAeroporto = 0 } = (opts && typeof opts === 'object') ? opts : {};
     const imgSrc = d.imagem ? escapeHtml(d.imagem) : 'assets/images/tripinha/avatar-pensando.png';
-    const nome = escapeHtml(d.nome);
+    // Grafia canônica quando o fornecedor devolve o nome com acento errado
+    const nomeCanonico = normalizarNomeDestino(d.nome, d.aeroporto);
+    const nome = escapeHtml(nomeCanonico);
     const pais = escapeHtml(d.pais);
     const aeroporto = escapeHtml(d.aeroporto);
     const estilosTags = (d.estilos || [])
@@ -514,14 +552,16 @@ export function renderStatsBarHtml(destinos) {
         <div class="stat-card stat-card-drop">
             <div class="stat-label">Maior queda</div>
             <div class="stat-value stat-value-drop">&darr; ${Math.abs(maiorQueda.variacao.percentual)}%</div>
-            <div class="stat-detail">${escapeHtml(maiorQueda.nome)} &middot; agora R$ ${fmt(maiorQueda.preco)}</div>
+            <div class="stat-detail">${escapeHtml(normalizarNomeDestino(maiorQueda.nome, maiorQueda.aeroporto))} &middot; agora R$ ${fmt(maiorQueda.preco)}, ante média de R$ ${fmt(maiorQueda.variacao.preco_anterior)}</div>
         </div>` : '';
 
+    // "Menor preço" só faz sentido com o universo de comparação explícito:
+    // é o menor ENTRE OS DESTINOS DESTA PÁGINA, não o menor do mercado.
     return `
         <div class="stat-card">
-            <div class="stat-label">Mais barato</div>
+            <div class="stat-label">Menor preço desta lista</div>
             <div class="stat-value">R$ ${fmt(maisBarato.preco)}</div>
-            <div class="stat-detail">${escapeHtml(maisBarato.nome)}</div>
+            <div class="stat-detail">${escapeHtml(normalizarNomeDestino(maisBarato.nome, maisBarato.aeroporto))} &middot; entre ${contagem.lugares} lugares pesquisados</div>
             ${renderVariacaoStatHtml(maisBarato.variacao)}
         </div>${maiorQuedaHtml}
         <div class="stat-card">
@@ -563,8 +603,8 @@ export function renderQuedasHtml(destinos) {
 
     return `
         <div class="quedas-header">
-            <h2 class="quedas-title">&#128293; Maiores quedas de preço</h2>
-            <span class="quedas-sub">comparado à média dos últimos dias</span>
+            <h2 class="quedas-title">Maiores quedas de preço</h2>
+            <span class="quedas-sub">Diferença em relação à média observada nos últimos dias nesta página. Não é histórico da rota.</span>
         </div>
         <div class="quedas-row">${cards}</div>`;
 }

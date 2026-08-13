@@ -31,6 +31,7 @@ import {
     renderQuedasHtml,
     renderTripinhaPickHtml,
 } from './_lib/discovery-shared.js';
+import { avaliarEvidencias, aplicarGuardaDeLinguagem, gerarFallbackInsight } from './_lib/tripinha-shared.js';
 
 const SITE_URL = 'https://benetrip.com.br';
 const DEFAULT_OG_IMAGE = `${SITE_URL}/assets/images/favicon/web-app-manifest-512x512.png`;
@@ -138,7 +139,15 @@ function renderPage({ cidadeAtual, cidades, snapshot, isDefault }) {
 
     const chips = montarChips(cidadeAtual, cidades);
     const badge = temDestinos ? badgeAtualizacao(snapshot.data) : null;
-    const insight = temDestinos ? (snapshot.insight || null) : null;
+    // Guarda de linguagem na RENDERIZAÇÃO: snapshots antigos foram gerados
+    // antes da regra de evidência e ainda guardam frases de urgência. Sem
+    // evidência de queda relevante e recente, a frase é trocada pelo texto
+    // factual derivado dos próprios dados.
+    const evidencias = temDestinos ? avaliarEvidencias(destinos, { dataSnapshot: snapshot.data }) : null;
+    const insightBruto = temDestinos ? (snapshot.insight || null) : null;
+    const insight = temDestinos
+        ? (aplicarGuardaDeLinguagem(insightBruto, evidencias) || gerarFallbackInsight(cidadeAtual.nome, destinos, evidencias))
+        : null;
     const tripinhaPick = temDestinos ? (snapshot.tripinha_pick || null) : null;
     const quedasHtml = temDestinos ? renderQuedasHtml(destinos) : '';
     const pickHtml = temDestinos ? renderTripinhaPickHtml(tripinhaPick, destinos) : '';
@@ -406,6 +415,7 @@ function renderPage({ cidadeAtual, cidades, snapshot, isDefault }) {
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="/assets/js/benetrip-header.js"></script>
     <script src="/assets/js/benetrip-auth.js"></script>
+    <script src="/assets/js/benetrip-shared-ui.js"></script>
     <script src="/assets/js/discovery-page.js"></script>
 </body>
 </html>`;
