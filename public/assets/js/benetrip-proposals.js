@@ -118,5 +118,61 @@
             .sort((a, b) => a.price - b.price);
     }
 
-    return { signatureOf, mergeBatch, toList, mergeTerms, hasValidUrl };
+    /**
+     * REGRA DE EXPIRAÇÃO DE LINKS (documentada)
+     *
+     * O link de compra do fornecedor tem validade curta: abrir um link velho
+     * leva a "oferta indisponível". A regra é:
+     *   - uma proposta vista pela última vez há mais de VALIDADE_LINK_MS é
+     *     considerada com link expirado;
+     *   - expirado NÃO é o mesmo que inexistente: a oferta continua na lista,
+     *     marcada como `_linkExpirado`, para o usuário saber que precisa
+     *     refazer a busca em vez de a lista encolher sem explicação;
+     *   - só a ausência de link válido (nunca a ausência num lote parcial)
+     *     remove de fato uma proposta.
+     */
+    var VALIDADE_LINK_MS = 15 * 60 * 1000;
+
+    function marcarLinksExpirados(store, agora) {
+        var t = agora || Date.now();
+        var expirados = 0;
+        store.forEach(function (p, key) {
+            var expirado = (t - (p._lastSeen || t)) > VALIDADE_LINK_MS;
+            // O campo é sempre gravado (inclusive false): a interface precisa
+            // distinguir "link vigente" de "ainda não avaliado".
+            if (p._linkExpirado !== expirado) {
+                store.set(key, Object.assign({}, p, { _linkExpirado: expirado }));
+            }
+            if (expirado) expirados++;
+        });
+        return expirados;
+    }
+
+    /**
+     * Resumo do ciclo de busca, para registro e para a interface.
+     * Inicial, final, adicionadas, atualizadas, descartadas sem link e tempo.
+     */
+    function resumoDaBusca(estado) {
+        var e = estado || {};
+        return {
+            quantidadeInicial: e.quantidadeInicial || 0,
+            quantidadeFinal: e.quantidadeFinal || 0,
+            adicionadas: e.adicionadas || 0,
+            atualizadas: e.atualizadas || 0,
+            descartadasSemLink: e.descartadasSemLink || 0,
+            lotes: e.lotes || 0,
+            tempoTotalMs: e.tempoTotalMs || 0,
+        };
+    }
+
+    return {
+        signatureOf: signatureOf,
+        mergeBatch: mergeBatch,
+        toList: toList,
+        mergeTerms: mergeTerms,
+        hasValidUrl: hasValidUrl,
+        marcarLinksExpirados: marcarLinksExpirados,
+        resumoDaBusca: resumoDaBusca,
+        VALIDADE_LINK_MS: VALIDADE_LINK_MS,
+    };
 });

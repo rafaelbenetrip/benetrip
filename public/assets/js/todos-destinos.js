@@ -25,7 +25,7 @@ const BenetripTodosDestinos = {
         fpIda: null,
         fpVolta: null,
         filtros: {
-            ordenacao: 'preco_asc',
+            ordenacao: 'custo_beneficio',
             orcamento: 'todos',
             paradas: 'qualquer',
             duracao: 'qualquer',
@@ -442,7 +442,7 @@ const BenetripTodosDestinos = {
 
     resetFiltros() {
         this.state.filtros = {
-            ordenacao: 'preco_asc', orcamento: 'todos', paradas: 'qualquer',
+            ordenacao: 'custo_beneficio', orcamento: 'todos', paradas: 'qualquer',
             duracao: 'qualquer', tipoDestino: 'todos', comboData: 'melhor',
             companhias: [],
             aeroportosDestino: [],  // v3.5
@@ -510,6 +510,10 @@ const BenetripTodosDestinos = {
 
         destinos.sort((a, b) => {
             switch (f.ordenacao) {
+                // Melhor custo-benefício: preço, duração, escalas e
+                // deslocamento adicional conhecido na mesma conta, para uma
+                // viagem 10h mais longa não vencer por uma economia irrelevante.
+                case 'custo_beneficio': return this._scoreCustoBeneficio(b, destinos) - this._scoreCustoBeneficio(a, destinos);
                 case 'preco_asc': return getPreco(a) - getPreco(b);
                 case 'preco_desc': return getPreco(b) - getPreco(a);
                 case 'duracao_asc': return getDur(a) - getDur(b);
@@ -518,12 +522,109 @@ const BenetripTodosDestinos = {
                     const nA = a._comboAtual?.noites || a._melhorNoites || 1, nB = b._comboAtual?.noites || b._melhorNoites || 1;
                     return (getPreco(a) + (a.avg_cost_per_night || 0) * nA) - (getPreco(b) + (b.avg_cost_per_night || 0) * nB);
                 }
-                default: return getPreco(a) - getPreco(b);
+                default: return this._scoreCustoBeneficio(b, destinos) - this._scoreCustoBeneficio(a, destinos);
             }
         });
 
         this.state.destinosFiltrados = destinos;
         this.renderResultados();
+    },
+
+    // ================================================================
+    // MELHOR CUSTO-BENEFÍCIO
+    //
+    // Combina preço, duração de voo, escalas e deslocamento terrestre
+    // conhecido, todos normalizados dentro do próprio conjunto de resultados.
+    // Assim uma viagem dez horas mais longa não vence por uma economia
+    // irrelevante, e o critério funciona para qualquer destino do mundo (não
+    // depende de tabela por lugar).
+    //
+    // Pesos documentados: preço 55%, duração 25%, escalas 15%,
+    // deslocamento adicional conhecido 5%.
+    // ================================================================
+    PESOS_CUSTO_BENEFICIO: { preco: 0.55, duracao: 0.25, paradas: 0.15, deslocamento: 0.05 },
+
+    _scoreCustoBeneficio(destino, universo) {
+        // Faixas do conjunto atual, calculadas uma vez por ordenação
+        if (!this._faixasCB || this._faixasCBFonte !== universo) {
+            const precos = universo.map(d => d.flight?.price || 0).filter(p => p > 0);
+            const duracoes = universo.map(d => d.flight?.flight_duration_minutes || 0).filter(v => v > 0);
+            this._faixasCB = {
+                precoMin: precos.length ? Math.min(...precos) : 0,
+                precoMax: precos.length ? Math.max(...precos) : 0,
+                durMin: duracoes.length ? Math.min(...duracoes) : 0,
+                durMax: duracoes.length ? Math.max(...duracoes) : 0,
+            };
+            this._faixasCBFonte = universo;
+        }
+        const F = this._faixasCB;
+        const P = this.PESOS_CUSTO_BENEFICIO;
+
+        const norm = (v, min, max) => (max > min ? 1 - (v - min) / (max - min) : 1);
+
+        const preco = destino.flight?.price || 0;
+        const dur = destino.flight?.flight_duration_minutes || 0;
+        const paradas = destino.flight?.stops ?? null;
+
+        const notaPreco = preco > 0 ? norm(preco, F.precoMin, F.precoMax) : 0;
+        // Duração desconhecida não ganha nota cheia: fica no meio da faixa,
+        // para dado ausente não virar vantagem.
+        const notaDuracao = dur > 0 ? norm(dur, F.durMin, F.durMax) : 0.5;
+        const notaParadas = paradas === null ? 0.5 : paradas === 0 ? 1 : paradas === 1 ? 0.6 : 0.15;
+        // Deslocamento terrestre só entra quando foi medido externamente
+        const desl = destino.deslocamento?.duracaoMin || 0;
+        const notaDeslocamento = desl > 0 ? Math.max(0, 1 - desl / 240) : 1;
+
+        return (
+            notaPreco * P.preco +
+            notaDuracao * P.duracao +
+            notaParadas * P.paradas +
+            notaDeslocamento * P.deslocamento
+        );
+    },
+
+    esc(t) {
+        if (window.BenetripSafe) return window.BenetripSafe.escapeHtml(t);
+        return String(t === null || t === undefined ? '' : t)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    },
+
+    // Volume controlado por vez, com carregamento progressivo
+    LOTE_INICIAL: 40,
+    LOTE_INCREMENTO: 40,
+
+    _atualizarBotaoCarregarMais() {
+        const wrap = document.getElementById('carregar-mais-wrap');
+        if (!wrap) return;
+        const total = this.state.destinosFiltrados.length;
+        const exibidos = this.state.exibidos || 0;
+        if (exibidos >= total) {
+            wrap.innerHTML = total > this.LOTE_INICIAL
+                ? `<p class="carregar-mais-fim">Todos os ${total} resultados desta busca já estão na tela.</p>`
+                : '';
+            return;
+        }
+        const restantes = total - exibidos;
+        const proximo = Math.min(this.LOTE_INCREMENTO, restantes);
+        wrap.innerHTML = `<button class="btn-carregar-mais" onclick="BenetripTodosDestinos.carregarMais()">
+            Ver mais ${proximo} destino${proximo > 1 ? 's' : ''} <span class="carregar-mais-restantes">(${restantes} restantes)</span>
+        </button>`;
+    },
+
+    carregarMais() {
+        const lista = document.getElementById('destinos-lista');
+        if (!lista) return;
+        const { orcamento, combinacoes } = this.state.formData;
+        const isFlexivel = combinacoes.length > 1;
+        const destinos = this.state.destinosFiltrados;
+        const inicio = this.state.exibidos || 0;
+        const fim = Math.min(inicio + this.LOTE_INCREMENTO, destinos.length);
+
+        lista.insertAdjacentHTML('beforeend',
+            destinos.slice(inicio, fim).map(d => this._cardHtml(d, orcamento, isFlexivel)).join(''));
+        this.state.exibidos = fim;
+        this._atualizarBotaoCarregarMais();
     },
 
     renderResultados() {
@@ -570,7 +671,8 @@ const BenetripTodosDestinos = {
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg> Nova busca
             </button>
             <div class="resultados-header">
-                <h1>${escopoEmoji} ${escopoTitulo} Disponíveis</h1>
+                <h1>${escopoEmoji} ${escopoTitulo}</h1>
+                <p class="resultados-subtitulo">Veja os destinos encontrados para suas datas.</p>
                 <div class="resultados-stats">
                     <div class="stat-item"><span class="stat-label">De</span><span class="stat-value">📍 ${origemDisplay}</span></div>
                     <div class="stat-item"><span class="stat-label">Aeroportos de ida</span><span class="stat-value">🛫 ${aeroportoIdaLabel}</span></div>
@@ -579,7 +681,8 @@ const BenetripTodosDestinos = {
                     <div class="stat-item"><span class="stat-label">Aeroportos</span><span class="stat-value">${aeroportosUnicos.size}</span></div>
                     <div class="stat-item"><span class="stat-label">No orçamento</span><span class="stat-value green">${dentroCount}</span></div>
                 </div>
-                <p class="contagem-explicacao">${todos.length} lugares para conhecer, por meio de ${aeroportosUnicos.size} aeroporto${aeroportosUnicos.size !== 1 ? 's' : ''}. Lugares que dividem o mesmo aeroporto costumam ter a mesma tarifa e podem exigir deslocamento terrestre.</p>
+                <p class="contagem-explicacao">${todos.length} lugares para conhecer, por meio de ${aeroportosUnicos.size} aeroporto${aeroportosUnicos.size !== 1 ? 's' : ''}, em ${combinacoes.length} combinação${combinacoes.length !== 1 ? 'ões' : ''} de datas pesquisada${combinacoes.length !== 1 ? 's' : ''}. Lugares que dividem o mesmo aeroporto costumam ter a mesma tarifa e podem exigir deslocamento terrestre.</p>
+                <p class="cobertura-aviso">Escopo consultado: ${this.esc(escopoTitulo.toLowerCase())}. A cobertura depende das rotas retornadas pelos parceiros, então este não é necessariamente o conjunto completo de destinos possíveis. Atualizado às ${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}.</p>
             </div>
             <div class="tripinha-message">
                 <img src="assets/images/tripinha/avatar-pensando.png" alt="Tripinha" class="tripinha-message-avatar" onerror="this.style.display='none'">
@@ -597,11 +700,17 @@ const BenetripTodosDestinos = {
                     ? `<span>Mostrando <strong>${todos.length}</strong> destinos</span>`
                     : `<span>Mostrando <strong>${destinos.length}</strong> de ${todos.length}</span> <button class="btn-limpar-inline" onclick="BenetripTodosDestinos.limparFiltros()">Limpar filtros</button>`}
             </div>
-            <div class="destinos-lista" id="destinos-lista">
+            <div class="destinos-lista" id="destinos-lista" aria-live="polite">
                 ${destinos.length > 0
-                    ? destinos.map(d => this._cardHtml(d, orcamento, isFlexivel)).join('')
+                    ? destinos.slice(0, this.LOTE_INICIAL).map(d => this._cardHtml(d, orcamento, isFlexivel)).join('')
                     : '<div class="sem-resultados-filtro"><p>😕 Nenhum destino com esses filtros.</p><button class="btn-limpar-filtros-mini" onclick="BenetripTodosDestinos.limparFiltros()">Limpar filtros</button></div>'}
-            </div>`;
+            </div>
+            <div class="carregar-mais-wrap" id="carregar-mais-wrap"></div>`;
+
+        // Renderizar centenas de cards de uma vez trava o celular: mostramos
+        // um lote e o resto entra sob demanda.
+        this.state.exibidos = Math.min(this.LOTE_INICIAL, destinos.length);
+        this._atualizarBotaoCarregarMais();
 
         this._atualizarBadgeFiltros();
     },
@@ -652,7 +761,7 @@ const BenetripTodosDestinos = {
             <div class="filtros-header-mobile"><h3>Filtros e Ordenação</h3><button class="btn-fechar-filtros" onclick="BenetripTodosDestinos.toggleFiltros()">✕</button></div>
             <div class="filtros-scroll-area">
                 <div class="filtro-grupo"><div class="filtro-titulo">📊 Ordenar por</div><div class="filtro-chips">
-                    ${chip('💰 Menor preço', 'ordenacao', 'preco_asc')} ${chip('💰 Maior preço', 'ordenacao', 'preco_desc')}
+                    ${chip('⭐ Melhor custo-benefício', 'ordenacao', 'custo_beneficio')} ${chip('💰 Menor preço', 'ordenacao', 'preco_asc')} ${chip('💰 Maior preço', 'ordenacao', 'preco_desc')}
                     ${chip('⏱️ Menor duração', 'ordenacao', 'duracao_asc')} ${chip('✈️ Menos paradas', 'ordenacao', 'paradas_asc')}
                     ${chip('🏨 Custo total', 'ordenacao', 'custo_total')}
                 </div></div>
@@ -715,7 +824,7 @@ const BenetripTodosDestinos = {
     _atualizarBadgeFiltros() {
         const f = this.state.filtros;
         let c = 0;
-        if (f.ordenacao !== 'preco_asc') c++;
+        if (f.ordenacao !== 'custo_beneficio') c++;
         if (f.orcamento !== 'todos') c++;
         if (f.paradas !== 'qualquer') c++;
         if (f.duracao !== 'qualquer') c++;
@@ -765,9 +874,19 @@ const BenetripTodosDestinos = {
         // Vários lugares no mesmo aeroporto: deixa explícito que o voo chega
         // ao aeroporto e pode haver deslocamento terrestre até o destino
         const compartilhado = destIata ? (this.state.lugaresPorAeroporto?.get(destIata.toUpperCase()) || 0) : 0;
-        const viaHtml = compartilhado > 1
-            ? `<div class="destino-via-aeroporto">via ${destIata} · aeroporto compartilhado com outros ${compartilhado - 1} lugar${compartilhado - 1 > 1 ? 'es' : ''} desta lista. Pode haver deslocamento terrestre até o destino.</div>`
-            : '';
+        // Componente compartilhado: mesmo texto usado em Descobrir, Escapadas
+        // e Destinos Baratos. "Direto" qualifica o voo até o aeroporto.
+        const viaHtml = (window.BenetripUI && destIata)
+            ? window.BenetripUI.aeroportoDisclosureHtml({
+                destino: dest.name,
+                aeroporto: destIata,
+                paradas: stops,
+                lugaresNoMesmoAeroporto: compartilhado,
+                deslocamento: dest.deslocamento || null,
+            })
+            : (compartilhado > 1
+                ? `<div class="destino-via-aeroporto">via ${this.esc(destIata)}, aeroporto compartilhado com outros ${compartilhado - 1} lugar${compartilhado - 1 > 1 ? 'es' : ''} desta lista. Pode haver deslocamento terrestre até o destino.</div>`
+                : '');
 
         let bestDates = '';
         if (isFlexivel) {

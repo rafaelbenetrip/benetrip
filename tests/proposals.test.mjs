@@ -149,3 +149,66 @@ test('lote vazio não quebra nem altera o acumulado', () => {
     assert.deepEqual([stats.added, stats.updated, stats.total], [0, 0, 1]);
     assert.equal(P.toList(store).length, 1);
 });
+
+// ============================================================
+// EXPIRAÇÃO DE LINKS (regra documentada) e RESUMO DO CICLO
+// ============================================================
+test('link antigo é marcado como expirado, mas a oferta não some da lista', () => {
+    const store = new Map();
+    const agora = Date.now();
+    P.mergeBatch(store, [
+        { sign: 'a', price: 1000, terms_url: 'https://x/a', all_terms: [{ gate_id: 1, price: 1000, url: 'https://x/a' }] },
+    ], agora - (P.VALIDADE_LINK_MS + 60000));
+
+    const expirados = P.marcarLinksExpirados(store, agora);
+    assert.equal(expirados, 1);
+    const lista = P.toList(store);
+    assert.equal(lista.length, 1, 'oferta continua na lista, apenas marcada');
+    assert.equal(lista[0]._linkExpirado, true);
+});
+
+test('oferta recém-vista não é marcada como expirada', () => {
+    const store = new Map();
+    const agora = Date.now();
+    P.mergeBatch(store, [
+        { sign: 'b', price: 900, terms_url: 'https://x/b', all_terms: [{ gate_id: 1, price: 900, url: 'https://x/b' }] },
+    ], agora);
+    assert.equal(P.marcarLinksExpirados(store, agora), 0);
+    assert.equal(P.toList(store)[0]._linkExpirado, false);
+});
+
+test('reaparecer num lote novo renova a validade do link', () => {
+    const store = new Map();
+    const agora = Date.now();
+    const proposta = { sign: 'c', price: 800, terms_url: 'https://x/c', all_terms: [{ gate_id: 1, price: 800, url: 'https://x/c' }] };
+
+    P.mergeBatch(store, [proposta], agora - (P.VALIDADE_LINK_MS + 60000));
+    assert.equal(P.marcarLinksExpirados(store, agora), 1);
+
+    P.mergeBatch(store, [proposta], agora);
+    assert.equal(P.marcarLinksExpirados(store, agora), 0);
+});
+
+test('o resumo do ciclo registra tudo que a auditoria pediu', () => {
+    const r = P.resumoDaBusca({
+        quantidadeInicial: 0,
+        quantidadeFinal: 3280,
+        adicionadas: 3300,
+        atualizadas: 120,
+        descartadasSemLink: 20,
+        lotes: 12,
+        tempoTotalMs: 41000,
+    });
+    assert.equal(r.quantidadeInicial, 0);
+    assert.equal(r.quantidadeFinal, 3280);
+    assert.equal(r.adicionadas, 3300);
+    assert.equal(r.atualizadas, 120);
+    assert.equal(r.descartadasSemLink, 20);
+    assert.equal(r.lotes, 12);
+    assert.equal(r.tempoTotalMs, 41000);
+});
+
+test('campos ausentes no resumo viram zero, nunca undefined na tela', () => {
+    const r = P.resumoDaBusca({});
+    assert.deepEqual(Object.values(r).every(v => typeof v === 'number'), true);
+});

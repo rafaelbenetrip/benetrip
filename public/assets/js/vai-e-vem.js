@@ -6,6 +6,20 @@
  */
 
 const BenetripVaiEVem = {
+    // Método único de normalização monetária (benetrip-shared-ui.js). Sem ele,
+    // o mesmo valor aparecia como R$ 786 num ponto e R$ 787 em outro.
+    fmtValor(v) {
+        if (window.BenetripPrice) return window.BenetripPrice.formatarValor(v);
+        return Math.round(Number(v) || 0).toLocaleString('pt-BR');
+    },
+
+    esc(t) {
+        if (window.BenetripSafe) return window.BenetripSafe.escapeHtml(t);
+        return String(t === null || t === undefined ? '' : t)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    },
+
     state: {
         origemSelecionada: null,
         destinoSelecionado: null,
@@ -354,7 +368,7 @@ const BenetripVaiEVem = {
                     <div class="tripinha-escolha">
                         <span class="escolha-badge">🏆 Escolha da Tripinha</span>
                         <span class="escolha-dates">${this.formatDateComDia(viagemEscolhida.ida)} → ${this.formatDateComDia(viagemEscolhida.volta)}</span>
-                        <span class="escolha-preco">${simbolo} ${viagemEscolhida.price.toLocaleString('pt-BR')}</span>
+                        <span class="escolha-preco">${simbolo} ${this.fmtValor(viagemEscolhida.price)}</span>
                         ${escolha.motivo ? `<span class="escolha-motivo">${escolha.motivo}</span>` : ''}
                         <a href="${url}" target="_blank" rel="noopener" class="escolha-link">Ver voo →</a>
                     </div>`;
@@ -367,7 +381,7 @@ const BenetripVaiEVem = {
         const faixa = classificacao.faixa;
         const faixaGoogle = classificacao.faixaGoogle;
         const contextoGoogle = faixaGoogle
-            ? `<span class="legenda-contexto">De referência: o Google indica faixa típica de <strong>${simbolo} ${faixaGoogle.low.toLocaleString('pt-BR')} a ${simbolo} ${faixaGoogle.high.toLocaleString('pt-BR')}</strong> para esta rota.</span>`
+            ? `<span class="legenda-contexto">De referência: o Google indica faixa típica de <strong>${simbolo} ${this.fmtValor(faixaGoogle.low)} a ${simbolo} ${this.fmtValor(faixaGoogle.high)}</strong> para esta rota.</span>`
             : '';
         const legendaHtml = faixa ? `
             <div class="legenda-classes fade-in" style="animation-delay: 0.18s">
@@ -381,6 +395,7 @@ const BenetripVaiEVem = {
                     <span class="badge-classe badge-caro">Mais cara que a maioria</span>
                 </div>`}
                 ${contextoGoogle}
+                <span class="legenda-contexto">O preço pode mudar até a conclusão da reserva no parceiro.</span>
             </div>` : '';
 
         const html = `
@@ -412,7 +427,7 @@ const BenetripVaiEVem = {
 
             <div class="winner-card fade-in" style="animation-delay: 0.05s">
                 <div class="winner-badge">🏆 SEMANA MAIS BARATA PRA IR</div>
-                <div class="winner-price">${simbolo} ${maisBarata.price.toLocaleString('pt-BR')}</div>
+                <div class="winner-price">${simbolo} ${this.fmtValor(maisBarata.price)}</div>
                 <div class="winner-price-label">ida e volta por pessoa</div>
                 ${this._renderFeriadoTag(maisBarata)}
                 ${this._renderWinnerFlightDetails(maisBarata)}
@@ -435,19 +450,19 @@ const BenetripVaiEVem = {
             <div class="stats-row fade-in" style="animation-delay: 0.1s">
                 <div class="stat-card">
                     <div class="stat-card-label">Mais barata</div>
-                    <div class="stat-card-value green">${simbolo} ${data.stats.maisBarata.price.toLocaleString('pt-BR')}</div>
+                    <div class="stat-card-value green">${simbolo} ${this.fmtValor(data.stats.maisBarata.price)}</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-card-label">Média</div>
-                    <div class="stat-card-value blue">${simbolo} ${data.stats.media.toLocaleString('pt-BR')}</div>
+                    <div class="stat-card-value blue">${simbolo} ${this.fmtValor(data.stats.media)}</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-card-label">Mais cara</div>
-                    <div class="stat-card-value orange">${simbolo} ${data.stats.maisCara.price.toLocaleString('pt-BR')}</div>
+                    <div class="stat-card-value orange">${simbolo} ${this.fmtValor(data.stats.maisCara.price)}</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-card-label">Economia entre semanas</div>
-                    <div class="stat-card-value">${simbolo} ${(data.stats.economia || 0).toLocaleString('pt-BR')}</div>
+                    <div class="stat-card-value">${simbolo} ${this.fmtValor(data.stats.economia || 0)}</div>
                 </div>
             </div>
 
@@ -584,7 +599,7 @@ const BenetripVaiEVem = {
                         ${o.viabilidade?.nivel === 'inviavel' ? `<div class="opcao-aviso">⚠️ ${o.viabilidade.motivo}</div>` : ''}
                     </div>
                     <span class="badge-classe badge-${o.classe}">${{ barato: 'Mais barata', normal: 'Na média', caro: 'Mais cara' }[o.classe] || ''}</span>
-                    <div class="opcao-preco">${simbolo} ${o.price.toLocaleString('pt-BR')}</div>
+                    <div class="opcao-preco">${simbolo} ${this.fmtValor(o.price)}</div>
                     <a href="${url}" target="_blank" rel="noopener" class="opcao-link" title="Ver no Google Flights">${svgArrow}</a>
                 </div>
             `;
@@ -595,7 +610,7 @@ const BenetripVaiEVem = {
                 <div class="semana-header">
                     <span class="semana-label">Semana de ${this.formatDateBR(semana.inicioSemana)}</span>
                     ${feriadoBadge}
-                    <span class="semana-desde">a partir de <strong>${simbolo} ${semana.maisBarata.price.toLocaleString('pt-BR')}</strong></span>
+                    <span class="semana-desde">a partir de <strong>${simbolo} ${this.fmtValor(semana.maisBarata.price)}</strong></span>
                 </div>
                 <div class="semana-opcoes">
                     ${opcoesHtml}
@@ -627,12 +642,12 @@ const BenetripVaiEVem = {
         let text = `🔁 *Achei as melhores datas pra nossa rota de sempre!*\n\n`;
         text += `📍 ${origemSelecionada.name} (${displayOrigemCode}) → ${destinoSelecionado.name} (${displayDestinoCode})\n\n`;
         text += `🏆 *Semana mais barata:*\n`;
-        text += `💰 *${simbolo} ${maisBarata.price.toLocaleString('pt-BR')}* ida e volta\n`;
+        text += `💰 *${simbolo} ${this.fmtValor(maisBarata.price)}* ida e volta\n`;
         text += `📆 ${this.formatDateComDia(maisBarata.ida)} → ${this.formatDateComDia(maisBarata.volta)}\n`;
         if (maisBarata.feriados && maisBarata.feriados.length > 0) {
             text += `🎉 Pegando ${maisBarata.feriados[0].nome}!\n`;
         }
-        text += `\n📊 Nos próximos ${data.meses} meses: média ${simbolo} ${data.stats.media.toLocaleString('pt-BR')}, mais cara ${simbolo} ${data.stats.maisCara.price.toLocaleString('pt-BR')}\n`;
+        text += `\n📊 Até ${data.meses} ${data.meses === 1 ? 'mês' : 'meses'} à frente: média ${simbolo} ${this.fmtValor(data.stats.media)}, mais cara ${simbolo} ${this.fmtValor(data.stats.maisCara.price)}\n`;
         text += `\n🔗 Ver no Google Flights:\n${googleUrl}\n`;
         text += `\n🐕 Pesquisado em benetrip.com.br/vai-e-vem`;
 

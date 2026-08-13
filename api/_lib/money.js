@@ -23,7 +23,14 @@ export function simboloMoeda(moeda) {
 // Valores não numéricos viram null (ausência de dado), nunca 0.
 export function normalizarValor(valor) {
     if (valor === null || valor === undefined || valor === '') return null;
-    const n = typeof valor === 'number' ? valor : Number(String(valor).replace(/[^\d.,-]/g, '').replace(/\./g, '').replace(',', '.'));
+    let n;
+    if (typeof valor === 'number') {
+        n = valor;
+    } else {
+        const limpo = String(valor).replace(/[^\d.,-]/g, '').replace(/\./g, '').replace(',', '.');
+        // String sem dígito nenhum é ausência de dado, não zero
+        n = /\d/.test(limpo) ? Number(limpo) : NaN;
+    }
     if (!Number.isFinite(n)) return null;
     return Math.round(n);
 }
