@@ -356,10 +356,18 @@ const BenetripTodosDestinos = {
                         const key = `${dest.name.toLowerCase()}_${(dest.country || '').toLowerCase()}`;
                         const existing = allResults.get(key);
                         const noites = this.calcularNoites(result.combo.dataIda, result.combo.dataVolta);
-                        const opcao = { combo: result.combo, price: dest.flight.price, noites, flight: { ...dest.flight } };
+                        // Cada opção carrega a combinação de datas à qual o preço
+                        // pertence — preço e datas nunca vêm de buscas diferentes
+                        const opcao = {
+                            combo: result.combo, price: dest.flight.price, noites,
+                            flight: { ...dest.flight },
+                            outbound_date: dest.outbound_date || result.combo.dataIda,
+                            return_date: dest.return_date || result.combo.dataVolta,
+                        };
                         if (!existing || dest.flight.price < existing.flight.price) {
                             allResults.set(key, {
                                 ...dest, _melhorCombo: result.combo, _melhorNoites: noites,
+                                _melhorOpcao: opcao,
                                 _totalCombos: existing ? existing._totalCombos + 1 : 1,
                                 _todasOpcoes: existing ? [...existing._todasOpcoes, opcao] : [opcao],
                             });
@@ -406,6 +414,16 @@ const BenetripTodosDestinos = {
         const comp = new Set();
         destinos.forEach(d => { if (d.flight.airline_name) comp.add(d.flight.airline_name); });
         this.state.companhiasDisponiveis = [...comp].sort();
+
+        // Quantos lugares compartilham cada aeroporto — usado para avisar que
+        // o voo pousa no aeroporto, não no atrativo
+        const porAeroporto = new Map();
+        destinos.forEach(d => {
+            const code = (d.flight?.airport_code || d.primary_airport || '').toUpperCase();
+            if (!code) return;
+            porAeroporto.set(code, (porAeroporto.get(code) || 0) + 1);
+        });
+        this.state.lugaresPorAeroporto = porAeroporto;
 
         // v3.5: Aeroportos de destino
         const aerosDest = new Set();
@@ -537,6 +555,11 @@ const BenetripTodosDestinos = {
         const aeroportoIdaLabel = this._getOrigemAeroportoLabel();
 
         const dentroCount = todos.filter(d => d.flight.price <= orcamento).length;
+        // Lugares != rotas aéreas: vários destinos podem usar o mesmo
+        // aeroporto (e a mesma tarifa). Contamos os dois separadamente.
+        const aeroportosUnicos = new Set(
+            todos.map(d => (d.flight?.airport_code || d.primary_airport || '').toUpperCase()).filter(Boolean)
+        );
         const tripinhaMsg = this._tripinhaMsg(todos, orcamento, moeda, isFlexivel, combinacoes.length, escopo);
         const filtrosHtml = this._filtrosPainelHtml(isFlexivel);
         const escopoEmoji = escopo === 'nacional' ? '🏠' : escopo === 'internacional' ? '✈️' : '🌍';
@@ -552,9 +575,11 @@ const BenetripTodosDestinos = {
                     <div class="stat-item"><span class="stat-label">De</span><span class="stat-value">📍 ${origemDisplay}</span></div>
                     <div class="stat-item"><span class="stat-label">Aeroportos de ida</span><span class="stat-value">🛫 ${aeroportoIdaLabel}</span></div>
                     ${periodoHtml}
-                    <div class="stat-item"><span class="stat-label">Total</span><span class="stat-value orange">${todos.length}</span></div>
+                    <div class="stat-item"><span class="stat-label">Lugares</span><span class="stat-value orange">${todos.length}</span></div>
+                    <div class="stat-item"><span class="stat-label">Aeroportos</span><span class="stat-value">${aeroportosUnicos.size}</span></div>
                     <div class="stat-item"><span class="stat-label">No orçamento</span><span class="stat-value green">${dentroCount}</span></div>
                 </div>
+                <p class="contagem-explicacao">${todos.length} lugares para conhecer, por meio de ${aeroportosUnicos.size} aeroporto${aeroportosUnicos.size !== 1 ? 's' : ''}. Lugares que compartilham o mesmo aeroporto costumam ter a mesma tarifa e podem exigir deslocamento terrestre.</p>
             </div>
             <div class="tripinha-message">
                 <img src="assets/images/tripinha/avatar-pensando.png" alt="Tripinha" class="tripinha-message-avatar" onerror="this.style.display='none'">
@@ -737,15 +762,22 @@ const BenetripTodosDestinos = {
         // v3.5: Aeroporto de ida (origem)
         const origemLabel = this._getOrigemAeroportoLabel();
 
+        // Vários lugares no mesmo aeroporto: deixa explícito que o voo chega
+        // ao aeroporto e pode haver deslocamento terrestre até o destino
+        const compartilhado = destIata ? (this.state.lugaresPorAeroporto?.get(destIata.toUpperCase()) || 0) : 0;
+        const viaHtml = compartilhado > 1
+            ? `<div class="destino-via-aeroporto">via ${destIata} · aeroporto compartilhado com outros ${compartilhado - 1} lugar${compartilhado - 1 > 1 ? 'es' : ''} desta lista — pode haver deslocamento terrestre até o destino</div>`
+            : '';
+
         let bestDates = '';
         if (isFlexivel) {
             const c = ca?.combo || dest._melhorCombo;
             if (c) bestDates = `<div class="best-dates-badge">📅 ${this.formatarDataCurta(c.dataIda)} → ${this.formatarDataCurta(c.dataVolta)} (${noites}n)</div>`;
         }
 
-        // v3.5: Hotel info melhorado
+        // v3.5: Hotel info melhorado (zero sem fonte = dado ausente)
         let hotelHtml = '';
-        const avgHotel = dest.avg_cost_per_night || 0;
+        const avgHotel = dest.avg_cost_per_night > 0 ? dest.avg_cost_per_night : 0;
         if (avgHotel > 0) {
             const custoHotelTotal = avgHotel * noites;
             const custoTotalViagem = preco + custoHotelTotal;
@@ -799,6 +831,7 @@ const BenetripTodosDestinos = {
                     <span class="rota-seta">→</span>
                     <span class="rota-item rota-volta">🛬 <strong>${destIata || '—'}</strong></span>
                 </div>
+                ${viaHtml}
             </div>
             <div class="destino-detalhes">
                 <div class="detalhe-item"><span class="detalhe-icon">✈️</span><span>${stopsT}</span></div>

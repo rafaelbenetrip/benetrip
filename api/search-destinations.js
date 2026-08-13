@@ -229,80 +229,61 @@ async function searchTravelExplore(params, label) {
 }
 
 // ============================================================
-// v3.7: MONTAR BUSCAS — estratégia unificada por escopo
+// v3.8: MONTAR BUSCAS — "todos" é SUPERSET de nacional e internacional
+//
+// O escopo nacional buscava no `geo.kgmid_continente` (id que vem do JSON de
+// cidades, ex.: /m/06n3y para a América do Sul) enquanto "todos" buscava no id
+// da tabela CONTINENTES_KGMID (/m/0dg3n1). Sendo ids diferentes, o fornecedor
+// devolvia conjuntos diferentes e destinos nacionais baratos apareciam só na
+// busca nacional — quebrando a promessa de que "Todos" contém tudo.
+//
+// Agora TODO escopo executa o núcleo comum (GLOBAL + PAÍS + continente do geo)
+// e os escopos amplos acrescentam os continentes da estratégia. Como o filtro
+// nacional/internacional só acontece na consolidação, vale por construção:
+//     resultados("todos") ⊇ resultados("nacional") ∪ resultados("internacional")
 // ============================================================
-function montarBuscas(baseParams, geo, escopoDestino) {
+export function montarBuscas(baseParams, geo, escopoDestino) {
     const buscas = [];
+    const arrivalIdsVistos = new Set();
 
-    // ─── BUSCA 1: GLOBAL (sempre, em qualquer escopo) ───
-    buscas.push({ params: { ...baseParams }, label: 'GLOBAL' });
+    // Evita gastar chamada repetida no mesmo arrival_id
+    const adicionar = (arrivalId, label) => {
+        const chave = arrivalId || '__GLOBAL__';
+        if (arrivalIdsVistos.has(chave)) return false;
+        arrivalIdsVistos.add(chave);
+        const params = { ...baseParams };
+        if (arrivalId) params.arrival_id = arrivalId;
+        buscas.push({ params, label });
+        return true;
+    };
+
+    // ─── NÚCLEO COMUM A TODOS OS ESCOPOS ───
+    adicionar(null, 'GLOBAL');
+    if (geo?.kgmid_pais) adicionar(geo.kgmid_pais, `PAÍS ${geo.pais}`);
+    // O continente do geo entra em QUALQUER escopo: é a busca que garante o
+    // superset, já que o escopo nacional depende dela.
+    if (geo?.kgmid_continente) adicionar(geo.kgmid_continente, `CONTINENTE ${geo.continente || '?'} (geo)`);
 
     if (escopoDestino === 'nacional') {
-        // ─── NACIONAL: GLOBAL + PAÍS (2-3 buscas, focadas) ───
-        // A busca GLOBAL já traz destinos domésticos populares
-        // A busca por PAÍS garante cobertura completa do território
-        if (geo?.kgmid_pais) {
-            buscas.push({
-                params: { ...baseParams, arrival_id: geo.kgmid_pais },
-                label: `PAÍS ${geo.pais}`
-            });
-        }
-        // Extra: busca no continente para pegar domésticos que aparecem lá
-        if (geo?.kgmid_continente) {
-            buscas.push({
-                params: { ...baseParams, arrival_id: geo.kgmid_continente },
-                label: `CONTINENTE ${geo.continente} (filtro nacional)`
-            });
-        }
         console.log(`🏠 Modo NACIONAL: ${buscas.length} buscas (GLOBAL + PAÍS + CONTINENTE → filtro doméstico na consolidação)`);
-
-    } else {
-        // ─── TANTO FAZ / INTERNACIONAL: Mesma estratégia ampla ───
-        // Diferença está APENAS no filtro de consolidação
-        
-        // Busca por PAÍS (traz domésticos — útil para "tanto faz", descartados para "internacional")
-        if (geo?.kgmid_pais) {
-            buscas.push({
-                params: { ...baseParams, arrival_id: geo.kgmid_pais },
-                label: `PAÍS ${geo.pais}`
-            });
-        }
-
-        // Buscas por CONTINENTES — estratégia baseada na região de origem
-        if (geo?.continente) {
-            const chave = getChaveContinente(geo.continente);
-            const estrategia = ESTRATEGIA_BUSCAS[chave];
-
-            if (estrategia) {
-                console.log(`🌍 Estratégia de continentes: ${estrategia.descricao}`);
-                
-                // Pega até 5 continentes da estratégia
-                const continentesParaBuscar = estrategia.continentes.slice(0, 5);
-                
-                for (const ck of continentesParaBuscar) {
-                    const kgmid = CONTINENTES_KGMID[ck];
-                    if (!kgmid) continue;
-                    
-                    // Evita duplicata se kgmid_continente do geo já é esse
-                    // (já está coberto implicitamente pela busca GLOBAL)
-                    buscas.push({
-                        params: { ...baseParams, arrival_id: kgmid },
-                        label: ck.toUpperCase().replace('_', ' ')
-                    });
-                }
-            } else if (geo.kgmid_continente) {
-                // Fallback: buscar no continente de origem
-                buscas.push({
-                    params: { ...baseParams, arrival_id: geo.kgmid_continente },
-                    label: `CONTINENTE ${geo.continente}`
-                });
-            }
-        }
-
-        const escopoTxt = escopoDestino === 'internacional' ? 'INTERNACIONAL' : 'TANTO FAZ';
-        console.log(`✈️ Modo ${escopoTxt}: ${buscas.length} buscas (GLOBAL + PAÍS + ${buscas.length - 2} continentes → filtro na consolidação)`);
+        return buscas;
     }
 
+    // ─── ESCOPOS AMPLOS: continentes da estratégia por região de origem ───
+    if (geo?.continente) {
+        const chave = getChaveContinente(geo.continente);
+        const estrategia = ESTRATEGIA_BUSCAS[chave];
+        if (estrategia) {
+            console.log(`🌍 Estratégia de continentes: ${estrategia.descricao}`);
+            for (const ck of estrategia.continentes.slice(0, 5)) {
+                const kgmid = CONTINENTES_KGMID[ck];
+                if (kgmid) adicionar(kgmid, ck.toUpperCase().replace('_', ' '));
+            }
+        }
+    }
+
+    const escopoTxt = escopoDestino === 'internacional' ? 'INTERNACIONAL' : 'TANTO FAZ';
+    console.log(`✈️ Modo ${escopoTxt}: ${buscas.length} buscas (núcleo comum + continentes → filtro na consolidação)`);
     return buscas;
 }
 
@@ -486,6 +467,8 @@ export default async function handler(req, res) {
                         existing._source_count++;
                     }
                     if (flightPrice > 0 && (existing.flight.price === 0 || flightPrice < existing.flight.price)) {
+                        // Preço e datas vêm sempre da MESMA oferta: trocar só o
+                        // preço deixaria o card mostrando a data de outra tarifa.
                         existing.flight = {
                             airport_code: dest.flight?.airport_code || dest.primary_airport || '',
                             price: dest.flight?.price || 0,
@@ -493,6 +476,8 @@ export default async function handler(req, res) {
                             flight_duration_minutes: dest.flight?.flight_duration_minutes || 0,
                             airline_name: dest.flight?.airline_name || ''
                         };
+                        existing.outbound_date = dest.outbound_date || null;
+                        existing.return_date = dest.return_date || null;
                     }
                 }
             }
