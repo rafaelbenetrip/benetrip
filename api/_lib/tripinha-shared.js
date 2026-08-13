@@ -312,7 +312,7 @@ export function gerarFallbackInsight(origem, destinos, evidencias = null) {
         const q = ev.quedaRelevante;
         const frases = [
             `📉 ${q.nome} caiu ${q.percentual}% em relação à média dos últimos ${q.dias} dias: agora R$${q.preco}`,
-            `💸 ${q.nome} está R$${q.diferenca} mais barato que a média recente — agora R$${q.preco} saindo de ${origem}`,
+            `💸 ${q.nome} está R$${q.diferenca} mais barato que a média recente: R$${q.preco} saindo de ${origem}`,
             `🔎 Boa hora pra olhar ${q.nome}: R$${q.preco}, ${q.percentual}% abaixo da referência dos últimos ${q.dias} dias`,
         ];
         return frases[seed % frases.length];
@@ -334,7 +334,7 @@ export function gerarFallbackInsight(origem, destinos, evidencias = null) {
     if (total >= 20) {
         const frases = [
             `✈️ ${total} destinos pesquisados saindo de ${origem}. O menor preço é ${maisBarato.nome}, R$${maisBarato.preco}`,
-            `🗺️ ${nacionais.length} nacionais e ${internacionais.length} internacionais saindo de ${origem} — ${maisBarato.nome} lidera com R$${maisBarato.preco}`,
+            `🗺️ ${nacionais.length} nacionais e ${internacionais.length} internacionais saindo de ${origem}, e ${maisBarato.nome} lidera com R$${maisBarato.preco}`,
             `🐶 Farejei ${total} opções de ${origem}: média R$${media}, e ${maisBarato.nome} sai por R$${maisBarato.preco}`,
         ];
         return frases[seed % frases.length];

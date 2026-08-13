@@ -362,7 +362,7 @@ export function renderCardHtml(d, opts) {
     // lista usam o mesmo aeroporto, isso fica explícito no card.
     const viaAeroporto = aeroporto
         ? `<div class="dest-via-aeroporto">via ${aeroporto}${compartilhamAeroporto > 1
-            ? ` &middot; mesmo aeroporto de outros ${compartilhamAeroporto - 1} lugar${compartilhamAeroporto - 1 > 1 ? 'es' : ''} desta lista; pode haver deslocamento terrestre`
+            ? ` &middot; mesmo aeroporto de outros ${compartilhamAeroporto - 1} lugar${compartilhamAeroporto - 1 > 1 ? 'es' : ''} desta lista, com possível deslocamento terrestre`
             : ''}</div>`
         : '';
 

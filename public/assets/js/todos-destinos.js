@@ -579,7 +579,7 @@ const BenetripTodosDestinos = {
                     <div class="stat-item"><span class="stat-label">Aeroportos</span><span class="stat-value">${aeroportosUnicos.size}</span></div>
                     <div class="stat-item"><span class="stat-label">No orçamento</span><span class="stat-value green">${dentroCount}</span></div>
                 </div>
-                <p class="contagem-explicacao">${todos.length} lugares para conhecer, por meio de ${aeroportosUnicos.size} aeroporto${aeroportosUnicos.size !== 1 ? 's' : ''}. Lugares que compartilham o mesmo aeroporto costumam ter a mesma tarifa e podem exigir deslocamento terrestre.</p>
+                <p class="contagem-explicacao">${todos.length} lugares para conhecer, por meio de ${aeroportosUnicos.size} aeroporto${aeroportosUnicos.size !== 1 ? 's' : ''}. Lugares que dividem o mesmo aeroporto costumam ter a mesma tarifa e podem exigir deslocamento terrestre.</p>
             </div>
             <div class="tripinha-message">
                 <img src="assets/images/tripinha/avatar-pensando.png" alt="Tripinha" class="tripinha-message-avatar" onerror="this.style.display='none'">
@@ -766,7 +766,7 @@ const BenetripTodosDestinos = {
         // ao aeroporto e pode haver deslocamento terrestre até o destino
         const compartilhado = destIata ? (this.state.lugaresPorAeroporto?.get(destIata.toUpperCase()) || 0) : 0;
         const viaHtml = compartilhado > 1
-            ? `<div class="destino-via-aeroporto">via ${destIata} · aeroporto compartilhado com outros ${compartilhado - 1} lugar${compartilhado - 1 > 1 ? 'es' : ''} desta lista — pode haver deslocamento terrestre até o destino</div>`
+            ? `<div class="destino-via-aeroporto">via ${destIata} · aeroporto compartilhado com outros ${compartilhado - 1} lugar${compartilhado - 1 > 1 ? 'es' : ''} desta lista. Pode haver deslocamento terrestre até o destino.</div>`
             : '';
 
         let bestDates = '';

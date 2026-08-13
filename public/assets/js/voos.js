@@ -375,7 +375,7 @@ const BenetripVoos = {
                 banner = document.createElement('div');
                 banner.id = 'searching-banner';
                 banner.className = 'searching-banner';
-                banner.innerHTML = `<div class="searching-banner-inner"><div class="searching-banner-pulse"></div><span>🔍 Ainda buscando ofertas melhores — a lista só cresce, nada some.</span></div>`;
+                banner.innerHTML = `<div class="searching-banner-inner"><div class="searching-banner-pulse"></div><span>🔍 Ainda buscando ofertas melhores. A lista só cresce, nada some daqui.</span></div>`;
                 const resultsInfo = document.querySelector('.results-info');
                 if (resultsInfo) resultsInfo.parentNode.insertBefore(banner, resultsInfo);
             }

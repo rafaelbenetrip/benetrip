@@ -1130,7 +1130,7 @@ const BenetripDiscovery = {
         return `
             <div class="alternativas-section acima-orcamento-section">
                 <h3>💸 Opções um pouco acima do seu orçamento</h3>
-                <p class="acima-orcamento-aviso">Nenhuma dessas cabe no valor que você definiu — estão aqui só como referência, com a diferença indicada.</p>
+                <p class="acima-orcamento-aviso">Nenhuma dessas cabe no valor que você definiu. Estão aqui só como referência, com a diferença indicada.</p>
                 <div class="alternativas-grid">${cards}</div>
             </div>`;
     },

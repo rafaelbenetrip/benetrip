@@ -272,7 +272,7 @@ function renderPage({ cidadeAtual, cidades, janelas, janelaAtiva, hoje, isDefaul
     <!-- Aviso de horários: o buscador devolve o preço da janela de datas,
          não os horários dos voos — então não prometemos "sem pedir folga" -->
     <p class="horarios-aviso container">
-        Datas que aproveitam o fim de semana. Os horários de ida e volta não vêm nesta busca &mdash; confirme no Google Flights se você precisará de folga.
+        Datas que aproveitam o fim de semana. Os horários de ida e volta não vêm nesta busca, então confirme no Google Flights se você vai precisar de folga.
     </p>
 
     <!-- ========================================

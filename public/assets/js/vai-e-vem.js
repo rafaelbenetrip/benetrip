@@ -367,12 +367,12 @@ const BenetripVaiEVem = {
         const faixa = classificacao.faixa;
         const faixaGoogle = classificacao.faixaGoogle;
         const contextoGoogle = faixaGoogle
-            ? `<span class="legenda-contexto">Contexto: o Google indica faixa típica de <strong>${simbolo} ${faixaGoogle.low.toLocaleString('pt-BR')} — ${simbolo} ${faixaGoogle.high.toLocaleString('pt-BR')}</strong> para esta rota.</span>`
+            ? `<span class="legenda-contexto">De referência: o Google indica faixa típica de <strong>${simbolo} ${faixaGoogle.low.toLocaleString('pt-BR')} a ${simbolo} ${faixaGoogle.high.toLocaleString('pt-BR')}</strong> para esta rota.</span>`
             : '';
         const legendaHtml = faixa ? `
             <div class="legenda-classes fade-in" style="animation-delay: 0.18s">
                 <span class="legenda-titulo">${classificacao.precosSemelhantes
-                    ? 'As semanas pesquisadas têm preços semelhantes — escolha pela conveniência das datas.'
+                    ? 'As semanas pesquisadas têm preços parecidos, então escolha pela data que for mais conveniente.'
                     : 'Classificação <strong>em relação às semanas pesquisadas</strong> (não é comparação histórica):'}</span>
                 ${classificacao.precosSemelhantes ? '' : `
                 <div class="legenda-itens">
