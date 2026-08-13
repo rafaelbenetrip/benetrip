@@ -489,8 +489,15 @@ const BenetripVoosBaratos = {
 
             <div class="top-list-section fade-in" style="animation-delay: 0.25s">
                 <h3 class="top-list-title">🏅 Top 10 Períodos Mais Baratos</h3>
-                <div class="top-list">
-                    ${data.top10.map((item, idx) => this.renderTopItem(item, idx, simbolo)).join('')}
+                <div class="voo-filtros" id="voo-filtros">
+                    <button class="voo-filtro-chip active" data-voo-filtro="todos">Todos</button>
+                    <button class="voo-filtro-chip" data-voo-filtro="direto">Voo direto</button>
+                    <button class="voo-filtro-chip" data-voo-filtro="max1">Até 1 escala</button>
+                    <button class="voo-filtro-chip" data-voo-filtro="curto">Voo até 4h</button>
+                </div>
+                <p class="voo-filtros-nota">Os filtros valem para esta lista. As estatísticas acima continuam considerando os ${data.stats.totalDates} períodos analisados.</p>
+                <div class="top-list" id="top-list">
+                    ${this.renderTopList(data.top10, simbolo)}
                 </div>
             </div>
 
@@ -511,6 +518,11 @@ const BenetripVoosBaratos = {
         `;
 
         container.innerHTML = html;
+
+        this.filtroVoo = 'todos';
+        document.querySelectorAll('.voo-filtro-chip').forEach(chip => {
+            chip.addEventListener('click', () => this.aplicarFiltroVoo(chip.dataset.vooFiltro));
+        });
 
         requestAnimationFrame(() => {
             setTimeout(() => this.animateChartBars(), 300);
@@ -594,6 +606,44 @@ const BenetripVoosBaratos = {
         });
     },
 
+    // ================================================================
+    // FILTROS DE VOO DA LISTA (não alteram as estatísticas globais)
+    // Só valem para itens com detalhes de voo carregados; itens sem esses
+    // dados não são escondidos por um critério que não dá para verificar.
+    // ================================================================
+    filtroVoo: 'todos',
+
+    aplicarFiltroVoo(filtro) {
+        this.filtroVoo = filtro;
+        document.querySelectorAll('.voo-filtro-chip').forEach(c => {
+            c.classList.toggle('active', c.dataset.vooFiltro === filtro);
+        });
+        const lista = document.getElementById('top-list');
+        const data = this.state.resultados;
+        if (!lista || !data) return;
+        lista.innerHTML = this.renderTopList(data.top10, this.getSimbolo(this.state.moedaSelecionada));
+    },
+
+    itemPassaFiltroVoo(item) {
+        const fd = item.flight_details;
+        if (this.filtroVoo === 'todos') return true;
+        if (!fd) return false; // sem dados não há como afirmar que atende
+        if (this.filtroVoo === 'direto') return fd.stops === 0;
+        if (this.filtroVoo === 'max1') return fd.stops <= 1;
+        if (this.filtroVoo === 'curto') return fd.total_duration > 0 && fd.total_duration <= 240;
+        return true;
+    },
+
+    renderTopList(itens, simbolo) {
+        const filtrados = (itens || []).filter(i => this.itemPassaFiltroVoo(i));
+        if (filtrados.length === 0) {
+            return `<div class="top-list-vazio">Nenhum período desta lista atende ao filtro escolhido.
+                <button class="btn-limpar-voo-filtro" onclick="BenetripVoosBaratos.aplicarFiltroVoo('todos')">Mostrar todos</button>
+            </div>`;
+        }
+        return filtrados.map((item, idx) => this.renderTopItem(item, idx, simbolo)).join('');
+    },
+
     renderTopItem(item, idx, simbolo) {
         const originIataGF = this.getIataParaGoogleFlights(this.state.origemSelecionada);
         const destIataGF = this.getIataParaGoogleFlights(this.state.destinoSelecionado);
@@ -663,6 +713,10 @@ const BenetripVoosBaratos = {
             `;
         }
 
+        // Badge do menor preço vem do nosso cálculo sobre o conjunto
+        // consolidado, não da marcação por janela do fornecedor
+        const lowestBadge = item.is_lowest ? '<span class="top-lowest-badge">menor preço</span>' : '';
+
         return `
             <div class="top-item ${idx === 0 ? 'rank-1' : ''}">
                 <div class="top-rank">${idx + 1}</div>
@@ -673,7 +727,7 @@ const BenetripVoosBaratos = {
                     <div class="top-weekday">${depWeekday} a ${retWeekday}</div>
                     ${detailsHtml}
                 </div>
-                <div class="top-price">${simbolo} ${item.price.toLocaleString('pt-BR')}</div>
+                <div class="top-price">${simbolo} ${item.price.toLocaleString('pt-BR')}${lowestBadge}</div>
                 <a href="${url}" target="_blank" rel="noopener" class="top-link" title="Ver no Google Flights">
                     ${svgArrow}
                 </a>

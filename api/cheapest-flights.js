@@ -10,7 +10,10 @@
 const MAX_COMBOS_PER_REQUEST = 200;
 const WINDOW_SIZE_DAYS = 14; // 14 x 14 = 196 combos (< 200)
 const MONTHS_AHEAD = 6;
-const ENRICH_TOP_N = 5; // Enriquecer os top N com detalhes do voo
+// Enriquece os top N com detalhes do voo (paradas, duração, companhias).
+// São exatamente os itens exibidos no Top 10, para que os filtros de voo
+// direto / escalas / duração possam ser aplicados à lista inteira.
+const ENRICH_TOP_N = 10;
 const STANDARD_DURATIONS = [7, 14, 21];
 const LOW_RESULTS_THRESHOLD = 15; // Abaixo disso, tentar fallback para duração padrão
 
@@ -299,7 +302,10 @@ async function runSearch(origemCode, destinoCode, duracaoNum, currencyCode, loca
                 departure: entry.departure,
                 return: entry.return || null,
                 price: entry.price,
-                is_lowest: entry.is_lowest_price || false,
+                // Guardamos a marcação do fornecedor apenas como referência:
+                // ela vem por janela de busca e discordava do nosso conjunto
+                // consolidado (item mais barato aparecia com is_lowest falso).
+                is_lowest_fornecedor: entry.is_lowest_price || false,
             });
         });
     });
@@ -316,6 +322,14 @@ async function runSearch(origemCode, destinoCode, duracaoNum, currencyCode, loca
     });
 
     const sorted = Array.from(uniquePrices.values()).sort((a, b) => a.price - b.price);
+
+    // is_lowest é recalculado sobre o conjunto JÁ consolidado: quem tem o
+    // menor preço é marcado como mais barato, sempre (inclusive empates).
+    const menorPreco = sorted.length > 0 ? sorted[0].price : null;
+    for (const entry of sorted) {
+        entry.is_lowest = menorPreco !== null && entry.price === menorPreco;
+    }
+
     return { sorted, totalCalendarEntries, validEntries, errorsCount, windows: windows.length };
 }
 
@@ -438,12 +452,16 @@ export default async function handler(req, res) {
             const prices = sorted.map(e => e.price);
             const sum = prices.reduce((a, b) => a + b, 0);
 
+            // Estatísticas sempre do conjunto COMPLETO processado — a mesma
+            // fonte do gráfico, do calendário e da lista. Filtros de voo na
+            // interface não alteram estes números.
             stats = {
                 cheapest: sorted[0],
                 mostExpensive: sorted[sorted.length - 1],
                 average: Math.round(sum / prices.length),
                 median: prices[Math.floor(prices.length / 2)],
                 totalDates: sorted.length,
+                duracao: duracaoFinal,
             };
         }
 
