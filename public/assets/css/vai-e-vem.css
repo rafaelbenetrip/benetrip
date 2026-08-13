@@ -423,3 +423,22 @@
         margin-left: auto;
     }
 }
+
+/* Referência da classificação e avisos de viabilidade */
+.legenda-contexto {
+    display: block;
+    margin-top: 6px;
+    font-size: 11px;
+    color: #777;
+    line-height: 1.45;
+}
+
+.opcao-aviso {
+    font-size: 11px;
+    line-height: 1.4;
+    color: #7a3c0d;
+    background: rgba(232, 119, 34, 0.1);
+    border-radius: 6px;
+    padding: 4px 8px;
+    margin-top: 4px;
+}

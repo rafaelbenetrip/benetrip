@@ -361,19 +361,26 @@ const BenetripVaiEVem = {
             }
         }
 
-        // Legenda de classificação
-        const faixa = data.classificacao?.faixa;
-        const fonteGoogle = data.classificacao?.fonte === 'google';
+        // Legenda de classificação: a referência é sempre a distribuição das
+        // semanas pesquisadas — a faixa do Google entra apenas como contexto
+        const classificacao = data.classificacao || {};
+        const faixa = classificacao.faixa;
+        const faixaGoogle = classificacao.faixaGoogle;
+        const contextoGoogle = faixaGoogle
+            ? `<span class="legenda-contexto">Contexto: o Google indica faixa típica de <strong>${simbolo} ${faixaGoogle.low.toLocaleString('pt-BR')} — ${simbolo} ${faixaGoogle.high.toLocaleString('pt-BR')}</strong> para esta rota.</span>`
+            : '';
         const legendaHtml = faixa ? `
             <div class="legenda-classes fade-in" style="animation-delay: 0.18s">
-                <span class="legenda-titulo">${fonteGoogle
-                    ? `Faixa típica do Google para esta rota: <strong>${simbolo} ${faixa.low.toLocaleString('pt-BR')} — ${simbolo} ${faixa.high.toLocaleString('pt-BR')}</strong>`
-                    : 'Comparação entre as semanas encontradas:'}</span>
+                <span class="legenda-titulo">${classificacao.precosSemelhantes
+                    ? 'As semanas pesquisadas têm preços semelhantes — escolha pela conveniência das datas.'
+                    : 'Classificação <strong>em relação às semanas pesquisadas</strong> (não é comparação histórica):'}</span>
+                ${classificacao.precosSemelhantes ? '' : `
                 <div class="legenda-itens">
-                    <span class="badge-classe badge-barato">Preço bom</span>
+                    <span class="badge-classe badge-barato">Mais barata que a maioria</span>
                     <span class="badge-classe badge-normal">Na média</span>
-                    <span class="badge-classe badge-caro">Salgado</span>
-                </div>
+                    <span class="badge-classe badge-caro">Mais cara que a maioria</span>
+                </div>`}
+                ${contextoGoogle}
             </div>` : '';
 
         const html = `
@@ -438,6 +445,10 @@ const BenetripVaiEVem = {
                     <div class="stat-card-label">Mais cara</div>
                     <div class="stat-card-value orange">${simbolo} ${data.stats.maisCara.price.toLocaleString('pt-BR')}</div>
                 </div>
+                <div class="stat-card">
+                    <div class="stat-card-label">Economia entre semanas</div>
+                    <div class="stat-card-value">${simbolo} ${(data.stats.economia || 0).toLocaleString('pt-BR')}</div>
+                </div>
             </div>
 
             <div class="tripinha-tip fade-in" style="animation-delay: 0.15s">
@@ -450,6 +461,7 @@ const BenetripVaiEVem = {
             </div>
 
             ${legendaHtml}
+            ${this.renderAlertaSection()}
 
             <div class="semanas-section fade-in" style="animation-delay: 0.2s">
                 <h3 class="semanas-title">📅 Semana a semana na sua rota</h3>
@@ -477,6 +489,30 @@ const BenetripVaiEVem = {
 
         container.innerHTML = html;
         this.showResults();
+    },
+
+    // ================================================================
+    // ALERTA DE PREÇO (segunda etapa)
+    // Só aparece com a feature flag ligada, o que exige a infraestrutura
+    // descrita em docs/alertas-de-preco.md (canal de envio, fila e
+    // persistência). Sem isso não exibimos formulário: cadastrar um alerta
+    // que nunca seria disparado é pior do que não oferecer.
+    // ================================================================
+    renderAlertaSection() {
+        if (!window.BENETRIP_FLAGS?.alertasPreco) return '';
+        const { origemSelecionada, destinoSelecionado } = this.state;
+        const rota = `${origemSelecionada?.displayCode || origemSelecionada?.code} → ${destinoSelecionado?.displayCode || destinoSelecionado?.code}`;
+        return `
+            <div class="alerta-section fade-in">
+                <h3 class="alerta-title">🔔 Avisar quando ficar mais barato</h3>
+                <p class="alerta-sub">Rota ${rota}, nos dias que você escolheu.</p>
+                <button class="btn-alerta" onclick="BenetripVaiEVem.abrirCadastroAlerta()">Criar alerta</button>
+            </div>`;
+    },
+
+    abrirCadastroAlerta() {
+        // Implementação depende de POST /api/price-alerts (ver docs/alertas-de-preco.md)
+        console.warn('[VaiEVem] Cadastro de alerta indisponível: infraestrutura de notificação não configurada');
     },
 
     encontrarViagem(data, ida, volta) {
@@ -542,10 +578,12 @@ const BenetripVaiEVem = {
                         </div>
                         <div class="opcao-meta">
                             ${o.noites} noite${o.noites > 1 ? 's' : ''}
+                            ${o.flight_details ? ` · ${o.flight_details.stops === 0 ? 'direto' : `${o.flight_details.stops} conexão${o.flight_details.stops > 1 ? 'ões' : ''}`}${o.flight_details.total_duration ? ` · ${Math.floor(o.flight_details.total_duration / 60)}h${String(o.flight_details.total_duration % 60).padStart(2, '0')}` : ''}` : ''}
                             ${o.feriados && o.feriados.length > 0 ? ` · 🎉 ${o.feriados[0].nome}` : ''}
                         </div>
+                        ${o.viabilidade?.nivel === 'inviavel' ? `<div class="opcao-aviso">⚠️ ${o.viabilidade.motivo}</div>` : ''}
                     </div>
-                    <span class="badge-classe badge-${o.classe}">${{ barato: 'Preço bom', normal: 'Na média', caro: 'Salgado' }[o.classe] || ''}</span>
+                    <span class="badge-classe badge-${o.classe}">${{ barato: 'Mais barata', normal: 'Na média', caro: 'Mais cara' }[o.classe] || ''}</span>
                     <div class="opcao-preco">${simbolo} ${o.price.toLocaleString('pt-BR')}</div>
                     <a href="${url}" target="_blank" rel="noopener" class="opcao-link" title="Ver no Google Flights">${svgArrow}</a>
                 </div>
