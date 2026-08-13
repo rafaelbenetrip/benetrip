@@ -1104,11 +1104,24 @@ const BenetripCompararVoos = {
 
         const saving = stats.mostExpensive - stats.cheapest;
         const savingPct = stats.mostExpensive > 0 ? Math.round((saving / stats.mostExpensive) * 100) : 0;
-        const tipText = savingPct > 20
-            ? `<strong>Boa escolha ser flexível!</strong> A diferença entre a combo mais barata e a mais cara é de <strong>${s} ${Math.round(saving / paxParaPreco).toLocaleString('pt-BR')}</strong> por pessoa (${savingPct}%)! 🐾`
-            : savingPct > 5
-            ? `A diferença entre as combinações é de <strong>${s} ${Math.round(saving / paxParaPreco).toLocaleString('pt-BR')}</strong> por pessoa. Cada real conta! 🐾`
-            : `Os preços estão bem parecidos. Escolha a data mais conveniente! 🎉`;
+        const savingPp = Math.round(saving / paxParaPreco);
+        // Só chama de economia relevante quando é relevante de fato: diferença
+        // pequena entre datas não merece mensagem entusiasmada
+        const diferencaRelevante = savingPct >= 10 && savingPp >= 50;
+        const tipText = diferencaRelevante
+            ? `<strong>Vale ser flexível:</strong> a diferença entre a combinação mais barata e a mais cara é de <strong>${s} ${savingPp.toLocaleString('pt-BR')}</strong> por pessoa (${savingPct}%). 🐾`
+            : `<strong>As datas pesquisadas têm preços semelhantes</strong> (diferença de ${s} ${savingPp.toLocaleString('pt-BR')} por pessoa). Escolha a data mais conveniente. 🐾`;
+
+        // O fornecedor devolve a tarifa de ida e volta, mas normalmente só os
+        // trechos da ida: sem a volta, isto é tarifa inicial, não itinerário
+        const itinerarioCompleto = data.itinerario?.completo === true;
+        const tarifaLabel = itinerarioCompleto
+            ? 'por pessoa · ida e volta com horários definidos'
+            : 'por pessoa · melhor tarifa inicial para esta combinação';
+        const avisoVolta = itinerarioCompleto
+            ? ''
+            : `<div class="aviso-volta">Escolha o voo de volta no Google Flights. A tarifa final pode variar conforme o retorno escolhido.</div>`;
+        const ctaLabel = 'Ver esta combinação no Google Flights';
 
         const paxParts = [`${numAdultos} adulto${numAdultos > 1 ? 's' : ''}`];
         if (numCriancas > 0) paxParts.push(`${numCriancas} criança${numCriancas > 1 ? 's' : ''}`);
@@ -1151,7 +1164,7 @@ const BenetripCompararVoos = {
                 <div class="winner-row">
                     <div>
                         <div class="winner-price">${s} ${precoPorPessoaCheapest.toLocaleString('pt-BR')}</div>
-                        <div class="winner-price-label">por pessoa · ida e volta</div>
+                        <div class="winner-price-label">${tarifaLabel}</div>
                         ${paxParaPreco > 1 ? `<div class="winner-price-label" style="opacity:1;font-weight:600">Total ${paxParaPreco}p: ${s} ${stats.cheapest.toLocaleString('pt-BR')}${numBebes > 0 ? ` + ${numBebes} bebê${numBebes > 1 ? 's' : ''} (grátis)` : ''}</div>` : ''}
                     </div>
                     <div style="display:flex;gap:8px;flex-wrap:wrap">
@@ -1170,8 +1183,9 @@ const BenetripCompararVoos = {
                         </div>
                     </div>
                 </div>
-                <a href="${this.buildGoogleFlightsUrl(orig.code, dest.code, stats.cheapestCombo.dataIda, stats.cheapestCombo.dataVolta, moeda)}"
-                   target="_blank" rel="noopener" class="winner-cta">✈️ Ver no Google Flights</a>
+                ${avisoVolta}
+                <a href="${this.buildGoogleFlightsUrl(orig, dest, stats.cheapestCombo.dataIda, stats.cheapestCombo.dataVolta, moeda, winnerCombo?.voos?.[0])}"
+                   target="_blank" rel="noopener" class="winner-cta">✈️ ${ctaLabel}</a>
             </div>
 
             <div class="stats-row fade-in" style="animation-delay:.1s">
@@ -1384,8 +1398,11 @@ const BenetripCompararVoos = {
         const stopsStr = voo.stops === 0 ? 'Direto' : voo.stops === 1 ? '1 parada' : `${voo.stops} paradas`;
         const stopsClass = voo.stops === 0 ? 'tag-direct' : voo.stops >= 2 ? 'tag-warn' : '';
 
-        const gfUrl = this.buildGoogleFlightsUrl(orig.code, dest.code, combo.dataIda, combo.dataVolta, moeda);
+        // CTA com os aeroportos efetivos desta tarifa
+        const gfUrl = this.buildGoogleFlightsUrl(orig, dest, combo.dataIda, combo.dataVolta, moeda, voo);
         const legsHtml = this._renderFlightLegs(voo);
+        // Sem o trecho de volta vindo do fornecedor, este é o preço inicial
+        const vooCompleto = voo.itinerario_completo === true;
 
         const precoTotal = voo.price;
         const precoPorPessoa = Math.round(precoTotal / paxParaPreco);
@@ -1441,7 +1458,7 @@ const BenetripCompararVoos = {
                     </div>
                     <div class="flight-price-box">
                         <div class="flight-price">${simbolo} ${precoPorPessoa.toLocaleString('pt-BR')}</div>
-                        <div class="flight-price-pp">por pessoa</div>
+                        <div class="flight-price-pp">por pessoa${vooCompleto ? ' · ida e volta' : ' · tarifa inicial'}</div>
                         ${paxParaPreco > 1 ? `<div class="flight-price-detail">Total: <span class="price-pax">${simbolo} ${precoTotal.toLocaleString('pt-BR')}</span></div>` : ''}
                         ${paxDetailHtml}
                     </div>
@@ -1453,10 +1470,11 @@ const BenetripCompararVoos = {
                     ${extHtml}
                 </div>
                 ${legsHtml}
+                ${vooCompleto ? '' : '<div class="aviso-volta aviso-volta-card">Só o voo de ida está definido aqui. Escolha a volta no Google Flights — a tarifa final pode variar conforme o retorno.</div>'}
                 <div class="flight-action">
                     <a href="${gfUrl}" target="_blank" rel="noopener" class="btn-google-flights">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/></svg>
-                        Ver no Google Flights
+                        Ver esta combinação no Google Flights
                     </a>
                     ${baggageHtml}
                 </div>
@@ -1613,22 +1631,43 @@ const BenetripCompararVoos = {
 
     // Retorna o código de aeroporto para uso no Google Flights URL
     // Para cidades agrupadas (kgmid), usa o primeiro aeroporto do grupo
+    // Cidade agregada: devolve TODOS os aeroportos do grupo (o link do Google
+    // Flights aceita vários por trecho), em vez de fixar o primeiro
     _getGfAirportCode(cityObj) {
         if (!cityObj) return '';
         if (cityObj.isCityCode && cityObj.aeroportosIncluidos && cityObj.aeroportosIncluidos.length > 0) {
-            return cityObj.aeroportosIncluidos[0]; // Ex: GRU para SAO
+            return cityObj.aeroportosIncluidos;
         }
         return cityObj.code;
     },
 
-    buildGoogleFlightsUrl(o, d, dep, ret, cur) {
-        // Para Google Flights URL, converter kgmid para aeroporto real
+    // vooReferencia: quando conhecido, o CTA usa os aeroportos EFETIVOS da
+    // tarifa encontrada (ex.: VCP em vez de GRU)
+    buildGoogleFlightsUrl(o, d, dep, ret, cur, vooReferencia = null) {
         const orig = this.state.origemSelecionada;
         const dest = this.state.destinoSelecionado;
-        const oCode = (orig && orig.code === o) ? this._getGfAirportCode(orig) : o;
-        const dCode = (dest && dest.code === d) ? this._getGfAirportCode(dest) : d;
+        const oInput = (o && typeof o === 'object') ? o : ((orig && orig.code === o) ? orig : o);
+        const dInput = (d && typeof d === 'object') ? d : ((dest && dest.code === d) ? dest : d);
+        const oCode = vooReferencia?.aeroporto_origem
+            || ((oInput && typeof oInput === 'object') ? this._getGfAirportCode(oInput) : oInput);
+        const dCode = vooReferencia?.aeroporto_destino
+            || ((dInput && typeof dInput === 'object') ? this._getGfAirportCode(dInput) : dInput);
 
-        const tfs = this._b64u([...this._pVF(1,28),...this._pVF(2,2),...this._pMF(3,this._bLeg(dep,oCode,dCode)),...this._pMF(3,this._bLeg(ret,dCode,oCode)),...this._pVF(14,1)]);
+        if (typeof BenetripFlightLinks !== 'undefined') {
+            const url = BenetripFlightLinks.buildUrl({
+                origins: oCode, destinations: dCode,
+                departDate: dep, returnDate: ret,
+                adults: this.state.numAdultos || 1,
+                children: this.state.numCriancas || 0,
+                infants: this.state.numBebes || 0,
+                currency: cur,
+            });
+            if (url) return url;
+        }
+
+        const oPrim = Array.isArray(oCode) ? oCode[0] : oCode;
+        const dPrim = Array.isArray(dCode) ? dCode[0] : dCode;
+        const tfs = this._b64u([...this._pVF(1,28),...this._pVF(2,2),...this._pMF(3,this._bLeg(dep,oPrim,dPrim)),...this._pMF(3,this._bLeg(ret,dPrim,oPrim)),...this._pVF(14,1)]);
         const tfu = this._b64u(this._pMF(2,[...this._pVF(1,1),...this._pVF(2,0),...this._pVF(3,0)]));
         const p = new URLSearchParams();
         p.set('tfs', tfs); p.set('tfu', tfu);

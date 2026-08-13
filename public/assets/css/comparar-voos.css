@@ -1028,3 +1028,19 @@ body {
     .price-matrix th.col-header,
     .price-matrix th.row-header { min-width: 80px; }
 }
+
+/* Transparência sobre a escolha do voo de volta */
+.aviso-volta {
+    font-size: 12px;
+    line-height: 1.45;
+    color: #fff;
+    background: rgba(0, 0, 0, 0.18);
+    border-radius: 8px;
+    padding: 8px 10px;
+    margin: 10px 0;
+}
+
+.aviso-volta-card {
+    color: #7a3c0d;
+    background: rgba(232, 119, 34, 0.1);
+}

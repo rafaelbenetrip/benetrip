@@ -4,6 +4,8 @@
 // v2.1: cheaper_alternatives, fare_type, baggage_allowance_links (SearchAPI update)
 // Suporte a adultos, crianças (2-11) e bebês (0-2)
 
+import { analisarItinerario } from './_lib/roundtrip.js';
+
 export const maxDuration = 60;
 
 const MAX_IDAS = 4;
@@ -58,7 +60,7 @@ async function searchFlights(params, label) {
     }
 }
 
-function extractFlightDetails(flight, isBestFlight) {
+function extractFlightDetails(flight, isBestFlight, rota = {}) {
     const legs = flight.flights || [];
     const layovers = flight.layovers || [];
 
@@ -96,6 +98,18 @@ function extractFlightDetails(flight, isBestFlight) {
         overnight: l.overnight || false,
     }));
 
+    // O engine devolve a tarifa de ida e volta, mas normalmente só os trechos
+    // da IDA — a volta é escolhida depois no Google Flights. Aqui olhamos os
+    // trechos reais para a interface não vender itinerário que não existe.
+    const itinerario = analisarItinerario(flightLegs, rota);
+
+    // Aeroportos EFETIVOS da tarifa (numa busca por cidade agregada o
+    // resultado pode sair de VCP em vez de GRU)
+    const aeroportoOrigemReal = flightLegs[0]?.departure_airport?.id || null;
+    const aeroportoDestinoReal = (itinerario.ida[itinerario.ida.length - 1]?.arrival_airport?.id)
+        || flightLegs[flightLegs.length - 1]?.arrival_airport?.id
+        || null;
+
     return {
         price: flight.price || 0,
         total_duration: flight.total_duration || 0,
@@ -104,6 +118,11 @@ function extractFlightDetails(flight, isBestFlight) {
         legs: flightLegs,
         layovers: layoverDetails,
         is_best: isBestFlight,
+        itinerario_completo: itinerario.completo,
+        trechos_ida: itinerario.ida.length,
+        trechos_volta: itinerario.volta.length,
+        aeroporto_origem: aeroportoOrigemReal,
+        aeroporto_destino: aeroportoDestinoReal,
         carbon_emissions: flight.carbon_emissions?.this_flight
             ? Math.round(flight.carbon_emissions.this_flight / 1000)
             : null,
@@ -255,7 +274,13 @@ export default async function handler(req, res) {
             }
 
             const voosDetalhados = flights.map((f, idx) => {
-                const details = extractFlightDetails(f, idx < result.isBest);
+                // Cidade agregada: a rota aceita qualquer aeroporto do grupo
+                const details = extractFlightDetails(f, idx < result.isBest, {
+                    origem: (origemIsCityCode && Array.isArray(origemAeroportos) && origemAeroportos.length)
+                        ? origemAeroportos : origemCode,
+                    destino: (destinoIsCityCode && Array.isArray(destinoAeroportos) && destinoAeroportos.length)
+                        ? destinoAeroportos : destinoCode,
+                });
                 details.airlines.forEach(a => { if (!todasCompanhias.has(a.name)) todasCompanhias.set(a.name, a); });
                 return details;
             });
@@ -320,6 +345,17 @@ export default async function handler(req, res) {
             combinacoesSemVoo: combinacoes.length - precosValidos.length,
         };
 
+        // A busca só entrega itinerário fechado se TODOS os voos exibidos
+        // trouxerem o trecho de volta; senão o preço é tarifa inicial.
+        const todosOsVoos = combinacoesResult.flatMap(c => c.voos || []);
+        const comItinerarioCompleto = todosOsVoos.filter(v => v.itinerario_completo).length;
+        const itinerarioInfo = {
+            completo: todosOsVoos.length > 0 && comItinerarioCompleto === todosOsVoos.length,
+            voosComVolta: comItinerarioCompleto,
+            voosTotal: todosOsVoos.length,
+        };
+        console.log(`🔁 Itinerário: ${comItinerarioCompleto}/${todosOsVoos.length} voos com trecho de volta do fornecedor`);
+
         console.log(`✅ Completo em ${totalTime}ms | ${origemLabel}→${destinoLabel} | Mais barato: ${globalCheapest} ${currencyCode} | Pax: ${adultosFinal}A/${criancasFinal}C/${numBebes}B | Alternativas: ${cheaperAlternativesFinal.length}`);
 
         return res.status(200).json({
@@ -338,6 +374,7 @@ export default async function handler(req, res) {
             datasIda,
             datasVolta,
             stats,
+            itinerario: itinerarioInfo,
             matrizPrecos,
             combinacoes: combinacoesResult,
             companhias: Array.from(todasCompanhias.values()),
