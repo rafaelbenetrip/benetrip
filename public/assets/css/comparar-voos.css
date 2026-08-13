@@ -1044,3 +1044,90 @@ body {
     color: #7a3c0d;
     background: rgba(232, 119, 34, 0.1);
 }
+
+/* ============================================================
+   COMPLETUDE DA TARIFA (P0)
+   Vencedor, economia e destaque visual só existem quando as
+   combinações são realmente comparáveis. Nos demais estados a
+   matriz informa o que cada célula representa — com símbolo e
+   texto, nunca só com cor.
+   ============================================================ */
+.sr-only {
+    position: absolute;
+    width: 1px; height: 1px;
+    padding: 0; margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+.winner-card-indicativo {
+    background: linear-gradient(135deg, #5f6b7a 0%, #46505c 100%);
+}
+
+.aviso-bebes {
+    font-size: 11.5px;
+    line-height: 1.45;
+    color: #fff;
+    opacity: .9;
+    margin-top: 6px;
+}
+
+.stats-row-indicativo .stat-card-wide {
+    grid-column: 1 / -1;
+    text-align: left;
+}
+
+.stats-row-indicativo .stat-detail {
+    font-family: 'Montserrat', sans-serif;
+    font-size: 11.5px;
+    color: #6b7280;
+    line-height: 1.45;
+    margin-top: 4px;
+}
+
+.matrix-estado {
+    display: block;
+    font-size: 10px;
+    line-height: 1;
+    opacity: .75;
+    margin-bottom: 2px;
+}
+
+.matrix-cell.cell-indicativa { border-style: dashed; }
+.matrix-cell.cell-insuficiente { opacity: .75; }
+
+.matrix-cell:focus-visible {
+    outline: 3px solid #E87722;
+    outline-offset: -3px;
+}
+
+.matrix-aviso {
+    font-family: 'Montserrat', sans-serif;
+    font-size: 12px;
+    line-height: 1.5;
+    color: #7a3c0d;
+    background: rgba(232, 119, 34, 0.1);
+    border-radius: 8px;
+    padding: 8px 10px;
+    margin: 10px 0 6px;
+}
+
+.matrix-legenda {
+    list-style: none;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 14px;
+    padding: 0;
+    margin: 8px 0 0;
+}
+
+.matrix-legenda-item {
+    font-family: 'Montserrat', sans-serif;
+    font-size: 11.5px;
+    color: #4b5563;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}

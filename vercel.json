@@ -56,6 +56,14 @@
       "memory": 1024,
       "maxDuration": 60
     },
+    "api/seasonality.js": {
+      "memory": 1024,
+      "maxDuration": 60
+    },
+    "api/rank-destinations.js": {
+      "memory": 1024,
+      "maxDuration": 60
+    },
     "api/cron/update-discovery.js": {
       "memory": 1024,
       "maxDuration": 300

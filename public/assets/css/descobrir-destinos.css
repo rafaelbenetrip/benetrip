@@ -1440,3 +1440,40 @@ body {
     color: #7a6a5c;
     margin: 0 0 12px;
 }
+
+/* ============================================================
+   SAZONALIDADE VERIFICADA (P0)
+   A adequação à época só é apresentada como fato quando veio de
+   uma fonte externa. Sem verificação, o texto fica marcado como
+   informação não verificada.
+   ============================================================ */
+.destino-epoca-verificada {
+    border-left: 3px solid #4CAF50;
+    padding-left: 10px;
+}
+
+.destino-epoca-conflito,
+.destino-epoca-nao-verificada {
+    border-left: 3px solid #9ca3af;
+    padding-left: 10px;
+}
+
+.epoca-alerta {
+    display: inline-block;
+    background: #fef3c7;
+    border: 1px solid #fcd34d;
+    color: #92400e;
+    border-radius: 4px;
+    padding: 1px 6px;
+    font-size: 11px;
+    font-weight: 600;
+    margin-left: 4px;
+}
+
+.destino-epoca-slot { display: none; }
+
+.destino-epoca .source-attribution {
+    font-size: 11px;
+    color: #E87722;
+    white-space: nowrap;
+}

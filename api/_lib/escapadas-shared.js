@@ -19,6 +19,7 @@ import {
     descricaoEmenda,
 } from './feriados.js';
 import { calcularVariacoesHistorico } from './discovery-shared.js';
+import { avaliarViabilidade, NIVEL } from './travel-viability.js';
 
 // Quantas janelas de cada tipo ficam vivas
 export const FDS_ATIVOS = 3;
@@ -56,23 +57,47 @@ export function janelasAtivas(hoje = hojeISO()) {
     const janelas = [];
 
     // --- Fins de semana rolantes (sex -> dom, 2 noites) ---
+    //
+    // Rótulo cronológico honesto: "Este fim de semana" só vale para o fim de
+    // semana IMEDIATO. Quando ele foi descartado por antecedência mínima
+    // (comprar na quinta para sexta gera preço de última hora, que envelhece
+    // mal no snapshot), a primeira janela passa a se chamar "Próximo fim de
+    // semana com tarifas disponíveis" e a omissão é explicada na interface.
     const dow = diaDaSemana(hoje);
-    let proximaSexta = somarDias(hoje, (5 - dow + 7) % 7); // sexta desta semana ou a próxima
-    if (diffDias(hoje, proximaSexta) < MIN_DIAS_ATE_SEXTA) {
-        proximaSexta = somarDias(proximaSexta, 7);
-    }
+    const sextaImediata = somarDias(hoje, (5 - dow + 7) % 7);
+    const diasAteSextaImediata = diffDias(hoje, sextaImediata);
+    const fdsImediatoOmitido = diasAteSextaImediata < MIN_DIAS_ATE_SEXTA;
+    const proximaSexta = fdsImediatoOmitido ? somarDias(sextaImediata, 7) : sextaImediata;
 
     for (let i = 0; i < FDS_ATIVOS; i++) {
         const ida = somarDias(proximaSexta, i * 7);
         const volta = somarDias(ida, 2);
+        let rotulo;
+        if (i === 0) {
+            rotulo = fdsImediatoOmitido ? 'Próximo fim de semana com tarifas disponíveis' : 'Este fim de semana';
+        } else if (i === 1) {
+            rotulo = fdsImediatoOmitido ? 'Em 2 semanas' : 'Próximo fim de semana';
+        } else {
+            rotulo = fdsImediatoOmitido ? 'Em 3 semanas' : 'Em 2 semanas';
+        }
         janelas.push({
             id: `fds-${ida}`,
             categoria: 'fds',
-            rotulo: i === 0 ? 'Este fim de semana' : i === 1 ? 'Próximo fim de semana' : 'Em 2 semanas',
+            rotulo,
             rotuloDatas: `${fmtCurta(ida)}–${fmtCurta(volta)}`,
             ida,
             volta,
             noites: 2,
+            // A interface usa isto para explicar por que o fds mais próximo
+            // não aparece, em vez de simplesmente sumir com ele.
+            omitidoPorAntecedencia: i === 0 && fdsImediatoOmitido
+                ? {
+                    ida: sextaImediata,
+                    volta: somarDias(sextaImediata, 2),
+                    diasAte: diasAteSextaImediata,
+                    explicacao: `O fim de semana de ${fmtCurta(sextaImediata)} está a menos de ${MIN_DIAS_ATE_SEXTA} dias: os preços de última hora mudam rápido demais para entrar aqui.`,
+                }
+                : null,
         });
     }
 
@@ -255,38 +280,13 @@ function classificarEstilos(destino) {
 
 // ============================================================
 // VIABILIDADE DA ESCAPADA
-// Uma escapada de 2 noites não comporta 10h, 20h ou 40h de voo: o
-// deslocamento consome a viagem. Classifica cada destino em
-// 'boa' | 'aceitavel' | 'inviavel' comparando o tempo de voo (ida +
-// volta) com o tempo total da janela.
-//
-// Sem duração de voo na resposta do fornecedor, a viabilidade fica
-// 'desconhecida' — nunca inventamos um número para preencher.
+// A regra vive em api/_lib/travel-viability.js, compartilhada com as demais
+// ferramentas: aqui ficou só o adaptador do shape dos snapshots.
 // ============================================================
-export const VIABILIDADE = {
-    // fração máxima da janela consumida por ida+volta
-    BOA: 0.12,
-    ACEITAVEL: 0.22,
-};
+export { REGRAS_VIABILIDADE as VIABILIDADE_REGRAS, separarPorViabilidade } from './travel-viability.js';
 
-export function classificarViabilidade({ duracaoVooMin, paradas, noites }) {
-    if (!duracaoVooMin || duracaoVooMin <= 0 || !noites || noites <= 0) {
-        return { nivel: 'desconhecida', fracao: null, motivo: null };
-    }
-    const minutosJanela = noites * 24 * 60;
-    const fracao = (duracaoVooMin * 2) / minutosJanela;
-
-    if (fracao > VIABILIDADE.ACEITAVEL) {
-        return { nivel: 'inviavel', fracao, motivo: 'O tempo de voo consome uma parte grande da escapada' };
-    }
-    // 2+ escalas numa janela curta praticamente inviabiliza a viagem
-    if ((paradas || 0) >= 2 && noites <= 2) {
-        return { nivel: 'inviavel', fracao, motivo: 'Duas ou mais escalas numa escapada curta' };
-    }
-    if (fracao > VIABILIDADE.BOA || (paradas || 0) >= 1) {
-        return { nivel: 'aceitavel', fracao, motivo: null };
-    }
-    return { nivel: 'boa', fracao, motivo: null };
+export function classificarViabilidade({ duracaoVooMin, paradas, noites, deslocamentoTerrestreMin = null }) {
+    return avaliarViabilidade({ noites, duracaoVooMin, paradas, deslocamentoTerrestreMin });
 }
 
 function formatarDestino(destino, posicao, janela) {
@@ -349,14 +349,16 @@ export function selecionarEFormatarDestinos(destinosRaw, janela) {
     return ordenarPorViabilidade(formatados);
 }
 
-// Reordena: viáveis (por preço) primeiro, inviáveis no fim. Reatribui
-// `posicao` para bater com a ordem exibida.
+// Reordena: recomendáveis (por preço) primeiro, depois os de viabilidade
+// desconhecida e por último os inviáveis. Reatribui `posicao` para bater com
+// a ordem exibida. A separação em duas listas (principal x seção fechada)
+// acontece na renderização, via separarPorViabilidade().
 export function ordenarPorViabilidade(destinos) {
-    const peso = { boa: 0, aceitavel: 1, desconhecida: 1, inviavel: 2 };
+    const peso = { [NIVEL.BOA]: 0, [NIVEL.ACEITAVEL]: 1, [NIVEL.DESCONHECIDA]: 2, [NIVEL.INVIAVEL]: 3 };
     return [...destinos]
         .sort((a, b) => {
-            const pa = peso[a.viabilidade?.nivel] ?? 1;
-            const pb = peso[b.viabilidade?.nivel] ?? 1;
+            const pa = peso[a.viabilidade?.nivel] ?? 2;
+            const pb = peso[b.viabilidade?.nivel] ?? 2;
             return pa - pb || (a.preco || 0) - (b.preco || 0);
         })
         .map((d, i) => ({ ...d, posicao: i + 1 }));
