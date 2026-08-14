@@ -47,7 +47,11 @@ const BenetripDiscovery = {
         origemSelecionada: null,
         formData: {},
         resultados: null,
-        viewingResults: false
+        viewingResults: false,
+        // Verificação sazonal (grounding externo), preenchida depois que os
+        // resultados de preço já estão na tela
+        sazonalidade: null,
+        ultimoRanking: null
     },
     config: {
         debug: true,
@@ -514,8 +518,25 @@ const BenetripDiscovery = {
         return { 'BRL': 'R$', 'USD': 'US$', 'EUR': '€' }[moeda] || 'R$';
     },
     formatarPreco(valor, moeda) {
+        // Normalização monetária única (benetrip-shared-ui.js) para o mesmo
+        // valor não aparecer arredondado de dois jeitos em telas diferentes.
+        if (window.BenetripPrice) {
+            return window.BenetripPrice.formatarPreco(valor, moeda || this.state.formData.moeda);
+        }
         const simbolo = this.getSimbolo(moeda || this.state.formData.moeda);
         return `${simbolo} ${Math.round(valor).toLocaleString('pt-BR')}`;
+    },
+    // Nome de destino, comentário da IA e observação do usuário são texto não
+    // confiável: escapar antes de qualquer innerHTML.
+    esc(t) {
+        if (window.BenetripSafe) return window.BenetripSafe.escapeHtml(t);
+        return String(t === null || t === undefined ? '' : t)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    },
+    safeHref(u) {
+        if (window.BenetripSafe) return window.BenetripSafe.safeHref(u);
+        return /^(https:|\/)/i.test(String(u || '')) ? this.esc(u) : '';
     },
     COMPANHIA_LABELS: {
         0: { emoji: '🧳', texto: 'Sozinho(a)' },
@@ -954,6 +975,104 @@ const BenetripDiscovery = {
         }
         return ranking;
     },
+    // ================================================================
+    // SAZONALIDADE COM GROUNDING (P0)
+    //
+    // O ranking é determinístico (preço, teto, escalas, duração). A adequação
+    // à época é uma etapa SEPARADA e verificada externamente: consultamos
+    // apenas os destinos que vão aparecer na tela, em paralelo, depois de os
+    // resultados já estarem renderizados.
+    //
+    // Se o serviço falhar, a Descoberta continua funcionando com preço,
+    // escalas e duração — só a alegação sazonal é omitida.
+    // ================================================================
+    async validarSazonalidade(ranking) {
+        const { dataIda } = this.state.formData;
+        if (!dataIda) return;
+        const mes = parseInt(dataIda.split('-')[1], 10);
+        if (!(mes >= 1 && mes <= 12)) return;
+
+        const exibidos = [ranking.top_destino, ...(ranking.alternativas || []), ranking.surpresa].filter(Boolean);
+        if (exibidos.length === 0) return;
+
+        try {
+            const resp = await fetch('/api/seasonality', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    mes,
+                    destinos: exibidos.map(d => ({ destino: d.name, pais: d.country })),
+                }),
+            });
+            if (!resp.ok) return;
+            const data = await resp.json();
+            if (!data.success || !Array.isArray(data.resultados)) return;
+
+            const porDestino = new Map();
+            data.resultados.forEach(r => {
+                if (r && r.destination) porDestino.set(String(r.destination).toLowerCase(), r);
+            });
+            this.state.sazonalidade = porDestino;
+            this.log(`🗓️ Sazonalidade: ${data._meta?.verificados ?? 0}/${data._meta?.validados ?? 0} verificados`);
+            this.atualizarBlocosSazonalidade();
+        } catch (err) {
+            this.log(`⚠️ Sazonalidade indisponível: ${err.message}`);
+        }
+    },
+
+    // Bloco exibido em cada card. Enquanto a verificação não chega (ou quando
+    // ela não encontra fonte), o texto da IA sobre a época NÃO é apresentado
+    // como fato: ou fica marcado como não verificado, ou é omitido.
+    gerarBlocoSazonalidade(d) {
+        const info = this.state.sazonalidade?.get(String(d.name || '').toLowerCase());
+        const chave = this.esc(String(d.name || ''));
+
+        if (info && info.status === 'verified' && info.summary) {
+            const fonte = window.BenetripUI
+                ? window.BenetripUI.fonteHtml(info.sourceName, info.sourceUrl)
+                : '';
+            const alerta = info.suitability === 'low'
+                ? '<span class="epoca-alerta">Época pouco favorável</span>'
+                : '';
+            return `<div class="destino-epoca destino-epoca-verificada" data-sazonalidade="${chave}">
+                📅 <strong>Nessas datas:</strong> ${this.esc(info.summary)} ${alerta} ${fonte}
+            </div>`;
+        }
+
+        if (info && info.status === 'conflicting_sources') {
+            const fonte = window.BenetripUI ? window.BenetripUI.fonteHtml(info.sourceName, info.sourceUrl) : '';
+            return `<div class="destino-epoca destino-epoca-conflito" data-sazonalidade="${chave}">
+                📅 <strong>Nessas datas:</strong> ${this.esc(info.summary)} ${fonte}
+            </div>`;
+        }
+
+        // Sem verificação: o comentário da IA sobre a época só aparece
+        // rotulado como informação não verificada.
+        if (d.adequacao_epoca) {
+            const texto = window.BenetripUI
+                ? window.BenetripUI.naoVerificadoHtml(d.adequacao_epoca)
+                : `<span class="info-nao-verificada"><span class="info-nao-verificada-tag">Informação não verificada</span> ${this.esc(d.adequacao_epoca)}</span>`;
+            return `<div class="destino-epoca destino-epoca-nao-verificada" data-sazonalidade="${chave}">
+                📅 <strong>Nessas datas:</strong> ${texto}
+            </div>`;
+        }
+
+        return `<div class="destino-epoca-slot" data-sazonalidade="${chave}"></div>`;
+    },
+
+    // Substitui os blocos já renderizados quando a verificação chega
+    atualizarBlocosSazonalidade() {
+        const exibidos = this.state.ultimoRanking;
+        if (!exibidos) return;
+        const todos = [exibidos.top_destino, ...(exibidos.alternativas || []), exibidos.surpresa].filter(Boolean);
+        todos.forEach(d => {
+            const chave = String(d.name || '');
+            document.querySelectorAll(`[data-sazonalidade="${CSS.escape(chave)}"]`).forEach(el => {
+                el.outerHTML = this.gerarBlocoSazonalidade(d);
+            });
+        });
+    },
+
     gerarLinksGoogleFlights(ranking) {
         const { dataIda, dataVolta, adultos, criancas, bebes, moeda } = this.state.formData;
         const originIata = this.getOrigemIataParaGoogleFlights();
@@ -1062,7 +1181,7 @@ const BenetripDiscovery = {
         const observacoesItem = observacoes 
             ? `<div class="criterio-item" style="grid-column: 1 / -1;">
                     <span class="criterio-label">Suas dicas pra Tripinha</span>
-                    <span class="criterio-valor">💬 "${observacoes}"</span>
+                    <span class="criterio-valor">💬 "${this.esc(observacoes)}"</span>
                </div>`
             : '';
         return `
@@ -1184,22 +1303,44 @@ const BenetripDiscovery = {
         this.pushResultsState();
         const formatPreco = (d) => this.formatarPreco(d.flight?.price || 0, moeda);
         
+        // Quantos destinos exibidos usam o mesmo aeroporto: a mesma tarifa
+        // pode servir lugares turísticos diferentes.
+        const exibidos = [destinos.top_destino, ...(destinos.alternativas || []), destinos.surpresa].filter(Boolean);
+        const porAeroporto = new Map();
+        exibidos.forEach(d => {
+            const code = String(d.primary_airport || '').toUpperCase();
+            if (code) porAeroporto.set(code, (porAeroporto.get(code) || 0) + 1);
+        });
+
+        // "Direto" qualifica o voo ATÉ O AEROPORTO, não a chegada ao destino
+        // turístico. O aeroporto usado no preço fica sempre visível.
         const formatParadas = (d) => {
             const stops = d.flight?.stops || 0;
             const durMin = d.flight?.flight_duration_minutes || 0;
             const durTxt = durMin > 0 ? ` · ⏱️ ${Math.floor(durMin / 60)}h${String(durMin % 60).padStart(2, '0')}` : '';
-            if (stops === 0) return `✈️ Voo direto${durTxt}`;
-            if (stops === 1) return `✈️ 1 parada${durTxt}`;
-            return `✈️ ${stops} paradas${durTxt}`;
+            const iata = String(d.primary_airport || '').toUpperCase();
+            const trecho = window.BenetripUI
+                ? window.BenetripUI.textoTrechoAereo({ aeroporto: iata, paradas: stops })
+                : (stops === 0 ? 'Voo direto' : stops === 1 ? '1 parada' : `${stops} paradas`);
+            return `✈️ ${this.esc(trecho)}${durTxt}`;
+        };
+
+        const aeroportoHtml = (d) => {
+            const iata = String(d.primary_airport || '').toUpperCase();
+            if (!iata || !window.BenetripUI) return '';
+            return window.BenetripUI.aeroportoDisclosureHtml({
+                destino: d.name,
+                aeroporto: iata,
+                paradas: d.flight?.stops || 0,
+                lugaresNoMesmoAeroporto: porAeroporto.get(iata) || 0,
+                deslocamento: d.deslocamento || null,
+            });
         };
         // v5.0: transparência — adequação à época e ponto de atenção
-        const epocaHtml = (d) => {
-            if (!d.adequacao_epoca) return '';
-            return `<div class="destino-epoca">📅 <strong>Nessas datas:</strong> ${d.adequacao_epoca}</div>`;
-        };
+        const epocaHtml = (d) => this.gerarBlocoSazonalidade(d);
         const negativoHtml = (d) => {
             if (!d.ponto_negativo) return '';
-            return `<div class="destino-ponto-negativo">⚠️ <strong>Fique de olho:</strong> ${d.ponto_negativo}</div>`;
+            return `<div class="destino-ponto-negativo">⚠️ <strong>Fique de olho:</strong> ${this.esc(d.ponto_negativo)}</div>`;
         };
         const fonteBadge = (d) => {
             const count = d._source_count || 1;
@@ -1234,11 +1375,11 @@ const BenetripDiscovery = {
         };
         const comentarioHtml = (d) => {
             if (!d.comentario) return '';
-            return `<div class="destino-comentario">${d.comentario}</div>`;
+            return `<div class="destino-comentario">${this.esc(d.comentario)}</div>`;
         };
         const dicaHtml = (d) => {
             if (!d.dica) return '';
-            return `<div class="destino-dica"><span class="dica-icon">💡</span> ${d.dica}</div>`;
+            return `<div class="destino-dica"><span class="dica-icon">💡</span> ${this.esc(d.dica)}</div>`;
         };
         const totalExibidos = 1 
             + (destinos.alternativas?.length || 0) 
@@ -1265,17 +1406,18 @@ const BenetripDiscovery = {
                         ${destinos.alternativas.map(d => `
                             <div class="destino-card">
                                 ${fonteBadge(d)}
-                                <h4>${d.name}${d.country ? ', ' + d.country : ''}</h4>
+                                <h4>${this.esc(d.name)}${d.country ? ', ' + this.esc(d.country) : ''}</h4>
                                 <div class="preco">${formatPreco(d)}</div>
                                 <div class="preco-label">ida e volta por pessoa</div>
                                 <div class="flight-info">${formatParadas(d)}</div>
+                                ${aeroportoHtml(d)}
                                 ${custoEstimado(d)}
-                                <div class="descricao">${d.razao || 'Boa opção!'}</div>
+                                <div class="descricao">${this.esc(d.razao || 'Boa opção!')}</div>
                                 ${comentarioHtml(d)}
                                 ${epocaHtml(d)}
                                 ${negativoHtml(d)}
                                 ${dicaHtml(d)}
-                                <a href="${d.link}" target="_blank" rel="noopener" class="btn-ver-voos btn-google-flights">${googleFlightsBtnIcon} ${googleFlightsBtnLabel} →</a>
+                                <a href="${this.safeHref(d.link)}" target="_blank" rel="noopener" class="btn-ver-voos btn-google-flights">${googleFlightsBtnIcon} ${googleFlightsBtnLabel} →</a>
                             </div>
                         `).join('')}
                     </div>
@@ -1288,17 +1430,18 @@ const BenetripDiscovery = {
                 <div class="surpresa-card">
                     <div class="badge">🎁 DESTINO SURPRESA</div>
                     ${fonteBadge(destinos.surpresa)}
-                    <h3>${destinos.surpresa.name}${destinos.surpresa.country ? ', ' + destinos.surpresa.country : ''}</h3>
+                    <h3>${this.esc(destinos.surpresa.name)}${destinos.surpresa.country ? ', ' + this.esc(destinos.surpresa.country) : ''}</h3>
                     <div class="preco">${formatPreco(destinos.surpresa)}</div>
                     <div class="preco-label">ida e volta por pessoa</div>
                     <div class="flight-info">${formatParadas(destinos.surpresa)}</div>
+                    ${aeroportoHtml(destinos.surpresa)}
                     ${custoEstimado(destinos.surpresa)}
-                    <div class="descricao">${destinos.surpresa.razao || 'Descubra!'}</div>
+                    <div class="descricao">${this.esc(destinos.surpresa.razao || 'Descubra!')}</div>
                     ${comentarioHtml(destinos.surpresa)}
                     ${epocaHtml(destinos.surpresa)}
                     ${negativoHtml(destinos.surpresa)}
                     ${dicaHtml(destinos.surpresa)}
-                    <a href="${destinos.surpresa.link}" target="_blank" rel="noopener" class="btn-ver-voos btn-google-flights">
+                    <a href="${this.safeHref(destinos.surpresa.link)}" target="_blank" rel="noopener" class="btn-ver-voos btn-google-flights">
                         ${googleFlightsBtnIcon} Descobrir no Google Flights ✈️
                     </a>
                 </div>
@@ -1326,17 +1469,18 @@ const BenetripDiscovery = {
             <div class="top-destino">
                 <div class="badge">${totalExibidos === 1 ? 'DESTINO ENCONTRADO' : 'MELHOR DESTINO PARA VOCÊ'}</div>
                 ${fonteBadge(destinos.top_destino)}
-                <h2>${destinos.top_destino.name}, ${destinos.top_destino.country || ''}</h2>
+                <h2>${this.esc(destinos.top_destino.name)}, ${this.esc(destinos.top_destino.country || '')}</h2>
                 <div class="preco">${formatPreco(destinos.top_destino)}</div>
                 <div class="preco-label">Passagem ida e volta por pessoa</div>
                 <div class="flight-info">${formatParadas(destinos.top_destino)}</div>
+                ${aeroportoHtml(destinos.top_destino)}
                 ${custoEstimado(destinos.top_destino)}
-                <div class="descricao">${destinos.top_destino.razao || 'Perfeito para você!'}</div>
+                <div class="descricao">${this.esc(destinos.top_destino.razao || 'Perfeito para você!')}</div>
                 ${comentarioHtml(destinos.top_destino)}
                 ${epocaHtml(destinos.top_destino)}
                 ${negativoHtml(destinos.top_destino)}
                 ${dicaHtml(destinos.top_destino)}
-                <a href="${destinos.top_destino.link}" target="_blank" rel="noopener" class="btn-ver-voos btn-google-flights btn-google-flights-destaque">
+                <a href="${this.safeHref(destinos.top_destino.link)}" target="_blank" rel="noopener" class="btn-ver-voos btn-google-flights btn-google-flights-destaque">
                     ${googleFlightsBtnIcon} ${googleFlightsBtnLabel} ✈️
                 </a>
             </div>
@@ -1358,6 +1502,11 @@ const BenetripDiscovery = {
         document.getElementById('loading-container').style.display = 'none';
         container.style.display = 'block';
         window.scrollTo({ top: 0, behavior: 'smooth' });
+
+        // Os preços já estão na tela: a verificação sazonal chega depois e
+        // apenas substitui os blocos de época. Falha aqui não afeta o resto.
+        this.state.ultimoRanking = destinos;
+        this.validarSazonalidade(destinos);
     }
 };
 

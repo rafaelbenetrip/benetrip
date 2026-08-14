@@ -26,6 +26,7 @@ import {
     buildGoogleFlightsUrl,
 } from './_lib/discovery-shared.js';
 import { janelasAtivas, fetchSnapshotsEscapadas, hojeISO } from './_lib/escapadas-shared.js';
+import { separarPorViabilidade, motivoLegivel, TITULO_SECAO_NAO_RECOMENDADOS } from './_lib/travel-viability.js';
 import { feriadosDoAno, proximosFeriados, janelaDoFeriado, descricaoEmenda, diffDias } from './_lib/feriados.js';
 
 const SITE_URL = 'https://benetrip.com.br';
@@ -131,7 +132,11 @@ function sendErrorPage(res, status, title, message) {
 // ============================================================
 function renderPage({ cidadeAtual, cidades, janelas, janelaAtiva, hoje, isDefault, janelaExplicita }) {
     const destinos = janelaAtiva?.snapshot?.destinos || [];
-    const temDestinos = destinos.length > 0;
+    // Resultados inviáveis para a janela saem da lista principal: uma escapada
+    // de duas noites não comporta 19h ou 42h de voo. Eles continuam visíveis
+    // numa seção fechada, com o motivo, mas não contam no total.
+    const { recomendados, naoRecomendados } = separarPorViabilidade(destinos);
+    const temDestinos = recomendados.length > 0;
     const porAeroporto = lugaresPorAeroporto(destinos);
     const canonicalPath = isDefault ? '/escapadas' : `/escapadas/${cidadeAtual.slug}`;
     // Canonical fica sem ?janela= (as janelas rolam; a página da cidade é o
@@ -139,7 +144,7 @@ function renderPage({ cidadeAtual, cidades, janelas, janelaAtiva, hoje, isDefaul
     const canonicalUrl = `${SITE_URL}${canonicalPath}`;
     const ogUrl = janelaExplicita ? `${canonicalUrl}?janela=${encodeURIComponent(janelaAtiva.id)}` : canonicalUrl;
 
-    const menorPreco = temDestinos ? destinos[0].preco : null;
+    const menorPreco = temDestinos ? recomendados[0].preco : null;
     let title = `Escapadas de Fim de Semana e Feriados Saindo de ${cidadeAtual.nome} | Benetrip`;
     let description = temDestinos
         ? `Para onde viajar no fim de semana ou no próximo feriado saindo de ${cidadeAtual.nome}? Voos de ida e volta a partir de R$ ${fmt(menorPreco)} para ${janelaAtiva.rotuloDatas}. Preços reais por data, atualizados todos os dias.`
@@ -185,7 +190,7 @@ function renderPage({ cidadeAtual, cidades, janelas, janelaAtiva, hoje, isDefaul
 
     <!-- JSON-LD -->
     <script type="application/ld+json">${jsonLdSafe(renderBreadcrumbJsonLd(cidadeAtual, isDefault, canonicalUrl))}</script>
-    ${temDestinos ? `<script type="application/ld+json">${jsonLdSafe(renderItemListJsonLd(cidadeAtual, janelaAtiva, destinos, canonicalUrl))}</script>` : ''}
+    ${temDestinos ? `<script type="application/ld+json">${jsonLdSafe(renderItemListJsonLd(cidadeAtual, janelaAtiva, recomendados, canonicalUrl))}</script>` : ''}
 
     <!-- Favicons -->
     <link rel="icon" type="image/svg+xml" href="/assets/images/favicon/favicon.svg">
@@ -224,9 +229,12 @@ function renderPage({ cidadeAtual, cidades, janelas, janelaAtiva, hoje, isDefaul
             <div class="hero-city-search">
                 <div class="city-search-box" id="city-search-box">
                     <svg class="city-search-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                    <label class="sr-only" for="city-search-input">Cidade ou aeroporto de origem</label>
                     <input type="text" id="city-search-input"
                            placeholder="Digite sua cidade ou código do aeroporto..."
-                           autocomplete="off" maxlength="60">
+                           autocomplete="off" maxlength="60"
+                           aria-describedby="city-search-hint">
+                    <span id="city-search-hint" class="sr-only">Digite pelo menos duas letras para ver sugestões de cidades e aeroportos.</span>
                     <button class="city-search-clear" id="city-search-clear" style="display:none;" aria-label="Limpar">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                     </button>
@@ -274,6 +282,7 @@ function renderPage({ cidadeAtual, cidades, janelas, janelaAtiva, hoje, isDefaul
     <p class="horarios-aviso container">
         Datas que aproveitam o fim de semana. Os horários de ida e volta não vêm nesta busca, então confirme no Google Flights se você vai precisar de folga.
     </p>
+    ${janelaAtiva?.omitidoPorAntecedencia ? `<p class="janela-omitida-aviso container">${escapeHtml(janelaAtiva.omitidoPorAntecedencia.explicacao)}</p>` : ''}
 
     <!-- ========================================
          BLOCO 6: FILTROS DE ESCAPADA
@@ -299,12 +308,12 @@ function renderPage({ cidadeAtual, cidades, janelas, janelaAtiva, hoje, isDefaul
     <!-- ========================================
          BLOCO 7: STATS DA JANELA ATIVA
          ======================================== -->
-    <div class="stats-bar" id="stats-bar">${renderStatsBarHtml(destinos)}</div>
+    <div class="stats-bar" id="stats-bar">${renderStatsBarHtml(recomendados)}</div>
 
     <!-- ========================================
          BLOCO 7.5: LOADING (busca ao vivo de cidade fora das 30)
          ======================================== -->
-    <div class="discovery-loading" id="loading-state" style="display:none;">
+    <div class="discovery-loading" id="loading-state" style="display:none;" role="status" aria-live="polite">
         <div class="spinner"></div>
         <p id="loading-message">A Tripinha está farejando voos em tempo real...</p>
     </div>
@@ -332,11 +341,18 @@ function renderPage({ cidadeAtual, cidades, janelas, janelaAtiva, hoje, isDefaul
                     <option value="queda">Maior queda de preço</option>
                     <option value="nome">Nome A-Z</option>
                 </select>
-                <span class="section-count" id="section-count">${destinos.length} destino${destinos.length !== 1 ? 's' : ''}</span>
+                <span class="section-count" id="section-count">${recomendados.length} destino${recomendados.length !== 1 ? 's' : ''}${naoRecomendados.length > 0 ? ` &middot; ${naoRecomendados.length} fora da janela` : ''}</span>
             </div>
         </div>
-        <div class="destinations-grid" id="destinations-grid">${destinos.map((d) => renderCardHtml(d, { escapada: true, href: hrefDoDestino(d, cidadeAtual), compartilhamAeroporto: porAeroporto.get((d.aeroporto || '').toUpperCase()) || 0 })).join('')}</div>
+        <div class="destinations-grid" id="destinations-grid" aria-live="polite" aria-busy="false">${recomendados.map((d) => renderCardHtml(d, { escapada: true, href: hrefDoDestino(d, cidadeAtual), compartilhamAeroporto: porAeroporto.get((d.aeroporto || '').toUpperCase()) || 0 })).join('')}</div>
     </main>
+
+    <!-- ========================================
+         BLOCO 9.5: TARIFAS NÃO RECOMENDADAS PARA A JANELA
+         Existem, mas o deslocamento não cabe nas noites disponíveis.
+         Ficam fora da lista e da contagem principal.
+         ======================================== -->
+    ${renderNaoRecomendadosHtml(naoRecomendados, cidadeAtual, porAeroporto)}
 
     <!-- ========================================
          BLOCO 10: CALENDÁRIO DE FERIADOS (crawlável, SEO)
@@ -394,6 +410,7 @@ function renderPage({ cidadeAtual, cidades, janelas, janelaAtiva, hoje, isDefaul
             volta: j.volta,
             noites: j.noites,
             feriado: j.feriado || null,
+            omitidoPorAntecedencia: j.omitidoPorAntecedencia || null,
             dataSnapshot: j.snapshot?.data || null,
             destinos: j.snapshot?.destinos || [],
         })),
@@ -404,6 +421,7 @@ function renderPage({ cidadeAtual, cidades, janelas, janelaAtiva, hoje, isDefaul
 
     <!-- Scripts -->
     <script src="/assets/js/benetrip-header.js"></script>
+    <script src="/assets/js/benetrip-shared-ui.js"></script>
     <script src="/assets/js/escapadas-page.js"></script>
 </body>
 </html>`;
@@ -420,6 +438,43 @@ function hrefDoDestino(d, cidadeAtual) {
     if (d.data_ida) params.set('data_ida', d.data_ida);
     if (d.data_volta) params.set('data_volta', d.data_volta);
     return `/voos-baratos?${params.toString()}`;
+}
+
+// ============================================================
+// SEÇÃO FECHADA: TARIFAS NÃO RECOMENDADAS PARA A JANELA
+// ============================================================
+function renderNaoRecomendadosHtml(naoRecomendados, cidadeAtual, porAeroporto) {
+    if (!naoRecomendados || naoRecomendados.length === 0) return '';
+
+    const cards = naoRecomendados
+        .map((d, i) => {
+            const motivo = motivoLegivel(d.viabilidade);
+            const card = renderCardHtml({ ...d, posicao: i + 1 }, {
+                escapada: true,
+                href: hrefDoDestino(d, cidadeAtual),
+                compartilhamAeroporto: porAeroporto.get((d.aeroporto || '').toUpperCase()) || 0,
+            });
+            return `<div class="nao-recomendado-item">
+                ${card}
+                ${motivo ? `<p class="nao-recomendado-motivo">&#9888;&#65039; ${escapeHtml(motivo)}</p>` : ''}
+            </div>`;
+        })
+        .join('');
+
+    return `
+    <section class="nao-recomendados-section" id="nao-recomendados-section">
+        <details class="nao-recomendados-details">
+            <summary class="nao-recomendados-summary">
+                ${escapeHtml(TITULO_SECAO_NAO_RECOMENDADOS)}
+                <span class="nao-recomendados-count">${naoRecomendados.length}</span>
+            </summary>
+            <p class="nao-recomendados-aviso">
+                Estes preços existem para estas datas, mas o tempo de deslocamento não cabe bem na janela.
+                Eles não entram na contagem principal.
+            </p>
+            <div class="destinations-grid">${cards}</div>
+        </details>
+    </section>`;
 }
 
 function tituloSecao(janelaAtiva, cidadeAtual) {
@@ -546,7 +601,7 @@ function renderOutrasCidadesHtml(cidades, cidadeAtual) {
     return `
     <section class="other-cities">
         <details>
-            <summary>Ver escapadas saindo de outras ${cidades.length} cidades</summary>
+            <summary aria-label="Ver escapadas saindo de outras cidades">Ver escapadas saindo de outras ${cidades.length} cidades</summary>
             <div class="other-cities-body">${grupos}</div>
         </details>
     </section>`;
@@ -570,7 +625,7 @@ function renderBreadcrumbJsonLd(cidadeAtual, isDefault, canonicalUrl) {
     };
 }
 
-function renderItemListJsonLd(cidadeAtual, janelaAtiva, destinos, canonicalUrl) {
+function renderItemListJsonLd(cidadeAtual, janelaAtiva, recomendados, canonicalUrl) {
     const top = destinos.slice(0, 20);
     const dataSnapshot = janelaAtiva.snapshot?.data || null;
 

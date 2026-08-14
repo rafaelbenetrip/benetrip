@@ -331,6 +331,114 @@ export function renderDatasCardHtml(d) {
                     </div>`;
 }
 
+// ============================================================
+// NOME DO DESTINO
+//
+// O fornecedor às vezes devolve o nome com acentuação errada ("Belêm" em vez
+// de "Belém"). Em vez de manter uma tabela de correções, comparamos com a
+// lista de cidades que o projeto JÁ usa como origens: quando o código IATA
+// bate e os nomes só diferem nos acentos, vale a grafia canônica.
+//
+// Destino sem correspondência (a maior parte do mundo) passa intacto — nada
+// aqui limita a Benetrip a um catálogo.
+// ============================================================
+function semAcento(texto) {
+    return String(texto || '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .trim();
+}
+
+export function normalizarNomeDestino(nome, aeroporto) {
+    const bruto = String(nome || '').trim();
+    const code = String(aeroporto || '').toUpperCase();
+    if (!bruto || !/^[A-Z]{3}$/.test(code)) return bruto;
+
+    let cidade = null;
+    try {
+        cidade = encontrarCidadePorCodigo(code);
+    } catch {
+        return bruto;
+    }
+    if (!cidade) return bruto;
+
+    // Só corrige quando é a MESMA palavra, escrita com acento diferente
+    return semAcento(cidade.nome) === semAcento(bruto) ? cidade.nome : bruto;
+}
+
+// ============================================================
+// DESTINO x AEROPORTO (componente compartilhado)
+//
+// "Direto" qualifica o voo ATÉ O AEROPORTO, nunca a chegada ao destino
+// turístico. Hermanus não tem aeroporto: o voo é direto até CPT e o resto é
+// deslocamento terrestre. São Luís e Lençóis Maranhenses compartilham SLZ e,
+// portanto, a mesma tarifa.
+//
+// Sem dado de rota confiável NÃO inventamos tempo nem distância: dizemos
+// apenas que existe um deslocamento adicional, fora do preço.
+// ============================================================
+export function textoTrechoAereo({ aeroporto, paradas = 0 }) {
+    const iata = String(aeroporto || '').toUpperCase();
+    if (!iata) return paradas === 0 ? 'Voo direto' : paradas === 1 ? '1 parada' : `${paradas} paradas`;
+    if (paradas === 0) return `Voo direto até ${iata}`;
+    if (paradas === 1) return `Voo com 1 parada até ${iata}`;
+    return `Voo com ${paradas} paradas até ${iata}`;
+}
+
+// Texto do deslocamento conforme a QUALIDADE do dado disponível:
+//   'rota'       -> provedor de rotas devolveu distância e tempo
+//   'linha_reta' -> só geocodificação: distância em linha reta, sem tempo
+//   'proximo'    -> aeroporto praticamente no destino, nada a avisar
+// Sem dado nenhum: string vazia (a interface diz só que existe deslocamento).
+export function descreverDeslocamento(deslocamento, destino) {
+    if (!deslocamento) return '';
+    const lugar = destino || 'o destino';
+
+    if (deslocamento.tipo === 'proximo') return '';
+
+    if (deslocamento.tipo === 'rota' && deslocamento.duracaoMin > 0) {
+        const h = Math.floor(deslocamento.duracaoMin / 60);
+        const m = Math.round(deslocamento.duracaoMin % 60);
+        const tempo = h > 0 ? `${h}h${m ? String(m).padStart(2, '0') : ''}` : `${m} min`;
+        const dist = deslocamento.distanciaKm > 0 ? `${Math.round(deslocamento.distanciaKm)} km, ` : '';
+        return `Do aeroporto até ${lugar}: ${dist}cerca de ${tempo} de carro. Esse trajeto não está incluído no preço.`;
+    }
+
+    if (deslocamento.distanciaKm > 0) {
+        // Sem provedor de rotas não afirmamos tempo de viagem: só a distância
+        // que o geocodificador devolveu, dita pelo que ela é.
+        return `${lugar} fica a cerca de ${Math.round(deslocamento.distanciaKm)} km em linha reta do aeroporto. O tempo de deslocamento não foi calculado e não está incluído no preço.`;
+    }
+
+    return '';
+}
+
+export function renderAeroportoDisclosureHtml({
+    destino, aeroporto, paradas = 0, lugaresNoMesmoAeroporto = 0, deslocamento = null,
+}) {
+    const iata = String(aeroporto || '').toUpperCase();
+    if (!iata) return '';
+
+    const partes = [`<span class="ad-trecho">${escapeHtml(textoTrechoAereo({ aeroporto: iata, paradas }))}</span>`];
+
+    if (lugaresNoMesmoAeroporto > 1) {
+        const outros = lugaresNoMesmoAeroporto - 1;
+        const quantos = outros === 1 ? 'outro lugar servido' : `outros ${outros} lugares servidos`;
+        partes.push(`<span class="ad-compartilhado">Esta tarifa também aparece para ${quantos} por ${escapeHtml(iata)}.</span>`);
+    }
+
+    const textoDeslocamento = descreverDeslocamento(deslocamento, destino);
+    if (textoDeslocamento) {
+        const fonte = deslocamento?.fonte ? ` <span class="ad-fonte">Fonte: ${escapeHtml(deslocamento.fonte)}</span>` : '';
+        partes.push(`<span class="ad-deslocamento">${escapeHtml(textoDeslocamento)}${fonte}</span>`);
+    } else if (lugaresNoMesmoAeroporto > 1) {
+        partes.push('<span class="ad-deslocamento">O destino final pode exigir deslocamento terrestre a partir do aeroporto. Esse trajeto não está incluído no preço.</span>');
+    }
+
+    return `<div class="airport-disclosure dest-via-aeroporto" data-aeroporto="${escapeHtml(iata)}">${partes.join('')}</div>`;
+}
+
 // opts.escapada: card de /escapadas — preço é de ida e volta em datas fixas
 // e a duração é em noites (min === max).
 // opts.href: card vira um <a target="_blank"> (link real, imune a bloqueio
@@ -339,7 +447,9 @@ export function renderDatasCardHtml(d) {
 export function renderCardHtml(d, opts) {
     const { escapada = false, href = null, compartilhamAeroporto = 0 } = (opts && typeof opts === 'object') ? opts : {};
     const imgSrc = d.imagem ? escapeHtml(d.imagem) : 'assets/images/tripinha/avatar-pensando.png';
-    const nome = escapeHtml(d.nome);
+    // Grafia canônica quando o fornecedor devolve o nome com acento errado
+    const nomeCanonico = normalizarNomeDestino(d.nome, d.aeroporto);
+    const nome = escapeHtml(nomeCanonico);
     const pais = escapeHtml(d.pais);
     const aeroporto = escapeHtml(d.aeroporto);
     const estilosTags = (d.estilos || [])
@@ -358,13 +468,15 @@ export function renderCardHtml(d, opts) {
         ? `<span class="dest-badge-drop">&darr; ${Math.abs(d.variacao.percentual)}%</span>`
         : '';
 
-    // O voo pousa no aeroporto, não no atrativo: quando outros lugares da
-    // lista usam o mesmo aeroporto, isso fica explícito no card.
-    const viaAeroporto = aeroporto
-        ? `<div class="dest-via-aeroporto">via ${aeroporto}${compartilhamAeroporto > 1
-            ? ` &middot; mesmo aeroporto de outros ${compartilhamAeroporto - 1} lugar${compartilhamAeroporto - 1 > 1 ? 'es' : ''} desta lista, com possível deslocamento terrestre`
-            : ''}</div>`
-        : '';
+    // O voo pousa no AEROPORTO, não no atrativo: destino desejado, aeroporto
+    // pesquisado, trecho aéreo e deslocamento posterior são coisas diferentes.
+    const viaAeroporto = renderAeroportoDisclosureHtml({
+        destino: d.nome,
+        aeroporto,
+        paradas: d.paradas || 0,
+        lugaresNoMesmoAeroporto: compartilhamAeroporto,
+        deslocamento: d.deslocamento || null,
+    });
 
     const tagAbre = href
         ? `<a class="dest-card" href="${escapeHtml(href)}" target="_blank" rel="noopener nofollow"`
@@ -387,11 +499,11 @@ export function renderCardHtml(d, opts) {
                 <div class="dest-info">
                     <div class="dest-header">
                         <h3 class="dest-name">${nome}</h3>
-                        <p class="dest-country">${pais}${d.paradas > 0 ? ` &middot; ${d.paradas} parada${d.paradas > 1 ? 's' : ''}` : ' &middot; Direto'}</p>
+                        <p class="dest-country">${pais}</p>
                     </div>
+                    ${viaAeroporto}
                     <div class="dest-tags">${estilosTags}</div>
                     ${datasHtml}
-                    ${viaAeroporto}
                     <div class="dest-footer">
                         <div class="dest-price-block">
                             <span class="dest-price-label">${labelPreco}</span>
@@ -440,14 +552,16 @@ export function renderStatsBarHtml(destinos) {
         <div class="stat-card stat-card-drop">
             <div class="stat-label">Maior queda</div>
             <div class="stat-value stat-value-drop">&darr; ${Math.abs(maiorQueda.variacao.percentual)}%</div>
-            <div class="stat-detail">${escapeHtml(maiorQueda.nome)} &middot; agora R$ ${fmt(maiorQueda.preco)}</div>
+            <div class="stat-detail">${escapeHtml(normalizarNomeDestino(maiorQueda.nome, maiorQueda.aeroporto))} &middot; agora R$ ${fmt(maiorQueda.preco)}, ante média de R$ ${fmt(maiorQueda.variacao.preco_anterior)}</div>
         </div>` : '';
 
+    // "Menor preço" só faz sentido com o universo de comparação explícito:
+    // é o menor ENTRE OS DESTINOS DESTA PÁGINA, não o menor do mercado.
     return `
         <div class="stat-card">
-            <div class="stat-label">Mais barato</div>
+            <div class="stat-label">Menor preço desta lista</div>
             <div class="stat-value">R$ ${fmt(maisBarato.preco)}</div>
-            <div class="stat-detail">${escapeHtml(maisBarato.nome)}</div>
+            <div class="stat-detail">${escapeHtml(normalizarNomeDestino(maisBarato.nome, maisBarato.aeroporto))} &middot; entre ${contagem.lugares} lugares pesquisados</div>
             ${renderVariacaoStatHtml(maisBarato.variacao)}
         </div>${maiorQuedaHtml}
         <div class="stat-card">
@@ -489,8 +603,8 @@ export function renderQuedasHtml(destinos) {
 
     return `
         <div class="quedas-header">
-            <h2 class="quedas-title">&#128293; Maiores quedas de preço</h2>
-            <span class="quedas-sub">comparado à média dos últimos dias</span>
+            <h2 class="quedas-title">Maiores quedas de preço</h2>
+            <span class="quedas-sub">Diferença em relação à média observada nos últimos dias nesta página. Não é histórico da rota.</span>
         </div>
         <div class="quedas-row">${cards}</div>`;
 }

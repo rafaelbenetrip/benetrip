@@ -253,7 +253,7 @@ const BenetripVoos = {
     // ================================================================
     // SEARCH FLOW
     // ================================================================
-    resetSearchState(){this.state.searchId=null;this.state.proposals=[];this.state.proposalStore=new Map();this.state.lastUpdateAt=null;this.state.searchComplete=false;this.state.resultsShown=false;this.state.displayedCount=0;this.state.pollCount=0;this.state.allAirlines={};this.state.allAirports={};this.state.currencyRates={};this.state.previousBestPrice=Infinity;if(this.state.pollTimer)clearTimeout(this.state.pollTimer);if(this.state.tipInterval)clearInterval(this.state.tipInterval);if(this.state.renderDebounceTimer)clearTimeout(this.state.renderDebounceTimer)},
+    resetSearchState(){this.state.searchId=null;this.state.proposals=[];this.state.proposalStore=new Map();this.state.lastUpdateAt=null;this.state.searchComplete=false;this.state.searchStartedAt=Date.now();this.state.searchStatus='buscando';this.state.cicloAdicionadas=0;this.state.cicloAtualizadas=0;this.state.cicloDescartadas=0;this.state.cicloQuantidadeInicial=0;this.state.resultsShown=false;this.state.displayedCount=0;this.state.pollCount=0;this.state.allAirlines={};this.state.allAirports={};this.state.currencyRates={};this.state.previousBestPrice=Infinity;if(this.state.pollTimer)clearTimeout(this.state.pollTimer);if(this.state.tipInterval)clearInterval(this.state.tipInterval);if(this.state.renderDebounceTimer)clearTimeout(this.state.renderDebounceTimer)},
 
     async startSearch(){
         this.setProgress(10,'Iniciando busca...');this.startTips();
@@ -295,8 +295,19 @@ const BenetripVoos = {
                 // lista fazia a melhor tarifa sumir quando ela não vinha no
                 // lote seguinte.
                 const stats = BenetripProposals.mergeBatch(this.state.proposalStore, data.proposals, Date.now());
+                if (this.state.cicloQuantidadeInicial === 0) this.state.cicloQuantidadeInicial = prevCount;
+                this.state.cicloAdicionadas += stats.added;
+                this.state.cicloAtualizadas += stats.updated;
+                this.state.cicloDescartadas += stats.skipped;
+                // Links do fornecedor expiram: a oferta continua na lista,
+                // marcada, em vez de sumir sem explicação (regra em
+                // benetrip-proposals.js).
+                if (BenetripProposals.marcarLinksExpirados) {
+                    BenetripProposals.marcarLinksExpirados(this.state.proposalStore, Date.now());
+                }
                 this.state.proposals = BenetripProposals.toList(this.state.proposalStore);
                 this.state.lastUpdateAt = Date.now();
+                this.setSearchStatus(stats.added > 0 || stats.updated > 0 ? 'lote_recebido' : 'buscando');
                 console.log(`🧩 [Poll ${this.state.pollCount}] lote: +${stats.added} novas, ${stats.updated} atualizadas, ${stats.skipped} sem link | acumulado: ${this.state.proposals.length}`);
 
                 this.updateFilterBounds();
@@ -340,7 +351,26 @@ const BenetripVoos = {
         if(this.state.pollTimer)clearTimeout(this.state.pollTimer);
         if(this.state.tipInterval)clearInterval(this.state.tipInterval);
         if(this.state.renderDebounceTimer){clearTimeout(this.state.renderDebounceTimer);this.state.renderDebounceTimer=null;}
-        this.setProgress(100,'Busca concluída!');
+        // "Concluída" quando o fornecedor fechou a busca; "interrompida" quando
+        // paramos por limite de polling e os resultados são parciais.
+        const concluidaPeloFornecedor = this.state.searchComplete === true;
+        this.setSearchStatus(concluidaPeloFornecedor ? 'concluida' : 'interrompida');
+        this.setProgress(100, concluidaPeloFornecedor ? 'Busca concluída' : 'Busca interrompida, resultados parciais');
+
+        const resumo = BenetripProposals.resumoDaBusca ? BenetripProposals.resumoDaBusca({
+            quantidadeInicial: this.state.cicloQuantidadeInicial || 0,
+            quantidadeFinal: this.state.proposals.length,
+            adicionadas: this.state.cicloAdicionadas || 0,
+            atualizadas: this.state.cicloAtualizadas || 0,
+            descartadasSemLink: this.state.cicloDescartadas || 0,
+            lotes: this.state.pollCount || 0,
+            tempoTotalMs: this.state.searchStartedAt ? Date.now() - this.state.searchStartedAt : 0,
+        }) : null;
+        if (resumo) {
+            console.log(`📈 Ciclo da busca: ${resumo.quantidadeInicial} → ${resumo.quantidadeFinal} ofertas | +${resumo.adicionadas} novas, ${resumo.atualizadas} atualizadas, ${resumo.descartadasSemLink} descartadas sem link | ${resumo.lotes} lotes em ${(resumo.tempoTotalMs / 1000).toFixed(1)}s`);
+            this.state.resumoBusca = resumo;
+        }
+
         if(this.state.proposals.length===0){this.showPanel('empty');return;}
         this.updateFilterBounds();this.populateAirlinesFilter();this.populateAirportsFilter();
         this.showSearchingBanner(false);
@@ -368,6 +398,31 @@ const BenetripVoos = {
         el.style.display = hora ? 'inline' : 'none';
     },
 
+    // ══════════════════════════════════════════════════════════
+    // ESTADOS EXPLÍCITOS DA BUSCA
+    // O usuário precisa saber se ainda estamos recebendo ofertas, quando
+    // chegou o último lote e, principalmente, quando a busca terminou.
+    // ══════════════════════════════════════════════════════════
+    SEARCH_STATUS_TEXTO: {
+        buscando: { texto: 'Buscando novas ofertas', classe: 'status-buscando', vivo: true },
+        lote_recebido: { texto: 'Último lote recebido às {hora}', classe: 'status-lote', vivo: true },
+        concluida: { texto: 'Busca concluída', classe: 'status-concluida', vivo: false },
+        interrompida: { texto: 'Busca interrompida, resultados parciais', classe: 'status-interrompida', vivo: false },
+    },
+
+    setSearchStatus(status) {
+        this.state.searchStatus = status;
+        const info = this.SEARCH_STATUS_TEXTO[status] || this.SEARCH_STATUS_TEXTO.buscando;
+        const el = document.getElementById('search-status-label');
+        if (el) {
+            el.textContent = info.texto.replace('{hora}', this.fmtClock(this.state.lastUpdateAt));
+            el.className = `search-status ${info.classe}`;
+        }
+        // Ao final do polling a mensagem de "ainda buscando" sai da tela
+        if (!info.vivo) this.showSearchingBanner(false);
+        this.updateLastUpdateLabel();
+    },
+
     showSearchingBanner(show) {
         let banner = document.getElementById('searching-banner');
         if (show) {
@@ -375,7 +430,7 @@ const BenetripVoos = {
                 banner = document.createElement('div');
                 banner.id = 'searching-banner';
                 banner.className = 'searching-banner';
-                banner.innerHTML = `<div class="searching-banner-inner"><div class="searching-banner-pulse"></div><span>🔍 Ainda buscando ofertas melhores. A lista só cresce, nada some daqui.</span></div>`;
+                banner.innerHTML = `<div class="searching-banner-inner" role="status" aria-live="polite"><div class="searching-banner-pulse"></div><span>🔍 Buscando novas ofertas. A lista só cresce, nada some daqui.</span> <span class="search-status status-buscando" id="search-status-label">Buscando novas ofertas</span></div>`;
                 const resultsInfo = document.querySelector('.results-info');
                 if (resultsInfo) resultsInfo.parentNode.insertBefore(banner, resultsInfo);
             }
@@ -508,7 +563,7 @@ const BenetripVoos = {
         const list=document.getElementById('fp-airline-list');
         const entries=Object.entries(this.state.allAirlines).sort((a,b)=>a[1].minPrice-b[1].minPrice);
         if(!entries.length){list.innerHTML='<p class="fp-empty">Nenhuma companhia</p>';return;}
-        list.innerHTML=entries.map(([code,info])=>`<label class="fp-opt"><input type="checkbox" name="airline" value="${code}" checked><img class="fp-airline-logo" src="${this.airlineLogo(code)}" alt="${code}" onerror="this.style.display='none'"><span class="fp-airline-name">${info.name}</span><span class="fp-airline-price">a partir de ${this.fmtPrice(info.minPrice)}</span></label>`).join('');
+        list.innerHTML=entries.map(([code,info])=>`<label class="fp-opt"><input type="checkbox" name="airline" value="${code}" checked><img class="fp-airline-logo" src="${this.airlineLogo(code)}" alt="${code}" onerror="this.style.display='none'"><span class="fp-airline-name">${this.esc(info.name)}</span><span class="fp-airline-price">a partir de ${this.fmtPrice(info.minPrice)}</span></label>`).join('');
         list.querySelectorAll('input[name="airline"]').forEach(cb=>cb.addEventListener('change',()=>this.onAirlineChange()));
     },
 
@@ -776,6 +831,15 @@ const BenetripVoos = {
         const lm=document.getElementById('load-more-wrap');if(lm)lm.style.display=this.state.displayedCount<sorted.length?'block':'none';
     },
 
+    // Nome de companhia, agência e códigos vêm do fornecedor: escapar antes
+    // de qualquer innerHTML.
+    esc(t) {
+        if (window.BenetripSafe) return window.BenetripSafe.escapeHtml(t);
+        return String(t === null || t === undefined ? '' : t)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    },
+
     cardHtml(p){
         const pp=this.pricePerPerson(p.price);
         const isRet=p.segments?.length>1;
@@ -794,7 +858,7 @@ const BenetripVoos = {
             const dayDiff = this.getDayDiff(seg.departure_date, seg.departure_time, seg.arrival_date, seg.arrival_time);
             const dayDiffHtml = dayDiff > 0 ? `<span class="fc-day-diff">+${dayDiff}</span>` : '';
 
-            return`<div class="fc-seg"><div class="fc-seg-time"><div class="fc-time">${this.fmtTime(seg.departure_time)}</div><div class="fc-airport">${seg.departure_airport}</div></div><div class="fc-line"><span class="fc-dur">${this.fmtDuration(seg.total_duration)}</span><div class="fc-line-bar"></div><span class="fc-stops ${this.stopsClass(seg.stops)}">${this.stopsText(seg.stops)}</span>${via?`<span class="fc-stop-via">${via}</span>`:''}</div><div class="fc-seg-time"><div class="fc-time">${this.fmtTime(seg.arrival_time)}${dayDiffHtml}</div><div class="fc-airport">${seg.arrival_airport}</div></div><div class="fc-airline"><img class="fc-al-logo" src="${this.airlineLogo(al)}" alt="${aln}" onerror="this.style.display='none'"><span class="fc-al-name">${aln}</span></div></div>`;
+            return`<div class="fc-seg"><div class="fc-seg-time"><div class="fc-time">${this.fmtTime(seg.departure_time)}</div><div class="fc-airport">${this.esc(seg.departure_airport)}</div></div><div class="fc-line"><span class="fc-dur">${this.fmtDuration(seg.total_duration)}</span><div class="fc-line-bar"></div><span class="fc-stops ${this.stopsClass(seg.stops)}">${this.stopsText(seg.stops)}</span>${via?`<span class="fc-stop-via">${this.esc(via)}</span>`:''}</div><div class="fc-seg-time"><div class="fc-time">${this.fmtTime(seg.arrival_time)}${dayDiffHtml}</div><div class="fc-airport">${this.esc(seg.arrival_airport)}</div></div><div class="fc-airline"><img class="fc-al-logo" src="${this.airlineLogo(al)}" alt="${this.esc(aln)}" onerror="this.style.display='none'"><span class="fc-al-name">${this.esc(aln)}</span></div></div>`;
         }).join('');
 
         // Baggage info
@@ -822,7 +886,7 @@ const BenetripVoos = {
         // Currency warning
         let currencyWarnHtml = '';
         if (currencyMismatch) {
-            currencyWarnHtml = `<div class="fc-currency-warn"><span class="fc-currency-warn-icon">💱</span> Preço convertido, a agência vende em ${bestTermCurrency.toUpperCase()}</div>`;
+            currencyWarnHtml = `<div class="fc-currency-warn"><span class="fc-currency-warn-icon">💱</span> Preço convertido, a agência vende em ${this.esc(bestTermCurrency.toUpperCase())}</div>`;
         }
 
         // More offers with currency info
@@ -830,10 +894,10 @@ const BenetripVoos = {
         const more=others.length>0?`<div class="fc-more-toggle"><button class="fc-more-btn" onclick="BenetripVoos.toggleMore(this)">+${others.length} oferta${others.length>1?'s':''} de outr${others.length>1?'as agências':'a agência'}</button></div><div class="fc-more-list">${others.map(t=>{
             const termMismatch = t.original_currency && t.original_currency.toUpperCase() !== userCurrency.toUpperCase();
             const curWarn = termMismatch ? `<span class="fc-mo-cur-warn">(${t.original_currency})</span>` : '';
-            return `<div class="fc-mo-row"><span class="fc-mo-gate">${t.gate_name}${curWarn}</span><span class="fc-mo-price">${this.fmtPrice(this.pricePerPerson(t.price))}</span><button class="fc-mo-book" onclick="BenetripVoos.book('${this.state.searchId}','${t.url}',this)">Reservar</button></div>`;
+            return `<div class="fc-mo-row"><span class="fc-mo-gate">${this.esc(t.gate_name)}${curWarn}</span><span class="fc-mo-price">${this.fmtPrice(this.pricePerPerson(t.price))}</span><button class="fc-mo-book" onclick="BenetripVoos.book('${this.state.searchId}','${t.url}',this)">Reservar</button></div>`;
         }).join('')}</div>`:'';
 
-        return`<div class="flight-card"><div class="fc-main"><div class="fc-segments">${segs}${baggageHtml}${currencyWarnHtml}</div><div class="fc-price-panel"><div><div class="fc-price">${this.fmtPrice(pp)}</div><div class="fc-price-lbl">por pessoa · ${isRet?'ida e volta':'só ida'}${(this.state.params.infants||0)>0?' · bebê de colo não entra na divisão':''}</div><div class="fc-gate">${p.gate_name}${operatorCount>1?` <span class="fc-gate-more">+${operatorCount-1}</span>`:''}</div></div><button class="fc-book" onclick="BenetripVoos.book('${this.state.searchId}','${p.terms_url}',this)">Reservar →</button></div></div>${more}</div>`;
+        return`<div class="flight-card"><div class="fc-main"><div class="fc-segments">${segs}${baggageHtml}${currencyWarnHtml}</div><div class="fc-price-panel"><div><div class="fc-price">${this.fmtPrice(pp)}</div><div class="fc-price-lbl">por pessoa · ${isRet?'ida e volta':'só ida'}${(this.state.params.infants||0)>0?' · bebê de colo não entra na divisão':''}</div><div class="fc-gate">${this.esc(p.gate_name)}${operatorCount>1?` <span class="fc-gate-more">+${operatorCount-1}</span>`:''}</div></div><button class="fc-book" onclick="BenetripVoos.book('${this.state.searchId}','${p.terms_url}',this)">Reservar →</button>${p._linkExpirado?'<div class="fc-link-expirado">Oferta vista há mais de 15 minutos: o preço pode ter mudado no parceiro.</div>':''}</div></div>${more}</div>`;
     },
 
     toggleMore(btn){const l=btn.closest('.flight-card').querySelector('.fc-more-list');if(l){l.classList.toggle('open');btn.textContent=l.classList.contains('open')?'Menos ofertas':btn.textContent;}},

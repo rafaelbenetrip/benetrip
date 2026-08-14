@@ -12,6 +12,8 @@
 // Body: { origem, destino, diasIda: [4,5], diasVolta: [0,1], meses: 3, moeda }
 // (dias da semana: 0 = domingo ... 6 = sábado)
 
+import { normalizarValor } from './_lib/money.js';
+
 import { feriadosDoAno, diaDaSemana, nomeDiaSemana } from './_lib/feriados.js';
 
 const MAX_COMBOS_PER_REQUEST = 200;
@@ -177,7 +179,9 @@ async function enrichFlightDetails(origemCode, destinoCode, departDate, returnDa
             stops: (bestFlight.layovers || []).length,
             airlines: Array.from(airlines),
             airline_logos: Array.from(airlineLogos),
-            price: bestFlight.price || 0,
+            // Método único de normalização monetária: o mesmo valor nunca
+            // aparece como 786 numa tela e 787 em outra.
+            price: normalizarValor(bestFlight.price) ?? 0,
             price_insights: priceInsights,
             origin_airport: origemReal,
             destination_airport: destinoReal,
@@ -573,7 +577,7 @@ export default async function handler(req, res) {
 
                 const key = `${entry.departure}_${entry.return}`;
                 if (!unique.has(key) || entry.price < unique.get(key).price) {
-                    unique.set(key, { ida: entry.departure, volta: entry.return, price: entry.price, noites });
+                    unique.set(key, { ida: entry.departure, volta: entry.return, price: normalizarValor(entry.price) ?? 0, noites });
                 }
             });
         });
@@ -680,11 +684,11 @@ export default async function handler(req, res) {
         const stats = {
             maisBarata: viagens[0],
             maisCara: viagens[viagens.length - 1],
-            media: Math.round(soma / viagens.length),
+            media: normalizarValor(soma / viagens.length),
             totalViagens: viagens.length,
             totalSemanas: semanas.length,
             // Economia entre a semana mais barata e a mais cara pesquisadas
-            economia: viagens[viagens.length - 1].price - viagens[0].price,
+            economia: normalizarValor(viagens[viagens.length - 1].price - viagens[0].price),
             economiaPct: viagens[viagens.length - 1].price > 0
                 ? Math.round(((viagens[viagens.length - 1].price - viagens[0].price) / viagens[viagens.length - 1].price) * 100)
                 : 0,

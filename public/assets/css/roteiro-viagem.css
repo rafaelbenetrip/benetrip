@@ -1318,3 +1318,33 @@ body {
 .meta-confirmar {
     color: #7a3c0d;
 }
+
+/* ============================================================
+   VALIDAÇÃO EXTERNA DOS LUGARES (P1)
+   A IA organiza a viagem; a existência dos lugares é resolvida
+   em API global. O selo diz sempre em que estado está o dado,
+   com símbolo e texto, nunca só cor.
+   ============================================================ */
+.atividade-validacao {
+    display: flex;
+    align-items: baseline;
+    gap: 5px;
+    font-family: 'Montserrat', sans-serif;
+    font-size: 11px;
+    line-height: 1.4;
+    margin: 4px 0 6px;
+    color: #6b7280;
+}
+
+.atividade-validacao.local-verificado { color: #15803d; }
+.atividade-validacao.local-parcial { color: #a16207; }
+.atividade-validacao.local-nao-verificado { color: #6b7280; }
+
+.atividade-generica {
+    border-left: 3px solid #d1d5db;
+    background: #fafafa;
+}
+
+.meta-confirmar {
+    color: #92400e;
+}

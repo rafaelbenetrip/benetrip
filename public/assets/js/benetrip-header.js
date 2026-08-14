@@ -64,58 +64,62 @@
         <p>Sua parceira de viagem!</p>
       </div>
 
+      <!-- As NOVE ferramentas da Benetrip, sempre as mesmas e nesta ordem,
+           em URLs canônicas sem .html (cleanUrls no vercel.json). -->
       <div class="bh-nav-group">
         <div class="bh-nav-group-title">Ferramentas</div>
-        <a href="${BASE}descobrir-destinos.html" class="bh-nav-item bh-primary-cta">
-          <span class="bh-nav-icon">&#x1F3AF;</span> Descobrir meu destino!
+        <a href="/descobrir-destinos" class="bh-nav-item bh-primary-cta">
+          <span class="bh-nav-icon">&#x1F3AF;</span> Descobrir Destinos
           <span class="bh-nav-badge popular">Popular</span>
         </a>
-        <a href="${BASE}todos-destinos.html" class="bh-nav-item">
+        <a href="/todos-destinos" class="bh-nav-item">
           <span class="bh-nav-icon">&#x1F30D;</span> Todos os Destinos
-          <span class="bh-nav-badge new">Novo</span>
         </a>
-        <a href="${BASE}comparar-voos.html" class="bh-nav-item">
+        <a href="/comparar-voos" class="bh-nav-item">
           <span class="bh-nav-icon">&#x1F500;</span> Comparar Voos
-          <span class="bh-nav-badge new">Novo</span>
         </a>
-        <a href="${BASE}voos-baratos.html" class="bh-nav-item">
+        <a href="/voos-baratos" class="bh-nav-item">
           <span class="bh-nav-icon">&#x1F4B8;</span> Voos Baratos
-          <span class="bh-nav-badge hot">Hot</span>
         </a>
-        <a href="${BASE}vai-e-vem.html" class="bh-nav-item">
-          <span class="bh-nav-icon">&#x1F501;</span> Vai e Vem
-          <span class="bh-nav-badge new">Novo</span>
-        </a>
-        <a href="${BASE}voos.html" class="bh-nav-item">
+        <a href="/voos" class="bh-nav-item">
           <span class="bh-nav-icon">&#x2708;&#xFE0F;</span> Busca de Voos
         </a>
-        <a href="${BASE}roteiro-viagem.html" class="bh-nav-item">
-          <span class="bh-nav-icon">&#x1F4CB;</span> Planejar Roteiro
+        <a href="/vai-e-vem" class="bh-nav-item">
+          <span class="bh-nav-icon">&#x1F501;</span> Vai e Vem
+        </a>
+        <a href="/escapadas" class="bh-nav-item">
+          <span class="bh-nav-icon">&#x1F3D6;&#xFE0F;</span> Escapadas
+        </a>
+        <a href="/destinos-baratos" class="bh-nav-item">
+          <span class="bh-nav-icon">&#x1F4C9;</span> Destinos Baratos
+        </a>
+        <a href="/roteiro-viagem" class="bh-nav-item">
+          <span class="bh-nav-icon">&#x1F4CB;</span> Roteiro de Viagem
         </a>
       </div>
 
       <div class="bh-nav-group" data-auth-show="logged-in" style="display:none">
         <div class="bh-nav-group-title">Minha Conta</div>
-        <a href="${BASE}minha-conta.html" class="bh-nav-item">
+        <a href="/minha-conta" class="bh-nav-item">
           <span class="bh-nav-icon">&#x1F4CA;</span> Historico de Buscas
         </a>
-        <a href="${BASE}minha-conta.html#destinos" class="bh-nav-item">
+        <a href="/minha-conta#destinos" class="bh-nav-item">
           <span class="bh-nav-icon">&#x1F4BE;</span> Destinos Salvos
         </a>
-        <a href="${BASE}minha-conta.html#roteiros" class="bh-nav-item">
+        <a href="/minha-conta#roteiros" class="bh-nav-item">
           <span class="bh-nav-icon">&#x1F5FA;&#xFE0F;</span> Roteiros Salvos
         </a>
       </div>
 
       <div class="bh-nav-group">
         <div class="bh-nav-group-title">Paginas</div>
-        <a href="${BASE}index.html" class="bh-nav-item">
+        <a href="/" class="bh-nav-item">
           <span class="bh-nav-icon">&#x1F3E0;</span> Inicio
         </a>
-        <a href="${BASE}quemsomos.html" class="bh-nav-item">
+        <a href="/quemsomos" class="bh-nav-item">
           <span class="bh-nav-icon">&#x1F3E2;</span> Quem Somos
         </a>
-        <a href="${BASE}perguntasfrequentes.html" class="bh-nav-item">
+        <a href="/perguntasfrequentes" class="bh-nav-item">
           <span class="bh-nav-icon">&#x2753;</span> Perguntas Frequentes
         </a>
       </div>
@@ -129,13 +133,13 @@
 
       <div class="bh-nav-group">
         <div class="bh-nav-group-title">Politicas</div>
-        <a href="${BASE}termos.html" class="bh-nav-item">
+        <a href="/termos" class="bh-nav-item">
           <span class="bh-nav-icon">&#x1F4DC;</span> Termos de Uso
         </a>
-        <a href="${BASE}privacidade.html" class="bh-nav-item">
+        <a href="/privacidade" class="bh-nav-item">
           <span class="bh-nav-icon">&#x1F512;</span> Privacidade
         </a>
-        <a href="${BASE}cookies.html" class="bh-nav-item">
+        <a href="/cookies" class="bh-nav-item">
           <span class="bh-nav-icon">&#x1F36A;</span> Cookies
         </a>
       </div>
@@ -152,7 +156,7 @@
               <line x1="3" y1="18" x2="21" y2="18"/>
             </svg>
           </button>
-          <a href="${BASE}index.html" class="bh-logo-link" aria-label="Benetrip - pagina inicial">
+          <a href="/" class="bh-logo-link" aria-label="Benetrip - pagina inicial">
             <img src="${BASE}logo1.png" alt="Benetrip" class="bh-logo">
           </a>
           ${PAGE_CONTEXT ? `<div class="bh-breadcrumb" id="bh-breadcrumb"><span class="bh-breadcrumb-sep">&#x203A;</span><span class="bh-breadcrumb-current">${PAGE_CONTEXT.label}</span></div>` : ''}
@@ -211,27 +215,27 @@
                 </div>
               </div>
               <div class="bh-dropdown-divider"></div>
-              <a href="${BASE}minha-conta.html" class="bh-dropdown-item">
+              <a href="/minha-conta" class="bh-dropdown-item">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
                   <circle cx="12" cy="7" r="4"/>
                 </svg>
                 Minha Conta
               </a>
-              <a href="${BASE}minha-conta.html#historico" class="bh-dropdown-item">
+              <a href="/minha-conta#historico" class="bh-dropdown-item">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <circle cx="12" cy="12" r="10"/>
                   <polyline points="12 6 12 12 16 14"/>
                 </svg>
                 Historico
               </a>
-              <a href="${BASE}minha-conta.html#destinos" class="bh-dropdown-item">
+              <a href="/minha-conta#destinos" class="bh-dropdown-item">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
                 </svg>
                 Destinos Salvos
               </a>
-              <a href="${BASE}minha-conta.html#roteiros" class="bh-dropdown-item">
+              <a href="/minha-conta#roteiros" class="bh-dropdown-item">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
                   <polyline points="14 2 14 8 20 8"/>

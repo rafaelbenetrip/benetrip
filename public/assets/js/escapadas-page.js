@@ -367,20 +367,78 @@ const EscapadasPage = {
     },
 
     // ============================================================
-    // VIABILIDADE DA ESCAPADA (espelha api/_lib/escapadas-shared.js)
-    // Calculada no cliente também para snapshots antigos, que foram
-    // salvos antes do campo existir.
+    // VIABILIDADE DA ESCAPADA
+    //
+    // A regra determinística vive no servidor (api/_lib/travel-viability.js) e
+    // vem pronta no snapshot. O cálculo local existe apenas para snapshots
+    // antigos, salvos antes do campo existir, e usa exatamente os mesmos
+    // limites — só noites, duração de voo e escalas, nunca lista de destinos.
     // ============================================================
+    REGRAS_VIABILIDADE: {
+        fracaoBoa: 0.12,
+        fracaoMaxima: 0.22,
+        duracaoMaximaPorTrechoMin: { 2: 300, 3: 420, 4: 600 },
+        maxEscalasJanelaCurta: 1,
+        noitesJanelaCurta: 3,
+    },
+
     viabilidadeDe(d) {
-        if (d.viabilidade && d.viabilidade.nivel) return d.viabilidade;
+        if (d.viabilidade && d.viabilidade.nivel) {
+            const v = d.viabilidade;
+            // Snapshots antigos não têm `recomendavel`: deriva do nível
+            if (v.recomendavel === undefined) {
+                return { ...v, recomendavel: v.nivel === 'boa' || v.nivel === 'aceitavel' };
+            }
+            return v;
+        }
+        const R = this.REGRAS_VIABILIDADE;
         const noites = this.state.janelaAtiva?.noites || 0;
         const dur = d.duracao_voo_min || 0;
-        if (!dur || !noites) return { nivel: 'desconhecida', fracao: null, motivo: null };
+        const paradas = d.paradas || 0;
+        if (!dur || !noites) {
+            return { nivel: 'desconhecida', fracao: null, motivo: null, motivos: ['Duração do voo não informada pelo fornecedor'], recomendavel: false };
+        }
         const fracao = (dur * 2) / (noites * 24 * 60);
-        if (fracao > 0.22) return { nivel: 'inviavel', fracao, motivo: 'O tempo de voo consome uma parte grande da escapada' };
-        if ((d.paradas || 0) >= 2 && noites <= 2) return { nivel: 'inviavel', fracao, motivo: 'Duas ou mais escalas numa escapada curta' };
-        if (fracao > 0.12 || (d.paradas || 0) >= 1) return { nivel: 'aceitavel', fracao, motivo: null };
-        return { nivel: 'boa', fracao, motivo: null };
+        const motivos = [];
+        if (noites <= R.noitesJanelaCurta && paradas > R.maxEscalasJanelaCurta) {
+            motivos.push(`${paradas} escalas para uma janela de ${noites} noite${noites > 1 ? 's' : ''}`);
+        }
+        const teto = R.duracaoMaximaPorTrechoMin[noites];
+        if (teto !== undefined && dur > teto) {
+            const h = Math.floor(dur / 60);
+            const m = String(dur % 60).padStart(2, '0');
+            motivos.push(`voo de ${h}h${m} por trecho para uma janela de ${noites} noite${noites > 1 ? 's' : ''}`);
+        }
+        if (fracao > R.fracaoMaxima) {
+            motivos.push(`o deslocamento consome ${Math.round(fracao * 100)}% da viagem`);
+        }
+        if (motivos.length > 0) {
+            return { nivel: 'inviavel', fracao, motivo: motivos[0], motivos, recomendavel: false };
+        }
+        if (fracao > R.fracaoBoa || paradas >= 1) {
+            return { nivel: 'aceitavel', fracao, motivo: null, motivos: [], recomendavel: true };
+        }
+        return { nivel: 'boa', fracao, motivo: null, motivos: [], recomendavel: true };
+    },
+
+    motivoLegivel(viab) {
+        if (!viab) return 'Sem dados suficientes sobre o voo';
+        if (viab.nivel === 'desconhecida') return 'Duração do voo não informada, não dá para avaliar se cabe na janela';
+        const lista = (viab.motivos && viab.motivos.length) ? viab.motivos : [viab.motivo].filter(Boolean);
+        if (!lista.length) return '';
+        return lista.map(m => m.charAt(0).toUpperCase() + m.slice(1)).join(' · ');
+    },
+
+    esc(t) {
+        if (window.BenetripSafe) return window.BenetripSafe.escapeHtml(t);
+        return String(t === null || t === undefined ? '' : t)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    },
+
+    safeHref(u) {
+        if (window.BenetripSafe) return window.BenetripSafe.safeHref(u);
+        return /^(https:|\/)/i.test(String(u || '')) ? this.esc(u) : '';
     },
 
     ordenar(destinos) {
@@ -388,7 +446,7 @@ const EscapadasPage = {
         // Independente da ordenação escolhida, opções inviáveis para a
         // janela (voo longo demais para o número de noites) vão para o fim
         // — sem sumir da lista.
-        const peso = (d) => ({ boa: 0, aceitavel: 1, desconhecida: 1, inviavel: 2 })[this.viabilidadeDe(d).nivel] ?? 1;
+        const peso = (d) => ({ boa: 0, aceitavel: 1, desconhecida: 2, inviavel: 3 })[this.viabilidadeDe(d).nivel] ?? 2;
         const comViabilidade = (cmp) => (a, b) => (peso(a) - peso(b)) || cmp(a, b);
 
         switch (this.state.ordenacao) {
@@ -417,6 +475,8 @@ const EscapadasPage = {
         const destinos = this.destinosAtivos();
         const temDestinos = destinos.length > 0;
         this.state.destinosFiltrados = [...destinos];
+        // Recalculado a cada troca de janela: quantos lugares dividem cada aeroporto
+        this._mapaAeroportos = this.lugaresPorAeroporto();
 
         const loading = document.getElementById('loading-state');
         if (loading) loading.style.display = 'none';
@@ -467,10 +527,56 @@ const EscapadasPage = {
         this.atualizarContagem();
     },
 
+    // Separa o que dá para fazer na janela do que não dá. Resultado inviável
+    // não aparece na lista principal: vai para uma seção fechada, com o
+    // motivo explícito.
+    separarPorViabilidade(destinos) {
+        const recomendados = [];
+        const naoRecomendados = [];
+        for (const d of destinos || []) {
+            (this.viabilidadeDe(d).recomendavel ? recomendados : naoRecomendados).push(d);
+        }
+        return { recomendados, naoRecomendados };
+    },
+
     renderizarCards() {
         const grid = document.getElementById('destinations-grid');
         if (!grid) return;
-        grid.innerHTML = this.state.destinosFiltrados.map(d => this.renderCard(d)).join('');
+        const { recomendados, naoRecomendados } = this.separarPorViabilidade(this.state.destinosFiltrados);
+        this.state.recomendados = recomendados;
+        this.state.naoRecomendados = naoRecomendados;
+
+        grid.innerHTML = recomendados.map((d, i) => this.renderCard(d, i + 1)).join('');
+        this.renderizarNaoRecomendados(naoRecomendados);
+    },
+
+    renderizarNaoRecomendados(lista) {
+        let secao = document.getElementById('nao-recomendados-section');
+        if (!lista || lista.length === 0) {
+            if (secao) secao.remove();
+            return;
+        }
+        if (!secao) {
+            secao = document.createElement('section');
+            secao.id = 'nao-recomendados-section';
+            secao.className = 'nao-recomendados-section';
+            const main = document.getElementById('destinations-section');
+            if (main && main.parentNode) main.parentNode.insertBefore(secao, main.nextSibling);
+            else document.body.appendChild(secao);
+        }
+        const cards = lista.map((d, i) => this.renderCard(d, i + 1, { naoRecomendado: true })).join('');
+        secao.innerHTML = `
+            <details class="nao-recomendados-details">
+                <summary class="nao-recomendados-summary">
+                    Outras tarifas encontradas, mas não recomendadas para uma viagem tão curta
+                    <span class="nao-recomendados-count">${lista.length}</span>
+                </summary>
+                <p class="nao-recomendados-aviso">
+                    Estes preços existem para estas datas, mas o tempo de deslocamento não cabe bem na janela.
+                    Eles não entram na contagem principal.
+                </p>
+                <div class="destinations-grid">${cards}</div>
+            </details>`;
     },
 
     // O card é um <a target="_blank"> direto pro Google Flights com as datas
@@ -546,9 +652,25 @@ const EscapadasPage = {
         return `https://www.google.com/travel/flights/search?${params.toString()}`;
     },
 
-    renderCard(d) {
-        const imgSrc = d.imagem || '/assets/images/tripinha/avatar-pensando.png';
-        const estilosTags = (d.estilos || []).map(e => `<span class="dest-tag">${this.capitalize(e)}</span>`).join('');
+    // Quantos lugares desta janela usam cada aeroporto: a mesma tarifa pode
+    // servir vários destinos turísticos distintos.
+    lugaresPorAeroporto() {
+        const mapa = new Map();
+        for (const d of this.destinosAtivos()) {
+            const code = String(d.aeroporto || '').toUpperCase();
+            if (!code) continue;
+            mapa.set(code, (mapa.get(code) || 0) + 1);
+        }
+        return mapa;
+    },
+
+    renderCard(d, posicaoExibida, opts) {
+        const options = opts || {};
+        const imgSrc = this.safeHref(d.imagem) || '/assets/images/tripinha/avatar-pensando.png';
+        const nome = this.esc(d.nome);
+        const pais = this.esc(d.pais);
+        const aeroporto = String(d.aeroporto || '').toUpperCase();
+        const estilosTags = (d.estilos || []).map(e => `<span class="dest-tag">${this.esc(this.capitalize(e))}</span>`).join('');
         const variacaoHtml = d.variacao ? this.renderVariacaoInline(d.variacao) : '';
         const periodo = this.fmtPeriodo(d.data_ida, d.data_volta);
         const noites = this.state.janelaAtiva?.noites;
@@ -558,34 +680,48 @@ const EscapadasPage = {
             : '';
         // Aviso honesto quando o deslocamento não cabe bem na janela
         const viab = this.viabilidadeDe(d);
-        const avisoViabilidade = viab.nivel === 'inviavel'
-            ? `<div class="dest-aviso-viabilidade">⚠️ ${viab.motivo || 'Deslocamento longo para esta janela'}</div>`
+        const motivo = this.motivoLegivel(viab);
+        const avisoViabilidade = (!viab.recomendavel && motivo)
+            ? `<div class="dest-aviso-viabilidade">⚠️ ${this.esc(motivo)}</div>`
+            : '';
+
+        // O voo pousa no aeroporto, não no atrativo
+        const compartilham = this._mapaAeroportos ? (this._mapaAeroportos.get(aeroporto) || 0) : 0;
+        const disclosure = (window.BenetripUI && aeroporto)
+            ? window.BenetripUI.aeroportoDisclosureHtml({
+                destino: d.nome,
+                aeroporto,
+                paradas: d.paradas || 0,
+                lugaresNoMesmoAeroporto: compartilham,
+            })
             : '';
 
         return `
-            <a class="dest-card${viab.nivel === 'inviavel' ? ' dest-card-inviavel' : ''}" href="${this.hrefDoDestino(d)}" target="_blank" rel="noopener nofollow" data-aeroporto="${d.aeroporto}" data-nome="${d.nome}" data-duracao="${noites || ''}" data-ida="${d.data_ida || ''}" data-volta="${d.data_volta || ''}">
+            <a class="dest-card${!viab.recomendavel ? ' dest-card-inviavel' : ''}" href="${this.safeHref(this.hrefDoDestino(d))}" target="_blank" rel="noopener nofollow" data-aeroporto="${this.esc(aeroporto)}" data-nome="${nome}" data-duracao="${noites || ''}" data-ida="${this.esc(d.data_ida || '')}" data-volta="${this.esc(d.data_volta || '')}">
                 <div class="dest-card-inner">
                     <div class="dest-image-wrapper">
-                        <img class="dest-image" src="${imgSrc}" alt="${d.nome}" loading="lazy"
+                        <img class="dest-image" src="${imgSrc}" alt="${nome}" loading="lazy"
                              onerror="this.src='/assets/images/tripinha/avatar-pensando.png'">
-                        <span class="dest-rank">${d.posicao}</span>
+                        <span class="dest-rank">${posicaoExibida || d.posicao}</span>
                         ${quedaDestaque}
                         ${d.internacional ? '<span class="dest-badge-international">Internacional</span>' : ''}
-                        <button class="dest-share-btn" data-share-nome="${d.nome}" title="Compartilhar ${d.nome}" aria-label="Compartilhar ${d.nome}">
+                        <button class="dest-share-btn" data-share-nome="${nome}" title="Compartilhar ${nome}" aria-label="Compartilhar ${nome}">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
                         </button>
                     </div>
                     <div class="dest-info">
                         <div class="dest-header">
-                            <h3 class="dest-name">${d.nome}</h3>
-                            <p class="dest-country">${d.pais}${d.paradas > 0 ? ` · ${d.paradas} parada${d.paradas > 1 ? 's' : ''}` : ' · Direto'}${vooTexto ? ` · ${vooTexto}` : ''}</p>
+                            <h3 class="dest-name">${nome}</h3>
+                            <p class="dest-country">${pais}${vooTexto ? ` · ${vooTexto}` : ''}</p>
                         </div>
+                        ${disclosure}
                         <div class="dest-tags">${estilosTags}</div>
                         ${periodo ? `<div class="dest-dates" title="Ida e volta nas datas da janela selecionada">
                             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-                            <span>${periodo}</span>
+                            <span>${this.esc(periodo)}</span>
                         </div>` : ''}
                         ${avisoViabilidade}
+                        ${options.naoRecomendado ? '<div class="dest-nao-recomendado-tag">Não recomendada para esta janela</div>' : ''}
                         <div class="dest-footer">
                             <div class="dest-price-block">
                                 <span class="dest-price-label">Ida e volta</span>
@@ -634,10 +770,16 @@ const EscapadasPage = {
             </div>`;
     },
 
+    // O total principal conta SOMENTE as opções recomendáveis para a janela.
     atualizarContagem() {
-        const count = this.state.destinosFiltrados.length;
+        const { recomendados, naoRecomendados } = this.separarPorViabilidade(this.state.destinosFiltrados);
         const el = document.getElementById('section-count');
-        if (el) el.textContent = `${count} destino${count !== 1 ? 's' : ''}`;
+        if (el) {
+            const base = `${recomendados.length} destino${recomendados.length !== 1 ? 's' : ''}`;
+            el.textContent = naoRecomendados.length > 0
+                ? `${base} · ${naoRecomendados.length} fora da janela`
+                : base;
+        }
     },
 
     // ============================================================

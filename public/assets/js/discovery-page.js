@@ -834,14 +834,14 @@ const DiscoveryPage = {
             <div class="stat-card stat-card-drop">
                 <div class="stat-label">Maior queda</div>
                 <div class="stat-value stat-value-drop">↓ ${Math.abs(maiorQueda.variacao.percentual)}%</div>
-                <div class="stat-detail">${maiorQueda.nome} · agora R$ ${this.fmt(maiorQueda.preco)}</div>
+                <div class="stat-detail">${this.esc(maiorQueda.nome)} · agora R$ ${this.fmt(maiorQueda.preco)}, ante média de R$ ${this.fmt(maiorQueda.variacao.preco_anterior)}</div>
             </div>` : '';
 
         document.getElementById('stats-bar').innerHTML = `
             <div class="stat-card">
-                <div class="stat-label">Mais barato</div>
+                <div class="stat-label">Menor preço desta lista</div>
                 <div class="stat-value">R$ ${this.fmt(maisBarato.preco)}</div>
-                <div class="stat-detail">${maisBarato.nome}</div>
+                <div class="stat-detail">${this.esc(maisBarato.nome)} &middot; entre ${destinos.length} lugares pesquisados</div>
                 ${this.renderVariacao(maisBarato.variacao)}
             </div>${maiorQuedaHtml}
             <div class="stat-card">
@@ -896,8 +896,8 @@ const DiscoveryPage = {
 
         section.innerHTML = `
             <div class="quedas-header">
-                <h2 class="quedas-title">🔥 Maiores quedas de preço</h2>
-                <span class="quedas-sub">comparado à média dos últimos dias</span>
+                <h2 class="quedas-title">Maiores quedas de preço</h2>
+                <span class="quedas-sub">Diferença em relação à média observada nos últimos dias nesta página. Não é histórico da rota.</span>
             </div>
             <div class="quedas-row">${cards}</div>`;
         section.style.display = 'block';
@@ -969,6 +969,7 @@ const DiscoveryPage = {
 
         document.getElementById('empty-state').style.display = 'none';
         document.getElementById('destinations-section').style.display = 'block';
+        this._mapaAeroportos = this.lugaresPorAeroporto();
         grid.innerHTML = destinos.map(d => this.renderCard(d)).join('');
 
         grid.querySelectorAll('.dest-card').forEach(card => {
@@ -976,10 +977,32 @@ const DiscoveryPage = {
         });
     },
 
+    esc(t) {
+        if (window.BenetripSafe) return window.BenetripSafe.escapeHtml(t);
+        return String(t === null || t === undefined ? '' : t)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    },
+
+    safeHref(u) {
+        if (window.BenetripSafe) return window.BenetripSafe.safeHref(u);
+        return /^(https:|\/|assets\/)/i.test(String(u || '')) ? this.esc(u) : '';
+    },
+
+    // Quantos lugares desta lista usam cada aeroporto
+    lugaresPorAeroporto() {
+        const mapa = new Map();
+        for (const d of this.state.destinos || []) {
+            const code = String(d.aeroporto || '').toUpperCase();
+            if (code) mapa.set(code, (mapa.get(code) || 0) + 1);
+        }
+        return mapa;
+    },
+
     renderCard(d) {
-        const imgSrc = d.imagem || 'assets/images/tripinha/avatar-pensando.png';
+        const imgSrc = this.safeHref(d.imagem) || 'assets/images/tripinha/avatar-pensando.png';
         const estilosTags = (d.estilos || []).map(e =>
-            `<span class="dest-tag">${this.capitalize(e)}</span>`
+            `<span class="dest-tag">${this.esc(this.capitalize(e))}</span>`
         ).join('');
         const variacaoHtml = d.variacao ? this.renderVariacaoInline(d.variacao) : '';
         const duracaoTexto = d.duracao_ideal ? `<strong>${d.duracao_ideal.min}-${d.duracao_ideal.max}</strong> dias` : '';
@@ -987,18 +1010,31 @@ const DiscoveryPage = {
         const datasHtml = periodo
             ? `<div class="dest-dates" title="Preço encontrado para essas datas, outras datas podem variar">
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-                    <span>${periodo}</span>
+                    <span>${this.esc(periodo)}</span>
                 </div>`
             : '';
         const quedaDestaque = d.variacao?.direcao === 'desceu' && Math.abs(d.variacao.percentual) >= 5
             ? `<span class="dest-badge-drop">↓ ${Math.abs(d.variacao.percentual)}%</span>`
             : '';
 
+        // O voo pousa no aeroporto, não no atrativo turístico
+        const aeroporto = String(d.aeroporto || '').toUpperCase();
+        if (!this._mapaAeroportos) this._mapaAeroportos = this.lugaresPorAeroporto();
+        const disclosure = (window.BenetripUI && aeroporto)
+            ? window.BenetripUI.aeroportoDisclosureHtml({
+                destino: d.nome,
+                aeroporto,
+                paradas: d.paradas || 0,
+                lugaresNoMesmoAeroporto: this._mapaAeroportos.get(aeroporto) || 0,
+                deslocamento: d.deslocamento || null,
+            })
+            : '';
+
         return `
-            <article class="dest-card" data-aeroporto="${d.aeroporto}" data-nome="${d.nome}" data-duracao="${d.duracao_ideal?.ideal || ''}" data-ida="${d.data_ida || ''}" data-volta="${d.data_volta || ''}">
+            <article class="dest-card" data-aeroporto="${this.esc(aeroporto)}" data-nome="${this.esc(d.nome)}" data-duracao="${d.duracao_ideal?.ideal || ''}" data-ida="${this.esc(d.data_ida || '')}" data-volta="${this.esc(d.data_volta || '')}">
                 <div class="dest-card-inner">
                     <div class="dest-image-wrapper">
-                        <img class="dest-image" src="${imgSrc}" alt="${d.nome}" loading="lazy"
+                        <img class="dest-image" src="${imgSrc}" alt="${this.esc(d.nome)}" loading="lazy"
                              onerror="this.src='assets/images/tripinha/avatar-pensando.png'">
                         <span class="dest-rank">${d.posicao}</span>
                         ${quedaDestaque}
@@ -1006,9 +1042,10 @@ const DiscoveryPage = {
                     </div>
                     <div class="dest-info">
                         <div class="dest-header">
-                            <h3 class="dest-name">${d.nome}</h3>
-                            <p class="dest-country">${d.pais}${d.paradas > 0 ? ` · ${d.paradas} parada${d.paradas > 1 ? 's' : ''}` : ' · Direto'}</p>
+                            <h3 class="dest-name">${this.esc(d.nome)}</h3>
+                            <p class="dest-country">${this.esc(d.pais)}</p>
                         </div>
+                        ${disclosure}
                         <div class="dest-tags">${estilosTags}</div>
                         ${datasHtml}
                         <div class="dest-footer">

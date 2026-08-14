@@ -81,6 +81,21 @@ const BenetripCompararVoos = {
     // ════════════════════════════════════════
     // TRADUÇÃO
     // ════════════════════════════════════════
+    // Escape de qualquer texto vindo do fornecedor/IA antes do innerHTML.
+    // Delega ao módulo compartilhado (benetrip-shared-ui.js) e mantém um
+    // fallback local para a página funcionar mesmo se o script não carregar.
+    esc(texto) {
+        if (window.BenetripSafe) return window.BenetripSafe.escapeHtml(texto);
+        return String(texto === null || texto === undefined ? '' : texto)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    },
+
+    safeHref(url) {
+        if (window.BenetripSafe) return window.BenetripSafe.safeHref(url);
+        return /^https:\/\//i.test(String(url || '')) ? this.esc(url) : '';
+    },
+
     traduzirTexto(texto) {
         if (!texto) return '';
         const dic = {
@@ -93,9 +108,10 @@ const BenetripCompararVoos = {
             "Change fees apply": "Taxas de alteração aplicáveis",
             "No free changes": "Sem alterações gratuitas",
         };
-        let t = texto;
+        let t = String(texto);
         for (const [eng, pt] of Object.entries(dic)) t = t.replace(new RegExp(eng, 'gi'), pt);
-        return t;
+        // O texto vem do fornecedor e é usado em innerHTML: escapa na saída
+        return this.esc(t);
     },
 
     // ════════════════════════════════════════
@@ -224,7 +240,10 @@ const BenetripCompararVoos = {
             const partes = [];
             partes.push(`${numAdultos} adulto${numAdultos > 1 ? 's' : ''}`);
             if (numCriancas > 0) partes.push(`${numCriancas} criança${numCriancas > 1 ? 's' : ''}`);
-            if (numBebes > 0) partes.push(`${numBebes} bebê${numBebes > 1 ? 's' : ''} (grátis)`);
+            // "Bebê grátis" não é regra universal: depende da companhia e do
+            // mercado. Só dizemos o que sabemos — o bebê vai no colo e o preço
+            // dele, quando existir, é confirmado na reserva.
+            if (numBebes > 0) partes.push(`${numBebes} bebê${numBebes > 1 ? 's' : ''} de colo`);
             hint.innerHTML = `Preço dividido por <strong>${totalPagantes}</strong> passageiro${totalPagantes > 1 ? 's' : ''} · ${partes.join(' + ')}`;
         }
     },
@@ -1102,31 +1121,50 @@ const BenetripCompararVoos = {
         const winnerCombo = data.combinacoes.find(c => c.dataIda === stats.cheapestCombo.dataIda && c.dataVolta === stats.cheapestCombo.dataVolta);
         const winnerNoites = winnerCombo?.noites ?? 'n/d';
 
+        // ─── COMPARABILIDADE (P0) ───────────────────────────────
+        // "Melhor combinação", "mais barato", "mais caro", "economia" e o
+        // destaque visual de vencedor só aparecem quando as células
+        // representam preços completos de ida e volta e há diferença real.
+        const comparavel = stats.comparavel === true;
+        const comparabilidade = data.comparabilidade || {};
+        const itinerarioCompleto = data.itinerario?.completo === true;
+
         const saving = stats.mostExpensive - stats.cheapest;
         const savingPct = stats.mostExpensive > 0 ? Math.round((saving / stats.mostExpensive) * 100) : 0;
         const savingPp = Math.round(saving / paxParaPreco);
         // Só chama de economia relevante quando é relevante de fato: diferença
         // pequena entre datas não merece mensagem entusiasmada
         const diferencaRelevante = savingPct >= 10 && savingPp >= 50;
-        const tipText = diferencaRelevante
-            ? `<strong>Vale ser flexível:</strong> a diferença entre a combinação mais barata e a mais cara é de <strong>${s} ${savingPp.toLocaleString('pt-BR')}</strong> por pessoa (${savingPct}%). 🐾`
-            : `<strong>As datas pesquisadas têm preços semelhantes</strong> (diferença de ${s} ${savingPp.toLocaleString('pt-BR')} por pessoa). Escolha a data mais conveniente. 🐾`;
+        let tipText;
+        if (!comparavel) {
+            tipText = comparabilidade.motivo === 'precos_iguais'
+                ? `<strong>Não encontramos diferença de preço confiável entre estas combinações.</strong> As datas pesquisadas voltaram com o mesmo valor inicial. 🐾`
+                : `<strong>Estes valores são indicativos para estas datas.</strong> ${this.esc(comparabilidade.mensagem || 'A tarifa final depende do voo de volta escolhido.')} 🐾`;
+        } else if (diferencaRelevante) {
+            tipText = `<strong>Vale ser flexível:</strong> a diferença entre a combinação mais barata e a mais cara é de <strong>${s} ${savingPp.toLocaleString('pt-BR')}</strong> por pessoa (${savingPct}%). 🐾`;
+        } else {
+            tipText = `<strong>As datas pesquisadas têm preços semelhantes</strong> (diferença de ${s} ${savingPp.toLocaleString('pt-BR')} por pessoa). Escolha a data mais conveniente. 🐾`;
+        }
 
         // O fornecedor devolve a tarifa de ida e volta, mas normalmente só os
         // trechos da ida: sem a volta, isto é tarifa inicial, não itinerário
-        const itinerarioCompleto = data.itinerario?.completo === true;
         const tarifaLabel = itinerarioCompleto
             ? 'por pessoa · ida e volta com horários definidos'
-            : 'por pessoa · melhor tarifa inicial para esta combinação';
+            : 'por pessoa · tarifa inicial encontrada para estas datas';
         const avisoVolta = itinerarioCompleto
             ? ''
-            : `<div class="aviso-volta">Escolha o voo de volta no Google Flights. A tarifa final pode variar conforme o retorno escolhido.</div>`;
-        const ctaLabel = 'Ver esta combinação no Google Flights';
+            : `<div class="aviso-volta">A tarifa final depende do voo de volta escolhido. Escolha o retorno no Google Flights para ver o valor fechado.</div>`;
+        const ctaLabel = itinerarioCompleto
+            ? 'Ver esta combinação no Google Flights'
+            : 'Ver datas no Google Flights';
 
         const paxParts = [`${numAdultos} adulto${numAdultos > 1 ? 's' : ''}`];
         if (numCriancas > 0) paxParts.push(`${numCriancas} criança${numCriancas > 1 ? 's' : ''}`);
-        if (numBebes > 0) paxParts.push(`${numBebes} bebê${numBebes > 1 ? 's' : ''}`);
+        if (numBebes > 0) paxParts.push(`${numBebes} bebê${numBebes > 1 ? 's' : ''} de colo`);
         const paxDesc = paxParts.join(' + ');
+        const bebesAviso = (numBebes > 0 && data.bebesInfo && !data.bebesInfo.incluido)
+            ? `<div class="aviso-bebes">${this.esc(data.bebesInfo.aviso)}</div>`
+            : '';
 
         // v2.1: seção de alternativas mais baratas (renderizada condicionalmente)
         const cheaperAltsHtml = this._renderCheaperAlternatives(data);
@@ -1159,13 +1197,14 @@ const BenetripCompararVoos = {
                 </div>
             </div>
 
-            <div class="winner-card fade-in" style="animation-delay:.05s">
-                <div class="winner-badge">🏆 MELHOR COMBINAÇÃO</div>
+            <div class="winner-card ${comparavel ? '' : 'winner-card-indicativo'} fade-in" style="animation-delay:.05s">
+                <div class="winner-badge">${comparavel ? '🏆 MELHOR COMBINAÇÃO' : '≈ TARIFA INICIAL ENCONTRADA'}</div>
                 <div class="winner-row">
                     <div>
                         <div class="winner-price">${s} ${precoPorPessoaCheapest.toLocaleString('pt-BR')}</div>
-                        <div class="winner-price-label">${tarifaLabel}</div>
-                        ${paxParaPreco > 1 ? `<div class="winner-price-label" style="opacity:1;font-weight:600">Total ${paxParaPreco}p: ${s} ${stats.cheapest.toLocaleString('pt-BR')}${numBebes > 0 ? ` + ${numBebes} bebê${numBebes > 1 ? 's' : ''} (grátis)` : ''}</div>` : ''}
+                        <div class="winner-price-label">${comparavel ? tarifaLabel : 'por pessoa · valor indicativo para estas datas'}</div>
+                        ${paxParaPreco > 1 ? `<div class="winner-price-label" style="opacity:1;font-weight:600">Total ${paxParaPreco}p: ${s} ${stats.cheapest.toLocaleString('pt-BR')}${numBebes > 0 ? ` + ${numBebes} bebê${numBebes > 1 ? 's' : ''} de colo` : ''}</div>` : ''}
+                        ${bebesAviso}
                     </div>
                     <div style="display:flex;gap:8px;flex-wrap:wrap">
                         <div class="winner-dates-box">
@@ -1188,11 +1227,19 @@ const BenetripCompararVoos = {
                    target="_blank" rel="noopener" class="winner-cta">✈️ ${ctaLabel}</a>
             </div>
 
+            ${comparavel ? `
             <div class="stats-row fade-in" style="animation-delay:.1s">
                 <div class="stat-card"><div class="stat-label">Mais barato</div><div class="stat-value green">${s} ${precoPorPessoaCheapest.toLocaleString('pt-BR')}</div></div>
                 <div class="stat-card"><div class="stat-label">Média</div><div class="stat-value blue">${s} ${precoPorPessoaMedia.toLocaleString('pt-BR')}</div></div>
                 <div class="stat-card"><div class="stat-label">Mais caro</div><div class="stat-value orange">${s} ${precoPorPessoaMaisCaro.toLocaleString('pt-BR')}</div></div>
-            </div>
+            </div>` : `
+            <div class="stats-row stats-row-indicativo fade-in" style="animation-delay:.1s">
+                <div class="stat-card stat-card-wide">
+                    <div class="stat-label">Faixa encontrada</div>
+                    <div class="stat-value blue">${s} ${precoPorPessoaCheapest.toLocaleString('pt-BR')} – ${s} ${precoPorPessoaMaisCaro.toLocaleString('pt-BR')}</div>
+                    <div class="stat-detail">Valores indicativos por pessoa. Sem o voo de volta definido não dá para dizer qual combinação sai mais barata.</div>
+                </div>
+            </div>`}
 
             ${cheaperAltsHtml}
 
@@ -1205,6 +1252,7 @@ const BenetripCompararVoos = {
                 <h3 class="matrix-title">📊 Matriz de Preços</h3>
                 <p class="matrix-subtitle">Valores por pessoa. Clique para ver os voos da combinação.</p>
                 ${this._renderMatrix(data, s, paxParaPreco)}
+                ${this._renderMatrixLegenda(data)}
             </div>
 
             <div id="combo-detail" class="fade-in" style="animation-delay:.25s">
@@ -1233,34 +1281,54 @@ const BenetripCompararVoos = {
     // ════════════════════════════════════════
     // PRICE MATRIX
     // ════════════════════════════════════════
+    // Estado de cada célula: o que aquele preço realmente representa.
+    // Nunca só a cor comunica — cada estado tem símbolo e texto acessível.
+    MATRIX_ESTADOS: {
+        tarifa_completa: { icone: '✓', rotulo: 'Tarifa completa de ida e volta', cls: 'cell-completa' },
+        tarifa_indicativa: { icone: '≈', rotulo: 'Valor indicativo, sem voo de volta definido', cls: 'cell-indicativa' },
+        informacao_insuficiente: { icone: '?', rotulo: 'Informação insuficiente sobre esta tarifa', cls: 'cell-insuficiente' },
+        sem_resultado: { icone: '✗', rotulo: 'Nenhum resultado para esta combinação', cls: 'cell-sem-resultado' },
+    },
+
     _renderMatrix(data, simbolo, paxParaPreco) {
         const { datasIda, datasVolta, matrizPrecos, stats } = data;
         const sel = this.state.comboSelecionada;
+        const comparavel = stats.comparavel === true;
 
-        let html = '<table class="price-matrix"><thead><tr>';
-        html += '<th class="corner-cell"><span class="corner-labels"><span class="corner-ida">IDA →</span><span class="corner-volta">↓ VOLTA</span></span></th>';
+        let html = '<table class="price-matrix"><caption class="sr-only">Preços por pessoa para cada combinação de ida e volta</caption><thead><tr>';
+        html += '<th class="corner-cell" scope="col"><span class="corner-labels"><span class="corner-ida">IDA →</span><span class="corner-volta">↓ VOLTA</span></span></th>';
         datasIda.forEach(d => {
-            html += `<th class="col-header">🛫 ${this.fmtDateShort(d)}<br><small>${this.fmtWeekday(d)}</small></th>`;
+            html += `<th class="col-header" scope="col">🛫 ${this.fmtDateShort(d)}<br><small>${this.fmtWeekday(d)}</small></th>`;
         });
         html += '</tr></thead><tbody>';
 
         datasVolta.forEach(volta => {
-            html += `<tr><th class="row-header">🛬 ${this.fmtDateShort(volta)}<br><small>${this.fmtWeekday(volta)}</small></th>`;
+            html += `<tr><th class="row-header" scope="row">🛬 ${this.fmtDateShort(volta)}<br><small>${this.fmtWeekday(volta)}</small></th>`;
             datasIda.forEach(ida => {
                 const key = `${ida}_${volta}`;
                 const cell = matrizPrecos[key];
                 if (!cell || cell.error || cell.melhorPreco === null) {
-                    html += `<td class="matrix-cell no-data">${volta <= ida ? '·' : '✗'}</td>`;
+                    const semDados = volta <= ida ? 'Combinação inválida (volta antes da ida)' : 'Nenhum resultado para esta combinação';
+                    html += `<td class="matrix-cell no-data" aria-label="${this.esc(semDados)}" title="${this.esc(semDados)}">${volta <= ida ? '·' : '✗'}</td>`;
                     return;
                 }
                 const pricePp = Math.round(cell.melhorPreco / paxParaPreco);
-                const isCheapest = cell.melhorPreco === stats.cheapest;
-                const isExpensive = cell.melhorPreco === stats.mostExpensive && stats.totalCombinacoes > 1;
+                // Vencedor/perdedor só com combinações realmente comparáveis
+                const isCheapest = comparavel && cell.melhorPreco === stats.cheapest;
+                const isExpensive = comparavel && cell.melhorPreco === stats.mostExpensive && stats.totalCombinacoes > 1;
                 const isSelected = sel && sel.dataIda === ida && sel.dataVolta === volta;
+                const estado = this.MATRIX_ESTADOS[cell.estado] || this.MATRIX_ESTADOS.informacao_insuficiente;
+
                 let cls = 'mid';
                 if (isCheapest) cls = 'cheapest';
                 else if (isExpensive) cls = 'expensive';
-                html += `<td class="matrix-cell ${cls} ${isSelected ? 'selected' : ''}" onclick="BenetripCompararVoos.selectCombo('${ida}','${volta}')">
+
+                const descricao = `${simbolo} ${pricePp.toLocaleString('pt-BR')} por pessoa, ${cell.noites} noites. ${estado.rotulo}.`;
+                html += `<td class="matrix-cell ${cls} ${estado.cls} ${isSelected ? 'selected' : ''}"
+                    onclick="BenetripCompararVoos.selectCombo('${ida}','${volta}')"
+                    tabindex="0" role="button" aria-label="${this.esc(descricao)}" title="${this.esc(estado.rotulo)}"
+                    onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();BenetripCompararVoos.selectCombo('${ida}','${volta}')}">
+                    <span class="matrix-estado" aria-hidden="true">${estado.icone}</span>
                     ${simbolo} ${pricePp.toLocaleString('pt-BR')}
                     <span class="matrix-noites">${cell.noites}n · ${cell.totalVoos} voos</span>
                 </td>`;
@@ -1270,6 +1338,21 @@ const BenetripCompararVoos = {
 
         html += '</tbody></table>';
         return html;
+    },
+
+    _renderMatrixLegenda(data) {
+        const usados = new Set(
+            Object.values(data.matrizPrecos || {}).map(c => (c && c.melhorPreco !== null && !c.error) ? c.estado : 'sem_resultado')
+        );
+        const itens = Object.entries(this.MATRIX_ESTADOS)
+            .filter(([k]) => usados.has(k))
+            .map(([, v]) => `<li class="matrix-legenda-item ${v.cls}"><span aria-hidden="true">${v.icone}</span> ${this.esc(v.rotulo)}</li>`)
+            .join('');
+        if (!itens) return '';
+        const aviso = data.stats?.comparavel === true
+            ? ''
+            : `<p class="matrix-aviso">${this.esc(data.comparabilidade?.mensagem || 'A tarifa final depende do voo de volta escolhido.')}</p>`;
+        return `${aviso}<ul class="matrix-legenda">${itens}</ul>`;
     },
 
     // ════════════════════════════════════════
@@ -1387,10 +1470,14 @@ const BenetripCompararVoos = {
         const { origemSelecionada: orig, destinoSelecionado: dest, moedaSelecionada: moeda, numBebes } = this.state;
         const isBest = idx === 0 && voo.is_best;
 
-        const airlinesHtml = voo.airlines.map(a =>
-            `<img src="${a.logo}" alt="${a.name}" class="airline-logo" onerror="this.style.display='none'">`
-        ).join('');
-        const airlinesNames = voo.airlines.map(a => a.name).join(', ');
+        // Nome e logo vêm do fornecedor: escapar antes do innerHTML e aceitar
+        // só URLs https no src.
+        const airlinesHtml = voo.airlines.map(a => {
+            const src = this.safeHref(a.logo);
+            if (!src) return '';
+            return `<img src="${src}" alt="${this.esc(a.name)}" class="airline-logo" onerror="this.style.display='none'">`;
+        }).join('');
+        const airlinesNames = this.esc(voo.airlines.map(a => a.name).join(', '));
 
         const durH = Math.floor(voo.total_duration / 60);
         const durM = voo.total_duration % 60;
@@ -1573,17 +1660,21 @@ const BenetripCompararVoos = {
 
         const paxParts = [`${numAdultos} adulto${numAdultos > 1 ? 's' : ''}`];
         if (numCriancas > 0) paxParts.push(`${numCriancas} criança${numCriancas > 1 ? 's' : ''}`);
-        if (numBebes > 0) paxParts.push(`${numBebes} bebê`);
+        if (numBebes > 0) paxParts.push(`${numBebes} bebê de colo`);
+        const comparavel = stats.comparavel === true;
 
         const origDisplay = orig.displayCode || orig.code;
         const destDisplay = dest.displayCode || dest.code;
         let text = `✈️ *Comparação de voos pela Benetrip!*\n\n`;
         text += `📍 ${orig.name} (${origDisplay}) → ${dest.name} (${destDisplay})\n`;
         text += `👥 ${paxParts.join(' + ')}\n\n`;
-        text += `🏆 *Melhor combinação:*\n`;
+        // Sem tarifa completa não anunciamos vencedor no compartilhamento
+        text += comparavel ? `🏆 *Melhor combinação:*\n` : `≈ *Tarifa inicial encontrada:*\n`;
         text += `💰 *${s} ${precoPorPessoa.toLocaleString('pt-BR')}* por pessoa\n`;
         text += `📆 ${this.fmtDateFull(stats.cheapestCombo.dataIda)} → ${this.fmtDateFull(stats.cheapestCombo.dataVolta)}\n`;
-        if (paxParaPreco > 1) text += `💰 Total: *${s} ${stats.cheapest.toLocaleString('pt-BR')}*${numBebes > 0 ? ` (+${numBebes} bebê grátis)` : ''}\n`;
+        if (paxParaPreco > 1) text += `💰 Total: *${s} ${stats.cheapest.toLocaleString('pt-BR')}*\n`;
+        if (numBebes > 0) text += `👶 Tarifas e impostos do bebê de colo são confirmados na reserva\n`;
+        if (!comparavel) text += `ℹ️ Valor indicativo para estas datas: a tarifa final depende do voo de volta escolhido\n`;
 
         // v2.1: incluir melhor alternativa no share se houver
         const alts = data.cheaperAlternatives;

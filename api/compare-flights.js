@@ -5,6 +5,19 @@
 // Suporte a adultos, crianças (2-11) e bebês (0-2)
 
 import { analisarItinerario } from './_lib/roundtrip.js';
+import {
+    QUOTE_TYPE,
+    CELL_STATE,
+    avaliarCompletudeTarifa,
+    avaliarCompletudeCombinacao,
+    avaliarComparabilidade,
+    descreverBebes,
+} from './_lib/quote-completeness.js';
+import {
+    travelpayoutsDisponivel,
+    buscarPropostaIdaEVolta,
+    comLimiteDeConcorrencia,
+} from './_lib/travelpayouts.js';
 
 export const maxDuration = 60;
 
@@ -12,6 +25,18 @@ const MAX_IDAS = 4;
 const MAX_VOLTAS = 4;
 const MAX_PAX_TOTAL = 9;
 const BATCH_SIZE = 4;
+
+// A auditoria limita a comparação a 16 combinações (4 idas x 4 voltas).
+const MAX_COMBINACOES = MAX_IDAS * MAX_VOLTAS;
+
+// Enriquecimento com propostas completas de ida e volta (Travelpayouts):
+// concorrência baixa para não estourar o fornecedor e orçamento de tempo
+// global para caber no maxDuration da função.
+const ENRIQUECIMENTO = {
+    concorrencia: 4,
+    timeoutPorCombinacaoMs: 18000,
+    orcamentoTotalMs: 40000,
+};
 
 async function searchFlights(params, label) {
     const url = new URL('https://www.searchapi.io/api/v1/search');
@@ -133,6 +158,109 @@ function extractFlightDetails(flight, isBestFlight, rota = {}) {
         fare_type: flight.fare_type || null,
         baggage_allowance_links: flight.baggage_allowance_links || null,
     };
+}
+
+// ════════════════════════════════════════════════════════════
+// ENRIQUECIMENTO COM PROPOSTAS COMPLETAS DE IDA E VOLTA
+//
+// O engine de calendário devolve tarifa inicial. Para poder eleger um
+// vencedor precisamos de propostas com os DOIS trechos definidos, e essas
+// vêm do provedor da Busca clássica (Travelpayouts), reaproveitado aqui com:
+// limite de concorrência, timeout por combinação, orçamento total de tempo,
+// acumulação de propostas entre lotes e cache por rota/passageiros/datas.
+//
+// Nada é presumido: se o provedor não devolver a viagem completa, a célula
+// continua indicativa.
+// ════════════════════════════════════════════════════════════
+async function enriquecerComPropostasCompletas({
+    combinacoesResult, origemCode, destinoCode, adultos, criancas, bebes, moeda, userIp,
+}) {
+    const pendentes = combinacoesResult.filter(
+        c => c.melhorPreco && c.completude?.quoteType === QUOTE_TYPE.INDICATIVE
+    );
+
+    if (pendentes.length === 0) {
+        return { tentado: false, motivo: 'nada_pendente', resolvidas: 0 };
+    }
+    if (!travelpayoutsDisponivel()) {
+        console.log('ℹ️ Propostas completas indisponíveis (AVIASALES_TOKEN/MARKER ausentes): matriz permanece indicativa');
+        return { tentado: false, motivo: 'provedor_indisponivel', resolvidas: 0 };
+    }
+
+    // O provedor exige IATA de 3 letras. Numa busca por cidade agregada usamos
+    // o aeroporto EFETIVO da tarifa mais barata de cada combinação.
+    const alvos = pendentes.slice(0, MAX_COMBINACOES).map(c => {
+        const maisBarato = (c.voos || [])[0] || null;
+        return {
+            combo: c,
+            origem: iataValido(maisBarato?.aeroporto_origem) || iataValido(origemCode),
+            destino: iataValido(maisBarato?.aeroporto_destino) || iataValido(destinoCode),
+        };
+    }).filter(a => a.origem && a.destino);
+
+    if (alvos.length === 0) {
+        return { tentado: false, motivo: 'sem_iata_resolvido', resolvidas: 0 };
+    }
+
+    const inicio = Date.now();
+    let resolvidas = 0;
+
+    await comLimiteDeConcorrencia(alvos, ENRIQUECIMENTO.concorrencia, async (alvo) => {
+        // Orçamento global: quem não coube fica indicativo, sem travar a resposta
+        const restante = ENRIQUECIMENTO.orcamentoTotalMs - (Date.now() - inicio);
+        if (restante < 5000) return null;
+
+        const proposta = await buscarPropostaIdaEVolta(
+            {
+                origem: alvo.origem,
+                destino: alvo.destino,
+                dataIda: alvo.combo.dataIda,
+                dataVolta: alvo.combo.dataVolta,
+                adultos, criancas, bebes, moeda, userIp,
+            },
+            { timeoutMs: Math.min(ENRIQUECIMENTO.timeoutPorCombinacaoMs, restante) }
+        );
+
+        if (!proposta?.encontrada || !proposta.temLinkDeCompra) {
+            alvo.combo.propostaCompleta = { encontrada: false, motivo: proposta?.motivo || 'sem_proposta' };
+            return null;
+        }
+
+        alvo.combo.propostaCompleta = proposta;
+        alvo.combo.melhorPreco = proposta.preco;
+        alvo.combo.completude = {
+            ...avaliarCompletudeTarifa(
+                {
+                    trechos_ida: proposta.trechosIda,
+                    trechos_volta: proposta.trechosVolta,
+                    itinerario_completo: true,
+                    booking_token: 'travelpayouts',
+                },
+                { buscaIdaEVolta: true, verificadoEm: proposta.verificadoEm }
+            ),
+            estado: CELL_STATE.COMPLETA,
+            voosComVolta: 1,
+            voosTotal: (alvo.combo.voos || []).length,
+            fonte: 'busca_completa',
+        };
+        resolvidas++;
+        return proposta;
+    });
+
+    const info = {
+        tentado: true,
+        motivo: null,
+        pendentes: pendentes.length,
+        consultadas: alvos.length,
+        resolvidas,
+        tempoMs: Date.now() - inicio,
+    };
+    console.log(`🔎 Propostas completas: ${resolvidas}/${alvos.length} resolvidas em ${info.tempoMs}ms`);
+    return info;
+}
+
+function iataValido(code) {
+    return /^[A-Z]{3}$/i.test(String(code || '')) ? String(code).toUpperCase() : null;
 }
 
 export default async function handler(req, res) {
@@ -316,14 +444,6 @@ export default async function handler(req, res) {
             console.log(`💡 ${cheaperAlternativesFinal.length} alternativas mais baratas encontradas | Mais barata: ${cheaperAlternativesFinal[0].price} ${currencyCode} (${cheaperAlternativesFinal[0].departure}→${cheaperAlternativesFinal[0].return})`);
         }
 
-        const matrizPrecos = {};
-        combinacoesResult.forEach(c => {
-            matrizPrecos[`${c.dataIda}_${c.dataVolta}`] = {
-                dataIda: c.dataIda, dataVolta: c.dataVolta, noites: c.noites,
-                melhorPreco: c.melhorPreco, totalVoos: c.totalVoos || 0, error: c.error,
-            };
-        });
-
         const precosValidos = combinacoesResult.filter(c => c.melhorPreco).map(c => c.melhorPreco);
 
         if (!precosValidos.length) {
@@ -334,29 +454,88 @@ export default async function handler(req, res) {
             });
         }
 
-        const sum = precosValidos.reduce((a, b) => a + b, 0);
+        // ════════════════════════════════════════════════════════════
+        // COMPLETUDE DA TARIFA (P0)
+        // O engine devolve o preço da tarifa de ida e volta mas normalmente só
+        // os trechos da IDA. Antes de dizer qual combinação é mais barata é
+        // preciso saber o que cada preço representa.
+        // ════════════════════════════════════════════════════════════
+        combinacoesResult.forEach(c => {
+            c.completude = avaliarCompletudeCombinacao(c, { buscaIdaEVolta: true });
+        });
+
+        // Solução preferencial: buscar propostas COMPLETAS de ida e volta no
+        // provedor da Busca clássica para as combinações que ficaram apenas
+        // indicativas. Falha, timeout ou provedor indisponível mantêm o modo
+        // indicativo — nunca fabricamos um itinerário fechado.
+        const enriquecimento = await enriquecerComPropostasCompletas({
+            combinacoesResult,
+            origemCode,
+            destinoCode,
+            adultos: adultosFinal,
+            criancas: criancasFinal,
+            bebes: numBebes,
+            moeda: currencyCode,
+            userIp: req.headers['x-forwarded-for']?.split(',')[0]?.trim() || '127.0.0.1',
+        });
+
+        const matrizPrecos = {};
+        combinacoesResult.forEach(c => {
+            matrizPrecos[`${c.dataIda}_${c.dataVolta}`] = {
+                dataIda: c.dataIda, dataVolta: c.dataVolta, noites: c.noites,
+                melhorPreco: c.melhorPreco, totalVoos: c.totalVoos || 0, error: c.error,
+                estado: c.completude.estado,
+                quoteType: c.completude.quoteType,
+                priceIncludesReturn: c.completude.priceIncludesReturn,
+                hasBookableProposal: c.completude.hasBookableProposal,
+                priceVerifiedAt: c.completude.priceVerifiedAt,
+            };
+        });
+
+        // Só é possível eleger vencedor quando todas as células com preço
+        // representam a viagem completa e há diferença real entre elas.
+        const comparabilidade = avaliarComparabilidade(
+            combinacoesResult.map(c => ({ preco: c.melhorPreco, quoteType: c.completude.quoteType }))
+        );
+
+        // O enriquecimento pode ter trocado o preço de uma célula pela proposta
+        // completa: as estatísticas são recalculadas sobre os valores finais.
+        const precosFinais = combinacoesResult.filter(c => c.melhorPreco).map(c => c.melhorPreco);
+        const comboMaisBarata = combinacoesResult
+            .filter(c => c.melhorPreco)
+            .reduce((menor, c) => (!menor || c.melhorPreco < menor.melhorPreco ? c : menor), null);
+
+        const sum = precosFinais.reduce((a, b) => a + b, 0);
         const stats = {
-            cheapest: globalCheapest,
-            cheapestCombo: globalCheapestCombo,
-            average: Math.round(sum / precosValidos.length),
-            mostExpensive: Math.max(...precosValidos),
+            cheapest: comboMaisBarata ? comboMaisBarata.melhorPreco : globalCheapest,
+            cheapestCombo: comboMaisBarata
+                ? { dataIda: comboMaisBarata.dataIda, dataVolta: comboMaisBarata.dataVolta }
+                : globalCheapestCombo,
+            average: Math.round(sum / precosFinais.length),
+            mostExpensive: Math.max(...precosFinais),
             totalCombinacoes: combinacoes.length,
-            combinacoesComVoo: precosValidos.length,
-            combinacoesSemVoo: combinacoes.length - precosValidos.length,
+            combinacoesComVoo: precosFinais.length,
+            combinacoesSemVoo: combinacoes.length - precosFinais.length,
+            // A interface só pode destacar vencedor/economia com isto ligado
+            comparavel: comparabilidade.comparavel,
         };
 
         // A busca só entrega itinerário fechado se TODOS os voos exibidos
         // trouxerem o trecho de volta; senão o preço é tarifa inicial.
         const todosOsVoos = combinacoesResult.flatMap(c => c.voos || []);
         const comItinerarioCompleto = todosOsVoos.filter(v => v.itinerario_completo).length;
+        const celulasComPreco = combinacoesResult.filter(c => c.melhorPreco);
         const itinerarioInfo = {
-            completo: todosOsVoos.length > 0 && comItinerarioCompleto === todosOsVoos.length,
+            completo: celulasComPreco.length > 0
+                && celulasComPreco.every(c => c.completude.quoteType === QUOTE_TYPE.BOOKABLE),
             voosComVolta: comItinerarioCompleto,
             voosTotal: todosOsVoos.length,
+            celulasCompletas: celulasComPreco.filter(c => c.completude.estado === CELL_STATE.COMPLETA).length,
+            celulasIndicativas: celulasComPreco.filter(c => c.completude.estado === CELL_STATE.INDICATIVA).length,
         };
-        console.log(`🔁 Itinerário: ${comItinerarioCompleto}/${todosOsVoos.length} voos com trecho de volta do fornecedor`);
+        console.log(`🔁 Itinerário: ${comItinerarioCompleto}/${todosOsVoos.length} voos com trecho de volta | células completas: ${itinerarioInfo.celulasCompletas}/${celulasComPreco.length} | comparável: ${comparabilidade.comparavel}`);
 
-        console.log(`✅ Completo em ${totalTime}ms | ${origemLabel}→${destinoLabel} | Mais barato: ${globalCheapest} ${currencyCode} | Pax: ${adultosFinal}A/${criancasFinal}C/${numBebes}B | Alternativas: ${cheaperAlternativesFinal.length}`);
+        console.log(`✅ Completo em ${totalTime}ms | ${origemLabel}→${destinoLabel} | Mais barato: ${stats.cheapest} ${currencyCode} | Pax: ${adultosFinal}A/${criancasFinal}C/${numBebes}B | Alternativas: ${cheaperAlternativesFinal.length}`);
 
         return res.status(200).json({
             success: true,
@@ -371,16 +550,25 @@ export default async function handler(req, res) {
             criancas: criancasFinal,
             bebes: numBebes,
             paxParaPreco,
+            // Bebê de colo não é "grátis" por regra universal: o aviso depende
+            // de o fornecedor ter precificado o bebê nesta busca.
+            bebesInfo: descreverBebes({ bebes: numBebes, precoInclui: false }),
             datasIda,
             datasVolta,
             stats,
             itinerario: itinerarioInfo,
+            comparabilidade,
             matrizPrecos,
             combinacoes: combinacoesResult,
             companhias: Array.from(todasCompanhias.values()),
             // v2.1: alternativas mais baratas fora das datas pesquisadas
             cheaperAlternatives: cheaperAlternativesFinal,
-            _meta: { totalTime, totalCombinacoes: combinacoes.length, batchSize: BATCH_SIZE },
+            _meta: {
+                totalTime,
+                totalCombinacoes: combinacoes.length,
+                batchSize: BATCH_SIZE,
+                enriquecimento,
+            },
         });
 
     } catch (error) {

@@ -127,3 +127,50 @@ test('a interpretação é legível e cobre os critérios', () => {
 test('sem critérios a interpretação fica vazia (não inventa)', () => {
     assert.deepEqual(descreverFiltros({}), []);
 });
+
+// ============================================================
+// CENÁRIO DE ACEITAÇÃO DA AUDITORIA
+// "praia internacional barata, sem escalas, até R$ 4.000"
+// ============================================================
+test('filtro "praia internacional barata, sem escalas, até R$ 4.000"', () => {
+    const filtros = {
+        estilos: ['praia'],
+        internacional: true,
+        direto: true,
+        precoMax: 4000,
+    };
+
+    const destinos = [
+        // 0: passa em tudo
+        { nome: 'Cartagena', pais: 'Colômbia', internacional: true, estilos: ['praia'], paradas: 0, preco: 2800, aeroporto: 'CTG' },
+        // 1: acima do teto
+        { nome: 'Cancún', pais: 'México', internacional: true, estilos: ['praia'], paradas: 0, preco: 4300, aeroporto: 'CUN' },
+        // 2: tem escala
+        { nome: 'Punta Cana', pais: 'República Dominicana', internacional: true, estilos: ['praia'], paradas: 1, preco: 3200, aeroporto: 'PUJ' },
+        // 3: nacional
+        { nome: 'Maceió', pais: 'Brasil', internacional: false, estilos: ['praia'], paradas: 0, preco: 900, aeroporto: 'MCZ' },
+        // 4: internacional e barato, mas não é praia
+        { nome: 'Buenos Aires', pais: 'Argentina', internacional: true, estilos: ['cidade'], paradas: 0, preco: 1800, aeroporto: 'EZE' },
+        // 5: sem dado de escalas — não pode passar por "sem escalas"
+        { nome: 'Aruba', pais: 'Aruba', internacional: true, estilos: ['praia'], paradas: null, preco: 3900, aeroporto: 'AUA' },
+    ];
+
+    const indices = aplicarFiltrosEstruturados(destinos, filtros);
+    assert.deepEqual(indices, [0], 'só Cartagena atende aos quatro critérios ao mesmo tempo');
+
+    const descricao = descreverFiltros(filtros).join(' · ');
+    assert.match(descricao, /praia/);
+    assert.match(descricao, /somente voo direto/);
+    assert.match(descricao, /4\.000/);
+    assert.match(descricao, /internacionais/);
+});
+
+test('o pedido "barata" sozinho não vira teto de preço inventado', () => {
+    // "barata" é vago: sem número explícito, nenhum precoMax é aplicado
+    const indices = aplicarFiltrosEstruturados(
+        [{ nome: 'X', preco: 9000, estilos: ['praia'], internacional: true, paradas: 0 }],
+        { estilos: ['praia'], internacional: true, direto: true }
+    );
+    assert.deepEqual(indices, [0]);
+    assert.ok(!descreverFiltros({ estilos: ['praia'] }).some(p => /até R\$/.test(p)));
+});

@@ -56,6 +56,14 @@
       "memory": 1024,
       "maxDuration": 60
     },
+    "api/seasonality.js": {
+      "memory": 1024,
+      "maxDuration": 60
+    },
+    "api/rank-destinations.js": {
+      "memory": 1024,
+      "maxDuration": 60
+    },
     "api/cron/update-discovery.js": {
       "memory": 1024,
       "maxDuration": 300
@@ -93,6 +101,12 @@
       "maxDuration": 15
     }
   },
+  "redirects": [
+    { "source": "/multidatas", "destination": "/comparar-voos", "permanent": true, "statusCode": 308 },
+    { "source": "/multidatas.html", "destination": "/comparar-voos", "permanent": true, "statusCode": 308 },
+    { "source": "/create-itinerary", "destination": "/roteiro-viagem", "permanent": true, "statusCode": 308 },
+    { "source": "/create-itinerary.html", "destination": "/roteiro-viagem", "permanent": true, "statusCode": 308 }
+  ],
   "rewrites": [
     { "source": "/destinos-baratos", "destination": "/api/destinos-baratos-page" },
     { "source": "/destinos-baratos/:cidade", "destination": "/api/destinos-baratos-page?cidade=:cidade" },

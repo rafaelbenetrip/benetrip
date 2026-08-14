@@ -586,6 +586,20 @@ const BenetripRoteiro = {
 
     buildMapsUrl(q) { return q ? `https://maps.google.com/?q=${encodeURIComponent(q)}` : ''; },
 
+    // Todo texto de IA, de API externa ou digitado pelo usuário passa por aqui
+    // antes de entrar em innerHTML.
+    esc(t) {
+        if (window.BenetripSafe) return window.BenetripSafe.escapeHtml(t);
+        return String(t === null || t === undefined ? '' : t)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    },
+
+    safeHref(u) {
+        if (window.BenetripSafe) return window.BenetripSafe.safeHref(u);
+        return /^https:\/\//i.test(String(u || '')) ? this.esc(u) : '';
+    },
+
     // ================================================================
     // RENDERIZAÇÃO (v2.1: visita_numero + cidades repetidas)
     // ================================================================
@@ -617,27 +631,57 @@ const BenetripRoteiro = {
             alto: '💰 Custo alto (estimativa)',
         };
 
+        // Estado da validação externa do lugar. `not_verified` nunca é exibido
+        // como recomendação específica: o servidor já trocou o nome por uma
+        // sugestão de categoria e região.
+        const SELO_LOCAL = {
+            verified: { texto: 'Local confirmado em fonte externa', classe: 'local-verificado', icone: '✓' },
+            partially_verified: { texto: 'Local encontrado, dados incompletos', classe: 'local-parcial', icone: '~' },
+            not_verified: { texto: 'Sugestão por categoria e região, sem estabelecimento confirmado', classe: 'local-nao-verificado', icone: '?' },
+        };
+
         const renderAtividade = (ativ) => {
-            const mapsUrl = self.buildMapsUrl(ativ.google_maps_query || ativ.nome);
-            const faixaCusto = ativ.gratuito === true
-                ? FAIXA_CUSTO_LABEL.gratuito
-                : FAIXA_CUSTO_LABEL[ativ.faixa_custo] || (ativ.gratuito === false ? '💰 Pago (estimativa)' : '');
+            // Todo texto abaixo vem da IA ou de API externa: escapado antes do
+            // innerHTML, e a URL só entra no href se passar pela validação.
+            const mapsUrl = self.safeHref(ativ.google_maps_url || self.buildMapsUrl(ativ.google_maps_query || ativ.nome));
+
+            // Custo reconciliado no servidor: nada é pago e gratuito ao mesmo
+            // tempo, e a tag "Gratuito" só existe com gratuito === true.
+            const ehGratuito = ativ.gratuito === true;
+            const faixaCusto = ativ.custo_conflito
+                ? '💰 Custo não confirmado'
+                : ehGratuito
+                    ? FAIXA_CUSTO_LABEL.gratuito
+                    : (ativ.gratuito === false
+                        ? (FAIXA_CUSTO_LABEL[ativ.faixa_custo] || '💰 Pago (estimativa)')
+                        : '💰 Custo não confirmado');
+
+            // Tag "Gratuito" do modelo é descartada quando o custo não bate
+            const tags = (ativ.tags || []).filter(t => t !== 'Gratuito' || ehGratuito);
+            const selo = SELO_LOCAL[ativ.validacao_local] || null;
+
+            const horarioHtml = ativ.horario_do_dia
+                ? `<span>⏰ ${self.esc(ativ.horario_do_dia)}</span>`
+                : `<span class="meta-confirmar">⏰ ${self.esc(ativ.aviso_horario || 'Horário não verificado, confirme antes de ir.')}</span>`;
+
             return `
-                <div class="atividade-card">
-                    <div class="atividade-nome">📍 ${ativ.nome}</div>
-                    <div class="atividade-desc">${ativ.descricao || ''}</div>
-                    ${(ativ.tags?.length) ? `<div class="atividade-tags">${ativ.tags.map(t => `<span class="tag ${TAG_CLASSES[t]||'tag-default'}">${t}</span>`).join('')}${ativ.gratuito ? '<span class="tag tag-gratuito">Gratuito</span>' : ''}</div>` : ''}
+                <div class="atividade-card${ativ.sugestao_generica ? ' atividade-generica' : ''}">
+                    <div class="atividade-nome">📍 ${self.esc(ativ.nome)}</div>
+                    <div class="atividade-desc">${self.esc(ativ.descricao || '')}</div>
+                    ${selo ? `<div class="atividade-validacao ${selo.classe}"><span aria-hidden="true">${selo.icone}</span> ${self.esc(selo.texto)}${ativ.fonte_local ? ` · ${self.esc(ativ.fonte_local)}` : ''}</div>` : ''}
+                    ${tags.length ? `<div class="atividade-tags">${tags.map(t => `<span class="tag ${TAG_CLASSES[t]||'tag-default'}">${self.esc(t)}</span>`).join('')}</div>` : ''}
                     <div class="atividade-meta">
-                        ${ativ.duracao_minutos ? `<span>🕐 ~${ativ.duracao_minutos}min</span>` : ''}
-                        ${faixaCusto ? `<span>${faixaCusto}</span>` : ''}
-                        ${ativ.regiao ? `<span>🗺️ ${ativ.regiao}</span>` : ''}
-                        ${ativ.horario_confirmar ? '<span class="meta-confirmar">⏰ Confirme o horário antes de ir</span>' : ''}
+                        ${ativ.duracao_minutos ? `<span>🕐 ~${Number(ativ.duracao_minutos)}min</span>` : ''}
+                        ${faixaCusto ? `<span>${self.esc(faixaCusto)}</span>` : ''}
+                        ${ativ.regiao ? `<span>🗺️ ${self.esc(ativ.regiao)}</span>` : ''}
+                        ${ativ.endereco ? `<span>📮 ${self.esc(ativ.endereco)}</span>` : ''}
+                        ${horarioHtml}
                     </div>
-                    ${ativ.dica_tripinha ? `<div class="atividade-dica"><span class="dica-icon">💡</span><p><strong>Dica da Tripinha:</strong> ${ativ.dica_tripinha}</p></div>` : ''}
-                    <a href="${mapsUrl}" target="_blank" rel="noopener" class="btn-maps">
+                    ${ativ.dica_tripinha ? `<div class="atividade-dica"><span class="dica-icon">💡</span><p><strong>Dica da Tripinha:</strong> ${self.esc(ativ.dica_tripinha)}</p></div>` : ''}
+                    ${mapsUrl ? `<a href="${mapsUrl}" target="_blank" rel="noopener" class="btn-maps">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
                         Ver no Google Maps
-                    </a>
+                    </a>` : ''}
                 </div>`;
         };
 
@@ -678,7 +722,7 @@ const BenetripRoteiro = {
             // vem do backend e diz o que o dado realmente é.
             const climaRotulo = roteiro._clima?.rotulo || 'Clima típico para o período';
             const clima = dia.clima_previsto
-                ? `<div class="clima-badge" title="${climaRotulo}"><span>🌤️</span><span><strong>${climaRotulo}:</strong> ${dia.clima_previsto}</span></div>`
+                ? `<div class="clima-badge" title="${self.esc(climaRotulo)}"><span>🌤️</span><span><strong>${self.esc(climaRotulo)}:</strong> ${self.esc(dia.clima_previsto)}</span></div>`
                 : '';
 
             return `
@@ -687,13 +731,13 @@ const BenetripRoteiro = {
                     <div class="dia-header">
                         <div class="dia-numero">${dia.dia_numero}</div>
                         <div class="dia-header-info">
-                            <div>${dia.titulo || `Dia ${dia.dia_numero}`}</div>
-                            <div class="dia-header-data">${dia.dia_semana || ''}, ${dia.data || ''}${isMulti && dest ? ` · ${dest}${visita > 1 ? ` (${visita}ª)` : ''}` : ''}</div>
+                            <div>${self.esc(dia.titulo || `Dia ${dia.dia_numero}`)}</div>
+                            <div class="dia-header-data">${self.esc(dia.dia_semana || '')}, ${self.esc(dia.data || '')}${isMulti && dest ? ` · ${self.esc(dest)}${visita > 1 ? ` (${visita}ª)` : ''}` : ''}</div>
                         </div>
                     </div>
                     <div class="dia-body">
                         ${transicao}${clima}
-                        ${dia.resumo_tripinha ? `<div class="dia-resumo-tripinha"><img src="assets/images/tripinha/avatar-pensando.png" alt="Tripinha" class="avatar-mini" onerror="this.style.display='none'"><p>${dia.resumo_tripinha}</p></div>` : ''}
+                        ${dia.resumo_tripinha ? `<div class="dia-resumo-tripinha"><img src="assets/images/tripinha/avatar-pensando.png" alt="Tripinha" class="avatar-mini" onerror="this.style.display='none'"><p>${self.esc(dia.resumo_tripinha)}</p></div>` : ''}
                         ${(dia.periodos || []).map(renderPeriodo).join('')}
                     </div>
                 </div>`;
@@ -702,16 +746,22 @@ const BenetripRoteiro = {
         // O texto só afirma que a restrição foi aplicada porque o backend
         // valida e remove o que a violou (ver api/_lib/itinerary-constraints.js)
         const restricoesAplicadas = roteiro._restricoes?.rotulos || [];
+        // "Aplicadas e conferidas" só quando o validador determinístico
+        // realmente processou restrições obrigatórias. Caso contrário, o texto
+        // diz apenas que elas foram consideradas na geração.
+        const rotuloRestricoes = roteiro._rotuloRestricoes
+            || (roteiro._restricoes?.obrigatorias?.length ? 'Restrições aplicadas e conferidas' : 'Restrições consideradas na geração');
+        const obsCurta = observacoes && observacoes.length > 80 ? observacoes.substring(0, 80) + '...' : (observacoes || '');
         const obsBadge = observacoes
-            ? `<div class="observacoes-badge"><span>📝</span><span>Seu pedido: <strong>"${observacoes.length > 80 ? observacoes.substring(0, 80) + '...' : observacoes}"</strong>${
+            ? `<div class="observacoes-badge"><span>📝</span><span>Seu pedido: <strong>"${this.esc(obsCurta)}"</strong>${
                 restricoesAplicadas.length
-                    ? `<br><span class="restricoes-aplicadas">Restrições aplicadas e conferidas: ${restricoesAplicadas.join(' · ')}</span>`
+                    ? `<br><span class="restricoes-aplicadas">${this.esc(rotuloRestricoes)}: ${this.esc(restricoesAplicadas.join(' · '))}</span>`
                     : ''
               }</span></div>`
             : '';
 
         const avisoLocais = roteiro._avisoLocais
-            ? `<div class="aviso-locais"><span>ℹ️</span><span>${roteiro._avisoLocais}</span></div>`
+            ? `<div class="aviso-locais"><span>ℹ️</span><span>${this.esc(roteiro._avisoLocais)}</span></div>`
             : '';
 
         const rotaVisual = isMulti ? `<div class="rota-visual">${destinos.map((d, i) => `<span class="rota-cidade">${d.destino}</span>${i < destinos.length - 1 ? '<span class="rota-seta">→</span>' : ''}`).join('')}</div>` : '';

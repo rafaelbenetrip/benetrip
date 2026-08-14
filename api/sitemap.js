@@ -8,24 +8,35 @@ import { carregarCidades } from './_lib/discovery-shared.js';
 
 const SITE_URL = 'https://benetrip.com.br';
 
-// Páginas estáticas do site (mesma lista do sitemap.xml anterior)
+// Páginas estáticas do site.
+//
+// `lastmod` é FIXO por página e só muda quando o conteúdo muda de verdade:
+// carimbar a data de hoje em tudo a cada deploy ensina o crawler a ignorar o
+// campo. As páginas movidas a dados (destinos-baratos e escapadas) são a
+// exceção legítima, porque o snapshot realmente muda todo dia.
+//
+// FORA DO SITEMAP de propósito:
+//   /multidatas       -> duplicava a matriz de datas do Comparar Voos.
+//                        Agora responde 308 para /comparar-voos.
+//   /create-itinerary -> duplicava o formulário do Roteiro de Viagem.
+//                        Agora responde 308 para /roteiro-viagem.
+//   /chat             -> fluxo conversacional legado, mantido no ar porque
+//                        ainda é acessado a partir de /destinos, mas
+//                        superado pela Descoberta. Sem valor de indexação.
 const PAGINAS_ESTATICAS = [
-    { loc: '/', changefreq: 'weekly', priority: '1.0' },
-    { loc: '/descobrir-destinos', changefreq: 'weekly', priority: '0.9' },
-    { loc: '/todos-destinos', changefreq: 'weekly', priority: '0.8' },
-    { loc: '/voos', changefreq: 'daily', priority: '0.9' },
-    { loc: '/voos-baratos', changefreq: 'daily', priority: '0.8' },
-    { loc: '/vai-e-vem', changefreq: 'daily', priority: '0.8' },
-    { loc: '/comparar-voos', changefreq: 'daily', priority: '0.7' },
-    { loc: '/multidatas', changefreq: 'daily', priority: '0.7' },
-    { loc: '/roteiro-viagem', changefreq: 'weekly', priority: '0.8' },
-    { loc: '/create-itinerary', changefreq: 'weekly', priority: '0.7' },
-    { loc: '/chat', changefreq: 'weekly', priority: '0.6' },
-    { loc: '/quemsomos', changefreq: 'monthly', priority: '0.5' },
-    { loc: '/perguntasfrequentes', changefreq: 'monthly', priority: '0.5' },
-    { loc: '/termos', changefreq: 'yearly', priority: '0.3' },
-    { loc: '/privacidade', changefreq: 'yearly', priority: '0.3' },
-    { loc: '/cookies', changefreq: 'yearly', priority: '0.3' },
+    { loc: '/', changefreq: 'weekly', priority: '1.0', lastmod: '2026-08-13' },
+    { loc: '/descobrir-destinos', changefreq: 'weekly', priority: '0.9', lastmod: '2026-08-13' },
+    { loc: '/todos-destinos', changefreq: 'weekly', priority: '0.8', lastmod: '2026-08-13' },
+    { loc: '/voos', changefreq: 'daily', priority: '0.9', lastmod: '2026-08-13' },
+    { loc: '/voos-baratos', changefreq: 'daily', priority: '0.8', lastmod: '2026-08-13' },
+    { loc: '/vai-e-vem', changefreq: 'daily', priority: '0.8', lastmod: '2026-08-13' },
+    { loc: '/comparar-voos', changefreq: 'daily', priority: '0.7', lastmod: '2026-08-13' },
+    { loc: '/roteiro-viagem', changefreq: 'weekly', priority: '0.8', lastmod: '2026-08-13' },
+    { loc: '/quemsomos', changefreq: 'monthly', priority: '0.5', lastmod: '2026-02-01' },
+    { loc: '/perguntasfrequentes', changefreq: 'monthly', priority: '0.5', lastmod: '2026-02-01' },
+    { loc: '/termos', changefreq: 'yearly', priority: '0.3', lastmod: '2026-02-01' },
+    { loc: '/privacidade', changefreq: 'yearly', priority: '0.3', lastmod: '2026-08-13' },
+    { loc: '/cookies', changefreq: 'yearly', priority: '0.3', lastmod: '2026-02-01' },
 ];
 
 export default async function handler(req, res) {
@@ -45,7 +56,7 @@ export default async function handler(req, res) {
     const hoje = new Date().toISOString().split('T')[0];
 
     const urls = [
-        ...PAGINAS_ESTATICAS.map((p) => urlEntry(p.loc, hoje, p.changefreq, p.priority)),
+        ...PAGINAS_ESTATICAS.map((p) => urlEntry(p.loc, p.lastmod, p.changefreq, p.priority)),
         urlEntry('/destinos-baratos', hoje, 'daily', '0.9'),
         // São Paulo (GRU) não entra separado: /destinos-baratos/sao-paulo redireciona pra base
         ...cidades

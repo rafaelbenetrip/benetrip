@@ -276,7 +276,7 @@ const BenetripVoosBaratos = {
         const { origemSelecionada, destinoSelecionado, duracaoSelecionada, moedaSelecionada } = this.state;
 
         this.showLoading();
-        this.updateProgress(10, '🔍 Preparando busca nos próximos 6 meses...');
+        this.updateProgress(10, '🔍 Preparando busca nos próximos 181 dias...');
 
         try {
             const destinoDisplay = destinoSelecionado.airport || destinoSelecionado.displayCode || destinoSelecionado.code || destinoSelecionado.name;
@@ -430,7 +430,7 @@ const BenetripVoosBaratos = {
                     <span class="trip-meta-chip">📅 ${duracaoSelecionada} dias</span>
                     <span class="trip-meta-chip">💱 ${moedaSelecionada}</span>
                     <span class="trip-meta-chip">🔍 ${data.stats.totalDates} períodos analisados</span>
-                    <span class="trip-meta-chip">📆 Próximos 6 meses</span>
+                    <span class="trip-meta-chip" title="A janela cobre 181 dias corridos a partir de hoje, então pode atravessar sete meses do calendário.">📆 Próximos 181 dias (até seis meses à frente)</span>
                 </div>
             </div>
 
@@ -681,16 +681,20 @@ const BenetripVoosBaratos = {
                 `<img src="${logo}" alt="" class="detail-airline-logo" onerror="this.style.display='none'">`
             ).join('');
 
+            // A classificação do fornecedor compara com o HISTÓRICO desta rota
+            // e desta data, não com os outros períodos da lista. Sem dizer isso,
+            // "menor preço" e "preço alto" no mesmo card parecem contradição.
             let insightBadge = '';
             if (fd.price_insights && fd.price_insights.price_level) {
                 const levelMap = {
-                    'low': { text: 'Preço baixo', cls: 'insight-low' },
-                    'typical': { text: 'Preço típico', cls: 'insight-typical' },
-                    'high': { text: 'Preço alto', cls: 'insight-high' },
+                    'low': { text: 'Abaixo do preço típico para esta data', cls: 'insight-low' },
+                    'typical': { text: 'Dentro do preço típico para esta data', cls: 'insight-typical' },
+                    'high': { text: 'Acima do preço típico para esta data', cls: 'insight-high' },
                 };
                 const lvl = levelMap[fd.price_insights.price_level];
                 if (lvl) {
-                    insightBadge = `<span class="insight-badge ${lvl.cls}">${lvl.text}</span>`;
+                    const tooltip = 'Esta classificação compara o valor com o histórico desta rota e data, não com os outros períodos da lista.';
+                    insightBadge = `<span class="insight-badge ${lvl.cls}" title="${tooltip}" aria-label="${lvl.text}. ${tooltip}">${lvl.text}</span>`;
                 }
             }
 
@@ -715,7 +719,11 @@ const BenetripVoosBaratos = {
 
         // Badge do menor preço vem do nosso cálculo sobre o conjunto
         // consolidado, não da marcação por janela do fornecedor
-        const lowestBadge = item.is_lowest ? '<span class="top-lowest-badge">menor preço</span>' : '';
+        // O universo desta marcação é a própria lista de períodos analisados.
+        // Empates recebem o selo juntos (is_lowest vem do backend).
+        const lowestBadge = item.is_lowest
+            ? '<span class="top-lowest-badge" title="Menor preço entre os períodos analisados nesta busca">menor preço da lista</span>'
+            : '';
 
         return `
             <div class="top-item ${idx === 0 ? 'rank-1' : ''}">
