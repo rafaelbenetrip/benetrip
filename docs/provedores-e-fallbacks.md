@@ -16,7 +16,7 @@ cache é temporário e some sozinho.
 | `api/_lib/seasonality.js` | adequação do destino ao mês da viagem | grounding acima + extração por LLM | as acima + `CEREBRAS_KEY` |
 | `api/_lib/places.js` | existência e funcionamento de lugares do Roteiro | Google Places (Text Search) | `GOOGLE_PLACES_API_KEY` ou `GOOGLE_API_KEY` |
 | `api/_lib/geo-routes.js` ⚠️ **não ligado** | coordenadas e deslocamento aeroporto→destino | Google Geocoding; Google Directions | `GOOGLE_PLACES_API_KEY` ou `GOOGLE_API_KEY` |
-| `api/_lib/travelpayouts.js` | propostas completas de ida e volta | Travelpayouts (o mesmo da Busca clássica) | `AVIASALES_TOKEN` + `AVIASALES_MARKER` |
+| `api/_lib/travelpayouts.js` ⚠️ **opt-in** | propostas completas de ida e volta | Travelpayouts (o mesmo da Busca clássica) | `COMPARE_FLIGHTS_ENRIQUECER` + `AVIASALES_TOKEN` + `AVIASALES_MARKER` |
 
 Nenhuma variável nova é obrigatória: todas já existiam no projeto. O que muda
 é que agora cada uma tem um caminho de degradação explícito.
@@ -64,15 +64,23 @@ As chamadas externas acontecem **só para o que vai aparecer na tela**:
 - propostas completas: no máximo 16 combinações, concorrência 4, com orçamento
   total de 40 s e timeout de 18 s por combinação.
 
-## Atenção: o enriquecimento do Comparar Voos ativa sozinho
+## Comparar Voos: enriquecimento é opt-in
 
-A SearchAPI continua sendo o provedor principal e o único obrigatório do
-Comparar Voos. A Travelpayouts só entra quando a tarifa ficou incompleta
-(sem trecho de volta) **e** `AVIASALES_TOKEN`/`AVIASALES_MARKER` existem.
+A SearchAPI é o provedor principal e o **único obrigatório** do Comparar Voos.
+A matriz de preços é montada só com ela, uma chamada por combinação de datas.
 
-Como é a mesma credencial que a Busca de Voos já usa, em produção essa etapa
-liga automaticamente. Se a preferência for manter o Comparar Voos 100%
-SearchAPI, o caminho é adicionar uma guarda de flag em
-`enriquecerComPropostasCompletas` (`api/compare-flights.js`): sem o
-enriquecimento, a matriz simplesmente permanece indicativa e não elege
-vencedor, que já é o comportamento correto do ponto de vista de dado.
+Buscar propostas completas na Travelpayouts é um passo extra, **desligado por
+padrão**. Ele só roda com as três condições juntas:
+
+1. `COMPARE_FLIGHTS_ENRIQUECER` com valor `1`, `true`, `on` ou `sim`;
+2. a tarifa da SearchAPI veio sem trecho de volta (`indicative_round_trip`);
+3. `AVIASALES_TOKEN` e `AVIASALES_MARKER` configurados.
+
+A flag existe porque a credencial é a mesma que a Busca de Voos já usa: sem
+ela, o passo ligaria sozinho em produção só por o token existir, e gasto não
+se decide por omissão.
+
+**Desligado, nada regride.** A matriz permanece indicativa e não elege
+vencedor, que já é a leitura honesta de uma tarifa sem volta definida. O que
+se deixa de ter é a chance de, às vezes, conseguir a comparação completa.
+Custo no estado atual: zero chamada extra.

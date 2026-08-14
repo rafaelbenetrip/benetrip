@@ -159,3 +159,46 @@ test('bebê precificado pelo fornecedor entra no total', () => {
     assert.equal(b.incluido, true);
     assert.doesNotMatch(b.aviso, /gr[áa]tis/i);
 });
+
+// ============================================================
+// FLAG DO ENRIQUECIMENTO (Comparar Voos)
+//
+// A SearchAPI é o provedor principal e o único obrigatório. Buscar propostas
+// completas na Travelpayouts custa chamadas extras e usa a mesma credencial
+// da Busca de Voos, então ligaria sozinha em produção. Passou a exigir
+// opt-in explícito.
+// ============================================================
+const { enriquecimentoHabilitado } = await import('../api/compare-flights.js');
+
+test('sem a variável, o enriquecimento fica desligado', () => {
+    assert.equal(enriquecimentoHabilitado({}), false);
+});
+
+test('valores vazios ou negativos mantêm desligado', () => {
+    for (const v of ['', ' ', '0', 'false', 'off', 'nao', 'no', 'undefined']) {
+        assert.equal(enriquecimentoHabilitado({ COMPARE_FLIGHTS_ENRIQUECER: v }), false, `"${v}" não deveria ligar`);
+    }
+});
+
+test('só liga com opt-in explícito', () => {
+    for (const v of ['1', 'true', 'on', 'sim', 'TRUE', ' True ']) {
+        assert.equal(enriquecimentoHabilitado({ COMPARE_FLIGHTS_ENRIQUECER: v }), true, `"${v}" deveria ligar`);
+    }
+});
+
+test('a presença da credencial da Busca de Voos não liga o enriquecimento sozinha', () => {
+    const env = { AVIASALES_TOKEN: 'tok', AVIASALES_MARKER: 'mk' };
+    assert.equal(enriquecimentoHabilitado(env), false,
+        'ter o token não pode virar decisão de custo tomada por omissão');
+});
+
+test('desligado, a matriz continua correta: sem vencedor em tarifa incompleta', () => {
+    // É o ponto central: desligar o enriquecimento não reintroduz o problema
+    // que o P0 corrigiu, só deixa de tentar resolver a tarifa incompleta.
+    const r = avaliarComparabilidade([
+        celula(2318, QUOTE_TYPE.INDICATIVE),
+        celula(2318, QUOTE_TYPE.INDICATIVE),
+    ]);
+    assert.equal(r.comparavel, false);
+    assert.equal(r.motivo, 'tarifa_incompleta');
+});
