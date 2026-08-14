@@ -118,8 +118,12 @@ a.dest-card {
 }
 
 /* ---- Barra do próximo feriado ---- */
+/* Mesmo cuidado do cabeçalho da lista: o botão não encolhe, então sem
+   permissão para quebrar ele deixava só 159px de 336px para o texto, que
+   descia em cinco linhas estreitas. */
 .feriado-bar {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: 10px;
     max-width: 960px;
@@ -133,10 +137,11 @@ a.dest-card {
 
 .feriado-bar-emoji { font-size: 18px; }
 
-.feriado-bar-texto { flex: 1; margin: 0; line-height: 1.4; }
+.feriado-bar-texto { flex: 1 1 200px; margin: 0; line-height: 1.4; }
 
 .feriado-bar-link {
     flex: 0 0 auto;
+    margin-left: auto;
     background: rgba(255, 255, 255, 0.2);
     border: 1px solid rgba(255, 255, 255, 0.5);
     color: var(--white);

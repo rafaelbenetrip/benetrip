@@ -165,7 +165,7 @@ test('destino inviável sai da contagem principal e aparece na seção fechada',
     const res = await render();
 
     assert.ok(res.body.includes('>2 destinos'), 'a contagem principal deve ignorar o inviável');
-    assert.ok(res.body.includes('1 fora da janela'));
+    assert.ok(res.body.includes('1 fora'));
     assert.ok(res.body.includes('nao-recomendados-section'));
     assert.ok(res.body.includes('Lisboa'), 'o inviável continua visível na seção fechada');
     assert.ok(res.body.includes('Voo de 10h20 por trecho'), 'o motivo da exclusão deve ser exibido');

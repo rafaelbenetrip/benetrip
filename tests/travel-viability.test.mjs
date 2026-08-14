@@ -135,10 +135,12 @@ test('"Este fim de semana" só aparece para o fim de semana imediato', () => {
     assert.equal(janelas[0].omitidoPorAntecedencia, null);
 });
 
-test('fim de semana próximo demais é omitido e o rótulo diz isso', () => {
-    // Quinta-feira 2026-11-12: a sexta 13/11 está a 1 dia (< 2), sai da lista
+test('fim de semana próximo demais é omitido e a omissão é explicada', () => {
+    // Quinta-feira 2026-11-12: a sexta 13/11 está a 1 dia (< 2), sai da lista.
+    // O rótulo continua curto (ele divide espaço com as datas em três lugares
+    // da página); quem explica a ausência é `omitidoPorAntecedencia`.
     const janelas = janelasAtivas('2026-11-12').filter((j) => j.categoria === 'fds');
-    assert.equal(janelas[0].rotulo, 'Próximo fim de semana com tarifas disponíveis');
+    assert.equal(janelas[0].rotulo, 'Próximo fim de semana');
     assert.equal(janelas[0].ida, '2026-11-20');
     assert.ok(janelas[0].omitidoPorAntecedencia, 'a omissão precisa ser explicada na interface');
     assert.equal(janelas[0].omitidoPorAntecedencia.ida, '2026-11-13');
@@ -157,7 +159,7 @@ test('os rótulos seguintes acompanham o deslocamento da janela', () => {
     const comOmissao = janelasAtivas('2026-08-13').filter((j) => j.categoria === 'fds');
     assert.deepEqual(
         comOmissao.map((j) => j.rotulo),
-        ['Próximo fim de semana com tarifas disponíveis', 'Em 2 semanas', 'Em 3 semanas']
+        ['Próximo fim de semana', 'Em 2 semanas', 'Em 3 semanas']
     );
 });
 

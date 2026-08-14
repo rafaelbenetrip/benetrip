@@ -425,7 +425,7 @@ export function renderAeroportoDisclosureHtml({
     if (lugaresNoMesmoAeroporto > 1) {
         const outros = lugaresNoMesmoAeroporto - 1;
         const quantos = outros === 1 ? 'outro lugar servido' : `outros ${outros} lugares servidos`;
-        partes.push(`<span class="ad-compartilhado">Esta tarifa também aparece para ${quantos} por ${escapeHtml(iata)}.</span>`);
+        partes.push(`<span class="ad-compartilhado">Mesma tarifa vale para ${quantos} por ${escapeHtml(iata)}.</span>`);
     }
 
     const textoDeslocamento = descreverDeslocamento(deslocamento, destino);
@@ -433,7 +433,7 @@ export function renderAeroportoDisclosureHtml({
         const fonte = deslocamento?.fonte ? ` <span class="ad-fonte">Fonte: ${escapeHtml(deslocamento.fonte)}</span>` : '';
         partes.push(`<span class="ad-deslocamento">${escapeHtml(textoDeslocamento)}${fonte}</span>`);
     } else if (lugaresNoMesmoAeroporto > 1) {
-        partes.push('<span class="ad-deslocamento">O destino final pode exigir deslocamento terrestre a partir do aeroporto. Esse trajeto não está incluído no preço.</span>');
+        partes.push('<span class="ad-deslocamento">Pode haver trecho terrestre do aeroporto até o destino, fora do preço.</span>');
     }
 
     return `<div class="airport-disclosure dest-via-aeroporto" data-aeroporto="${escapeHtml(iata)}">${partes.join('')}</div>`;
