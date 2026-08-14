@@ -165,7 +165,7 @@ export function avaliarViabilidade({
 // fechada, com o motivo explícito. O total principal conta só os
 // recomendáveis.
 // ============================================================
-export const TITULO_SECAO_NAO_RECOMENDADOS = 'Outras tarifas encontradas, mas não recomendadas para uma viagem tão curta';
+export const TITULO_SECAO_NAO_RECOMENDADOS = 'Tarifas que não cabem bem nesta janela';
 
 export function separarPorViabilidade(destinos) {
     const recomendados = [];

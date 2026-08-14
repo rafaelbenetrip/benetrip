@@ -72,9 +72,13 @@ export function janelasAtivas(hoje = hojeISO()) {
     for (let i = 0; i < FDS_ATIVOS; i++) {
         const ida = somarDias(proximaSexta, i * 7);
         const volta = somarDias(ida, 2);
+        // O rótulo é curto de propósito: ele aparece no chip, na barra da
+        // janela ativa e no título da lista, sempre ao lado das datas. Quando
+        // o fds imediato sai, quem explica a omissão é `omitidoPorAntecedencia`
+        // logo abaixo, não o rótulo.
         let rotulo;
         if (i === 0) {
-            rotulo = fdsImediatoOmitido ? 'Próximo fim de semana com tarifas disponíveis' : 'Este fim de semana';
+            rotulo = fdsImediatoOmitido ? 'Próximo fim de semana' : 'Este fim de semana';
         } else if (i === 1) {
             rotulo = fdsImediatoOmitido ? 'Em 2 semanas' : 'Próximo fim de semana';
         } else {
@@ -95,7 +99,7 @@ export function janelasAtivas(hoje = hojeISO()) {
                     ida: sextaImediata,
                     volta: somarDias(sextaImediata, 2),
                     diasAte: diasAteSextaImediata,
-                    explicacao: `O fim de semana de ${fmtCurta(sextaImediata)} está a menos de ${MIN_DIAS_ATE_SEXTA} dias: os preços de última hora mudam rápido demais para entrar aqui.`,
+                    explicacao: `O fim de semana de ${fmtCurta(sextaImediata)} ficou de fora: falta menos de ${MIN_DIAS_ATE_SEXTA} dias e o preço de última hora muda rápido demais.`,
                 }
                 : null,
         });

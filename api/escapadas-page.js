@@ -222,7 +222,7 @@ function renderPage({ cidadeAtual, cidades, janelas, janelaAtiva, hoje, isDefaul
                  onerror="this.style.display='none'">
             <h1 id="hero-title">Escapadas de Fim de Semana Saindo de ${escapeHtml(cidadeAtual.nome)}</h1>
             <p class="hero-subtitle" id="hero-subtitle">
-                Fins de semana e feriados nacionais com preço real por data, saindo de ${escapeHtml(cidadeAtual.nome)} (${escapeHtml(cidadeAtual.codigo)}). Para quem não está de férias, mas não abre mão de viajar.
+                Fins de semana e feriados nacionais saindo de ${escapeHtml(cidadeAtual.nome)} (${escapeHtml(cidadeAtual.codigo)}), com preço real por data. Para quem não está de férias.
             </p>
 
             <!-- BUSCA DE CIDADE (30 automáticas + qualquer aeroporto ao vivo) -->
@@ -280,7 +280,7 @@ function renderPage({ cidadeAtual, cidades, janelas, janelaAtiva, hoje, isDefaul
     <!-- Aviso de horários: o buscador devolve o preço da janela de datas,
          não os horários dos voos — então não prometemos "sem pedir folga" -->
     <p class="horarios-aviso container">
-        Datas que aproveitam o fim de semana. Os horários de ida e volta não vêm nesta busca, então confirme no Google Flights se você vai precisar de folga.
+        Os horários dos voos não vêm nesta busca: confirme no Google Flights se vai precisar de folga.
     </p>
     ${janelaAtiva?.omitidoPorAntecedencia ? `<p class="janela-omitida-aviso container">${escapeHtml(janelaAtiva.omitidoPorAntecedencia.explicacao)}</p>` : ''}
 
@@ -341,7 +341,7 @@ function renderPage({ cidadeAtual, cidades, janelas, janelaAtiva, hoje, isDefaul
                     <option value="queda">Maior queda de preço</option>
                     <option value="nome">Nome A-Z</option>
                 </select>
-                <span class="section-count" id="section-count">${recomendados.length} destino${recomendados.length !== 1 ? 's' : ''}${naoRecomendados.length > 0 ? ` &middot; ${naoRecomendados.length} fora da janela` : ''}</span>
+                <span class="section-count" id="section-count">${recomendados.length} destino${recomendados.length !== 1 ? 's' : ''}${naoRecomendados.length > 0 ? ` &middot; ${naoRecomendados.length} fora` : ''}</span>
             </div>
         </div>
         <div class="destinations-grid" id="destinations-grid" aria-live="polite" aria-busy="false">${recomendados.map((d) => renderCardHtml(d, { escapada: true, href: hrefDoDestino(d, cidadeAtual), compartilhamAeroporto: porAeroporto.get((d.aeroporto || '').toUpperCase()) || 0 })).join('')}</div>
@@ -469,8 +469,7 @@ function renderNaoRecomendadosHtml(naoRecomendados, cidadeAtual, porAeroporto) {
                 <span class="nao-recomendados-count">${naoRecomendados.length}</span>
             </summary>
             <p class="nao-recomendados-aviso">
-                Estes preços existem para estas datas, mas o tempo de deslocamento não cabe bem na janela.
-                Eles não entram na contagem principal.
+                O preço existe para estas datas, mas o deslocamento não cabe na janela. Fora da contagem principal.
             </p>
             <div class="destinations-grid">${cards}</div>
         </details>

@@ -162,14 +162,21 @@ export function descricaoEmenda(feriado) {
     const dia = nomeDiaSemana(feriado.data);
     const noitesTxt = `${janela.noites} noite${janela.noites > 1 ? 's' : ''}`;
 
+    // Frase curta: ela entra numa barra estreita no celular. O que não pode
+    // sair é a distinção entre dias livres e noites de viagem, nem o número
+    // de folgas exigidas.
     if (feriado.diaSemana === 6 || feriado.diaSemana === 0) {
-        return `cai no ${dia}, que já é dia livre, então não estende o fim de semana (${noitesTxt} de viagem)`;
+        return `${dia}, dia que já era livre: não estende o fim de semana (${noitesTxt})`;
     }
     if (janela.folga === 0) {
-        return `cai numa ${dia} e rende ${janela.diasLivres} dias livres sem pedir folga (${noitesTxt} de viagem)`;
+        return `${dia}: ${janela.diasLivres} dias livres sem pedir folga (${noitesTxt})`;
     }
     if (feriado.diaSemana === 3) {
-        return `cai numa ${dia}, no meio da semana: só vira viagem longa pedindo ${janela.folga} dias de folga (${noitesTxt})`;
+        return `${dia}, no meio da semana: só vira viagem com ${janela.folga} dias de folga (${noitesTxt})`;
     }
-    return `cai numa ${dia} e, pedindo ${janela.folga} dia${janela.folga > 1 ? 's' : ''} de folga, rende ${janela.diasLivres} dias livres (${noitesTxt} de viagem)`;
+    // Sobram terça e quinta, que é o caso clássico de emenda: o feriado fica
+    // colado no fim de semana com um dia de folga no meio. Dizer "emenda" é o
+    // que a pessoa procura, e cabe trocando "pedindo N dias de folga" por
+    // "com N folga" — a frase fica um caractere mais curta que antes.
+    return `${dia}: emenda de ${janela.diasLivres} dias livres com ${janela.folga} folga${janela.folga > 1 ? 's' : ''} (${noitesTxt})`;
 }
