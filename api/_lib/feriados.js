@@ -174,5 +174,9 @@ export function descricaoEmenda(feriado) {
     if (feriado.diaSemana === 3) {
         return `${dia}, no meio da semana: só vira viagem com ${janela.folga} dias de folga (${noitesTxt})`;
     }
-    return `${dia}: ${janela.diasLivres} dias livres pedindo ${janela.folga} dia${janela.folga > 1 ? 's' : ''} de folga (${noitesTxt})`;
+    // Sobram terça e quinta, que é o caso clássico de emenda: o feriado fica
+    // colado no fim de semana com um dia de folga no meio. Dizer "emenda" é o
+    // que a pessoa procura, e cabe trocando "pedindo N dias de folga" por
+    // "com N folga" — a frase fica um caractere mais curta que antes.
+    return `${dia}: emenda de ${janela.diasLivres} dias livres com ${janela.folga} folga${janela.folga > 1 ? 's' : ''} (${noitesTxt})`;
 }
