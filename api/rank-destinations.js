@@ -9,6 +9,11 @@ import {
     violaRestricaoObjetiva,
     descreverPenalidades,
 } from './_lib/flight-quality.js';
+import {
+    INSTRUCOES_SAZONALIDADE,
+    aplicarGuardaSazonal,
+    TEXTO_SEM_FONTE,
+} from './_lib/seasonal-claims.js';
 
 function getCerebrasKey() {
     return process.env.CEREBRAS_KEY || process.env.CEREBRAS_API_KEY || null;
@@ -175,11 +180,9 @@ CRITÉRIOS DE SELEÇÃO (em ordem de prioridade):
 6. DIVERSIDADE: Não repita países
 ${(criancas > 0 || bebes > 0) ? '7. LOGÍSTICA FAMILIAR: Prefira voos diretos ou com menos paradas' : ''}
 
-REGRAS DE SAZONALIDADE (OBRIGATÓRIO):
-✓ NUNCA apresente fenômeno sazonal (lagoas cheias, neve, floração, desova, clima perfeito) como GARANTIDO
-✓ Se a experiência típica do destino depende da época e ${nomeMesViagem || 'o mês da viagem'} está fora do período mais favorável, diga isso em "adequacao_epoca" (ex: "fora do período mais favorável para as lagoas, confirme as condições antes da viagem")
-✓ Use expressões como "costuma", "geralmente", "as condições variam nesta época", nunca certezas
-✓ Preencha "adequacao_epoca" (1 frase sobre o destino nessas datas) e "ponto_negativo" (1 ponto de atenção honesto: escalas, chuva, alta temporada, deslocamento etc.) para CADA destino escolhido
+${INSTRUCOES_SAZONALIDADE}
+
+Preencha "adequacao_epoca" (1 a 2 frases sobre o destino nessas datas, seguindo as regras acima) e "ponto_negativo" (1 ponto de atenção honesto: escalas, chuva, alta temporada, deslocamento etc.) para CADA destino escolhido.
 
 REGRAS:
 ✓ Use APENAS IDs da lista (1-${destinos.length})
@@ -278,6 +281,10 @@ JSON:
             const idx = item.id - 1;
             if (idx < 0 || idx >= destinosQualidade.length) return null;
             const d = destinosQualidade[idx];
+            const guardaEpoca = aplicarGuardaSazonal(item.adequacao_epoca, { verificado: false });
+            if (guardaEpoca.descartada) {
+                console.warn(`🚫 Sazonalidade descartada em ${d.name}: afirmação sem fonte ("${String(item.adequacao_epoca).slice(0, 90)}")`);
+            }
             return {
                 id: item.id,
                 name: d.name,
@@ -295,7 +302,14 @@ JSON:
                 razao: item.razao || '',
                 comentario: item.comentario || '',
                 dica: item.dica || '',
-                adequacao_epoca: item.adequacao_epoca || '',
+                // Segunda camada, determinística: o prompt proíbe afirmar
+                // fenômeno sazonal, mas prompt não é garantia. Frase que
+                // afirme lagoas cheias, neve, floração ou clima garantido sem
+                // fonte é DESCARTADA aqui, e o card fica sem comentário de
+                // época em vez de exibir uma previsão que não sustentamos.
+                adequacao_epoca: guardaEpoca.texto || '',
+                adequacao_epoca_descartada: guardaEpoca.descartada,
+                adequacao_epoca_substituta: guardaEpoca.descartada ? TEXTO_SEM_FONTE : '',
                 ponto_negativo: item.ponto_negativo || '',
             };
         };

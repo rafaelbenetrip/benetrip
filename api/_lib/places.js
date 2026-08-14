@@ -7,8 +7,19 @@
 // Não existe catálogo local de atrações ou restaurantes aqui: o resolvedor
 // funciona para qualquer cidade do mundo, com cache técnico por consulta.
 //
-// Provedor: Google Places (GOOGLE_PLACES_API_KEY | GOOGLE_API_KEY), o mesmo já
-// usado em api/image-search.js para pontos turísticos.
+// DESLIGADO POR PADRÃO. Sem opt-in em ROTEIRO_VALIDAR_LUGARES, nenhuma
+// chamada externa acontece e todo candidato fica `not_verified` — o que já
+// produz o comportamento correto: sugestão por categoria e região, sem nome
+// de estabelecimento inventado.
+//
+// Provedor: SearchAPI.io com engine=google_maps, a mesma credencial das
+// buscas de voo. NÃO usamos token do Google aqui.
+//
+// A parte que mais importa desta camada NÃO depende de rede:
+// ehCandidatoEspeculativo() e reconciliarCusto() são determinísticos e
+// continuam valendo com o provedor desligado. É o filtro determinístico que
+// mata "Café do Forte, se acessível, ou um café similar", o exemplo da
+// auditoria.
 //
 // Estados possíveis para um candidato:
 //   verified            encontrado, com identificador e endereço
@@ -30,12 +41,15 @@ export const STATUS_LUGAR = {
 
 export const TEXTO_HORARIO_NAO_VERIFICADO = 'Horário não verificado, confirme antes de ir.';
 
-function chaveApi() {
-    return process.env.GOOGLE_PLACES_API_KEY || process.env.GOOGLE_API_KEY || null;
+// Opt-in explícito: uma chamada por atividade do roteiro é custo real.
+const VALORES_LIGADOS = new Set(['1', 'true', 'on', 'sim']);
+
+export function placesHabilitado(env = process.env) {
+    return VALORES_LIGADOS.has(String(env.ROTEIRO_VALIDAR_LUGARES ?? '').trim().toLowerCase());
 }
 
-export function placesDisponivel() {
-    return Boolean(chaveApi());
+export function placesDisponivel(env = process.env) {
+    return placesHabilitado(env) && Boolean(env.SEARCHAPI_KEY);
 }
 
 function naoVerificado(nome, motivo) {
@@ -62,48 +76,49 @@ function naoVerificado(nome, motivo) {
 export async function resolverLugar({ nome, cidade = '', pais = '', diaDaSemana = null, idioma = 'pt-BR' }) {
     const consulta = String(nome || '').trim();
     if (!consulta) return naoVerificado(consulta, 'nome_vazio');
-    const key = chaveApi();
-    if (!key) return naoVerificado(consulta, 'provedor_indisponivel');
+    if (!placesDisponivel()) return naoVerificado(consulta, 'provedor_indisponivel');
 
     const termo = [consulta, cidade, pais].filter(Boolean).join(', ');
     const cacheKey = `place|${idioma}|${termo.toLowerCase()}`;
 
     const base = await comCache(cacheKey, TTL_LUGAR_MS, async () => {
         try {
-            const url = new URL('https://maps.googleapis.com/maps/api/place/textsearch/json');
-            url.searchParams.set('query', termo);
-            url.searchParams.set('language', idioma);
-            url.searchParams.set('key', key);
+            const url = new URL('https://www.searchapi.io/api/v1/search');
+            url.searchParams.set('engine', 'google_maps');
+            url.searchParams.set('api_key', process.env.SEARCHAPI_KEY);
+            url.searchParams.set('q', termo);
+            url.searchParams.set('hl', idioma);
 
-            const resp = await fetch(url.toString());
+            const resp = await fetch(url.toString(), { headers: { Accept: 'application/json' } });
             if (!resp.ok) return naoVerificado(consulta, `http_${resp.status}`);
             const data = await resp.json();
-            const lugar = (data.results || [])[0];
+            const lugar = (data.local_results || [])[0];
             if (!lugar) return naoVerificado(consulta, 'nao_encontrado');
 
-            const temEndereco = Boolean(lugar.formatted_address);
-            const temCoordenadas = Boolean(lugar.geometry?.location);
+            const endereco = lugar.address || null;
+            const coords = (lugar.gps_coordinates && lugar.gps_coordinates.latitude != null)
+                ? { lat: lugar.gps_coordinates.latitude, lng: lugar.gps_coordinates.longitude }
+                : null;
 
             return {
-                status: temEndereco && temCoordenadas ? STATUS_LUGAR.VERIFICADO : STATUS_LUGAR.PARCIAL,
+                status: endereco && coords ? STATUS_LUGAR.VERIFICADO : STATUS_LUGAR.PARCIAL,
                 consulta,
-                nomeOficial: lugar.name || consulta,
-                idExterno: lugar.place_id || null,
-                endereco: lugar.formatted_address || null,
-                coordenadas: temCoordenadas
-                    ? { lat: lugar.geometry.location.lat, lng: lugar.geometry.location.lng }
-                    : null,
-                categoria: (lugar.types || [])[0] || null,
-                // business_status vem do provedor; ausência NÃO vira "aberto"
+                nomeOficial: lugar.title || consulta,
+                idExterno: lugar.place_id || lugar.data_id || null,
+                endereco,
+                coordenadas: coords,
+                categoria: lugar.type || (lugar.types || [])[0] || null,
+                // Ausência de status NÃO vira "aberto"
                 statusFuncionamento: lugar.business_status || null,
-                // opening_hours.open_now é volátil e não vale para uma data
-                // futura: só guardamos se o provedor mandou o horário semanal
-                horarioSemanal: lugar.opening_hours?.weekday_text || null,
+                // Só guardamos o quadro semanal quando o provedor o envia
+                horarioSemanal: Array.isArray(lugar.operating_hours)
+                    ? lugar.operating_hours
+                    : (lugar.hours || null),
                 urlMapa: lugar.place_id
                     ? `https://www.google.com/maps/place/?q=place_id:${encodeURIComponent(lugar.place_id)}`
                     : null,
                 verificadoEm: new Date().toISOString(),
-                fonte: 'Google Places',
+                fonte: 'SearchAPI Maps',
             };
         } catch (err) {
             console.warn(`[Places] Falha ao resolver "${termo}": ${err.message}`);

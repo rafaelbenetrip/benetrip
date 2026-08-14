@@ -32,16 +32,15 @@ test('funciona igual para um destino fora do Brasil', () => {
 // ============================================================
 // SEM GROUNDING NÃO HÁ AFIRMAÇÃO
 // ============================================================
-test('sem provedor de busca configurado o status é unavailable', async (t) => {
+test('com o grounding desligado o status é unavailable', async (t) => {
     limparCache();
     const salvos = {
-        GOOGLE_API_KEY: process.env.GOOGLE_API_KEY,
-        GOOGLE_SEARCH_ENGINE_ID: process.env.GOOGLE_SEARCH_ENGINE_ID,
+        BENETRIP_GROUNDING_WEB: process.env.BENETRIP_GROUNDING_WEB,
         SEARCHAPI_KEY: process.env.SEARCHAPI_KEY,
     };
-    delete process.env.GOOGLE_API_KEY;
-    delete process.env.GOOGLE_SEARCH_ENGINE_ID;
-    delete process.env.SEARCHAPI_KEY;
+    // Credencial presente e flag ausente: é o estado padrão de produção
+    delete process.env.BENETRIP_GROUNDING_WEB;
+    process.env.SEARCHAPI_KEY = 'chave-de-teste';
     t.after(() => {
         for (const [k, v] of Object.entries(salvos)) {
             if (v === undefined) delete process.env[k];
@@ -71,13 +70,10 @@ test('parâmetros inválidos não geram afirmação', async () => {
 // ============================================================
 test('o lote é limitado aos destinos que serão exibidos', async (t) => {
     limparCache();
-    const salvo = process.env.SEARCHAPI_KEY;
-    const salvoGoogle = process.env.GOOGLE_API_KEY;
-    delete process.env.SEARCHAPI_KEY;
-    delete process.env.GOOGLE_API_KEY;
+    const salvo = process.env.BENETRIP_GROUNDING_WEB;
+    delete process.env.BENETRIP_GROUNDING_WEB;
     t.after(() => {
-        if (salvo !== undefined) process.env.SEARCHAPI_KEY = salvo;
-        if (salvoGoogle !== undefined) process.env.GOOGLE_API_KEY = salvoGoogle;
+        if (salvo !== undefined) process.env.BENETRIP_GROUNDING_WEB = salvo;
         limparCache();
     });
 

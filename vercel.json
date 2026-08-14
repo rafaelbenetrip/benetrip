@@ -102,10 +102,10 @@
     }
   },
   "redirects": [
-    { "source": "/multidatas", "destination": "/comparar-voos", "permanent": true, "statusCode": 308 },
-    { "source": "/multidatas.html", "destination": "/comparar-voos", "permanent": true, "statusCode": 308 },
-    { "source": "/create-itinerary", "destination": "/roteiro-viagem", "permanent": true, "statusCode": 308 },
-    { "source": "/create-itinerary.html", "destination": "/roteiro-viagem", "permanent": true, "statusCode": 308 }
+    { "source": "/multidatas", "destination": "/comparar-voos", "statusCode": 308 },
+    { "source": "/multidatas.html", "destination": "/comparar-voos", "statusCode": 308 },
+    { "source": "/create-itinerary", "destination": "/roteiro-viagem", "statusCode": 308 },
+    { "source": "/create-itinerary.html", "destination": "/roteiro-viagem", "statusCode": 308 }
   ],
   "rewrites": [
     { "source": "/destinos-baratos", "destination": "/api/destinos-baratos-page" },

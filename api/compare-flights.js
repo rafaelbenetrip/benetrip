@@ -38,6 +38,30 @@ const ENRIQUECIMENTO = {
     orcamentoTotalMs: 40000,
 };
 
+// ════════════════════════════════════════════════════════════
+// FLAG DO ENRIQUECIMENTO — DESLIGADO POR PADRÃO
+//
+// A SearchAPI é o provedor principal e o único obrigatório desta ferramenta.
+// Buscar propostas completas na Travelpayouts é um passo EXTRA, que só existe
+// para permitir eleger um vencedor quando o engine devolve tarifa sem trecho
+// de volta.
+//
+// Ele usa a mesma credencial da Busca de Voos, então ligaria sozinho em
+// produção só por ela existir. Isso seria uma decisão de custo tomada por
+// omissão, e não é assim que se decide gastar dinheiro: agora exige opt-in
+// explícito via COMPARE_FLIGHTS_ENRIQUECER.
+//
+// Desligado, a ferramenta não perde correção nenhuma: a matriz permanece
+// indicativa e simplesmente não elege vencedor, que já é a leitura honesta de
+// uma tarifa sem volta definida. O que se perde é a chance de, às vezes,
+// conseguir a comparação completa.
+// ════════════════════════════════════════════════════════════
+const VALORES_LIGADOS = new Set(['1', 'true', 'on', 'sim']);
+
+export function enriquecimentoHabilitado(env = process.env) {
+    return VALORES_LIGADOS.has(String(env.COMPARE_FLIGHTS_ENRIQUECER ?? '').trim().toLowerCase());
+}
+
 async function searchFlights(params, label) {
     const url = new URL('https://www.searchapi.io/api/v1/search');
 
@@ -181,6 +205,11 @@ async function enriquecerComPropostasCompletas({
 
     if (pendentes.length === 0) {
         return { tentado: false, motivo: 'nada_pendente', resolvidas: 0 };
+    }
+    // Opt-in explícito: sem a flag, nenhuma chamada extra é feita e a matriz
+    // permanece indicativa (comportamento correto para tarifa sem volta).
+    if (!enriquecimentoHabilitado()) {
+        return { tentado: false, motivo: 'desligado_por_flag', resolvidas: 0 };
     }
     if (!travelpayoutsDisponivel()) {
         console.log('ℹ️ Propostas completas indisponíveis (AVIASALES_TOKEN/MARKER ausentes): matriz permanece indicativa');
