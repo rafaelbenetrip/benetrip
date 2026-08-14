@@ -626,7 +626,7 @@ function renderBreadcrumbJsonLd(cidadeAtual, isDefault, canonicalUrl) {
 }
 
 function renderItemListJsonLd(cidadeAtual, janelaAtiva, recomendados, canonicalUrl) {
-    const top = destinos.slice(0, 20);
+    const top = recomendados.slice(0, 20);
     const dataSnapshot = janelaAtiva.snapshot?.data || null;
 
     let priceValidUntil = null;
@@ -643,7 +643,7 @@ function renderItemListJsonLd(cidadeAtual, janelaAtiva, recomendados, canonicalU
         '@type': 'ItemList',
         name: `Escapadas saindo de ${cidadeAtual.nome} · ${janelaAtiva.rotulo} (${janelaAtiva.rotuloDatas})`,
         itemListOrder: 'https://schema.org/ItemListOrderAscending',
-        numberOfItems: destinos.length,
+        numberOfItems: recomendados.length,
         itemListElement: top.map((d, i) => ({
             '@type': 'ListItem',
             position: i + 1,
