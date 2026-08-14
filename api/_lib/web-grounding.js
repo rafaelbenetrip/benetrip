@@ -4,30 +4,38 @@
 // projeto. Serve para SUSTENTAR afirmações factuais com fonte: sazonalidade de
 // um destino, funcionamento de uma atração, condições de um período.
 //
-// Provedores, nesta ordem:
-//   1. Google Custom Search  (GOOGLE_API_KEY + GOOGLE_SEARCH_ENGINE_ID)
-//   2. SearchAPI.io engine=google (SEARCHAPI_KEY) — já usado nas buscas de voo
+// DESLIGADO POR PADRÃO. Nenhuma busca acontece sem opt-in explícito em
+// BENETRIP_GROUNDING_WEB (1, true, on ou sim).
+//
+// Provedor: SearchAPI.io com engine=google, a mesma credencial já usada nas
+// buscas de voo. NÃO usamos token do Google aqui.
 //
 // A interface nunca fala direto com um fornecedor: consome sempre este módulo.
-// Sem provedor configurado, `buscarNaWeb` devolve lista vazia e quem chama
+// Sem provedor habilitado, `buscarNaWeb` devolve lista vazia e quem chama
 // OMITE a afirmação — nunca preenche a lacuna com o conhecimento do modelo.
+//
+// Com o grounding desligado, a Descoberta continua correta por outro caminho:
+// api/_lib/seasonal-claims.js descarta, sem rede, qualquer frase que afirme
+// fenômeno sazonal sem fonte.
 
 import { comCache } from './external-cache.js';
 
 const TTL_BUSCA_MS = 24 * 60 * 60 * 1000; // resultado de busca: 1 dia
 
-export function groundingDisponivel() {
-    return Boolean(
-        (process.env.GOOGLE_API_KEY && process.env.GOOGLE_SEARCH_ENGINE_ID)
-        || process.env.SEARCHAPI_KEY
-    );
+// Opt-in explícito: buscar na web custa chamada por destino, então não pode
+// ligar sozinho só porque a credencial de voos existe.
+const VALORES_LIGADOS = new Set(['1', 'true', 'on', 'sim']);
+
+export function groundingHabilitado(env = process.env) {
+    return VALORES_LIGADOS.has(String(env.BENETRIP_GROUNDING_WEB ?? '').trim().toLowerCase());
 }
 
-export function provedoresDisponiveis() {
-    const lista = [];
-    if (process.env.GOOGLE_API_KEY && process.env.GOOGLE_SEARCH_ENGINE_ID) lista.push('google_custom_search');
-    if (process.env.SEARCHAPI_KEY) lista.push('searchapi_google');
-    return lista;
+export function groundingDisponivel(env = process.env) {
+    return groundingHabilitado(env) && Boolean(env.SEARCHAPI_KEY);
+}
+
+export function provedoresDisponiveis(env = process.env) {
+    return groundingDisponivel(env) ? ['searchapi_google'] : [];
 }
 
 // ============================================================
@@ -45,20 +53,6 @@ function normalizar(item, provedor) {
         dominio,
         provedor,
     };
-}
-
-async function buscarGoogleCustomSearch(consulta, { idioma, limite }) {
-    const url = new URL('https://www.googleapis.com/customsearch/v1');
-    url.searchParams.set('key', process.env.GOOGLE_API_KEY);
-    url.searchParams.set('cx', process.env.GOOGLE_SEARCH_ENGINE_ID);
-    url.searchParams.set('q', consulta);
-    url.searchParams.set('num', String(Math.min(limite, 10)));
-    if (idioma) url.searchParams.set('hl', idioma);
-
-    const resp = await fetch(url.toString());
-    if (!resp.ok) throw new Error(`Google Custom Search respondeu ${resp.status}`);
-    const data = await resp.json();
-    return (data.items || []).map((i) => normalizar(i, 'google_custom_search'));
 }
 
 async function buscarSearchApi(consulta, { idioma, limite }) {
@@ -85,14 +79,11 @@ export async function buscarNaWeb(consulta, { idioma = 'pt-BR', limite = 5 } = {
     if (!termo || !groundingDisponivel()) return [];
 
     return comCache(`web|${idioma}|${limite}|${termo.toLowerCase()}`, TTL_BUSCA_MS, async () => {
-        for (const provedor of provedoresDisponiveis()) {
-            try {
-                const fn = provedor === 'google_custom_search' ? buscarGoogleCustomSearch : buscarSearchApi;
-                const resultados = await fn(termo, { idioma, limite });
-                if (resultados.length > 0) return resultados;
-            } catch (err) {
-                console.warn(`[Grounding][${provedor}] ${err.message}`);
-            }
+        try {
+            const resultados = await buscarSearchApi(termo, { idioma, limite });
+            if (resultados.length > 0) return resultados;
+        } catch (err) {
+            console.warn(`[Grounding][searchapi_google] ${err.message}`);
         }
         return [];
     });

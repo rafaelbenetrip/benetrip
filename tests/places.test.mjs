@@ -42,14 +42,15 @@ test('nome concreto de lugar não é especulativo', () => {
 // ============================================================
 // SEM PROVEDOR NÃO EXISTE LUGAR VERIFICADO
 // ============================================================
-test('sem chave de lugares o candidato fica not_verified', async (t) => {
+test('com a validação desligada o candidato fica not_verified', async (t) => {
     limparCache();
     const salvos = {
-        GOOGLE_PLACES_API_KEY: process.env.GOOGLE_PLACES_API_KEY,
-        GOOGLE_API_KEY: process.env.GOOGLE_API_KEY,
+        ROTEIRO_VALIDAR_LUGARES: process.env.ROTEIRO_VALIDAR_LUGARES,
+        SEARCHAPI_KEY: process.env.SEARCHAPI_KEY,
     };
-    delete process.env.GOOGLE_PLACES_API_KEY;
-    delete process.env.GOOGLE_API_KEY;
+    // Credencial presente e flag ausente: é o estado padrão de produção
+    delete process.env.ROTEIRO_VALIDAR_LUGARES;
+    process.env.SEARCHAPI_KEY = 'chave-de-teste';
     t.after(() => {
         for (const [k, v] of Object.entries(salvos)) {
             if (v === undefined) delete process.env[k];
