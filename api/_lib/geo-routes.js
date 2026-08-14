@@ -1,5 +1,18 @@
 // api/_lib/geo-routes.js - BENETRIP ADAPTER DE GEO E ROTAS v1.0
 //
+// ⚠️ NÃO ESTÁ LIGADO A NENHUM ENDPOINT.
+//
+// O componente de aeroporto (renderAeroportoDisclosureHtml) aceita um campo
+// `deslocamento`, mas hoje NADA o preenche: nenhum endpoint importa este
+// módulo. Na prática o card diz apenas que "pode exigir deslocamento
+// terrestre", sem km nem tempo, e o custo destas APIs é zero.
+//
+// Para ativar seria preciso: chamar deslocamentoAeroportoDestino() no
+// endpoint que monta os cards (com limite de concorrência, só para os
+// destinos exibidos) e anexar o resultado em `destino.deslocamento`.
+// Isso liga duas APIs do Google Cloud que precisam estar habilitadas e são
+// cobradas à parte: Geocoding e Directions. Decisão de custo pendente.
+//
 // Resolve dinamicamente, para QUALQUER lugar do mundo:
 //   - coordenadas de um destino turístico (geocodificação);
 //   - coordenadas de um aeroporto pelo código IATA;
