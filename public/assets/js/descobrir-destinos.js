@@ -565,13 +565,12 @@ const BenetripDiscovery = {
                 </div>`;
     },
 
-    // Companhia da COTAÇÃO, não do itinerário inteiro: com escala, os
-    // trechos podem ser operados por empresas diferentes e o provedor
-    // devolve só uma. O rótulo não promete mais do que o dado sustenta.
+    // Companhia que o provedor devolveu para esta tarifa. Com escala, os
+    // trechos podem ser operados por empresas diferentes e vem só uma.
     ciaHtml(d) {
         const cia = String(d.flight?.airline_name || '').trim();
         if (!cia) return '';
-        return `<div class="destino-cia">🛫 Cotação com ${this.esc(cia)}</div>`;
+        return `<div class="destino-cia">🛫 ${this.esc(cia)}</div>`;
     },
 
     COMPANHIA_LABELS: {

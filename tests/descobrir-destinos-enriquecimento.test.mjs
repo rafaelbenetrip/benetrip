@@ -74,11 +74,11 @@ test('nome do destino é escapado no alt', () => {
 });
 
 // ============================================================
-// COMPANHIA — rótulo fala da cotação, não do itinerário inteiro
+// COMPANHIA
 // ============================================================
-test('companhia da tarifa aparece rotulada como cotação', () => {
+test('companhia da tarifa aparece no card', () => {
     const html = D.ciaHtml({ flight: { airline_name: 'TAP Air Portugal' } });
-    assert.match(html, /Cotação com TAP Air Portugal/);
+    assert.match(html, /TAP Air Portugal/);
 });
 
 test('sem companhia informada o bloco some', () => {
