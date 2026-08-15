@@ -111,6 +111,9 @@
     cursor: pointer;
     transition: var(--transition);
     text-align: center;
+    /* <button> não herda tipografia do body por padrão */
+    font-family: inherit;
+    color: inherit;
     font-size: 13px;
     font-weight: 600;
     white-space: nowrap;
@@ -125,6 +128,14 @@
     border-color: var(--blue);
     background: var(--blue);
     color: var(--white);
+}
+
+/* ---------- FORM: foco de teclado nos chips ---------- */
+.dia-chip:focus-visible,
+.mes-chip:focus-visible,
+.currency-chip:focus-visible {
+    outline: 3px solid var(--orange-dark);
+    outline-offset: 2px;
 }
 
 /* ---------- RESULTADOS: badges de classificação ---------- */
@@ -426,6 +437,21 @@
 .opcao-link svg {
     width: 16px;
     height: 16px;
+}
+
+/* ---------- CTA sempre alcançável no mobile ----------
+   A partir de 768px o form-row vira uma coluna só e o formulário fica mais
+   alto que a tela: o botão sobrava embaixo, fora da vista. Sticky mantém ele
+   na base enquanto o formulário está em cena e devolve ao lugar natural no
+   fim da rolagem — sem overlay fixo, que continuaria aparecendo por cima dos
+   resultados. O z-index fica abaixo do dropdown do autocomplete (100). */
+@media (max-width: 768px) {
+    .form-section .btn-submit {
+        position: sticky;
+        bottom: 12px;
+        z-index: 20;
+        box-shadow: 0 6px 20px rgba(232, 119, 34, 0.45);
+    }
 }
 
 /* ---------- Mobile ---------- */
