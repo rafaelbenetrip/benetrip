@@ -969,10 +969,80 @@ const BenetripDiscovery = {
     // Quando nada cabe no teto, devolve as opções mais próximas acima
     // do orçamento em lista SEPARADA (não misturada ao resultado).
     // ================================================================
-    // Limite prático de destinos enviados ao ranking (o LLM recebe a
-    // lista inteira no prompt). Os mais baratos entram primeiro, então
-    // nenhuma opção barata dentro do teto fica de fora por causa do corte.
+    // Limite prático de destinos enviados ao ranking: o LLM recebe a
+    // lista inteira no prompt, e cada linha custa ~122 caracteres.
     MAX_DESTINOS_RANKING: 60,
+
+    // Mesmas bandas de 10% usadas por faixaOrcamento() em
+    // api/_lib/flight-quality.js. A duplicação é intencional: aquele
+    // módulo é ESM de servidor e esta é uma página de navegador. Se a
+    // largura da banda mudar lá, muda aqui.
+    BANDAS_ORCAMENTO: 10,
+
+    faixaDoPreco(preco, orcamento) {
+        if (!orcamento || orcamento <= 0 || !preco || preco <= 0) return null;
+        const razao = Math.min(preco / orcamento, 1);
+        return Math.min(this.BANDAS_ORCAMENTO - 1, Math.floor(razao * this.BANDAS_ORCAMENTO));
+    },
+
+    // ================================================================
+    // AMOSTRAGEM POR FAIXA DE ORÇAMENTO
+    //
+    // O corte para o ranking pegava os N mais baratos. Enquanto o score
+    // premiava barateza isso concordava com o ranqueador; agora contradiz:
+    // com teto de R$ 12.000 e 116 destinos elegíveis, tudo acima de
+    // R$ 6.400 era descartado ANTES de qualquer ordenação — justamente a
+    // ponta que o ranking passou a preferir.
+    //
+    // Aqui as vagas são distribuídas entre as bandas de orçamento, uma por
+    // vez, começando pela mais alta. Bandas com poucos destinos não
+    // desperdiçam vaga: o rodízio continua enquanto houver candidatos e
+    // espaço. O custo em tokens do prompt não muda, porque o número de
+    // linhas continua o mesmo.
+    //
+    // Dentro de uma banda os preços variam no máximo 10%, então o critério
+    // de desempate é logístico: menos escalas primeiro e, aí sim, o que
+    // aproveita mais o orçamento.
+    // ================================================================
+    amostrarPorFaixa(dentro, orcamento, max) {
+        if (dentro.length <= max) return dentro.slice();
+        if (!orcamento || orcamento <= 0) return dentro.slice(0, max);
+
+        const porBanda = new Map();
+        for (const d of dentro) {
+            const banda = this.faixaDoPreco(d.flight?.price, orcamento);
+            if (banda === null) continue;
+            if (!porBanda.has(banda)) porBanda.set(banda, []);
+            porBanda.get(banda).push(d);
+        }
+        if (porBanda.size === 0) return dentro.slice(0, max);
+
+        for (const fila of porBanda.values()) {
+            fila.sort((a, b) =>
+                ((a.flight?.stops || 0) - (b.flight?.stops || 0)) ||
+                ((b.flight?.price || 0) - (a.flight?.price || 0))
+            );
+        }
+
+        // Rodízio do teto para baixo: sobras de vaga ficam com as bandas
+        // altas, que são as que o corte antigo eliminava.
+        const bandas = [...porBanda.keys()].sort((a, b) => b - a);
+        const escolhidos = [];
+        let avancou = true;
+        while (escolhidos.length < max && avancou) {
+            avancou = false;
+            for (const banda of bandas) {
+                if (escolhidos.length >= max) break;
+                const fila = porBanda.get(banda);
+                if (fila.length > 0) {
+                    escolhidos.push(fila.shift());
+                    avancou = true;
+                }
+            }
+        }
+
+        return escolhidos.sort((a, b) => (a.flight?.price || 0) - (b.flight?.price || 0));
+    },
     filtrarDestinos(destinos) {
         const { orcamento, moeda } = this.state.formData;
         const simbolo = this.getSimbolo(moeda);
@@ -996,9 +1066,18 @@ const BenetripDiscovery = {
             const mensagem = poucos
                 ? `🐕 A Tripinha encontrou ${dentro.length === 1 ? '1 destino' : `${dentro.length} destinos`} dentro do seu orçamento de ${simbolo} ${orcamento.toLocaleString('pt-BR')}. ${dentro.length === 1 ? 'É uma ótima opção!' : 'Confira!'}`
                 : '';
+
+            // A mensagem e o cenário olham TODOS os destinos elegíveis; a
+            // amostragem decide apenas quais vão ao ranqueador.
+            const amostra = this.amostrarPorFaixa(dentro, orcamento, this.MAX_DESTINOS_RANKING);
+            if (amostra.length < dentro.length) {
+                const precos = amostra.map(d => d.flight.price);
+                this.log(`🎚️ Amostragem por faixa: ${amostra.length} de ${dentro.length} enviados ao ranking (${simbolo} ${Math.min(...precos).toLocaleString('pt-BR')} a ${simbolo} ${Math.max(...precos).toLocaleString('pt-BR')})`);
+            }
+
             return {
                 cenario: poucos ? 'abaixo' : 'ideal',
-                destinos: dentro.slice(0, this.MAX_DESTINOS_RANKING),
+                destinos: amostra,
                 mensagem,
                 acimaOrcamento: []
             };
