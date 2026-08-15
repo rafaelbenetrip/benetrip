@@ -100,9 +100,11 @@
 }
 
 .mes-chip {
-    flex: 1;
-    min-width: 60px;
-    padding: 12px 8px;
+    /* flex-basis auto + min-width auto: o chip nunca encolhe abaixo do
+       próprio texto. Com min-width fixo e white-space: nowrap o rótulo
+       vazava para fora do card no mobile em vez de quebrar a linha. */
+    flex: 1 1 auto;
+    padding: 12px 10px;
     border: 2px solid var(--gray-border);
     border-radius: var(--radius-xs);
     background: var(--white);
@@ -169,11 +171,12 @@
 
 /* ---------- Legenda ---------- */
 .legenda-classes {
+    /* Coluna: a frase de abertura tem comprimento variável e, disputando a
+       mesma linha dos badges via space-between, produzia buracos aleatórios. */
     display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-    gap: 10px;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
     background: var(--white);
     border: 1px solid var(--gray-border);
     border-radius: var(--radius-xs);
@@ -181,6 +184,16 @@
     margin-bottom: 20px;
     font-size: 13px;
     color: #555;
+}
+
+.legenda-titulo {
+    font-size: 13px;
+    line-height: 1.5;
+    color: #555;
+}
+
+.legenda-titulo strong {
+    color: var(--gray-dark);
 }
 
 .legenda-itens {
@@ -338,9 +351,15 @@
 }
 
 .opcao-row {
-    display: flex;
+    /* Grid com áreas nomeadas: em flex-wrap a ordem visual mudava de linha
+       para linha conforme o tamanho da badge e do preço. */
+    display: grid;
+    /* largura mínima no preço para as badges terminarem na mesma coluna,
+       já que cada linha é um grid independente */
+    grid-template-columns: 1fr auto minmax(84px, auto) auto;
+    grid-template-areas: "info badge preco link";
     align-items: center;
-    gap: 12px;
+    gap: 8px 12px;
     padding: 10px 12px;
     border-radius: var(--radius-xs);
     background: var(--gray-light, #F5F7FA);
@@ -357,8 +376,13 @@
 }
 
 .opcao-info {
-    flex: 1;
+    grid-area: info;
     min-width: 0;
+}
+
+.opcao-row .badge-classe {
+    grid-area: badge;
+    justify-self: start;
 }
 
 .opcao-dates {
@@ -373,12 +397,15 @@
 }
 
 .opcao-preco {
+    grid-area: preco;
+    justify-self: end;
     font-size: 16px;
     font-weight: 700;
     white-space: nowrap;
 }
 
 .opcao-link {
+    grid-area: link;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -414,20 +441,29 @@
         flex-basis: 100%;
     }
 
-    .opcao-row {
-        flex-wrap: wrap;
-        gap: 8px;
+    /* base de 30% = 3 chips por linha, com as duas últimas dividindo a
+       segunda linha em vez de sobrar uma sozinha ocupando a largura toda */
+    .mes-chip {
+        flex-basis: 30%;
+        padding: 11px 8px;
+        font-size: 12px;
     }
 
-    .opcao-preco {
-        margin-left: auto;
+    /* Datas ocupam a linha inteira; badge, preço e link dividem a de baixo
+       sempre nas mesmas posições. */
+    .opcao-row {
+        grid-template-columns: 1fr minmax(84px, auto) auto;
+        grid-template-areas:
+            "info  info  info"
+            "badge preco link";
+        gap: 8px 10px;
     }
 }
 
 /* Referência da classificação e avisos de viabilidade */
 .legenda-contexto {
+    /* o espaçamento vem do gap da .legenda-classes */
     display: block;
-    margin-top: 6px;
     font-size: 11px;
     color: #777;
     line-height: 1.45;
