@@ -28,50 +28,20 @@ function carregarDiscovery() {
 
 const D = carregarDiscovery();
 
-function comDatasPedidas(ida, volta) {
-    return { ...D, state: { ...D.state, formData: { ...D.state.formData, dataIda: ida, dataVolta: volta } } };
-}
-
 // ============================================================
-// DATAS — as do viajante são as únicas que aparecem
+// DATAS — as do viajante são as únicas que existem na tela
 //
-// O provedor devolve as datas da tarifa, mas elas NÃO vão para o card:
-// um segundo par de datas ao lado do destino é lido como o período da
-// viagem e leva a comprar no dia errado. Quando a tarifa vem de outros
-// dias, o que fica em dúvida é o preço, e é só disso que o aviso trata.
+// O provedor devolve as datas da tarifa, mas o card não as usa de forma
+// alguma: as datas da viagem são as escolhidas no formulário, aparecem
+// no resumo de critérios e são as que o link do Google Flights carrega.
+// Um segundo par de datas ao lado do destino seria lido como o período
+// da viagem e levaria a comprar no dia errado.
 // ============================================================
-test('card nunca exibe as datas devolvidas pelo provedor', () => {
-    const ui = comDatasPedidas('2026-03-15', '2026-03-22');
-    const html = ui.avisoPrecoOutrasDatasHtml.call(ui, { outbound_date: '2026-03-17', return_date: '2026-03-24' });
-    for (const marca of ['17', '24', 'mar', '2026-03-17', '2026-03-24']) {
-        assert.ok(!html.includes(marca), `data da tarifa vazou para o card: ${marca}`);
+test('a renderização dos cards não toca nas datas do provedor', () => {
+    const fonte = readFileSync(arquivo, 'utf-8');
+    for (const campo of ['outbound_date', 'return_date']) {
+        assert.ok(!fonte.includes(campo), `${campo} voltou para a tela de resultados`);
     }
-});
-
-test('tarifa nas datas pedidas não gera aviso nenhum', () => {
-    const ui = comDatasPedidas('2026-03-15', '2026-03-22');
-    assert.equal(ui.avisoPrecoOutrasDatasHtml.call(ui, { outbound_date: '2026-03-15', return_date: '2026-03-22' }), '');
-});
-
-test('tarifa de outros dias marca o preço como aproximado', () => {
-    const ui = comDatasPedidas('2026-03-15', '2026-03-22');
-    const soIda = ui.avisoPrecoOutrasDatasHtml.call(ui, { outbound_date: '2026-03-17', return_date: '2026-03-22' });
-    const soVolta = ui.avisoPrecoOutrasDatasHtml.call(ui, { outbound_date: '2026-03-15', return_date: '2026-03-24' });
-    for (const html of [soIda, soVolta]) {
-        assert.match(html, /Preço aproximado/);
-        assert.match(html, /destino-preco-aviso/);
-    }
-});
-
-test('destino sem datas do provedor não gera aviso', () => {
-    const ui = comDatasPedidas('2026-03-15', '2026-03-22');
-    assert.equal(ui.avisoPrecoOutrasDatasHtml.call(ui, { outbound_date: null, return_date: null }), '');
-    assert.equal(ui.avisoPrecoOutrasDatasHtml.call(ui, {}), '');
-});
-
-test('sem datas no formulário não se inventa divergência', () => {
-    const ui = comDatasPedidas(null, null);
-    assert.equal(ui.avisoPrecoOutrasDatasHtml.call(ui, { outbound_date: '2026-03-17', return_date: '2026-03-24' }), '');
 });
 
 // ============================================================

@@ -565,26 +565,6 @@ const BenetripDiscovery = {
                 </div>`;
     },
 
-    // As datas da viagem são as que o viajante escolheu no formulário: são
-    // elas que o resumo de critérios mostra, e são elas que o link do Google
-    // Flights carrega. O card NÃO exibe as datas devolvidas pelo provedor —
-    // um segundo par de datas ao lado do destino é lido como o período da
-    // viagem e convida a comprar no dia errado.
-    //
-    // O que muda quando o engine devolve a tarifa em outros dias da janela
-    // (desvio que a Escapadas já registra no servidor) é a confiança no
-    // PREÇO: aquele valor não é o das datas escolhidas. É só isso que o
-    // aviso diz, sem competir com as datas do link.
-    avisoPrecoOutrasDatasHtml(d) {
-        const { dataIda, dataVolta } = this.state.formData;
-        const divergiu = (d.outbound_date && dataIda && d.outbound_date !== dataIda)
-            || (d.return_date && dataVolta && d.return_date !== dataVolta);
-        if (!divergiu) return '';
-        return `<div class="destino-preco-aviso">
-                    ⚠️ <strong>Preço aproximado:</strong> a tarifa encontrada é de outros dias dentro do período. Nas suas datas o valor pode mudar.
-                </div>`;
-    },
-
     // Companhia da COTAÇÃO, não do itinerário inteiro: com escala, os
     // trechos podem ser operados por empresas diferentes e o provedor
     // devolve só uma. O rótulo não promete mais do que o dado sustenta.
@@ -1299,7 +1279,6 @@ const BenetripDiscovery = {
                     <div class="preco">${this.formatarPreco(d.flight.price, moeda)}</div>
                     <div class="preco-label">ida e volta por pessoa</div>
                     <div class="acima-diferenca">+ ${this.formatarPreco(diff.diferenca, moeda)} acima do orçamento (+${diff.percentual}%)</div>
-                    ${this.avisoPrecoOutrasDatasHtml(d)}
                     <div class="flight-info">✈️ ${stopsTxt}</div>
                     ${this.ciaHtml(d)}
                     <a href="${this.safeHref(link)}" target="_blank" rel="noopener" class="btn-ver-voos btn-google-flights">Ver no Google Flights →</a>
@@ -1469,7 +1448,6 @@ const BenetripDiscovery = {
                                 <h4>${this.esc(d.name)}${d.country ? ', ' + this.esc(d.country) : ''}</h4>
                                 <div class="preco">${formatPreco(d)}</div>
                                 <div class="preco-label">ida e volta por pessoa</div>
-                                ${this.avisoPrecoOutrasDatasHtml(d)}
                                 <div class="flight-info">${formatParadas(d)}</div>
                                 ${this.ciaHtml(d)}
                                 ${aeroportoHtml(d)}
@@ -1496,7 +1474,6 @@ const BenetripDiscovery = {
                     <h3>${this.esc(destinos.surpresa.name)}${destinos.surpresa.country ? ', ' + this.esc(destinos.surpresa.country) : ''}</h3>
                     <div class="preco">${formatPreco(destinos.surpresa)}</div>
                     <div class="preco-label">ida e volta por pessoa</div>
-                    ${this.avisoPrecoOutrasDatasHtml(destinos.surpresa)}
                     <div class="flight-info">${formatParadas(destinos.surpresa)}</div>
                     ${this.ciaHtml(destinos.surpresa)}
                     ${aeroportoHtml(destinos.surpresa)}
@@ -1538,7 +1515,6 @@ const BenetripDiscovery = {
                 <h2>${this.esc(destinos.top_destino.name)}, ${this.esc(destinos.top_destino.country || '')}</h2>
                 <div class="preco">${formatPreco(destinos.top_destino)}</div>
                 <div class="preco-label">Passagem ida e volta por pessoa</div>
-                ${this.avisoPrecoOutrasDatasHtml(destinos.top_destino)}
                 <div class="flight-info">${formatParadas(destinos.top_destino)}</div>
                 ${this.ciaHtml(destinos.top_destino)}
                 ${aeroportoHtml(destinos.top_destino)}

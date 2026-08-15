@@ -1516,20 +1516,6 @@ body {
     background: var(--gray-light);
 }
 
-/* Aviso de preço: a tarifa veio de outros dias do período.
-   Qualifica o PREÇO — as datas da viagem seguem sendo as do
-   formulário, e são as únicas que o card e o link mostram. */
-.destino-preco-aviso {
-    background: #FEF3C7;
-    border: 1px solid #FCD34D;
-    color: #92400E;
-    border-radius: var(--border-radius-sm);
-    padding: 8px 12px;
-    font-size: 12px;
-    line-height: 1.5;
-    margin-bottom: 12px;
-}
-
 /* Companhia da cotação */
 .destino-cia {
     font-size: 13px;
