@@ -161,7 +161,7 @@
       "source": "/assets/js/:path*.js",
       "headers": [
         { "key": "Content-Type", "value": "application/javascript; charset=utf-8" },
-        { "key": "Cache-Control", "value": "public, max-age=86400" },
+        { "key": "Cache-Control", "value": "public, max-age=600, stale-while-revalidate=86400" },
         { "key": "X-Content-Type-Options", "value": "nosniff" }
       ]
     },
@@ -169,7 +169,7 @@
       "source": "/assets/css/:path*.css",
       "headers": [
         { "key": "Content-Type", "value": "text/css; charset=utf-8" },
-        { "key": "Cache-Control", "value": "public, max-age=86400" }
+        { "key": "Cache-Control", "value": "public, max-age=600, stale-while-revalidate=86400" }
       ]
     },
     {
