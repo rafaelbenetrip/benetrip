@@ -115,3 +115,27 @@ test('todo cron aponta para uma function declarada', () => {
         assert.ok(declaradas.has(arquivo), `cron ${c.path} não tem function declarada (${arquivo})`);
     });
 });
+
+// ============================================================
+// CACHE DOS ASSETS
+// ============================================================
+// CSS e JS não são versionados no nome do arquivo: /assets/css/discovery.css
+// é sempre a mesma URL. Com max-age longo e sem revalidação, uma correção de
+// layout já publicada continuava invisível por até um dia para quem já tinha
+// visitado o site — foi exatamente o que aconteceu com o cabeçalho da página
+// de escapadas. Enquanto não houver hash no nome, a janela de defasagem tem
+// que ser curta.
+test('CSS e JS revalidam rápido, porque a URL não muda quando o arquivo muda', () => {
+    const alvos = ['/assets/js/:path*.js', '/assets/css/:path*.css'];
+    alvos.forEach((source) => {
+        const regra = (cfg.headers || []).find((h) => h.source === source);
+        assert.ok(regra, `sem regra de headers para ${source}`);
+        const cache = regra.headers.find((h) => h.key === 'Cache-Control')?.value || '';
+        const maxAge = Number(/max-age=(\d+)/.exec(cache)?.[1] ?? -1);
+        assert.ok(maxAge >= 0, `${source} não declara max-age: ${cache}`);
+        assert.ok(maxAge <= 3600,
+            `${source} guarda por ${maxAge}s sem hash no nome: correção publicada demora a chegar`);
+        assert.match(cache, /stale-while-revalidate=\d+/,
+            `${source} precisa de stale-while-revalidate para não pagar latência na revalidação`);
+    });
+});

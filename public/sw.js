@@ -9,7 +9,7 @@
  * Para forçar atualização em todos os clientes, incremente VERSION.
  */
 
-const VERSION = 'benetrip-v1';
+const VERSION = 'benetrip-v2';
 const STATIC_CACHE = `${VERSION}-static`;
 const PAGES_CACHE = `${VERSION}-pages`;
 
@@ -82,10 +82,17 @@ self.addEventListener('fetch', (event) => {
   }
 
   // Assets estáticos: stale-while-revalidate
+  //
+  // A revalidação usa cache: 'no-cache' de propósito. Sem isso ela caía no
+  // cache HTTP do navegador (os assets vão com max-age=86400 no vercel.json)
+  // e o Service Worker regravava a mesma cópia velha: uma correção de CSS
+  // podia levar até um dia para aparecer, mesmo com o deploy pronto. Com
+  // 'no-cache' o navegador revalida no servidor — 304 quando nada mudou,
+  // então continua barato — e a correção entra na próxima navegação.
   if (isStaticAsset(url)) {
     event.respondWith(
       caches.match(request).then((cached) => {
-        const fetchPromise = fetch(request)
+        const fetchPromise = fetch(request, { cache: 'no-cache' })
           .then((response) => {
             if (response && response.ok) {
               const copy = response.clone();

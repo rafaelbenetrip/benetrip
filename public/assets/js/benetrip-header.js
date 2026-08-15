@@ -12,41 +12,51 @@
  *
  * USO: Adicione ao <body> de qualquer pagina:
  *   <div id="benetrip-header-root"></div>
- *   <script src="assets/js/benetrip-header.js"></script>
+ *   <script src="/assets/js/benetrip-header.js"></script>
+ *
+ * Sempre com a barra inicial: paginas em pasta (/escapadas/curitiba) nao
+ * encontram o script por caminho relativo.
  */
 
 (function () {
   'use strict';
 
-  // --- Detecta o caminho relativo correto para assets e links ---
-  const BASE = (function () {
-    const scripts = document.querySelectorAll('script[src*="benetrip-header"]');
-    if (scripts.length) {
-      const src = scripts[scripts.length - 1].getAttribute('src');
-      const parts = src.split('/');
-      const depth = parts.filter(p => p && p !== '.').length - 1;
-      return depth > 0 ? '../'.repeat(depth - 2) : '';
-    }
-    return '';
-  })();
+  // --- Caminhos do header sao absolutos, sempre a partir da raiz ---
+  //
+  // O header calculava o prefixo dos assets a partir do src do proprio script
+  // e devolvia '' (caminho relativo) para todas as paginas. Isso funciona em
+  // /voos ou /descobrir-destinos, que ficam na raiz, mas quebra em qualquer
+  // URL com pasta: em /escapadas/curitiba o navegador resolvia 'logo1.png'
+  // como /escapadas/logo1.png (404) e o logo aparecia como imagem quebrada.
+  // O site inteiro e servido a partir da raiz do dominio, entao o prefixo
+  // correto para todas as paginas e sempre '/'.
+  const BASE = '/';
 
   // --- Contexto da pagina atual (para breadcrumb) ---
   const PAGE_CONTEXT = (function () {
-    const page = (window.location.pathname.split('/').pop() || 'index.html').replace('.html', '');
     const map = {
-      'index': null,
       'descobrir-destinos': { label: 'Descobrir Destinos', icon: '&#x1F3AF;' },
       'todos-destinos': { label: 'Todos os Destinos', icon: '&#x1F30D;' },
       'voos': { label: 'Busca de Voos', icon: '&#x2708;&#xFE0F;' },
       'voos-baratos': { label: 'Voos Baratos', icon: '&#x1F4B8;' },
       'comparar-voos': { label: 'Comparar Voos', icon: '&#x1F500;' },
       'vai-e-vem': { label: 'Vai e Vem', icon: '&#x1F501;' },
+      'escapadas': { label: 'Escapadas', icon: '&#x1F3D6;&#xFE0F;' },
+      'destinos-baratos': { label: 'Destinos Baratos', icon: '&#x1F4C9;' },
       'roteiro-viagem': { label: 'Planejar Roteiro', icon: '&#x1F4CB;' },
       'minha-conta': { label: 'Minha Conta', icon: '&#x1F464;' },
       'quemsomos': { label: 'Quem Somos', icon: '&#x1F3E2;' },
       'perguntasfrequentes': { label: 'FAQ', icon: '&#x2753;' },
     };
-    return map[page] || null;
+    // Em /escapadas/curitiba a ferramenta esta no primeiro segmento e a
+    // cidade no ultimo: percorrer os segmentos acha o contexto nos dois
+    // formatos de URL, com e sem pasta.
+    const segments = window.location.pathname.split('/').filter(Boolean);
+    for (const segment of segments) {
+      const context = map[segment.replace('.html', '')];
+      if (context) return context;
+    }
+    return null;
   })();
 
   // --- HTML do componente ---
@@ -157,16 +167,17 @@
             </svg>
           </button>
           <a href="/" class="bh-logo-link" aria-label="Benetrip - pagina inicial">
-            <img src="${BASE}logo1.png" alt="Benetrip" class="bh-logo">
+            <img src="${BASE}logo1.png" alt="Benetrip" class="bh-logo"
+                 onerror="this.classList.add('bh-logo-fallback')">
           </a>
           ${PAGE_CONTEXT ? `<div class="bh-breadcrumb" id="bh-breadcrumb"><span class="bh-breadcrumb-sep">&#x203A;</span><span class="bh-breadcrumb-current">${PAGE_CONTEXT.label}</span></div>` : ''}
         </div>
 
         <nav class="bh-header-nav" aria-label="Navegacao principal">
-          <a href="${BASE}descobrir-destinos.html" class="bh-nav-link">&#x1F3AF; Descobrir</a>
-          <a href="${BASE}todos-destinos.html" class="bh-nav-link">&#x1F30D; Destinos</a>
-          <a href="${BASE}voos.html" class="bh-nav-link">&#x2708;&#xFE0F; Voos</a>
-          <a href="${BASE}roteiro-viagem.html" class="bh-nav-link">&#x1F4CB; Roteiro</a>
+          <a href="/descobrir-destinos" class="bh-nav-link">&#x1F3AF; Descobrir</a>
+          <a href="/todos-destinos" class="bh-nav-link">&#x1F30D; Destinos</a>
+          <a href="/voos" class="bh-nav-link">&#x2708;&#xFE0F; Voos</a>
+          <a href="/roteiro-viagem" class="bh-nav-link">&#x1F4CB; Roteiro</a>
         </nav>
 
         <div class="bh-header-auth">
@@ -437,7 +448,7 @@
     .bh-menu-btn:hover { background: rgba(255,255,255,0.28); }
     .bh-menu-btn svg { width: 22px; height: 22px; stroke: white; }
 
-    .bh-logo-link { display: flex; align-items: center; }
+    .bh-logo-link { display: flex; align-items: center; text-decoration: none; }
     .bh-logo {
       height: 52px;
       width: auto;
@@ -445,6 +456,16 @@
       transition: transform 0.3s ease, height 0.3s ease;
     }
     .bh-logo:hover { transform: scale(1.04); }
+    /* Rede ruim ou arquivo fora do ar: em vez do icone de imagem quebrada
+       com o alt sublinhado em azul, o alt vira o wordmark da marca. */
+    .bh-logo.bh-logo-fallback {
+      height: auto;
+      font-family: 'Poppins', sans-serif;
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: #fff;
+      white-space: nowrap;
+    }
 
     /* Breadcrumb */
     .bh-breadcrumb {
@@ -900,7 +921,7 @@
         if (typeof BenetripAuth !== 'undefined') {
           try { await BenetripAuth.signOut(); } catch (e) { /* ignore */ }
         }
-        window.location.href = BASE + 'index.html';
+        window.location.href = '/';
       });
     }
 
@@ -909,7 +930,7 @@
       if (typeof BenetripLoginModal !== 'undefined') {
         BenetripLoginModal.open();
       } else {
-        window.location.href = BASE + 'index.html';
+        window.location.href = '/';
       }
     });
 
