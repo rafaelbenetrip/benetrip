@@ -12,16 +12,22 @@ import vm from 'node:vm';
 
 const arquivo = fileURLToPath(new URL('../public/assets/js/descobrir-destinos.js', import.meta.url));
 
+const compartilhado = fileURLToPath(new URL('../public/assets/js/benetrip-shared-ui.js', import.meta.url));
+
 function carregarDiscovery() {
-    // O arquivo é um script de navegador: registra um listener no final e
-    // depende de `window`. Um contexto mínimo basta para os helpers puros.
+    // A página carrega benetrip-shared-ui.js ANTES de descobrir-destinos.js,
+    // então em produção window.BenetripSafe existe e é ele quem escapa e
+    // filtra URLs. Sem carregá-lo aqui, os testes exercitariam só o fallback
+    // interno — justamente o caminho que o navegador não usa.
     const contexto = {
         window: {},
         document: { addEventListener() {} },
+        URL,
         console,
     };
     contexto.window.document = contexto.document;
     vm.createContext(contexto);
+    vm.runInContext(readFileSync(compartilhado, 'utf-8'), contexto);
     vm.runInContext(`${readFileSync(arquivo, 'utf-8')}\n;globalThis.__discovery = BenetripDiscovery;`, contexto);
     return contexto.__discovery;
 }
@@ -71,6 +77,70 @@ test('URL com esquema perigoso nunca chega ao src', () => {
 test('nome do destino é escapado no alt', () => {
     const html = D.imagemHtml({ image: '', name: '"><script>alert(1)</script>', country: '' }, 'top');
     assert.ok(!html.includes('<script>'), 'nome do provedor não pode fechar o atributo');
+});
+
+// ============================================================
+// TRECHO AÉREO — a frase aparece uma vez só
+//
+// A disclosure de aeroporto já abre com "Voo direto até PUJ". Uma linha
+// separada com o mesmo texto era a duplicata visível no card.
+// ============================================================
+const voo = { name: 'Punta Cana', primary_airport: 'PUJ', flight: { stops: 0, flight_duration_minutes: 425 } };
+
+test('trecho aéreo não é repetido quando há aeroporto', () => {
+    const html = D.vooHtml(voo, 1);
+    const ocorrencias = html.split('Voo direto até PUJ').length - 1;
+    assert.equal(ocorrencias, 1, 'o trecho apareceu mais de uma vez no card');
+});
+
+test('duração acompanha o trecho sem repeti-lo', () => {
+    const html = D.vooHtml(voo, 1);
+    assert.match(html, /7h05 de voo/);
+    assert.match(html, /airport-disclosure/);
+});
+
+test('sem aeroporto o trecho ganha linha própria', () => {
+    const html = D.vooHtml({ name: 'X', flight: { stops: 2, flight_duration_minutes: 180 } }, 0);
+    assert.match(html, /Voo com 2 paradas/);
+    assert.match(html, /3h00 de voo/);
+    assert.ok(!html.includes('airport-disclosure'));
+});
+
+test('voo sem duração informada não inventa tempo', () => {
+    assert.equal(D.duracaoVooTxt({ flight: {} }), '');
+    const html = D.vooHtml({ name: 'X', flight: { stops: 0 } }, 0);
+    assert.ok(!html.includes('de voo'));
+});
+
+// ============================================================
+// ÉPOCA — a ressalva não se funde ao texto
+// ============================================================
+test('texto sem verificação leva ressalva em linha própria', () => {
+    const ui = { ...D, state: { ...D.state, sazonalidade: null } };
+    const html = ui.gerarBlocoSazonalidade.call(ui, {
+        name: 'Buenos Aires',
+        adequacao_epoca: 'Em outubro a cidade costuma ter temperaturas amenas.',
+    });
+    assert.match(html, /Em outubro a cidade costuma ter temperaturas amenas\./);
+    assert.match(html, /<span class="epoca-rodape">/);
+    // O texto e a ressalva não podem sair na mesma frase corrida
+    assert.ok(!/verificada Em outubro/.test(html), 'ressalva colou no texto');
+});
+
+test('frase descartada pela guarda do servidor não deixa o card mudo', () => {
+    const ui = { ...D, state: { ...D.state, sazonalidade: null } };
+    const html = ui.gerarBlocoSazonalidade.call(ui, {
+        name: 'Santiago',
+        adequacao_epoca: '',
+        adequacao_epoca_substituta: 'As condições variam conforme o período.',
+    });
+    assert.match(html, /As condições variam conforme o período\./);
+});
+
+test('sem nada sobre a época o bloco fica vazio, não inventa texto', () => {
+    const ui = { ...D, state: { ...D.state, sazonalidade: null } };
+    const html = ui.gerarBlocoSazonalidade.call(ui, { name: 'X' });
+    assert.match(html, /destino-epoca-slot/);
 });
 
 // ============================================================

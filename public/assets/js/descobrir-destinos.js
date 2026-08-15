@@ -565,6 +565,40 @@ const BenetripDiscovery = {
                 </div>`;
     },
 
+    duracaoVooTxt(d) {
+        const durMin = d.flight?.flight_duration_minutes || 0;
+        if (durMin <= 0) return '';
+        return `${Math.floor(durMin / 60)}h${String(durMin % 60).padStart(2, '0')} de voo`;
+    },
+
+    // "Direto" qualifica o voo ATÉ O AEROPORTO, não a chegada ao destino
+    // turístico. O aeroporto usado no preço fica sempre visível.
+    //
+    // A disclosure de aeroporto JÁ abre com esse trecho ("Voo direto até
+    // PUJ"), então uma linha separada repetia a frase inteira — era a
+    // duplicata que aparecia no card. Aqui o trecho sai uma vez só: dentro
+    // da disclosure quando há aeroporto, em linha própria quando não há.
+    vooHtml(d, lugaresNoMesmoAeroporto = 0) {
+        const iata = String(d.primary_airport || '').toUpperCase();
+        const dur = this.duracaoVooTxt(d);
+        const linhaDuracao = dur ? `<div class="flight-info">⏱️ ${this.esc(dur)}</div>` : '';
+
+        if (iata && window.BenetripUI) {
+            const disclosure = window.BenetripUI.aeroportoDisclosureHtml({
+                destino: d.name,
+                aeroporto: iata,
+                paradas: d.flight?.stops || 0,
+                lugaresNoMesmoAeroporto,
+                deslocamento: d.deslocamento || null,
+            });
+            if (disclosure) return `${disclosure}${linhaDuracao}`;
+        }
+
+        const stops = d.flight?.stops || 0;
+        const trecho = stops === 0 ? 'Voo direto' : stops === 1 ? 'Voo com 1 parada' : `Voo com ${stops} paradas`;
+        return `<div class="flight-info">✈️ ${this.esc(trecho)}${dur ? ` · ⏱️ ${this.esc(dur)}` : ''}</div>`;
+    },
+
     // Companhia que o provedor devolveu para esta tarifa. Com escala, os
     // trechos podem ser operados por empresas diferentes e vem só uma.
     ciaHtml(d) {
@@ -1069,26 +1103,37 @@ const BenetripDiscovery = {
             const alerta = info.suitability === 'low'
                 ? '<span class="epoca-alerta">Época pouco favorável</span>'
                 : '';
+            const rodape = [alerta, fonte].filter(Boolean).join(' ');
             return `<div class="destino-epoca destino-epoca-verificada" data-sazonalidade="${chave}">
-                📅 <strong>Nessas datas:</strong> ${this.esc(info.summary)} ${alerta} ${fonte}
+                📅 <strong>Nessas datas:</strong> ${this.esc(info.summary)}
+                ${rodape ? `<span class="epoca-rodape">${rodape}</span>` : ''}
             </div>`;
         }
 
         if (info && info.status === 'conflicting_sources') {
             const fonte = window.BenetripUI ? window.BenetripUI.fonteHtml(info.sourceName, info.sourceUrl) : '';
             return `<div class="destino-epoca destino-epoca-conflito" data-sazonalidade="${chave}">
-                📅 <strong>Nessas datas:</strong> ${this.esc(info.summary)} ${fonte}
+                📅 <strong>Nessas datas:</strong> ${this.esc(info.summary)}
+                <span class="epoca-rodape">As fontes consultadas divergem sobre essa época. ${fonte}</span>
             </div>`;
         }
 
-        // Sem verificação: o comentário da IA sobre a época só aparece
-        // rotulado como informação não verificada.
+        // Sem verificação, o texto da IA aparece, mas nunca como fato apurado.
+        // A ressalva vai em linha própria: colada na frente da frase, ela se
+        // fundia ao texto e o card lia "Informação não verificada Em outubro
+        // costuma ser quente", como se fosse uma sentença só.
         if (d.adequacao_epoca) {
-            const texto = window.BenetripUI
-                ? window.BenetripUI.naoVerificadoHtml(d.adequacao_epoca)
-                : `<span class="info-nao-verificada"><span class="info-nao-verificada-tag">Informação não verificada</span> ${this.esc(d.adequacao_epoca)}</span>`;
             return `<div class="destino-epoca destino-epoca-nao-verificada" data-sazonalidade="${chave}">
-                📅 <strong>Nessas datas:</strong> ${texto}
+                📅 <strong>Nessas datas:</strong> ${this.esc(d.adequacao_epoca)}
+                <span class="epoca-rodape">Impressão da Tripinha, ainda sem confirmação em fonte oficial.</span>
+            </div>`;
+        }
+
+        // A guarda do servidor descartou a frase da IA por afirmar fenômeno
+        // sazonal sem fonte. O card não fica mudo: diz o que dá para dizer.
+        if (d.adequacao_epoca_substituta) {
+            return `<div class="destino-epoca destino-epoca-nao-verificada" data-sazonalidade="${chave}">
+                📅 <strong>Nessas datas:</strong> ${this.esc(d.adequacao_epoca_substituta)}
             </div>`;
         }
 
@@ -1267,7 +1312,7 @@ const BenetripDiscovery = {
         const cards = acimaOrcamento.map(d => {
             const diff = d._acimaOrcamento || { diferenca: 0, percentual: 0 };
             const stops = d.flight?.stops || 0;
-            const stopsTxt = stops === 0 ? 'Voo direto' : stops === 1 ? '1 parada' : `${stops} paradas`;
+            const stopsTxt = stops === 0 ? 'Voo direto' : stops === 1 ? 'Voo com 1 parada' : `Voo com ${stops} paradas`;
             const link = d.primary_airport
                 ? this.buildGoogleFlightsUrl(originIata, d.primary_airport, dataIda, dataVolta, adultos, criancas, bebes, moeda)
                 : '#';
@@ -1349,41 +1394,22 @@ const BenetripDiscovery = {
             if (code) porAeroporto.set(code, (porAeroporto.get(code) || 0) + 1);
         });
 
-        // "Direto" qualifica o voo ATÉ O AEROPORTO, não a chegada ao destino
-        // turístico. O aeroporto usado no preço fica sempre visível.
-        const formatParadas = (d) => {
-            const stops = d.flight?.stops || 0;
-            const durMin = d.flight?.flight_duration_minutes || 0;
-            const durTxt = durMin > 0 ? ` · ⏱️ ${Math.floor(durMin / 60)}h${String(durMin % 60).padStart(2, '0')}` : '';
-            const iata = String(d.primary_airport || '').toUpperCase();
-            const trecho = window.BenetripUI
-                ? window.BenetripUI.textoTrechoAereo({ aeroporto: iata, paradas: stops })
-                : (stops === 0 ? 'Voo direto' : stops === 1 ? '1 parada' : `${stops} paradas`);
-            return `✈️ ${this.esc(trecho)}${durTxt}`;
-        };
-
-        const aeroportoHtml = (d) => {
-            const iata = String(d.primary_airport || '').toUpperCase();
-            if (!iata || !window.BenetripUI) return '';
-            return window.BenetripUI.aeroportoDisclosureHtml({
-                destino: d.name,
-                aeroporto: iata,
-                paradas: d.flight?.stops || 0,
-                lugaresNoMesmoAeroporto: porAeroporto.get(iata) || 0,
-                deslocamento: d.deslocamento || null,
-            });
-        };
+        const vooHtml = (d) => this.vooHtml(d, porAeroporto.get(String(d.primary_airport || '').toUpperCase()) || 0);
         // v5.0: transparência — adequação à época e ponto de atenção
         const epocaHtml = (d) => this.gerarBlocoSazonalidade(d);
         const negativoHtml = (d) => {
             if (!d.ponto_negativo) return '';
             return `<div class="destino-ponto-negativo">⚠️ <strong>Fique de olho:</strong> ${this.esc(d.ponto_negativo)}</div>`;
         };
+        // O contador diz em quantas buscas o MESMO destino apareceu — é
+        // corroboração da oferta, não julgamento sobre o lugar. "Alta
+        // confiança" sugeria a segunda coisa; o rótulo agora nomeia a
+        // primeira.
         const fonteBadge = (d) => {
             const count = d._source_count || 1;
-            if (count >= 3) return '<span class="fonte-badge fonte-alta" title="Encontrado em 3 buscas diferentes">⭐ Alta confiança</span>';
-            if (count >= 2) return '<span class="fonte-badge fonte-media" title="Encontrado em 2 buscas diferentes">✓ Confirmado</span>';
-            return '';
+            if (count < 2) return '';
+            const classe = count >= 3 ? 'fonte-alta' : 'fonte-media';
+            return `<span class="fonte-badge ${classe}" title="A mesma oferta apareceu em ${count} buscas independentes">✓ Preço visto em ${count} buscas</span>`;
         };
         const custoEstimado = (d) => {
             const passagem = d.flight?.price || 0;
@@ -1447,9 +1473,8 @@ const BenetripDiscovery = {
                                 <h4>${this.esc(d.name)}${d.country ? ', ' + this.esc(d.country) : ''}</h4>
                                 <div class="preco">${formatPreco(d)}</div>
                                 <div class="preco-label">ida e volta por pessoa</div>
-                                <div class="flight-info">${formatParadas(d)}</div>
+                                ${vooHtml(d)}
                                 ${this.ciaHtml(d)}
-                                ${aeroportoHtml(d)}
                                 ${custoEstimado(d)}
                                 <div class="descricao">${this.esc(d.razao || 'Boa opção!')}</div>
                                 ${comentarioHtml(d)}
@@ -1473,9 +1498,8 @@ const BenetripDiscovery = {
                     <h3>${this.esc(destinos.surpresa.name)}${destinos.surpresa.country ? ', ' + this.esc(destinos.surpresa.country) : ''}</h3>
                     <div class="preco">${formatPreco(destinos.surpresa)}</div>
                     <div class="preco-label">ida e volta por pessoa</div>
-                    <div class="flight-info">${formatParadas(destinos.surpresa)}</div>
+                    ${vooHtml(destinos.surpresa)}
                     ${this.ciaHtml(destinos.surpresa)}
-                    ${aeroportoHtml(destinos.surpresa)}
                     ${custoEstimado(destinos.surpresa)}
                     <div class="descricao">${this.esc(destinos.surpresa.razao || 'Descubra!')}</div>
                     ${comentarioHtml(destinos.surpresa)}
@@ -1514,9 +1538,8 @@ const BenetripDiscovery = {
                 <h2>${this.esc(destinos.top_destino.name)}, ${this.esc(destinos.top_destino.country || '')}</h2>
                 <div class="preco">${formatPreco(destinos.top_destino)}</div>
                 <div class="preco-label">Passagem ida e volta por pessoa</div>
-                <div class="flight-info">${formatParadas(destinos.top_destino)}</div>
+                ${vooHtml(destinos.top_destino)}
                 ${this.ciaHtml(destinos.top_destino)}
-                ${aeroportoHtml(destinos.top_destino)}
                 ${custoEstimado(destinos.top_destino)}
                 <div class="descricao">${this.esc(destinos.top_destino.razao || 'Perfeito para você!')}</div>
                 ${comentarioHtml(destinos.top_destino)}

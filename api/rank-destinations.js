@@ -184,12 +184,19 @@ ${INSTRUCOES_SAZONALIDADE}
 
 Preencha "adequacao_epoca" (1 a 2 frases sobre o destino nessas datas, seguindo as regras acima) e "ponto_negativo" (1 ponto de atenção honesto: escalas, chuva, alta temporada, deslocamento etc.) para CADA destino escolhido.
 
+O "ponto_negativo" fala do DESTINO OU DA VIAGEM, nunca dos dados desta lista.
+✗ Errado: "a oferta de hotéis não está especificada na lista", "não há alerta de voo", "faltam informações sobre o destino", "o preço não inclui bagagem porque não foi informado"
+✓ Certo: "o voo de 7 horas cansa quem viaja sozinho", "em outubro a cidade fica cheia de turistas", "o aeroporto fica longe do centro"
+Se não houver ponto de atenção relevante, devolva "ponto_negativo" como string vazia. Vazio é melhor que um comentário sobre a lista.
+
 REGRAS:
 ✓ Use APENAS IDs da lista (1-${destinos.length})
 ✓ Escreva "comentario" e "dica" em português brasileiro
+✓ NÃO comente a lista, os dados, o formato ou o que falta neles: o viajante não vê nada disso, só o card
 ✓ O "comentario" deve ser da Tripinha (cachorrinha mascote) falando DIRETAMENTE com o viajante, como amiga animada (ex: "Esse lugar é incrível! Você vai amar as praias de lá...")
 ✓ A "dica" também deve ter tom da Tripinha (ex: "Fica a dica da Tripinha: reserve o passeio X com antecedência!")
 ✓ Use no máximo 1 referência canina por destino para não saturar
+✓ "razao" e "comentario" aparecem um embaixo do outro no card: não repita a mesma ideia nos dois. A "razao" diz POR QUE este destino foi escolhido para este viajante; o "comentario" descreve COMO é estar lá
 ✓ NÃO use emoji nos textos (o frontend já cuida disso)
 ✓ NÃO use travessão (—) nos textos: escreva com vírgula, ponto ou dois-pontos
 ${observacoes ? '✓ O viajante deixou OBSERVAÇÕES PESSOAIS: faça referência a elas nos comentários e dicas, mostrando que a Tripinha levou em conta o pedido específico dele' : ''}
