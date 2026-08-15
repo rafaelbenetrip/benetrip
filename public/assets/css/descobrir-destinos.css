@@ -1477,3 +1477,81 @@ body {
     color: #E87722;
     white-space: nowrap;
 }
+
+/* ============================================================
+   ENRIQUECIMENTO DO CARD
+   Foto do destino, datas da tarifa e companhia aérea — dados que
+   o provedor já devolve e que a tela descartava.
+   ============================================================ */
+.destino-imagem-wrapper {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    overflow: hidden;
+    border-radius: var(--border-radius-sm);
+    margin-bottom: 16px;
+    background: #E4E4E4;
+}
+
+/* Cards em destaque ocupam a largura toda: faixa mais baixa evita
+   empurrar preço e botão para fora da primeira dobra no celular. */
+.destino-imagem-top,
+.destino-imagem-surpresa {
+    aspect-ratio: 2 / 1;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
+}
+
+.destino-imagem {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+/* O fallback é o avatar da Tripinha, não uma foto de lugar:
+   cabe inteiro em vez de ser cortado como paisagem. */
+.destino-imagem-fallback {
+    object-fit: contain;
+    padding: 16px;
+    background: var(--gray-light);
+}
+
+/* Datas da tarifa */
+.destino-datas {
+    font-size: 13px;
+    line-height: 1.6;
+    margin-bottom: 10px;
+}
+
+.destino-card .destino-datas {
+    color: #555;
+}
+
+.destino-datas-divergente {
+    border-left: 3px solid #F5A623;
+    padding-left: 10px;
+}
+
+.destino-datas-alerta {
+    display: inline-block;
+    background: #FEF3C7;
+    border: 1px solid #FCD34D;
+    color: #92400E;
+    border-radius: 4px;
+    padding: 1px 6px;
+    font-size: 11px;
+    font-weight: 600;
+    margin-left: 4px;
+}
+
+/* Companhia da cotação */
+.destino-cia {
+    font-size: 13px;
+    opacity: 0.85;
+    margin-bottom: 8px;
+}
+
+.destino-card .destino-cia {
+    color: #666;
+    opacity: 1;
+}

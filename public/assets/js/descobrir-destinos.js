@@ -538,6 +538,80 @@ const BenetripDiscovery = {
         if (window.BenetripSafe) return window.BenetripSafe.safeHref(u);
         return /^(https:|\/)/i.test(String(u || '')) ? this.esc(u) : '';
     },
+
+    // ================================================================
+    // ENRIQUECIMENTO DO CARD — dados que o provedor JÁ devolve
+    //
+    // /api/search-destinations guarda foto, datas da tarifa e companhia
+    // aérea por destino, e /api/rank-destinations os repassa intactos.
+    // A tela descartava os três na renderização. Nada aqui custa uma
+    // chamada extra: é dado já pago que não chegava ao viajante.
+    // ================================================================
+    MESES_CURTOS: ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'],
+
+    // Data ISO sem passar por new Date(): 'YYYY-MM-DD' parseado como Date
+    // vira UTC e volta um dia atrás em fuso negativo.
+    fmtDataCurta(iso) {
+        if (!iso || typeof iso !== 'string') return '';
+        const [ano, mes, dia] = iso.split('-').map(Number);
+        if (!ano || !mes || !dia || mes < 1 || mes > 12) return '';
+        return `${dia} ${this.MESES_CURTOS[mes - 1]}`;
+    },
+
+    fmtPeriodo(dataIda, dataVolta) {
+        const ida = this.fmtDataCurta(dataIda);
+        if (!ida) return '';
+        const volta = this.fmtDataCurta(dataVolta);
+        return volta ? `${ida} → ${volta}` : ida;
+    },
+
+    IMAGEM_FALLBACK: 'assets/images/tripinha/avatar-pensando.png',
+
+    // A foto vem do provedor, hospedada em domínio de terceiro. A URL é
+    // texto não confiável (safeHref) e o carregamento pode falhar por
+    // hotlinking: nos dois casos o card cai no avatar da Tripinha em vez
+    // de exibir um buraco.
+    imagemHtml(d, variante) {
+        const url = this.safeHref(d.image);
+        const src = url || this.IMAGEM_FALLBACK;
+        const semFoto = url ? '' : ' destino-imagem-fallback';
+        const alt = this.esc(`${d.name || 'Destino'}${d.country ? ', ' + d.country : ''}`);
+        return `<div class="destino-imagem-wrapper destino-imagem-${variante}">
+                    <img class="destino-imagem${semFoto}" src="${src}" alt="${alt}"
+                         loading="lazy" decoding="async"
+                         onerror="this.onerror=null;this.src='${this.IMAGEM_FALLBACK}';this.classList.add('destino-imagem-fallback')">
+                </div>`;
+    },
+
+    // A busca pede time_period=IDA..VOLTA, mas o engine pode devolver a
+    // tarifa em outras datas da janela — o mesmo desvio que a Escapadas já
+    // registra no servidor. Quando isso acontece, o preço do card não é o
+    // preço das datas pedidas, e o link do Google Flights (montado com as
+    // datas do formulário) vai mostrar outro valor. O card diz isso em vez
+    // de deixar a diferença passar despercebida.
+    datasTarifaHtml(d) {
+        const periodo = this.fmtPeriodo(d.outbound_date, d.return_date);
+        if (!periodo) return '';
+        const { dataIda, dataVolta } = this.state.formData;
+        const divergiu = (d.outbound_date && d.outbound_date !== dataIda)
+            || (d.return_date && d.return_date !== dataVolta);
+        const aviso = divergiu
+            ? '<span class="destino-datas-alerta">datas diferentes das que você pediu</span>'
+            : '';
+        return `<div class="destino-datas${divergiu ? ' destino-datas-divergente' : ''}">
+                    📅 <strong>Preço encontrado para:</strong> ${this.esc(periodo)} ${aviso}
+                </div>`;
+    },
+
+    // Companhia da COTAÇÃO, não do itinerário inteiro: com escala, os
+    // trechos podem ser operados por empresas diferentes e o provedor
+    // devolve só uma. O rótulo não promete mais do que o dado sustenta.
+    ciaHtml(d) {
+        const cia = String(d.flight?.airline_name || '').trim();
+        if (!cia) return '';
+        return `<div class="destino-cia">🛫 Cotação com ${this.esc(cia)}</div>`;
+    },
+
     COMPANHIA_LABELS: {
         0: { emoji: '🧳', texto: 'Sozinho(a)' },
         1: { emoji: '❤️', texto: 'Viagem romântica' },
@@ -1238,12 +1312,15 @@ const BenetripDiscovery = {
                 : '#';
             return `
                 <div class="destino-card destino-card-acima">
-                    <h4>${d.name}${d.country ? ', ' + d.country : ''}</h4>
+                    ${this.imagemHtml(d, 'alternativa')}
+                    <h4>${this.esc(d.name)}${d.country ? ', ' + this.esc(d.country) : ''}</h4>
                     <div class="preco">${this.formatarPreco(d.flight.price, moeda)}</div>
                     <div class="preco-label">ida e volta por pessoa</div>
                     <div class="acima-diferenca">+ ${this.formatarPreco(diff.diferenca, moeda)} acima do orçamento (+${diff.percentual}%)</div>
+                    ${this.datasTarifaHtml(d)}
                     <div class="flight-info">✈️ ${stopsTxt}</div>
-                    <a href="${link}" target="_blank" rel="noopener" class="btn-ver-voos btn-google-flights">Ver no Google Flights →</a>
+                    ${this.ciaHtml(d)}
+                    <a href="${this.safeHref(link)}" target="_blank" rel="noopener" class="btn-ver-voos btn-google-flights">Ver no Google Flights →</a>
                 </div>`;
         }).join('');
         return `
@@ -1405,11 +1482,14 @@ const BenetripDiscovery = {
                     <div class="alternativas-grid">
                         ${destinos.alternativas.map(d => `
                             <div class="destino-card">
+                                ${this.imagemHtml(d, 'alternativa')}
                                 ${fonteBadge(d)}
                                 <h4>${this.esc(d.name)}${d.country ? ', ' + this.esc(d.country) : ''}</h4>
                                 <div class="preco">${formatPreco(d)}</div>
                                 <div class="preco-label">ida e volta por pessoa</div>
+                                ${this.datasTarifaHtml(d)}
                                 <div class="flight-info">${formatParadas(d)}</div>
+                                ${this.ciaHtml(d)}
                                 ${aeroportoHtml(d)}
                                 ${custoEstimado(d)}
                                 <div class="descricao">${this.esc(d.razao || 'Boa opção!')}</div>
@@ -1428,12 +1508,15 @@ const BenetripDiscovery = {
         if (destinos.surpresa) {
             surpresaHtml = `
                 <div class="surpresa-card">
+                    ${this.imagemHtml(destinos.surpresa, 'surpresa')}
                     <div class="badge">🎁 DESTINO SURPRESA</div>
                     ${fonteBadge(destinos.surpresa)}
                     <h3>${this.esc(destinos.surpresa.name)}${destinos.surpresa.country ? ', ' + this.esc(destinos.surpresa.country) : ''}</h3>
                     <div class="preco">${formatPreco(destinos.surpresa)}</div>
                     <div class="preco-label">ida e volta por pessoa</div>
+                    ${this.datasTarifaHtml(destinos.surpresa)}
                     <div class="flight-info">${formatParadas(destinos.surpresa)}</div>
+                    ${this.ciaHtml(destinos.surpresa)}
                     ${aeroportoHtml(destinos.surpresa)}
                     ${custoEstimado(destinos.surpresa)}
                     <div class="descricao">${this.esc(destinos.surpresa.razao || 'Descubra!')}</div>
@@ -1467,12 +1550,15 @@ const BenetripDiscovery = {
             </div>
             ` : ''}
             <div class="top-destino">
+                ${this.imagemHtml(destinos.top_destino, 'top')}
                 <div class="badge">${totalExibidos === 1 ? 'DESTINO ENCONTRADO' : 'MELHOR DESTINO PARA VOCÊ'}</div>
                 ${fonteBadge(destinos.top_destino)}
                 <h2>${this.esc(destinos.top_destino.name)}, ${this.esc(destinos.top_destino.country || '')}</h2>
                 <div class="preco">${formatPreco(destinos.top_destino)}</div>
                 <div class="preco-label">Passagem ida e volta por pessoa</div>
+                ${this.datasTarifaHtml(destinos.top_destino)}
                 <div class="flight-info">${formatParadas(destinos.top_destino)}</div>
+                ${this.ciaHtml(destinos.top_destino)}
                 ${aeroportoHtml(destinos.top_destino)}
                 ${custoEstimado(destinos.top_destino)}
                 <div class="descricao">${this.esc(destinos.top_destino.razao || 'Perfeito para você!')}</div>
