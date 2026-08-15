@@ -14,6 +14,7 @@
 
 import { readFileSync } from 'fs';
 import { join } from 'path';
+import { avaliarIdentidade, identidadeQuebrada } from './_lib/destination-identity.js';
 
 export const maxDuration = 60;
 
@@ -65,6 +66,48 @@ const ESTRATEGIA_BUSCAS = {
         descricao: 'Oceania → Oceania, Ásia, América do Norte, Europa'
     },
 };
+
+// ============================================================
+// PREFERÊNCIA DO VIAJANTE → FILTRO TEMÁTICO DO PROVEDOR
+//
+// `interests` é parâmetro do motor google_travel_explore e tem conjunto
+// fechado de valores: "relax" é palavra da Benetrip e não existe do lado
+// do provedor, então traduzir é obrigatório. A questão é PARA O QUÊ.
+//
+// O filtro não decide só quais destinos voltam: o provedor devolve cada
+// destino já ILUSTRADO pelo tema. Com relax -> beaches, Belo Horizonte vinha
+// com foto de praia, e a mesma cidade trocava de foto quando o viajante
+// mudava a preferência.
+//
+// "Relax" para um viajante brasileiro pode ser serra, campo, pousada ou
+// praia. Reduzir tudo isso a "praia" era escolha nossa, não imposição do
+// provedor, e decidia por praia sem que ninguém tivesse pedido praia. Agora
+// relax não tem tradução temática, como já era o caso de urbano: vale a
+// busca ampla.
+//
+// A preferência não se perde. Ela chega inteira ao ranqueador, em
+// api/rank-destinations.js, que é onde a personalização acontece de fato —
+// o filtro aqui era uma segunda aplicação, mais grosseira, do mesmo dado.
+//
+// Aventura e cultura seguem traduzidos: "trilha" e "museu" atravessam a
+// tradução sem virar outra coisa.
+// ============================================================
+export const INTERESSE_PADRAO = 'popular';
+
+export const INTERESTS_MAP = {
+    relax: INTERESSE_PADRAO,
+    aventura: 'outdoors',
+    cultura: 'museums',
+    urbano: INTERESSE_PADRAO,
+};
+
+// Duas ou mais preferências não têm tradução possível: o provedor aceita um
+// tema só, e eleger um deles descartaria o outro em silêncio.
+export function resolverInterests(prefArray) {
+    const prefs = Array.isArray(prefArray) ? prefArray.filter(Boolean) : [];
+    if (prefs.length !== 1) return INTERESSE_PADRAO;
+    return INTERESTS_MAP[prefs[0]] || INTERESSE_PADRAO;
+}
 
 function getChaveContinente(continente) {
     const mapeamento = {
@@ -359,11 +402,10 @@ export default async function handler(req, res) {
         }
 
         // Preferências → interests
-        const INTERESTS_MAP = { 'relax': 'beaches', 'aventura': 'outdoors', 'cultura': 'museums', 'urbano': 'popular' };
         let prefArray = [];
         if (Array.isArray(preferencias)) prefArray = preferencias;
         else if (typeof preferencias === 'string') prefArray = preferencias.split(',').filter(Boolean);
-        const interests = prefArray.length === 1 ? (INTERESTS_MAP[prefArray[0]] || 'popular') : 'popular';
+        const interests = resolverInterests(prefArray);
         console.log(`🎯 Preferências: [${prefArray.join(', ')}] → interests: ${interests}`);
 
         // Parâmetros base
@@ -488,6 +530,39 @@ export default async function handler(req, res) {
             addDestinations(result.destinations, label);
         });
 
+        // ============================================================
+        // IDENTIDADE DO DESTINO
+        //
+        // O provedor devolve nome, país, aeroporto e coordenada como campos
+        // independentes: nada garante que os quatro descrevam o mesmo lugar.
+        // Aqui o par destino/aeroporto é conferido contra a tabela de
+        // aeroportos que o projeto já mantém.
+        //
+        // Aeroporto em país diferente do destino é comum e legítimo (Foz do
+        // Iguaçu/Puerto Iguazú), então vira ROTULO no card, não descarte.
+        // Descarte só quando a coordenada do destino cai fora do continente
+        // do aeroporto: aí o registro está quebrado e a tarifa não é daquele
+        // lugar.
+        // ============================================================
+        const lookupIata = getIataLookup();
+        let descartadosPorIdentidade = 0;
+        for (const [key, dest] of allDestinations) {
+            const identidade = avaliarIdentidade(dest, lookupIata);
+            if (identidadeQuebrada(identidade)) {
+                console.warn(`🚫 Identidade quebrada: ${dest.name} (${dest.country}) @${identidade.coordenadas} não fica em ${identidade.continenteAeroporto}, continente de ${identidade.aeroporto}`);
+                allDestinations.delete(key);
+                descartadosPorIdentidade++;
+                continue;
+            }
+            if (identidade.aeroportoEmOutroPais) {
+                console.log(`🛬 ${dest.name} (${dest.country}) usa ${identidade.aeroporto}, que fica em ${identidade.paisAeroporto}`);
+            }
+            dest._identidade = identidade;
+        }
+        if (descartadosPorIdentidade > 0) {
+            console.warn(`🚫 ${descartadosPorIdentidade} destino(s) descartado(s) por par destino/aeroporto inconsistente`);
+        }
+
         // Ordenar por preço
         const consolidated = Array.from(allDestinations.values()).sort((a, b) => {
             if (a.flight.price === 0 && b.flight.price === 0) return 0;
@@ -562,10 +637,17 @@ export default async function handler(req, res) {
                 origemTipo: isKgmid ? 'kgmid' : isMultiIata ? 'multi_iata' : 'iata',
                 escopoDestino: escopoLabel.toLowerCase(),
                 preferencias: prefArray,
+                // O filtro temático que o provedor aplicou. Ele não escolhe
+                // só QUAIS destinos voltam: a miniatura de cada destino volta
+                // ilustrada por ele. O card precisa saber disso para dizer sob
+                // que filtro a foto foi escolhida — relax e urbano não filtram
+                // mais, mas aventura e cultura continuam temáticas.
+                interests,
                 totalBuscas: buscasConfig.length,
                 totalBruto,
                 filtradosDomestico: apenasInternacional ? filtradosDomestico : 0,
                 filtradosInternacional: apenasNacional ? filtradosInternacional : 0,
+                descartadosPorIdentidade,
                 sources: sourcesInfo,
                 buscasDetalhadas: results.map((r, i) => ({
                     ordem: i + 1,

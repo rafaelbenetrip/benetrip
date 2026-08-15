@@ -51,13 +51,59 @@ test('a renderização dos cards não toca nas datas do provedor', () => {
 });
 
 // ============================================================
-// FOTO — URL do provedor é texto não confiável
+// FOTO — URL do provedor é texto não confiável, e o CONTEÚDO também
+//
+// A preferência do formulário vira o parâmetro `interests` da busca, e o
+// provedor devolve cada destino ILUSTRADO por esse filtro. Foi assim que
+// Belo Horizonte apareceu com foto de praia numa busca por relax, e é por
+// isso que o mesmo destino troca de foto quando a preferência muda. O card
+// pode ilustrar; não pode afirmar que a foto retrata o lugar.
 // ============================================================
+function comInteresse(interesse) {
+    return { ...D, state: { ...D.state, interesseBusca: interesse } };
+}
+
 test('foto do provedor entra no card', () => {
     const html = D.imagemHtml({ image: 'https://cdn.exemplo.com/lisboa.jpg', name: 'Lisboa', country: 'Portugal' }, 'top');
     assert.match(html, /src="https:\/\/cdn\.exemplo\.com\/lisboa\.jpg"/);
-    assert.match(html, /alt="Lisboa, Portugal"/);
     assert.match(html, /loading="lazy"/);
+});
+
+test('a foto é apresentada como ilustração, não como registro do destino', () => {
+    const html = D.imagemHtml({ image: 'https://cdn.exemplo.com/bh.jpg', name: 'Belo Horizonte', country: 'Brasil' }, 'top');
+    assert.match(html, /alt="Imagem ilustrativa de Belo Horizonte, Brasil"/);
+    assert.match(html, /destino-imagem-legenda[^>]*>Foto ilustrativa</);
+});
+
+test('quando a busca tem filtro temático, a legenda nomeia o filtro', () => {
+    // O caso relatado: relax -> interests=beaches -> praia no card de BH.
+    // Sem nomear o filtro, o viajante só vê uma foto errada.
+    const ui = comInteresse('beaches');
+    const html = ui.imagemHtml.call(ui, { image: 'https://cdn.exemplo.com/bh.jpg', name: 'Belo Horizonte', country: 'Brasil' }, 'top');
+    assert.match(html, /Foto ilustrativa · praias/);
+    assert.match(html, /alt="Imagem ilustrativa de Belo Horizonte, Brasil, escolhida pelo filtro de praias"/);
+    assert.match(html, /title="[^"]*filtro de praias[^"]*Belo Horizonte/);
+});
+
+test('cada filtro temático tem rótulo próprio em português', () => {
+    for (const [interesse, rotulo] of [['beaches', 'praias'], ['outdoors', 'natureza'], ['museums', 'museus']]) {
+        const ui = comInteresse(interesse);
+        assert.equal(ui.legendaFotoTexto.call(ui), `Foto ilustrativa · ${rotulo}`);
+    }
+});
+
+test('busca sem filtro temático não inventa tema na legenda', () => {
+    // 'popular' é a ausência de filtro: não há critério para explicar.
+    for (const interesse of ['popular', null, undefined, 'desconhecido']) {
+        const ui = comInteresse(interesse);
+        assert.equal(ui.legendaFotoTexto.call(ui), 'Foto ilustrativa');
+    }
+});
+
+test('sem foto de terceiro não há o que ressalvar', () => {
+    const ui = comInteresse('beaches');
+    const html = ui.imagemHtml.call(ui, { image: '', name: 'Recife', country: 'Brasil' }, 'top');
+    assert.ok(!html.includes('destino-imagem-legenda'), 'o avatar da Tripinha não é foto ilustrativa de lugar');
 });
 
 test('destino sem foto cai no avatar da Tripinha', () => {
@@ -77,6 +123,60 @@ test('URL com esquema perigoso nunca chega ao src', () => {
 test('nome do destino é escapado no alt', () => {
     const html = D.imagemHtml({ image: '', name: '"><script>alert(1)</script>', country: '' }, 'top');
     assert.ok(!html.includes('<script>'), 'nome do provedor não pode fechar o atributo');
+});
+
+// ============================================================
+// ONDE FICA — o nome não identifica lugar nenhum
+//
+// "São Petersburgo, Estados Unidos" com aeroporto TPA é St. Petersburg, na
+// Flórida, atendida pelo aeroporto de Tampa. O card não consegue explicar
+// cada caso em texto; consegue entregar a coordenada que o provedor já
+// devolveu.
+// ============================================================
+test('coordenada do provedor vira link de mapa', () => {
+    const html = D.mapaHtml({
+        name: 'São Petersburgo', country: 'Estados Unidos',
+        coordinates: { latitude: 27.7676, longitude: -82.6403 },
+    });
+    assert.match(html, /27\.7676%2C-82\.6403/);
+    assert.match(html, /Ver no mapa onde fica/);
+    assert.match(html, /rel="noopener nofollow"/);
+});
+
+test('sem coordenada o link é busca por nome, e o rótulo diz isso', () => {
+    const html = D.mapaHtml({ name: 'Lisboa', country: 'Portugal' });
+    assert.match(html, /Procurar no mapa/);
+    assert.match(html, /Lisboa\+Portugal|Lisboa%20Portugal/);
+});
+
+test('coordenada em array não é adivinhada', () => {
+    // [lat,lon] e [lon,lat] são indistinguíveis: o link cairia no oceano.
+    const html = D.mapaHtml({ name: 'Belo Horizonte', country: 'Brasil', coordinates: [-19.92, -43.94] });
+    assert.match(html, /Procurar no mapa/);
+    assert.ok(!html.includes('19.92'), 'array não pode virar coordenada no link');
+});
+
+test('destino sem nome nem coordenada não ganha link vazio', () => {
+    assert.equal(D.mapaHtml({}), '');
+});
+
+// ============================================================
+// AEROPORTO EM OUTRO PAÍS
+// ============================================================
+test('voo que pousa em outro país avisa no card', () => {
+    const html = D.aeroportoOutroPaisHtml({
+        name: 'Puerto Iguazú',
+        _identidade: { aeroporto: 'IGU', paisAeroporto: 'Brasil', aeroportoEmOutroPais: true },
+    });
+    assert.match(html, /IGU/);
+    assert.match(html, /Brasil/);
+    assert.match(html, /não está no preço/);
+});
+
+test('aeroporto no mesmo país, ou não verificado, não gera aviso', () => {
+    assert.equal(D.aeroportoOutroPaisHtml({ name: 'X', _identidade: { aeroportoEmOutroPais: false, paisAeroporto: 'Brasil' } }), '');
+    assert.equal(D.aeroportoOutroPaisHtml({ name: 'X', _identidade: { aeroportoEmOutroPais: null, paisAeroporto: null } }), '');
+    assert.equal(D.aeroportoOutroPaisHtml({ name: 'X' }), '');
 });
 
 // ============================================================

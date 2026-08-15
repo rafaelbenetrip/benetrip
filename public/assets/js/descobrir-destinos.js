@@ -51,7 +51,11 @@ const BenetripDiscovery = {
         // Verificação sazonal (grounding externo), preenchida depois que os
         // resultados de preço já estão na tela
         sazonalidade: null,
-        ultimoRanking: null
+        ultimoRanking: null,
+        // Filtro temático que o provedor aplicou na busca (interests). Ele
+        // decide também a foto de cada destino, então o card usa isso para
+        // dizer sob que critério a imagem foi escolhida.
+        interesseBusca: null
     },
     config: {
         debug: true,
@@ -553,16 +557,120 @@ const BenetripDiscovery = {
     // texto não confiável (safeHref) e o carregamento pode falhar por
     // hotlinking: nos dois casos o card cai no avatar da Tripinha em vez
     // de exibir um buraco.
+    //
+    // A FOTO SEGUE O FILTRO DA BUSCA, NÃO O DESTINO.
+    //
+    // A preferência do formulário pode virar o parâmetro `interests` da
+    // busca (aventura -> outdoors, cultura -> museums), e esse filtro não
+    // escolhe só QUAIS destinos voltam: o provedor devolve cada destino já
+    // ilustrado por ele. Enquanto relax se traduzia como "beaches", Belo
+    // Horizonte vinha com foto de praia, e o MESMO destino trocava de foto
+    // quando a preferência mudava.
+    //
+    // Relax e urbano deixaram de filtrar (ver INTERESTS_MAP em
+    // api/search-destinations.js), mas o viés continua existindo nos temas
+    // que restaram: um destino sem museu, numa busca por cultura, é
+    // ilustrado pelo tema mesmo assim.
+    //
+    // Do lado do provedor não há erro; do lado do card, sim: a imagem era
+    // apresentada como retrato do lugar. Agora ela é apresentada pelo que
+    // é — ilustração escolhida sob o filtro da busca —, no alt para quem
+    // usa leitor de tela e na legenda para quem vê o card.
+    LEGENDA_FOTO: 'Foto ilustrativa',
+
+    // Rótulo em português do filtro que o provedor aplicou. 'popular' não
+    // entra: sem tema declarado, não há o que explicar ao viajante.
+    //
+    // 'beaches' segue aqui de propósito. O rótulo traduz o que o PROVEDOR
+    // devolveu em _meta.interests, e não o que a Benetrip decide mandar: se
+    // o valor voltar a ser usado, o card explica em vez de calar.
+    INTERESSE_FOTO_LABELS: {
+        beaches: 'praias',
+        outdoors: 'natureza',
+        museums: 'museus',
+    },
+
+    temaDaFoto() {
+        return this.INTERESSE_FOTO_LABELS[this.state.interesseBusca] || '';
+    },
+
+    legendaFotoTexto() {
+        const tema = this.temaDaFoto();
+        return tema ? `${this.LEGENDA_FOTO} · ${tema}` : this.LEGENDA_FOTO;
+    },
+
     imagemHtml(d, variante) {
         const url = this.safeHref(d.image);
         const src = url || this.IMAGEM_FALLBACK;
         const semFoto = url ? '' : ' destino-imagem-fallback';
-        const alt = this.esc(`${d.name || 'Destino'}${d.country ? ', ' + d.country : ''}`);
+        const lugar = this.esc(`${d.name || 'Destino'}${d.country ? ', ' + d.country : ''}`);
+        const tema = this.temaDaFoto();
+        const alt = tema
+            ? `Imagem ilustrativa de ${lugar}, escolhida pelo filtro de ${this.esc(tema)}`
+            : `Imagem ilustrativa de ${lugar}`;
+        const explicacao = tema
+            ? `Foto escolhida pelo buscador sob o filtro de ${tema} da sua busca. Pode não retratar ${d.name || 'o destino'}.`
+            : 'Foto do buscador de destinos. Pode não retratar o destino.';
+        const legenda = url
+            ? `<span class="destino-imagem-legenda" title="${this.esc(explicacao)}">${this.esc(this.legendaFotoTexto())}</span>`
+            : '';
         return `<div class="destino-imagem-wrapper destino-imagem-${variante}">
                     <img class="destino-imagem${semFoto}" src="${src}" alt="${alt}"
                          loading="lazy" decoding="async"
-                         onerror="this.onerror=null;this.src='${this.IMAGEM_FALLBACK}';this.classList.add('destino-imagem-fallback')">
+                         onerror="this.onerror=null;this.src='${this.IMAGEM_FALLBACK}';this.classList.add('destino-imagem-fallback');this.parentNode.classList.add('sem-foto')">
+                    ${legenda}
                 </div>`;
+    },
+
+    // ================================================================
+    // ONDE FICA, DE FATO
+    //
+    // Nome de cidade se repete pelo mundo e o aeroporto da tarifa pode
+    // servir uma cidade vizinha: "São Petersburgo, Estados Unidos" com
+    // aeroporto TPA é St. Petersburg, na Flórida, atendida pelo aeroporto
+    // de Tampa — nada disso é dedutível do nome. O provedor já devolve a
+    // coordenada do destino; o card entrega esse link e a dúvida acaba em
+    // um toque.
+    //
+    // A leitura da coordenada é a mesma de api/_lib/destination-identity.js
+    // e a duplicação é intencional: aquele módulo é ESM de servidor e esta
+    // é uma página de navegador. Array é recusado nos dois lados, porque
+    // [lat,lon] e [lon,lat] são indistinguíveis e o erro joga o ponto no
+    // oceano.
+    // ================================================================
+    coordenadaDe(d) {
+        const c = d && d.coordinates;
+        if (!c || typeof c !== 'object' || Array.isArray(c)) return null;
+        const lat = Number(c.latitude !== undefined ? c.latitude : c.lat);
+        const lon = Number(c.longitude !== undefined ? c.longitude : (c.lng !== undefined ? c.lng : c.lon));
+        if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+        if (lat < -90 || lat > 90 || lon < -180 || lon > 180) return null;
+        if (lat === 0 && lon === 0) return null;
+        return `${lat.toFixed(4)},${lon.toFixed(4)}`;
+    },
+
+    mapaHtml(d) {
+        const coord = this.coordenadaDe(d);
+        const consulta = coord || `${d.name || ''} ${d.country || ''}`.trim();
+        if (!consulta) return '';
+        const href = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(consulta)}`;
+        // Sem coordenada o link é uma BUSCA por nome, e o rótulo diz isso:
+        // "ver onde fica" prometeria uma precisão que não temos.
+        const rotulo = coord ? 'Ver no mapa onde fica' : 'Procurar no mapa';
+        return `<a class="destino-mapa" href="${this.esc(href)}" target="_blank" rel="noopener nofollow">📍 ${rotulo}</a>`;
+    },
+
+    // O par destino/aeroporto é conferido no servidor
+    // (api/_lib/destination-identity.js). Quando o voo pousa em outro país,
+    // isso muda fronteira, documento e trajeto: precisa estar no card, não
+    // só no log do servidor.
+    aeroportoOutroPaisHtml(d) {
+        const id = d && d._identidade;
+        if (!id || !id.aeroportoEmOutroPais || !id.paisAeroporto) return '';
+        const iata = this.esc(id.aeroporto || '');
+        const pais = this.esc(id.paisAeroporto);
+        const destino = this.esc(d.name || 'o destino');
+        return `<div class="destino-outro-pais">🛬 O voo pousa em ${iata}, que fica em ${pais}. O trecho até ${destino} é por conta própria e não está no preço.</div>`;
     },
 
     // Sugestão abaixo do teto: a diferença é dinheiro que fica com o
@@ -948,6 +1056,10 @@ const BenetripDiscovery = {
         }
         
         const data = await response.json();
+        // A foto de cada destino vem ilustrada pelo filtro temático da busca:
+        // guardar o filtro é o que permite ao card explicar por que a mesma
+        // cidade troca de imagem quando a preferência muda.
+        this.state.interesseBusca = data._meta?.interests || null;
         if (data._meta) {
             this.log('📊 Search:', {
                 global: data._meta.sources.global,
@@ -957,6 +1069,7 @@ const BenetripDiscovery = {
                 tempo: `${data._meta.totalTime}ms`,
                 moeda: data._meta.currency || 'BRL',
                 escopo: data._meta.escopoDestino || 'todos',
+                interesse: data._meta.interests || 'popular',
                 origemTipo: data._meta.origemTipo || 'iata'
             });
         }
@@ -1496,7 +1609,12 @@ const BenetripDiscovery = {
             if (code) porAeroporto.set(code, (porAeroporto.get(code) || 0) + 1);
         });
 
-        const vooHtml = (d) => this.vooHtml(d, porAeroporto.get(String(d.primary_airport || '').toUpperCase()) || 0);
+        // Trecho aéreo + onde o aeroporto fica + onde o destino fica: três
+        // coisas diferentes que o card precisa manter separadas.
+        const vooHtml = (d) =>
+            this.vooHtml(d, porAeroporto.get(String(d.primary_airport || '').toUpperCase()) || 0)
+            + this.aeroportoOutroPaisHtml(d)
+            + this.mapaHtml(d);
         // v5.0: transparência — adequação à época e ponto de atenção
         const epocaHtml = (d) => this.gerarBlocoSazonalidade(d);
         const negativoHtml = (d) => {

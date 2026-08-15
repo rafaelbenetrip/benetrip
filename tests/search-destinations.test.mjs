@@ -2,7 +2,7 @@
 // A promessa é: resultados("todos") ⊇ resultados("nacional")
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { montarBuscas } from '../api/search-destinations.js';
+import { montarBuscas, resolverInterests, INTERESSE_PADRAO } from '../api/search-destinations.js';
 
 const baseParams = { departure_id: 'SAO', interests: 'popular', currency: 'BRL' };
 
@@ -80,5 +80,45 @@ test('os parâmetros base são preservados em cada busca', () => {
         assert.equal(b.params.departure_id, 'SAO');
         assert.equal(b.params.currency, 'BRL');
         assert.ok(b.label, 'toda busca precisa de rótulo para rastrear a origem do resultado');
+    }
+});
+
+// ============================================================
+// PREFERÊNCIA → FILTRO TEMÁTICO DO PROVEDOR
+//
+// `interests` não escolhe só quais destinos voltam: o provedor devolve cada
+// destino ILUSTRADO pelo tema. Enquanto relax se traduzia como "beaches",
+// Belo Horizonte vinha com foto de praia e a mesma cidade trocava de foto
+// quando o viajante mudava a preferência.
+// ============================================================
+test('relax não vira filtro de praia', () => {
+    // A regressão que estes testes existem para impedir. "Relax" pode ser
+    // serra, campo ou pousada: reduzir a praia decidia por praia sem que
+    // ninguém tivesse pedido praia.
+    assert.equal(resolverInterests(['relax']), INTERESSE_PADRAO);
+    assert.notEqual(resolverInterests(['relax']), 'beaches');
+});
+
+test('aventura e cultura seguem traduzidas', () => {
+    // "Trilha" e "museu" atravessam a tradução sem virar outra coisa.
+    assert.equal(resolverInterests(['aventura']), 'outdoors');
+    assert.equal(resolverInterests(['cultura']), 'museums');
+});
+
+test('urbano continua sem filtro temático', () => {
+    assert.equal(resolverInterests(['urbano']), INTERESSE_PADRAO);
+});
+
+test('duas ou mais preferências não elegem um tema em silêncio', () => {
+    // O provedor aceita um tema só: escolher um descartaria o outro sem o
+    // viajante saber.
+    assert.equal(resolverInterests(['relax', 'cultura']), INTERESSE_PADRAO);
+    assert.equal(resolverInterests(['aventura', 'cultura', 'urbano']), INTERESSE_PADRAO);
+});
+
+test('entrada vazia ou desconhecida cai no padrão, nunca em undefined', () => {
+    for (const entrada of [[], null, undefined, ['inexistente'], [''], 'relax']) {
+        assert.equal(resolverInterests(entrada), INTERESSE_PADRAO,
+            `entrada ${JSON.stringify(entrada)} não caiu no padrão`);
     }
 });
