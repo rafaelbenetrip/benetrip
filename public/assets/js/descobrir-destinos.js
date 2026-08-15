@@ -547,24 +547,6 @@ const BenetripDiscovery = {
     // A tela descartava os três na renderização. Nada aqui custa uma
     // chamada extra: é dado já pago que não chegava ao viajante.
     // ================================================================
-    MESES_CURTOS: ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'],
-
-    // Data ISO sem passar por new Date(): 'YYYY-MM-DD' parseado como Date
-    // vira UTC e volta um dia atrás em fuso negativo.
-    fmtDataCurta(iso) {
-        if (!iso || typeof iso !== 'string') return '';
-        const [ano, mes, dia] = iso.split('-').map(Number);
-        if (!ano || !mes || !dia || mes < 1 || mes > 12) return '';
-        return `${dia} ${this.MESES_CURTOS[mes - 1]}`;
-    },
-
-    fmtPeriodo(dataIda, dataVolta) {
-        const ida = this.fmtDataCurta(dataIda);
-        if (!ida) return '';
-        const volta = this.fmtDataCurta(dataVolta);
-        return volta ? `${ida} → ${volta}` : ida;
-    },
-
     IMAGEM_FALLBACK: 'assets/images/tripinha/avatar-pensando.png',
 
     // A foto vem do provedor, hospedada em domínio de terceiro. A URL é
@@ -583,23 +565,23 @@ const BenetripDiscovery = {
                 </div>`;
     },
 
-    // A busca pede time_period=IDA..VOLTA, mas o engine pode devolver a
-    // tarifa em outras datas da janela — o mesmo desvio que a Escapadas já
-    // registra no servidor. Quando isso acontece, o preço do card não é o
-    // preço das datas pedidas, e o link do Google Flights (montado com as
-    // datas do formulário) vai mostrar outro valor. O card diz isso em vez
-    // de deixar a diferença passar despercebida.
-    datasTarifaHtml(d) {
-        const periodo = this.fmtPeriodo(d.outbound_date, d.return_date);
-        if (!periodo) return '';
+    // As datas da viagem são as que o viajante escolheu no formulário: são
+    // elas que o resumo de critérios mostra, e são elas que o link do Google
+    // Flights carrega. O card NÃO exibe as datas devolvidas pelo provedor —
+    // um segundo par de datas ao lado do destino é lido como o período da
+    // viagem e convida a comprar no dia errado.
+    //
+    // O que muda quando o engine devolve a tarifa em outros dias da janela
+    // (desvio que a Escapadas já registra no servidor) é a confiança no
+    // PREÇO: aquele valor não é o das datas escolhidas. É só isso que o
+    // aviso diz, sem competir com as datas do link.
+    avisoPrecoOutrasDatasHtml(d) {
         const { dataIda, dataVolta } = this.state.formData;
-        const divergiu = (d.outbound_date && d.outbound_date !== dataIda)
-            || (d.return_date && d.return_date !== dataVolta);
-        const aviso = divergiu
-            ? '<span class="destino-datas-alerta">datas diferentes das que você pediu</span>'
-            : '';
-        return `<div class="destino-datas${divergiu ? ' destino-datas-divergente' : ''}">
-                    📅 <strong>Preço encontrado para:</strong> ${this.esc(periodo)} ${aviso}
+        const divergiu = (d.outbound_date && dataIda && d.outbound_date !== dataIda)
+            || (d.return_date && dataVolta && d.return_date !== dataVolta);
+        if (!divergiu) return '';
+        return `<div class="destino-preco-aviso">
+                    ⚠️ <strong>Preço aproximado:</strong> a tarifa encontrada é de outros dias dentro do período. Nas suas datas o valor pode mudar.
                 </div>`;
     },
 
@@ -1317,7 +1299,7 @@ const BenetripDiscovery = {
                     <div class="preco">${this.formatarPreco(d.flight.price, moeda)}</div>
                     <div class="preco-label">ida e volta por pessoa</div>
                     <div class="acima-diferenca">+ ${this.formatarPreco(diff.diferenca, moeda)} acima do orçamento (+${diff.percentual}%)</div>
-                    ${this.datasTarifaHtml(d)}
+                    ${this.avisoPrecoOutrasDatasHtml(d)}
                     <div class="flight-info">✈️ ${stopsTxt}</div>
                     ${this.ciaHtml(d)}
                     <a href="${this.safeHref(link)}" target="_blank" rel="noopener" class="btn-ver-voos btn-google-flights">Ver no Google Flights →</a>
@@ -1487,7 +1469,7 @@ const BenetripDiscovery = {
                                 <h4>${this.esc(d.name)}${d.country ? ', ' + this.esc(d.country) : ''}</h4>
                                 <div class="preco">${formatPreco(d)}</div>
                                 <div class="preco-label">ida e volta por pessoa</div>
-                                ${this.datasTarifaHtml(d)}
+                                ${this.avisoPrecoOutrasDatasHtml(d)}
                                 <div class="flight-info">${formatParadas(d)}</div>
                                 ${this.ciaHtml(d)}
                                 ${aeroportoHtml(d)}
@@ -1514,7 +1496,7 @@ const BenetripDiscovery = {
                     <h3>${this.esc(destinos.surpresa.name)}${destinos.surpresa.country ? ', ' + this.esc(destinos.surpresa.country) : ''}</h3>
                     <div class="preco">${formatPreco(destinos.surpresa)}</div>
                     <div class="preco-label">ida e volta por pessoa</div>
-                    ${this.datasTarifaHtml(destinos.surpresa)}
+                    ${this.avisoPrecoOutrasDatasHtml(destinos.surpresa)}
                     <div class="flight-info">${formatParadas(destinos.surpresa)}</div>
                     ${this.ciaHtml(destinos.surpresa)}
                     ${aeroportoHtml(destinos.surpresa)}
@@ -1556,7 +1538,7 @@ const BenetripDiscovery = {
                 <h2>${this.esc(destinos.top_destino.name)}, ${this.esc(destinos.top_destino.country || '')}</h2>
                 <div class="preco">${formatPreco(destinos.top_destino)}</div>
                 <div class="preco-label">Passagem ida e volta por pessoa</div>
-                ${this.datasTarifaHtml(destinos.top_destino)}
+                ${this.avisoPrecoOutrasDatasHtml(destinos.top_destino)}
                 <div class="flight-info">${formatParadas(destinos.top_destino)}</div>
                 ${this.ciaHtml(destinos.top_destino)}
                 ${aeroportoHtml(destinos.top_destino)}

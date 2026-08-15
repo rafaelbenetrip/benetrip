@@ -33,46 +33,45 @@ function comDatasPedidas(ida, volta) {
 }
 
 // ============================================================
-// DATA — 'YYYY-MM-DD' não pode andar um dia para trás
+// DATAS — as do viajante são as únicas que aparecem
+//
+// O provedor devolve as datas da tarifa, mas elas NÃO vão para o card:
+// um segundo par de datas ao lado do destino é lido como o período da
+// viagem e leva a comprar no dia errado. Quando a tarifa vem de outros
+// dias, o que fica em dúvida é o preço, e é só disso que o aviso trata.
 // ============================================================
-test('data ISO é formatada sem passar por fuso horário', () => {
-    assert.equal(D.fmtDataCurta('2026-03-01'), '1 mar');
-    assert.equal(D.fmtDataCurta('2026-12-31'), '31 dez');
-});
-
-test('data ausente ou inválida não vira texto quebrado', () => {
-    for (const v of ['', null, undefined, 'amanhã', '2026-13-01']) {
-        assert.equal(D.fmtDataCurta(v), '');
+test('card nunca exibe as datas devolvidas pelo provedor', () => {
+    const ui = comDatasPedidas('2026-03-15', '2026-03-22');
+    const html = ui.avisoPrecoOutrasDatasHtml.call(ui, { outbound_date: '2026-03-17', return_date: '2026-03-24' });
+    for (const marca of ['17', '24', 'mar', '2026-03-17', '2026-03-24']) {
+        assert.ok(!html.includes(marca), `data da tarifa vazou para o card: ${marca}`);
     }
 });
 
-test('período sem volta mostra só a ida', () => {
-    assert.equal(D.fmtPeriodo('2026-03-15', '2026-03-22'), '15 mar → 22 mar');
-    assert.equal(D.fmtPeriodo('2026-03-15', null), '15 mar');
-    assert.equal(D.fmtPeriodo(null, '2026-03-22'), '');
+test('tarifa nas datas pedidas não gera aviso nenhum', () => {
+    const ui = comDatasPedidas('2026-03-15', '2026-03-22');
+    assert.equal(ui.avisoPrecoOutrasDatasHtml.call(ui, { outbound_date: '2026-03-15', return_date: '2026-03-22' }), '');
 });
 
-// ============================================================
-// DATAS DA TARIFA — divergência é exibida, não escondida
-// ============================================================
-test('tarifa nas datas pedidas não gera alerta', () => {
+test('tarifa de outros dias marca o preço como aproximado', () => {
     const ui = comDatasPedidas('2026-03-15', '2026-03-22');
-    const html = ui.datasTarifaHtml.call(ui, { outbound_date: '2026-03-15', return_date: '2026-03-22' });
-    assert.match(html, /15 mar → 22 mar/);
-    assert.ok(!html.includes('destino-datas-alerta'), 'não deve alertar quando as datas batem');
+    const soIda = ui.avisoPrecoOutrasDatasHtml.call(ui, { outbound_date: '2026-03-17', return_date: '2026-03-22' });
+    const soVolta = ui.avisoPrecoOutrasDatasHtml.call(ui, { outbound_date: '2026-03-15', return_date: '2026-03-24' });
+    for (const html of [soIda, soVolta]) {
+        assert.match(html, /Preço aproximado/);
+        assert.match(html, /destino-preco-aviso/);
+    }
 });
 
-test('tarifa em datas diferentes das pedidas é sinalizada', () => {
+test('destino sem datas do provedor não gera aviso', () => {
     const ui = comDatasPedidas('2026-03-15', '2026-03-22');
-    const html = ui.datasTarifaHtml.call(ui, { outbound_date: '2026-03-17', return_date: '2026-03-24' });
-    assert.match(html, /17 mar → 24 mar/);
-    assert.match(html, /destino-datas-alerta/);
-    assert.match(html, /datas diferentes das que você pediu/);
+    assert.equal(ui.avisoPrecoOutrasDatasHtml.call(ui, { outbound_date: null, return_date: null }), '');
+    assert.equal(ui.avisoPrecoOutrasDatasHtml.call(ui, {}), '');
 });
 
-test('destino sem datas do provedor não renderiza o bloco', () => {
-    const ui = comDatasPedidas('2026-03-15', '2026-03-22');
-    assert.equal(ui.datasTarifaHtml.call(ui, { outbound_date: null, return_date: null }), '');
+test('sem datas no formulário não se inventa divergência', () => {
+    const ui = comDatasPedidas(null, null);
+    assert.equal(ui.avisoPrecoOutrasDatasHtml.call(ui, { outbound_date: '2026-03-17', return_date: '2026-03-24' }), '');
 });
 
 // ============================================================
