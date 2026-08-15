@@ -53,6 +53,56 @@ test('destinos sem preço são excluídos (não viram preço zero)', () => {
 });
 
 // ============================================================
+// SCORE DE PREÇO — aproveitar o orçamento vale mais que economizar
+//
+// Quem informa um teto está dizendo o que aceita gastar. Entre opções
+// equivalentes em logística, a que usa melhor o orçamento vem primeiro:
+// a versão anterior premiava a barateza e devolvia listas inteiras pela
+// metade do valor que a pessoa tinha disponível.
+// ============================================================
+test('entre voos equivalentes, o mais próximo do teto pontua mais', () => {
+    const perfil = { orcamento: 5000, noites: 7 };
+    const perto = scoreVoo(dest('Perto do teto', 4500, 0, 120), perfil);
+    const metade = scoreVoo(dest('Metade', 2500, 0, 120), perfil);
+    assert.ok(perto.score > metade.score,
+        `perto=${perto.score} deveria superar metade=${metade.score}`);
+});
+
+test('preço no teto não sofre penalidade alguma por estar no limite', () => {
+    const perfil = { orcamento: 5000, noites: 7 };
+    const noTeto = scoreVoo(dest('No teto', 5000, 0, 120), perfil);
+    assert.deepEqual(noTeto.penalidades, []);
+    assert.equal(noTeto.score, 100);
+});
+
+test('logística ainda vence orçamento bem aproveitado', () => {
+    // Opção cara e ruim não pode passar à frente de opção barata e direta
+    const perfil = { orcamento: 5000, noites: 7 };
+    const caroComEscalas = scoreVoo(dest('Caro, 2 escalas', 4900, 2, 800), perfil);
+    const baratoDireto = scoreVoo(dest('Barato, direto', 2000, 0, 120), perfil);
+    assert.ok(baratoDireto.score > caroComEscalas.score,
+        `barato+direto=${baratoDireto.score} vs caro+escalas=${caroComEscalas.score}`);
+});
+
+test('sem orçamento informado o preço não influencia o score', () => {
+    const semTeto = { noites: 7 };
+    const barato = scoreVoo(dest('Barato', 800, 0, 120), semTeto);
+    const caro = scoreVoo(dest('Caro', 9000, 0, 120), semTeto);
+    assert.equal(barato.score, caro.score);
+});
+
+test('opção barata continua elegível e ranqueada, nunca descartada', () => {
+    const perfil = { orcamento: 5000, noites: 7 };
+    const ranqueados = ranquearPorQualidade([
+        dest('Barato', 900, 0, 120),
+        dest('Perto do teto', 4700, 0, 120),
+    ], perfil);
+    assert.equal(ranqueados.length, 2, 'nenhuma opção pode sumir do ranking');
+    assert.equal(ranqueados[0].name, 'Perto do teto');
+    assert.equal(ranqueados[1].name, 'Barato');
+});
+
+// ============================================================
 // SCORE DE ESCALAS E DURAÇÃO
 // ============================================================
 test('família com crianças: 2+ escalas recebem penalização forte', () => {
@@ -64,15 +114,19 @@ test('família com crianças: 2+ escalas recebem penalização forte', () => {
     assert.ok(duasEscalas.penalidades.includes('escalas_familia'));
 });
 
-test('voo direto barato supera voo com 2 escalas mais caro (cenário da auditoria)', () => {
+test('voo direto supera voo com 2 escalas mais caro (cenário da auditoria)', () => {
+    // O que a auditoria exige é que o voo de 2 escalas e 14h não lidere
+    // havendo diretos. QUAL dos diretos vem primeiro é outra questão, hoje
+    // decidida pelo aproveitamento do orçamento — por isso a asserção olha
+    // para as escalas, não para o nome do mais barato.
     const familia = { orcamento: 1500, criancas: 2, noites: 7 };
     const ranqueados = ranquearPorQualidade([
         dest('Destino 2 escalas 14h', 1400, 2, 840),
         dest('BH direto', 534, 0, 75),
         dest('Floripa direto', 628, 0, 80),
     ], familia);
-    assert.equal(ranqueados[0].name, 'BH direto');
-    assert.notEqual(ranqueados[ranqueados.length - 1].name, 'BH direto');
+    assert.equal(ranqueados[0].flight.stops, 0, 'o primeiro colocado precisa ser um voo direto');
+    assert.equal(ranqueados[ranqueados.length - 1].name, 'Destino 2 escalas 14h');
 });
 
 test('viagem curta: voo que consome parcela excessiva da viagem é penalizado', () => {

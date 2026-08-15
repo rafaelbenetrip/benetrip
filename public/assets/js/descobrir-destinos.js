@@ -565,6 +565,30 @@ const BenetripDiscovery = {
                 </div>`;
     },
 
+    // Sugestão abaixo do teto: a diferença é dinheiro que fica com o
+    // viajante, não sinal de que a busca ficou aquém. O orçamento do
+    // formulário é o da PASSAGEM, então a sobra é apresentada como o que
+    // resta para o resto da viagem.
+    //
+    // Diferenças pequenas não ganham destaque: um card anunciando "R$ 40
+    // abaixo do orçamento" vira ruído em vez de informação.
+    ECONOMIA_MINIMA_PCT: 0.08,
+
+    economiaHtml(d) {
+        const { orcamento, moeda } = this.state.formData;
+        const preco = d.flight?.price || 0;
+        if (!orcamento || orcamento <= 0 || preco <= 0 || preco >= orcamento) return '';
+
+        const sobra = orcamento - preco;
+        if (sobra < orcamento * this.ECONOMIA_MINIMA_PCT) return '';
+
+        const pct = Math.round((sobra / orcamento) * 100);
+        return `<div class="destino-economia">
+                    💰 <strong>${this.formatarPreco(sobra, moeda)} abaixo do seu limite de passagem</strong>
+                    <span class="economia-detalhe">${pct}% do orçamento sobra para hotel, passeios e comida</span>
+                </div>`;
+    },
+
     duracaoVooTxt(d) {
         const durMin = d.flight?.flight_duration_minutes || 0;
         if (durMin <= 0) return '';
@@ -1118,14 +1142,13 @@ const BenetripDiscovery = {
             </div>`;
         }
 
-        // Sem verificação, o texto da IA aparece, mas nunca como fato apurado.
-        // A ressalva vai em linha própria: colada na frente da frase, ela se
-        // fundia ao texto e o card lia "Informação não verificada Em outubro
-        // costuma ser quente", como se fosse uma sentença só.
+        // Sem verificação externa, a frase é atribuída à Tripinha em vez de
+        // apresentada como dado apurado. A assinatura vai em linha própria:
+        // colada na frente do texto, ela se fundia à frase.
         if (d.adequacao_epoca) {
             return `<div class="destino-epoca destino-epoca-nao-verificada" data-sazonalidade="${chave}">
                 📅 <strong>Nessas datas:</strong> ${this.esc(d.adequacao_epoca)}
-                <span class="epoca-rodape">Impressão da Tripinha, ainda sem confirmação em fonte oficial.</span>
+                <span class="epoca-rodape">Impressão da Tripinha</span>
             </div>`;
         }
 
@@ -1473,6 +1496,7 @@ const BenetripDiscovery = {
                                 <h4>${this.esc(d.name)}${d.country ? ', ' + this.esc(d.country) : ''}</h4>
                                 <div class="preco">${formatPreco(d)}</div>
                                 <div class="preco-label">ida e volta por pessoa</div>
+                                ${this.economiaHtml(d)}
                                 ${vooHtml(d)}
                                 ${this.ciaHtml(d)}
                                 ${custoEstimado(d)}
@@ -1498,6 +1522,7 @@ const BenetripDiscovery = {
                     <h3>${this.esc(destinos.surpresa.name)}${destinos.surpresa.country ? ', ' + this.esc(destinos.surpresa.country) : ''}</h3>
                     <div class="preco">${formatPreco(destinos.surpresa)}</div>
                     <div class="preco-label">ida e volta por pessoa</div>
+                    ${this.economiaHtml(destinos.surpresa)}
                     ${vooHtml(destinos.surpresa)}
                     ${this.ciaHtml(destinos.surpresa)}
                     ${custoEstimado(destinos.surpresa)}
@@ -1538,6 +1563,7 @@ const BenetripDiscovery = {
                 <h2>${this.esc(destinos.top_destino.name)}, ${this.esc(destinos.top_destino.country || '')}</h2>
                 <div class="preco">${formatPreco(destinos.top_destino)}</div>
                 <div class="preco-label">Passagem ida e volta por pessoa</div>
+                ${this.economiaHtml(destinos.top_destino)}
                 ${vooHtml(destinos.top_destino)}
                 ${this.ciaHtml(destinos.top_destino)}
                 ${custoEstimado(destinos.top_destino)}

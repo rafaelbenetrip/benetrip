@@ -156,7 +156,7 @@ ${estacaoInfo ? `- Contexto sazonal: ${estacaoInfo}` : ''}
 ${cenario === 'abaixo' ? `- NOTA: Poucos destinos dentro do orçamento, valorize os disponíveis` : ''}
 ${restricoesFamilia}
 ${observacoesBloco}
-DESTINOS PRÉ-FILTRADOS (todos DENTRO do orçamento, o orçamento é um TETO, opções mais baratas são tão válidas quanto as próximas do limite):
+DESTINOS PRÉ-FILTRADOS (todos DENTRO do orçamento; nada acima do teto chegou até aqui):
 Formato: ID|Nome|País|Aeroporto|Passagem ida+volta|Paradas|Duração do voo|Score objetivo (0-125, maior = melhor logística)|Fontes|Hotel/noite|Alertas
 A lista já está ORDENADA pelo score objetivo (preço, escalas, duração do voo vs. duração da viagem, perfil dos passageiros).
 ${listaCompacta}
@@ -167,7 +167,8 @@ ${numAlternativas > 0 ? `2. ${numAlternativas} ALTERNATIVA${numAlternativas > 1 
 ${temSurpresa ? `3. 1 SURPRESA (inesperado e interessante)` : ''}
 
 CRITÉRIOS DE SELEÇÃO (em ordem de prioridade):
-1. RESTRIÇÕES OBJETIVAS (NÃO NEGOCIÁVEL): você pode desempatar entre destinos de score parecido, mas NÃO pode escolher como MELHOR DESTINO uma opção com ALERTA de escalas/duração quando existir opção sem alerta de score igual ou maior. Um destino mais barato que o orçamento NUNCA é motivo de rejeição.
+1. RESTRIÇÕES OBJETIVAS (NÃO NEGOCIÁVEL): você pode desempatar entre destinos de score parecido, mas NÃO pode escolher como MELHOR DESTINO uma opção com ALERTA de escalas/duração quando existir opção sem alerta de score igual ou maior.
+   Sobre preço: o viajante informou ${simboloMoeda} ${orcamento} como o que ACEITA GASTAR na passagem. Entre opções parecidas em logística e match de perfil, prefira a que aproveita melhor esse valor, em vez da mais barata da lista. Uma opção bem mais barata continua válida quando é claramente melhor em logística ou em match com o perfil: nesse caso, mencione a economia no "razao" ou no "comentario".
 2. MATCH COM PERFIL: O destino combina com "${preferencias}"? É adequado para ${companhia}?
    - Família com crianças → segurança, infraestrutura, atividades para crianças, voos curtos
    - Família com bebês → infraestrutura de saúde, clima ameno, facilidade de acesso

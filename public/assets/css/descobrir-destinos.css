@@ -1596,6 +1596,30 @@ body {
     background: var(--gray-light);
 }
 
+/* Economia contra o teto de passagem */
+.destino-economia {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin: 8px 0 12px;
+    padding: 8px 12px;
+    border-radius: var(--border-radius-sm);
+    font-size: 13px;
+    line-height: 1.45;
+    background: rgba(255, 255, 255, 0.16);
+}
+
+.destino-economia .economia-detalhe {
+    font-size: 11px;
+    opacity: 0.85;
+}
+
+.destino-card .destino-economia {
+    background: #EDF9F0;
+    border: 1px solid #C6EBD1;
+    color: #1B6B3A;
+}
+
 /* Companhia da cotação */
 .destino-cia {
     font-size: 13px;

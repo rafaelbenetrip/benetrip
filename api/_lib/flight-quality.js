@@ -1,7 +1,10 @@
 // api/_lib/flight-quality.js - CAMADA DETERMINÍSTICA DE QUALIDADE DE VOO v1.0
 // Score objetivo aplicado ANTES e DEPOIS do ranking por IA em rank-destinations.
 // A IA pode explicar e desempatar, mas não pode violar os limites daqui:
-//  - orçamento é TETO (preço válido <= orçamento máximo), nunca valor-alvo;
+//  - orçamento é TETO no FILTRO: nada acima dele entra, e nada é descartado
+//    por ser barato (separarPorOrcamento);
+//  - dentro do teto, o RANKING prefere quem aproveita melhor o orçamento:
+//    quem informou um limite está dizendo o que aceita gastar (scoreVoo);
 //  - família com crianças/bebês: penalização forte em 2+ escalas;
 //  - viagem curta: penalização quando o voo consome parcela excessiva da viagem.
 //
@@ -61,12 +64,19 @@ export function scoreVoo(destino, perfil = {}) {
     let score = 100;
     const penalidades = [];
 
-    // --- Preço: quanto mais barato em relação ao teto, melhor (até 25 pts) ---
+    // --- Preço: quanto mais perto do teto, melhor (até 25 pts) ---
+    //
+    // Quem define R$ 5.000 de teto está dizendo o que aceita gastar, não
+    // pedindo o mais barato possível. A versão anterior premiava a barateza
+    // de forma monotônica, então uma opção pela metade do orçamento ganhava
+    // ~13 pontos de vantagem só por custar menos, e o resultado vinha todo
+    // da ponta barata — frustrando quem queria ver o que o próprio limite
+    // compra. O teto continua sendo teto: acima dele nada entra, e isso é
+    // decidido antes daqui, em separarPorOrcamento.
     if (orcamento > 0 && price > 0) {
         const razao = Math.min(price / orcamento, 1); // 0..1 dentro do teto
-        const bonusPreco = Math.round((1 - razao) * 25);
-        score += bonusPreco - 25; // preço no teto = -25; metade do teto ≈ -12
-        if (razao >= 0.95) penalidades.push('preco_no_limite');
+        const bonusPreco = Math.round(razao * 25);
+        score += bonusPreco - 25; // preço no teto = 0; metade do teto ≈ -13
     }
 
     // --- Escalas ---
@@ -158,7 +168,6 @@ export function descreverPenalidades(quality) {
         voo_longo_para_duracao: 'Voo relativamente longo para a duração da viagem',
         voo_longo_viagem_curta: 'Voo longo para uma viagem curta',
         voo_longo_familia: 'Voo longo para quem viaja com crianças',
-        preco_no_limite: 'Preço encosta no limite do orçamento',
     };
     return (quality?.penalidades || []).map(p => map[p]).filter(Boolean);
 }
