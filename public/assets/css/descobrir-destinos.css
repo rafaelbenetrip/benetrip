@@ -1596,13 +1596,19 @@ body {
     background: var(--gray-light);
 }
 
-/* Ninguém confere o que a miniatura do provedor mostra. A legenda fica
-   sobre a foto, discreta e sempre visível: o card ilustra o destino, não
-   afirma estar retratando-o. */
+/* A miniatura vem do provedor ilustrada pelo filtro temático da busca
+   (interests): a mesma cidade troca de foto quando a preferência muda. A
+   legenda fica sobre a foto, discreta e sempre visível, e nomeia o filtro
+   quando existe — o card ilustra o destino, não afirma retratá-lo. */
 .destino-imagem-legenda {
     position: absolute;
     left: 8px;
     bottom: 8px;
+    max-width: calc(100% - 16px);
+    box-sizing: border-box;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
     padding: 3px 8px;
     border-radius: 999px;
     font-size: 10px;

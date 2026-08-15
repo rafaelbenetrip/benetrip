@@ -51,7 +51,11 @@ const BenetripDiscovery = {
         // Verificação sazonal (grounding externo), preenchida depois que os
         // resultados de preço já estão na tela
         sazonalidade: null,
-        ultimoRanking: null
+        ultimoRanking: null,
+        // Filtro temático que o provedor aplicou na busca (interests). Ele
+        // decide também a foto de cada destino, então o card usa isso para
+        // dizer sob que critério a imagem foi escolhida.
+        interesseBusca: null
     },
     config: {
         debug: true,
@@ -554,22 +558,52 @@ const BenetripDiscovery = {
     // hotlinking: nos dois casos o card cai no avatar da Tripinha em vez
     // de exibir um buraco.
     //
-    // O QUE a foto mostra, ninguém confere. É uma miniatura que o provedor
-    // associa ao destino, não um registro dele: já saiu foto de praia num
-    // card de Belo Horizonte. Enquanto não houver verificação do conteúdo,
-    // a imagem é apresentada como ILUSTRAÇÃO — no alt, para quem usa leitor
-    // de tela, e na legenda, para quem vê o card. Afirmar "esta é a foto de
-    // Belo Horizonte" é a única coisa que o card não pode fazer aqui.
+    // A FOTO SEGUE A PREFERÊNCIA, NÃO O DESTINO.
+    //
+    // A preferência do formulário vira o parâmetro `interests` da busca
+    // (relax -> beaches, aventura -> outdoors, cultura -> museums) e esse
+    // filtro não escolhe só QUAIS destinos voltam: o provedor devolve cada
+    // destino já ilustrado por ele. Foi assim que Belo Horizonte apareceu
+    // com foto de praia numa busca por relax, e é por isso que o MESMO
+    // destino troca de foto quando a preferência muda.
+    //
+    // Do lado do provedor não há erro; do lado do card, sim: a imagem era
+    // apresentada como retrato do lugar. Agora ela é apresentada pelo que
+    // é — ilustração escolhida sob o filtro da busca —, no alt para quem
+    // usa leitor de tela e na legenda para quem vê o card.
     LEGENDA_FOTO: 'Foto ilustrativa',
+
+    // Rótulo em português do filtro que o provedor aplicou. 'popular' não
+    // entra: sem tema declarado, não há o que explicar ao viajante.
+    INTERESSE_FOTO_LABELS: {
+        beaches: 'praias',
+        outdoors: 'natureza',
+        museums: 'museus',
+    },
+
+    temaDaFoto() {
+        return this.INTERESSE_FOTO_LABELS[this.state.interesseBusca] || '';
+    },
+
+    legendaFotoTexto() {
+        const tema = this.temaDaFoto();
+        return tema ? `${this.LEGENDA_FOTO} · ${tema}` : this.LEGENDA_FOTO;
+    },
 
     imagemHtml(d, variante) {
         const url = this.safeHref(d.image);
         const src = url || this.IMAGEM_FALLBACK;
         const semFoto = url ? '' : ' destino-imagem-fallback';
         const lugar = this.esc(`${d.name || 'Destino'}${d.country ? ', ' + d.country : ''}`);
-        const alt = `Imagem ilustrativa de ${lugar}`;
+        const tema = this.temaDaFoto();
+        const alt = tema
+            ? `Imagem ilustrativa de ${lugar}, escolhida pelo filtro de ${this.esc(tema)}`
+            : `Imagem ilustrativa de ${lugar}`;
+        const explicacao = tema
+            ? `Foto escolhida pelo buscador sob o filtro de ${tema} da sua busca. Pode não retratar ${d.name || 'o destino'}.`
+            : 'Foto do buscador de destinos. Pode não retratar o destino.';
         const legenda = url
-            ? `<span class="destino-imagem-legenda">${this.LEGENDA_FOTO}</span>`
+            ? `<span class="destino-imagem-legenda" title="${this.esc(explicacao)}">${this.esc(this.legendaFotoTexto())}</span>`
             : '';
         return `<div class="destino-imagem-wrapper destino-imagem-${variante}">
                     <img class="destino-imagem${semFoto}" src="${src}" alt="${alt}"
@@ -1013,6 +1047,10 @@ const BenetripDiscovery = {
         }
         
         const data = await response.json();
+        // A foto de cada destino vem ilustrada pelo filtro temático da busca:
+        // guardar o filtro é o que permite ao card explicar por que a mesma
+        // cidade troca de imagem quando a preferência muda.
+        this.state.interesseBusca = data._meta?.interests || null;
         if (data._meta) {
             this.log('📊 Search:', {
                 global: data._meta.sources.global,
@@ -1022,6 +1060,7 @@ const BenetripDiscovery = {
                 tempo: `${data._meta.totalTime}ms`,
                 moeda: data._meta.currency || 'BRL',
                 escopo: data._meta.escopoDestino || 'todos',
+                interesse: data._meta.interests || 'popular',
                 origemTipo: data._meta.origemTipo || 'iata'
             });
         }

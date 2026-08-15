@@ -53,10 +53,16 @@ test('a renderização dos cards não toca nas datas do provedor', () => {
 // ============================================================
 // FOTO — URL do provedor é texto não confiável, e o CONTEÚDO também
 //
-// A miniatura vem do provedor de destinos e ninguém confere o que ela
-// mostra: já saiu foto de praia num card de Belo Horizonte. O card pode
-// ilustrar; não pode afirmar que a foto retrata o lugar.
+// A preferência do formulário vira o parâmetro `interests` da busca, e o
+// provedor devolve cada destino ILUSTRADO por esse filtro. Foi assim que
+// Belo Horizonte apareceu com foto de praia numa busca por relax, e é por
+// isso que o mesmo destino troca de foto quando a preferência muda. O card
+// pode ilustrar; não pode afirmar que a foto retrata o lugar.
 // ============================================================
+function comInteresse(interesse) {
+    return { ...D, state: { ...D.state, interesseBusca: interesse } };
+}
+
 test('foto do provedor entra no card', () => {
     const html = D.imagemHtml({ image: 'https://cdn.exemplo.com/lisboa.jpg', name: 'Lisboa', country: 'Portugal' }, 'top');
     assert.match(html, /src="https:\/\/cdn\.exemplo\.com\/lisboa\.jpg"/);
@@ -66,11 +72,37 @@ test('foto do provedor entra no card', () => {
 test('a foto é apresentada como ilustração, não como registro do destino', () => {
     const html = D.imagemHtml({ image: 'https://cdn.exemplo.com/bh.jpg', name: 'Belo Horizonte', country: 'Brasil' }, 'top');
     assert.match(html, /alt="Imagem ilustrativa de Belo Horizonte, Brasil"/);
-    assert.match(html, /destino-imagem-legenda">Foto ilustrativa</);
+    assert.match(html, /destino-imagem-legenda[^>]*>Foto ilustrativa</);
+});
+
+test('quando a busca tem filtro temático, a legenda nomeia o filtro', () => {
+    // O caso relatado: relax -> interests=beaches -> praia no card de BH.
+    // Sem nomear o filtro, o viajante só vê uma foto errada.
+    const ui = comInteresse('beaches');
+    const html = ui.imagemHtml.call(ui, { image: 'https://cdn.exemplo.com/bh.jpg', name: 'Belo Horizonte', country: 'Brasil' }, 'top');
+    assert.match(html, /Foto ilustrativa · praias/);
+    assert.match(html, /alt="Imagem ilustrativa de Belo Horizonte, Brasil, escolhida pelo filtro de praias"/);
+    assert.match(html, /title="[^"]*filtro de praias[^"]*Belo Horizonte/);
+});
+
+test('cada filtro temático tem rótulo próprio em português', () => {
+    for (const [interesse, rotulo] of [['beaches', 'praias'], ['outdoors', 'natureza'], ['museums', 'museus']]) {
+        const ui = comInteresse(interesse);
+        assert.equal(ui.legendaFotoTexto.call(ui), `Foto ilustrativa · ${rotulo}`);
+    }
+});
+
+test('busca sem filtro temático não inventa tema na legenda', () => {
+    // 'popular' é a ausência de filtro: não há critério para explicar.
+    for (const interesse of ['popular', null, undefined, 'desconhecido']) {
+        const ui = comInteresse(interesse);
+        assert.equal(ui.legendaFotoTexto.call(ui), 'Foto ilustrativa');
+    }
 });
 
 test('sem foto de terceiro não há o que ressalvar', () => {
-    const html = D.imagemHtml({ image: '', name: 'Recife', country: 'Brasil' }, 'top');
+    const ui = comInteresse('beaches');
+    const html = ui.imagemHtml.call(ui, { image: '', name: 'Recife', country: 'Brasil' }, 'top');
     assert.ok(!html.includes('destino-imagem-legenda'), 'o avatar da Tripinha não é foto ilustrativa de lugar');
 });
 

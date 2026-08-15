@@ -596,6 +596,12 @@ export default async function handler(req, res) {
                 origemTipo: isKgmid ? 'kgmid' : isMultiIata ? 'multi_iata' : 'iata',
                 escopoDestino: escopoLabel.toLowerCase(),
                 preferencias: prefArray,
+                // O filtro temático que o provedor aplicou. Ele não escolhe
+                // só QUAIS destinos voltam: a miniatura de cada destino volta
+                // ilustrada por ele. Com interests=beaches, Belo Horizonte vem
+                // com foto de praia. O card precisa saber disso para dizer sob
+                // que filtro a foto foi escolhida.
+                interests,
                 totalBuscas: buscasConfig.length,
                 totalBruto,
                 filtradosDomestico: apenasInternacional ? filtradosDomestico : 0,
