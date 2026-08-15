@@ -105,12 +105,12 @@
                     <!-- Dias da semana -->
                     <div class="form-row">
                         <div class="form-group">
-                            <label>🛫 Dias que você pode ir</label>
-                            <div class="dias-chips" id="dias-ida"></div>
+                            <label id="label-dias-ida">🛫 Dias que você pode ir</label>
+                            <div class="dias-chips" id="dias-ida" role="group" aria-labelledby="label-dias-ida"></div>
                         </div>
                         <div class="form-group">
-                            <label>🛬 Dias que você pode voltar</label>
-                            <div class="dias-chips" id="dias-volta"></div>
+                            <label id="label-dias-volta">🛬 Dias que você pode voltar</label>
+                            <div class="dias-chips" id="dias-volta" role="group" aria-labelledby="label-dias-volta"></div>
                         </div>
                     </div>
                     <p class="dias-hint">💡 Cada ida combina com a volta seguinte naqueles dias. Por exemplo: ida na quinta + volta na segunda = o fim de semana estendido daquela semana.</p>
@@ -118,22 +118,22 @@
                     <!-- Meses + Moeda -->
                     <div class="form-row">
                         <div class="form-group">
-                            <label>📆 Pesquisar quantos meses à frente?</label>
-                            <div class="meses-chips" id="meses-chips">
-                                <div class="mes-chip" data-meses="1">1 mês</div>
-                                <div class="mes-chip active" data-meses="2" title="A janela conta 2 meses a partir de hoje e pode atravessar três meses do calendário">2 meses</div>
-                                <div class="mes-chip" data-meses="3">3 meses</div>
-                                <div class="mes-chip" data-meses="4">4 meses</div>
-                                <div class="mes-chip" data-meses="6">6 meses</div>
+                            <label id="label-meses">📆 Pesquisar quantos meses à frente?</label>
+                            <div class="meses-chips" id="meses-chips" role="group" aria-labelledby="label-meses">
+                                <button type="button" class="mes-chip" data-meses="1" aria-pressed="false">1 mês</button>
+                                <button type="button" class="mes-chip active" data-meses="2" aria-pressed="true" title="A janela conta 2 meses a partir de hoje e pode atravessar três meses do calendário">2 meses</button>
+                                <button type="button" class="mes-chip" data-meses="3" aria-pressed="false">3 meses</button>
+                                <button type="button" class="mes-chip" data-meses="4" aria-pressed="false">4 meses</button>
+                                <button type="button" class="mes-chip" data-meses="6" aria-pressed="false">6 meses</button>
                             </div>
                         </div>
 
                         <div class="form-group">
-                            <label>💱 Moeda</label>
-                            <div class="currency-chips">
-                                <div class="currency-chip" data-currency="BRL">R$</div>
-                                <div class="currency-chip" data-currency="USD">US$</div>
-                                <div class="currency-chip" data-currency="EUR">€</div>
+                            <label id="label-moeda">💱 Moeda</label>
+                            <div class="currency-chips" role="group" aria-labelledby="label-moeda">
+                                <button type="button" class="currency-chip" data-currency="BRL" aria-pressed="true">R$</button>
+                                <button type="button" class="currency-chip" data-currency="USD" aria-pressed="false">US$</button>
+                                <button type="button" class="currency-chip" data-currency="EUR" aria-pressed="false">€</button>
                             </div>
                         </div>
                     </div>

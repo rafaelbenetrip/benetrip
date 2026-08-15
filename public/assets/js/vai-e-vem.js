@@ -187,8 +187,8 @@ const BenetripVaiEVem = {
         if (!container) return;
 
         container.innerHTML = this.DIAS_CURTO.map((nome, dia) => {
-            const active = this.state[stateKey].has(dia) ? ' active' : '';
-            return `<button type="button" class="dia-chip${active}" data-dia="${dia}">${nome}</button>`;
+            const ativo = this.state[stateKey].has(dia);
+            return `<button type="button" class="dia-chip${ativo ? ' active' : ''}" data-dia="${dia}" aria-pressed="${ativo}">${nome}</button>`;
         }).join('');
 
         container.querySelectorAll('.dia-chip').forEach(chip => {
@@ -196,21 +196,31 @@ const BenetripVaiEVem = {
                 const dia = parseInt(chip.dataset.dia);
                 if (this.state[stateKey].has(dia)) {
                     this.state[stateKey].delete(dia);
-                    chip.classList.remove('active');
+                    this.marcarChip(chip, false);
                 } else {
                     this.state[stateKey].add(dia);
-                    chip.classList.add('active');
+                    this.marcarChip(chip, true);
                 }
                 this.log(`📅 ${stateKey}:`, [...this.state[stateKey]]);
             });
         });
     },
 
+    // Estado visual e estado acessível andam juntos: a classe pinta o chip,
+    // o aria-pressed é o que o leitor de tela anuncia.
+    marcarChip(chip, ativo) {
+        chip.classList.toggle('active', ativo);
+        chip.setAttribute('aria-pressed', String(ativo));
+    },
+
+    selecionarChipUnico(seletor, escolhido) {
+        document.querySelectorAll(seletor).forEach(c => this.marcarChip(c, c === escolhido));
+    },
+
     setupMesesChips() {
         document.querySelectorAll('.mes-chip[data-meses]').forEach(chip => {
             chip.addEventListener('click', () => {
-                document.querySelectorAll('.mes-chip[data-meses]').forEach(c => c.classList.remove('active'));
-                chip.classList.add('active');
+                this.selecionarChipUnico('.mes-chip[data-meses]', chip);
                 this.state.mesesSelecionados = parseInt(chip.dataset.meses);
                 this.log('📆 Meses:', this.state.mesesSelecionados);
             });
@@ -220,12 +230,12 @@ const BenetripVaiEVem = {
     setupCurrencyChips() {
         document.querySelectorAll('.currency-chip[data-currency]').forEach(chip => {
             chip.addEventListener('click', () => {
-                document.querySelectorAll('.currency-chip[data-currency]').forEach(c => c.classList.remove('active'));
-                chip.classList.add('active');
+                this.selecionarChipUnico('.currency-chip[data-currency]', chip);
                 this.state.moedaSelecionada = chip.dataset.currency;
             });
         });
-        document.querySelector('.currency-chip[data-currency="BRL"]')?.classList.add('active');
+        const padrao = document.querySelector(`.currency-chip[data-currency="${this.state.moedaSelecionada}"]`);
+        if (padrao) this.selecionarChipUnico('.currency-chip[data-currency]', padrao);
     },
 
     // ================================================================
