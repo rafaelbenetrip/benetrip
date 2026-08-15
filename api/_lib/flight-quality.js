@@ -1,9 +1,28 @@
 // api/_lib/flight-quality.js - CAMADA DETERMINÍSTICA DE QUALIDADE DE VOO v1.0
 // Score objetivo aplicado ANTES e DEPOIS do ranking por IA em rank-destinations.
 // A IA pode explicar e desempatar, mas não pode violar os limites daqui:
-//  - orçamento é TETO (preço válido <= orçamento máximo), nunca valor-alvo;
+//  - orçamento é TETO no FILTRO: nada acima dele entra, e nada é descartado
+//    por ser barato (separarPorOrcamento);
 //  - família com crianças/bebês: penalização forte em 2+ escalas;
 //  - viagem curta: penalização quando o voo consome parcela excessiva da viagem.
+//
+// ORDEM DO RANKING: orçamento primeiro, logística depois.
+//
+// O preço não é mais um peso somado ao score, disputando pontos com escalas e
+// duração — calibrar isso viraria um cabo de guerra entre números arbitrários.
+// A ordenação é lexicográfica e explícita:
+//
+//   1º  faixa de aproveitamento do orçamento (bandas de 10% do teto)
+//   2º  score de logística (escalas, duração, perfil dos passageiros)
+//   3º  desempate: preço mais próximo do teto
+//
+// Consequência aceita e desejada: um voo com escalas que use melhor o
+// orçamento fica à frente de um voo direto bem mais barato. Dentro da MESMA
+// faixa de orçamento, quem decide é a logística.
+//
+// A exceção continua sendo família com crianças/bebês, onde
+// violaRestricaoObjetiva garante voo com no máximo 1 escala como MELHOR
+// DESTINO sempre que existir opção equivalente.
 //
 // Todas as funções são puras (sem rede/efeitos) para permitir testes unitários.
 
@@ -38,10 +57,30 @@ export function separarPorOrcamento(destinos, orcamento) {
 }
 
 // ============================================================
-// SCORE DETERMINÍSTICO (0-100, maior = melhor)
-// Considera preço, escalas, duração total, perfil dos passageiros
-// e duração da viagem. Horário não entra porque o engine explore
-// não retorna horários por destino.
+// FAIXA DE APROVEITAMENTO DO ORÇAMENTO
+//
+// Bandas de 10% do teto: 9 = usa de 90% a 100% do orçamento, 0 = usa
+// menos de 10%. É o primeiro critério de ordenação.
+//
+// A banda evita que centavos decidam a ordem: entre R$ 4.500 e R$ 4.900
+// num teto de R$ 5.000, ambos na faixa 9, quem decide é a logística.
+//
+// Sem orçamento informado devolve null, e a ordenação cai direto na
+// logística.
+// ============================================================
+export const BANDAS_ORCAMENTO = 10;
+
+export function faixaOrcamento(price, orcamento) {
+    if (!orcamento || orcamento <= 0 || !price || price <= 0) return null;
+    const razao = Math.min(price / orcamento, 1);
+    return Math.min(BANDAS_ORCAMENTO - 1, Math.floor(razao * BANDAS_ORCAMENTO));
+}
+
+// ============================================================
+// SCORE DE LOGÍSTICA (0-100, maior = melhor)
+// Escalas, duração total, perfil dos passageiros e duração da viagem.
+// Horário não entra porque o engine explore não retorna horários por
+// destino. Preço NÃO entra: ele ordena antes, pela faixa de orçamento.
 // ============================================================
 export function scoreVoo(destino, perfil = {}) {
     const flight = destino?.flight || {};
@@ -60,14 +99,6 @@ export function scoreVoo(destino, perfil = {}) {
 
     let score = 100;
     const penalidades = [];
-
-    // --- Preço: quanto mais barato em relação ao teto, melhor (até 25 pts) ---
-    if (orcamento > 0 && price > 0) {
-        const razao = Math.min(price / orcamento, 1); // 0..1 dentro do teto
-        const bonusPreco = Math.round((1 - razao) * 25);
-        score += bonusPreco - 25; // preço no teto = -25; metade do teto ≈ -12
-        if (razao >= 0.95) penalidades.push('preco_no_limite');
-    }
 
     // --- Escalas ---
     if (stops === 1) {
@@ -105,21 +136,45 @@ export function scoreVoo(destino, perfil = {}) {
         penalidades.push('voo_longo_familia');
     }
 
+    const faixa = faixaOrcamento(price, orcamento);
+
     return {
         score: Math.max(0, Math.min(125, Math.round(score))),
         penalidades,
+        faixaOrcamento: faixa,
+        // 0..1: quanto do teto a passagem consome. Serve ao texto do card
+        // e ao prompt; a ordenação usa a faixa, não este número.
+        aproveitamento: orcamento > 0 && price > 0
+            ? Math.min(1, price / orcamento)
+            : null,
     };
 }
 
-// Anota cada destino com _quality = { score, penalidades } e devolve
-// nova lista ordenada por score (desempate: preço).
+// Anota cada destino com _quality e devolve nova lista ordenada.
+//
+// Orçamento primeiro: a faixa de aproveitamento manda, e só dentro da
+// mesma faixa a logística decide. Um voo com escalas numa faixa superior
+// fica à frente de um voo direto bem mais barato — comportamento
+// pretendido, não efeito colateral.
 export function ranquearPorQualidade(destinos, perfil = {}) {
+    const orcamento = perfil.orcamento || 0;
     return (destinos || [])
         .map(d => ({ ...d, _quality: scoreVoo(d, perfil) }))
-        .sort((a, b) =>
-            (b._quality.score - a._quality.score) ||
-            ((a.flight?.price || Infinity) - (b.flight?.price || Infinity))
-        );
+        .sort((a, b) => {
+            const fa = a._quality.faixaOrcamento;
+            const fb = b._quality.faixaOrcamento;
+            if (fa !== null && fb !== null && fa !== fb) return fb - fa;
+
+            const porScore = b._quality.score - a._quality.score;
+            if (porScore !== 0) return porScore;
+
+            const pa = a.flight?.price || 0;
+            const pb = b.flight?.price || 0;
+            // Com teto definido, desempata pelo que aproveita mais o
+            // orçamento. Sem teto, não há o que aproveitar: o mais barato
+            // é o desempate razoável.
+            return orcamento > 0 ? pb - pa : (pa || Infinity) - (pb || Infinity);
+        });
 }
 
 // ============================================================
@@ -158,7 +213,6 @@ export function descreverPenalidades(quality) {
         voo_longo_para_duracao: 'Voo relativamente longo para a duração da viagem',
         voo_longo_viagem_curta: 'Voo longo para uma viagem curta',
         voo_longo_familia: 'Voo longo para quem viaja com crianças',
-        preco_no_limite: 'Preço encosta no limite do orçamento',
     };
     return (quality?.penalidades || []).map(p => map[p]).filter(Boolean);
 }
