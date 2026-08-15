@@ -58,7 +58,7 @@ export default async function handler(req, res) {
 
     if (!getCerebrasKey()) {
         console.warn('⚠️ CEREBRAS_KEY não configurada, usando fallback determinístico');
-        return res.status(200).json(rankByQuality(destinosQualidade, orcamento));
+        return res.status(200).json(rankByQuality(destinosQualidade, orcamento, perfilVoo));
     }
 
     try {
@@ -106,7 +106,10 @@ export default async function handler(req, res) {
             const hotelTxt = hotel > 0 ? `Hotel:${simboloMoeda}${hotel}/noite` : 'Hotel:sem dado';
             const alertas = descreverPenalidades(d._quality);
             const alertaTxt = alertas.length > 0 ? `|ALERTA: ${alertas.join('; ')}` : '';
-            return `${i + 1}|${d.name}|${d.country}|${d.primary_airport}|${simboloMoeda}${passagem}|${paradas}paradas|voo ${durTxt}|score ${d._quality.score}|${fontes}fontes|${hotelTxt}${alertaTxt}`;
+            const aproveitamento = d._quality.aproveitamento != null
+                ? `${Math.round(d._quality.aproveitamento * 100)}% do orçamento`
+                : 'orçamento não informado';
+            return `${i + 1}|${d.name}|${d.country}|${d.primary_airport}|${simboloMoeda}${passagem}|${aproveitamento}|${paradas}paradas|voo ${durTxt}|logística ${d._quality.score}|${fontes}fontes|${hotelTxt}${alertaTxt}`;
         }).join('\n');
 
         // ============================================================
@@ -157,8 +160,8 @@ ${cenario === 'abaixo' ? `- NOTA: Poucos destinos dentro do orçamento, valorize
 ${restricoesFamilia}
 ${observacoesBloco}
 DESTINOS PRÉ-FILTRADOS (todos DENTRO do orçamento; nada acima do teto chegou até aqui):
-Formato: ID|Nome|País|Aeroporto|Passagem ida+volta|Paradas|Duração do voo|Score objetivo (0-125, maior = melhor logística)|Fontes|Hotel/noite|Alertas
-A lista já está ORDENADA pelo score objetivo (preço, escalas, duração do voo vs. duração da viagem, perfil dos passageiros).
+Formato: ID|Nome|País|Aeroporto|Passagem ida+volta|Quanto usa do orçamento|Paradas|Duração do voo|Logística (0-125, maior = melhor)|Fontes|Hotel/noite|Alertas
+A lista já está ORDENADA assim: primeiro o quanto a passagem aproveita o orçamento, depois a logística. Um voo com escalas pode aparecer acima de um voo direto por usar melhor o orçamento — isso é intencional.
 ${listaCompacta}
 
 TAREFA: Com base no PERFIL acima, escolha os melhores destinos:
@@ -167,8 +170,9 @@ ${numAlternativas > 0 ? `2. ${numAlternativas} ALTERNATIVA${numAlternativas > 1 
 ${temSurpresa ? `3. 1 SURPRESA (inesperado e interessante)` : ''}
 
 CRITÉRIOS DE SELEÇÃO (em ordem de prioridade):
-1. RESTRIÇÕES OBJETIVAS (NÃO NEGOCIÁVEL): você pode desempatar entre destinos de score parecido, mas NÃO pode escolher como MELHOR DESTINO uma opção com ALERTA de escalas/duração quando existir opção sem alerta de score igual ou maior.
-   Sobre preço: o viajante informou ${simboloMoeda} ${orcamento} como o que ACEITA GASTAR na passagem. Entre opções parecidas em logística e match de perfil, prefira a que aproveita melhor esse valor, em vez da mais barata da lista. Uma opção bem mais barata continua válida quando é claramente melhor em logística ou em match com o perfil: nesse caso, mencione a economia no "razao" ou no "comentario".
+1. ORÇAMENTO PRIMEIRO: o viajante informou ${simboloMoeda} ${orcamento} como o que ACEITA GASTAR na passagem. A lista já vem ordenada por isso. Prefira destinos que aproveitam bem esse valor; uma opção com escalas que usa mais do orçamento PODE ser escolhida à frente de um voo direto bem mais barato.
+   Se você escolher uma opção bem mais barata, ela precisa compensar em logística ou em match com o perfil, e a economia deve ser mencionada no "razao" ou no "comentario".
+${(criancas > 0 || bebes > 0) ? `   EXCEÇÃO NÃO NEGOCIÁVEL (viagem com crianças/bebês): NÃO escolha como MELHOR DESTINO uma opção com 2 ou mais escalas quando existir opção de até 1 escala com logística igual ou maior. Aqui a logística vem antes do orçamento.` : ''}
 2. MATCH COM PERFIL: O destino combina com "${preferencias}"? É adequado para ${companhia}?
    - Família com crianças → segurança, infraestrutura, atividades para crianças, voos curtos
    - Família com bebês → infraestrutura de saúde, clima ameno, facilidade de acesso
@@ -278,7 +282,7 @@ JSON:
         // ============================================================
         if (!ranking) {
             console.warn('⚠️ Todos os modelos falharam, usando fallback determinístico');
-            return res.status(200).json(rankByQuality(destinosQualidade, orcamento));
+            return res.status(200).json(rankByQuality(destinosQualidade, orcamento, perfilVoo));
         }
 
         // ============================================================
@@ -333,7 +337,7 @@ JSON:
 
         if (!resultado.top_destino) {
             console.warn('⚠️ top_destino inválido após mapeamento, usando fallback');
-            return res.status(200).json(rankByQuality(destinosQualidade, orcamento));
+            return res.status(200).json(rankByQuality(destinosQualidade, orcamento, perfilVoo));
         }
 
         // ============================================================
@@ -384,7 +388,7 @@ JSON:
         console.error('❌ Erro no ranking:', erro);
 
         try {
-            return res.status(200).json(rankByQuality(ranquearPorQualidade(destinos, perfilVoo), orcamento));
+            return res.status(200).json(rankByQuality(ranquearPorQualidade(destinos, perfilVoo), orcamento, perfilVoo));
         } catch (fallbackErr) {
             return res.status(500).json({
                 error: 'Erro interno no ranking',
@@ -416,10 +420,17 @@ function getSeasonContext(mes) {
 }
 
 // ============================================================
-// FALLBACK: Ranking determinístico por score de qualidade (sem LLM)
+// FALLBACK: Ranking determinístico (sem LLM)
 // Recebe a lista JÁ ordenada por ranquearPorQualidade().
+//
+// A ordenação passou a colocar o orçamento antes da logística, então a
+// primeira posição pode ser um voo com 2+ escalas. No caminho com IA, a
+// trava de família roda depois da escolha do modelo; aqui não havia
+// escolha nenhuma para validar, e o topo saía direto de selected[0].
+// Sem este guarda, uma família com crianças receberia como MELHOR
+// DESTINO exatamente o que violaRestricaoObjetiva existe para impedir.
 // ============================================================
-function rankByQuality(destinosOrdenados, orcamento) {
+export function rankByQuality(destinosOrdenados, orcamento, perfilVoo = {}) {
     const pool = destinosOrdenados.filter(d => d.flight?.price > 0);
     if (pool.length === 0) {
         return buildFallbackResult(destinosOrdenados.slice(0, 5), orcamento);
@@ -451,7 +462,21 @@ function rankByQuality(destinosOrdenados, orcamento) {
         }
     }
 
-    return buildFallbackResult(selected, orcamento);
+    // Trava de família: se o primeiro colocado tem 2+ escalas havendo
+    // opção equivalente com no máximo 1, promove essa opção ao topo e
+    // rebaixa a outra, sem tirá-la da lista.
+    if (selected.length > 0 && violaRestricaoObjetiva(selected[0], pool, perfilVoo)) {
+        const idx = selected.findIndex(d => !violaRestricaoObjetiva(d, pool, perfilVoo));
+        if (idx > 0) {
+            const [promovido] = selected.splice(idx, 1);
+            selected.unshift(promovido);
+        } else if (idx === -1) {
+            const doPool = pool.find(d => !violaRestricaoObjetiva(d, pool, perfilVoo));
+            if (doPool) selected.unshift(doPool);
+        }
+    }
+
+    return buildFallbackResult(selected.slice(0, 5), orcamento);
 }
 
 function buildFallbackResult(selected, orcamento) {
