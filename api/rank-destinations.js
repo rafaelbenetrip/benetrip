@@ -18,6 +18,10 @@ import {
     INSTRUCOES_IDENTIDADE,
     linhaLocalizacao,
 } from './_lib/destination-identity.js';
+import {
+    blocoRestricoesFamilia,
+    limparAfirmacoesDeSaude,
+} from './_lib/family-claims.js';
 
 function getCerebrasKey() {
     return process.env.CEREBRAS_KEY || process.env.CEREBRAS_API_KEY || null;
@@ -132,14 +136,10 @@ export default async function handler(req, res) {
             if (bebes > 0) parts.push(`${bebes} bebê(s) de 0-1 ano`);
             passageirosInfo = parts.join(', ');
 
-            restricoesFamilia = `
-ATENÇÃO ESPECIAL - VIAGEM COM CRIANÇAS/BEBÊS:
-- Priorize destinos com BOA INFRAESTRUTURA para famílias com crianças pequenas
-- Evite destinos que exigem longas caminhadas ou acesso difícil com carrinhos
-- Considere destinos com hospitais/clínicas acessíveis
-- Voos diretos ou com poucas paradas são PREFERÍVEIS (viagem longa com crianças é cansativa)
-${bebes > 0 ? '- BEBÊ(S) NO COLO: priorize destinos com boa estrutura de saúde e clima ameno' : ''}
-${criancas > 0 ? '- CRIANÇAS: considere destinos com atividades infantis, parques, praias calmas' : ''}`;
+            // Critério de escolha e assunto do texto são coisas diferentes:
+            // o bloco antigo não dizia isso e virava frase sobre hospitais em
+            // todos os cards. Ver api/_lib/family-claims.js.
+            restricoesFamilia = blocoRestricoesFamilia({ criancas, bebes });
         }
 
         // ============================================================
@@ -298,6 +298,13 @@ JSON:
         // ============================================================
         // MAPEAR IDs → DADOS REAIS (na ordem enviada ao LLM)
         // ============================================================
+        // Guarda de saúde aplicada a TODOS os textos escolhidos. O prompt
+        // proíbe falar de hospital, mas prompt reduz frequência e não
+        // garante: não temos dado nenhum sobre rede de saúde, e uma família
+        // decidindo para onde levar um bebê não pode receber palpite nosso
+        // como se fosse informação. Ver api/_lib/family-claims.js.
+        let oracoesDeSaudeRemovidas = 0;
+
         const mapDestino = (item) => {
             if (!item || typeof item.id !== 'number') return null;
             const idx = item.id - 1;
@@ -307,7 +314,7 @@ JSON:
             if (guardaEpoca.descartada) {
                 console.warn(`🚫 Sazonalidade descartada em ${d.name}: afirmação sem fonte ("${String(item.adequacao_epoca).slice(0, 90)}")`);
             }
-            return {
+            const base = {
                 id: item.id,
                 name: d.name,
                 primary_airport: d.primary_airport,
@@ -338,6 +345,13 @@ JSON:
                 adequacao_epoca_substituta: guardaEpoca.descartada ? TEXTO_SEM_FONTE : '',
                 ponto_negativo: item.ponto_negativo || '',
             };
+
+            const limpo = limparAfirmacoesDeSaude(base);
+            if (limpo.removidas > 0) {
+                oracoesDeSaudeRemovidas += limpo.removidas;
+                console.warn(`🩺 ${limpo.removidas} oração(ões) sobre infraestrutura de saúde descartada(s) em ${d.name}: não temos fonte para isso`);
+            }
+            return limpo.destino;
         };
 
         const resultado = {
@@ -347,6 +361,7 @@ JSON:
             _model: usedModel,
             _totalAnalisados: destinos.length,
             _poucosResultados: poucosResultados,
+            _oracoesDeSaudeRemovidas: oracoesDeSaudeRemovidas,
         };
 
         if (!resultado.top_destino) {
