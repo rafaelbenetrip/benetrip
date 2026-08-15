@@ -345,6 +345,12 @@ async function classificarDestino(query, descricao = '', pontosTuristicos = []) 
 }
 
 // Função para normalizar nome de destino para correspondência com a base de dados
+//
+// A correspondência é EXATA, nunca por substring. Com includes(), a sigla
+// 'la' casava dentro de "Orlando", "Atlanta", "Málaga" e "Guadalajara", e
+// todas viravam Los Angeles: a busca de imagens saía procurando foto da
+// cidade errada. O mesmo valia para 'rio' dentro de "Rio Branco" e 'ny'
+// dentro de "Sydney". Sigla é apelido do nome inteiro, não pedaço dele.
 function normalizarNomeDestino(destino) {
   const substituicoes = {
     'nyc': 'Nova York',
@@ -363,15 +369,12 @@ function normalizarNomeDestino(destino) {
     'rome': 'Roma'
   };
 
-  const nomeNormalizado = destino.toLowerCase();
-  for (const [abreviacao, nomeCompleto] of Object.entries(substituicoes)) {
-    if (nomeNormalizado.includes(abreviacao)) {
-      return nomeCompleto;
-    }
+  const nomeNormalizado = String(destino || '').toLowerCase().trim();
+  if (substituicoes[nomeNormalizado]) {
+    return substituicoes[nomeNormalizado];
   }
   for (const nomeDestino of Object.keys(PONTOS_TURISTICOS_POPULARES)) {
-    if (nomeDestino.toLowerCase().includes(nomeNormalizado) ||
-        nomeNormalizado.includes(nomeDestino.toLowerCase())) {
+    if (nomeDestino.toLowerCase() === nomeNormalizado) {
       return nomeDestino;
     }
   }

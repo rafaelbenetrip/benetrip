@@ -1596,6 +1596,66 @@ body {
     background: var(--gray-light);
 }
 
+/* Ninguém confere o que a miniatura do provedor mostra. A legenda fica
+   sobre a foto, discreta e sempre visível: o card ilustra o destino, não
+   afirma estar retratando-o. */
+.destino-imagem-legenda {
+    position: absolute;
+    left: 8px;
+    bottom: 8px;
+    padding: 3px 8px;
+    border-radius: 999px;
+    font-size: 10px;
+    line-height: 1.4;
+    letter-spacing: 0.02em;
+    color: #FFF;
+    background: rgba(0, 0, 0, 0.55);
+    backdrop-filter: blur(2px);
+    pointer-events: none;
+}
+
+/* Caiu no avatar da Tripinha: não há foto de terceiro para ressalvar. */
+.destino-imagem-wrapper.sem-foto .destino-imagem-legenda {
+    display: none;
+}
+
+/* Onde o destino fica de fato — desfaz homônimo ("São Petersburgo" nos
+   Estados Unidos) e mostra a distância até o aeroporto da tarifa. */
+.destino-mapa {
+    display: inline-block;
+    margin: 0 0 8px;
+    font-size: 12px;
+    line-height: 1.4;
+    color: inherit;
+    opacity: 0.85;
+    text-decoration: underline;
+}
+
+.destino-card .destino-mapa {
+    color: #666;
+    opacity: 1;
+}
+
+.destino-mapa:hover {
+    opacity: 1;
+}
+
+/* O voo pousa em outro país: fronteira, documento e trajeto mudam. */
+.destino-outro-pais {
+    margin: 0 0 8px;
+    padding: 6px 10px;
+    border-radius: var(--border-radius-sm);
+    font-size: 12px;
+    line-height: 1.45;
+    background: rgba(255, 255, 255, 0.16);
+}
+
+.destino-card .destino-outro-pais {
+    background: #FFF7E6;
+    border: 1px solid #F2DCA8;
+    color: #7A5A12;
+}
+
 /* Economia contra o teto de passagem */
 .destino-economia {
     display: flex;

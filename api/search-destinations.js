@@ -14,6 +14,7 @@
 
 import { readFileSync } from 'fs';
 import { join } from 'path';
+import { avaliarIdentidade, identidadeQuebrada } from './_lib/destination-identity.js';
 
 export const maxDuration = 60;
 
@@ -488,6 +489,39 @@ export default async function handler(req, res) {
             addDestinations(result.destinations, label);
         });
 
+        // ============================================================
+        // IDENTIDADE DO DESTINO
+        //
+        // O provedor devolve nome, país, aeroporto e coordenada como campos
+        // independentes: nada garante que os quatro descrevam o mesmo lugar.
+        // Aqui o par destino/aeroporto é conferido contra a tabela de
+        // aeroportos que o projeto já mantém.
+        //
+        // Aeroporto em país diferente do destino é comum e legítimo (Foz do
+        // Iguaçu/Puerto Iguazú), então vira ROTULO no card, não descarte.
+        // Descarte só quando a coordenada do destino cai fora do continente
+        // do aeroporto: aí o registro está quebrado e a tarifa não é daquele
+        // lugar.
+        // ============================================================
+        const lookupIata = getIataLookup();
+        let descartadosPorIdentidade = 0;
+        for (const [key, dest] of allDestinations) {
+            const identidade = avaliarIdentidade(dest, lookupIata);
+            if (identidadeQuebrada(identidade)) {
+                console.warn(`🚫 Identidade quebrada: ${dest.name} (${dest.country}) @${identidade.coordenadas} não fica em ${identidade.continenteAeroporto}, continente de ${identidade.aeroporto}`);
+                allDestinations.delete(key);
+                descartadosPorIdentidade++;
+                continue;
+            }
+            if (identidade.aeroportoEmOutroPais) {
+                console.log(`🛬 ${dest.name} (${dest.country}) usa ${identidade.aeroporto}, que fica em ${identidade.paisAeroporto}`);
+            }
+            dest._identidade = identidade;
+        }
+        if (descartadosPorIdentidade > 0) {
+            console.warn(`🚫 ${descartadosPorIdentidade} destino(s) descartado(s) por par destino/aeroporto inconsistente`);
+        }
+
         // Ordenar por preço
         const consolidated = Array.from(allDestinations.values()).sort((a, b) => {
             if (a.flight.price === 0 && b.flight.price === 0) return 0;
@@ -566,6 +600,7 @@ export default async function handler(req, res) {
                 totalBruto,
                 filtradosDomestico: apenasInternacional ? filtradosDomestico : 0,
                 filtradosInternacional: apenasNacional ? filtradosInternacional : 0,
+                descartadosPorIdentidade,
                 sources: sourcesInfo,
                 buscasDetalhadas: results.map((r, i) => ({
                     ordem: i + 1,

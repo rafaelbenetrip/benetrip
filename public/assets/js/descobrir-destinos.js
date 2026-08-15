@@ -553,16 +553,81 @@ const BenetripDiscovery = {
     // texto não confiável (safeHref) e o carregamento pode falhar por
     // hotlinking: nos dois casos o card cai no avatar da Tripinha em vez
     // de exibir um buraco.
+    //
+    // O QUE a foto mostra, ninguém confere. É uma miniatura que o provedor
+    // associa ao destino, não um registro dele: já saiu foto de praia num
+    // card de Belo Horizonte. Enquanto não houver verificação do conteúdo,
+    // a imagem é apresentada como ILUSTRAÇÃO — no alt, para quem usa leitor
+    // de tela, e na legenda, para quem vê o card. Afirmar "esta é a foto de
+    // Belo Horizonte" é a única coisa que o card não pode fazer aqui.
+    LEGENDA_FOTO: 'Foto ilustrativa',
+
     imagemHtml(d, variante) {
         const url = this.safeHref(d.image);
         const src = url || this.IMAGEM_FALLBACK;
         const semFoto = url ? '' : ' destino-imagem-fallback';
-        const alt = this.esc(`${d.name || 'Destino'}${d.country ? ', ' + d.country : ''}`);
+        const lugar = this.esc(`${d.name || 'Destino'}${d.country ? ', ' + d.country : ''}`);
+        const alt = `Imagem ilustrativa de ${lugar}`;
+        const legenda = url
+            ? `<span class="destino-imagem-legenda">${this.LEGENDA_FOTO}</span>`
+            : '';
         return `<div class="destino-imagem-wrapper destino-imagem-${variante}">
                     <img class="destino-imagem${semFoto}" src="${src}" alt="${alt}"
                          loading="lazy" decoding="async"
-                         onerror="this.onerror=null;this.src='${this.IMAGEM_FALLBACK}';this.classList.add('destino-imagem-fallback')">
+                         onerror="this.onerror=null;this.src='${this.IMAGEM_FALLBACK}';this.classList.add('destino-imagem-fallback');this.parentNode.classList.add('sem-foto')">
+                    ${legenda}
                 </div>`;
+    },
+
+    // ================================================================
+    // ONDE FICA, DE FATO
+    //
+    // Nome de cidade se repete pelo mundo e o aeroporto da tarifa pode
+    // servir uma cidade vizinha: "São Petersburgo, Estados Unidos" com
+    // aeroporto TPA é St. Petersburg, na Flórida, atendida pelo aeroporto
+    // de Tampa — nada disso é dedutível do nome. O provedor já devolve a
+    // coordenada do destino; o card entrega esse link e a dúvida acaba em
+    // um toque.
+    //
+    // A leitura da coordenada é a mesma de api/_lib/destination-identity.js
+    // e a duplicação é intencional: aquele módulo é ESM de servidor e esta
+    // é uma página de navegador. Array é recusado nos dois lados, porque
+    // [lat,lon] e [lon,lat] são indistinguíveis e o erro joga o ponto no
+    // oceano.
+    // ================================================================
+    coordenadaDe(d) {
+        const c = d && d.coordinates;
+        if (!c || typeof c !== 'object' || Array.isArray(c)) return null;
+        const lat = Number(c.latitude !== undefined ? c.latitude : c.lat);
+        const lon = Number(c.longitude !== undefined ? c.longitude : (c.lng !== undefined ? c.lng : c.lon));
+        if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+        if (lat < -90 || lat > 90 || lon < -180 || lon > 180) return null;
+        if (lat === 0 && lon === 0) return null;
+        return `${lat.toFixed(4)},${lon.toFixed(4)}`;
+    },
+
+    mapaHtml(d) {
+        const coord = this.coordenadaDe(d);
+        const consulta = coord || `${d.name || ''} ${d.country || ''}`.trim();
+        if (!consulta) return '';
+        const href = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(consulta)}`;
+        // Sem coordenada o link é uma BUSCA por nome, e o rótulo diz isso:
+        // "ver onde fica" prometeria uma precisão que não temos.
+        const rotulo = coord ? 'Ver no mapa onde fica' : 'Procurar no mapa';
+        return `<a class="destino-mapa" href="${this.esc(href)}" target="_blank" rel="noopener nofollow">📍 ${rotulo}</a>`;
+    },
+
+    // O par destino/aeroporto é conferido no servidor
+    // (api/_lib/destination-identity.js). Quando o voo pousa em outro país,
+    // isso muda fronteira, documento e trajeto: precisa estar no card, não
+    // só no log do servidor.
+    aeroportoOutroPaisHtml(d) {
+        const id = d && d._identidade;
+        if (!id || !id.aeroportoEmOutroPais || !id.paisAeroporto) return '';
+        const iata = this.esc(id.aeroporto || '');
+        const pais = this.esc(id.paisAeroporto);
+        const destino = this.esc(d.name || 'o destino');
+        return `<div class="destino-outro-pais">🛬 O voo pousa em ${iata}, que fica em ${pais}. O trecho até ${destino} é por conta própria e não está no preço.</div>`;
     },
 
     // Sugestão abaixo do teto: a diferença é dinheiro que fica com o
@@ -1496,7 +1561,12 @@ const BenetripDiscovery = {
             if (code) porAeroporto.set(code, (porAeroporto.get(code) || 0) + 1);
         });
 
-        const vooHtml = (d) => this.vooHtml(d, porAeroporto.get(String(d.primary_airport || '').toUpperCase()) || 0);
+        // Trecho aéreo + onde o aeroporto fica + onde o destino fica: três
+        // coisas diferentes que o card precisa manter separadas.
+        const vooHtml = (d) =>
+            this.vooHtml(d, porAeroporto.get(String(d.primary_airport || '').toUpperCase()) || 0)
+            + this.aeroportoOutroPaisHtml(d)
+            + this.mapaHtml(d);
         // v5.0: transparência — adequação à época e ponto de atenção
         const epocaHtml = (d) => this.gerarBlocoSazonalidade(d);
         const negativoHtml = (d) => {

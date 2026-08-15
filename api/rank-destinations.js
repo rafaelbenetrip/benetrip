@@ -14,6 +14,10 @@ import {
     aplicarGuardaSazonal,
     TEXTO_SEM_FONTE,
 } from './_lib/seasonal-claims.js';
+import {
+    INSTRUCOES_IDENTIDADE,
+    linhaLocalizacao,
+} from './_lib/destination-identity.js';
 
 function getCerebrasKey() {
     return process.env.CEREBRAS_KEY || process.env.CEREBRAS_API_KEY || null;
@@ -109,7 +113,11 @@ export default async function handler(req, res) {
             const aproveitamento = d._quality.aproveitamento != null
                 ? `${Math.round(d._quality.aproveitamento * 100)}% do orçamento`
                 : 'orçamento não informado';
-            return `${i + 1}|${d.name}|${d.country}|${d.primary_airport}|${simboloMoeda}${passagem}|${aproveitamento}|${paradas}paradas|voo ${durTxt}|logística ${d._quality.score}|${fontes}fontes|${hotelTxt}${alertaTxt}`;
+            // País e coordenada saem JUNTOS, num campo só: o nome do destino
+            // não identifica lugar nenhum (São Petersburgo/EUA não é a cidade
+            // russa) e é a coordenada que impede o modelo de descrever o
+            // homônimo famoso.
+            return `${i + 1}|${d.name}|${linhaLocalizacao(d)}|${d.primary_airport}|${simboloMoeda}${passagem}|${aproveitamento}|${paradas}paradas|voo ${durTxt}|logística ${d._quality.score}|${fontes}fontes|${hotelTxt}${alertaTxt}`;
         }).join('\n');
 
         // ============================================================
@@ -160,7 +168,7 @@ ${cenario === 'abaixo' ? `- NOTA: Poucos destinos dentro do orçamento, valorize
 ${restricoesFamilia}
 ${observacoesBloco}
 DESTINOS PRÉ-FILTRADOS (todos DENTRO do orçamento; nada acima do teto chegou até aqui):
-Formato: ID|Nome|País|Aeroporto|Passagem ida+volta|Quanto usa do orçamento|Paradas|Duração do voo|Logística (0-125, maior = melhor)|Fontes|Hotel/noite|Alertas
+Formato: ID|Nome|País @latitude,longitude|Aeroporto|Passagem ida+volta|Quanto usa do orçamento|Paradas|Duração do voo|Logística (0-125, maior = melhor)|Fontes|Hotel/noite|Alertas
 A lista já está ORDENADA assim: primeiro o quanto a passagem aproveita o orçamento, depois a logística. Um voo com escalas pode aparecer acima de um voo direto por usar melhor o orçamento — isso é intencional.
 ${listaCompacta}
 
@@ -184,6 +192,8 @@ ${(criancas > 0 || bebes > 0) ? `   EXCEÇÃO NÃO NEGOCIÁVEL (viagem com crian
 5. CUSTO TOTAL: passagem + hotel × ${noites || 7} noites
 6. DIVERSIDADE: Não repita países
 ${(criancas > 0 || bebes > 0) ? '7. LOGÍSTICA FAMILIAR: Prefira voos diretos ou com menos paradas' : ''}
+
+${INSTRUCOES_IDENTIDADE}
 
 ${INSTRUCOES_SAZONALIDADE}
 
@@ -234,7 +244,7 @@ JSON:
                         messages: [
                             {
                                 role: 'system',
-                                content: 'Você é a Tripinha, uma cachorrinha vira-lata caramelo que é especialista em turismo. Retorna APENAS JSON válido em português do Brasil. Zero texto extra. IDs referem a destinos da lista fornecida. Seus comentários são entusiasmados mas informativos, como uma amiga animada dando dicas de viagem. Quando a viagem inclui crianças ou bebês, sempre considere segurança e praticidade nas recomendações.'
+                                content: 'Você é a Tripinha, uma cachorrinha vira-lata caramelo que é especialista em turismo. Retorna APENAS JSON válido em português do Brasil. Zero texto extra. IDs referem a destinos da lista fornecida. Cada destino é identificado por nome + país + coordenada JUNTOS: nomes de cidade se repetem pelo mundo, e quando o nome lembra uma cidade famosa de outro país, quem manda é o país e a coordenada da linha, nunca a fama do nome. Seus comentários são entusiasmados mas informativos, como uma amiga animada dando dicas de viagem, e você prefere um comentário genérico e correto a um comentário específico sobre a cidade errada. Quando a viagem inclui crianças ou bebês, sempre considere segurança e praticidade nas recomendações.'
                             },
                             { role: 'user', content: prompt }
                         ],
@@ -311,6 +321,10 @@ JSON:
                 _sources: d._sources,
                 _source_count: d._source_count,
                 _quality: d._quality,
+                // Avaliação determinística do par destino/aeroporto feita em
+                // search-destinations.js. O card usa para dizer, quando for o
+                // caso, que o voo pousa em outro país.
+                _identidade: d._identidade || null,
                 razao: item.razao || '',
                 comentario: item.comentario || '',
                 dica: item.dica || '',
@@ -494,6 +508,7 @@ function buildFallbackResult(selected, orcamento) {
         _sources: d._sources,
         _source_count: d._source_count,
         _quality: d._quality || null,
+        _identidade: d._identidade || null,
         razao,
         comentario: '',
         dica: '',
