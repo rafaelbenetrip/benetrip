@@ -558,14 +558,19 @@ const BenetripDiscovery = {
     // hotlinking: nos dois casos o card cai no avatar da Tripinha em vez
     // de exibir um buraco.
     //
-    // A FOTO SEGUE A PREFERÊNCIA, NÃO O DESTINO.
+    // A FOTO SEGUE O FILTRO DA BUSCA, NÃO O DESTINO.
     //
-    // A preferência do formulário vira o parâmetro `interests` da busca
-    // (relax -> beaches, aventura -> outdoors, cultura -> museums) e esse
-    // filtro não escolhe só QUAIS destinos voltam: o provedor devolve cada
-    // destino já ilustrado por ele. Foi assim que Belo Horizonte apareceu
-    // com foto de praia numa busca por relax, e é por isso que o MESMO
-    // destino troca de foto quando a preferência muda.
+    // A preferência do formulário pode virar o parâmetro `interests` da
+    // busca (aventura -> outdoors, cultura -> museums), e esse filtro não
+    // escolhe só QUAIS destinos voltam: o provedor devolve cada destino já
+    // ilustrado por ele. Enquanto relax se traduzia como "beaches", Belo
+    // Horizonte vinha com foto de praia, e o MESMO destino trocava de foto
+    // quando a preferência mudava.
+    //
+    // Relax e urbano deixaram de filtrar (ver INTERESTS_MAP em
+    // api/search-destinations.js), mas o viés continua existindo nos temas
+    // que restaram: um destino sem museu, numa busca por cultura, é
+    // ilustrado pelo tema mesmo assim.
     //
     // Do lado do provedor não há erro; do lado do card, sim: a imagem era
     // apresentada como retrato do lugar. Agora ela é apresentada pelo que
@@ -575,6 +580,10 @@ const BenetripDiscovery = {
 
     // Rótulo em português do filtro que o provedor aplicou. 'popular' não
     // entra: sem tema declarado, não há o que explicar ao viajante.
+    //
+    // 'beaches' segue aqui de propósito. O rótulo traduz o que o PROVEDOR
+    // devolveu em _meta.interests, e não o que a Benetrip decide mandar: se
+    // o valor voltar a ser usado, o card explica em vez de calar.
     INTERESSE_FOTO_LABELS: {
         beaches: 'praias',
         outdoors: 'natureza',
