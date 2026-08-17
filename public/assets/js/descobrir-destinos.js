@@ -55,7 +55,12 @@ const BenetripDiscovery = {
         // Filtro temático que o provedor aplicou na busca (interests). Ele
         // decide também a foto de cada destino, então o card usa isso para
         // dizer sob que critério a imagem foi escolhida.
-        interesseBusca: null
+        interesseBusca: null,
+        // O ranqueador só lê as observações do viajante no caminho com IA. Se
+        // ele cair no fallback determinístico, o texto que a pessoa escreveu
+        // não teve peso nenhum — e o resumo de critérios precisa dizer isso em
+        // vez de listar as dicas como se tivessem sido usadas.
+        observacoesUsadas: null
     },
     config: {
         debug: true,
@@ -941,6 +946,8 @@ const BenetripDiscovery = {
 
         try {
             this.mostrarLoading();
+            // Sinal da busca anterior não vale para esta
+            this.state.observacoesUsadas = null;
 
             this.atualizarProgresso(15, '🔍 Buscando destinos pelo mundo...');
             const destinosDisponiveis = await this.buscarDestinosAPI();
@@ -1255,8 +1262,14 @@ const BenetripDiscovery = {
         }
         
         const ranking = await response.json();
+        // Só `true` conta como usado: resposta sem o campo é resposta que não
+        // garante ter lido as observações, e nesse caso a tela não afirma que leu.
+        this.state.observacoesUsadas = ranking._observacoesUsadas === true;
         if (ranking._model) {
             this.log(`🤖 Modelo: ${ranking._model} | Analisados: ${ranking._totalAnalisados}`);
+        }
+        if (formData.observacoes && !this.state.observacoesUsadas) {
+            this.log('⚠️ Observações não entraram no ranking (fallback determinístico)');
         }
         return ranking;
     },
@@ -1473,10 +1486,19 @@ const BenetripDiscovery = {
             : escopoDestino === 'nacional'
             ? '🏠 Apenas nacionais'
             : '🗺️ Nacionais e internacionais';
+        // O ranqueador pode ter caído no fallback determinístico (preço,
+        // escalas e duração), que não lê as dicas. Listá-las aqui do mesmo
+        // jeito nos dois casos apresenta como critério algo que não pesou na
+        // escolha: quando não pesou, o card diz.
+        const observacoesUsadas = this.state.observacoesUsadas === true;
+        const ressalvaObservacoes = observacoesUsadas
+            ? ''
+            : `<span class="criterio-ressalva">⚠️ Desta vez a Tripinha não conseguiu levar suas dicas em conta: a busca caiu no modo automático, que ordena só por preço, escalas e duração do voo. Tente de novo para que elas contem na escolha.</span>`;
         const observacoesItem = observacoes 
-            ? `<div class="criterio-item" style="grid-column: 1 / -1;">
+            ? `<div class="criterio-item${observacoesUsadas ? '' : ' criterio-item-ressalva'}" style="grid-column: 1 / -1;">
                     <span class="criterio-label">Suas dicas pra Tripinha</span>
                     <span class="criterio-valor">💬 "${this.esc(observacoes)}"</span>
+                    ${ressalvaObservacoes}
                </div>`
             : '';
         return `

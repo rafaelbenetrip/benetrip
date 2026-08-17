@@ -1019,6 +1019,23 @@ body {
     color: var(--gray-dark);
 }
 
+/* Ressalva das dicas do viajante: quando o ranqueador cai no fallback
+   determinístico, o texto que a pessoa escreveu não pesou na escolha. O item
+   continua visível (ela escreveu, tem direito de ver), mas com o aviso do que
+   de fato aconteceu, em vez de figurar como critério usado. */
+.criterio-item-ressalva {
+    background: #FFF6E9;
+    border: 1px solid #F0D3A8;
+}
+
+.criterio-ressalva {
+    display: block;
+    margin-top: 6px;
+    font-size: 12px;
+    line-height: 1.45;
+    color: #8A5A12;
+}
+
 @media (min-width: 480px) {
     .criterios-grid {
         grid-template-columns: repeat(2, 1fr);
