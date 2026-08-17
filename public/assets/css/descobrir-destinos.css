@@ -1458,6 +1458,71 @@ body {
     margin: 0 0 12px;
 }
 
+/* Aviso de que o filtro de destinos anula o que o viajante escreveu. Não é
+   erro: é uma escolha que só ele pode fazer, então tem as duas saídas. */
+.aviso-escopo {
+    display: none;
+    background: #fff9ec;
+    border: 1.5px solid #e0a63c;
+    border-radius: 12px;
+    padding: 16px 18px;
+    margin-bottom: 18px;
+}
+.aviso-escopo-titulo {
+    font-weight: 700;
+    color: #6b4a10;
+    margin-bottom: 6px;
+}
+.aviso-escopo-msg {
+    font-size: 0.92rem;
+    color: #5a4526;
+    margin: 0 0 6px;
+    line-height: 1.5;
+}
+.aviso-escopo-dica {
+    font-size: 0.85rem;
+    color: #7a6a5c;
+    margin: 0 0 12px;
+    line-height: 1.45;
+}
+.aviso-escopo-acoes {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+.btn-ajustar-escopo,
+.btn-buscar-assim {
+    border-radius: 10px;
+    padding: 9px 16px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition);
+}
+.btn-ajustar-escopo {
+    background: var(--orange-primary);
+    border: 1.5px solid var(--orange-primary);
+    color: var(--white);
+}
+.btn-buscar-assim {
+    background: transparent;
+    border: 1.5px solid #c9a86a;
+    color: #6b4a10;
+}
+.btn-ajustar-escopo:hover,
+.btn-buscar-assim:hover {
+    filter: brightness(0.95);
+}
+
+/* Pedido de país que a busca não teve como atender */
+.criterio-sem-destino {
+    display: block;
+    margin-top: 6px;
+    font-size: 12px;
+    line-height: 1.45;
+    color: #8A5A12;
+}
+
 /* ============================================================
    SAZONALIDADE VERIFICADA (P0)
    A adequação à época só é apresentada como fato quando veio de

@@ -22,6 +22,45 @@ import {
     blocoRestricoesFamilia,
     limparAfirmacoesDeSaude,
 } from './_lib/family-claims.js';
+import {
+    interpretarPedido,
+    aplicarPedido,
+    pedidoVazio,
+    normalizar,
+} from './_lib/destination-requests.js';
+import { readFileSync } from 'fs';
+import { join } from 'path';
+
+// ============================================================
+// PAÍSES CONHECIDOS
+//
+// Vem do mesmo lookup que search-destinations.js já lê. É uma lista FIXA, e
+// não os países dos candidatos, porque o caso que mais importa é o oposto:
+// saber que o viajante pediu os Estados Unidos justamente quando nenhum
+// destino americano coube no orçamento. Sem isso a tela não teria como contar
+// para ele o que aconteceu com o pedido.
+// ============================================================
+let PAISES_CONHECIDOS = null;
+
+// Nome do país como o viajante o reconhece. O pedido trafega normalizado (sem
+// acento, minúsculo) para poder ser comparado; a tela precisa do original.
+function nomeDePais(paisNorm) {
+    const original = getPaisesConhecidos().find(p => normalizar(p) === paisNorm);
+    return original || paisNorm;
+}
+
+function getPaisesConhecidos() {
+    if (PAISES_CONHECIDOS) return PAISES_CONHECIDOS;
+    try {
+        const filePath = join(process.cwd(), 'public', 'data', 'iata_geo_lookup.json');
+        const lookup = JSON.parse(readFileSync(filePath, 'utf-8'));
+        PAISES_CONHECIDOS = [...new Set(Object.values(lookup).map(v => v?.pais).filter(Boolean))];
+    } catch (err) {
+        console.warn('[Pedido] Lista de países indisponível, usando só os países dos candidatos:', err.message);
+        PAISES_CONHECIDOS = [];
+    }
+    return PAISES_CONHECIDOS;
+}
 
 function getCerebrasKey() {
     return process.env.CEREBRAS_KEY || process.env.CEREBRAS_API_KEY || null;
@@ -473,6 +512,44 @@ JSON:
                 if (resultado.surpresa === substituto) resultado.surpresa = null;
                 resultado._ajusteDeterministico = true;
             }
+        }
+
+        // ============================================================
+        // TRAVA DO PEDIDO DE PAÍS/CIDADE
+        //
+        // O critério do prompt pede; esta trava garante. Roda DEPOIS da trava
+        // de família e recebe violaRestricaoObjetiva como filtro: o pedido do
+        // viajante reordena o que sobrou, mas não promove ao topo um voo que a
+        // regra de escalas com criança acabou de barrar. Aquela regra está
+        // escrita no prompt como não negociável e continua sendo.
+        // ============================================================
+        const pedido = interpretarPedido(observacoesTexto, {
+            destinos: destinosQualidade,
+            paisesConhecidos: getPaisesConhecidos(),
+        });
+
+        if (!pedidoVazio(pedido)) {
+            const relatorio = aplicarPedido(resultado, destinosQualidade, pedido, {
+                permitido: (d) => !violaRestricaoObjetiva(d, destinosQualidade, perfilVoo),
+            });
+
+            if (relatorio.removidos.length > 0) {
+                console.warn(`🚫 Pedido do viajante: ${relatorio.removidos.join(', ')} fora dos resultados`);
+            }
+            if (relatorio.promovido) {
+                console.warn(`📌 Pedido do viajante: ${relatorio.promovido} promovido ao topo`);
+            }
+            if (relatorio.paisesSemDestino.length > 0) {
+                console.warn(`🗺️ Pedido do viajante sem destino na busca: ${relatorio.paisesSemDestino.join(', ')}`);
+            }
+
+            resultado._pedido = {
+                ajustado: relatorio.ajustado,
+                removidos: relatorio.removidos,
+                promovido: relatorio.promovido,
+                // Nomes como o viajante os reconhece, não normalizados
+                paisesSemDestino: relatorio.paisesSemDestino.map(nomeDePais),
+            };
         }
 
         return res.status(200).json(resultado);

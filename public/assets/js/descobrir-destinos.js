@@ -60,7 +60,14 @@ const BenetripDiscovery = {
         // ele cair no fallback determinístico, o texto que a pessoa escreveu
         // não teve peso nenhum — e o resumo de critérios precisa dizer isso em
         // vez de listar as dicas como se tivessem sido usadas.
-        observacoesUsadas: null
+        observacoesUsadas: null,
+        // O viajante já viu o aviso de que o filtro de destinos contraria o
+        // que ele escreveu, e escolheu buscar assim mesmo
+        escopoAvisoAceito: false,
+        paisesConhecidos: null,
+        // Relatório da trava determinística de país/cidade. Interessa à tela
+        // um campo só: o país que o viajante pediu e a busca não alcançou.
+        pedido: null
     },
     config: {
         debug: true,
@@ -141,7 +148,139 @@ const BenetripDiscovery = {
         }
     },
     normalizarTexto(texto) {
-        return texto.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        return String(texto || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    },
+    // ================================================================
+    // O TEXTO LIVRE CONTRA O FILTRO DE DESTINOS
+    //
+    // "Apenas nacionais" é filtro rígido aplicado na busca; "quero ir aos EUA"
+    // é texto livre, que só tem peso no ranqueador. Quando os dois se
+    // contradizem, o texto perde SEMPRE — e até aqui perdia calado: a pessoa
+    // recebia destinos brasileiros sem nada dizer que a própria resposta dela,
+    // dois campos acima, tinha anulado o pedido.
+    //
+    // Isto detecta a contradição antes de gastar a busca. Só o suficiente para
+    // avisar: reconhecer país citado com vontade declarada.
+    //
+    // As duas tabelas abaixo repetem api/_lib/destination-requests.js de
+    // propósito, como BANDAS_ORCAMENTO repete flight-quality.js: lá é módulo
+    // ESM de servidor, aqui é script de navegador que precisa continuar
+    // expondo BenetripDiscovery no escopo global. Se mudar lá, muda aqui.
+    // ================================================================
+    PEDIDO_ALIASES_PAIS: {
+        'eua': 'estados unidos',
+        'usa': 'estados unidos',
+        'estados unidos da america': 'estados unidos',
+        'inglaterra': 'reino unido',
+        'gra bretanha': 'reino unido',
+        'gra-bretanha': 'reino unido',
+        'uk': 'reino unido',
+        'holanda': 'paises baixos',
+        'tchequia': 'republica tcheca',
+        'republica checa': 'republica tcheca',
+        'emirados arabes unidos': 'emirados arabes',
+    },
+    PEDIDO_CUES_DESEJO: [
+        'quero', 'queria', 'gostaria', 'adoraria', 'adoro', 'amaria', 'sonho',
+        'vontade', 'pretendo', 'prefiro', 'interesse', 'interessa', 'conhecer',
+        'desejo', 'penso', 'visitar', 'ir para', 'ir pra', 'ir a', 'ir ao',
+        'ir aos', 'sempre quis', 'morro de vontade',
+    ],
+    PEDIDO_CUES_NEGATIVOS: [
+        'nao', 'exceto', 'menos', 'sem', 'tirando', 'fora', 'evitar', 'evite',
+        'evito', 'nada de', 'longe de', 'nem', 'nunca', 'jamais', 'odeio',
+        'detesto',
+    ],
+    PEDIDO_JANELA_DESEJO: 4,
+    PEDIDO_JANELA_NEGACAO: 2,
+    // Negação colada no verbo de vontade ("não quero") neutraliza o desejo em
+    // vez de virar exclusão: ver o comentário longo em destination-requests.js
+    PEDIDO_JANELA_NEGACAO_DO_VERBO: 0,
+
+    // Países que aparecem no JSON de cidades, na grafia original
+    getPaisesConhecidos() {
+        if (this.state.paisesConhecidos) return this.state.paisesConhecidos;
+        const mapa = new Map();
+        for (const c of this.state.cidadesData || []) {
+            if (c?.pais) mapa.set(this.normalizarTexto(c.pais), c.pais);
+        }
+        this.state.paisesConhecidos = mapa;
+        return mapa;
+    },
+    // Todas as pistas que cabem na janela, não só a mais próxima: ver o
+    // comentário de acharPistas em api/_lib/destination-requests.js
+    _pedidoAcharPistas(antes, pistas, janela) {
+        const achadas = [];
+        for (const pista of pistas) {
+            let de = antes.length;
+            let idx;
+            while ((idx = antes.lastIndexOf(pista, de - 1)) !== -1) {
+                de = idx;
+                const ant = antes[idx - 1];
+                const post = antes[idx + pista.length];
+                if ((!ant || !/[a-z0-9]/.test(ant)) && (!post || !/[a-z0-9]/.test(post))) {
+                    const meio = antes.slice(idx + pista.length).trim();
+                    if ((meio ? meio.split(/\s+/).length : 0) <= janela) achadas.push(idx);
+                }
+                if (idx === 0) break;
+            }
+        }
+        return achadas;
+    },
+    // Países que o viajante disse querer, na grafia original
+    paisesDesejadosNoTexto(observacoes) {
+        const texto = this.normalizarTexto(observacoes);
+        if (!texto.trim()) return [];
+        const paises = this.getPaisesConhecidos();
+        const desejados = [];
+
+        for (const [norm, original] of paises) {
+            const apelidos = Object.keys(this.PEDIDO_ALIASES_PAIS)
+                .filter(a => this.PEDIDO_ALIASES_PAIS[a] === norm);
+            const termos = [norm, ...apelidos];
+            let querido = false;
+            let recusado = false;
+
+            for (const termo of termos) {
+                if (termo === norm && termo.length < 4) continue;
+                const re = new RegExp(`(^|[^a-z0-9])(${termo.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})([^a-z0-9]|$)`);
+                for (const clausula of texto.split(/[.,;:!?\n]+/)) {
+                    const m = re.exec(clausula);
+                    if (!m) continue;
+                    const antes = clausula.slice(0, m.index + m[1].length);
+                    if (this._pedidoAcharPistas(antes, this.PEDIDO_CUES_NEGATIVOS, this.PEDIDO_JANELA_NEGACAO).length > 0) {
+                        recusado = true;
+                        continue;
+                    }
+                    const desejos = this._pedidoAcharPistas(antes, this.PEDIDO_CUES_DESEJO, this.PEDIDO_JANELA_DESEJO);
+                    const algumNegado = desejos.some(i =>
+                        this._pedidoAcharPistas(antes.slice(0, i), this.PEDIDO_CUES_NEGATIVOS, this.PEDIDO_JANELA_NEGACAO_DO_VERBO).length > 0
+                    );
+                    if (desejos.length > 0 && !algumNegado) querido = true;
+                }
+            }
+            if (querido && !recusado) desejados.push(original);
+        }
+        return desejados;
+    },
+    // { tipo, paises } quando o filtro de destinos anula o texto livre
+    detectarContradicaoEscopo() {
+        const { escopoDestino, observacoes, origem } = this.state.formData;
+        if (!observacoes || escopoDestino === 'tanto_faz') return null;
+
+        const paisOrigem = this.normalizarTexto(origem?.country || '');
+        const desejados = this.paisesDesejadosNoTexto(observacoes);
+        if (desejados.length === 0) return null;
+
+        if (escopoDestino === 'nacional') {
+            const estrangeiros = desejados.filter(p => this.normalizarTexto(p) !== paisOrigem);
+            if (estrangeiros.length > 0) return { tipo: 'nacional', paises: estrangeiros };
+        }
+        if (escopoDestino === 'internacional' && paisOrigem) {
+            const proprio = desejados.filter(p => this.normalizarTexto(p) === paisOrigem);
+            if (proprio.length > 0) return { tipo: 'internacional', paises: proprio };
+        }
+        return null;
     },
     // ================================================================
     // v4.5: buscarCidades inclui dados geo do JSON
@@ -439,8 +578,69 @@ const BenetripDiscovery = {
             }
             
             this.coletarDadosFormulario();
+
+            // O filtro de destinos contraria o que a pessoa escreveu? Ela
+            // decide o que fazer antes de gastarmos a busca — o texto livre
+            // não tem como vencer esse filtro depois.
+            const contradicao = this.detectarContradicaoEscopo();
+            if (contradicao && !this.state.escopoAvisoAceito) {
+                this.mostrarAvisoEscopo(contradicao);
+                return;
+            }
+
             await this.buscarDestinos();
         });
+
+        // Mexeu no filtro ou no texto: o aviso volta a valer para a
+        // combinação nova, que pode não ser mais contraditória
+        const invalidarAviso = () => {
+            this.state.escopoAvisoAceito = false;
+            const painel = document.getElementById('aviso-escopo');
+            if (painel) painel.style.display = 'none';
+        };
+        document.getElementById('observacoes')?.addEventListener('input', invalidarAviso);
+        document.querySelector('.escopo-group')?.addEventListener('click', invalidarAviso);
+    },
+    mostrarAvisoEscopo(contradicao) {
+        const lista = contradicao.paises.map(p => this.esc(p)).join(', ');
+        const explicacao = contradicao.tipo === 'nacional'
+            ? `Você marcou <strong>“Destinos nacionais”</strong>, mas escreveu que quer ir para <strong>${lista}</strong>.`
+            : `Você marcou <strong>“Destinos internacionais”</strong>, mas escreveu que quer ir para <strong>${lista}</strong>, que é o seu próprio país.`;
+
+        const container = document.getElementById('form-container');
+        let painel = document.getElementById('aviso-escopo');
+        if (!painel) {
+            painel = document.createElement('div');
+            painel.id = 'aviso-escopo';
+            painel.className = 'aviso-escopo';
+            container.insertBefore(painel, container.firstChild);
+        }
+        painel.innerHTML = `
+            <div class="aviso-escopo-titulo">🐕 A Tripinha percebeu uma coisa</div>
+            <p class="aviso-escopo-msg">${explicacao}</p>
+            <p class="aviso-escopo-dica">O filtro de destinos manda na busca: se ele continuar assim, a Tripinha não vai nem procurar por lá, e suas dicas não conseguem mudar isso.</p>
+            <div class="aviso-escopo-acoes">
+                <button type="button" class="btn-ajustar-escopo" onclick="BenetripDiscovery.irParaEscopo()">Mudar o filtro</button>
+                <button type="button" class="btn-buscar-assim" onclick="BenetripDiscovery.buscarIgnorandoAviso()">Buscar assim mesmo</button>
+            </div>
+        `;
+        painel.style.display = 'block';
+        painel.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    },
+    irParaEscopo() {
+        const painel = document.getElementById('aviso-escopo');
+        if (painel) painel.style.display = 'none';
+        const grupo = document.querySelector('.escopo-group');
+        if (grupo) {
+            grupo.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            grupo.querySelector('.btn-option')?.focus();
+        }
+    },
+    async buscarIgnorandoAviso() {
+        this.state.escopoAvisoAceito = true;
+        const painel = document.getElementById('aviso-escopo');
+        if (painel) painel.style.display = 'none';
+        await this.buscarDestinos();
     },
     validarFormulario() {
         if (!this.state.origemSelecionada) {
@@ -948,6 +1148,7 @@ const BenetripDiscovery = {
             this.mostrarLoading();
             // Sinal da busca anterior não vale para esta
             this.state.observacoesUsadas = null;
+            this.state.pedido = null;
 
             this.atualizarProgresso(15, '🔍 Buscando destinos pelo mundo...');
             const destinosDisponiveis = await this.buscarDestinosAPI();
@@ -1265,6 +1466,7 @@ const BenetripDiscovery = {
         // Só `true` conta como usado: resposta sem o campo é resposta que não
         // garante ter lido as observações, e nesse caso a tela não afirma que leu.
         this.state.observacoesUsadas = ranking._observacoesUsadas === true;
+        this.state.pedido = ranking._pedido || null;
         if (ranking._model) {
             this.log(`🤖 Modelo: ${ranking._model} | Analisados: ${ranking._totalAnalisados}`);
         }
@@ -1494,11 +1696,19 @@ const BenetripDiscovery = {
         const ressalvaObservacoes = observacoesUsadas
             ? ''
             : `<span class="criterio-ressalva">⚠️ Desta vez a Tripinha não conseguiu levar suas dicas em conta: a busca caiu no modo automático, que ordena só por preço, escalas e duração do voo. Tente de novo para que elas contem na escolha.</span>`;
+        // O viajante nomeou um país e a busca não trouxe nenhum destino de
+        // lá. A trava não tem o que promover; o que resta é contar, em vez de
+        // entregar outra coisa como se fosse o que ele pediu.
+        const semDestino = (this.state.pedido?.paisesSemDestino || []);
+        const avisoSemDestino = semDestino.length > 0
+            ? `<span class="criterio-sem-destino">🗺️ Nenhum destino dentro do seu orçamento fica ${semDestino.length === 1 ? 'em' : 'nestes países:'} ${semDestino.map(p => this.esc(p)).join(', ')}. O que está abaixo é o melhor do resto da busca.</span>`
+            : '';
         const observacoesItem = observacoes 
             ? `<div class="criterio-item${observacoesUsadas ? '' : ' criterio-item-ressalva'}" style="grid-column: 1 / -1;">
                     <span class="criterio-label">Suas dicas pra Tripinha</span>
                     <span class="criterio-valor">💬 "${this.esc(observacoes)}"</span>
                     ${ressalvaObservacoes}
+                    ${avisoSemDestino}
                </div>`
             : '';
         return `
