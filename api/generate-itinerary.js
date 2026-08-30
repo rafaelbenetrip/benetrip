@@ -42,10 +42,16 @@ const AI_PROVIDERS = {
     },
 };
 
+// Modelo de reserva da cascata Cerebras. `zai-glm-4.7` foi arquivado pela
+// Cerebras (HTTP 404 model_archived) e deixou a cascata sem segunda chance.
+// O thinking segue DESLIGADO neste: ele só entra quando os anteriores falham
+// e custa mais por token.
+const MODELO_FALLBACK_CEREBRAS = process.env.CEREBRAS_MODEL_FALLBACK || 'gemma-4-31b';
+
 const AI_MODEL_CHAIN = [
     { provider: 'gemini', model: process.env.GEMINI_MODEL || 'gemini-2.5-flash' },
     { provider: 'cerebras', model: process.env.CEREBRAS_MODEL || 'gpt-oss-120b' },
-    { provider: 'cerebras', model: process.env.CEREBRAS_MODEL_FALLBACK || 'zai-glm-4.7' },
+    { provider: 'cerebras', model: MODELO_FALLBACK_CEREBRAS },
 ];
 
 function getAIKey(provider) {
@@ -401,8 +407,8 @@ JSON VÁLIDO apenas, zero texto extra. Estrutura: ${estruturaJSON}`;
                             response_format: { type: 'json_object' },
                             temperature: 0.7,
                             // Gemini/gpt-oss: raciocínio mínimo para sobrar tokens para o roteiro.
-                            // GLM: thinking desligado (mesmo em 'low' ele consome o orçamento inteiro)
-                            reasoning_effort: model.startsWith('zai-glm') ? 'none' : 'low',
+                            // Modelo de reserva: thinking desligado (em 'low' ele consome o orçamento inteiro)
+                            reasoning_effort: model === MODELO_FALLBACK_CEREBRAS ? 'none' : 'low',
                         })
                     });
                     clearTimeout(timeoutId);

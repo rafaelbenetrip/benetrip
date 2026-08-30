@@ -410,7 +410,13 @@ ${faixaResumo ? `- Faixa típica do Google para a rota: ${faixaResumo}` : ''}
 ${feriadosResumo ? `- Viagens pegando feriado: ${feriadosResumo}` : ''}
 - Candidatas à escolha (as 8 mais baratas): ${viagensTop.map(v => `ida ${v.ida} volta ${v.volta} ${simbolo}${v.price}${v.feriados.length ? ` (${v.feriados[0].nome})` : ''}`).join('; ')}`;
 
-    const models = [process.env.CEREBRAS_MODEL || 'gpt-oss-120b', process.env.CEREBRAS_MODEL_FALLBACK || 'zai-glm-4.7'];
+    // Modelo de reserva da cascata. `zai-glm-4.7` foi arquivado pela Cerebras
+    // (HTTP 404 model_archived) e deixou a cascata sem segunda chance: qualquer
+    // falha do principal caía direto no fallback determinístico, sem IA nenhuma.
+    // O thinking fica DESLIGADO neste: ele só entra quando o principal falha e
+    // custa mais por token, então quem raciocina é o principal.
+    const MODELO_FALLBACK = process.env.CEREBRAS_MODEL_FALLBACK || 'gemma-4-31b';
+    const models = [process.env.CEREBRAS_MODEL || 'gpt-oss-120b', MODELO_FALLBACK];
 
     for (const model of models) {
         try {
@@ -429,7 +435,7 @@ ${feriadosResumo ? `- Viagens pegando feriado: ${feriadosResumo}` : ''}
                     response_format: { type: 'json_object' },
                     temperature: 0.9,
                     max_tokens: 1000,
-                    reasoning_effort: model.startsWith('zai-glm') ? 'none' : 'low',
+                    reasoning_effort: model === MODELO_FALLBACK ? 'none' : 'low',
                 }),
                 signal: AbortSignal.timeout(8000),
             });

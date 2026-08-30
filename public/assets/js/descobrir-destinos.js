@@ -1421,6 +1421,17 @@ const BenetripDiscovery = {
         this.log(`❌ Nenhum destino dentro do orçamento — ${acima.length} opção(ões) acima para exibir separadamente`);
         return { cenario: 'nenhum', destinos: [], mensagem: '', acimaOrcamento: acima };
     },
+    // ================================================================
+    // O selo "Curadoria da Tripinha" afirma que a IA escolheu os destinos.
+    // A checagem antiga comparava com 'fallback_price', string que a API
+    // deixou de emitir quando o fallback passou a ser 'fallback_quality':
+    // o selo aparecia em TODA busca, inclusive nas semanas em que a cota da
+    // Cerebras estava estourada e nenhum modelo rodou. Agora o teste é pelo
+    // prefixo, que cobre qualquer marcador de fallback presente ou futuro.
+    // ================================================================
+    houveCuradoria(model) {
+        return Boolean(model) && !String(model).startsWith('fallback');
+    },
     calcularNoites(dataIda, dataVolta) {
         const ida = new Date(dataIda);
         const volta = new Date(dataVolta);
@@ -1469,6 +1480,12 @@ const BenetripDiscovery = {
         this.state.pedido = ranking._pedido || null;
         if (ranking._model) {
             this.log(`🤖 Modelo: ${ranking._model} | Analisados: ${ranking._totalAnalisados}`);
+        }
+        // O log acima existia e não bastou: "Modelo: fallback_quality" se lê
+        // como um modelo que rodou. A API só manda `_motivo` quando a IA não
+        // entrou, e é esse motivo que transforma o log em diagnóstico.
+        if (!this.houveCuradoria(ranking._model)) {
+            console.warn(`[Benetrip] Ranking sem IA (${ranking._model || 'sem modelo'})${ranking._motivo ? `: ${ranking._motivo}` : ''}`);
         }
         if (formData.observacoes && !this.state.observacoesUsadas) {
             this.log('⚠️ Observações não entraram no ranking (fallback determinístico)');
@@ -1606,6 +1623,7 @@ const BenetripDiscovery = {
             alternativas: (ranking.alternativas || []).map(d => ({ ...d, link: gerarLink(d) })),
             surpresa: ranking.surpresa ? { ...ranking.surpresa, link: gerarLink(ranking.surpresa) } : null,
             _model: ranking._model,
+            _motivo: ranking._motivo || null,
             _totalAnalisados: ranking._totalAnalisados,
             _poucosResultados: ranking._poucosResultados || false,
         };
@@ -1973,7 +1991,7 @@ const BenetripDiscovery = {
                 <h1>${cenario === 'ideal' && !poucosResultados ? '🎉 Destinos Perfeitos!' : poucosResultados ? '✈️ Destinos Encontrados' : '✈️ Destinos Encontrados!'}</h1>
                 <p class="resultado-subtitulo">
                     ${destinos._totalAnalisados ? `${destinos._totalAnalisados} destinos analisados` : ''}
-                    ${destinos._model && destinos._model !== 'fallback_price' ? ' · Curadoria da Tripinha 🐶' : ''}
+                    ${this.houveCuradoria(destinos._model) ? ' · Curadoria da Tripinha 🐶' : ''}
                 </p>
                 <p class="resultado-google-flights-info">
                     🔗 Os links abrem diretamente no <strong>Google Flights</strong> com suas preferências pré-preenchidas
