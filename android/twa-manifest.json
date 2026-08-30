@@ -38,7 +38,7 @@
     {
       "name": "Criar Roteiro",
       "shortName": "Roteiro",
-      "url": "https://benetrip.com.br/create-itinerary?source=twa",
+      "url": "https://benetrip.com.br/roteiro-viagem?source=twa",
       "chosenIconUrl": "https://benetrip.com.br/assets/images/favicon/web-app-manifest-192x192.png"
     }
   ],
