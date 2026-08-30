@@ -57,7 +57,7 @@
       "name": "Criar Roteiro",
       "short_name": "Roteiro",
       "description": "Crie um roteiro personalizado",
-      "url": "/create-itinerary?source=pwa",
+      "url": "/roteiro-viagem?source=pwa",
       "icons": [{ "src": "/assets/images/favicon/web-app-manifest-192x192.png", "sizes": "192x192" }]
     }
   ]
