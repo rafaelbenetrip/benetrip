@@ -116,14 +116,23 @@ export default async function handler(req, res) {
     // de uma busca que o ignorou por completo. Mesmo princípio das guardas de
     // sazonalidade e de saúde: não afirmamos o que não sustentamos.
     // ============================================================
-    const respostaDeterministica = (lista = destinosQualidade) => ({
+    //
+    // A resposta também precisa dizer POR QUE a IA não entrou. Sem isso a queda
+    // é silenciosa: o campo `_model` vem preenchido com "fallback_quality", a
+    // tela loga "Modelo: fallback_quality" como se um modelo tivesse rodado, e
+    // uma cota estourada na Cerebras pode passar semanas sem ninguém notar.
+    // Foi exatamente o que aconteceu. `_motivo` é diagnóstico, não texto de
+    // interface: nada dele é exibido ao viajante.
+    // ============================================================
+    const respostaDeterministica = (lista = destinosQualidade, motivo = null) => ({
         ...rankByQuality(lista, orcamento, perfilVoo),
         _observacoesUsadas: false,
+        ...(motivo ? { _motivo: motivo } : {}),
     });
 
     if (!getCerebrasKey()) {
         console.warn('⚠️ CEREBRAS_KEY não configurada, usando fallback determinístico');
-        return res.status(200).json(respostaDeterministica());
+        return res.status(200).json(respostaDeterministica(destinosQualidade, 'CEREBRAS_KEY não configurada'));
     }
 
     try {
@@ -327,9 +336,16 @@ JSON:
         // ============================================================
         // TENTAR MODELOS EM CASCATA
         // ============================================================
-        const models = [process.env.CEREBRAS_MODEL || 'gpt-oss-120b', process.env.CEREBRAS_MODEL_FALLBACK || 'zai-glm-4.7'];
+        // Modelo de reserva da cascata. `zai-glm-4.7` foi arquivado pela Cerebras
+        // (HTTP 404 model_archived) e deixou a cascata sem segunda chance: qualquer
+        // falha do principal caía direto no fallback determinístico, sem IA nenhuma.
+        // O thinking fica DESLIGADO neste: ele só entra quando o principal falha e
+        // custa mais por token, então quem raciocina é o principal.
+        const MODELO_FALLBACK = process.env.CEREBRAS_MODEL_FALLBACK || 'gemma-4-31b';
+        const models = [process.env.CEREBRAS_MODEL || 'gpt-oss-120b', MODELO_FALLBACK];
         let ranking = null;
         let usedModel = null;
+        const errosDosModelos = [];
 
         for (const model of models) {
             try {
@@ -350,7 +366,7 @@ JSON:
                         ],
                         temperature: 0.4,
                         max_tokens: 4000, // inclui tokens de "thinking" dos modelos de reasoning
-                        reasoning_effort: model.startsWith('zai-glm') ? 'none' : 'low',
+                        reasoning_effort: model === MODELO_FALLBACK ? 'none' : 'low',
                         response_format: { type: 'json_object' }
                     })
                 });
@@ -358,6 +374,7 @@ JSON:
                 if (!aiResponse.ok) {
                     const errText = await aiResponse.text();
                     console.warn(`⚠️ Modelo ${model} falhou: ${aiResponse.status} - ${errText}`);
+                    errosDosModelos.push(`${model} HTTP ${aiResponse.status}: ${errText.slice(0, 200)}`);
                     continue;
                 }
 
@@ -366,6 +383,7 @@ JSON:
 
                 if (!content) {
                     console.warn(`⚠️ Modelo ${model}: resposta vazia`);
+                    errosDosModelos.push(`${model}: resposta vazia`);
                     continue;
                 }
 
@@ -373,6 +391,7 @@ JSON:
 
                 if (!parsed.top_destino || typeof parsed.top_destino.id !== 'number') {
                     console.warn(`⚠️ Modelo ${model}: JSON inválido`);
+                    errosDosModelos.push(`${model}: JSON inválido`);
                     continue;
                 }
 
@@ -383,6 +402,7 @@ JSON:
 
             } catch (modelErr) {
                 console.warn(`⚠️ Erro no modelo ${model}:`, modelErr.message);
+                errosDosModelos.push(`${model}: ${modelErr.message}`);
                 continue;
             }
         }
@@ -391,8 +411,9 @@ JSON:
         // FALLBACK: Ranking determinístico (sem LLM)
         // ============================================================
         if (!ranking) {
-            console.warn('⚠️ Todos os modelos falharam, usando fallback determinístico');
-            return res.status(200).json(respostaDeterministica());
+            const motivo = errosDosModelos.join(' | ') || 'todos os modelos falharam';
+            console.warn(`⚠️ Todos os modelos falharam, usando fallback determinístico: ${motivo}`);
+            return res.status(200).json(respostaDeterministica(destinosQualidade, motivo));
         }
 
         // ============================================================
@@ -469,7 +490,7 @@ JSON:
 
         if (!resultado.top_destino) {
             console.warn('⚠️ top_destino inválido após mapeamento, usando fallback');
-            return res.status(200).json(respostaDeterministica());
+            return res.status(200).json(respostaDeterministica(destinosQualidade, `${usedModel}: top_destino inválido após mapeamento`));
         }
 
         // ============================================================
@@ -558,7 +579,7 @@ JSON:
         console.error('❌ Erro no ranking:', erro);
 
         try {
-            return res.status(200).json(respostaDeterministica(ranquearPorQualidade(destinos, perfilVoo)));
+            return res.status(200).json(respostaDeterministica(ranquearPorQualidade(destinos, perfilVoo), erro.message));
         } catch (fallbackErr) {
             return res.status(500).json({
                 error: 'Erro interno no ranking',

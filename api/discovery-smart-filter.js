@@ -91,7 +91,13 @@ IMPORTANTE: Retorne APENAS o JSON, sem markdown, sem explicação extra.`;
 Destinos disponíveis (índice|nome|país|preço|estilos|tipo|paradas):
 ${listaCompacta}`;
 
-    const models = [process.env.CEREBRAS_MODEL || 'gpt-oss-120b', process.env.CEREBRAS_MODEL_FALLBACK || 'zai-glm-4.7'];
+    // Modelo de reserva da cascata. `zai-glm-4.7` foi arquivado pela Cerebras
+    // (HTTP 404 model_archived) e deixou a cascata sem segunda chance: qualquer
+    // falha do principal caía direto no fallback determinístico, sem IA nenhuma.
+    // O thinking fica DESLIGADO neste: ele só entra quando o principal falha e
+    // custa mais por token, então quem raciocina é o principal.
+    const MODELO_FALLBACK = process.env.CEREBRAS_MODEL_FALLBACK || 'gemma-4-31b';
+    const models = [process.env.CEREBRAS_MODEL || 'gpt-oss-120b', MODELO_FALLBACK];
 
     for (const model of models) {
         try {
@@ -110,7 +116,7 @@ ${listaCompacta}`;
                     response_format: { type: 'json_object' },
                     temperature: 0.3,
                     max_tokens: 2500, // inclui tokens de "thinking" dos modelos de reasoning
-                    reasoning_effort: model.startsWith('zai-glm') ? 'none' : 'low',
+                    reasoning_effort: model === MODELO_FALLBACK ? 'none' : 'low',
                 }),
                 signal: AbortSignal.timeout(15000),
             });
