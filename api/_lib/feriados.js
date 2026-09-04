@@ -87,6 +87,25 @@ export function feriadosDoAno(ano) {
         .sort((a, b) => a.data.localeCompare(b.data));
 }
 
+// ============================================================
+// ANTECEDÊNCIA MÍNIMA DE UM FERIADO
+// Um feriado a menos de 7 dias já não é viagem que se planeje: a passagem
+// entrou na faixa de última hora e a janela de datas praticamente coincide
+// com o fim de semana que a página já mostra. Quando o feriado que está
+// chegando cruza esse limite, a chamada passa para o PRÓXIMO feriado do
+// calendário — em vez de anunciar um feriado para o qual não há mais o que
+// oferecer.
+//
+// Este é o número que a home (radar de feriado), a barra da /escapadas e as
+// janelas pesquisadas pelo cron precisam compartilhar: se cada superfície
+// usar o seu, uma anuncia um feriado que a outra já não tem.
+// ============================================================
+export const MIN_DIAS_FERIADO = 7;
+
+// Antecedência máxima: comprar um feriado a mais de ~5 meses não tem preço
+// confiável para exibir.
+export const MAX_DIAS_FERIADO = 150;
+
 // Próximos feriados a partir de uma data (inclui o ano seguinte na virada)
 export function proximosFeriados(aPartirDe, limite = 3, minDiasAntecedencia = 0) {
     const ano = Number(aPartirDe.slice(0, 4));
@@ -94,6 +113,16 @@ export function proximosFeriados(aPartirDe, limite = 3, minDiasAntecedencia = 0)
     return todos
         .filter((f) => diffDias(aPartirDe, f.data) >= minDiasAntecedencia)
         .slice(0, limite);
+}
+
+// O feriado que vale destacar hoje: o primeiro que ainda está a MIN_DIAS_FERIADO
+// ou mais. Devolve null se nem o próximo do calendário couber no horizonte de
+// compra (não acontece com o calendário nacional, mas quem chama não precisa
+// supor isso).
+export function feriadoEmDestaque(hoje) {
+    const f = proximosFeriados(hoje, 1, MIN_DIAS_FERIADO)[0] || null;
+    if (!f || diffDias(hoje, f.data) > MAX_DIAS_FERIADO) return null;
+    return f;
 }
 
 // ============================================================
