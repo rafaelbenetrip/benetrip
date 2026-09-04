@@ -136,15 +136,33 @@ test('"Este fim de semana" só aparece para o fim de semana imediato', () => {
 });
 
 test('fim de semana próximo demais é omitido e a omissão é explicada', () => {
-    // Quinta-feira 2026-11-12: a sexta 13/11 está a 1 dia (< 2), sai da lista.
-    // O rótulo continua curto (ele divide espaço com as datas em três lugares
-    // da página); quem explica a ausência é `omitidoPorAntecedencia`.
-    const janelas = janelasAtivas('2026-11-12').filter((j) => j.categoria === 'fds');
+    // Quinta-feira 2026-08-13: a sexta 14/08 está a 1 dia (< 2), sai da lista.
+    // Agosto não tem feriado nacional, então nenhuma janela de fds é absorvida
+    // e dá para ler o rótulo isolado. O rótulo continua curto (ele divide
+    // espaço com as datas em três lugares da página); quem explica a ausência
+    // é `omitidoPorAntecedencia`.
+    const janelas = janelasAtivas('2026-08-13').filter((j) => j.categoria === 'fds');
     assert.equal(janelas[0].rotulo, 'Próximo fim de semana');
-    assert.equal(janelas[0].ida, '2026-11-20');
+    assert.equal(janelas[0].ida, '2026-08-21');
     assert.ok(janelas[0].omitidoPorAntecedencia, 'a omissão precisa ser explicada na interface');
-    assert.equal(janelas[0].omitidoPorAntecedencia.ida, '2026-11-13');
+    assert.equal(janelas[0].omitidoPorAntecedencia.ida, '2026-08-14');
     assert.match(janelas[0].omitidoPorAntecedencia.explicacao, /última hora/);
+});
+
+test('feriado colado no fim de semana absorve a janela de fds equivalente', () => {
+    // Quinta 2026-11-12: a Consciência Negra (sexta 20/11) está a 8 dias, ou
+    // seja, dentro da antecedência mínima de feriado. A janela 20–22/nov é a
+    // mesma do fds, e quem fica é a versão "feriado", que carrega o contexto
+    // da emenda. O primeiro fds da lista passa a ser o de 27/nov.
+    const janelas = janelasAtivas('2026-11-12');
+    const feriado = janelas.find((j) => j.id === 'feriado-consciencia-negra-2026');
+    assert.ok(feriado, 'feriado a 8 dias precisa estar na lista');
+    assert.equal(feriado.ida, '2026-11-20');
+    assert.ok(
+        !janelas.some((j) => j.categoria === 'fds' && j.ida === '2026-11-20'),
+        'o fds duplicado do feriado não pode aparecer duas vezes'
+    );
+    assert.equal(janelas.filter((j) => j.categoria === 'fds')[0].ida, '2026-11-27');
 });
 
 test('os rótulos seguintes acompanham o deslocamento da janela', () => {

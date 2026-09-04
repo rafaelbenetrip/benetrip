@@ -27,7 +27,7 @@ import {
 } from './_lib/discovery-shared.js';
 import { janelasAtivas, fetchSnapshotsEscapadas, hojeISO } from './_lib/escapadas-shared.js';
 import { separarPorViabilidade, motivoLegivel, TITULO_SECAO_NAO_RECOMENDADOS } from './_lib/travel-viability.js';
-import { feriadosDoAno, proximosFeriados, janelaDoFeriado, descricaoEmenda, diffDias } from './_lib/feriados.js';
+import { feriadosDoAno, feriadoEmDestaque, janelaDoFeriado, descricaoEmenda, diffDias } from './_lib/feriados.js';
 
 const SITE_URL = 'https://benetrip.com.br';
 const DEFAULT_OG_IMAGE = `${SITE_URL}/assets/images/favicon/web-app-manifest-512x512.png`;
@@ -162,7 +162,10 @@ function renderPage({ cidadeAtual, cidades, janelas, janelaAtiva, hoje, isDefaul
 
     const chips = montarChips(cidadeAtual, cidades);
     const badge = janelaAtiva?.snapshot ? badgeAtualizacao(janelaAtiva.snapshot.data) : null;
-    const proximoFeriado = proximosFeriados(hoje, 1, 1)[0] || null;
+    // Feriado a menos de uma semana já não é chamada: a barra pula para o
+    // próximo do calendário, o mesmo que a home anuncia e que a lista de
+    // janelas ainda tem para pesquisar.
+    const proximoFeriado = feriadoEmDestaque(hoje);
 
     return `<!DOCTYPE html>
 <html lang="pt-BR">

@@ -17,6 +17,8 @@ import {
     proximosFeriados,
     janelaDoFeriado,
     descricaoEmenda,
+    MIN_DIAS_FERIADO,
+    MAX_DIAS_FERIADO,
 } from './feriados.js';
 import { calcularVariacoesHistorico } from './discovery-shared.js';
 import { avaliarViabilidade, NIVEL } from './travel-viability.js';
@@ -30,11 +32,10 @@ export const FERIADOS_ATIVOS = 3;
 // (preço de última hora ficaria enganoso no snapshot).
 const MIN_DIAS_ATE_SEXTA = 2;
 
-// Feriado entra na lista com pelo menos 10 dias de antecedência (antes disso
-// a janela do feriado praticamente coincide com um fds já pesquisado) e até
-// ~5 meses à frente (limite prático de antecedência de compra).
-const MIN_DIAS_FERIADO = 10;
-const MAX_DIAS_FERIADO = 150;
+// A antecedência mínima e máxima de um feriado vem de _lib/feriados.js: é a
+// mesma faixa que decide qual feriado a home e a barra da /escapadas anunciam.
+// Se a janela sumisse antes do anúncio, a chamada apontaria para voos que a
+// página não tem.
 
 const MESES_CURTOS = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
 

@@ -943,6 +943,12 @@
         // Contagem regressiva pro próximo feriado nacional, calculada no
         // navegador (mesma lógica de api/_lib/feriados.js em versão compacta).
         // Linka pra janela correspondente em /escapadas.
+        //
+        // A faixa de antecedência é a mesma de api/_lib/feriados.js
+        // (MIN_DIAS_FERIADO / MAX_DIAS_FERIADO): feriado a menos de 7 dias sai
+        // de cartaz e o radar pula pro próximo do calendário. Sem isso a home
+        // anunciaria um feriado que a /escapadas já tirou da lista de janelas,
+        // e o CTA cairia num fim de semana qualquer.
         (function () {
             function pascoa(ano) {
                 const a = ano % 19, b = Math.floor(ano / 100), c = ano % 100, d = Math.floor(b / 4), e = b % 4,
@@ -961,21 +967,23 @@
                     ['tiradentes', 'Tiradentes', new Date(Date.UTC(ano, 3, 21, 12))],
                     ['dia-do-trabalho', 'o Dia do Trabalho', new Date(Date.UTC(ano, 4, 1, 12))],
                     ['corpus-christi', 'Corpus Christi', mais(p, 60)],
-                    ['independencia', 'o 7 de Setembro', new Date(Date.UTC(ano, 8, 7, 12))],
-                    ['aparecida', 'o feriado de N. Sra. Aparecida', new Date(Date.UTC(ano, 9, 12, 12))],
+                    ['independencia', 'a Independência do Brasil (7 de Setembro)', new Date(Date.UTC(ano, 8, 7, 12))],
+                    ['aparecida', 'Nossa Senhora Aparecida', new Date(Date.UTC(ano, 9, 12, 12))],
                     ['finados', 'Finados', new Date(Date.UTC(ano, 10, 2, 12))],
                     ['proclamacao', 'a Proclamação da República', new Date(Date.UTC(ano, 10, 15, 12))],
-                    ['consciencia-negra', 'a Consciência Negra', new Date(Date.UTC(ano, 10, 20, 12))],
+                    ['consciencia-negra', 'o Dia da Consciência Negra', new Date(Date.UTC(ano, 10, 20, 12))],
                     ['natal', 'o Natal', new Date(Date.UTC(ano, 11, 25, 12))],
                 ].map(([slug, nome, data]) => ({ slug, nome, data, ano }));
             }
+            const MIN_DIAS = 7, MAX_DIAS = 150;
             const agora = new Date();
             const hoje = new Date(Date.UTC(agora.getFullYear(), agora.getMonth(), agora.getDate(), 12));
+            const diasAte = f => Math.round((f.data - hoje) / 86400000);
             const proximo = feriados(hoje.getUTCFullYear()).concat(feriados(hoje.getUTCFullYear() + 1))
-                .find(f => f.data >= hoje);
+                .find(f => diasAte(f) >= MIN_DIAS && diasAte(f) <= MAX_DIAS);
             if (!proximo) return;
 
-            const dias = Math.round((proximo.data - hoje) / 86400000);
+            const dias = diasAte(proximo);
             const dow = proximo.data.getUTCDay();
             // Mesma regra de api/_lib/feriados.js (descricaoEmenda): feriado que
             // cai no sábado ou no domingo NÃO estende o fim de semana: o dia
@@ -990,7 +998,7 @@
                 5: 'cai numa sexta e rende 3 dias livres sem pedir folga',
                 6: 'cai num sábado, que já é dia livre, então não estende o fim de semana',
             }[dow];
-            const contagem = dias === 0 ? '🎉 É hoje!' : dias === 1 ? '🎉 É amanhã:' : `Faltam <strong>${dias} dias</strong> para`;
+            const contagem = `Faltam <strong>${dias} dias</strong> para`;
 
             document.getElementById('feriado-radar-text').innerHTML =
                 `${contagem} ${proximo.nome} · <span class="radar-emenda">${emenda}</span>`;
