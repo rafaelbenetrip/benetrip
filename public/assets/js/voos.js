@@ -1,5 +1,8 @@
 /**
- * BENETRIP VOOS v4.2 — Busca de voos completa
+ * BENETRIP VOOS v4.3 — Busca de voos completa
+ *
+ * Changelog v4.3:
+ * - NEW: Voo só de ida: basta não escolher a volta (botão "Só ida" no rodapé do calendário)
  *
  * Changelog v4.2:
  * - REFACTOR: Autocomplete extraído para módulo compartilhado benetrip-places.js
@@ -106,9 +109,8 @@ const BenetripVoos = {
         if (p.departure_date) {
             document.getElementById('sf-departure').value = p.departure_date;
             document.getElementById('sf-return').value = p.return_date;
-            const fmt = d => d ? new Date(d+'T12:00:00').toLocaleDateString('pt-BR') : '';
-            document.getElementById('sf-input-dates').value = p.return_date ? `${fmt(p.departure_date)} a ${fmt(p.return_date)}` : fmt(p.departure_date);
         }
+        this.setupDatePicker();
         document.getElementById('pax-adults').value = p.adults;
         document.getElementById('pax-children').value = p.children;
         document.getElementById('pax-infants').value = p.infants;
@@ -126,20 +128,7 @@ const BenetripVoos = {
             const ids = [['sf-input-origin','sf-input-dest'],['sf-origin-code','sf-dest-code'],['sf-origin-name','sf-dest-name']];
             ids.forEach(([a,b]) => { const ea=document.getElementById(a),eb=document.getElementById(b); [ea.value,eb.value]=[eb.value,ea.value]; });
         });
-        const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate()+1);
-        flatpickr('#sf-input-dates', {
-            mode:'range', minDate:tomorrow, dateFormat:'Y-m-d', locale:'pt',
-            onChange: sel => {
-                if (sel.length===2) {
-                    document.getElementById('sf-departure').value = this.isoDate(sel[0]);
-                    document.getElementById('sf-return').value = this.isoDate(sel[1]);
-                    document.getElementById('sf-input-dates').value = `${this.brDate(sel[0])} a ${this.brDate(sel[1])}`;
-                } else if (sel.length===1) {
-                    document.getElementById('sf-departure').value = this.isoDate(sel[0]);
-                    document.getElementById('sf-return').value = '';
-                }
-            }
-        });
+        this.setupDatePicker();
         const trigger=document.getElementById('sf-pax-trigger'), dd=document.getElementById('sf-pax-dropdown');
         trigger.addEventListener('click', e => { e.stopPropagation(); dd.classList.toggle('open'); });
         document.getElementById('sf-pax-done').addEventListener('click', () => dd.classList.remove('open'));
@@ -211,6 +200,51 @@ const BenetripVoos = {
     isoDate(d){return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`},
     brDate(d){return d.toLocaleDateString('pt-BR')},
 
+    // Calendário em modo range. Fechar com só a data de ida = voo só de ida.
+    // O rodapé do calendário orienta e oferece o botão "Só ida".
+    setupDatePicker() {
+        const input = document.getElementById('sf-input-dates');
+        const depEl = document.getElementById('sf-departure'), retEl = document.getElementById('sf-return');
+        const parse = iso => new Date(iso+'T12:00:00');
+        const fmtInput = () => {
+            const d = depEl.value, r = retEl.value;
+            input.value = !d ? '' : (r ? `${this.brDate(parse(d))} a ${this.brDate(parse(r))}` : `${this.brDate(parse(d))} · só ida`);
+        };
+        const sync = sel => {
+            depEl.value = sel[0] ? this.isoDate(sel[0]) : '';
+            retEl.value = sel[1] ? this.isoDate(sel[1]) : '';
+        };
+        const updateFooter = fp => {
+            const f = fp.calendarContainer.querySelector('.fp-footer');
+            if (!f) return;
+            const n = fp.selectedDates.length;
+            f.querySelector('.fp-footer-hint').textContent = n === 0 ? 'Escolha a data da ida' : n === 1 ? 'Escolha a volta ou fique só com a ida' : 'Ida e volta';
+            f.querySelector('.fp-oneway').hidden = n === 0;
+        };
+        if (this._datePicker) this._datePicker.destroy();
+        const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate()+1);
+        const dep = depEl.value, ret = retEl.value;
+        this._datePicker = flatpickr(input, {
+            mode: 'range', minDate: tomorrow, dateFormat: 'Y-m-d', locale: 'pt',
+            defaultDate: dep ? (ret ? [dep, ret] : [dep]) : undefined,
+            onReady: (sel, str, fp) => {
+                const f = document.createElement('div');
+                f.className = 'fp-footer';
+                f.innerHTML = '<span class="fp-footer-hint"></span><span class="fp-footer-btns"><button type="button" class="fp-oneway">Só ida</button></span>';
+                f.querySelector('.fp-oneway').addEventListener('click', () => {
+                    if (fp.selectedDates.length > 1) fp.setDate([fp.selectedDates[0]], true);
+                    fp.close();
+                });
+                fp.calendarContainer.appendChild(f);
+                updateFooter(fp);
+            },
+            onChange: (sel, str, fp) => { sync(sel); fmtInput(); updateFooter(fp); },
+            onOpen: (sel, str, fp) => updateFooter(fp),
+            onClose: (sel) => { sync(sel); fmtInput(); },
+        });
+        fmtInput();
+    },
+
     // ================================================================
     // SUBMIT SEARCH
     // ================================================================
@@ -219,7 +253,7 @@ const BenetripVoos = {
         const dep=document.getElementById('sf-departure').value, ret=document.getElementById('sf-return').value;
         if(!oc){alert('Selecione a cidade de origem');return;}
         if(!dc){alert('Selecione o destino');return;}
-        if(!dep){alert('Selecione as datas');return;}
+        if(!dep){alert('Selecione a data da ida');return;}
         this.state.params = {origin:oc,destination:dc,departure_date:dep,return_date:ret,
             adults:parseInt(document.getElementById('pax-adults').value),
             children:parseInt(document.getElementById('pax-children').value),
@@ -462,7 +496,7 @@ const BenetripVoos = {
     showError(msg){document.getElementById('error-msg').textContent=msg;this.showPanel('error')},
     showResults(){this.showPanel('results');this.populateAirlinesFilter();this.populateAirportsFilter();this.updateTimeReturnVisibility();this.renderCards();window.scrollTo({top:0,behavior:'smooth'})},
     setProgress(pct,msg){const b=document.getElementById('progress-fill');if(b)b.style.width=`${pct}%`;const m=document.getElementById('loading-msg');if(m)m.textContent=msg},
-    startTips(){const tips=['💡 Preços por pessoa, ida e volta','✈️ Comparando dezenas de companhias','🔍 Buscando as melhores tarifas','💰 Preços na moeda escolhida','🐕 A Tripinha farejando ofertas!','⏰ Busca leva até 60 segundos'];let i=0;this.state.tipInterval=setInterval(()=>{i=(i+1)%tips.length;const el=document.getElementById('loading-tip');if(el)el.textContent=tips[i]},4000)},
+    startTips(){const tips=[`💡 Preços por pessoa, ${this.state.params.return_date?'ida e volta':'só ida'}`,'✈️ Comparando dezenas de companhias','🔍 Buscando as melhores tarifas','💰 Preços na moeda escolhida','🐕 A Tripinha farejando ofertas!','⏰ Busca leva até 60 segundos'];let i=0;{const el0=document.getElementById('loading-tip');if(el0)el0.textContent=tips[0]}this.state.tipInterval=setInterval(()=>{i=(i+1)%tips.length;const el=document.getElementById('loading-tip');if(el)el.textContent=tips[i]},4000)},
 
     // ================================================================
     // FORMAT HELPERS
