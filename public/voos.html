@@ -58,12 +58,6 @@
             </div>
 
             <form class="search-form" id="search-form" autocomplete="off">
-                <!-- Tipo de viagem -->
-                <div class="sf-trip-type" role="radiogroup" aria-label="Tipo de viagem">
-                    <label class="sf-tt-opt"><input type="radio" name="sf-trip-type" value="roundtrip" checked><span>Ida e volta</span></label>
-                    <label class="sf-tt-opt"><input type="radio" name="sf-trip-type" value="oneway"><span>Só ida</span></label>
-                </div>
-
                 <!-- Origem / Destino -->
                 <div class="sf-row sf-row-cities">
                     <div class="sf-field sf-origin">
@@ -88,7 +82,7 @@
                 <!-- Datas / Passageiros / Moeda -->
                 <div class="sf-row sf-row-details">
                     <div class="sf-field sf-dates">
-                        <label for="sf-input-dates" id="sf-dates-label">Datas</label>
+                        <label for="sf-input-dates">Datas</label>
                         <input type="text" id="sf-input-dates" placeholder="Ida e volta" required readonly>
                         <input type="hidden" id="sf-departure">
                         <input type="hidden" id="sf-return">

@@ -2,7 +2,7 @@
  * BENETRIP VOOS v4.3 — Busca de voos completa
  *
  * Changelog v4.3:
- * - NEW: Seletor "Ida e volta / Só ida" no formulário (calendário alterna entre range e data única)
+ * - NEW: Voo só de ida: basta não escolher a volta (botão "Só ida" no rodapé do calendário)
  *
  * Changelog v4.2:
  * - REFACTOR: Autocomplete extraído para módulo compartilhado benetrip-places.js
@@ -110,7 +110,7 @@ const BenetripVoos = {
             document.getElementById('sf-departure').value = p.departure_date;
             document.getElementById('sf-return').value = p.return_date;
         }
-        this.setTripType(p.departure_date && !p.return_date ? 'oneway' : 'roundtrip');
+        this.setupDatePicker();
         document.getElementById('pax-adults').value = p.adults;
         document.getElementById('pax-children').value = p.children;
         document.getElementById('pax-infants').value = p.infants;
@@ -128,10 +128,7 @@ const BenetripVoos = {
             const ids = [['sf-input-origin','sf-input-dest'],['sf-origin-code','sf-dest-code'],['sf-origin-name','sf-dest-name']];
             ids.forEach(([a,b]) => { const ea=document.getElementById(a),eb=document.getElementById(b); [ea.value,eb.value]=[eb.value,ea.value]; });
         });
-        document.querySelectorAll('input[name="sf-trip-type"]').forEach(r => {
-            r.addEventListener('change', () => { if (r.checked) this.setTripType(r.value); });
-        });
-        this.setTripType(this.getTripType());
+        this.setupDatePicker();
         const trigger=document.getElementById('sf-pax-trigger'), dd=document.getElementById('sf-pax-dropdown');
         trigger.addEventListener('click', e => { e.stopPropagation(); dd.classList.toggle('open'); });
         document.getElementById('sf-pax-done').addEventListener('click', () => dd.classList.remove('open'));
@@ -203,40 +200,49 @@ const BenetripVoos = {
     isoDate(d){return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`},
     brDate(d){return d.toLocaleDateString('pt-BR')},
 
-    getTripType() {
-        const r = document.querySelector('input[name="sf-trip-type"]:checked');
-        return r ? r.value : 'roundtrip';
-    },
-
-    // Recria o calendário conforme o tipo de viagem: range (ida e volta) ou data única (só ida)
-    setTripType(type) {
-        const oneway = type === 'oneway';
-        const radio = document.querySelector(`input[name="sf-trip-type"][value="${type}"]`);
-        if (radio) radio.checked = true;
+    // Calendário em modo range. Fechar com só a data de ida = voo só de ida.
+    // O rodapé do calendário orienta e oferece o botão "Só ida".
+    setupDatePicker() {
         const input = document.getElementById('sf-input-dates');
         const depEl = document.getElementById('sf-departure'), retEl = document.getElementById('sf-return');
-        const dep = depEl.value, ret = oneway ? '' : retEl.value;
-        retEl.value = ret;
-        if (this._datePicker) this._datePicker.destroy();
-        const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate()+1);
         const parse = iso => new Date(iso+'T12:00:00');
         const fmtInput = () => {
             const d = depEl.value, r = retEl.value;
-            input.value = !d ? '' : (r ? `${this.brDate(parse(d))} a ${this.brDate(parse(r))}` : this.brDate(parse(d)));
+            input.value = !d ? '' : (r ? `${this.brDate(parse(d))} a ${this.brDate(parse(r))}` : `${this.brDate(parse(d))} · só ida`);
         };
+        const sync = sel => {
+            depEl.value = sel[0] ? this.isoDate(sel[0]) : '';
+            retEl.value = sel[1] ? this.isoDate(sel[1]) : '';
+        };
+        const updateFooter = fp => {
+            const f = fp.calendarContainer.querySelector('.fp-footer');
+            if (!f) return;
+            const n = fp.selectedDates.length;
+            f.querySelector('.fp-footer-hint').textContent = n === 0 ? 'Escolha a data da ida' : n === 1 ? 'Escolha a volta ou fique só com a ida' : 'Ida e volta';
+            f.querySelector('.fp-oneway').hidden = n === 0;
+        };
+        if (this._datePicker) this._datePicker.destroy();
+        const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate()+1);
+        const dep = depEl.value, ret = retEl.value;
         this._datePicker = flatpickr(input, {
-            mode: oneway ? 'single' : 'range', minDate: tomorrow, dateFormat: 'Y-m-d', locale: 'pt',
+            mode: 'range', minDate: tomorrow, dateFormat: 'Y-m-d', locale: 'pt',
             defaultDate: dep ? (ret ? [dep, ret] : [dep]) : undefined,
-            onChange: sel => {
-                depEl.value = sel[0] ? this.isoDate(sel[0]) : '';
-                retEl.value = (!oneway && sel[1]) ? this.isoDate(sel[1]) : '';
-                fmtInput();
+            onReady: (sel, str, fp) => {
+                const f = document.createElement('div');
+                f.className = 'fp-footer';
+                f.innerHTML = '<span class="fp-footer-hint"></span><span class="fp-footer-btns"><button type="button" class="fp-oneway">Só ida</button></span>';
+                f.querySelector('.fp-oneway').addEventListener('click', () => {
+                    if (fp.selectedDates.length > 1) fp.setDate([fp.selectedDates[0]], true);
+                    fp.close();
+                });
+                fp.calendarContainer.appendChild(f);
+                updateFooter(fp);
             },
-            onClose: () => fmtInput(),
+            onChange: (sel, str, fp) => { sync(sel); fmtInput(); updateFooter(fp); },
+            onOpen: (sel, str, fp) => updateFooter(fp),
+            onClose: (sel) => { sync(sel); fmtInput(); },
         });
         fmtInput();
-        input.placeholder = oneway ? 'Data da ida' : 'Ida e volta';
-        document.getElementById('sf-dates-label').textContent = oneway ? 'Data da ida' : 'Datas';
     },
 
     // ================================================================
@@ -247,9 +253,7 @@ const BenetripVoos = {
         const dep=document.getElementById('sf-departure').value, ret=document.getElementById('sf-return').value;
         if(!oc){alert('Selecione a cidade de origem');return;}
         if(!dc){alert('Selecione o destino');return;}
-        const oneway=this.getTripType()==='oneway';
-        if(!dep){alert(oneway?'Selecione a data da ida':'Selecione as datas');return;}
-        if(!oneway&&!ret){alert('Selecione a data da volta ou escolha "Só ida"');return;}
+        if(!dep){alert('Selecione a data da ida');return;}
         this.state.params = {origin:oc,destination:dc,departure_date:dep,return_date:ret,
             adults:parseInt(document.getElementById('pax-adults').value),
             children:parseInt(document.getElementById('pax-children').value),
