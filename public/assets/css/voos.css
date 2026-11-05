@@ -53,6 +53,12 @@ body{font-family:'Montserrat',-apple-system,sans-serif;background:var(--g50);col
 /* Search Form */
 .search-form{display:flex;flex-direction:column;gap:12px}
 .sf-row{display:flex;gap:8px;align-items:stretch}
+.sf-trip-type{display:inline-flex;align-self:flex-start;gap:4px;background:var(--g100);border-radius:24px;padding:4px}
+.sf-tt-opt{position:relative;cursor:pointer}
+.sf-tt-opt input{position:absolute;opacity:0;pointer-events:none}
+.sf-tt-opt span{display:block;padding:6px 16px;border-radius:20px;font-size:13px;font-weight:600;color:var(--g600);font-family:'Poppins',sans-serif;transition:all .2s}
+.sf-tt-opt input:checked+span{background:var(--white);color:var(--orange);box-shadow:var(--shadow)}
+.sf-tt-opt input:focus-visible+span{outline:2px solid var(--orange);outline-offset:2px}
 .sf-field{flex:1;position:relative;background:var(--white);border:2px solid var(--g200);border-radius:var(--radius);padding:8px 14px;transition:border-color .2s}
 .sf-field:focus-within{border-color:var(--orange)}
 .sf-field label{display:block;font-size:11px;font-weight:600;color:var(--g500);text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px}
