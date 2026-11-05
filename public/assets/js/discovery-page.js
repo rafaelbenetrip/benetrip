@@ -940,20 +940,96 @@ const DiscoveryPage = {
         });
     },
 
-    // Navega para o calendário de preços já com destino, duração e as datas
-    // do preço mostrado (continuidade da oferta que convenceu o clique)
-    navegarParaVoos(dataset) {
-        const dest = dataset.aeroporto || dataset.nome;
-        if (!dest) return;
+    // Leva direto à busca de ida e volta no Google Flights, nas mesmas datas
+    // do preço mostrado. Sem IATA ou sem datas não há como montar a busca:
+    // cai no calendário interno de preços.
+    hrefDoDestino(dataset) {
+        const aeroporto = dataset.aeroporto;
+        if (aeroporto && dataset.ida && dataset.volta) {
+            return this.buildGoogleFlightsUrl(this.state.origemAtual, aeroporto, dataset.ida, dataset.volta);
+        }
+        const dest = aeroporto || dataset.nome;
+        if (!dest) return null;
         const params = new URLSearchParams({
             origem: this.state.origemAtual,
             destino: dest,
-            nome: dataset.nome,
+            nome: dataset.nome || '',
         });
         if (dataset.duracao) params.set('duracao', dataset.duracao);
         if (dataset.ida) params.set('data_ida', dataset.ida);
         if (dataset.volta) params.set('data_volta', dataset.volta);
-        window.location.href = `/voos-baratos?${params.toString()}`;
+        return `/voos-baratos?${params.toString()}`;
+    },
+
+    // Usado pelos cards de "Maiores quedas" e "Escolha da Tripinha", que não
+    // são <a>. Busca externa abre em nova aba; se o popup for bloqueado, abre
+    // na mesma aba.
+    navegarParaVoos(dataset) {
+        const href = this.hrefDoDestino(dataset);
+        if (!href) return;
+        if (href.startsWith('https://')) {
+            // Sem a flag 'noopener' (com ela o retorno é sempre null e não dá
+            // pra detectar bloqueio); corta o opener manualmente.
+            const w = window.open(href, '_blank');
+            if (w) { try { w.opener = null; } catch (_) {} return; }
+        }
+        window.location.href = href;
+    },
+
+    // ============================================================
+    // GOOGLE FLIGHTS URL (mesmo encoding tfs/tfu de escapadas-page.js:
+    // protobuf em base64url, abre direto nos resultados de ida e volta)
+    // ============================================================
+    _protoVarint(value) {
+        const bytes = [];
+        let v = value >>> 0;
+        while (v > 0x7f) { bytes.push((v & 0x7f) | 0x80); v >>>= 7; }
+        bytes.push(v & 0x7f);
+        return bytes;
+    },
+    _protoVarintField(fieldNumber, value) {
+        return [...this._protoVarint((fieldNumber << 3) | 0), ...this._protoVarint(value)];
+    },
+    _protoStringField(fieldNumber, str) {
+        const encoded = new TextEncoder().encode(str);
+        return [...this._protoVarint((fieldNumber << 3) | 2), ...this._protoVarint(encoded.length), ...encoded];
+    },
+    _protoMessageField(fieldNumber, messageBytes) {
+        return [...this._protoVarint((fieldNumber << 3) | 2), ...this._protoVarint(messageBytes.length), ...messageBytes];
+    },
+    _toBase64Url(bytes) {
+        return btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    },
+    _buildAirport(iataCode) {
+        return [...this._protoVarintField(1, 1), ...this._protoStringField(2, iataCode)];
+    },
+    _buildFlightLeg(date, originIata, destIata) {
+        return [
+            ...this._protoStringField(2, date),
+            ...this._protoMessageField(13, this._buildAirport(originIata)),
+            ...this._protoMessageField(14, this._buildAirport(destIata)),
+        ];
+    },
+    buildGoogleFlightsUrl(originIata, destIata, departDate, returnDate) {
+        const tfs = this._toBase64Url([
+            ...this._protoVarintField(1, 28),
+            ...this._protoVarintField(2, 2),
+            ...this._protoMessageField(3, this._buildFlightLeg(departDate, originIata, destIata)),
+            ...this._protoMessageField(3, this._buildFlightLeg(returnDate, destIata, originIata)),
+            ...this._protoVarintField(14, 1),
+        ]);
+        const tfu = this._toBase64Url(this._protoMessageField(2, [
+            ...this._protoVarintField(1, 1),
+            ...this._protoVarintField(2, 0),
+            ...this._protoVarintField(3, 0),
+        ]));
+        const params = new URLSearchParams();
+        params.set('tfs', tfs);
+        params.set('tfu', tfu);
+        params.set('curr', 'BRL');
+        params.set('hl', 'pt-BR');
+        params.set('gl', 'br');
+        return `https://www.google.com/travel/flights/search?${params.toString()}`;
     },
 
     renderizarCards() {
@@ -970,11 +1046,8 @@ const DiscoveryPage = {
         document.getElementById('empty-state').style.display = 'none';
         document.getElementById('destinations-section').style.display = 'block';
         this._mapaAeroportos = this.lugaresPorAeroporto();
+        // Cards são <a> (link real: imune a bloqueio de popup, aceita clique do meio)
         grid.innerHTML = destinos.map(d => this.renderCard(d)).join('');
-
-        grid.querySelectorAll('.dest-card').forEach(card => {
-            card.addEventListener('click', () => this.navegarParaVoos(card.dataset));
-        });
     },
 
     esc(t) {
@@ -1031,7 +1104,7 @@ const DiscoveryPage = {
             : '';
 
         return `
-            <article class="dest-card" data-aeroporto="${this.esc(aeroporto)}" data-nome="${this.esc(d.nome)}" data-duracao="${d.duracao_ideal?.ideal || ''}" data-ida="${this.esc(d.data_ida || '')}" data-volta="${this.esc(d.data_volta || '')}">
+            <a class="dest-card" href="${this.safeHref(this.hrefDoDestino({ aeroporto, nome: d.nome, duracao: d.duracao_ideal?.ideal || '', ida: d.data_ida, volta: d.data_volta }))}" target="_blank" rel="noopener nofollow" data-aeroporto="${this.esc(aeroporto)}" data-nome="${this.esc(d.nome)}" data-duracao="${d.duracao_ideal?.ideal || ''}" data-ida="${this.esc(d.data_ida || '')}" data-volta="${this.esc(d.data_volta || '')}">
                 <div class="dest-card-inner">
                     <div class="dest-image-wrapper">
                         <img class="dest-image" src="${imgSrc}" alt="${this.esc(d.nome)}" loading="lazy"
@@ -1058,7 +1131,7 @@ const DiscoveryPage = {
                         </div>
                     </div>
                 </div>
-            </article>`;
+            </a>`;
     },
 
     labelVariacao(v) {
