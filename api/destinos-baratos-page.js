@@ -30,6 +30,7 @@ import {
     lugaresPorAeroporto,
     renderQuedasHtml,
     renderTripinhaPickHtml,
+    buildGoogleFlightsUrl,
 } from './_lib/discovery-shared.js';
 import { avaliarEvidencias, aplicarGuardaDeLinguagem, gerarFallbackInsight } from './_lib/tripinha-shared.js';
 
@@ -364,7 +365,7 @@ function renderPage({ cidadeAtual, cidades, snapshot, isDefault }) {
                 <span class="section-count" id="section-count">${contagem.lugares} lugar${contagem.lugares !== 1 ? 'es' : ''} &middot; ${contagem.aeroportos} aeroporto${contagem.aeroportos !== 1 ? 's' : ''}</span>
             </div>
         </div>
-        <div class="destinations-grid" id="destinations-grid" aria-live="polite" aria-busy="false">${destinos.map((d) => renderCardHtml(d, { compartilhamAeroporto: porAeroporto.get((d.aeroporto || '').toUpperCase()) || 0 })).join('')}</div>
+        <div class="destinations-grid" id="destinations-grid" aria-live="polite" aria-busy="false">${destinos.map((d) => renderCardHtml(d, { href: hrefDoDestino(d, cidadeAtual), compartilhamAeroporto: porAeroporto.get((d.aeroporto || '').toUpperCase()) || 0 })).join('')}</div>
     </main>
 
     ${renderOutrasCidadesHtml(cidades, cidadeAtual)}
@@ -543,4 +544,18 @@ function jsonLdSafe(obj) {
         .replace(/</g, '\\u003c')
         .replace(/>/g, '\\u003e')
         .replace(/&/g, '\\u0026');
+}
+
+// Card leva direto à busca de ida e volta no Google Flights, nas datas do
+// preço mostrado. Sem IATA ou datas cai no calendário interno de preços.
+// Espelha hrefDoDestino de public/assets/js/discovery-page.js.
+function hrefDoDestino(d, cidadeAtual) {
+    if (d.aeroporto && d.data_ida && d.data_volta) {
+        return buildGoogleFlightsUrl(cidadeAtual.codigo, d.aeroporto, d.data_ida, d.data_volta);
+    }
+    const params = new URLSearchParams({ origem: cidadeAtual.codigo, destino: d.aeroporto || d.nome, nome: d.nome });
+    if (d.duracao_ideal?.ideal) params.set('duracao', d.duracao_ideal.ideal);
+    if (d.data_ida) params.set('data_ida', d.data_ida);
+    if (d.data_volta) params.set('data_volta', d.data_volta);
+    return `/voos-baratos?${params.toString()}`;
 }

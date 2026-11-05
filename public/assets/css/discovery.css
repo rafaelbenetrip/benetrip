@@ -812,6 +812,13 @@ body {
     cursor: pointer;
 }
 
+/* Card como link real pra busca de voos (herda o visual do <article>) */
+a.dest-card {
+    display: block;
+    text-decoration: none;
+    color: inherit;
+}
+
 .dest-card:hover {
     box-shadow: var(--shadow-hover);
     transform: translateY(-2px);
